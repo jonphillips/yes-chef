@@ -110,23 +110,26 @@ This violates three settled rules at once:
 - **"Structure where useful"** (DATA_MODEL §2.2): the parsed model exists; the
   editor can't see or keep it.
 
-**Resolved (2026-06-16): edit structured rows, not text blobs — see
-[ADR-0004](../decisions/ADR-0004-structured-recipe-editor.md).** The blob
-shape is replaced, not patched. **Required:**
+**Resolved (2026-06-16): accept text-entry UX for MVP, reject destructive blob
+persistence — see
+[ADR-0004](../decisions/ADR-0004-structured-recipe-editor.md).** Text areas are
+an input affordance, but persistence is scoped and non-destructive. **Required:**
 
-1. Edit ingredient lines, instruction steps, and notes as real rows that keep
-   their UUIDs across edits. Save updates/inserts/deletes **by identity** — no
-   wholesale delete+reinsert, so child-row UUIDs stay stable (kills the sync
-   churn).
-2. Preserve `noteType` and section structure through an edit; never collapse
-   multiple sections to one or many note types to a single `general` note.
+1. Within the editor-owned scope, preserve stable UUIDs for unchanged ingredient
+   lines, instruction steps, general notes, and tag/category joins. No wholesale
+   delete+reinsert saves.
+2. Preserve `noteType` and section structure outside the editor-owned scope; the
+   MVP text editor owns only the first/default ingredient section, first/default
+   instruction section, and general notes.
 3. Preserve parsed fields; the parser only fills what it can improve, never
    overwrites a field a prior parse/import or the user already set.
 4. Keep the pure functional core (`IngredientParser` etc.) — it feeds row
-   creation for pasted-in new content, it does not re-parse-and-replace on save.
+   creation/reconciliation for pasted-in content, it does not re-parse-and-replace
+   the entire recipe on save.
 
-Free-text paste stays as an *input affordance* for new content; it just produces
-structured rows. See ADR-0004 for the full rationale and rejected alternatives.
+Free-text paste stays as an *input affordance* for MVP content. See ADR-0004 for
+the full rationale, accepted scope, and remaining limitation: a future row-aware
+editor is needed to preserve UUIDs when an existing line's text changes.
 
 ---
 

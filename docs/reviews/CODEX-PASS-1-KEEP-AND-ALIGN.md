@@ -85,12 +85,10 @@ Codex's editor is text-blob in / re-parse out. CHANGES P0-2 flags the destructiv
 parse on save — may be the right MVP entry experience. DATA_MODEL as written
 implies a more structured editor.
 
-**Decision to make:** do we (a) accept blob-entry UX for MVP but fix the
-persistence to be identity-preserving and non-lossy, or (b) move to a more
-structured editor sooner? Either way the current code contradicts DATA_MODEL, so
-this needs a written answer.
-→ This is an **app decision-log entry** (app-specific product/UX call), and may
-add a sentence to DATA_MODEL §27/§35 about the editing model.
+**Resolved in ADR-0004:** accept text-entry UX for MVP, but make persistence
+scoped and non-destructive. The MVP text fields own only the first/default
+ingredient section, first/default instruction section, and general notes; extra
+sections and typed notes are preserved until the UI can edit them directly.
 
 ### A-3. Reaffirm enums-over-strings for persisted columns, with the SQLiteData recipe
 Codex reached for `String` columns (CHANGES P1-3). Two agents diverging here
