@@ -1,0 +1,48 @@
+name: YesChef
+options:
+  bundleIdPrefix: com.jon
+  deploymentTarget:
+    iOS: "27.0"
+packages:
+  YesChefPackage:
+    path: YesChefPackage
+  CasePaths:
+    url: https://github.com/pointfreeco/swift-case-paths
+    from: 1.0.0
+  SwiftNavigation:
+    url: https://github.com/pointfreeco/swift-navigation
+    from: 2.0.0
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+targets:
+  YesChef:
+    type: application
+    platform: iOS
+    deploymentTarget: "27.0"
+    sources:
+      - path: YesChefApp
+    dependencies:
+      - package: YesChefPackage
+        product: YesChefCore
+      - package: CasePaths
+        product: CasePaths
+      - package: SwiftNavigation
+        product: SwiftUINavigation
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jon.yeschef
+        PRODUCT_NAME: YesChef
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Yes Chef
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+schemes:
+  YesChef:
+    build:
+      targets:
+        YesChef: all
+    run:
+      config: Debug

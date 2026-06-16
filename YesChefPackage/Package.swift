@@ -1,0 +1,36 @@
+// swift-tools-version: 6.4
+
+import PackageDescription
+
+let package = Package(
+  name: "YesChefPackage",
+  platforms: [
+    .iOS(.v27),
+    .macOS(.v26),
+  ],
+  products: [
+    .library(name: "YesChefCore", targets: ["YesChefCore"]),
+  ],
+  dependencies: [
+    .package(url: "https://github.com/pointfreeco/sqlite-data", from: "1.0.0"),
+    .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.0.0"),
+    .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
+  ],
+  targets: [
+    .target(
+      name: "YesChefCore",
+      dependencies: [
+        .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "SQLiteData", package: "sqlite-data"),
+      ]
+    ),
+    .testTarget(
+      name: "YesChefCoreTests",
+      dependencies: [
+        "YesChefCore",
+        .product(name: "CustomDump", package: "swift-custom-dump"),
+        .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
+      ]
+    ),
+  ]
+)
