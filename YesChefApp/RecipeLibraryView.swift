@@ -2,63 +2,222 @@ import SwiftUI
 import SwiftUINavigation
 import YesChefCore
 
-struct RecipeLibraryView: View {
-  @State private var model = RecipeLibraryModel()
+struct AppContainer: View {
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+  @State private var recipeModel = RecipeLibraryModel()
+  @State private var selectedSection: AppSection? = .recipes
 
   var body: some View {
-    @Bindable var model = model
+    @Bindable var recipeModel = recipeModel
 
-    NavigationSplitView {
-      List(selection: $model.selectedRecipeID) {
-        ForEach(model.visibleRecipes) { recipe in
-          RecipeListRow(recipe: recipe)
-            .tag(recipe.id)
+    Group {
+      if horizontalSizeClass == .compact {
+        TabView(selection: $selectedSection) {
+          RecipesStack(model: recipeModel)
+            .tabItem { AppSection.recipes.label }
+            .tag(AppSection.recipes as AppSection?)
+          NavigationStack {
+            AppPlaceholderView(section: .mealCalendar)
+          }
+            .tabItem { AppSection.mealCalendar.label }
+            .tag(AppSection.mealCalendar as AppSection?)
+          NavigationStack {
+            AppPlaceholderView(section: .menus)
+          }
+            .tabItem { AppSection.menus.label }
+            .tag(AppSection.menus as AppSection?)
         }
-      }
-      .navigationTitle("Recipes")
-      .searchable(text: $model.searchText, prompt: "Search recipes")
-      .toolbar {
-        ToolbarItem(placement: .primaryAction) {
-          Button {
-            model.addRecipeButtonTapped()
-          } label: {
-            Label("Add Recipe", systemImage: "plus")
+      } else {
+        NavigationSplitView {
+          List(AppSection.allCases, selection: $selectedSection) { section in
+            section.label
+              .tag(section)
+          }
+          .navigationTitle("Yes Chef")
+        } content: {
+          switch selectedSection ?? .recipes {
+          case .recipes:
+            RecipeListView(model: recipeModel, style: .selection)
+          case .mealCalendar:
+            AppPlaceholderView(section: .mealCalendar)
+          case .menus:
+            AppPlaceholderView(section: .menus)
+          }
+        } detail: {
+          switch selectedSection ?? .recipes {
+          case .recipes:
+            RecipeDetailColumn(model: recipeModel)
+          case .mealCalendar:
+            AppPlaceholderView(section: .mealCalendar)
+          case .menus:
+            AppPlaceholderView(section: .menus)
           }
         }
       }
-    } detail: {
-      if let recipe = model.selectedRecipe {
-        RecipeDetailView(recipeID: recipe.id, libraryModel: model)
-          .id(recipe.id)
-      } else {
-        ContentUnavailableView("Select a Recipe", systemImage: "fork.knife")
-      }
     }
-    .sheet(isPresented: $model.destination.addRecipe) {
+    .sheet(isPresented: $recipeModel.destination.addRecipe) {
       NavigationStack {
         RecipeEditorView(model: RecipeEditorModel(recipeID: nil))
       }
     }
-    .sheet(item: $model.destination.editRecipe, id: \.self) { (recipeID: Recipe.ID) in
+    .sheet(item: $recipeModel.destination.editRecipe, id: \.self) { (recipeID: Recipe.ID) in
       NavigationStack {
         RecipeEditorView(model: RecipeEditorModel(recipeID: recipeID))
       }
     }
-    .sheet(item: $model.destination.cookingMode, id: \.self) { (recipeID: Recipe.ID) in
+    .sheet(item: $recipeModel.destination.cookingMode, id: \.self) { (recipeID: Recipe.ID) in
       NavigationStack {
         CookingModeView(model: CookingModeModel(recipeID: recipeID))
       }
     }
-    .sheet(item: $model.destination.markCooked, id: \.self) { (recipeID: Recipe.ID) in
+    .sheet(item: $recipeModel.destination.originalSnapshot, id: \.self) { (recipeID: Recipe.ID) in
       NavigationStack {
-        MarkCookedView(model: MarkCookedModel(recipeID: recipeID))
+        OriginalSnapshotView(recipe: recipeModel.recipes.first { $0.id == recipeID })
       }
     }
-    .sheet(item: $model.destination.originalSnapshot, id: \.self) { (recipeID: Recipe.ID) in
-      NavigationStack {
-        OriginalSnapshotView(recipe: model.recipes.first { $0.id == recipeID })
+    .confirmationDialog(
+      "Delete Recipe?",
+      item: $recipeModel.destination.deleteRecipe,
+      titleVisibility: .visible
+    ) { recipeID in
+      Button("Delete Recipe", role: .destructive) {
+        recipeModel.confirmDeleteRecipeButtonTapped(recipeID: recipeID)
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: { recipeID in
+      Text("Delete \(recipeModel.title(for: recipeID)) from your recipe library?")
+    }
+    .alert("Could Not Delete Recipe", isPresented: $recipeModel.isShowingError) {
+      Button("OK") {}
+    } message: {
+      Text(recipeModel.errorMessage ?? "")
+    }
+  }
+
+}
+
+private enum AppSection: String, CaseIterable, Identifiable {
+  case recipes
+  case mealCalendar
+  case menus
+
+  var id: Self { self }
+
+  @ViewBuilder var label: some View {
+    Label(title, systemImage: systemImage)
+  }
+
+  var title: String {
+    switch self {
+    case .recipes: "Recipes"
+    case .mealCalendar: "Meal Calendar"
+    case .menus: "Menus"
+    }
+  }
+
+  var systemImage: String {
+    switch self {
+    case .recipes: "book.closed"
+    case .mealCalendar: "calendar"
+    case .menus: "menucard"
+    }
+  }
+}
+
+private struct RecipesStack: View {
+  let model: RecipeLibraryModel
+
+  var body: some View {
+    NavigationStack {
+      RecipeListView(model: model, style: .navigation)
+        .navigationDestination(for: Recipe.ID.self) { recipeID in
+          RecipeDetailView(recipeID: recipeID, libraryModel: model)
+            .id(recipeID)
+        }
+    }
+  }
+}
+
+private struct RecipeDetailColumn: View {
+  let model: RecipeLibraryModel
+
+  var body: some View {
+    if let recipe = model.selectedRecipe {
+      RecipeDetailView(recipeID: recipe.id, libraryModel: model)
+        .id(recipe.id)
+    } else {
+      ContentUnavailableView("Select a Recipe", systemImage: "fork.knife")
+    }
+  }
+}
+
+private struct RecipeListView: View {
+  enum Style {
+    case navigation
+    case selection
+  }
+
+  let model: RecipeLibraryModel
+  let style: Style
+
+  var body: some View {
+    @Bindable var model = model
+
+    Group {
+      switch style {
+      case .navigation:
+        List {
+          ForEach(model.visibleRecipes) { recipe in
+            NavigationLink(value: recipe.id) {
+              RecipeListRow(recipe: recipe)
+            }
+            .swipeActions {
+              Button {
+                model.deleteButtonTapped(recipeID: recipe.id)
+              } label: {
+                Label("Delete", systemImage: "trash")
+              }
+              .tint(.red)
+            }
+          }
+        }
+      case .selection:
+        List(selection: $model.selectedRecipeID) {
+          ForEach(model.visibleRecipes) { recipe in
+            RecipeListRow(recipe: recipe)
+              .tag(recipe.id)
+              .swipeActions {
+                Button {
+                  model.deleteButtonTapped(recipeID: recipe.id)
+                } label: {
+                  Label("Delete", systemImage: "trash")
+                }
+                .tint(.red)
+              }
+          }
+        }
       }
     }
+    .navigationTitle("Recipes")
+    .searchable(text: $model.searchText, prompt: "Search recipes")
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button {
+          model.addRecipeButtonTapped()
+        } label: {
+          Label("Add Recipe", systemImage: "plus")
+        }
+      }
+    }
+  }
+}
+
+private struct AppPlaceholderView: View {
+  let section: AppSection
+
+  var body: some View {
+    ContentUnavailableView(section.title, systemImage: section.systemImage)
+      .navigationTitle(section.title)
   }
 }
 
@@ -82,9 +241,6 @@ private struct RecipeListRow: View {
         } else if let summary = recipe.summary {
           Text(summary)
         }
-        if recipe.timesCooked > 0 {
-          Text("Cooked \(recipe.timesCooked)x")
-        }
       }
       .font(.caption)
       .foregroundStyle(.secondary)
@@ -99,5 +255,5 @@ private struct RecipeListRow: View {
     try! $0.bootstrapDatabase()
     try! $0.seedSampleDataIfNeeded()
   }
-  RecipeLibraryView()
+  AppContainer()
 }

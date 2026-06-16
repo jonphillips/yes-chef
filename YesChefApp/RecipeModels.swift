@@ -11,14 +11,20 @@ final class RecipeLibraryModel {
     case addRecipe
     case editRecipe(Recipe.ID)
     case cookingMode(Recipe.ID)
-    case markCooked(Recipe.ID)
     case originalSnapshot(Recipe.ID)
+    case deleteRecipe(Recipe.ID)
   }
 
   @ObservationIgnored
-  @FetchAll(animation: .default) var recipes: [Recipe]
+  @Dependency(\.date.now) private var now
+  @ObservationIgnored
+  @Dependency(\.defaultDatabase) private var database
+  @ObservationIgnored
+  @FetchAll var recipes: [Recipe]
 
   var destination: Destination?
+  var errorMessage: String?
+  var isShowingError = false
   var searchText = ""
   var selectedRecipeID: Recipe.ID?
 
@@ -54,24 +60,52 @@ final class RecipeLibraryModel {
     destination = .cookingMode(recipeID)
   }
 
-  func markCookedButtonTapped(recipeID: Recipe.ID) {
-    destination = .markCooked(recipeID)
-  }
-
   func originalSnapshotButtonTapped(recipeID: Recipe.ID) {
     destination = .originalSnapshot(recipeID)
+  }
+
+  func deleteButtonTapped(recipeID: Recipe.ID) {
+    destination = .deleteRecipe(recipeID)
+  }
+
+  func confirmDeleteRecipeButtonTapped(recipeID: Recipe.ID) {
+    destination = nil
+    if selectedRecipeID == recipeID {
+      selectedRecipeID = nil
+    }
+
+    do {
+      try database.write { db in
+        try RecipeRepository.archive(recipeID: recipeID, in: db, now: now)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func title(for recipeID: Recipe.ID) -> String {
+    recipes.first { $0.id == recipeID }?.title ?? "this recipe"
   }
 }
 
 @Observable
 @MainActor
 final class RecipeDetailModel {
+  @CasePathable
+  enum Destination {
+    case scaling
+  }
+
   let recipeID: Recipe.ID
 
   @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
 
+  var destination: Destination?
   var scaleFactor = 1.0
+  var scaleWholePart = 1
+  var scaleFraction = ScaleFraction.none
 
   init(recipeID: Recipe.ID) {
     self.recipeID = recipeID
@@ -88,6 +122,150 @@ final class RecipeDetailModel {
 
   var instructionSteps: [InstructionStep] {
     detail?.instructionSteps.sorted { $0.sortOrder < $1.sortOrder } ?? []
+  }
+
+  var visibleNotes: [RecipeNote] {
+    detail?.notes.filter { $0.noteType != .retrospective } ?? []
+  }
+
+  var baseServings: Double? {
+    recipe?.servings
+  }
+
+  var scaledServings: Double? {
+    baseServings.map { $0 * scaleFactor }
+  }
+
+  var scaleSummary: String {
+    let factor = ScaleText.factor(scaleFactor)
+    guard let scaledServings else { return factor }
+    return "\(ScaleText.mixedNumber(scaledServings)) \(ScaleText.servingUnit(scaledServings)) · \(factor)"
+  }
+
+  func scaleButtonTapped() {
+    syncScalePickerFromCurrentScale()
+    destination = .scaling
+  }
+
+  func resetScaleButtonTapped() {
+    scaleFactor = 1
+    syncScalePickerFromCurrentScale()
+  }
+
+  func setScaledServings(_ servings: Double) {
+    guard let baseServings, baseServings > 0 else { return }
+    scaleFactor = servings / baseServings
+  }
+
+  func scalePickerChanged() {
+    let value = Double(scaleWholePart) + scaleFraction.value
+    if baseServings == nil {
+      scaleFactor = value
+    } else {
+      setScaledServings(value)
+    }
+  }
+
+  private func syncScalePickerFromCurrentScale() {
+    let value = scaledServings ?? scaleFactor
+    let selection = ScaleFraction.nearestSelection(to: value)
+    scaleWholePart = selection.whole
+    scaleFraction = selection.fraction
+  }
+}
+
+enum ScaleFraction: String, CaseIterable, Identifiable {
+  case none
+  case oneHalf
+  case oneThird
+  case oneFourth
+  case oneFifth
+  case oneEighth
+  case twoThirds
+  case threeFourths
+
+  var id: Self { self }
+
+  var label: String {
+    switch self {
+    case .none: "-"
+    case .oneHalf: "1/2"
+    case .oneThird: "1/3"
+    case .oneFourth: "1/4"
+    case .oneFifth: "1/5"
+    case .oneEighth: "1/8"
+    case .twoThirds: "2/3"
+    case .threeFourths: "3/4"
+    }
+  }
+
+  var value: Double {
+    switch self {
+    case .none: 0
+    case .oneHalf: 1.0 / 2.0
+    case .oneThird: 1.0 / 3.0
+    case .oneFourth: 1.0 / 4.0
+    case .oneFifth: 1.0 / 5.0
+    case .oneEighth: 1.0 / 8.0
+    case .twoThirds: 2.0 / 3.0
+    case .threeFourths: 3.0 / 4.0
+    }
+  }
+
+  static func nearestSelection(to value: Double) -> (whole: Int, fraction: ScaleFraction) {
+    var bestWhole = 1
+    var bestFraction = ScaleFraction.none
+    var bestDistance = Double.greatestFiniteMagnitude
+
+    for whole in 1...10 {
+      for fraction in ScaleFraction.allCases {
+        let candidate = Double(whole) + fraction.value
+        let distance = abs(candidate - value)
+        if distance < bestDistance {
+          bestWhole = whole
+          bestFraction = fraction
+          bestDistance = distance
+        }
+      }
+    }
+
+    return (bestWhole, bestFraction)
+  }
+}
+
+enum ScaleText {
+  static func factor(_ factor: Double) -> String {
+    if factor == 1 { return "1x" }
+    return "\(number(factor))x"
+  }
+
+  static func number(_ value: Double) -> String {
+    if value.rounded() == value {
+      return "\(Int(value))"
+    }
+    return value.formatted(.number.precision(.fractionLength(0...2)))
+  }
+
+  static func mixedNumber(_ value: Double) -> String {
+    let whole = Int(value.rounded(.down))
+    let fractionValue = value - Double(whole)
+    let fraction = ScaleFraction.allCases
+      .filter { $0 != .none }
+      .min { lhs, rhs in
+        abs(lhs.value - fractionValue) < abs(rhs.value - fractionValue)
+      }
+
+    guard let fraction, abs(fraction.value - fractionValue) < 0.01 else {
+      return number(value)
+    }
+    if whole == 0 {
+      return fraction.label
+    }
+    return "\(whole) \(fraction.label)"
+  }
+
+  static func servingUnit(_ value: Double) -> String {
+    value == 1 ? "serving" : "servings"
   }
 }
 
@@ -178,6 +356,10 @@ final class CookingModeModel {
     return instructionSteps[focusedStepIndex]
   }
 
+  var visibleNotes: [RecipeNote] {
+    detail?.notes.filter { $0.noteType != .retrospective } ?? []
+  }
+
   func detailChanged(_ detail: RecipeDetailData?) {
     guard detail != nil else { return }
     focusedStepIndex = min(focusedStepIndex, max(instructionSteps.count - 1, 0))
@@ -196,46 +378,6 @@ final class CookingModeModel {
       ids.remove(id)
     } else {
       ids.insert(id)
-    }
-  }
-}
-
-@Observable
-@MainActor
-final class MarkCookedModel {
-  let recipeID: Recipe.ID
-
-  @ObservationIgnored
-  @Dependency(\.date.now) private var now
-  @ObservationIgnored
-  @Dependency(\.defaultDatabase) private var database
-  @ObservationIgnored
-  @Dependency(\.uuid) private var uuid
-
-  var noteText = ""
-  var errorMessage: String?
-  var isShowingError = false
-
-  init(recipeID: Recipe.ID) {
-    self.recipeID = recipeID
-  }
-
-  func saveButtonTapped() -> Bool {
-    do {
-      try database.write { db in
-        try RecipeRepository.markCooked(
-          recipeID: recipeID,
-          noteText: noteText,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
-      }
-      return true
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
-      return false
     }
   }
 }

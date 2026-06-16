@@ -357,33 +357,12 @@ public enum RecipeRepository {
     return recipeID
   }
 
-  public static func markCooked(
-    recipeID: Recipe.ID,
-    noteText: String?,
-    in db: Database,
-    now: Date,
-    uuid: () -> UUID
-  ) throws {
-    try #sql("""
-      UPDATE "recipes"
-      SET "lastCookedAt" = \(bind: now),
-          "timesCooked" = "timesCooked" + 1,
-          "dateModified" = \(bind: now)
-      WHERE "id" = \(bind: recipeID)
-      """)
-      .execute(db)
-
-    if let noteText = noteText?.nonEmpty {
-      let note = RecipeNote(
-        id: uuid(),
-        recipeID: recipeID,
-        text: noteText,
-        noteType: .retrospective,
-        dateCreated: now,
-        dateModified: now
-      )
-      try insert(note, in: db)
+  public static func archive(recipeID: Recipe.ID, in db: Database, now: Date) throws {
+    try Recipe.find(recipeID).update {
+      $0.archived = true
+      $0.dateModified = now
     }
+    .execute(db)
   }
 
   private static func upsert(_ recipe: Recipe, in db: Database) throws {

@@ -12,8 +12,7 @@ struct YesChefApp: App {
 
   var body: some Scene {
     WindowGroup {
-      RecipeLibraryView()
+      AppContainer()
     }
   }
 }
-

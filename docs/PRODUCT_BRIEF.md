@@ -222,7 +222,8 @@ The first successful version should allow the user to:
 4. Preserve original source text, URL, and a read-only first-saved snapshot.
 5. Scale ingredient quantities without overwriting the canonical recipe.
 6. Use a cooking-friendly display mode.
-7. Mark a recipe cooked and add a lightweight retrospective note.
+7. Preserve last-cooked fields for the future meal calendar without asking the user
+   to manually mark recipes cooked in the first slice.
 8. Validate the model against a small Paprika export fixture without shipping full import UI.
 9. Trust that data will not be silently corrupted.
 

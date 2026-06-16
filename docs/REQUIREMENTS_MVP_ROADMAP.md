@@ -363,6 +363,7 @@ Requirements:
 - Edit instructions as structured sections.
 - Edit notes.
 - Edit tags/categories.
+- Delete/archive a recipe with confirmation; use `Recipe.archived` as a soft delete.
 - Add/remove/reorder ingredient lines.
 - Add/remove/reorder instruction steps.
 
@@ -375,6 +376,10 @@ Requirements:
 - Display original servings.
 - Allow user to choose new serving count or scale factor.
 - Scale parsed quantities when possible.
+- Defer "change units" until unit normalization exists. When added, conversion must
+  be dimension-safe (for example teaspoons/tablespoons/cups within volume, grams/
+  ounces within weight) and must not imply volume-to-weight conversions without
+  ingredient density data.
 - Leave unparsed ingredient text unchanged or visibly marked.
 - Do not overwrite the canonical recipe unless user explicitly saves the scaled version.
 
@@ -684,6 +689,7 @@ first build.
 - Recipe list.
 - Recipe detail.
 - Recipe edit.
+- Delete/archive recipe with confirmation, implemented as a soft delete.
 - Search.
 - Tags/categories.
 - `Recipe.originalSnapshot` captured for manually-created and imported recipes on
@@ -692,8 +698,10 @@ first build.
   saved.
 - Cooking mode shell: readable typography, ingredient checklist, step focus, keep
   screen awake.
-- Lightweight cooking memory: "mark cooked" updates `lastCookedAt`/`timesCooked` and
-  can create a retrospective `RecipeNote`.
+- Meal-planner-ready cooking memory: keep `lastCookedAt`/`timesCooked` in the
+  schema, but do not expose a manual "mark cooked" or retrospective-note flow in
+  the first slice. The meal calendar will later update/derive last-cooked history
+  from planned meals whose dates have passed.
 - Explicitly excluded: CloudKit sync, production import UI, grocery lists, meal
   planning, recipe transfer, family cookbook, pantry, and AI.
 
@@ -710,6 +718,8 @@ first build.
 ### Milestone 3: Scaling and Cooking Mode Hardening
 
 - Ingredient scaling edge cases.
+- Unit normalization and a "change units" scaling control for compatible units only;
+  canonical recipe text remains unchanged unless explicitly saved.
 - Unparsed/uncertain quantity display.
 - Cooking mode polish.
 - Ingredient checklist persistence if useful.
@@ -728,6 +738,8 @@ first build.
 
 - Calendar/date-based planning.
 - Add recipe to meal.
+- Past dated meal entries update/derive `Recipe.lastCookedAt` and related cooking
+  memory, replacing any manual "mark cooked" workflow.
 - Generate grocery list from plan.
 
 ### Milestone 6: Send a Recipe (Phase 1 transfer)

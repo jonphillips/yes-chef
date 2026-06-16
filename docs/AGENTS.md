@@ -115,6 +115,9 @@ These are now project rules, not preferences:
    not introduce a separate lossy display-only snapshot format.
 7. Add regression tests when a review identifies a data-preservation bug. At a
    minimum, test stable IDs and preservation of out-of-scope structured data.
+8. Codex owns compiler/package verification and should not spend project time on
+   brittle simulator-driving or screenshot automation unless explicitly asked.
+   Jon will do the primary UI testing pass, even when that makes the loop slower.
 
 ## Data Preservation Rules
 
@@ -294,8 +297,10 @@ Build a minimal but real recipe library:
    - View original version, read-only (from the frozen `originalSnapshot`)
    - Basic scaling display
    - Cooking mode shell
-   - Lightweight cooking memory: mark cooked, update `lastCookedAt`/`timesCooked`,
-     and optionally create a retrospective note
+   - Meal-planner-ready cooking memory: keep `lastCookedAt`/`timesCooked` in the
+     schema, but do not expose a manual "mark cooked" or retrospective-note flow
+     in the first slice. The meal calendar will later update/derive last-cooked
+     history from planned meals whose dates have passed.
 
 Do not implement CloudKit sync, recipe transfer (send/Family Cookbook), production
 import UI, grocery list, meal planning, pantry, or AI in the first coding pass unless

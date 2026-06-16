@@ -13,7 +13,6 @@
 		5FF287DEA72793C3CDA1ACD1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7871BB8EDB397A338B979FCD /* Assets.xcassets */; };
 		638EB65557B6EADDD89B33DD /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = F6DB8F903598A87E2AA0443F /* CasePaths */; };
 		754138B487846E702D9E769E /* SwiftUINavigation in Frameworks */ = {isa = PBXBuildFile; productRef = AD2559042536058C97728A19 /* SwiftUINavigation */; };
-		97E63EF9DB445B93901F7547 /* MarkCookedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBE1DF1A0DA7509E2E8822CE /* MarkCookedView.swift */; };
 		A103667583AD5577C2633211 /* OriginalSnapshotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76C7E4899A1093E58F713C2F /* OriginalSnapshotView.swift */; };
 		CB4F5CEA046A10EF5FDE0892 /* RecipeDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CCF32B5108C44892607FF3B /* RecipeDetailView.swift */; };
 		D59746CB074FDFB47B624AA1 /* CookingModeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ACC051A4D7294E6FDE5632A /* CookingModeView.swift */; };
@@ -31,7 +30,6 @@
 		76906E88E579D71619461798 /* RecipeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeEditorView.swift; sourceTree = "<group>"; };
 		76C7E4899A1093E58F713C2F /* OriginalSnapshotView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OriginalSnapshotView.swift; sourceTree = "<group>"; };
 		7871BB8EDB397A338B979FCD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		DBE1DF1A0DA7509E2E8822CE /* MarkCookedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkCookedView.swift; sourceTree = "<group>"; };
 		FC48B146F8E70CD1E9903EBC /* YesChef.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = YesChef.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -79,7 +77,6 @@
 			children = (
 				7871BB8EDB397A338B979FCD /* Assets.xcassets */,
 				1ACC051A4D7294E6FDE5632A /* CookingModeView.swift */,
-				DBE1DF1A0DA7509E2E8822CE /* MarkCookedView.swift */,
 				76C7E4899A1093E58F713C2F /* OriginalSnapshotView.swift */,
 				3CCF32B5108C44892607FF3B /* RecipeDetailView.swift */,
 				76906E88E579D71619461798 /* RecipeEditorView.swift */,
@@ -167,7 +164,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				D59746CB074FDFB47B624AA1 /* CookingModeView.swift in Sources */,
-				97E63EF9DB445B93901F7547 /* MarkCookedView.swift in Sources */,
 				A103667583AD5577C2633211 /* OriginalSnapshotView.swift in Sources */,
 				CB4F5CEA046A10EF5FDE0892 /* RecipeDetailView.swift in Sources */,
 				5A3CE29C1018A68874A977A2 /* RecipeEditorView.swift in Sources */,

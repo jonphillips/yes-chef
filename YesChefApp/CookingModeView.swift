@@ -64,11 +64,11 @@ struct CookingModeView: View {
           }
         }
 
-        if let notes = model.detail?.notes, !notes.isEmpty {
+        if !model.visibleNotes.isEmpty {
           VStack(alignment: .leading, spacing: 10) {
             Text("Notes")
               .font(.title2.bold())
-            ForEach(notes) { note in
+            ForEach(model.visibleNotes) { note in
               Text(note.text)
                 .font(.body)
             }

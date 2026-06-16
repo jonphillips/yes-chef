@@ -105,6 +105,61 @@ struct RecipeCoreTests {
   }
 
   @Test
+  func archiveRecipeMarksRecipeArchivedAndPreservesChildren() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 802_000_000)
+    let archivedAt = now.addingTimeInterval(60)
+    let recipeID = SampleUUIDSequence.uuid(201)
+    let sectionID = SampleUUIDSequence.uuid(202)
+    let lineID = SampleUUIDSequence.uuid(203)
+
+    try database.write { db in
+      try Recipe.insert {
+        Recipe(
+          id: recipeID,
+          title: "Archive Me",
+          dateCreated: now,
+          dateModified: now
+        )
+      }
+      .execute(db)
+      try IngredientSection.insert {
+        IngredientSection(id: sectionID, recipeID: recipeID, sortOrder: 0)
+      }
+      .execute(db)
+      try IngredientLine.insert {
+        IngredientLine(
+          id: lineID,
+          recipeID: recipeID,
+          sectionID: sectionID,
+          originalText: "1 onion",
+          quantity: 1,
+          quantityText: "1",
+          item: "onion",
+          sortOrder: 0,
+          confidence: .medium
+        )
+      }
+      .execute(db)
+
+      try RecipeRepository.archive(recipeID: recipeID, in: db, now: archivedAt)
+
+      let archivedRecipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+      expectNoDifference(archivedRecipe.archived, true)
+      expectNoDifference(archivedRecipe.dateModified, archivedAt)
+
+      let visibleRecipeIDs = try Recipe.fetchAll(db)
+        .filter { !$0.archived }
+        .map(\.id)
+      expectNoDifference(visibleRecipeIDs.contains(recipeID), false)
+
+      let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+      expectNoDifference(detail.ingredientSections.map(\.id), [sectionID])
+      expectNoDifference(detail.ingredientLines.map(\.id), [lineID])
+    }
+  }
+
+  @Test
   func savePreservesUnchangedChildIDsAndNonGeneralNotes() throws {
     @Dependency(\.defaultDatabase) var database
     let now = Date(timeIntervalSinceReferenceDate: 802_000_000)

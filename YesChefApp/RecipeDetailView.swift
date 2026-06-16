@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftUINavigation
 import YesChefCore
 
 struct RecipeDetailView: View {
@@ -19,13 +20,13 @@ struct RecipeDetailView: View {
           header(recipe)
           metadata(recipe)
           if !model.ingredientLines.isEmpty {
-            ingredients(scaleFactor: $model.scaleFactor)
+            ingredients
           }
           if !model.instructionSteps.isEmpty {
             instructions
           }
-          if let notes = model.detail?.notes, !notes.isEmpty {
-            notesView(notes)
+          if !model.visibleNotes.isEmpty {
+            notesView(model.visibleNotes)
           }
         }
         .padding()
@@ -34,14 +35,10 @@ struct RecipeDetailView: View {
         ContentUnavailableView("Recipe Not Found", systemImage: "fork.knife")
       }
     }
-    .navigationTitle(model.recipe?.title ?? "Recipe")
+    .navigationTitle("")
+    .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {
-        Button {
-          libraryModel.markCookedButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("Mark Cooked", systemImage: "checkmark.circle")
-        }
         Button {
           libraryModel.cookButtonTapped(recipeID: model.recipeID)
         } label: {
@@ -51,6 +48,15 @@ struct RecipeDetailView: View {
           libraryModel.editButtonTapped(recipeID: model.recipeID)
         } label: {
           Label("Edit", systemImage: "square.and.pencil")
+        }
+        Menu {
+          Button(role: .destructive) {
+            libraryModel.deleteButtonTapped(recipeID: model.recipeID)
+          } label: {
+            Label("Delete Recipe", systemImage: "trash")
+          }
+        } label: {
+          Label("More", systemImage: "ellipsis.circle")
         }
       }
     }
@@ -86,9 +92,6 @@ struct RecipeDetailView: View {
         if let totalTime = recipe.totalTimeMinutes {
           Label("\(totalTime) min", systemImage: "clock")
         }
-        if recipe.timesCooked > 0 {
-          Label("Cooked \(recipe.timesCooked)x", systemImage: "checkmark")
-        }
       }
       .font(.subheadline)
       .foregroundStyle(.secondary)
@@ -123,20 +126,28 @@ struct RecipeDetailView: View {
     }
   }
 
-  private func ingredients(scaleFactor: Binding<Double>) -> some View {
-    VStack(alignment: .leading, spacing: 12) {
+  private var ingredients: some View {
+    @Bindable var model = model
+
+    return VStack(alignment: .leading, spacing: 12) {
       HStack {
         Text("Ingredients")
           .font(.title2.bold())
         Spacer()
-        Picker("Scale", selection: scaleFactor) {
-          Text("1x").tag(1.0)
-          Text("1.5x").tag(1.5)
-          Text("2x").tag(2.0)
-          Text("3x").tag(3.0)
+        Button {
+          model.scaleButtonTapped()
+        } label: {
+          Label(model.scaleSummary, systemImage: "slider.horizontal.3")
         }
-        .pickerStyle(.segmented)
-        .frame(maxWidth: 260)
+        .buttonStyle(.bordered)
+        .popover(
+          isPresented: $model.destination.scaling,
+          attachmentAnchor: .rect(.bounds),
+          arrowEdge: .top
+        ) {
+          ScalePanel(model: model)
+            .presentationCompactAdaptation(.popover)
+        }
       }
       VStack(alignment: .leading, spacing: 8) {
         ForEach(model.ingredientLines) { line in
@@ -182,6 +193,74 @@ struct RecipeDetailView: View {
     }
   }
 
+}
+
+private struct ScalePanel: View {
+  let model: RecipeDetailModel
+
+  var body: some View {
+    @Bindable var model = model
+
+    VStack(alignment: .leading, spacing: 16) {
+      Label("Scale Ingredients", systemImage: "slider.horizontal.3")
+        .font(.headline)
+
+      if let recipe = model.recipe {
+        LabeledContent("Original", value: recipe.servingsText ?? recipe.yieldText ?? "Unknown")
+          .font(.subheadline)
+      }
+
+      VStack(alignment: .leading, spacing: 8) {
+        Text(model.baseServings == nil ? "Scale" : "Servings")
+          .font(.subheadline.bold())
+
+        HStack(spacing: 0) {
+          Picker("Whole", selection: $model.scaleWholePart) {
+            ForEach(1...10, id: \.self) { whole in
+              Text("\(whole)")
+                .tag(whole)
+            }
+          }
+          .pickerStyle(.wheel)
+          .frame(width: 96, height: 128)
+          .clipped()
+
+          Picker("Fraction", selection: $model.scaleFraction) {
+            ForEach(ScaleFraction.allCases) { fraction in
+              Text(fraction.label)
+                .tag(fraction)
+            }
+          }
+          .pickerStyle(.wheel)
+          .frame(width: 112, height: 128)
+          .clipped()
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .center)
+      .onChange(of: model.scaleWholePart) { _, _ in
+        model.scalePickerChanged()
+      }
+      .onChange(of: model.scaleFraction) { _, _ in
+        model.scalePickerChanged()
+      }
+
+      LabeledContent("Scale", value: ScaleText.factor(model.scaleFactor))
+        .font(.subheadline)
+
+      HStack {
+        LabeledContent("Units", value: "Default")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+        Spacer()
+        Button("Reset") {
+          model.resetScaleButtonTapped()
+        }
+        .disabled(model.scaleFactor == 1)
+      }
+    }
+    .padding()
+    .frame(width: 300)
+  }
 }
 
 private struct WrappingLabels: View {

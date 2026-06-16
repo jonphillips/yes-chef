@@ -698,9 +698,14 @@ Pantry features should eventually support:
 
 But pantry should not become a full inventory-management burden. The app should support light, useful pantry awareness without making the user maintain a grocery warehouse database.
 
-## 15. Cooking History and Retrospectives
+## 15. Cooking History
 
-After cooking, the app should invite lightweight retrospective notes.
+Cooking history should primarily come from the meal calendar: if a recipe is on the
+calendar and the date has passed, the app can treat that as the last time it was
+cooked and update/derive `Recipe.lastCookedAt` from it.
+
+Optional future retrospectives should be designed as meal-planning intelligence, not
+as a manual "mark cooked" requirement in the recipe detail surface.
 
 Questions:
 

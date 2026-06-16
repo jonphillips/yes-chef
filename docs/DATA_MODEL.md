@@ -1790,9 +1790,11 @@ RecipeEquipment
 (A single owner's private library — no Household, Cook, or sharing entities. Recipe
 transfer between people is a separate feature, not part of the core schema. See §2.6.)
 
-The first vertical slice may expose a lightweight "mark cooked" action without adding
-`CookingSession`: update `Recipe.lastCookedAt`/`timesCooked` and optionally create a
-`RecipeNote` with type `retrospective`. Full cooking history remains deferred.
+The first vertical slice keeps `Recipe.lastCookedAt`/`timesCooked` in the schema but
+does not expose a manual "mark cooked" action or retrospective-note flow. The meal
+planner milestone owns cooking history: past dated `MealPlanEntry` records will
+update or derive the last-cooked value. Full `CookingSession` history remains
+deferred.
 
 Defer:
 
