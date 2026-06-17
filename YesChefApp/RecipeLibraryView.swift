@@ -225,8 +225,14 @@ private struct RecipeListView: View {
         }
       }
     }
+    .safeAreaInset(edge: .top, spacing: 0) {
+      if model.hasActiveFilters {
+        RecipeActiveFilterBar(model: model)
+      }
+    }
     .toolbar {
-      ToolbarItem(placement: .primaryAction) {
+      ToolbarItemGroup(placement: .primaryAction) {
+        RecipeListOptionsMenu(model: model)
         Button {
           model.addRecipeButtonTapped()
         } label: {
@@ -243,6 +249,155 @@ private struct RecipeListView: View {
         .disabled(model.isImporting)
       }
     }
+  }
+}
+
+private struct RecipeListOptionsMenu: View {
+  let model: RecipeLibraryModel
+
+  var body: some View {
+    @Bindable var model = model
+
+    Menu {
+      Picker("Sort", selection: $model.sortOrder) {
+        ForEach(RecipeListSort.allCases) { sort in
+          Text(sort.title)
+            .tag(sort)
+        }
+      }
+      Section("Filter") {
+        Toggle("Favorites", isOn: $model.showsFavoritesOnly)
+        Toggle("With Photos", isOn: $model.showsPhotosOnly)
+      }
+      RecipeStringFilterPicker(
+        title: "Category",
+        selection: $model.selectedCategoryName,
+        options: model.categoryFilterOptions
+      )
+      RecipeStringFilterPicker(
+        title: "Tag",
+        selection: $model.selectedTagName,
+        options: model.tagFilterOptions
+      )
+      RecipeStringFilterPicker(
+        title: "Cuisine",
+        selection: $model.selectedCuisine,
+        options: model.cuisineFilterOptions
+      )
+      RecipeStringFilterPicker(
+        title: "Course",
+        selection: $model.selectedCourse,
+        options: model.courseFilterOptions
+      )
+      if model.hasActiveFilters {
+        Section {
+          Button("Clear Filters") {
+            model.clearFiltersButtonTapped()
+          }
+        }
+      }
+    } label: {
+      Label(
+        "Filter and Sort",
+        systemImage: model.hasActiveFilters
+          ? "line.3.horizontal.decrease.circle.fill"
+          : "line.3.horizontal.decrease.circle"
+      )
+    }
+    .disabled(model.isImporting)
+  }
+}
+
+private struct RecipeStringFilterPicker: View {
+  let title: String
+  @Binding var selection: String?
+  let options: [String]
+
+  var body: some View {
+    if !options.isEmpty {
+      Picker(title, selection: $selection) {
+        Text("All")
+          .tag(nil as String?)
+        ForEach(options, id: \.self) { option in
+          Text(option)
+            .tag(option as String?)
+        }
+      }
+    }
+  }
+}
+
+private struct RecipeActiveFilterBar: View {
+  let model: RecipeLibraryModel
+
+  var body: some View {
+    ScrollView(.horizontal, showsIndicators: false) {
+      HStack(spacing: 8) {
+        if model.showsFavoritesOnly {
+          RecipeFilterChip(title: "Favorites", systemImage: "star.fill") {
+            model.showsFavoritesOnly = false
+          }
+        }
+        if model.showsPhotosOnly {
+          RecipeFilterChip(title: "Photos", systemImage: "photo") {
+            model.showsPhotosOnly = false
+          }
+        }
+        if let selectedCategoryName = model.selectedCategoryName {
+          RecipeFilterChip(title: selectedCategoryName, systemImage: "folder") {
+            model.selectedCategoryName = nil
+          }
+        }
+        if let selectedTagName = model.selectedTagName {
+          RecipeFilterChip(title: selectedTagName, systemImage: "tag") {
+            model.selectedTagName = nil
+          }
+        }
+        if let selectedCuisine = model.selectedCuisine {
+          RecipeFilterChip(title: selectedCuisine, systemImage: "globe.americas") {
+            model.selectedCuisine = nil
+          }
+        }
+        if let selectedCourse = model.selectedCourse {
+          RecipeFilterChip(title: selectedCourse, systemImage: "fork.knife") {
+            model.selectedCourse = nil
+          }
+        }
+        Button {
+          model.clearFiltersButtonTapped()
+        } label: {
+          Image(systemName: "xmark.circle.fill")
+            .font(.body)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Clear Filters")
+      }
+      .padding(.horizontal)
+      .padding(.vertical, 8)
+    }
+    .background(.bar)
+  }
+}
+
+private struct RecipeFilterChip: View {
+  let title: String
+  let systemImage: String
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      Label {
+        Text(title)
+          .lineLimit(1)
+      } icon: {
+        Image(systemName: systemImage)
+      }
+      .font(.caption.weight(.semibold))
+      .padding(.horizontal, 10)
+      .padding(.vertical, 6)
+      .background(.quaternary, in: Capsule())
+    }
+    .buttonStyle(.plain)
   }
 }
 

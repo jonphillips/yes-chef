@@ -165,6 +165,8 @@ extension RecipeCoreTests {
       }
       let row = try #require(recipeRows.first { $0.recipe.id == recipeID })
       expectNoDifference(row.thumbnailData != nil, true)
+      expectNoDifference(row.categoryNames, ["Import Fixture"])
+      expectNoDifference(row.tagNames, [])
     }
 
     private static var fixtureURL: URL {

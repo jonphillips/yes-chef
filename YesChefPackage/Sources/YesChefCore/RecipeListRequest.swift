@@ -4,13 +4,26 @@ import SQLiteData
 public struct RecipeListRowData: Identifiable, Equatable, Sendable {
   public var recipe: Recipe
   public var thumbnailData: Data?
+  public var categoryNames: [String]
+  public var tagNames: [String]
 
-  public init(recipe: Recipe, thumbnailData: Data? = nil) {
+  public init(
+    recipe: Recipe,
+    thumbnailData: Data? = nil,
+    categoryNames: [String] = [],
+    tagNames: [String] = []
+  ) {
     self.recipe = recipe
     self.thumbnailData = thumbnailData
+    self.categoryNames = categoryNames
+    self.tagNames = tagNames
   }
 
   public var id: Recipe.ID { recipe.id }
+
+  public var hasPhoto: Bool {
+    thumbnailData != nil
+  }
 }
 
 public struct RecipeListRequest: FetchKeyRequest {
@@ -18,6 +31,24 @@ public struct RecipeListRequest: FetchKeyRequest {
 
   public func fetch(_ db: Database) throws -> [RecipeListRowData] {
     let recipes = try Recipe.fetchAll(db)
+    let categoriesByID = Dictionary(
+      uniqueKeysWithValues: try Category.fetchAll(db).map { ($0.id, $0) }
+    )
+    let tagsByID = Dictionary(
+      uniqueKeysWithValues: try Tag.fetchAll(db).map { ($0.id, $0) }
+    )
+    let categoryNamesByRecipeID = Dictionary(grouping: try RecipeCategory.fetchAll(db), by: \.recipeID)
+      .mapValues { recipeCategories in
+        recipeCategories
+          .compactMap { categoriesByID[$0.categoryID]?.name }
+          .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+      }
+    let tagNamesByRecipeID = Dictionary(grouping: try RecipeTag.fetchAll(db), by: \.recipeID)
+      .mapValues { recipeTags in
+        recipeTags
+          .sorted { $0.sortOrder < $1.sortOrder }
+          .compactMap { tagsByID[$0.tagID]?.name }
+      }
     let photoRows = try RecipePhoto
       .select {
         RecipeListPhotoRow.Columns(
@@ -46,7 +77,9 @@ public struct RecipeListRequest: FetchKeyRequest {
     return recipes.map { recipe in
       RecipeListRowData(
         recipe: recipe,
-        thumbnailData: thumbnailsByRecipeID[recipe.id]?.listImageData
+        thumbnailData: thumbnailsByRecipeID[recipe.id]?.listImageData,
+        categoryNames: categoryNamesByRecipeID[recipe.id] ?? [],
+        tagNames: tagNamesByRecipeID[recipe.id] ?? []
       )
     }
   }

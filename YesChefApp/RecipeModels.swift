@@ -32,26 +32,54 @@ final class RecipeLibraryModel {
   var isPresentingPaprikaImporter = false
   var searchText = ""
   var selectedRecipeID: Recipe.ID?
+  var sortOrder = RecipeListSort.title
+  var showsFavoritesOnly = false
+  var showsPhotosOnly = false
+  var selectedCategoryName: String?
+  var selectedTagName: String?
+  var selectedCuisine: String?
+  var selectedCourse: String?
 
   var visibleRecipeRows: [RecipeListRowData] {
-    recipeRows
-      .filter { !$0.recipe.archived }
+    unarchivedRecipeRows
       .filter { row in
-        let recipe = row.recipe
-        guard !searchText.isEmpty else { return true }
-        return recipe.title.localizedCaseInsensitiveContains(searchText)
-          || (recipe.subtitle?.localizedCaseInsensitiveContains(searchText) ?? false)
-          || (recipe.summary?.localizedCaseInsensitiveContains(searchText) ?? false)
-          || (recipe.cuisine?.localizedCaseInsensitiveContains(searchText) ?? false)
-          || (recipe.course?.localizedCaseInsensitiveContains(searchText) ?? false)
+        matchesSearch(row)
+          && matchesFilters(row)
       }
-      .sorted { lhs, rhs in
-        lhs.recipe.title.localizedStandardCompare(rhs.recipe.title) == .orderedAscending
-      }
+      .sorted(by: areInIncreasingOrder)
+  }
+
+  var hasActiveFilters: Bool {
+    showsFavoritesOnly
+      || showsPhotosOnly
+      || selectedCategoryName != nil
+      || selectedTagName != nil
+      || selectedCuisine != nil
+      || selectedCourse != nil
+  }
+
+  var categoryFilterOptions: [String] {
+    distinctOptions(unarchivedRecipeRows.flatMap(\.categoryNames))
+  }
+
+  var tagFilterOptions: [String] {
+    distinctOptions(unarchivedRecipeRows.flatMap(\.tagNames))
+  }
+
+  var cuisineFilterOptions: [String] {
+    distinctOptions(unarchivedRecipeRows.compactMap(\.recipe.cuisine))
+  }
+
+  var courseFilterOptions: [String] {
+    distinctOptions(unarchivedRecipeRows.compactMap(\.recipe.course))
   }
 
   var selectedRecipe: Recipe? {
     recipeRows.first { $0.recipe.id == selectedRecipeID }?.recipe
+  }
+
+  private var unarchivedRecipeRows: [RecipeListRowData] {
+    recipeRows.filter { !$0.recipe.archived }
   }
 
   func addRecipeButtonTapped() {
@@ -125,6 +153,15 @@ final class RecipeLibraryModel {
     destination = .deleteRecipe(recipeID)
   }
 
+  func clearFiltersButtonTapped() {
+    showsFavoritesOnly = false
+    showsPhotosOnly = false
+    selectedCategoryName = nil
+    selectedTagName = nil
+    selectedCuisine = nil
+    selectedCourse = nil
+  }
+
   func confirmDeleteRecipeButtonTapped(recipeID: Recipe.ID) {
     destination = nil
     if selectedRecipeID == recipeID {
@@ -143,6 +180,136 @@ final class RecipeLibraryModel {
 
   func title(for recipeID: Recipe.ID) -> String {
     recipeRows.first { $0.recipe.id == recipeID }?.recipe.title ?? "this recipe"
+  }
+
+  private func matchesSearch(_ row: RecipeListRowData) -> Bool {
+    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !query.isEmpty else { return true }
+    let recipe = row.recipe
+    return recipe.title.localizedCaseInsensitiveContains(query)
+      || (recipe.subtitle?.localizedCaseInsensitiveContains(query) ?? false)
+      || (recipe.summary?.localizedCaseInsensitiveContains(query) ?? false)
+      || (recipe.cuisine?.localizedCaseInsensitiveContains(query) ?? false)
+      || (recipe.course?.localizedCaseInsensitiveContains(query) ?? false)
+      || row.categoryNames.contains { $0.localizedCaseInsensitiveContains(query) }
+      || row.tagNames.contains { $0.localizedCaseInsensitiveContains(query) }
+  }
+
+  private func matchesFilters(_ row: RecipeListRowData) -> Bool {
+    let recipe = row.recipe
+    if showsFavoritesOnly && !recipe.favorite { return false }
+    if showsPhotosOnly && !row.hasPhoto { return false }
+    if let selectedCategoryName, !row.categoryNames.contains(selectedCategoryName) {
+      return false
+    }
+    if let selectedTagName, !row.tagNames.contains(selectedTagName) {
+      return false
+    }
+    if let selectedCuisine, recipe.cuisine != selectedCuisine {
+      return false
+    }
+    if let selectedCourse, recipe.course != selectedCourse {
+      return false
+    }
+    return true
+  }
+
+  private func areInIncreasingOrder(_ lhs: RecipeListRowData, _ rhs: RecipeListRowData) -> Bool {
+    switch sortOrder {
+    case .title:
+      titleSort(lhs.recipe, rhs.recipe)
+    case .newest:
+      descendingDateSort(lhs.recipe.dateCreated, rhs.recipe.dateCreated, lhs.recipe, rhs.recipe)
+    case .recentlyModified:
+      descendingDateSort(lhs.recipe.dateModified, rhs.recipe.dateModified, lhs.recipe, rhs.recipe)
+    case .cookTime:
+      optionalIntSort(lhs.recipe.listCookTimeMinutes, rhs.recipe.listCookTimeMinutes, lhs.recipe, rhs.recipe)
+    case .recentlyCooked:
+      optionalDateSort(lhs.recipe.lastCookedAt, rhs.recipe.lastCookedAt, lhs.recipe, rhs.recipe)
+    }
+  }
+
+  private func titleSort(_ lhs: Recipe, _ rhs: Recipe) -> Bool {
+    lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+  }
+
+  private func descendingDateSort(_ lhsDate: Date, _ rhsDate: Date, _ lhs: Recipe, _ rhs: Recipe) -> Bool {
+    if lhsDate != rhsDate {
+      return lhsDate > rhsDate
+    }
+    return titleSort(lhs, rhs)
+  }
+
+  private func optionalDateSort(
+    _ lhsDate: Date?,
+    _ rhsDate: Date?,
+    _ lhs: Recipe,
+    _ rhs: Recipe
+  ) -> Bool {
+    switch (lhsDate, rhsDate) {
+    case let (lhsDate?, rhsDate?) where lhsDate != rhsDate:
+      lhsDate > rhsDate
+    case (nil, nil), (_?, _?):
+      titleSort(lhs, rhs)
+    case (_?, nil):
+      true
+    case (nil, _?):
+      false
+    }
+  }
+
+  private func optionalIntSort(
+    _ lhsValue: Int?,
+    _ rhsValue: Int?,
+    _ lhs: Recipe,
+    _ rhs: Recipe
+  ) -> Bool {
+    switch (lhsValue, rhsValue) {
+    case let (lhsValue?, rhsValue?) where lhsValue != rhsValue:
+      lhsValue < rhsValue
+    case (nil, nil), (_?, _?):
+      titleSort(lhs, rhs)
+    case (_?, nil):
+      true
+    case (nil, _?):
+      false
+    }
+  }
+
+  private func distinctOptions(_ values: [String]) -> [String] {
+    Array(Set(values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }))
+      .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+  }
+}
+
+enum RecipeListSort: String, CaseIterable, Identifiable, Sendable {
+  case title
+  case newest
+  case recentlyModified
+  case cookTime
+  case recentlyCooked
+
+  var id: Self { self }
+
+  var title: String {
+    switch self {
+    case .title: "Title"
+    case .newest: "Newest"
+    case .recentlyModified: "Recently Modified"
+    case .cookTime: "Cook Time"
+    case .recentlyCooked: "Last Cooked"
+    }
+  }
+}
+
+private extension Recipe {
+  var listCookTimeMinutes: Int? {
+    if let totalTimeMinutes {
+      return totalTimeMinutes
+    }
+    let parts = [prepTimeMinutes, cookTimeMinutes, activeTimeMinutes].compactMap { $0 }
+    guard !parts.isEmpty else { return nil }
+    return parts.reduce(0, +)
   }
 }
 
