@@ -299,6 +299,15 @@ public struct RecipePhoto: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID
   public var recipeID: Recipe.ID
   public var imageDataReference: String
+  public var displayData: Data?
+  public var thumbnailData: Data?
+  public var mediaType: String?
+  public var pixelWidth: Int?
+  public var pixelHeight: Int?
+  public var originalSourcePath: String?
+  public var sourceURL: String?
+  public var checksum: String?
+  public var kind: RecipePhotoKind
   public var caption: String?
   public var source: PhotoSource
   public var sortOrder: Int
@@ -308,6 +317,15 @@ public struct RecipePhoto: Codable, Identifiable, Equatable, Sendable {
     id: UUID,
     recipeID: Recipe.ID,
     imageDataReference: String,
+    displayData: Data? = nil,
+    thumbnailData: Data? = nil,
+    mediaType: String? = nil,
+    pixelWidth: Int? = nil,
+    pixelHeight: Int? = nil,
+    originalSourcePath: String? = nil,
+    sourceURL: String? = nil,
+    checksum: String? = nil,
+    kind: RecipePhotoKind = .gallery,
     caption: String? = nil,
     source: PhotoSource = .user,
     sortOrder: Int,
@@ -316,11 +334,26 @@ public struct RecipePhoto: Codable, Identifiable, Equatable, Sendable {
     self.id = id
     self.recipeID = recipeID
     self.imageDataReference = imageDataReference
+    self.displayData = displayData
+    self.thumbnailData = thumbnailData
+    self.mediaType = mediaType
+    self.pixelWidth = pixelWidth
+    self.pixelHeight = pixelHeight
+    self.originalSourcePath = originalSourcePath
+    self.sourceURL = sourceURL
+    self.checksum = checksum
+    self.kind = kind
     self.caption = caption
     self.source = source
     self.sortOrder = sortOrder
     self.dateCreated = dateCreated
   }
+}
+
+public enum RecipePhotoKind: String, Codable, QueryBindable, QueryDecodable, Sendable {
+  case hero
+  case gallery
+  case referenceDocument
 }
 
 public enum PhotoSource: String, Codable, QueryBindable, QueryDecodable, Sendable {

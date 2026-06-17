@@ -1,5 +1,7 @@
 import SwiftUI
 import SwiftUINavigation
+import UIKit
+import UniformTypeIdentifiers
 import YesChefCore
 
 struct AppContainer: View {
@@ -72,7 +74,7 @@ struct AppContainer: View {
     }
     .sheet(item: $recipeModel.destination.originalSnapshot, id: \.self) { (recipeID: Recipe.ID) in
       NavigationStack {
-        OriginalSnapshotView(recipe: recipeModel.recipes.first { $0.id == recipeID })
+        OriginalSnapshotView(recipe: recipeModel.recipeRows.first { $0.recipe.id == recipeID }?.recipe)
       }
     }
     .confirmationDialog(
@@ -87,7 +89,12 @@ struct AppContainer: View {
     } message: { recipeID in
       Text("Delete \(recipeModel.title(for: recipeID)) from your recipe library?")
     }
-    .alert("Could Not Delete Recipe", isPresented: $recipeModel.isShowingError) {
+    .alert("Import Complete", item: $recipeModel.destination.importSummary) { _ in
+      Button("OK") {}
+    } message: { summary in
+      Text(summary.message)
+    }
+    .alert("Something Went Wrong", isPresented: $recipeModel.isShowingError) {
       Button("OK") {}
     } message: {
       Text(recipeModel.errorMessage ?? "")
@@ -167,13 +174,13 @@ private struct RecipeListView: View {
       switch style {
       case .navigation:
         List {
-          ForEach(model.visibleRecipes) { recipe in
-            NavigationLink(value: recipe.id) {
-              RecipeListRow(recipe: recipe)
+          ForEach(model.visibleRecipeRows) { row in
+            NavigationLink(value: row.recipe.id) {
+              RecipeListRow(row: row)
             }
             .swipeActions {
               Button {
-                model.deleteButtonTapped(recipeID: recipe.id)
+                model.deleteButtonTapped(recipeID: row.recipe.id)
               } label: {
                 Label("Delete", systemImage: "trash")
               }
@@ -183,12 +190,12 @@ private struct RecipeListView: View {
         }
       case .selection:
         List(selection: $model.selectedRecipeID) {
-          ForEach(model.visibleRecipes) { recipe in
-            RecipeListRow(recipe: recipe)
-              .tag(recipe.id)
+          ForEach(model.visibleRecipeRows) { row in
+            RecipeListRow(row: row)
+              .tag(row.recipe.id)
               .swipeActions {
                 Button {
-                  model.deleteButtonTapped(recipeID: recipe.id)
+                  model.deleteButtonTapped(recipeID: row.recipe.id)
                 } label: {
                   Label("Delete", systemImage: "trash")
                 }
@@ -200,6 +207,24 @@ private struct RecipeListView: View {
     }
     .navigationTitle("Recipes")
     .searchable(text: $model.searchText, prompt: "Search recipes")
+    .fileImporter(
+      isPresented: $model.isPresentingPaprikaImporter,
+      allowedContentTypes: [.zip]
+    ) { result in
+      Task {
+        await model.paprikaExportSelected(result)
+      }
+    }
+    .overlay {
+      if model.isImporting {
+        ZStack {
+          Rectangle()
+            .fill(.background.opacity(0.65))
+          ProgressView("Importing")
+            .controlSize(.large)
+        }
+      }
+    }
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Button {
@@ -207,6 +232,15 @@ private struct RecipeListView: View {
         } label: {
           Label("Add Recipe", systemImage: "plus")
         }
+        .disabled(model.isImporting)
+      }
+      ToolbarItem(placement: .secondaryAction) {
+        Button {
+          model.importPaprikaExportButtonTapped()
+        } label: {
+          Label("Import Paprika Export", systemImage: "square.and.arrow.down")
+        }
+        .disabled(model.isImporting)
       }
     }
   }
@@ -222,31 +256,59 @@ private struct AppPlaceholderView: View {
 }
 
 private struct RecipeListRow: View {
-  let recipe: Recipe
+  let row: RecipeListRowData
+
+  private var recipe: Recipe { row.recipe }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      HStack(spacing: 6) {
-        Text(recipe.title)
-          .font(.headline)
-        if recipe.favorite {
-          Image(systemName: "star.fill")
-            .font(.caption)
-            .foregroundStyle(.yellow)
+    HStack(spacing: 12) {
+      RecipeListThumbnail(data: row.thumbnailData)
+
+      VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 6) {
+          Text(recipe.title)
+            .font(.headline)
+          if recipe.favorite {
+            Image(systemName: "star.fill")
+              .font(.caption)
+              .foregroundStyle(.yellow)
+          }
         }
-      }
-      HStack(spacing: 6) {
-        if let subtitle = recipe.subtitle {
-          Text(subtitle)
-        } else if let summary = recipe.summary {
-          Text(summary)
+        HStack(spacing: 6) {
+          if let subtitle = recipe.subtitle {
+            Text(subtitle)
+          } else if let summary = recipe.summary {
+            Text(summary)
+          }
         }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
       }
-      .font(.caption)
-      .foregroundStyle(.secondary)
-      .lineLimit(1)
     }
     .padding(.vertical, 4)
+  }
+}
+
+private struct RecipeListThumbnail: View {
+  let data: Data?
+
+  var body: some View {
+    ZStack {
+      if let data, let image = UIImage(data: data) {
+        Image(uiImage: image)
+          .resizable()
+          .scaledToFill()
+      } else {
+        Image(systemName: "photo")
+          .font(.body)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .frame(width: 52, height: 52)
+    .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+    .clipShape(RoundedRectangle(cornerRadius: 8))
+    .accessibilityHidden(true)
   }
 }
 

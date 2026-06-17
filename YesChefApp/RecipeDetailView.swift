@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftUINavigation
+import UIKit
 import YesChefCore
 
 struct RecipeDetailView: View {
@@ -18,6 +19,9 @@ struct RecipeDetailView: View {
       if let recipe = model.recipe {
         VStack(alignment: .leading, spacing: 24) {
           header(recipe)
+          if !model.displayablePhotos.isEmpty {
+            RecipePhotoGallery(photos: model.displayablePhotos)
+          }
           metadata(recipe)
           if !model.ingredientLines.isEmpty {
             ingredients
@@ -193,6 +197,138 @@ struct RecipeDetailView: View {
     }
   }
 
+}
+
+private struct RecipePhotoGallery: View {
+  let photos: [RecipePhoto]
+  @State private var selectedPhotoID: RecipePhoto.ID?
+
+  private var selectedPhoto: RecipePhoto? {
+    if let selectedPhotoID, let photo = photos.first(where: { $0.id == selectedPhotoID }) {
+      return photo
+    }
+    return photos.min { lhs, rhs in lhs.displaySortKey < rhs.displaySortKey }
+  }
+
+  var body: some View {
+    if let selectedPhoto, let data = selectedPhoto.displayData ?? selectedPhoto.thumbnailData {
+      VStack(alignment: .leading, spacing: 10) {
+        RecipePhotoFrame(data: data, aspectRatio: selectedPhoto.displayAspectRatio)
+          .frame(maxWidth: selectedPhoto.isLowResolution ? 240 : .infinity, alignment: .leading)
+          .accessibilityLabel(Text(selectedPhoto.caption ?? "Recipe photo"))
+
+        if let caption = selectedPhoto.caption {
+          Text(caption)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(3)
+        }
+
+        if photos.count > 1 {
+          ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+              ForEach(photos) { photo in
+                if let thumbnailData = photo.thumbnailData ?? photo.displayData {
+                  Button {
+                    selectedPhotoID = photo.id
+                  } label: {
+                    RecipePhotoFrame(data: thumbnailData, aspectRatio: 1)
+                      .frame(width: 76, height: 76)
+                      .overlay {
+                        RoundedRectangle(cornerRadius: 8)
+                          .stroke(
+                            photo.id == selectedPhoto.id ? Color.accentColor : Color.clear,
+                            lineWidth: 3
+                          )
+                      }
+                  }
+                  .buttonStyle(.plain)
+                  .accessibilityLabel(Text(photo.caption ?? "Recipe photo"))
+                }
+              }
+            }
+            .padding(.vertical, 2)
+          }
+          .scrollIndicators(.hidden)
+        }
+      }
+    }
+  }
+}
+
+private extension RecipePhoto {
+  var displaySortKey: PhotoDisplaySortKey {
+    PhotoDisplaySortKey(
+      isLowResolution: isLowResolution,
+      kindRank: kind == .hero ? 0 : 1,
+      sortOrder: sortOrder
+    )
+  }
+
+  var displayAspectRatio: CGFloat {
+    guard isLowResolution else { return 16.0 / 10.0 }
+    guard
+      let pixelWidth,
+      let pixelHeight,
+      pixelWidth > 0,
+      pixelHeight > 0
+    else {
+      return 1
+    }
+    return CGFloat(pixelWidth) / CGFloat(pixelHeight)
+  }
+
+  var isLowResolution: Bool {
+    max(pixelWidth ?? 0, pixelHeight ?? 0) < 700
+  }
+}
+
+private struct PhotoDisplaySortKey: Comparable {
+  var isLowResolution: Bool
+  var kindRank: Int
+  var sortOrder: Int
+
+  static func < (lhs: Self, rhs: Self) -> Bool {
+    if lhs.isLowResolution != rhs.isLowResolution {
+      return !lhs.isLowResolution
+    }
+    if lhs.kindRank != rhs.kindRank {
+      return lhs.kindRank < rhs.kindRank
+    }
+    return lhs.sortOrder < rhs.sortOrder
+  }
+}
+
+private struct RecipePhotoFrame: View {
+  let data: Data
+  let aspectRatio: CGFloat
+
+  var body: some View {
+    Color.clear
+      .aspectRatio(aspectRatio, contentMode: .fit)
+      .overlay {
+        RecipePhotoImage(data: data)
+      }
+      .clipShape(RoundedRectangle(cornerRadius: 8))
+      .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+  }
+}
+
+private struct RecipePhotoImage: View {
+  let data: Data
+
+  var body: some View {
+    if let image = UIImage(data: data) {
+      Image(uiImage: image)
+        .resizable()
+        .scaledToFill()
+    } else {
+      Image(systemName: "photo")
+        .font(.title)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+  }
 }
 
 private struct ScalePanel: View {

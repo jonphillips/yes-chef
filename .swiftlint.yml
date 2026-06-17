@@ -19,7 +19,7 @@ file_length:
   ignore_comment_only_lines: true
 
 type_body_length:
-  warning: 520
+  warning: 560
   error: 650
 
 function_body_length:

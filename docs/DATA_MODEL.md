@@ -980,7 +980,16 @@ Stores references to recipe photos.
 
 id: UUID
 recipeID: UUID
-imageDataReference: String
+imageDataReference: String        // app-owned reference/identity, not an external path
+displayData: Data?
+thumbnailData: Data?
+mediaType: String?
+pixelWidth: Int?
+pixelHeight: Int?
+originalSourcePath: String?
+sourceURL: String?
+checksum: String?
+kind: RecipePhotoKind
 caption: String?
 source: PhotoSource
 sortOrder: Int
@@ -997,11 +1006,11 @@ generated
 
 For MVP, avoid generated images.
 
-Image storage/processing decision: see ADR-0005. `imageDataReference` is acceptable for
-the Paprika import spike, where it points at an observed export-relative file path. It
-is not the final production image-storage shape; production import/user-photo features
-should store app-owned display and thumbnail data plus provenance, while preserving
-readability for recipe-reference photos.
+Image storage/processing decision: see ADR-0005. `imageDataReference` is an app-owned
+reference string. Imported external paths belong in provenance fields such as
+`originalSourcePath`; do not depend on a private Paprika export path as photo identity.
+Production import/user-photo features should preserve readability for
+recipe-reference photos.
 
 12. Tag
 

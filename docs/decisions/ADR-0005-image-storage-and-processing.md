@@ -81,7 +81,7 @@ Use the shared house image strategy, adapted for recipe evidence.
 
 ## Relationship To Current Implementation
 
-The current `RecipePhoto.imageDataReference` field is sufficient for the Paprika import
-spike because it records observed export-relative paths. It is not the final production
-image-storage design. Before shipping import/user-photo features, replace or extend it
-with the display/thumbnail/provenance fields described by this ADR.
+`RecipePhoto` now stores app-owned display/thumbnail bytes and provenance fields.
+`imageDataReference` is an app-owned reference string; imported Paprika paths are kept
+in `originalSourcePath` for provenance and diagnostics. Full-resolution originals and
+more careful quality policies for text-heavy reference photos remain deferred.

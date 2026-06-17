@@ -1,4 +1,5 @@
 import CustomDump
+import Dependencies
 import Foundation
 import Testing
 import YesChefCore
@@ -31,13 +32,17 @@ extension RecipeCoreTests {
 
       let curry = try #require(result.recipes.first { $0.title == "Photo Board Curry" })
       expectNoDifference(
-        curry.photos,
+        curry.photos.map(\.path),
         [
-          PaprikaHTMLPhotoReference(path: "Images/curry/hero.jpg", isAvailable: true),
-          PaprikaHTMLPhotoReference(path: "Images/curry/step1.jpg", caption: "Prep board", isAvailable: true),
-          PaprikaHTMLPhotoReference(path: "Images/curry/missing.jpg", caption: "Missing board", isAvailable: false),
+          "Images/curry/step1.jpg",
+          "Images/curry/missing.jpg",
         ]
       )
+      expectNoDifference(curry.photos.map(\.isAvailable), [true, false])
+      expectNoDifference(curry.photos.map(\.kind), [.hero, .gallery])
+      expectNoDifference(curry.photos.map(\.caption), ["Prep board", "Missing board"])
+      expectNoDifference(curry.photos.first?.displayData != nil, true)
+      expectNoDifference(curry.photos.last?.displayData, nil)
     }
 
     @Test
@@ -109,12 +114,57 @@ extension RecipeCoreTests {
 
       expectNoDifference(
         bundle.photos.map(\.imageDataReference),
-        [
-          "Images/curry/hero.jpg",
-          "Images/curry/step1.jpg",
-        ]
+        bundle.photos.map { "recipePhotos/\($0.id.uuidString)" }
       )
-      expectNoDifference(bundle.photos.map(\.source), [.imported, .imported])
+      expectNoDifference(bundle.photos.map(\.originalSourcePath), ["Images/curry/step1.jpg"])
+      expectNoDifference(bundle.photos.map(\.kind), [.hero])
+      expectNoDifference(bundle.photos.map { $0.displayData != nil }, [true])
+      expectNoDifference(bundle.photos.map(\.source), [.imported])
+    }
+
+    @Test
+    func importBundleWritesPaprikaRecipeIntoLibrary() throws {
+      @Dependency(\.defaultDatabase) var database
+      let result = try PaprikaHTMLImporter.parseExport(at: Self.fixtureURL)
+      let curry = try #require(result.recipes.first { $0.title == "Photo Board Curry" })
+      let now = Date(timeIntervalSinceReferenceDate: 802_100_000)
+      var importUUIDs = SampleUUIDSequence(start: 3_000)
+      let bundle = try curry.makeRecipeBundle(now: now, uuid: { importUUIDs.next() })
+
+      let recipeID = try database.write { db in
+        var categoryUUIDs = SampleUUIDSequence(start: 4_000)
+        return try RecipeRepository.importBundle(
+          bundle,
+          in: db,
+          now: now,
+          uuid: { categoryUUIDs.next() }
+        )
+      }
+
+      let detail = try database.read { db in
+        try RecipeRepository.fetchDetail(recipeID: recipeID, in: db)
+      }
+      let imported = try #require(detail)
+
+      expectNoDifference(imported.recipe.title, "Photo Board Curry")
+      expectNoDifference(imported.recipe.originalImportText?.contains("Photo Board Curry"), true)
+      expectNoDifference(imported.ingredientLines.map(\.originalText), ["see attached photo"])
+      expectNoDifference(imported.instructionSteps.map(\.text), ["See attached photo."])
+      expectNoDifference(imported.categories.map(\.name), ["Import Fixture"])
+      expectNoDifference(imported.photos.map(\.originalSourcePath), ["Images/curry/step1.jpg"])
+      expectNoDifference(imported.photos.map(\.kind), [.hero])
+      expectNoDifference(imported.photos.map(\.source), [.imported])
+      expectNoDifference(
+        imported.photos.map { $0.imageDataReference == $0.originalSourcePath },
+        [false]
+      )
+      expectNoDifference(imported.photos.map { $0.displayData != nil }, [true])
+
+      let recipeRows = try database.read { db in
+        try RecipeListRequest().fetch(db)
+      }
+      let row = try #require(recipeRows.first { $0.recipe.id == recipeID })
+      expectNoDifference(row.thumbnailData != nil, true)
     }
 
     private static var fixtureURL: URL {

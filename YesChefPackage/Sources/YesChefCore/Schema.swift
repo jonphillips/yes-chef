@@ -131,6 +131,15 @@ extension DependencyValues {
           "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
           "recipeID" TEXT NOT NULL REFERENCES "recipes"("id") ON DELETE CASCADE,
           "imageDataReference" TEXT NOT NULL,
+          "displayData" BLOB,
+          "thumbnailData" BLOB,
+          "mediaType" TEXT,
+          "pixelWidth" INTEGER,
+          "pixelHeight" INTEGER,
+          "originalSourcePath" TEXT,
+          "sourceURL" TEXT,
+          "checksum" TEXT,
+          "kind" TEXT NOT NULL DEFAULT 'gallery',
           "caption" TEXT,
           "source" TEXT NOT NULL,
           "sortOrder" INTEGER NOT NULL,
@@ -220,4 +229,3 @@ extension DependencyValues {
     defaultDatabase = database
   }
 }
-

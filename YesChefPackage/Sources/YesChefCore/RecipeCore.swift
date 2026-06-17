@@ -365,6 +365,65 @@ public enum RecipeRepository {
     .execute(db)
   }
 
+  @discardableResult
+  public static func importBundle(
+    _ bundle: RecipeBundleCoding.RecipeBundle,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> Recipe.ID {
+    var recipe = bundle.recipe
+    if recipe.originalSnapshot == nil {
+      recipe.originalSnapshot = try RecipeBundleCoding.snapshotData(
+        recipe: recipe,
+        source: bundle.source,
+        ingredientSections: bundle.ingredientSections,
+        ingredientLines: bundle.ingredientLines,
+        instructionSections: bundle.instructionSections,
+        instructionSteps: bundle.instructionSteps,
+        notes: bundle.recipeNotes,
+        tagNames: bundle.tagNames,
+        categoryNames: bundle.categoryNames,
+        photos: bundle.photos,
+        equipment: bundle.equipment,
+        recipeEquipment: bundle.recipeEquipment
+      )
+    }
+
+    try upsert(recipe, in: db)
+    try replaceSource(bundle.source, recipeID: recipe.id, in: db)
+
+    for section in bundle.ingredientSections {
+      try IngredientSection.upsert { section }.execute(db)
+    }
+    for line in bundle.ingredientLines {
+      try IngredientLine.upsert { line }.execute(db)
+    }
+    for section in bundle.instructionSections {
+      try InstructionSection.upsert { section }.execute(db)
+    }
+    for step in bundle.instructionSteps {
+      try InstructionStep.upsert { step }.execute(db)
+    }
+    for note in bundle.recipeNotes {
+      try insert(note, in: db)
+    }
+    for photo in bundle.photos {
+      try RecipePhoto.upsert { photo }.execute(db)
+    }
+    for equipment in bundle.equipment {
+      try Equipment.upsert { equipment }.execute(db)
+    }
+    for recipeEquipment in bundle.recipeEquipment {
+      try RecipeEquipment.upsert { recipeEquipment }.execute(db)
+    }
+
+    try reconcileTags(bundle.tagNames, recipeID: recipe.id, in: db, now: now, uuid: uuid)
+    try reconcileCategories(bundle.categoryNames, recipeID: recipe.id, in: db, now: now, uuid: uuid)
+
+    return recipe.id
+  }
+
   private static func upsert(_ recipe: Recipe, in db: Database) throws {
     try Recipe.upsert { recipe }.execute(db)
   }

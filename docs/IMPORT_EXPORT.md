@@ -98,6 +98,9 @@ Observed image behavior:
 
 * The primary image is an `<img itemprop="image">` reference.
 * Additional exported images can appear in a PhotoSwipe JavaScript `items` gallery.
+* In observed exports, the `itemprop="image"` file may be only a small square cover
+  thumbnail (for example 280x280), while PhotoSwipe `src` files may be the
+  higher-resolution originals.
 * Images are stored under `Recipes/Images/<folder-id>/<file-id>.jpg`.
 * Recipe pages may reference image files that are not present in a partial fixture.
 
@@ -115,8 +118,12 @@ Implemented now:
 * Import present recipe pages, independent of `index.html` completeness.
 * Parse common metadata into `PaprikaHTMLRecipe`.
 * Convert parsed recipes into `RecipeBundleCoding.RecipeBundle`.
+* Write a bundle into the library through `RecipeRepository.importBundle`.
 * Preserve raw HTML as `Recipe.originalImportText`.
-* Keep available photo references as imported `RecipePhoto` entries for the spike.
+* Prefer the first PhotoSwipe gallery image as the imported hero when a gallery is
+  present, rather than promoting Paprika's small cover thumbnail.
+* Copy available photo bytes into app-owned `RecipePhoto` display/thumbnail payloads.
+* Preserve Paprika image paths as provenance in `RecipePhoto.originalSourcePath`.
 * Report missing recipe-page and missing-photo warnings.
 * Test against a synthetic, committed Paprika-shaped fixture.
 
@@ -124,7 +131,14 @@ Not implemented yet:
 
 * Production import UI.
 * Parsing Paprika's binary `.paprikarecipes` format.
-* Copying image bytes into app-owned storage.
+* Full-resolution/original image asset storage.
+* Quality tuning for text-heavy reference photos.
+* Consistent recipe-detail image presentation across low-resolution and
+  high-resolution imports.
+* Source refresh/image recovery from recipe source pages.
+* Authenticated source capture for login-only recipe sites. This must use
+  user-controlled authentication and sanitized fixtures; raw credentials must not be
+  stored in source, docs, logs, commits, or prompts.
 * Promoting ingredient headings into real sections.
 * Full import review/rollback flow.
 * Importing all private fixture data into committed tests.

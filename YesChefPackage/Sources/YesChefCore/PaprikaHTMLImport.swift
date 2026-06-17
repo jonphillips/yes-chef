@@ -138,10 +138,19 @@ public struct PaprikaHTMLRecipe: Equatable, Sendable {
       .filter(\.isAvailable)
       .enumerated()
       .map { index, photo in
-        RecipePhoto(
-          id: uuid(),
+        let photoID = uuid()
+        return RecipePhoto(
+          id: photoID,
           recipeID: recipeID,
-          imageDataReference: photo.path,
+          imageDataReference: "recipePhotos/\(photoID.uuidString)",
+          displayData: photo.displayData,
+          thumbnailData: photo.thumbnailData,
+          mediaType: photo.mediaType,
+          pixelWidth: photo.pixelWidth,
+          pixelHeight: photo.pixelHeight,
+          originalSourcePath: photo.path,
+          checksum: photo.checksum,
+          kind: photo.kind,
           caption: photo.caption,
           source: .imported,
           sortOrder: index,
@@ -214,11 +223,36 @@ public struct PaprikaHTMLPhotoReference: Equatable, Sendable {
   public var path: String
   public var caption: String?
   public var isAvailable: Bool
+  public var displayData: Data?
+  public var thumbnailData: Data?
+  public var mediaType: String?
+  public var pixelWidth: Int?
+  public var pixelHeight: Int?
+  public var checksum: String?
+  public var kind: RecipePhotoKind
 
-  public init(path: String, caption: String? = nil, isAvailable: Bool) {
+  public init(
+    path: String,
+    caption: String? = nil,
+    isAvailable: Bool,
+    displayData: Data? = nil,
+    thumbnailData: Data? = nil,
+    mediaType: String? = nil,
+    pixelWidth: Int? = nil,
+    pixelHeight: Int? = nil,
+    checksum: String? = nil,
+    kind: RecipePhotoKind = .gallery
+  ) {
     self.path = path
     self.caption = caption
     self.isAvailable = isAvailable
+    self.displayData = displayData
+    self.thumbnailData = thumbnailData
+    self.mediaType = mediaType
+    self.pixelWidth = pixelWidth
+    self.pixelHeight = pixelHeight
+    self.checksum = checksum
+    self.kind = kind
   }
 }
 
@@ -412,32 +446,51 @@ public enum PaprikaHTMLImporter {
     var photos: [PaprikaHTMLPhotoReference] = []
     var seenPaths: Set<String> = []
 
-    func append(path: String, caption: String?) {
+    func append(path: String, caption: String?, kind: RecipePhotoKind) {
       let decodedPath = decodeHTMLEntities(path)
       guard decodedPath.hasPrefix("Images/"), !seenPaths.contains(decodedPath) else { return }
       seenPaths.insert(decodedPath)
       let isAvailable = recipeDirectoryURL
         .map { fileManager.fileExists(atPath: $0.appendingPathComponent(decodedPath).path) }
         ?? false
+      let processedPhoto = recipeDirectoryURL
+        .map { $0.appendingPathComponent(decodedPath) }
+        .flatMap { try? Data(contentsOf: $0) }
+        .map { RecipePhotoProcessor.process(sourceData: $0, sourcePath: decodedPath) }
       photos.append(
         PaprikaHTMLPhotoReference(
           path: decodedPath,
           caption: caption?.nonEmpty,
-          isAvailable: isAvailable
+          isAvailable: isAvailable,
+          displayData: processedPhoto?.displayData,
+          thumbnailData: processedPhoto?.thumbnailData,
+          mediaType: processedPhoto?.mediaType,
+          pixelWidth: processedPhoto?.pixelWidth,
+          pixelHeight: processedPhoto?.pixelHeight,
+          checksum: processedPhoto?.checksum,
+          kind: kind
         )
       )
     }
 
-    let imageTagPattern = #"(?is)<img\b(?=[^>]*\bitemprop\s*=\s*["']image["'])[^>]*>"#
-    for match in captures(pattern: imageTagPattern, in: html) {
-      if let tag = match.first, let src = attributeValue("src", in: tag) {
-        append(path: src, caption: nil)
-      }
+    let galleryItemPattern = #"(?is)\{\s*msrc:\s*'[^']*',\s*src:\s*'([^']+)'[\s\S]*?title:\s*'([^']*)'\s*\}"#
+    let galleryMatches = captures(pattern: galleryItemPattern, in: html)
+      .filter { $0.count > 2 }
+    for (index, match) in galleryMatches.enumerated() {
+      append(
+        path: unescapeJavaScriptString(match[1]),
+        caption: unescapeJavaScriptString(match[2]),
+        kind: index == 0 ? .hero : .gallery
+      )
     }
 
-    let galleryItemPattern = #"(?is)\{\s*msrc:\s*'[^']*',\s*src:\s*'([^']+)'[\s\S]*?title:\s*'([^']*)'\s*\}"#
-    for match in captures(pattern: galleryItemPattern, in: html) where match.count > 2 {
-      append(path: unescapeJavaScriptString(match[1]), caption: unescapeJavaScriptString(match[2]))
+    if galleryMatches.isEmpty {
+      let imageTagPattern = #"(?is)<img\b(?=[^>]*\bitemprop\s*=\s*["']image["'])[^>]*>"#
+      for match in captures(pattern: imageTagPattern, in: html) {
+        if let tag = match.first, let src = attributeValue("src", in: tag) {
+          append(path: src, caption: nil, kind: .hero)
+        }
+      }
     }
 
     return photos

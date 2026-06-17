@@ -13,6 +13,7 @@ final class RecipeLibraryModel {
     case cookingMode(Recipe.ID)
     case originalSnapshot(Recipe.ID)
     case deleteRecipe(Recipe.ID)
+    case importSummary(RecipeImportSummary)
   }
 
   @ObservationIgnored
@@ -20,18 +21,23 @@ final class RecipeLibraryModel {
   @ObservationIgnored
   @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored
-  @FetchAll var recipes: [Recipe]
+  @Dependency(\.uuid) private var uuid
+  @ObservationIgnored
+  @Fetch(RecipeListRequest(), animation: .default) var recipeRows: [RecipeListRowData] = []
 
   var destination: Destination?
   var errorMessage: String?
   var isShowingError = false
+  var isImporting = false
+  var isPresentingPaprikaImporter = false
   var searchText = ""
   var selectedRecipeID: Recipe.ID?
 
-  var visibleRecipes: [Recipe] {
-    recipes
-      .filter { !$0.archived }
-      .filter { recipe in
+  var visibleRecipeRows: [RecipeListRowData] {
+    recipeRows
+      .filter { !$0.recipe.archived }
+      .filter { row in
+        let recipe = row.recipe
         guard !searchText.isEmpty else { return true }
         return recipe.title.localizedCaseInsensitiveContains(searchText)
           || (recipe.subtitle?.localizedCaseInsensitiveContains(searchText) ?? false)
@@ -40,16 +46,67 @@ final class RecipeLibraryModel {
           || (recipe.course?.localizedCaseInsensitiveContains(searchText) ?? false)
       }
       .sorted { lhs, rhs in
-        lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+        lhs.recipe.title.localizedStandardCompare(rhs.recipe.title) == .orderedAscending
       }
   }
 
   var selectedRecipe: Recipe? {
-    recipes.first { $0.id == selectedRecipeID }
+    recipeRows.first { $0.recipe.id == selectedRecipeID }?.recipe
   }
 
   func addRecipeButtonTapped() {
     destination = .addRecipe
+  }
+
+  func importPaprikaExportButtonTapped() {
+    isPresentingPaprikaImporter = true
+  }
+
+  func paprikaExportSelected(_ result: Result<URL, any Error>) async {
+    do {
+      let sourceURL = try result.get()
+      isImporting = true
+      defer { isImporting = false }
+
+      let importDate = now
+      let makeUUID = uuid
+      let importResult = try await PaprikaImportWorkspace.parseExport(from: sourceURL)
+      let bundles = try importResult.recipes.map { recipe in
+        try recipe.makeRecipeBundle(now: importDate, uuid: { makeUUID() })
+      }
+      let importedIDs = try await database.write { db in
+        var recipeIDs: [Recipe.ID] = []
+        for bundle in bundles {
+          let recipeID = try RecipeRepository.importBundle(
+            bundle,
+            in: db,
+            now: importDate,
+            uuid: { makeUUID() }
+          )
+          recipeIDs.append(recipeID)
+        }
+        return recipeIDs
+      }
+      selectedRecipeID = importedIDs.first ?? selectedRecipeID
+      destination = .importSummary(
+        RecipeImportSummary(
+          importedCount: importedIDs.count,
+          warningCount: importResult.warnings.count,
+          missingRecipePageCount: importResult.warnings
+            .filter { $0.kind == .missingRecipePages }
+            .compactMap(\.affectedCount)
+            .reduce(0, +),
+          missingPhotoCount: importResult.warnings.filter { $0.kind == .missingPhoto }.count,
+          unreadableRecipeCount: importResult.warnings.filter { $0.kind == .unreadableRecipe }.count
+        )
+      )
+    } catch CocoaError.userCancelled {
+      isImporting = false
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      isImporting = false
+    }
   }
 
   func editButtonTapped(recipeID: Recipe.ID) {
@@ -85,7 +142,33 @@ final class RecipeLibraryModel {
   }
 
   func title(for recipeID: Recipe.ID) -> String {
-    recipes.first { $0.id == recipeID }?.title ?? "this recipe"
+    recipeRows.first { $0.recipe.id == recipeID }?.recipe.title ?? "this recipe"
+  }
+}
+
+struct RecipeImportSummary: Identifiable, Equatable, Sendable {
+  let id = UUID()
+  var importedCount: Int
+  var warningCount: Int
+  var missingRecipePageCount: Int
+  var missingPhotoCount: Int
+  var unreadableRecipeCount: Int
+
+  var message: String {
+    var lines = ["Imported \(importedCount) \(importedCount == 1 ? "recipe" : "recipes")."]
+    if missingRecipePageCount > 0 {
+      lines.append("\(missingRecipePageCount) index \(missingRecipePageCount == 1 ? "entry was" : "entries were") missing from the ZIP.")
+    }
+    if missingPhotoCount > 0 {
+      lines.append("\(missingPhotoCount) image \(missingPhotoCount == 1 ? "file was" : "files were") missing.")
+    }
+    if unreadableRecipeCount > 0 {
+      lines.append("\(unreadableRecipeCount) recipe \(unreadableRecipeCount == 1 ? "page could" : "pages could") not be read.")
+    }
+    if warningCount == 0 {
+      lines.append("No warnings.")
+    }
+    return lines.joined(separator: "\n")
   }
 }
 
@@ -126,6 +209,14 @@ final class RecipeDetailModel {
 
   var visibleNotes: [RecipeNote] {
     detail?.notes.filter { $0.noteType != .retrospective } ?? []
+  }
+
+  var displayablePhotos: [RecipePhoto] {
+    detail?.photos
+      .filter { photo in
+        photo.kind != .referenceDocument
+          && (photo.displayData != nil || photo.thumbnailData != nil)
+      } ?? []
   }
 
   var baseServings: Double? {

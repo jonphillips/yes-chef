@@ -469,6 +469,8 @@ Import existing user-owned recipes from Paprika or other export formats.
 - Preserve notes.
 - Preserve categories/tags where possible.
 - Preserve photos if practical.
+- Preserve the best available image quality from the source export, and record when
+  the available image appears to be low-resolution.
 - Provide import summary:
   - imported count
   - skipped count
@@ -576,6 +578,44 @@ The app should eventually identify and track:
 - What should be packed separately.
 - What needs cooler space.
 - What needs to thaw 12/24/48 hours ahead.
+
+### Source Refresh and Image Recovery
+
+For recipes with source URLs, the app should eventually be able to revisit the source
+page and attempt to recover fresher structured data or a higher-resolution image than
+the original import provided. This depends on a source-page scraper/importer and must
+preserve the user's current recipe as the canonical editable copy unless the user
+explicitly accepts updates.
+
+Initial goals:
+
+- Detect recipes whose imported image is low-resolution or visibly inconsistent with
+  the detail display target.
+- Offer a "refresh from source" or "find better image" workflow when a source URL is
+  available.
+- Preserve provenance: source URL, fetched image URL, dimensions, checksum, date
+  fetched, and any warnings.
+- Never overwrite user edits silently; recovered data should be reviewable.
+- Respect source site terms and only fetch content the user is allowed to access.
+
+### Authenticated Source Capture
+
+Some high-value recipe sources require login, such as America's Test Kitchen and Milk
+Street. The app should investigate a private, user-controlled authentication approach
+before building site-specific importers.
+
+Guardrails:
+
+- Do not store raw passwords in source code, docs, fixtures, logs, commits, or agent
+  prompts.
+- Prefer interactive user login through an app-controlled browser/auth surface, with
+  any reusable credentials or session material stored only in the user's Keychain.
+- Treat private distribution as reducing product exposure, not as permission to embed
+  credentials or bypass access controls.
+- Design site connectors so authenticated fetch, parsing, and storage are separable and
+  testable with sanitized HTML fixtures.
+- Provide a manual fallback where the user can import saved HTML or copied recipe text
+  from a logged-in browser session without sharing credentials with development tools.
 
 ### Equipment-Aware Planning
 
@@ -710,7 +750,13 @@ first build.
 - Inspect sample Paprika export.
 - Document format.
 - Parse fixture.
-- Import into model.
+- Import into model and persist through repository.
+- Copy available photo bytes into app-owned recipe photo rows.
+- Prefer the best available Paprika photo source, recognizing that `itemprop=image`
+  may be only a small cover thumbnail while PhotoSwipe gallery sources may be higher
+  resolution.
+- Reconcile recipe detail image display so low-resolution and high-resolution imports
+  feel intentionally handled rather than visually jumpy.
 - Preserve unmapped/raw fields.
 - Add tests.
 - No production import UI yet.
