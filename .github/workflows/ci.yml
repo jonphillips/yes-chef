@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: SwiftLint
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/realm/swiftlint:0.63.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run drift lint
+        run: swiftlint lint --strict --config .swiftlint.yml
+
+  test:
+    name: Swift package tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prefer Xcode beta when available
+        run: |
+          if [ -d /Applications/Xcode-beta.app/Contents/Developer ]; then
+            echo "DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer" >> "$GITHUB_ENV"
+          else
+            echo "::notice::Xcode beta not found; using the runner default toolchain."
+          fi
+      - name: Run package tests
+        run: swift test --package-path YesChefPackage

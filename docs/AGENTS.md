@@ -146,6 +146,11 @@ Do not casually rename or remove persisted fields.
 
 ## Testing Expectations
 
+Before committing code changes, run `scripts/check-drift.sh` from the repository root
+when feasible. It runs the focused SwiftLint drift gate from jon-platform's
+`docs/ios/drift-control.md` and the Swift package tests. Use it instead of scheduled
+or broad "hunt for drift" sweeps; code review should stay scoped to the diff.
+
 Add tests for:
 
 - Recipe model creation.

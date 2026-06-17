@@ -1,0 +1,35 @@
+included:
+  - YesChefApp
+  - YesChefPackage/Sources
+  - YesChefPackage/Tests
+
+excluded:
+  - YesChefPackage/Sources/YesChefCore/SampleData.swift
+  - YesChefPackage/Sources/YesChefCore/Schema.swift
+
+only_rules:
+  - custom_rules
+  - file_length
+  - function_body_length
+  - type_body_length
+
+file_length:
+  warning: 1000
+  error: 1150
+  ignore_comment_only_lines: true
+
+type_body_length:
+  warning: 520
+  error: 650
+
+function_body_length:
+  warning: 170
+  error: 220
+
+custom_rules:
+  persistence_in_views:
+    name: Persistence in SwiftUI views
+    included: .*View\.swift
+    regex: \bdatabase\.(write|read)\b
+    message: Move database reads/writes into an observable model or core package boundary.
+    severity: error
