@@ -997,6 +997,12 @@ generated
 
 For MVP, avoid generated images.
 
+Image storage/processing decision: see ADR-0005. `imageDataReference` is acceptable for
+the Paprika import spike, where it points at an observed export-relative file path. It
+is not the final production image-storage shape; production import/user-photo features
+should store app-owned display and thumbnail data plus provenance, while preserving
+readability for recipe-reference photos.
+
 12. Tag
 
 12.1 Purpose
@@ -1670,7 +1676,8 @@ Import must be forgiving.
 
 29.2 Paprika Import
 
-Do not assume the Paprika export format until a real sample is inspected.
+Do not assume the Paprika export format until a real sample is inspected. Observed
+Paprika HTML export behavior is recorded in IMPORT_EXPORT.md.
 
 Once a sample exists:
 
