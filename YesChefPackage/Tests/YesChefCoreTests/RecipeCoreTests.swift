@@ -160,6 +160,141 @@ struct RecipeCoreTests {
   }
 
   @Test
+  func supplementCreatedDatesMatchesBackupByTitleAndSourceURL() throws {
+    @Dependency(\.defaultDatabase) var database
+    let importedAt = Date(timeIntervalSinceReferenceDate: 802_100_000)
+    let paprikaCreatedAt = Date(timeIntervalSinceReferenceDate: 700_100_000)
+    let bakedBrieCreatedAt = Date(timeIntervalSinceReferenceDate: 700_200_000)
+    let targetID = SampleUUIDSequence.uuid(301)
+    let duplicateID = SampleUUIDSequence.uuid(302)
+    let bakedBrieID = SampleUUIDSequence.uuid(303)
+
+    try database.write { db in
+      try Recipe.insert {
+        Recipe(
+          id: targetID,
+          title: "Kung Pao Chicken - JP",
+          dateCreated: importedAt,
+          dateModified: importedAt
+        )
+      }
+      .execute(db)
+      try RecipeSource.insert {
+        RecipeSource(
+          id: SampleUUIDSequence.uuid(304),
+          recipeID: targetID,
+          name: "Cooks Illustrated",
+          url: "https://www.cooksillustrated.com/recipes/11227-kung-pao-chicken"
+        )
+      }
+      .execute(db)
+      try Recipe.insert {
+        Recipe(
+          id: duplicateID,
+          title: "Kung Pao Chicken - JP",
+          dateCreated: importedAt,
+          dateModified: importedAt
+        )
+      }
+      .execute(db)
+      try RecipeSource.insert {
+        RecipeSource(
+          id: SampleUUIDSequence.uuid(305),
+          recipeID: duplicateID,
+          name: "Notebook",
+          url: "https://example.com/kung-pao"
+        )
+      }
+      .execute(db)
+      try Recipe.insert {
+        Recipe(
+          id: bakedBrieID,
+          title: "Baked Brie",
+          dateCreated: importedAt,
+          dateModified: importedAt
+        )
+      }
+      .execute(db)
+
+      let summary = try RecipeRepository.supplementCreatedDates(
+        from: [
+          PaprikaRecipeBackupRecord(
+            name: "Kung Pao Chicken — JP",
+            sourceName: "cooksillustrated.com",
+            sourceURL: "https://www.cooksillustrated.com/recipes/11227-kung-pao-chicken",
+            created: paprikaCreatedAt
+          ),
+          PaprikaRecipeBackupRecord(name: "Baked Brie", created: bakedBrieCreatedAt),
+          PaprikaRecipeBackupRecord(name: "Missing Recipe", created: paprikaCreatedAt),
+        ],
+        in: db
+      )
+
+      expectNoDifference(summary.backupRecipeCount, 3)
+      expectNoDifference(summary.matchedRecipeCount, 2)
+      expectNoDifference(summary.updatedRecipeCount, 2)
+      expectNoDifference(summary.unchangedRecipeCount, 0)
+      expectNoDifference(summary.ambiguousRecipeCount, 0)
+      expectNoDifference(summary.unmatchedRecipeCount, 1)
+      expectNoDifference(summary.skippedRecordCount, 0)
+
+      let target = try #require(try Recipe.find(targetID).fetchOne(db))
+      let duplicate = try #require(try Recipe.find(duplicateID).fetchOne(db))
+      let bakedBrie = try #require(try Recipe.find(bakedBrieID).fetchOne(db))
+      expectNoDifference(target.dateCreated, paprikaCreatedAt)
+      expectNoDifference(duplicate.dateCreated, importedAt)
+      expectNoDifference(bakedBrie.dateCreated, bakedBrieCreatedAt)
+    }
+  }
+
+  @Test
+  func supplementCreatedDatesLeavesAmbiguousTitleMatchesUntouched() throws {
+    @Dependency(\.defaultDatabase) var database
+    let importedAt = Date(timeIntervalSinceReferenceDate: 802_200_000)
+    let paprikaCreatedAt = Date(timeIntervalSinceReferenceDate: 700_300_000)
+    let firstID = SampleUUIDSequence.uuid(311)
+    let secondID = SampleUUIDSequence.uuid(312)
+
+    try database.write { db in
+      try Recipe.insert {
+        Recipe(
+          id: firstID,
+          title: "Duplicate Dish",
+          dateCreated: importedAt,
+          dateModified: importedAt
+        )
+      }
+      .execute(db)
+      try Recipe.insert {
+        Recipe(
+          id: secondID,
+          title: "Duplicate Dish",
+          dateCreated: importedAt,
+          dateModified: importedAt
+        )
+      }
+      .execute(db)
+
+      let summary = try RecipeRepository.supplementCreatedDates(
+        from: [
+          PaprikaRecipeBackupRecord(name: "Duplicate Dish", created: paprikaCreatedAt)
+        ],
+        in: db
+      )
+
+      expectNoDifference(summary.backupRecipeCount, 1)
+      expectNoDifference(summary.matchedRecipeCount, 0)
+      expectNoDifference(summary.updatedRecipeCount, 0)
+      expectNoDifference(summary.ambiguousRecipeCount, 1)
+
+      let first = try #require(try Recipe.find(firstID).fetchOne(db))
+      let second = try #require(try Recipe.find(secondID).fetchOne(db))
+      expectNoDifference(first.dateCreated, importedAt)
+      expectNoDifference(second.dateCreated, importedAt)
+    }
+  }
+
+  @Test
   func savePreservesUnchangedChildIDsAndNonGeneralNotes() throws {
     @Dependency(\.defaultDatabase) var database
     let now = Date(timeIntervalSinceReferenceDate: 802_000_000)
@@ -185,7 +320,13 @@ struct RecipeCoreTests {
       }
       .execute(db)
       try RecipeSource.insert {
-        RecipeSource(id: sourceID, recipeID: recipeID, name: "Notebook")
+        RecipeSource(
+          id: sourceID,
+          recipeID: recipeID,
+          name: "Notebook",
+          importedFrom: "Paprika HTML",
+          dateImported: now
+        )
       }
       .execute(db)
       try IngredientSection.insert {
@@ -262,6 +403,11 @@ struct RecipeCoreTests {
       let detail = try #require(maybeDetail)
       var draft = RecipeEditorDraft(detail: detail)
       draft.summary = "Updated without rewriting children"
+      draft.sourceAuthor = "Source Author"
+      draft.sourcePublicationName = "Source Publication"
+      draft.sourceBookTitle = "Source Book"
+      draft.sourcePageNumber = "42"
+      draft.sourceNotes = "Source metadata stays typed."
 
       var uuids = SampleUUIDSequence(start: 50)
       try RecipeRepository.save(
@@ -286,6 +432,14 @@ struct RecipeCoreTests {
         updated.ingredientSections.map(\.id),
         [ingredientSectionID, extraIngredientSectionID]
       )
+      expectNoDifference(updated.source?.id, sourceID)
+      expectNoDifference(updated.source?.author, "Source Author")
+      expectNoDifference(updated.source?.publicationName, "Source Publication")
+      expectNoDifference(updated.source?.bookTitle, "Source Book")
+      expectNoDifference(updated.source?.pageNumber, "42")
+      expectNoDifference(updated.source?.importedFrom, "Paprika HTML")
+      expectNoDifference(updated.source?.dateImported, now)
+      expectNoDifference(updated.source?.sourceNotes, "Source metadata stays typed.")
     }
   }
 }

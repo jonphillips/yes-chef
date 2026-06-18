@@ -25,6 +25,11 @@ struct RecipeEditorView: View {
         TextField("URL", text: $model.draft.sourceURL)
           .keyboardType(.URL)
           .textInputAutocapitalization(.never)
+        TextField("Author", text: $model.draft.sourceAuthor)
+        TextField("Publication", text: $model.draft.sourcePublicationName)
+        TextField("Book title", text: $model.draft.sourceBookTitle)
+        TextField("Page", text: $model.draft.sourcePageNumber)
+        TextField("Source notes", text: $model.draft.sourceNotes, axis: .vertical)
       }
 
       Section("Timing and Yield") {

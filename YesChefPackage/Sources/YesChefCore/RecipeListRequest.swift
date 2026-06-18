@@ -3,17 +3,20 @@ import SQLiteData
 
 public struct RecipeListRowData: Identifiable, Equatable, Sendable {
   public var recipe: Recipe
+  public var source: RecipeSource?
   public var thumbnailData: Data?
   public var categoryNames: [String]
   public var tagNames: [String]
 
   public init(
     recipe: Recipe,
+    source: RecipeSource? = nil,
     thumbnailData: Data? = nil,
     categoryNames: [String] = [],
     tagNames: [String] = []
   ) {
     self.recipe = recipe
+    self.source = source
     self.thumbnailData = thumbnailData
     self.categoryNames = categoryNames
     self.tagNames = tagNames
@@ -36,6 +39,10 @@ public struct RecipeListRequest: FetchKeyRequest {
     )
     let tagsByID = Dictionary(
       uniqueKeysWithValues: try Tag.fetchAll(db).map { ($0.id, $0) }
+    )
+    let sourcesByRecipeID = Dictionary(
+      grouping: try RecipeSource.fetchAll(db),
+      by: \.recipeID
     )
     let categoryNamesByRecipeID = Dictionary(grouping: try RecipeCategory.fetchAll(db), by: \.recipeID)
       .mapValues { recipeCategories in
@@ -77,6 +84,7 @@ public struct RecipeListRequest: FetchKeyRequest {
     return recipes.map { recipe in
       RecipeListRowData(
         recipe: recipe,
+        source: sourcesByRecipeID[recipe.id]?.first,
         thumbnailData: thumbnailsByRecipeID[recipe.id]?.listImageData,
         categoryNames: categoryNamesByRecipeID[recipe.id] ?? [],
         tagNames: tagNamesByRecipeID[recipe.id] ?? []

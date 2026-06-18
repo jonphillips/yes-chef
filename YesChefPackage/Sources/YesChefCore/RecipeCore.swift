@@ -63,6 +63,11 @@ public struct RecipeEditorDraft: Equatable, Sendable {
   public var summary: String
   public var sourceName: String
   public var sourceURL: String
+  public var sourceAuthor: String
+  public var sourcePublicationName: String
+  public var sourceBookTitle: String
+  public var sourcePageNumber: String
+  public var sourceNotes: String
   public var servingsText: String
   public var yieldText: String
   public var prepTimeMinutes: Int
@@ -85,6 +90,11 @@ public struct RecipeEditorDraft: Equatable, Sendable {
     summary: String = "",
     sourceName: String = "",
     sourceURL: String = "",
+    sourceAuthor: String = "",
+    sourcePublicationName: String = "",
+    sourceBookTitle: String = "",
+    sourcePageNumber: String = "",
+    sourceNotes: String = "",
     servingsText: String = "",
     yieldText: String = "",
     prepTimeMinutes: Int = 0,
@@ -106,6 +116,11 @@ public struct RecipeEditorDraft: Equatable, Sendable {
     self.summary = summary
     self.sourceName = sourceName
     self.sourceURL = sourceURL
+    self.sourceAuthor = sourceAuthor
+    self.sourcePublicationName = sourcePublicationName
+    self.sourceBookTitle = sourceBookTitle
+    self.sourcePageNumber = sourcePageNumber
+    self.sourceNotes = sourceNotes
     self.servingsText = servingsText
     self.yieldText = yieldText
     self.prepTimeMinutes = prepTimeMinutes
@@ -139,6 +154,11 @@ public struct RecipeEditorDraft: Equatable, Sendable {
       summary: detail.recipe.summary ?? "",
       sourceName: detail.source?.name ?? "",
       sourceURL: detail.source?.url ?? "",
+      sourceAuthor: detail.source?.author ?? "",
+      sourcePublicationName: detail.source?.publicationName ?? "",
+      sourceBookTitle: detail.source?.bookTitle ?? "",
+      sourcePageNumber: detail.source?.pageNumber ?? "",
+      sourceNotes: detail.source?.sourceNotes ?? "",
       servingsText: detail.recipe.servingsText ?? "",
       yieldText: detail.recipe.yieldText ?? "",
       prepTimeMinutes: detail.recipe.prepTimeMinutes ?? 0,
@@ -297,7 +317,7 @@ public enum RecipeRepository {
     let source = sourceFromDraft(
       draft,
       recipeID: recipeID,
-      existingID: existingDetail?.source?.id,
+      existingSource: existingDetail?.source,
       uuid: uuid
     )
     let snapshotIngredientSections = mergedSections(
@@ -431,15 +451,22 @@ public enum RecipeRepository {
   private static func sourceFromDraft(
     _ draft: RecipeEditorDraft,
     recipeID: Recipe.ID,
-    existingID: RecipeSource.ID?,
+    existingSource: RecipeSource?,
     uuid: () -> UUID
   ) -> RecipeSource? {
-    guard draft.sourceName.nonEmpty != nil || draft.sourceURL.nonEmpty != nil else { return nil }
+    guard draft.hasSourceData else { return nil }
     return RecipeSource(
-      id: existingID ?? uuid(),
+      id: existingSource?.id ?? uuid(),
       recipeID: recipeID,
       name: draft.sourceName.nonEmpty,
-      url: draft.sourceURL.nonEmpty
+      url: draft.sourceURL.nonEmpty,
+      author: draft.sourceAuthor.nonEmpty,
+      publicationName: draft.sourcePublicationName.nonEmpty,
+      bookTitle: draft.sourceBookTitle.nonEmpty,
+      pageNumber: draft.sourcePageNumber.nonEmpty,
+      importedFrom: existingSource?.importedFrom,
+      dateImported: existingSource?.dateImported,
+      sourceNotes: draft.sourceNotes.nonEmpty
     )
   }
 
@@ -1027,5 +1054,17 @@ private extension String {
     components(separatedBy: "\n\n")
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
       .filter { !$0.isEmpty }
+  }
+}
+
+private extension RecipeEditorDraft {
+  var hasSourceData: Bool {
+    sourceName.nonEmpty != nil
+      || sourceURL.nonEmpty != nil
+      || sourceAuthor.nonEmpty != nil
+      || sourcePublicationName.nonEmpty != nil
+      || sourceBookTitle.nonEmpty != nil
+      || sourcePageNumber.nonEmpty != nil
+      || sourceNotes.nonEmpty != nil
   }
 }

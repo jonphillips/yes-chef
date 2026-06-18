@@ -13,7 +13,9 @@ final class RecipeLibraryModel {
     case cookingMode(Recipe.ID)
     case originalSnapshot(Recipe.ID)
     case deleteRecipe(Recipe.ID)
+    case filterRecipes
     case importSummary(RecipeImportSummary)
+    case backupSupplementSummary(RecipeBackupSupplementSummary)
   }
 
   @ObservationIgnored
@@ -29,16 +31,20 @@ final class RecipeLibraryModel {
   var errorMessage: String?
   var isShowingError = false
   var isImporting = false
+  var importActivityTitle = "Importing"
   var isPresentingPaprikaImporter = false
+  var isPresentingPaprikaBackupSupplementer = false
   var searchText = ""
   var selectedRecipeID: Recipe.ID?
   var sortOrder = RecipeListSort.title
   var showsFavoritesOnly = false
   var showsPhotosOnly = false
   var selectedCategoryName: String?
-  var selectedTagName: String?
+  var selectedTagNames: Set<String> = []
   var selectedCuisine: String?
   var selectedCourse: String?
+  var selectedSourceName: String?
+  var selectedAuthorName: String?
 
   var visibleRecipeRows: [RecipeListRowData] {
     unarchivedRecipeRows
@@ -53,9 +59,11 @@ final class RecipeLibraryModel {
     showsFavoritesOnly
       || showsPhotosOnly
       || selectedCategoryName != nil
-      || selectedTagName != nil
+      || !selectedTagNames.isEmpty
       || selectedCuisine != nil
       || selectedCourse != nil
+      || selectedSourceName != nil
+      || selectedAuthorName != nil
   }
 
   var categoryFilterOptions: [String] {
@@ -74,6 +82,14 @@ final class RecipeLibraryModel {
     distinctOptions(unarchivedRecipeRows.compactMap(\.recipe.course))
   }
 
+  var sourceFilterOptions: [String] {
+    distinctOptions(unarchivedRecipeRows.compactMap(\.filterSourceName))
+  }
+
+  var authorFilterOptions: [String] {
+    distinctOptions(unarchivedRecipeRows.compactMap { $0.source?.author.nonEmpty })
+  }
+
   var selectedRecipe: Recipe? {
     recipeRows.first { $0.recipe.id == selectedRecipeID }?.recipe
   }
@@ -90,9 +106,18 @@ final class RecipeLibraryModel {
     isPresentingPaprikaImporter = true
   }
 
+  func supplementPaprikaBackupButtonTapped() {
+    isPresentingPaprikaBackupSupplementer = true
+  }
+
+  func filterButtonTapped() {
+    destination = .filterRecipes
+  }
+
   func paprikaExportSelected(_ result: Result<URL, any Error>) async {
     do {
       let sourceURL = try result.get()
+      importActivityTitle = "Importing"
       isImporting = true
       defer { isImporting = false }
 
@@ -137,6 +162,29 @@ final class RecipeLibraryModel {
     }
   }
 
+  func paprikaBackupSelected(_ result: Result<URL, any Error>) async {
+    do {
+      let sourceURL = try result.get()
+      importActivityTitle = "Supplementing"
+      isImporting = true
+      defer { isImporting = false }
+
+      let parseResult = try await PaprikaImportWorkspace.parseRecipeBackup(from: sourceURL)
+      var summary = try await database.write { db in
+        try RecipeRepository.supplementCreatedDates(from: parseResult.records, in: db)
+      }
+      summary.backupRecipeCount += parseResult.skippedEntryCount
+      summary.skippedRecordCount += parseResult.skippedEntryCount
+      destination = .backupSupplementSummary(RecipeBackupSupplementSummary(summary: summary))
+    } catch CocoaError.userCancelled {
+      isImporting = false
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      isImporting = false
+    }
+  }
+
   func editButtonTapped(recipeID: Recipe.ID) {
     destination = .editRecipe(recipeID)
   }
@@ -157,9 +205,23 @@ final class RecipeLibraryModel {
     showsFavoritesOnly = false
     showsPhotosOnly = false
     selectedCategoryName = nil
-    selectedTagName = nil
+    selectedTagNames = []
     selectedCuisine = nil
     selectedCourse = nil
+    selectedSourceName = nil
+    selectedAuthorName = nil
+  }
+
+  func doneFilteringButtonTapped() {
+    destination = nil
+  }
+
+  func tagFilterButtonTapped(_ tagName: String) {
+    if selectedTagNames.contains(tagName) {
+      selectedTagNames.remove(tagName)
+    } else {
+      selectedTagNames.insert(tagName)
+    }
   }
 
   func confirmDeleteRecipeButtonTapped(recipeID: Recipe.ID) {
@@ -191,6 +253,7 @@ final class RecipeLibraryModel {
       || (recipe.summary?.localizedCaseInsensitiveContains(query) ?? false)
       || (recipe.cuisine?.localizedCaseInsensitiveContains(query) ?? false)
       || (recipe.course?.localizedCaseInsensitiveContains(query) ?? false)
+      || row.sourceSearchValues.contains { $0.localizedCaseInsensitiveContains(query) }
       || row.categoryNames.contains { $0.localizedCaseInsensitiveContains(query) }
       || row.tagNames.contains { $0.localizedCaseInsensitiveContains(query) }
   }
@@ -202,13 +265,19 @@ final class RecipeLibraryModel {
     if let selectedCategoryName, !row.categoryNames.contains(selectedCategoryName) {
       return false
     }
-    if let selectedTagName, !row.tagNames.contains(selectedTagName) {
+    if !selectedTagNames.isEmpty, !selectedTagNames.isSubset(of: Set(row.tagNames)) {
       return false
     }
     if let selectedCuisine, recipe.cuisine != selectedCuisine {
       return false
     }
     if let selectedCourse, recipe.course != selectedCourse {
+      return false
+    }
+    if let selectedSourceName, row.filterSourceName != selectedSourceName {
+      return false
+    }
+    if let selectedAuthorName, row.source?.author.nonEmpty != selectedAuthorName {
       return false
     }
     return true
@@ -313,6 +382,40 @@ private extension Recipe {
   }
 }
 
+private extension RecipeListRowData {
+  var filterSourceName: String? {
+    source?.name.nonEmpty
+      ?? source?.publicationName.nonEmpty
+      ?? source?.bookTitle.nonEmpty
+  }
+
+  var sourceSearchValues: [String] {
+    [
+      source?.name,
+      source?.url,
+      source?.author,
+      source?.publicationName,
+      source?.bookTitle,
+      source?.pageNumber,
+      source?.sourceNotes,
+    ]
+    .compactMap { $0?.nonEmpty }
+  }
+}
+
+private extension String {
+  var nonEmpty: String? {
+    let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+  }
+}
+
+private extension Optional where Wrapped == String {
+  var nonEmpty: String? {
+    flatMap(\.nonEmpty)
+  }
+}
+
 struct RecipeImportSummary: Identifiable, Equatable, Sendable {
   let id = UUID()
   var importedCount: Int
@@ -336,6 +439,23 @@ struct RecipeImportSummary: Identifiable, Equatable, Sendable {
       lines.append("No warnings.")
     }
     return lines.joined(separator: "\n")
+  }
+}
+
+struct RecipeBackupSupplementSummary: Identifiable, Equatable, Sendable {
+  let id = UUID()
+  var summary: PaprikaRecipeBackupSupplementSummary
+
+  var message: String {
+    [
+      "Read \(summary.backupRecipeCount) \(summary.backupRecipeCount == 1 ? "backup recipe" : "backup recipes").",
+      "Updated \(summary.updatedRecipeCount) \(summary.updatedRecipeCount == 1 ? "recipe" : "recipes").",
+      "Left \(summary.unchangedRecipeCount) already-correct \(summary.unchangedRecipeCount == 1 ? "recipe" : "recipes") unchanged.",
+      "\(summary.unmatchedRecipeCount) did not match an existing recipe.",
+      "\(summary.ambiguousRecipeCount) had ambiguous title matches.",
+      "\(summary.skippedRecordCount) \(summary.skippedRecordCount == 1 ? "record was" : "records were") skipped."
+    ]
+    .joined(separator: "\n")
   }
 }
 

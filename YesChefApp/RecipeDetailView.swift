@@ -101,15 +101,7 @@ struct RecipeDetailView: View {
       .foregroundStyle(.secondary)
 
       if let source = model.detail?.source {
-        HStack {
-          Image(systemName: "book")
-          if let urlString = source.url, let url = URL(string: urlString) {
-            Link(source.name ?? urlString, destination: url)
-          } else {
-            Text(source.name ?? "Source")
-          }
-        }
-        .font(.subheadline)
+        SourceMetadataView(source: source)
       }
 
       if let tags = model.detail?.tags, !tags.isEmpty {
@@ -199,6 +191,60 @@ struct RecipeDetailView: View {
 
 }
 
+private struct SourceMetadataView: View {
+  let source: RecipeSource
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(alignment: .firstTextBaseline, spacing: 8) {
+        Image(systemName: "book")
+          .foregroundStyle(.secondary)
+        if let urlString = source.url, let url = URL(string: urlString) {
+          Link(source.displayName, destination: url)
+        } else {
+          Text(source.displayName)
+        }
+      }
+
+      ForEach(source.detailLines, id: \.self) { line in
+        Text(line)
+          .foregroundStyle(.secondary)
+          .padding(.leading, 28)
+      }
+    }
+    .font(.subheadline)
+  }
+}
+
+private extension RecipeSource {
+  var displayName: String {
+    name?.nonEmpty ?? publicationName?.nonEmpty ?? bookTitle?.nonEmpty ?? url?.nonEmpty ?? "Source"
+  }
+
+  var detailLines: [String] {
+    [
+      author.nonEmpty.map { "Author: \($0)" },
+      publicationName.nonEmpty.map { "Publication: \($0)" },
+      bookTitle.nonEmpty.map { "Book: \($0)" },
+      pageNumber.nonEmpty.map { "Page: \($0)" },
+      sourceNotes.nonEmpty,
+    ].compactMap(\.self)
+  }
+}
+
+private extension String {
+  var nonEmpty: String? {
+    let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+  }
+}
+
+private extension Optional where Wrapped == String {
+  var nonEmpty: String? {
+    flatMap(\.nonEmpty)
+  }
+}
+
 private struct RecipePhotoGallery: View {
   let photos: [RecipePhoto]
   @State private var selectedPhotoID: RecipePhoto.ID?
@@ -279,7 +325,7 @@ private extension RecipePhoto {
   }
 
   var isLowResolution: Bool {
-    max(pixelWidth ?? 0, pixelHeight ?? 0) < 700
+    Swift.max(pixelWidth ?? 0, pixelHeight ?? 0) < 700
   }
 }
 

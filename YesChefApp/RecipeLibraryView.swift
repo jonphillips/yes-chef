@@ -62,6 +62,11 @@ struct AppContainer: View {
         RecipeEditorView(model: RecipeEditorModel(recipeID: nil))
       }
     }
+    .sheet(isPresented: $recipeModel.destination.filterRecipes) {
+      NavigationStack {
+        RecipeFilterView(model: recipeModel)
+      }
+    }
     .sheet(item: $recipeModel.destination.editRecipe, id: \.self) { (recipeID: Recipe.ID) in
       NavigationStack {
         RecipeEditorView(model: RecipeEditorModel(recipeID: recipeID))
@@ -90,6 +95,11 @@ struct AppContainer: View {
       Text("Delete \(recipeModel.title(for: recipeID)) from your recipe library?")
     }
     .alert("Import Complete", item: $recipeModel.destination.importSummary) { _ in
+      Button("OK") {}
+    } message: { summary in
+      Text(summary.message)
+    }
+    .alert("Backup Supplement Complete", item: $recipeModel.destination.backupSupplementSummary) { _ in
       Button("OK") {}
     } message: { summary in
       Text(summary.message)
@@ -215,12 +225,20 @@ private struct RecipeListView: View {
         await model.paprikaExportSelected(result)
       }
     }
+    .fileImporter(
+      isPresented: $model.isPresentingPaprikaBackupSupplementer,
+      allowedContentTypes: [.paprikaRecipes]
+    ) { result in
+      Task {
+        await model.paprikaBackupSelected(result)
+      }
+    }
     .overlay {
       if model.isImporting {
         ZStack {
           Rectangle()
             .fill(.background.opacity(0.65))
-          ProgressView("Importing")
+          ProgressView(model.importActivityTitle)
             .controlSize(.large)
         }
       }
@@ -232,7 +250,18 @@ private struct RecipeListView: View {
     }
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {
-        RecipeListOptionsMenu(model: model)
+        RecipeSortMenu(model: model)
+        Button {
+          model.filterButtonTapped()
+        } label: {
+          Label(
+            "Filter Recipes",
+            systemImage: model.hasActiveFilters
+              ? "line.3.horizontal.decrease.circle.fill"
+              : "line.3.horizontal.decrease.circle"
+          )
+        }
+        .disabled(model.isImporting)
         Button {
           model.addRecipeButtonTapped()
         } label: {
@@ -240,11 +269,18 @@ private struct RecipeListView: View {
         }
         .disabled(model.isImporting)
       }
-      ToolbarItem(placement: .secondaryAction) {
+      ToolbarItemGroup(placement: .secondaryAction) {
         Button {
           model.importPaprikaExportButtonTapped()
         } label: {
           Label("Import Paprika Export", systemImage: "square.and.arrow.down")
+        }
+        .disabled(model.isImporting)
+
+        Button {
+          model.supplementPaprikaBackupButtonTapped()
+        } label: {
+          Label("Supplement Paprika Backup", systemImage: "calendar.badge.clock")
         }
         .disabled(model.isImporting)
       }
@@ -252,63 +288,150 @@ private struct RecipeListView: View {
   }
 }
 
-private struct RecipeListOptionsMenu: View {
+private extension UTType {
+  static var paprikaRecipes: UTType {
+    UTType(filenameExtension: "paprikarecipes") ?? .data
+  }
+}
+
+private struct RecipeSortMenu: View {
   let model: RecipeLibraryModel
 
   var body: some View {
     @Bindable var model = model
 
     Menu {
-      Picker("Sort", selection: $model.sortOrder) {
+      Picker("Sort Recipes", selection: $model.sortOrder) {
         ForEach(RecipeListSort.allCases) { sort in
           Text(sort.title)
             .tag(sort)
         }
       }
-      Section("Filter") {
-        Toggle("Favorites", isOn: $model.showsFavoritesOnly)
-        Toggle("With Photos", isOn: $model.showsPhotosOnly)
-      }
-      RecipeStringFilterPicker(
-        title: "Category",
-        selection: $model.selectedCategoryName,
-        options: model.categoryFilterOptions
-      )
-      RecipeStringFilterPicker(
-        title: "Tag",
-        selection: $model.selectedTagName,
-        options: model.tagFilterOptions
-      )
-      RecipeStringFilterPicker(
-        title: "Cuisine",
-        selection: $model.selectedCuisine,
-        options: model.cuisineFilterOptions
-      )
-      RecipeStringFilterPicker(
-        title: "Course",
-        selection: $model.selectedCourse,
-        options: model.courseFilterOptions
-      )
-      if model.hasActiveFilters {
-        Section {
-          Button("Clear Filters") {
-            model.clearFiltersButtonTapped()
-          }
-        }
-      }
     } label: {
-      Label(
-        "Filter and Sort",
-        systemImage: model.hasActiveFilters
-          ? "line.3.horizontal.decrease.circle.fill"
-          : "line.3.horizontal.decrease.circle"
-      )
+      Label("Sort Recipes", systemImage: "arrow.up.arrow.down")
     }
     .disabled(model.isImporting)
   }
 }
 
-private struct RecipeStringFilterPicker: View {
+private struct RecipeFilterView: View {
+  let model: RecipeLibraryModel
+  @State private var tagSearchText = ""
+
+  private var filteredTagOptions: [String] {
+    let query = tagSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !query.isEmpty else { return model.tagFilterOptions }
+    return model.tagFilterOptions.filter { $0.localizedCaseInsensitiveContains(query) }
+  }
+
+  var body: some View {
+    @Bindable var model = model
+
+    Form {
+      Section {
+        Toggle("Favorites", isOn: $model.showsFavoritesOnly)
+        Toggle("With Photos", isOn: $model.showsPhotosOnly)
+      }
+
+      Section {
+        if model.tagFilterOptions.isEmpty {
+          Text("No tags yet")
+            .foregroundStyle(.secondary)
+        } else {
+          TextField("Find tags", text: $tagSearchText)
+            .textInputAutocapitalization(.never)
+          if filteredTagOptions.isEmpty {
+            Text("No matching tags")
+              .foregroundStyle(.secondary)
+          } else {
+            ForEach(filteredTagOptions, id: \.self) { tagName in
+              RecipeTagFilterRow(
+                tagName: tagName,
+                isSelected: model.selectedTagNames.contains(tagName)
+              ) {
+                model.tagFilterButtonTapped(tagName)
+              }
+            }
+          }
+        }
+      } header: {
+        Text("Tags")
+      } footer: {
+        if model.selectedTagNames.count > 1 {
+          Text("Recipes must match all selected tags.")
+        }
+      }
+
+      Section("Fields") {
+        RecipeOptionalStringPicker(
+          title: "Category",
+          selection: $model.selectedCategoryName,
+          options: model.categoryFilterOptions
+        )
+        RecipeOptionalStringPicker(
+          title: "Cuisine",
+          selection: $model.selectedCuisine,
+          options: model.cuisineFilterOptions
+        )
+        RecipeOptionalStringPicker(
+          title: "Course",
+          selection: $model.selectedCourse,
+          options: model.courseFilterOptions
+        )
+        RecipeOptionalStringPicker(
+          title: "Source",
+          selection: $model.selectedSourceName,
+          options: model.sourceFilterOptions
+        )
+        RecipeOptionalStringPicker(
+          title: "Author",
+          selection: $model.selectedAuthorName,
+          options: model.authorFilterOptions
+        )
+      }
+    }
+    .navigationTitle("Filters")
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .cancellationAction) {
+        Button("Clear") {
+          model.clearFiltersButtonTapped()
+        }
+        .disabled(!model.hasActiveFilters)
+      }
+      ToolbarItem(placement: .confirmationAction) {
+        Button("Done") {
+          model.doneFilteringButtonTapped()
+        }
+      }
+    }
+    .presentationDetents([.medium, .large])
+  }
+}
+
+private struct RecipeTagFilterRow: View {
+  let tagName: String
+  let isSelected: Bool
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      HStack {
+        Text(tagName)
+        Spacer()
+        if isSelected {
+          Image(systemName: "checkmark")
+            .font(.body.weight(.semibold))
+            .foregroundStyle(.tint)
+        }
+      }
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+  }
+}
+
+private struct RecipeOptionalStringPicker: View {
   let title: String
   @Binding var selection: String?
   let options: [String]
@@ -348,9 +471,9 @@ private struct RecipeActiveFilterBar: View {
             model.selectedCategoryName = nil
           }
         }
-        if let selectedTagName = model.selectedTagName {
-          RecipeFilterChip(title: selectedTagName, systemImage: "tag") {
-            model.selectedTagName = nil
+        ForEach(model.selectedTagNames.sorted(), id: \.self) { tagName in
+          RecipeFilterChip(title: tagName, systemImage: "tag") {
+            model.selectedTagNames.remove(tagName)
           }
         }
         if let selectedCuisine = model.selectedCuisine {
@@ -361,6 +484,16 @@ private struct RecipeActiveFilterBar: View {
         if let selectedCourse = model.selectedCourse {
           RecipeFilterChip(title: selectedCourse, systemImage: "fork.knife") {
             model.selectedCourse = nil
+          }
+        }
+        if let selectedSourceName = model.selectedSourceName {
+          RecipeFilterChip(title: selectedSourceName, systemImage: "book") {
+            model.selectedSourceName = nil
+          }
+        }
+        if let selectedAuthorName = model.selectedAuthorName {
+          RecipeFilterChip(title: selectedAuthorName, systemImage: "person.text.rectangle") {
+            model.selectedAuthorName = nil
           }
         }
         Button {

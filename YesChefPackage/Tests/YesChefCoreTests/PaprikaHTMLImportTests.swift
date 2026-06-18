@@ -88,6 +88,7 @@ extension RecipeCoreTests {
       expectNoDifference(bundle.recipe.originalImportText?.contains("schema.org/Recipe"), true)
       expectNoDifference(bundle.source?.name, "Example Kitchen")
       expectNoDifference(bundle.source?.url, "https://example.com/pasta?from=fixture&unit=test")
+      expectNoDifference(bundle.source?.author, nil)
       expectNoDifference(bundle.source?.importedFrom, "Paprika HTML")
       expectNoDifference(bundle.ingredients, pasta.ingredients)
       expectNoDifference(bundle.ingredientLines.first?.quantity, 1.5)
@@ -100,6 +101,45 @@ extension RecipeCoreTests {
       expectNoDifference(snapshot.recipe.title, "Weeknight Tomato Pasta")
       expectNoDifference(snapshot.ingredients, pasta.ingredients)
       expectNoDifference(snapshot.categories, ["Dinner", "Pasta"])
+    }
+
+    @Test
+    func recipeBundleNormalizesKnownSourceDomainsWithoutInferringAuthor() throws {
+      let recipe = PaprikaHTMLRecipe(
+        title: "Kung Pao Chicken",
+        sourceName: "www.cooksillustrated.com",
+        sourceURL: "https://www.cooksillustrated.com/recipes/11227-kung-pao-chicken",
+        originalHTML: "<html></html>"
+      )
+
+      var uuids = SampleUUIDSequence(start: 1_100)
+      let bundle = try recipe.makeRecipeBundle(
+        now: Date(timeIntervalSinceReferenceDate: 802_200_000),
+        uuid: { uuids.next() }
+      )
+
+      expectNoDifference(bundle.source?.name, "Cook's Illustrated")
+      expectNoDifference(bundle.source?.url, "https://www.cooksillustrated.com/recipes/11227-kung-pao-chicken")
+      expectNoDifference(bundle.source?.author, nil)
+    }
+
+    @Test
+    func recipeBundleKeepsNonDomainSourceLabels() throws {
+      let recipe = PaprikaHTMLRecipe(
+        title: "Source Label Test",
+        sourceName: "Example Kitchen",
+        sourceURL: "https://example.com/recipe",
+        originalHTML: "<html></html>"
+      )
+
+      var uuids = SampleUUIDSequence(start: 1_200)
+      let bundle = try recipe.makeRecipeBundle(
+        now: Date(timeIntervalSinceReferenceDate: 802_300_000),
+        uuid: { uuids.next() }
+      )
+
+      expectNoDifference(bundle.source?.name, "Example Kitchen")
+      expectNoDifference(bundle.source?.author, nil)
     }
 
     @Test
