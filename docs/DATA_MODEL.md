@@ -1112,6 +1112,15 @@ parentCategoryID: Category.ID?
 sortOrder: Int
 dateCreated: Date
 
+Possible future field:
+
+description: String?
+
+This should not be required initially. Category titles, child categories, and assigned
+recipes are usually enough semantic context for LLM-assisted workflows. Add an
+optional description or LLM hint only if ambiguous parent categories need more user
+supplied meaning.
+
 13.3 Rules
 
 * Recipes may have multiple categories.

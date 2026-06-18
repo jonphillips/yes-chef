@@ -77,6 +77,11 @@ Yes Chef will use both flexible user taxonomy and typed semantic facets.
     domains should not be aggressively guessed; they can wait for scraping, manual
     cleanup, or LLM-assisted suggestions.
 
+11. **Category descriptions are optional future metadata.** Category names, child
+    categories, and assigned recipes should be sufficient context for most LLM-assisted
+    workflows. Do not require descriptions in the initial category editor; consider an
+    optional description or LLM hint field later for ambiguous parent categories.
+
 ## Consequences
 
 - Do not solve "filter by author" by creating author categories.
@@ -110,4 +115,6 @@ Future work should add:
   exists.
 - Full category management UI for renaming, merging, deleting, and re-parenting
   categories.
+- Optional category descriptions or LLM hints if user-created category names prove
+  ambiguous.
 - A recipe-family model for related versions and preferred/canonical recipe selection.

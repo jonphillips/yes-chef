@@ -84,6 +84,7 @@ public struct RecipeEditorDraft: Equatable, Sendable {
   public var noteText: String
   public var tagNames: String
   public var categoryNames: String
+  public var selectedCategoryIDs: Set<Category.ID>?
   public var originalSnapshot: Data?
   public var dateCreated: Date?
 
@@ -112,6 +113,7 @@ public struct RecipeEditorDraft: Equatable, Sendable {
     noteText: String = "",
     tagNames: String = "",
     categoryNames: String = "",
+    selectedCategoryIDs: Set<Category.ID>? = nil,
     originalSnapshot: Data? = nil,
     dateCreated: Date? = nil
   ) {
@@ -139,6 +141,7 @@ public struct RecipeEditorDraft: Equatable, Sendable {
     self.noteText = noteText
     self.tagNames = tagNames
     self.categoryNames = categoryNames
+    self.selectedCategoryIDs = selectedCategoryIDs
     self.originalSnapshot = originalSnapshot
     self.dateCreated = dateCreated
   }
@@ -188,6 +191,7 @@ public struct RecipeEditorDraft: Equatable, Sendable {
         .joined(separator: "\n\n"),
       tagNames: detail.tags.map(\.name).joined(separator: ", "),
       categoryNames: detail.categoryDisplayNames.joined(separator: ", "),
+      selectedCategoryIDs: Set(detail.categories.map(\.id)),
       originalSnapshot: detail.recipe.originalSnapshot,
       dateCreated: detail.recipe.dateCreated
     )
@@ -353,6 +357,7 @@ public enum RecipeRepository {
       with: reconciledInstructionSteps
     )
     let snapshotNotes = (existingDetail?.notes.filter { $0.noteType != .general } ?? []) + generalNotes
+    let categoryNames = try categoryNames(from: draft, in: db)
 
     if recipe.originalSnapshot == nil {
       recipe.originalSnapshot = try RecipeBundleCoding.snapshotData(
@@ -364,7 +369,7 @@ public enum RecipeRepository {
         instructionSteps: snapshotInstructionSteps,
         notes: snapshotNotes,
         tagNames: draft.tagNames.listNames,
-        categoryNames: draft.categoryNames.listNames,
+        categoryNames: categoryNames,
         photos: existingDetail?.photos ?? [],
         equipment: existingDetail?.equipment ?? [],
         recipeEquipment: existingDetail?.recipeEquipment ?? []
@@ -386,7 +391,7 @@ public enum RecipeRepository {
       in: db
     )
     try reconcileTags(draft.tagNames.listNames, recipeID: recipeID, in: db, now: now, uuid: uuid)
-    try reconcileCategories(draft.categoryNames.listNames, recipeID: recipeID, in: db, now: now, uuid: uuid)
+    try reconcileCategories(from: draft, recipeID: recipeID, in: db, now: now, uuid: uuid)
 
     return recipeID
   }
@@ -397,6 +402,31 @@ public enum RecipeRepository {
       $0.dateModified = now
     }
     .execute(db)
+  }
+
+  private static func categoryNames(from draft: RecipeEditorDraft, in db: Database) throws -> [String] {
+    guard let selectedCategoryIDs = draft.selectedCategoryIDs else {
+      return draft.categoryNames.listNames
+    }
+    let categories = CategoryRepository.sortedCategories(try Category.fetchAll(db))
+    let categoriesByID = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0) })
+    return categories
+      .filter { selectedCategoryIDs.contains($0.id) }
+      .map { CategoryHierarchy.displayName(for: $0, categoriesByID: categoriesByID) }
+  }
+
+  private static func reconcileCategories(
+    from draft: RecipeEditorDraft,
+    recipeID: Recipe.ID,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws {
+    if let selectedCategoryIDs = draft.selectedCategoryIDs {
+      try reconcileCategoryIDs(Array(selectedCategoryIDs), recipeID: recipeID, in: db, uuid: uuid)
+    } else {
+      try reconcileCategories(draft.categoryNames.listNames, recipeID: recipeID, in: db, now: now, uuid: uuid)
+    }
   }
 
   @discardableResult

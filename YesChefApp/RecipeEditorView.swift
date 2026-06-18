@@ -53,11 +53,7 @@ struct RecipeEditorView: View {
         StackedTextField(title: "Cuisine", text: $model.draft.cuisine)
         StackedTextField(title: "Course", text: $model.draft.course)
         StackedTextField(title: "Tags", text: $model.draft.tagNames, prompt: "grill, make-ahead")
-        StackedTextField(
-          title: "Categories",
-          text: $model.draft.categoryNames,
-          prompt: "Meal Type > Mains, Chicken"
-        )
+        RecipeCategorySelectionField(model: model)
       }
 
       Section("Ingredients") {

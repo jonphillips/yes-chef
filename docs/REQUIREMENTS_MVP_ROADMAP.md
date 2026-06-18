@@ -593,6 +593,10 @@ The app should eventually identify and track:
 - What needs cooler space.
 - What needs to thaw 12/24/48 hours ahead.
 
+Future LLM-assisted workflow: generate an on-demand make-ahead strategy for a saved
+recipe, let the user review/edit it, and persist it with the recipe, likely as a
+dedicated make-ahead section rather than a generic note.
+
 ### Source Refresh and Image Recovery
 
 For recipes with source URLs, the app should eventually be able to revisit the source
@@ -611,6 +615,10 @@ Initial goals:
   fetched, and any warnings.
 - Never overwrite user edits silently; recovered data should be reviewable.
 - Respect source site terms and only fetch content the user is allowed to access.
+- At the end of the scraping milestone, evaluate whether the scraper can recover
+  selected recipe comments, especially "most helpful" comments from NYTimes recipes.
+  Treat this as a separate, site-specific research task because it may require DOM
+  interaction, authentication, and stricter source-site terms review.
 
 ### Hierarchical Recipe Categories
 
@@ -636,6 +644,15 @@ Initial goals:
 - Use recovered flat Paprika category names as raw material, but expect manual
   hierarchy reconstruction because the observed `.paprikarecipes` archive does not
   expose the old parent/child category tree.
+- Do not require category descriptions in the first implementation. LLM workflows
+  should usually infer category meaning from the title, children, and assigned
+  recipes. Consider an optional description or LLM hint field later for ambiguous
+  parent categories.
+- Outstanding iOS 27 beta 1 issue: drag/drop category re-parenting is deferred. The
+  SDK 27 drag/drop container APIs compile, but in current simulator testing category
+  rows became draggable without reliable drop behavior and interfered with navigation
+  activation. Revisit after later iOS 27 betas or after isolating a stable minimal
+  reproduction.
 
 ### Source and Author Facets
 

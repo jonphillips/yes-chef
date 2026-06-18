@@ -8,6 +8,7 @@ struct AppContainer: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   @State private var recipeModel = RecipeLibraryModel()
   @State private var selectedSection: AppSection? = .recipes
+  @State private var selectedSettingsPane: SettingsPane? = .categories
 
   var body: some View {
     @Bindable var recipeModel = recipeModel
@@ -28,6 +29,9 @@ struct AppContainer: View {
           }
             .tabItem { AppSection.menus.label }
             .tag(AppSection.menus as AppSection?)
+          SettingsStack(model: recipeModel)
+            .tabItem { AppSection.settings.label }
+            .tag(AppSection.settings as AppSection?)
         }
       } else {
         NavigationSplitView {
@@ -44,6 +48,8 @@ struct AppContainer: View {
             AppPlaceholderView(section: .mealCalendar)
           case .menus:
             AppPlaceholderView(section: .menus)
+          case .settings:
+            SettingsView(model: recipeModel, selectedPane: $selectedSettingsPane)
           }
         } detail: {
           switch selectedSection ?? .recipes {
@@ -53,6 +59,8 @@ struct AppContainer: View {
             AppPlaceholderView(section: .mealCalendar)
           case .menus:
             AppPlaceholderView(section: .menus)
+          case .settings:
+            SettingsDetailPane(selectedPane: selectedSettingsPane)
           }
         }
       }
@@ -109,6 +117,32 @@ struct AppContainer: View {
     } message: {
       Text(recipeModel.errorMessage ?? "")
     }
+    .fileImporter(
+      isPresented: $recipeModel.isPresentingPaprikaImporter,
+      allowedContentTypes: [.zip]
+    ) { result in
+      Task {
+        await recipeModel.paprikaExportSelected(result)
+      }
+    }
+    .fileImporter(
+      isPresented: $recipeModel.isPresentingPaprikaBackupSupplementer,
+      allowedContentTypes: [.paprikaRecipes]
+    ) { result in
+      Task {
+        await recipeModel.paprikaBackupSelected(result)
+      }
+    }
+    .overlay {
+      if recipeModel.isImporting {
+        ZStack {
+          Rectangle()
+            .fill(.background.opacity(0.65))
+          ProgressView(recipeModel.importActivityTitle)
+            .controlSize(.large)
+        }
+      }
+    }
   }
 
 }
@@ -117,6 +151,7 @@ private enum AppSection: String, CaseIterable, Identifiable {
   case recipes
   case mealCalendar
   case menus
+  case settings
 
   var id: Self { self }
 
@@ -129,6 +164,7 @@ private enum AppSection: String, CaseIterable, Identifiable {
     case .recipes: "Recipes"
     case .mealCalendar: "Meal Calendar"
     case .menus: "Menus"
+    case .settings: "Settings"
     }
   }
 
@@ -137,7 +173,30 @@ private enum AppSection: String, CaseIterable, Identifiable {
     case .recipes: "book.closed"
     case .mealCalendar: "calendar"
     case .menus: "menucard"
+    case .settings: "gearshape"
     }
+  }
+}
+
+private enum SettingsPane: String, CaseIterable, Identifiable {
+  case categories
+
+  var id: Self { self }
+
+  var title: String {
+    switch self {
+    case .categories: "Categories"
+    }
+  }
+
+  var systemImage: String {
+    switch self {
+    case .categories: "folder"
+    }
+  }
+
+  @ViewBuilder var label: some View {
+    Label(title, systemImage: systemImage)
   }
 }
 
@@ -164,6 +223,83 @@ private struct RecipeDetailColumn: View {
         .id(recipe.id)
     } else {
       ContentUnavailableView("Select a Recipe", systemImage: "fork.knife")
+    }
+  }
+}
+
+private struct SettingsStack: View {
+  let model: RecipeLibraryModel
+
+  var body: some View {
+    NavigationStack {
+      SettingsView(model: model)
+    }
+  }
+}
+
+private struct SettingsView: View {
+  let model: RecipeLibraryModel
+  private let selectedPane: Binding<SettingsPane?>?
+
+  init(model: RecipeLibraryModel, selectedPane: Binding<SettingsPane?>? = nil) {
+    self.model = model
+    self.selectedPane = selectedPane
+  }
+
+  var body: some View {
+    Form {
+      Section("Library") {
+        categoryRow
+      }
+
+      Section("Import & Export") {
+        Button {
+          model.importPaprikaExportButtonTapped()
+        } label: {
+          Label("Import Paprika HTML Export", systemImage: "square.and.arrow.down")
+        }
+        .disabled(model.isImporting)
+
+        Button {
+          model.supplementPaprikaBackupButtonTapped()
+        } label: {
+          Label("Supplement Paprika Backup", systemImage: "calendar.badge.clock")
+        }
+        .disabled(model.isImporting)
+      }
+    }
+    .navigationTitle("Settings")
+  }
+
+  @ViewBuilder private var categoryRow: some View {
+    if let selectedPane {
+      Button {
+        selectedPane.wrappedValue = .categories
+      } label: {
+        SettingsPane.categories.label
+      }
+      .foregroundStyle(.primary)
+    } else {
+      NavigationLink {
+        CategoryManagementView()
+      } label: {
+        SettingsPane.categories.label
+      }
+    }
+  }
+}
+
+private struct SettingsDetailPane: View {
+  let selectedPane: SettingsPane?
+
+  var body: some View {
+    switch selectedPane {
+    case .categories:
+      NavigationStack {
+        CategoryManagementView()
+      }
+    case nil:
+      ContentUnavailableView("Settings", systemImage: AppSection.settings.systemImage)
     }
   }
 }
@@ -217,32 +353,6 @@ private struct RecipeListView: View {
     }
     .navigationTitle("Recipes")
     .searchable(text: $model.searchText, prompt: "Search recipes")
-    .fileImporter(
-      isPresented: $model.isPresentingPaprikaImporter,
-      allowedContentTypes: [.zip]
-    ) { result in
-      Task {
-        await model.paprikaExportSelected(result)
-      }
-    }
-    .fileImporter(
-      isPresented: $model.isPresentingPaprikaBackupSupplementer,
-      allowedContentTypes: [.paprikaRecipes]
-    ) { result in
-      Task {
-        await model.paprikaBackupSelected(result)
-      }
-    }
-    .overlay {
-      if model.isImporting {
-        ZStack {
-          Rectangle()
-            .fill(.background.opacity(0.65))
-          ProgressView(model.importActivityTitle)
-            .controlSize(.large)
-        }
-      }
-    }
     .safeAreaInset(edge: .top, spacing: 0) {
       if model.hasActiveFilters {
         RecipeActiveFilterBar(model: model)
@@ -266,21 +376,6 @@ private struct RecipeListView: View {
           model.addRecipeButtonTapped()
         } label: {
           Label("Add Recipe", systemImage: "plus")
-        }
-        .disabled(model.isImporting)
-      }
-      ToolbarItemGroup(placement: .secondaryAction) {
-        Button {
-          model.importPaprikaExportButtonTapped()
-        } label: {
-          Label("Import Paprika Export", systemImage: "square.and.arrow.down")
-        }
-        .disabled(model.isImporting)
-
-        Button {
-          model.supplementPaprikaBackupButtonTapped()
-        } label: {
-          Label("Supplement Paprika Backup", systemImage: "calendar.badge.clock")
         }
         .disabled(model.isImporting)
       }
