@@ -58,6 +58,8 @@ Required fields:
 - difficulty
 - rating
 - favorite
+- archived
+- libraryPlacement (future; main vs reference/source material)
 - dateCreated
 - dateModified
 - lastCookedAt
@@ -68,6 +70,8 @@ Required fields:
 
 Note: rating and favorite are plain columns — this is the owner's own private copy of
 the recipe, so there is exactly one of each (theirs). See DATA_MODEL.md §2.6.
+Source, author, cuisine, course, library placement, and future recipe-family role are
+typed concepts, not category/tag conventions. See ADR-0006.
 
 ### IngredientSection
 
@@ -227,6 +231,7 @@ Fields:
 
 - id
 - name
+- parentID (future)
 - sortOrder
 
 ### ShoppingList
@@ -322,7 +327,12 @@ Requirements:
 
 - Show recipe title.
 - Show optional subtitle/source/category.
-- Support search by title, ingredient text, instruction text, note text, source, category, and tag.
+- Support search by title, ingredient text, instruction text, note text, source,
+  author, category, and tag.
+- Support filtering by source and author using `RecipeSource` fields, not category or
+  tag strings.
+- Default browsing should eventually show main-library recipes; reference/source
+  material should be opt-in or reachable from related recipe/family surfaces.
 - Support basic sorting:
   - title
   - date added
@@ -468,6 +478,10 @@ Import existing user-owned recipes from Paprika or other export formats.
 - Preserve instructions.
 - Preserve notes.
 - Preserve categories/tags where possible.
+- Preserve flat Paprika category names; do not assume Paprika parent/child category
+  hierarchy survives export unless a future fixture proves it.
+- Preserve or backfill original creation dates when the selected export format exposes
+  them. The HTML export does not; observed `.paprikarecipes` backups do.
 - Preserve photos if practical.
 - Preserve the best available image quality from the source export, and record when
   the available image appears to be low-resolution.
@@ -597,6 +611,64 @@ Initial goals:
   fetched, and any warnings.
 - Never overwrite user edits silently; recovered data should be reviewable.
 - Respect source site terms and only fetch content the user is allowed to access.
+
+### Hierarchical Recipe Categories
+
+Yes Chef should support a curated category tree for stable personal organization.
+This should be modeled as categories with an optional parent category, not as
+parent/child tags.
+
+Initial goals:
+
+- Keep tags flat for cross-cutting labels such as `make-ahead`, `grill`, and
+  `dinner-party`.
+- Let categories form a tree for stable user organization such as meal type, protein,
+  occasion, or personal collection.
+- Do not make source, author, cuisine, course, or library placement depend on category
+  strings when the app has typed fields for those concepts.
+- In list filtering, selecting a parent category should include recipes in descendant
+  categories unless the user explicitly asks for exact matching.
+- In the iPad layout, consider a category tree in the recipe navigation surface once
+  the library grows beyond simple filters.
+- Use recovered flat Paprika category names as raw material, but expect manual
+  hierarchy reconstruction because the observed `.paprikarecipes` archive does not
+  expose the old parent/child category tree.
+
+### Source and Author Facets
+
+Source and author should be first-class browse/filter facets.
+
+Initial goals:
+
+- Expose `RecipeSource.name`, `author`, `publicationName`, and `bookTitle` in the
+  editor when the user wants detailed source metadata.
+- Preserve source and author data during import where it is available.
+- Filter recipe lists by source and author independently.
+- Treat cookbook names and publications as source metadata, not categories.
+- Allow category/tag import evidence to help populate source fields, but keep uncertain
+  labels as imported categories until the user or a parser can confidently clean them.
+
+### Library Placement and Recipe Families
+
+Yes Chef should support two browsing tiers:
+
+- Main library: recipes the user normally wants to browse, cook, plan, or improve.
+- Reference/source material: recipes kept for comparison, inspiration, or source
+  evidence but hidden from default browsing.
+
+Initial goals:
+
+- Add a `libraryPlacement` concept with main as the default and reference/source
+  material as an alternate placement.
+- Keep archived/deleted recipes separate from reference recipes. Reference means
+  intentionally retained; archived means hidden because the user no longer wants it
+  active.
+- Add a future `RecipeFamily` concept for related recipes such as multiple chocolate
+  chip cookie or Kung Pao chicken versions.
+- Let a family identify one preferred/canonical recipe while keeping related versions
+  available from the detail/family surface.
+- Do not require a `canonical` tag or category filter to keep the normal recipe list
+  useful.
 
 ### Authenticated Source Capture
 
@@ -742,8 +814,8 @@ first build.
   schema, but do not expose a manual "mark cooked" or retrospective-note flow in
   the first slice. The meal calendar will later update/derive last-cooked history
   from planned meals whose dates have passed.
-- Explicitly excluded: CloudKit sync, production import UI, grocery lists, meal
-  planning, recipe transfer, family cookbook, pantry, and AI.
+- Explicitly excluded: CloudKit sync, grocery lists, meal planning, recipe transfer,
+  family cookbook, pantry, and AI.
 
 ### Milestone 2: Paprika Import Spike (schema validation)
 
@@ -757,9 +829,11 @@ first build.
   resolution.
 - Reconcile recipe detail image display so low-resolution and high-resolution imports
   feel intentionally handled rather than visually jumpy.
+- Supplement existing HTML-imported recipes from a Paprika `.paprikarecipes` backup to
+  recover `Recipe.dateCreated` when title/source matching is confident.
 - Preserve unmapped/raw fields.
 - Add tests.
-- No production import UI yet.
+- Full import review/rollback flow remains later.
 
 ### Milestone 3: Scaling and Cooking Mode Hardening
 

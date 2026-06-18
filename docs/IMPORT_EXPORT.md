@@ -120,25 +120,74 @@ Implemented now:
 * Convert parsed recipes into `RecipeBundleCoding.RecipeBundle`.
 * Write a bundle into the library through `RecipeRepository.importBundle`.
 * Preserve raw HTML as `Recipe.originalImportText`.
+* Preserve Paprika HTML source labels as source/publication identity, not as a
+  confidently inferred human author.
+* Normalize known source domains into publication names when the imported source label
+  is only a URL/domain, for example `www.cooksillustrated.com` to `Cook's Illustrated`.
 * Prefer the first PhotoSwipe gallery image as the imported hero when a gallery is
   present, rather than promoting Paprika's small cover thumbnail.
 * Copy available photo bytes into app-owned `RecipePhoto` display/thumbnail payloads.
 * Preserve Paprika image paths as provenance in `RecipePhoto.originalSourcePath`.
 * Report missing recipe-page and missing-photo warnings.
+* Read Paprika `.paprikarecipes` backups as a supplement source for original
+  `Recipe.dateCreated` values.
 * Test against a synthetic, committed Paprika-shaped fixture.
 
 Not implemented yet:
 
-* Production import UI.
-* Parsing Paprika's binary `.paprikarecipes` format.
+* Full replacement import from Paprika `.paprikarecipes` backups.
 * Full-resolution/original image asset storage.
 * Quality tuning for text-heavy reference photos.
 * Consistent recipe-detail image presentation across low-resolution and
   high-resolution imports.
 * Source refresh/image recovery from recipe source pages.
+* Conservative source/author/book cleanup from Paprika categories/tags.
 * Authenticated source capture for login-only recipe sites. This must use
   user-controlled authentication and sanitized fixtures; raw credentials must not be
   stored in source, docs, logs, commits, or prompts.
 * Promoting ingredient headings into real sections.
 * Full import review/rollback flow.
 * Importing all private fixture data into committed tests.
+
+2.9 Paprika `.paprikarecipes` Backup
+
+The observed `.paprikarecipes` file is a ZIP archive containing one
+`.paprikarecipe` entry per recipe. Each entry is gzip-compressed JSON. It is not
+currently treated as the primary import format, because the HTML importer already
+preserves raw recipe pages, imported images, and enough structured recipe data for the
+current app.
+
+The backup format is valuable as a metadata supplement. Observed records include a
+`created` timestamp in `yyyy-MM-dd HH:mm:ss` format, and this data is not present in
+the HTML export. Yes Chef can read a selected `.paprikarecipes` file and backfill
+`Recipe.dateCreated` for existing recipes when matching is confident.
+
+Current supplement rules:
+
+* Match by normalized recipe title.
+* If multiple existing recipes have the same normalized title, require a matching
+  source URL to disambiguate.
+* Skip unmatched, ambiguous, duplicate, or unreadable records and report counts in the
+  completion summary.
+* Update only `Recipe.dateCreated`; do not touch `Recipe.dateModified` or recipe
+  content.
+* Preserve the HTML importer as the primary import path until a full backup importer
+  provides clear additional value beyond created dates.
+
+2.10 Source and Author Inference
+
+Source and author enrichment has multiple inputs with different confidence levels:
+
+* Explicit Paprika source fields are source identity evidence.
+* If an explicit Paprika source field is just a URL/domain, Yes Chef may apply a small
+  deterministic publication map for known domains.
+* Paprika category/tag labels may contain cookbook or author clues, including patterns
+  such as `[Cookbook Name] by [Author]`, but these should be treated as cleanup
+  candidates unless the pattern is clear.
+* Future web scraping can recover structured author/publisher metadata from source
+  pages.
+* Once web scraping exists, Yes Chef can revisit recipes with source URLs to enrich
+  missing source metadata.
+
+Do not silently convert ambiguous imported categories/tags into author/source fields.
+Preserve ambiguous labels and let later cleanup workflows make reviewable suggestions.

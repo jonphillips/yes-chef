@@ -328,6 +328,7 @@ difficulty: RecipeDifficulty?
 rating: Int?
 favorite: Bool
 archived: Bool
+libraryPlacement: RecipeLibraryPlacement (future; not persisted in MVP 1)
 dateCreated: Date
 dateModified: Date
 lastCookedAt: Date?
@@ -338,6 +339,10 @@ importMetadata: ImportMetadata? (future, not persisted in MVP 1)
 
 Note: favorite and rating are plain columns — this is your own private copy of the
 recipe, so there is exactly one rating and one favorite flag (yours). See §2.6.
+
+Taxonomy note: categories and tags are not the universal metadata bucket. Source,
+author, cuisine, course, library placement, and future recipe-family role should be
+typed fields/entities when the app understands them. See ADR-0006.
 
 4.3 Field Notes
 
@@ -469,7 +474,23 @@ yours — because the library is private (see §2.6).
 
 archived
 
-Boolean flag for hiding recipes without deleting them.
+Boolean flag for hiding recipes without deleting them. Archived recipes are hidden
+because the user no longer wants them active. Do not use `archived` for recipes that
+are still valuable as source/reference material; use future `libraryPlacement`
+instead.
+
+libraryPlacement
+
+Future field, not persisted in MVP 1. Controls whether a recipe appears in the default
+main library or is kept as source/reference material. Default should be `main`.
+
+Possible enum:
+
+main
+reference
+
+Reference recipes remain searchable and linkable, and may appear as related versions
+from a canonical/preferred recipe. They should not clutter the default browse list.
 
 originalImportText
 
@@ -524,6 +545,12 @@ sourceNotes: String?
 `recipeID`. It is logically one optional source record per recipe for MVP 1, not a
 set of flattened columns on `Recipe`. If a later recipe needs multiple sources, add a
 new relationship deliberately rather than overloading this first shape.
+
+Source identity and author identity are first-class metadata, not categories. Filtering
+by source (America's Test Kitchen, Milk Street, The French Laundry Cookbook) or author
+(Steve Dunn, Christopher Kimball, Thomas Keller) should use `RecipeSource` fields
+rather than category/tag strings. Importers may use category strings as evidence, but
+known source/author data should be mapped into typed fields when confidence is high.
 
 5.4 Examples
 
@@ -1081,6 +1108,7 @@ Breakfast
 
 id: UUID
 name: String
+parentID: Category.ID? (future; not persisted in MVP 1)
 sortOrder: Int
 dateCreated: Date
 
@@ -1089,6 +1117,24 @@ dateCreated: Date
 * Recipes may have multiple categories.
 * Categories should support Paprika import if Paprika categories exist.
 * Do not require exactly one category per recipe.
+* Categories are the right place for stable hierarchy. Future category UI should
+support parent/child organization such as `Meal Type > Appetizers`,
+`Protein > Chicken`, or `Occasion > Beach`.
+* Categories should not be the primary model for known facets that deserve typed
+fields, including source, author, cuisine, course, and library placement. See
+ADR-0006.
+* Tags remain flat and cross-cutting; do not recreate Paprika-style parent/child
+tags in the Tag model.
+* Paprika `.paprikarecipes` exports observed so far preserve flat category names per
+recipe but not the global parent/child category tree, so category hierarchy may need
+manual reconstruction or a separate source of truth.
+
+13.4 Category Management
+
+Categories are user/library data, not built-in constants. Import can create categories
+from source labels, and future UI should allow creating, renaming, merging, deleting,
+and re-parenting categories. The app may ship suggestions or templates later, but the
+owner's library taxonomy wins.
 
 14. Equipment
 
@@ -1396,6 +1442,62 @@ Toast spices
 Salt cabbage
 Make margarita base
 
+22A. RecipeFamily
+
+22A.1 Purpose
+
+Future entity for grouping recipes that are variants or source material for the same
+dish.
+
+Examples:
+
+Chocolate Chip Cookies
+Kung Pao Chicken
+Caesar Salad
+French Onion Soup
+
+A family lets the app keep several recipes without making the main library noisy. One
+recipe can be the preferred/canonical recipe, while related recipes remain available
+for comparison, inspiration, or source evidence.
+
+22A.2 Fields
+
+id: UUID
+name: String
+preferredRecipeID: Recipe.ID?
+dateCreated: Date
+dateModified: Date
+
+22A.3 Join Entity
+
+RecipeFamilyMember
+
+id: UUID
+familyID: RecipeFamily.ID
+recipeID: Recipe.ID
+role: RecipeFamilyRole
+sortOrder: Int
+notes: String?
+
+Possible roles:
+
+preferred
+variant
+sourceMaterial
+adaptation
+inspiration
+
+22A.4 Rules
+
+* A recipe family is not the same as a RecipeVersion. Families group separate recipe
+rows that the user wants to compare or relate.
+* A family may have zero or one preferred recipe.
+* The preferred recipe usually belongs in the main library. Related source material
+may use `libraryPlacement = reference`.
+* Do not model "canonical" as a tag the user must constantly filter by.
+* Related versions should be discoverable from the recipe detail view and from future
+family browsing/search.
+
 22. RecipeVersion
 
 22.1 Purpose
@@ -1687,6 +1789,12 @@ Import must be forgiving.
 
 Do not assume the Paprika export format until a real sample is inspected. Observed
 Paprika HTML export behavior is recorded in IMPORT_EXPORT.md.
+
+Observed Paprika `.paprikarecipes` backups are ZIP archives of gzip-compressed JSON
+records. Yes Chef currently uses them as a supplement source for `Recipe.dateCreated`,
+not as a replacement for the HTML importer. Matching must be conservative: normalized
+title match, with source URL required when the title is ambiguous. Supplementing
+created dates must not change `dateModified` or rewrite recipe content.
 
 Once a sample exists:
 
