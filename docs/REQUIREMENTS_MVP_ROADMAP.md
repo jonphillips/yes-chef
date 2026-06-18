@@ -643,7 +643,9 @@ Initial goals:
   categories unless the user explicitly asks for exact matching.
 - Current foundation: the editor accepts category paths such as
   `Meal Type > Dinner Party`; the repository creates parent/child category rows and
-  list filters include parent paths for descendant recipes.
+  list filters include parent paths for descendant recipes. The recipe filter sheet
+  supports multi-select category filtering through a hierarchical picker rather than
+  a flat path list.
 - In the iPad layout, consider a category tree in the recipe navigation surface once
   the library grows beyond simple filters.
 - Use recovered flat Paprika category names as raw material, but expect manual

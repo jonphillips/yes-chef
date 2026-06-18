@@ -40,7 +40,7 @@ final class RecipeLibraryModel {
   var libraryScope = RecipeLibraryScope.main
   var showsFavoritesOnly = false
   var showsPhotosOnly = false
-  var selectedCategoryName: String?
+  var selectedCategoryNames: Set<String> = []
   var selectedTagNames: Set<String> = []
   var selectedCuisine: String?
   var selectedCourse: String?
@@ -60,7 +60,7 @@ final class RecipeLibraryModel {
     showsFavoritesOnly
       || showsPhotosOnly
       || libraryScope != .main
-      || selectedCategoryName != nil
+      || !selectedCategoryNames.isEmpty
       || !selectedTagNames.isEmpty
       || selectedCuisine != nil
       || selectedCourse != nil
@@ -90,6 +90,13 @@ final class RecipeLibraryModel {
 
   var authorFilterOptions: [String] {
     distinctOptions(unarchivedRecipeRows.compactMap { $0.source?.author.nonEmpty })
+  }
+
+  var selectedCategoryFilterSummary: String {
+    guard !selectedCategoryNames.isEmpty else { return "All categories" }
+    return selectedCategoryNames
+      .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+      .joined(separator: ", ")
   }
 
   var selectedRecipe: Recipe? {
@@ -207,7 +214,7 @@ final class RecipeLibraryModel {
     showsFavoritesOnly = false
     showsPhotosOnly = false
     libraryScope = .main
-    selectedCategoryName = nil
+    selectedCategoryNames = []
     selectedTagNames = []
     selectedCuisine = nil
     selectedCourse = nil
@@ -224,6 +231,14 @@ final class RecipeLibraryModel {
       selectedTagNames.remove(tagName)
     } else {
       selectedTagNames.insert(tagName)
+    }
+  }
+
+  func categoryFilterButtonTapped(_ categoryName: String) {
+    if selectedCategoryNames.contains(categoryName) {
+      selectedCategoryNames.remove(categoryName)
+    } else {
+      selectedCategoryNames.insert(categoryName)
     }
   }
 
@@ -273,7 +288,8 @@ final class RecipeLibraryModel {
     }
     if showsFavoritesOnly && !recipe.favorite { return false }
     if showsPhotosOnly && !row.hasPhoto { return false }
-    if let selectedCategoryName, !row.categoryFilterNames.contains(selectedCategoryName) {
+    if !selectedCategoryNames.isEmpty,
+       !selectedCategoryNames.isSubset(of: Set(row.categoryFilterNames)) {
       return false
     }
     if !selectedTagNames.isEmpty, !selectedTagNames.isSubset(of: Set(row.tagNames)) {

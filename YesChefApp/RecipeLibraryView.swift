@@ -436,6 +436,29 @@ private struct RecipeFilterView: View {
       }
 
       Section {
+        if model.categoryFilterOptions.isEmpty {
+          Text("No categories yet")
+            .foregroundStyle(.secondary)
+        } else {
+          NavigationLink {
+            RecipeCategoryFilterPickerView(model: model)
+          } label: {
+            StackedFormField(title: "Categories") {
+              Text(model.selectedCategoryFilterSummary)
+                .foregroundStyle(model.selectedCategoryNames.isEmpty ? .secondary : .primary)
+                .lineLimit(3)
+            }
+          }
+        }
+      } header: {
+        Text("Categories")
+      } footer: {
+        if !model.selectedCategoryNames.isEmpty {
+          Text("Recipes must match all selected categories. Parent categories include descendants.")
+        }
+      }
+
+      Section {
         if model.tagFilterOptions.isEmpty {
           Text("No tags yet")
             .foregroundStyle(.secondary)
@@ -447,8 +470,9 @@ private struct RecipeFilterView: View {
               .foregroundStyle(.secondary)
           } else {
             ForEach(filteredTagOptions, id: \.self) { tagName in
-              RecipeTagFilterRow(
-                tagName: tagName,
+              RecipeFilterSelectionRow(
+                title: tagName,
+                systemImage: "tag",
                 isSelected: model.selectedTagNames.contains(tagName)
               ) {
                 model.tagFilterButtonTapped(tagName)
@@ -465,11 +489,6 @@ private struct RecipeFilterView: View {
       }
 
       Section("Fields") {
-        RecipeOptionalStringPicker(
-          title: "Category",
-          selection: $model.selectedCategoryName,
-          options: model.categoryFilterOptions
-        )
         RecipeOptionalStringPicker(
           title: "Cuisine",
           selection: $model.selectedCuisine,
@@ -511,15 +530,203 @@ private struct RecipeFilterView: View {
   }
 }
 
-private struct RecipeTagFilterRow: View {
-  let tagName: String
+private struct RecipeCategoryFilterPickerView: View {
+  let model: RecipeLibraryModel
+  @State private var searchText = ""
+
+  private var rootNodes: [RecipeCategoryFilterNode] {
+    RecipeCategoryFilterNode.tree(from: model.categoryFilterOptions)
+  }
+
+  private var matchingNodes: [RecipeCategoryFilterNode] {
+    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !query.isEmpty else { return [] }
+    return rootNodes
+      .flatMap(\.flattened)
+      .filter { $0.path.localizedCaseInsensitiveContains(query) }
+  }
+
+  var body: some View {
+    Group {
+      if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        RecipeCategoryFilterLevelView(
+          model: model,
+          title: "Categories",
+          parentNode: nil,
+          nodes: rootNodes
+        )
+      } else {
+        List {
+          if matchingNodes.isEmpty {
+            ContentUnavailableView("No Matching Categories", systemImage: "folder")
+          } else {
+            ForEach(matchingNodes) { node in
+              RecipeFilterSelectionRow(
+                title: node.path,
+                systemImage: "folder",
+                isSelected: model.selectedCategoryNames.contains(node.path)
+              ) {
+                model.categoryFilterButtonTapped(node.path)
+              }
+            }
+          }
+        }
+        .navigationTitle("Categories")
+      }
+    }
+    .searchable(text: $searchText, prompt: "Search categories")
+  }
+}
+
+private struct RecipeCategoryFilterLevelView: View {
+  let model: RecipeLibraryModel
+  let title: String
+  let parentNode: RecipeCategoryFilterNode?
+  let nodes: [RecipeCategoryFilterNode]
+
+  var body: some View {
+    List {
+      if let parentNode {
+        Section {
+          RecipeFilterSelectionRow(
+            title: "All \(parentNode.title)",
+            systemImage: "folder.fill",
+            isSelected: model.selectedCategoryNames.contains(parentNode.path)
+          ) {
+            model.categoryFilterButtonTapped(parentNode.path)
+          }
+        } footer: {
+          Text("Parent filters include recipes in descendant categories.")
+        }
+      }
+
+      Section(parentNode == nil ? "Top Level" : "Subcategories") {
+        ForEach(nodes) { node in
+          RecipeCategoryFilterNodeRow(model: model, node: node)
+        }
+      }
+    }
+    .navigationTitle(title)
+    .navigationBarTitleDisplayMode(.inline)
+  }
+}
+
+private struct RecipeCategoryFilterNodeRow: View {
+  let model: RecipeLibraryModel
+  let node: RecipeCategoryFilterNode
+
+  var body: some View {
+    if node.children.isEmpty {
+      RecipeFilterSelectionRow(
+        title: node.title,
+        systemImage: "folder",
+        isSelected: model.selectedCategoryNames.contains(node.path)
+      ) {
+        model.categoryFilterButtonTapped(node.path)
+      }
+    } else {
+      NavigationLink {
+        RecipeCategoryFilterLevelView(
+          model: model,
+          title: node.title,
+          parentNode: node,
+          nodes: node.children
+        )
+      } label: {
+        HStack(spacing: 12) {
+          Image(systemName: "folder.fill")
+            .foregroundStyle(.secondary)
+            .frame(width: 22)
+          VStack(alignment: .leading, spacing: 2) {
+            Text(node.title)
+            if selectedPathCount > 0 {
+              Text("\(selectedPathCount) selected")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private var selectedPathCount: Int {
+    node.flattened.filter { model.selectedCategoryNames.contains($0.path) }.count
+  }
+}
+
+private struct RecipeCategoryFilterNode: Identifiable, Equatable {
+  let title: String
+  let path: String
+  let children: [RecipeCategoryFilterNode]
+
+  var id: String { path }
+
+  var flattened: [RecipeCategoryFilterNode] {
+    [self] + children.flatMap(\.flattened)
+  }
+
+  static func tree(from categoryPaths: [String]) -> [RecipeCategoryFilterNode] {
+    let parsedPaths = categoryPaths
+      .map(pathComponents)
+      .filter { !$0.isEmpty }
+    return nodes(parentComponents: [], parsedPaths: parsedPaths)
+  }
+
+  private static func nodes(
+    parentComponents: [String],
+    parsedPaths: [[String]]
+  ) -> [RecipeCategoryFilterNode] {
+    let depth = parentComponents.count
+    let childTitles: Set<String> = Set(
+      parsedPaths.compactMap { components in
+        guard components.count > depth,
+              hasPrefix(parentComponents, in: components) else { return nil }
+        return components[depth]
+      }
+    )
+
+    return childTitles
+      .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+      .map { title in
+        let components = parentComponents + [title]
+        let childPaths = parsedPaths.filter { hasPrefix(components, in: $0) }
+        return RecipeCategoryFilterNode(
+          title: title,
+          path: components.joined(separator: " > "),
+          children: nodes(parentComponents: components, parsedPaths: childPaths)
+        )
+      }
+  }
+
+  private static func pathComponents(_ path: String) -> [String] {
+    path
+      .split(separator: ">")
+      .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+  }
+
+  private static func hasPrefix(_ prefix: [String], in components: [String]) -> Bool {
+    guard prefix.count <= components.count else { return false }
+    return zip(prefix, components).allSatisfy { pair in
+      pair.0 == pair.1
+    }
+  }
+}
+
+private struct RecipeFilterSelectionRow: View {
+  let title: String
+  let systemImage: String
   let isSelected: Bool
   let action: () -> Void
 
   var body: some View {
     Button(action: action) {
-      HStack {
-        Text(tagName)
+      HStack(spacing: 12) {
+        Image(systemName: systemImage)
+          .foregroundStyle(.secondary)
+          .frame(width: 22)
+        Text(title)
         Spacer()
         if isSelected {
           Image(systemName: "checkmark")
@@ -573,9 +780,9 @@ private struct RecipeActiveFilterBar: View {
             model.libraryScope = .main
           }
         }
-        if let selectedCategoryName = model.selectedCategoryName {
-          RecipeFilterChip(title: selectedCategoryName, systemImage: "folder") {
-            model.selectedCategoryName = nil
+        ForEach(model.selectedCategoryNames.sorted(), id: \.self) { categoryName in
+          RecipeFilterChip(title: categoryName, systemImage: "folder") {
+            model.selectedCategoryNames.remove(categoryName)
           }
         }
         ForEach(model.selectedTagNames.sorted(), id: \.self) { tagName in
