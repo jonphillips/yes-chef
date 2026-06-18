@@ -319,7 +319,11 @@ Good AI features include:
 - Extract oven temperatures.
 - Extract make-ahead opportunities.
 - Generate a reviewable make-ahead strategy for a saved recipe and persist the accepted
-  version with that recipe.
+  version with that recipe, likely as its own make-ahead section rather than a generic
+  note.
+- For supported source sites, recover selected high-signal recipe comments and either
+  let the user mark keepers in real time or synthesize useful adjustments into a
+  reviewable proposal.
 - Extract freezing/thawing implications.
 - Suggest grocery categories.
 - Merge shopping-list items.

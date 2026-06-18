@@ -594,8 +594,10 @@ The app should eventually identify and track:
 - What needs to thaw 12/24/48 hours ahead.
 
 Future LLM-assisted workflow: generate an on-demand make-ahead strategy for a saved
-recipe, let the user review/edit it, and persist it with the recipe, likely as a
-dedicated make-ahead section rather than a generic note.
+recipe, let the user review/edit it, and persist the accepted strategy with the
+recipe, likely as a dedicated make-ahead section rather than a generic note. This
+should remain user-approved recipe content, not an invisible model inference that
+changes automatically.
 
 ### Source Refresh and Image Recovery
 
@@ -617,8 +619,11 @@ Initial goals:
 - Respect source site terms and only fetch content the user is allowed to access.
 - At the end of the scraping milestone, evaluate whether the scraper can recover
   selected recipe comments, especially "most helpful" comments from NYTimes recipes.
-  Treat this as a separate, site-specific research task because it may require DOM
-  interaction, authentication, and stricter source-site terms review.
+  Possible workflows include live user review to mark a few keepers, or asking an
+  LLM to integrate and synthesize useful comment-derived adjustments into a
+  reviewable proposal. Treat this as a separate, site-specific research task because
+  it may require DOM interaction, authentication, and stricter source-site terms
+  review.
 
 ### Hierarchical Recipe Categories
 
