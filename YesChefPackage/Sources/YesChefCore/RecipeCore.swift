@@ -12,6 +12,7 @@ public struct RecipeDetailData: Equatable, Sendable {
   public var photos: [RecipePhoto]
   public var tags: [Tag]
   public var categories: [Category]
+  public var categoryDisplayNames: [String]
   public var equipment: [Equipment]
   public var recipeEquipment: [RecipeEquipment]
 
@@ -26,6 +27,7 @@ public struct RecipeDetailData: Equatable, Sendable {
     photos: [RecipePhoto] = [],
     tags: [Tag] = [],
     categories: [Category] = [],
+    categoryDisplayNames: [String] = [],
     equipment: [Equipment] = [],
     recipeEquipment: [RecipeEquipment] = []
   ) {
@@ -39,6 +41,7 @@ public struct RecipeDetailData: Equatable, Sendable {
     self.photos = photos
     self.tags = tags
     self.categories = categories
+    self.categoryDisplayNames = categoryDisplayNames
     self.equipment = equipment
     self.recipeEquipment = recipeEquipment
   }
@@ -74,6 +77,7 @@ public struct RecipeEditorDraft: Equatable, Sendable {
   public var cookTimeMinutes: Int
   public var cuisine: String
   public var course: String
+  public var libraryPlacement: RecipeLibraryPlacement
   public var favorite: Bool
   public var ingredientText: String
   public var instructionText: String
@@ -101,6 +105,7 @@ public struct RecipeEditorDraft: Equatable, Sendable {
     cookTimeMinutes: Int = 0,
     cuisine: String = "",
     course: String = "",
+    libraryPlacement: RecipeLibraryPlacement = .main,
     favorite: Bool = false,
     ingredientText: String = "",
     instructionText: String = "",
@@ -127,6 +132,7 @@ public struct RecipeEditorDraft: Equatable, Sendable {
     self.cookTimeMinutes = cookTimeMinutes
     self.cuisine = cuisine
     self.course = course
+    self.libraryPlacement = libraryPlacement
     self.favorite = favorite
     self.ingredientText = ingredientText
     self.instructionText = instructionText
@@ -165,6 +171,7 @@ public struct RecipeEditorDraft: Equatable, Sendable {
       cookTimeMinutes: detail.recipe.cookTimeMinutes ?? 0,
       cuisine: detail.recipe.cuisine ?? "",
       course: detail.recipe.course ?? "",
+      libraryPlacement: detail.recipe.libraryPlacement,
       favorite: detail.recipe.favorite,
       ingredientText: editableIngredientLines
         .sorted { $0.sortOrder < $1.sortOrder }
@@ -180,7 +187,7 @@ public struct RecipeEditorDraft: Equatable, Sendable {
         .map(\.text)
         .joined(separator: "\n\n"),
       tagNames: detail.tags.map(\.name).joined(separator: ", "),
-      categoryNames: detail.categories.map(\.name).joined(separator: ", "),
+      categoryNames: detail.categoryDisplayNames.joined(separator: ", "),
       originalSnapshot: detail.recipe.originalSnapshot,
       dateCreated: detail.recipe.dateCreated
     )
@@ -227,9 +234,14 @@ public enum RecipeRepository {
         let rhsOrder = recipeTags.first { $0.tagID == rhs.id }?.sortOrder ?? 0
         return lhsOrder < rhsOrder
       }
-    let categories = try Category.fetchAll(db)
+    let allCategories = try Category.fetchAll(db)
+    let categoriesByID = Dictionary(uniqueKeysWithValues: allCategories.map { ($0.id, $0) })
+    let categories = allCategories
       .filter { category in recipeCategories.contains { $0.categoryID == category.id } }
       .sorted { $0.sortOrder < $1.sortOrder }
+    let categoryDisplayNames = categories.map {
+      CategoryHierarchy.displayName(for: $0, categoriesByID: categoriesByID)
+    }
     let equipment = try Equipment.fetchAll(db)
       .filter { equipment in recipeEquipment.contains { $0.equipmentID == equipment.id } }
       .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -245,6 +257,7 @@ public enum RecipeRepository {
       photos: photos,
       tags: tags,
       categories: categories,
+      categoryDisplayNames: categoryDisplayNames,
       equipment: equipment,
       recipeEquipment: recipeEquipment
     )
@@ -310,6 +323,7 @@ public enum RecipeRepository {
       cuisine: draft.cuisine.nonEmpty,
       course: draft.course.nonEmpty,
       favorite: draft.favorite,
+      libraryPlacement: draft.libraryPlacement,
       dateCreated: dateCreated,
       dateModified: now,
       originalSnapshot: draft.originalSnapshot
@@ -562,36 +576,6 @@ public enum RecipeRepository {
     try deleteMissingRows(existingRecipeTags, keeping: keptRecipeTagIDs, in: db)
   }
 
-  private static func reconcileCategories(
-    _ names: [String],
-    recipeID: Recipe.ID,
-    in db: Database,
-    now: Date,
-    uuid: () -> UUID
-  ) throws {
-    var existingCategories = try Category.fetchAll(db)
-    let existingRecipeCategories = try RecipeCategory.where { $0.recipeID.eq(recipeID) }.fetchAll(db)
-    var keptRecipeCategoryIDs: Set<RecipeCategory.ID> = []
-
-    for name in names {
-      let category = existingCategories.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
-        ?? Category(id: uuid(), name: name, sortOrder: existingCategories.count, dateCreated: now)
-      if !existingCategories.contains(where: { $0.id == category.id }) {
-        try Category.insert { category }.execute(db)
-        existingCategories.append(category)
-      }
-      let recipeCategory = RecipeCategory(
-        id: existingRecipeCategories.first { $0.categoryID == category.id }?.id ?? uuid(),
-        recipeID: recipeID,
-        categoryID: category.id
-      )
-      keptRecipeCategoryIDs.insert(recipeCategory.id)
-      try RecipeCategory.upsert { recipeCategory }.execute(db)
-    }
-
-    try deleteMissingRows(existingRecipeCategories, keeping: keptRecipeCategoryIDs, in: db)
-  }
-
   private static func reconcileIngredientLines(
     _ parsedLines: [IngredientLine],
     existing existingLines: [IngredientLine]
@@ -769,16 +753,6 @@ public enum RecipeRepository {
   ) throws {
     for row in rows where !keptIDs.contains(row.id) {
       try #sql("DELETE FROM \"recipeTags\" WHERE \"id\" = \(bind: row.id)").execute(db)
-    }
-  }
-
-  private static func deleteMissingRows(
-    _ rows: [RecipeCategory],
-    keeping keptIDs: Set<RecipeCategory.ID>,
-    in db: Database
-  ) throws {
-    for row in rows where !keptIDs.contains(row.id) {
-      try #sql("DELETE FROM \"recipeCategories\" WHERE \"id\" = \(bind: row.id)").execute(db)
     }
   }
 

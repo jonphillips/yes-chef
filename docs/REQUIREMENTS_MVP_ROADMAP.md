@@ -628,6 +628,9 @@ Initial goals:
   strings when the app has typed fields for those concepts.
 - In list filtering, selecting a parent category should include recipes in descendant
   categories unless the user explicitly asks for exact matching.
+- Current foundation: the editor accepts category paths such as
+  `Meal Type > Dinner Party`; the repository creates parent/child category rows and
+  list filters include parent paths for descendant recipes.
 - In the iPad layout, consider a category tree in the recipe navigation surface once
   the library grows beyond simple filters.
 - Use recovered flat Paprika category names as raw material, but expect manual
@@ -659,7 +662,9 @@ Yes Chef should support two browsing tiers:
 Initial goals:
 
 - Add a `libraryPlacement` concept with main as the default and reference/source
-  material as an alternate placement.
+  material as an alternate placement. Implemented foundation: recipes persist this
+  field, the editor can change it, and recipe browsing defaults to the main library
+  with controls for Reference and All.
 - Keep archived/deleted recipes separate from reference recipes. Reference means
   intentionally retained; archived means hidden because the user no longer wants it
   active.

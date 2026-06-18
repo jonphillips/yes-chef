@@ -94,18 +94,20 @@ Yes Chef will use both flexible user taxonomy and typed semantic facets.
 
 ## Relationship To Current Implementation
 
-The current model already has `RecipeSource.author`, `publicationName`, `bookTitle`,
-and related fields, but the editor and filters expose only a subset. Categories and
-tags are already app data rather than built-in constants. `Recipe.archived` exists for
-soft deletion.
+The current model has `RecipeSource.author`, `publicationName`, `bookTitle`, and
+related fields; the editor and filters expose source and author facets. Categories
+and tags are app data rather than built-in constants. `Category.parentCategoryID`
+supports hierarchy, and the editor accepts path-style category input such as
+`Meal Type > Dinner Party`. `Recipe.libraryPlacement` is persisted with `main` as
+the default and `reference` as an alternate browsing tier. `Recipe.archived` exists
+for soft deletion.
 
 Future work should add:
 
-- Source and author editing/filtering in the recipe UI.
 - Conservative Paprika metadata cleanup for clear cookbook/author patterns.
 - Web source scraping for structured author/publisher metadata.
 - Source metadata enrichment for existing recipes with source URLs, after scraping
   exists.
-- A library placement field, with main library as the default and reference/source
-  material as an alternate placement.
+- Full category management UI for renaming, merging, deleting, and re-parenting
+  categories.
 - A recipe-family model for related versions and preferred/canonical recipe selection.

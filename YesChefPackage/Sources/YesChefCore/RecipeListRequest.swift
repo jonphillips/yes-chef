@@ -6,6 +6,7 @@ public struct RecipeListRowData: Identifiable, Equatable, Sendable {
   public var source: RecipeSource?
   public var thumbnailData: Data?
   public var categoryNames: [String]
+  public var categoryFilterNames: [String]
   public var tagNames: [String]
 
   public init(
@@ -13,12 +14,14 @@ public struct RecipeListRowData: Identifiable, Equatable, Sendable {
     source: RecipeSource? = nil,
     thumbnailData: Data? = nil,
     categoryNames: [String] = [],
+    categoryFilterNames: [String]? = nil,
     tagNames: [String] = []
   ) {
     self.recipe = recipe
     self.source = source
     self.thumbnailData = thumbnailData
     self.categoryNames = categoryNames
+    self.categoryFilterNames = categoryFilterNames ?? categoryNames
     self.tagNames = tagNames
   }
 
@@ -44,11 +47,21 @@ public struct RecipeListRequest: FetchKeyRequest {
       grouping: try RecipeSource.fetchAll(db),
       by: \.recipeID
     )
-    let categoryNamesByRecipeID = Dictionary(grouping: try RecipeCategory.fetchAll(db), by: \.recipeID)
+    let categorySummariesByRecipeID = Dictionary(grouping: try RecipeCategory.fetchAll(db), by: \.recipeID)
       .mapValues { recipeCategories in
-        recipeCategories
-          .compactMap { categoriesByID[$0.categoryID]?.name }
-          .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        let categories = recipeCategories
+          .compactMap { categoriesByID[$0.categoryID] }
+          .sorted { $0.sortOrder < $1.sortOrder }
+        return RecipeListCategorySummary(
+          displayNames: categories.map {
+            CategoryHierarchy.displayName(for: $0, categoriesByID: categoriesByID)
+          },
+          filterNames: distinctSortedOptions(
+            categories.flatMap {
+              CategoryHierarchy.filterDisplayNames(for: $0, categoriesByID: categoriesByID)
+            }
+          )
+        )
       }
     let tagNamesByRecipeID = Dictionary(grouping: try RecipeTag.fetchAll(db), by: \.recipeID)
       .mapValues { recipeTags in
@@ -86,11 +99,17 @@ public struct RecipeListRequest: FetchKeyRequest {
         recipe: recipe,
         source: sourcesByRecipeID[recipe.id]?.first,
         thumbnailData: thumbnailsByRecipeID[recipe.id]?.listImageData,
-        categoryNames: categoryNamesByRecipeID[recipe.id] ?? [],
+        categoryNames: categorySummariesByRecipeID[recipe.id]?.displayNames ?? [],
+        categoryFilterNames: categorySummariesByRecipeID[recipe.id]?.filterNames ?? [],
         tagNames: tagNamesByRecipeID[recipe.id] ?? []
       )
     }
   }
+}
+
+private struct RecipeListCategorySummary {
+  var displayNames: [String]
+  var filterNames: [String]
 }
 
 @Selection
@@ -130,4 +149,9 @@ private struct PhotoSortKey: Comparable {
     }
     return lhs.sortOrder < rhs.sortOrder
   }
+}
+
+private func distinctSortedOptions(_ values: [String]) -> [String] {
+  Array(Set(values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }))
+    .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
 }

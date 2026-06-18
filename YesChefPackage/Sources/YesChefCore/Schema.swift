@@ -222,7 +222,26 @@ extension DependencyValues {
         #"CREATE INDEX "index_recipeEquipment_on_recipeID" ON "recipeEquipment"("recipeID")"#,
       ] {
         try db.execute(sql: statement)
-      }
+    }
+	    }
+
+    migrator.registerMigration("Add library placement and category hierarchy") { db in
+      try #sql("""
+        ALTER TABLE "recipes"
+        ADD COLUMN "libraryPlacement" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT 'main'
+        """)
+        .execute(db)
+
+      try #sql("""
+        ALTER TABLE "categories"
+        ADD COLUMN "parentCategoryID" TEXT REFERENCES "categories"("id") ON DELETE SET NULL
+        """)
+        .execute(db)
+
+      try #sql("""
+        CREATE INDEX "index_categories_on_parentCategoryID" ON "categories"("parentCategoryID")
+        """)
+        .execute(db)
     }
 
     try migrator.migrate(database)

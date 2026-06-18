@@ -21,6 +21,7 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
   public var rating: Int?
   public var favorite: Bool
   public var archived: Bool
+  public var libraryPlacement: RecipeLibraryPlacement
   public var dateCreated: Date
   public var dateModified: Date
   public var lastCookedAt: Date?
@@ -47,6 +48,7 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     rating: Int? = nil,
     favorite: Bool = false,
     archived: Bool = false,
+    libraryPlacement: RecipeLibraryPlacement = .main,
     dateCreated: Date,
     dateModified: Date,
     lastCookedAt: Date? = nil,
@@ -72,6 +74,7 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     self.rating = rating
     self.favorite = favorite
     self.archived = archived
+    self.libraryPlacement = libraryPlacement
     self.dateCreated = dateCreated
     self.dateModified = dateModified
     self.lastCookedAt = lastCookedAt
@@ -79,6 +82,70 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     self.originalImportText = originalImportText
     self.originalSnapshot = originalSnapshot
   }
+
+  private enum CodingKeys: String, CodingKey {
+    case id
+    case title
+    case subtitle
+    case summary
+    case servings
+    case servingsText
+    case yieldText
+    case prepTimeMinutes
+    case cookTimeMinutes
+    case totalTimeMinutes
+    case activeTimeMinutes
+    case restTimeMinutes
+    case cuisine
+    case course
+    case difficulty
+    case rating
+    case favorite
+    case archived
+    case libraryPlacement
+    case dateCreated
+    case dateModified
+    case lastCookedAt
+    case timesCooked
+    case originalImportText
+    case originalSnapshot
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      id: try container.decode(UUID.self, forKey: .id),
+      title: try container.decode(String.self, forKey: .title),
+      subtitle: try container.decodeIfPresent(String.self, forKey: .subtitle),
+      summary: try container.decodeIfPresent(String.self, forKey: .summary),
+      servings: try container.decodeIfPresent(Double.self, forKey: .servings),
+      servingsText: try container.decodeIfPresent(String.self, forKey: .servingsText),
+      yieldText: try container.decodeIfPresent(String.self, forKey: .yieldText),
+      prepTimeMinutes: try container.decodeIfPresent(Int.self, forKey: .prepTimeMinutes),
+      cookTimeMinutes: try container.decodeIfPresent(Int.self, forKey: .cookTimeMinutes),
+      totalTimeMinutes: try container.decodeIfPresent(Int.self, forKey: .totalTimeMinutes),
+      activeTimeMinutes: try container.decodeIfPresent(Int.self, forKey: .activeTimeMinutes),
+      restTimeMinutes: try container.decodeIfPresent(Int.self, forKey: .restTimeMinutes),
+      cuisine: try container.decodeIfPresent(String.self, forKey: .cuisine),
+      course: try container.decodeIfPresent(String.self, forKey: .course),
+      difficulty: try container.decodeIfPresent(RecipeDifficulty.self, forKey: .difficulty),
+      rating: try container.decodeIfPresent(Int.self, forKey: .rating),
+      favorite: try container.decodeIfPresent(Bool.self, forKey: .favorite) ?? false,
+      archived: try container.decodeIfPresent(Bool.self, forKey: .archived) ?? false,
+      libraryPlacement: try container.decodeIfPresent(RecipeLibraryPlacement.self, forKey: .libraryPlacement) ?? .main,
+      dateCreated: try container.decode(Date.self, forKey: .dateCreated),
+      dateModified: try container.decode(Date.self, forKey: .dateModified),
+      lastCookedAt: try container.decodeIfPresent(Date.self, forKey: .lastCookedAt),
+      timesCooked: try container.decodeIfPresent(Int.self, forKey: .timesCooked) ?? 0,
+      originalImportText: try container.decodeIfPresent(String.self, forKey: .originalImportText),
+      originalSnapshot: try container.decodeIfPresent(Data.self, forKey: .originalSnapshot)
+    )
+  }
+}
+
+public enum RecipeLibraryPlacement: String, CaseIterable, Codable, QueryBindable, QueryDecodable, Sendable {
+  case main
+  case reference
 }
 
 public enum RecipeDifficulty: String, Codable, QueryBindable, QueryDecodable, Sendable {
@@ -383,12 +450,20 @@ public struct Tag: Codable, Identifiable, Equatable, Sendable {
 public struct Category: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID
   public var name: String
+  public var parentCategoryID: Category.ID?
   public var sortOrder: Int
   public var dateCreated: Date
 
-  public init(id: UUID, name: String, sortOrder: Int, dateCreated: Date) {
+  public init(
+    id: UUID,
+    name: String,
+    parentCategoryID: Category.ID? = nil,
+    sortOrder: Int,
+    dateCreated: Date
+  ) {
     self.id = id
     self.name = name
+    self.parentCategoryID = parentCategoryID
     self.sortOrder = sortOrder
     self.dateCreated = dateCreated
   }

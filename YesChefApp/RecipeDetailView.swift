@@ -100,6 +100,12 @@ struct RecipeDetailView: View {
       .font(.subheadline)
       .foregroundStyle(.secondary)
 
+      if recipe.libraryPlacement == .reference {
+        Label(recipe.libraryPlacement.title, systemImage: "books.vertical")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+      }
+
       if let source = model.detail?.source {
         SourceMetadataView(source: source)
       }
@@ -107,8 +113,8 @@ struct RecipeDetailView: View {
       if let tags = model.detail?.tags, !tags.isEmpty {
         WrappingLabels(labels: tags.map(\.name), systemImage: "tag")
       }
-      if let categories = model.detail?.categories, !categories.isEmpty {
-        WrappingLabels(labels: categories.map(\.name), systemImage: "folder")
+      if let categoryDisplayNames = model.detail?.categoryDisplayNames, !categoryDisplayNames.isEmpty {
+        WrappingLabels(labels: categoryDisplayNames, systemImage: "folder")
       }
 
       if recipe.originalSnapshot != nil {

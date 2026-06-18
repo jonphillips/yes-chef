@@ -5,8 +5,8 @@ struct RecipeEditorView: View {
   @State private var model: RecipeEditorModel
   @Environment(\.dismiss) private var dismiss
 
-  init(model: RecipeEditorModel) {
-    _model = State(wrappedValue: model)
+  init(recipeID: Recipe.ID?) {
+    _model = State(wrappedValue: RecipeEditorModel(recipeID: recipeID))
   }
 
   var body: some View {
@@ -14,27 +14,27 @@ struct RecipeEditorView: View {
 
     Form {
       Section("Recipe") {
-        TextField("Title", text: $model.draft.title)
-        TextField("Subtitle", text: $model.draft.subtitle)
-        TextField("Summary", text: $model.draft.summary, axis: .vertical)
+        StackedTextField(title: "Title", text: $model.draft.title)
+        StackedTextField(title: "Subtitle", text: $model.draft.subtitle)
+        StackedTextField(title: "Summary", text: $model.draft.summary, axis: .vertical)
         Toggle("Favorite", isOn: $model.draft.favorite)
       }
 
       Section("Source") {
-        TextField("Source name", text: $model.draft.sourceName)
-        TextField("URL", text: $model.draft.sourceURL)
+        StackedTextField(title: "Source name", text: $model.draft.sourceName)
+        StackedTextField(title: "URL", text: $model.draft.sourceURL)
           .keyboardType(.URL)
           .textInputAutocapitalization(.never)
-        TextField("Author", text: $model.draft.sourceAuthor)
-        TextField("Publication", text: $model.draft.sourcePublicationName)
-        TextField("Book title", text: $model.draft.sourceBookTitle)
-        TextField("Page", text: $model.draft.sourcePageNumber)
-        TextField("Source notes", text: $model.draft.sourceNotes, axis: .vertical)
+        StackedTextField(title: "Author", text: $model.draft.sourceAuthor)
+        StackedTextField(title: "Publication", text: $model.draft.sourcePublicationName)
+        StackedTextField(title: "Book title", text: $model.draft.sourceBookTitle)
+        StackedTextField(title: "Page", text: $model.draft.sourcePageNumber)
+        StackedTextField(title: "Source notes", text: $model.draft.sourceNotes, axis: .vertical)
       }
 
       Section("Timing and Yield") {
-        TextField("Servings", text: $model.draft.servingsText)
-        TextField("Yield", text: $model.draft.yieldText)
+        StackedTextField(title: "Servings", text: $model.draft.servingsText)
+        StackedTextField(title: "Yield", text: $model.draft.yieldText)
         Stepper(value: $model.draft.prepTimeMinutes, in: 0...600, step: 5) {
           Text("Prep: \(model.draft.prepTimeMinutes) min")
         }
@@ -44,26 +44,45 @@ struct RecipeEditorView: View {
       }
 
       Section("Organization") {
-        TextField("Cuisine", text: $model.draft.cuisine)
-        TextField("Course", text: $model.draft.course)
-        TextField("Tags", text: $model.draft.tagNames, prompt: Text("grill, make-ahead"))
-        TextField("Categories", text: $model.draft.categoryNames, prompt: Text("Mains, Chicken"))
+        Picker("Library", selection: $model.draft.libraryPlacement) {
+          ForEach(RecipeLibraryPlacement.allCases, id: \.self) { placement in
+            Text(placement.title)
+              .tag(placement)
+          }
+        }
+        StackedTextField(title: "Cuisine", text: $model.draft.cuisine)
+        StackedTextField(title: "Course", text: $model.draft.course)
+        StackedTextField(title: "Tags", text: $model.draft.tagNames, prompt: "grill, make-ahead")
+        StackedTextField(
+          title: "Categories",
+          text: $model.draft.categoryNames,
+          prompt: "Meal Type > Mains, Chicken"
+        )
       }
 
       Section("Ingredients") {
-        TextEditor(text: $model.draft.ingredientText)
-          .frame(minHeight: 180)
-          .font(.body.monospacedDigit())
+        StackedTextEditor(
+          title: "Ingredients",
+          text: $model.draft.ingredientText,
+          minHeight: 180,
+          font: .body.monospacedDigit()
+        )
       }
 
       Section("Instructions") {
-        TextEditor(text: $model.draft.instructionText)
-          .frame(minHeight: 220)
+        StackedTextEditor(
+          title: "Instructions",
+          text: $model.draft.instructionText,
+          minHeight: 220
+        )
       }
 
       Section("Notes") {
-        TextEditor(text: $model.draft.noteText)
-          .frame(minHeight: 120)
+        StackedTextEditor(
+          title: "Notes",
+          text: $model.draft.noteText,
+          minHeight: 120
+        )
       }
     }
     .navigationTitle(model.recipeID == nil ? "New Recipe" : "Edit Recipe")

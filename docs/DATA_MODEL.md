@@ -328,7 +328,7 @@ difficulty: RecipeDifficulty?
 rating: Int?
 favorite: Bool
 archived: Bool
-libraryPlacement: RecipeLibraryPlacement (future; not persisted in MVP 1)
+libraryPlacement: RecipeLibraryPlacement
 dateCreated: Date
 dateModified: Date
 lastCookedAt: Date?
@@ -1108,7 +1108,7 @@ Breakfast
 
 id: UUID
 name: String
-parentID: Category.ID? (future; not persisted in MVP 1)
+parentCategoryID: Category.ID?
 sortOrder: Int
 dateCreated: Date
 
@@ -1117,9 +1117,10 @@ dateCreated: Date
 * Recipes may have multiple categories.
 * Categories should support Paprika import if Paprika categories exist.
 * Do not require exactly one category per recipe.
-* Categories are the right place for stable hierarchy. Future category UI should
-support parent/child organization such as `Meal Type > Appetizers`,
-`Protein > Chicken`, or `Occasion > Beach`.
+* Categories are the right place for stable hierarchy. The current editor accepts
+path-style category entries such as `Meal Type > Appetizers`, `Protein > Chicken`,
+or `Occasion > Beach`; a future category manager should add rename, merge, delete,
+and re-parent workflows.
 * Categories should not be the primary model for known facets that deserve typed
 fields, including source, author, cuisine, course, and library placement. See
 ADR-0006.

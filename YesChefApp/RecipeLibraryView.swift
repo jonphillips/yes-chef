@@ -59,7 +59,7 @@ struct AppContainer: View {
     }
     .sheet(isPresented: $recipeModel.destination.addRecipe) {
       NavigationStack {
-        RecipeEditorView(model: RecipeEditorModel(recipeID: nil))
+        RecipeEditorView(recipeID: nil)
       }
     }
     .sheet(isPresented: $recipeModel.destination.filterRecipes) {
@@ -69,7 +69,7 @@ struct AppContainer: View {
     }
     .sheet(item: $recipeModel.destination.editRecipe, id: \.self) { (recipeID: Recipe.ID) in
       NavigationStack {
-        RecipeEditorView(model: RecipeEditorModel(recipeID: recipeID))
+        RecipeEditorView(recipeID: recipeID)
       }
     }
     .sheet(item: $recipeModel.destination.cookingMode, id: \.self) { (recipeID: Recipe.ID) in
@@ -329,6 +329,13 @@ private struct RecipeFilterView: View {
 
     Form {
       Section {
+        Picker("Library", selection: $model.libraryScope) {
+          ForEach(RecipeLibraryScope.allCases) { scope in
+            Text(scope.title)
+              .tag(scope)
+          }
+        }
+        .pickerStyle(.segmented)
         Toggle("Favorites", isOn: $model.showsFavoritesOnly)
         Toggle("With Photos", isOn: $model.showsPhotosOnly)
       }
@@ -338,7 +345,7 @@ private struct RecipeFilterView: View {
           Text("No tags yet")
             .foregroundStyle(.secondary)
         } else {
-          TextField("Find tags", text: $tagSearchText)
+          StackedTextField(title: "Find tags", text: $tagSearchText)
             .textInputAutocapitalization(.never)
           if filteredTagOptions.isEmpty {
             Text("No matching tags")
@@ -466,6 +473,11 @@ private struct RecipeActiveFilterBar: View {
             model.showsPhotosOnly = false
           }
         }
+        if model.libraryScope != .main {
+          RecipeFilterChip(title: model.libraryScope.title, systemImage: "books.vertical") {
+            model.libraryScope = .main
+          }
+        }
         if let selectedCategoryName = model.selectedCategoryName {
           RecipeFilterChip(title: selectedCategoryName, systemImage: "folder") {
             model.selectedCategoryName = nil
@@ -556,6 +568,14 @@ private struct RecipeListRow: View {
         HStack(spacing: 6) {
           Text(recipe.title)
             .font(.headline)
+          if recipe.libraryPlacement == .reference {
+            Text(recipe.libraryPlacement.badgeTitle)
+              .font(.caption2.weight(.semibold))
+              .foregroundStyle(.secondary)
+              .padding(.horizontal, 6)
+              .padding(.vertical, 2)
+              .background(.quaternary, in: Capsule())
+          }
           if recipe.favorite {
             Image(systemName: "star.fill")
               .font(.caption)

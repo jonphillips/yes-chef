@@ -37,6 +37,7 @@ final class RecipeLibraryModel {
   var searchText = ""
   var selectedRecipeID: Recipe.ID?
   var sortOrder = RecipeListSort.title
+  var libraryScope = RecipeLibraryScope.main
   var showsFavoritesOnly = false
   var showsPhotosOnly = false
   var selectedCategoryName: String?
@@ -58,6 +59,7 @@ final class RecipeLibraryModel {
   var hasActiveFilters: Bool {
     showsFavoritesOnly
       || showsPhotosOnly
+      || libraryScope != .main
       || selectedCategoryName != nil
       || !selectedTagNames.isEmpty
       || selectedCuisine != nil
@@ -67,7 +69,7 @@ final class RecipeLibraryModel {
   }
 
   var categoryFilterOptions: [String] {
-    distinctOptions(unarchivedRecipeRows.flatMap(\.categoryNames))
+    distinctOptions(unarchivedRecipeRows.flatMap(\.categoryFilterNames))
   }
 
   var tagFilterOptions: [String] {
@@ -204,6 +206,7 @@ final class RecipeLibraryModel {
   func clearFiltersButtonTapped() {
     showsFavoritesOnly = false
     showsPhotosOnly = false
+    libraryScope = .main
     selectedCategoryName = nil
     selectedTagNames = []
     selectedCuisine = nil
@@ -260,9 +263,17 @@ final class RecipeLibraryModel {
 
   private func matchesFilters(_ row: RecipeListRowData) -> Bool {
     let recipe = row.recipe
+    switch libraryScope {
+    case .main where recipe.libraryPlacement != .main:
+      return false
+    case .reference where recipe.libraryPlacement != .reference:
+      return false
+    case .all, .main, .reference:
+      break
+    }
     if showsFavoritesOnly && !recipe.favorite { return false }
     if showsPhotosOnly && !row.hasPhoto { return false }
-    if let selectedCategoryName, !row.categoryNames.contains(selectedCategoryName) {
+    if let selectedCategoryName, !row.categoryFilterNames.contains(selectedCategoryName) {
       return false
     }
     if !selectedTagNames.isEmpty, !selectedTagNames.isSubset(of: Set(row.tagNames)) {
@@ -367,6 +378,38 @@ enum RecipeListSort: String, CaseIterable, Identifiable, Sendable {
     case .recentlyModified: "Recently Modified"
     case .cookTime: "Cook Time"
     case .recentlyCooked: "Last Cooked"
+    }
+  }
+}
+
+enum RecipeLibraryScope: String, CaseIterable, Identifiable, Sendable {
+  case main
+  case reference
+  case all
+
+  var id: Self { self }
+
+  var title: String {
+    switch self {
+    case .main: "Main"
+    case .reference: "Reference"
+    case .all: "All"
+    }
+  }
+}
+
+extension RecipeLibraryPlacement {
+  var title: String {
+    switch self {
+    case .main: "Main Library"
+    case .reference: "Reference"
+    }
+  }
+
+  var badgeTitle: String {
+    switch self {
+    case .main: "Main"
+    case .reference: "Reference"
     }
   }
 }

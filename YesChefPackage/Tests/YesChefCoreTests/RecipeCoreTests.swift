@@ -295,6 +295,90 @@ struct RecipeCoreTests {
   }
 
   @Test
+  func savePersistsLibraryPlacement() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 802_300_000)
+    var uuids = SampleUUIDSequence(start: 600)
+
+    try database.write { db in
+      let recipeID = try RecipeRepository.save(
+        draft: RecipeEditorDraft(
+          title: "Variant Chocolate Chip Cookies",
+          libraryPlacement: .reference,
+          ingredientText: "1 cup flour",
+          instructionText: "Bake until done."
+        ),
+        in: db,
+        now: now,
+        uuid: { uuids.next() }
+      )
+
+      let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+      expectNoDifference(detail.recipe.libraryPlacement, .reference)
+
+      let row = try #require(try RecipeListRequest().fetch(db).first { $0.recipe.id == recipeID })
+      expectNoDifference(row.recipe.libraryPlacement, .reference)
+    }
+  }
+
+  @Test
+  func saveCreatesHierarchicalCategoryPathsForDisplayAndFiltering() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 802_400_000)
+    var uuids = SampleUUIDSequence(start: 700)
+
+    try database.write { db in
+      let recipeID = try RecipeRepository.save(
+        draft: RecipeEditorDraft(
+          title: "Dinner Party Chicken",
+          ingredientText: "1 chicken",
+          instructionText: "Roast.",
+          categoryNames: "Meal Type > Dinner Party, Protein > Chicken"
+        ),
+        in: db,
+        now: now,
+        uuid: { uuids.next() }
+      )
+
+      let categories = try Category.fetchAll(db)
+      let mealType = try #require(categories.first { $0.name == "Meal Type" })
+      let dinnerParty = try #require(categories.first { $0.name == "Dinner Party" })
+      let protein = try #require(categories.first { $0.name == "Protein" })
+      let chicken = try #require(categories.first { $0.name == "Chicken" })
+
+      expectNoDifference(dinnerParty.parentCategoryID, mealType.id)
+      expectNoDifference(chicken.parentCategoryID, protein.id)
+
+      let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+      expectNoDifference(
+        detail.categoryDisplayNames,
+        [
+          "Meal Type > Dinner Party",
+          "Protein > Chicken",
+        ]
+      )
+
+      let row = try #require(try RecipeListRequest().fetch(db).first { $0.recipe.id == recipeID })
+      expectNoDifference(
+        row.categoryNames,
+        [
+          "Meal Type > Dinner Party",
+          "Protein > Chicken",
+        ]
+      )
+      expectNoDifference(
+        row.categoryFilterNames,
+        [
+          "Meal Type",
+          "Meal Type > Dinner Party",
+          "Protein",
+          "Protein > Chicken",
+        ]
+      )
+    }
+  }
+
+  @Test
   func savePreservesUnchangedChildIDsAndNonGeneralNotes() throws {
     @Dependency(\.defaultDatabase) var database
     let now = Date(timeIntervalSinceReferenceDate: 802_000_000)
