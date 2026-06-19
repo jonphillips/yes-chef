@@ -326,7 +326,9 @@ The user can view all recipes in a list.
 Requirements:
 
 - Show recipe title.
-- Show optional subtitle/source/category.
+- Show optional subtitle/source/category. Current foundation: recipe list rows show
+  thumbnail, subtitle or summary, compact source/author metadata, and a bounded
+  category summary.
 - Support search by title, ingredient text, instruction text, note text, source,
   author, category, and tag.
 - Support filtering by source and author using `RecipeSource` fields, not category or
