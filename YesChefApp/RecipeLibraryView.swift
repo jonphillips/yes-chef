@@ -354,9 +354,7 @@ private struct RecipeListView: View {
     .navigationTitle("Recipes")
     .searchable(text: $model.searchText, prompt: "Search recipes")
     .safeAreaInset(edge: .top, spacing: 0) {
-      if model.hasActiveFilters {
-        RecipeActiveFilterBar(model: model)
-      }
+      RecipeListStatusBar(model: model)
     }
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {
@@ -515,6 +513,7 @@ private struct RecipeFilterView: View {
             options: model.sourceFilterOptions,
             popularOptions: model.popularSourceFilterOptions,
             remainingOptions: model.remainingSourceFilterOptions,
+            countsByOption: model.sourceFilterCountsByName,
             selectedValues: model.selectedSourceNames,
             systemImage: "book"
           ) { sourceName in
@@ -535,6 +534,7 @@ private struct RecipeFilterView: View {
             options: model.authorFilterOptions,
             popularOptions: model.popularAuthorFilterOptions,
             remainingOptions: model.remainingAuthorFilterOptions,
+            countsByOption: model.authorFilterCountsByName,
             selectedValues: model.selectedAuthorNames,
             systemImage: "person.text.rectangle"
           ) { authorName in

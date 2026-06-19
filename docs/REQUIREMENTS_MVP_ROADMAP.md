@@ -339,6 +339,8 @@ Requirements:
   - date modified
   - last cooked
   - favorite
+- Show the current result count and sort order in the recipe list header so browsing
+  state stays visible while filtering.
 
 #### 4.2 Recipe Detail
 
@@ -676,9 +678,9 @@ Initial goals:
 - Preserve source and author data during import where it is available.
 - Filter recipe lists by source and author independently. Current foundation: source
   and author filters are searchable multi-select facets with the top ten most-used
-  values grouped above the remaining alphabetical list. Active source and author
-  filters are grouped into bounded summary chips rather than one chip per selected
-  value.
+  values grouped above the remaining alphabetical list. Picker rows show recipe
+  counts for each source or author. Active source and author filters are grouped into
+  bounded summary chips rather than one chip per selected value.
 - Treat cookbook names and publications as source metadata, not categories.
 - Allow category/tag import evidence to help populate source fields, but keep uncertain
   labels as imported categories until the user or a parser can confidently clean them.

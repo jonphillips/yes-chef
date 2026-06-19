@@ -151,12 +151,12 @@ final class RecipeLibraryModel {
     return facets
   }
 
-  var activeFilterSelectionCount: Int {
-    activeFilterFacets.reduce(0) { $0 + $1.selectionCount }
-  }
-
   var filteredRecipeCountSummary: String {
     "\(filteredRecipeCount) of \(unarchivedRecipeRows.count) \(unarchivedRecipeRows.count == 1 ? "recipe" : "recipes")"
+  }
+
+  var sortStatusTitle: String {
+    "Sorted by \(sortOrder.title)"
   }
 
   var categoryFilterOptions: [String] {
@@ -207,6 +207,10 @@ final class RecipeLibraryModel {
     distinctOptions(unarchivedRecipeRows.compactMap(\.filterSourceName))
   }
 
+  var sourceFilterCountsByName: [String: Int] {
+    optionCounts(unarchivedRecipeRows.compactMap(\.filterSourceName))
+  }
+
   var popularSourceFilterOptions: [String] {
     popularOptions(unarchivedRecipeRows.compactMap(\.filterSourceName), limit: 10)
   }
@@ -217,6 +221,10 @@ final class RecipeLibraryModel {
 
   var authorFilterOptions: [String] {
     distinctOptions(unarchivedRecipeRows.compactMap { $0.source?.author.nonEmpty })
+  }
+
+  var authorFilterCountsByName: [String: Int] {
+    optionCounts(unarchivedRecipeRows.compactMap { $0.source?.author.nonEmpty })
   }
 
   var popularAuthorFilterOptions: [String] {
@@ -561,16 +569,12 @@ final class RecipeLibraryModel {
   }
 
   private func distinctOptions(_ values: [String]) -> [String] {
-    Array(Set(values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }))
+    Array(Set(normalizedOptions(values)))
       .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
   }
 
   private func popularOptions(_ values: [String], limit: Int) -> [String] {
-    let normalizedValues = values
-      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-      .filter { !$0.isEmpty }
-    let counts = Dictionary(grouping: normalizedValues, by: { $0 })
-      .mapValues { $0.count }
+    let counts = optionCounts(values)
 
     return counts
       .sorted { lhs, rhs in
@@ -580,6 +584,17 @@ final class RecipeLibraryModel {
       .prefix(limit)
       .map(\.key)
       .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+  }
+
+  private func optionCounts(_ values: [String]) -> [String: Int] {
+    Dictionary(grouping: normalizedOptions(values), by: { $0 })
+      .mapValues { $0.count }
+  }
+
+  private func normalizedOptions(_ values: [String]) -> [String] {
+    values
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
   }
 
   private func remainingOptions(all options: [String], popular: [String]) -> [String] {

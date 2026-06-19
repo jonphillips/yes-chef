@@ -56,27 +56,33 @@ enum RecipeFilterFacetKind: Hashable, Identifiable, Sendable {
   }
 }
 
-struct RecipeActiveFilterBar: View {
+struct RecipeListStatusBar: View {
   let model: RecipeLibraryModel
 
   var body: some View {
+    let facets = model.activeFilterFacets
+    let activeSelectionCount = facets.reduce(0) { $0 + $1.selectionCount }
+
     VStack(alignment: .leading, spacing: 8) {
-      RecipeActiveFilterSummaryHeader(
+      RecipeListStatusHeader(
         resultSummary: model.filteredRecipeCountSummary,
-        activeSelectionCount: model.activeFilterSelectionCount
+        sortTitle: model.sortStatusTitle,
+        activeSelectionCount: activeSelectionCount
       ) {
         model.clearFiltersButtonTapped()
       }
 
-      ScrollView(.horizontal, showsIndicators: false) {
-        HStack(spacing: 8) {
-          ForEach(model.activeFilterFacets) { facet in
-            RecipeActiveFilterFacetChip(facet: facet) {
-              model.clearFilterFacetButtonTapped(facet.kind)
+      if !facets.isEmpty {
+        ScrollView(.horizontal, showsIndicators: false) {
+          HStack(spacing: 8) {
+            ForEach(facets) { facet in
+              RecipeActiveFilterFacetChip(facet: facet) {
+                model.clearFilterFacetButtonTapped(facet.kind)
+              }
             }
           }
+          .padding(.horizontal)
         }
-        .padding(.horizontal)
       }
     }
     .padding(.vertical, 8)
@@ -84,23 +90,34 @@ struct RecipeActiveFilterBar: View {
   }
 }
 
-private struct RecipeActiveFilterSummaryHeader: View {
+private struct RecipeListStatusHeader: View {
   let resultSummary: String
+  let sortTitle: String
   let activeSelectionCount: Int
   let clearAction: () -> Void
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 8) {
-      Text(resultSummary)
-        .font(.caption.weight(.semibold))
-      Text("\(activeSelectionCount) \(activeSelectionCount == 1 ? "filter" : "filters")")
-        .font(.caption2)
-        .foregroundStyle(.secondary)
-      Spacer(minLength: 8)
-      Button("Clear") {
-        clearAction()
+    HStack(alignment: .center, spacing: 10) {
+      VStack(alignment: .leading, spacing: 2) {
+        Text(resultSummary)
+          .font(.caption.weight(.semibold))
+        Label(sortTitle, systemImage: "arrow.up.arrow.down")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
       }
-      .font(.caption.weight(.semibold))
+
+      Spacer(minLength: 8)
+
+      if activeSelectionCount > 0 {
+        Text("\(activeSelectionCount) \(activeSelectionCount == 1 ? "filter" : "filters")")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+
+        Button("Clear") {
+          clearAction()
+        }
+        .font(.caption.weight(.semibold))
+      }
     }
     .padding(.horizontal)
   }

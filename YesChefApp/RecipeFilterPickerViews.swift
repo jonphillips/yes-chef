@@ -73,6 +73,7 @@ struct RecipeStringFilterPickerView: View {
   let options: [String]
   let popularOptions: [String]
   let remainingOptions: [String]
+  let countsByOption: [String: Int]
   let selectedValues: Set<String>
   let systemImage: String
   let toggle: (String) -> Void
@@ -94,6 +95,7 @@ struct RecipeStringFilterPickerView: View {
         RecipeStringFilterSearchSection(
           title: title,
           options: filteredOptions,
+          countsByOption: countsByOption,
           selectedValues: selectedValues,
           systemImage: systemImage,
           toggle: toggle
@@ -105,6 +107,7 @@ struct RecipeStringFilterPickerView: View {
           RecipeStringFilterPickerSection(
             title: "Top \(title)",
             options: popularOptions,
+            countsByOption: countsByOption,
             selectedValues: selectedValues,
             systemImage: systemImage,
             toggle: toggle
@@ -114,6 +117,7 @@ struct RecipeStringFilterPickerView: View {
           RecipeStringFilterPickerSection(
             title: popularOptions.isEmpty ? title : "All Other \(title)",
             options: remainingOptions,
+            countsByOption: countsByOption,
             selectedValues: selectedValues,
             systemImage: systemImage,
             toggle: toggle
@@ -181,6 +185,7 @@ struct RecipeFilterSelectionRow: View {
 private struct RecipeStringFilterSearchSection: View {
   let title: String
   let options: [String]
+  let countsByOption: [String: Int]
   let selectedValues: Set<String>
   let systemImage: String
   let toggle: (String) -> Void
@@ -192,6 +197,7 @@ private struct RecipeStringFilterSearchSection: View {
       RecipeStringFilterPickerSection(
         title: "Matches",
         options: options,
+        countsByOption: countsByOption,
         selectedValues: selectedValues,
         systemImage: systemImage,
         toggle: toggle
@@ -203,6 +209,7 @@ private struct RecipeStringFilterSearchSection: View {
 private struct RecipeStringFilterPickerSection: View {
   let title: String
   let options: [String]
+  let countsByOption: [String: Int]
   let selectedValues: Set<String>
   let systemImage: String
   let toggle: (String) -> Void
@@ -213,6 +220,7 @@ private struct RecipeStringFilterPickerSection: View {
         RecipeFilterSelectionRow(
           title: option,
           systemImage: systemImage,
+          detail: countsByOption[option].map { String($0) },
           isSelected: selectedValues.contains(option)
         ) {
           toggle(option)
