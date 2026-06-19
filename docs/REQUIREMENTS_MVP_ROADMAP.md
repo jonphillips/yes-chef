@@ -345,6 +345,11 @@ Requirements:
   - favorite
 - Show the current result count and sort order in the recipe list header so browsing
   state stays visible while filtering.
+- Support saved recipe-list views for reusable browse states. Current foundation:
+  saved views are local app preferences that capture search text, sort order, library
+  scope, favorites/photos filters, category/tag selections, cuisine/course, and
+  source/author selections. They do not capture row density or metadata visibility,
+  which remain per-device display preferences.
 
 #### 4.2 Recipe Detail
 
