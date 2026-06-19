@@ -56,6 +56,15 @@ final class RecipeLibraryModel {
       .sorted(by: areInIncreasingOrder)
   }
 
+  var filteredRecipeCount: Int {
+    unarchivedRecipeRows
+      .filter { row in
+        matchesSearch(row)
+          && matchesFilters(row)
+      }
+      .count
+  }
+
   var hasActiveFilters: Bool {
     showsFavoritesOnly
       || showsPhotosOnly
@@ -68,8 +77,118 @@ final class RecipeLibraryModel {
       || !selectedAuthorNames.isEmpty
   }
 
+  var activeFilterFacets: [RecipeActiveFilterFacet] {
+    var facets: [RecipeActiveFilterFacet] = []
+    if libraryScope != .main {
+      facets.append(
+        RecipeActiveFilterFacet(
+          kind: .library,
+          detail: libraryScope.title,
+          selectionCount: 1
+        )
+      )
+    }
+    if showsFavoritesOnly {
+      facets.append(RecipeActiveFilterFacet(kind: .favorites, selectionCount: 1))
+    }
+    if showsPhotosOnly {
+      facets.append(RecipeActiveFilterFacet(kind: .photos, selectionCount: 1))
+    }
+    if !selectedCategoryNames.isEmpty {
+      facets.append(
+        RecipeActiveFilterFacet(
+          kind: .categories,
+          detail: selectedFilterDetail(selectedCategoryNames),
+          selectionCount: selectedCategoryNames.count
+        )
+      )
+    }
+    if !selectedTagNames.isEmpty {
+      facets.append(
+        RecipeActiveFilterFacet(
+          kind: .tags,
+          detail: selectedFilterDetail(selectedTagNames),
+          selectionCount: selectedTagNames.count
+        )
+      )
+    }
+    if let selectedCuisine {
+      facets.append(
+        RecipeActiveFilterFacet(
+          kind: .cuisine,
+          detail: selectedCuisine,
+          selectionCount: 1
+        )
+      )
+    }
+    if let selectedCourse {
+      facets.append(
+        RecipeActiveFilterFacet(
+          kind: .course,
+          detail: selectedCourse,
+          selectionCount: 1
+        )
+      )
+    }
+    if !selectedSourceNames.isEmpty {
+      facets.append(
+        RecipeActiveFilterFacet(
+          kind: .sources,
+          detail: selectedFilterDetail(selectedSourceNames),
+          selectionCount: selectedSourceNames.count
+        )
+      )
+    }
+    if !selectedAuthorNames.isEmpty {
+      facets.append(
+        RecipeActiveFilterFacet(
+          kind: .authors,
+          detail: selectedFilterDetail(selectedAuthorNames),
+          selectionCount: selectedAuthorNames.count
+        )
+      )
+    }
+    return facets
+  }
+
+  var activeFilterSelectionCount: Int {
+    activeFilterFacets.reduce(0) { $0 + $1.selectionCount }
+  }
+
+  var filteredRecipeCountSummary: String {
+    "\(filteredRecipeCount) of \(unarchivedRecipeRows.count) \(unarchivedRecipeRows.count == 1 ? "recipe" : "recipes")"
+  }
+
   var categoryFilterOptions: [String] {
     distinctOptions(unarchivedRecipeRows.flatMap(\.categoryFilterNames))
+  }
+
+  var categoryFilterAvailabilityByName: [String: RecipeCategoryFilterAvailability] {
+    let categoryNames = distinctOptions(categoryFilterOptions + Array(selectedCategoryNames))
+    let categoryNameSet = Set(categoryNames)
+    var matchingRecipeCounts = Dictionary(uniqueKeysWithValues: categoryNames.map { ($0, 0) })
+
+    for row in unarchivedRecipeRows where matchesSearch(row) && matchesFilters(row, categoryNames: []) {
+      let rowCategoryNames = Set(row.categoryFilterNames)
+      guard selectedCategoryNames.isSubset(of: rowCategoryNames) else { continue }
+
+      for categoryName in rowCategoryNames where categoryNameSet.contains(categoryName) {
+        matchingRecipeCounts[categoryName, default: 0] += 1
+      }
+    }
+
+    return Dictionary(
+      uniqueKeysWithValues: categoryNames.map { categoryName in
+        (
+          categoryName,
+          RecipeCategoryFilterAvailability(
+            categoryName: categoryName,
+            matchingRecipeCount: matchingRecipeCounts[categoryName, default: 0],
+            isSelected: selectedCategoryNames.contains(categoryName)
+          )
+        )
+      }
+    )
   }
 
   var tagFilterOptions: [String] {
@@ -246,6 +365,29 @@ final class RecipeLibraryModel {
     selectedAuthorNames = []
   }
 
+  func clearFilterFacetButtonTapped(_ kind: RecipeFilterFacetKind) {
+    switch kind {
+    case .library:
+      libraryScope = .main
+    case .favorites:
+      showsFavoritesOnly = false
+    case .photos:
+      showsPhotosOnly = false
+    case .categories:
+      selectedCategoryNames = []
+    case .tags:
+      selectedTagNames = []
+    case .cuisine:
+      selectedCuisine = nil
+    case .course:
+      selectedCourse = nil
+    case .sources:
+      selectedSourceNames = []
+    case .authors:
+      selectedAuthorNames = []
+    }
+  }
+
   func doneFilteringButtonTapped() {
     destination = nil
   }
@@ -317,6 +459,10 @@ final class RecipeLibraryModel {
   }
 
   private func matchesFilters(_ row: RecipeListRowData) -> Bool {
+    matchesFilters(row, categoryNames: selectedCategoryNames)
+  }
+
+  private func matchesFilters(_ row: RecipeListRowData, categoryNames: Set<String>) -> Bool {
     let recipe = row.recipe
     switch libraryScope {
     case .main where recipe.libraryPlacement != .main:
@@ -328,8 +474,8 @@ final class RecipeLibraryModel {
     }
     if showsFavoritesOnly && !recipe.favorite { return false }
     if showsPhotosOnly && !row.hasPhoto { return false }
-    if !selectedCategoryNames.isEmpty,
-       !selectedCategoryNames.isSubset(of: Set(row.categoryFilterNames)) {
+    if !categoryNames.isEmpty,
+       !categoryNames.isSubset(of: Set(row.categoryFilterNames)) {
       return false
     }
     if !selectedTagNames.isEmpty, !selectedTagNames.isSubset(of: Set(row.tagNames)) {
@@ -446,6 +592,15 @@ final class RecipeLibraryModel {
     return values
       .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
       .joined(separator: ", ")
+  }
+
+  private func selectedFilterDetail(_ values: Set<String>) -> String {
+    let sortedValues = values.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    let visibleValues = sortedValues.prefix(2)
+    let remainingCount = sortedValues.count - visibleValues.count
+    let visibleSummary = visibleValues.joined(separator: ", ")
+    guard remainingCount > 0 else { return visibleSummary }
+    return "\(visibleSummary) + \(remainingCount) more"
   }
 }
 
@@ -862,195 +1017,6 @@ final class RecipeEditorModel {
       return false
     }
   }
-}
-
-@Observable
-@MainActor
-final class CategoryManagementModel {
-  @CasePathable
-  enum Destination {
-    case deleteCategory(YesChefCore.Category.ID)
-  }
-
-  @ObservationIgnored
-  @Dependency(\.date.now) private var now
-  @ObservationIgnored
-  @Dependency(\.defaultDatabase) private var database
-  @ObservationIgnored
-  @Dependency(\.uuid) private var uuid
-  @ObservationIgnored
-  @Fetch(CategoryListRequest(), animation: .default) var categories: [YesChefCore.Category] = []
-
-  var destination: Destination?
-  var editor: CategoryEditorModel?
-  var errorMessage: String?
-  var isShowingError = false
-
-  var categoryRows: [CategoryHierarchy.DisplayRow] {
-    CategoryHierarchy.displayRows(from: categories)
-  }
-
-  func addRootCategoryButtonTapped() {
-    let editor = CategoryEditorModel()
-    editor.parentCategoryID = nil
-    self.editor = editor
-  }
-
-  func addChildCategoryButtonTapped(parentCategoryID: YesChefCore.Category.ID) {
-    let editor = CategoryEditorModel()
-    editor.parentCategoryID = parentCategoryID
-    self.editor = editor
-  }
-
-  func editCategoryButtonTapped(categoryID: YesChefCore.Category.ID) {
-    guard let category = categories.first(where: { $0.id == categoryID }) else { return }
-    let editor = CategoryEditorModel()
-    editor.categoryID = category.id
-    editor.name = category.name
-    editor.parentCategoryID = category.parentCategoryID
-    self.editor = editor
-  }
-
-  func deleteCategoryButtonTapped(categoryID: YesChefCore.Category.ID) {
-    destination = .deleteCategory(categoryID)
-  }
-
-  var isSaveDisabled: Bool {
-    editor?.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
-  }
-
-  func saveCategoryButtonTapped() -> Bool {
-    guard let editor else { return false }
-
-    do {
-      if let categoryID = editor.categoryID {
-        try database.write { db in
-          try CategoryRepository.updateCategory(
-            categoryID: categoryID,
-            name: editor.name,
-            parentCategoryID: editor.parentCategoryID,
-            in: db
-          )
-        }
-      } else {
-        _ = try database.write { db in
-          try CategoryRepository.createCategory(
-            name: editor.name,
-            parentCategoryID: editor.parentCategoryID,
-            in: db,
-            now: now,
-            uuid: { uuid() }
-          )
-        }
-      }
-      self.editor = nil
-      return true
-    } catch {
-      errorMessage = error.localizedDescription
-      isShowingError = true
-      return false
-    }
-  }
-
-  func confirmDeleteCategoryButtonTapped(categoryID: YesChefCore.Category.ID) {
-    do {
-      try database.write { db in
-        try CategoryRepository.deleteCategory(categoryID: categoryID, in: db)
-      }
-      if editor?.categoryID == categoryID {
-        editor = nil
-      }
-      destination = nil
-    } catch {
-      errorMessage = error.localizedDescription
-      isShowingError = true
-    }
-  }
-
-  func title(for categoryID: YesChefCore.Category.ID) -> String {
-    categories.first { $0.id == categoryID }?.name ?? "this category"
-  }
-
-  func cancelEditingButtonTapped() {
-    editor = nil
-  }
-
-  func children(of parentCategoryID: YesChefCore.Category.ID?) -> [YesChefCore.Category] {
-    CategoryHierarchy.children(of: parentCategoryID, in: categories)
-  }
-
-  func childCount(for categoryID: YesChefCore.Category.ID) -> Int {
-    children(of: categoryID).count
-  }
-
-  func parentTitle(for categoryID: YesChefCore.Category.ID?) -> String {
-    categoryID.map { title(for: $0) } ?? "None"
-  }
-
-  @discardableResult
-  func categoryItemsDropped(
-    _ categoryIDs: [YesChefCore.Category.ID],
-    onParentCategoryID parentCategoryID: YesChefCore.Category.ID?
-  ) -> Bool {
-    var didMoveCategory = false
-    for categoryID in categoryIDs {
-      didMoveCategory = moveCategory(categoryID: categoryID, parentCategoryID: parentCategoryID) || didMoveCategory
-    }
-    return didMoveCategory
-  }
-
-  @discardableResult
-  private func moveCategory(
-    categoryID: YesChefCore.Category.ID,
-    parentCategoryID: YesChefCore.Category.ID?
-  ) -> Bool {
-    guard categoryID != parentCategoryID,
-          let category = categories.first(where: { $0.id == categoryID }),
-          category.parentCategoryID != parentCategoryID else { return false }
-
-    do {
-      try database.write { db in
-        try CategoryRepository.updateCategory(
-          categoryID: categoryID,
-          name: category.name,
-          parentCategoryID: parentCategoryID,
-          in: db
-        )
-      }
-      if editor?.categoryID == categoryID {
-        editor?.parentCategoryID = parentCategoryID
-      }
-      return true
-    } catch {
-      errorMessage = error.localizedDescription
-      isShowingError = true
-      return false
-    }
-  }
-
-  func parentOptions(excluding categoryID: YesChefCore.Category.ID?) -> [CategoryParentOption] {
-    let excludedIDs = categoryID
-      .map { CategoryHierarchy.descendantIDs(of: $0, in: categories).union([$0]) }
-      ?? Set<YesChefCore.Category.ID>()
-    return categoryRows
-      .filter { !excludedIDs.contains($0.category.id) }
-      .map { CategoryParentOption(categoryID: $0.category.id, title: $0.displayName) }
-  }
-}
-
-@Observable
-@MainActor
-final class CategoryEditorModel: Identifiable {
-  var categoryID: YesChefCore.Category.ID?
-  var name = ""
-  var parentCategoryID: YesChefCore.Category.ID?
-}
-
-struct CategoryParentOption: Identifiable, Equatable {
-  var categoryID: YesChefCore.Category.ID
-  var title: String
-
-  var id: YesChefCore.Category.ID { categoryID }
 }
 
 @Observable

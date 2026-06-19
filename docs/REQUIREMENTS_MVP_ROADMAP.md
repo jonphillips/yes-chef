@@ -645,7 +645,10 @@ Initial goals:
   `Meal Type > Dinner Party`; the repository creates parent/child category rows and
   list filters include parent paths for descendant recipes. The recipe filter sheet
   supports multi-select category filtering through a hierarchical picker rather than
-  a flat path list.
+  a flat path list. Active list filters are summarized by facet in the recipe list
+  header so large category/source/author selections stay compact. The category picker
+  is AND-aware: selected categories stay available, viable additions show live counts,
+  and impossible additions are disabled instead of hidden.
 - In the iPad layout, consider a category tree in the recipe navigation surface once
   the library grows beyond simple filters.
 - Use recovered flat Paprika category names as raw material, but expect manual
@@ -673,7 +676,9 @@ Initial goals:
 - Preserve source and author data during import where it is available.
 - Filter recipe lists by source and author independently. Current foundation: source
   and author filters are searchable multi-select facets with the top ten most-used
-  values grouped above the remaining alphabetical list.
+  values grouped above the remaining alphabetical list. Active source and author
+  filters are grouped into bounded summary chips rather than one chip per selected
+  value.
 - Treat cookbook names and publications as source metadata, not categories.
 - Allow category/tag import evidence to help populate source fields, but keep uncertain
   labels as imported categories until the user or a parser can confidently clean them.

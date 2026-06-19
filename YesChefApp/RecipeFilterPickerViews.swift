@@ -1,5 +1,23 @@
 import SwiftUI
 
+struct RecipeCategoryFilterAvailability: Equatable {
+  let categoryName: String
+  let matchingRecipeCount: Int
+  let isSelected: Bool
+
+  var isEnabled: Bool {
+    isSelected || matchingRecipeCount > 0
+  }
+
+  var countText: String {
+    "\(matchingRecipeCount)"
+  }
+
+  static func empty(categoryName: String) -> Self {
+    Self(categoryName: categoryName, matchingRecipeCount: 0, isSelected: false)
+  }
+}
+
 struct RecipeStringFilterNavigationRow<Destination: View>: View {
   let title: LocalizedStringKey
   let emptyTitle: LocalizedStringKey
@@ -112,8 +130,26 @@ struct RecipeStringFilterPickerView: View {
 struct RecipeFilterSelectionRow: View {
   let title: String
   let systemImage: String
+  let detail: String?
   let isSelected: Bool
+  let isEnabled: Bool
   let action: () -> Void
+
+  init(
+    title: String,
+    systemImage: String,
+    detail: String? = nil,
+    isSelected: Bool,
+    isEnabled: Bool = true,
+    action: @escaping () -> Void
+  ) {
+    self.title = title
+    self.systemImage = systemImage
+    self.detail = detail
+    self.isSelected = isSelected
+    self.isEnabled = isEnabled
+    self.action = action
+  }
 
   var body: some View {
     Button(action: action) {
@@ -122,7 +158,13 @@ struct RecipeFilterSelectionRow: View {
           .foregroundStyle(.secondary)
           .frame(width: 22)
         Text(title)
+          .foregroundStyle(isEnabled ? .primary : .secondary)
         Spacer()
+        if let detail {
+          Text(detail)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
         if isSelected {
           Image(systemName: "checkmark")
             .font(.body.weight(.semibold))
@@ -131,6 +173,7 @@ struct RecipeFilterSelectionRow: View {
       }
       .contentShape(Rectangle())
     }
+    .disabled(!isEnabled)
     .buttonStyle(.plain)
   }
 }

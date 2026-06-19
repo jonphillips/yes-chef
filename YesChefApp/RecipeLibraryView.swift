@@ -585,13 +585,16 @@ private struct RecipeCategoryFilterPickerView: View {
   }
 
   var body: some View {
+    let availabilityByName = model.categoryFilterAvailabilityByName
+
     Group {
       if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
         RecipeCategoryFilterLevelView(
           model: model,
           title: "Categories",
           parentNode: nil,
-          nodes: rootNodes
+          nodes: rootNodes,
+          availabilityByName: availabilityByName
         )
       } else {
         List {
@@ -599,10 +602,13 @@ private struct RecipeCategoryFilterPickerView: View {
             ContentUnavailableView("No Matching Categories", systemImage: "folder")
           } else {
             ForEach(matchingNodes) { node in
+              let availability = availabilityByName[node.path] ?? .empty(categoryName: node.path)
               RecipeFilterSelectionRow(
                 title: node.path,
                 systemImage: "folder",
-                isSelected: model.selectedCategoryNames.contains(node.path)
+                detail: availability.countText,
+                isSelected: availability.isSelected,
+                isEnabled: availability.isEnabled
               ) {
                 model.categoryFilterButtonTapped(node.path)
               }
@@ -621,26 +627,34 @@ private struct RecipeCategoryFilterLevelView: View {
   let title: String
   let parentNode: RecipeCategoryFilterNode?
   let nodes: [RecipeCategoryFilterNode]
+  let availabilityByName: [String: RecipeCategoryFilterAvailability]
 
   var body: some View {
     List {
       if let parentNode {
         Section {
+          let availability = availabilityByName[parentNode.path] ?? .empty(categoryName: parentNode.path)
           RecipeFilterSelectionRow(
             title: "All \(parentNode.title)",
             systemImage: "folder.fill",
-            isSelected: model.selectedCategoryNames.contains(parentNode.path)
+            detail: availability.countText,
+            isSelected: availability.isSelected,
+            isEnabled: availability.isEnabled
           ) {
             model.categoryFilterButtonTapped(parentNode.path)
           }
         } footer: {
-          Text("Parent filters include recipes in descendant categories.")
+          Text("Parent filters include recipes in descendant categories. Disabled categories would leave no recipes with the current filters.")
         }
       }
 
       Section(parentNode == nil ? "Top Level" : "Subcategories") {
         ForEach(nodes) { node in
-          RecipeCategoryFilterNodeRow(model: model, node: node)
+          RecipeCategoryFilterNodeRow(
+            model: model,
+            node: node,
+            availabilityByName: availabilityByName
+          )
         }
       }
     }
@@ -652,13 +666,16 @@ private struct RecipeCategoryFilterLevelView: View {
 private struct RecipeCategoryFilterNodeRow: View {
   let model: RecipeLibraryModel
   let node: RecipeCategoryFilterNode
+  let availabilityByName: [String: RecipeCategoryFilterAvailability]
 
   var body: some View {
     if node.children.isEmpty {
       RecipeFilterSelectionRow(
         title: node.title,
         systemImage: "folder",
-        isSelected: model.selectedCategoryNames.contains(node.path)
+        detail: availability.countText,
+        isSelected: availability.isSelected,
+        isEnabled: availability.isEnabled
       ) {
         model.categoryFilterButtonTapped(node.path)
       }
@@ -668,7 +685,8 @@ private struct RecipeCategoryFilterNodeRow: View {
           model: model,
           title: node.title,
           parentNode: node,
-          nodes: node.children
+          nodes: node.children,
+          availabilityByName: availabilityByName
         )
       } label: {
         HStack(spacing: 12) {
@@ -677,19 +695,50 @@ private struct RecipeCategoryFilterNodeRow: View {
             .frame(width: 22)
           VStack(alignment: .leading, spacing: 2) {
             Text(node.title)
-            if selectedPathCount > 0 {
-              Text("\(selectedPathCount) selected")
+            if let summary {
+              Text(summary)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
           }
         }
       }
+      .disabled(!isNavigable)
+      .opacity(isNavigable ? 1 : 0.55)
     }
   }
 
+  private var availability: RecipeCategoryFilterAvailability {
+    availabilityByName[node.path] ?? .empty(categoryName: node.path)
+  }
+
+  private var descendantAvailabilities: [RecipeCategoryFilterAvailability] {
+    node.flattened.map { availabilityByName[$0.path] ?? .empty(categoryName: $0.path) }
+  }
+
   private var selectedPathCount: Int {
-    node.flattened.filter { model.selectedCategoryNames.contains($0.path) }.count
+    descendantAvailabilities.filter(\.isSelected).count
+  }
+
+  private var possiblePathCount: Int {
+    descendantAvailabilities.filter { !$0.isSelected && $0.matchingRecipeCount > 0 }.count
+  }
+
+  private var isNavigable: Bool {
+    selectedPathCount > 0 || possiblePathCount > 0
+  }
+
+  private var summary: String? {
+    switch (selectedPathCount, possiblePathCount) {
+    case (0, 0):
+      "No matches"
+    case (0, let possible):
+      "\(possible) possible"
+    case (let selected, 0):
+      "\(selected) selected"
+    case let (selected, possible):
+      "\(selected) selected · \(possible) possible"
+    }
   }
 }
 
@@ -768,95 +817,6 @@ private struct RecipeOptionalStringPicker: View {
         }
       }
     }
-  }
-}
-
-private struct RecipeActiveFilterBar: View {
-  let model: RecipeLibraryModel
-
-  var body: some View {
-    ScrollView(.horizontal, showsIndicators: false) {
-      HStack(spacing: 8) {
-        if model.showsFavoritesOnly {
-          RecipeFilterChip(title: "Favorites", systemImage: "star.fill") {
-            model.showsFavoritesOnly = false
-          }
-        }
-        if model.showsPhotosOnly {
-          RecipeFilterChip(title: "Photos", systemImage: "photo") {
-            model.showsPhotosOnly = false
-          }
-        }
-        if model.libraryScope != .main {
-          RecipeFilterChip(title: model.libraryScope.title, systemImage: "books.vertical") {
-            model.libraryScope = .main
-          }
-        }
-        ForEach(model.selectedCategoryNames.sorted(), id: \.self) { categoryName in
-          RecipeFilterChip(title: categoryName, systemImage: "folder") {
-            model.selectedCategoryNames.remove(categoryName)
-          }
-        }
-        ForEach(model.selectedTagNames.sorted(), id: \.self) { tagName in
-          RecipeFilterChip(title: tagName, systemImage: "tag") {
-            model.selectedTagNames.remove(tagName)
-          }
-        }
-        if let selectedCuisine = model.selectedCuisine {
-          RecipeFilterChip(title: selectedCuisine, systemImage: "globe.americas") {
-            model.selectedCuisine = nil
-          }
-        }
-        if let selectedCourse = model.selectedCourse {
-          RecipeFilterChip(title: selectedCourse, systemImage: "fork.knife") {
-            model.selectedCourse = nil
-          }
-        }
-        ForEach(model.selectedSourceNames.sorted(), id: \.self) { sourceName in
-          RecipeFilterChip(title: sourceName, systemImage: "book") {
-            model.selectedSourceNames.remove(sourceName)
-          }
-        }
-        ForEach(model.selectedAuthorNames.sorted(), id: \.self) { authorName in
-          RecipeFilterChip(title: authorName, systemImage: "person.text.rectangle") {
-            model.selectedAuthorNames.remove(authorName)
-          }
-        }
-        Button {
-          model.clearFiltersButtonTapped()
-        } label: {
-          Image(systemName: "xmark.circle.fill")
-            .font(.body)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Clear Filters")
-      }
-      .padding(.horizontal)
-      .padding(.vertical, 8)
-    }
-    .background(.bar)
-  }
-}
-
-private struct RecipeFilterChip: View {
-  let title: String
-  let systemImage: String
-  let action: () -> Void
-
-  var body: some View {
-    Button(action: action) {
-      Label {
-        Text(title)
-          .lineLimit(1)
-      } icon: {
-        Image(systemName: systemImage)
-      }
-      .font(.caption.weight(.semibold))
-      .padding(.horizontal, 10)
-      .padding(.vertical, 6)
-      .background(.quaternary, in: Capsule())
-    }
-    .buttonStyle(.plain)
   }
 }
 
