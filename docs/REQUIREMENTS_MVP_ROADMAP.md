@@ -668,9 +668,12 @@ Source and author should be first-class browse/filter facets.
 Initial goals:
 
 - Expose `RecipeSource.name`, `author`, `publicationName`, and `bookTitle` in the
-  editor when the user wants detailed source metadata.
+  editor when the user wants detailed source metadata. Current foundation: the recipe
+  editor shows a compact source summary row that drills into a dedicated source editor.
 - Preserve source and author data during import where it is available.
-- Filter recipe lists by source and author independently.
+- Filter recipe lists by source and author independently. Current foundation: source
+  and author filters are searchable multi-select facets with the top ten most-used
+  values grouped above the remaining alphabetical list.
 - Treat cookbook names and publications as source metadata, not categories.
 - Allow category/tag import evidence to help populate source fields, but keep uncertain
   labels as imported categories until the user or a parser can confidently clean them.

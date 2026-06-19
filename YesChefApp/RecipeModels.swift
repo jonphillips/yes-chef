@@ -44,8 +44,8 @@ final class RecipeLibraryModel {
   var selectedTagNames: Set<String> = []
   var selectedCuisine: String?
   var selectedCourse: String?
-  var selectedSourceName: String?
-  var selectedAuthorName: String?
+  var selectedSourceNames: Set<String> = []
+  var selectedAuthorNames: Set<String> = []
 
   var visibleRecipeRows: [RecipeListRowData] {
     unarchivedRecipeRows
@@ -64,8 +64,8 @@ final class RecipeLibraryModel {
       || !selectedTagNames.isEmpty
       || selectedCuisine != nil
       || selectedCourse != nil
-      || selectedSourceName != nil
-      || selectedAuthorName != nil
+      || !selectedSourceNames.isEmpty
+      || !selectedAuthorNames.isEmpty
   }
 
   var categoryFilterOptions: [String] {
@@ -88,8 +88,24 @@ final class RecipeLibraryModel {
     distinctOptions(unarchivedRecipeRows.compactMap(\.filterSourceName))
   }
 
+  var popularSourceFilterOptions: [String] {
+    popularOptions(unarchivedRecipeRows.compactMap(\.filterSourceName), limit: 10)
+  }
+
+  var remainingSourceFilterOptions: [String] {
+    remainingOptions(all: sourceFilterOptions, popular: popularSourceFilterOptions)
+  }
+
   var authorFilterOptions: [String] {
     distinctOptions(unarchivedRecipeRows.compactMap { $0.source?.author.nonEmpty })
+  }
+
+  var popularAuthorFilterOptions: [String] {
+    popularOptions(unarchivedRecipeRows.compactMap { $0.source?.author.nonEmpty }, limit: 10)
+  }
+
+  var remainingAuthorFilterOptions: [String] {
+    remainingOptions(all: authorFilterOptions, popular: popularAuthorFilterOptions)
   }
 
   var selectedCategoryFilterSummary: String {
@@ -97,6 +113,14 @@ final class RecipeLibraryModel {
     return selectedCategoryNames
       .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
       .joined(separator: ", ")
+  }
+
+  var selectedSourceFilterSummary: String {
+    selectedFilterSummary(selectedSourceNames, emptyTitle: "All sources")
+  }
+
+  var selectedAuthorFilterSummary: String {
+    selectedFilterSummary(selectedAuthorNames, emptyTitle: "All authors")
   }
 
   var selectedRecipe: Recipe? {
@@ -218,8 +242,8 @@ final class RecipeLibraryModel {
     selectedTagNames = []
     selectedCuisine = nil
     selectedCourse = nil
-    selectedSourceName = nil
-    selectedAuthorName = nil
+    selectedSourceNames = []
+    selectedAuthorNames = []
   }
 
   func doneFilteringButtonTapped() {
@@ -239,6 +263,22 @@ final class RecipeLibraryModel {
       selectedCategoryNames.remove(categoryName)
     } else {
       selectedCategoryNames.insert(categoryName)
+    }
+  }
+
+  func sourceFilterButtonTapped(_ sourceName: String) {
+    if selectedSourceNames.contains(sourceName) {
+      selectedSourceNames.remove(sourceName)
+    } else {
+      selectedSourceNames.insert(sourceName)
+    }
+  }
+
+  func authorFilterButtonTapped(_ authorName: String) {
+    if selectedAuthorNames.contains(authorName) {
+      selectedAuthorNames.remove(authorName)
+    } else {
+      selectedAuthorNames.insert(authorName)
     }
   }
 
@@ -301,10 +341,12 @@ final class RecipeLibraryModel {
     if let selectedCourse, recipe.course != selectedCourse {
       return false
     }
-    if let selectedSourceName, row.filterSourceName != selectedSourceName {
+    if !selectedSourceNames.isEmpty,
+       !selectedSourceNames.contains(row.filterSourceName ?? "") {
       return false
     }
-    if let selectedAuthorName, row.source?.author.nonEmpty != selectedAuthorName {
+    if !selectedAuthorNames.isEmpty,
+       !selectedAuthorNames.contains(row.source?.author.nonEmpty ?? "") {
       return false
     }
     return true
@@ -375,6 +417,35 @@ final class RecipeLibraryModel {
   private func distinctOptions(_ values: [String]) -> [String] {
     Array(Set(values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }))
       .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+  }
+
+  private func popularOptions(_ values: [String], limit: Int) -> [String] {
+    let normalizedValues = values
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+    let counts = Dictionary(grouping: normalizedValues, by: { $0 })
+      .mapValues { $0.count }
+
+    return counts
+      .sorted { lhs, rhs in
+        if lhs.value != rhs.value { return lhs.value > rhs.value }
+        return lhs.key.localizedStandardCompare(rhs.key) == .orderedAscending
+      }
+      .prefix(limit)
+      .map(\.key)
+      .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+  }
+
+  private func remainingOptions(all options: [String], popular: [String]) -> [String] {
+    let popularSet = Set(popular)
+    return options.filter { !popularSet.contains($0) }
+  }
+
+  private func selectedFilterSummary(_ values: Set<String>, emptyTitle: String) -> String {
+    guard !values.isEmpty else { return emptyTitle }
+    return values
+      .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+      .joined(separator: ", ")
   }
 }
 

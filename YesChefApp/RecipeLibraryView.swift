@@ -499,16 +499,54 @@ private struct RecipeFilterView: View {
           selection: $model.selectedCourse,
           options: model.courseFilterOptions
         )
-        RecipeOptionalStringPicker(
-          title: "Source",
-          selection: $model.selectedSourceName,
+      }
+
+      Section {
+        RecipeStringFilterNavigationRow(
+          title: "Sources",
+          emptyTitle: "No sources",
+          summary: model.selectedSourceFilterSummary,
+          systemImage: "book",
+          isDefaultSelection: model.selectedSourceNames.isEmpty,
           options: model.sourceFilterOptions
-        )
-        RecipeOptionalStringPicker(
-          title: "Author",
-          selection: $model.selectedAuthorName,
+        ) {
+          RecipeStringFilterPickerView(
+            title: "Sources",
+            options: model.sourceFilterOptions,
+            popularOptions: model.popularSourceFilterOptions,
+            remainingOptions: model.remainingSourceFilterOptions,
+            selectedValues: model.selectedSourceNames,
+            systemImage: "book"
+          ) { sourceName in
+            model.sourceFilterButtonTapped(sourceName)
+          }
+        }
+
+        RecipeStringFilterNavigationRow(
+          title: "Authors",
+          emptyTitle: "No authors",
+          summary: model.selectedAuthorFilterSummary,
+          systemImage: "person.text.rectangle",
+          isDefaultSelection: model.selectedAuthorNames.isEmpty,
           options: model.authorFilterOptions
-        )
+        ) {
+          RecipeStringFilterPickerView(
+            title: "Authors",
+            options: model.authorFilterOptions,
+            popularOptions: model.popularAuthorFilterOptions,
+            remainingOptions: model.remainingAuthorFilterOptions,
+            selectedValues: model.selectedAuthorNames,
+            systemImage: "person.text.rectangle"
+          ) { authorName in
+            model.authorFilterButtonTapped(authorName)
+          }
+        }
+      } header: {
+        Text("Source")
+      } footer: {
+        if !model.selectedSourceNames.isEmpty || !model.selectedAuthorNames.isEmpty {
+          Text("Recipes may match any selected source and any selected author.")
+        }
       }
     }
     .navigationTitle("Filters")
@@ -714,32 +752,6 @@ private struct RecipeCategoryFilterNode: Identifiable, Equatable {
   }
 }
 
-private struct RecipeFilterSelectionRow: View {
-  let title: String
-  let systemImage: String
-  let isSelected: Bool
-  let action: () -> Void
-
-  var body: some View {
-    Button(action: action) {
-      HStack(spacing: 12) {
-        Image(systemName: systemImage)
-          .foregroundStyle(.secondary)
-          .frame(width: 22)
-        Text(title)
-        Spacer()
-        if isSelected {
-          Image(systemName: "checkmark")
-            .font(.body.weight(.semibold))
-            .foregroundStyle(.tint)
-        }
-      }
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-  }
-}
-
 private struct RecipeOptionalStringPicker: View {
   let title: String
   @Binding var selection: String?
@@ -800,14 +812,14 @@ private struct RecipeActiveFilterBar: View {
             model.selectedCourse = nil
           }
         }
-        if let selectedSourceName = model.selectedSourceName {
-          RecipeFilterChip(title: selectedSourceName, systemImage: "book") {
-            model.selectedSourceName = nil
+        ForEach(model.selectedSourceNames.sorted(), id: \.self) { sourceName in
+          RecipeFilterChip(title: sourceName, systemImage: "book") {
+            model.selectedSourceNames.remove(sourceName)
           }
         }
-        if let selectedAuthorName = model.selectedAuthorName {
-          RecipeFilterChip(title: selectedAuthorName, systemImage: "person.text.rectangle") {
-            model.selectedAuthorName = nil
+        ForEach(model.selectedAuthorNames.sorted(), id: \.self) { authorName in
+          RecipeFilterChip(title: authorName, systemImage: "person.text.rectangle") {
+            model.selectedAuthorNames.remove(authorName)
           }
         }
         Button {

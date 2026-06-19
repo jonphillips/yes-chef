@@ -21,15 +21,15 @@ struct RecipeEditorView: View {
       }
 
       Section("Source") {
-        StackedTextField(title: "Source name", text: $model.draft.sourceName)
-        StackedTextField(title: "URL", text: $model.draft.sourceURL)
-          .keyboardType(.URL)
-          .textInputAutocapitalization(.never)
-        StackedTextField(title: "Author", text: $model.draft.sourceAuthor)
-        StackedTextField(title: "Publication", text: $model.draft.sourcePublicationName)
-        StackedTextField(title: "Book title", text: $model.draft.sourceBookTitle)
-        StackedTextField(title: "Page", text: $model.draft.sourcePageNumber)
-        StackedTextField(title: "Source notes", text: $model.draft.sourceNotes, axis: .vertical)
+        NavigationLink {
+          RecipeSourceEditorView(model: model)
+        } label: {
+          RecipeSourceSummaryRow(
+            title: model.draft.sourceSummaryTitle,
+            detail: model.draft.sourceSummaryDetail,
+            hasSource: model.draft.hasVisibleSourceData
+          )
+        }
       }
 
       Section("Timing and Yield") {
@@ -106,5 +106,104 @@ struct RecipeEditorView: View {
     } message: {
       Text(model.errorMessage ?? "")
     }
+  }
+}
+
+private struct RecipeSourceSummaryRow: View {
+  let title: String
+  let detail: String?
+  let hasSource: Bool
+
+  var body: some View {
+    StackedFormField(title: "Source") {
+      HStack(alignment: .firstTextBaseline, spacing: 12) {
+        Image(systemName: "book")
+          .foregroundStyle(.secondary)
+          .frame(width: 22)
+        VStack(alignment: .leading, spacing: 3) {
+          Text(title)
+            .foregroundStyle(hasSource ? .primary : .secondary)
+          if let detail {
+            Text(detail)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .lineLimit(2)
+          }
+        }
+      }
+    }
+  }
+}
+
+private struct RecipeSourceEditorView: View {
+  let model: RecipeEditorModel
+
+  var body: some View {
+    @Bindable var model = model
+
+    Form {
+      Section("Identity") {
+        StackedTextField(title: "Source name", text: $model.draft.sourceName)
+        StackedTextField(title: "Author", text: $model.draft.sourceAuthor)
+        StackedTextField(title: "URL", text: $model.draft.sourceURL)
+          .keyboardType(.URL)
+          .textInputAutocapitalization(.never)
+      }
+
+      Section("Publication or Book") {
+        StackedTextField(title: "Publication", text: $model.draft.sourcePublicationName)
+        StackedTextField(title: "Book title", text: $model.draft.sourceBookTitle)
+        StackedTextField(title: "Page", text: $model.draft.sourcePageNumber)
+      }
+
+      Section("Notes") {
+        StackedTextField(title: "Source notes", text: $model.draft.sourceNotes, axis: .vertical)
+      }
+    }
+    .navigationTitle("Source")
+    .navigationBarTitleDisplayMode(.inline)
+  }
+}
+
+private extension RecipeEditorDraft {
+  var hasVisibleSourceData: Bool {
+    [
+      sourceName,
+      sourceURL,
+      sourceAuthor,
+      sourcePublicationName,
+      sourceBookTitle,
+      sourcePageNumber,
+      sourceNotes,
+    ]
+    .contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+  }
+
+  var sourceSummaryTitle: String {
+    firstNonEmpty(sourceName, publicationNameDisplay, sourceBookTitle, sourceURL) ?? "No source"
+  }
+
+  var sourceSummaryDetail: String? {
+    let details = [
+      sourceAuthor.nonEmpty.map { "Author: \($0)" },
+      sourceURL.nonEmpty,
+    ].compactMap(\.self)
+    guard !details.isEmpty else { return nil }
+    return details.joined(separator: " | ")
+  }
+
+  private var publicationNameDisplay: String? {
+    firstNonEmpty(sourcePublicationName, sourceBookTitle)
+  }
+
+  private func firstNonEmpty(_ values: String?...) -> String? {
+    values.lazy.compactMap { $0?.nonEmpty }.first
+  }
+}
+
+private extension String {
+  var nonEmpty: String? {
+    let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
   }
 }
