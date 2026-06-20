@@ -439,24 +439,11 @@ public enum GroceryRepository {
     var itemIDs: [GroceryItem.ID] = []
     var sortOrder = try nextItemSortOrder(groceryListID: groceryListID, in: db)
     for line in lines {
-      let item = GroceryItem(
-        id: uuid(),
+      let itemID = try addOrConsolidateGeneratedItem(
+        GroceryGeneratedItemDraft(line: line),
         groceryListID: groceryListID,
-        title: line.groceryItemTitle,
-        quantity: line.quantity,
-        quantityText: line.groceryQuantityText,
-        unit: line.unit?.nonEmptyGroceryText,
-        aisle: line.shoppingCategory?.nonEmptyGroceryText,
-        notes: line.groceryNotes,
-        sortOrder: sortOrder,
-        dateCreated: now,
-        dateModified: now
-      )
-      try GroceryItem.insert { item }.execute(db)
-      try GroceryItemSource.insert {
-        GroceryItemSource(
+        source: PendingGroceryItemSource(
           id: uuid(),
-          groceryItemID: item.id,
           origin: source.origin,
           recipeID: recipe.id,
           ingredientLineID: line.id,
@@ -470,14 +457,104 @@ public enum GroceryRepository {
           sourceSubtitle: source.sourceSubtitle,
           ingredientText: line.originalText,
           dateCreated: now
-        )
-      }
-      .execute(db)
-      itemIDs.append(item.id)
-      sortOrder += 1
+        ),
+        sortOrder: &sortOrder,
+        in: db,
+        now: now,
+        uuid: uuid
+      )
+      itemIDs.append(itemID)
     }
 
     return itemIDs
+  }
+
+  private static func addOrConsolidateGeneratedItem(
+    _ draft: GroceryGeneratedItemDraft,
+    groceryListID: GroceryList.ID,
+    source: PendingGroceryItemSource,
+    sortOrder: inout Int,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> GroceryItem.ID {
+    if var item = try existingItemCompatibleWithGeneratedDraft(
+      draft,
+      groceryListID: groceryListID,
+      in: db
+    ) {
+      item.quantity = combinedQuantity(item.quantity, draft.quantity)
+      item.quantityText = item.quantity.map(formatGroceryQuantity)
+      item.dateModified = now
+      try GroceryItem.upsert { item }.execute(db)
+      try insertSource(source, groceryItemID: item.id, in: db)
+      return item.id
+    }
+
+    let item = GroceryItem(
+      id: uuid(),
+      groceryListID: groceryListID,
+      title: draft.title,
+      quantity: draft.quantity,
+      quantityText: draft.quantityText,
+      unit: draft.unit,
+      aisle: draft.aisle,
+      notes: draft.notes,
+      sortOrder: sortOrder,
+      dateCreated: now,
+      dateModified: now
+    )
+    try GroceryItem.insert { item }.execute(db)
+    try insertSource(source, groceryItemID: item.id, in: db)
+    sortOrder += 1
+    return item.id
+  }
+
+  private static func insertSource(
+    _ source: PendingGroceryItemSource,
+    groceryItemID: GroceryItem.ID,
+    in db: Database
+  ) throws {
+    try GroceryItemSource.insert {
+      GroceryItemSource(
+        id: source.id,
+        groceryItemID: groceryItemID,
+        origin: source.origin,
+        recipeID: source.recipeID,
+        ingredientLineID: source.ingredientLineID,
+        mealPlanItemID: source.mealPlanItemID,
+        menuID: source.menuID,
+        menuItemID: source.menuItemID,
+        menuPlacementID: source.menuPlacementID,
+        scheduledDate: source.scheduledDate,
+        mealSlot: source.mealSlot,
+        sourceTitle: source.sourceTitle,
+        sourceSubtitle: source.sourceSubtitle,
+        ingredientText: source.ingredientText,
+        dateCreated: source.dateCreated
+      )
+    }
+    .execute(db)
+  }
+
+  private static func existingItemCompatibleWithGeneratedDraft(
+    _ draft: GroceryGeneratedItemDraft,
+    groceryListID: GroceryList.ID,
+    in db: Database
+  ) throws -> GroceryItem? {
+    try GroceryItem
+      .where { $0.groceryListID.eq(groceryListID) }
+      .fetchAll(db)
+      .filter { !$0.isPurchased }
+      .sorted {
+        if $0.sortOrder != $1.sortOrder {
+          return $0.sortOrder < $1.sortOrder
+        }
+        return $0.id.uuidString < $1.id.uuidString
+      }
+      .first { item in
+        item.canConsolidate(with: draft)
+      }
   }
 
   private static func requireList(_ listID: GroceryList.ID, in db: Database) throws -> GroceryList {
@@ -551,6 +628,39 @@ public enum GroceryRepositoryError: Error, Equatable, Sendable {
 
 private struct GroceryItemSourceDraft {
   var origin: GroceryItemOrigin
+  var mealPlanItemID: MealPlanItem.ID? = nil
+  var menuID: Menu.ID? = nil
+  var menuItemID: MenuItem.ID? = nil
+  var menuPlacementID: MenuPlacement.ID? = nil
+  var scheduledDate: Date? = nil
+  var mealSlot: MealPlanItemSlot? = nil
+  var sourceTitle: String? = nil
+  var sourceSubtitle: String? = nil
+}
+
+private struct GroceryGeneratedItemDraft {
+  var title: String
+  var quantity: Double?
+  var quantityText: String?
+  var unit: String?
+  var aisle: String?
+  var notes: String?
+
+  init(line: IngredientLine) {
+    self.title = line.groceryItemTitle
+    self.quantity = line.quantity
+    self.quantityText = line.groceryQuantityText
+    self.unit = line.unit?.nonEmptyGroceryText
+    self.aisle = line.shoppingCategory?.nonEmptyGroceryText
+    self.notes = line.groceryNotes
+  }
+}
+
+private struct PendingGroceryItemSource {
+  var id: UUID
+  var origin: GroceryItemOrigin
+  var recipeID: Recipe.ID?
+  var ingredientLineID: IngredientLine.ID?
   var mealPlanItemID: MealPlanItem.ID?
   var menuID: Menu.ID?
   var menuItemID: MenuItem.ID?
@@ -559,28 +669,8 @@ private struct GroceryItemSourceDraft {
   var mealSlot: MealPlanItemSlot?
   var sourceTitle: String?
   var sourceSubtitle: String?
-
-  init(
-    origin: GroceryItemOrigin,
-    mealPlanItemID: MealPlanItem.ID? = nil,
-    menuID: Menu.ID? = nil,
-    menuItemID: MenuItem.ID? = nil,
-    menuPlacementID: MenuPlacement.ID? = nil,
-    scheduledDate: Date? = nil,
-    mealSlot: MealPlanItemSlot? = nil,
-    sourceTitle: String? = nil,
-    sourceSubtitle: String? = nil
-  ) {
-    self.origin = origin
-    self.mealPlanItemID = mealPlanItemID
-    self.menuID = menuID
-    self.menuItemID = menuItemID
-    self.menuPlacementID = menuPlacementID
-    self.scheduledDate = scheduledDate
-    self.mealSlot = mealSlot
-    self.sourceTitle = sourceTitle
-    self.sourceSubtitle = sourceSubtitle
-  }
+  var ingredientText: String?
+  var dateCreated: Date
 }
 
 private func areGroceryListRowsInIncreasingOrder(
@@ -640,6 +730,21 @@ private func areMenuItemsInIncreasingOrder(_ lhs: MenuItem, _ rhs: MenuItem) -> 
   return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
 }
 
+private extension GroceryItem {
+  func canConsolidate(with draft: GroceryGeneratedItemDraft) -> Bool {
+    title.groceryConsolidationKey == draft.title.groceryConsolidationKey
+      && unit.groceryConsolidationKey == draft.unit.groceryConsolidationKey
+      && aisle.groceryConsolidationKey == draft.aisle.groceryConsolidationKey
+      && notes.groceryConsolidationKey == draft.notes.groceryConsolidationKey
+      && canCombineQuantity(
+        quantity,
+        quantityText: quantityText,
+        with: draft.quantity,
+        quantityText: draft.quantityText
+      )
+  }
+}
+
 private extension IngredientLine {
   var isShoppable: Bool {
     !doNotShop && !isHeader && !originalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -661,6 +766,26 @@ private extension IngredientLine {
   }
 }
 
+private func canCombineQuantity(
+  _ lhs: Double?,
+  quantityText lhsQuantityText: String?,
+  with rhs: Double?,
+  quantityText rhsQuantityText: String?
+) -> Bool {
+  if lhs != nil, rhs != nil {
+    return true
+  }
+  return lhs == nil
+    && rhs == nil
+    && lhsQuantityText == nil
+    && rhsQuantityText == nil
+}
+
+private func combinedQuantity(_ lhs: Double?, _ rhs: Double?) -> Double? {
+  guard let lhs, let rhs else { return nil }
+  return lhs + rhs
+}
+
 private func formatGroceryQuantity(_ quantity: Double) -> String {
   if quantity.rounded() == quantity {
     return String(Int(quantity))
@@ -672,5 +797,21 @@ private extension String {
   var nonEmptyGroceryText: String? {
     let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
+  }
+
+  var groceryConsolidationKey: String? {
+    let collapsedWhitespace = split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    let trimmed = collapsedWhitespace.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    return trimmed.folding(
+      options: [.caseInsensitive, .diacriticInsensitive],
+      locale: Locale(identifier: "en_US_POSIX")
+    )
+  }
+}
+
+private extension Optional where Wrapped == String {
+  var groceryConsolidationKey: String? {
+    flatMap(\.groceryConsolidationKey)
   }
 }

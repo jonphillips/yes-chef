@@ -7,7 +7,8 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 
 ## Current Checkpoint
 
-The current slice scaffolds menus and connects them to the meal calendar.
+The current slice scaffolds meal planning, menus, and grocery lists with
+source-preserving generated grocery items.
 
 Implemented behavior:
 
@@ -17,44 +18,48 @@ Implemented behavior:
   iCal-style work.
 - A month-first Meal Calendar workspace in the existing app shell, with month,
   week, and day display modes.
-- On regular-width iPad, Meal Calendar uses a two-column sidebar + workspace
-  layout instead of the app's recipe-style content/detail split.
-- Month/week planning views own the main workspace, with the selected-day agenda
-  in a right rail on wide layouts and below the calendar on compact/narrow
-  layouts.
-- A selected-day agenda grouped by meal slot: breakfast, lunch, dinner, snack.
-- Add recipe and add note flows from the calendar.
-- A `Plan` toolbar button on recipe detail that starts a preselected recipe plan
-  item for the calendar's selected date.
-- Edit/reschedule support for existing meal plan recipe and note items.
-- Delete support for meal plan items.
-- Core request/repository tests covering add, validation, fetch, sort order, and
-  update/delete behavior.
+- Add recipe/add note flows from the calendar, plus a `Plan` toolbar button on
+  recipe detail that starts a preselected recipe plan item.
 - A durable menu schema with `menus`, `menuItems`, and `menuPlacements`.
-- Menu items support recipe dishes and freeform note dishes, each assigned to a
-  menu day offset and meal slot.
-- A menu can be placed on the calendar with a start date. Multi-day menus project
-  each menu item onto the correct calendar day automatically.
+- Menus can contain recipe dishes and freeform notes, be placed on the calendar,
+  shifted to a new start date, and removed from the calendar without deleting the
+  menu.
 - Calendar rows projected from a menu preserve provenance through menu placement
   data and show as menu-derived instead of editable standalone meal plan items.
-- Menu-derived calendar rows can open the source menu from the selected-day
-  agenda.
 - A minimal Menus section in the app shell for creating menus, adding dishes, and
   placing a menu on the calendar.
-- Menu placements can be shifted to a new start date or removed from the
-  calendar without deleting the menu.
-- Core menu tests covering menu creation, item validation, placement, and calendar
-  projection behavior, including placement update/delete behavior.
+- A durable grocery schema with `groceryLists`, `groceryItems`, and
+  `groceryItemSources`.
+- Grocery sources preserve recipe, menu, menu placement, calendar item, and
+  custom origins, including source titles/subtitles and original ingredient text.
+- A minimal Groceries section in the app shell supports list creation, custom
+  items, purchased state, add-from-calendar-range, add-menu, and add-recipe
+  flows.
+- Recipe detail has a `Shop` toolbar button that adds the recipe's shoppable
+  ingredients to the selected/default grocery list.
+- Generated grocery ingredients consolidate conservatively when title, unit,
+  aisle, notes, and quantity shape are compatible. Compatible numeric quantities
+  are added together, while each contributing origin remains represented as its
+  own `GroceryItemSource` row.
+- Purchased items and prep/comment-sensitive rows stay separate when generating
+  groceries.
+- Core tests cover meal calendar, menus, grocery source provenance, and generated
+  grocery consolidation behavior.
 
 Deferred from this slice:
 
 - Drag/drop or direct manipulation inside the calendar grid.
 - Restaurant reservation-specific UI.
 - iCal import/export/sync.
-- Shopping list, prep strategy, and menu generation integrations.
 - Rich menu editing: reordering dishes, editing existing menu dishes, and
   duplicating menus.
-- Importing Paprika menus from backup/export data, if that data is recoverable.
+- Ingredient selection before adding a recipe/menu/calendar range to groceries.
+- Source-aware grocery removal, such as removing a recipe's contribution from a
+  consolidated grocery row without deleting unrelated sources.
+- Pantry interactions, Reminders/Siri integration, store/category learning, and
+  shopping workflow polish.
+- Importing Paprika menus or grocery lists from backup/export data, if that data
+  is recoverable.
 
 ## Verification Pattern
 
@@ -71,30 +76,31 @@ Jon performs the primary UI testing pass.
 
 ## Recommended Next Larger Task
 
-Scaffold grocery/shopping lists while the menu/calendar source relationships are
-fresh.
+Make grocery generation source-aware in the UI, especially before and after
+consolidation.
 
 Suggested next scope:
 
 - Jon should do the primary UI pass on iPad and iPhone.
 - Create a multi-day menu, place it on the calendar, shift the placement, remove
   the placement, and confirm the calendar/source relationship remains legible.
-- Use Paprika's grocery docs as inspiration, but preserve Yes Chef's source model:
-  grocery rows should know whether they came from a recipe, a menu placement, a
-  calendar item, or a custom item.
-- Scaffold grocery lists, grocery items, and a minimal Groceries section before
-  implementing consolidation, pantry interactions, or Reminders/Siri integration.
-- Revisit drag/drop from recipe rows into either the calendar or a menu after the
-  grocery source model is standing.
+- Add an ingredient selection step before adding a recipe, menu, menu placement,
+  or calendar range to groceries.
+- Show a compact source breakdown for grocery rows so consolidated items make
+  their recipe/menu/calendar/custom origins visible.
+- Implement source-aware removal so deleting "this recipe from the grocery list"
+  removes only matching source rows and recalculates/deletes the grocery row as
+  appropriate.
+- Revisit drag/drop from recipe rows into either the calendar, a menu, or
+  groceries after the source model is visible to users.
 
 Reasoning:
 
-- The high-risk model question is now represented in code: menu placement projects
-  rows into the calendar without erasing their source relationship, and placement
-  changes update the projection instead of copying anonymous calendar rows.
-- Groceries are the next source-of-truth pressure test because recipe/menu/calendar
-  inputs, ingredient scaling, consolidation, purchased state, and custom items all
-  need to coexist.
-- The calendar can later give `lastCookedAt` a principled source of truth: a
-  recipe scheduled on a past date can drive or supplement that field instead of
-  relying only on a manual "mark cooked" flow.
+- The storage model can now represent multiple origins for one grocery row, but
+  the UI still treats generation as a blind add operation.
+- Paprika's grocery flow allows recipe ingredients to be chosen before adding and
+  recipes to be removed from the grocery list later; Yes Chef needs the same
+  user-facing affordance while keeping richer provenance intact.
+- Source-aware removal is the next pressure test for consolidation because a
+  single row may contain quantities from several recipes, menu placements, and
+  calendar items.
