@@ -659,17 +659,17 @@ private struct GroceryGeneratedItemDraft {
 private struct PendingGroceryItemSource {
   var id: UUID
   var origin: GroceryItemOrigin
-  var recipeID: Recipe.ID?
-  var ingredientLineID: IngredientLine.ID?
-  var mealPlanItemID: MealPlanItem.ID?
-  var menuID: Menu.ID?
-  var menuItemID: MenuItem.ID?
-  var menuPlacementID: MenuPlacement.ID?
-  var scheduledDate: Date?
-  var mealSlot: MealPlanItemSlot?
-  var sourceTitle: String?
-  var sourceSubtitle: String?
-  var ingredientText: String?
+  var recipeID: Recipe.ID? = nil
+  var ingredientLineID: IngredientLine.ID? = nil
+  var mealPlanItemID: MealPlanItem.ID? = nil
+  var menuID: Menu.ID? = nil
+  var menuItemID: MenuItem.ID? = nil
+  var menuPlacementID: MenuPlacement.ID? = nil
+  var scheduledDate: Date? = nil
+  var mealSlot: MealPlanItemSlot? = nil
+  var sourceTitle: String? = nil
+  var sourceSubtitle: String? = nil
+  var ingredientText: String? = nil
   var dateCreated: Date
 }
 
