@@ -1,0 +1,298 @@
+import CustomDump
+import Dependencies
+import Foundation
+import Testing
+import YesChefCore
+
+extension RecipeCoreTests {
+  @Suite
+  struct MenuTests {
+    @Test
+    func createsMenuItemsAndPlacements() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 804_100_000)
+      let startDate = Date(timeIntervalSinceReferenceDate: 804_200_000)
+      let recipeID = SampleUUIDSequence.uuid(9_001)
+      var uuids = SampleUUIDSequence(start: 9_100)
+
+      try database.write { db in
+        try Recipe.insert {
+          Recipe(
+            id: recipeID,
+            title: "Menu Chicken",
+            dateCreated: now,
+            dateModified: now
+          )
+        }
+        .execute(db)
+
+        let menuID = try MenuRepository.addMenu(
+          title: " Weekend Menu ",
+          notes: "  Guests on Saturday  ",
+          dayCount: 2,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let recipeItemID = try MenuRepository.addRecipeItem(
+          menuID: menuID,
+          recipeID: recipeID,
+          dayOffset: 0,
+          mealSlot: .dinner,
+          notes: "  Grill outside  ",
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let noteItemID = try MenuRepository.addNoteItem(
+          menuID: menuID,
+          title: "  Leftover lunch  ",
+          notes: "  Use extra chicken  ",
+          dayOffset: 1,
+          mealSlot: .lunch,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let placementID = try MenuRepository.placeMenu(
+          menuID: menuID,
+          startDate: startDate,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        let detail = try #require(try MenuDetailRequest(menuID: menuID).fetch(db))
+        expectNoDifference(detail.menu.title, "Weekend Menu")
+        expectNoDifference(detail.menu.notes, "Guests on Saturday")
+        expectNoDifference(detail.menu.dayCount, 2)
+        expectNoDifference(detail.itemRows.map(\.id), [recipeItemID, noteItemID])
+        expectNoDifference(detail.itemRows.map(\.displayTitle), ["Menu Chicken", "Leftover lunch"])
+        expectNoDifference(detail.itemRows.map(\.item.notes), ["Grill outside", "Use extra chicken"])
+        expectNoDifference(detail.placements.map(\.id), [placementID])
+      }
+    }
+
+    @Test
+    func projectsPlacedMenusOntoCalendar() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 804_300_000)
+      let startDate = Date(timeIntervalSinceReferenceDate: 804_400_000)
+      let secondDate = try #require(
+        Calendar(identifier: .gregorian)
+          .date(byAdding: .day, value: 1, to: startDate)
+      )
+      let recipeID = SampleUUIDSequence.uuid(10_001)
+      var uuids = SampleUUIDSequence(start: 10_100)
+
+      try database.write { db in
+        try Recipe.insert {
+          Recipe(
+            id: recipeID,
+            title: "Calendar Menu Chicken",
+            dateCreated: now,
+            dateModified: now
+          )
+        }
+        .execute(db)
+
+        let menuID = try MenuRepository.addMenu(
+          title: "Two Day Menu",
+          notes: nil,
+          dayCount: 2,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let recipeItemID = try MenuRepository.addRecipeItem(
+          menuID: menuID,
+          recipeID: recipeID,
+          dayOffset: 0,
+          mealSlot: .dinner,
+          notes: nil,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let noteItemID = try MenuRepository.addNoteItem(
+          menuID: menuID,
+          title: "Brunch note",
+          notes: "Make coffee cake.",
+          dayOffset: 1,
+          mealSlot: .breakfast,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let placementID = try MenuRepository.placeMenu(
+          menuID: menuID,
+          startDate: startDate,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        let rows = try MealCalendarRequest().fetch(db)
+          .filter { $0.menuPlacement?.id == placementID }
+
+        expectNoDifference(rows.map(\.id), [
+          .menu(placementID: placementID, itemID: recipeItemID),
+          .menu(placementID: placementID, itemID: noteItemID),
+        ])
+        expectNoDifference(rows.map(\.displayTitle), ["Calendar Menu Chicken", "Brunch note"])
+        expectNoDifference(rows.map(\.item.scheduledDate), [startDate, secondDate])
+        expectNoDifference(rows.map(\.item.mealSlot), [.dinner, .breakfast])
+        expectNoDifference(rows.map(\.isFromMenu), [true, true])
+        expectNoDifference(rows.map(\.menu?.title), ["Two Day Menu", "Two Day Menu"])
+      }
+    }
+
+    @Test
+    func updatesAndDeletesMenuPlacements() throws {
+      @Dependency(\.defaultDatabase) var database
+      let createdAt = Date(timeIntervalSinceReferenceDate: 804_550_000)
+      let modifiedAt = Date(timeIntervalSinceReferenceDate: 804_650_000)
+      let originalStartDate = Date(timeIntervalSinceReferenceDate: 804_750_000)
+      let movedStartDate = Date(timeIntervalSinceReferenceDate: 804_850_000)
+      let secondMovedDate = try #require(
+        Calendar(identifier: .gregorian)
+          .date(byAdding: .day, value: 1, to: movedStartDate)
+      )
+      var uuids = SampleUUIDSequence(start: 12_100)
+
+      try database.write { db in
+        let menuID = try MenuRepository.addMenu(
+          title: "Placement Menu",
+          notes: nil,
+          dayCount: 2,
+          in: db,
+          now: createdAt,
+          uuid: { uuids.next() }
+        )
+        let firstItemID = try MenuRepository.addNoteItem(
+          menuID: menuID,
+          title: "First dinner",
+          notes: nil,
+          dayOffset: 0,
+          mealSlot: .dinner,
+          in: db,
+          now: createdAt,
+          uuid: { uuids.next() }
+        )
+        let secondItemID = try MenuRepository.addNoteItem(
+          menuID: menuID,
+          title: "Second lunch",
+          notes: nil,
+          dayOffset: 1,
+          mealSlot: .lunch,
+          in: db,
+          now: createdAt,
+          uuid: { uuids.next() }
+        )
+        let placementID = try MenuRepository.placeMenu(
+          menuID: menuID,
+          startDate: originalStartDate,
+          in: db,
+          now: createdAt,
+          uuid: { uuids.next() }
+        )
+
+        try MenuRepository.updateMenuPlacement(
+          placementID: placementID,
+          startDate: movedStartDate,
+          in: db,
+          now: modifiedAt
+        )
+
+        let movedRows = try MealCalendarRequest().fetch(db)
+          .filter { $0.menuPlacement?.id == placementID }
+
+        expectNoDifference(movedRows.map(\.id), [
+          .menu(placementID: placementID, itemID: firstItemID),
+          .menu(placementID: placementID, itemID: secondItemID),
+        ])
+        expectNoDifference(movedRows.map(\.item.scheduledDate), [movedStartDate, secondMovedDate])
+        expectNoDifference(
+          movedRows.map(\.menuPlacement?.dateModified),
+          [modifiedAt, modifiedAt].map(Optional.some)
+        )
+
+        try MenuRepository.deleteMenuPlacement(
+          placementID: placementID,
+          in: db
+        )
+
+        let detailAfterDelete = try #require(try MenuDetailRequest(menuID: menuID).fetch(db))
+        expectNoDifference(detailAfterDelete.placements, [])
+        expectNoDifference(
+          try MealCalendarRequest().fetch(db).contains { $0.menuPlacement?.id == placementID },
+          false
+        )
+      }
+    }
+
+    @Test
+    func rejectsInvalidMenus() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 804_500_000)
+
+      try database.write { db in
+        do {
+          _ = try MenuRepository.addMenu(
+            title: " ",
+            notes: nil,
+            dayCount: 1,
+            in: db,
+            now: now,
+            uuid: { SampleUUIDSequence.uuid(11_001) }
+          )
+          #expect(Bool(false), "Expected empty menu title to be rejected.")
+        } catch let error as MenuRepositoryError {
+          expectNoDifference(error, .emptyTitle)
+        }
+
+        do {
+          _ = try MenuRepository.addMenu(
+            title: "Broken Menu",
+            notes: nil,
+            dayCount: 0,
+            in: db,
+            now: now,
+            uuid: { SampleUUIDSequence.uuid(11_002) }
+          )
+          #expect(Bool(false), "Expected invalid menu length to be rejected.")
+        } catch let error as MenuRepositoryError {
+          expectNoDifference(error, .invalidDayCount)
+        }
+
+        do {
+          _ = try MenuRepository.addNoteItem(
+            menuID: SampleUUIDSequence.uuid(11_003),
+            title: "Missing menu",
+            notes: nil,
+            dayOffset: 0,
+            mealSlot: .dinner,
+            in: db,
+            now: now,
+            uuid: { SampleUUIDSequence.uuid(11_004) }
+          )
+          #expect(Bool(false), "Expected missing menu to be rejected.")
+        } catch let error as MenuRepositoryError {
+          expectNoDifference(error, .menuNotFound(SampleUUIDSequence.uuid(11_003)))
+        }
+
+        do {
+          try MenuRepository.updateMenuPlacement(
+            placementID: SampleUUIDSequence.uuid(11_005),
+            startDate: now,
+            in: db,
+            now: now
+          )
+          #expect(Bool(false), "Expected missing placement to be rejected.")
+        } catch let error as MenuRepositoryError {
+          expectNoDifference(error, .placementNotFound(SampleUUIDSequence.uuid(11_005)))
+        }
+      }
+    }
+  }
+}

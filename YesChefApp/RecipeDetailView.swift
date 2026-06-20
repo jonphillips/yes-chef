@@ -6,10 +6,19 @@ import YesChefCore
 struct RecipeDetailView: View {
   @State private var model: RecipeDetailModel
   let libraryModel: RecipeLibraryModel
+  let mealCalendarModel: MealCalendarModel
+  let groceryModel: GroceryLibraryModel
 
-  init(recipeID: Recipe.ID, libraryModel: RecipeLibraryModel) {
+  init(
+    recipeID: Recipe.ID,
+    libraryModel: RecipeLibraryModel,
+    mealCalendarModel: MealCalendarModel,
+    groceryModel: GroceryLibraryModel
+  ) {
     _model = State(wrappedValue: RecipeDetailModel(recipeID: recipeID))
     self.libraryModel = libraryModel
+    self.mealCalendarModel = mealCalendarModel
+    self.groceryModel = groceryModel
   }
 
   var body: some View {
@@ -43,6 +52,16 @@ struct RecipeDetailView: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {
+        Button {
+          mealCalendarModel.addRecipeToPlanButtonTapped(recipeID: model.recipeID)
+        } label: {
+          Label("Plan", systemImage: "calendar.badge.plus")
+        }
+        Button {
+          groceryModel.addRecipeButtonTapped(recipeID: model.recipeID)
+        } label: {
+          Label("Shop", systemImage: "basket.badge.plus")
+        }
         Button {
           libraryModel.cookButtonTapped(recipeID: model.recipeID)
         } label: {

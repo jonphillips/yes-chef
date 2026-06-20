@@ -7,62 +7,55 @@ import YesChefCore
 struct AppContainer: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   @State private var recipeModel = RecipeLibraryModel()
+  @State private var mealCalendarModel = MealCalendarModel()
+  @State private var menuModel = MenuLibraryModel()
+  @State private var groceryModel = GroceryLibraryModel()
   @State private var selectedSection: AppSection? = .recipes
   @State private var selectedSettingsPane: SettingsPane? = .categories
 
   var body: some View {
     @Bindable var recipeModel = recipeModel
+    @Bindable var mealCalendarModel = mealCalendarModel
+    @Bindable var menuModel = menuModel
+    @Bindable var groceryModel = groceryModel
 
-    Group {
-      if horizontalSizeClass == .compact {
-        TabView(selection: $selectedSection) {
-          RecipesStack(model: recipeModel)
-            .tabItem { AppSection.recipes.label }
-            .tag(AppSection.recipes as AppSection?)
-          NavigationStack {
-            AppPlaceholderView(section: .mealCalendar)
-          }
-            .tabItem { AppSection.mealCalendar.label }
-            .tag(AppSection.mealCalendar as AppSection?)
-          NavigationStack {
-            AppPlaceholderView(section: .menus)
-          }
-            .tabItem { AppSection.menus.label }
-            .tag(AppSection.menus as AppSection?)
-          SettingsStack(model: recipeModel)
-            .tabItem { AppSection.settings.label }
-            .tag(AppSection.settings as AppSection?)
-        }
-      } else {
-        NavigationSplitView {
-          List(AppSection.allCases, selection: $selectedSection) { section in
-            section.label
-              .tag(section)
-          }
-          .navigationTitle("Yes Chef")
-        } content: {
-          switch selectedSection ?? .recipes {
-          case .recipes:
-            RecipeListView(model: recipeModel, style: .selection)
-          case .mealCalendar:
-            AppPlaceholderView(section: .mealCalendar)
-          case .menus:
-            AppPlaceholderView(section: .menus)
-          case .settings:
-            SettingsView(model: recipeModel, selectedPane: $selectedSettingsPane)
-          }
-        } detail: {
-          switch selectedSection ?? .recipes {
-          case .recipes:
-            RecipeDetailColumn(model: recipeModel)
-          case .mealCalendar:
-            AppPlaceholderView(section: .mealCalendar)
-          case .menus:
-            AppPlaceholderView(section: .menus)
-          case .settings:
-            SettingsDetailPane(selectedPane: selectedSettingsPane)
-          }
-        }
+    AppMainLayout(
+      horizontalSizeClass: horizontalSizeClass,
+      recipeModel: recipeModel,
+      mealCalendarModel: mealCalendarModel,
+      menuModel: menuModel,
+      groceryModel: groceryModel,
+      selectedSection: $selectedSection,
+      selectedSettingsPane: $selectedSettingsPane
+    )
+    .sheet(item: $mealCalendarModel.destination.itemEditor, id: \.self) { context in
+      NavigationStack {
+        MealPlanItemEditorView(model: mealCalendarModel, context: context)
+      }
+    }
+    .sheet(isPresented: $menuModel.destination.addMenu) {
+      NavigationStack {
+        MenuEditorView(model: menuModel)
+      }
+    }
+    .sheet(item: $menuModel.destination.addItem, id: \.self) { context in
+      NavigationStack {
+        MenuItemEditorView(model: menuModel, context: context)
+      }
+    }
+    .sheet(item: $menuModel.destination.placeMenu, id: \.self) { context in
+      NavigationStack {
+        MenuPlacementEditorView(model: menuModel, context: context)
+      }
+    }
+    .sheet(isPresented: $groceryModel.destination.addList) {
+      NavigationStack {
+        GroceryListEditorView(model: groceryModel)
+      }
+    }
+    .sheet(isPresented: $groceryModel.destination.addCustomItem) {
+      NavigationStack {
+        GroceryItemEditorView(model: groceryModel)
       }
     }
     .sheet(isPresented: $recipeModel.destination.addRecipe) {
@@ -102,6 +95,30 @@ struct AppContainer: View {
     } message: { recipeID in
       Text("Delete \(recipeModel.title(for: recipeID)) from your recipe library?")
     }
+    .confirmationDialog(
+      "Remove Meal Plan Item?",
+      item: $mealCalendarModel.destination.deleteItem,
+      titleVisibility: .visible
+    ) { itemID in
+      Button("Remove", role: .destructive) {
+        mealCalendarModel.confirmDeleteItemButtonTapped(itemID: itemID)
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: { itemID in
+      Text("Remove \(mealCalendarModel.title(for: itemID)) from your meal calendar?")
+    }
+    .confirmationDialog(
+      "Remove Menu from Calendar?",
+      item: $menuModel.destination.deletePlacement,
+      titleVisibility: .visible
+    ) { context in
+      Button("Remove from Calendar", role: .destructive) {
+        menuModel.confirmDeletePlacementButtonTapped(context)
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: { context in
+      Text("Remove \(context.menuTitle) from \(context.startDate.formatted(.dateTime.month(.wide).day().year()))?")
+    }
     .alert("Import Complete", item: $recipeModel.destination.importSummary) { _ in
       Button("OK") {}
     } message: { summary in
@@ -116,6 +133,21 @@ struct AppContainer: View {
       Button("OK") {}
     } message: {
       Text(recipeModel.errorMessage ?? "")
+    }
+    .alert("Meal Calendar Error", isPresented: $mealCalendarModel.isShowingError) {
+      Button("OK") {}
+    } message: {
+      Text(mealCalendarModel.errorMessage ?? "")
+    }
+    .alert("Menus Error", isPresented: $menuModel.isShowingError) {
+      Button("OK") {}
+    } message: {
+      Text(menuModel.errorMessage ?? "")
+    }
+    .alert("Groceries Error", isPresented: $groceryModel.isShowingError) {
+      Button("OK") {}
+    } message: {
+      Text(groceryModel.errorMessage ?? "")
     }
     .fileImporter(
       isPresented: $recipeModel.isPresentingPaprikaImporter,
@@ -147,67 +179,149 @@ struct AppContainer: View {
 
 }
 
-private enum AppSection: String, CaseIterable, Identifiable {
-  case recipes
-  case mealCalendar
-  case menus
-  case settings
+private struct AppMainLayout: View {
+  let horizontalSizeClass: UserInterfaceSizeClass?
+  let recipeModel: RecipeLibraryModel
+  let mealCalendarModel: MealCalendarModel
+  let menuModel: MenuLibraryModel
+  let groceryModel: GroceryLibraryModel
+  @Binding var selectedSection: AppSection?
+  @Binding var selectedSettingsPane: SettingsPane?
 
-  var id: Self { self }
-
-  @ViewBuilder var label: some View {
-    Label(title, systemImage: systemImage)
-  }
-
-  var title: String {
-    switch self {
-    case .recipes: "Recipes"
-    case .mealCalendar: "Meal Calendar"
-    case .menus: "Menus"
-    case .settings: "Settings"
+  var body: some View {
+    if horizontalSizeClass == .compact {
+      AppCompactTabView(
+        selection: $selectedSection,
+        recipeModel: recipeModel,
+        mealCalendarModel: mealCalendarModel,
+        menuModel: menuModel,
+        groceryModel: groceryModel,
+        onMenuSelected: openMenuFromCalendar
+      )
+    } else if selectedSection == .mealCalendar {
+      NavigationSplitView {
+        AppSidebar(selection: $selectedSection)
+      } detail: {
+        MealCalendarWorkspaceView(
+          model: mealCalendarModel,
+          onMenuSelected: openMenuFromCalendar
+        )
+      }
+    } else {
+      NavigationSplitView {
+        AppSidebar(selection: $selectedSection)
+      } content: {
+        switch selectedSection ?? .recipes {
+        case .recipes:
+          RecipeListView(model: recipeModel, style: .selection)
+        case .mealCalendar:
+          MealCalendarWorkspaceView(
+            model: mealCalendarModel,
+            onMenuSelected: openMenuFromCalendar
+          )
+        case .groceries:
+          GroceryListView(model: groceryModel, style: .selection)
+        case .menus:
+          MenuListView(model: menuModel, style: .selection)
+        case .settings:
+          SettingsView(model: recipeModel, selectedPane: $selectedSettingsPane)
+        }
+      } detail: {
+        switch selectedSection ?? .recipes {
+        case .recipes:
+          RecipeDetailColumn(
+            model: recipeModel,
+            mealCalendarModel: mealCalendarModel,
+            groceryModel: groceryModel
+          )
+        case .mealCalendar:
+          EmptyView()
+        case .groceries:
+          GroceryDetailColumn(
+            model: groceryModel,
+            mealCalendarModel: mealCalendarModel
+          )
+        case .menus:
+          MenuDetailColumn(model: menuModel)
+        case .settings:
+          SettingsDetailPane(selectedPane: selectedSettingsPane)
+        }
+      }
     }
   }
 
-  var systemImage: String {
-    switch self {
-    case .recipes: "book.closed"
-    case .mealCalendar: "calendar"
-    case .menus: "menucard"
-    case .settings: "gearshape"
+  private func openMenuFromCalendar(_ menuID: CoreMenu.ID) {
+    menuModel.selectMenu(menuID)
+    selectedSection = .menus
+  }
+}
+
+private struct AppCompactTabView: View {
+  @Binding var selection: AppSection?
+  let recipeModel: RecipeLibraryModel
+  let mealCalendarModel: MealCalendarModel
+  let menuModel: MenuLibraryModel
+  let groceryModel: GroceryLibraryModel
+  let onMenuSelected: (CoreMenu.ID) -> Void
+
+  var body: some View {
+    TabView(selection: $selection) {
+      RecipesStack(
+        model: recipeModel,
+        mealCalendarModel: mealCalendarModel,
+        groceryModel: groceryModel
+      )
+        .tabItem { AppSection.recipes.label }
+        .tag(AppSection.recipes as AppSection?)
+      MealCalendarStack(
+        model: mealCalendarModel,
+        onMenuSelected: onMenuSelected
+      )
+        .tabItem { AppSection.mealCalendar.label }
+        .tag(AppSection.mealCalendar as AppSection?)
+      GroceriesStack(
+        model: groceryModel,
+        mealCalendarModel: mealCalendarModel
+      )
+        .tabItem { AppSection.groceries.label }
+        .tag(AppSection.groceries as AppSection?)
+      MenusStack(model: menuModel)
+        .tabItem { AppSection.menus.label }
+        .tag(AppSection.menus as AppSection?)
+      SettingsStack(model: recipeModel)
+        .tabItem { AppSection.settings.label }
+        .tag(AppSection.settings as AppSection?)
     }
   }
 }
 
-private enum SettingsPane: String, CaseIterable, Identifiable {
-  case categories
+private struct AppSidebar: View {
+  @Binding var selection: AppSection?
 
-  var id: Self { self }
-
-  var title: String {
-    switch self {
-    case .categories: "Categories"
+  var body: some View {
+    List(AppSection.allCases, selection: $selection) { section in
+      section.label
+        .tag(section)
     }
-  }
-
-  var systemImage: String {
-    switch self {
-    case .categories: "folder"
-    }
-  }
-
-  @ViewBuilder var label: some View {
-    Label(title, systemImage: systemImage)
+    .navigationTitle("Yes Chef")
   }
 }
 
 private struct RecipesStack: View {
   let model: RecipeLibraryModel
+  let mealCalendarModel: MealCalendarModel
+  let groceryModel: GroceryLibraryModel
 
   var body: some View {
     NavigationStack {
       RecipeListView(model: model, style: .navigation)
         .navigationDestination(for: Recipe.ID.self) { recipeID in
-          RecipeDetailView(recipeID: recipeID, libraryModel: model)
+          RecipeDetailView(
+            recipeID: recipeID,
+            libraryModel: model,
+            mealCalendarModel: mealCalendarModel,
+            groceryModel: groceryModel
+          )
             .id(recipeID)
         }
     }
@@ -216,10 +330,17 @@ private struct RecipesStack: View {
 
 private struct RecipeDetailColumn: View {
   let model: RecipeLibraryModel
+  let mealCalendarModel: MealCalendarModel
+  let groceryModel: GroceryLibraryModel
 
   var body: some View {
     if let recipe = model.selectedRecipe {
-      RecipeDetailView(recipeID: recipe.id, libraryModel: model)
+      RecipeDetailView(
+        recipeID: recipe.id,
+        libraryModel: model,
+        mealCalendarModel: mealCalendarModel,
+        groceryModel: groceryModel
+      )
         .id(recipe.id)
     } else {
       ContentUnavailableView("Select a Recipe", systemImage: "fork.knife")
@@ -907,15 +1028,6 @@ private struct RecipeOptionalStringPicker: View {
         }
       }
     }
-  }
-}
-
-private struct AppPlaceholderView: View {
-  let section: AppSection
-
-  var body: some View {
-    ContentUnavailableView(section.title, systemImage: section.systemImage)
-      .navigationTitle(section.title)
   }
 }
 

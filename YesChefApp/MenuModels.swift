@@ -1,0 +1,265 @@
+import CasePaths
+import Dependencies
+import Foundation
+import Observation
+import SQLiteData
+import SwiftUI
+import YesChefCore
+
+typealias CoreMenu = YesChefCore.Menu
+
+@Observable
+@MainActor
+final class MenuLibraryModel {
+  @CasePathable
+  enum Destination {
+    case addMenu
+    case addItem(MenuItemDraftContext)
+    case placeMenu(MenuPlacementDraftContext)
+    case deletePlacement(MenuPlacementDeletionContext)
+  }
+
+  @ObservationIgnored
+  @Dependency(\.date.now) private var now
+  @ObservationIgnored
+  @Dependency(\.defaultDatabase) private var database
+  @ObservationIgnored
+  @Dependency(\.uuid) private var uuid
+  @ObservationIgnored
+  @Fetch(MenuListRequest(), animation: .default) var menuRows: [MenuRowData] = []
+  @ObservationIgnored
+  @Fetch(RecipeListRequest(), animation: .default) var recipeRows: [RecipeListRowData] = []
+
+  var destination: Destination?
+  var navigationPath: [CoreMenu.ID] = []
+  var selectedMenuID: CoreMenu.ID?
+  var errorMessage: String?
+  var isShowingError = false
+
+  var availableRecipeRows: [RecipeListRowData] {
+    recipeRows
+      .filter { !$0.recipe.archived }
+      .sorted {
+        $0.recipe.title.localizedStandardCompare($1.recipe.title) == .orderedAscending
+      }
+  }
+
+  func addMenuButtonTapped() {
+    destination = .addMenu
+  }
+
+  func selectMenu(_ menuID: CoreMenu.ID) {
+    selectedMenuID = menuID
+    navigationPath = [menuID]
+  }
+
+  func addItemButtonTapped(menu: CoreMenu) {
+    destination = .addItem(
+      MenuItemDraftContext(
+        menuID: menu.id,
+        menuTitle: menu.title,
+        dayCount: menu.dayCount
+      )
+    )
+  }
+
+  func placeMenuButtonTapped(menu: CoreMenu) {
+    destination = .placeMenu(
+      MenuPlacementDraftContext(
+        menuID: menu.id,
+        menuTitle: menu.title,
+        placementID: nil,
+        startDate: Calendar.autoupdatingCurrent.startOfDay(for: now)
+      )
+    )
+  }
+
+  func saveMenuButtonTapped(title: String, notes: String, dayCount: Int) -> Bool {
+    do {
+      let menuID = try database.write { db in
+        try MenuRepository.addMenu(
+          title: title,
+          notes: notes,
+          dayCount: dayCount,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+      selectedMenuID = menuID
+      destination = nil
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
+  func saveRecipeItemButtonTapped(
+    menuID: CoreMenu.ID,
+    recipeID: Recipe.ID,
+    dayOffset: Int,
+    mealSlot: MealPlanItemSlot,
+    notes: String
+  ) -> Bool {
+    do {
+      _ = try database.write { db in
+        try MenuRepository.addRecipeItem(
+          menuID: menuID,
+          recipeID: recipeID,
+          dayOffset: dayOffset,
+          mealSlot: mealSlot,
+          notes: notes,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+      destination = nil
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
+  func saveNoteItemButtonTapped(
+    menuID: CoreMenu.ID,
+    title: String,
+    notes: String,
+    dayOffset: Int,
+    mealSlot: MealPlanItemSlot
+  ) -> Bool {
+    do {
+      _ = try database.write { db in
+        try MenuRepository.addNoteItem(
+          menuID: menuID,
+          title: title,
+          notes: notes,
+          dayOffset: dayOffset,
+          mealSlot: mealSlot,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+      destination = nil
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
+  func editPlacementButtonTapped(menu: CoreMenu, placement: MenuPlacement) {
+    destination = .placeMenu(
+      MenuPlacementDraftContext(
+        menuID: menu.id,
+        menuTitle: menu.title,
+        placementID: placement.id,
+        startDate: placement.startDate
+      )
+    )
+  }
+
+  func deletePlacementButtonTapped(menu: CoreMenu, placement: MenuPlacement) {
+    destination = .deletePlacement(
+      MenuPlacementDeletionContext(
+        placementID: placement.id,
+        menuTitle: menu.title,
+        startDate: placement.startDate
+      )
+    )
+  }
+
+  func savePlacementButtonTapped(context: MenuPlacementDraftContext, startDate: Date) -> Bool {
+    do {
+      let startDate = Calendar.autoupdatingCurrent.startOfDay(for: startDate)
+      _ = try database.write { db in
+        if let placementID = context.placementID {
+          try MenuRepository.updateMenuPlacement(
+            placementID: placementID,
+            startDate: startDate,
+            in: db,
+            now: now
+          )
+        } else {
+          try MenuRepository.placeMenu(
+            menuID: context.menuID,
+            startDate: startDate,
+            in: db,
+            now: now,
+            uuid: { uuid() }
+          )
+        }
+      }
+      destination = nil
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
+  func confirmDeletePlacementButtonTapped(_ context: MenuPlacementDeletionContext) {
+    destination = nil
+
+    do {
+      try database.write { db in
+        try MenuRepository.deleteMenuPlacement(
+          placementID: context.placementID,
+          in: db
+        )
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+}
+
+@Observable
+@MainActor
+final class MenuDetailModel {
+  let menuID: CoreMenu.ID
+
+  @ObservationIgnored
+  @Fetch var detail: MenuDetailData?
+
+  init(menuID: CoreMenu.ID) {
+    self.menuID = menuID
+    _detail = Fetch(wrappedValue: nil, MenuDetailRequest(menuID: menuID), animation: .default)
+  }
+}
+
+enum MenuListStyle {
+  case navigation
+  case selection
+}
+
+struct MenuItemDraftContext: Hashable, Sendable {
+  var menuID: CoreMenu.ID
+  var menuTitle: String
+  var dayCount: Int
+}
+
+struct MenuPlacementDraftContext: Hashable, Sendable {
+  var menuID: CoreMenu.ID
+  var menuTitle: String
+  var placementID: MenuPlacement.ID?
+  var startDate: Date
+
+  var isEditing: Bool { placementID != nil }
+}
+
+struct MenuPlacementDeletionContext: Identifiable, Hashable, Sendable {
+  var placementID: MenuPlacement.ID
+  var menuTitle: String
+  var startDate: Date
+
+  var id: MenuPlacement.ID { placementID }
+}

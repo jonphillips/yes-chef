@@ -244,6 +244,154 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Create meal calendar schema") { db in
+      try #sql("""
+        CREATE TABLE "mealPlanItems" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "kind" TEXT NOT NULL,
+          "recipeID" TEXT REFERENCES "recipes"("id") ON DELETE SET NULL,
+          "title" TEXT NOT NULL,
+          "scheduledDate" TEXT NOT NULL,
+          "mealSlot" TEXT NOT NULL,
+          "notes" TEXT,
+          "startTime" TEXT,
+          "endTime" TEXT,
+          "sortOrder" INTEGER NOT NULL,
+          "dateCreated" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      for statement in [
+        #"CREATE INDEX "index_mealPlanItems_on_recipeID" ON "mealPlanItems"("recipeID")"#,
+        #"CREATE INDEX "index_mealPlanItems_on_scheduledDate" ON "mealPlanItems"("scheduledDate")"#,
+        #"CREATE INDEX "index_mealPlanItems_on_scheduledDate_mealSlot" ON "mealPlanItems"("scheduledDate", "mealSlot")"#,
+      ] {
+        try db.execute(sql: statement)
+      }
+    }
+
+    migrator.registerMigration("Create menu schema") { db in
+      try #sql("""
+        CREATE TABLE "menus" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "title" TEXT NOT NULL,
+          "notes" TEXT,
+          "dayCount" INTEGER NOT NULL,
+          "dateCreated" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      try #sql("""
+        CREATE TABLE "menuItems" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "menuID" TEXT NOT NULL REFERENCES "menus"("id") ON DELETE CASCADE,
+          "kind" TEXT NOT NULL,
+          "recipeID" TEXT REFERENCES "recipes"("id") ON DELETE SET NULL,
+          "title" TEXT NOT NULL,
+          "dayOffset" INTEGER NOT NULL,
+          "mealSlot" TEXT NOT NULL,
+          "notes" TEXT,
+          "sortOrder" INTEGER NOT NULL,
+          "dateCreated" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      try #sql("""
+        CREATE TABLE "menuPlacements" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "menuID" TEXT NOT NULL REFERENCES "menus"("id") ON DELETE CASCADE,
+          "startDate" TEXT NOT NULL,
+          "dateCreated" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      for statement in [
+        #"CREATE INDEX "index_menuItems_on_menuID" ON "menuItems"("menuID")"#,
+        #"CREATE INDEX "index_menuItems_on_recipeID" ON "menuItems"("recipeID")"#,
+        #"CREATE INDEX "index_menuItems_on_menuID_dayOffset_mealSlot" ON "menuItems"("menuID", "dayOffset", "mealSlot")"#,
+        #"CREATE INDEX "index_menuPlacements_on_menuID" ON "menuPlacements"("menuID")"#,
+        #"CREATE INDEX "index_menuPlacements_on_startDate" ON "menuPlacements"("startDate")"#,
+      ] {
+        try db.execute(sql: statement)
+      }
+    }
+
+    migrator.registerMigration("Create grocery schema") { db in
+      try #sql("""
+        CREATE TABLE "groceryLists" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "title" TEXT NOT NULL,
+          "sortOrder" INTEGER NOT NULL,
+          "isDefault" INTEGER NOT NULL DEFAULT 0,
+          "remindersListName" TEXT,
+          "dateCreated" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      try #sql("""
+        CREATE TABLE "groceryItems" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "groceryListID" TEXT NOT NULL REFERENCES "groceryLists"("id") ON DELETE CASCADE,
+          "title" TEXT NOT NULL,
+          "quantity" REAL,
+          "quantityText" TEXT,
+          "unit" TEXT,
+          "aisle" TEXT,
+          "notes" TEXT,
+          "isPurchased" INTEGER NOT NULL DEFAULT 0,
+          "purchasedAt" TEXT,
+          "sortOrder" INTEGER NOT NULL,
+          "dateCreated" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      try #sql("""
+        CREATE TABLE "groceryItemSources" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "groceryItemID" TEXT NOT NULL REFERENCES "groceryItems"("id") ON DELETE CASCADE,
+          "origin" TEXT NOT NULL,
+          "recipeID" TEXT,
+          "ingredientLineID" TEXT,
+          "mealPlanItemID" TEXT,
+          "menuID" TEXT,
+          "menuItemID" TEXT,
+          "menuPlacementID" TEXT,
+          "scheduledDate" TEXT,
+          "mealSlot" TEXT,
+          "sourceTitle" TEXT,
+          "sourceSubtitle" TEXT,
+          "ingredientText" TEXT,
+          "dateCreated" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      for statement in [
+        #"CREATE INDEX "index_groceryLists_on_sortOrder" ON "groceryLists"("sortOrder")"#,
+        #"CREATE INDEX "index_groceryItems_on_groceryListID" ON "groceryItems"("groceryListID")"#,
+        #"CREATE INDEX "index_groceryItems_on_groceryListID_isPurchased" ON "groceryItems"("groceryListID", "isPurchased")"#,
+        #"CREATE INDEX "index_groceryItemSources_on_groceryItemID" ON "groceryItemSources"("groceryItemID")"#,
+        #"CREATE INDEX "index_groceryItemSources_on_recipeID" ON "groceryItemSources"("recipeID")"#,
+        #"CREATE INDEX "index_groceryItemSources_on_mealPlanItemID" ON "groceryItemSources"("mealPlanItemID")"#,
+        #"CREATE INDEX "index_groceryItemSources_on_menuID" ON "groceryItemSources"("menuID")"#,
+        #"CREATE INDEX "index_groceryItemSources_on_menuPlacementID" ON "groceryItemSources"("menuPlacementID")"#,
+      ] {
+        try db.execute(sql: statement)
+      }
+    }
+
     try migrator.migrate(database)
     defaultDatabase = database
   }

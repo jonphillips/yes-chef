@@ -1,0 +1,846 @@
+import SwiftUI
+import UIKit
+import YesChefCore
+
+struct MealCalendarStack: View {
+  let model: MealCalendarModel
+  var onMenuSelected: ((CoreMenu.ID) -> Void)?
+
+  var body: some View {
+    NavigationStack {
+      MealCalendarPlannerView(
+        model: model,
+        showsSelectedDayAgenda: true,
+        onMenuSelected: onMenuSelected
+      )
+    }
+  }
+}
+
+struct MealCalendarWorkspaceView: View {
+  let model: MealCalendarModel
+  var onMenuSelected: ((CoreMenu.ID) -> Void)?
+
+  var body: some View {
+    GeometryReader { geometry in
+      if geometry.size.width >= 840 && model.displayMode != .day {
+        MealCalendarWideWorkspace(
+          model: model,
+          agendaWidth: agendaWidth(for: geometry.size.width),
+          onMenuSelected: onMenuSelected
+        )
+      } else {
+        MealCalendarStackedContent(
+          model: model,
+          showsSelectedDayAgenda: true,
+          monthCellMinHeight: 104,
+          weekCellMinHeight: 190,
+          maxContentWidth: 1120,
+          onMenuSelected: onMenuSelected
+        )
+      }
+    }
+    .navigationTitle("Meal Calendar")
+    .toolbar {
+      MealCalendarNavigationToolbar(model: model)
+    }
+  }
+
+  private func agendaWidth(for workspaceWidth: CGFloat) -> CGFloat {
+    let baselineWidth = min(max(workspaceWidth * 0.34, 360), 460)
+    return baselineWidth * 0.85
+  }
+}
+
+struct MealCalendarPlannerView: View {
+  let model: MealCalendarModel
+  var showsSelectedDayAgenda: Bool
+  var onMenuSelected: ((CoreMenu.ID) -> Void)?
+
+  var body: some View {
+    MealCalendarStackedContent(
+      model: model,
+      showsSelectedDayAgenda: showsSelectedDayAgenda,
+      monthCellMinHeight: 86,
+      weekCellMinHeight: 180,
+      maxContentWidth: 980,
+      onMenuSelected: onMenuSelected
+    )
+    .navigationTitle("Meal Calendar")
+    .toolbar {
+      MealCalendarNavigationToolbar(model: model)
+    }
+  }
+}
+
+private struct MealCalendarWideWorkspace: View {
+  let model: MealCalendarModel
+  let agendaWidth: CGFloat
+  var onMenuSelected: ((CoreMenu.ID) -> Void)?
+
+  var body: some View {
+    HStack(spacing: 0) {
+      MealCalendarStackedContent(
+        model: model,
+        showsSelectedDayAgenda: false,
+        monthCellMinHeight: 118,
+        weekCellMinHeight: 220,
+        maxContentWidth: nil,
+        onMenuSelected: onMenuSelected
+      )
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+      Divider()
+
+      MealCalendarAgendaRail(model: model, onMenuSelected: onMenuSelected)
+        .frame(width: agendaWidth)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+}
+
+private struct MealCalendarStackedContent: View {
+  let model: MealCalendarModel
+  var showsSelectedDayAgenda: Bool
+  var monthCellMinHeight: CGFloat
+  var weekCellMinHeight: CGFloat
+  var maxContentWidth: CGFloat?
+  var onMenuSelected: ((CoreMenu.ID) -> Void)?
+
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 20) {
+        MealCalendarToolbar(model: model)
+
+        MealCalendarCalendarBody(
+          model: model,
+          monthCellMinHeight: monthCellMinHeight,
+          weekCellMinHeight: weekCellMinHeight,
+          onMenuSelected: onMenuSelected
+        )
+
+        if showsSelectedDayAgenda, model.displayMode != .day {
+          Divider()
+          MealCalendarDayAgendaView(
+            model: model,
+            showsHeader: true,
+            onMenuSelected: onMenuSelected
+          )
+        }
+      }
+      .padding()
+      .frame(maxWidth: maxContentWidth, alignment: .leading)
+      .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+}
+
+private struct MealCalendarCalendarBody: View {
+  let model: MealCalendarModel
+  var monthCellMinHeight: CGFloat
+  var weekCellMinHeight: CGFloat
+  var onMenuSelected: ((CoreMenu.ID) -> Void)?
+
+  var body: some View {
+    switch model.displayMode {
+    case .month:
+      MealCalendarMonthGrid(model: model, cellMinHeight: monthCellMinHeight)
+    case .week:
+      MealCalendarWeekGrid(model: model, cellMinHeight: weekCellMinHeight)
+    case .day:
+      MealCalendarDayAgendaView(
+        model: model,
+        showsHeader: true,
+        onMenuSelected: onMenuSelected
+      )
+    }
+  }
+}
+
+private struct MealCalendarAgendaRail: View {
+  let model: MealCalendarModel
+  var onMenuSelected: ((CoreMenu.ID) -> Void)?
+
+  var body: some View {
+    ScrollView {
+      MealCalendarDayAgendaView(
+        model: model,
+        showsHeader: true,
+        onMenuSelected: onMenuSelected
+      )
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .background(.background)
+  }
+}
+
+private struct MealCalendarNavigationToolbar: ToolbarContent {
+  let model: MealCalendarModel
+
+  var body: some ToolbarContent {
+    ToolbarItemGroup(placement: .primaryAction) {
+      Button {
+        model.todayButtonTapped()
+      } label: {
+        Label("Today", systemImage: "calendar.badge.clock")
+      }
+      Menu {
+        Button {
+          model.addItemButtonTapped(kind: .recipe)
+        } label: {
+          Label("Recipe", systemImage: MealPlanItemKind.recipe.systemImage)
+        }
+        Button {
+          model.addItemButtonTapped(kind: .note)
+        } label: {
+          Label("Note", systemImage: MealPlanItemKind.note.systemImage)
+        }
+      } label: {
+        Label("Add", systemImage: "plus")
+      }
+    }
+  }
+}
+
+struct MealCalendarDayAgendaView: View {
+  let model: MealCalendarModel
+  var showsHeader: Bool
+  var onMenuSelected: ((CoreMenu.ID) -> Void)?
+
+  private var occupiedMealSlots: [MealPlanItemSlot] {
+    MealPlanItemSlot.allCases.filter { !model.rows(on: model.selectedDate, mealSlot: $0).isEmpty }
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      if showsHeader {
+        MealCalendarDayHeader(model: model)
+      }
+
+      if model.selectedDayRows.isEmpty {
+        ContentUnavailableView(
+          "No Meals Scheduled",
+          systemImage: "calendar.badge.plus",
+          description: Text("Add a recipe or note to \(model.selectedDateShortTitle).")
+        )
+        .frame(maxWidth: .infinity, minHeight: 220)
+      } else {
+        VStack(alignment: .leading, spacing: 18) {
+          ForEach(occupiedMealSlots, id: \.self) { mealSlot in
+            MealPlanSlotSection(
+              model: model,
+              mealSlot: mealSlot,
+              rows: model.rows(on: model.selectedDate, mealSlot: mealSlot),
+              onMenuSelected: onMenuSelected
+            )
+          }
+        }
+      }
+    }
+  }
+}
+
+struct MealPlanItemEditorView: View {
+  @Environment(\.dismiss) private var dismiss
+  @State private var kind: MealPlanItemKind
+  @State private var scheduledDate: Date
+  @State private var mealSlot: MealPlanItemSlot
+  @State private var selectedRecipeID: Recipe.ID?
+  @State private var noteTitle = ""
+  @State private var notes = ""
+  @State private var recipeSearchText = ""
+
+  let model: MealCalendarModel
+  private let context: MealPlanItemDraftContext
+
+  init(model: MealCalendarModel, context: MealPlanItemDraftContext) {
+    self.model = model
+    self.context = context
+    let initialKind = context.kind == .reservation ? MealPlanItemKind.note : context.kind
+    _kind = State(wrappedValue: initialKind)
+    _scheduledDate = State(wrappedValue: context.date)
+    _mealSlot = State(wrappedValue: context.mealSlot)
+    _selectedRecipeID = State(wrappedValue: context.recipeID)
+    _noteTitle = State(wrappedValue: context.title)
+    _notes = State(wrappedValue: context.notes)
+  }
+
+  private var filteredRecipeRows: [RecipeListRowData] {
+    let query = recipeSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !query.isEmpty else { return model.availableRecipeRows }
+    return model.availableRecipeRows.filter { row in
+      row.recipe.title.localizedCaseInsensitiveContains(query)
+        || (row.recipe.subtitle?.localizedCaseInsensitiveContains(query) ?? false)
+        || (row.recipe.summary?.localizedCaseInsensitiveContains(query) ?? false)
+        || row.tagNames.contains { $0.localizedCaseInsensitiveContains(query) }
+        || row.categoryNames.contains { $0.localizedCaseInsensitiveContains(query) }
+    }
+  }
+
+  private var isSaveDisabled: Bool {
+    switch kind {
+    case .recipe:
+      selectedRecipeID == nil
+    case .note, .reservation:
+      noteTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+  }
+
+  var body: some View {
+    Form {
+      Section("What") {
+        Picker("Type", selection: $kind) {
+          Text(MealPlanItemKind.recipe.title)
+            .tag(MealPlanItemKind.recipe)
+          Text(MealPlanItemKind.note.title)
+            .tag(MealPlanItemKind.note)
+        }
+        .pickerStyle(.segmented)
+      }
+
+      Section("When") {
+        DatePicker("Date", selection: $scheduledDate, displayedComponents: .date)
+
+        Picker("Meal", selection: $mealSlot) {
+          ForEach(MealPlanItemSlot.allCases, id: \.self) { mealSlot in
+            Label(mealSlot.title, systemImage: mealSlot.systemImage)
+              .tag(mealSlot)
+          }
+        }
+      }
+
+      switch kind {
+      case .recipe:
+        Section("Recipe") {
+          StackedTextField(title: "Find Recipes", text: $recipeSearchText)
+            .textInputAutocapitalization(.never)
+
+          if model.availableRecipeRows.isEmpty {
+            ContentUnavailableView("No Recipes", systemImage: "book.closed")
+          } else if filteredRecipeRows.isEmpty {
+            ContentUnavailableView.search(text: recipeSearchText)
+          } else {
+            ForEach(filteredRecipeRows) { row in
+              Button {
+                selectedRecipeID = row.recipe.id
+              } label: {
+                MealPlanRecipeSelectionRow(
+                  row: row,
+                  isSelected: selectedRecipeID == row.recipe.id
+                )
+              }
+              .foregroundStyle(.primary)
+            }
+          }
+        }
+
+        Section("Notes") {
+          StackedTextEditor(
+            title: "Serving Notes",
+            text: $notes,
+            minHeight: 80
+          )
+        }
+      case .note, .reservation:
+        Section("Note") {
+          StackedTextField(title: "Title", text: $noteTitle, prompt: "Leftovers, guests, prep reminder")
+          StackedTextEditor(
+            title: "Details",
+            text: $notes,
+            minHeight: 120
+          )
+        }
+      }
+    }
+    .navigationTitle(context.isEditing ? "Edit Meal" : "Add Meal")
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .cancellationAction) {
+        Button("Cancel") {
+          dismiss()
+        }
+      }
+      ToolbarItem(placement: .confirmationAction) {
+        Button("Save") {
+          saveButtonTapped()
+        }
+        .disabled(isSaveDisabled)
+      }
+    }
+  }
+
+  private func saveButtonTapped() {
+    switch kind {
+    case .recipe:
+      guard let selectedRecipeID else { return }
+      if model.saveRecipeItemButtonTapped(
+        itemID: context.itemID,
+        recipeID: selectedRecipeID,
+        date: scheduledDate,
+        mealSlot: mealSlot,
+        notes: notes
+      ) {
+        dismiss()
+      }
+    case .note, .reservation:
+      if model.saveNoteItemButtonTapped(
+        itemID: context.itemID,
+        title: noteTitle,
+        notes: notes,
+        date: scheduledDate,
+        mealSlot: mealSlot
+      ) {
+        dismiss()
+      }
+    }
+  }
+}
+
+private struct MealCalendarToolbar: View {
+  let model: MealCalendarModel
+
+  var body: some View {
+    @Bindable var model = model
+
+    VStack(alignment: .leading, spacing: 12) {
+      Picker("Calendar View", selection: $model.displayMode) {
+        ForEach(MealCalendarDisplayMode.allCases) { mode in
+          Text(mode.title)
+            .tag(mode)
+        }
+      }
+      .pickerStyle(.segmented)
+
+      HStack(spacing: 12) {
+        Button {
+          model.previousPeriodButtonTapped()
+        } label: {
+          Label("Previous", systemImage: "chevron.left")
+            .labelStyle(.iconOnly)
+        }
+        .accessibilityLabel("Previous \(model.displayMode.title)")
+
+        Text(model.periodTitle)
+          .font(.title2.weight(.semibold))
+          .frame(maxWidth: .infinity)
+          .lineLimit(1)
+          .minimumScaleFactor(0.75)
+
+        Button {
+          model.nextPeriodButtonTapped()
+        } label: {
+          Label("Next", systemImage: "chevron.right")
+            .labelStyle(.iconOnly)
+        }
+        .accessibilityLabel("Next \(model.displayMode.title)")
+      }
+    }
+  }
+}
+
+private struct MealCalendarMonthGrid: View {
+  let model: MealCalendarModel
+  var cellMinHeight: CGFloat
+
+  private var columns: [GridItem] {
+    Array(repeating: GridItem(.flexible(minimum: 36), spacing: 6), count: 7)
+  }
+
+  var body: some View {
+    VStack(spacing: 8) {
+      LazyVGrid(columns: columns, spacing: 6) {
+        ForEach(model.weekdaySymbols, id: \.self) { weekday in
+          Text(weekday)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+        }
+      }
+
+      LazyVGrid(columns: columns, spacing: 6) {
+        ForEach(model.visibleMonthSummaries) { summary in
+          MealCalendarMonthCell(
+            summary: summary,
+            isSelected: model.isSelectedDate(summary.date),
+            isToday: model.isToday(summary.date),
+            minHeight: cellMinHeight
+          ) {
+            model.selectDateButtonTapped(summary.date)
+          }
+        }
+      }
+    }
+  }
+}
+
+private struct MealCalendarWeekGrid: View {
+  let model: MealCalendarModel
+  var cellMinHeight: CGFloat
+
+  private var columns: [GridItem] {
+    Array(repeating: GridItem(.flexible(minimum: 72), spacing: 8), count: 7)
+  }
+
+  var body: some View {
+    LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+      ForEach(model.visibleWeekSummaries) { summary in
+          MealCalendarWeekCell(
+            summary: summary,
+            isSelected: model.isSelectedDate(summary.date),
+            isToday: model.isToday(summary.date),
+            minHeight: cellMinHeight
+          ) {
+            model.selectDateButtonTapped(summary.date)
+          }
+      }
+    }
+  }
+}
+
+private struct MealCalendarMonthCell: View {
+  let summary: MealCalendarDaySummary
+  let isSelected: Bool
+  let isToday: Bool
+  let minHeight: CGFloat
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      VStack(alignment: .leading, spacing: 5) {
+        HStack {
+          Text(summary.date, format: .dateTime.day())
+            .font(.callout.weight(isToday ? .bold : .medium))
+            .foregroundStyle(isToday ? Color.accentColor : Color.primary)
+          Spacer(minLength: 0)
+        }
+
+        ForEach(summary.rows.prefix(3)) { row in
+          MealCalendarChip(row: row)
+        }
+
+        if summary.rows.count > 3 {
+          Text("+\(summary.rows.count - 3) more")
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(.secondary)
+        }
+
+        Spacer(minLength: 0)
+      }
+      .padding(6)
+      .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
+      .opacity(summary.isInDisplayedMonth ? 1 : 0.42)
+      .background(isSelected ? Color.accentColor.opacity(0.12) : Color(uiColor: .secondarySystemGroupedBackground))
+      .clipShape(.rect(cornerRadius: 8))
+      .overlay {
+        RoundedRectangle(cornerRadius: 8)
+          .stroke(isSelected ? Color.accentColor : Color(uiColor: .separator), lineWidth: isSelected ? 1.5 : 0.5)
+      }
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(accessibilityLabel)
+  }
+
+  private var accessibilityLabel: String {
+    let mealCount = summary.rows.count == 1 ? "1 item" : "\(summary.rows.count) items"
+    return "\(summary.date.formatted(.dateTime.weekday(.wide).month(.wide).day())), \(mealCount)"
+  }
+}
+
+private struct MealCalendarWeekCell: View {
+  let summary: MealCalendarDaySummary
+  let isSelected: Bool
+  let isToday: Bool
+  let minHeight: CGFloat
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      VStack(alignment: .leading, spacing: 8) {
+        HStack(alignment: .firstTextBaseline) {
+          VStack(alignment: .leading, spacing: 2) {
+            Text(summary.date, format: .dateTime.weekday(.abbreviated))
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(.secondary)
+            Text(summary.date, format: .dateTime.day())
+              .font(.title3.weight(.bold))
+              .foregroundStyle(isToday ? Color.accentColor : Color.primary)
+          }
+          Spacer(minLength: 0)
+        }
+
+        if summary.rows.isEmpty {
+          Text("Open")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        } else {
+          ForEach(summary.rows.prefix(5)) { row in
+            MealCalendarChip(row: row)
+          }
+        }
+
+        Spacer(minLength: 0)
+      }
+      .padding(8)
+      .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
+      .background(isSelected ? Color.accentColor.opacity(0.12) : Color(uiColor: .secondarySystemGroupedBackground))
+      .clipShape(.rect(cornerRadius: 8))
+      .overlay {
+        RoundedRectangle(cornerRadius: 8)
+          .stroke(isSelected ? Color.accentColor : Color(uiColor: .separator), lineWidth: isSelected ? 1.5 : 0.5)
+      }
+    }
+    .buttonStyle(.plain)
+  }
+}
+
+private struct MealCalendarChip: View {
+  let row: MealPlanItemRowData
+
+  var body: some View {
+    Label {
+      Text(row.displayTitle)
+        .lineLimit(1)
+    } icon: {
+      Image(systemName: row.isFromMenu ? "menucard" : row.item.kind.systemImage)
+    }
+    .font(.caption2.weight(.medium))
+    .labelStyle(.titleAndIcon)
+    .foregroundStyle(.primary)
+    .padding(.horizontal, 5)
+    .padding(.vertical, 3)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(
+      row.isFromMenu
+        ? Color(uiColor: .tertiarySystemFill)
+        : Color.accentColor.opacity(row.item.kind == .recipe ? 0.12 : 0.08)
+    )
+    .clipShape(.rect(cornerRadius: 5))
+  }
+}
+
+private struct MealCalendarDayHeader: View {
+  let model: MealCalendarModel
+
+  var body: some View {
+    HStack(alignment: .firstTextBaseline) {
+      VStack(alignment: .leading, spacing: 6) {
+        Text(model.selectedDateTitle)
+          .font(.largeTitle.bold())
+        Text(itemCountTitle)
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+      }
+      Spacer()
+      Menu {
+        Button {
+          model.addItemButtonTapped(kind: .recipe)
+        } label: {
+          Label("Recipe", systemImage: MealPlanItemKind.recipe.systemImage)
+        }
+        Button {
+          model.addItemButtonTapped(kind: .note)
+        } label: {
+          Label("Note", systemImage: MealPlanItemKind.note.systemImage)
+        }
+      } label: {
+        Label("Add", systemImage: "plus")
+      }
+      .buttonStyle(.borderedProminent)
+    }
+  }
+
+  private var itemCountTitle: String {
+    switch model.selectedDayRows.count {
+    case 0: "No items scheduled"
+    case 1: "1 item scheduled"
+    default: "\(model.selectedDayRows.count) items scheduled"
+    }
+  }
+}
+
+private struct MealPlanSlotSection: View {
+  let model: MealCalendarModel
+  let mealSlot: MealPlanItemSlot
+  let rows: [MealPlanItemRowData]
+  var onMenuSelected: ((CoreMenu.ID) -> Void)?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Label(mealSlot.title, systemImage: mealSlot.systemImage)
+        .font(.title3.weight(.semibold))
+
+      VStack(spacing: 0) {
+        ForEach(rows) { row in
+          MealPlanItemRowView(
+            row: row,
+            editAction: row.isFromMenu ? nil : {
+              model.editButtonTapped(itemID: row.item.id)
+            },
+            deleteAction: row.isFromMenu ? nil : {
+              model.deleteButtonTapped(itemID: row.item.id)
+            },
+            sourceAction: sourceAction(for: row)
+          )
+          if row.id != rows.last?.id {
+            Divider()
+              .padding(.leading, 72)
+          }
+        }
+      }
+      .background(.background)
+      .clipShape(.rect(cornerRadius: 8))
+      .overlay {
+        RoundedRectangle(cornerRadius: 8)
+          .stroke(.quaternary)
+      }
+    }
+  }
+
+  private func sourceAction(for row: MealPlanItemRowData) -> (() -> Void)? {
+    guard let menuID = row.menu?.id, let onMenuSelected else { return nil }
+    return {
+      onMenuSelected(menuID)
+    }
+  }
+}
+
+private struct MealPlanItemRowView: View {
+  let row: MealPlanItemRowData
+  let editAction: (() -> Void)?
+  let deleteAction: (() -> Void)?
+  let sourceAction: (() -> Void)?
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 12) {
+      MealPlanItemImage(row: row)
+        .frame(width: 56, height: 56)
+
+      VStack(alignment: .leading, spacing: 6) {
+        Text(row.displayTitle)
+          .font(.headline)
+        Label(row.item.kind.title, systemImage: row.item.kind.systemImage)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        if row.isFromMenu {
+          menuSourceLabel
+        }
+        if let notes = row.displayNotes {
+          Text(notes)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        }
+      }
+
+      Spacer()
+
+      if editAction != nil || deleteAction != nil {
+        Menu {
+          if let editAction {
+            Button(action: editAction) {
+              Label("Edit", systemImage: "pencil")
+            }
+          }
+          if let deleteAction {
+            Button(role: .destructive, action: deleteAction) {
+              Label("Remove", systemImage: "trash")
+            }
+          }
+        } label: {
+          Label("Meal Actions", systemImage: "ellipsis.circle")
+            .labelStyle(.iconOnly)
+        }
+      }
+    }
+    .padding(12)
+  }
+
+  @ViewBuilder private var menuSourceLabel: some View {
+    if let sourceAction {
+      Button(action: sourceAction) {
+        Label(row.menu?.title ?? "Menu", systemImage: "menucard")
+          .lineLimit(1)
+      }
+      .buttonStyle(.plain)
+      .font(.caption)
+      .foregroundStyle(.tint)
+    } else {
+      Label(row.menu?.title ?? "Menu", systemImage: "menucard")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+    }
+  }
+}
+
+private struct MealPlanRecipeSelectionRow: View {
+  let row: RecipeListRowData
+  let isSelected: Bool
+
+  var body: some View {
+    HStack(spacing: 12) {
+      RecipeThumbnail(data: row.thumbnailData)
+        .frame(width: 44, height: 44)
+
+      VStack(alignment: .leading, spacing: 4) {
+        Text(row.recipe.title)
+          .font(.headline)
+        if let subtitle = row.recipe.subtitle {
+          Text(subtitle)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
+        } else if !row.categoryNames.isEmpty {
+          Text(row.categoryNames.joined(separator: ", "))
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
+        }
+      }
+
+      Spacer()
+
+      Image(systemName: isSelected ? "checkmark.circle.fill" : "plus.circle")
+        .foregroundStyle(.tint)
+    }
+    .padding(.vertical, 4)
+  }
+}
+
+private struct MealPlanItemImage: View {
+  let row: MealPlanItemRowData
+
+  var body: some View {
+    if row.item.kind == .recipe {
+      RecipeThumbnail(data: row.thumbnailData)
+    } else {
+      Image(systemName: row.item.kind.systemImage)
+        .font(.title3)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.quinary)
+        .clipShape(.rect(cornerRadius: 8))
+    }
+  }
+}
+
+private struct RecipeThumbnail: View {
+  let data: Data?
+
+  var body: some View {
+    Group {
+      if let data, let image = UIImage(data: data) {
+        Image(uiImage: image)
+          .resizable()
+          .scaledToFill()
+      } else {
+        Image(systemName: "fork.knife")
+          .font(.title3)
+          .foregroundStyle(.secondary)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .background(.quinary)
+      }
+    }
+    .clipShape(.rect(cornerRadius: 8))
+  }
+}

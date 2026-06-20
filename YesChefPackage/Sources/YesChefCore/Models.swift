@@ -154,6 +154,353 @@ public enum RecipeDifficulty: String, Codable, QueryBindable, QueryDecodable, Se
   case hard
 }
 
+@Table("mealPlanItems")
+public struct MealPlanItem: Codable, Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var kind: MealPlanItemKind
+  public var recipeID: Recipe.ID?
+  public var title: String
+  public var scheduledDate: Date
+  public var mealSlot: MealPlanItemSlot
+  public var notes: String?
+  public var startTime: Date?
+  public var endTime: Date?
+  public var sortOrder: Int
+  public var dateCreated: Date
+  public var dateModified: Date
+
+  public init(
+    id: UUID,
+    kind: MealPlanItemKind,
+    recipeID: Recipe.ID? = nil,
+    title: String,
+    scheduledDate: Date,
+    mealSlot: MealPlanItemSlot,
+    notes: String? = nil,
+    startTime: Date? = nil,
+    endTime: Date? = nil,
+    sortOrder: Int,
+    dateCreated: Date,
+    dateModified: Date
+  ) {
+    self.id = id
+    self.kind = kind
+    self.recipeID = recipeID
+    self.title = title
+    self.scheduledDate = scheduledDate
+    self.mealSlot = mealSlot
+    self.notes = notes
+    self.startTime = startTime
+    self.endTime = endTime
+    self.sortOrder = sortOrder
+    self.dateCreated = dateCreated
+    self.dateModified = dateModified
+  }
+}
+
+public enum MealPlanItemKind: String, CaseIterable, Codable, QueryBindable, QueryDecodable, Sendable {
+  case recipe
+  case note
+  case reservation
+
+  public var title: String {
+    switch self {
+    case .recipe: "Recipe"
+    case .note: "Note"
+    case .reservation: "Reservation"
+    }
+  }
+
+  public var systemImage: String {
+    switch self {
+    case .recipe: "book.closed"
+    case .note: "note.text"
+    case .reservation: "fork.knife.circle"
+    }
+  }
+}
+
+public enum MealPlanItemSlot: String, CaseIterable, Codable, QueryBindable, QueryDecodable, Sendable {
+  case breakfast
+  case lunch
+  case dinner
+  case snack
+
+  public var title: String {
+    switch self {
+    case .breakfast: "Breakfast"
+    case .lunch: "Lunch"
+    case .dinner: "Dinner"
+    case .snack: "Snack"
+    }
+  }
+
+  public var systemImage: String {
+    switch self {
+    case .breakfast: "sunrise"
+    case .lunch: "takeoutbag.and.cup.and.straw"
+    case .dinner: "fork.knife"
+    case .snack: "carrot"
+    }
+  }
+
+  public var sortOrder: Int {
+    switch self {
+    case .breakfast: 0
+    case .lunch: 1
+    case .dinner: 2
+    case .snack: 3
+    }
+  }
+}
+
+@Table("menus")
+public struct Menu: Codable, Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var title: String
+  public var notes: String?
+  public var dayCount: Int
+  public var dateCreated: Date
+  public var dateModified: Date
+
+  public init(
+    id: UUID,
+    title: String,
+    notes: String? = nil,
+    dayCount: Int,
+    dateCreated: Date,
+    dateModified: Date
+  ) {
+    self.id = id
+    self.title = title
+    self.notes = notes
+    self.dayCount = dayCount
+    self.dateCreated = dateCreated
+    self.dateModified = dateModified
+  }
+}
+
+@Table("menuItems")
+public struct MenuItem: Codable, Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var menuID: Menu.ID
+  public var kind: MealPlanItemKind
+  public var recipeID: Recipe.ID?
+  public var title: String
+  public var dayOffset: Int
+  public var mealSlot: MealPlanItemSlot
+  public var notes: String?
+  public var sortOrder: Int
+  public var dateCreated: Date
+  public var dateModified: Date
+
+  public init(
+    id: UUID,
+    menuID: Menu.ID,
+    kind: MealPlanItemKind,
+    recipeID: Recipe.ID? = nil,
+    title: String,
+    dayOffset: Int,
+    mealSlot: MealPlanItemSlot,
+    notes: String? = nil,
+    sortOrder: Int,
+    dateCreated: Date,
+    dateModified: Date
+  ) {
+    self.id = id
+    self.menuID = menuID
+    self.kind = kind
+    self.recipeID = recipeID
+    self.title = title
+    self.dayOffset = dayOffset
+    self.mealSlot = mealSlot
+    self.notes = notes
+    self.sortOrder = sortOrder
+    self.dateCreated = dateCreated
+    self.dateModified = dateModified
+  }
+}
+
+@Table("menuPlacements")
+public struct MenuPlacement: Codable, Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var menuID: Menu.ID
+  public var startDate: Date
+  public var dateCreated: Date
+  public var dateModified: Date
+
+  public init(
+    id: UUID,
+    menuID: Menu.ID,
+    startDate: Date,
+    dateCreated: Date,
+    dateModified: Date
+  ) {
+    self.id = id
+    self.menuID = menuID
+    self.startDate = startDate
+    self.dateCreated = dateCreated
+    self.dateModified = dateModified
+  }
+}
+
+@Table("groceryLists")
+public struct GroceryList: Codable, Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var title: String
+  public var sortOrder: Int
+  public var isDefault: Bool
+  public var remindersListName: String?
+  public var dateCreated: Date
+  public var dateModified: Date
+
+  public init(
+    id: UUID,
+    title: String,
+    sortOrder: Int,
+    isDefault: Bool = false,
+    remindersListName: String? = nil,
+    dateCreated: Date,
+    dateModified: Date
+  ) {
+    self.id = id
+    self.title = title
+    self.sortOrder = sortOrder
+    self.isDefault = isDefault
+    self.remindersListName = remindersListName
+    self.dateCreated = dateCreated
+    self.dateModified = dateModified
+  }
+}
+
+@Table("groceryItems")
+public struct GroceryItem: Codable, Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var groceryListID: GroceryList.ID
+  public var title: String
+  public var quantity: Double?
+  public var quantityText: String?
+  public var unit: String?
+  public var aisle: String?
+  public var notes: String?
+  public var isPurchased: Bool
+  public var purchasedAt: Date?
+  public var sortOrder: Int
+  public var dateCreated: Date
+  public var dateModified: Date
+
+  public init(
+    id: UUID,
+    groceryListID: GroceryList.ID,
+    title: String,
+    quantity: Double? = nil,
+    quantityText: String? = nil,
+    unit: String? = nil,
+    aisle: String? = nil,
+    notes: String? = nil,
+    isPurchased: Bool = false,
+    purchasedAt: Date? = nil,
+    sortOrder: Int,
+    dateCreated: Date,
+    dateModified: Date
+  ) {
+    self.id = id
+    self.groceryListID = groceryListID
+    self.title = title
+    self.quantity = quantity
+    self.quantityText = quantityText
+    self.unit = unit
+    self.aisle = aisle
+    self.notes = notes
+    self.isPurchased = isPurchased
+    self.purchasedAt = purchasedAt
+    self.sortOrder = sortOrder
+    self.dateCreated = dateCreated
+    self.dateModified = dateModified
+  }
+}
+
+@Table("groceryItemSources")
+public struct GroceryItemSource: Codable, Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var groceryItemID: GroceryItem.ID
+  public var origin: GroceryItemOrigin
+  public var recipeID: Recipe.ID?
+  public var ingredientLineID: IngredientLine.ID?
+  public var mealPlanItemID: MealPlanItem.ID?
+  public var menuID: Menu.ID?
+  public var menuItemID: MenuItem.ID?
+  public var menuPlacementID: MenuPlacement.ID?
+  public var scheduledDate: Date?
+  public var mealSlot: MealPlanItemSlot?
+  public var sourceTitle: String?
+  public var sourceSubtitle: String?
+  public var ingredientText: String?
+  public var dateCreated: Date
+
+  public init(
+    id: UUID,
+    groceryItemID: GroceryItem.ID,
+    origin: GroceryItemOrigin,
+    recipeID: Recipe.ID? = nil,
+    ingredientLineID: IngredientLine.ID? = nil,
+    mealPlanItemID: MealPlanItem.ID? = nil,
+    menuID: Menu.ID? = nil,
+    menuItemID: MenuItem.ID? = nil,
+    menuPlacementID: MenuPlacement.ID? = nil,
+    scheduledDate: Date? = nil,
+    mealSlot: MealPlanItemSlot? = nil,
+    sourceTitle: String? = nil,
+    sourceSubtitle: String? = nil,
+    ingredientText: String? = nil,
+    dateCreated: Date
+  ) {
+    self.id = id
+    self.groceryItemID = groceryItemID
+    self.origin = origin
+    self.recipeID = recipeID
+    self.ingredientLineID = ingredientLineID
+    self.mealPlanItemID = mealPlanItemID
+    self.menuID = menuID
+    self.menuItemID = menuItemID
+    self.menuPlacementID = menuPlacementID
+    self.scheduledDate = scheduledDate
+    self.mealSlot = mealSlot
+    self.sourceTitle = sourceTitle
+    self.sourceSubtitle = sourceSubtitle
+    self.ingredientText = ingredientText
+    self.dateCreated = dateCreated
+  }
+}
+
+public enum GroceryItemOrigin: String, CaseIterable, Codable, QueryBindable, QueryDecodable, Sendable {
+  case custom
+  case recipe
+  case menu
+  case calendarItem
+  case menuPlacement
+
+  public var title: String {
+    switch self {
+    case .custom: "Custom"
+    case .recipe: "Recipe"
+    case .menu: "Menu"
+    case .calendarItem: "Meal Calendar"
+    case .menuPlacement: "Placed Menu"
+    }
+  }
+
+  public var systemImage: String {
+    switch self {
+    case .custom: "plus.circle"
+    case .recipe: "book.closed"
+    case .menu: "menucard"
+    case .calendarItem: "calendar"
+    case .menuPlacement: "calendar.badge.checkmark"
+    }
+  }
+}
+
 @Table("recipeSources")
 public struct RecipeSource: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID

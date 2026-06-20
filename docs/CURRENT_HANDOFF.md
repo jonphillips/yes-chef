@@ -7,36 +7,54 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 
 ## Current Checkpoint
 
-The current slice is saved recipe-list views/presets.
+The current slice scaffolds menus and connects them to the meal calendar.
 
 Implemented behavior:
 
-- A `Saved Views` toolbar menu on the recipe list.
-- Save the current browse state with a user-provided name.
-- Apply a saved view from the menu.
-- Manage saved views in a sheet and delete with row swipe actions.
-- Show the active saved view with a filled bookmark when the current list state
-  exactly matches a saved preset.
-- Saved views are local app preferences backed by `@AppStorage`, not database rows
-  or iCloud-synced records.
+- A durable `mealPlanItems` SQLite table and `MealPlanItem` core model.
+- Meal plan items support recipes and freeform notes now, with a reserved
+  `reservation` kind and optional start/end time fields for later restaurant or
+  iCal-style work.
+- A month-first Meal Calendar workspace in the existing app shell, with month,
+  week, and day display modes.
+- On regular-width iPad, Meal Calendar uses a two-column sidebar + workspace
+  layout instead of the app's recipe-style content/detail split.
+- Month/week planning views own the main workspace, with the selected-day agenda
+  in a right rail on wide layouts and below the calendar on compact/narrow
+  layouts.
+- A selected-day agenda grouped by meal slot: breakfast, lunch, dinner, snack.
+- Add recipe and add note flows from the calendar.
+- A `Plan` toolbar button on recipe detail that starts a preselected recipe plan
+  item for the calendar's selected date.
+- Edit/reschedule support for existing meal plan recipe and note items.
+- Delete support for meal plan items.
+- Core request/repository tests covering add, validation, fetch, sort order, and
+  update/delete behavior.
+- A durable menu schema with `menus`, `menuItems`, and `menuPlacements`.
+- Menu items support recipe dishes and freeform note dishes, each assigned to a
+  menu day offset and meal slot.
+- A menu can be placed on the calendar with a start date. Multi-day menus project
+  each menu item onto the correct calendar day automatically.
+- Calendar rows projected from a menu preserve provenance through menu placement
+  data and show as menu-derived instead of editable standalone meal plan items.
+- Menu-derived calendar rows can open the source menu from the selected-day
+  agenda.
+- A minimal Menus section in the app shell for creating menus, adding dishes, and
+  placing a menu on the calendar.
+- Menu placements can be shifted to a new start date or removed from the
+  calendar without deleting the menu.
+- Core menu tests covering menu creation, item validation, placement, and calendar
+  projection behavior, including placement update/delete behavior.
 
-Saved views capture:
+Deferred from this slice:
 
-- Search text
-- Sort order
-- Library scope
-- Favorites-only and photos-only filters
-- Selected categories and tags
-- Selected cuisine and course
-- Selected sources and authors
-
-Saved views intentionally do not capture:
-
-- Row density
-- Source/category metadata visibility in rows
-
-Those remain per-device display preferences through the existing list view-options
-menu.
+- Drag/drop or direct manipulation inside the calendar grid.
+- Restaurant reservation-specific UI.
+- iCal import/export/sync.
+- Shopping list, prep strategy, and menu generation integrations.
+- Rich menu editing: reordering dishes, editing existing menu dishes, and
+  duplicating menus.
+- Importing Paprika menus from backup/export data, if that data is recoverable.
 
 ## Verification Pattern
 
@@ -53,21 +71,30 @@ Jon performs the primary UI testing pass.
 
 ## Recommended Next Larger Task
 
-Start the meal calendar vertical slice.
+Scaffold grocery/shopping lists while the menu/calendar source relationships are
+fresh.
 
-Suggested first scope:
+Suggested next scope:
 
-- Add the durable data model for scheduled meals.
-- Show a simple Meal Calendar surface from the existing app shell.
-- Let the user place one or more recipes on a date.
-- Display recipe title, meal/date, and serving notes if needed.
-- Keep shopping lists, menus, event planning, generated prep strategy, and iCloud
-  sync for later slices.
+- Jon should do the primary UI pass on iPad and iPhone.
+- Create a multi-day menu, place it on the calendar, shift the placement, remove
+  the placement, and confirm the calendar/source relationship remains legible.
+- Use Paprika's grocery docs as inspiration, but preserve Yes Chef's source model:
+  grocery rows should know whether they came from a recipe, a menu placement, a
+  calendar item, or a custom item.
+- Scaffold grocery lists, grocery items, and a minimal Groceries section before
+  implementing consolidation, pantry interactions, or Reminders/Siri integration.
+- Revisit drag/drop from recipe rows into either the calendar or a menu after the
+  grocery source model is standing.
 
 Reasoning:
 
-- The recipe library is now useful enough to browse, filter, and save repeated views.
-- Meal calendar work connects directly to the existing product thesis.
-- It will also give `lastCookedAt` a principled source of truth: a recipe scheduled
-  on a past calendar date can later drive or supplement that field instead of using
-  a manual "mark cooked" flow.
+- The high-risk model question is now represented in code: menu placement projects
+  rows into the calendar without erasing their source relationship, and placement
+  changes update the projection instead of copying anonymous calendar rows.
+- Groceries are the next source-of-truth pressure test because recipe/menu/calendar
+  inputs, ingredient scaling, consolidation, purchased state, and custom items all
+  need to coexist.
+- The calendar can later give `lastCookedAt` a principled source of truth: a
+  recipe scheduled on a past date can drive or supplement that field instead of
+  relying only on a manual "mark cooked" flow.
