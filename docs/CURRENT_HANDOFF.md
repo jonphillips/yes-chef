@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: June 19, 2026.
+Last updated: June 26, 2026.
 
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
@@ -43,8 +43,12 @@ Implemented behavior:
   own `GroceryItemSource` row.
 - Purchased items and prep/comment-sensitive rows stay separate when generating
   groceries.
+- Grocery rows expose their source breakdown in the list. Each source now has an
+  actions menu that can remove only that source; the repository deletes the
+  grocery row when its last source is removed and recalculates generated numeric
+  quantities when a consolidated recipe/menu/calendar contribution is removed.
 - Core tests cover meal calendar, menus, grocery source provenance, and generated
-  grocery consolidation behavior.
+  grocery consolidation/source-removal behavior.
 
 Deferred from this slice:
 
@@ -54,10 +58,11 @@ Deferred from this slice:
 - Rich menu editing: reordering dishes, editing existing menu dishes, and
   duplicating menus.
 - Ingredient selection before adding a recipe/menu/calendar range to groceries.
-- Source-aware grocery removal, such as removing a recipe's contribution from a
-  consolidated grocery row without deleting unrelated sources.
-- Pantry interactions, Reminders/Siri integration, store/category learning, and
-  shopping workflow polish.
+- Higher-level source-aware grocery removal flows, such as removing a recipe's
+  full contribution from a grocery list without deleting unrelated sources.
+- Pantry assumptions and reviewable skipped staples.
+- Reminders/Siri integration, store/category learning, and shopping workflow
+  polish.
 - Importing Paprika menus or grocery lists from backup/export data, if that data
   is recoverable.
 
@@ -86,11 +91,15 @@ Suggested next scope:
   the placement, and confirm the calendar/source relationship remains legible.
 - Add an ingredient selection step before adding a recipe, menu, menu placement,
   or calendar range to groceries.
-- Show a compact source breakdown for grocery rows so consolidated items make
-  their recipe/menu/calendar/custom origins visible.
-- Implement source-aware removal so deleting "this recipe from the grocery list"
-  removes only matching source rows and recalculates/deletes the grocery row as
-  appropriate.
+- Polish the grocery source breakdown if Jon's UI pass finds the per-source
+  actions too subtle or too noisy.
+- Broaden source-aware removal from the current per-source action into higher-level
+  "remove this recipe/menu/calendar contribution" flows where useful.
+- Add lightweight pantry assumptions: staples can be skipped by default, shown in
+  a "skipped pantry staples" review section, and added back with one tap. Do not
+  build quantity-based pantry inventory as part of this slice.
+- Treat Grocy as inspiration for shopping locations/assortments and product/barcode
+  workflows, but keep Yes Chef recipe/planning-first rather than inventory-first.
 - Revisit drag/drop from recipe rows into either the calendar, a menu, or
   groceries after the source model is visible to users.
 
@@ -104,3 +113,5 @@ Reasoning:
 - Source-aware removal is the next pressure test for consolidation because a
   single row may contain quantities from several recipes, menu placements, and
   calendar items.
+- Pantry value comes first from suppressing known staples and making skipped items
+  reviewable, not from tracking exact on-hand quantities.

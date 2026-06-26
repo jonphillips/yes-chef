@@ -1314,6 +1314,13 @@ notes: String?
 * User edits should be preserved.
 * Combining ingredients should be conservative.
 * Original source lines should be traceable.
+* Pantry-staple suppression should be traceable and reversible. If an item is
+  skipped because the user usually has it, the user should be able to review the
+  skipped item and add it back.
+* Shopping categories are user-facing ordering/grouping hints, not a universal
+  taxonomy. Grocy's "assortment" idea is useful inspiration for store-order
+  grouping; Yes Chef should not require store-specific setup before grocery
+  generation is useful.
 
 18.4 Combining Example
 
@@ -1333,27 +1340,38 @@ cilantro, for garnish
 
 Should not be overconfidently combined unless user confirms.
 
-19. PantryItem
+19. PantryAssumption
 
 19.1 Purpose
 
-Represents an item the user has on hand.
+Represents an item the user generally assumes is on hand, or wants treated
+according to a shopping policy.
 
 This is future functionality.
+
+This is not a quantity-based inventory ledger. The core use case is "I usually
+have soy sauce; don't add it automatically, but let me see what was skipped."
 
 19.2 Fields
 
 id: UUID
-name: String
-quantity: Double?
-quantityText: String?
-unit: String?
+displayName: String
+canonicalItemKey: String
+shoppingPolicy: PantryShoppingPolicy
 category: String?
-location: String?
-expirationDate: Date?
+shoppingLocation: String?
 notes: String?
 dateCreated: Date
 dateModified: Date
+
+19.2.1 PantryShoppingPolicy
+
+Possible values:
+
+* shopByDefault
+* pantryStaple
+* checkFirst
+* neverShop
 
 19.3 Examples
 
@@ -1368,10 +1386,18 @@ dried hibiscus flowers
 Pantry can support:
 
 * Suppressing owned items from shopping lists
+* Showing skipped pantry staples for review
+* "Check pantry" prompts for uncertain staples
+* Vacation-house shopping assumptions
+* User-specific defaults such as preferred soy sauce, rice, oil, or canned tomatoes
+
+Explicitly deferred/opt-in only:
+
+* Quantity tracking
+* Minimum stock rules
 * Expiration reminders
+* Freezer inventory
 * “Use this up” suggestions
-* Vacation-house inventory
-* Freezer planning
 
 20. CookingPlan
 
@@ -1777,6 +1803,13 @@ Important rules:
 * Combine only when reasonably confident.
 * Let the user edit everything.
 * Do not treat shopping list as a perfect normalized ingredient database.
+* Treat pantry as memory and suppression rules, not as automatic inventory
+  accounting.
+* Use pantry assumptions to keep generated lists clean, but expose skipped items
+  for review.
+* Product/barcode enrichment can come later. Open Food Facts and Grocy-style
+  barcode workflows are useful for packaged products, not a prerequisite for
+  recipe ingredient parsing.
 
 29. Import Requirements
 
@@ -1900,7 +1933,17 @@ Need to decide whether grocery categories are:
 * Store-specific
 * Learned over time
 
-Likely starting point: default categories with user override.
+Likely starting point: default categories with user override. Keep the model
+compatible with Grocy-style store-order grouping/assortments, but do not require
+store setup in MVP grocery generation.
+
+33.6 Pantry Scope
+
+Settled starting point: pantry means assumptions and shopping policies, not precise
+stock accounting. The app may remember that soy sauce is normally on hand and skip
+it by default, but it should not require the user to log every use of soy sauce.
+Quantity tracking, minimum stock, expiration, freezer inventory, and "use this up"
+workflows are optional future layers, not the base pantry model.
 
 34. MVP 1 Data Model
 

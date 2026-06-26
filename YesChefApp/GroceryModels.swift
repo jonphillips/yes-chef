@@ -168,6 +168,21 @@ final class GroceryLibraryModel {
     }
   }
 
+  func deleteSourceButtonTapped(sourceID: GroceryItemSource.ID) {
+    do {
+      try database.write { db in
+        try GroceryRepository.deleteSource(
+          sourceID: sourceID,
+          in: db,
+          now: now
+        )
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
   func addSelectedMealRowsButtonTapped(_ rows: [MealPlanItemRowData]) {
     do {
       let selectedListID = selectedListID

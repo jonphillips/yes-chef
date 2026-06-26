@@ -211,9 +211,15 @@ private struct GroceryItemsSection: View {
     if !rows.isEmpty {
       Section(title) {
         ForEach(rows) { row in
-          GroceryItemRowView(row: row) {
-            model.togglePurchasedButtonTapped(itemID: row.id)
-          }
+          GroceryItemRowView(
+            row: row,
+            togglePurchased: {
+              model.togglePurchasedButtonTapped(itemID: row.id)
+            },
+            deleteSource: { sourceID in
+              model.deleteSourceButtonTapped(sourceID: sourceID)
+            }
+          )
           .swipeActions {
             Button(role: .destructive) {
               model.deleteButtonTapped(itemID: row.id)
@@ -230,6 +236,7 @@ private struct GroceryItemsSection: View {
 private struct GroceryItemRowView: View {
   let row: GroceryItemRowData
   var togglePurchased: () -> Void
+  var deleteSource: (GroceryItemSource.ID) -> Void
 
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
@@ -258,7 +265,9 @@ private struct GroceryItemRowView: View {
         if !row.sources.isEmpty {
           VStack(alignment: .leading, spacing: 4) {
             ForEach(row.sources) { source in
-              GrocerySourceLabel(source: source)
+              GrocerySourceLabel(source: source) {
+                deleteSource(source.id)
+              }
             }
           }
           .font(.caption)
@@ -284,17 +293,35 @@ private struct GroceryItemRowView: View {
 
 private struct GrocerySourceLabel: View {
   let source: GroceryItemSource
+  var deleteSource: () -> Void
 
   var body: some View {
-    Label {
+    HStack(alignment: .firstTextBaseline, spacing: 6) {
+      Image(systemName: source.origin.systemImage)
+        .foregroundStyle(.secondary)
+        .frame(width: 14)
+
       VStack(alignment: .leading, spacing: 2) {
         Text(source.sourceTitle ?? source.origin.title)
         if let detailText {
           Text(detailText)
         }
       }
-    } icon: {
-      Image(systemName: source.origin.systemImage)
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+      Menu {
+        Button(role: .destructive) {
+          deleteSource()
+        } label: {
+          Label("Remove Source", systemImage: "minus.circle")
+        }
+      } label: {
+        Image(systemName: "ellipsis.circle")
+          .imageScale(.medium)
+      }
+      .buttonStyle(.borderless)
+      .menuStyle(.button)
+      .accessibilityLabel("Source Actions")
     }
   }
 

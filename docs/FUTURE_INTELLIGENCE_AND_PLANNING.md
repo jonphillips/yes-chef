@@ -471,7 +471,9 @@ Generate the shopping list for this dinner party, but assume I already have soy 
 AI should:
 
 - Generate shopping list from selected recipes.
-- Suppress pantry items.
+- Suppress pantry staples based on user-controlled assumptions, not inferred stock
+  quantities.
+- Show skipped pantry staples for review.
 - Group by store section.
 - Flag uncertain quantities.
 - Preserve recipe sources for each item.
@@ -652,13 +654,15 @@ Shopping should eventually go beyond aggregating ingredients.
 Capabilities:
 
 - Combine ingredients conservatively.
-- Group by store section.
+- Group by store section or user-defined shopping location. Grocy's assortment
+  model is a useful reference for optimizing store order, but Yes Chef should stay
+  recipe/planning-first rather than inventory/ERP-first.
 - Group by store.
 - Flag specialty items.
 - Distinguish buy-ahead vs buy-day-of.
 - Distinguish transport-from-home vs buy-local.
-- Suppress pantry staples.
-- Handle partial pantry quantities.
+- Suppress pantry staples via pantry assumptions.
+- Show skipped pantry staples for review and one-tap add-back.
 - Support vacation-house shopping.
 - Track what was hard to find.
 - Remember preferred sources.
@@ -692,17 +696,27 @@ Buy day-of:
 
 Pantry features should eventually support:
 
-- On-hand items
-- Freezer items
-- Expiration dates
-- Vacation-house inventory
+- Pantry assumptions: "I usually have this"
+- Shopping policies: shop by default, pantry staple, check first, never shop
+- Reviewable skipped pantry staples
+- Vacation-house shopping assumptions
 - Specialty condiments
 - Staple suppression
-- “Use this up” suggestions
-- Shopping-list deduction
-- Recipe suggestions from inventory
+- User-specific defaults for common items
 
-But pantry should not become a full inventory-management burden. The app should support light, useful pantry awareness without making the user maintain a grocery warehouse database.
+But pantry should not become a full inventory-management burden. The app should
+support light, useful pantry awareness without making the user maintain a grocery
+warehouse database. Do not assume the user will track exact amounts of soy sauce,
+spices, flour, oil, or similar staples.
+
+Explicitly optional future layers:
+
+- Freezer inventory
+- Expiration dates
+- Minimum stock rules
+- Partial quantity tracking
+- “Use this up” suggestions
+- Recipe suggestions from inventory
 
 ## 15. Cooking History
 
