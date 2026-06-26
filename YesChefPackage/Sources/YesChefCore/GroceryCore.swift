@@ -195,28 +195,34 @@ public enum GroceryRepository {
     guard let source = try GroceryItemSource.find(sourceID).fetchOne(db) else {
       throw GroceryRepositoryError.sourceNotFound(sourceID)
     }
-    guard var item = try GroceryItem.find(source.groceryItemID).fetchOne(db) else {
+    guard try GroceryItem.find(source.groceryItemID).fetchOne(db) != nil else {
       throw GroceryRepositoryError.itemNotFound(source.groceryItemID)
     }
 
-    try GroceryItemSource.find(sourceID).delete().execute(db)
+    try deleteGroceryItemSources([source], in: db, now: now)
+  }
 
-    let remainingSources = try GroceryItemSource
-      .where { $0.groceryItemID.eq(item.id) }
-      .fetchAll(db)
-      .sorted(by: areGroceryItemSourcesInIncreasingOrder)
-
-    guard !remainingSources.isEmpty else {
-      try GroceryItem.find(item.id).delete().execute(db)
-      return
+  public static func deleteContribution(
+    containingSourceID sourceID: GroceryItemSource.ID,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard let source = try GroceryItemSource.find(sourceID).fetchOne(db) else {
+      throw GroceryRepositoryError.sourceNotFound(sourceID)
+    }
+    guard let item = try GroceryItem.find(source.groceryItemID).fetchOne(db) else {
+      throw GroceryRepositoryError.itemNotFound(source.groceryItemID)
     }
 
-    if let recalculatedQuantity = try generatedQuantity(for: remainingSources, in: db) {
-      item.quantity = recalculatedQuantity
-      item.quantityText = formatGroceryQuantity(recalculatedQuantity)
-    }
-    item.dateModified = now
-    try GroceryItem.upsert { item }.execute(db)
+    let contributionKey = source.contributionKey
+    let itemsByID = Dictionary(uniqueKeysWithValues: try GroceryItem.fetchAll(db).map { ($0.id, $0) })
+    let sourcesToDelete = try GroceryItemSource.fetchAll(db)
+      .filter { candidate in
+        candidate.contributionKey == contributionKey
+          && itemsByID[candidate.groceryItemID]?.groceryListID == item.groceryListID
+      }
+
+    try deleteGroceryItemSources(sourcesToDelete, in: db, now: now)
   }
 
   @discardableResult
@@ -659,6 +665,36 @@ public enum GroceryRepositoryError: Error, Equatable, Sendable {
   case sourceNotFound(GroceryItemSource.ID)
 }
 
+private func deleteGroceryItemSources(
+  _ sources: [GroceryItemSource],
+  in db: Database,
+  now: Date
+) throws {
+  for source in sources {
+    try GroceryItemSource.find(source.id).delete().execute(db)
+  }
+
+  for itemID in Set(sources.map(\.groceryItemID)) {
+    guard var item = try GroceryItem.find(itemID).fetchOne(db) else { continue }
+    let remainingSources = try GroceryItemSource
+      .where { $0.groceryItemID.eq(item.id) }
+      .fetchAll(db)
+      .sorted(by: areGroceryItemSourcesInIncreasingOrder)
+
+    guard !remainingSources.isEmpty else {
+      try GroceryItem.find(item.id).delete().execute(db)
+      continue
+    }
+
+    if let recalculatedQuantity = try generatedQuantity(for: remainingSources, in: db) {
+      item.quantity = recalculatedQuantity
+      item.quantityText = formatGroceryQuantity(recalculatedQuantity)
+    }
+    item.dateModified = now
+    try GroceryItem.upsert { item }.execute(db)
+  }
+}
+
 private struct GroceryItemSourceDraft {
   var origin: GroceryItemOrigin
   var mealPlanItemID: MealPlanItem.ID? = nil
@@ -704,6 +740,51 @@ private struct PendingGroceryItemSource {
   var sourceSubtitle: String? = nil
   var ingredientText: String? = nil
   var dateCreated: Date
+}
+
+private enum GrocerySourceContributionKey: Equatable {
+  case source(GroceryItemSource.ID)
+  case recipe(Recipe.ID)
+  case calendarItem(MealPlanItem.ID)
+  case menuItem(Menu.ID, MenuItem.ID)
+  case menuPlacementItem(MenuPlacement.ID, MenuItem.ID)
+}
+
+private extension GroceryItemSource {
+  var contributionKey: GrocerySourceContributionKey {
+    switch origin {
+    case .custom:
+      .source(id)
+
+    case .recipe:
+      if let recipeID {
+        .recipe(recipeID)
+      } else {
+        .source(id)
+      }
+
+    case .calendarItem:
+      if let mealPlanItemID {
+        .calendarItem(mealPlanItemID)
+      } else {
+        .source(id)
+      }
+
+    case .menu:
+      if let menuID, let menuItemID {
+        .menuItem(menuID, menuItemID)
+      } else {
+        .source(id)
+      }
+
+    case .menuPlacement:
+      if let menuPlacementID, let menuItemID {
+        .menuPlacementItem(menuPlacementID, menuItemID)
+      } else {
+        .source(id)
+      }
+    }
+  }
 }
 
 private func areGroceryListRowsInIncreasingOrder(

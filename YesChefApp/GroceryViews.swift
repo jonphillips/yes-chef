@@ -218,6 +218,9 @@ private struct GroceryItemsSection: View {
             },
             deleteSource: { sourceID in
               model.deleteSourceButtonTapped(sourceID: sourceID)
+            },
+            deleteContribution: { sourceID in
+              model.deleteContributionButtonTapped(sourceID: sourceID)
             }
           )
           .swipeActions {
@@ -237,6 +240,7 @@ private struct GroceryItemRowView: View {
   let row: GroceryItemRowData
   var togglePurchased: () -> Void
   var deleteSource: (GroceryItemSource.ID) -> Void
+  var deleteContribution: (GroceryItemSource.ID) -> Void
 
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
@@ -267,6 +271,8 @@ private struct GroceryItemRowView: View {
             ForEach(row.sources) { source in
               GrocerySourceLabel(source: source) {
                 deleteSource(source.id)
+              } deleteContribution: {
+                deleteContribution(source.id)
               }
             }
           }
@@ -294,6 +300,7 @@ private struct GroceryItemRowView: View {
 private struct GrocerySourceLabel: View {
   let source: GroceryItemSource
   var deleteSource: () -> Void
+  var deleteContribution: () -> Void
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -310,6 +317,14 @@ private struct GrocerySourceLabel: View {
       .frame(maxWidth: .infinity, alignment: .leading)
 
       Menu {
+        if let contributionRemovalTitle = source.contributionRemovalTitle {
+          Button(role: .destructive) {
+            deleteContribution()
+          } label: {
+            Label(contributionRemovalTitle, systemImage: "minus.square")
+          }
+        }
+
         Button(role: .destructive) {
           deleteSource()
         } label: {
@@ -339,6 +354,23 @@ private struct GrocerySourceLabel: View {
       parts.append(mealSlot.title)
     }
     return parts.joined(separator: " · ").nonEmptyGroceryViewText
+  }
+}
+
+private extension GroceryItemSource {
+  var contributionRemovalTitle: String? {
+    switch origin {
+    case .custom:
+      nil
+    case .recipe:
+      recipeID == nil ? nil : "Remove Recipe Items"
+    case .calendarItem:
+      mealPlanItemID == nil ? nil : "Remove Calendar Items"
+    case .menu:
+      menuID == nil || menuItemID == nil ? nil : "Remove Menu Dish Items"
+    case .menuPlacement:
+      menuPlacementID == nil || menuItemID == nil ? nil : "Remove Placed Dish Items"
+    }
   }
 }
 
