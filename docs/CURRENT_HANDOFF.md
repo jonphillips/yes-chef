@@ -8,7 +8,8 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 ## Current Checkpoint
 
 The current slice scaffolds meal planning, menus, and grocery lists with
-source-preserving generated grocery items.
+source-preserving generated grocery items and a review step before adding
+generated ingredients.
 
 Implemented behavior:
 
@@ -35,8 +36,8 @@ Implemented behavior:
 - A minimal Groceries section in the app shell supports list creation, custom
   items, purchased state, add-from-calendar-range, add-menu, and add-recipe
   flows.
-- Recipe detail has a `Shop` toolbar button that adds the recipe's shoppable
-  ingredients to the selected/default grocery list.
+- Recipe detail has a `Shop` toolbar button that opens a shoppable-ingredient
+  review sheet before adding selected lines to the selected/default grocery list.
 - Generated grocery ingredients consolidate conservatively when title, unit,
   aisle, notes, and quantity shape are compatible. Compatible numeric quantities
   are added together, while each contributing origin remains represented as its
@@ -47,8 +48,13 @@ Implemented behavior:
   actions menu that can remove only that source; the repository deletes the
   grocery row when its last source is removed and recalculates generated numeric
   quantities when a consolidated recipe/menu/calendar contribution is removed.
+- Recipe detail `Shop`, grocery add-from-calendar-day, and grocery add-menu flows
+  now open an ingredient-selection sheet before generating grocery rows. All
+  shoppable lines start selected, and the repository can restrict generation to
+  selected `IngredientLine` IDs while preserving source provenance and
+  consolidation behavior.
 - Core tests cover meal calendar, menus, grocery source provenance, and generated
-  grocery consolidation/source-removal behavior.
+  grocery consolidation/source-removal/ingredient-selection behavior.
 
 Deferred from this slice:
 
@@ -57,7 +63,6 @@ Deferred from this slice:
 - iCal import/export/sync.
 - Rich menu editing: reordering dishes, editing existing menu dishes, and
   duplicating menus.
-- Ingredient selection before adding a recipe/menu/calendar range to groceries.
 - Higher-level source-aware grocery removal flows, such as removing a recipe's
   full contribution from a grocery list without deleting unrelated sources.
 - Pantry assumptions and reviewable skipped staples.
@@ -81,16 +86,14 @@ Jon performs the primary UI testing pass.
 
 ## Recommended Next Larger Task
 
-Make grocery generation source-aware in the UI, especially before and after
-consolidation.
+Polish grocery generation and shopping workflow around the newly visible source
+model.
 
 Suggested next scope:
 
 - Jon should do the primary UI pass on iPad and iPhone.
 - Create a multi-day menu, place it on the calendar, shift the placement, remove
   the placement, and confirm the calendar/source relationship remains legible.
-- Add an ingredient selection step before adding a recipe, menu, menu placement,
-  or calendar range to groceries.
 - Polish the grocery source breakdown if Jon's UI pass finds the per-source
   actions too subtle or too noisy.
 - Broaden source-aware removal from the current per-source action into higher-level
@@ -105,11 +108,13 @@ Suggested next scope:
 
 Reasoning:
 
-- The storage model can now represent multiple origins for one grocery row, but
-  the UI still treats generation as a blind add operation.
+- The storage model can now represent multiple origins for one grocery row, and
+  the UI has a first review step before generation. The next pressure point is
+  making source-aware removal and skipped pantry staples equally legible.
 - Paprika's grocery flow allows recipe ingredients to be chosen before adding and
-  recipes to be removed from the grocery list later; Yes Chef needs the same
-  user-facing affordance while keeping richer provenance intact.
+  recipes to be removed from the grocery list later; Yes Chef now has the
+  ingredient-selection affordance and still needs the broader removal/review
+  affordances while keeping richer provenance intact.
 - Source-aware removal is the next pressure test for consolidation because a
   single row may contain quantities from several recipes, menu placements, and
   calendar items.

@@ -58,6 +58,19 @@ struct AppContainer: View {
         GroceryItemEditorView(model: groceryModel)
       }
     }
+    .sheet(item: $groceryModel.destination.selectIngredients, id: \.self) { context in
+      NavigationStack {
+        GroceryIngredientSelectionView(
+          model: groceryModel,
+          context: context,
+          choices: groceryModel.ingredientChoices(
+            for: context,
+            mealRows: mealCalendarModel.itemRows
+          ),
+          mealRows: mealCalendarModel.itemRows
+        )
+      }
+    }
     .sheet(isPresented: $recipeModel.destination.addRecipe) {
       NavigationStack {
         RecipeEditorView(recipeID: nil)

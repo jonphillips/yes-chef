@@ -584,6 +584,97 @@ extension RecipeCoreTests {
 
 extension RecipeCoreTests {
   @Suite
+  struct GroceryIngredientSelectionTests {
+    @Test
+    func addsOnlySelectedRecipeIngredients() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 805_225_000)
+      let recipeID = SampleUUIDSequence.uuid(14_201)
+      let sectionID = SampleUUIDSequence.uuid(14_202)
+      let flourLineID = SampleUUIDSequence.uuid(14_203)
+      let sugarLineID = SampleUUIDSequence.uuid(14_204)
+      let butterLineID = SampleUUIDSequence.uuid(14_205)
+      var uuids = SampleUUIDSequence(start: 14_300)
+
+      try database.write { db in
+        let listID = try GroceryRepository.ensureDefaultList(
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        try insertRecipeFixture(
+          recipeID: recipeID,
+          sectionID: sectionID,
+          title: "Snack Cake",
+          lines: [
+            IngredientLine(
+              id: flourLineID,
+              recipeID: recipeID,
+              sectionID: sectionID,
+              originalText: "2 cups flour",
+              quantity: 2,
+              quantityText: "2",
+              unit: "cups",
+              item: "flour",
+              shoppingCategory: "Baking",
+              sortOrder: 0,
+              confidence: .medium
+            ),
+            IngredientLine(
+              id: sugarLineID,
+              recipeID: recipeID,
+              sectionID: sectionID,
+              originalText: "1 cup sugar",
+              quantity: 1,
+              quantityText: "1",
+              unit: "cup",
+              item: "sugar",
+              shoppingCategory: "Baking",
+              sortOrder: 1,
+              confidence: .medium
+            ),
+            IngredientLine(
+              id: butterLineID,
+              recipeID: recipeID,
+              sectionID: sectionID,
+              originalText: "4 tablespoons butter",
+              quantity: 4,
+              quantityText: "4",
+              unit: "tablespoons",
+              item: "butter",
+              shoppingCategory: "Dairy",
+              sortOrder: 2,
+              confidence: .medium
+            ),
+          ],
+          now: now,
+          in: db
+        )
+
+        let itemIDs = try GroceryRepository.addRecipe(
+          recipeID: recipeID,
+          groceryListID: listID,
+          in: db,
+          now: now,
+          uuid: { uuids.next() },
+          includedIngredientLineIDs: [flourLineID, butterLineID]
+        )
+        let rows = try GroceryItemListRequest().fetch(db)
+          .filter { itemIDs.contains($0.id) }
+
+        expectNoDifference(rows.map(\.item.title), ["flour", "butter"])
+        expectNoDifference(
+          rows.flatMap(\.sources).map(\.ingredientLineID),
+          [flourLineID, butterLineID].map(Optional.some)
+        )
+        expectNoDifference(rows.flatMap(\.sources).contains { $0.ingredientLineID == sugarLineID }, false)
+      }
+    }
+  }
+}
+
+extension RecipeCoreTests {
+  @Suite
   struct GrocerySourceRemovalTests {
     @Test
     func deletingSourceFromConsolidatedItemRecalculatesQuantity() throws {

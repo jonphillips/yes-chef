@@ -486,6 +486,151 @@ struct GroceryItemEditorView: View {
   }
 }
 
+struct GroceryIngredientSelectionView: View {
+  @Environment(\.dismiss) private var dismiss
+  @State private var selectedIngredientLineIDs: Set<IngredientLine.ID>
+
+  let model: GroceryLibraryModel
+  let context: GroceryIngredientSelectionContext
+  let choices: [GroceryIngredientChoice]
+  let mealRows: [MealPlanItemRowData]
+
+  init(
+    model: GroceryLibraryModel,
+    context: GroceryIngredientSelectionContext,
+    choices: [GroceryIngredientChoice],
+    mealRows: [MealPlanItemRowData]
+  ) {
+    self.model = model
+    self.context = context
+    self.choices = choices
+    self.mealRows = mealRows
+    _selectedIngredientLineIDs = State(initialValue: Set(choices.map(\.line.id)))
+  }
+
+  private var isAddDisabled: Bool {
+    selectedIngredientLineIDs.isEmpty
+  }
+
+  var body: some View {
+    List {
+      if choices.isEmpty {
+        Section {
+          ContentUnavailableView("No Shoppable Ingredients", systemImage: "basket")
+            .frame(maxWidth: .infinity, minHeight: 220)
+        }
+      } else {
+        ForEach(choices) { choice in
+          Button {
+            toggle(choice.line.id)
+          } label: {
+            GroceryIngredientChoiceRow(
+              choice: choice,
+              isSelected: selectedIngredientLineIDs.contains(choice.line.id),
+              showsRecipeTitle: showsRecipeTitle
+            )
+          }
+          .buttonStyle(.plain)
+        }
+      }
+    }
+    .navigationTitle(context.title)
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .cancellationAction) {
+        Button("Cancel") {
+          dismiss()
+        }
+      }
+      ToolbarItem(placement: .confirmationAction) {
+        Button("Add") {
+          if model.confirmIngredientSelectionButtonTapped(
+            context: context,
+            selectedIngredientLineIDs: selectedIngredientLineIDs,
+            mealRows: mealRows
+          ) {
+            dismiss()
+          }
+        }
+        .disabled(isAddDisabled)
+      }
+      if !choices.isEmpty {
+        ToolbarItem(placement: .secondaryAction) {
+          Button(selectionToggleTitle) {
+            selectionToggleButtonTapped()
+          }
+        }
+      }
+    }
+  }
+
+  private var showsRecipeTitle: Bool {
+    Set(choices.map(\.recipe.id)).count > 1
+  }
+
+  private var selectionToggleTitle: String {
+    selectedIngredientLineIDs.count == choices.count ? "Clear" : "All"
+  }
+
+  private func toggle(_ lineID: IngredientLine.ID) {
+    if selectedIngredientLineIDs.contains(lineID) {
+      selectedIngredientLineIDs.remove(lineID)
+    } else {
+      selectedIngredientLineIDs.insert(lineID)
+    }
+  }
+
+  private func selectionToggleButtonTapped() {
+    if selectedIngredientLineIDs.count == choices.count {
+      selectedIngredientLineIDs.removeAll()
+    } else {
+      selectedIngredientLineIDs = Set(choices.map(\.line.id))
+    }
+  }
+}
+
+private struct GroceryIngredientChoiceRow: View {
+  let choice: GroceryIngredientChoice
+  var isSelected: Bool
+  var showsRecipeTitle: Bool
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 12) {
+      Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+        .font(.title3)
+        .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+        .frame(width: 28, height: 28)
+
+      VStack(alignment: .leading, spacing: 4) {
+        Text(choice.line.originalText)
+          .foregroundStyle(.primary)
+
+        if let detailText {
+          Text(detailText)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+    }
+    .padding(.vertical, 4)
+  }
+
+  private var detailText: String? {
+    var parts: [String] = []
+    if showsRecipeTitle {
+      parts.append(choice.recipe.title)
+    }
+    if let sectionName = choice.section.name?.nonEmptyGroceryViewText {
+      parts.append(sectionName)
+    }
+    if let item = choice.line.item?.nonEmptyGroceryViewText,
+       item != choice.line.originalText {
+      parts.append(item)
+    }
+    return parts.joined(separator: " · ").nonEmptyGroceryViewText
+  }
+}
+
 private extension String {
   var nonEmptyGroceryViewText: String? {
     let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
