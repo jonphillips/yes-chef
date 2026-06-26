@@ -14,6 +14,7 @@ final class GroceryLibraryModel {
   enum Destination {
     case addCustomItem
     case addList
+    case selectIngredients(GroceryIngredientSelectionContext)
   }
 
   @ObservationIgnored
@@ -28,6 +29,10 @@ final class GroceryLibraryModel {
   @Fetch(GroceryItemListRequest(), animation: .default) var itemRows: [GroceryItemRowData] = []
   @ObservationIgnored
   @Fetch(MenuListRequest(), animation: .default) var menuRows: [MenuRowData] = []
+  @ObservationIgnored
+  @Fetch(GroceryIngredientChoiceRequest(), animation: .default) var ingredientChoices: [GroceryIngredientChoice] = []
+  @ObservationIgnored
+  @Fetch(GroceryMenuRecipeItemRequest(), animation: .default) var menuRecipeItems: [GroceryMenuRecipeItem] = []
 
   var destination: Destination?
   var selectedListID: CoreGroceryList.ID?
@@ -199,6 +204,63 @@ final class GroceryLibraryModel {
   }
 
   func addSelectedMealRowsButtonTapped(_ rows: [MealPlanItemRowData]) {
+    selectMealRowsButtonTapped(rows)
+  }
+
+  func selectMealRowsButtonTapped(_ rows: [MealPlanItemRowData]) {
+    let recipeRows = rows.filter { $0.item.kind == .recipe && $0.item.recipeID != nil }
+    guard !recipeRows.isEmpty else { return }
+    let date = recipeRows.first?.item.scheduledDate
+    destination = .selectIngredients(
+      GroceryIngredientSelectionContext(
+        source: .mealPlanRows(recipeRows.map(\.item.id)),
+        title: date?.formatted(.dateTime.month(.abbreviated).day()) ?? "Meal Plan",
+        subtitle: "Meal Calendar"
+      )
+    )
+  }
+
+  func selectMenuButtonTapped(menuID: CoreMenu.ID) {
+    guard let menu = menuRows.first(where: { $0.menu.id == menuID })?.menu else { return }
+    destination = .selectIngredients(
+      GroceryIngredientSelectionContext(
+        source: .menu(menu.id),
+        title: menu.title,
+        subtitle: "Menu"
+      )
+    )
+  }
+
+  func selectRecipeButtonTapped(recipeID: Recipe.ID) {
+    let title = ingredientChoices.first { $0.recipe.id == recipeID }?.recipe.title ?? "Recipe"
+    destination = .selectIngredients(
+      GroceryIngredientSelectionContext(
+        source: .recipe(recipeID),
+        title: title,
+        subtitle: "Recipe"
+      )
+    )
+  }
+
+  func ingredientChoices(
+    for context: GroceryIngredientSelectionContext,
+    mealRows: [MealPlanItemRowData]
+  ) -> [GroceryIngredientChoice] {
+    let recipeIDs = recipeIDs(for: context, mealRows: mealRows)
+    return ingredientChoices.filter { recipeIDs.contains($0.recipe.id) }
+  }
+
+  func confirmIngredientSelectionButtonTapped(
+    context: GroceryIngredientSelectionContext,
+    selectedIngredientLineIDs: Set<IngredientLine.ID>,
+    mealRows: [MealPlanItemRowData]
+  ) -> Bool {
+    guard !selectedIngredientLineIDs.isEmpty else {
+      errorMessage = "Select at least one ingredient."
+      isShowingError = true
+      return false
+    }
+
     do {
       let selectedListID = selectedListID
       let listID = try database.write { db in
@@ -208,23 +270,55 @@ final class GroceryLibraryModel {
           now: now,
           uuid: { uuid() }
         )
-        try GroceryRepository.addMealPlanRows(
-          rows,
-          groceryListID: listID,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
+        switch context.source {
+        case let .recipe(recipeID):
+          try GroceryRepository.addRecipe(
+            recipeID: recipeID,
+            groceryListID: listID,
+            in: db,
+            now: now,
+            uuid: { uuid() },
+            includedIngredientLineIDs: selectedIngredientLineIDs
+          )
+
+        case let .mealPlanRows(itemIDs):
+          let rows = mealRows.filter { itemIDs.contains($0.item.id) }
+          try GroceryRepository.addMealPlanRows(
+            rows,
+            groceryListID: listID,
+            in: db,
+            now: now,
+            uuid: { uuid() },
+            includedIngredientLineIDs: selectedIngredientLineIDs
+          )
+
+        case let .menu(menuID):
+          try GroceryRepository.addMenu(
+            menuID: menuID,
+            groceryListID: listID,
+            in: db,
+            now: now,
+            uuid: { uuid() },
+            includedIngredientLineIDs: selectedIngredientLineIDs
+          )
+        }
         return listID
       }
       self.selectedListID = listID
+      destination = nil
+      return true
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
+      return false
     }
   }
 
   func addMenuButtonTapped(menuID: CoreMenu.ID) {
+    selectMenuButtonTapped(menuID: menuID)
+  }
+
+  func addMenuImmediately(menuID: CoreMenu.ID) {
     do {
       let selectedListID = selectedListID
       let listID = try database.write { db in
@@ -251,6 +345,10 @@ final class GroceryLibraryModel {
   }
 
   func addRecipeButtonTapped(recipeID: Recipe.ID) {
+    selectRecipeButtonTapped(recipeID: recipeID)
+  }
+
+  func addRecipeImmediately(recipeID: Recipe.ID) {
     do {
       let selectedListID = selectedListID
       let listID = try database.write { db in
@@ -275,6 +373,42 @@ final class GroceryLibraryModel {
       isShowingError = true
     }
   }
+
+  private func recipeIDs(
+    for context: GroceryIngredientSelectionContext,
+    mealRows: [MealPlanItemRowData]
+  ) -> Set<Recipe.ID> {
+    switch context.source {
+    case let .recipe(recipeID):
+      return [recipeID]
+
+    case let .mealPlanRows(itemIDs):
+      return Set(
+        mealRows
+          .filter { itemIDs.contains($0.item.id) }
+          .compactMap(\.item.recipeID)
+      )
+
+    case let .menu(menuID):
+      return Set(
+        menuRecipeItems
+          .filter { $0.item.menuID == menuID }
+          .map(\.recipe.id)
+      )
+    }
+  }
+}
+
+struct GroceryIngredientSelectionContext: Hashable, Sendable {
+  enum Source: Hashable, Sendable {
+    case recipe(Recipe.ID)
+    case mealPlanRows([MealPlanItem.ID])
+    case menu(CoreMenu.ID)
+  }
+
+  var source: Source
+  var title: String
+  var subtitle: String?
 }
 
 private func selectedOrDefaultGroceryListID(

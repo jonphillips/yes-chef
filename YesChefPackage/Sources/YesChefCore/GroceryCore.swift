@@ -27,6 +27,32 @@ public struct GroceryListRowData: Identifiable, Equatable, Sendable {
   public var id: GroceryList.ID { list.id }
 }
 
+public struct GroceryIngredientChoice: Identifiable, Equatable, Sendable {
+  public var recipe: Recipe
+  public var section: IngredientSection
+  public var line: IngredientLine
+
+  public init(recipe: Recipe, section: IngredientSection, line: IngredientLine) {
+    self.recipe = recipe
+    self.section = section
+    self.line = line
+  }
+
+  public var id: IngredientLine.ID { line.id }
+}
+
+public struct GroceryMenuRecipeItem: Identifiable, Equatable, Sendable {
+  public var item: MenuItem
+  public var recipe: Recipe
+
+  public init(item: MenuItem, recipe: Recipe) {
+    self.item = item
+    self.recipe = recipe
+  }
+
+  public var id: MenuItem.ID { item.id }
+}
+
 public struct GroceryListRequest: FetchKeyRequest {
   public init() {}
 
@@ -61,6 +87,43 @@ public struct GroceryItemListRequest: FetchKeyRequest {
         )
       }
       .sorted(by: areGroceryItemRowsInIncreasingOrder)
+  }
+}
+
+public struct GroceryIngredientChoiceRequest: FetchKeyRequest {
+  public init() {}
+
+  public func fetch(_ db: Database) throws -> [GroceryIngredientChoice] {
+    let recipesByID = Dictionary(uniqueKeysWithValues: try Recipe.fetchAll(db).map { ($0.id, $0) })
+    let sectionsByID = Dictionary(uniqueKeysWithValues: try IngredientSection.fetchAll(db).map { ($0.id, $0) })
+
+    return try IngredientLine.fetchAll(db)
+      .filter(\.isShoppableForGroceries)
+      .compactMap { line in
+        guard let recipe = recipesByID[line.recipeID],
+              let section = sectionsByID[line.sectionID]
+        else { return nil }
+        return GroceryIngredientChoice(recipe: recipe, section: section, line: line)
+      }
+      .sorted(by: areGroceryIngredientChoicesInIncreasingOrder)
+  }
+}
+
+public struct GroceryMenuRecipeItemRequest: FetchKeyRequest {
+  public init() {}
+
+  public func fetch(_ db: Database) throws -> [GroceryMenuRecipeItem] {
+    let recipesByID = Dictionary(uniqueKeysWithValues: try Recipe.fetchAll(db).map { ($0.id, $0) })
+
+    return try MenuItem.fetchAll(db)
+      .compactMap { item in
+        guard item.kind == .recipe,
+              let recipeID = item.recipeID,
+              let recipe = recipesByID[recipeID]
+        else { return nil }
+        return GroceryMenuRecipeItem(item: item, recipe: recipe)
+      }
+      .sorted(by: areGroceryMenuRecipeItemsInIncreasingOrder)
   }
 }
 
@@ -231,7 +294,8 @@ public enum GroceryRepository {
     groceryListID: GroceryList.ID,
     in db: Database,
     now: Date,
-    uuid: () -> UUID
+    uuid: () -> UUID,
+    includedIngredientLineIDs: Set<IngredientLine.ID>? = nil
   ) throws -> [GroceryItem.ID] {
     _ = try requireList(groceryListID, in: db)
     let recipe = try requireRecipe(recipeID, in: db)
@@ -245,7 +309,8 @@ public enum GroceryRepository {
       ),
       in: db,
       now: now,
-      uuid: uuid
+      uuid: uuid,
+      includedIngredientLineIDs: includedIngredientLineIDs
     )
   }
 
@@ -255,7 +320,8 @@ public enum GroceryRepository {
     groceryListID: GroceryList.ID,
     in db: Database,
     now: Date,
-    uuid: () -> UUID
+    uuid: () -> UUID,
+    includedIngredientLineIDs: Set<IngredientLine.ID>? = nil
   ) throws -> [GroceryItem.ID] {
     _ = try requireList(groceryListID, in: db)
     let item = try requireMealPlanItem(itemID, in: db)
@@ -277,7 +343,8 @@ public enum GroceryRepository {
       ),
       in: db,
       now: now,
-      uuid: uuid
+      uuid: uuid,
+      includedIngredientLineIDs: includedIngredientLineIDs
     )
   }
 
@@ -287,7 +354,8 @@ public enum GroceryRepository {
     groceryListID: GroceryList.ID,
     in db: Database,
     now: Date,
-    uuid: () -> UUID
+    uuid: () -> UUID,
+    includedIngredientLineIDs: Set<IngredientLine.ID>? = nil
   ) throws -> [GroceryItem.ID] {
     _ = try requireList(groceryListID, in: db)
 
@@ -329,7 +397,8 @@ public enum GroceryRepository {
           source: source,
           in: db,
           now: now,
-          uuid: uuid
+          uuid: uuid,
+          includedIngredientLineIDs: includedIngredientLineIDs
         )
       } catch GroceryRepositoryError.noShoppableIngredients {
         continue
@@ -348,7 +417,8 @@ public enum GroceryRepository {
     groceryListID: GroceryList.ID,
     in db: Database,
     now: Date,
-    uuid: () -> UUID
+    uuid: () -> UUID,
+    includedIngredientLineIDs: Set<IngredientLine.ID>? = nil
   ) throws -> [GroceryItem.ID] {
     _ = try requireList(groceryListID, in: db)
     let menu = try requireMenu(menuID, in: db)
@@ -376,7 +446,8 @@ public enum GroceryRepository {
           ),
           in: db,
           now: now,
-          uuid: uuid
+          uuid: uuid,
+          includedIngredientLineIDs: includedIngredientLineIDs
         )
       } catch GroceryRepositoryError.noShoppableIngredients {
         continue
@@ -395,7 +466,8 @@ public enum GroceryRepository {
     groceryListID: GroceryList.ID,
     in db: Database,
     now: Date,
-    uuid: () -> UUID
+    uuid: () -> UUID,
+    includedIngredientLineIDs: Set<IngredientLine.ID>? = nil
   ) throws -> [GroceryItem.ID] {
     _ = try requireList(groceryListID, in: db)
     let placement = try requireMenuPlacement(placementID, in: db)
@@ -432,7 +504,8 @@ public enum GroceryRepository {
           ),
           in: db,
           now: now,
-          uuid: uuid
+          uuid: uuid,
+          includedIngredientLineIDs: includedIngredientLineIDs
         )
       } catch GroceryRepositoryError.noShoppableIngredients {
         continue
@@ -451,7 +524,8 @@ public enum GroceryRepository {
     source: GroceryItemSourceDraft,
     in db: Database,
     now: Date,
-    uuid: () -> UUID
+    uuid: () -> UUID,
+    includedIngredientLineIDs: Set<IngredientLine.ID>? = nil
   ) throws -> [GroceryItem.ID] {
     let sectionsByID = Dictionary(uniqueKeysWithValues: try IngredientSection
       .where { $0.recipeID.eq(recipe.id) }
@@ -460,7 +534,10 @@ public enum GroceryRepository {
     let lines = try IngredientLine
       .where { $0.recipeID.eq(recipe.id) }
       .fetchAll(db)
-      .filter(\.isShoppable)
+      .filter(\.isShoppableForGroceries)
+      .filter { line in
+        includedIngredientLineIDs?.contains(line.id) ?? true
+      }
       .sorted { lhs, rhs in
         let lhsSectionSort = sectionsByID[lhs.sectionID]?.sortOrder ?? 0
         let rhsSectionSort = sectionsByID[rhs.sectionID]?.sortOrder ?? 0
@@ -831,6 +908,42 @@ private func areGroceryItemSourcesInIncreasingOrder(
   return lhs.id.uuidString < rhs.id.uuidString
 }
 
+private func areGroceryIngredientChoicesInIncreasingOrder(
+  _ lhs: GroceryIngredientChoice,
+  _ rhs: GroceryIngredientChoice
+) -> Bool {
+  let recipeComparison = lhs.recipe.title.localizedStandardCompare(rhs.recipe.title)
+  if recipeComparison != .orderedSame {
+    return recipeComparison == .orderedAscending
+  }
+  if lhs.section.sortOrder != rhs.section.sortOrder {
+    return lhs.section.sortOrder < rhs.section.sortOrder
+  }
+  if lhs.line.sortOrder != rhs.line.sortOrder {
+    return lhs.line.sortOrder < rhs.line.sortOrder
+  }
+  return lhs.line.id.uuidString < rhs.line.id.uuidString
+}
+
+private func areGroceryMenuRecipeItemsInIncreasingOrder(
+  _ lhs: GroceryMenuRecipeItem,
+  _ rhs: GroceryMenuRecipeItem
+) -> Bool {
+  if lhs.item.menuID != rhs.item.menuID {
+    return lhs.item.menuID.uuidString < rhs.item.menuID.uuidString
+  }
+  if lhs.item.dayOffset != rhs.item.dayOffset {
+    return lhs.item.dayOffset < rhs.item.dayOffset
+  }
+  if lhs.item.mealSlot.sortOrder != rhs.item.mealSlot.sortOrder {
+    return lhs.item.mealSlot.sortOrder < rhs.item.mealSlot.sortOrder
+  }
+  if lhs.item.sortOrder != rhs.item.sortOrder {
+    return lhs.item.sortOrder < rhs.item.sortOrder
+  }
+  return lhs.recipe.title.localizedStandardCompare(rhs.recipe.title) == .orderedAscending
+}
+
 private func areMenuItemsInIncreasingOrder(_ lhs: MenuItem, _ rhs: MenuItem) -> Bool {
   if lhs.dayOffset != rhs.dayOffset {
     return lhs.dayOffset < rhs.dayOffset
@@ -859,11 +972,13 @@ private extension GroceryItem {
   }
 }
 
-private extension IngredientLine {
-  var isShoppable: Bool {
+public extension IngredientLine {
+  var isShoppableForGroceries: Bool {
     !doNotShop && !isHeader && !originalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
+}
 
+private extension IngredientLine {
   var groceryItemTitle: String {
     item?.nonEmptyGroceryText ?? originalText
   }
