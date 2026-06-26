@@ -526,11 +526,18 @@ Generate a usable shopping list from recipes.
 - Add selected ingredients from a recipe.
 - Manually add shopping items.
 - Check off items.
-- Group items by category.
+- Group items by shopping category/location. Treat Grocy-style "assortments" as
+  useful inspiration for store-order grouping, but keep Yes Chef recipe-first and
+  local-first rather than inventory/ERP-first.
 - Preserve source recipe references.
 - Combine obvious like items where possible.
 - Allow user to edit combined items manually.
+- Support lightweight pantry assumptions: staples such as soy sauce, kosher salt,
+  olive oil, flour, or black pepper may be skipped by default and shown in a
+  reviewable "skipped pantry staples" section.
 - Do not over-normalize if uncertain.
+- Do not require quantity-based pantry tracking. The user should not need to log
+  every use of a condiment just to keep grocery generation useful.
 
 ### Examples
 
@@ -549,6 +556,14 @@ If two recipes include:
 - cilantro, for garnish
 
 The app should preserve ambiguity or ask user rather than confidently combining.
+
+If a recipe includes:
+
+- 2 tablespoons soy sauce
+
+and soy sauce is marked as a pantry staple, the app should skip it from the main
+shopping list by default, while making the skipped item easy to review and add back
+if the user is out.
 
 ## 8. MVP 4: Meal Planning
 
@@ -899,8 +914,12 @@ first build.
 
 - Add recipe ingredients to list.
 - Check off items.
-- Group items.
-- Basic combining.
+- Group items by shopping category/location.
+- Basic source-preserving combining.
+- Show skipped pantry staples separately from the main shopping list.
+- Allow one-tap "add anyway" for skipped pantry staples.
+- Defer quantity-based pantry inventory, expiration tracking, minimum-stock rules,
+  and automatic replenishment.
 
 ### Milestone 5: Meal Planning
 
@@ -909,6 +928,8 @@ first build.
 - Past dated meal entries update/derive `Recipe.lastCookedAt` and related cooking
   memory, replacing any manual "mark cooked" workflow.
 - Generate grocery list from plan.
+- Apply the same pantry assumptions and source-preserving grocery generation used
+  for recipe-level shopping.
 
 ### Milestone 6: Send a Recipe (Phase 1 transfer)
 

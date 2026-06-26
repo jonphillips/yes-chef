@@ -582,6 +582,139 @@ extension RecipeCoreTests {
   }
 }
 
+extension RecipeCoreTests {
+  @Suite
+  struct GrocerySourceRemovalTests {
+    @Test
+    func deletingSourceFromConsolidatedItemRecalculatesQuantity() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 805_255_000)
+      let modifiedAt = Date(timeIntervalSinceReferenceDate: 805_256_000)
+      let firstRecipeID = SampleUUIDSequence.uuid(17_201)
+      let firstSectionID = SampleUUIDSequence.uuid(17_202)
+      let firstMilkLineID = SampleUUIDSequence.uuid(17_203)
+      let secondRecipeID = SampleUUIDSequence.uuid(17_204)
+      let secondSectionID = SampleUUIDSequence.uuid(17_205)
+      let secondMilkLineID = SampleUUIDSequence.uuid(17_206)
+      var uuids = SampleUUIDSequence(start: 17_300)
+
+      try database.write { db in
+        let listID = try GroceryRepository.ensureDefaultList(
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        try insertRecipeFixture(
+          recipeID: firstRecipeID,
+          sectionID: firstSectionID,
+          title: "Pancakes",
+          lines: [
+            IngredientLine(
+              id: firstMilkLineID,
+              recipeID: firstRecipeID,
+              sectionID: firstSectionID,
+              originalText: "2 cups milk",
+              quantity: 2,
+              quantityText: "2",
+              unit: "cups",
+              item: "milk",
+              shoppingCategory: "Dairy",
+              sortOrder: 0,
+              confidence: .medium
+            )
+          ],
+          now: now,
+          in: db
+        )
+        try insertRecipeFixture(
+          recipeID: secondRecipeID,
+          sectionID: secondSectionID,
+          title: "Waffles",
+          lines: [
+            IngredientLine(
+              id: secondMilkLineID,
+              recipeID: secondRecipeID,
+              sectionID: secondSectionID,
+              originalText: "1.5 cups milk",
+              quantity: 1.5,
+              quantityText: "1.5",
+              unit: "cups",
+              item: "milk",
+              shoppingCategory: "Dairy",
+              sortOrder: 0,
+              confidence: .medium
+            )
+          ],
+          now: now,
+          in: db
+        )
+
+        _ = try GroceryRepository.addRecipe(
+          recipeID: firstRecipeID,
+          groceryListID: listID,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        _ = try GroceryRepository.addRecipe(
+          recipeID: secondRecipeID,
+          groceryListID: listID,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        let consolidatedRow = try #require(
+          try GroceryItemListRequest().fetch(db).first { $0.item.title == "milk" }
+        )
+        let wafflesSource = try #require(consolidatedRow.sources.first { $0.recipeID == secondRecipeID })
+        try GroceryRepository.deleteSource(sourceID: wafflesSource.id, in: db, now: modifiedAt)
+
+        let updatedRow = try #require(
+          try GroceryItemListRequest().fetch(db).first { $0.id == consolidatedRow.id }
+        )
+        expectNoDifference(updatedRow.item.quantity, 2)
+        expectNoDifference(updatedRow.item.quantityText, "2")
+        expectNoDifference(updatedRow.item.dateModified, modifiedAt)
+        expectNoDifference(updatedRow.sources.map(\.recipeID), [firstRecipeID].map(Optional.some))
+        expectNoDifference(updatedRow.sources.map(\.ingredientLineID), [firstMilkLineID].map(Optional.some))
+        expectNoDifference(try GroceryItemSource.find(wafflesSource.id).fetchOne(db), nil)
+      }
+    }
+
+    @Test
+    func deletingLastSourceDeletesItem() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 805_257_000)
+      var uuids = SampleUUIDSequence(start: 17_400)
+
+      try database.write { db in
+        let listID = try GroceryRepository.ensureDefaultList(
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let itemID = try GroceryRepository.addCustomItem(
+          title: "Sparkling water",
+          quantityText: "12 cans",
+          groceryListID: listID,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        let row = try #require(try GroceryItemListRequest().fetch(db).first { $0.id == itemID })
+        let source = try #require(row.sources.first)
+        try GroceryRepository.deleteSource(sourceID: source.id, in: db, now: now)
+
+        expectNoDifference(try GroceryItem.find(itemID).fetchOne(db), nil)
+        expectNoDifference(try GroceryItemSource.find(source.id).fetchOne(db), nil)
+        expectNoDifference(try GroceryListRequest().fetch(db).first { $0.id == listID }?.itemCount, 0)
+      }
+    }
+  }
+}
+
 private func insertRecipeFixture(
   recipeID: Recipe.ID,
   sectionID: IngredientSection.ID,

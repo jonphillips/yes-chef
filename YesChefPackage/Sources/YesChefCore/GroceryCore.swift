@@ -187,6 +187,38 @@ public enum GroceryRepository {
     try GroceryItem.find(itemID).delete().execute(db)
   }
 
+  public static func deleteSource(
+    sourceID: GroceryItemSource.ID,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard let source = try GroceryItemSource.find(sourceID).fetchOne(db) else {
+      throw GroceryRepositoryError.sourceNotFound(sourceID)
+    }
+    guard var item = try GroceryItem.find(source.groceryItemID).fetchOne(db) else {
+      throw GroceryRepositoryError.itemNotFound(source.groceryItemID)
+    }
+
+    try GroceryItemSource.find(sourceID).delete().execute(db)
+
+    let remainingSources = try GroceryItemSource
+      .where { $0.groceryItemID.eq(item.id) }
+      .fetchAll(db)
+      .sorted(by: areGroceryItemSourcesInIncreasingOrder)
+
+    guard !remainingSources.isEmpty else {
+      try GroceryItem.find(item.id).delete().execute(db)
+      return
+    }
+
+    if let recalculatedQuantity = try generatedQuantity(for: remainingSources, in: db) {
+      item.quantity = recalculatedQuantity
+      item.quantityText = formatGroceryQuantity(recalculatedQuantity)
+    }
+    item.dateModified = now
+    try GroceryItem.upsert { item }.execute(db)
+  }
+
   @discardableResult
   public static func addRecipe(
     recipeID: Recipe.ID,
@@ -624,6 +656,7 @@ public enum GroceryRepositoryError: Error, Equatable, Sendable {
   case menuPlacementNotFound(MenuPlacement.ID)
   case noShoppableIngredients
   case recipeNotFound(Recipe.ID)
+  case sourceNotFound(GroceryItemSource.ID)
 }
 
 private struct GroceryItemSourceDraft {
@@ -784,6 +817,23 @@ private func canCombineQuantity(
 private func combinedQuantity(_ lhs: Double?, _ rhs: Double?) -> Double? {
   guard let lhs, let rhs else { return nil }
   return lhs + rhs
+}
+
+private func generatedQuantity(
+  for sources: [GroceryItemSource],
+  in db: Database
+) throws -> Double? {
+  var quantity: Double?
+  for source in sources {
+    guard let lineID = source.ingredientLineID,
+          let line = try IngredientLine.find(lineID).fetchOne(db),
+          let lineQuantity = line.quantity
+    else {
+      return nil
+    }
+    quantity = (quantity ?? 0) + lineQuantity
+  }
+  return quantity
 }
 
 private func formatGroceryQuantity(_ quantity: Double) -> String {
