@@ -36,8 +36,11 @@ Implemented behavior:
 - A minimal Groceries section in the app shell supports list creation, custom
   items, purchased state, add-from-calendar-range, add-menu, and add-recipe
   flows.
-- Recipe detail has a `Shop` toolbar button that opens a shoppable-ingredient
-  review sheet before adding selected lines to the selected/default grocery list.
+- Recipe detail groups the `Plan` and `Groceries` actions in the toolbar, and the
+  groceries action opens a shoppable-ingredient review sheet before adding
+  selected lines to the selected/default grocery list.
+- Recipe detail shows the `Start Cooking` flame action in the recipe body near
+  servings/time instead of in the toolbar.
 - Generated grocery ingredients consolidate conservatively when title, unit,
   aisle, notes, and quantity shape are compatible. Compatible numeric quantities
   are added together, while each contributing origin remains represented as its
@@ -53,8 +56,19 @@ Implemented behavior:
   shoppable lines start selected, and the repository can restrict generation to
   selected `IngredientLine` IDs while preserving source provenance and
   consolidation behavior.
+- The ingredient-selection sheet now applies conservative pantry assumptions:
+  likely staples such as salt, pepper, water, ice, common cooking oils, and
+  cooking spray remain visible in a "Skipped Pantry Staples" review section but
+  start deselected and can be added back with a tap.
+- Settings exposes an editable Pantry list backed by app storage; one item per
+  line controls which pantry staples are skipped by default in grocery selection.
+- The meal-calendar recipe picker supports adding multiple recipes in one save.
+- Ingredient parsing avoids treating food words like red/celery/anchovy as units,
+  splits comma preparations into notes, and normalizes anchovy fillets into the
+  shoppable title "anchovies".
 - Core tests cover meal calendar, menus, grocery source provenance, and generated
-  grocery consolidation/source-removal/ingredient-selection behavior.
+  grocery consolidation/source-removal/ingredient-selection/pantry-assumption/
+  ingredient-parsing behavior.
 
 Deferred from this slice:
 
@@ -65,7 +79,7 @@ Deferred from this slice:
   duplicating menus.
 - Higher-level source-aware grocery removal flows, such as removing a recipe's
   full contribution from a grocery list without deleting unrelated sources.
-- Pantry assumptions and reviewable skipped staples.
+- Quantity-based pantry inventory.
 - Reminders/Siri integration, store/category learning, and shopping workflow
   polish.
 - Importing Paprika menus or grocery lists from backup/export data, if that data
@@ -98,9 +112,9 @@ Suggested next scope:
   actions too subtle or too noisy.
 - Broaden source-aware removal from the current per-source action into higher-level
   "remove this recipe/menu/calendar contribution" flows where useful.
-- Add lightweight pantry assumptions: staples can be skipped by default, shown in
-  a "skipped pantry staples" review section, and added back with one tap. Do not
-  build quantity-based pantry inventory as part of this slice.
+- Continue pantry polish if Jon's UI pass finds the conservative staple list too
+  narrow or too aggressive. Do not build quantity-based pantry inventory as part
+  of this slice.
 - Treat Grocy as inspiration for shopping locations/assortments and product/barcode
   workflows, but keep Yes Chef recipe/planning-first rather than inventory-first.
 - Revisit drag/drop from recipe rows into either the calendar, a menu, or
@@ -118,5 +132,5 @@ Reasoning:
 - Source-aware removal is the next pressure test for consolidation because a
   single row may contain quantities from several recipes, menu placements, and
   calendar items.
-- Pantry value comes first from suppressing known staples and making skipped items
-  reviewable, not from tracking exact on-hand quantities.
+- Pantry value comes first from making skipped known staples reviewable and easy
+  to add back, not from tracking exact on-hand quantities.
