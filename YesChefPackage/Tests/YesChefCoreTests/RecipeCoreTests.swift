@@ -27,7 +27,32 @@ struct RecipeCoreTests {
 
     expectNoDifference(lines.map(\.quantity), [2, nil])
     expectNoDifference(lines.map(\.unit), ["tablespoons", nil])
-    expectNoDifference(lines.map(\.item), ["soy sauce", "Kosher salt, to taste"])
+    expectNoDifference(lines.map(\.item), ["soy sauce", "Kosher salt"])
+    expectNoDifference(lines.map(\.preparation), [nil, "to taste"])
+  }
+
+  @Test
+  func ingredientParserDoesNotTreatFoodWordsAsUnits() {
+    let recipeID = SampleUUIDSequence.uuid(11)
+    let sectionID = SampleUUIDSequence.uuid(12)
+    var uuids = SampleUUIDSequence(start: 13)
+
+    let lines = IngredientParser.lines(
+      from: """
+      4 anchovy fillets, minced
+      1/2 red onion, thinly sliced
+      2 celery ribs, sliced
+      """,
+      recipeID: recipeID,
+      sectionID: sectionID,
+      uuid: { uuids.next() }
+    )
+
+    expectNoDifference(lines.map(\.quantity), [4, 0.5, 2])
+    expectNoDifference(lines.map(\.quantityText), ["4", "1/2", "2"])
+    expectNoDifference(lines.map(\.unit), [nil, nil, nil])
+    expectNoDifference(lines.map(\.item), ["anchovy fillets", "red onion", "celery ribs"])
+    expectNoDifference(lines.map(\.preparation), ["minced", "thinly sliced", "sliced"])
   }
 
   @Test
@@ -57,6 +82,20 @@ struct RecipeCoreTests {
 
     expectNoDifference(IngredientScaler.scaledText(for: parsed, factor: 2), "4 tablespoons soy sauce")
     expectNoDifference(IngredientScaler.scaledText(for: unparsed, factor: 2), "Kosher salt, to taste")
+
+    let unitless = IngredientLine(
+      id: SampleUUIDSequence.uuid(5),
+      recipeID: recipeID,
+      sectionID: sectionID,
+      originalText: "1/2 red onion, thinly sliced",
+      quantity: 0.5,
+      quantityText: "1/2",
+      item: "red onion",
+      preparation: "thinly sliced",
+      sortOrder: 2,
+      confidence: .medium
+    )
+    expectNoDifference(IngredientScaler.scaledText(for: unitless, factor: 2), "1 red onion")
   }
 
   @Test

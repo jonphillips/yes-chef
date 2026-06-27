@@ -12,6 +12,7 @@ struct AppContainer: View {
   @State private var groceryModel = GroceryLibraryModel()
   @State private var selectedSection: AppSection? = .recipes
   @State private var selectedSettingsPane: SettingsPane? = .categories
+  @AppStorage(GroceryPantryStorage.storageKey) private var pantryText = GroceryPantryStorage.defaultText
 
   var body: some View {
     @Bindable var recipeModel = recipeModel
@@ -67,7 +68,8 @@ struct AppContainer: View {
             for: context,
             mealRows: mealCalendarModel.itemRows
           ),
-          mealRows: mealCalendarModel.itemRows
+          mealRows: mealCalendarModel.itemRows,
+          pantryStaples: GroceryPantryStorage.items(from: pantryText)
         )
       }
     }
@@ -224,7 +226,7 @@ private struct AppMainLayout: View {
       NavigationSplitView {
         AppSidebar(selection: $selectedSection)
       } content: {
-        switch selectedSection ?? .recipes {
+      switch selectedSection ?? .recipes {
         case .recipes:
           RecipeListView(model: recipeModel, style: .selection)
         case .mealCalendar:
@@ -384,6 +386,7 @@ private struct SettingsView: View {
     Form {
       Section("Library") {
         categoryRow
+        pantryRow
       }
 
       Section("Import & Export") {
@@ -421,6 +424,23 @@ private struct SettingsView: View {
       }
     }
   }
+
+  @ViewBuilder private var pantryRow: some View {
+    if let selectedPane {
+      Button {
+        selectedPane.wrappedValue = .pantry
+      } label: {
+        SettingsPane.pantry.label
+      }
+      .foregroundStyle(.primary)
+    } else {
+      NavigationLink {
+        PantrySettingsView()
+      } label: {
+        SettingsPane.pantry.label
+      }
+    }
+  }
 }
 
 private struct SettingsDetailPane: View {
@@ -431,6 +451,10 @@ private struct SettingsDetailPane: View {
     case .categories:
       NavigationStack {
         CategoryManagementView()
+      }
+    case .pantry:
+      NavigationStack {
+        PantrySettingsView()
       }
     case nil:
       ContentUnavailableView("Settings", systemImage: AppSection.settings.systemImage)
@@ -1021,25 +1045,6 @@ private struct RecipeCategoryFilterNode: Identifiable, Equatable {
     guard prefix.count <= components.count else { return false }
     return zip(prefix, components).allSatisfy { pair in
       pair.0 == pair.1
-    }
-  }
-}
-
-private struct RecipeOptionalStringPicker: View {
-  let title: String
-  @Binding var selection: String?
-  let options: [String]
-
-  var body: some View {
-    if !options.isEmpty {
-      Picker(title, selection: $selection) {
-        Text("All")
-          .tag(nil as String?)
-        ForEach(options, id: \.self) { option in
-          Text(option)
-            .tag(option as String?)
-        }
-      }
     }
   }
 }

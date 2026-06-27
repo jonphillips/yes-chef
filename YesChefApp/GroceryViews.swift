@@ -108,7 +108,7 @@ struct GroceryDetailView: View {
 
           if model.selectedItemRows.isEmpty {
             Section {
-              ContentUnavailableView("No Grocery Items", systemImage: "basket")
+              ContentUnavailableView("No Grocery Items", systemImage: "cart")
                 .frame(maxWidth: .infinity, minHeight: 220)
             }
           } else {
@@ -133,7 +133,7 @@ struct GroceryDetailView: View {
             Button {
               model.addCustomItemButtonTapped()
             } label: {
-              Label("Add Item", systemImage: "basket.badge.plus")
+              Label("Add Item", systemImage: "cart.badge.plus")
             }
 
             GrocerySourceMenu(
@@ -152,7 +152,7 @@ struct GroceryDetailView: View {
           }
         }
       } else {
-        ContentUnavailableView("Groceries", systemImage: "basket")
+        ContentUnavailableView("Groceries", systemImage: "cart")
           .navigationTitle("Groceries")
           .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -374,6 +374,51 @@ private extension GroceryItemSource {
   }
 }
 
+struct PantrySettingsView: View {
+  @AppStorage(GroceryPantryStorage.storageKey) private var pantryText = GroceryPantryStorage.defaultText
+
+  var body: some View {
+    Form {
+      Section("Pantry List") {
+        StackedTextEditor(title: "Items", text: $pantryText, minHeight: 260)
+          .textInputAutocapitalization(.never)
+      }
+    }
+    .navigationTitle("Pantry")
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button {
+          pantryText = GroceryPantryStorage.defaultText
+        } label: {
+          Label("Reset", systemImage: "arrow.counterclockwise")
+        }
+      }
+    }
+  }
+}
+
+enum GroceryPantryStorage {
+  static let storageKey = "GroceryPantry.items"
+  static let defaultText = GroceryPantryAssumptions.defaultStaples.joined(separator: "\n")
+
+  static func items(from text: String) -> [String] {
+    var seen: Set<String> = []
+    return text
+      .split(whereSeparator: \.isNewline)
+      .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+      .filter { item in
+        let key = item.folding(
+          options: [.caseInsensitive, .diacriticInsensitive],
+          locale: Locale(identifier: "en_US_POSIX")
+        )
+        guard !seen.contains(key) else { return false }
+        seen.insert(key)
+        return true
+      }
+  }
+}
+
 private struct GroceryListRowView: View {
   let row: GroceryListRowData
 
@@ -382,7 +427,7 @@ private struct GroceryListRowView: View {
       Text(row.list.title)
         .font(.headline)
       HStack(spacing: 10) {
-        Label(itemCountTitle, systemImage: "basket")
+        Label(itemCountTitle, systemImage: "cart")
         if row.remainingItemCount > 0 {
           Label("\(row.remainingItemCount)", systemImage: "circle")
         }
@@ -494,18 +539,27 @@ struct GroceryIngredientSelectionView: View {
   let context: GroceryIngredientSelectionContext
   let choices: [GroceryIngredientChoice]
   let mealRows: [MealPlanItemRowData]
+  let pantryStaples: [String]
 
   init(
     model: GroceryLibraryModel,
     context: GroceryIngredientSelectionContext,
     choices: [GroceryIngredientChoice],
-    mealRows: [MealPlanItemRowData]
+    mealRows: [MealPlanItemRowData],
+    pantryStaples: [String]
   ) {
     self.model = model
     self.context = context
     self.choices = choices
     self.mealRows = mealRows
-    _selectedIngredientLineIDs = State(initialValue: Set(choices.map(\.line.id)))
+    self.pantryStaples = pantryStaples
+    _selectedIngredientLineIDs = State(
+      initialValue: Set(
+        choices
+          .filter { !$0.isAssumedPantryStaple(pantryStaples: pantryStaples) }
+          .map(\.line.id)
+      )
+    )
   }
 
   private var isAddDisabled: Bool {
@@ -516,21 +570,26 @@ struct GroceryIngredientSelectionView: View {
     List {
       if choices.isEmpty {
         Section {
-          ContentUnavailableView("No Shoppable Ingredients", systemImage: "basket")
+          ContentUnavailableView("No Shoppable Ingredients", systemImage: "cart")
             .frame(maxWidth: .infinity, minHeight: 220)
         }
       } else {
-        ForEach(choices) { choice in
-          Button {
-            toggle(choice.line.id)
-          } label: {
-            GroceryIngredientChoiceRow(
-              choice: choice,
-              isSelected: selectedIngredientLineIDs.contains(choice.line.id),
-              showsRecipeTitle: showsRecipeTitle
-            )
-          }
-          .buttonStyle(.plain)
+        if !regularChoices.isEmpty {
+          GroceryIngredientChoiceSection(
+            title: "Ingredients",
+            choices: regularChoices,
+            selectedIngredientLineIDs: $selectedIngredientLineIDs,
+            showsRecipeTitle: showsRecipeTitle
+          )
+        }
+
+        if !pantryStapleChoices.isEmpty {
+          GroceryIngredientChoiceSection(
+            title: "Skipped Pantry Staples",
+            choices: pantryStapleChoices,
+            selectedIngredientLineIDs: $selectedIngredientLineIDs,
+            showsRecipeTitle: showsRecipeTitle
+          )
         }
       }
     }
@@ -568,16 +627,16 @@ struct GroceryIngredientSelectionView: View {
     Set(choices.map(\.recipe.id)).count > 1
   }
 
-  private var selectionToggleTitle: String {
-    selectedIngredientLineIDs.count == choices.count ? "Clear" : "All"
+  private var regularChoices: [GroceryIngredientChoice] {
+    choices.filter { !$0.isAssumedPantryStaple(pantryStaples: pantryStaples) }
   }
 
-  private func toggle(_ lineID: IngredientLine.ID) {
-    if selectedIngredientLineIDs.contains(lineID) {
-      selectedIngredientLineIDs.remove(lineID)
-    } else {
-      selectedIngredientLineIDs.insert(lineID)
-    }
+  private var pantryStapleChoices: [GroceryIngredientChoice] {
+    choices.filter { $0.isAssumedPantryStaple(pantryStaples: pantryStaples) }
+  }
+
+  private var selectionToggleTitle: String {
+    selectedIngredientLineIDs.count == choices.count ? "Clear" : "All"
   }
 
   private func selectionToggleButtonTapped() {
@@ -585,6 +644,38 @@ struct GroceryIngredientSelectionView: View {
       selectedIngredientLineIDs.removeAll()
     } else {
       selectedIngredientLineIDs = Set(choices.map(\.line.id))
+    }
+  }
+}
+
+private struct GroceryIngredientChoiceSection: View {
+  let title: String
+  let choices: [GroceryIngredientChoice]
+  @Binding var selectedIngredientLineIDs: Set<IngredientLine.ID>
+  var showsRecipeTitle: Bool
+
+  var body: some View {
+    Section(title) {
+      ForEach(choices) { choice in
+        Button {
+          toggle(choice.line.id)
+        } label: {
+          GroceryIngredientChoiceRow(
+            choice: choice,
+            isSelected: selectedIngredientLineIDs.contains(choice.line.id),
+            showsRecipeTitle: showsRecipeTitle
+          )
+        }
+        .buttonStyle(.plain)
+      }
+    }
+  }
+
+  private func toggle(_ lineID: IngredientLine.ID) {
+    if selectedIngredientLineIDs.contains(lineID) {
+      selectedIngredientLineIDs.remove(lineID)
+    } else {
+      selectedIngredientLineIDs.insert(lineID)
     }
   }
 }

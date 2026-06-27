@@ -131,6 +131,25 @@ struct RecipeStringFilterPickerView: View {
   }
 }
 
+struct RecipeOptionalStringPicker: View {
+  let title: String
+  @Binding var selection: String?
+  let options: [String]
+
+  var body: some View {
+    if !options.isEmpty {
+      Picker(title, selection: $selection) {
+        Text("All")
+          .tag(nil as String?)
+        ForEach(options, id: \.self) { option in
+          Text(option)
+            .tag(option as String?)
+        }
+      }
+    }
+  }
+}
+
 struct RecipeFilterSelectionRow: View {
   let title: String
   let systemImage: String

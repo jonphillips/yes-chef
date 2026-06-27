@@ -59,6 +59,56 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func addsMultipleRecipeItemsToMealCalendar() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 803_050_000)
+      let scheduledDate = Date(timeIntervalSinceReferenceDate: 803_150_000)
+      let firstRecipeID = SampleUUIDSequence.uuid(5_201)
+      let secondRecipeID = SampleUUIDSequence.uuid(5_202)
+      var uuids = SampleUUIDSequence(start: 5_300)
+
+      try database.write { db in
+        try Recipe.insert {
+          Recipe(
+            id: firstRecipeID,
+            title: "Planner Chicken",
+            dateCreated: now,
+            dateModified: now
+          )
+        }
+        .execute(db)
+        try Recipe.insert {
+          Recipe(
+            id: secondRecipeID,
+            title: "Rice Pilaf",
+            dateCreated: now,
+            dateModified: now
+          )
+        }
+        .execute(db)
+
+        let itemIDs = try MealCalendarRepository.addRecipeItems(
+          recipeIDs: [firstRecipeID, secondRecipeID],
+          on: scheduledDate,
+          mealSlot: .dinner,
+          notes: "Company dinner",
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        let rows = try MealCalendarRequest().fetch(db)
+          .filter { itemIDs.contains($0.item.id) }
+
+        expectNoDifference(rows.map(\.item.id), itemIDs)
+        expectNoDifference(rows.map(\.item.recipeID), [firstRecipeID, secondRecipeID].map(Optional.some))
+        expectNoDifference(rows.map(\.displayTitle), ["Planner Chicken", "Rice Pilaf"])
+        expectNoDifference(rows.map(\.item.notes), ["Company dinner", "Company dinner"])
+        expectNoDifference(rows.map(\.item.sortOrder), [0, 1])
+      }
+    }
+
+    @Test
     func updatesMealCalendarItems() throws {
       @Dependency(\.defaultDatabase) var database
       let createdAt = Date(timeIntervalSinceReferenceDate: 803_600_000)

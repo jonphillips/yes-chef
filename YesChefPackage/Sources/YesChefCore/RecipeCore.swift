@@ -796,85 +796,6 @@ public enum RecipeRepository {
   }
 }
 
-public enum IngredientParser {
-  public static func lines(
-    from text: String,
-    recipeID: Recipe.ID,
-    sectionID: IngredientSection.ID,
-    uuid: () -> UUID
-  ) -> [IngredientLine] {
-    text
-      .split(whereSeparator: \.isNewline)
-      .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-      .filter { !$0.isEmpty }
-      .enumerated()
-      .map { index, text in
-        let parsed = parse(text)
-        return IngredientLine(
-          id: uuid(),
-          recipeID: recipeID,
-          sectionID: sectionID,
-          originalText: text,
-          quantity: parsed.quantity,
-          quantityText: parsed.quantityText,
-          unit: parsed.unit,
-          item: parsed.item,
-          isOptional: text.localizedCaseInsensitiveContains("optional"),
-          doNotShop: Self.doNotShop(text),
-          isHeader: text.hasSuffix(":"),
-          sortOrder: index,
-          confidence: parsed.quantity == nil ? .low : .medium
-        )
-      }
-  }
-
-  public static func parse(_ text: String) -> (quantity: Double?, quantityText: String?, unit: String?, item: String?) {
-    let tokens = text.split(separator: " ").map(String.init)
-    guard let first = tokens.first else { return (nil, nil, nil, nil) }
-
-    if tokens.count >= 2, let whole = Double(first), let fraction = fractionValue(tokens[1]) {
-      let quantityText = "\(first) \(tokens[1])"
-      return (
-        whole + fraction,
-        quantityText,
-        tokens.dropFirst(2).first,
-        tokens.dropFirst(3).joined(separator: " ").nonEmpty
-      )
-    }
-
-    if let quantity = Double(first) ?? fractionValue(first) {
-      return (
-        quantity,
-        first,
-        tokens.dropFirst().first,
-        tokens.dropFirst(2).joined(separator: " ").nonEmpty
-      )
-    }
-
-    return (nil, nil, nil, text)
-  }
-
-  private static func fractionValue(_ text: String) -> Double? {
-    let parts = text.split(separator: "/")
-    guard
-      parts.count == 2,
-      let numerator = Double(parts[0]),
-      let denominator = Double(parts[1]),
-      denominator != 0
-    else { return nil }
-    return numerator / denominator
-  }
-
-  private static func doNotShop(_ text: String) -> Bool {
-    let lowercased = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    return lowercased == "water"
-      || lowercased == "kosher salt"
-      || lowercased == "salt"
-      || lowercased == "freshly ground black pepper"
-      || lowercased == "black pepper"
-  }
-}
-
 public enum InstructionParser {
   public static func steps(
     from text: String,
@@ -903,12 +824,14 @@ public enum IngredientScaler {
   public static func scaledText(for line: IngredientLine, factor: Double) -> String {
     guard
       let quantity = line.quantity,
-      let unit = line.unit,
       let item = line.item,
       factor != 1
     else { return line.originalText }
 
     let scaledQuantity = format(quantity * factor)
+    guard let unit = line.unit else {
+      return "\(scaledQuantity) \(item)"
+    }
     return "\(scaledQuantity) \(pluralized(unit, quantity: quantity * factor)) \(item)"
   }
 

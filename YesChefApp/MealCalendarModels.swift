@@ -188,6 +188,44 @@ final class MealCalendarModel {
     }
   }
 
+  func saveRecipeItemsButtonTapped(
+    recipeIDs: Set<Recipe.ID>,
+    date: Date,
+    mealSlot: MealPlanItemSlot,
+    notes: String
+  ) -> Bool {
+    let orderedRecipeIDs = availableRecipeRows
+      .map(\.recipe.id)
+      .filter { recipeIDs.contains($0) }
+    guard !orderedRecipeIDs.isEmpty else {
+      errorMessage = "Select at least one recipe."
+      isShowingError = true
+      return false
+    }
+
+    do {
+      let scheduledDate = startOfDay(date)
+      _ = try database.write { db in
+        try MealCalendarRepository.addRecipeItems(
+          recipeIDs: orderedRecipeIDs,
+          on: scheduledDate,
+          mealSlot: mealSlot,
+          notes: notes,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+      selectedDate = scheduledDate
+      destination = nil
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
   func saveNoteItemButtonTapped(
     itemID: MealPlanItem.ID? = nil,
     title: String,
