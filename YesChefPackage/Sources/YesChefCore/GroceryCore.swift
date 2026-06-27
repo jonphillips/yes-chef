@@ -39,6 +39,14 @@ public struct GroceryIngredientChoice: Identifiable, Equatable, Sendable {
   }
 
   public var id: IngredientLine.ID { line.id }
+
+  public var isAssumedPantryStaple: Bool {
+    GroceryPantryAssumptions.isPantryStaple(line)
+  }
+
+  public func isAssumedPantryStaple(pantryStaples: [String]) -> Bool {
+    GroceryPantryAssumptions.isPantryStaple(line, pantryStaples: pantryStaples)
+  }
 }
 
 public struct GroceryMenuRecipeItem: Identifiable, Equatable, Sendable {
@@ -277,11 +285,11 @@ public enum GroceryRepository {
       throw GroceryRepositoryError.itemNotFound(source.groceryItemID)
     }
 
-    let contributionKey = source.contributionKey
+    let contributionID = source.contributionID
     let itemsByID = Dictionary(uniqueKeysWithValues: try GroceryItem.fetchAll(db).map { ($0.id, $0) })
     let sourcesToDelete = try GroceryItemSource.fetchAll(db)
       .filter { candidate in
-        candidate.contributionKey == contributionKey
+        candidate.contributionID == contributionID
           && itemsByID[candidate.groceryItemID]?.groceryListID == item.groceryListID
       }
 
@@ -819,51 +827,6 @@ private struct PendingGroceryItemSource {
   var dateCreated: Date
 }
 
-private enum GrocerySourceContributionKey: Equatable {
-  case source(GroceryItemSource.ID)
-  case recipe(Recipe.ID)
-  case calendarItem(MealPlanItem.ID)
-  case menuItem(Menu.ID, MenuItem.ID)
-  case menuPlacementItem(MenuPlacement.ID, MenuItem.ID)
-}
-
-private extension GroceryItemSource {
-  var contributionKey: GrocerySourceContributionKey {
-    switch origin {
-    case .custom:
-      .source(id)
-
-    case .recipe:
-      if let recipeID {
-        .recipe(recipeID)
-      } else {
-        .source(id)
-      }
-
-    case .calendarItem:
-      if let mealPlanItemID {
-        .calendarItem(mealPlanItemID)
-      } else {
-        .source(id)
-      }
-
-    case .menu:
-      if let menuID, let menuItemID {
-        .menuItem(menuID, menuItemID)
-      } else {
-        .source(id)
-      }
-
-    case .menuPlacement:
-      if let menuPlacementID, let menuItemID {
-        .menuPlacementItem(menuPlacementID, menuItemID)
-      } else {
-        .source(id)
-      }
-    }
-  }
-}
-
 private func areGroceryListRowsInIncreasingOrder(
   _ lhs: GroceryListRowData,
   _ rhs: GroceryListRowData
@@ -980,7 +943,7 @@ public extension IngredientLine {
 
 private extension IngredientLine {
   var groceryItemTitle: String {
-    item?.nonEmptyGroceryText ?? originalText
+    canonicalGroceryItemTitle(item?.nonEmptyGroceryText ?? originalText)
   }
 
   var groceryQuantityText: String? {
@@ -992,6 +955,15 @@ private extension IngredientLine {
       .compactMap { $0?.nonEmptyGroceryText }
       .joined(separator: "; ")
       .nonEmptyGroceryText
+  }
+}
+
+private func canonicalGroceryItemTitle(_ title: String) -> String {
+  switch title.groceryConsolidationKey {
+  case "anchovy fillet", "anchovy fillets", "anchovy filet", "anchovy filets":
+    return "anchovies"
+  default:
+    return title
   }
 }
 

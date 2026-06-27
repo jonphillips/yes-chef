@@ -60,13 +60,10 @@ struct RecipeDetailView: View {
         Button {
           groceryModel.addRecipeButtonTapped(recipeID: model.recipeID)
         } label: {
-          Label("Shop", systemImage: "basket.badge.plus")
+          Label("Groceries", systemImage: "cart.badge.plus")
         }
-        Button {
-          libraryModel.cookButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("Cook", systemImage: "flame")
-        }
+      }
+      ToolbarItemGroup(placement: .primaryAction) {
         Button {
           libraryModel.editButtonTapped(recipeID: model.recipeID)
         } label: {
@@ -108,16 +105,18 @@ struct RecipeDetailView: View {
 
   private func metadata(_ recipe: Recipe) -> some View {
     VStack(alignment: .leading, spacing: 10) {
-      HStack {
-        if let servingsText = recipe.servingsText {
-          Label(servingsText, systemImage: "person.2")
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .center, spacing: 12) {
+          recipeStats(recipe)
+          Spacer(minLength: 12)
+          startCookingButton(recipe)
         }
-        if let totalTime = recipe.totalTimeMinutes {
-          Label("\(totalTime) min", systemImage: "clock")
+
+        VStack(alignment: .leading, spacing: 10) {
+          recipeStats(recipe)
+          startCookingButton(recipe)
         }
       }
-      .font(.subheadline)
-      .foregroundStyle(.secondary)
 
       if recipe.libraryPlacement == .reference {
         Label(recipe.libraryPlacement.title, systemImage: "books.vertical")
@@ -145,6 +144,28 @@ struct RecipeDetailView: View {
         .buttonStyle(.bordered)
       }
     }
+  }
+
+  private func recipeStats(_ recipe: Recipe) -> some View {
+    HStack(spacing: 12) {
+      if let servingsText = recipe.servingsText {
+        Label(servingsText, systemImage: "person.2")
+      }
+      if let totalTime = recipe.totalTimeMinutes {
+        Label("\(totalTime) min", systemImage: "clock")
+      }
+    }
+    .font(.subheadline)
+    .foregroundStyle(.secondary)
+  }
+
+  private func startCookingButton(_ recipe: Recipe) -> some View {
+    Button {
+      libraryModel.cookButtonTapped(recipeID: recipe.id)
+    } label: {
+      Label("Start Cooking", systemImage: "flame")
+    }
+    .buttonStyle(.borderedProminent)
   }
 
   private var ingredients: some View {

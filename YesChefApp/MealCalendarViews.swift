@@ -246,7 +246,7 @@ struct MealPlanItemEditorView: View {
   @State private var kind: MealPlanItemKind
   @State private var scheduledDate: Date
   @State private var mealSlot: MealPlanItemSlot
-  @State private var selectedRecipeID: Recipe.ID?
+  @State private var selectedRecipeIDs: Set<Recipe.ID>
   @State private var noteTitle = ""
   @State private var notes = ""
   @State private var recipeSearchText = ""
@@ -261,7 +261,7 @@ struct MealPlanItemEditorView: View {
     _kind = State(wrappedValue: initialKind)
     _scheduledDate = State(wrappedValue: context.date)
     _mealSlot = State(wrappedValue: context.mealSlot)
-    _selectedRecipeID = State(wrappedValue: context.recipeID)
+    _selectedRecipeIDs = State(wrappedValue: Set([context.recipeID].compactMap(\.self)))
     _noteTitle = State(wrappedValue: context.title)
     _notes = State(wrappedValue: context.notes)
   }
@@ -281,10 +281,14 @@ struct MealPlanItemEditorView: View {
   private var isSaveDisabled: Bool {
     switch kind {
     case .recipe:
-      selectedRecipeID == nil
+      selectedRecipeIDs.isEmpty
     case .note, .reservation:
       noteTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
+  }
+
+  private var allowsMultipleRecipeSelection: Bool {
+    !context.isEditing
   }
 
   var body: some View {
@@ -323,11 +327,12 @@ struct MealPlanItemEditorView: View {
           } else {
             ForEach(filteredRecipeRows) { row in
               Button {
-                selectedRecipeID = row.recipe.id
+                recipeSelectionButtonTapped(row.recipe.id)
               } label: {
                 MealPlanRecipeSelectionRow(
                   row: row,
-                  isSelected: selectedRecipeID == row.recipe.id
+                  isSelected: selectedRecipeIDs.contains(row.recipe.id),
+                  allowsMultipleSelection: allowsMultipleRecipeSelection
                 )
               }
               .foregroundStyle(.primary)
@@ -373,15 +378,26 @@ struct MealPlanItemEditorView: View {
   private func saveButtonTapped() {
     switch kind {
     case .recipe:
-      guard let selectedRecipeID else { return }
-      if model.saveRecipeItemButtonTapped(
-        itemID: context.itemID,
-        recipeID: selectedRecipeID,
-        date: scheduledDate,
-        mealSlot: mealSlot,
-        notes: notes
-      ) {
-        dismiss()
+      if context.isEditing {
+        guard let selectedRecipeID = selectedRecipeIDs.first else { return }
+        if model.saveRecipeItemButtonTapped(
+          itemID: context.itemID,
+          recipeID: selectedRecipeID,
+          date: scheduledDate,
+          mealSlot: mealSlot,
+          notes: notes
+        ) {
+          dismiss()
+        }
+      } else {
+        if model.saveRecipeItemsButtonTapped(
+          recipeIDs: selectedRecipeIDs,
+          date: scheduledDate,
+          mealSlot: mealSlot,
+          notes: notes
+        ) {
+          dismiss()
+        }
       }
     case .note, .reservation:
       if model.saveNoteItemButtonTapped(
@@ -393,6 +409,18 @@ struct MealPlanItemEditorView: View {
       ) {
         dismiss()
       }
+    }
+  }
+
+  private func recipeSelectionButtonTapped(_ recipeID: Recipe.ID) {
+    if allowsMultipleRecipeSelection {
+      if selectedRecipeIDs.contains(recipeID) {
+        selectedRecipeIDs.remove(recipeID)
+      } else {
+        selectedRecipeIDs.insert(recipeID)
+      }
+    } else {
+      selectedRecipeIDs = [recipeID]
     }
   }
 }
@@ -776,6 +804,7 @@ private struct MealPlanItemRowView: View {
 private struct MealPlanRecipeSelectionRow: View {
   let row: RecipeListRowData
   let isSelected: Bool
+  var allowsMultipleSelection = false
 
   var body: some View {
     HStack(spacing: 12) {
@@ -802,8 +831,13 @@ private struct MealPlanRecipeSelectionRow: View {
 
       Image(systemName: isSelected ? "checkmark.circle.fill" : "plus.circle")
         .foregroundStyle(.tint)
+        .accessibilityLabel(isSelected ? "Selected" : selectionAccessibilityLabel)
     }
     .padding(.vertical, 4)
+  }
+
+  private var selectionAccessibilityLabel: String {
+    allowsMultipleSelection ? "Add recipe to selection" : "Select recipe"
   }
 }
 

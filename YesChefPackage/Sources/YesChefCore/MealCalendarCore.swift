@@ -199,6 +199,32 @@ public enum MealCalendarRepository {
   }
 
   @discardableResult
+  public static func addRecipeItems(
+    recipeIDs: [Recipe.ID],
+    on scheduledDate: Date,
+    mealSlot: MealPlanItemSlot,
+    notes: String?,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> [MealPlanItem.ID] {
+    var itemIDs: [MealPlanItem.ID] = []
+    for recipeID in recipeIDs {
+      let itemID = try addRecipeItem(
+        recipeID: recipeID,
+        on: scheduledDate,
+        mealSlot: mealSlot,
+        notes: notes,
+        in: db,
+        now: now,
+        uuid: uuid
+      )
+      itemIDs.append(itemID)
+    }
+    return itemIDs
+  }
+
+  @discardableResult
   public static func addNoteItem(
     title: String,
     notes: String?,
