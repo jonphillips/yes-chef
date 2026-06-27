@@ -12,7 +12,6 @@ struct AppContainer: View {
   @State private var groceryModel = GroceryLibraryModel()
   @State private var selectedSection: AppSection? = .recipes
   @State private var selectedSettingsPane: SettingsPane? = .categories
-  @AppStorage(GroceryPantryStorage.storageKey) private var pantryText = GroceryPantryStorage.defaultText
 
   var body: some View {
     @Bindable var recipeModel = recipeModel
@@ -49,30 +48,10 @@ struct AppContainer: View {
         MenuPlacementEditorView(model: menuModel, context: context)
       }
     }
-    .sheet(isPresented: $groceryModel.destination.addList) {
-      NavigationStack {
-        GroceryListEditorView(model: groceryModel)
-      }
-    }
-    .sheet(isPresented: $groceryModel.destination.addCustomItem) {
-      NavigationStack {
-        GroceryItemEditorView(model: groceryModel)
-      }
-    }
-    .sheet(item: $groceryModel.destination.selectIngredients, id: \.self) { context in
-      NavigationStack {
-        GroceryIngredientSelectionView(
-          model: groceryModel,
-          context: context,
-          choices: groceryModel.ingredientChoices(
-            for: context,
-            mealRows: mealCalendarModel.itemRows
-          ),
-          mealRows: mealCalendarModel.itemRows,
-          pantryStaples: GroceryPantryStorage.items(from: pantryText)
-        )
-      }
-    }
+    .groceryDestinations(
+      groceryModel: groceryModel,
+      mealCalendarModel: mealCalendarModel
+    )
     .sheet(isPresented: $recipeModel.destination.addRecipe) {
       NavigationStack {
         RecipeEditorView(recipeID: nil)
@@ -194,6 +173,106 @@ struct AppContainer: View {
 
 }
 
+private struct GroceryDestinationsModifier: ViewModifier {
+  let groceryModel: GroceryLibraryModel
+  let mealCalendarModel: MealCalendarModel
+
+  func body(content: Content) -> some View {
+    @Bindable var groceryModel = groceryModel
+
+    content
+      .sheet(isPresented: $groceryModel.destination.addList) {
+        NavigationStack {
+          GroceryListEditorView(model: groceryModel)
+        }
+      }
+      .sheet(item: $groceryModel.destination.editList, id: \.self) { listID in
+        NavigationStack {
+          GroceryListEditorView(model: groceryModel, listID: listID)
+        }
+      }
+      .sheet(isPresented: $groceryModel.destination.addCustomItem) {
+        NavigationStack {
+          GroceryItemEditorView(model: groceryModel)
+        }
+      }
+      .sheet(isPresented: $groceryModel.destination.addPantryItem) {
+        NavigationStack {
+          PantryItemEditorView(model: groceryModel)
+        }
+      }
+      .sheet(item: $groceryModel.destination.editPantryItem, id: \.self) { itemID in
+        NavigationStack {
+          PantryItemEditorView(model: groceryModel, itemID: itemID)
+        }
+      }
+      .sheet(item: $groceryModel.destination.selectIngredients, id: \.self) { context in
+        NavigationStack {
+          GroceryIngredientSelectionView(
+            model: groceryModel,
+            context: context,
+            choices: groceryModel.ingredientChoices(
+              for: context,
+              mealRows: mealCalendarModel.itemRows
+            ),
+            mealRows: mealCalendarModel.itemRows,
+            pantryStaples: groceryModel.pantryStapleNames
+          )
+        }
+      }
+      .confirmationDialog(
+        "Clear Purchased?",
+        item: $groceryModel.destination.clearPurchased,
+        titleVisibility: .visible
+      ) { listID in
+        Button("Clear Purchased", role: .destructive) {
+          groceryModel.confirmClearPurchasedButtonTapped(listID: listID)
+        }
+        Button("Cancel", role: .cancel) {}
+      } message: { listID in
+        Text("Remove purchased items from \(groceryModel.title(forList: listID))?")
+      }
+      .confirmationDialog(
+        "Clear Grocery List?",
+        item: $groceryModel.destination.clearAll,
+        titleVisibility: .visible
+      ) { listID in
+        Button("Clear All", role: .destructive) {
+          groceryModel.confirmClearAllButtonTapped(listID: listID)
+        }
+        Button("Cancel", role: .cancel) {}
+      } message: { listID in
+        Text("Remove every item from \(groceryModel.title(forList: listID))?")
+      }
+      .confirmationDialog(
+        "Delete Grocery List?",
+        item: $groceryModel.destination.deleteList,
+        titleVisibility: .visible
+      ) { listID in
+        Button("Delete List", role: .destructive) {
+          groceryModel.confirmDeleteListButtonTapped(listID: listID)
+        }
+        Button("Cancel", role: .cancel) {}
+      } message: { listID in
+        Text("Delete \(groceryModel.title(forList: listID)) and its grocery items?")
+      }
+  }
+}
+
+private extension View {
+  func groceryDestinations(
+    groceryModel: GroceryLibraryModel,
+    mealCalendarModel: MealCalendarModel
+  ) -> some View {
+    modifier(
+      GroceryDestinationsModifier(
+        groceryModel: groceryModel,
+        mealCalendarModel: mealCalendarModel
+      )
+    )
+  }
+}
+
 private struct AppMainLayout: View {
   let horizontalSizeClass: UserInterfaceSizeClass?
   let recipeModel: RecipeLibraryModel
@@ -239,7 +318,11 @@ private struct AppMainLayout: View {
         case .menus:
           MenuListView(model: menuModel, style: .selection)
         case .settings:
-          SettingsView(model: recipeModel, selectedPane: $selectedSettingsPane)
+          SettingsView(
+            model: recipeModel,
+            groceryModel: groceryModel,
+            selectedPane: $selectedSettingsPane
+          )
         }
       } detail: {
         switch selectedSection ?? .recipes {
@@ -259,7 +342,10 @@ private struct AppMainLayout: View {
         case .menus:
           MenuDetailColumn(model: menuModel)
         case .settings:
-          SettingsDetailPane(selectedPane: selectedSettingsPane)
+          SettingsDetailPane(
+            selectedPane: selectedSettingsPane,
+            groceryModel: groceryModel
+          )
         }
       }
     }
@@ -303,7 +389,7 @@ private struct AppCompactTabView: View {
       MenusStack(model: menuModel)
         .tabItem { AppSection.menus.label }
         .tag(AppSection.menus as AppSection?)
-      SettingsStack(model: recipeModel)
+      SettingsStack(model: recipeModel, groceryModel: groceryModel)
         .tabItem { AppSection.settings.label }
         .tag(AppSection.settings as AppSection?)
     }
@@ -365,20 +451,27 @@ private struct RecipeDetailColumn: View {
 
 private struct SettingsStack: View {
   let model: RecipeLibraryModel
+  let groceryModel: GroceryLibraryModel
 
   var body: some View {
     NavigationStack {
-      SettingsView(model: model)
+      SettingsView(model: model, groceryModel: groceryModel)
     }
   }
 }
 
 private struct SettingsView: View {
   let model: RecipeLibraryModel
+  let groceryModel: GroceryLibraryModel
   private let selectedPane: Binding<SettingsPane?>?
 
-  init(model: RecipeLibraryModel, selectedPane: Binding<SettingsPane?>? = nil) {
+  init(
+    model: RecipeLibraryModel,
+    groceryModel: GroceryLibraryModel,
+    selectedPane: Binding<SettingsPane?>? = nil
+  ) {
     self.model = model
+    self.groceryModel = groceryModel
     self.selectedPane = selectedPane
   }
 
@@ -435,7 +528,7 @@ private struct SettingsView: View {
       .foregroundStyle(.primary)
     } else {
       NavigationLink {
-        PantrySettingsView()
+        PantrySettingsView(model: groceryModel)
       } label: {
         SettingsPane.pantry.label
       }
@@ -445,6 +538,7 @@ private struct SettingsView: View {
 
 private struct SettingsDetailPane: View {
   let selectedPane: SettingsPane?
+  let groceryModel: GroceryLibraryModel
 
   var body: some View {
     switch selectedPane {
@@ -454,7 +548,7 @@ private struct SettingsDetailPane: View {
       }
     case .pantry:
       NavigationStack {
-        PantrySettingsView()
+        PantrySettingsView(model: groceryModel)
       }
     case nil:
       ContentUnavailableView("Settings", systemImage: AppSection.settings.systemImage)

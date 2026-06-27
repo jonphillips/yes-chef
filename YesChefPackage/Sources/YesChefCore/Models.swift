@@ -501,6 +501,32 @@ public enum GroceryItemOrigin: String, CaseIterable, Codable, QueryBindable, Que
   }
 }
 
+@Table("pantryItems")
+public struct PantryItem: Codable, Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var title: String
+  public var notes: String?
+  public var sortOrder: Int
+  public var dateCreated: Date
+  public var dateModified: Date
+
+  public init(
+    id: UUID,
+    title: String,
+    notes: String? = nil,
+    sortOrder: Int,
+    dateCreated: Date,
+    dateModified: Date
+  ) {
+    self.id = id
+    self.title = title
+    self.notes = notes
+    self.sortOrder = sortOrder
+    self.dateCreated = dateCreated
+    self.dateModified = dateModified
+  }
+}
+
 @Table("recipeSources")
 public struct RecipeSource: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID

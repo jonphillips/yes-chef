@@ -3,6 +3,22 @@ import Foundation
 import SQLiteData
 
 extension DependencyValues {
+  public func seedPantryItemsIfNeeded(titles: [String]? = nil) throws {
+    try defaultDatabase.write { db in
+      guard try PantryItem.fetchCount(db) == 0 else { return }
+
+      let now = Date(timeIntervalSinceReferenceDate: 806_000_000)
+      var uuids = SampleUUIDSequence(start: 90_000)
+      let seedTitles = titles?.isEmpty == false ? titles! : GroceryPantryAssumptions.defaultStaples
+      try PantryRepository.replaceItems(
+        titles: seedTitles,
+        in: db,
+        now: now,
+        uuid: { uuids.next() }
+      )
+    }
+  }
+
   public func seedSampleDataIfNeeded() throws {
     try defaultDatabase.write { db in
       guard try Recipe.fetchCount(db) == 0 else { return }
@@ -182,4 +198,3 @@ public struct SampleUUIDSequence: Sendable {
     UUID(uuidString: "00000000-0000-0000-0000-\(String(format: "%012d", value))")!
   }
 }
-

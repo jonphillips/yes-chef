@@ -392,6 +392,27 @@ extension DependencyValues {
       }
     }
 
+    migrator.registerMigration("Create pantry schema") { db in
+      try #sql("""
+        CREATE TABLE "pantryItems" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "title" TEXT NOT NULL,
+          "notes" TEXT,
+          "sortOrder" INTEGER NOT NULL,
+          "dateCreated" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      for statement in [
+        #"CREATE INDEX "index_pantryItems_on_sortOrder" ON "pantryItems"("sortOrder")"#,
+        #"CREATE INDEX "index_pantryItems_on_title" ON "pantryItems"("title")"#,
+      ] {
+        try db.execute(sql: statement)
+      }
+    }
+
     try migrator.migrate(database)
     defaultDatabase = database
   }
