@@ -53,12 +53,22 @@ final class MenuLibraryModel {
     navigationPath = [menuID]
   }
 
-  func addItemButtonTapped(menu: CoreMenu) {
+  func addItemButtonTapped(
+    menu: CoreMenu,
+    kind: MealPlanItemKind = .recipe,
+    dayOffset: Int = 0,
+    mealSlot: MealPlanItemSlot = .dinner,
+    recipeID: Recipe.ID? = nil
+  ) {
     destination = .addItem(
       MenuItemDraftContext(
         menuID: menu.id,
         menuTitle: menu.title,
-        dayCount: menu.dayCount
+        dayCount: menu.dayCount,
+        kind: kind,
+        dayOffset: dayOffset,
+        mealSlot: mealSlot,
+        recipeID: recipeID
       )
     )
   }
@@ -117,6 +127,56 @@ final class MenuLibraryModel {
         )
       }
       destination = nil
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
+  func addRecipesToMenu(
+    recipeIDs: [Recipe.ID],
+    menuID: CoreMenu.ID,
+    dayOffset: Int,
+    mealSlot: MealPlanItemSlot = .dinner
+  ) -> Bool {
+    do {
+      try database.write { db in
+        for recipeID in recipeIDs {
+          try MenuRepository.addRecipeItem(
+            menuID: menuID,
+            recipeID: recipeID,
+            dayOffset: dayOffset,
+            mealSlot: mealSlot,
+            notes: nil,
+            in: db,
+            now: now,
+            uuid: { uuid() }
+          )
+        }
+      }
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
+  func moveMenuItem(
+    itemID: MenuItem.ID,
+    toDayOffset dayOffset: Int
+  ) -> Bool {
+    do {
+      try database.write { db in
+        try MenuRepository.moveItem(
+          itemID: itemID,
+          toDayOffset: dayOffset,
+          in: db,
+          now: now
+        )
+      }
       return true
     } catch {
       errorMessage = String(describing: error)
@@ -245,6 +305,10 @@ struct MenuItemDraftContext: Hashable, Sendable {
   var menuID: CoreMenu.ID
   var menuTitle: String
   var dayCount: Int
+  var kind: MealPlanItemKind = .recipe
+  var dayOffset: Int = 0
+  var mealSlot: MealPlanItemSlot = .dinner
+  var recipeID: Recipe.ID?
 }
 
 struct MenuPlacementDraftContext: Hashable, Sendable {

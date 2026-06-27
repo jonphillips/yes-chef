@@ -235,6 +235,30 @@ public enum MenuRepository {
     try MenuPlacement.upsert { placement }.execute(db)
   }
 
+  public static func moveItem(
+    itemID: MenuItem.ID,
+    toDayOffset dayOffset: Int,
+    mealSlot: MealPlanItemSlot? = nil,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard var item = try MenuItem.find(itemID).fetchOne(db) else {
+      throw MenuRepositoryError.menuItemNotFound(itemID)
+    }
+    let menu = try requireMenu(item.menuID, in: db)
+    try validateDayOffset(dayOffset, for: menu)
+
+    let mealSlot = mealSlot ?? item.mealSlot
+    let isMoving = item.dayOffset != dayOffset || item.mealSlot != mealSlot
+    item.dayOffset = dayOffset
+    item.mealSlot = mealSlot
+    item.sortOrder = isMoving
+      ? try nextSortOrder(menuID: item.menuID, dayOffset: dayOffset, mealSlot: mealSlot, in: db)
+      : item.sortOrder
+    item.dateModified = now
+    try MenuItem.upsert { item }.execute(db)
+  }
+
   public static func deleteMenuPlacement(
     placementID: MenuPlacement.ID,
     in db: Database
@@ -288,6 +312,7 @@ public enum MenuRepositoryError: Error, Equatable, Sendable {
   case invalidDayCount
   case invalidDayOffset(Int)
   case menuNotFound(Menu.ID)
+  case menuItemNotFound(MenuItem.ID)
   case placementNotFound(MenuPlacement.ID)
   case recipeNotFound(Recipe.ID)
 }

@@ -538,6 +538,10 @@ Generate a usable shopping list from recipes.
 - Do not over-normalize if uncertain.
 - Do not require quantity-based pantry tracking. The user should not need to log
   every use of a condiment just to keep grocery generation useful.
+- Treat that as an intentional product boundary, not an MVP omission: pantry
+  quantity is not a feature goal. Future pantry work should stay focused on
+  assumptions, shopping policies, and reviewable prompts rather than inventory
+  bookkeeping.
 
 ### Examples
 

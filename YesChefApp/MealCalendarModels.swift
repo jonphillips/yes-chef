@@ -1,6 +1,8 @@
 import CasePaths
+import Dependencies
 import Foundation
 import Observation
+import SQLiteData
 import SwiftUI
 import YesChefCore
 
@@ -20,9 +22,12 @@ final class MealCalendarModel {
   @ObservationIgnored
   @Dependency(\.uuid) private var uuid
   @ObservationIgnored
-  @Fetch(MealCalendarRequest(), animation: .default) var itemRows: [MealPlanItemRowData] = []
+  @Fetch(MealCalendarRequest(), animation: .default) private var fetchedItemRows: [MealPlanItemRowData] = []
   @ObservationIgnored
   @Fetch(RecipeListRequest(), animation: .default) var recipeRows: [RecipeListRowData] = []
+
+  private var optimisticItemRowsByID: [MealPlanItem.ID: MealPlanItemRowData] = [:]
+  private var optimisticDeletedItemIDs: Set<MealPlanItem.ID> = []
 
   var destination: Destination?
   var displayMode = MealCalendarDisplayMode.month
@@ -82,6 +87,26 @@ final class MealCalendarModel {
 
   var selectedDayRows: [MealPlanItemRowData] {
     rows(on: selectedDate)
+  }
+
+  var itemRows: [MealPlanItemRowData] {
+    let pendingItemRows = optimisticItemRowsByID.filter { itemID, row in
+      fetchedItemRows.first { !$0.isFromMenu && $0.item.id == itemID } != row
+    }
+    let pendingDeletedItemIDs = optimisticDeletedItemIDs.filter { itemID in
+      fetchedItemRows.contains { !$0.isFromMenu && $0.item.id == itemID }
+    }
+    guard !pendingItemRows.isEmpty || !pendingDeletedItemIDs.isEmpty else {
+      return fetchedItemRows
+    }
+
+    var rows = fetchedItemRows.filter { row in
+      guard !row.isFromMenu else { return true }
+      return pendingItemRows[row.item.id] == nil
+        && !pendingDeletedItemIDs.contains(row.item.id)
+    }
+    rows.append(contentsOf: pendingItemRows.values)
+    return rows.sorted(by: areMealPlanRowsInIncreasingOrderForCalendarModel)
   }
 
   var availableRecipeRows: [RecipeListRowData] {
@@ -155,7 +180,8 @@ final class MealCalendarModel {
   ) -> Bool {
     do {
       let scheduledDate = startOfDay(date)
-      try database.write { db in
+      let result = try database.write { db in
+        let savedItemID: MealPlanItem.ID
         if let itemID {
           try MealCalendarRepository.updateRecipeItem(
             itemID: itemID,
@@ -166,8 +192,9 @@ final class MealCalendarModel {
             in: db,
             now: now
           )
+          savedItemID = itemID
         } else {
-          try MealCalendarRepository.addRecipeItem(
+          savedItemID = try MealCalendarRepository.addRecipeItem(
             recipeID: recipeID,
             on: scheduledDate,
             mealSlot: mealSlot,
@@ -177,7 +204,9 @@ final class MealCalendarModel {
             uuid: { uuid() }
           )
         }
+        return (savedItemID, try MealCalendarRequest().fetch(db))
       }
+      applyOptimisticRows(result.1, updatedItemIDs: [result.0])
       selectedDate = scheduledDate
       destination = nil
       return true
@@ -205,8 +234,8 @@ final class MealCalendarModel {
 
     do {
       let scheduledDate = startOfDay(date)
-      _ = try database.write { db in
-        try MealCalendarRepository.addRecipeItems(
+      let result = try database.write { db in
+        let itemIDs = try MealCalendarRepository.addRecipeItems(
           recipeIDs: orderedRecipeIDs,
           on: scheduledDate,
           mealSlot: mealSlot,
@@ -215,7 +244,9 @@ final class MealCalendarModel {
           now: now,
           uuid: { uuid() }
         )
+        return (itemIDs, try MealCalendarRequest().fetch(db))
       }
+      applyOptimisticRows(result.1, updatedItemIDs: Set(result.0))
       selectedDate = scheduledDate
       destination = nil
       return true
@@ -235,7 +266,8 @@ final class MealCalendarModel {
   ) -> Bool {
     do {
       let scheduledDate = startOfDay(date)
-      try database.write { db in
+      let result = try database.write { db in
+        let savedItemID: MealPlanItem.ID
         if let itemID {
           try MealCalendarRepository.updateNoteItem(
             itemID: itemID,
@@ -246,8 +278,9 @@ final class MealCalendarModel {
             in: db,
             now: now
           )
+          savedItemID = itemID
         } else {
-          try MealCalendarRepository.addNoteItem(
+          savedItemID = try MealCalendarRepository.addNoteItem(
             title: title,
             notes: notes,
             on: scheduledDate,
@@ -257,7 +290,9 @@ final class MealCalendarModel {
             uuid: { uuid() }
           )
         }
+        return (savedItemID, try MealCalendarRequest().fetch(db))
       }
+      applyOptimisticRows(result.1, updatedItemIDs: [result.0])
       selectedDate = scheduledDate
       destination = nil
       return true
@@ -276,9 +311,11 @@ final class MealCalendarModel {
     destination = nil
 
     do {
-      try database.write { db in
+      let updatedRows = try database.write { db in
         try MealCalendarRepository.deleteItem(itemID: itemID, in: db)
+        return try MealCalendarRequest().fetch(db)
       }
+      applyOptimisticRows(updatedRows, deletedItemIDs: [itemID])
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
@@ -357,6 +394,30 @@ final class MealCalendarModel {
   private func startOfDay(_ date: Date) -> Date {
     calendar.startOfDay(for: date)
   }
+
+  private func applyOptimisticRows(
+    _ rows: [MealPlanItemRowData],
+    updatedItemIDs: Set<MealPlanItem.ID> = [],
+    deletedItemIDs: Set<MealPlanItem.ID> = []
+  ) {
+    optimisticItemRowsByID = optimisticItemRowsByID.filter { itemID, row in
+      fetchedItemRows.first { !$0.isFromMenu && $0.item.id == itemID } != row
+    }
+    optimisticDeletedItemIDs = optimisticDeletedItemIDs.filter { itemID in
+      fetchedItemRows.contains { !$0.isFromMenu && $0.item.id == itemID }
+    }
+
+    for itemID in updatedItemIDs {
+      if let row = rows.first(where: { !$0.isFromMenu && $0.item.id == itemID }) {
+        optimisticItemRowsByID[itemID] = row
+        optimisticDeletedItemIDs.remove(itemID)
+      }
+    }
+    for itemID in deletedItemIDs {
+      optimisticItemRowsByID[itemID] = nil
+      optimisticDeletedItemIDs.insert(itemID)
+    }
+  }
 }
 
 enum MealCalendarDisplayMode: String, CaseIterable, Identifiable {
@@ -419,4 +480,27 @@ struct MealCalendarDaySummary: Identifiable, Equatable {
       rows.contains { $0.item.mealSlot == slot }
     }
   }
+}
+
+private func areMealPlanRowsInIncreasingOrderForCalendarModel(
+  _ lhs: MealPlanItemRowData,
+  _ rhs: MealPlanItemRowData
+) -> Bool {
+  if lhs.item.scheduledDate != rhs.item.scheduledDate {
+    return lhs.item.scheduledDate < rhs.item.scheduledDate
+  }
+  if lhs.item.mealSlot.sortOrder != rhs.item.mealSlot.sortOrder {
+    return lhs.item.mealSlot.sortOrder < rhs.item.mealSlot.sortOrder
+  }
+  if lhs.item.sortOrder != rhs.item.sortOrder {
+    return lhs.item.sortOrder < rhs.item.sortOrder
+  }
+  if lhs.isFromMenu != rhs.isFromMenu {
+    return !lhs.isFromMenu
+  }
+  let titleComparison = lhs.displayTitle.localizedStandardCompare(rhs.displayTitle)
+  if titleComparison != .orderedSame {
+    return titleComparison == .orderedAscending
+  }
+  return lhs.id.rawValue < rhs.id.rawValue
 }

@@ -59,6 +59,25 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func sortsPantryItemsAlphabetically() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 805_150_000)
+      var uuids = SampleUUIDSequence(start: 13_200)
+
+      try database.write { db in
+        try PantryRepository.replaceItems(
+          titles: ["vanilla", "Brown sugar", "all-purpose flour"],
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        let items = try PantryItemListRequest().fetch(db)
+        expectNoDifference(items.map(\.title), ["all-purpose flour", "Brown sugar", "vanilla"])
+      }
+    }
+
+    @Test
     func addsRecipeIngredientsWithRecipeSource() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 805_200_000)

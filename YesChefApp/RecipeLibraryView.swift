@@ -12,6 +12,7 @@ struct AppContainer: View {
   @State private var groceryModel = GroceryLibraryModel()
   @State private var selectedSection: AppSection? = .recipes
   @State private var selectedSettingsPane: SettingsPane? = .categories
+  @State private var presentedRecipeID: Recipe.ID?
 
   var body: some View {
     @Bindable var recipeModel = recipeModel
@@ -26,8 +27,19 @@ struct AppContainer: View {
       menuModel: menuModel,
       groceryModel: groceryModel,
       selectedSection: $selectedSection,
-      selectedSettingsPane: $selectedSettingsPane
+      selectedSettingsPane: $selectedSettingsPane,
+      onRecipeSelected: { recipeID in
+        presentedRecipeID = recipeID
+      }
     )
+    .fullScreenCover(item: $presentedRecipeID, id: \.self) { recipeID in
+      RecipeFullScreenCover(
+        recipeID: recipeID,
+        recipeModel: recipeModel,
+        mealCalendarModel: mealCalendarModel,
+        groceryModel: groceryModel
+      )
+    }
     .sheet(item: $mealCalendarModel.destination.itemEditor, id: \.self) { context in
       NavigationStack {
         MealPlanItemEditorView(model: mealCalendarModel, context: context)
@@ -173,6 +185,32 @@ struct AppContainer: View {
 
 }
 
+private struct RecipeFullScreenCover: View {
+  @Environment(\.dismiss) private var dismiss
+  let recipeID: Recipe.ID
+  let recipeModel: RecipeLibraryModel
+  let mealCalendarModel: MealCalendarModel
+  let groceryModel: GroceryLibraryModel
+
+  var body: some View {
+    NavigationStack {
+      RecipeDetailView(
+        recipeID: recipeID,
+        libraryModel: recipeModel,
+        mealCalendarModel: mealCalendarModel,
+        groceryModel: groceryModel
+      )
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Done") {
+            dismiss()
+          }
+        }
+      }
+    }
+  }
+}
+
 private struct GroceryDestinationsModifier: ViewModifier {
   let groceryModel: GroceryLibraryModel
   let mealCalendarModel: MealCalendarModel
@@ -281,6 +319,7 @@ private struct AppMainLayout: View {
   let groceryModel: GroceryLibraryModel
   @Binding var selectedSection: AppSection?
   @Binding var selectedSettingsPane: SettingsPane?
+  var onRecipeSelected: (Recipe.ID) -> Void
 
   var body: some View {
     if horizontalSizeClass == .compact {
@@ -290,7 +329,8 @@ private struct AppMainLayout: View {
         mealCalendarModel: mealCalendarModel,
         menuModel: menuModel,
         groceryModel: groceryModel,
-        onMenuSelected: openMenuFromCalendar
+        onMenuSelected: openMenuFromCalendar,
+        onRecipeSelected: onRecipeSelected
       )
     } else if selectedSection == .mealCalendar {
       NavigationSplitView {
@@ -298,7 +338,8 @@ private struct AppMainLayout: View {
       } detail: {
         MealCalendarWorkspaceView(
           model: mealCalendarModel,
-          onMenuSelected: openMenuFromCalendar
+          onMenuSelected: openMenuFromCalendar,
+          onRecipeSelected: onRecipeSelected
         )
       }
     } else {
@@ -311,7 +352,8 @@ private struct AppMainLayout: View {
         case .mealCalendar:
           MealCalendarWorkspaceView(
             model: mealCalendarModel,
-            onMenuSelected: openMenuFromCalendar
+            onMenuSelected: openMenuFromCalendar,
+            onRecipeSelected: onRecipeSelected
           )
         case .groceries:
           GroceryListView(model: groceryModel, style: .selection)
@@ -340,7 +382,11 @@ private struct AppMainLayout: View {
             mealCalendarModel: mealCalendarModel
           )
         case .menus:
-          MenuDetailColumn(model: menuModel)
+          MenuDetailColumn(
+            model: menuModel,
+            recipeModel: recipeModel,
+            onRecipeSelected: onRecipeSelected
+          )
         case .settings:
           SettingsDetailPane(
             selectedPane: selectedSettingsPane,
@@ -364,6 +410,7 @@ private struct AppCompactTabView: View {
   let menuModel: MenuLibraryModel
   let groceryModel: GroceryLibraryModel
   let onMenuSelected: (CoreMenu.ID) -> Void
+  let onRecipeSelected: (Recipe.ID) -> Void
 
   var body: some View {
     TabView(selection: $selection) {
@@ -376,7 +423,8 @@ private struct AppCompactTabView: View {
         .tag(AppSection.recipes as AppSection?)
       MealCalendarStack(
         model: mealCalendarModel,
-        onMenuSelected: onMenuSelected
+        onMenuSelected: onMenuSelected,
+        onRecipeSelected: onRecipeSelected
       )
         .tabItem { AppSection.mealCalendar.label }
         .tag(AppSection.mealCalendar as AppSection?)
@@ -386,7 +434,11 @@ private struct AppCompactTabView: View {
       )
         .tabItem { AppSection.groceries.label }
         .tag(AppSection.groceries as AppSection?)
-      MenusStack(model: menuModel)
+      MenusStack(
+        model: menuModel,
+        recipeModel: recipeModel,
+        onRecipeSelected: onRecipeSelected
+      )
         .tabItem { AppSection.menus.label }
         .tag(AppSection.menus as AppSection?)
       SettingsStack(model: recipeModel, groceryModel: groceryModel)

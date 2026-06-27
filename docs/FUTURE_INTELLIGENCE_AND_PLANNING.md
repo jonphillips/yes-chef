@@ -709,6 +709,18 @@ support light, useful pantry awareness without making the user maintain a grocer
 warehouse database. Do not assume the user will track exact amounts of soy sauce,
 spices, flour, oil, or similar staples.
 
+Settled boundary: pantry quantity is not a feature goal. Pantry should be modeled
+as memory, assumptions, and shopping policy, not a stock ledger the user has to
+maintain.
+
+One bounded future idea is an "Inventory Confirm" shopping-list section. A pantry
+item could optionally carry a threshold amount such as "1/2 cup brown sugar"; when
+a recipe calls for an equal or greater amount, grocery generation could route that
+line to "Inventory Confirm" instead of silently skipping it. This should not become
+general quantity tracking. It would require a real measurement normalization layer
+for unit families and conversions; the current parser stores quantity/unit text but
+is not a complete measurement library.
+
 Explicitly optional future layers:
 
 - Freezer inventory
@@ -771,7 +783,22 @@ Adapted: Jon’s beach-week version
 Event version: Serves 12, freezer-friendly prep
 ```
 
-## 17. Privacy and Data Control
+## 17. App Intents and Shortcuts
+
+App Intents do not need a large plan before the core app stabilizes. The best early
+targets are low-risk actions over existing local data:
+
+- Open today's meal calendar.
+- Open a specific recipe.
+- Start cooking mode for a recipe.
+- Add a recipe to a date, defaulting to dinner.
+- Add selected recipe ingredients to the primary grocery list.
+- Add a pantry assumption by name.
+
+These should use the same model/repository paths as the app UI. Avoid intents that
+silently rewrite recipes, infer pantry inventory, or run AI without a review step.
+
+## 18. Privacy and Data Control
 
 The app should be private by default.
 
@@ -784,7 +811,7 @@ Core principles:
 - Local processing should be preferred where practical.
 - Destructive AI edits require confirmation.
 
-## 18. MVP Implications
+## 19. MVP Implications
 
 Although these features are not MVP, MVP should prepare for them by:
 
@@ -800,7 +827,7 @@ Although these features are not MVP, MVP should prepare for them by:
 9. Avoiding rigid taxonomies.
 10. Avoiding destructive import cleanup.
 
-## 19. Explicit Non-MVP Status
+## 20. Explicit Non-MVP Status
 
 The following are not MVP 1:
 
@@ -815,10 +842,11 @@ The following are not MVP 1:
 - Personal preference engine
 - Multi-day trip planning
 - AI chat interface
+- App Intents
 
 They are documented to shape the data model and product direction, not to expand the first build.
 
-## 20. Long-Term Product Bet
+## 21. Long-Term Product Bet
 
 The app becomes worth building when it can do something Paprika does not do well:
 

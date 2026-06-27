@@ -232,6 +232,60 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func movesMenuItemsBetweenDays() throws {
+      @Dependency(\.defaultDatabase) var database
+      let createdAt = Date(timeIntervalSinceReferenceDate: 804_900_000)
+      let modifiedAt = Date(timeIntervalSinceReferenceDate: 805_000_000)
+
+      try database.write { db in
+        let menuID = try MenuRepository.addMenu(
+          title: "Move Menu",
+          notes: nil,
+          dayCount: 3,
+          in: db,
+          now: createdAt,
+          uuid: { SampleUUIDSequence.uuid(12_200) }
+        )
+        _ = try MenuRepository.addNoteItem(
+          menuID: menuID,
+          title: "Existing dinner",
+          notes: nil,
+          dayOffset: 2,
+          mealSlot: .dinner,
+          in: db,
+          now: createdAt,
+          uuid: { SampleUUIDSequence.uuid(12_201) }
+        )
+        let movedItemID = try MenuRepository.addNoteItem(
+          menuID: menuID,
+          title: "Move me",
+          notes: nil,
+          dayOffset: 0,
+          mealSlot: .dinner,
+          in: db,
+          now: createdAt,
+          uuid: { SampleUUIDSequence.uuid(12_202) }
+        )
+
+        try MenuRepository.moveItem(
+          itemID: movedItemID,
+          toDayOffset: 2,
+          in: db,
+          now: modifiedAt
+        )
+
+        let movedRow = try #require(
+          try MenuDetailRequest(menuID: menuID).fetch(db)?.itemRows.first { $0.id == movedItemID }
+        )
+        expectNoDifference(movedRow.item.dayOffset, 2)
+        expectNoDifference(movedRow.item.mealSlot, .dinner)
+        expectNoDifference(movedRow.item.sortOrder, 1)
+        expectNoDifference(movedRow.item.dateCreated, createdAt)
+        expectNoDifference(movedRow.item.dateModified, modifiedAt)
+      }
+    }
+
+    @Test
     func rejectsInvalidMenus() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 804_500_000)
@@ -291,6 +345,18 @@ extension RecipeCoreTests {
           #expect(Bool(false), "Expected missing placement to be rejected.")
         } catch let error as MenuRepositoryError {
           expectNoDifference(error, .placementNotFound(SampleUUIDSequence.uuid(11_005)))
+        }
+
+        do {
+          try MenuRepository.moveItem(
+            itemID: SampleUUIDSequence.uuid(11_006),
+            toDayOffset: 0,
+            in: db,
+            now: now
+          )
+          #expect(Bool(false), "Expected missing menu item to be rejected.")
+        } catch let error as MenuRepositoryError {
+          expectNoDifference(error, .menuItemNotFound(SampleUUIDSequence.uuid(11_006)))
         }
       }
     }

@@ -1147,12 +1147,12 @@ private func areGroceryItemSourcesInIncreasingOrder(
 }
 
 private func arePantryItemsInIncreasingOrder(_ lhs: PantryItem, _ rhs: PantryItem) -> Bool {
-  if lhs.sortOrder != rhs.sortOrder {
-    return lhs.sortOrder < rhs.sortOrder
-  }
   let titleComparison = lhs.title.localizedStandardCompare(rhs.title)
   if titleComparison != .orderedSame {
     return titleComparison == .orderedAscending
+  }
+  if lhs.sortOrder != rhs.sortOrder {
+    return lhs.sortOrder < rhs.sortOrder
   }
   return lhs.id.uuidString < rhs.id.uuidString
 }

@@ -1,8 +1,11 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import YesChefCore
 
 struct MenusStack: View {
   let model: MenuLibraryModel
+  let recipeModel: RecipeLibraryModel
+  var onRecipeSelected: ((Recipe.ID) -> Void)?
 
   var body: some View {
     @Bindable var model = model
@@ -10,7 +13,12 @@ struct MenusStack: View {
     NavigationStack(path: $model.navigationPath) {
       MenuListView(model: model, style: .navigation)
         .navigationDestination(for: CoreMenu.ID.self) { menuID in
-          MenuDetailView(model: model, menuID: menuID)
+          MenuDetailView(
+            model: model,
+            recipeModel: recipeModel,
+            menuID: menuID,
+            onRecipeSelected: onRecipeSelected
+          )
             .id(menuID)
         }
     }
@@ -85,10 +93,17 @@ private struct MenuRowView: View {
 
 struct MenuDetailColumn: View {
   let model: MenuLibraryModel
+  let recipeModel: RecipeLibraryModel
+  var onRecipeSelected: ((Recipe.ID) -> Void)?
 
   var body: some View {
     if let menuID = model.selectedMenuID {
-      MenuDetailView(model: model, menuID: menuID)
+      MenuDetailView(
+        model: model,
+        recipeModel: recipeModel,
+        menuID: menuID,
+        onRecipeSelected: onRecipeSelected
+      )
         .id(menuID)
     } else {
       ContentUnavailableView("Select a Menu", systemImage: "menucard")
@@ -98,10 +113,20 @@ struct MenuDetailColumn: View {
 
 struct MenuDetailView: View {
   let model: MenuLibraryModel
+  let recipeModel: RecipeLibraryModel
+  var onRecipeSelected: ((Recipe.ID) -> Void)?
   @State private var detailModel: MenuDetailModel
+  @State private var isShowingRecipeBrowser = false
 
-  init(model: MenuLibraryModel, menuID: CoreMenu.ID) {
+  init(
+    model: MenuLibraryModel,
+    recipeModel: RecipeLibraryModel,
+    menuID: CoreMenu.ID,
+    onRecipeSelected: ((Recipe.ID) -> Void)? = nil
+  ) {
     self.model = model
+    self.recipeModel = recipeModel
+    self.onRecipeSelected = onRecipeSelected
     _detailModel = State(wrappedValue: MenuDetailModel(menuID: menuID))
   }
 
@@ -111,7 +136,12 @@ struct MenuDetailView: View {
         ScrollView {
           VStack(alignment: .leading, spacing: 24) {
             MenuDetailHeader(detail: detail)
-            MenuDishList(detail: detail)
+            MenuDishList(
+              model: model,
+              menu: detail.menu,
+              detail: detail,
+              onRecipeSelected: onRecipeSelected
+            )
             MenuPlacementList(
               model: model,
               menu: detail.menu,
@@ -131,6 +161,11 @@ struct MenuDetailView: View {
       if let menu = detailModel.detail?.menu {
         ToolbarItemGroup(placement: .primaryAction) {
           Button {
+            isShowingRecipeBrowser.toggle()
+          } label: {
+            Label("Browse Recipes", systemImage: "sidebar.right")
+          }
+          Button {
             model.addItemButtonTapped(menu: menu)
           } label: {
             Label("Add Dish", systemImage: "plus")
@@ -143,6 +178,17 @@ struct MenuDetailView: View {
         }
       }
     }
+    .inspector(isPresented: $isShowingRecipeBrowser) {
+      if detailModel.detail != nil {
+        MenuRecipeBrowserPanel(
+          recipeModel: recipeModel,
+          onRecipeSelected: onRecipeSelected
+        )
+        .inspectorColumnWidth(min: 320, ideal: 380, max: 480)
+      } else {
+        ContentUnavailableView("Recipes", systemImage: "book.closed")
+      }
+    }
   }
 }
 
@@ -151,8 +197,6 @@ private struct MenuDetailHeader: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Text(detail.menu.title)
-        .font(.largeTitle.bold())
       HStack(spacing: 12) {
         Label(dayCountTitle, systemImage: "calendar")
         Label(itemCountTitle, systemImage: "fork.knife")
@@ -177,24 +221,26 @@ private struct MenuDetailHeader: View {
 }
 
 private struct MenuDishList: View {
+  let model: MenuLibraryModel
+  let menu: CoreMenu
   let detail: MenuDetailData
+  var onRecipeSelected: ((Recipe.ID) -> Void)?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
       Text("Dishes")
         .font(.title2.weight(.semibold))
 
-      if detail.itemRows.isEmpty {
-        ContentUnavailableView("No Dishes", systemImage: "fork.knife")
-          .frame(maxWidth: .infinity, minHeight: 180)
-      } else {
-        ForEach(0..<detail.menu.dayCount, id: \.self) { dayOffset in
-          MenuDaySection(
-            dayNumber: dayOffset + 1,
-            scheduledDate: scheduledDate(for: dayOffset),
-            rows: detail.itemRows.filter { $0.item.dayOffset == dayOffset }
-          )
-        }
+      ForEach(0..<detail.menu.dayCount, id: \.self) { dayOffset in
+        MenuDaySection(
+          model: model,
+          menu: menu,
+          dayNumber: dayOffset + 1,
+          dayOffset: dayOffset,
+          scheduledDate: scheduledDate(for: dayOffset),
+          rows: detail.itemRows.filter { $0.item.dayOffset == dayOffset },
+          onRecipeSelected: onRecipeSelected
+        )
       }
     }
   }
@@ -214,24 +260,46 @@ private struct MenuDishList: View {
 }
 
 private struct MenuDaySection: View {
+  let model: MenuLibraryModel
+  let menu: CoreMenu
   let dayNumber: Int
+  let dayOffset: Int
   let scheduledDate: Date?
   let rows: [MenuItemRowData]
+  var onRecipeSelected: ((Recipe.ID) -> Void)?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
-      dayTitle
-        .font(.headline)
-        .foregroundStyle(.secondary)
+      HStack(alignment: .firstTextBaseline) {
+        dayTitle
+          .font(.headline)
+          .foregroundStyle(.secondary)
+
+        Spacer()
+
+        Button {
+          model.addItemButtonTapped(
+            menu: menu,
+            kind: .recipe,
+            dayOffset: dayOffset,
+            mealSlot: .dinner
+          )
+        } label: {
+          Label("Add Recipe to Day \(dayNumber)", systemImage: "plus.circle")
+            .labelStyle(.iconOnly)
+        }
+        .accessibilityLabel("Add recipe to Day \(dayNumber)")
+      }
 
       if rows.isEmpty {
         Text("No dishes")
           .font(.subheadline)
           .foregroundStyle(.secondary)
+          .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
       } else {
         VStack(spacing: 0) {
           ForEach(rows) { row in
-            MenuDishRowView(row: row)
+            MenuDishRowView(row: row, onRecipeSelected: onRecipeSelected)
             if row.id != rows.last?.id {
               Divider()
                 .padding(.leading, 44)
@@ -244,6 +312,23 @@ private struct MenuDaySection: View {
           RoundedRectangle(cornerRadius: 8)
             .stroke(.quaternary)
         }
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .contentShape(Rectangle())
+    .dropDestination(for: MenuDraggedRecipe.self) { recipes, _ -> Bool in
+      return model.addRecipesToMenu(
+        recipeIDs: recipes.map(\.recipeID),
+        menuID: menu.id,
+        dayOffset: dayOffset,
+        mealSlot: .dinner
+      )
+    }
+    .dropDestination(for: MenuDraggedMenuItem.self) { items, _ in
+      let sameMenuItems = items.filter { $0.menuID == menu.id }
+      guard !sameMenuItems.isEmpty else { return false }
+      return sameMenuItems.allSatisfy { item in
+        model.moveMenuItem(itemID: item.itemID, toDayOffset: dayOffset)
       }
     }
   }
@@ -261,8 +346,30 @@ private struct MenuDaySection: View {
 
 private struct MenuDishRowView: View {
   let row: MenuItemRowData
+  var onRecipeSelected: ((Recipe.ID) -> Void)?
 
   var body: some View {
+    Group {
+      if let recipeID = row.item.recipeID, let onRecipeSelected {
+        Button {
+          onRecipeSelected(recipeID)
+        } label: {
+          rowContent
+        }
+        .buttonStyle(.plain)
+        .draggable(
+          MenuDraggedMenuItem(
+            menuID: row.item.menuID,
+            itemID: row.item.id
+          )
+        )
+      } else {
+        rowContent
+      }
+    }
+  }
+
+  private var rowContent: some View {
     HStack(alignment: .top, spacing: 12) {
       Image(systemName: row.item.kind.systemImage)
         .font(.title3)
@@ -286,6 +393,93 @@ private struct MenuDishRowView: View {
     }
     .padding(12)
   }
+}
+
+private struct MenuRecipeBrowserPanel: View {
+  let recipeModel: RecipeLibraryModel
+  var onRecipeSelected: ((Recipe.ID) -> Void)?
+
+  var body: some View {
+    @Bindable var recipeModel = recipeModel
+
+    VStack(spacing: 0) {
+      VStack(alignment: .leading, spacing: 12) {
+        HStack {
+          Text("Recipes")
+            .font(.headline)
+
+          Spacer()
+
+          Button {
+            recipeModel.filterButtonTapped()
+          } label: {
+            Label(
+              "Filter Recipes",
+              systemImage: recipeModel.hasActiveFilters
+                ? "line.3.horizontal.decrease.circle.fill"
+                : "line.3.horizontal.decrease.circle"
+            )
+            .labelStyle(.iconOnly)
+          }
+          .accessibilityLabel("Filter Recipes")
+        }
+
+        TextField("Search recipes", text: $recipeModel.searchText)
+          .textFieldStyle(.roundedBorder)
+          .textInputAutocapitalization(.never)
+      }
+      .padding()
+
+      RecipeListStatusBar(model: recipeModel)
+
+      List {
+        if recipeModel.visibleRecipeRows.isEmpty {
+          ContentUnavailableView.search(text: recipeModel.searchText)
+        } else {
+          ForEach(recipeModel.visibleRecipeRows) { row in
+            Button {
+              onRecipeSelected?(row.recipe.id)
+            } label: {
+              RecipeListRow(
+                row: row,
+                options: RecipeListViewOptions(
+                  density: .compact,
+                  showsSourceMetadata: true,
+                  showsCategoryMetadata: true
+                )
+              )
+            }
+            .buttonStyle(.plain)
+            .draggable(MenuDraggedRecipe(recipeID: row.recipe.id))
+          }
+        }
+      }
+      .listStyle(.plain)
+    }
+    .background(.background)
+  }
+}
+
+private struct MenuDraggedRecipe: Codable, Transferable {
+  var recipeID: Recipe.ID
+
+  static var transferRepresentation: some TransferRepresentation {
+    CodableRepresentation(contentType: .yesChefMenuRecipe)
+  }
+}
+
+private struct MenuDraggedMenuItem: Codable, Transferable {
+  var menuID: CoreMenu.ID
+  var itemID: MenuItem.ID
+
+  static var transferRepresentation: some TransferRepresentation {
+    CodableRepresentation(contentType: .yesChefMenuItem)
+  }
+}
+
+private extension UTType {
+  static let yesChefMenuRecipe = UTType(exportedAs: "com.jon.yeschef.menu-recipe")
+  static let yesChefMenuItem = UTType(exportedAs: "com.jon.yeschef.menu-item")
 }
 
 private struct MenuPlacementList: View {
@@ -398,6 +592,15 @@ struct MenuItemEditorView: View {
 
   let model: MenuLibraryModel
   let context: MenuItemDraftContext
+
+  init(model: MenuLibraryModel, context: MenuItemDraftContext) {
+    self.model = model
+    self.context = context
+    _kind = State(wrappedValue: context.kind == .reservation ? .note : context.kind)
+    _dayOffset = State(wrappedValue: context.dayOffset)
+    _mealSlot = State(wrappedValue: context.mealSlot)
+    _selectedRecipeID = State(wrappedValue: context.recipeID)
+  }
 
   private var dayOffsets: [Int] {
     Array(0..<max(context.dayCount, 1))
