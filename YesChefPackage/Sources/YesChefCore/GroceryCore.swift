@@ -285,11 +285,11 @@ public enum GroceryRepository {
       throw GroceryRepositoryError.itemNotFound(source.groceryItemID)
     }
 
-    let contributionKey = source.contributionKey
+    let contributionID = source.contributionID
     let itemsByID = Dictionary(uniqueKeysWithValues: try GroceryItem.fetchAll(db).map { ($0.id, $0) })
     let sourcesToDelete = try GroceryItemSource.fetchAll(db)
       .filter { candidate in
-        candidate.contributionKey == contributionKey
+        candidate.contributionID == contributionID
           && itemsByID[candidate.groceryItemID]?.groceryListID == item.groceryListID
       }
 
@@ -825,51 +825,6 @@ private struct PendingGroceryItemSource {
   var sourceSubtitle: String? = nil
   var ingredientText: String? = nil
   var dateCreated: Date
-}
-
-private enum GrocerySourceContributionKey: Equatable {
-  case source(GroceryItemSource.ID)
-  case recipe(Recipe.ID)
-  case calendarItem(MealPlanItem.ID)
-  case menuItem(Menu.ID, MenuItem.ID)
-  case menuPlacementItem(MenuPlacement.ID, MenuItem.ID)
-}
-
-private extension GroceryItemSource {
-  var contributionKey: GrocerySourceContributionKey {
-    switch origin {
-    case .custom:
-      .source(id)
-
-    case .recipe:
-      if let recipeID {
-        .recipe(recipeID)
-      } else {
-        .source(id)
-      }
-
-    case .calendarItem:
-      if let mealPlanItemID {
-        .calendarItem(mealPlanItemID)
-      } else {
-        .source(id)
-      }
-
-    case .menu:
-      if let menuID, let menuItemID {
-        .menuItem(menuID, menuItemID)
-      } else {
-        .source(id)
-      }
-
-    case .menuPlacement:
-      if let menuPlacementID, let menuItemID {
-        .menuPlacementItem(menuPlacementID, menuItemID)
-      } else {
-        .source(id)
-      }
-    }
-  }
 }
 
 private func areGroceryListRowsInIncreasingOrder(

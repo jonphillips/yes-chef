@@ -216,6 +216,9 @@ private struct GroceryItemsSection: View {
             togglePurchased: {
               model.togglePurchasedButtonTapped(itemID: row.id)
             },
+            deleteItem: {
+              model.deleteButtonTapped(itemID: row.id)
+            },
             deleteSource: { sourceID in
               model.deleteSourceButtonTapped(sourceID: sourceID)
             },
@@ -239,6 +242,7 @@ private struct GroceryItemsSection: View {
 private struct GroceryItemRowView: View {
   let row: GroceryItemRowData
   var togglePurchased: () -> Void
+  var deleteItem: () -> Void
   var deleteSource: (GroceryItemSource.ID) -> Void
   var deleteContribution: (GroceryItemSource.ID) -> Void
 
@@ -280,6 +284,13 @@ private struct GroceryItemRowView: View {
           .foregroundStyle(.secondary)
         }
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+      GroceryItemActionsMenu(
+        row: row,
+        deleteItem: deleteItem,
+        deleteContribution: deleteContribution
+      )
     }
     .padding(.vertical, 4)
   }
@@ -294,6 +305,48 @@ private struct GroceryItemRowView: View {
     .compactMap { $0 }
     .joined(separator: " ")
     .nonEmptyGroceryViewText
+  }
+}
+
+private struct GroceryItemActionsMenu: View {
+  let row: GroceryItemRowData
+  var deleteItem: () -> Void
+  var deleteContribution: (GroceryItemSource.ID) -> Void
+
+  var body: some View {
+    Menu {
+      if !removableContributions.isEmpty {
+        Section("Remove Contribution") {
+          ForEach(removableContributions) { contribution in
+            Button(role: .destructive) {
+              if let sourceID = contribution.representativeSourceID {
+                deleteContribution(sourceID)
+              }
+            } label: {
+              Label(contribution.actionTitle, systemImage: contribution.systemImage)
+            }
+          }
+        }
+      }
+
+      Button(role: .destructive) {
+        deleteItem()
+      } label: {
+        Label("Delete Item", systemImage: "trash")
+      }
+    } label: {
+      Image(systemName: "ellipsis.circle")
+        .imageScale(.large)
+        .frame(width: 32, height: 32)
+    }
+    .buttonStyle(.borderless)
+    .menuStyle(.button)
+    .accessibilityLabel("Grocery Item Actions")
+  }
+
+  private var removableContributions: [GrocerySourceContribution] {
+    row.sourceContributions
+      .filter { $0.removalTitle != nil && $0.representativeSourceID != nil }
   }
 }
 
@@ -357,20 +410,34 @@ private struct GrocerySourceLabel: View {
   }
 }
 
-private extension GroceryItemSource {
-  var contributionRemovalTitle: String? {
-    switch origin {
-    case .custom:
-      nil
-    case .recipe:
-      recipeID == nil ? nil : "Remove Recipe Items"
-    case .calendarItem:
-      mealPlanItemID == nil ? nil : "Remove Calendar Items"
-    case .menu:
-      menuID == nil || menuItemID == nil ? nil : "Remove Menu Dish Items"
-    case .menuPlacement:
-      menuPlacementID == nil || menuItemID == nil ? nil : "Remove Placed Dish Items"
+private extension GrocerySourceContribution {
+  var actionTitle: String {
+    guard let source = representativeSource else {
+      return removalTitle ?? "Remove Contribution"
     }
+
+    switch source.origin {
+    case .custom:
+      return removalTitle ?? "Remove Source"
+    case .recipe:
+      return source.sourceTitle.map { "Remove \($0) Recipe Items" } ?? "Remove Recipe Items"
+    case .calendarItem:
+      return source.sourceTitle.map { "Remove \($0) Calendar Items" } ?? "Remove Calendar Items"
+    case .menu:
+      if let dish = source.sourceSubtitle, let menu = source.sourceTitle {
+        return "Remove \(dish) from \(menu)"
+      }
+      return source.sourceTitle.map { "Remove \($0) Menu Dish Items" } ?? "Remove Menu Dish Items"
+    case .menuPlacement:
+      if let dish = source.sourceSubtitle, let menu = source.sourceTitle {
+        return "Remove \(dish) from Placed \(menu)"
+      }
+      return source.sourceTitle.map { "Remove Placed \($0) Items" } ?? "Remove Placed Dish Items"
+    }
+  }
+
+  var systemImage: String {
+    representativeSource?.origin.systemImage ?? "minus.square"
   }
 }
 
