@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: June 26, 2026.
+Last updated: June 27, 2026.
 
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
@@ -8,8 +8,8 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 ## Current Checkpoint
 
 The current slice scaffolds meal planning, menus, and grocery lists with
-source-preserving generated grocery items and a review step before adding
-generated ingredients.
+source-preserving generated grocery items, a review step before adding generated
+ingredients, and first-pass menu/calendar planning polish.
 
 Implemented behavior:
 
@@ -29,6 +29,17 @@ Implemented behavior:
   data and show as menu-derived instead of editable standalone meal plan items.
 - A minimal Menus section in the app shell for creating menus, adding dishes, and
   placing a menu on the calendar.
+- Menu detail now has a single navigation title, a slide-in recipe browser
+  inspector with search/filter controls, day-header add buttons, recipe drops
+  from the browser onto a day, and drag-to-move support for menu recipes between
+  days.
+- Tapping a recipe from menus or the meal-calendar agenda opens the recipe in a
+  full-screen presentation.
+- The meal calendar now optimistically reflects item date edits/deletes while
+  SQLiteData observation catches up, avoiding stale month and agenda counts after
+  moving items between days.
+- Week calendar cells are taller on wide layouts and allow longer recipe/note
+  titles to display.
 - A durable grocery schema with `groceryLists`, `groceryItems`, and
   `groceryItemSources`.
 - Grocery sources preserve recipe, menu, menu placement, calendar item, and
@@ -62,24 +73,32 @@ Implemented behavior:
   start deselected and can be added back with a tap.
 - Settings exposes an editable Pantry list backed by app storage; one item per
   line controls which pantry staples are skipped by default in grocery selection.
+- Pantry items sort alphabetically. Pantry quantity tracking remains explicitly
+  out of scope; a possible future "Inventory Confirm" grocery-list section would
+  need a real measurement normalization layer rather than general pantry
+  inventory.
 - The meal-calendar recipe picker supports adding multiple recipes in one save.
 - Ingredient parsing avoids treating food words like red/celery/anchovy as units,
   splits comma preparations into notes, and normalizes anchovy fillets into the
   shoppable title "anchovies".
-- Core tests cover meal calendar, menus, grocery source provenance, and generated
+- Core tests cover meal calendar, menus, grocery source provenance, generated
   grocery consolidation/source-removal/ingredient-selection/pantry-assumption/
-  ingredient-parsing behavior.
+  ingredient-parsing behavior, menu item moves, and alphabetical pantry sorting.
 
 Deferred from this slice:
 
 - Drag/drop or direct manipulation inside the calendar grid.
 - Restaurant reservation-specific UI.
 - iCal import/export/sync.
-- Rich menu editing: reordering dishes, editing existing menu dishes, and
-  duplicating menus.
+- Rich menu editing: editing existing menu dishes, duplicating menus, and
+  fine-grained ordering within a day.
 - Higher-level source-aware grocery removal flows, such as removing a recipe's
   full contribution from a grocery list without deleting unrelated sources.
 - Quantity-based pantry inventory.
+- App Intents/Shortcuts implementation. Current low-hanging candidates are:
+  open today's calendar, open a recipe, start cooking mode, add a recipe to a
+  date defaulting to dinner, add selected recipe ingredients to groceries, and
+  add a pantry assumption by name.
 - Reminders/Siri integration, store/category learning, and shopping workflow
   polish.
 - Importing Paprika menus or grocery lists from backup/export data, if that data
@@ -98,16 +117,31 @@ Before checkpointing UI work:
 
 Jon performs the primary UI testing pass.
 
+Latest verification:
+
+- `swift test --package-path YesChefPackage` passed.
+- `xcodebuild -scheme YesChef -destination 'platform=iOS Simulator,name=iPad Air 13-inch (M4)' -skipMacroValidation build` passed.
+- Installing/running on both active simulators still needs a follow-up pass;
+  `CoreSimulatorService`/`simdiskimaged` became unavailable during the last
+  attempt after the iPad build succeeded.
+
 ## Recommended Next Larger Task
 
-Polish grocery generation and shopping workflow around the newly visible source
-model.
+Do Jon's primary UI pass on the new menu/calendar planning interactions, then
+return to grocery generation and shopping workflow polish around the visible
+source model.
 
 Suggested next scope:
 
 - Jon should do the primary UI pass on iPad and iPhone.
-- Create a multi-day menu, place it on the calendar, shift the placement, remove
-  the placement, and confirm the calendar/source relationship remains legible.
+- Create a multi-day menu, add recipes via the day header, drag recipes from the
+  browser onto days, drag menu recipes between days, place the menu on the
+  calendar, shift the placement, remove the placement, and confirm the
+  calendar/source relationship remains legible.
+- Confirm full-screen recipe presentation from menu rows and meal-calendar agenda
+  rows works naturally with the current navigation setup.
+- Re-test calendar move/edit flows on adjacent days to confirm the optimistic
+  refresh behavior matches the visible month, week, and agenda state.
 - Polish the grocery source breakdown if Jon's UI pass finds the per-source
   actions too subtle or too noisy.
 - Broaden source-aware removal from the current per-source action into higher-level
@@ -117,8 +151,8 @@ Suggested next scope:
   of this slice.
 - Treat Grocy as inspiration for shopping locations/assortments and product/barcode
   workflows, but keep Yes Chef recipe/planning-first rather than inventory-first.
-- Revisit drag/drop from recipe rows into either the calendar, a menu, or
-  groceries after the source model is visible to users.
+- Revisit drag/drop from recipe rows into the calendar or groceries after the
+  source model is visible to users.
 
 Reasoning:
 
@@ -134,3 +168,5 @@ Reasoning:
   calendar items.
 - Pantry value comes first from making skipped known staples reviewable and easy
   to add back, not from tracking exact on-hand quantities.
+- Menu drag/drop is now implemented for menus, but still needs Jon's hands-on UI
+  pass across iPad and iPhone before treating it as settled.
