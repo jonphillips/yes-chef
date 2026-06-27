@@ -38,6 +38,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jon.yeschef
         PRODUCT_NAME: YesChef
+        DEVELOPMENT_TEAM: 7MQEE539G9
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Yes Chef
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
