@@ -98,6 +98,15 @@ public struct GroceryItemListRequest: FetchKeyRequest {
   }
 }
 
+public struct PantryItemListRequest: FetchKeyRequest {
+  public init() {}
+
+  public func fetch(_ db: Database) throws -> [PantryItem] {
+    try PantryItem.fetchAll(db)
+      .sorted(by: arePantryItemsInIncreasingOrder)
+  }
+}
+
 public struct GroceryIngredientChoiceRequest: FetchKeyRequest {
   public init() {}
 
@@ -149,6 +158,10 @@ public enum GroceryRepository {
       return defaultList.id
     }
     if let firstList = lists.first {
+      var list = firstList
+      list.isDefault = true
+      list.dateModified = now
+      try GroceryList.upsert { list }.execute(db)
       return firstList.id
     }
 
@@ -175,17 +188,83 @@ public enum GroceryRepository {
     guard let title = title.nonEmptyGroceryText else {
       throw GroceryRepositoryError.emptyListTitle
     }
+    let isFirstList = try GroceryList.fetchCount(db) == 0
 
     let list = GroceryList(
       id: uuid(),
       title: title,
       sortOrder: try nextListSortOrder(in: db),
+      isDefault: isFirstList,
       remindersListName: remindersListName?.nonEmptyGroceryText,
       dateCreated: now,
       dateModified: now
     )
     try GroceryList.insert { list }.execute(db)
     return list.id
+  }
+
+  public static func updateList(
+    listID: GroceryList.ID,
+    title: String,
+    remindersListName: String? = nil,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard var list = try GroceryList.find(listID).fetchOne(db) else {
+      throw GroceryRepositoryError.listNotFound(listID)
+    }
+    guard let title = title.nonEmptyGroceryText else {
+      throw GroceryRepositoryError.emptyListTitle
+    }
+
+    list.title = title
+    list.remindersListName = remindersListName?.nonEmptyGroceryText
+    list.dateModified = now
+    try GroceryList.upsert { list }.execute(db)
+  }
+
+  public static func setDefaultList(
+    listID: GroceryList.ID,
+    in db: Database,
+    now: Date
+  ) throws {
+    _ = try requireList(listID, in: db)
+
+    for var list in try GroceryList.fetchAll(db) {
+      let shouldBeDefault = list.id == listID
+      guard list.isDefault != shouldBeDefault else { continue }
+      list.isDefault = shouldBeDefault
+      list.dateModified = now
+      try GroceryList.upsert { list }.execute(db)
+    }
+  }
+
+  @discardableResult
+  public static func deleteList(
+    listID: GroceryList.ID,
+    in db: Database,
+    now: Date
+  ) throws -> GroceryList.ID {
+    let list = try requireList(listID, in: db)
+    let lists = try GroceryList.fetchAll(db).sorted(by: areGroceryListsInIncreasingOrder)
+    guard lists.count > 1 else {
+      throw GroceryRepositoryError.cannotDeleteOnlyList
+    }
+
+    try GroceryList.find(list.id).delete().execute(db)
+
+    let remainingLists = try GroceryList.fetchAll(db).sorted(by: areGroceryListsInIncreasingOrder)
+    if let defaultList = remainingLists.first(where: \.isDefault) {
+      return defaultList.id
+    }
+
+    guard var promotedList = remainingLists.first else {
+      throw GroceryRepositoryError.cannotDeleteOnlyList
+    }
+    promotedList.isDefault = true
+    promotedList.dateModified = now
+    try GroceryList.upsert { promotedList }.execute(db)
+    return promotedList.id
   }
 
   @discardableResult
@@ -256,6 +335,39 @@ public enum GroceryRepository {
       throw GroceryRepositoryError.itemNotFound(itemID)
     }
     try GroceryItem.find(itemID).delete().execute(db)
+  }
+
+  @discardableResult
+  public static func clearPurchasedItems(
+    groceryListID: GroceryList.ID,
+    in db: Database
+  ) throws -> Int {
+    _ = try requireList(groceryListID, in: db)
+    let items = try GroceryItem
+      .where { $0.groceryListID.eq(groceryListID) }
+      .fetchAll(db)
+      .filter(\.isPurchased)
+
+    for item in items {
+      try GroceryItem.find(item.id).delete().execute(db)
+    }
+    return items.count
+  }
+
+  @discardableResult
+  public static func clearAllItems(
+    groceryListID: GroceryList.ID,
+    in db: Database
+  ) throws -> Int {
+    _ = try requireList(groceryListID, in: db)
+    let items = try GroceryItem
+      .where { $0.groceryListID.eq(groceryListID) }
+      .fetchAll(db)
+
+    for item in items {
+      try GroceryItem.find(item.id).delete().execute(db)
+    }
+    return items.count
   }
 
   public static func deleteSource(
@@ -736,9 +848,171 @@ public enum GroceryRepository {
   }
 }
 
+public enum PantryRepository {
+  @discardableResult
+  public static func ensureDefaultItems(
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> [PantryItem.ID] {
+    guard try PantryItem.fetchCount(db) == 0 else { return [] }
+    return try addItems(
+      GroceryPantryAssumptions.defaultStaples,
+      in: db,
+      now: now,
+      uuid: uuid
+    )
+  }
+
+  @discardableResult
+  public static func replaceItems(
+    titles: [String],
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> [PantryItem.ID] {
+    try PantryItem.delete().execute(db)
+    return try addItems(titles, in: db, now: now, uuid: uuid)
+  }
+
+  @discardableResult
+  public static func resetToDefaults(
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> [PantryItem.ID] {
+    try replaceItems(
+      titles: GroceryPantryAssumptions.defaultStaples,
+      in: db,
+      now: now,
+      uuid: uuid
+    )
+  }
+
+  @discardableResult
+  public static func addItem(
+    title: String,
+    notes: String? = nil,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> PantryItem.ID {
+    guard let title = title.nonEmptyGroceryText else {
+      throw GroceryRepositoryError.emptyPantryItemTitle
+    }
+
+    if var existingItem = try pantryItem(matching: title, in: db) {
+      let notes = notes?.nonEmptyGroceryText
+      if let notes, existingItem.notes != notes {
+        existingItem.notes = notes
+        existingItem.dateModified = now
+        try PantryItem.upsert { existingItem }.execute(db)
+      }
+      return existingItem.id
+    }
+
+    let item = PantryItem(
+      id: uuid(),
+      title: title,
+      notes: notes?.nonEmptyGroceryText,
+      sortOrder: try nextPantrySortOrder(in: db),
+      dateCreated: now,
+      dateModified: now
+    )
+    try PantryItem.insert { item }.execute(db)
+    return item.id
+  }
+
+  public static func updateItem(
+    itemID: PantryItem.ID,
+    title: String,
+    notes: String? = nil,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard var item = try PantryItem.find(itemID).fetchOne(db) else {
+      throw GroceryRepositoryError.pantryItemNotFound(itemID)
+    }
+    guard let title = title.nonEmptyGroceryText else {
+      throw GroceryRepositoryError.emptyPantryItemTitle
+    }
+
+    if let existingItem = try pantryItem(matching: title, in: db),
+       existingItem.id != itemID {
+      try PantryItem.find(itemID).delete().execute(db)
+      return
+    }
+
+    item.title = title
+    item.notes = notes?.nonEmptyGroceryText
+    item.dateModified = now
+    try PantryItem.upsert { item }.execute(db)
+  }
+
+  public static func deleteItem(
+    itemID: PantryItem.ID,
+    in db: Database
+  ) throws {
+    guard try PantryItem.find(itemID).fetchOne(db) != nil else {
+      throw GroceryRepositoryError.pantryItemNotFound(itemID)
+    }
+    try PantryItem.find(itemID).delete().execute(db)
+  }
+
+  @discardableResult
+  private static func addItems(
+    _ titles: [String],
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> [PantryItem.ID] {
+    var itemIDs: [PantryItem.ID] = []
+    for title in uniquePantryTitles(titles) {
+      itemIDs.append(
+        try addItem(
+          title: title,
+          in: db,
+          now: now,
+          uuid: uuid
+        )
+      )
+    }
+    return itemIDs
+  }
+
+  private static func pantryItem(
+    matching title: String,
+    in db: Database
+  ) throws -> PantryItem? {
+    let key = title.groceryConsolidationKey
+    return try PantryItem.fetchAll(db)
+      .first { $0.title.groceryConsolidationKey == key }
+  }
+
+  private static func nextPantrySortOrder(in db: Database) throws -> Int {
+    (try PantryItem.fetchAll(db).map(\.sortOrder).max() ?? -1) + 1
+  }
+
+  private static func uniquePantryTitles(_ titles: [String]) -> [String] {
+    var seen: Set<String> = []
+    var uniqueTitles: [String] = []
+    for title in titles {
+      guard let title = title.nonEmptyGroceryText,
+            let key = title.groceryConsolidationKey,
+            !seen.contains(key)
+      else { continue }
+      seen.insert(key)
+      uniqueTitles.append(title)
+    }
+    return uniqueTitles
+  }
+}
+
 public enum GroceryRepositoryError: Error, Equatable, Sendable {
+  case cannotDeleteOnlyList
   case emptyItemTitle
   case emptyListTitle
+  case emptyPantryItemTitle
   case itemNotFound(GroceryItem.ID)
   case listNotFound(GroceryList.ID)
   case mealPlanItemHasNoRecipe(MealPlanItem.ID)
@@ -746,6 +1020,7 @@ public enum GroceryRepositoryError: Error, Equatable, Sendable {
   case menuNotFound(Menu.ID)
   case menuPlacementNotFound(MenuPlacement.ID)
   case noShoppableIngredients
+  case pantryItemNotFound(PantryItem.ID)
   case recipeNotFound(Recipe.ID)
   case sourceNotFound(GroceryItemSource.ID)
 }
@@ -867,6 +1142,17 @@ private func areGroceryItemSourcesInIncreasingOrder(
 ) -> Bool {
   if lhs.dateCreated != rhs.dateCreated {
     return lhs.dateCreated < rhs.dateCreated
+  }
+  return lhs.id.uuidString < rhs.id.uuidString
+}
+
+private func arePantryItemsInIncreasingOrder(_ lhs: PantryItem, _ rhs: PantryItem) -> Bool {
+  if lhs.sortOrder != rhs.sortOrder {
+    return lhs.sortOrder < rhs.sortOrder
+  }
+  let titleComparison = lhs.title.localizedStandardCompare(rhs.title)
+  if titleComparison != .orderedSame {
+    return titleComparison == .orderedAscending
   }
   return lhs.id.uuidString < rhs.id.uuidString
 }

@@ -579,6 +579,178 @@ extension RecipeCoreTests {
       }
     }
 
+    @Test
+    func clearsPurchasedAndAllItems() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 805_700_000)
+      let purchasedAt = Date(timeIntervalSinceReferenceDate: 805_701_000)
+      var uuids = SampleUUIDSequence(start: 19_100)
+
+      try database.write { db in
+        let listID = try GroceryRepository.addList(
+          title: "Clear Test",
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let purchasedItemID = try GroceryRepository.addCustomItem(
+          title: "Milk",
+          groceryListID: listID,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        _ = try GroceryRepository.addCustomItem(
+          title: "Eggs",
+          groceryListID: listID,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        try GroceryRepository.updatePurchasedState(
+          itemID: purchasedItemID,
+          isPurchased: true,
+          in: db,
+          now: purchasedAt
+        )
+
+        expectNoDifference(
+          try GroceryRepository.clearPurchasedItems(groceryListID: listID, in: db),
+          1
+        )
+        expectNoDifference(
+          try GroceryItemListRequest().fetch(db)
+            .filter { $0.item.groceryListID == listID }
+            .map(\.item.title),
+          ["Eggs"]
+        )
+
+        expectNoDifference(
+          try GroceryRepository.clearAllItems(groceryListID: listID, in: db),
+          1
+        )
+        expectNoDifference(
+          try GroceryItemListRequest().fetch(db)
+            .filter { $0.item.groceryListID == listID },
+          []
+        )
+      }
+    }
+
+    @Test
+    func managesPrimaryAndSecondaryLists() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 805_710_000)
+      let modifiedAt = Date(timeIntervalSinceReferenceDate: 805_711_000)
+      var uuids = SampleUUIDSequence(start: 19_300)
+
+      try database.write { db in
+        try GroceryList.delete().execute(db)
+
+        let primaryListID = try GroceryRepository.addList(
+          title: "Primary",
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let secondaryListID = try GroceryRepository.addList(
+          title: "Secondary",
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        try GroceryRepository.setDefaultList(
+          listID: secondaryListID,
+          in: db,
+          now: modifiedAt
+        )
+        var rows = try GroceryListRequest().fetch(db)
+          .filter { [primaryListID, secondaryListID].contains($0.id) }
+
+        expectNoDifference(rows.first { $0.id == primaryListID }?.list.isDefault, false)
+        expectNoDifference(rows.first { $0.id == secondaryListID }?.list.isDefault, true)
+
+        try GroceryRepository.updateList(
+          listID: secondaryListID,
+          title: "Hardware Store",
+          remindersListName: "Hardware",
+          in: db,
+          now: modifiedAt
+        )
+
+        let updatedList = try #require(try GroceryList.find(secondaryListID).fetchOne(db))
+        expectNoDifference(updatedList.title, "Hardware Store")
+        expectNoDifference(updatedList.remindersListName, "Hardware")
+
+        _ = try GroceryRepository.deleteList(
+          listID: secondaryListID,
+          in: db,
+          now: modifiedAt
+        )
+        rows = try GroceryListRequest().fetch(db)
+          .filter { [primaryListID, secondaryListID].contains($0.id) }
+
+        expectNoDifference(rows.map(\.id), [primaryListID])
+        expectNoDifference(rows.first?.list.isDefault, true)
+      }
+    }
+
+    @Test
+    func managesPantryRows() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 805_720_000)
+      let modifiedAt = Date(timeIntervalSinceReferenceDate: 805_721_000)
+      var uuids = SampleUUIDSequence(start: 19_500)
+
+      try database.write { db in
+        let sugarID = try PantryRepository.addItem(
+          title: "  Sugar  ",
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let duplicateSugarID = try PantryRepository.addItem(
+          title: "sugar",
+          notes: "Baking",
+          in: db,
+          now: modifiedAt,
+          uuid: { uuids.next() }
+        )
+
+        expectNoDifference(duplicateSugarID, sugarID)
+        var row = try #require(try PantryItem.find(sugarID).fetchOne(db))
+        expectNoDifference(row.title, "Sugar")
+        expectNoDifference(row.notes, "Baking")
+
+        expectNoDifference(
+          try PantryRepository.addItem(
+            title: "SUGAR",
+            in: db,
+            now: modifiedAt,
+            uuid: { uuids.next() }
+          ),
+          sugarID
+        )
+        row = try #require(try PantryItem.find(sugarID).fetchOne(db))
+        expectNoDifference(row.notes, "Baking")
+
+        try PantryRepository.updateItem(
+          itemID: sugarID,
+          title: "Brown sugar",
+          notes: "Light or dark",
+          in: db,
+          now: modifiedAt
+        )
+        row = try #require(try PantryItem.find(sugarID).fetchOne(db))
+        expectNoDifference(row.title, "Brown sugar")
+        expectNoDifference(row.notes, "Light or dark")
+
+        try PantryRepository.deleteItem(itemID: sugarID, in: db)
+        expectNoDifference(try PantryItem.find(sugarID).fetchOne(db), nil)
+      }
+    }
+
   }
 }
 

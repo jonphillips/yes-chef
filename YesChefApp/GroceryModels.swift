@@ -14,6 +14,12 @@ final class GroceryLibraryModel {
   enum Destination {
     case addCustomItem
     case addList
+    case addPantryItem
+    case clearAll(CoreGroceryList.ID)
+    case clearPurchased(CoreGroceryList.ID)
+    case deleteList(CoreGroceryList.ID)
+    case editList(CoreGroceryList.ID)
+    case editPantryItem(PantryItem.ID)
     case selectIngredients(GroceryIngredientSelectionContext)
   }
 
@@ -27,6 +33,8 @@ final class GroceryLibraryModel {
   @Fetch(GroceryListRequest(), animation: .default) var listRows: [GroceryListRowData] = []
   @ObservationIgnored
   @Fetch(GroceryItemListRequest(), animation: .default) var itemRows: [GroceryItemRowData] = []
+  @ObservationIgnored
+  @Fetch(PantryItemListRequest(), animation: .default) var pantryItems: [PantryItem] = []
   @ObservationIgnored
   @Fetch(MenuListRequest(), animation: .default) var menuRows: [MenuRowData] = []
   @ObservationIgnored
@@ -50,6 +58,10 @@ final class GroceryLibraryModel {
   var selectedItemRows: [GroceryItemRowData] {
     guard let listID = selectedListRow?.id else { return [] }
     return itemRows.filter { $0.item.groceryListID == listID }
+  }
+
+  var pantryStapleNames: [String] {
+    pantryItems.map(\.title)
   }
 
   var availableMenuRows: [MenuRowData] {
@@ -80,20 +92,43 @@ final class GroceryLibraryModel {
     destination = .addList
   }
 
+  func addPantryItemButtonTapped() {
+    destination = .addPantryItem
+  }
+
   func addCustomItemButtonTapped() {
     destination = .addCustomItem
   }
 
-  func saveListButtonTapped(title: String, remindersListName: String) -> Bool {
+  func editListButtonTapped(listID: CoreGroceryList.ID) {
+    destination = .editList(listID)
+  }
+
+  func saveListButtonTapped(
+    listID: CoreGroceryList.ID? = nil,
+    title: String,
+    remindersListName: String
+  ) -> Bool {
     do {
       let listID = try database.write { db in
-        try GroceryRepository.addList(
-          title: title,
-          remindersListName: remindersListName,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
+        if let listID {
+          try GroceryRepository.updateList(
+            listID: listID,
+            title: title,
+            remindersListName: remindersListName,
+            in: db,
+            now: now
+          )
+          return listID
+        } else {
+          return try GroceryRepository.addList(
+            title: title,
+            remindersListName: remindersListName,
+            in: db,
+            now: now,
+            uuid: { uuid() }
+          )
+        }
       }
       selectedListID = listID
       destination = nil
@@ -102,6 +137,43 @@ final class GroceryLibraryModel {
       errorMessage = String(describing: error)
       isShowingError = true
       return false
+    }
+  }
+
+  func setPrimaryListButtonTapped(listID: CoreGroceryList.ID) {
+    do {
+      try database.write { db in
+        try GroceryRepository.setDefaultList(
+          listID: listID,
+          in: db,
+          now: now
+        )
+      }
+      selectedListID = listID
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func deleteListButtonTapped(listID: CoreGroceryList.ID) {
+    destination = .deleteList(listID)
+  }
+
+  func confirmDeleteListButtonTapped(listID: CoreGroceryList.ID) {
+    do {
+      let selectedListID = try database.write { db in
+        try GroceryRepository.deleteList(
+          listID: listID,
+          in: db,
+          now: now
+        )
+      }
+      self.selectedListID = selectedListID
+      destination = nil
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
     }
   }
 
@@ -144,6 +216,89 @@ final class GroceryLibraryModel {
     }
   }
 
+  func addToPantryButtonTapped(itemID: GroceryItem.ID) {
+    guard let row = itemRows.first(where: { $0.item.id == itemID }) else { return }
+
+    do {
+      _ = try database.write { db in
+        try PantryRepository.addItem(
+          title: row.item.title,
+          notes: row.item.notes,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func savePantryItemButtonTapped(
+    itemID: PantryItem.ID? = nil,
+    title: String,
+    notes: String
+  ) -> Bool {
+    do {
+      try database.write { db in
+        if let itemID {
+          try PantryRepository.updateItem(
+            itemID: itemID,
+            title: title,
+            notes: notes,
+            in: db,
+            now: now
+          )
+        } else {
+          try PantryRepository.addItem(
+            title: title,
+            notes: notes,
+            in: db,
+            now: now,
+            uuid: { uuid() }
+          )
+        }
+      }
+      destination = nil
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
+  func editPantryItemButtonTapped(itemID: PantryItem.ID) {
+    destination = .editPantryItem(itemID)
+  }
+
+  func deletePantryItemButtonTapped(itemID: PantryItem.ID) {
+    do {
+      try database.write { db in
+        try PantryRepository.deleteItem(itemID: itemID, in: db)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func resetPantryButtonTapped() {
+    do {
+      _ = try database.write { db in
+        try PantryRepository.resetToDefaults(
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
   func togglePurchasedButtonTapped(itemID: GroceryItem.ID) {
     guard let row = itemRows.first(where: { $0.item.id == itemID }) else { return }
 
@@ -156,6 +311,44 @@ final class GroceryLibraryModel {
           now: now
         )
       }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func clearPurchasedButtonTapped(listID: CoreGroceryList.ID) {
+    destination = .clearPurchased(listID)
+  }
+
+  func confirmClearPurchasedButtonTapped(listID: CoreGroceryList.ID) {
+    do {
+      _ = try database.write { db in
+        try GroceryRepository.clearPurchasedItems(
+          groceryListID: listID,
+          in: db
+        )
+      }
+      destination = nil
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func clearAllButtonTapped(listID: CoreGroceryList.ID) {
+    destination = .clearAll(listID)
+  }
+
+  func confirmClearAllButtonTapped(listID: CoreGroceryList.ID) {
+    do {
+      _ = try database.write { db in
+        try GroceryRepository.clearAllItems(
+          groceryListID: listID,
+          in: db
+        )
+      }
+      destination = nil
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
@@ -372,6 +565,14 @@ final class GroceryLibraryModel {
       errorMessage = String(describing: error)
       isShowingError = true
     }
+  }
+
+  func title(forList listID: CoreGroceryList.ID) -> String {
+    listRows.first { $0.id == listID }?.list.title ?? "Grocery List"
+  }
+
+  func title(forPantryItem itemID: PantryItem.ID) -> String {
+    pantryItems.first { $0.id == itemID }?.title ?? "Pantry Item"
   }
 
   private func recipeIDs(

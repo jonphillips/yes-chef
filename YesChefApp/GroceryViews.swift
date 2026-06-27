@@ -34,11 +34,13 @@ struct GroceryListView: View {
         List {
           ForEach(model.listRows) { row in
             GroceryListRowView(row: row)
+              .groceryListManagementActions(row: row, model: model)
           }
         }
       case .selection:
         List(model.listRows, selection: $model.selectedListID) { row in
           GroceryListRowView(row: row)
+            .groceryListManagementActions(row: row, model: model)
             .tag(row.id)
         }
       }
@@ -142,6 +144,14 @@ struct GroceryDetailView: View {
               selectedDate: mealCalendarModel.selectedDate
             )
 
+            GroceryListActionsMenu(
+              row: selectedList,
+              purchasedItemCount: purchasedRows.count,
+              totalItemCount: model.selectedItemRows.count,
+              listCount: model.listRows.count,
+              model: model
+            )
+
             if showsListPicker {
               Button {
                 model.addListButtonTapped()
@@ -202,6 +212,60 @@ private struct GrocerySourceMenu: View {
   }
 }
 
+private struct GroceryListActionsMenu: View {
+  let row: GroceryListRowData
+  var purchasedItemCount: Int
+  var totalItemCount: Int
+  var listCount: Int
+  let model: GroceryLibraryModel
+
+  var body: some View {
+    Menu {
+      Button {
+        model.editListButtonTapped(listID: row.id)
+      } label: {
+        Label("Edit List", systemImage: "pencil")
+      }
+
+      if !row.list.isDefault {
+        Button {
+          model.setPrimaryListButtonTapped(listID: row.id)
+        } label: {
+          Label("Make Primary", systemImage: "star")
+        }
+      }
+
+      Section("Clear") {
+        Button(role: .destructive) {
+          model.clearPurchasedButtonTapped(listID: row.id)
+        } label: {
+          Label("Clear Purchased", systemImage: "checkmark.circle")
+        }
+        .disabled(purchasedItemCount == 0)
+
+        Button(role: .destructive) {
+          model.clearAllButtonTapped(listID: row.id)
+        } label: {
+          Label("Clear All", systemImage: "trash")
+        }
+        .disabled(totalItemCount == 0)
+      }
+
+      if listCount > 1 {
+        Section {
+          Button(role: .destructive) {
+            model.deleteListButtonTapped(listID: row.id)
+          } label: {
+            Label("Delete List", systemImage: "trash")
+          }
+        }
+      }
+    } label: {
+      Label("List Actions", systemImage: "ellipsis.circle")
+    }
+  }
+}
+
 private struct GroceryItemsSection: View {
   let title: String
   let rows: [GroceryItemRowData]
@@ -224,8 +288,19 @@ private struct GroceryItemsSection: View {
             },
             deleteContribution: { sourceID in
               model.deleteContributionButtonTapped(sourceID: sourceID)
+            },
+            addToPantry: {
+              model.addToPantryButtonTapped(itemID: row.id)
             }
           )
+          .swipeActions(edge: .leading) {
+            Button {
+              model.addToPantryButtonTapped(itemID: row.id)
+            } label: {
+              Label("Add to Pantry", systemImage: "archivebox")
+            }
+            .tint(.green)
+          }
           .swipeActions {
             Button(role: .destructive) {
               model.deleteButtonTapped(itemID: row.id)
@@ -245,6 +320,7 @@ private struct GroceryItemRowView: View {
   var deleteItem: () -> Void
   var deleteSource: (GroceryItemSource.ID) -> Void
   var deleteContribution: (GroceryItemSource.ID) -> Void
+  var addToPantry: () -> Void
 
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
@@ -288,6 +364,7 @@ private struct GroceryItemRowView: View {
 
       GroceryItemActionsMenu(
         row: row,
+        addToPantry: addToPantry,
         deleteItem: deleteItem,
         deleteContribution: deleteContribution
       )
@@ -310,11 +387,18 @@ private struct GroceryItemRowView: View {
 
 private struct GroceryItemActionsMenu: View {
   let row: GroceryItemRowData
+  var addToPantry: () -> Void
   var deleteItem: () -> Void
   var deleteContribution: (GroceryItemSource.ID) -> Void
 
   var body: some View {
     Menu {
+      Button {
+        addToPantry()
+      } label: {
+        Label("Add to Pantry", systemImage: "archivebox")
+      }
+
       if !removableContributions.isEmpty {
         Section("Remove Contribution") {
           ForEach(removableContributions) { contribution in
@@ -442,25 +526,70 @@ private extension GrocerySourceContribution {
 }
 
 struct PantrySettingsView: View {
-  @AppStorage(GroceryPantryStorage.storageKey) private var pantryText = GroceryPantryStorage.defaultText
+  let model: GroceryLibraryModel
 
   var body: some View {
-    Form {
-      Section("Pantry List") {
-        StackedTextEditor(title: "Items", text: $pantryText, minHeight: 260)
-          .textInputAutocapitalization(.never)
+    List {
+      if model.pantryItems.isEmpty {
+        Section {
+          ContentUnavailableView("No Pantry Items", systemImage: "archivebox")
+            .frame(maxWidth: .infinity, minHeight: 220)
+        }
+      } else {
+        Section("Pantry Items") {
+          ForEach(model.pantryItems) { item in
+            Button {
+              model.editPantryItemButtonTapped(itemID: item.id)
+            } label: {
+              PantryItemRowView(item: item)
+            }
+            .buttonStyle(.plain)
+            .swipeActions {
+              Button(role: .destructive) {
+                model.deletePantryItemButtonTapped(itemID: item.id)
+              } label: {
+                Label("Delete", systemImage: "trash")
+              }
+            }
+          }
+        }
       }
     }
     .navigationTitle("Pantry")
     .toolbar {
-      ToolbarItem(placement: .primaryAction) {
+      ToolbarItemGroup(placement: .primaryAction) {
         Button {
-          pantryText = GroceryPantryStorage.defaultText
+          model.addPantryItemButtonTapped()
+        } label: {
+          Label("Add Pantry Item", systemImage: "plus")
+        }
+
+        Button {
+          model.resetPantryButtonTapped()
         } label: {
           Label("Reset", systemImage: "arrow.counterclockwise")
         }
       }
     }
+  }
+}
+
+private struct PantryItemRowView: View {
+  let item: PantryItem
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(item.title)
+        .font(.headline)
+
+      if let notes = item.notes?.nonEmptyGroceryViewText {
+        Text(notes)
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.vertical, 4)
   }
 }
 
@@ -486,6 +615,41 @@ enum GroceryPantryStorage {
   }
 }
 
+private extension View {
+  func groceryListManagementActions(
+    row: GroceryListRowData,
+    model: GroceryLibraryModel
+  ) -> some View {
+    self
+      .swipeActions(edge: .leading) {
+        if !row.list.isDefault {
+          Button {
+            model.setPrimaryListButtonTapped(listID: row.id)
+          } label: {
+            Label("Make Primary", systemImage: "star")
+          }
+          .tint(.blue)
+        }
+      }
+      .swipeActions {
+        Button {
+          model.editListButtonTapped(listID: row.id)
+        } label: {
+          Label("Edit", systemImage: "pencil")
+        }
+        .tint(.blue)
+
+        if model.listRows.count > 1 {
+          Button(role: .destructive) {
+            model.deleteListButtonTapped(listID: row.id)
+          } label: {
+            Label("Delete", systemImage: "trash")
+          }
+        }
+      }
+  }
+}
+
 private struct GroceryListRowView: View {
   let row: GroceryListRowData
 
@@ -494,6 +658,9 @@ private struct GroceryListRowView: View {
       Text(row.list.title)
         .font(.headline)
       HStack(spacing: 10) {
+        if row.list.isDefault {
+          Label("Primary", systemImage: "star.fill")
+        }
         Label(itemCountTitle, systemImage: "cart")
         if row.remainingItemCount > 0 {
           Label("\(row.remainingItemCount)", systemImage: "circle")
@@ -516,6 +683,17 @@ struct GroceryListEditorView: View {
   @State private var remindersListName = ""
 
   let model: GroceryLibraryModel
+  let listID: CoreGroceryList.ID?
+
+  init(model: GroceryLibraryModel, listID: CoreGroceryList.ID? = nil) {
+    self.model = model
+    self.listID = listID
+    let list = listID.flatMap { id in
+      model.listRows.first { $0.id == id }?.list
+    }
+    _title = State(initialValue: list?.title ?? "")
+    _remindersListName = State(initialValue: list?.remindersListName ?? "")
+  }
 
   private var isSaveDisabled: Bool {
     title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -528,7 +706,7 @@ struct GroceryListEditorView: View {
         StackedTextField(title: "Reminders List", text: $remindersListName, prompt: "Groceries")
       }
     }
-    .navigationTitle("Add Grocery List")
+    .navigationTitle(listID == nil ? "Add Grocery List" : "Edit Grocery List")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {
@@ -538,7 +716,64 @@ struct GroceryListEditorView: View {
       }
       ToolbarItem(placement: .confirmationAction) {
         Button("Save") {
-          if model.saveListButtonTapped(title: title, remindersListName: remindersListName) {
+          if model.saveListButtonTapped(
+            listID: listID,
+            title: title,
+            remindersListName: remindersListName
+          ) {
+            dismiss()
+          }
+        }
+        .disabled(isSaveDisabled)
+      }
+    }
+  }
+}
+
+struct PantryItemEditorView: View {
+  @Environment(\.dismiss) private var dismiss
+  @State private var title = ""
+  @State private var notes = ""
+
+  let model: GroceryLibraryModel
+  let itemID: PantryItem.ID?
+
+  init(model: GroceryLibraryModel, itemID: PantryItem.ID? = nil) {
+    self.model = model
+    self.itemID = itemID
+    let item = itemID.flatMap { id in
+      model.pantryItems.first { $0.id == id }
+    }
+    _title = State(initialValue: item?.title ?? "")
+    _notes = State(initialValue: item?.notes ?? "")
+  }
+
+  private var isSaveDisabled: Bool {
+    title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  var body: some View {
+    Form {
+      Section("Pantry Item") {
+        StackedTextField(title: "Name", text: $title, prompt: "Sugar")
+        StackedTextEditor(title: "Notes", text: $notes, minHeight: 90)
+      }
+    }
+    .navigationTitle(itemID == nil ? "Add Pantry Item" : "Edit Pantry Item")
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .cancellationAction) {
+        Button("Cancel") {
+          dismiss()
+        }
+      }
+      ToolbarItem(placement: .confirmationAction) {
+        Button("Save") {
+          if model.savePantryItemButtonTapped(
+            itemID: itemID,
+            title: title,
+            notes: notes
+          ) {
             dismiss()
           }
         }
