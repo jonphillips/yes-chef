@@ -51,20 +51,23 @@ as forward milestones; they are the starting evidence the audit assesses.
 Goal: bring current `main` into conformance with the now-codified house rules before
 any new surface lands on it.
 
-- **First:** an architect re-baselining audit of current `main` (a `docs/reviews/`
-  doc), checking the built feature areas against jon-platform's
-  `persistence-and-sync.md` (observed reads, identity-preserving saves, snapshot =
-  interchange format), `swift-style.md` (repository core, feature models, persisted
-  enums), and the Yes Chef ADRs. The audit's findings *are* the M1 build order's
-  content.
-- **Then:** M1 build order — pay down the confirmed debt as ordered slices.
+**Resolved (2026-06-27):** the
+[re-baselining audit](reviews/AUDIT-2026-06-27-main-conformance.md) found **no
+architecture debt** to pay down — every Pass-1 P0/P1 finding is resolved in code, the
+solo-built grocery/menu/calendar subsystems conform, and `swift test` is green. Phase A
+therefore **collapses from a milestone into a single tests-only slice** (the audit's one
+"now" residual: grocery dangling-source tolerance), folded in as **Slice 0 of M1**. The
+remaining audit findings (dedup-on-read; `menuItems.recipeID` second FK) are parked on
+the sync and Family Cookbook milestones, where they belong.
 
-Output: a foundation we trust enough to build import and (eventually) sync on.
+Output: a foundation already trusted enough to build import on — confirmed, not assumed.
 
 ## Phase B — Import hardening + landing the real library  *(your "(b)")*
 
 Goal: make Paprika import trustworthy enough to bring Jon's real library in — the
-gate that must close before sync.
+gate that must close before sync. **Build order:**
+[milestones/M1-paprika-import-hardening.md](milestones/M1-paprika-import-hardening.md)
+(which opens with the Phase-A fold-in as Slice 0).
 
 - Mine Paprika feature-and-format parity systematically (its export formats, the
   `.paprikarecipes` backup, image sources, category/source semantics).
