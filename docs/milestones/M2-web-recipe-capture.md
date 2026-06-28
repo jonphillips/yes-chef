@@ -117,7 +117,8 @@ Invariants that must hold at merge:
 | Deferred | Goes to | Why not now |
 |---|---|---|
 | Shared **capture-engine SPM package** both apps consume | **ADR-0007 north star; M-later** | Generalizing Galavant's `ParsedPage` and re-pointing its domain mapping is a cross-repo refactor that risks a working app; harvest with clean seams first |
-| **In-app browser** capture surface (`WebExtractorBrowser`/`BrowserScreen`) | **Slice 5 if M2 has room, else M3** | Share + paste-URL is the unlock; the browser is a second surface, deferrable |
+| **In-app browser** capture surface (`WebExtractorBrowser`/`BrowserScreen`) | **M3** | Jon wants to perfect the browser experience in Galavant first, then harvest it once it's proven there — not block M2 on an unsettled surface |
+| **Photo → LLM recipe capture** (snap a printed/handwritten recipe, an LLM structures it) | **M-later milestone** | Explicit product goal (Jon, 2026-06-28). Likely harvests Galavant's `GalavantAI` + `GalavantImaging`; needs its own model-access + review design. Also the **fallback** for any favorite site that resists structured extraction (Slice 5 trigger) |
 | Authenticated / paywalled capture (ATK, Milk Street) | **M-later** | User-controlled auth, never store credentials (mirrors M1 out-of-scope) |
 | Universal "reader-mode" scraping for sites with no structured data | **M-later research** | This milestone does best-effort + preserve-raw, not a universal scraper |
 | Re-capture / "update from source" of an already-captured recipe | **M-later, reviewable** | Matched = skip, edits sacred (same policy as M1) |
@@ -169,8 +170,10 @@ box in the slice PR that completes it. **Depends on M1 Slices 1 (identity) and 3
 - [ ] Slice 2 — Paste-a-URL capture in-app (fetch → review → idempotent commit)
 - [ ] Slice 3 — App-group shared SQLite container (migration-aware)
 - [ ] Slice 4 — Share extension target (page-share path)
-- [ ] Slice 5 — In-app browser capture surface *(optional; defer to M3 if M2 runs long)*
-- [ ] Slice 6 — Real-site hardening + committed sanitized fixtures
+- [ ] Slice 5 — Real-site hardening + committed sanitized fixtures
+
+*(In-app browser capture is deferred to **M3** — perfect it in Galavant first, then
+harvest. See Decisions.)*
 
 ### Slice 1 — Harvest + recipe-retarget the engine
 
@@ -216,21 +219,19 @@ hands captured HTML + URL to the **same core capture path** with a compact recip
 extraction adapter over a fixture extension context; manual on-device verification of the
 share sheet. **Done when:** sharing a recipe page from Safari lands a reviewed recipe in the app.
 
-### Slice 5 — In-app browser capture *(optional)*
-
-Harvest `WebExtractorBrowser` + `BrowserScreen[Model]`: an in-app browser where the user
-navigates to a recipe and taps **Save** → the same capture path. Second capture surface;
-**defer to its own milestone (M3) if M2 is running long** — share + paste-URL is the unlock.
-**Done when:** in-app navigation can capture through the same reviewed, idempotent flow.
-
-### Slice 6 — Real-site hardening + committed fixtures
+### Slice 5 — Real-site hardening + committed fixtures
 
 Run the real recipe sites Jon actually captures from end to end. Commit small, **sanitized**
 HTML-page fixtures covering the real shapes: JSON-LD site; microdata site; no-structured-data
 fallback; multi-section ingredients; unicode title; and a **JS-rendered-only** page requiring
 `RenderedDOMFetcher`. **Tests:** the fixtures exercise Slices 1–4 together (fetch → parse →
-review → idempotent commit), idempotency verified across all. **Done when:** real sites
-capture cleanly and idempotently, and the committed fixtures guard every behavior M2 adds.
+review → idempotent commit), idempotency verified across all. **The favorite-sites proof
+point** (per Decision #4): Jon's must-have sites must demonstrably capture via structured
+data + OpenGraph/meta; **if a must-have site resists structured extraction, that is the
+trigger to revisit** the fallback (LLM-assisted parse / photo-OCR capture, a later milestone)
+— flag it, don't silently ship a site that can't be sucked in. **Done when:** real sites
+capture cleanly and idempotently, the committed fixtures guard every behavior M2 adds, and
+any resistant favorite site is surfaced as a revisit trigger.
 
 ## Constants register (pre-justified — jon-platform "constants need a rationale")
 
@@ -251,23 +252,33 @@ capture cleanly and idempotently, and the committed fixtures guard every behavio
   `author`, `image`, `description`** — the typed recipe vocabulary replacing Galavant's place
   vocab; derived from `schema.org/Recipe` and IMPORT_EXPORT §2.4, not guessed.
 
-## Decisions for Jon to confirm (not Codex's to make alone)
+## Decisions (confirmed 2026-06-28)
 
-1. **Convergence timing:** the shared-package extraction stays a documented **ADR-0007 north
-   star**, not this milestone — Codex keeps clean seams so a later extraction is mechanical.
-   **Recommend:** yes; harvest now, converge when a second consumer makes the cost worth it.
-2. **In-app browser scope:** include it as Slice 5, or split it into its own milestone (M3)?
-   **Recommend:** split if M2 is running long — share + paste-URL is the behavior-shift unlock.
-3. **App-group store now:** confirm OK to move the SQLite store into an app group this
-   milestone, coordinated with the sync milestone's CloudKit container choice.
-   **Recommend:** yes, with the migration tested.
-4. **No-structured-data fallback depth:** best-effort (OpenGraph/meta + cleaned body text) +
-   preserve-raw only — no universal scraper. **Recommend:** yes (preserve over interpret).
-5. **Real sites for Slice 6 fixtures:** name the handful you actually capture from, so the
-   committed fixtures reflect real shapes (as M1 did with `cooksillustrated.com`).
-6. **Upstream divergence:** until the shared package lands, how do we pull Galavant engine
-   fixes? **Recommend:** ADR-0007 commits to periodic reconciliation; keep the harvested files
-   structurally aligned with Galavant's so diffs are reviewable.
+1. **Convergence — harvest now, but converge, and don't lose the thread.** YesChef *is* the
+   second consumer, so the usual "extract once there's a second use" trigger is **already
+   met** — the reason to harvest first is narrower: you generalize a shared abstraction best
+   from **two working implementations, not one plus a guess** (Galavant's `ParsedPage` is
+   place-shaped today and isn't yet neutral enough for recipes). So: harvest in M2, then
+   **extract the shared package once M2 ships and the recipe-shaped engine is real** — the
+   convergence checkpoint is **M2 close** (or Galavant's next capture-engine change,
+   whichever comes first). ADR-0007 owns this as an explicit follow-up with that trigger, and
+   a tracking **GitHub issue** keeps it from being forgotten. Not "someday" — a dated next step.
+2. **In-app browser → M3.** Split out of M2. Jon hasn't exercised Galavant's browser capture
+   enough to be confident in it; **perfect it in Galavant first, then harvest** into YesChef
+   as M3. M2 ships share + paste-URL, which is the behavior-shift unlock.
+3. **App-group store now — yes.** Move the SQLite store into the app group this milestone
+   (Slice 3), migration tested, coordinated with the sync milestone's CloudKit container.
+4. **Fallback = OpenGraph/meta + preserve-raw for now — with a proof point and a known
+   successor.** No universal scraper this milestone. **But** Jon's must-have sites must prove
+   capturable in Slice 5; a site that resists structured extraction is the trigger to revisit.
+   The intended successor is **photo → LLM recipe capture** (snap a recipe, an LLM structures
+   it) — an explicit product goal, scoped as its own later milestone (see Out of scope), not
+   forced into M2.
+5. **Real sites for Slice 5 fixtures — confirmed;** Jon to name the handful (captured into the
+   slice when authored, as M1 did with `cooksillustrated.com`).
+6. **Upstream divergence — confirmed.** Until the shared package lands, ADR-0007 commits to
+   periodic reconciliation; keep the harvested files structurally aligned with Galavant's so
+   diffs stay reviewable.
 
 ## Working agreement
 

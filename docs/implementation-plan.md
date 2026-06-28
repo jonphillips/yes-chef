@@ -94,6 +94,9 @@ capture pollutes the iCloud zone exactly like a bad bulk import. **Build order:*
   so capture is idempotent and reviewable.
 - App-group shared store so the extension and app see one library; committed sanitized
   HTML-page fixtures.
+- In-app browser capture is a **follow-on milestone (M3)** — proven in Galavant first, then
+  harvested. Photo → LLM recipe capture is a later milestone and the intended fallback for
+  any site that resists structured extraction.
 
 Output: the app is worth living in before sync turns on — new recipes land here, cleanly
 and idempotently.
