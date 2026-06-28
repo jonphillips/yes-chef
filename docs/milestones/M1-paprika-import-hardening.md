@@ -129,7 +129,7 @@ later, reviewable affordance, not an automatic overwrite.
 `main` is protected — every slice is a branch + PR, small enough to review in one
 sitting, green at merge (build + tests). Tick the box in the slice PR that completes it.
 
-- [ ] Slice 0 — Grocery dangling-source tests (audit fold-in)
+- [x] Slice 0 — Grocery dangling-source tests (audit fold-in)
 - [ ] Slice 1 — Re-import identity + idempotency
 - [ ] Slice 2 — Parser fidelity: rating, difficulty, ingredient sections
 - [ ] Slice 3 — Review-before-commit + rollback
