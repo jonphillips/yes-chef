@@ -5,12 +5,25 @@ enum RecipeJSONLDExtractor {
   static func extract(from document: Document, into builder: inout RecipeParseBuilder) {
     let scripts = (try? document.select("script[type=application/ld+json]").array()) ?? []
     for script in scripts {
-      guard let data = cleanedJSON(script.data()) else { continue }
-      guard let top = try? JSONSerialization.jsonObject(with: data) else { continue }
+      guard let top = jsonObject(from: script.data()) else { continue }
       for node in recipeNodes(in: top) {
         mine(node, into: &builder)
       }
     }
+  }
+
+  /// Parse the raw JSON-LD **first**, so well-formed content keeps its apostrophes and
+  /// curly quotes (a title like "Grandma's Soup" must survive intact). Only on a strict
+  /// parse failure do we attempt the smart-quote salvage — for pages that misuse curly
+  /// quotes as JSON delimiters — accepting that lossy fallback rather than imposing it.
+  private static func jsonObject(from raw: String) -> Any? {
+    if let data = raw.data(using: .utf8),
+      let object = try? JSONSerialization.jsonObject(with: data) {
+      return object
+    }
+    guard let salvaged = cleanedJSON(raw),
+      let object = try? JSONSerialization.jsonObject(with: salvaged) else { return nil }
+    return object
   }
 
   private static func recipeNodes(in value: Any) -> [[String: Any]] {

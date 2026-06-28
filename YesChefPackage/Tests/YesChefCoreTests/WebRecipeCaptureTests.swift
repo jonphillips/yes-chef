@@ -161,7 +161,44 @@ extension RecipeCoreTests {
       )
     }
 
+    @Test
+    func jsonLDPreservesApostrophesAndAppliesPublicationMap() throws {
+      let page = WebRecipePageParser.parse(
+        html: Fixtures.jsonLDApostrophe,
+        sourceURL: URL(string: "https://www.cooksillustrated.com/recipes/grandmas-pie")
+      )
+
+      // Well-formed JSON-LD content keeps its typographic apostrophe and curly quotes
+      // (regression: the smart-quote salvage must not run on a clean parse).
+      expectNoDifference(page.title, "Grandma\u{2019}s Apple Pie")
+      expectNoDifference(page.summary, "She called it \u{201C}the best.\u{201D}")
+      expectNoDifference(page.warnings, [])
+
+      var uuids = SampleUUIDSequence(start: 22_000)
+      let now = Date(timeIntervalSinceReferenceDate: 803_200_000)
+      let bundle = try page.makeRecipeBundle(now: now, uuid: { uuids.next() })
+
+      expectNoDifference(bundle.recipe.title, "Grandma\u{2019}s Apple Pie")
+      // The shared publication map turns the bare host into a clean name.
+      expectNoDifference(bundle.source?.name, "Cook's Illustrated")
+    }
+
     private enum Fixtures {
+      static let jsonLDApostrophe = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "Recipe",
+          "name": "Grandma\u{2019}s Apple Pie",
+          "description": "She called it \u{201C}the best.\u{201D}",
+          "recipeIngredient": ["2 apples", "1 pie crust"],
+          "recipeInstructions": "Bake it."
+        }
+        </script>
+        </head><body></body></html>
+        """
+
       static let jsonLDRecipe = """
         <html><head>
         <script type="application/ld+json">

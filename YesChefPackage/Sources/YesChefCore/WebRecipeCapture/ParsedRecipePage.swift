@@ -263,7 +263,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
     uuid: () -> UUID
   ) -> RecipeSource? {
     let sourceURL = sourceURL?.absoluteString.nonEmpty
-    let name = publisherName?.nonEmpty ?? Self.displayName(from: self.sourceURL)
+    let name = RecipeSourceNameNormalizer.name(importedName: publisherName, url: sourceURL)
     guard name != nil || sourceURL != nil || author?.nonEmpty != nil else { return nil }
     return RecipeSource(
       id: uuid(),
@@ -274,11 +274,6 @@ public struct ParsedRecipePage: Equatable, Sendable {
       importedFrom: "Web Recipe Capture",
       dateImported: now
     )
-  }
-
-  private static func displayName(from url: URL?) -> String? {
-    guard let host = url?.host()?.nonEmpty else { return nil }
-    return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
   }
 
   private static func totalTime(prep: Int?, cook: Int?) -> Int? {

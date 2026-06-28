@@ -154,9 +154,9 @@ struct RecipeParseBuilder {
     }
 
     for line in lines {
-      if isIngredientHeading(line) {
+      if IngredientSectionHeading.isHeading(line) {
         flush()
-        currentName = headingName(line)
+        currentName = IngredientSectionHeading.name(line)
       } else {
         currentLines.append(line)
       }
@@ -166,19 +166,6 @@ struct RecipeParseBuilder {
       return [ParsedRecipeIngredientSection(lines: lines)]
     }
     return sections
-  }
-
-  private static func isIngredientHeading(_ line: String) -> Bool {
-    let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty, IngredientParser.parse(trimmed).quantity == nil else { return false }
-    if trimmed.hasSuffix(":") { return true }
-    let letters = trimmed.filter(\.isLetter)
-    guard !letters.isEmpty else { return false }
-    return String(letters).uppercased() == String(letters)
-  }
-
-  private static func headingName(_ line: String) -> String {
-    line.trimmingCharacters(in: CharacterSet(charactersIn: ":").union(.whitespacesAndNewlines))
   }
 
   private static func ratingValue(_ text: String) -> Int? {
