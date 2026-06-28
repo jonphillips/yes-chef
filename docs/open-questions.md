@@ -3,6 +3,26 @@
 Live ambiguities and recently-resolved decisions. Resolved items stay here briefly
 (dated) so the reasoning is durable, then graduate into the relevant doc or ADR.
 
+## Resolved — 2026-06-28
+
+- **Web recipe capture is its own milestone (M2), before sync.** A share extension is
+  another write path; it must be idempotent before the iCloud one-way gate. See
+  [milestones/M2-web-recipe-capture.md](milestones/M2-web-recipe-capture.md).
+- **Harvest Galavant's capture engine, don't reinvent.** Same-stack, proven (JSON-LD/
+  microdata votes, headless rendered-DOM). Re-target to schema.org/Recipe in YesChefCore.
+- **In-app browser capture → M3.** Perfect it in Galavant first, then harvest.
+- **App-group shared store now** (M2 Slice 3), coordinated with the sync CloudKit container.
+- **Fallback is OpenGraph/meta + preserve-raw for M2;** photo → LLM recipe capture is the
+  intended successor (its own later milestone) and the fallback for sites that resist
+  structured extraction.
+
+## Live — web-capture engine convergence
+
+- **Converge YesChef + Galavant onto a shared capture-engine package (ADR-0007).** YesChef
+  is already the second consumer; harvest-first only defers the abstraction until two working
+  implementations exist. **Trigger: M2 close** (or Galavant's next capture-engine change).
+  Tracked so it isn't forgotten — do not let the two engines drift permanently.
+
 ## Resolved — 2026-06-27
 
 - **Rebaseline cleanly, don't retro-fit.** The roadmap §11 numbering is retired;

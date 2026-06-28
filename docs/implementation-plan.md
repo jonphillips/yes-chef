@@ -78,10 +78,33 @@ gate that must close before sync. **Build order:**
 
 Output: the real library lands locally, clean enough to live with permanently.
 
-## Phase C — CloudKit sync enablement  *(your "(a)" — deliberately last of the three)*
+## Phase C — Web recipe capture  *(new — the daily-driver unlock, before the sync gate)*
 
-Goal: turn on sync only once import is trustworthy, to avoid polluting the iCloud
-private zone with throwaway re-imports.
+Goal: let Jon capture *new* recipes from web pages — paste-a-URL and a share
+extension — so the app becomes his daily driver instead of Paprika. M1 lands the
+*existing* library; capture is what makes the *next* recipe land here. Sequenced
+**before sync** because a share extension is another write path: an un-idempotent
+capture pollutes the iCloud zone exactly like a bad bulk import. **Build order:**
+[milestones/M2-web-recipe-capture.md](milestones/M2-web-recipe-capture.md).
+
+- Harvest Galavant's proven, same-stack capture engine (JSON-LD/microdata value-votes,
+  headless rendered-DOM fetch) and re-target it to `schema.org/Recipe` — harvest now,
+  converge on a shared package later (ADR-0007).
+- Reuse M1's composed import identity (URL-present strong path) and review-before-commit,
+  so capture is idempotent and reviewable.
+- App-group shared store so the extension and app see one library; committed sanitized
+  HTML-page fixtures.
+- In-app browser capture is a **follow-on milestone (M3)** — proven in Galavant first, then
+  harvested. Photo → LLM recipe capture is a later milestone and the intended fallback for
+  any site that resists structured extraction.
+
+Output: the app is worth living in before sync turns on — new recipes land here, cleanly
+and idempotently.
+
+## Phase D — CloudKit sync enablement  *(your "(a)" — deliberately last of the four)*
+
+Goal: turn on sync only once import **and capture** are trustworthy, to avoid polluting
+the iCloud private zone with throwaway re-imports or duplicate captures.
 
 - **Verify the current SQLiteData API/version at milestone start** (house rule — the
   library moves fast).
@@ -92,7 +115,7 @@ private zone with throwaway re-imports.
 Output: multi-device sync with no server, no auth — the central bet, paid once the
 data is worth keeping.
 
-## Phase D+ — Parity completion, then differentiation
+## Phase E+ — Parity completion, then differentiation
 
 Sequenced after the foundation is stable, the real data is in, and sync works.
 Paprika-parity-first, then the features that make Yes Chef next-gen:
@@ -106,6 +129,6 @@ Paprika-parity-first, then the features that make Yes Chef next-gen:
 
 ## Status
 
-Phases A–D are provisional and strategic; the audit (Phase A, first task) may
+Phases A–E are provisional and strategic; the audit (Phase A, first task) may
 reshuffle the detail. Build orders are authored one milestone ahead in
 [milestones/](milestones/), never as a giant dump.
