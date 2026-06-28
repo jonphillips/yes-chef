@@ -11,3 +11,4 @@ plus any app-specific calls.
 - [ADR-0004](ADR-0004-structured-recipe-editor.md) — MVP editor uses text entry with structured, non-destructive persistence
 - [ADR-0005](ADR-0005-image-storage-and-processing.md) — Recipe images use a pure processing pipeline and recipe-owned storage rows
 - [ADR-0006](ADR-0006-taxonomy-source-and-library-placement.md) — Categories stay flexible; source, author, placement, and recipe families are typed concepts
+- [ADR-0007](ADR-0007-web-recipe-capture-engine.md) — Web recipe capture harvests Galavant's parser now and converges on a shared package later

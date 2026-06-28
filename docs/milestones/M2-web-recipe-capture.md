@@ -166,7 +166,7 @@ warn. No fourth heuristic tier this milestone (preserve over guess).
 box in the slice PR that completes it. **Depends on M1 Slices 1 (identity) and 3
 (review-before-commit) having landed.**
 
-- [ ] Slice 1 — Harvest + recipe-retarget the capture engine (pure core) + ADR-0007
+- [x] Slice 1 — Harvest + recipe-retarget the capture engine (pure core) + ADR-0007
 - [ ] Slice 2 — Paste-a-URL capture in-app (fetch → review → idempotent commit)
 - [ ] Slice 3 — App-group shared SQLite container (migration-aware)
 - [ ] Slice 4 — Share extension target (page-share path)
