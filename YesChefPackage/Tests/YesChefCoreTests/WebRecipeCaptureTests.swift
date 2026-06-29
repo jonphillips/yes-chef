@@ -367,6 +367,156 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func sanitizedRealShapeFixturesCaptureAndCommitIdempotently() async throws {
+      @Dependency(\.defaultDatabase) var database
+      let cases = try SanitizedSiteCase.all()
+      let uuids = LockedSampleUUIDSequence(start: 26_000)
+
+      for siteCase in cases {
+        let client = WebRecipeCaptureClient(
+          fetchHTML: { url in
+            expectNoDifference(url, siteCase.sourceURL)
+            return siteCase.fetchHTML
+          },
+          renderHTML: { url in
+            expectNoDifference(url, siteCase.sourceURL)
+            return siteCase.renderedHTML
+          }
+        )
+
+        let draft = try await client.capture(
+          url: siteCase.sourceURL,
+          capturedAt: Date(timeIntervalSinceReferenceDate: 804_000_000)
+        )
+
+        expectNoDifference(draft.usedRenderedFallback, siteCase.expectsRenderedFallback)
+        expectNoDifference(draft.page.title, siteCase.expectedTitle)
+        expectNoDifference(draft.page.ingredientSections.map(\.name), siteCase.expectedIngredientSectionNames)
+        expectNoDifference(draft.page.instructionSections.map(\.name), siteCase.expectedInstructionSectionNames)
+        expectNoDifference(draft.page.warnings, siteCase.expectedWarnings)
+
+        let before = try await database.read(captureRowCounts)
+        let firstResult = try await database.write { db in
+          try RecipeRepository.importCapturedRecipe(
+            draft,
+            in: db,
+            now: Date(timeIntervalSinceReferenceDate: 804_100_000),
+            uuid: { uuids.next() }
+          )
+        }
+        let afterFirst = try await database.read(captureRowCounts)
+        let secondResult = try await database.write { db in
+          try RecipeRepository.importCapturedRecipe(
+            draft,
+            in: db,
+            now: Date(timeIntervalSinceReferenceDate: 804_100_060),
+            uuid: { uuids.next() }
+          )
+        }
+        let afterSecond = try await database.read(captureRowCounts)
+
+        expectNoDifference(firstResult.outcome, .imported)
+        expectNoDifference(secondResult.outcome, .alreadyImported)
+        expectNoDifference(secondResult.recipeID, firstResult.recipeID)
+        expectNoDifference(afterFirst.recipes, before.recipes + 1)
+        expectNoDifference(afterFirst.sources, before.sources + 1)
+        expectNoDifference(afterFirst.importRefs, before.importRefs + 1)
+        expectNoDifference(afterSecond, afterFirst)
+
+        try await database.read { db in
+          let recipe = try #require(try Recipe.find(firstResult.recipeID).fetchOne(db))
+          let source = try #require(try RecipeSource.fetchAll(db).first { $0.recipeID == recipe.id })
+          expectNoDifference(recipe.title, siteCase.expectedTitle)
+          expectNoDifference(recipe.originalImportText, siteCase.expectedOriginalHTML)
+          expectNoDifference(source.name, siteCase.expectedSourceName)
+          expectNoDifference(source.url, siteCase.sourceURL.absoluteString)
+        }
+      }
+    }
+
+    @Test
+    func sanitizedShareHTMLFixtureMatchesURLCapture() async throws {
+      let siteCase = try SanitizedSiteCase.seriousEatsJSONLD()
+      let client = WebRecipeCaptureClient(
+        fetchHTML: { _ in siteCase.fetchHTML },
+        renderHTML: { _ in nil }
+      )
+
+      let urlDraft = try await client.capture(
+        url: siteCase.sourceURL,
+        capturedAt: Date(timeIntervalSinceReferenceDate: 804_200_000)
+      )
+      let shareDraft = try await client.capture(
+        sharePayload: WebRecipeSharePayload(
+          sourceURL: siteCase.sourceURL,
+          renderedHTML: siteCase.fetchHTML
+        ),
+        capturedAt: Date(timeIntervalSinceReferenceDate: 804_200_000)
+      )
+
+      expectNoDifference(shareDraft, urlDraft)
+    }
+
+    @Test
+    func declaredNonUTF8CharsetPreservesOriginalHTMLBytesThroughCommit() async throws {
+      @Dependency(\.defaultDatabase) var database
+      let sourceURL = try #require(URL(string: "https://www.kingarthurbaking.com/recipes/cafe-toast"))
+      let html = """
+        <!doctype html>
+        <html><head>
+          <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+          <script type="application/ld+json">
+          {
+            "@context": "https://schema.org",
+            "@type": "Recipe",
+            "name": "Caf\u{00E9} Breakfast Toast",
+            "description": "A Latin-1 encoded fixture.",
+            "publisher": { "@type": "Organization", "name": "King Arthur Baking" },
+            "recipeYield": "2 servings",
+            "recipeIngredient": ["2 slices bread", "1 spoon jam"],
+            "recipeInstructions": ["Toast the bread.", "Spread with jam."]
+          }
+          </script>
+        </head><body></body></html>
+        """
+      let data = try #require(html.data(using: .isoLatin1))
+      let response = try #require(HTTPURLResponse(
+        url: sourceURL,
+        statusCode: 200,
+        httpVersion: "HTTP/1.1",
+        headerFields: ["Content-Type": "text/html; charset=iso-8859-1"]
+      ))
+      let decodedHTML = WebRecipeCaptureClient.decodedHTML(data: data, response: response)
+      let client = WebRecipeCaptureClient(
+        fetchHTML: { _ in decodedHTML },
+        renderHTML: { _ in nil }
+      )
+
+      let draft = try await client.capture(
+        url: sourceURL,
+        capturedAt: Date(timeIntervalSinceReferenceDate: 804_300_000)
+      )
+      expectNoDifference(draft.page.title, "Caf\u{00E9} Breakfast Toast")
+      expectNoDifference(decodedHTML.data(using: .isoLatin1), data)
+
+      let uuids = LockedSampleUUIDSequence(start: 27_000)
+      let result = try await database.write { db in
+        try RecipeRepository.importCapturedRecipe(
+          draft,
+          in: db,
+          now: Date(timeIntervalSinceReferenceDate: 804_300_000),
+          uuid: { uuids.next() }
+        )
+      }
+
+      try await database.read { db in
+        let recipe = try #require(try Recipe.find(result.recipeID).fetchOne(db))
+        expectNoDifference(recipe.title, "Caf\u{00E9} Breakfast Toast")
+        expectNoDifference(recipe.originalImportText?.data(using: .isoLatin1), data)
+      }
+    }
+
+    @Test
     func cancelAfterFetchWritesNothing() async throws {
       @Dependency(\.defaultDatabase) var database
       let sourceURL = try #require(URL(string: "https://example.com/recipes/cancelled"))
@@ -446,100 +596,222 @@ extension RecipeCoreTests {
       }
     }
 
-    private enum Fixtures {
-      static let jsonLDApostrophe = """
-        <html><head>
-        <script type="application/ld+json">
-        {
-          "@context": "https://schema.org",
-          "@type": "Recipe",
-          "name": "Grandma\u{2019}s Apple Pie",
-          "description": "She called it \u{201C}the best.\u{201D}",
-          "recipeIngredient": ["2 apples", "1 pie crust"],
-          "recipeInstructions": "Bake it."
-        }
-        </script>
-        </head><body></body></html>
-        """
+  }
+}
 
-      static let jsonLDRecipe = """
-        <html><head>
-        <script type="application/ld+json">
+private struct SanitizedSiteCase {
+  var sourceURL: URL
+  var fetchHTML: String
+  var renderedHTML: String?
+  var expectedTitle: String
+  var expectedSourceName: String
+  var expectedIngredientSectionNames: [String?]
+  var expectedInstructionSectionNames: [String?]
+  var expectedWarnings: [WebRecipeCaptureWarning]
+  var expectsRenderedFallback: Bool
+
+  var expectedOriginalHTML: String {
+    renderedHTML ?? fetchHTML
+  }
+
+  static func all() throws -> [Self] {
+    [
+      try seriousEatsJSONLD(),
+      try smittenKitchenMicrodata(),
+      try kitchnOpenGraph(),
+      try kingArthurUnicode(),
+      try jsRenderedAllrecipes(),
+    ]
+  }
+
+  static func seriousEatsJSONLD() throws -> Self {
+    Self(
+      sourceURL: try #require(URL(string: "https://www.seriouseats.com/crispy-chickpea-bowls")),
+      fetchHTML: try fixtureHTML("serious-eats-json-ld"),
+      expectedTitle: "Crispy Chickpea Bowls",
+      expectedSourceName: "Serious Eats",
+      expectedIngredientSectionNames: ["For the chickpeas", "For serving"],
+      expectedInstructionSectionNames: ["Roast", "Assemble"],
+      expectedWarnings: [],
+      expectsRenderedFallback: false
+    )
+  }
+
+  static func smittenKitchenMicrodata() throws -> Self {
+    Self(
+      sourceURL: try #require(URL(string: "https://smittenkitchen.com/2026/06/broccoli-cheddar-galette/")),
+      fetchHTML: try fixtureHTML("smitten-kitchen-microdata"),
+      expectedTitle: "Broccoli Cheddar Galette",
+      expectedSourceName: "Smitten Kitchen",
+      expectedIngredientSectionNames: ["For the dough", "For the filling"],
+      expectedInstructionSectionNames: ["Make the dough", "Bake"],
+      expectedWarnings: []
+    )
+  }
+
+  static func kitchnOpenGraph() throws -> Self {
+    Self(
+      sourceURL: try #require(URL(string: "https://www.thekitchn.com/freezer-breakfast-burritos")),
+      fetchHTML: try fixtureHTML("kitchn-open-graph"),
+      expectedTitle: "Freezer Breakfast Burritos",
+      expectedSourceName: "The Kitchn",
+      expectedIngredientSectionNames: [],
+      expectedInstructionSectionNames: [],
+      expectedWarnings: [.noStructuredRecipeData, .noIngredients, .noInstructions]
+    )
+  }
+
+  static func kingArthurUnicode() throws -> Self {
+    Self(
+      sourceURL: try #require(URL(string: "https://www.kingarthurbaking.com/recipes/almond-breakfast-buns")),
+      fetchHTML: try fixtureHTML("king-arthur-unicode-json-ld"),
+      expectedTitle: "杏仁 Breakfast Buns",
+      expectedSourceName: "King Arthur Baking",
+      expectedIngredientSectionNames: [nil],
+      expectedInstructionSectionNames: [nil, nil, nil],
+      expectedWarnings: []
+    )
+  }
+
+  static func jsRenderedAllrecipes() throws -> Self {
+    Self(
+      sourceURL: try #require(URL(string: "https://www.allrecipes.com/skillet-noodles")),
+      fetchHTML: try fixtureHTML("js-rendered-shell"),
+      renderedHTML: try fixtureHTML("js-rendered-result"),
+      expectedTitle: "Skillet Noodles",
+      expectedSourceName: "Allrecipes",
+      expectedIngredientSectionNames: [nil],
+      expectedInstructionSectionNames: [nil, nil],
+      expectedWarnings: [],
+      expectsRenderedFallback: true
+    )
+  }
+
+  init(
+    sourceURL: URL,
+    fetchHTML: String,
+    renderedHTML: String? = nil,
+    expectedTitle: String,
+    expectedSourceName: String,
+    expectedIngredientSectionNames: [String?],
+    expectedInstructionSectionNames: [String?],
+    expectedWarnings: [WebRecipeCaptureWarning],
+    expectsRenderedFallback: Bool = false
+  ) {
+    self.sourceURL = sourceURL
+    self.fetchHTML = fetchHTML
+    self.renderedHTML = renderedHTML
+    self.expectedTitle = expectedTitle
+    self.expectedSourceName = expectedSourceName
+    self.expectedIngredientSectionNames = expectedIngredientSectionNames
+    self.expectedInstructionSectionNames = expectedInstructionSectionNames
+    self.expectedWarnings = expectedWarnings
+    self.expectsRenderedFallback = expectsRenderedFallback
+  }
+
+  private static func fixtureHTML(_ name: String) throws -> String {
+    try String(contentsOf: fixtureURL.appendingPathComponent("\(name).html"), encoding: .utf8)
+  }
+
+  private static var fixtureURL: URL {
+    URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .appendingPathComponent("Fixtures/WebRecipeCapture/SanitizedSites", isDirectory: true)
+  }
+}
+
+private enum Fixtures {
+  static let jsonLDApostrophe = """
+    <html><head>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      "name": "Grandma\u{2019}s Apple Pie",
+      "description": "She called it \u{201C}the best.\u{201D}",
+      "recipeIngredient": ["2 apples", "1 pie crust"],
+      "recipeInstructions": "Bake it."
+    }
+    </script>
+    </head><body></body></html>
+    """
+
+  static let jsonLDRecipe = """
+    <html><head>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      "name": "Lemon Chicken",
+      "description": "A bright weeknight chicken dinner.",
+      "author": { "@type": "Person", "name": "Jamie Example" },
+      "publisher": { "@type": "Organization", "name": "Example Kitchen" },
+      "image": "https://example.com/images/lemon-chicken.jpg",
+      "recipeYield": "Serves 4",
+      "prepTime": "PT15M",
+      "cookTime": "PT40M",
+      "totalTime": "PT55M",
+      "recipeCategory": ["Dinner", "Chicken"],
+      "aggregateRating": { "@type": "AggregateRating", "ratingValue": "4.6" },
+      "recipeIngredient": [
+        "For the chicken:",
+        "1 1/2 pounds chicken thighs",
+        "2 tablespoons olive oil",
+        "SAUCE",
+        "1 lemon, juiced",
+        "Kosher salt, to taste"
+      ],
+      "recipeInstructions": [
         {
-          "@context": "https://schema.org",
-          "@type": "Recipe",
-          "name": "Lemon Chicken",
-          "description": "A bright weeknight chicken dinner.",
-          "author": { "@type": "Person", "name": "Jamie Example" },
-          "publisher": { "@type": "Organization", "name": "Example Kitchen" },
-          "image": "https://example.com/images/lemon-chicken.jpg",
-          "recipeYield": "Serves 4",
-          "prepTime": "PT15M",
-          "cookTime": "PT40M",
-          "totalTime": "PT55M",
-          "recipeCategory": ["Dinner", "Chicken"],
-          "aggregateRating": { "@type": "AggregateRating", "ratingValue": "4.6" },
-          "recipeIngredient": [
-            "For the chicken:",
-            "1 1/2 pounds chicken thighs",
-            "2 tablespoons olive oil",
-            "SAUCE",
-            "1 lemon, juiced",
-            "Kosher salt, to taste"
-          ],
-          "recipeInstructions": [
-            {
-              "@type": "HowToSection",
-              "name": "Cook",
-              "itemListElement": [
-                { "@type": "HowToStep", "text": "Season the chicken." },
-                { "@type": "HowToStep", "text": "Roast until browned." }
-              ]
-            }
+          "@type": "HowToSection",
+          "name": "Cook",
+          "itemListElement": [
+            { "@type": "HowToStep", "text": "Season the chicken." },
+            { "@type": "HowToStep", "text": "Roast until browned." }
           ]
         }
-        </script>
-        <meta property="og:title" content="Lemon Chicken | Example Kitchen">
-        </head><body><main><p>Recipe body.</p></main></body></html>
-        """
-
-      static let microdataRecipe = """
-        <html><body>
-        <article itemscope itemtype="https://schema.org/Recipe">
-          <h1 itemprop="name">Brothy Beans</h1>
-          <p itemprop="description">Beans with herbs.</p>
-          <span itemprop="recipeYield">6 servings</span>
-          <time itemprop="prepTime" datetime="PT10M">10 minutes</time>
-          <time itemprop="cookTime" datetime="PT1H30M">1 hour 30 minutes</time>
-          <span itemprop="recipeCategory">Beans, Dinner</span>
-          <div itemprop="aggregateRating" value="4"></div>
-          <ul>
-            <li itemprop="recipeIngredient">1 pound dried beans</li>
-            <li itemprop="recipeIngredient">Water</li>
-          </ul>
-          <ol itemprop="recipeInstructions">
-            <li>Soak the beans.</li>
-            <li>Simmer until tender.</li>
-          </ol>
-        </article>
-        </body></html>
-        """
-
-      static let openGraphOnly = """
-        <html><head>
-          <title>Chocolate Tart | Example</title>
-          <meta property="og:title" content="Chocolate Tart">
-          <meta property="og:description" content="A tart from the archive.">
-          <meta property="og:image" content="https://example.com/tart.jpg">
-          <meta name="author" content="Example Staff">
-        </head><body></body></html>
-        """
-
-      static let barrenShell = """
-        <html><head><title></title></head><body>
-        <main><div id="app"></div></main>
-        </body></html>
-        """
+      ]
     }
-  }
+    </script>
+    <meta property="og:title" content="Lemon Chicken | Example Kitchen">
+    </head><body><main><p>Recipe body.</p></main></body></html>
+    """
+
+  static let microdataRecipe = """
+    <html><body>
+    <article itemscope itemtype="https://schema.org/Recipe">
+      <h1 itemprop="name">Brothy Beans</h1>
+      <p itemprop="description">Beans with herbs.</p>
+      <span itemprop="recipeYield">6 servings</span>
+      <time itemprop="prepTime" datetime="PT10M">10 minutes</time>
+      <time itemprop="cookTime" datetime="PT1H30M">1 hour 30 minutes</time>
+      <span itemprop="recipeCategory">Beans, Dinner</span>
+      <div itemprop="aggregateRating" value="4"></div>
+      <ul>
+        <li itemprop="recipeIngredient">1 pound dried beans</li>
+        <li itemprop="recipeIngredient">Water</li>
+      </ul>
+      <ol itemprop="recipeInstructions">
+        <li>Soak the beans.</li>
+        <li>Simmer until tender.</li>
+      </ol>
+    </article>
+    </body></html>
+    """
+
+  static let openGraphOnly = """
+    <html><head>
+      <title>Chocolate Tart | Example</title>
+      <meta property="og:title" content="Chocolate Tart">
+      <meta property="og:description" content="A tart from the archive.">
+      <meta property="og:image" content="https://example.com/tart.jpg">
+      <meta name="author" content="Example Staff">
+    </head><body></body></html>
+    """
+
+  static let barrenShell = """
+    <html><head><title></title></head><body>
+    <main><div id="app"></div></main>
+    </body></html>
+    """
 }
