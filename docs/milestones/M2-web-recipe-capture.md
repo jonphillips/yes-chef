@@ -163,14 +163,19 @@ warn. No fourth heuristic tier this milestone (preserve over guess).
 ## The slices (each is one PR into `main`)
 
 `main` is protected — every slice is a branch + PR, green at merge (build + tests). Tick the
-box in the slice PR that completes it. **Depends on M1 Slices 1 (identity) and 3
-(review-before-commit) having landed.**
+box in the slice PR that completes it. Reuses M1 Slice 1 (identity). **Originally specced
+to depend on M1 Slice 3 (review-before-commit); in execution that dependency flipped** —
+M1 S3 was still open, so M2 Slice 2 built its own review-before-commit model
+(`RecipeCaptureModel`, `YesChefApp/RecipeModels.swift`). M1 S3 now reuses *that* pattern.
+
+**Milestone status: COMPLETE — 2026-06-29.** All slices merged; capture is trustworthy and
+idempotent. (Open, non-blocking follow-up: issue #26, meta-tag charset fidelity.)
 
 - [x] Slice 1 — Harvest + recipe-retarget the capture engine (pure core) + ADR-0007
 - [x] Slice 2 — Paste-a-URL capture in-app (fetch → review → idempotent commit)
 - [x] Slice 3 — App-group shared SQLite container (migration-aware)
 - [x] Slice 4 — Share extension target (page-share path)
-- [ ] Slice 5 — Real-site hardening + committed sanitized fixtures
+- [x] Slice 5 — Real-site hardening + committed sanitized fixtures (PR #25)
 
 *(In-app browser capture is deferred to **M3** — perfect it in Galavant first, then
 harvest. See Decisions.)*
