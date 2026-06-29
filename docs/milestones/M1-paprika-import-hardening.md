@@ -89,8 +89,9 @@ No new module boundaries. Work lands in the existing seams:
 ```
 YesChefPackage/Sources/YesChefCore/
   PaprikaHTMLImport.swift        # parser fidelity (Slice 2); import-identity key (Slice 1)
-  RecipeCore.swift               # RecipeRepository.importBundle: idempotent upsert,
-                                 #   import-session tagging for rollback (Slices 1, 3)
+  RecipeRepository+Import.swift  # importBundle find-or-skip + identity (Slice 1);
+                                 #   read-only preview/classify + rollback of a commit's
+                                 #   inserted-ID set, no session table (Slice 3)
   RecipePhotoProcessing.swift    # full-res + derivative pipeline (Slice 4)
   GroceryCore.swift              # (Slice 0 touches tests only, not this file)
 YesChefApp/
@@ -130,12 +131,20 @@ later, reviewable affordance, not an automatic overwrite.
 `main` is protected — every slice is a branch + PR, small enough to review in one
 sitting, green at merge (build + tests). Tick the box in the slice PR that completes it.
 
+Each slice carries a **reasoning hint** for the executor (`reasoning: high | xhigh`).
+The architect writes a tight enough contract that **`high` is the default**; `xhigh` is
+reserved for slices with genuine design judgment or invariant risk — schema migrations,
+concurrency/actor correctness, idempotency/sync invariants, or heuristics with real-data
+edge cases. Spend the extra reasoning on the spec and the review, not on grinding a
+well-specified slice.
+
 - [x] Slice 0 — Grocery dangling-source tests (audit fold-in)
 - [x] Slice 1 — Re-import identity + idempotency
-- [x] Slice 2 — Parser fidelity: rating, difficulty, ingredient sections
-- [ ] Slice 3 — Review-before-commit + rollback
-- [ ] Slice 4 — Image fidelity (full-res + consistent detail)
-- [ ] Slice 5 — Land the real library + committed sanitized fixture
+- [x] Slice 2 — Parser fidelity: rating, difficulty, ingredient sections *(was secretly
+  `xhigh`-shaped — the all-caps real-data edge case)*
+- [ ] Slice 3 — Review-before-commit + rollback — `reasoning: high`
+- [ ] Slice 4 — Image fidelity (full-res + consistent detail) — `reasoning: high`
+- [ ] Slice 5 — Land the real library + committed sanitized fixture — `reasoning: high`
 
 ### Slice 0 — Grocery dangling-source tests
 
@@ -176,20 +185,63 @@ the multi-section recipe yields the expected sections; a recipe with no headings
 one default section unchanged. **Done when:** recovered fields appear in detail and are
 tested, with nothing over-interpreted.
 
-### Slice 3 — Review-before-commit + rollback
+### Slice 3 — Review-before-commit + rollback — `reasoning: high`
 
-Replace parse→import→summary with parse→**review**→commit/cancel. A
-`RecipeImportModel` (`@Observable @MainActor`, `Destination`-driven) holds the parsed
-result and per-recipe status (new / already-imported / warning); the view previews and
-offers **Commit** or **Cancel** (cancel writes nothing). Commit tags rows with an
-**import-session id** so the whole batch can be **rolled back** as a unit (an Undo
-affordance on the post-commit summary). Identity-preserving writes throughout; rollback
-deletes only that session's inserted rows. **Tests:** cancel writes nothing; commit then
-rollback returns row counts to baseline; rollback of session A leaves session B intact.
-**Done when:** no import mutates the library without an explicit commit, and a commit is
-reversible.
+Replace parse→import→summary with parse→**review**→commit/cancel. Today the whole flow
+lives inside `RecipeLibraryModel.paprikaExportSelected` (`YesChefApp/RecipeModels.swift`):
+it parses, builds bundles, calls `RecipeRepository.importBundles` **immediately**, then
+shows a post-hoc `.importSummary`. There is no review gate and no rollback. This slice
+inserts the gate and makes a commit reversible.
 
-### Slice 4 — Image fidelity (ADR-0005)
+**Grounding (what S1 already gives us — build on it, don't reinvent):**
+- `importBundles` is **find-or-skip** and returns a `RecipeImportBatchResult`: per-recipe
+  `outcome` (`imported` / `alreadyImported`), `warnings`, and **`importedIDs`** (exactly
+  the recipes a commit inserts). `makeRecipeBundle` **pre-allocates every child ID**
+  (sections, lines, photos, source, notes) under the recipe ID. So "what a commit
+  inserted" is fully determined by its `importedIDs` plus those recipes' child rows —
+  **no session bookkeeping table is required.**
+- Classifying new-vs-already-imported is a **read** against existing `recipeImportRef`s
+  (the composed identity key), not a trial write.
+
+**The review step (read-only preview).** Add a pure classifier that, given the parsed
+bundles and the existing `RecipeImportRef`s, returns per-recipe status (new /
+already-imported / title-only-collision) **without writing**. Reuse the single import-key
+home from S1 — do not re-derive the key here. `RecipeImportModel`
+(`@Observable @MainActor`, `Destination`-driven) holds the parsed result + the preview and
+renders per-recipe rows with parse/identity warnings surfaced. **Cancel writes nothing.**
+The read must follow the house rule — **no `database.read` inside `.task`**; classify via
+the injected db seam the model already uses.
+
+**Commit.** On Commit, call the existing `importBundles` (identity-preserving writes,
+unchanged) and present the post-commit summary that exists today. The summary carries the
+batch's `importedIDs` so it can offer **Undo**.
+
+**Rollback (Undo).** Rollback is an **undo of an insert**, not a user deletion of a real
+recipe — so it **hard-deletes** exactly the committed batch's inserted rows (the
+`importedIDs` recipes + their child rows + the `recipeImportRef`s created for them), unlike
+the normal recipe-delete flow which **archives** (`RecipeRepository.archive`). It must
+return per-entity counts to the pre-commit baseline. Disjoint batches are independent by
+construction (disjoint `importedIDs`), so rolling back batch A cannot touch batch B.
+Downstream loose references (a grocery/menu origin pointing at a rolled-back recipe)
+**degrade gracefully** — that is the Slice 0 contract, already tested; rollback does not
+need to chase them.
+
+**Why no import-session column** (correcting the original "tag rows with a session id"
+sketch): the inserted-ID set already identifies a batch precisely, an Undo is a
+same-session post-commit affordance, and adding a persisted session id is a model change
+with migration cost for no done-criteria benefit (AGENTS.md: preserve data, avoid
+premature migration; ask before persistent model changes). Durable import-session
+provenance, if it ever earns its place (a "manage imports" screen), is its own ADR — not
+this slice.
+
+**Tests:** cancel writes nothing (counts unchanged); the preview classifies a fixture
+with a new recipe, an already-imported recipe, and a title-only collision correctly with
+**zero writes**; commit then rollback returns every entity count to baseline; rolling back
+batch A leaves batch B intact; a rolled-back recipe that fed a grocery row leaves the
+grocery row degrading gracefully (no crash). **Done when:** no import mutates the library
+without an explicit commit, and a commit is reversible to the exact prior row counts.
+
+### Slice 4 — Image fidelity (ADR-0005) — `reasoning: high`
 
 Follow ADR-0005 through: retain the **full-resolution** original bytes (prefer the
 PhotoSwipe gallery source over the small cover thumbnail — already chosen), generate
@@ -201,7 +253,7 @@ over fixture image bytes; provenance retained; a recipe with a missing reference
 imports with a warning. **Done when:** imported photos display crisply and detail is
 visually consistent across resolutions.
 
-### Slice 5 — Land the real library + committed sanitized fixture
+### Slice 5 — Land the real library + committed sanitized fixture — `reasoning: high`
 
 Run the full real `/Users/jon/code/PaprikaExport` through end to end. Commit a small,
 **sanitized** multi-recipe fixture into the test target covering the real shapes:
@@ -252,6 +304,13 @@ and the committed fixture guards every behavior this milestone adds.
 4. **Already-imported policy:** **CONFIRMED 2026-06-28 — skip, never overwrite.** Matched
    recipes are reported as already-imported and skipped; no field overwrite (edits are
    sacred). "Update from source" is a later, reviewable feature.
+5. **Rollback storage (Slice 3):** an Undo of a commit hard-deletes the batch's inserted
+   rows, identified by the `importedIDs` set the commit already returns — **no persisted
+   import-session column.** A durable session id would be a model change with migration
+   cost and no done-criteria benefit. **Recommend:** ship Slice 3 without it; if a
+   "manage imports" view ever needs durable session provenance, that earns its own ADR.
+   Flagged here rather than decided silently — say the word if you'd rather pay for the
+   durable session id now.
 
 ## Working agreement
 
