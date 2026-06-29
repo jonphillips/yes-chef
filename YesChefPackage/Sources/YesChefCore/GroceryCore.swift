@@ -408,237 +408,7 @@ public enum GroceryRepository {
     try deleteGroceryItemSources(sourcesToDelete, in: db, now: now)
   }
 
-  @discardableResult
-  public static func addRecipe(
-    recipeID: Recipe.ID,
-    groceryListID: GroceryList.ID,
-    in db: Database,
-    now: Date,
-    uuid: () -> UUID,
-    includedIngredientLineIDs: Set<IngredientLine.ID>? = nil
-  ) throws -> [GroceryItem.ID] {
-    _ = try requireList(groceryListID, in: db)
-    let recipe = try requireRecipe(recipeID, in: db)
-
-    return try addRecipeIngredients(
-      recipe: recipe,
-      groceryListID: groceryListID,
-      source: GroceryItemSourceDraft(
-        origin: .recipe,
-        sourceTitle: recipe.title
-      ),
-      in: db,
-      now: now,
-      uuid: uuid,
-      includedIngredientLineIDs: includedIngredientLineIDs
-    )
-  }
-
-  @discardableResult
-  public static func addMealPlanItem(
-    itemID: MealPlanItem.ID,
-    groceryListID: GroceryList.ID,
-    in db: Database,
-    now: Date,
-    uuid: () -> UUID,
-    includedIngredientLineIDs: Set<IngredientLine.ID>? = nil
-  ) throws -> [GroceryItem.ID] {
-    _ = try requireList(groceryListID, in: db)
-    let item = try requireMealPlanItem(itemID, in: db)
-    guard item.kind == .recipe, let recipeID = item.recipeID else {
-      throw GroceryRepositoryError.mealPlanItemHasNoRecipe(itemID)
-    }
-    let recipe = try requireRecipe(recipeID, in: db)
-
-    return try addRecipeIngredients(
-      recipe: recipe,
-      groceryListID: groceryListID,
-      source: GroceryItemSourceDraft(
-        origin: .calendarItem,
-        mealPlanItemID: item.id,
-        scheduledDate: item.scheduledDate,
-        mealSlot: item.mealSlot,
-        sourceTitle: recipe.title,
-        sourceSubtitle: item.mealSlot.title
-      ),
-      in: db,
-      now: now,
-      uuid: uuid,
-      includedIngredientLineIDs: includedIngredientLineIDs
-    )
-  }
-
-  @discardableResult
-  public static func addMealPlanRows(
-    _ rows: [MealPlanItemRowData],
-    groceryListID: GroceryList.ID,
-    in db: Database,
-    now: Date,
-    uuid: () -> UUID,
-    includedIngredientLineIDs: Set<IngredientLine.ID>? = nil
-  ) throws -> [GroceryItem.ID] {
-    _ = try requireList(groceryListID, in: db)
-
-    var itemIDs: [GroceryItem.ID] = []
-    for row in rows {
-      guard row.item.kind == .recipe, let recipeID = row.item.recipeID else { continue }
-      let recipe = try requireRecipe(recipeID, in: db)
-      let source: GroceryItemSourceDraft
-
-      if let menu = row.menu,
-         let menuPlacement = row.menuPlacement,
-         let menuItem = row.menuItem {
-        source = GroceryItemSourceDraft(
-          origin: .menuPlacement,
-          mealPlanItemID: nil,
-          menuID: menu.id,
-          menuItemID: menuItem.id,
-          menuPlacementID: menuPlacement.id,
-          scheduledDate: row.item.scheduledDate,
-          mealSlot: row.item.mealSlot,
-          sourceTitle: menu.title,
-          sourceSubtitle: recipe.title
-        )
-      } else {
-        source = GroceryItemSourceDraft(
-          origin: .calendarItem,
-          mealPlanItemID: row.item.id,
-          scheduledDate: row.item.scheduledDate,
-          mealSlot: row.item.mealSlot,
-          sourceTitle: recipe.title,
-          sourceSubtitle: row.item.mealSlot.title
-        )
-      }
-
-      do {
-        itemIDs += try addRecipeIngredients(
-          recipe: recipe,
-          groceryListID: groceryListID,
-          source: source,
-          in: db,
-          now: now,
-          uuid: uuid,
-          includedIngredientLineIDs: includedIngredientLineIDs
-        )
-      } catch GroceryRepositoryError.noShoppableIngredients {
-        continue
-      }
-    }
-
-    guard !itemIDs.isEmpty else {
-      throw GroceryRepositoryError.noShoppableIngredients
-    }
-    return itemIDs
-  }
-
-  @discardableResult
-  public static func addMenu(
-    menuID: Menu.ID,
-    groceryListID: GroceryList.ID,
-    in db: Database,
-    now: Date,
-    uuid: () -> UUID,
-    includedIngredientLineIDs: Set<IngredientLine.ID>? = nil
-  ) throws -> [GroceryItem.ID] {
-    _ = try requireList(groceryListID, in: db)
-    let menu = try requireMenu(menuID, in: db)
-    let items = try MenuItem
-      .where { $0.menuID.eq(menuID) }
-      .fetchAll(db)
-      .filter { $0.kind == .recipe && $0.recipeID != nil }
-      .sorted(by: areMenuItemsInIncreasingOrder)
-
-    var itemIDs: [GroceryItem.ID] = []
-    for menuItem in items {
-      guard let recipeID = menuItem.recipeID else { continue }
-      let recipe = try requireRecipe(recipeID, in: db)
-      do {
-        itemIDs += try addRecipeIngredients(
-          recipe: recipe,
-          groceryListID: groceryListID,
-          source: GroceryItemSourceDraft(
-            origin: .menu,
-            menuID: menu.id,
-            menuItemID: menuItem.id,
-            mealSlot: menuItem.mealSlot,
-            sourceTitle: menu.title,
-            sourceSubtitle: recipe.title
-          ),
-          in: db,
-          now: now,
-          uuid: uuid,
-          includedIngredientLineIDs: includedIngredientLineIDs
-        )
-      } catch GroceryRepositoryError.noShoppableIngredients {
-        continue
-      }
-    }
-
-    guard !itemIDs.isEmpty else {
-      throw GroceryRepositoryError.noShoppableIngredients
-    }
-    return itemIDs
-  }
-
-  @discardableResult
-  public static func addMenuPlacement(
-    placementID: MenuPlacement.ID,
-    groceryListID: GroceryList.ID,
-    in db: Database,
-    now: Date,
-    uuid: () -> UUID,
-    includedIngredientLineIDs: Set<IngredientLine.ID>? = nil
-  ) throws -> [GroceryItem.ID] {
-    _ = try requireList(groceryListID, in: db)
-    let placement = try requireMenuPlacement(placementID, in: db)
-    let menu = try requireMenu(placement.menuID, in: db)
-    let items = try MenuItem
-      .where { $0.menuID.eq(menu.id) }
-      .fetchAll(db)
-      .filter { $0.kind == .recipe && $0.recipeID != nil }
-      .sorted(by: areMenuItemsInIncreasingOrder)
-    let calendar = Calendar(identifier: .gregorian)
-
-    var itemIDs: [GroceryItem.ID] = []
-    for menuItem in items {
-      guard let recipeID = menuItem.recipeID else { continue }
-      let recipe = try requireRecipe(recipeID, in: db)
-      let scheduledDate = calendar.date(
-        byAdding: .day,
-        value: menuItem.dayOffset,
-        to: placement.startDate
-      )
-      do {
-        itemIDs += try addRecipeIngredients(
-          recipe: recipe,
-          groceryListID: groceryListID,
-          source: GroceryItemSourceDraft(
-            origin: .menuPlacement,
-            menuID: menu.id,
-            menuItemID: menuItem.id,
-            menuPlacementID: placement.id,
-            scheduledDate: scheduledDate,
-            mealSlot: menuItem.mealSlot,
-            sourceTitle: menu.title,
-            sourceSubtitle: recipe.title
-          ),
-          in: db,
-          now: now,
-          uuid: uuid,
-          includedIngredientLineIDs: includedIngredientLineIDs
-        )
-      } catch GroceryRepositoryError.noShoppableIngredients {
-        continue
-      }
-    }
-
-    guard !itemIDs.isEmpty else {
-      throw GroceryRepositoryError.noShoppableIngredients
-    }
-    return itemIDs
-  }
-
-  private static func addRecipeIngredients(
+  static func addRecipeIngredients(
     recipe: Recipe,
     groceryListID: GroceryList.ID,
     source: GroceryItemSourceDraft,
@@ -792,28 +562,28 @@ public enum GroceryRepository {
       }
   }
 
-  private static func requireList(_ listID: GroceryList.ID, in db: Database) throws -> GroceryList {
+  static func requireList(_ listID: GroceryList.ID, in db: Database) throws -> GroceryList {
     guard let list = try GroceryList.find(listID).fetchOne(db) else {
       throw GroceryRepositoryError.listNotFound(listID)
     }
     return list
   }
 
-  private static func requireRecipe(_ recipeID: Recipe.ID, in db: Database) throws -> Recipe {
+  static func requireRecipe(_ recipeID: Recipe.ID, in db: Database) throws -> Recipe {
     guard let recipe = try Recipe.find(recipeID).fetchOne(db) else {
       throw GroceryRepositoryError.recipeNotFound(recipeID)
     }
     return recipe
   }
 
-  private static func requireMenu(_ menuID: Menu.ID, in db: Database) throws -> Menu {
+  static func requireMenu(_ menuID: Menu.ID, in db: Database) throws -> Menu {
     guard let menu = try Menu.find(menuID).fetchOne(db) else {
       throw GroceryRepositoryError.menuNotFound(menuID)
     }
     return menu
   }
 
-  private static func requireMenuPlacement(
+  static func requireMenuPlacement(
     _ placementID: MenuPlacement.ID,
     in db: Database
   ) throws -> MenuPlacement {
@@ -823,7 +593,7 @@ public enum GroceryRepository {
     return placement
   }
 
-  private static func requireMealPlanItem(
+  static func requireMealPlanItem(
     _ itemID: MealPlanItem.ID,
     in db: Database
   ) throws -> MealPlanItem {
@@ -1055,7 +825,7 @@ private func deleteGroceryItemSources(
   }
 }
 
-private struct GroceryItemSourceDraft {
+struct GroceryItemSourceDraft {
   var origin: GroceryItemOrigin
   var mealPlanItemID: MealPlanItem.ID? = nil
   var menuID: Menu.ID? = nil
@@ -1193,7 +963,7 @@ private func areGroceryMenuRecipeItemsInIncreasingOrder(
   return lhs.recipe.title.localizedStandardCompare(rhs.recipe.title) == .orderedAscending
 }
 
-private func areMenuItemsInIncreasingOrder(_ lhs: MenuItem, _ rhs: MenuItem) -> Bool {
+func areMenuItemsInIncreasingOrder(_ lhs: MenuItem, _ rhs: MenuItem) -> Bool {
   if lhs.dayOffset != rhs.dayOffset {
     return lhs.dayOffset < rhs.dayOffset
   }

@@ -21,6 +21,7 @@
 		76A09E387271E9757E7AA9B8 /* MenuViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26A031F93AA06D9ADCD5C36D /* MenuViews.swift */; };
 		866C7FBB7E3079ECED997DEB /* MealCalendarModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B49D2E9B66A731DB272F063C /* MealCalendarModels.swift */; };
 		91DE45EFBB52B916289EEB1D /* GroceryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21092B09A19EF04372E6A66D /* GroceryModels.swift */; };
+		92B6078CD3AE6AE5320A87F8 /* RecipeCategoryFilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9FE33039715323689ED24FD /* RecipeCategoryFilterView.swift */; };
 		96AEA500A9F6D8D9BE126014 /* RecipeActiveFilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0F7538696E770B31AA47A0 /* RecipeActiveFilterBar.swift */; };
 		A103667583AD5577C2633211 /* OriginalSnapshotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76C7E4899A1093E58F713C2F /* OriginalSnapshotView.swift */; };
 		A53A9EE95AC871F9F6B627C5 /* RecipeLibraryListState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3B1C7A7E48A8FFE074A05E0 /* RecipeLibraryListState.swift */; };
@@ -65,6 +66,7 @@
 		E48B9ACFF26E71C15146E3E9 /* RecipeListPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeListPresets.swift; sourceTree = "<group>"; };
 		E8DD44679AA1444215DC743E /* RecipeFilterPickerViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeFilterPickerViews.swift; sourceTree = "<group>"; };
 		ED3C57E4D25E07B0D4161163 /* CategoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryViews.swift; sourceTree = "<group>"; };
+		F9FE33039715323689ED24FD /* RecipeCategoryFilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeCategoryFilterView.swift; sourceTree = "<group>"; };
 		FC48B146F8E70CD1E9903EBC /* YesChef.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = YesChef.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -126,6 +128,7 @@
 				76C7E4899A1093E58F713C2F /* OriginalSnapshotView.swift */,
 				56F66618C21D85EE42AB4DEB /* PaprikaImportWorkspace.swift */,
 				DD0F7538696E770B31AA47A0 /* RecipeActiveFilterBar.swift */,
+				F9FE33039715323689ED24FD /* RecipeCategoryFilterView.swift */,
 				3CCF32B5108C44892607FF3B /* RecipeDetailView.swift */,
 				76906E88E579D71619461798 /* RecipeEditorView.swift */,
 				E8DD44679AA1444215DC743E /* RecipeFilterPickerViews.swift */,
@@ -235,6 +238,7 @@
 				A103667583AD5577C2633211 /* OriginalSnapshotView.swift in Sources */,
 				FD6F7881ECEA6DC437F9F32C /* PaprikaImportWorkspace.swift in Sources */,
 				96AEA500A9F6D8D9BE126014 /* RecipeActiveFilterBar.swift in Sources */,
+				92B6078CD3AE6AE5320A87F8 /* RecipeCategoryFilterView.swift in Sources */,
 				CB4F5CEA046A10EF5FDE0892 /* RecipeDetailView.swift in Sources */,
 				5A3CE29C1018A68874A977A2 /* RecipeEditorView.swift in Sources */,
 				0E82B1425855BBD9736BDFD7 /* RecipeFilterPickerViews.swift in Sources */,
