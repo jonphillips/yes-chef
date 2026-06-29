@@ -69,6 +69,11 @@ struct AppContainer: View {
         RecipeEditorView(recipeID: nil)
       }
     }
+    .sheet(isPresented: $recipeModel.destination.captureRecipe) {
+      NavigationStack {
+        RecipeCaptureView(libraryModel: recipeModel, model: recipeModel.captureModel)
+      }
+    }
     .sheet(isPresented: $recipeModel.destination.filterRecipes) {
       NavigationStack {
         RecipeFilterView(model: recipeModel)
@@ -131,6 +136,11 @@ struct AppContainer: View {
       Text(summary.message)
     }
     .alert("Backup Supplement Complete", item: $recipeModel.destination.backupSupplementSummary) { _ in
+      Button("OK") {}
+    } message: { summary in
+      Text(summary.message)
+    }
+    .alert("Capture Complete", item: $recipeModel.destination.captureSummary) { _ in
       Button("OK") {}
     } message: { summary in
       Text(summary.message)
@@ -709,6 +719,12 @@ private struct RecipeListView: View {
           model.addRecipeButtonTapped()
         } label: {
           Label("Add Recipe", systemImage: "plus")
+        }
+        .disabled(model.isImporting)
+        Button {
+          model.captureRecipeButtonTapped()
+        } label: {
+          Label("Capture Recipe", systemImage: "link.badge.plus")
         }
         .disabled(model.isImporting)
       }
