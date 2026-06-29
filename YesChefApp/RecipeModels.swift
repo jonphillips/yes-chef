@@ -9,11 +9,13 @@ final class RecipeLibraryModel {
   @CasePathable
   enum Destination {
     case addRecipe
+    case captureRecipe
     case editRecipe(Recipe.ID)
     case cookingMode(Recipe.ID)
     case originalSnapshot(Recipe.ID)
     case deleteRecipe(Recipe.ID)
     case filterRecipes
+    case captureSummary(WebRecipeCaptureSummary)
     case importSummary(RecipeImportSummary)
     case backupSupplementSummary(RecipeBackupSupplementSummary)
   }
@@ -34,6 +36,7 @@ final class RecipeLibraryModel {
   var importActivityTitle = "Importing"
   var isPresentingPaprikaImporter = false
   var isPresentingPaprikaBackupSupplementer = false
+  var captureModel = RecipeCaptureModel()
   var searchText = ""
   var selectedRecipeID: Recipe.ID?
   var sortOrder = RecipeListSort.title
@@ -49,6 +52,16 @@ final class RecipeLibraryModel {
 
   func addRecipeButtonTapped() {
     destination = .addRecipe
+  }
+
+  func captureRecipeButtonTapped() {
+    captureModel.reset()
+    destination = .captureRecipe
+  }
+
+  func webCaptureCompleted(_ result: RecipeImportBundleResult) {
+    selectedRecipeID = result.recipeID
+    destination = .captureSummary(WebRecipeCaptureSummary(result: result))
   }
 
   func importPaprikaExportButtonTapped() {
@@ -161,6 +174,128 @@ final class RecipeLibraryModel {
 
   func title(for recipeID: Recipe.ID) -> String {
     recipeRows.first { $0.recipe.id == recipeID }?.recipe.title ?? "this recipe"
+  }
+}
+
+@Observable
+@MainActor
+final class RecipeCaptureModel {
+  @ObservationIgnored
+  @Dependency(\.date.now) private var now
+  @ObservationIgnored
+  @Dependency(\.defaultDatabase) private var database
+  @ObservationIgnored
+  @Dependency(\.uuid) private var uuid
+  @ObservationIgnored
+  @Dependency(\.webRecipeCaptureClient) private var captureClient
+
+  var urlText = ""
+  var draft: WebRecipeCaptureDraft?
+  var errorMessage: String?
+  var isShowingError = false
+  var isFetching = false
+  var isCommitting = false
+
+  var canFetch: Bool {
+    normalizedURL != nil && !isFetching && !isCommitting
+  }
+
+  var canCommit: Bool {
+    draft != nil && !isFetching && !isCommitting
+  }
+
+  func reset() {
+    urlText = ""
+    draft = nil
+    errorMessage = nil
+    isShowingError = false
+    isFetching = false
+    isCommitting = false
+  }
+
+  func pastedText(_ text: String) {
+    urlText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  func fetchButtonTapped() async {
+    guard let url = normalizedURL else {
+      showError("Enter a valid recipe URL.")
+      return
+    }
+
+    isFetching = true
+    defer { isFetching = false }
+
+    do {
+      draft = try await captureClient.capture(url: url, capturedAt: now)
+    } catch is CancellationError {
+    } catch {
+      showError(String(describing: error))
+    }
+  }
+
+  func commitButtonTapped() async -> RecipeImportBundleResult? {
+    guard let draft else { return nil }
+    isCommitting = true
+    defer { isCommitting = false }
+
+    do {
+      let importDate = now
+      let makeUUID = uuid
+      return try await database.write { db in
+        try RecipeRepository.importCapturedRecipe(
+          draft,
+          in: db,
+          now: importDate,
+          uuid: { makeUUID() }
+        )
+      }
+    } catch is CancellationError {
+      return nil
+    } catch {
+      showError(String(describing: error))
+      return nil
+    }
+  }
+
+  private var normalizedURL: URL? {
+    let trimmed = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    let candidate = trimmed.contains("://") ? trimmed : "https://\(trimmed)"
+    guard let url = URL(string: candidate), url.host()?.isEmpty == false else { return nil }
+    return url
+  }
+
+  private func showError(_ message: String) {
+    errorMessage = message
+    isShowingError = true
+  }
+}
+
+struct WebRecipeCaptureSummary: Identifiable, Equatable, Sendable {
+  let id = UUID()
+  var title: String
+  var outcome: RecipeImportOutcome
+  var warningCount: Int
+
+  init(result: RecipeImportBundleResult) {
+    self.title = result.title
+    self.outcome = result.outcome
+    self.warningCount = result.warnings.count
+  }
+
+  var message: String {
+    var lines: [String]
+    switch outcome {
+    case .imported:
+      lines = ["Saved \(title)."]
+    case .alreadyImported:
+      lines = ["Skipped \(title) because it is already in your library."]
+    }
+    if warningCount > 0 {
+      lines.append("\(warningCount) identity \(warningCount == 1 ? "warning" : "warnings").")
+    }
+    return lines.joined(separator: "\n")
   }
 }
 

@@ -10,6 +10,12 @@ struct YesChefApp: App {
       try! $0.bootstrapDatabase()
       try! $0.seedPantryItemsIfNeeded(titles: legacyPantryItems)
       try! $0.seedSampleDataIfNeeded()
+      $0.webRecipeCaptureClient = WebRecipeCaptureClient(
+        fetchHTML: WebRecipeCaptureClient.liveValue.fetchHTML,
+        renderHTML: { url in
+          await RenderedDOMFetcher.renderedHTML(of: url)
+        }
+      )
     }
   }
 

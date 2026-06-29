@@ -1,0 +1,208 @@
+import SwiftUI
+import YesChefCore
+
+struct RecipeCaptureView: View {
+  @Environment(\.dismiss) private var dismiss
+  let libraryModel: RecipeLibraryModel
+  let model: RecipeCaptureModel
+
+  var body: some View {
+    @Bindable var model = model
+
+    Form {
+      Section {
+        TextField("Recipe URL", text: $model.urlText)
+          .keyboardType(.URL)
+          .textInputAutocapitalization(.never)
+          .autocorrectionDisabled()
+          .onSubmit {
+            Task { await model.fetchButtonTapped() }
+          }
+
+        HStack {
+          PasteButton(payloadType: String.self) { strings in
+            model.pastedText(strings.first ?? "")
+          }
+          .labelStyle(.titleAndIcon)
+
+          Spacer()
+
+          Button {
+            Task { await model.fetchButtonTapped() }
+          } label: {
+            Label("Fetch", systemImage: "arrow.down.doc")
+          }
+          .disabled(!model.canFetch)
+        }
+      } footer: {
+        if model.isFetching {
+          ProgressView("Fetching recipe page")
+        }
+      }
+
+      if let draft = model.draft {
+        RecipeCaptureReviewSections(draft: draft)
+      }
+    }
+    .navigationTitle("Capture Recipe")
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .cancellationAction) {
+        Button("Cancel") {
+          dismiss()
+        }
+        .disabled(model.isCommitting)
+      }
+      ToolbarItem(placement: .confirmationAction) {
+        Button {
+          Task {
+            if let result = await model.commitButtonTapped() {
+              libraryModel.webCaptureCompleted(result)
+              dismiss()
+            }
+          }
+        } label: {
+          if model.isCommitting {
+            ProgressView()
+          } else {
+            Text("Save")
+          }
+        }
+        .disabled(!model.canCommit)
+      }
+    }
+    .alert("Capture Error", isPresented: $model.isShowingError) {
+      Button("OK") {}
+    } message: {
+      Text(model.errorMessage ?? "")
+    }
+  }
+}
+
+private struct RecipeCaptureReviewSections: View {
+  let draft: WebRecipeCaptureDraft
+
+  private var page: ParsedRecipePage {
+    draft.page
+  }
+
+  var body: some View {
+    Section("Review") {
+      LabeledContent("Title") {
+        Text(page.title ?? "Untitled Recipe")
+      }
+      if let summary = page.summary {
+        LabeledContent("Summary") {
+          Text(summary)
+        }
+      }
+      if let servings = page.servingsText {
+        LabeledContent("Servings") {
+          Text(servings)
+        }
+      }
+      if let totalTime = page.totalTimeMinutes {
+        LabeledContent("Total Time") {
+          Text("\(totalTime) min")
+        }
+      }
+      if draft.usedRenderedFallback {
+        LabeledContent("Fetch") {
+          Text("Rendered page")
+        }
+      }
+    }
+
+    Section("Source") {
+      if let sourceURL = page.sourceURL {
+        LabeledContent("URL") {
+          Text(sourceURL.absoluteString)
+            .textSelection(.enabled)
+        }
+      }
+      if let publisherName = page.publisherName {
+        LabeledContent("Source") {
+          Text(publisherName)
+        }
+      }
+      if let author = page.author {
+        LabeledContent("Author") {
+          Text(author)
+        }
+      }
+    }
+
+    if !page.warnings.isEmpty {
+      Section("Warnings") {
+        Text(page.warnings.map(\.reviewTitle).joined(separator: "\n"))
+          .foregroundStyle(.secondary)
+      }
+    }
+
+    Section("Ingredients") {
+      if ingredientText.isEmpty {
+        Text("No ingredients found")
+          .foregroundStyle(.secondary)
+      } else {
+        Text(ingredientText)
+          .textSelection(.enabled)
+      }
+    }
+
+    Section("Instructions") {
+      if instructionText.isEmpty {
+        Text("No instructions found")
+          .foregroundStyle(.secondary)
+      } else {
+        Text(instructionText)
+          .textSelection(.enabled)
+      }
+    }
+
+    if let bodyText = page.bodyText, page.ingredientSections.isEmpty || page.instructionSections.isEmpty {
+      Section("Page Text") {
+        Text(bodyText)
+          .lineLimit(8)
+          .foregroundStyle(.secondary)
+          .textSelection(.enabled)
+      }
+    }
+  }
+
+  private var ingredientText: String {
+    page.ingredientSections
+      .flatMap { section -> [String] in
+        if let name = section.name {
+          return [name] + section.lines
+        }
+        return section.lines
+      }
+      .joined(separator: "\n")
+  }
+
+  private var instructionText: String {
+    page.instructionSections
+      .flatMap { section -> [String] in
+        if let name = section.name {
+          return [name] + section.steps
+        }
+        return section.steps
+      }
+      .joined(separator: "\n")
+  }
+}
+
+private extension WebRecipeCaptureWarning {
+  var reviewTitle: String {
+    switch self {
+    case .noStructuredRecipeData:
+      "No structured recipe data found."
+    case .untitledRecipe:
+      "No title found."
+    case .noIngredients:
+      "No ingredients found."
+    case .noInstructions:
+      "No instructions found."
+    }
+  }
+}

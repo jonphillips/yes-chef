@@ -183,6 +183,179 @@ extension RecipeCoreTests {
       expectNoDifference(bundle.source?.name, "Cook's Illustrated")
     }
 
+    @Test
+    func captureClientFetchesParsesAndCommitsRecipe() async throws {
+      @Dependency(\.defaultDatabase) var database
+      let sourceURL = try #require(URL(string: "https://example.com/recipes/lemon-chicken"))
+      let capturedAt = Date(timeIntervalSinceReferenceDate: 803_300_000)
+      let client = WebRecipeCaptureClient(
+        fetchHTML: { _ in Fixtures.jsonLDRecipe },
+        renderHTML: { _ in nil }
+      )
+
+      let draft = try await client.capture(url: sourceURL, capturedAt: capturedAt)
+
+      expectNoDifference(draft.page.title, "Lemon Chicken")
+      expectNoDifference(draft.usedRenderedFallback, false)
+
+      let uuids = LockedSampleUUIDSequence(start: 23_000)
+      let importResult = try await database.write { db in
+        try RecipeRepository.importCapturedRecipe(
+          draft,
+          in: db,
+          now: capturedAt,
+          uuid: { uuids.next() }
+        )
+      }
+
+      expectNoDifference(importResult.outcome, .imported)
+
+      try await database.read { db in
+        let recipe = try #require(try Recipe.find(importResult.recipeID).fetchOne(db))
+        let source = try #require(try RecipeSource.fetchAll(db).first { $0.recipeID == recipe.id })
+        expectNoDifference(recipe.title, "Lemon Chicken")
+        expectNoDifference(recipe.originalImportText, Fixtures.jsonLDRecipe)
+        expectNoDifference(source.url, sourceURL.absoluteString)
+      }
+    }
+
+    @Test
+    func capturingSameURLTwiceIsIdempotent() async throws {
+      @Dependency(\.defaultDatabase) var database
+      let sourceURL = try #require(URL(string: "https://example.com/recipes/idempotent-lemon-chicken"))
+      let capturedAt = Date(timeIntervalSinceReferenceDate: 803_400_000)
+      let client = WebRecipeCaptureClient(
+        fetchHTML: { _ in Fixtures.jsonLDRecipe },
+        renderHTML: { _ in nil }
+      )
+      let draft = try await client.capture(url: sourceURL, capturedAt: capturedAt)
+
+      let baseline = try await database.read(captureRowCounts)
+      let uuids = LockedSampleUUIDSequence(start: 24_000)
+      let firstResult = try await database.write { db in
+        try RecipeRepository.importCapturedRecipe(
+          draft,
+          in: db,
+          now: capturedAt,
+          uuid: { uuids.next() }
+        )
+      }
+      let afterFirst = try await database.read(captureRowCounts)
+      let secondResult = try await database.write { db in
+        try RecipeRepository.importCapturedRecipe(
+          draft,
+          in: db,
+          now: capturedAt.addingTimeInterval(60),
+          uuid: { uuids.next() }
+        )
+      }
+      let afterSecond = try await database.read(captureRowCounts)
+
+      expectNoDifference(firstResult.outcome, .imported)
+      expectNoDifference(secondResult.outcome, .alreadyImported)
+      expectNoDifference(secondResult.recipeID, firstResult.recipeID)
+      expectNoDifference(afterFirst, baseline.adding(recipeDelta: 1, sourceDelta: 1, ingredientSectionDelta: 2, ingredientLineDelta: 4, instructionSectionDelta: 1, instructionStepDelta: 2, photoDelta: 1, importRefDelta: 1))
+      expectNoDifference(afterSecond, afterFirst)
+    }
+
+    @Test
+    func captureClientUsesRenderedFallbackWhenRawFetchParsesToNothing() async throws {
+      let sourceURL = try #require(URL(string: "https://example.com/recipes/js-rendered"))
+      let client = WebRecipeCaptureClient(
+        fetchHTML: { _ in Fixtures.barrenShell },
+        renderHTML: { _ in Fixtures.jsonLDRecipe }
+      )
+
+      let draft = try await client.capture(
+        url: sourceURL,
+        capturedAt: Date(timeIntervalSinceReferenceDate: 803_500_000)
+      )
+
+      expectNoDifference(draft.usedRenderedFallback, true)
+      expectNoDifference(draft.page.title, "Lemon Chicken")
+      expectNoDifference(draft.page.originalHTML, Fixtures.jsonLDRecipe)
+    }
+
+    @Test
+    func cancelAfterFetchWritesNothing() async throws {
+      @Dependency(\.defaultDatabase) var database
+      let sourceURL = try #require(URL(string: "https://example.com/recipes/cancelled"))
+      let client = WebRecipeCaptureClient(
+        fetchHTML: { _ in Fixtures.jsonLDRecipe },
+        renderHTML: { _ in nil }
+      )
+      let baseline = try await database.read(captureRowCounts)
+
+      _ = try await client.capture(
+        url: sourceURL,
+        capturedAt: Date(timeIntervalSinceReferenceDate: 803_600_000)
+      )
+
+      let afterFetch = try await database.read(captureRowCounts)
+      expectNoDifference(afterFetch, baseline)
+    }
+
+    private struct CaptureRowCounts: Equatable {
+      var recipes: Int
+      var sources: Int
+      var ingredientSections: Int
+      var ingredientLines: Int
+      var instructionSections: Int
+      var instructionSteps: Int
+      var photos: Int
+      var importRefs: Int
+
+      func adding(
+        recipeDelta: Int,
+        sourceDelta: Int,
+        ingredientSectionDelta: Int,
+        ingredientLineDelta: Int,
+        instructionSectionDelta: Int,
+        instructionStepDelta: Int,
+        photoDelta: Int,
+        importRefDelta: Int
+      ) -> Self {
+        Self(
+          recipes: recipes + recipeDelta,
+          sources: sources + sourceDelta,
+          ingredientSections: ingredientSections + ingredientSectionDelta,
+          ingredientLines: ingredientLines + ingredientLineDelta,
+          instructionSections: instructionSections + instructionSectionDelta,
+          instructionSteps: instructionSteps + instructionStepDelta,
+          photos: photos + photoDelta,
+          importRefs: importRefs + importRefDelta
+        )
+      }
+    }
+
+    private func captureRowCounts(_ db: Database) throws -> CaptureRowCounts {
+      try CaptureRowCounts(
+        recipes: Recipe.fetchAll(db).count,
+        sources: RecipeSource.fetchAll(db).count,
+        ingredientSections: IngredientSection.fetchAll(db).count,
+        ingredientLines: IngredientLine.fetchAll(db).count,
+        instructionSections: InstructionSection.fetchAll(db).count,
+        instructionSteps: InstructionStep.fetchAll(db).count,
+        photos: RecipePhoto.fetchAll(db).count,
+        importRefs: RecipeImportRef.fetchAll(db).count
+      )
+    }
+
+    private final class LockedSampleUUIDSequence: @unchecked Sendable {
+      private let lock = NSLock()
+      private var sequence: SampleUUIDSequence
+
+      init(start: Int) {
+        self.sequence = SampleUUIDSequence(start: start)
+      }
+
+      func next() -> UUID {
+        lock.withLock {
+          sequence.next()
+        }
+      }
+    }
+
     private enum Fixtures {
       static let jsonLDApostrophe = """
         <html><head>
@@ -270,6 +443,12 @@ extension RecipeCoreTests {
           <meta property="og:image" content="https://example.com/tart.jpg">
           <meta name="author" content="Example Staff">
         </head><body></body></html>
+        """
+
+      static let barrenShell = """
+        <html><head><title></title></head><body>
+        <main><div id="app"></div></main>
+        </body></html>
         """
     }
   }
