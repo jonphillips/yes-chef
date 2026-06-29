@@ -226,6 +226,13 @@ the share context carries no usable HTML** — never double-fetch a page the pre
 rendered. (The app-side `RenderedDOMFetcher` is not needed here — the preprocessor *is* the render
 step; the URL path is the plain-GET fallback.)
 
+**Accepted tradeoff (URL-only shares):** because the extension uses `YesChefCore`'s `liveValue`
+(whose `renderHTML` is a no-op) rather than the app's WKWebView-backed client, the plain-GET
+fallback has **no rendered-DOM recovery**. Sharing a *bare URL* (not a Safari web page) for a
+JS-rendered recipe site can therefore yield an empty draft. This is intentional — the Safari
+page-share path already carries the rendered DOM, and the recovery path for a stubborn URL is
+in-app paste capture (Slice 2), which does render. Revisit only if URL-only shares prove common.
+
 **Respect the target boundary.** The extension is a separate target and **cannot import the app
 target** — `RecipeCaptureModel`, `RecipeCaptureView`, and `RenderedDOMFetcher` all live in
 `YesChefApp` and are unreachable. Give the extension its own thin `@Observable @MainActor` confirm
