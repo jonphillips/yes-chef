@@ -224,7 +224,15 @@ share sheet. **Done when:** sharing a recipe page from Safari lands a reviewed r
 Run the real recipe sites Jon actually captures from end to end. Commit small, **sanitized**
 HTML-page fixtures covering the real shapes: JSON-LD site; microdata site; no-structured-data
 fallback; multi-section ingredients; unicode title; and a **JS-rendered-only** page requiring
-`RenderedDOMFetcher`. **Tests:** the fixtures exercise Slices 1–4 together (fetch → parse →
+`RenderedDOMFetcher`. **Charset fidelity (carried from Slice 2):** the live fetch decodes the
+response body as hard UTF-8 (`String(decoding:as:UTF8.self)`), which substitutes replacement
+characters for any non-UTF-8 page (Latin-1, or charset declared only in the HTTP header) — and
+that decoded string is what lands in `originalImportText`, violating the "raw HTML preserved
+**whole** / never lossy" invariant. Honor the response's declared encoding (check what
+Galavant's harvested fetcher does first — if it already resolves charset, this is a
+harvest-fidelity gap to close; if not, note it as a shared upstream issue in the ADR-0007
+convergence tracking) and cover it with a non-UTF-8 fixture asserting the raw bytes round-trip
+intact. **Tests:** the fixtures exercise Slices 1–4 together (fetch → parse →
 review → idempotent commit), idempotency verified across all. **The favorite-sites proof
 point** (per Decision #4): Jon's must-have sites must demonstrably capture via structured
 data + OpenGraph/meta; **if a must-have site resists structured extraction, that is the
