@@ -4,7 +4,19 @@ import SQLiteData
 
 extension DependencyValues {
   public mutating func bootstrapDatabase() throws {
-    let database = try SQLiteData.defaultDatabase()
+    @Dependency(\.context) var context
+    let databasePath: String?
+    switch context {
+    case .live:
+      databasePath = try YesChefDatabaseStorage.prepareLiveSharedStore().path
+    case .preview, .test:
+      databasePath = nil
+    }
+    try bootstrapDatabase(path: databasePath)
+  }
+
+  public mutating func bootstrapDatabase(path: String?) throws {
+    let database = try SQLiteData.defaultDatabase(path: path)
     var migrator = DatabaseMigrator()
     #if DEBUG
       migrator.eraseDatabaseOnSchemaChange = true
