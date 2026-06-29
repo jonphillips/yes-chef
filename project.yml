@@ -34,22 +34,46 @@ targets:
         product: SwiftUINavigation
       - package: ZIPFoundation
         product: ZIPFoundation
+      - target: YesChefShareExtension
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jon.yeschef
         PRODUCT_NAME: YesChef
         CODE_SIGN_ENTITLEMENTS: YesChefApp/YesChef.entitlements
         DEVELOPMENT_TEAM: 7MQEE539G9
+        CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Yes Chef
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        MARKETING_VERSION: "1.0"
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+  YesChefShareExtension:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "27.0"
+    sources:
+      - path: YesChefShareExtension
+    dependencies:
+      - package: YesChefPackage
+        product: YesChefCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jon.yeschef.share-extension
+        PRODUCT_NAME: YesChefShareExtension
+        CODE_SIGN_ENTITLEMENTS: YesChefShareExtension/YesChefShareExtension.entitlements
+        DEVELOPMENT_TEAM: 7MQEE539G9
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_FILE: YesChefShareExtension/Info.plist
+        MARKETING_VERSION: "1.0"
+        APPLICATION_EXTENSION_API_ONLY: YES
 schemes:
   YesChef:
     build:
       targets:
         YesChef: all
+        YesChefShareExtension: all
     run:
       config: Debug

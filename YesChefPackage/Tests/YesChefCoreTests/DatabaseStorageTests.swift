@@ -92,6 +92,56 @@ extension RecipeCoreTests {
       #expect(!FileManager.default.fileExists(atPath: legacyDatabaseURL.path))
       #expect(FileManager.default.fileExists(atPath: sharedDatabaseURL.path))
     }
+
+    @Test
+    func extensionRefusesToCreateFreshGroupStoreBeforeAppMigration() throws {
+      let rootURL = try temporaryDirectory()
+      let applicationSupportURL = rootURL.appendingPathComponent("Application Support", isDirectory: true)
+      let groupURL = rootURL.appendingPathComponent("Group", isDirectory: true)
+      let legacyDatabaseURL = YesChefDatabaseStorage.legacyDatabaseURL(
+        applicationSupportDirectory: applicationSupportURL
+      )
+      let sharedDatabaseURL = YesChefDatabaseStorage.sharedDatabaseURL(appGroupContainerURL: groupURL)
+      let recipeID = SampleUUIDSequence.uuid(11)
+
+      try FileManager.default.createDirectory(
+        at: applicationSupportURL,
+        withIntermediateDirectories: true
+      )
+
+      do {
+        let legacyDatabase = try pathBackedDatabase(at: legacyDatabaseURL)
+        try legacyDatabase.write { db in
+          try Recipe.insert {
+            Recipe(
+              id: recipeID,
+              title: "Legacy First-Run Recipe",
+              dateCreated: Date(timeIntervalSinceReferenceDate: 811_200_000),
+              dateModified: Date(timeIntervalSinceReferenceDate: 811_200_000)
+            )
+          }
+          .execute(db)
+        }
+      }
+
+      #expect(throws: YesChefDatabaseStorage.StorageError.missingSharedStoreForExtension) {
+        try YesChefDatabaseStorage.prepareSharedStoreForExtension(
+          sharedDatabaseURL: sharedDatabaseURL
+        )
+      }
+      #expect(!FileManager.default.fileExists(atPath: sharedDatabaseURL.path))
+
+      try YesChefDatabaseStorage.migrateLegacyDatabaseIfNeeded(
+        from: legacyDatabaseURL,
+        to: sharedDatabaseURL
+      )
+
+      let sharedDatabase = try pathBackedDatabase(at: sharedDatabaseURL)
+      try sharedDatabase.read { db in
+        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+        expectNoDifference(recipe.title, "Legacy First-Run Recipe")
+      }
+    }
   }
 }
 

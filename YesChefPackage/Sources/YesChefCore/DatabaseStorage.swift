@@ -6,11 +6,14 @@ public enum YesChefDatabaseStorage {
 
   public enum StorageError: Error, Equatable, LocalizedError {
     case missingAppGroupContainer(String)
+    case missingSharedStoreForExtension
 
     public var errorDescription: String? {
       switch self {
       case let .missingAppGroupContainer(identifier):
         "Could not locate the app group container for \(identifier)."
+      case .missingSharedStoreForExtension:
+        "Open Yes Chef once to finish setup before saving from the share sheet."
       }
     }
   }
@@ -53,6 +56,24 @@ public enum YesChefDatabaseStorage {
       to: sharedDatabaseURL,
       fileManager: fileManager
     )
+    return sharedDatabaseURL
+  }
+
+  public static func prepareLiveSharedStoreForExtension(fileManager: FileManager = .default) throws -> URL {
+    let sharedDatabaseURL = try liveSharedDatabaseURL(fileManager: fileManager)
+    return try prepareSharedStoreForExtension(
+      sharedDatabaseURL: sharedDatabaseURL,
+      fileManager: fileManager
+    )
+  }
+
+  public static func prepareSharedStoreForExtension(
+    sharedDatabaseURL: URL,
+    fileManager: FileManager = .default
+  ) throws -> URL {
+    guard fileManager.fileExists(atPath: sharedDatabaseURL.path) else {
+      throw StorageError.missingSharedStoreForExtension
+    }
     return sharedDatabaseURL
   }
 

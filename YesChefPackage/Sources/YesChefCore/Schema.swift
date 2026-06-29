@@ -15,6 +15,18 @@ extension DependencyValues {
     try bootstrapDatabase(path: databasePath)
   }
 
+  public mutating func bootstrapDatabaseForShareExtension() throws {
+    @Dependency(\.context) var context
+    let databasePath: String?
+    switch context {
+    case .live:
+      databasePath = try YesChefDatabaseStorage.prepareLiveSharedStoreForExtension().path
+    case .preview, .test:
+      databasePath = nil
+    }
+    try bootstrapDatabase(path: databasePath)
+  }
+
   public mutating func bootstrapDatabase(path: String?) throws {
     let database = try SQLiteData.defaultDatabase(path: path)
     var migrator = DatabaseMigrator()

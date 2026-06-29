@@ -21,6 +21,20 @@
                ReferencedContainer = "container:YesChef.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "1FAEF2F92C17FBEFBD6C21E6"
+               BuildableName = "YesChefShareExtension.appex"
+               BlueprintName = "YesChefShareExtension"
+               ReferencedContainer = "container:YesChef.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

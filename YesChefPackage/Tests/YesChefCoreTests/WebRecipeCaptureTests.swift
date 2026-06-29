@@ -277,6 +277,96 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func sharePayloadWithRenderedHTMLDoesNotFetchAgain() async throws {
+      let sourceURL = try #require(URL(string: "https://example.com/recipes/shared-lemon-chicken"))
+      let client = WebRecipeCaptureClient(
+        fetchHTML: { _ in throw WebRecipeCaptureClientError.unimplementedFetch },
+        renderHTML: { _ in nil }
+      )
+
+      let draft = try await client.capture(
+        sharePayload: WebRecipeSharePayload(
+          sourceURL: sourceURL,
+          renderedHTML: Fixtures.jsonLDRecipe
+        ),
+        capturedAt: Date(timeIntervalSinceReferenceDate: 803_700_000)
+      )
+
+      expectNoDifference(draft.usedRenderedFallback, false)
+      expectNoDifference(draft.page.title, "Lemon Chicken")
+      expectNoDifference(draft.page.sourceURL?.absoluteString, sourceURL.absoluteString)
+      expectNoDifference(draft.page.originalHTML, Fixtures.jsonLDRecipe)
+    }
+
+    @Test
+    func sharePayloadFallsBackToURLCaptureWhenRenderedHTMLIsMissing() async throws {
+      let sourceURL = try #require(URL(string: "https://example.com/recipes/shared-url-only"))
+      let client = WebRecipeCaptureClient(
+        fetchHTML: { url in
+          expectNoDifference(url, sourceURL)
+          return Fixtures.jsonLDRecipe
+        },
+        renderHTML: { _ in nil }
+      )
+
+      let draft = try await client.capture(
+        sharePayload: WebRecipeSharePayload(sourceURL: sourceURL, renderedHTML: nil),
+        capturedAt: Date(timeIntervalSinceReferenceDate: 803_800_000)
+      )
+
+      expectNoDifference(draft.page.title, "Lemon Chicken")
+      expectNoDifference(draft.page.originalHTML, Fixtures.jsonLDRecipe)
+    }
+
+    @Test
+    func sharePayloadHTMLPathCommitsWithSameDeltasAsURLPathAndIsIdempotent() async throws {
+      @Dependency(\.defaultDatabase) var database
+      let sourceURL = try #require(URL(string: "https://example.com/recipes/shared-parity"))
+      let capturedAt = Date(timeIntervalSinceReferenceDate: 803_900_000)
+      let client = WebRecipeCaptureClient(
+        fetchHTML: { _ in Fixtures.jsonLDRecipe },
+        renderHTML: { _ in nil }
+      )
+      let urlDraft = try await client.capture(url: sourceURL, capturedAt: capturedAt)
+      let shareDraft = try await client.capture(
+        sharePayload: WebRecipeSharePayload(
+          sourceURL: sourceURL,
+          renderedHTML: Fixtures.jsonLDRecipe
+        ),
+        capturedAt: capturedAt
+      )
+
+      expectNoDifference(shareDraft.page, urlDraft.page)
+
+      let baseline = try await database.read(captureRowCounts)
+      let uuids = LockedSampleUUIDSequence(start: 25_000)
+      let firstResult = try await database.write { db in
+        try RecipeRepository.importCapturedRecipe(
+          shareDraft,
+          in: db,
+          now: capturedAt,
+          uuid: { uuids.next() }
+        )
+      }
+      let afterFirst = try await database.read(captureRowCounts)
+      let secondResult = try await database.write { db in
+        try RecipeRepository.importCapturedRecipe(
+          shareDraft,
+          in: db,
+          now: capturedAt.addingTimeInterval(60),
+          uuid: { uuids.next() }
+        )
+      }
+      let afterSecond = try await database.read(captureRowCounts)
+
+      expectNoDifference(firstResult.outcome, .imported)
+      expectNoDifference(secondResult.outcome, .alreadyImported)
+      expectNoDifference(secondResult.recipeID, firstResult.recipeID)
+      expectNoDifference(afterFirst, baseline.adding(recipeDelta: 1, sourceDelta: 1, ingredientSectionDelta: 2, ingredientLineDelta: 4, instructionSectionDelta: 1, instructionStepDelta: 2, photoDelta: 1, importRefDelta: 1))
+      expectNoDifference(afterSecond, afterFirst)
+    }
+
+    @Test
     func cancelAfterFetchWritesNothing() async throws {
       @Dependency(\.defaultDatabase) var database
       let sourceURL = try #require(URL(string: "https://example.com/recipes/cancelled"))
