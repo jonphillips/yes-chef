@@ -132,7 +132,7 @@ sitting, green at merge (build + tests). Tick the box in the slice PR that compl
 
 - [x] Slice 0 — Grocery dangling-source tests (audit fold-in)
 - [x] Slice 1 — Re-import identity + idempotency
-- [ ] Slice 2 — Parser fidelity: rating, difficulty, ingredient sections
+- [x] Slice 2 — Parser fidelity: rating, difficulty, ingredient sections
 - [ ] Slice 3 — Review-before-commit + rollback
 - [ ] Slice 4 — Image fidelity (full-res + consistent detail)
 - [ ] Slice 5 — Land the real library + committed sanitized fixture
@@ -222,7 +222,13 @@ and the committed fixture guards every behavior this milestone adds.
 - **Section-heading heuristic = a `recipeIngredient` line with no `<strong>` quantity
   that is all-caps or colon-terminated.** Derived from the real export
   (`itemprop="recipeIngredient">CHICKEN</p>`), not guessed. Anything ambiguous stays a
-  plain ingredient line (preserve over interpret).
+  plain ingredient line (preserve over interpret). **Refinement (Slice 2, from real
+  data):** when *every* ingredient line in a recipe is uppercase, casing carries no
+  signal — a fully-uppercased export (real, e.g. the Garlicky Traybake) would otherwise
+  promote ordinary lines like `KOSHER SALT AND GROUND BLACK PEPPER`. So the all-caps
+  branch is suppressed for fully-uppercased lists; colon-terminated headings still count.
+  The rule lives once in `IngredientSectionHeading.sections(in:)`, shared by Paprika
+  import and web capture.
 - **Primary image source = first PhotoSwipe gallery image, else `itemprop="image"`.**
   Already chosen in the spike; the gallery source is the higher-resolution original,
   the `itemprop="image"` file is often a ~280×280 cover thumbnail (IMPORT_EXPORT §2.7).
