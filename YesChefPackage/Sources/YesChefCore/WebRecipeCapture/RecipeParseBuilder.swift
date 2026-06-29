@@ -143,29 +143,8 @@ struct RecipeParseBuilder {
   }
 
   private static func sectionedIngredients(_ lines: [String]) -> [ParsedRecipeIngredientSection] {
-    var sections: [ParsedRecipeIngredientSection] = []
-    var currentName: String?
-    var currentLines: [String] = []
-
-    func flush() {
-      guard !currentLines.isEmpty else { return }
-      sections.append(ParsedRecipeIngredientSection(name: currentName, lines: currentLines))
-      currentLines = []
-    }
-
-    for line in lines {
-      if IngredientSectionHeading.isHeading(line) {
-        flush()
-        currentName = IngredientSectionHeading.name(line)
-      } else {
-        currentLines.append(line)
-      }
-    }
-    flush()
-    if sections.isEmpty, !lines.isEmpty {
-      return [ParsedRecipeIngredientSection(lines: lines)]
-    }
-    return sections
+    IngredientSectionHeading.sections(in: lines)
+      .map { ParsedRecipeIngredientSection(name: $0.name, lines: $0.lines) }
   }
 
   private static func ratingValue(_ text: String) -> Int? {

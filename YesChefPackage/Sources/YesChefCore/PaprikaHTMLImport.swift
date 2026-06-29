@@ -53,6 +53,7 @@ public struct PaprikaHTMLRecipe: Equatable, Sendable {
   public var cookTimeMinutes: Int?
   public var totalTimeMinutes: Int?
   public var rating: Int?
+  public var difficulty: RecipeDifficulty?
   public var sourceName: String?
   public var sourceURL: String?
   public var categoryNames: [String]
@@ -70,6 +71,7 @@ public struct PaprikaHTMLRecipe: Equatable, Sendable {
     cookTimeMinutes: Int? = nil,
     totalTimeMinutes: Int? = nil,
     rating: Int? = nil,
+    difficulty: RecipeDifficulty? = nil,
     sourceName: String? = nil,
     sourceURL: String? = nil,
     categoryNames: [String] = [],
@@ -86,6 +88,7 @@ public struct PaprikaHTMLRecipe: Equatable, Sendable {
     self.cookTimeMinutes = cookTimeMinutes
     self.totalTimeMinutes = totalTimeMinutes
     self.rating = rating
+    self.difficulty = difficulty
     self.sourceName = sourceName
     self.sourceURL = sourceURL
     self.categoryNames = categoryNames
@@ -101,18 +104,31 @@ public struct PaprikaHTMLRecipe: Equatable, Sendable {
     uuid: () -> UUID
   ) throws -> RecipeBundleCoding.RecipeBundle {
     let recipeID = uuid()
-    let ingredientSectionID = uuid()
-    let instructionSectionID = uuid()
 
-    let ingredientSections = ingredients.isEmpty
-      ? []
-      : [IngredientSection(id: ingredientSectionID, recipeID: recipeID, sortOrder: 0)]
-    let ingredientLines = IngredientParser.lines(
-      from: ingredients.joined(separator: "\n"),
-      recipeID: recipeID,
-      sectionID: ingredientSectionID,
-      uuid: uuid
-    )
+    var ingredientSections: [IngredientSection] = []
+    var ingredientLines: [IngredientLine] = []
+    for (index, group) in IngredientSectionHeading.sections(in: ingredients).enumerated() {
+      let sectionID = uuid()
+      ingredientSections.append(
+        IngredientSection(id: sectionID, recipeID: recipeID, name: group.name?.nonEmpty, sortOrder: index)
+      )
+      let sortOffset = ingredientLines.count
+      ingredientLines.append(
+        contentsOf: IngredientParser.lines(
+          from: group.lines.joined(separator: "\n"),
+          recipeID: recipeID,
+          sectionID: sectionID,
+          uuid: uuid
+        )
+        .map { line in
+          var line = line
+          line.sortOrder += sortOffset
+          return line
+        }
+      )
+    }
+
+    let instructionSectionID = uuid()
     let instructionSections = instructions.isEmpty
       ? []
       : [InstructionSection(id: instructionSectionID, recipeID: recipeID, sortOrder: 0)]
@@ -180,6 +196,7 @@ public struct PaprikaHTMLRecipe: Equatable, Sendable {
       prepTimeMinutes: prepTimeMinutes,
       cookTimeMinutes: cookTimeMinutes,
       totalTimeMinutes: totalTimeMinutes ?? Self.totalTime(prep: prepTimeMinutes, cook: cookTimeMinutes),
+      difficulty: difficulty,
       rating: rating,
       dateCreated: now,
       dateModified: now,
@@ -365,6 +382,7 @@ public enum PaprikaHTMLImporter {
       cookTimeMinutes: firstItemText(in: html, itemprop: "cookTime").flatMap(parseDurationMinutes),
       totalTimeMinutes: firstItemText(in: html, itemprop: "totalTime").flatMap(parseDurationMinutes),
       rating: rating(in: html),
+      difficulty: difficulty(in: html),
       sourceName: sourceName,
       sourceURL: sourceURL,
       categoryNames: categoryNames,
@@ -508,6 +526,21 @@ public enum PaprikaHTMLImporter {
       rating > 0
     else { return nil }
     return rating
+  }
+
+  private static func difficulty(in html: String) -> RecipeDifficulty? {
+    // Paprika has no schema.org itemprop for difficulty; the export renders it (when set)
+    // as a `<b>Difficulty: </b>` metadata label, so anchor on the label and read the value
+    // up to the next field. Map only the known levels — anything else stays nil and the raw
+    // page is preserved in originalImportText (preserve over interpret).
+    let pattern = #"(?is)Difficulty:\s*</b>(.*?)(?:<b\b|</p>)"#
+    guard let raw = captures(pattern: pattern, in: html).first?.dropFirst().first else { return nil }
+    switch textContent(raw).lowercased() {
+    case "easy": return .easy
+    case "medium": return .medium
+    case "hard": return .hard
+    default: return nil
+    }
   }
 
   private static func parseDurationMinutes(_ text: String) -> Int? {

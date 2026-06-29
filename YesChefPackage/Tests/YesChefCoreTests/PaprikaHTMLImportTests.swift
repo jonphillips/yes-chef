@@ -14,6 +14,8 @@ extension RecipeCoreTests {
       expectNoDifference(
         result.recipes.map(\.title),
         [
+          "All Caps Traybake",
+          "Layered Enchiladas",
           "Photo Board Curry",
           "Title Only Collision",
           "Title Only Collision",
@@ -87,6 +89,7 @@ extension RecipeCoreTests {
       expectNoDifference(bundle.recipe.cookTimeMinutes, 70)
       expectNoDifference(bundle.recipe.totalTimeMinutes, 82)
       expectNoDifference(bundle.recipe.rating, 4)
+      expectNoDifference(bundle.recipe.difficulty, nil)
       expectNoDifference(bundle.recipe.originalImportText?.contains("schema.org/Recipe"), true)
       expectNoDifference(bundle.source?.name, "Example Kitchen")
       expectNoDifference(bundle.source?.url, "https://example.com/pasta?from=fixture&unit=test")
@@ -103,6 +106,78 @@ extension RecipeCoreTests {
       expectNoDifference(snapshot.recipe.title, "Weeknight Tomato Pasta")
       expectNoDifference(snapshot.ingredients, pasta.ingredients)
       expectNoDifference(snapshot.categories, ["Dinner", "Pasta"])
+    }
+
+    @Test
+    func parsePromotesIngredientSectionHeadingsAndRecoversDifficulty() throws {
+      let result = try PaprikaHTMLImporter.parseExport(at: Self.fixtureURL)
+      let enchiladas = try #require(result.recipes.first { $0.title == "Layered Enchiladas" })
+
+      expectNoDifference(enchiladas.difficulty, .medium)
+      expectNoDifference(
+        enchiladas.ingredients,
+        [
+          "CHICKEN",
+          "2 cups shredded chicken",
+          "Kosher salt, to taste",
+          "SAUCE",
+          "1 can crushed tomatoes",
+          "2 chipotle peppers",
+        ]
+      )
+
+      var uuids = SampleUUIDSequence(start: 9_000)
+      let bundle = try enchiladas.makeRecipeBundle(
+        now: Date(timeIntervalSinceReferenceDate: 802_500_000),
+        uuid: { uuids.next() }
+      )
+
+      expectNoDifference(bundle.recipe.difficulty, .medium)
+      expectNoDifference(bundle.ingredientSections.map(\.name), ["CHICKEN", "SAUCE"])
+      expectNoDifference(bundle.ingredientSections.map(\.sortOrder), [0, 1])
+
+      let chickenSection = try #require(bundle.ingredientSections.first { $0.name == "CHICKEN" })
+      let sauceSection = try #require(bundle.ingredientSections.first { $0.name == "SAUCE" })
+      expectNoDifference(
+        bundle.ingredientLines.filter { $0.sectionID == chickenSection.id }.map(\.originalText),
+        ["2 cups shredded chicken", "Kosher salt, to taste"]
+      )
+      expectNoDifference(
+        bundle.ingredientLines.filter { $0.sectionID == sauceSection.id }.map(\.originalText),
+        ["1 can crushed tomatoes", "2 chipotle peppers"]
+      )
+      // Section headings are not themselves shoppable ingredient lines.
+      expectNoDifference(
+        bundle.ingredientLines.map(\.originalText).contains("CHICKEN"),
+        false
+      )
+      // sortOrder runs globally across sections.
+      expectNoDifference(bundle.ingredientLines.map(\.sortOrder), [0, 1, 2, 3])
+    }
+
+    @Test
+    func parseKeepsFullyUppercasedListAsOneSectionWithoutFalseHeadings() throws {
+      let result = try PaprikaHTMLImporter.parseExport(at: Self.fixtureURL)
+      let traybake = try #require(result.recipes.first { $0.title == "All Caps Traybake" })
+
+      var uuids = SampleUUIDSequence(start: 9_500)
+      let bundle = try traybake.makeRecipeBundle(
+        now: Date(timeIntervalSinceReferenceDate: 802_600_000),
+        uuid: { uuids.next() }
+      )
+
+      // Every line is uppercase, so casing carries no signal: no line is promoted to a
+      // heading and the quantity-less "KOSHER SALT AND GROUND BLACK PEPPER" stays an
+      // ingredient (preserve over interpret).
+      expectNoDifference(bundle.ingredientSections.map(\.name), [nil])
+      expectNoDifference(
+        bundle.ingredientLines.map(\.originalText),
+        [
+          "2 POUNDS CHICKEN PARTS",
+          "KOSHER SALT AND GROUND BLACK PEPPER",
+          "1 POUND RED POTATOES",
+        ]
+      )
     }
 
     @Test
@@ -253,7 +328,7 @@ extension RecipeCoreTests {
         try LibraryEntityCounts.fetch(in: db)
       }
 
-      expectNoDifference(firstSummary.importedCount, 4)
+      expectNoDifference(firstSummary.importedCount, 6)
       expectNoDifference(firstSummary.alreadyImportedCount, 0)
       expectNoDifference(
         firstSummary.results.filter { $0.title == "Title Only Collision" }.map(\.outcome),
@@ -263,13 +338,13 @@ extension RecipeCoreTests {
       expectNoDifference(
         countsAfterFirstImport,
         LibraryEntityCounts(
-          recipes: 4,
+          recipes: 6,
           recipeSources: 1,
-          recipeImportRefs: 4,
-          ingredientSections: 4,
-          ingredientLines: 5,
-          instructionSections: 4,
-          instructionSteps: 5,
+          recipeImportRefs: 6,
+          ingredientSections: 7,
+          ingredientLines: 12,
+          instructionSections: 6,
+          instructionSteps: 8,
           recipeNotes: 1,
           recipePhotos: 1,
           tags: 0,
@@ -282,7 +357,7 @@ extension RecipeCoreTests {
       )
 
       expectNoDifference(secondSummary.importedCount, 0)
-      expectNoDifference(secondSummary.alreadyImportedCount, 4)
+      expectNoDifference(secondSummary.alreadyImportedCount, 6)
       expectNoDifference(secondSummary.warnings, [])
       expectNoDifference(
         secondSummary.results.first { $0.title == "Weeknight Tomato Pasta" }?.outcome,

@@ -154,6 +154,14 @@ struct RecipeDetailView: View {
       if let totalTime = recipe.totalTimeMinutes {
         Label("\(totalTime) min", systemImage: "clock")
       }
+      if let rating = recipe.rating, rating > 0 {
+        Label("\(rating)", systemImage: "star.fill")
+          .accessibilityLabel(Text("Rating \(rating) out of 5"))
+      }
+      if let difficulty = recipe.difficulty {
+        Label(difficulty.rawValue.capitalized, systemImage: "gauge.with.dots.needle.33percent")
+          .accessibilityLabel(Text("Difficulty \(difficulty.rawValue)"))
+      }
     }
     .font(.subheadline)
     .foregroundStyle(.secondary)
@@ -191,11 +199,31 @@ struct RecipeDetailView: View {
             .presentationCompactAdaptation(.popover)
         }
       }
-      VStack(alignment: .leading, spacing: 8) {
-        ForEach(model.ingredientLines) { line in
-          Text("• \(IngredientScaler.scaledText(for: line, factor: model.scaleFactor))")
-            .font(.body)
+      let groups = model.ingredientGroups
+      VStack(alignment: .leading, spacing: 12) {
+        if groups.isEmpty {
+          ingredientLineList(model.ingredientLines)
+        } else {
+          ForEach(groups) { group in
+            VStack(alignment: .leading, spacing: 8) {
+              if let name = group.name, !name.isEmpty {
+                Text(name)
+                  .font(.subheadline.bold())
+                  .foregroundStyle(.secondary)
+              }
+              ingredientLineList(group.lines)
+            }
+          }
         }
+      }
+    }
+  }
+
+  private func ingredientLineList(_ lines: [IngredientLine]) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      ForEach(lines) { line in
+        Text("• \(IngredientScaler.scaledText(for: line, factor: model.scaleFactor))")
+          .font(.body)
       }
     }
   }
