@@ -122,6 +122,10 @@ Paprika-parity-first, then the features that make Yes Chef next-gen:
 
 - Scaling and cooking-mode hardening (old roadmap M3).
 - Menu / meal-plan / grocery polish; ratify the Menus model (likely its own ADR).
+  Grocery consolidation + pantry thresholds is specced ahead in
+  [milestones/grocery-consolidation-and-pantry.md](milestones/grocery-consolidation-and-pantry.md)
+  (one canonical key, same-dimension unit merge, static pantry thresholds — deterministic,
+  no inventory).
 - Send-a-recipe (Phase-1 transfer), then Family Cookbook (Phase-2, CloudKit
   sharing).
 - Grounded AI planning (`FUTURE_INTELLIGENCE_AND_PLANNING.md`) — make-ahead/thaw/
