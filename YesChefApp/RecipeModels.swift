@@ -72,24 +72,21 @@ final class RecipeLibraryModel {
       let bundles = try importResult.recipes.map { recipe in
         try recipe.makeRecipeBundle(now: importDate, uuid: { makeUUID() })
       }
-      let importedIDs = try await database.write { db in
-        var recipeIDs: [Recipe.ID] = []
-        for bundle in bundles {
-          let recipeID = try RecipeRepository.importBundle(
-            bundle,
-            in: db,
-            now: importDate,
-            uuid: { makeUUID() }
-          )
-          recipeIDs.append(recipeID)
-        }
-        return recipeIDs
+      let importSummary = try await database.write { db in
+        try RecipeRepository.importBundles(
+          bundles,
+          in: db,
+          now: importDate,
+          uuid: { makeUUID() }
+        )
       }
-      selectedRecipeID = importedIDs.first ?? selectedRecipeID
+      selectedRecipeID = importSummary.importedIDs.first ?? importSummary.results.first?.recipeID ?? selectedRecipeID
       destination = .importSummary(
         RecipeImportSummary(
-          importedCount: importedIDs.count,
-          warningCount: importResult.warnings.count,
+          importedCount: importSummary.importedCount,
+          alreadyImportedCount: importSummary.alreadyImportedCount,
+          warningCount: importResult.warnings.count + importSummary.warnings.count,
+          identityWarningCount: importSummary.warnings.count,
           missingRecipePageCount: importResult.warnings
             .filter { $0.kind == .missingRecipePages }
             .compactMap(\.affectedCount)
@@ -170,13 +167,18 @@ final class RecipeLibraryModel {
 struct RecipeImportSummary: Identifiable, Equatable, Sendable {
   let id = UUID()
   var importedCount: Int
+  var alreadyImportedCount: Int
   var warningCount: Int
+  var identityWarningCount: Int
   var missingRecipePageCount: Int
   var missingPhotoCount: Int
   var unreadableRecipeCount: Int
 
   var message: String {
     var lines = ["Imported \(importedCount) \(importedCount == 1 ? "recipe" : "recipes")."]
+    if alreadyImportedCount > 0 {
+      lines.append("Skipped \(alreadyImportedCount) already-imported \(alreadyImportedCount == 1 ? "recipe" : "recipes").")
+    }
     if missingRecipePageCount > 0 {
       lines.append("\(missingRecipePageCount) index \(missingRecipePageCount == 1 ? "entry was" : "entries were") missing from the ZIP.")
     }
@@ -185,6 +187,9 @@ struct RecipeImportSummary: Identifiable, Equatable, Sendable {
     }
     if unreadableRecipeCount > 0 {
       lines.append("\(unreadableRecipeCount) recipe \(unreadableRecipeCount == 1 ? "page could" : "pages could") not be read.")
+    }
+    if identityWarningCount > 0 {
+      lines.append("\(identityWarningCount) import identity \(identityWarningCount == 1 ? "warning" : "warnings").")
     }
     if warningCount == 0 {
       lines.append("No warnings.")

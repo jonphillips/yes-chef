@@ -413,6 +413,27 @@ extension DependencyValues {
       }
     }
 
+    migrator.registerMigration("Create recipe import ref schema") { db in
+      try #sql("""
+        CREATE TABLE "recipeImportRef" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "recipeID" TEXT NOT NULL REFERENCES "recipes"("id") ON DELETE CASCADE,
+          "normalizedSourceURL" TEXT,
+          "normalizedTitle" TEXT NOT NULL,
+          "dateCreated" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      for statement in [
+        #"CREATE INDEX "index_recipeImportRef_on_recipeID" ON "recipeImportRef"("recipeID")"#,
+        #"CREATE INDEX "index_recipeImportRef_on_normalizedSourceURL_normalizedTitle" ON "recipeImportRef"("normalizedSourceURL", "normalizedTitle")"#,
+        #"CREATE INDEX "index_recipeImportRef_on_normalizedTitle" ON "recipeImportRef"("normalizedTitle")"#,
+      ] {
+        try db.execute(sql: statement)
+      }
+    }
+
     try migrator.migrate(database)
     defaultDatabase = database
   }
