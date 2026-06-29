@@ -38,8 +38,9 @@ Two facts shape everything forward:
 2. **Sync is a one-way gate.** Local re-imports while iterating are free and
    throwaway. The first time CloudKit sync is enabled, every bad or duplicate import
    propagates to all devices and is painful to purge from the private zone.
-   Therefore sync is sequenced **after** import is trustworthy — gated on data
-   quality, not a date.
+   Therefore sync is sequenced **after** import *and capture* are trustworthy — gated
+   on data quality, not a date. (As of 2026-06-29 "all capture" explicitly includes
+   authenticated in-app browser capture; see Phase D.)
 
 ## Baseline (built, un-audited)
 
@@ -94,17 +95,50 @@ capture pollutes the iCloud zone exactly like a bad bulk import. **Build order:*
   so capture is idempotent and reviewable.
 - App-group shared store so the extension and app see one library; committed sanitized
   HTML-page fixtures.
-- In-app browser capture is a **follow-on milestone (M3)** — proven in Galavant first, then
-  harvested. Photo → LLM recipe capture is a later milestone and the intended fallback for
-  any site that resists structured extraction.
+- In-app browser capture is its own milestone (**M3 — now Phase D, elevated above sync**),
+  proven in Galavant first, then harvested. Photo → LLM recipe capture is a *separate*, later
+  fallback for sources with **no** structured data (printed/handwritten); it is **not** the
+  answer to paywalled sites, which embed good structured data behind a login (see Phase D).
 
 Output: the app is worth living in before sync turns on — new recipes land here, cleanly
 and idempotently.
 
-## Phase D — CloudKit sync enablement  *(your "(a)" — deliberately last of the four)*
+## Phase D — In-app authenticated browser capture  *(M3 — elevated above sync, 2026-06-29)*
 
-Goal: turn on sync only once import **and capture** are trustworthy, to avoid polluting
-the iCloud private zone with throwaway re-imports or duplicate captures.
+Goal: capture recipes from sites that gate their content behind a login, by browsing to them
+in an **in-app `WKWebView` that holds Jon's authenticated session** and capturing the rendered
+DOM directly.
+
+**Why this jumped ahead of sync (decision — Jon + architect, 2026-06-29).** Jon's named
+must-have sites are **4-of-7 paywalled** (NYT Cooking, Cook's Illustrated, America's Test
+Kitchen, Milk Street — issue #29). Those sites embed perfectly good `schema.org` structured
+data; it simply sits behind a login wall, so an unauthenticated paste-a-URL GET retrieves a
+teaser stub, and the share extension only helps when Safari hands over rendered content (its
+URL-only fallback re-hits the wall). The in-app browser is the **robust** path — it owns the
+session end-to-end and reaches the structured data that is already there. This is therefore
+**not** an OCR/LLM problem; it is an authentication problem. Because a majority of the daily
+sites depend on it, the app is not genuinely "worth living in before sync" without it — and the
+one-way-gate logic already says *all* trustworthy capture should precede sync, so elevating it
+above sync is **consistent with** the gate, not contrary to it. (M1 still lands first — agreed;
+this only reorders what follows M1.)
+
+- **Evaluate in Galavant first (Jon), then harvest (ADR-0007).** Code at
+  `/Users/jon/code/galavant/galavant`. Two questions decide harvest-vs-rebuild: (1) does it
+  already capture the **rendered DOM from its `WKWebView`**, and (2) does it **persist the
+  login session / cookies across launches**? (2) is the whole value for paywalled sites — log
+  in once, not per capture.
+- Capture flows through the **same** review-before-commit + idempotent `importBundle` path as
+  M2; the browser is a new *fetch* seam, not a new write path. **Never store credentials** —
+  the session lives in the web view's own store.
+- Committed sanitized fixtures for the rendered-DOM shape, as in M2 Slice 5.
+
+Output: Jon's real daily sites — paywalled included — capture cleanly into the library,
+**before** the sync gate opens.
+
+## Phase E — CloudKit sync enablement  *(deliberately last — after import AND all capture)*
+
+Goal: turn on sync only once import **and all capture paths** are trustworthy, to avoid
+polluting the iCloud private zone with throwaway re-imports or duplicate captures.
 
 - **Verify the current SQLiteData API/version at milestone start** (house rule — the
   library moves fast).
@@ -115,7 +149,7 @@ the iCloud private zone with throwaway re-imports or duplicate captures.
 Output: multi-device sync with no server, no auth — the central bet, paid once the
 data is worth keeping.
 
-## Phase E+ — Parity completion, then differentiation
+## Phase F+ — Parity completion, then differentiation
 
 Sequenced after the foundation is stable, the real data is in, and sync works.
 Paprika-parity-first, then the features that make Yes Chef next-gen:
@@ -133,6 +167,6 @@ Paprika-parity-first, then the features that make Yes Chef next-gen:
 
 ## Status
 
-Phases A–E are provisional and strategic; the audit (Phase A, first task) may
+Phases A–F are provisional and strategic; the audit (Phase A, first task) may
 reshuffle the detail. Build orders are authored one milestone ahead in
 [milestones/](milestones/), never as a giant dump.
