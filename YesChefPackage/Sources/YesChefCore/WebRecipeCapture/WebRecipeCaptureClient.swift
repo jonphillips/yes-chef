@@ -11,6 +11,16 @@ public struct WebRecipeCaptureDraft: Equatable, Sendable {
   }
 }
 
+public struct WebRecipeSharePayload: Equatable, Sendable {
+  public var sourceURL: URL?
+  public var renderedHTML: String?
+
+  public init(sourceURL: URL?, renderedHTML: String?) {
+    self.sourceURL = sourceURL
+    self.renderedHTML = renderedHTML
+  }
+}
+
 public enum WebRecipeCaptureClientError: Error, Equatable, LocalizedError, Sendable {
   case invalidHTTPStatus(Int)
   case missingHTTPResponse
@@ -54,6 +64,39 @@ public struct WebRecipeCaptureClient: Sendable {
     }
 
     return WebRecipeCaptureDraft(page: page, usedRenderedFallback: usedRenderedFallback)
+  }
+
+  public func capture(
+    sharePayload payload: WebRecipeSharePayload,
+    capturedAt: Date
+  ) async throws -> WebRecipeCaptureDraft {
+    if let renderedHTML = payload.renderedHTML,
+       !renderedHTML.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    {
+      return WebRecipeCaptureDraft(
+        page: WebRecipePageParser.parse(
+          html: renderedHTML,
+          sourceURL: payload.sourceURL,
+          capturedAt: capturedAt
+        )
+      )
+    }
+
+    guard let sourceURL = payload.sourceURL else {
+      throw WebRecipeSharePayloadError.missingURL
+    }
+    return try await capture(url: sourceURL, capturedAt: capturedAt)
+  }
+}
+
+public enum WebRecipeSharePayloadError: Error, Equatable, LocalizedError, Sendable {
+  case missingURL
+
+  public var errorDescription: String? {
+    switch self {
+    case .missingURL:
+      "The shared item did not include a recipe page URL."
+    }
   }
 }
 

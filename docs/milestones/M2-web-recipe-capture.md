@@ -169,7 +169,7 @@ box in the slice PR that completes it. **Depends on M1 Slices 1 (identity) and 3
 - [x] Slice 1 — Harvest + recipe-retarget the capture engine (pure core) + ADR-0007
 - [x] Slice 2 — Paste-a-URL capture in-app (fetch → review → idempotent commit)
 - [x] Slice 3 — App-group shared SQLite container (migration-aware)
-- [ ] Slice 4 — Share extension target (page-share path)
+- [x] Slice 4 — Share extension target (page-share path)
 - [ ] Slice 5 — Real-site hardening + committed sanitized fixtures
 
 *(In-app browser capture is deferred to **M3** — perfect it in Galavant first, then
@@ -225,6 +225,13 @@ the rendered HTML Safari already handed us; only `WebRecipeCaptureClient.capture
 the share context carries no usable HTML** — never double-fetch a page the preprocessor already
 rendered. (The app-side `RenderedDOMFetcher` is not needed here — the preprocessor *is* the render
 step; the URL path is the plain-GET fallback.)
+
+**Accepted tradeoff (URL-only shares):** because the extension uses `YesChefCore`'s `liveValue`
+(whose `renderHTML` is a no-op) rather than the app's WKWebView-backed client, the plain-GET
+fallback has **no rendered-DOM recovery**. Sharing a *bare URL* (not a Safari web page) for a
+JS-rendered recipe site can therefore yield an empty draft. This is intentional — the Safari
+page-share path already carries the rendered DOM, and the recovery path for a stubborn URL is
+in-app paste capture (Slice 2), which does render. Revisit only if URL-only shares prove common.
 
 **Respect the target boundary.** The extension is a separate target and **cannot import the app
 target** — `RecipeCaptureModel`, `RecipeCaptureView`, and `RenderedDOMFetcher` all live in
