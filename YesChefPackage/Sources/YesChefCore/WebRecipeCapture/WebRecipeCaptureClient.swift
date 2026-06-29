@@ -87,6 +87,54 @@ public struct WebRecipeCaptureClient: Sendable {
     }
     return try await capture(url: sourceURL, capturedAt: capturedAt)
   }
+
+  public static func decodedHTML(data: Data, response: URLResponse) -> String {
+    if let encodingName = response.textEncodingName ?? contentTypeCharset(response),
+       let encoding = stringEncoding(named: encodingName),
+       let html = String(data: data, encoding: encoding)
+    {
+      return html
+    }
+    return String(decoding: data, as: UTF8.self)
+  }
+
+  private static func contentTypeCharset(_ response: URLResponse) -> String? {
+    guard let httpResponse = response as? HTTPURLResponse else { return nil }
+    for (field, value) in httpResponse.allHeaderFields {
+      guard
+        String(describing: field).localizedCaseInsensitiveCompare("Content-Type") == .orderedSame,
+        let contentType = value as? String
+      else { continue }
+      for component in contentType.split(separator: ";").dropFirst() {
+        let pieces = component.split(separator: "=", maxSplits: 1).map {
+          $0.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard pieces.count == 2, pieces[0].localizedCaseInsensitiveCompare("charset") == .orderedSame else {
+          continue
+        }
+        return pieces[1].trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+      }
+    }
+    return nil
+  }
+
+  private static func stringEncoding(named name: String) -> String.Encoding? {
+    let normalized = name
+      .trimmingCharacters(in: CharacterSet(charactersIn: "\"'").union(.whitespacesAndNewlines))
+      .lowercased()
+    switch normalized {
+    case "utf-8", "utf8":
+      return .utf8
+    case "iso-8859-1", "iso_8859-1", "latin1", "latin-1", "iso-latin-1":
+      return .isoLatin1
+    case "windows-1252", "cp1252":
+      return .windowsCP1252
+    default:
+      let cfEncoding = CFStringConvertIANACharSetNameToEncoding(normalized as CFString)
+      guard cfEncoding != kCFStringEncodingInvalidId else { return nil }
+      return String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(cfEncoding))
+    }
+  }
 }
 
 public enum WebRecipeSharePayloadError: Error, Equatable, LocalizedError, Sendable {
@@ -116,7 +164,7 @@ extension WebRecipeCaptureClient: DependencyKey {
         guard (200..<300).contains(httpResponse.statusCode) else {
           throw WebRecipeCaptureClientError.invalidHTTPStatus(httpResponse.statusCode)
         }
-        return String(decoding: data, as: UTF8.self)
+        return Self.decodedHTML(data: data, response: response)
       },
       renderHTML: { _ in nil }
     )
