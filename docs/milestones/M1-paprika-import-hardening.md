@@ -241,6 +241,60 @@ batch A leaves batch B intact; a rolled-back recipe that fed a grocery row leave
 grocery row degrading gracefully (no crash). **Done when:** no import mutates the library
 without an explicit commit, and a commit is reversible to the exact prior row counts.
 
+---
+
+#### Handoff refinement — 2026-06-29 (dispatch-ready; the dependency flipped)
+
+This slice was originally specced to *precede* M2 and hand M2 its review pattern. Execution
+inverted that: M2 shipped first and built the review-before-commit model this slice needs.
+**So M1 S3 is now a "mirror the proven template, add batch + rollback" job, not a greenfield
+one.** Read M2's `RecipeCaptureModel` before writing anything.
+
+**The template to mirror — `RecipeCaptureModel` (`YesChefApp/RecipeModels.swift:182`).**
+It is the shape the new `RecipeImportModel` must follow:
+- `@Observable @MainActor final class`, `Destination`-driven on the owning `RecipeLibraryModel`.
+- Dependencies as `@ObservationIgnored @Dependency` seams only: `\.date.now`,
+  `\.defaultDatabase`, `\.uuid`. No I/O in `init`, no `database.read` in `.task`.
+- **Preview is a held value, commit is the only write.** Capture holds a `draft`
+  (`WebRecipeCaptureDraft?`) and exposes `canCommit`; `commitButtonTapped()` is the *only*
+  path that opens `database.write`, calling a repository method and returning the result.
+  Cancel/`reset()` writes nothing. Import mirrors this exactly — the held value is a batch
+  preview instead of a single draft.
+
+**Exact boundaries (what to touch, what not to):**
+- **Replace** the eager path in `RecipeLibraryModel.paprikaExportSelected`
+  (`YesChefApp/RecipeModels.swift:75`) — today it parses and calls `database.write { … importBundles … }`
+  immediately (~line 88), then shows `.importSummary` post-hoc. Re-route: parse → build
+  preview → present `RecipeImportModel` for review → commit on explicit action. The existing
+  `.importSummary` destination stays as the *post-commit* summary, now carrying Undo.
+- **New pure classifier in YesChefCore** (alongside `RecipeRepository+Import.swift`): given the
+  parsed bundles + existing `RecipeImportRef`s, return per-recipe status
+  (new / already-imported / title-only collision) with **zero writes**. Reuse the single
+  import-key home from S1 — do **not** re-derive the key. This is the read-only preview;
+  `importBundles` (`RecipeRepository+Import.swift:89`, returns `RecipeImportBatchResult` with
+  `importedIDs` at `:60`) is the commit, unchanged.
+- **New rollback method on `RecipeRepository`** — hard-delete a batch's `importedIDs` recipes
+  + their pre-allocated child rows + the `RecipeImportRef`s created for them, returning counts
+  to baseline. **Contrast it explicitly with `RecipeRepository.archive`
+  (`RecipeCore.swift:399`)**, which is the soft user-delete path; rollback is an undo-of-insert
+  and must be a true hard delete. Disjoint batches → disjoint `importedIDs`, so independence is
+  by construction.
+
+**Commit-API contrast to keep straight:** capture commits a *single* recipe via
+`importCapturedRecipe` → `RecipeImportBundleResult`; import commits a *batch* via
+`importBundles` → `RecipeImportBatchResult`. Same `@Dependency`/`@Observable`/commit-on-write
+structure, different cardinality and the added classifier + rollback. Don't collapse the two
+models; mirror the structure.
+
+**No persistent model change.** No import-session column (decided above) — the `importedIDs`
+set identifies the batch precisely. AGENTS.md: ask before persistent model changes; none is
+needed here.
+
+**Verify locally (CI is disabled on this repo — billing):** `swift test --package-path
+YesChefPackage` green; `bash scripts/check-drift.sh` green; `xcodegen generate` clean;
+`xcodebuild -scheme YesChef -destination 'platform=iOS Simulator,name=iPad Air 13-inch (M4)'
+-skipMacroValidation build` green; `git diff --check` clean. `reasoning: high`.
+
 ### Slice 4 — Image fidelity (ADR-0005) — `reasoning: high`
 
 Follow ADR-0005 through: retain the **full-resolution** original bytes (prefer the
