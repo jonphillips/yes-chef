@@ -83,5 +83,10 @@ Use the shared house image strategy, adapted for recipe evidence.
 
 `RecipePhoto` now stores app-owned display/thumbnail bytes and provenance fields.
 `imageDataReference` is an app-owned reference string; imported Paprika paths are kept
-in `originalSourcePath` for provenance and diagnostics. Full-resolution originals and
-more careful quality policies for text-heavy reference photos remain deferred.
+in `originalSourcePath` for provenance and diagnostics. As of M1 Slice 4, the pure
+`RecipePhotoProcessing` pipeline emits the §4 display/thumbnail derivatives at a
+quality-aware byte budget, and **text-heavy reference photos take the larger display
+tier** (§4): a Paprika "see attached photo" recipe — whose body is only a pointer to its
+image — is imported with its photos classified `.referenceDocument`, which both selects
+the larger readability budget and drops the photo from list/calendar card thumbnails
+(a document scan is a poor card image). Full-resolution originals (§5) remain deferred.

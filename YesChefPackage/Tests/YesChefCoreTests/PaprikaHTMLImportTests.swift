@@ -43,7 +43,8 @@ extension RecipeCoreTests {
         ]
       )
       expectNoDifference(curry.photos.map(\.isAvailable), [true, false])
-      expectNoDifference(curry.photos.map(\.kind), [.hero, .gallery])
+      // "see attached photo" body → photos are reference documents (ADR-0005 §4).
+      expectNoDifference(curry.photos.map(\.kind), [.referenceDocument, .referenceDocument])
       expectNoDifference(curry.photos.map(\.caption), ["Prep board", "Missing board"])
       expectNoDifference(curry.photos.first?.displayData != nil, true)
       expectNoDifference(curry.photos.first?.thumbnailData != nil, true)
@@ -240,7 +241,8 @@ extension RecipeCoreTests {
       )
       expectNoDifference(bundle.photos.map(\.originalSourcePath), ["Images/curry/step1.jpg"])
       expectNoDifference(bundle.photos.map(\.sourceURL), [nil])
-      expectNoDifference(bundle.photos.map(\.kind), [.hero])
+      // "see attached photo" body → photo is a reference document (ADR-0005 §4).
+      expectNoDifference(bundle.photos.map(\.kind), [.referenceDocument])
       expectNoDifference(bundle.photos.map { $0.displayData != nil }, [true])
       expectNoDifference(bundle.photos.map { $0.thumbnailData != nil }, [true])
       expectNoDifference(bundle.photos.map(\.mediaType), ["image/jpeg"])
@@ -283,7 +285,8 @@ extension RecipeCoreTests {
       expectNoDifference(imported.categories.map(\.name), ["Import Fixture"])
       expectNoDifference(imported.photos.map(\.originalSourcePath), ["Images/curry/step1.jpg"])
       expectNoDifference(imported.photos.map(\.sourceURL), [nil])
-      expectNoDifference(imported.photos.map(\.kind), [.hero])
+      // "see attached photo" body → photo is a reference document (ADR-0005 §4).
+      expectNoDifference(imported.photos.map(\.kind), [.referenceDocument])
       expectNoDifference(imported.photos.map(\.source), [.imported])
       expectNoDifference(
         imported.photos.map { $0.imageDataReference == $0.originalSourcePath },
@@ -300,7 +303,9 @@ extension RecipeCoreTests {
         try RecipeListRequest().fetch(db)
       }
       let row = try #require(recipeRows.first { $0.recipe.id == importResult.recipeID })
-      expectNoDifference(row.thumbnailData != nil, true)
+      // Reference-document photos are excluded from list thumbnails, and this
+      // evidence recipe has no other photo, so its card shows no image.
+      expectNoDifference(row.thumbnailData, nil)
       expectNoDifference(row.categoryNames, ["Import Fixture"])
       expectNoDifference(row.tagNames, [])
     }
@@ -610,6 +615,43 @@ extension RecipeCoreTests {
       URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .appendingPathComponent("Fixtures/PaprikaHTML/SyntheticExport", isDirectory: true)
+    }
+  }
+
+  @Suite
+  struct PaprikaPhotoClassificationTests {
+    @Test
+    func referenceDocumentClassificationDependsOnRecipeBody() {
+      func html(ingredient: String, instruction: String) -> String {
+        """
+        <div itemscope itemtype="http://schema.org/Recipe">
+          <h1 itemprop="name">Sample</h1>
+          <div class="ingredients text">
+            <p class="line" itemprop="recipeIngredient">\(ingredient)</p>
+          </div>
+          <div itemprop="recipeInstructions" class="directions text">
+            <p class="line">\(instruction)</p>
+          </div>
+          <script type="text/javascript">
+            var items = [
+              { msrc: 'Images/x/a.jpg', src: 'Images/x/a.jpg', w: 1200.0, h: 900.0, title: 'A' }
+            ];
+          </script>
+        </div>
+        """
+      }
+
+      // "see attached photo" body → the photo carries the recipe → reference document.
+      let evidence = PaprikaHTMLImporter.parseRecipePage(
+        html(ingredient: "see attached photo", instruction: "See attached photo.")
+      )
+      expectNoDifference(evidence.photos.map(\.kind), [.referenceDocument])
+
+      // Substantive body → ordinary display photo, kept as a hero (and a card thumbnail).
+      let normal = PaprikaHTMLImporter.parseRecipePage(
+        html(ingredient: "2 cups flour", instruction: "Mix and bake.")
+      )
+      expectNoDifference(normal.photos.map(\.kind), [.hero])
     }
   }
 }

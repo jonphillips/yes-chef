@@ -322,7 +322,9 @@ Run the full real `/Users/jon/code/PaprikaExport` through end to end. Commit a s
 **sanitized** multi-recipe fixture into the test target covering the real shapes:
 simple single-section; multi-section (`CHICKEN`/`SAUCE`); source-mapped
 (cooksillustrated.com → Cook's Illustrated); unicode title (the Chinese-character
-recipes); gallery vs cover-thumbnail image; and a partial/missing-image case. **Tests:**
+recipes); gallery vs cover-thumbnail image; an image-only **"see attached photo"**
+recipe (to exercise Slice 4's `.referenceDocument` classification + larger budget +
+no-card-thumbnail end to end); and a partial/missing-image case. **Tests:**
 the fixture exercises Slices 1–4 together (parse → review → idempotent commit →
 fidelity → images). **Done when:** the real library imports cleanly and idempotently,
 and the committed fixture guards every behavior this milestone adds.
@@ -347,6 +349,17 @@ and the committed fixture guards every behavior this milestone adds.
 - **Primary image source = first PhotoSwipe gallery image, else `itemprop="image"`.**
   Already chosen in the spike; the gallery source is the higher-resolution original,
   the `itemprop="image"` file is often a ~280×280 cover thumbnail (IMPORT_EXPORT §2.7).
+- **Image-processing budgets = display ≈1600px / thumbnail 320px / ~300 KB target;
+  reference-document tier ≈2400px / 480px / ~900 KB.** Directly from ADR-0005 §4 (the
+  Galavant default, plus a larger tier where text readability matters). The processor
+  steps JPEG quality down from 0.82 toward 0.55 only until the byte target is met, and
+  never fails the recipe (over-budget images are accepted rather than dropped).
+- **Reference-document trigger = an image-only "see attached photo" recipe** — has at
+  least one photo-pointer body line (`see … attached/photo/image/picture/scan`) and *no*
+  substantive ingredient/instruction text. Such photos are classified
+  `.referenceDocument` so they take the larger budget (ADR-0005 §4 + Consequences). A
+  recipe with any real text, or a photo recipe with no text yet, is **not** reclassified
+  (preserve over interpret; don't silently strip a recipe's only card thumbnail).
 - **Ignored ZIP sidecars = `__MACOSX/`, `.DS_Store`.** Present in real macOS exports;
   must not be parsed (IMPORT_EXPORT §2.2).
 - **Source→publication map** (e.g. `www.cooksillustrated.com` → `Cook's Illustrated`):
