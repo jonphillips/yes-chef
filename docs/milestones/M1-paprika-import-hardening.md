@@ -116,9 +116,10 @@ the backup supplementer already does:
   **weaker** — on collision, treat as *new* and warn rather than silently merging
   (preserve-data-over-magic).
 - Persist the chosen key as **provenance** so a re-import is a lookup, not a re-derive.
-  Store it as a loose column on `Recipe` (e.g. `importIdentity: String?`) or a small
-  `recipeImportRef` side table — Codex picks the simpler one and flags it; either way
-  it is provenance, not a unique index (CloudKit law 3).
+  Store it in a small **`recipeImportRef` side table** keyed to recipe (confirmed with
+  Jon 2026-06-28) — keeps `Recipe` clean and isolates import provenance. It is
+  provenance, **not a unique index** (CloudKit law 3): a lookup-then-decide, never a DB
+  constraint.
 
 On re-import, a matched recipe is **reported as already-imported and skipped by
 default** (no field overwrite — the user may have edited it). "Update from source" is a
@@ -130,7 +131,7 @@ later, reviewable affordance, not an automatic overwrite.
 sitting, green at merge (build + tests). Tick the box in the slice PR that completes it.
 
 - [x] Slice 0 — Grocery dangling-source tests (audit fold-in)
-- [ ] Slice 1 — Re-import identity + idempotency
+- [x] Slice 1 — Re-import identity + idempotency
 - [ ] Slice 2 — Parser fidelity: rating, difficulty, ingredient sections
 - [ ] Slice 3 — Review-before-commit + rollback
 - [ ] Slice 4 — Image fidelity (full-res + consistent detail)
@@ -155,6 +156,11 @@ up the key; if matched, skip and report already-imported; if new, insert as toda
 **still N** — per entity (recipes, sections, lines, photos, joins), no duplicates.
 Title-only collision → new + warning. **Done when:** double-import is a no-op on row
 counts and the summary distinguishes new vs already-imported.
+**Fixture:** reuse the existing `Tests/.../Fixtures/PaprikaHTML/SyntheticExport`; extend
+it minimally for the two identity branches this slice needs — one recipe **with** a
+source URL (strong key) and a **title-only collision** pair (same title, no/empty source
+URL → second imports as *new* + warns). The full sanitized real-shape fixture is Slice 5,
+not this slice.
 
 ### Slice 2 — Parser fidelity: rating, difficulty, ingredient sections
 
@@ -235,13 +241,11 @@ and the committed fixture guards every behavior this milestone adds.
    `originalImportText` until the backup path makes it structured? **Recommend:**
    preserve raw this milestone; add the field with the backup importer, so we model it
    once from the richer source.
-3. **Import identity storage:** loose `Recipe.importIdentity` column vs a
-   `recipeImportRef` side table — confirm you're fine letting Codex pick the simpler
-   one in Slice 1 and flag it in the PR. **Recommend:** yes, Codex's call, provenance
-   not a unique index.
-4. **Already-imported policy:** confirm matched recipes are **skipped, never
-   overwritten** (edits are sacred); "update from source" is a later reviewable feature.
-   **Recommend:** confirm skip-by-default.
+3. **Import identity storage:** ~~loose column vs side table~~ **CONFIRMED 2026-06-28 —
+   `recipeImportRef` side table** keyed to recipe; provenance, not a unique index.
+4. **Already-imported policy:** **CONFIRMED 2026-06-28 — skip, never overwrite.** Matched
+   recipes are reported as already-imported and skipped; no field overwrite (edits are
+   sacred). "Update from source" is a later, reviewable feature.
 
 ## Working agreement
 

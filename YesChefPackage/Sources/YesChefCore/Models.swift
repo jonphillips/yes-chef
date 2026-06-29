@@ -568,6 +568,29 @@ public struct RecipeSource: Codable, Identifiable, Equatable, Sendable {
   }
 }
 
+@Table("recipeImportRef")
+public struct RecipeImportRef: Codable, Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var recipeID: Recipe.ID
+  public var normalizedSourceURL: String?
+  public var normalizedTitle: String
+  public var dateCreated: Date
+
+  public init(
+    id: UUID,
+    recipeID: Recipe.ID,
+    normalizedSourceURL: String? = nil,
+    normalizedTitle: String,
+    dateCreated: Date
+  ) {
+    self.id = id
+    self.recipeID = recipeID
+    self.normalizedSourceURL = normalizedSourceURL
+    self.normalizedTitle = normalizedTitle
+    self.dateCreated = dateCreated
+  }
+}
+
 @Table("ingredientSections")
 public struct IngredientSection: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID

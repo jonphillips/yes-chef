@@ -71,14 +71,14 @@ extension RecipeRepository {
     )
     let recipesByNormalizedName = Dictionary(
       grouping: recipes,
-      by: { normalizedRecipeName($0.title) }
+      by: { RecipeImportIdentityKey.normalizedTitle($0.title) }
     )
 
     var summary = PaprikaRecipeBackupSupplementSummary(backupRecipeCount: backupRecords.count)
     var handledRecipeIDs: Set<Recipe.ID> = []
 
     for record in backupRecords {
-      let normalizedName = normalizedRecipeName(record.name)
+      let normalizedName = RecipeImportIdentityKey.normalizedTitle(record.name)
       guard !normalizedName.isEmpty else {
         summary.skippedRecordCount += 1
         continue
@@ -125,44 +125,12 @@ extension RecipeRepository {
       return candidates[0]
     }
 
-    guard let recordSourceURL = normalizedSourceURL(record.sourceURL) else { return nil }
+    guard let recordSourceURL = RecipeImportIdentityKey.normalizedSourceURL(record.sourceURL) else { return nil }
     let sourceMatches = candidates.filter { recipe in
       (sourcesByRecipeID[recipe.id] ?? []).contains { source in
-        normalizedSourceURL(source.url) == recordSourceURL
+        RecipeImportIdentityKey.normalizedSourceURL(source.url) == recordSourceURL
       }
     }
     return sourceMatches.count == 1 ? sourceMatches[0] : nil
-  }
-
-  private static func normalizedRecipeName(_ value: String) -> String {
-    let folded = value
-      .folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
-    let words = folded.unicodeScalars.reduce(into: [String]()) { words, scalar in
-      if CharacterSet.alphanumerics.contains(scalar) {
-        if words.isEmpty || words[words.count - 1] == " " {
-          words.append(String(scalar))
-        } else {
-          words[words.count - 1].append(String(scalar))
-        }
-      } else if words.last != " " {
-        words.append(" ")
-      }
-    }
-    return words
-      .joined()
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-  }
-
-  private static func normalizedSourceURL(_ value: String?) -> String? {
-    guard var value = value?
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-      .lowercased(),
-      !value.isEmpty
-    else { return nil }
-
-    while value.hasSuffix("/") {
-      value.removeLast()
-    }
-    return value
   }
 }

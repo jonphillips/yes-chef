@@ -15,6 +15,8 @@ extension RecipeCoreTests {
         result.recipes.map(\.title),
         [
           "Photo Board Curry",
+          "Title Only Collision",
+          "Title Only Collision",
           "Weeknight Tomato Pasta",
         ]
       )
@@ -171,7 +173,7 @@ extension RecipeCoreTests {
       var importUUIDs = SampleUUIDSequence(start: 3_000)
       let bundle = try curry.makeRecipeBundle(now: now, uuid: { importUUIDs.next() })
 
-      let recipeID = try database.write { db in
+      let importResult = try database.write { db in
         var categoryUUIDs = SampleUUIDSequence(start: 4_000)
         return try RecipeRepository.importBundle(
           bundle,
@@ -182,10 +184,12 @@ extension RecipeCoreTests {
       }
 
       let detail = try database.read { db in
-        try RecipeRepository.fetchDetail(recipeID: recipeID, in: db)
+        try RecipeRepository.fetchDetail(recipeID: importResult.recipeID, in: db)
       }
       let imported = try #require(detail)
 
+      expectNoDifference(importResult.outcome, .imported)
+      expectNoDifference(importResult.warnings, [])
       expectNoDifference(imported.recipe.title, "Photo Board Curry")
       expectNoDifference(imported.recipe.originalImportText?.contains("Photo Board Curry"), true)
       expectNoDifference(imported.ingredientLines.map(\.originalText), ["see attached photo"])
@@ -203,10 +207,88 @@ extension RecipeCoreTests {
       let recipeRows = try database.read { db in
         try RecipeListRequest().fetch(db)
       }
-      let row = try #require(recipeRows.first { $0.recipe.id == recipeID })
+      let row = try #require(recipeRows.first { $0.recipe.id == importResult.recipeID })
       expectNoDifference(row.thumbnailData != nil, true)
       expectNoDifference(row.categoryNames, ["Import Fixture"])
       expectNoDifference(row.tagNames, [])
+    }
+
+    @Test
+    func importBundlesAreIdempotentPerEntityAndWarnOnTitleOnlyCollision() throws {
+      @Dependency(\.defaultDatabase) var database
+      let parseResult = try PaprikaHTMLImporter.parseExport(at: Self.fixtureURL)
+      let now = Date(timeIntervalSinceReferenceDate: 802_400_000)
+
+      var firstBundleUUIDs = SampleUUIDSequence(start: 5_000)
+      let firstBundles = try parseResult.recipes.map { recipe in
+        try recipe.makeRecipeBundle(now: now, uuid: { firstBundleUUIDs.next() })
+      }
+      let firstSummary = try database.write { db in
+        var repositoryUUIDs = SampleUUIDSequence(start: 6_000)
+        return try RecipeRepository.importBundles(
+          firstBundles,
+          in: db,
+          now: now,
+          uuid: { repositoryUUIDs.next() }
+        )
+      }
+      let countsAfterFirstImport = try database.read { db in
+        try LibraryEntityCounts.fetch(in: db)
+      }
+
+      var secondBundleUUIDs = SampleUUIDSequence(start: 7_000)
+      let secondBundles = try parseResult.recipes.map { recipe in
+        try recipe.makeRecipeBundle(now: now.addingTimeInterval(60), uuid: { secondBundleUUIDs.next() })
+      }
+      let secondSummary = try database.write { db in
+        var repositoryUUIDs = SampleUUIDSequence(start: 8_000)
+        return try RecipeRepository.importBundles(
+          secondBundles,
+          in: db,
+          now: now.addingTimeInterval(60),
+          uuid: { repositoryUUIDs.next() }
+        )
+      }
+      let countsAfterSecondImport = try database.read { db in
+        try LibraryEntityCounts.fetch(in: db)
+      }
+
+      expectNoDifference(firstSummary.importedCount, 4)
+      expectNoDifference(firstSummary.alreadyImportedCount, 0)
+      expectNoDifference(
+        firstSummary.results.filter { $0.title == "Title Only Collision" }.map(\.outcome),
+        [.imported, .imported]
+      )
+      expectNoDifference(firstSummary.warnings.map(\.kind), [.titleOnlyCollision])
+      expectNoDifference(
+        countsAfterFirstImport,
+        LibraryEntityCounts(
+          recipes: 4,
+          recipeSources: 1,
+          recipeImportRefs: 4,
+          ingredientSections: 4,
+          ingredientLines: 5,
+          instructionSections: 4,
+          instructionSteps: 5,
+          recipeNotes: 1,
+          recipePhotos: 1,
+          tags: 0,
+          categories: 3,
+          equipment: 0,
+          recipeTags: 0,
+          recipeCategories: 3,
+          recipeEquipment: 0
+        )
+      )
+
+      expectNoDifference(secondSummary.importedCount, 0)
+      expectNoDifference(secondSummary.alreadyImportedCount, 4)
+      expectNoDifference(secondSummary.warnings, [])
+      expectNoDifference(
+        secondSummary.results.first { $0.title == "Weeknight Tomato Pasta" }?.outcome,
+        .alreadyImported
+      )
+      expectNoDifference(countsAfterSecondImport, countsAfterFirstImport)
     }
 
     private static var fixtureURL: URL {
@@ -214,5 +296,43 @@ extension RecipeCoreTests {
         .deletingLastPathComponent()
         .appendingPathComponent("Fixtures/PaprikaHTML/SyntheticExport", isDirectory: true)
     }
+  }
+}
+
+private struct LibraryEntityCounts: Equatable {
+  var recipes: Int
+  var recipeSources: Int
+  var recipeImportRefs: Int
+  var ingredientSections: Int
+  var ingredientLines: Int
+  var instructionSections: Int
+  var instructionSteps: Int
+  var recipeNotes: Int
+  var recipePhotos: Int
+  var tags: Int
+  var categories: Int
+  var equipment: Int
+  var recipeTags: Int
+  var recipeCategories: Int
+  var recipeEquipment: Int
+
+  static func fetch(in db: Database) throws -> Self {
+    Self(
+      recipes: try Recipe.fetchAll(db).count,
+      recipeSources: try RecipeSource.fetchAll(db).count,
+      recipeImportRefs: try RecipeImportRef.fetchAll(db).count,
+      ingredientSections: try IngredientSection.fetchAll(db).count,
+      ingredientLines: try IngredientLine.fetchAll(db).count,
+      instructionSections: try InstructionSection.fetchAll(db).count,
+      instructionSteps: try InstructionStep.fetchAll(db).count,
+      recipeNotes: try RecipeNote.fetchAll(db).count,
+      recipePhotos: try RecipePhoto.fetchAll(db).count,
+      tags: try Tag.fetchAll(db).count,
+      categories: try YesChefCore.Category.fetchAll(db).count,
+      equipment: try Equipment.fetchAll(db).count,
+      recipeTags: try RecipeTag.fetchAll(db).count,
+      recipeCategories: try RecipeCategory.fetchAll(db).count,
+      recipeEquipment: try RecipeEquipment.fetchAll(db).count
+    )
   }
 }
