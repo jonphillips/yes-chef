@@ -153,6 +153,13 @@ when feasible. It runs the focused SwiftLint drift gate from jon-platform's
 `docs/ios/drift-control.md` and the Swift package tests. Use it instead of scheduled
 or broad "hunt for drift" sweeps; code review should stay scoped to the diff.
 
+When completing a milestone slice as the coding worker, finish the handoff by committing,
+pushing the branch, and opening a pull request for Jon as architect unless explicitly told
+not to. Keep unrelated working-tree changes out of the slice PR. Use direct `gh` commands
+for GitHub operations, run them with network escalation immediately, and prefer
+`gh pr create --body-file` over shell-wrapped multiline `--body` arguments so saved
+permission prefixes match cleanly.
+
 Add tests for:
 
 - Recipe model creation.
