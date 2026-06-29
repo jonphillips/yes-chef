@@ -1,7 +1,7 @@
 import Foundation
 
 public enum YesChefDatabaseStorage {
-  public static let appGroupIdentifier = "group.com.jon.yeschef"
+  public static let appGroupIdentifier = "group.com.jonphillips.yeschef"
   public static let databaseFileName = "SQLiteData.db"
 
   public enum StorageError: Error, Equatable, LocalizedError {
@@ -35,6 +35,7 @@ public enum YesChefDatabaseStorage {
   }
 
   public static func liveLegacyDatabaseURL(fileManager: FileManager = .default) throws -> URL {
+    // The legacy .path checks match SQLiteData's .absoluteString default only because Apple's libsqlite3 enables URI filenames; revisit if GRDB/SQLiteData URI handling changes.
     let applicationSupportDirectory = try fileManager.url(
       for: .applicationSupportDirectory,
       in: .userDomainMask,
