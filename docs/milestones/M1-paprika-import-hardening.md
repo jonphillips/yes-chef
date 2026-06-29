@@ -89,8 +89,9 @@ No new module boundaries. Work lands in the existing seams:
 ```
 YesChefPackage/Sources/YesChefCore/
   PaprikaHTMLImport.swift        # parser fidelity (Slice 2); import-identity key (Slice 1)
-  RecipeCore.swift               # RecipeRepository.importBundle: idempotent upsert,
-                                 #   import-session tagging for rollback (Slices 1, 3)
+  RecipeRepository+Import.swift  # importBundle find-or-skip + identity (Slice 1);
+                                 #   read-only preview/classify + rollback of a commit's
+                                 #   inserted-ID set, no session table (Slice 3)
   RecipePhotoProcessing.swift    # full-res + derivative pipeline (Slice 4)
   GroceryCore.swift              # (Slice 0 touches tests only, not this file)
 YesChefApp/
