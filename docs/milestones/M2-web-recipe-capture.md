@@ -201,7 +201,7 @@ becomes a reviewed, idempotent recipe with raw HTML preserved.
 
 ### Slice 3 — App-group shared SQLite container
 
-Move the SQLite store into an app group (`group.com.jon.yeschef`) so the app and the
+Move the SQLite store into an app group (`group.com.jonphillips.yeschef`) so the app and the
 (forthcoming) extension share one library. **Migration-aware** — relocate the existing store,
 never drop data. **Tests:** the store opens from the group container; a pre-existing store
 migrates without loss. **Flag in the PR:** this must be coordinated with the CloudKit
@@ -244,9 +244,9 @@ any resistant favorite site is surfaced as a revisit trigger.
   cheap path parses to nothing. Injected as a `@Dependency` — tests never hit the network.
 - **Capture identity = normalized(sourceURL) + normalized(title)** — M1's key; web capture is
   the URL-present strong path.
-- **App-group identifier = `group.com.jon.yeschef`** — required so app + extension share one
-  SQLite store (single source of truth, no cross-process copy). UUID PKs / no-unique-index
-  CloudKit laws still hold; flag the container choice for the sync milestone.
+- **App-group identifier = `group.com.jonphillips.yeschef`** — mirrors Jon's owned
+  `jonphillips.com` namespace, must match the extension, and must equal the CloudKit container
+  coordination noted for the sync milestone.
 - **`schema.org/Recipe` property set = `name`, `recipeIngredient`, `recipeInstructions`,
   `recipeYield`, `prepTime`/`cookTime`/`totalTime`, `recipeCategory`, `aggregateRating`,
   `author`, `image`, `description`** — the typed recipe vocabulary replacing Galavant's place
