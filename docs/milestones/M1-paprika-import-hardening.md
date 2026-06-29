@@ -44,8 +44,9 @@ A reviewer can, in the running app:
 3. See recovered fidelity that the spike dropped: **rating**, **difficulty**, and
    ingredient **section headings** (e.g. `CHICKEN`, `SAUCE`) materialized as real
    `IngredientSection`s — with `originalImportText` still preserved whole.
-4. See imported photos at **display resolution** (full-resolution original retained),
-   with recipe detail presenting low- and high-res imports consistently.
+4. See imported photos at the **canonical display tier** (processed from the high-res
+   gallery source, not the cover thumbnail — full-res originals stay deferred per
+   ADR-0005 §5), with recipe detail presenting low- and high-res imports consistently.
 5. Undo a just-committed import (**rollback**) and confirm the library returns to its
    prior state.
 
@@ -66,7 +67,8 @@ Invariants that must hold at merge:
 - Re-import identity + idempotency (the keystone).
 - Review-before-commit and rollback of a committed import.
 - HTML parser fidelity recovery: rating, difficulty, ingredient section promotion.
-- Image fidelity per ADR-0005: full-resolution storage + consistent detail display.
+- Image fidelity per ADR-0005: high-res gallery source → canonical display tier
+  (originals deferred, §5) + consistent detail display.
 - Landing the real library and committing a sanitized multi-recipe test fixture.
 - Slice 0: the audit's one "now" residual — grocery dangling-source tests.
 
@@ -297,14 +299,21 @@ YesChefPackage` green; `bash scripts/check-drift.sh` green; `xcodegen generate` 
 
 ### Slice 4 — Image fidelity (ADR-0005) — `reasoning: high`
 
-Follow ADR-0005 through: retain the **full-resolution** original bytes (prefer the
-PhotoSwipe gallery source over the small cover thumbnail — already chosen), generate
-display/thumbnail derivatives via the **pure** `RecipePhotoProcessing` pipeline, and
-reconcile recipe-detail presentation so low-res and high-res imports look intentional
-(no jumpy layout). Preserve provenance: source path, dimensions, checksum. Missing
-images still never fail a recipe. **Tests:** processing pipeline (resize/derivative)
-over fixture image bytes; provenance retained; a recipe with a missing referenced image
-imports with a warning. **Done when:** imported photos display crisply and detail is
+Follow ADR-0005 through. **Reconciled with ADR-0005 §5 (2026-06-29):** "full resolution"
+here means **process from the high-res PhotoSwipe gallery source** (over the ~280×280
+cover thumbnail — already chosen) **into the canonical display tier** — *not* storing a
+pristine original blob. ADR-0005 §5 defers full-resolution originals; the display tier is
+the synced canonical image, so **no new originals column and no migration.** Generate
+display/thumbnail derivatives via the **pure** `RecipePhotoProcessing` pipeline at the
+ADR-0005 §4 budget (≈1600px longest edge / ~300 KB default; use the **larger budget for
+text-heavy/reference photos** where readability matters — ADR-0005 §4 + Consequences).
+Reconcile recipe-detail presentation so low-res and high-res imports look intentional (no
+jumpy layout). Preserve provenance on the **existing** `RecipePhoto` fields
+(`originalSourcePath`, `sourceURL`, `pixelWidth`/`pixelHeight`, `checksum`) — they already
+exist, so this is fidelity recovery, not a schema change. Missing images still never fail
+a recipe. **Tests:** processing pipeline (resize/derivative) over fixture image bytes;
+provenance retained; a recipe with a missing referenced image imports with a warning.
+**Done when:** imported photos display crisply at the canonical display tier and detail is
 visually consistent across resolutions.
 
 ### Slice 5 — Land the real library + committed sanitized fixture — `reasoning: high`
