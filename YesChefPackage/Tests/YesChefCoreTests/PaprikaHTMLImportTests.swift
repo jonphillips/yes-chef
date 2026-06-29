@@ -46,6 +46,11 @@ extension RecipeCoreTests {
       expectNoDifference(curry.photos.map(\.kind), [.hero, .gallery])
       expectNoDifference(curry.photos.map(\.caption), ["Prep board", "Missing board"])
       expectNoDifference(curry.photos.first?.displayData != nil, true)
+      expectNoDifference(curry.photos.first?.thumbnailData != nil, true)
+      expectNoDifference(curry.photos.first?.mediaType, "image/jpeg")
+      expectNoDifference(curry.photos.first?.pixelWidth, 1_200)
+      expectNoDifference(curry.photos.first?.pixelHeight, 900)
+      expectNoDifference(curry.photos.first?.checksum?.isEmpty, false)
       expectNoDifference(curry.photos.last?.displayData, nil)
     }
 
@@ -234,8 +239,14 @@ extension RecipeCoreTests {
         bundle.photos.map { "recipePhotos/\($0.id.uuidString)" }
       )
       expectNoDifference(bundle.photos.map(\.originalSourcePath), ["Images/curry/step1.jpg"])
+      expectNoDifference(bundle.photos.map(\.sourceURL), [nil])
       expectNoDifference(bundle.photos.map(\.kind), [.hero])
       expectNoDifference(bundle.photos.map { $0.displayData != nil }, [true])
+      expectNoDifference(bundle.photos.map { $0.thumbnailData != nil }, [true])
+      expectNoDifference(bundle.photos.map(\.mediaType), ["image/jpeg"])
+      expectNoDifference(bundle.photos.map(\.pixelWidth), [1_200])
+      expectNoDifference(bundle.photos.map(\.pixelHeight), [900])
+      expectNoDifference(bundle.photos.map { $0.checksum?.isEmpty == false }, [true])
       expectNoDifference(bundle.photos.map(\.source), [.imported])
     }
 
@@ -271,6 +282,7 @@ extension RecipeCoreTests {
       expectNoDifference(imported.instructionSteps.map(\.text), ["See attached photo."])
       expectNoDifference(imported.categories.map(\.name), ["Import Fixture"])
       expectNoDifference(imported.photos.map(\.originalSourcePath), ["Images/curry/step1.jpg"])
+      expectNoDifference(imported.photos.map(\.sourceURL), [nil])
       expectNoDifference(imported.photos.map(\.kind), [.hero])
       expectNoDifference(imported.photos.map(\.source), [.imported])
       expectNoDifference(
@@ -278,6 +290,11 @@ extension RecipeCoreTests {
         [false]
       )
       expectNoDifference(imported.photos.map { $0.displayData != nil }, [true])
+      expectNoDifference(imported.photos.map { $0.thumbnailData != nil }, [true])
+      expectNoDifference(imported.photos.map(\.mediaType), ["image/jpeg"])
+      expectNoDifference(imported.photos.map(\.pixelWidth), [1_200])
+      expectNoDifference(imported.photos.map(\.pixelHeight), [900])
+      expectNoDifference(imported.photos.map { $0.checksum?.isEmpty == false }, [true])
 
       let recipeRows = try database.read { db in
         try RecipeListRequest().fetch(db)

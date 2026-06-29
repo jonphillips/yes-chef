@@ -334,7 +334,7 @@ private struct RecipePhotoGallery: View {
     if let selectedPhoto, let data = selectedPhoto.displayData ?? selectedPhoto.thumbnailData {
       VStack(alignment: .leading, spacing: 10) {
         RecipePhotoFrame(data: data, aspectRatio: selectedPhoto.displayAspectRatio)
-          .frame(maxWidth: selectedPhoto.isLowResolution ? 240 : .infinity, alignment: .leading)
+          .frame(maxWidth: .infinity, alignment: .leading)
           .accessibilityLabel(Text(selectedPhoto.caption ?? "Recipe photo"))
 
         if let caption = selectedPhoto.caption {
@@ -386,16 +386,16 @@ private extension RecipePhoto {
   }
 
   var displayAspectRatio: CGFloat {
-    guard isLowResolution else { return 16.0 / 10.0 }
+    guard kind == .referenceDocument else { return 16.0 / 10.0 }
     guard
       let pixelWidth,
       let pixelHeight,
       pixelWidth > 0,
       pixelHeight > 0
     else {
-      return 1
+      return 3.0 / 4.0
     }
-    return CGFloat(pixelWidth) / CGFloat(pixelHeight)
+    return Swift.min(Swift.max(CGFloat(pixelWidth) / CGFloat(pixelHeight), 0.65), 1.4)
   }
 
   var isLowResolution: Bool {
@@ -428,6 +428,7 @@ private struct RecipePhotoFrame: View {
       .aspectRatio(aspectRatio, contentMode: .fit)
       .overlay {
         RecipePhotoImage(data: data)
+          .padding(1)
       }
       .clipShape(RoundedRectangle(cornerRadius: 8))
       .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
@@ -441,7 +442,8 @@ private struct RecipePhotoImage: View {
     if let image = UIImage(data: data) {
       Image(uiImage: image)
         .resizable()
-        .scaledToFill()
+        .scaledToFit()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     } else {
       Image(systemName: "photo")
         .font(.title)

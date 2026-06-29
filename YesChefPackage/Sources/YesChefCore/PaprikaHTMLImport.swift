@@ -477,7 +477,7 @@ public enum PaprikaHTMLImporter {
       let processedPhoto = recipeDirectoryURL
         .map { $0.appendingPathComponent(decodedPath) }
         .flatMap { try? Data(contentsOf: $0) }
-        .map { RecipePhotoProcessor.process(sourceData: $0, sourcePath: decodedPath) }
+        .map { RecipePhotoProcessor.process(sourceData: $0, sourcePath: decodedPath, kind: kind) }
       photos.append(
         PaprikaHTMLPhotoReference(
           path: decodedPath,
