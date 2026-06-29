@@ -373,6 +373,8 @@ public enum PaprikaHTMLImporter {
     let description = firstItemBlockText(in: html, itemprop: "description")
     let notes = firstItemBlockText(in: html, itemprop: "comment").map { [$0] } ?? []
     let recipeDirectoryURL = recipeFileURL?.deletingLastPathComponent()
+    let ingredients = lineTexts(in: html, itemprop: "recipeIngredient")
+    let instructions = firstItemHTML(in: html, itemprop: "recipeInstructions").map { lineTexts(in: $0) } ?? []
 
     return PaprikaHTMLRecipe(
       title: title,
@@ -386,16 +388,39 @@ public enum PaprikaHTMLImporter {
       sourceName: sourceName,
       sourceURL: sourceURL,
       categoryNames: categoryNames,
-      ingredients: lineTexts(in: html, itemprop: "recipeIngredient"),
-      instructions: firstItemHTML(in: html, itemprop: "recipeInstructions").map { lineTexts(in: $0) } ?? [],
+      ingredients: ingredients,
+      instructions: instructions,
       notes: notes,
       photos: photoReferences(
         in: html,
         recipeDirectoryURL: recipeDirectoryURL,
-        fileManager: fileManager
+        fileManager: fileManager,
+        // A "see attached photo" recipe carries its method/ingredients in the image,
+        // so its photos are reference documents (ADR-0005 §4): process them at the
+        // larger readability budget rather than the default display tier.
+        treatPhotosAsReferenceDocuments: isImageOnlyEvidence(
+          ingredients: ingredients,
+          instructions: instructions
+        )
       ),
       originalHTML: html
     )
+  }
+
+  /// A recipe whose entire textual body is a pointer to its photo (e.g. the
+  /// ADR-0005 canonical case `see attached photo`) carries no real recipe text —
+  /// the image *is* the content. Requires at least one such pointer line so that
+  /// ordinary photo recipes with no text yet are not reclassified.
+  private static func isImageOnlyEvidence(ingredients: [String], instructions: [String]) -> Bool {
+    let bodyLines = (ingredients + instructions)
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+      .filter { !$0.isEmpty }
+    return !bodyLines.isEmpty && bodyLines.allSatisfy(isPhotoPointer)
+  }
+
+  private static func isPhotoPointer(_ line: String) -> Bool {
+    guard line.contains("see") else { return false }
+    return ["attached", "photo", "image", "picture", "scan"].contains { line.contains($0) }
   }
 
   private static func indexRecipeLinks(from html: String) -> [(href: String, fileName: String)] {
@@ -462,7 +487,8 @@ public enum PaprikaHTMLImporter {
   private static func photoReferences(
     in html: String,
     recipeDirectoryURL: URL?,
-    fileManager: FileManager
+    fileManager: FileManager,
+    treatPhotosAsReferenceDocuments: Bool = false
   ) -> [PaprikaHTMLPhotoReference] {
     var photos: [PaprikaHTMLPhotoReference] = []
     var seenPaths: Set<String> = []
@@ -471,13 +497,14 @@ public enum PaprikaHTMLImporter {
       let decodedPath = decodeHTMLEntities(path)
       guard decodedPath.hasPrefix("Images/"), !seenPaths.contains(decodedPath) else { return }
       seenPaths.insert(decodedPath)
+      let effectiveKind: RecipePhotoKind = treatPhotosAsReferenceDocuments ? .referenceDocument : kind
       let isAvailable = recipeDirectoryURL
         .map { fileManager.fileExists(atPath: $0.appendingPathComponent(decodedPath).path) }
         ?? false
       let processedPhoto = recipeDirectoryURL
         .map { $0.appendingPathComponent(decodedPath) }
         .flatMap { try? Data(contentsOf: $0) }
-        .map { RecipePhotoProcessor.process(sourceData: $0, sourcePath: decodedPath) }
+        .map { RecipePhotoProcessor.process(sourceData: $0, sourcePath: decodedPath, kind: effectiveKind) }
       photos.append(
         PaprikaHTMLPhotoReference(
           path: decodedPath,
@@ -489,7 +516,7 @@ public enum PaprikaHTMLImporter {
           pixelWidth: processedPhoto?.pixelWidth,
           pixelHeight: processedPhoto?.pixelHeight,
           checksum: processedPhoto?.checksum,
-          kind: kind
+          kind: effectiveKind
         )
       )
     }
