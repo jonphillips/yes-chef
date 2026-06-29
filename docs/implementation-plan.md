@@ -106,8 +106,12 @@ and idempotently.
 ## Phase D — In-app authenticated browser capture  *(M3 — elevated above sync, 2026-06-29)*
 
 Goal: capture recipes from sites that gate their content behind a login, by browsing to them
-in an **in-app `WKWebView` that holds Jon's authenticated session** and capturing the rendered
-DOM directly.
+in an **in-app `WebView`/`WebPage`** (the iOS 26 SwiftUI WebKit API — the *same* one
+`YesChefApp/RenderedDOMFetcher.swift` already uses headlessly; **not** `SFSafariViewController`/
+"SafariView", which sandboxes the page and forbids the JS/DOM access capture needs) **holding
+Jon's authenticated session**, capturing the rendered DOM directly. The interactive browser is
+`RenderedDOMFetcher` shown rather than headless: a visible `WebView` for navigation/login, plus
+the same `page.callJavaScript("…outerHTML")` capture — now against the *authenticated* DOM.
 
 **Why this jumped ahead of sync (decision — Jon + architect, 2026-06-29).** Jon's named
 must-have sites are **4-of-7 paywalled** (NYT Cooking, Cook's Illustrated, America's Test
@@ -124,9 +128,10 @@ this only reorders what follows M1.)
 
 - **Evaluate in Galavant first (Jon), then harvest (ADR-0007).** Code at
   `/Users/jon/code/galavant/galavant`. Two questions decide harvest-vs-rebuild: (1) does it
-  already capture the **rendered DOM from its `WKWebView`**, and (2) does it **persist the
-  login session / cookies across launches**? (2) is the whole value for paywalled sites — log
-  in once, not per capture.
+  already capture the **rendered DOM from a visible/interactive web view** (vs. only the
+  headless `WebPage` fetch we already harvested), and (2) does it **persist the login session /
+  cookies across launches** (WebKit's data store does by default; confirm Galavant doesn't use
+  an ephemeral store)? (2) is the whole value for paywalled sites — log in once, not per capture.
 - Capture flows through the **same** review-before-commit + idempotent `importBundle` path as
   M2; the browser is a new *fetch* seam, not a new write path. **Never store credentials** —
   the session lives in the web view's own store.
