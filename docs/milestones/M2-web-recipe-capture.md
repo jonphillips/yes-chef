@@ -210,14 +210,54 @@ group, migration is tested, and the sync-container dependency is surfaced.
 
 ### Slice 4 — Share extension target
 
-New `YesChefShareExtension`. Harvest the **page-share path** from Galavant's `CaptureExtraction`
-— Safari's rendered DOM via the JS preprocessor, falling back to fetching the shared URL with a
-Safari-like User-Agent — and **drop the MapKit/vCard location branch entirely**. The extension
-hands captured HTML + URL to the **same core capture path** with a compact recipe confirm
-(harvested `CaptureConfirmView` pattern, recipe-shaped) and commits through the **same**
-`importBundle`; the recipe appears in the app via the Slice 3 shared store. **Tests:** the
-extraction adapter over a fixture extension context; manual on-device verification of the
-share sheet. **Done when:** sharing a recipe page from Safari lands a reviewed recipe in the app.
+New `YesChefShareExtension` app-extension target. Harvest the **page-share path** from Galavant's
+`CaptureExtraction` — Safari's rendered DOM via an `NSExtensionJavaScriptPreprocessingFile`
+(`document.documentElement.outerHTML` + the page URL), falling back to fetching the shared URL —
+and **drop the MapKit/vCard location branch entirely**. The recipe appears in the app via the
+Slice 3 shared store. **Done when:** sharing a recipe page from Safari lands a reviewed recipe in
+the app, idempotently, with raw HTML preserved.
+
+**Reuse the existing core path — do not add a parallel one.** The pure entry points already exist
+from Slices 1–2: `WebRecipePageParser.parse(html:sourceURL:capturedAt:)` →
+`WebRecipeCaptureDraft` → `RecipeRepository.importCapturedRecipe(_:in:now:uuid:)`. The extension's
+job is only to *source* the HTML+URL and present a compact confirm, then call that path. **Prefer
+the rendered HTML Safari already handed us; only `WebRecipeCaptureClient.capture(url:)`-fetch when
+the share context carries no usable HTML** — never double-fetch a page the preprocessor already
+rendered. (The app-side `RenderedDOMFetcher` is not needed here — the preprocessor *is* the render
+step; the URL path is the plain-GET fallback.)
+
+**Respect the target boundary.** The extension is a separate target and **cannot import the app
+target** — `RecipeCaptureModel`, `RecipeCaptureView`, and `RenderedDOMFetcher` all live in
+`YesChefApp` and are unreachable. Give the extension its own thin `@Observable @MainActor` confirm
+model (recipe-shaped `CaptureConfirmView` pattern) that calls the **core** path above; **do not
+reimplement import** — the parse→draft→commit orchestration is already in core, so anything the
+two surfaces would share belongs in core, not copied. The extension bootstraps the *same* shared
+store: `prepareDependencies { try $0.bootstrapDatabase() }` against the app group.
+
+**Migration-ordering constraint (this slice breaks a Slice 3 assumption — handle it, don't
+inherit a data-loss bug).** Slice 3's `migrateLegacyDatabaseIfNeeded` relocates the pre-M2
+app-only store into the group **and guards on "the group store doesn't exist yet"** — and only the
+**app** process can see the legacy Application Support container. Adding a second writer breaks the
+"app runs first" assumption: if a user shares a page **before** ever opening the M2 build, the
+extension creates a fresh group store, and the app's later launch sees the group store already
+present, **skips the migration, and strands the user's entire existing library** in the legacy
+file. The invariant: **no first-runner ordering may strand or drop the legacy library** — whether
+the app or the extension touches the group store first. Simplest safe resolution: the legacy→group
+migration stays the **app's exclusive responsibility**, and the extension **refuses to create a
+fresh group store** when none exists yet (surface "Open Yes Chef once to finish setup" rather than
+forking a divergent store). Pick the mechanism in the PR, but **state it and test it**.
+
+**Target wiring (xcodegen).** New extension target in `project.yml`: the app-group entitlement
+(`group.com.jonphillips.yeschef`) on **both** the app and the extension; `YesChefCore` as a target
+dependency; the `NSExtension` share point with an activation rule for web pages/URLs; the JS
+preprocessing file bundled. Keep `xcodegen generate` and `scripts/check-drift.sh` green.
+
+**Tests:** the HTML-in extraction adapter over a fixture extension context (rendered-HTML-present
+and URL-fallback-only); a **parity** assertion that the extension's HTML-in path yields the same
+draft + row-count deltas as Slice 2's in-app URL path for the same fixture; the **idempotency**
+assertion again (share the same page twice → one recipe); and the **migration-ordering** test
+(group store created extension-first, then the app launch still surfaces the full legacy library,
+no loss). Plus manual on-device verification of the real share sheet.
 
 ### Slice 5 — Real-site hardening + committed fixtures
 
