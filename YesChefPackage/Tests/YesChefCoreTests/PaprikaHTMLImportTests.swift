@@ -366,6 +366,229 @@ extension RecipeCoreTests {
       expectNoDifference(countsAfterSecondImport, countsAfterFirstImport)
     }
 
+    @Test
+    func previewClassifiesImportWithoutWriting() throws {
+      @Dependency(\.defaultDatabase) var database
+      let parseResult = try PaprikaHTMLImporter.parseExport(at: Self.fixtureURL)
+      let now = Date(timeIntervalSinceReferenceDate: 802_700_000)
+      let pasta = try #require(parseResult.recipes.first { $0.title == "Weeknight Tomato Pasta" })
+      var existingBundleUUIDs = SampleUUIDSequence(start: 10_000)
+      let existingBundle = try pasta.makeRecipeBundle(now: now, uuid: { existingBundleUUIDs.next() })
+
+      try database.write { db in
+        var repositoryUUIDs = SampleUUIDSequence(start: 10_500)
+        try RecipeRepository.importBundle(
+          existingBundle,
+          in: db,
+          now: now,
+          uuid: { repositoryUUIDs.next() }
+        )
+      }
+      let countsBeforePreview = try database.read { db in
+        try LibraryEntityCounts.fetch(in: db)
+      }
+
+      var previewBundleUUIDs = SampleUUIDSequence(start: 11_000)
+      let previewBundles = try parseResult.recipes.map { recipe in
+        try recipe.makeRecipeBundle(now: now.addingTimeInterval(60), uuid: { previewBundleUUIDs.next() })
+      }
+      let preview = try database.read { db in
+        RecipeRepository.previewImportBundles(
+          previewBundles,
+          against: try RecipeImportRef.fetchAll(db)
+        )
+      }
+      let countsAfterPreview = try database.read { db in
+        try LibraryEntityCounts.fetch(in: db)
+      }
+
+      expectNoDifference(
+        preview.results.first { $0.title == "Weeknight Tomato Pasta" }?.status,
+        .alreadyImported
+      )
+      expectNoDifference(
+        preview.results.first { $0.title == "Photo Board Curry" }?.status,
+        .new
+      )
+      expectNoDifference(
+        preview.results.filter { $0.title == "Title Only Collision" }.map(\.status),
+        [.new, .titleOnlyCollision]
+      )
+      expectNoDifference(preview.warnings.map(\.kind), [.titleOnlyCollision])
+      expectNoDifference(countsAfterPreview, countsBeforePreview)
+    }
+
+    @Test
+    func rollbackImportedBatchReturnsEntityCountsToBaseline() throws {
+      @Dependency(\.defaultDatabase) var database
+      let parseResult = try PaprikaHTMLImporter.parseExport(at: Self.fixtureURL)
+      let now = Date(timeIntervalSinceReferenceDate: 802_800_000)
+      let baselineCounts = try database.read { db in
+        try LibraryEntityCounts.fetch(in: db)
+      }
+      var bundleUUIDs = SampleUUIDSequence(start: 12_000)
+      let bundles = try parseResult.recipes.map { recipe in
+        try recipe.makeRecipeBundle(now: now, uuid: { bundleUUIDs.next() })
+      }
+      let importSummary = try database.write { db in
+        var repositoryUUIDs = SampleUUIDSequence(start: 12_500)
+        return try RecipeRepository.importBundles(
+          bundles,
+          in: db,
+          now: now,
+          uuid: { repositoryUUIDs.next() }
+        )
+      }
+
+      let rollback = try database.write { db in
+        try RecipeRepository.rollbackImportedRecipes(recipeIDs: importSummary.importedIDs, in: db)
+      }
+      let countsAfterRollback = try database.read { db in
+        try LibraryEntityCounts.fetch(in: db)
+      }
+
+      expectNoDifference(rollback.recipes, 6)
+      expectNoDifference(rollback.recipeImportRefs, 6)
+      expectNoDifference(rollback.categories, 3)
+      expectNoDifference(countsAfterRollback, baselineCounts)
+    }
+
+    @Test
+    func rollbackBatchLeavesDisjointBatchIntact() throws {
+      @Dependency(\.defaultDatabase) var database
+      let parseResult = try PaprikaHTMLImporter.parseExport(at: Self.fixtureURL)
+      let pasta = try #require(parseResult.recipes.first { $0.title == "Weeknight Tomato Pasta" })
+      let curry = try #require(parseResult.recipes.first { $0.title == "Photo Board Curry" })
+      let firstDate = Date(timeIntervalSinceReferenceDate: 802_900_000)
+      let secondDate = firstDate.addingTimeInterval(60)
+      var firstBundleUUIDs = SampleUUIDSequence(start: 13_000)
+      let firstBundle = try pasta.makeRecipeBundle(now: firstDate, uuid: { firstBundleUUIDs.next() })
+      var secondBundleUUIDs = SampleUUIDSequence(start: 13_500)
+      let secondBundle = try curry.makeRecipeBundle(now: secondDate, uuid: { secondBundleUUIDs.next() })
+
+      let firstSummary = try database.write { db in
+        var repositoryUUIDs = SampleUUIDSequence(start: 14_000)
+        return try RecipeRepository.importBundles(
+          [firstBundle],
+          in: db,
+          now: firstDate,
+          uuid: { repositoryUUIDs.next() }
+        )
+      }
+      let secondSummary = try database.write { db in
+        var repositoryUUIDs = SampleUUIDSequence(start: 14_500)
+        return try RecipeRepository.importBundles(
+          [secondBundle],
+          in: db,
+          now: secondDate,
+          uuid: { repositoryUUIDs.next() }
+        )
+      }
+
+      _ = try database.write { db in
+        try RecipeRepository.rollbackImportedRecipes(recipeIDs: firstSummary.importedIDs, in: db)
+      }
+
+      let remainingRecipes = try database.read { db in
+        try Recipe.fetchAll(db).map(\.id)
+      }
+      let remainingImportRefs = try database.read { db in
+        try RecipeImportRef.fetchAll(db).map(\.recipeID)
+      }
+
+      expectNoDifference(remainingRecipes, secondSummary.importedIDs)
+      expectNoDifference(remainingImportRefs, secondSummary.importedIDs)
+    }
+
+    @Test
+    func rollbackPreservesLinkedEquipmentWithoutBatchProvenance() throws {
+      @Dependency(\.defaultDatabase) var database
+      let parseResult = try PaprikaHTMLImporter.parseExport(at: Self.fixtureURL)
+      let pasta = try #require(parseResult.recipes.first { $0.title == "Weeknight Tomato Pasta" })
+      let now = Date(timeIntervalSinceReferenceDate: 802_950_000)
+      let equipment = Equipment(
+        id: SampleUUIDSequence.uuid(14_800),
+        name: "Dutch oven",
+        equipmentType: "Cookware"
+      )
+      var bundleUUIDs = SampleUUIDSequence(start: 14_900)
+      var bundle = try pasta.makeRecipeBundle(now: now, uuid: { bundleUUIDs.next() })
+      bundle.equipment = [equipment]
+      bundle.recipeEquipment = [
+        RecipeEquipment(
+          id: SampleUUIDSequence.uuid(14_801),
+          recipeID: bundle.recipe.id,
+          equipmentID: equipment.id
+        )
+      ]
+
+      let importSummary = try database.write { db in
+        try Equipment.insert { equipment }.execute(db)
+        var repositoryUUIDs = SampleUUIDSequence(start: 14_950)
+        return try RecipeRepository.importBundles(
+          [bundle],
+          in: db,
+          now: now,
+          uuid: { repositoryUUIDs.next() }
+        )
+      }
+
+      let rollback = try database.write { db in
+        try RecipeRepository.rollbackImportedRecipes(recipeIDs: importSummary.importedIDs, in: db)
+      }
+      let remainingEquipment = try database.read { db in
+        try Equipment.find(equipment.id).fetchOne(db)
+      }
+
+      expectNoDifference(rollback.recipeEquipment, 1)
+      expectNoDifference(rollback.equipment, 0)
+      expectNoDifference(remainingEquipment, equipment)
+    }
+
+    @Test
+    func rollbackRecipeImportLeavesGroceryDanglingSourceReadable() throws {
+      @Dependency(\.defaultDatabase) var database
+      let parseResult = try PaprikaHTMLImporter.parseExport(at: Self.fixtureURL)
+      let pasta = try #require(parseResult.recipes.first { $0.title == "Weeknight Tomato Pasta" })
+      let now = Date(timeIntervalSinceReferenceDate: 803_000_000)
+      var bundleUUIDs = SampleUUIDSequence(start: 15_000)
+      let bundle = try pasta.makeRecipeBundle(now: now, uuid: { bundleUUIDs.next() })
+
+      let importSummary = try database.write { db in
+        var repositoryUUIDs = SampleUUIDSequence(start: 15_500)
+        return try RecipeRepository.importBundles(
+          [bundle],
+          in: db,
+          now: now,
+          uuid: { repositoryUUIDs.next() }
+        )
+      }
+      let recipeID = try #require(importSummary.importedIDs.first)
+
+      try database.write { db in
+        var groceryUUIDs = SampleUUIDSequence(start: 16_000)
+        let listID = try GroceryRepository.ensureDefaultList(
+          in: db,
+          now: now,
+          uuid: { groceryUUIDs.next() }
+        )
+        try GroceryRepository.addRecipe(
+          recipeID: recipeID,
+          groceryListID: listID,
+          in: db,
+          now: now,
+          uuid: { groceryUUIDs.next() }
+        )
+        try RecipeRepository.rollbackImportedRecipes(recipeIDs: [recipeID], in: db)
+
+        let rows = try GroceryItemListRequest().fetch(db)
+        expectNoDifference(try Recipe.find(recipeID).fetchOne(db), nil)
+        expectNoDifference(rows.isEmpty, false)
+        expectNoDifference(rows.flatMap(\.sources).allSatisfy { $0.recipeID == recipeID }, true)
+        expectNoDifference(rows.flatMap(\.sources).map(\.sourceTitle).contains("Weeknight Tomato Pasta"), true)
+      }
+    }
+
     private static var fixtureURL: URL {
       URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()

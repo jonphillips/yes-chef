@@ -28,6 +28,7 @@
 		9348C360551795BFB614ABDE /* RenderedDOMFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61110479B13513C1A68F2CFD /* RenderedDOMFetcher.swift */; };
 		96AEA500A9F6D8D9BE126014 /* RecipeActiveFilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0F7538696E770B31AA47A0 /* RecipeActiveFilterBar.swift */; };
 		9ADADC85EDEC6208590FC533 /* YesChefCore in Frameworks */ = {isa = PBXBuildFile; productRef = 13643DFF3682EB50C6B096D2 /* YesChefCore */; };
+		9B8EFD5B3540051D7122B27D /* PaprikaImportReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E29F682A3093D37071F5A924 /* PaprikaImportReviewView.swift */; };
 		A103667583AD5577C2633211 /* OriginalSnapshotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76C7E4899A1093E58F713C2F /* OriginalSnapshotView.swift */; };
 		A53A9EE95AC871F9F6B627C5 /* RecipeLibraryListState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3B1C7A7E48A8FFE074A05E0 /* RecipeLibraryListState.swift */; };
 		A7663D81E209037F796813A4 /* CategoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA4CA05A4077E714D63D297 /* CategoryModels.swift */; };
@@ -101,6 +102,7 @@
 		D3B1C7A7E48A8FFE074A05E0 /* RecipeLibraryListState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeLibraryListState.swift; sourceTree = "<group>"; };
 		D674AFA7977D211C929BE6B0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DD0F7538696E770B31AA47A0 /* RecipeActiveFilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeActiveFilterBar.swift; sourceTree = "<group>"; };
+		E29F682A3093D37071F5A924 /* PaprikaImportReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaprikaImportReviewView.swift; sourceTree = "<group>"; };
 		E48B9ACFF26E71C15146E3E9 /* RecipeListPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeListPresets.swift; sourceTree = "<group>"; };
 		E8DD44679AA1444215DC743E /* RecipeFilterPickerViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeFilterPickerViews.swift; sourceTree = "<group>"; };
 		ED3C57E4D25E07B0D4161163 /* CategoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryViews.swift; sourceTree = "<group>"; };
@@ -185,6 +187,7 @@
 				7090DA55279458851517DD5A /* MenuModels.swift */,
 				26A031F93AA06D9ADCD5C36D /* MenuViews.swift */,
 				76C7E4899A1093E58F713C2F /* OriginalSnapshotView.swift */,
+				E29F682A3093D37071F5A924 /* PaprikaImportReviewView.swift */,
 				56F66618C21D85EE42AB4DEB /* PaprikaImportWorkspace.swift */,
 				DD0F7538696E770B31AA47A0 /* RecipeActiveFilterBar.swift */,
 				C39EB2615AF4AAC9AFF1F6C3 /* RecipeCaptureView.swift */,
@@ -340,6 +343,7 @@
 				D778483B6523AB97BDE06ED6 /* MenuModels.swift in Sources */,
 				76A09E387271E9757E7AA9B8 /* MenuViews.swift in Sources */,
 				A103667583AD5577C2633211 /* OriginalSnapshotView.swift in Sources */,
+				9B8EFD5B3540051D7122B27D /* PaprikaImportReviewView.swift in Sources */,
 				FD6F7881ECEA6DC437F9F32C /* PaprikaImportWorkspace.swift in Sources */,
 				96AEA500A9F6D8D9BE126014 /* RecipeActiveFilterBar.swift in Sources */,
 				210BE26D7D55A64BB3FCB1D3 /* RecipeCaptureView.swift in Sources */,
