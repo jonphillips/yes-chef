@@ -74,6 +74,11 @@ struct AppContainer: View {
         RecipeCaptureView(libraryModel: recipeModel, model: recipeModel.captureModel)
       }
     }
+    .sheet(isPresented: $recipeModel.destination.importReview) {
+      NavigationStack {
+        PaprikaImportReviewView(libraryModel: recipeModel, model: recipeModel.importModel)
+      }
+    }
     .sheet(isPresented: $recipeModel.destination.filterRecipes) {
       NavigationStack {
         RecipeFilterView(model: recipeModel)
@@ -130,7 +135,14 @@ struct AppContainer: View {
     } message: { context in
       Text("Remove \(context.menuTitle) from \(context.startDate.formatted(.dateTime.month(.wide).day().year()))?")
     }
-    .alert("Import Complete", item: $recipeModel.destination.importSummary) { _ in
+    .alert("Import Complete", item: $recipeModel.destination.importSummary) { summary in
+      if summary.canUndo {
+        Button("Undo Import", role: .destructive) {
+          Task {
+            await recipeModel.undoPaprikaImportButtonTapped(summary)
+          }
+        }
+      }
       Button("OK") {}
     } message: { summary in
       Text(summary.message)

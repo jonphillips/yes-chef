@@ -15,6 +15,7 @@ final class RecipeLibraryModel {
     case originalSnapshot(Recipe.ID)
     case deleteRecipe(Recipe.ID)
     case filterRecipes
+    case importReview
     case captureSummary(WebRecipeCaptureSummary)
     case importSummary(RecipeImportSummary)
     case backupSupplementSummary(RecipeBackupSupplementSummary)
@@ -37,6 +38,7 @@ final class RecipeLibraryModel {
   var isPresentingPaprikaImporter = false
   var isPresentingPaprikaBackupSupplementer = false
   var captureModel = RecipeCaptureModel()
+  var importModel = RecipeImportModel()
   var searchText = ""
   var selectedRecipeID: Recipe.ID?
   var sortOrder = RecipeListSort.title
@@ -75,45 +77,41 @@ final class RecipeLibraryModel {
   func paprikaExportSelected(_ result: Result<URL, any Error>) async {
     do {
       let sourceURL = try result.get()
-      importActivityTitle = "Importing"
+      importActivityTitle = "Preparing Import"
       isImporting = true
       defer { isImporting = false }
 
-      let importDate = now
-      let makeUUID = uuid
-      let importResult = try await PaprikaImportWorkspace.parseExport(from: sourceURL)
-      let bundles = try importResult.recipes.map { recipe in
-        try recipe.makeRecipeBundle(now: importDate, uuid: { makeUUID() })
-      }
-      let importSummary = try await database.write { db in
-        try RecipeRepository.importBundles(
-          bundles,
-          in: db,
-          now: importDate,
-          uuid: { makeUUID() }
-        )
-      }
-      selectedRecipeID = importSummary.importedIDs.first ?? importSummary.results.first?.recipeID ?? selectedRecipeID
-      destination = .importSummary(
-        RecipeImportSummary(
-          importedCount: importSummary.importedCount,
-          alreadyImportedCount: importSummary.alreadyImportedCount,
-          warningCount: importResult.warnings.count + importSummary.warnings.count,
-          identityWarningCount: importSummary.warnings.count,
-          missingRecipePageCount: importResult.warnings
-            .filter { $0.kind == .missingRecipePages }
-            .compactMap(\.affectedCount)
-            .reduce(0, +),
-          missingPhotoCount: importResult.warnings.filter { $0.kind == .missingPhoto }.count,
-          unreadableRecipeCount: importResult.warnings.filter { $0.kind == .unreadableRecipe }.count
-        )
-      )
+      try await importModel.prepareImport(from: sourceURL)
+      destination = .importReview
     } catch CocoaError.userCancelled {
       isImporting = false
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
       isImporting = false
+    }
+  }
+
+  func paprikaImportCommitted(_ commit: RecipeImportCommitResult) {
+    selectedRecipeID = commit.selectedRecipeID ?? selectedRecipeID
+    destination = .importSummary(commit.summary)
+  }
+
+  func undoPaprikaImportButtonTapped(_ summary: RecipeImportSummary) async {
+    guard !summary.importedIDs.isEmpty else { return }
+    importActivityTitle = "Undoing Import"
+    isImporting = true
+    defer { isImporting = false }
+
+    do {
+      let rollback = try await importModel.rollbackImportedRecipes(summary.importedIDs)
+      if rollback.recipes > 0, let selectedRecipeID, summary.importedIDs.contains(selectedRecipeID) {
+        self.selectedRecipeID = nil
+      }
+      destination = .importSummary(summary.rolledBack(rollback))
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
     }
   }
 
@@ -175,6 +173,107 @@ final class RecipeLibraryModel {
   func title(for recipeID: Recipe.ID) -> String {
     recipeRows.first { $0.recipe.id == recipeID }?.recipe.title ?? "this recipe"
   }
+}
+
+@Observable
+@MainActor
+final class RecipeImportModel {
+  @ObservationIgnored
+  @Dependency(\.date.now) private var now
+  @ObservationIgnored
+  @Dependency(\.defaultDatabase) private var database
+  @ObservationIgnored
+  @Dependency(\.uuid) private var uuid
+
+  var draft: PaprikaRecipeImportDraft?
+  var errorMessage: String?
+  var isShowingError = false
+  var isCommitting = false
+
+  var canCommit: Bool {
+    draft != nil && !isCommitting
+  }
+
+  func reset() {
+    draft = nil
+    errorMessage = nil
+    isShowingError = false
+    isCommitting = false
+  }
+
+  func prepareImport(from sourceURL: URL) async throws {
+    reset()
+    let importDate = now
+    let makeUUID = uuid
+    let parseResult = try await PaprikaImportWorkspace.parseExport(from: sourceURL)
+    let bundles = try parseResult.recipes.map { recipe in
+      try recipe.makeRecipeBundle(now: importDate, uuid: { makeUUID() })
+    }
+    let preview = try await database.read { db in
+      RecipeRepository.previewImportBundles(
+        bundles,
+        against: try RecipeImportRef.fetchAll(db)
+      )
+    }
+    draft = PaprikaRecipeImportDraft(
+      parseResult: parseResult,
+      bundles: bundles,
+      preview: preview,
+      importDate: importDate
+    )
+  }
+
+  func commitButtonTapped() async -> RecipeImportCommitResult? {
+    guard let draft else { return nil }
+    isCommitting = true
+    defer { isCommitting = false }
+
+    do {
+      let makeUUID = uuid
+      let importResult = try await database.write { db in
+        try RecipeRepository.importBundles(
+          draft.bundles,
+          in: db,
+          now: draft.importDate,
+          uuid: { makeUUID() }
+        )
+      }
+      let summary = RecipeImportSummary(parseResult: draft.parseResult, importResult: importResult)
+      return RecipeImportCommitResult(
+        summary: summary,
+        selectedRecipeID: importResult.importedIDs.first ?? importResult.results.first?.recipeID
+      )
+    } catch is CancellationError {
+      return nil
+    } catch {
+      showError(String(describing: error))
+      return nil
+    }
+  }
+
+  func rollbackImportedRecipes(_ recipeIDs: [Recipe.ID]) async throws -> RecipeImportRollbackResult {
+    try await database.write { db in
+      try RecipeRepository.rollbackImportedRecipes(recipeIDs: recipeIDs, in: db)
+    }
+  }
+
+  private func showError(_ message: String) {
+    errorMessage = message
+    isShowingError = true
+  }
+}
+
+struct PaprikaRecipeImportDraft: Identifiable {
+  let id = UUID()
+  var parseResult: PaprikaHTMLImportResult
+  var bundles: [RecipeBundleCoding.RecipeBundle]
+  var preview: RecipeImportBatchPreview
+  var importDate: Date
+}
+
+struct RecipeImportCommitResult {
+  var summary: RecipeImportSummary
+  var selectedRecipeID: Recipe.ID?
 }
 
 @Observable
@@ -308,9 +407,52 @@ struct RecipeImportSummary: Identifiable, Equatable, Sendable {
   var missingRecipePageCount: Int
   var missingPhotoCount: Int
   var unreadableRecipeCount: Int
+  var importedIDs: [Recipe.ID]
+  var rollbackDeletedRecipeCount: Int
+
+  init(
+    importedCount: Int,
+    alreadyImportedCount: Int,
+    warningCount: Int,
+    identityWarningCount: Int,
+    missingRecipePageCount: Int,
+    missingPhotoCount: Int,
+    unreadableRecipeCount: Int,
+    importedIDs: [Recipe.ID] = [],
+    rollbackDeletedRecipeCount: Int = 0
+  ) {
+    self.importedCount = importedCount
+    self.alreadyImportedCount = alreadyImportedCount
+    self.warningCount = warningCount
+    self.identityWarningCount = identityWarningCount
+    self.missingRecipePageCount = missingRecipePageCount
+    self.missingPhotoCount = missingPhotoCount
+    self.unreadableRecipeCount = unreadableRecipeCount
+    self.importedIDs = importedIDs
+    self.rollbackDeletedRecipeCount = rollbackDeletedRecipeCount
+  }
+
+  init(parseResult: PaprikaHTMLImportResult, importResult: RecipeImportBatchResult) {
+    self.init(
+      importedCount: importResult.importedCount,
+      alreadyImportedCount: importResult.alreadyImportedCount,
+      warningCount: parseResult.warnings.count + importResult.warnings.count,
+      identityWarningCount: importResult.warnings.count,
+      missingRecipePageCount: parseResult.warnings
+        .filter { $0.kind == .missingRecipePages }
+        .compactMap(\.affectedCount)
+        .reduce(0, +),
+      missingPhotoCount: parseResult.warnings.filter { $0.kind == .missingPhoto }.count,
+      unreadableRecipeCount: parseResult.warnings.filter { $0.kind == .unreadableRecipe }.count,
+      importedIDs: importResult.importedIDs
+    )
+  }
 
   var message: String {
     var lines = ["Imported \(importedCount) \(importedCount == 1 ? "recipe" : "recipes")."]
+    if rollbackDeletedRecipeCount > 0 {
+      lines = ["Undo removed \(rollbackDeletedRecipeCount) imported \(rollbackDeletedRecipeCount == 1 ? "recipe" : "recipes")."]
+    }
     if alreadyImportedCount > 0 {
       lines.append("Skipped \(alreadyImportedCount) already-imported \(alreadyImportedCount == 1 ? "recipe" : "recipes").")
     }
@@ -330,6 +472,24 @@ struct RecipeImportSummary: Identifiable, Equatable, Sendable {
       lines.append("No warnings.")
     }
     return lines.joined(separator: "\n")
+  }
+
+  var canUndo: Bool {
+    rollbackDeletedRecipeCount == 0 && !importedIDs.isEmpty
+  }
+
+  func rolledBack(_ rollback: RecipeImportRollbackResult) -> Self {
+    RecipeImportSummary(
+      importedCount: importedCount,
+      alreadyImportedCount: alreadyImportedCount,
+      warningCount: warningCount,
+      identityWarningCount: identityWarningCount,
+      missingRecipePageCount: missingRecipePageCount,
+      missingPhotoCount: missingPhotoCount,
+      unreadableRecipeCount: unreadableRecipeCount,
+      importedIDs: rollback.recipes > 0 ? [] : importedIDs,
+      rollbackDeletedRecipeCount: rollback.recipes
+    )
   }
 }
 

@@ -142,7 +142,7 @@ well-specified slice.
 - [x] Slice 1 — Re-import identity + idempotency
 - [x] Slice 2 — Parser fidelity: rating, difficulty, ingredient sections *(was secretly
   `xhigh`-shaped — the all-caps real-data edge case)*
-- [ ] Slice 3 — Review-before-commit + rollback — `reasoning: high`
+- [x] Slice 3 — Review-before-commit + rollback — `reasoning: high`
 - [ ] Slice 4 — Image fidelity (full-res + consistent detail) — `reasoning: high`
 - [ ] Slice 5 — Land the real library + committed sanitized fixture — `reasoning: high`
 
