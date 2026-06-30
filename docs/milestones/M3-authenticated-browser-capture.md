@@ -285,7 +285,8 @@ browser in the three-column split's middle `content` column with an `EmptyView()
 column and the empty `detail` column eats the rest of the screen (the bug Jon reported
 2026-06-30). The spec was wrong, not the execution.
 
-**Fix** (one branch, review-suggestion-sized — fold into #38 or a fast follow):
+**Fix** (review-suggestion-sized — **fold into #38**, Jon's call 2026-06-30; #38 already
+touches `RecipeLibraryView.swift`):
 
 1. In [`RecipeLibraryView.swift`](../../YesChefApp/RecipeLibraryView.swift)'s
    `AppMainLayout`, give `.browser` its **own two-column branch**, mirroring the existing
