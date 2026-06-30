@@ -6,6 +6,8 @@ options:
 packages:
   YesChefPackage:
     path: YesChefPackage
+  WebExtractorKit:
+    path: ../../jon-platform/packages/WebExtractorKit
   CasePaths:
     url: https://github.com/pointfreeco/swift-case-paths
     from: 1.0.0
@@ -28,6 +30,8 @@ targets:
     dependencies:
       - package: YesChefPackage
         product: YesChefCore
+      - package: WebExtractorKit
+        product: WebExtractorKit
       - package: CasePaths
         product: CasePaths
       - package: SwiftNavigation
