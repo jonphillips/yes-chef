@@ -371,6 +371,15 @@ private struct AppMainLayout: View {
         onMenuSelected: openMenuFromCalendar,
         onRecipeSelected: onRecipeSelected
       )
+    } else if selectedSection == .browser {
+      NavigationSplitView {
+        AppSidebar(selection: $selectedSection)
+      } detail: {
+        BrowserWorkspaceView(
+          model: browserModel,
+          onCapture: onBrowserCapture
+        )
+      }
     } else if selectedSection == .mealCalendar {
       NavigationSplitView {
         AppSidebar(selection: $selectedSection)
@@ -382,23 +391,13 @@ private struct AppMainLayout: View {
         )
       }
     } else {
+      let columnSection = AppMainColumnSection(selectedSection ?? .recipes) ?? .recipes
       NavigationSplitView {
         AppSidebar(selection: $selectedSection)
       } content: {
-      switch selectedSection ?? .recipes {
+        switch columnSection {
         case .recipes:
           RecipeListView(model: recipeModel, style: .selection)
-        case .browser:
-          BrowserWorkspaceView(
-            model: browserModel,
-            onCapture: onBrowserCapture
-          )
-        case .mealCalendar:
-          MealCalendarWorkspaceView(
-            model: mealCalendarModel,
-            onMenuSelected: openMenuFromCalendar,
-            onRecipeSelected: onRecipeSelected
-          )
         case .groceries:
           GroceryListView(model: groceryModel, style: .selection)
         case .menus:
@@ -411,17 +410,13 @@ private struct AppMainLayout: View {
           )
         }
       } detail: {
-        switch selectedSection ?? .recipes {
+        switch columnSection {
         case .recipes:
           RecipeDetailColumn(
             model: recipeModel,
             mealCalendarModel: mealCalendarModel,
             groceryModel: groceryModel
           )
-        case .browser:
-          EmptyView()
-        case .mealCalendar:
-          EmptyView()
         case .groceries:
           GroceryDetailColumn(
             model: groceryModel,
@@ -446,6 +441,28 @@ private struct AppMainLayout: View {
   private func openMenuFromCalendar(_ menuID: CoreMenu.ID) {
     menuModel.selectMenu(menuID)
     selectedSection = .menus
+  }
+}
+
+private enum AppMainColumnSection {
+  case recipes
+  case groceries
+  case menus
+  case settings
+
+  init?(_ section: AppSection) {
+    switch section {
+    case .recipes:
+      self = .recipes
+    case .groceries:
+      self = .groceries
+    case .menus:
+      self = .menus
+    case .settings:
+      self = .settings
+    case .browser, .mealCalendar:
+      return nil
+    }
   }
 }
 
