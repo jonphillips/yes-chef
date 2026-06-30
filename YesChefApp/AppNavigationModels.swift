@@ -2,6 +2,7 @@ import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
   case recipes
+  case browser
   case mealCalendar
   case groceries
   case menus
@@ -16,6 +17,7 @@ enum AppSection: String, CaseIterable, Identifiable {
   var title: String {
     switch self {
     case .recipes: "Recipes"
+    case .browser: "Browser"
     case .mealCalendar: "Meal Calendar"
     case .groceries: "Groceries"
     case .menus: "Menus"
@@ -26,6 +28,7 @@ enum AppSection: String, CaseIterable, Identifiable {
   var systemImage: String {
     switch self {
     case .recipes: "book.closed"
+    case .browser: "safari"
     case .mealCalendar: "calendar"
     case .groceries: "cart"
     case .menus: "menucard"

@@ -2,11 +2,14 @@ import SwiftUI
 import SwiftUINavigation
 import UIKit
 import UniformTypeIdentifiers
+import WebExtractorKit
+import WebKit
 import YesChefCore
 
 struct AppContainer: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   @State private var recipeModel = RecipeLibraryModel()
+  @State private var browserModel = BrowserModel()
   @State private var mealCalendarModel = MealCalendarModel()
   @State private var menuModel = MenuLibraryModel()
   @State private var groceryModel = GroceryLibraryModel()
@@ -23,11 +26,13 @@ struct AppContainer: View {
     AppMainLayout(
       horizontalSizeClass: horizontalSizeClass,
       recipeModel: recipeModel,
+      browserModel: browserModel,
       mealCalendarModel: mealCalendarModel,
       menuModel: menuModel,
       groceryModel: groceryModel,
       selectedSection: $selectedSection,
       selectedSettingsPane: $selectedSettingsPane,
+      onBrowserCapture: browserCaptureButtonTapped,
       onRecipeSelected: { recipeID in
         presentedRecipeID = recipeID
       }
@@ -205,6 +210,14 @@ struct AppContainer: View {
     }
   }
 
+  @MainActor private func browserCaptureButtonTapped(page: WebPage) async {
+    let outcome = await browserModel.captureButtonTapped(page: page) { html, url in
+      recipeModel.captureModel.ingestBrowserCapture(html: html, sourceURL: url)
+    }
+    if outcome == .extracted {
+      recipeModel.destination = .captureRecipe
+    }
+  }
 }
 
 private struct RecipeFullScreenCover: View {
@@ -336,11 +349,13 @@ private extension View {
 private struct AppMainLayout: View {
   let horizontalSizeClass: UserInterfaceSizeClass?
   let recipeModel: RecipeLibraryModel
+  let browserModel: BrowserModel
   let mealCalendarModel: MealCalendarModel
   let menuModel: MenuLibraryModel
   let groceryModel: GroceryLibraryModel
   @Binding var selectedSection: AppSection?
   @Binding var selectedSettingsPane: SettingsPane?
+  let onBrowserCapture: (WebPage) async -> Void
   var onRecipeSelected: (Recipe.ID) -> Void
 
   var body: some View {
@@ -348,9 +363,11 @@ private struct AppMainLayout: View {
       AppCompactTabView(
         selection: $selectedSection,
         recipeModel: recipeModel,
+        browserModel: browserModel,
         mealCalendarModel: mealCalendarModel,
         menuModel: menuModel,
         groceryModel: groceryModel,
+        onBrowserCapture: onBrowserCapture,
         onMenuSelected: openMenuFromCalendar,
         onRecipeSelected: onRecipeSelected
       )
@@ -371,6 +388,11 @@ private struct AppMainLayout: View {
       switch selectedSection ?? .recipes {
         case .recipes:
           RecipeListView(model: recipeModel, style: .selection)
+        case .browser:
+          BrowserWorkspaceView(
+            model: browserModel,
+            onCapture: onBrowserCapture
+          )
         case .mealCalendar:
           MealCalendarWorkspaceView(
             model: mealCalendarModel,
@@ -396,6 +418,8 @@ private struct AppMainLayout: View {
             mealCalendarModel: mealCalendarModel,
             groceryModel: groceryModel
           )
+        case .browser:
+          EmptyView()
         case .mealCalendar:
           EmptyView()
         case .groceries:
@@ -428,9 +452,11 @@ private struct AppMainLayout: View {
 private struct AppCompactTabView: View {
   @Binding var selection: AppSection?
   let recipeModel: RecipeLibraryModel
+  let browserModel: BrowserModel
   let mealCalendarModel: MealCalendarModel
   let menuModel: MenuLibraryModel
   let groceryModel: GroceryLibraryModel
+  let onBrowserCapture: (WebPage) async -> Void
   let onMenuSelected: (CoreMenu.ID) -> Void
   let onRecipeSelected: (Recipe.ID) -> Void
 
@@ -443,6 +469,12 @@ private struct AppCompactTabView: View {
       )
         .tabItem { AppSection.recipes.label }
         .tag(AppSection.recipes as AppSection?)
+      BrowserStack(
+        model: browserModel,
+        onCapture: onBrowserCapture
+      )
+        .tabItem { AppSection.browser.label }
+        .tag(AppSection.browser as AppSection?)
       MealCalendarStack(
         model: mealCalendarModel,
         onMenuSelected: onMenuSelected,
