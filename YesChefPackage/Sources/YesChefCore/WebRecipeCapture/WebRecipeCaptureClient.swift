@@ -4,10 +4,20 @@ import Foundation
 public struct WebRecipeCaptureDraft: Equatable, Sendable {
   public var page: ParsedRecipePage
   public var usedRenderedFallback: Bool
+  public var capturedInBrowser: Bool
 
-  public init(page: ParsedRecipePage, usedRenderedFallback: Bool = false) {
+  public init(
+    page: ParsedRecipePage,
+    usedRenderedFallback: Bool = false,
+    capturedInBrowser: Bool = false
+  ) {
     self.page = page
     self.usedRenderedFallback = usedRenderedFallback
+    self.capturedInBrowser = capturedInBrowser
+  }
+
+  public var isUsable: Bool {
+    !page.isEmpty
   }
 }
 
@@ -64,6 +74,21 @@ public struct WebRecipeCaptureClient: Sendable {
     }
 
     return WebRecipeCaptureDraft(page: page, usedRenderedFallback: usedRenderedFallback)
+  }
+
+  public func browserCapture(
+    html: String,
+    sourceURL: URL?,
+    capturedAt: Date
+  ) -> WebRecipeCaptureDraft {
+    WebRecipeCaptureDraft(
+      page: WebRecipePageParser.parse(
+        html: html,
+        sourceURL: sourceURL,
+        capturedAt: capturedAt
+      ),
+      capturedInBrowser: true
+    )
   }
 
   public func capture(
