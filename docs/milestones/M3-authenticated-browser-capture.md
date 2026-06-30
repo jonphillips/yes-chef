@@ -317,17 +317,24 @@ Jon's 2026-06-30 device capture of an ATK recipe surfaced two **content** gaps (
 from the nav bug): the hero image renders as a placeholder, and editorial prose blocks
 ("Why This Recipe Works", "Before You Begin") are dropped. Diagnosing either needs the
 **real rendered, logged-in DOM** — which we can get **without handling Jon's credentials**,
-because the captured HTML is already persisted on `recipe.originalImportText` (and the
-`originalSnapshot`). This slice adds a tiny, **DEBUG-only** affordance to get that artifact
-off-device so we can build a committed *sanitized* fixture and fix the gaps properly.
+because the captured HTML is already persisted on `recipe.originalImportText`. This slice
+adds a tiny, **DEBUG-only** affordance to get that artifact off-device so we can build a
+committed *sanitized* fixture and fix the gaps properly.
 
 Scope is **diagnostics only** — no parser or pipeline behavior change.
 
-1. Add a `#if DEBUG` action (share sheet, or write-to-Files) that exports the captured
-   rendered DOM for a captured recipe — source it from `recipe.originalImportText` so it
-   works for already-saved recipes, no re-capture/re-login. A natural home is the existing
-   "View Original" / original-snapshot surface, gated `#if DEBUG`. Keep it out of release
-   builds and out of any user-facing menu.
+1. Add a `#if DEBUG` action that exports the captured rendered DOM for a captured recipe —
+   so it works for already-saved recipes, no re-capture/re-login. A natural home is the
+   existing "View Original" surface, gated `#if DEBUG`. Keep it out of release builds and
+   out of any user-facing menu. **Two things to get right or the artifact is unusable:**
+   - **Export `recipe.originalImportText` — the raw captured DOM — NOT
+     `recipe.originalSnapshot`.** They live next to each other and the "View Original" UI
+     renders the snapshot, but `originalSnapshot` is *encoded bundle data*
+     (`RecipeBundleCoding.snapshotData`), not HTML. The fixture needs the raw DOM string.
+   - **Share it as a `.html` file**, not a plain `String`: write `originalImportText` to a
+     temp `…/<slug>.html` and share/export *that* (`ShareLink`/activity sheet or
+     write-to-Files). A text-typed share of a multi-hundred-KB DOM gets mangled/truncated on
+     some targets; a file round-trips clean.
 2. **No credentials, ever.** The export is the rendered DOM only. Before it leaves the
    device it's Jon's to inspect; the architect sanitizes it (scrub cookies, tokens, PII,
    account markup) into
