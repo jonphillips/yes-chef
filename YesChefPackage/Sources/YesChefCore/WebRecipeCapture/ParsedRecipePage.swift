@@ -290,16 +290,20 @@ public struct ParsedRecipePage: Equatable, Sendable {
     now: Date,
     uuid: () -> UUID
   ) -> [RecipeNote] {
-    editorialBlocks.enumerated().map { index, block in
-      let createdAt = now.addingTimeInterval(TimeInterval(index))
-      return RecipeNote(
-        id: uuid(),
-        recipeID: recipeID,
-        text: block.noteText,
-        dateCreated: createdAt,
-        dateModified: createdAt
-      )
-    }
+    editorialBlocks
+      .map { ParsedRecipeEditorialBlock(label: $0.label, text: $0.text) }
+      .filter { !$0.text.isEmpty }
+      .enumerated()
+      .map { index, block in
+        let createdAt = now.addingTimeInterval(TimeInterval(index))
+        return RecipeNote(
+          id: uuid(),
+          recipeID: recipeID,
+          text: block.noteText,
+          dateCreated: createdAt,
+          dateModified: createdAt
+        )
+      }
   }
 
   private func makeSource(

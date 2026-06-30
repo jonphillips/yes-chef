@@ -50,6 +50,33 @@ extension RecipeCoreTests {
       expectNoDifference(snapshot.notes, bundle.notes)
     }
 
+    @Test
+    func editedEditorialBlocksTrimAndDropEmptyNotesInBundle() throws {
+      var page = ParsedRecipePage(
+        title: "Curated Cookies",
+        ingredientSections: [ParsedRecipeIngredientSection(lines: ["1 cup flour"])],
+        instructionSections: [ParsedRecipeInstructionSection(steps: ["Bake."])],
+        editorialBlocks: [
+          ParsedRecipeEditorialBlock(label: "Why This Recipe Works", text: "Original text."),
+          ParsedRecipeEditorialBlock(label: "Before You Begin", text: "Read me."),
+        ]
+      )
+      page.editorialBlocks[0].text = "  Trimmed note.  "
+      page.editorialBlocks[1].text = "   "
+
+      var uuids = SampleUUIDSequence(start: 29_000)
+      let bundle = try page.makeRecipeBundle(
+        now: Date(timeIntervalSinceReferenceDate: 804_600_000),
+        uuid: { uuids.next() }
+      )
+
+      expectNoDifference(bundle.notes, ["Why This Recipe Works\n\nTrimmed note."])
+
+      let snapshotData = try #require(bundle.recipe.originalSnapshot)
+      let snapshot = try RecipeBundleCoding.decodeSnapshot(snapshotData)
+      expectNoDifference(snapshot.notes, bundle.notes)
+    }
+
     private func fixtureHTML(_ name: String) throws -> String {
       try String(contentsOf: fixtureURL.appendingPathComponent("\(name).html"), encoding: .utf8)
     }
