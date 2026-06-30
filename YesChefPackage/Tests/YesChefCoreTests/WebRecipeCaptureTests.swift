@@ -60,6 +60,7 @@ extension RecipeCoreTests {
         page.imageURLs.map(\.absoluteString),
         ["https://example.com/images/lemon-chicken.jpg"]
       )
+      expectNoDifference(page.editorialBlocks, [])
       expectNoDifference(page.originalHTML.contains("application/ld+json"), true)
       expectNoDifference(page.warnings, [])
 
@@ -95,11 +96,13 @@ extension RecipeCoreTests {
       expectNoDifference(bundle.photos.map(\.sourceURL), ["https://example.com/images/lemon-chicken.jpg"])
       expectNoDifference(bundle.photos.map(\.kind), [.hero])
       expectNoDifference(bundle.photos.map(\.source), [.extracted])
+      expectNoDifference(bundle.recipeNotes, [])
 
       let snapshotData = try #require(bundle.recipe.originalSnapshot)
       let snapshot = try RecipeBundleCoding.decodeSnapshot(snapshotData)
       expectNoDifference(snapshot.recipe.title, "Lemon Chicken")
       expectNoDifference(snapshot.ingredients, bundle.ingredients)
+      expectNoDifference(snapshot.notes, [])
       expectNoDifference(snapshot.photos.map(\.sourceURL), ["https://example.com/images/lemon-chicken.jpg"])
     }
 

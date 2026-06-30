@@ -7,6 +7,7 @@ struct RecipeParseBuilder {
   private(set) var categoryNames: [String] = []
   private(set) var ingredients: [String] = []
   private(set) var instructionSections: [ParsedRecipeInstructionSection] = []
+  private(set) var editorialBlocks: [ParsedRecipeEditorialBlock] = []
 
   let sourceURL: URL?
   let originalHTML: String
@@ -50,6 +51,12 @@ struct RecipeParseBuilder {
     appendInstructionSection(name: name?.trimmingCharacters(in: .whitespacesAndNewlines), steps: cleanedSteps)
   }
 
+  mutating func addEditorialBlock(label: String, text: String) {
+    let block = ParsedRecipeEditorialBlock(label: label, text: text)
+    guard !block.text.isEmpty, !editorialBlocks.contains(block) else { return }
+    editorialBlocks.append(block)
+  }
+
   func build(capturedAt: Date) -> ParsedRecipePage {
     let prepTime = votes.winner(.prepTime).flatMap(RecipeDurationParser.minutes)
     let cookTime = votes.winner(.cookTime).flatMap(RecipeDurationParser.minutes)
@@ -84,6 +91,7 @@ struct RecipeParseBuilder {
       categoryNames: categoryNames,
       ingredientSections: ingredientSections,
       instructionSections: instructionSections,
+      editorialBlocks: editorialBlocks,
       imageURLs: images,
       schemaTypes: schemaTypes,
       capturedAt: capturedAt,

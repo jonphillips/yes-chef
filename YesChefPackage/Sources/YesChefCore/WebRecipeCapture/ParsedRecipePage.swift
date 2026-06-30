@@ -20,6 +20,20 @@ public struct ParsedRecipeInstructionSection: Equatable, Sendable {
   }
 }
 
+public struct ParsedRecipeEditorialBlock: Equatable, Sendable {
+  public var label: String
+  public var text: String
+
+  public init(label: String, text: String) {
+    self.label = label.trimmingCharacters(in: .whitespacesAndNewlines)
+    self.text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  public var noteText: String {
+    "\(label)\n\n\(text)"
+  }
+}
+
 public enum WebRecipeCaptureWarning: String, Equatable, Sendable {
   case noStructuredRecipeData
   case untitledRecipe
@@ -42,6 +56,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
   public var categoryNames: [String]
   public var ingredientSections: [ParsedRecipeIngredientSection]
   public var instructionSections: [ParsedRecipeInstructionSection]
+  public var editorialBlocks: [ParsedRecipeEditorialBlock]
   public var imageURLs: [URL]
   public var processedImages: [URL: ProcessedRecipePhoto]
   public var schemaTypes: [String]
@@ -66,6 +81,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
     categoryNames: [String] = [],
     ingredientSections: [ParsedRecipeIngredientSection] = [],
     instructionSections: [ParsedRecipeInstructionSection] = [],
+    editorialBlocks: [ParsedRecipeEditorialBlock] = [],
     imageURLs: [URL] = [],
     processedImages: [URL: ProcessedRecipePhoto] = [:],
     schemaTypes: [String] = [],
@@ -89,6 +105,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
     self.categoryNames = categoryNames
     self.ingredientSections = ingredientSections
     self.instructionSections = instructionSections
+    self.editorialBlocks = editorialBlocks
     self.imageURLs = imageURLs
     self.processedImages = processedImages
     self.schemaTypes = schemaTypes
@@ -125,6 +142,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
     let ingredientLines = makeIngredientLines(recipeID: recipeID, sections: ingredientSections, uuid: uuid)
     let instructionSections = makeInstructionSections(recipeID: recipeID, uuid: uuid)
     let instructionSteps = makeInstructionSteps(recipeID: recipeID, sections: instructionSections, uuid: uuid)
+    let recipeNotes = makeRecipeNotes(recipeID: recipeID, now: now, uuid: uuid)
     let photos = imageURLs.enumerated().map { index, url in
       let photoID = uuid()
       let processedImage = processedImages[url]
@@ -167,7 +185,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
       ingredientLines: ingredientLines,
       instructionSections: instructionSections,
       instructionSteps: instructionSteps,
-      notes: [],
+      notes: recipeNotes,
       tagNames: [],
       categoryNames: categoryNames,
       photos: photos
@@ -180,7 +198,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
       ingredientLines: ingredientLines,
       instructionSections: instructionSections,
       instructionSteps: instructionSteps,
-      recipeNotes: [],
+      recipeNotes: recipeNotes,
       photos: photos,
       tagNames: [],
       categoryNames: categoryNames
@@ -265,6 +283,23 @@ public struct ParsedRecipePage: Equatable, Sendable {
       }
     }
     return steps
+  }
+
+  private func makeRecipeNotes(
+    recipeID: Recipe.ID,
+    now: Date,
+    uuid: () -> UUID
+  ) -> [RecipeNote] {
+    editorialBlocks.enumerated().map { index, block in
+      let createdAt = now.addingTimeInterval(TimeInterval(index))
+      return RecipeNote(
+        id: uuid(),
+        recipeID: recipeID,
+        text: block.noteText,
+        dateCreated: createdAt,
+        dateModified: createdAt
+      )
+    }
   }
 
   private func makeSource(
