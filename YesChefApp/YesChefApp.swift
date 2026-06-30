@@ -15,7 +15,8 @@ struct YesChefApp: App {
         fetchHTML: WebRecipeCaptureClient.liveValue.fetchHTML,
         renderHTML: { url in
           await RenderedDOMFetcher.renderedHTML(of: url)
-        }
+        },
+        fetchImageData: WebRecipeCaptureClient.liveValue.fetchImageData
       )
     }
     DatabaseChangeBeacon.startObserving()

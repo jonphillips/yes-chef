@@ -90,7 +90,7 @@ struct RecipeCaptureView: View {
         title: "Capture from Site",
         confirmLabel: "Capture",
         onExtract: { html, url in
-          model.ingestBrowserCapture(html: html, sourceURL: url)
+          await model.ingestBrowserCapture(html: html, sourceURL: url)
         }
       )
     }

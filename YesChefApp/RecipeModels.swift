@@ -382,14 +382,15 @@ final class RecipeCaptureModel {
     defer { isFetching = false }
 
     do {
-      draft = try await captureClient.capture(url: url, capturedAt: now)
+      let capturedDraft = try await captureClient.capture(url: url, capturedAt: now)
+      draft = await captureClient.hydrateHeroImage(in: capturedDraft)
     } catch is CancellationError {
     } catch {
       showError(String(describing: error))
     }
   }
 
-  func ingestBrowserCapture(html: String, sourceURL: URL?) -> WebExtractionOutcome {
+  func ingestBrowserCapture(html: String, sourceURL: URL?) async -> WebExtractionOutcome {
     let capturedDraft = captureClient.browserCapture(
       html: html,
       sourceURL: sourceURL,
@@ -398,7 +399,7 @@ final class RecipeCaptureModel {
     guard capturedDraft.isUsable else {
       return .notFound(message: "No recipe found on this page - sign in or open the recipe, then try again.")
     }
-    draft = capturedDraft
+    draft = await captureClient.hydrateHeroImage(in: capturedDraft)
     return .extracted
   }
 

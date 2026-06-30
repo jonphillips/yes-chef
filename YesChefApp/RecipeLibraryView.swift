@@ -219,7 +219,7 @@ struct AppContainer: View {
 
   @MainActor private func browserCaptureButtonTapped(page: WebPage) async {
     let outcome = await browserModel.captureButtonTapped(page: page) { html, url in
-      recipeModel.captureModel.ingestBrowserCapture(html: html, sourceURL: url)
+      await recipeModel.captureModel.ingestBrowserCapture(html: html, sourceURL: url)
     }
     if outcome == .extracted {
       recipeModel.destination = .captureRecipe

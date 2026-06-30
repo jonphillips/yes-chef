@@ -33,6 +33,7 @@ public struct WebRecipeSharePayload: Equatable, Sendable {
 
 public enum WebRecipeCaptureClientError: Error, Equatable, LocalizedError, Sendable {
   case invalidHTTPStatus(Int)
+  case imageTooLarge(maxBytes: Int)
   case missingHTTPResponse
   case unimplementedFetch
 
@@ -40,6 +41,8 @@ public enum WebRecipeCaptureClientError: Error, Equatable, LocalizedError, Senda
     switch self {
     case let .invalidHTTPStatus(statusCode):
       "Could not fetch that recipe page (HTTP \(statusCode))."
+    case let .imageTooLarge(maxBytes):
+      "That recipe image is too large to import (maximum \(maxBytes) bytes)."
     case .missingHTTPResponse:
       "Could not read a valid response from that recipe page."
     case .unimplementedFetch:
@@ -51,13 +54,18 @@ public enum WebRecipeCaptureClientError: Error, Equatable, LocalizedError, Senda
 public struct WebRecipeCaptureClient: Sendable {
   public var fetchHTML: @Sendable (URL) async throws -> String
   public var renderHTML: @Sendable (URL) async throws -> String?
+  public var fetchImageData: @Sendable (URL) async throws -> Data
 
   public init(
     fetchHTML: @escaping @Sendable (URL) async throws -> String,
-    renderHTML: @escaping @Sendable (URL) async throws -> String?
+    renderHTML: @escaping @Sendable (URL) async throws -> String?,
+    fetchImageData: @escaping @Sendable (URL) async throws -> Data = { _ in
+      throw WebRecipeCaptureClientError.unimplementedFetch
+    }
   ) {
     self.fetchHTML = fetchHTML
     self.renderHTML = renderHTML
+    self.fetchImageData = fetchImageData
   }
 
   public func capture(
@@ -89,6 +97,28 @@ public struct WebRecipeCaptureClient: Sendable {
       ),
       capturedInBrowser: true
     )
+  }
+
+  public func hydrateHeroImage(in draft: WebRecipeCaptureDraft) async -> WebRecipeCaptureDraft {
+    guard let heroURL = draft.page.imageURLs.first, draft.page.processedImages[heroURL] == nil else {
+      return draft
+    }
+
+    var hydratedDraft = draft
+    do {
+      let data = try await fetchImageData(heroURL)
+      let sourcePath = heroURL.lastPathComponent.isEmpty
+        ? heroURL.absoluteString
+        : heroURL.lastPathComponent
+      hydratedDraft.page.processedImages[heroURL] = RecipePhotoProcessor.process(
+        sourceData: data,
+        sourcePath: sourcePath,
+        kind: .hero
+      )
+    } catch {
+      return draft
+    }
+    return hydratedDraft
   }
 
   public func capture(
@@ -174,6 +204,8 @@ public enum WebRecipeSharePayloadError: Error, Equatable, LocalizedError, Sendab
 }
 
 extension WebRecipeCaptureClient: DependencyKey {
+  private static let maxImageResponseBytes = 12 * 1_024 * 1_024
+
   public static var liveValue: Self {
     Self(
       fetchHTML: { url in
@@ -191,14 +223,33 @@ extension WebRecipeCaptureClient: DependencyKey {
         }
         return Self.decodedHTML(data: data, response: response)
       },
-      renderHTML: { _ in nil }
+      renderHTML: { _ in nil },
+      fetchImageData: { url in
+        var request = URLRequest(url: url)
+        request.setValue(
+          "Mozilla/5.0 AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+          forHTTPHeaderField: "User-Agent"
+        )
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+          throw WebRecipeCaptureClientError.missingHTTPResponse
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+          throw WebRecipeCaptureClientError.invalidHTTPStatus(httpResponse.statusCode)
+        }
+        guard data.count <= maxImageResponseBytes else {
+          throw WebRecipeCaptureClientError.imageTooLarge(maxBytes: maxImageResponseBytes)
+        }
+        return data
+      }
     )
   }
 
   public static var testValue: Self {
     Self(
       fetchHTML: { _ in throw WebRecipeCaptureClientError.unimplementedFetch },
-      renderHTML: { _ in nil }
+      renderHTML: { _ in nil },
+      fetchImageData: { _ in throw WebRecipeCaptureClientError.unimplementedFetch }
     )
   }
 }
