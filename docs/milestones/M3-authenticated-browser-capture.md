@@ -227,11 +227,18 @@ section switches and relaunch. Reuses the Slice 2/3 capture seam; **build it las
    browser` to `AppSection` (title `"Browser"`, `systemImage "safari"`). Decide placement
    in `allCases` order (suggest after `recipes`). This auto-populates `AppSidebar` (it
    lists `AppSection.allCases`). Then add the matching arms in
-   [`RecipeLibraryView.swift`](../../YesChefApp/RecipeLibraryView.swift): a `.browser`
-   branch in `AppMainLayout`'s `content`/`detail` switches (the browser is a single
-   full-width surface — render it in `content` and return `EmptyView()` in `detail`, like
-   `.mealCalendar`), a `BrowserStack` + `.tabItem`/`.tag` in `AppCompactTabView`, and the
-   stack view itself (mirror `MealCalendarStack`).
+   [`RecipeLibraryView.swift`](../../YesChefApp/RecipeLibraryView.swift): the browser is a
+   single full-width surface, so give it a **dedicated two-column branch** in
+   `AppMainLayout` — `NavigationSplitView { AppSidebar } detail: { BrowserWorkspaceView }`,
+   exactly the shape `.mealCalendar` uses — **not** an arm in the three-column
+   `content`/`detail` switches. (Rendering it in the middle `content` column with an
+   `EmptyView()` `detail` sizes the browser to the narrow column and leaves the detail
+   column blank — see the S4-followup nav correction below.) Then add a `BrowserStack` +
+   `.tabItem`/`.tag` in `AppCompactTabView`, and the stack view itself (mirror
+   `MealCalendarStack`). `BrowserWorkspaceView` carries **no `NavigationStack` of its own**
+   in the regular-width path (the split view's detail column already provides one; nesting
+   another traps the iPad split view — same rule as galavant's `BrowserScreen`); only the
+   compact `BrowserStack` wraps a `NavigationStack`, which is correct.
 3. **Wire the view.** Use `WebBrowserView`'s **no-field-bar convenience init** (recipes
    don't need the tap-to-fill `fieldBar` — that's a Galavant place-specific affordance):
    ```swift
@@ -266,6 +273,83 @@ section switches and relaunch. Reuses the Slice 2/3 capture seam; **build it las
    switch to Recipes and back → the page/session is still there (not reset). **Device verify
    recommended** for a real paywalled login persisting across an app relaunch — note results
    in the PR. `swift test` + `check-drift.sh`.
+
+---
+
+## Slice 4-followup — Full-width Browser (navigation correction)
+
+PR #38 shipped Slice 4 functionally correct but **rendered the browser in the wrong
+column** — it followed this doc's (now-corrected) Slice 4 step 2, which told it to put the
+browser in the three-column split's middle `content` column with an `EmptyView()`
+`detail`. Result on iPad regular width: the browser is sized to the narrow `content`
+column and the empty `detail` column eats the rest of the screen (the bug Jon reported
+2026-06-30). The spec was wrong, not the execution.
+
+**Fix** (review-suggestion-sized — **fold into #38**, Jon's call 2026-06-30; #38 already
+touches `RecipeLibraryView.swift`):
+
+1. In [`RecipeLibraryView.swift`](../../YesChefApp/RecipeLibraryView.swift)'s
+   `AppMainLayout`, give `.browser` its **own two-column branch**, mirroring the existing
+   `.mealCalendar` branch:
+   ```swift
+   } else if selectedSection == .browser {
+     NavigationSplitView {
+       AppSidebar(selection: $selectedSection)
+     } detail: {
+       BrowserWorkspaceView(model: browserModel, onCapture: onBrowserCapture)
+     }
+   } else if selectedSection == .mealCalendar {
+     …
+   ```
+2. Delete the `.browser` arms from the three-column `content` and `detail` switches.
+3. The session does **not** reset across this 2-/3-column structural-identity change: the
+   `WebPage` is host-owned in `BrowserModel`, not in the view. Confirm by switching
+   Recipes ⇄ Browser — the loaded page/login survives.
+
+**Verify.** iOS-27 iPad sim: Browser fills the detail area edge-to-edge (no blank right
+column); compact tab unaffected. `swift test` + `check-drift.sh`.
+
+---
+
+## Slice 5 — DEBUG capture-DOM export (diagnostics for the image + prose gaps)
+
+Jon's 2026-06-30 device capture of an ATK recipe surfaced two **content** gaps (distinct
+from the nav bug): the hero image renders as a placeholder, and editorial prose blocks
+("Why This Recipe Works", "Before You Begin") are dropped. Diagnosing either needs the
+**real rendered, logged-in DOM** — which we can get **without handling Jon's credentials**,
+because the captured HTML is already persisted on `recipe.originalImportText` (and the
+`originalSnapshot`). This slice adds a tiny, **DEBUG-only** affordance to get that artifact
+off-device so we can build a committed *sanitized* fixture and fix the gaps properly.
+
+Scope is **diagnostics only** — no parser or pipeline behavior change.
+
+1. Add a `#if DEBUG` action (share sheet, or write-to-Files) that exports the captured
+   rendered DOM for a captured recipe — source it from `recipe.originalImportText` so it
+   works for already-saved recipes, no re-capture/re-login. A natural home is the existing
+   "View Original" / original-snapshot surface, gated `#if DEBUG`. Keep it out of release
+   builds and out of any user-facing menu.
+2. **No credentials, ever.** The export is the rendered DOM only. Before it leaves the
+   device it's Jon's to inspect; the architect sanitizes it (scrub cookies, tokens, PII,
+   account markup) into
+   `Tests/YesChefCoreTests/Fixtures/WebRecipeCapture/SanitizedSites/atk-rendered.html` —
+   the same fixture pattern as Slice 2.
+3. **Verify.** Build the iOS-27 iPad sim; confirm the action is absent in a Release config
+   and present in Debug. `swift test` + `check-drift.sh`.
+
+This unblocks two follow-on slices, both informed by the fixture and tracked separately
+once we've seen the real DOM:
+
+- **Image bytes:** the capture pipeline records photos as `sourceURL` only
+  (`makeRecipeBundle`, [`ParsedRecipePage.swift`](../../YesChefPackage/Sources/YesChefCore/WebRecipeCapture/ParsedRecipePage.swift));
+  nothing downloads them, and `RecipeDetailModel.displayablePhotos` filters out any photo
+  lacking `displayData`/`thumbnailData` — so the hero shows a placeholder (true for the
+  paste-URL path too). The fix downloads hero bytes; **note** the download may need to run
+  in the authenticated `WebPage` context (cookie-gated CDN), which is why we want the real
+  fixture/DOM before designing it.
+- **Editorial prose:** "Why This Recipe Works" / "Before You Begin" are not part of
+  `schema.org/Recipe` JSON-LD, so the schema-first parser drops them by design. The fixture
+  tells us whether ATK exposes them in JSON-LD (map to `summary`/notes) or only in
+  site-specific DOM (a scoped scrape) — a deliberate feature decision, not a bug.
 
 ---
 

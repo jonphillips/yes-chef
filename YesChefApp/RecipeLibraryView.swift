@@ -2,11 +2,14 @@ import SwiftUI
 import SwiftUINavigation
 import UIKit
 import UniformTypeIdentifiers
+import WebExtractorKit
+import WebKit
 import YesChefCore
 
 struct AppContainer: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   @State private var recipeModel = RecipeLibraryModel()
+  @State private var browserModel = BrowserModel()
   @State private var mealCalendarModel = MealCalendarModel()
   @State private var menuModel = MenuLibraryModel()
   @State private var groceryModel = GroceryLibraryModel()
@@ -23,11 +26,13 @@ struct AppContainer: View {
     AppMainLayout(
       horizontalSizeClass: horizontalSizeClass,
       recipeModel: recipeModel,
+      browserModel: browserModel,
       mealCalendarModel: mealCalendarModel,
       menuModel: menuModel,
       groceryModel: groceryModel,
       selectedSection: $selectedSection,
       selectedSettingsPane: $selectedSettingsPane,
+      onBrowserCapture: browserCaptureButtonTapped,
       onRecipeSelected: { recipeID in
         presentedRecipeID = recipeID
       }
@@ -205,6 +210,14 @@ struct AppContainer: View {
     }
   }
 
+  @MainActor private func browserCaptureButtonTapped(page: WebPage) async {
+    let outcome = await browserModel.captureButtonTapped(page: page) { html, url in
+      recipeModel.captureModel.ingestBrowserCapture(html: html, sourceURL: url)
+    }
+    if outcome == .extracted {
+      recipeModel.destination = .captureRecipe
+    }
+  }
 }
 
 private struct RecipeFullScreenCover: View {
@@ -336,11 +349,13 @@ private extension View {
 private struct AppMainLayout: View {
   let horizontalSizeClass: UserInterfaceSizeClass?
   let recipeModel: RecipeLibraryModel
+  let browserModel: BrowserModel
   let mealCalendarModel: MealCalendarModel
   let menuModel: MenuLibraryModel
   let groceryModel: GroceryLibraryModel
   @Binding var selectedSection: AppSection?
   @Binding var selectedSettingsPane: SettingsPane?
+  let onBrowserCapture: (WebPage) async -> Void
   var onRecipeSelected: (Recipe.ID) -> Void
 
   var body: some View {
@@ -348,12 +363,23 @@ private struct AppMainLayout: View {
       AppCompactTabView(
         selection: $selectedSection,
         recipeModel: recipeModel,
+        browserModel: browserModel,
         mealCalendarModel: mealCalendarModel,
         menuModel: menuModel,
         groceryModel: groceryModel,
+        onBrowserCapture: onBrowserCapture,
         onMenuSelected: openMenuFromCalendar,
         onRecipeSelected: onRecipeSelected
       )
+    } else if selectedSection == .browser {
+      NavigationSplitView {
+        AppSidebar(selection: $selectedSection)
+      } detail: {
+        BrowserWorkspaceView(
+          model: browserModel,
+          onCapture: onBrowserCapture
+        )
+      }
     } else if selectedSection == .mealCalendar {
       NavigationSplitView {
         AppSidebar(selection: $selectedSection)
@@ -365,18 +391,13 @@ private struct AppMainLayout: View {
         )
       }
     } else {
+      let columnSection = AppMainColumnSection(selectedSection ?? .recipes) ?? .recipes
       NavigationSplitView {
         AppSidebar(selection: $selectedSection)
       } content: {
-      switch selectedSection ?? .recipes {
+        switch columnSection {
         case .recipes:
           RecipeListView(model: recipeModel, style: .selection)
-        case .mealCalendar:
-          MealCalendarWorkspaceView(
-            model: mealCalendarModel,
-            onMenuSelected: openMenuFromCalendar,
-            onRecipeSelected: onRecipeSelected
-          )
         case .groceries:
           GroceryListView(model: groceryModel, style: .selection)
         case .menus:
@@ -389,15 +410,13 @@ private struct AppMainLayout: View {
           )
         }
       } detail: {
-        switch selectedSection ?? .recipes {
+        switch columnSection {
         case .recipes:
           RecipeDetailColumn(
             model: recipeModel,
             mealCalendarModel: mealCalendarModel,
             groceryModel: groceryModel
           )
-        case .mealCalendar:
-          EmptyView()
         case .groceries:
           GroceryDetailColumn(
             model: groceryModel,
@@ -425,12 +444,36 @@ private struct AppMainLayout: View {
   }
 }
 
+private enum AppMainColumnSection {
+  case recipes
+  case groceries
+  case menus
+  case settings
+
+  init?(_ section: AppSection) {
+    switch section {
+    case .recipes:
+      self = .recipes
+    case .groceries:
+      self = .groceries
+    case .menus:
+      self = .menus
+    case .settings:
+      self = .settings
+    case .browser, .mealCalendar:
+      return nil
+    }
+  }
+}
+
 private struct AppCompactTabView: View {
   @Binding var selection: AppSection?
   let recipeModel: RecipeLibraryModel
+  let browserModel: BrowserModel
   let mealCalendarModel: MealCalendarModel
   let menuModel: MenuLibraryModel
   let groceryModel: GroceryLibraryModel
+  let onBrowserCapture: (WebPage) async -> Void
   let onMenuSelected: (CoreMenu.ID) -> Void
   let onRecipeSelected: (Recipe.ID) -> Void
 
@@ -443,6 +486,12 @@ private struct AppCompactTabView: View {
       )
         .tabItem { AppSection.recipes.label }
         .tag(AppSection.recipes as AppSection?)
+      BrowserStack(
+        model: browserModel,
+        onCapture: onBrowserCapture
+      )
+        .tabItem { AppSection.browser.label }
+        .tag(AppSection.browser as AppSection?)
       MealCalendarStack(
         model: mealCalendarModel,
         onMenuSelected: onMenuSelected,
