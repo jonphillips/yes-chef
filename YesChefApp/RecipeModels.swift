@@ -54,6 +54,10 @@ final class RecipeLibraryModel {
   var selectedSourceNames: Set<String> = []
   var selectedAuthorNames: Set<String> = []
 
+  func reloadAfterExternalChange() async {
+    try? await $recipeRows.load()
+  }
+
   func addRecipeButtonTapped() {
     destination = .addRecipe
   }
@@ -320,6 +324,9 @@ final class BrowserModel {
 
   func noticeDismissButtonTapped() {
     notice = nil
+  }
+
+  func reloadAfterExternalChange() async {
   }
 }
 

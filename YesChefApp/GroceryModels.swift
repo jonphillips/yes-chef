@@ -70,6 +70,15 @@ final class GroceryLibraryModel {
     }
   }
 
+  func reloadAfterExternalChange() async {
+    try? await $listRows.load()
+    try? await $itemRows.load()
+    try? await $pantryItems.load()
+    try? await $menuRows.load()
+    try? await $ingredientChoices.load()
+    try? await $menuRecipeItems.load()
+  }
+
   func ensureDefaultListIfNeeded() {
     do {
       let listID = try database.write { db in

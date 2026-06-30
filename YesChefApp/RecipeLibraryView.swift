@@ -208,6 +208,13 @@ struct AppContainer: View {
         }
       }
     }
+    .externalDatabaseChangeReload(
+      recipeModel: recipeModel,
+      browserModel: browserModel,
+      mealCalendarModel: mealCalendarModel,
+      menuModel: menuModel,
+      groceryModel: groceryModel
+    )
   }
 
   @MainActor private func browserCaptureButtonTapped(page: WebPage) async {

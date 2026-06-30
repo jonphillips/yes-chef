@@ -117,6 +117,11 @@ final class MealCalendarModel {
       }
   }
 
+  func reloadAfterExternalChange() async {
+    try? await $fetchedItemRows.load()
+    try? await $recipeRows.load()
+  }
+
   func selectDisplayMode(_ mode: MealCalendarDisplayMode) {
     displayMode = mode
   }
