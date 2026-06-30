@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WebExtractorKit
 import YesChefCore
 
@@ -49,7 +50,7 @@ struct RecipeCaptureView: View {
       }
 
       if let draft = model.draft {
-        RecipeCaptureReviewSections(draft: draft)
+        RecipeCaptureReviewSections(model: model, draft: draft)
       }
     }
     .navigationTitle("Capture Recipe")
@@ -98,6 +99,7 @@ struct RecipeCaptureView: View {
 }
 
 private struct RecipeCaptureReviewSections: View {
+  @Bindable var model: RecipeCaptureModel
   let draft: WebRecipeCaptureDraft
 
   private var page: ParsedRecipePage {
@@ -155,10 +157,38 @@ private struct RecipeCaptureReviewSections: View {
       }
     }
 
+    if let heroImage {
+      Section("Photo") {
+        Image(uiImage: heroImage)
+          .resizable()
+          .scaledToFit()
+          .frame(maxHeight: 220)
+          .clipShape(RoundedRectangle(cornerRadius: 8))
+      }
+    }
+
     if !page.warnings.isEmpty {
       Section("Warnings") {
         Text(page.warnings.map(\.reviewTitle).joined(separator: "\n"))
           .foregroundStyle(.secondary)
+      }
+    }
+
+    if !model.editorialBlocks.isEmpty {
+      Section("Notes") {
+        ForEach(model.editorialBlocks.indices, id: \.self) { index in
+          VStack(alignment: .leading, spacing: 8) {
+            Text(model.editorialBlocks[index].label)
+              .font(.headline)
+              .foregroundStyle(.secondary)
+            TextField("Note", text: editorialBlockTextBinding(at: index), axis: .vertical)
+              .lineLimit(3...8)
+          }
+          .padding(.vertical, 4)
+        }
+        .onDelete { offsets in
+          model.removeEditorialBlocks(atOffsets: offsets)
+        }
       }
     }
 
@@ -201,6 +231,22 @@ private struct RecipeCaptureReviewSections: View {
         return section.lines
       }
       .joined(separator: "\n")
+  }
+
+  private var heroImage: UIImage? {
+    guard let heroURL = page.imageURLs.first,
+      let photo = page.processedImages[heroURL]
+    else { return nil }
+    return UIImage(data: photo.thumbnailData ?? photo.displayData)
+  }
+
+  private func editorialBlockTextBinding(at index: Int) -> Binding<String> {
+    Binding {
+      guard model.editorialBlocks.indices.contains(index) else { return "" }
+      return model.editorialBlocks[index].text
+    } set: { text in
+      model.updateEditorialBlockText(text, at: index)
+    }
   }
 
   private var instructionText: String {

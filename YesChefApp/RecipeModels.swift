@@ -358,6 +358,11 @@ final class RecipeCaptureModel {
     draft != nil && !isFetching && !isCommitting
   }
 
+  var editorialBlocks: [ParsedRecipeEditorialBlock] {
+    get { draft?.page.editorialBlocks ?? [] }
+    set { draft?.page.editorialBlocks = newValue }
+  }
+
   func reset() {
     urlText = ""
     draft = nil
@@ -404,7 +409,7 @@ final class RecipeCaptureModel {
   }
 
   func commitButtonTapped() async -> RecipeImportBundleResult? {
-    guard let draft else { return nil }
+    guard let draft = curatedDraftForCommit() else { return nil }
     isCommitting = true
     defer { isCommitting = false }
 
@@ -427,11 +432,33 @@ final class RecipeCaptureModel {
     }
   }
 
+  func updateEditorialBlockText(_ text: String, at index: Int) {
+    guard editorialBlocks.indices.contains(index) else { return }
+    var blocks = editorialBlocks
+    blocks[index].text = text
+    editorialBlocks = blocks
+  }
+
+  func removeEditorialBlocks(atOffsets offsets: IndexSet) {
+    var blocks = editorialBlocks
+    blocks.remove(atOffsets: offsets)
+    editorialBlocks = blocks
+  }
+
   var browserStartURL: URL {
     if let normalizedURL {
       return normalizedURL
     }
     return WebAddress.duckDuckGo("recipe") ?? URL(string: "https://duckduckgo.com")!
+  }
+
+  private func curatedDraftForCommit() -> WebRecipeCaptureDraft? {
+    guard var draft else { return nil }
+    draft.page.editorialBlocks = draft.page.editorialBlocks
+      .map { ParsedRecipeEditorialBlock(label: $0.label, text: $0.text) }
+      .filter { !$0.text.isEmpty }
+    self.draft = draft
+    return draft
   }
 
   private var normalizedURL: URL? {
