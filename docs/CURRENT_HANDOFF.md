@@ -1,9 +1,21 @@
 # Current Handoff
 
-Last updated: June 27, 2026.
+Last updated: June 30, 2026.
 
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
+
+## Ready Efforts
+
+- **Share Extension import does not refresh the library list** —
+  `docs/efforts/share-import-list-refresh.md`. Defect in M2 (Web Recipe Capture):
+  saving a recipe from the browser share sheet writes correctly but the list does
+  not update until relaunch, because the extension commits on a separate process
+  connection that the app's `@Fetch`/GRDB observation never hears. Effort is
+  scoped and ready for Codex: a Darwin-notification beacon in `YesChefCore` plus a
+  `scenePhase` backstop, reloading the five `AppContainer` models. Sync-safe (the
+  later `SyncEngine` path applies remote changes in-process and does not need this
+  bridge).
 
 ## Current Checkpoint
 

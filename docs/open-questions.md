@@ -65,6 +65,34 @@ Live ambiguities and recently-resolved decisions. Resolved items stay here brief
 - Does any high-value source need authenticated capture (ATK, Milk Street), and if
   so, when does that enter scope vs. the manual-HTML fallback?
 
+## Comment ingestion — top-ranked tips as recipe enrichment
+
+Feature interest noted 2026-06-30 (Jon), surfaced while sanitizing the ATK capture-DOM
+fixture. The want: pull a source's comments, sort by **Most Liked (ATK) / Most Helpful
+(NYT)**, and surface the top few for their *valuable advice* (e.g. "they spread too much —
+cut the sugar", "came out flat") — not the whole thread.
+
+- **The capture-DOM does not give us this — confirmed from the real artifact.** ATK
+  server-renders only the **first ~4 comments** into the page, in default **Newest** order;
+  the other ~1488 lazy-load via a JS/API call. So a static page capture yields neither the
+  volume nor the *ranking* the feature needs. "Most liked" is a different query than what
+  the DOM hands us.
+- **Two separable axes — don't conflate them:**
+  1. *How to obtain ranked comments.* Either **(a) user-driven in the in-app browser** —
+     tap "Most Liked," let it load, then a capture scrapes the rendered comment DOM (manual
+     sort + automated extract; brittle against hashed CSS-module classes like
+     `comments_commentText__3vCsW`), or **(b) per-site comments API** with a sort param
+     (reliable ranking, but per-site integration, possible auth/ToS gating, and *not*
+     generalizable the way `schema.org` JSON-LD is). Extraction itself is automatable —
+     same shape as the editorial-prose scrape.
+  2. *How to judge "valuable."* **Jon-reviews** (a review/share-sheet pass over the top N)
+     vs **LLM triage** that distills the top comments into a recipe note. Connects to the
+     already-noted photo→LLM fallback and the existing review-before-commit flow.
+- **Constraints:** comments are third-party user content — PII (display names/initials),
+  plus copyright/ToS questions for *storing and re-displaying* them, and a sanitization
+  step on ingest (the ATK capture already pulled in 4 commenters' names and Jon's own `JP`
+  avatar). Post-M3 enrichment idea; not in the current milestone arc.
+
 ## Menus / planning model
 
 - Does the Menus subsystem need its own ADR, and what is the canonical provenance
@@ -120,6 +148,40 @@ premature-abstraction trap. This **challenges §22A `RecipeFamily`** in
   variation (select the siblings) need batch selection, as do batch tag/categorize/trash.
   **Build it early and separately**, ahead of and independent from either relationship
   feature. Not in the current milestone arc; sequencing TBD.
+- **Sync-safe — these impose zero constraint on doing iCloud first (2026-06-30).** Every
+  primitive here is *purely additive*: new tables (family / cluster header / membership
+  joins) + at most a nullable column, all keyed on the existing `recipes.id` UUID. None
+  touch an existing synced column, recipe identity, or primary key — and CloudKit's
+  append-only schema only punishes *destructive* changes (delete/rename/retype/re-key),
+  not new record types or nullable fields. So sync can ship first deploying today's
+  schema, and RecipeFamily/clusters arrive later as a clean additive migration. The
+  synthetic-header decision helps here: the variation parent isn't a recipe, so it can't
+  perturb synced recipe records at all. **This is independent of the import-before-sync
+  gate** — that gate is about import *trustworthiness*, not relationship modeling.
+
+## Sequencing — after the browser milestone (the "fun features vs. the gate" tension)
+
+Named 2026-06-30, as M3 (authenticated browser capture) approaches close and attention
+turns to "what next."
+
+- **The pull:** iCloud sync is a *risk* (a solvable one — see the sync-safety note above
+  and [ADR-0002](decisions/ADR-0002-cloudkit-sync-no-server.md)), and risk is less fun
+  than building. More features and more data-model build-out (variation grouping,
+  families, collections) are the tempting next move precisely *because* they're lower-
+  stakes and more gratifying.
+- **Why that's a trap:** sync is also **backup**, and in Jon's "new world" durability
+  matters *now*, not just multi-device convergence. Every feature built *before* sync is
+  more un-backed-up data riding on a single device, and more surface that first-sync has
+  to carry into an effectively-irreversible private zone. Deferring the gate to chase
+  features increases the cost and risk of the eventually-unavoidable crossing.
+- **The counter-discipline:** the modeling work is provably sync-safe and bolts on
+  cleanly *after* sync (above), so there's no technical reason to front-load it. The only
+  thing that should gate sync is **import trustworthiness** — and if backup is now a
+  first-order goal, the honest question is "is import good enough to back up?", not "what
+  else can we build first?" Treat post-M3 as a deliberate re-decision of the
+  stabilize → import → **sync** order, with eyes open about the fun-vs-gate pull, rather
+  than drifting into feature work by default. "Soon-ish done with browser" is the moment
+  to make that call on purpose.
 
 ## House layer
 
