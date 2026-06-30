@@ -43,6 +43,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
   public var ingredientSections: [ParsedRecipeIngredientSection]
   public var instructionSections: [ParsedRecipeInstructionSection]
   public var imageURLs: [URL]
+  public var processedImages: [URL: ProcessedRecipePhoto]
   public var schemaTypes: [String]
   public var capturedAt: Date
   public var textExcerpt: String?
@@ -66,6 +67,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
     ingredientSections: [ParsedRecipeIngredientSection] = [],
     instructionSections: [ParsedRecipeInstructionSection] = [],
     imageURLs: [URL] = [],
+    processedImages: [URL: ProcessedRecipePhoto] = [:],
     schemaTypes: [String] = [],
     capturedAt: Date = Date(),
     textExcerpt: String? = nil,
@@ -88,6 +90,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
     self.ingredientSections = ingredientSections
     self.instructionSections = instructionSections
     self.imageURLs = imageURLs
+    self.processedImages = processedImages
     self.schemaTypes = schemaTypes
     self.capturedAt = capturedAt
     self.textExcerpt = textExcerpt
@@ -124,11 +127,18 @@ public struct ParsedRecipePage: Equatable, Sendable {
     let instructionSteps = makeInstructionSteps(recipeID: recipeID, sections: instructionSections, uuid: uuid)
     let photos = imageURLs.enumerated().map { index, url in
       let photoID = uuid()
+      let processedImage = processedImages[url]
       return RecipePhoto(
         id: photoID,
         recipeID: recipeID,
         imageDataReference: "recipePhotos/\(photoID.uuidString)",
+        displayData: processedImage?.displayData,
+        thumbnailData: processedImage?.thumbnailData,
+        mediaType: processedImage?.mediaType,
+        pixelWidth: processedImage?.pixelWidth,
+        pixelHeight: processedImage?.pixelHeight,
         sourceURL: url.absoluteString,
+        checksum: processedImage?.checksum,
         kind: index == 0 ? .hero : .gallery,
         source: .extracted,
         sortOrder: index,
