@@ -18,6 +18,7 @@ struct YesChefApp: App {
         }
       )
     }
+    DatabaseChangeBeacon.startObserving()
   }
 
   var body: some Scene {

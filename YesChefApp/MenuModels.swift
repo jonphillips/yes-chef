@@ -44,6 +44,11 @@ final class MenuLibraryModel {
       }
   }
 
+  func reloadAfterExternalChange() async {
+    try? await $menuRows.load()
+    try? await $recipeRows.load()
+  }
+
   func addMenuButtonTapped() {
     destination = .addMenu
   }

@@ -102,6 +102,7 @@ final class ShareCaptureModel {
           uuid: { makeUUID() }
         )
       }
+      DatabaseChangeBeacon.post()
       didSave = true
       extensionContext?.completeRequest(returningItems: nil)
     } catch is CancellationError {
