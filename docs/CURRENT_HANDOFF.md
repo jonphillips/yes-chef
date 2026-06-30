@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: June 30, 2026.
+Last updated: June 30, 2026 (hero image bytes merged — PR #43).
 
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
@@ -12,20 +12,31 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **Download hero image bytes for browser-captured recipes** —
-  `docs/efforts/hero-image-bytes.md`. M3 S5 follow-on: captured recipes show a placeholder
-  because photos are stored as `sourceURL` only, never downloaded. The hero is public
-  Cloudinary (no auth), so reuse the existing `RecipePhotoProcessor` pipeline the Paprika
-  path already uses. The brief carries verified anchors + design.
+- **Capture editorial prose blocks** ("Why This Recipe Works" / "Before You Begin") —
+  `docs/efforts/editorial-prose.md`. M3 S5 follow-on: schema-first parser drops the
+  editorial blocks because they live only in the page-body DOM, never in JSON-LD. Needs a
+  scoped DOM scrape mapped to recipe notes. The brief carries verified anchors + design.
 
 ## Ready Efforts (queue)
 
 Drawn into **Next Up** one at a time; this is not a dispatch target.
 
-1. **Capture editorial prose blocks** ("Why This Recipe Works" / "Before You Begin") —
-   `docs/efforts/editorial-prose.md` (M3 S5 follow-on; scoped DOM scrape, mapped to notes).
+1. **Show the hero image in the share-extension review UI** — `ShareCaptureReviewSections`
+   (`YesChefShareExtension/ShareViewController.swift`) renders text only; the draft is now
+   hydrated in `loadSharedPage`, so a preview can read
+   `draft.page.processedImages[heroURL]?.thumbnailData ?? .displayData`. Small, additive.
+2. **Real-device jetsam check for share-extension hero hydration** — the share extension runs
+   under a ~120 MB limit; a 12 MB download + `RecipePhotoProcessor` decode was never exercised
+   on device (simulator doesn't enforce jetsam). Validate with a large hero before this path is
+   leaned on; a memory kill is the one failure mode the `catch → return draft` fallback doesn't
+   cover. Carry-forward from PR #43 review.
 
 Comment ingestion stays in `docs/open-questions.md` until it is a scoped effort.
+
+**Looming fork (Jon's call, not a dispatch target):** with M3 capture follow-ons wrapping,
+the iCloud sync/backup gate is the next milestone — the one-way gate everything precedes.
+Editorial prose is the last queued M3 capture feature; weigh sync before pulling further
+feature work, since modeling is sync-safe and can follow.
 
 ## Current Checkpoint
 

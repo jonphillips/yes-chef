@@ -2,7 +2,7 @@
 
 **Type:** Feature gap (M3 — Authenticated Browser Capture; follow-on from Slice 5)
 **Owner:** Codex (implement) · Jon (architect/review)
-**Status:** Ready to scope into Next Up after the Share-Extension refresh effort merges
+**Status:** Next Up (promoted after hero image bytes merged — PR #43)
 
 ## Symptom
 
