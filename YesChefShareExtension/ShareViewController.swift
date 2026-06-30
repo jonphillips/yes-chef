@@ -79,7 +79,8 @@ final class ShareCaptureModel {
 
     do {
       let payload = try await ShareCaptureExtraction.payload(from: extensionContext)
-      draft = try await captureClient.capture(sharePayload: payload, capturedAt: now)
+      let capturedDraft = try await captureClient.capture(sharePayload: payload, capturedAt: now)
+      draft = await captureClient.hydrateHeroImage(in: capturedDraft)
     } catch is CancellationError {
     } catch {
       errorMessage = error.localizedDescription

@@ -77,6 +77,50 @@ extension RecipeCoreTests {
       expectNoDifference(hero.thumbnailData, nil)
     }
 
+    @Test
+    func sharePayloadHydratesHeroImageBeforeCommit() async throws {
+      @Dependency(\.defaultDatabase) var database
+      let sourceURL = try #require(URL(string: "https://example.com/recipes/shared-lemon-chicken-with-photo"))
+      let heroURL = try #require(URL(string: "https://example.com/images/lemon-chicken.jpg"))
+      let imageData = try Self.heroImageData()
+      let client = WebRecipeCaptureClient(
+        fetchHTML: { _ in throw WebRecipeCaptureClientError.unimplementedFetch },
+        renderHTML: { _ in nil },
+        fetchImageData: { url in
+          expectNoDifference(url, heroURL)
+          return imageData
+        }
+      )
+      let capturedAt = Date(timeIntervalSinceReferenceDate: 804_370_000)
+
+      let capturedDraft = try await client.capture(
+        sharePayload: WebRecipeSharePayload(
+          sourceURL: sourceURL,
+          renderedHTML: Self.jsonLDRecipe
+        ),
+        capturedAt: capturedAt
+      )
+      let draft = await client.hydrateHeroImage(in: capturedDraft)
+
+      let uuids = LockedSampleUUIDSequence(start: 27_700)
+      let result = try await database.write { db in
+        try RecipeRepository.importCapturedRecipe(
+          draft,
+          in: db,
+          now: capturedAt,
+          uuid: { uuids.next() }
+        )
+      }
+
+      try await database.read { db in
+        let photos = try RecipePhoto.fetchAll(db).filter { $0.recipeID == result.recipeID }
+        let hero = try #require(photos.first)
+        expectNoDifference(hero.sourceURL, heroURL.absoluteString)
+        expectNoDifference(hero.displayData != nil, true)
+        expectNoDifference(hero.thumbnailData != nil, true)
+      }
+    }
+
     private static func heroImageData() throws -> Data {
       try Data(contentsOf: fixtureURL.appendingPathComponent("PaprikaHTML/SanitizedRealExport/Recipes/Images/simple/hero.jpg"))
     }
