@@ -1,4 +1,5 @@
 import SwiftUI
+import WebExtractorKit
 import YesChefCore
 
 struct RecipeCaptureView: View {
@@ -26,6 +27,13 @@ struct RecipeCaptureView: View {
           .labelStyle(.titleAndIcon)
 
           Spacer()
+
+          Button {
+            model.isPresentingBrowser = true
+          } label: {
+            Label("Open in browser", systemImage: "safari")
+          }
+          .disabled(model.isCommitting)
 
           Button {
             Task { await model.fetchButtonTapped() }
@@ -76,6 +84,16 @@ struct RecipeCaptureView: View {
     } message: {
       Text(model.errorMessage ?? "")
     }
+    .fullScreenCover(isPresented: $model.isPresentingBrowser) {
+      WebExtractorBrowser(
+        startURL: model.browserStartURL,
+        title: "Capture from Site",
+        confirmLabel: "Capture",
+        onExtract: { html, url in
+          model.ingestBrowserCapture(html: html, sourceURL: url)
+        }
+      )
+    }
   }
 }
 
@@ -109,6 +127,11 @@ private struct RecipeCaptureReviewSections: View {
       if draft.usedRenderedFallback {
         LabeledContent("Fetch") {
           Text("Rendered page")
+        }
+      }
+      if draft.capturedInBrowser {
+        LabeledContent("Fetch") {
+          Text("Captured in browser")
         }
       }
     }

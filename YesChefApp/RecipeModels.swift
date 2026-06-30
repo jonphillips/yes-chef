@@ -1,6 +1,7 @@
 import CasePaths
 import Observation
 import SwiftUI
+import WebExtractorKit
 import YesChefCore
 
 @Observable
@@ -292,6 +293,7 @@ final class RecipeCaptureModel {
   var draft: WebRecipeCaptureDraft?
   var errorMessage: String?
   var isShowingError = false
+  var isPresentingBrowser = false
   var isFetching = false
   var isCommitting = false
 
@@ -308,6 +310,7 @@ final class RecipeCaptureModel {
     draft = nil
     errorMessage = nil
     isShowingError = false
+    isPresentingBrowser = false
     isFetching = false
     isCommitting = false
   }
@@ -333,6 +336,19 @@ final class RecipeCaptureModel {
     }
   }
 
+  func ingestBrowserCapture(html: String, sourceURL: URL?) -> WebExtractionOutcome {
+    let capturedDraft = captureClient.browserCapture(
+      html: html,
+      sourceURL: sourceURL,
+      capturedAt: now
+    )
+    guard capturedDraft.isUsable else {
+      return .notFound(message: "No recipe found on this page - sign in or open the recipe, then try again.")
+    }
+    draft = capturedDraft
+    return .extracted
+  }
+
   func commitButtonTapped() async -> RecipeImportBundleResult? {
     guard let draft else { return nil }
     isCommitting = true
@@ -355,6 +371,13 @@ final class RecipeCaptureModel {
       showError(String(describing: error))
       return nil
     }
+  }
+
+  var browserStartURL: URL {
+    if let normalizedURL {
+      return normalizedURL
+    }
+    return WebAddress.duckDuckGo("recipe") ?? URL(string: "https://duckduckgo.com")!
   }
 
   private var normalizedURL: URL? {
