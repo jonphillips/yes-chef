@@ -2,6 +2,7 @@ import CasePaths
 import Observation
 import SwiftUI
 import WebExtractorKit
+import WebKit
 import YesChefCore
 
 @Observable
@@ -275,6 +276,51 @@ struct PaprikaRecipeImportDraft: Identifiable {
 struct RecipeImportCommitResult {
   var summary: RecipeImportSummary
   var selectedRecipeID: Recipe.ID?
+}
+
+@Observable
+@MainActor
+final class BrowserModel {
+  let page = WebPage.browser()
+  var recents: [URL] = []
+  var notice: String?
+  var isCapturing = false
+
+  func recordRecent(_ url: URL) {
+    recents.removeAll { $0.absoluteString == url.absoluteString }
+    recents.insert(url, at: 0)
+    if recents.count > 12 {
+      recents.removeSubrange(12...)
+    }
+  }
+
+  func captureButtonTapped(
+    page: WebPage,
+    ingest: (String, URL?) async -> WebExtractionOutcome
+  ) async -> WebExtractionOutcome {
+    isCapturing = true
+    notice = nil
+    defer { isCapturing = false }
+
+    guard let html = await page.currentDOM(), !html.isEmpty else {
+      let message = "Couldn't read this page - try again once it's loaded."
+      notice = message
+      return .notFound(message: message)
+    }
+
+    let outcome = await ingest(html, page.url)
+    switch outcome {
+    case .extracted:
+      notice = nil
+    case .notFound(let message):
+      notice = message
+    }
+    return outcome
+  }
+
+  func noticeDismissButtonTapped() {
+    notice = nil
+  }
 }
 
 @Observable
