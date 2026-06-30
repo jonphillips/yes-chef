@@ -3,6 +3,11 @@ import YesChefCore
 
 struct OriginalSnapshotView: View {
   let recipe: Recipe?
+#if DEBUG
+  @State private var originalImportDOMExport: OriginalImportDOMExport?
+  @State private var originalImportDOMExportError: String?
+  @State private var isShowingOriginalImportDOMExportError = false
+#endif
 
   private var snapshot: RecipeBundleCoding.Snapshot? {
     guard let data = recipe?.originalSnapshot else { return nil }
@@ -47,8 +52,71 @@ struct OriginalSnapshotView: View {
       }
     }
     .navigationTitle("Original")
+#if DEBUG
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        if let originalImportDOMExport {
+          ShareLink(item: originalImportDOMExport.fileURL) {
+            Label("Export DOM", systemImage: "square.and.arrow.up")
+          }
+        }
+      }
+    }
+    .task(id: recipe?.id) {
+      prepareOriginalImportDOMExport()
+    }
+    .alert("Could Not Export DOM", isPresented: $isShowingOriginalImportDOMExportError) {
+      Button("OK") {}
+    } message: {
+      Text(originalImportDOMExportError ?? "")
+    }
+#endif
   }
+
+#if DEBUG
+  private func prepareOriginalImportDOMExport() {
+    do {
+      originalImportDOMExport = try Self.makeOriginalImportDOMExport(for: recipe)
+      originalImportDOMExportError = nil
+      isShowingOriginalImportDOMExportError = false
+    } catch {
+      originalImportDOMExport = nil
+      originalImportDOMExportError = String(describing: error)
+      isShowingOriginalImportDOMExportError = true
+    }
+  }
+
+  private static func makeOriginalImportDOMExport(for recipe: Recipe?) throws -> OriginalImportDOMExport? {
+    guard let recipe, let html = recipe.originalImportText, !html.isEmpty else { return nil }
+
+    let directoryURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("YesChefDebugDOMExports", isDirectory: true)
+    try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+
+    let fileURL = directoryURL
+      .appendingPathComponent("\(slug(for: recipe.title))-\(recipe.id.uuidString).html")
+    try html.write(to: fileURL, atomically: true, encoding: .utf8)
+    return OriginalImportDOMExport(fileURL: fileURL)
+  }
+
+  private static func slug(for title: String) -> String {
+    let slug = String(title
+      .lowercased()
+      .map { character in
+        character.isLetter || character.isNumber ? character : "-"
+      }
+      .split(separator: "-")
+      .joined(separator: "-"))
+    return slug.isEmpty ? "recipe" : slug
+  }
+#endif
 }
+
+#if DEBUG
+private struct OriginalImportDOMExport {
+  var fileURL: URL
+}
+#endif
 
 private struct SnapshotSection: View {
   let title: String
@@ -66,4 +134,3 @@ private struct SnapshotSection: View {
     }
   }
 }
-
