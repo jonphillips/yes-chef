@@ -2,7 +2,7 @@
 
 **Type:** Defect fix (M2 — Web Recipe Capture)
 **Owner:** Codex (implement) · Jon (architect/review)
-**Status:** Ready to implement
+**Status:** Done — merged in #42 (2026-06-30)
 
 ## Symptom
 

@@ -12,24 +12,20 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **Refresh the library list after a Share Extension import** —
-  `docs/efforts/share-import-list-refresh.md`. M2 defect: a recipe saved from the
-  browser share sheet writes correctly but the list does not refresh until relaunch
-  (the extension commits on a separate process connection the app's `@Fetch`/GRDB
-  observation never hears). The brief carries the verified root cause and design.
+- **Download hero image bytes for browser-captured recipes** —
+  `docs/efforts/hero-image-bytes.md`. M3 S5 follow-on: captured recipes show a placeholder
+  because photos are stored as `sourceURL` only, never downloaded. The hero is public
+  Cloudinary (no auth), so reuse the existing `RecipePhotoProcessor` pipeline the Paprika
+  path already uses. The brief carries verified anchors + design.
 
 ## Ready Efforts (queue)
 
-Drawn into **Next Up** one at a time; this is not a dispatch target. Ordered, most-ready
-first:
+Drawn into **Next Up** one at a time; this is not a dispatch target.
 
-1. **Download hero image bytes for browser-captured recipes** —
-   `docs/efforts/hero-image-bytes.md` (M3 S5 follow-on; reuses the Paprika photo pipeline).
-2. **Capture editorial prose blocks** ("Why This Recipe Works" / "Before You Begin") —
-   `docs/efforts/editorial-prose.md` (M3 S5 follow-on; scoped DOM scrape).
+1. **Capture editorial prose blocks** ("Why This Recipe Works" / "Before You Begin") —
+   `docs/efforts/editorial-prose.md` (M3 S5 follow-on; scoped DOM scrape, mapped to notes).
 
-Both unblock once the Share-Extension refresh effort merges; promote the top one to **Next
-Up** then. Comment ingestion stays in `docs/open-questions.md` until it is a scoped effort.
+Comment ingestion stays in `docs/open-questions.md` until it is a scoped effort.
 
 ## Current Checkpoint
 
