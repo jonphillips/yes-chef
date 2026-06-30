@@ -20,10 +20,16 @@ task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
 ## Ready Efforts (queue)
 
-Drawn into **Next Up** one at a time; this is not a dispatch target. Nothing queued
-beyond Next Up yet — the M3 S5 follow-on briefs (hero image bytes, editorial prose)
-land here when the architect promotes them. Comment ingestion stays in
-`docs/open-questions.md` until it is a scoped effort.
+Drawn into **Next Up** one at a time; this is not a dispatch target. Ordered, most-ready
+first:
+
+1. **Download hero image bytes for browser-captured recipes** —
+   `docs/efforts/hero-image-bytes.md` (M3 S5 follow-on; reuses the Paprika photo pipeline).
+2. **Capture editorial prose blocks** ("Why This Recipe Works" / "Before You Begin") —
+   `docs/efforts/editorial-prose.md` (M3 S5 follow-on; scoped DOM scrape).
+
+Both unblock once the Share-Extension refresh effort merges; promote the top one to **Next
+Up** then. Comment ingestion stays in `docs/open-questions.md` until it is a scoped effort.
 
 ## Current Checkpoint
 
