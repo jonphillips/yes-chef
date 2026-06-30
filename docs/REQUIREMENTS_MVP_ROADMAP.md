@@ -948,11 +948,58 @@ Builds on the import payload from Milestone 2 — transfer is just another impor
 - Carry sender name as a plain provenance string.
 - Tests: round-trip a recipe (export → import) and assert an independent copy.
 
-### Milestone 7: Family Cookbook (Phase 2 transfer — later)
+### Milestone 7: Private-DB Sync (CloudKit private database)
+
+The gate everything multi-device depends on. Sync each person's library across **their
+own devices** via CloudKit's **private** database using SQLiteData's built-in sync — no
+server, no auth, no sharing yet (ADR-0002). Deferred through the local milestones, but
+the schema has obeyed its rules from the first table; this milestone turns it on.
+
+- Enable SQLiteData CloudKit sync against the private database; the iCloud account is
+  the identity (no login/registration UI).
+- Verify the **CloudKit invariants** the schema already commits to: UUID primary keys
+  everywhere, **no unique indexes** beyond the primary key, and **dedup-on-read** for
+  logically-unique entities (two of one person's devices editing offline can each
+  insert a duplicate — pick one row per key deterministically, clean up the losers).
+- Audit and harden the **soft cross-record FKs** that were parked here:
+  `menuItems.recipeID`, `mealPlanItems.recipeID`, `groceryItemSources.recipeID` — they
+  must tolerate dangling/not-yet-synced/deduped references on read.
+- Test eventual-consistency behavior on real devices (no server logs to lean on).
+
+This is the **one-way gate**: the Family Cookbook (sharing) and Curated Collections
+(cross-device editorial references) both sit behind it. Requires a paid Apple Developer
+membership.
+
+### Milestone 8: Family Cookbook (Phase 2 transfer — later)
 
 The browsable shared surface. The only part of the app that uses CloudKit *sharing*
 (a shared zone the family joins once). Build after the private library + send are
 solid — see §9 Future Differentiators.
+
+### Milestone 9: Curated Collections (editorial indexes — post-sync)
+
+A user-authored, birds-eye view of part of the library: e.g. a "Mexican" index with an
+ordered list of taco recipes, then salsas, in the cook's own grouping and order.
+Replaces the Paprika description-field hack (grouped title-match links in prose) with
+structured, reorderable data and stable recipe references. See
+[ADR-0008](decisions/ADR-0008-curated-collections.md) for the entity and sync-safety
+decisions.
+
+- New `Collection` → `CollectionSection` → `CollectionItem` entity, a sibling of `Menu`
+  (not an overload of it, not a reinterpretation of `Category`).
+- Curated editor: add/reorder sections and recipe items, plus freeform `note` items.
+- Read view: the rendered index surface.
+- Stable references with `recipeID` as a soft FK and a denormalized title snapshot, so
+  entries survive a missing/unsynced/deduped recipe (ADR-0002, ADR-0008).
+- Manual membership first; optional per-section category/tag smart-seed rules layered on
+  later (schema fields reserved from the first migration).
+- Composes with the hierarchical category tree (§ Hierarchical Recipe Categories) as a
+  membership source rather than duplicating it.
+
+Sequencing is **provisional**: this depends on private-DB sync (M7) being live (for the
+cross-device reference tolerance ADR-0008 reserves) and is otherwise independent of the
+Family Cookbook (M8). Its position relative to M8 — and whether it lands before sharing —
+is open for refinement when next steps are planned.
 
 ## 12. Quality Bar
 

@@ -6,7 +6,8 @@ The strategic arc for Yes Chef. Concrete, Codex-ready build orders live in
 ## Why this doc re-baselines the roadmap
 
 `REQUIREMENTS_MVP_ROADMAP.md §11` staged the build as M0 setup → M1 library → M2
-import → M3 scaling/cooking → M4 grocery → M5 meal planning → M6 send → M7 family.
+import → M3 scaling/cooking → M4 grocery → M5 meal planning → M6 send → M7 sync →
+M8 family → M9 collections.
 The repository no longer matches that numbering. Working solo (PRs #1–#5, all
 self-merged, with **no `milestones/` build orders ever in place**), the executor has
 already built well past and out of order from that plan:
