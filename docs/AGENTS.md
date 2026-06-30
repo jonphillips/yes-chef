@@ -9,6 +9,43 @@ It is inspired by Paprika-style recipe management but is not intended to be a di
 ## House Style and Guidelines
 Shared style and architectural guidelines are available in ~/code/jon-platform directory. Start with AGENTS.md there. Nothing in this document should override those guidelines unless we discuss. If you cannot access this directory and information, you must alert me.
 
+## Work Intake & Dispatch
+
+There is **one front door** for "what do I work on": `docs/CURRENT_HANDOFF.md`. Work flows
+through a single funnel, not two competing plans:
+
+```
+docs/open-questions.md  → ideas, unscoped (e.g. comment ingestion)
+docs/milestones/*.md    → the strategic arc/plan (milestones + ordered slices; the sync gate)
+docs/efforts/*.md       → scoped, ready-to-build briefs (a milestone slice OR an off-arc item)
+docs/CURRENT_HANDOFF.md → the dispatcher: Next Up (one item) + Ready Efforts (the queue)
+a pull request          → the handoff out
+```
+
+An **"effort"** is the executable unit of work. It is the generalization of a milestone-slice
+handoff to also cover work the milestone arc cannot express (defects, spin-offs). A milestone
+slice, when approved to build, *becomes* an effort — usually a thin pointer
+("M3 Slice 6 — build per the milestone doc §Slice 6, plus these deltas"), never re-specced.
+
+`CURRENT_HANDOFF.md` has two distinct parts:
+
+- **Next Up** — exactly **one** designated effort, named, with a pointer to its brief. This is
+  the single dispatch target. Jon and the architect curate it; the coding agent never chooses it.
+- **Ready Efforts** — the ordered queue of scoped, ready briefs. Not a dispatch target; it is
+  where Next Up is drawn from.
+
+Rules:
+
+1. **Dispatch trigger.** Jon dispatches with: *"Do the Next Up effort in `docs/CURRENT_HANDOFF.md`."*
+   The coding agent reads `Next Up`, opens the referenced brief, and implements that — nothing else.
+2. **Never infer the next task.** If `Next Up` is empty, missing, or ambiguous, **STOP and ask
+   Jon.** Do not pick from Ready Efforts, the milestone doc, or anywhere else on your own.
+3. **Curation is the architect's job.** When an effort merges or a slice is approved, the
+   architect proposes the promotion and writes the new `Next Up` pointer + brief. Detail lives in
+   the effort brief (or the milestone slice it points to), not in chat.
+4. **The handoff points, it does not duplicate.** For slices already specced in a milestone doc,
+   the brief references that section rather than copying it, so there is one source of truth.
+
 ## Development Priorities
 
 Follow these priorities in order:

@@ -5,17 +5,25 @@ Last updated: June 30, 2026.
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
 
-## Ready Efforts
+## Next Up
 
-- **Share Extension import does not refresh the library list** —
-  `docs/efforts/share-import-list-refresh.md`. Defect in M2 (Web Recipe Capture):
-  saving a recipe from the browser share sheet writes correctly but the list does
-  not update until relaunch, because the extension commits on a separate process
-  connection that the app's `@Fetch`/GRDB observation never hears. Effort is
-  scoped and ready for Codex: a Darwin-notification beacon in `YesChefCore` plus a
-  `scenePhase` backstop, reloading the five `AppContainer` models. Sync-safe (the
-  later `SyncEngine` path applies remote changes in-process and does not need this
-  bridge).
+**Single dispatch target.** Dispatch to the coding agent with:
+*"Do the Next Up effort in `docs/CURRENT_HANDOFF.md`."* If this section is empty,
+missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
+task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
+
+- **Refresh the library list after a Share Extension import** —
+  `docs/efforts/share-import-list-refresh.md`. M2 defect: a recipe saved from the
+  browser share sheet writes correctly but the list does not refresh until relaunch
+  (the extension commits on a separate process connection the app's `@Fetch`/GRDB
+  observation never hears). The brief carries the verified root cause and design.
+
+## Ready Efforts (queue)
+
+Drawn into **Next Up** one at a time; this is not a dispatch target. Nothing queued
+beyond Next Up yet — the M3 S5 follow-on briefs (hero image bytes, editorial prose)
+land here when the architect promotes them. Comment ingestion stays in
+`docs/open-questions.md` until it is a scoped effort.
 
 ## Current Checkpoint
 
@@ -137,7 +145,11 @@ Latest verification:
   `CoreSimulatorService`/`simdiskimaged` became unavailable during the last
   attempt after the iPad build succeeded.
 
-## Recommended Next Larger Task
+## Strategic Context (not a dispatch target)
+
+> Background only — **not** what the coding agent works on next. Dispatch always comes from
+> **Next Up** above. This section captures where the larger work is heading so the architect
+> can curate Next Up; it never instructs the agent directly.
 
 Do Jon's primary UI pass on the new menu/calendar planning interactions, then
 return to grocery generation and shopping workflow polish around the visible
