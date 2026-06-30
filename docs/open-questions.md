@@ -79,6 +79,48 @@ Live ambiguities and recently-resolved decisions. Resolved items stay here brief
 - Can the private CloudKit zone be reset cheaply if a bad import does sync, or must
   we treat first-sync as effectively irreversible?
 
+## Recipe relationships — suppression vs. variation vs. collection
+
+Design discussion 2026-06-30. The thesis: these are **three distinct primitives that
+differ on *who does the managing***, and the tempting unification is the classic
+premature-abstraction trap. This **challenges §22A `RecipeFamily`** in
+[DATA_MODEL.md](DATA_MODEL.md), which currently bundles the first two into one entity
+(an optional `preferredRecipeID` + a role-discriminated `RecipeFamilyMember` join).
+
+1. **Suppression / preferred-canonical** — *rivals* (substitutes): the "one true
+   chocolate-chip cookie" with the also-rans hidden but kept. **Asymmetric**: one real
+   winner that lives in the main library, losers suppressed yet available for
+   comparison. Parent **is a real recipe**. Managed: *you, once* (crown the winner).
+2. **Variation cluster** — *siblings* (complements) on a shared base: Cook's Illustrated
+   "Sugar Snap Peas with {almond+orange / pine-nut+lemon / sesame+ginger}". **Symmetric**:
+   all members stay visible, **no winner**. Membership asserted **manually** (multi-select
+   → "group as variations") — precise, never auto-derived, so no false clusters across
+   2,115 recipes. Parent is a **synthetic display header, NOT a real recipe and NOT a
+   `preferredRecipeID`** (don't mint a phantom recipe / pollute the count). Label is
+   **LLM-proposed** (the *shared theme* — ingredient **or** technique **or** form, kept
+   general), human-overridable, cached once, never re-derived on render. Grouping is
+   rendered **at display time** (tall parent row + smaller child links). Managed:
+   *nobody ongoing* — the list draws it.
+3. **Curated collection** — hand-authored, ordered, sectioned editorial index
+   ([ADR-0008](decisions/ADR-0008-curated-collections.md)). Managed: *you, ongoing*.
+
+- **Position: don't unify suppression and variation by default.** They differ in
+  cardinality (asymmetric vs. symmetric), parent semantics (real winner vs. synthetic
+  header), and lifecycle (crown a winner vs. curate a peer family). §22A's role-enum +
+  `preferredRecipeID` shape fits suppression but mis-fits variation. Let whichever ships
+  first stand alone; only unify if the second *proves* shared structure. The tell that
+  they're secretly one concept: wanting the variation parent to be "the best of the
+  three" — that's primacy, i.e. suppression leaking back in.
+- **Open — concrete model decision:** split §22A into two entities, or keep one entity
+  with two display policies (collapse-to-preferred vs. expand-as-cluster)? Defer until
+  the first of the two ships.
+- **Shared prerequisite — multi-select in the recipe list.** The list is **single-select
+  today** ([RecipeLibraryView.swift:728](../YesChefApp/RecipeLibraryView.swift)
+  `List(selection: $model.selectedRecipeID)`). Both suppression (select the losers) and
+  variation (select the siblings) need batch selection, as do batch tag/categorize/trash.
+  **Build it early and separately**, ahead of and independent from either relationship
+  feature. Not in the current milestone arc; sequencing TBD.
+
 ## House layer
 
 - Any of these resolutions that generalize beyond Yes Chef (e.g. the

@@ -1480,6 +1480,12 @@ Make margarita base
 
 22A. RecipeFamily
 
+> **Contested (2026-06-30).** This entity bundles two relationships that a design
+> discussion argues are distinct primitives — *suppression* (rivals, one real winner,
+> losers hidden) and *variation clustering* (siblings, all visible, a synthetic header,
+> manual membership + LLM-derived label). See open-questions.md → "Recipe relationships —
+> suppression vs. variation vs. collection" before building from the shape below.
+
 22A.1 Purpose
 
 Future entity for grouping recipes that are variants or source material for the same
