@@ -1,13 +1,18 @@
 # Current Handoff
 
-Last updated: July 1, 2026 (**Cleanup slice (PR #54) architect-approved and merged** — bounded the
-hero-image download via true streaming (`URLSession.bytes(for:)` with a running byte-count guard,
-not just an early `Content-Length` check), fixed the orphan-heading fallback gap, and de-duplicated
-the print/body ingredient extraction paths in `RecipeMilkStreetExtractor`. **Next up is dispatching
-NYT "Reader Feedback"** — confirmed as the next milestone. Two-device sync dogfooding is parked —
-blocked on Apple shipping iOS Beta 3 (Jon isn't putting an earlier beta on his primary phone) and the
-feedback from the simulator pass Jon already has needs a few more days to marinate before it should
-drive scope — so it isn't gating the next dispatch.)
+Last updated: July 1, 2026 (**Reader Feedback Slice 1 (PR #55) architect-approved and merged** —
+confirmation-dialog-gated Cancel plus `interactiveDismissDisabled`/`isModalInPresentation` for the
+in-app capture sheet and share-extension review, keyed off a new `hasUnsavedReviewChanges`.
+Architect review caught a gap before sign-off: the dismiss-guard excluded `isCommitting`, so
+swipe-to-dismiss stayed unlocked during the in-flight save/CloudKit-sync-wait even though the
+toolbar Cancel button was independently disabled for that state. **The fix (commit `51cfed1`) was
+pushed directly to `main` as a follow-up** — it was committed locally but not pushed before PR #55's
+merge button was clicked, so the merged PR briefly shipped without it; confirmed fixed on `main` now,
+108 tests green. **Next up is Slice 2** — harvesting a real NYT "Most Helpful, fully loaded"
+comment-thread DOM fixture — but it's **not yet a Codex dispatch target**: it needs Jon to capture
+the post-interaction DOM and hand it to the architect for sanitization first, same pattern as every
+prior authenticated-site fixture. Two-device sync dogfooding stays parked — blocked on Apple shipping
+iOS Beta 3 and Jon's simulator-pass feedback still marinating — so it isn't gating the next dispatch.)
 
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
@@ -19,15 +24,16 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **Dispatch NYT "Reader Feedback"** — comment ingestion + LLM curation,
-  `docs/efforts/reader-feedback-comment-ingestion.md`. New, larger effort: in-app
-  `WebPage` browser playbook to scrape "Most Helpful" comments (anonymized at
-  extraction), first client-side LLM integration (personal Claude API key, Keychain),
-  global editable curation prompt in Settings, new `RecipeNoteType.readerFeedback`.
-  Six-slice build order in the doc, starting with review-sheet dismiss-fragility
-  hardening. Explicitly designed so the LLM curates (selects/trims distinct quoted
-  tips) rather than synthesizes them into a flattened consensus summary. **Confirmed as the
-  next milestone (Jon, 2026-07-01)** — cleanup slice landed (PR #54), dispatch this now.
+- **Reader Feedback Slice 2 — harvest the real NYT comment-thread fixture.**
+  `docs/efforts/reader-feedback-comment-ingestion.md` §Slice 2. **Blocked, not a Codex
+  dispatch target yet:** needs Jon to sort an authenticated NYT Cooking recipe to Most
+  Helpful, click Load More a few times, and pull the live DOM off-device (Web Inspector →
+  Copy Element on `<html>`, not View Source — the comments are JS-loaded, so the
+  server-rendered source won't have them). Architect sanitizes (scrub cookies/tokens/account
+  markup/commenter PII) into
+  `Tests/YesChefCoreTests/Fixtures/WebRecipeCapture/SanitizedSites/nyt-comments.html`. Once
+  that fixture lands, **Slice 3** (named "Load Comments" browser playbook + host-keyed
+  comment extractor) becomes the real Next Up for Codex.
 
   **Still parked (not dispatched):**
   - **Dogfood the core loop on two devices** — capture ~15–20 real recipes via the extension, cook
@@ -40,6 +46,20 @@ task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
     pantry thresholds, dialog-free); spec = [[grocery-pantry-threshold-design]] (Phase E). Lower
     priority than Reader Feedback per Jon's stated intent (2026-07-01).
   - Full context in the `post-sync-next-tracks` memory.
+
+Reader Feedback Slice 1 — review-sheet dismiss-fragility hardening — **DONE** (PR #55,
+`codex/reader-feedback-review-dismiss-hardening`; architect-approved and merged 2026-07-01):
+destructive-confirmation `confirmationDialog` on Cancel plus `interactiveDismissDisabled` (in-app) /
+`isModalInPresentation` (share extension) while a draft is under review, both driven by a new
+`hasUnsavedReviewChanges` on `RecipeCaptureModel`/`ShareCaptureModel`. Architect review found
+`hasUnsavedReviewChanges` excluded `isCommitting`, leaving swipe-to-dismiss enabled during the async
+save (and, in the share extension, through the `waitForPendingRecordZoneChanges` sync wait) even
+though the toolbar Cancel button was independently disabled for that state — a mid-save swipe could
+let the user dismiss while the import still completed in the background and later popped an
+unexpected `.captureSummary` sheet. Fixed by dropping the redundant `!isCommitting` clause (it can
+only be `true` while `draft != nil`, so it added no protection, only the gap) — landed as commit
+`51cfed1` directly on `main` since it was committed locally but not pushed before the PR merge
+button was clicked. 108 tests pass, swiftlint clean.
 
 Web-capture cleanup slice — **DONE** (PR #54, `codex/web-capture-cleanup-nits`; architect-approved
 and merged 2026-07-01): `WebRecipeCaptureClient.fetchImageData` now streams the hero-image download
