@@ -58,7 +58,9 @@ struct RecipeCaptureView: View {
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {
         Button("Cancel") {
-          dismiss()
+          if model.cancelButtonTapped() {
+            dismiss()
+          }
         }
         .disabled(model.isCommitting)
       }
@@ -85,6 +87,19 @@ struct RecipeCaptureView: View {
     } message: {
       Text(model.errorMessage ?? "")
     }
+    .confirmationDialog(
+      "Discard this captured recipe?",
+      isPresented: $model.isShowingDiscardConfirmation,
+      titleVisibility: .visible
+    ) {
+      Button("Discard Capture", role: .destructive) {
+        dismiss()
+      }
+      Button("Keep Editing", role: .cancel) {}
+    } message: {
+      Text("Your review edits have not been saved.")
+    }
+    .interactiveDismissDisabled(model.hasUnsavedReviewChanges)
     .fullScreenCover(isPresented: $model.isPresentingBrowser) {
       WebExtractorBrowser(
         startURL: model.browserStartURL,
