@@ -229,7 +229,10 @@ extension RecipeCoreTests {
         let recipe = try #require(try Recipe.find(importResult.recipeID).fetchOne(db))
         let source = try #require(try RecipeSource.fetchAll(db).first { $0.recipeID == recipe.id })
         expectNoDifference(recipe.title, "Lemon Chicken")
-        expectNoDifference(recipe.originalImportText, nil)
+        expectOriginalImportTextForCurrentBuild(
+          recipe.originalImportText,
+          contains: "Lemon Chicken"
+        )
         expectNoDifference(source.url, sourceURL.absoluteString)
       }
     }
@@ -442,7 +445,10 @@ extension RecipeCoreTests {
           let recipe = try #require(try Recipe.find(firstResult.recipeID).fetchOne(db))
           let source = try #require(try RecipeSource.fetchAll(db).first { $0.recipeID == recipe.id })
           expectNoDifference(recipe.title, siteCase.expectedTitle)
-          expectNoDifference(recipe.originalImportText, nil)
+          expectOriginalImportTextForCurrentBuild(
+            recipe.originalImportText,
+            contains: siteCase.expectedTitle
+          )
           expectNoDifference(source.name, siteCase.expectedSourceName)
           expectNoDifference(source.url, siteCase.sourceURL.absoluteString)
         }
@@ -527,7 +533,11 @@ extension RecipeCoreTests {
       try await database.read { db in
         let recipe = try #require(try Recipe.find(result.recipeID).fetchOne(db))
         expectNoDifference(recipe.title, "Caf\u{00E9} Breakfast Toast")
-        expectNoDifference(recipe.originalImportText, nil)
+        expectOriginalImportTextForCurrentBuild(
+          recipe.originalImportText,
+          encodedAs: .isoLatin1,
+          matches: data
+        )
       }
 
       let preservingUUIDs = LockedSampleUUIDSequence(start: 27_100)
@@ -620,6 +630,29 @@ extension RecipeCoreTests {
     }
 
   }
+}
+
+private func expectOriginalImportTextForCurrentBuild(
+  _ originalImportText: String?,
+  contains text: String
+) {
+#if DEBUG
+  expectNoDifference(originalImportText?.contains(text), true)
+#else
+  expectNoDifference(originalImportText, nil)
+#endif
+}
+
+private func expectOriginalImportTextForCurrentBuild(
+  _ originalImportText: String?,
+  encodedAs encoding: String.Encoding,
+  matches data: Data
+) {
+#if DEBUG
+  expectNoDifference(originalImportText?.data(using: encoding), data)
+#else
+  expectNoDifference(originalImportText, nil)
+#endif
 }
 
 private struct SanitizedSiteCase {
