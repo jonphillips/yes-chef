@@ -1,11 +1,12 @@
 # Current Handoff
 
-Last updated: July 1, 2026 (**Milk Street sections/Tip/summary/time (PR #52) and the DEBUG Export
-DOM revival (PR #51) both architect-approved and merged.** Three of four follow-on gaps from PR #50
-dogfooding are fixed and fixture-tested: Tip callout, real per-recipe summary outranking site
-boilerplate, and servings/cook-time (with a unicode-vulgar-fraction normalizer for values like
-`"1½ hours"`). The fourth — ingredient subsection headings — is **not** a missing-markup limitation;
-architect review root-caused it as a branch-selection bug, see Next Up below.)
+Last updated: July 1, 2026 (**Milk Street print-template ingredient headings (PR #53)
+architect-approved and merged, closing out the Milk Street parsing-quality track.** Next up is a
+small cleanup slice bundling a deferred hero-image memory guard with two non-blocking nits from the
+#53 review; after that the plan is to turn to the NYT "Reader Feedback" effort. Two-device sync
+dogfooding is parked — blocked on Apple shipping iOS Beta 3 (Jon isn't putting an earlier beta on
+his primary phone) and the feedback from the simulator pass Jon already has needs a few more days
+to marinate before it should drive scope — so it isn't gating the next two dispatches.)
 
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
@@ -17,42 +18,65 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **Fix ingredient-subsection headings dropped on the print-template path** —
-  `RecipeMilkStreetExtractor.extract` (`RecipeMilkStreetExtractor.swift:22-34`) tries
-  `extractIngredients` against `RecipePrintTemplate_*` selectors first, and only falls back to
-  `extractBodyIngredients` (the function PR #52 taught to recognize
-  `RecipeBodyContent_ingredientSectionHeadingItemContainer__*` / `LineHeading_title__*` headings)
-  when the print-template pass finds **zero** ingredients. Jon's own gochujang capture (PR #50's
-  fixture) proves real Milk Street pages render `RecipePrintTemplate_*` markup with amount+
-  description pairs, so on his chicken-peanut capture the print-template branch almost certainly
-  succeeded and the body fallback — the only place that understands headings — never ran.
-  Ingredients came through; headings silently didn't. This is a code gap, not a Milk Street
-  display limitation. **The real DOM export already exists** — Jon gave Codex the chicken-peanut
-  recipe via the DEBUG "Export DOM" button (just revived in PR #51) on the booted iPad Pro
-  simulator (`iPad Pro 13-inch (M5) (16GB)`, UDID `B9E64A9C-0D66-4061-A3B6-39AB8E0A806F`); pull it
-  from that simulator's filesystem rather than asking Jon to re-capture. Inspect the print-template
-  markup for heading rows (may use a different class than `LineHeading_title__`); either teach
-  `extractIngredients`'s print-template path to recognize them the same way `extractBodyIngredients`
-  does, or restructure so heading detection isn't fallback-only. Extend
-  `milk-street-chicken-peanut.html`/its test to cover the print-template branch specifically (the
-  current fixture only exercises `RecipeBodyContent_*`, which is why this branch-selection bug
-  passed CI).
+- **Cleanup slice (three small, independent fixes — land as one PR):**
+  1. **Bound the hero-image download before it fully buffers** —
+     `WebRecipeCaptureClient.fetchImageData` (`WebRecipeCaptureClient.swift:227`) enforces the
+     12 MB `maxImageResponseBytes` cap only *after* `URLSession.shared.data` has already buffered
+     the full response (`:233→:240`), so peak download memory in the ~120 MB share extension isn't
+     bounded — an oversized image downloads in full before being rejected. Add an early
+     `response.expectedContentLength` check to bail before buffering an oversized body. No device
+     testing needed.
+  2. **Fix the orphan-heading fallback gap in the print-template ingredient path** —
+     `RecipeMilkStreetExtractor.extractPrintIngredients` (`RecipeMilkStreetExtractor.swift:102-116`,
+     landed in PR #53) adds every `ingredientHeading` row to the builder unconditionally (line 104)
+     but only sets `foundIngredient = true` for item rows. If a real page renders print-template
+     headings with zero valid item rows (e.g. a markup variant missing the description span), the
+     function still returns `false`, so `extract()` falls through to `extractBodyIngredients` —
+     appending body-sourced lines *after* the already-added, now-orphaned print headings, which
+     `IngredientSectionHeading.sections` will mis-attribute. Not hit by either current fixture (both
+     have well-formed item markup). Make heading additions conditional on the branch actually
+     succeeding, or roll back builder state on fallback.
+  3. **De-duplicate `extractPrintIngredients`/`extractBodyIngredients`** —
+     (`RecipeMilkStreetExtractor.swift:94-153`) now share an identical shape (combined selector →
+     loop → heading branch `continue` → item branch guard+join) since PR #53 taught the print path
+     the same heading logic PR #52 gave the body path. Collapse into one generic helper
+     parameterized by the four selectors + a heading-text closure so the two can't drift apart
+     again.
 
-  **Queued next (parking lot, not dispatched — planned 2026-07-01):**
-  - **NYT "Reader Feedback" — comment ingestion + LLM curation** —
-    `docs/efforts/reader-feedback-comment-ingestion.md`. New, larger effort: in-app
-    `WebPage` browser playbook to scrape "Most Helpful" comments (anonymized at
-    extraction), first client-side LLM integration (personal Claude API key, Keychain),
-    global editable curation prompt in Settings, new `RecipeNoteType.readerFeedback`.
-    Six-slice build order in the doc, starting with review-sheet dismiss-fragility
-    hardening. Explicitly designed so the LLM curates (selects/trims distinct quoted
-    tips) rather than synthesizes them into a flattened consensus summary.
+  All three are non-blocking review nits/hygiene, not user-visible bugs — safe to batch into a
+  single small PR.
+
+  **Then: dispatch NYT "Reader Feedback"** — comment ingestion + LLM curation,
+  `docs/efforts/reader-feedback-comment-ingestion.md`. New, larger effort: in-app
+  `WebPage` browser playbook to scrape "Most Helpful" comments (anonymized at
+  extraction), first client-side LLM integration (personal Claude API key, Keychain),
+  global editable curation prompt in Settings, new `RecipeNoteType.readerFeedback`.
+  Six-slice build order in the doc, starting with review-sheet dismiss-fragility
+  hardening. Explicitly designed so the LLM curates (selects/trims distinct quoted
+  tips) rather than synthesizes them into a flattened consensus summary. **Confirmed as the
+  next milestone after the cleanup slice above (Jon, 2026-07-01)** — dispatch once cleanup lands.
+
+  **Still parked (not dispatched):**
   - **Dogfood the core loop on two devices** — capture ~15–20 real recipes via the extension, cook
     from them (phone captures / iPad cooks, which also exercises the untested multi-device
-    dedup-on-read convergence). The most annoying gaps found here choose the real next milestone.
+    dedup-on-read convergence). Blocked on Apple shipping iOS Beta 3 (Jon isn't installing an
+    earlier beta on his phone); separately, Jon's existing simulator-pass feedback needs a few more
+    days to marinate before it should drive scope. Revisit once both land — the most annoying gaps
+    found here still choose the real next milestone after Reader Feedback.
   - **Recipe → grocery list w/ pantry checking** — make it slick early (canonical-key merge, static
-    pantry thresholds, dialog-free); spec = [[grocery-pantry-threshold-design]] (Phase E).
+    pantry thresholds, dialog-free); spec = [[grocery-pantry-threshold-design]] (Phase E). Lower
+    priority than Reader Feedback per Jon's stated intent (2026-07-01).
   - Full context in the `post-sync-next-tracks` memory.
+
+Milk Street print-template ingredient headings — **DONE** (PR #53,
+`codex/milk-street-print-ingredient-headings`; architect-approved and merged 2026-07-01): the
+print-template ingredient path now recognizes `RecipePrintTemplate_ingredientHeading__*` rows
+interleaved with `ingredientItem__*` rows, walking heading/item elements in DOM order so section
+names attach before their items instead of silently falling through to body-only heading support.
+`milk-street-chicken-peanut.html` extended with real-shape print-template markup so the existing
+section assertion exercises this branch. Architect review found two non-blocking nits (orphan-
+heading fallback gap, extract-print/extract-body duplication) — folded into Next Up above rather
+than blocking merge.
 
 Milk Street sections/Tip/summary/time — **DONE** (PR #52, `codex/milk-street-sections-tip-summary`;
 architect-approved 2026-07-01, merged): real per-recipe summary (`RecipeSummaryContent_body__*`)
@@ -60,8 +84,8 @@ outranking site-boilerplate meta description, Tip callout captured as an editori
 (`[role=note][aria-label=Tip]`), servings/prep/cook/total time from `ItemLabelList_item__*`, and a
 `RecipeDurationParser` unicode-vulgar-fraction normalizer (`"1½ hours"` → 90 min) — all fixture-
 tested against a sanitized `milk-street-chicken-peanut.html`. **Architect review found the fourth
-gap (ingredient subsection headings) is a branch-selection bug, not a missing-markup limitation** —
-see Next Up above.
+gap (ingredient subsection headings) was a branch-selection bug, not a missing-markup limitation** —
+fixed in PR #53 above.
 
 Revive DEBUG DOM export — **DONE** (PR #51, `codex/revive-debug-dom-export`; architect-approved
 2026-07-01, merged): `preserveRawImportHTML: true` gated `#if DEBUG` at both production capture call
@@ -173,16 +197,7 @@ M3 authenticated browser capture — **DONE** (PR #44 merged, `2f5b588`):
 
 Drawn into **Next Up** one at a time; this is not a dispatch target.
 
-1. **Early `expectedContentLength` guard on hero download** — `WebRecipeCaptureClient.fetchImageData`
-   (`WebRecipeCaptureClient.swift:227`) enforces the 12 MB `maxImageResponseBytes` cap only *after*
-   `URLSession.shared.data` has fully buffered the response (`:233→:240`), so it doesn't bound peak
-   download memory in the ~120 MB share extension — an oversized body is downloaded in full, then
-   rejected. Add a one-line `response.expectedContentLength` pre-check to bail before buffering an
-   oversized image. Small, deterministic, no device testing needed. (Supersedes the earlier
-   "real-device jetsam check": the decode itself is already memory-safe via
-   `CGImageSourceCreateThumbnailAtIndex` + `kCGImageSourceThumbnailMaxPixelSize` downsampling in
-   `RecipePhotoProcessor`, which never materializes the full-resolution bitmap, so the residual gap
-   is the unbounded *download* buffer, not the decode.) Standalone; not on the sync critical path.
+_(empty — the `expectedContentLength` guard was drawn into the cleanup slice in Next Up above.)_
 
 Comment ingestion stays in `docs/open-questions.md` until it is a scoped effort.
 
