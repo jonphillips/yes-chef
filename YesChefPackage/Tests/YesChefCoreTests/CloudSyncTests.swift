@@ -21,10 +21,14 @@ extension RecipeCoreTests {
         try syncTriggerTableNames(in: db)
       }
 
-      expectNoDifference(
-        actualTableNames,
-        currentModelTableNames.sorted()
-      )
+      // Derive the expected set from the live schema, not a literal, so a new
+      // @Table added to the schema but never wired into makeSyncEngine fails
+      // here instead of silently staying local.
+      let modelTableNames = try mainDatabase.read { db in
+        try schemaTableNames(in: db)
+      }
+
+      expectNoDifference(actualTableNames, modelTableNames)
     }
 
     @Test
@@ -127,32 +131,6 @@ extension RecipeCoreTests {
   }
 }
 
-private let currentModelTableNames = [
-  Recipe.tableName,
-  RecipeSource.tableName,
-  IngredientSection.tableName,
-  IngredientLine.tableName,
-  InstructionSection.tableName,
-  InstructionStep.tableName,
-  RecipeNote.tableName,
-  RecipePhoto.tableName,
-  Tag.tableName,
-  Category.tableName,
-  Equipment.tableName,
-  RecipeTag.tableName,
-  RecipeCategory.tableName,
-  RecipeEquipment.tableName,
-  RecipeImportRef.tableName,
-  MealPlanItem.tableName,
-  Menu.tableName,
-  MenuItem.tableName,
-  MenuPlacement.tableName,
-  GroceryList.tableName,
-  GroceryItem.tableName,
-  GroceryItemSource.tableName,
-  PantryItem.tableName,
-]
-
 private func temporaryCloudSyncDatabaseURL() throws -> URL {
   let directory = FileManager.default.temporaryDirectory
     .appendingPathComponent("YesChefCloudSyncTests-\(UUID().uuidString)", isDirectory: true)
@@ -207,5 +185,19 @@ private func syncTriggerTableNames(in db: Database) throws -> [String] {
     return String(name.dropFirst(prefix.count))
   }
   .filter { !$0.hasPrefix("sqlitedata_icloud_") }
+  .sorted()
+}
+
+private func schemaTableNames(in db: Database) throws -> [String] {
+  try #sql(
+    """
+    SELECT "name" FROM "sqlite_master"
+    WHERE "type" = 'table'
+      AND "name" NOT LIKE 'sqlite_%'
+      AND "name" != 'grdb_migrations'
+    """,
+    as: String.self
+  )
+  .fetchAll(db)
   .sorted()
 }
