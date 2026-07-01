@@ -95,10 +95,13 @@ extension RecipeCoreTests {
       expectNoDifference(unicodeRecipe.photos.map(\.originalSourcePath), ["Images/simple/hero.jpg"])
       expectNoDifference(unicodeRecipe.photos.map(\.kind), [.hero])
       expectNoDifference(unicodeRecipe.photos.map { $0.displayData != nil }, [true])
-      expectNoDifference(unicodeRecipe.recipe.originalImportText?.contains("薑蔥蓉"), true)
+      expectNoDifference(unicodeRecipe.recipe.originalImportText, nil)
       let unicodeSnapshotData = try #require(unicodeRecipe.recipe.originalSnapshot)
       let unicodeSnapshot = try RecipeBundleCoding.decodeSnapshot(unicodeSnapshotData)
       expectNoDifference(unicodeSnapshot.recipe.title, "Ginger-Scallion Sauce (Jiāngcōngróng / 薑蔥蓉)")
+      expectNoDifference(unicodeSnapshot.recipe.originalImportText, nil)
+      expectNoDifference(unicodeSnapshot.photos.map(\.displayData), [nil])
+      expectNoDifference(unicodeSnapshot.photos.map(\.thumbnailData), [nil])
 
       let firstSummary = try database.write { db in
         var repositoryUUIDs = SampleUUIDSequence(start: 31_000)
