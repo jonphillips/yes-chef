@@ -1,8 +1,9 @@
 # Current Handoff
 
-Last updated: June 30, 2026 (**PR #45 merged → M4 Slice 1 (lean original-provenance) is DONE**.
-Next Up = M4 Slice 2, CloudKit project setup + `SyncEngine` wiring, started OFF —
-[`milestones/M4-icloud-sync.md`](milestones/M4-icloud-sync.md) § Slice 2).
+Last updated: July 1, 2026 (**PR #46 architect-approved → M4 Slice 2 (CloudKit `SyncEngine`
+wiring, started OFF) is DONE** — on-device dev round-trip still owed before the S4 flip, not a
+blocker for S3). Next Up = M4 Slice 3, logical-uniqueness hardening (upsert + dedup-on-read) —
+[`milestones/M4-icloud-sync.md`](milestones/M4-icloud-sync.md) § Slice 3).
 
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
@@ -14,17 +15,35 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **M4 (iCloud sync) — Slice 2: CloudKit project setup + `SyncEngine` wiring (started OFF)** —
-  [`milestones/M4-icloud-sync.md`](milestones/M4-icloud-sync.md) § Slice 2. Wire sync end-to-end
-  against the CloudKit **dev** environment but keep it **opt-in / off for real data** until the
-  cutover (Slice 4). Additive Xcode entitlements via **XcodeGen `project.yml`** (iCloud + CloudKit
-  container, `aps-environment`, `UIBackgroundModes = remote-notification`; defer `CKSharingSupported`);
-  `attachMetadatabase()` + a `SyncEngine(startImmediately: false)` in `bootstrapDatabase`
-  (`Schema.swift`) enumerating **every** synced `@Table` explicitly; a launch gate for local-only
-  when there's no iCloud account. The **share extension may construct a stopped engine** only to
-  install triggers/write `SyncMetadata`, but must never start/network; confirm the main app picks up
-  extension-written metadata. Verify round-trip in the CloudKit **dev** dashboard on device; do
-  **not** point at Production. Dispatchable now.
+- **M4 (iCloud sync) — Slice 3: logical-uniqueness hardening (upsert + dedup-on-read)** —
+  [`milestones/M4-icloud-sync.md`](milestones/M4-icloud-sync.md) § Slice 3. With no unique indexes,
+  offline two-device inserts can create duplicate rows for the same logical key; make reads
+  deterministic and self-healing. **Import identity** (`recipeImportRef`, composed normalized
+  `sourceURL` + `title`): make the import path an **upsert** and add **dedup-on-read** — when >1 row
+  shares a key, pick one deterministically (lowest `id` / earliest `dateCreated`) and a cleanup pass
+  deletes the losers, re-pointing any `recipeID` references; reuse M1's composed-identity logic.
+  **Audit other logically-unique data** for the same hazard (default `GroceryList` `isDefault`,
+  `Tag`/`Category` by name, `PantryItem` by title) and record a per-entity dedup decision (a
+  duplicate default list is a real bug; two same-named tags may be tolerable). **Tests:** seed
+  duplicates (simulating two offline inserts), assert dedup converges to one row deterministically
+  and references survive. No device testing needed — pure convergence logic. Dispatchable now.
+
+M4 Slice 2 — CloudKit `SyncEngine` wiring (started OFF) — **DONE** (PR #46, architect-approved):
+
+- Additive CloudKit **dev** entitlements (iCloud container `iCloud.com.jon.yeschef`, CloudKit
+  service, `aps-environment`, `UIBackgroundModes = remote-notification`) via XcodeGen.
+  `attachMetadatabase()` + `SyncEngine(startImmediately: false)` in `bootstrapDatabase` enumerating
+  all 23 synced `@Table`s; iCloud account-status launch gate; sync opt-in defaults **OFF**. Share
+  extension **constructs a stopped engine** (`.configured(startImmediately: false)`) purely to
+  install triggers / write `SyncMetadata` — it never starts or networks (**construct ≠ run**;
+  `bootstrapDatabase` and `bootstrapDatabaseForShareExtension` now differ only by store path).
+  `categories.parentCategoryID` loosened from a self-referential FK to a plain UUID column
+  (SQLiteData rejects the self-FK as a schema cycle). Drift test derives both sides from the live DB
+  (installed sync triggers vs. `sqlite_master` tables) so a new unsynced `@Table` fails the test.
+- **Still owed before S4 (the Production flip), not a prerequisite for S3:** on-device CloudKit
+  **dev** round-trip — capture a recipe via the **share extension**, foreground the main app with
+  sync enabled, confirm it lands in the dev dashboard and round-trips on relaunch. This is the one
+  link no unit test covers: that the main app actually uploads extension-written metadata.
 
 M4 Slice 1 — lean original-provenance — **DONE** (PR #45 merged):
 
