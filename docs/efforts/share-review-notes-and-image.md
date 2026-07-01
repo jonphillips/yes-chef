@@ -90,12 +90,18 @@ the existing `Form`/`Section` style.
 
 - **In scope:** notes display + inline edit + per-block delete; read-only hero image preview;
   edits/deletes honored at Save. All in the share extension view layer.
-- **Out of scope:** making ingredients/instructions editable in the share sheet (they stay
+- **Out of scope:** making ingredients/instructions editable in either review sheet (they stay
   read-only `Text`). No general share-extension editor — this is targeted curation of notes only.
-  No new editing affordances in the in-app browser capture path (separate surface).
-- **Directional note:** this is the share extension's *first* editing affordance; everything
-  there is read-only today. That's intended and matches Jon's ask, but keep it minimal so the
-  screen stays "confirm + light curate," not a full editor.
+- **Delivered on both surfaces (scope extension, Jon's call at review):** the original brief
+  scoped this to the share extension only. During implementation the same notes show/edit/delete
+  + read-only hero preview was also added to the **in-app browser capture** review
+  (`RecipeCaptureView` / `RecipeCaptureModel`), mirroring the share path so the two surfaces stay
+  in parity. Both are shipped in PR #44. (Follow-on: the notes/hero UI + model helpers are now
+  near-duplicated across the app and share-extension targets — a shared component/module is a
+  tracked cleanup, not a blocker.)
+- **Directional note:** this is the review screens' *first* editing affordance; everything there
+  was read-only before. Keep it minimal so the screen stays "confirm + light curate," not a full
+  editor.
 - **Sync-safety:** no model/schema change. Edits happen in memory pre-import; the image preview
   only displays already-hydrated bytes. Nothing for the later `SyncEngine` path.
 
