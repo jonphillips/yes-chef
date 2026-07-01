@@ -1,12 +1,14 @@
 # Current Handoff
 
-Last updated: July 1, 2026 (**PR #48 merged → share-extension launch crash FIXED** (entitlement
-hotfix). But device testing during review revealed the extension→CloudKit round-trip is **still
-broken by a separate, deeper issue**: extension-written recipes save locally but never upload.
-Next Up = **M4 share-extension write-not-enqueued fix** — SQLiteData defers the stopped engine's
-`PendingRecordZoneChange` write to a fire-and-forget Task that `completeRequest` kills; must land
-before the S4 Production flip. On-device sync round-trip remains **confirmed only for the main-app
-capture path** (sim in-app browser capture → device); the extension path is **not** yet confirmed.
+Last updated: July 1, 2026 (**M4 share-extension iCloud round-trip CONFIRMED end-to-end on device.**
+Share from the extension → tap the app icon to reopen → recipe uploads to CloudKit. PR #49 carried
+both halves (producer wait + consumer foreground re-drain); the final missing piece was an
+**enablement gate** — `isManuallyEnabled` was set only by the volatile Xcode launch-arg, so a
+non-Xcode launch (icon tap / extension handoff, exactly how Jon tests) had sync OFF and the engine
+never started to drain the extension's pending rows. Folded into #49:
+`persistManualEnablementFromLaunchEnvironment()` mirrors the dev flag into persistent `UserDefaults`
+at app `init()`. **This closes the CloudSync effort.** Next Up = **needs a conversation with Jon —
+do not infer.**)
 
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
@@ -18,39 +20,32 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **M4 (iCloud sync) — share-extension write not enqueued for CloudKit upload (P1, pre-S4)** —
-  extension-shared recipes commit to the shared DB (they show in the app) but **never upload to
-  CloudKit**, so they don't round-trip to other devices. Confirmed on device 2026-07-01: the shared
-  recipe is absent from the Dev Private DB (`co.pointfree.SQLiteData.defaultZone`) even though the
-  main app logs a full `willSend/didSendChanges` cycle (it sends unrelated rows); main-app in-app
-  capture round-trips fine. **NOT an entitlement/account issue** — PR #48 fixed the launch crash, and
-  the sim + device are on the same iCloud account.
-  **Root cause (traced through SQLiteData source):** the extension constructs a *stopped* engine
-  (`startImmediately: false`), so `isRunning == false`. The SQL trigger fires on the extension's
-  write and writes the durable `SyncMetadata` row synchronously — **but** the trigger's
-  `didUpdate`/`didDelete` callback, when `isRunning == false`, does **not** persist the
-  `PendingRecordZoneChange` (the row the main-app uploader consumes) synchronously; it defers it to a
-  fire-and-forget `Task { userDatabase.write { … } }`
-  (`sqlite-data/Sources/SQLiteData/CloudKit/SyncEngine.swift:823-838`, carrying the upstream
-  `// TODO: Perform this work in a trigger instead of a task`). `ShareCaptureModel.saveButtonTapped`
-  calls `extensionContext.completeRequest(...)` immediately after `database.write` returns
-  (`ShareViewController.swift:113`), tearing the process down **before that Task commits** → the
-  `PendingRecordZoneChange` is lost. On main-app `start()`, `enqueueLocallyPendingChanges()`
-  (`SyncEngine.swift:645`) reads an empty pending table → nothing uploads. The "new record type ⇒
-  full-table upload" fallback doesn't rescue it because `recipes` already exists in CloudKit. This is
-  the exact link the S2 note flagged as "no unit test covers." See [[extension-sync-construct-not-run]].
-  **Fix direction (respects construct ≠ run / no-network):** the extension must not `completeRequest`
-  until the deferred pending-change is durably written — after `database.write`, bounded-poll the
-  attached `sqliteDataCloudKit` `PendingRecordZoneChange` table until the expected change(s) land
-  (short timeout, then complete anyway so a save is never blocked forever). Still **no `start()` /
-  no networking / no `aps-environment`** in the extension. Also file the upstream `TODO` with
-  PointFree (the clean fix is theirs: persist the pending change in the trigger synchronously).
-  **Rejected:** extension calling `start()` / `sendChanges` (violates the guardrail + 120 MB budget +
-  no push). **Verify (device):** share a recipe from Safari (no crash — that's #48), foreground the
-  app with sync enabled → the recipe now appears in the Dev Private DB custom zone and round-trips to
-  a second device. This is the one link no unit test covers, so a **device round-trip is the DoD** —
-  a green `swift test` is necessary but not sufficient. `swift test` + `check-drift.sh` should be
-  unaffected. Dispatchable now.
+- **(Next Up is intentionally empty — the CloudSync effort just closed. Discuss the next milestone
+  with Jon before dispatching; do not infer a task.)**
+
+M4 — share-extension iCloud sync (producer wait + consumer re-drain + enablement persistence) —
+**DONE** (PR #49, `codex/m4-share-extension-pending-upload`; architect-approved 2026-07-01, round-trip
+confirmed on device). Three defects, one landable unit:
+  1. **Producer race (Codex):** stopped extension engine defers the `PendingRecordZoneChange` insert to
+     a fire-and-forget `Task` that `completeRequest` killed → row lost. `ShareCaptureModel.saveButtonTapped`
+     now bounded-polls `pendingRecordZoneChangeCount` until the row lands before completing. No
+     `start()`/networking/`aps-environment` in the extension (guardrail intact).
+  2. **Consumer drain (Codex):** the pending table only drains inside `start()`
+     (`enqueueLocallyPendingChanges`, `SyncEngine.swift:645`), which no-ops when already `isRunning`.
+     Added a scene-`.active` foreground re-drain that cycles `stop()`+`start()` when pending rows exist.
+  3. **Enablement gate (folded in directly, 2026-07-01):** the real reason device testing kept failing —
+     `isManuallyEnabled` was set only by the volatile Xcode launch-arg, so an icon-tap / extension-handoff
+     launch had sync OFF and neither the cold-launch `start()` nor the re-drain ever ran. Proven by reading
+     the sim metadatabase: 81 undrained `PendingRecordZoneChange` rows == 81 metadata rows with NULL
+     `lastKnownServerRecord`, table never cleared → `start()` had not run since the extension wrote.
+     `persistManualEnablementFromLaunchEnvironment()` (called in `YesChefApp.init()` before
+     `startIfManuallyEnabled`) mirrors the dev flag into persistent `UserDefaults` so non-Xcode launches
+     stay enabled. See [[extension-sync-construct-not-run]].
+  Follow-ups deferred (not blocking): file the upstream SQLiteData issues — (a) persist the pending change
+  in the trigger synchronously (existing `// TODO` at `SyncEngine.swift:823-838`), (b) expose a public
+  "drain persisted pending changes into a running engine" entrypoint so consumers needn't stop/start.
+  Before the S4 Production flip, replace the dev launch-arg gate with a real persisted opt-in (the
+  enablement fix is a dev-ergonomics bridge, not the GA toggle).
 
 M4 — share-extension iCloud entitlement hotfix — **DONE** (PR #48 merged, `5e8be14`):
 

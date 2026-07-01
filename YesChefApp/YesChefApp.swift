@@ -19,6 +19,7 @@ struct YesChefApp: App {
         fetchImageData: WebRecipeCaptureClient.liveValue.fetchImageData
       )
     }
+    YesChefCloudSync.persistManualEnablementFromLaunchEnvironment()
     Task {
       _ = await YesChefCloudSync.startIfManuallyEnabled()
     }
