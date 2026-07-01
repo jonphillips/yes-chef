@@ -20,7 +20,18 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-**Blocked on Jon — needs a sanitized authenticated fixture before dispatch:**
+- **Revive the dead "Export DOM" debug button in DEBUG builds** — `OriginalSnapshotView.swift:56-64`
+  ships a DEBUG-only `ShareLink` that exports `recipe.originalImportText` as raw HTML, silently dead
+  since PR #45 (`docs/efforts/lean-original-provenance.md`): both production capture call sites
+  (`RecipeModels.swift:216`, `WebRecipeCaptureClient.swift:272`) use the `preserveRawImportHTML`
+  default of `false`, so `originalImportText` is always `nil` and the button's `if let
+  originalImportDOMExport` guard never renders — in *any* build config. Jon confirmed (2026-07-01) he
+  wants DEBUG builds only to keep preserving the raw HTML for this tool, Release/sync payload staying
+  lean as PR #45 intended. Pass `preserveRawImportHTML: true` from those two call sites gated behind
+  `#if DEBUG`/`#else false #endif` — don't just flip the function default, that would undo the
+  sync-payload leanness PR #45 was for. Small, deterministic, no device testing needed; standalone.
+
+**Blocked on Jon, not this dispatch — needs a sanitized authenticated fixture:**
 `docs/efforts/milk-street-sections-tip-summary.md`. Dogfooding PR #50 against a second
 real recipe (chicken-peanut-red-chili-sauce-pollo-encacahuatado) found four gaps beyond
 that effort's scope — all stem from the same root cause (the JSON-LD node is truncated,
@@ -176,17 +187,6 @@ Drawn into **Next Up** one at a time; this is not a dispatch target.
    `CGImageSourceCreateThumbnailAtIndex` + `kCGImageSourceThumbnailMaxPixelSize` downsampling in
    `RecipePhotoProcessor`, which never materializes the full-resolution bitmap, so the residual gap
    is the unbounded *download* buffer, not the decode.) Standalone; not on the sync critical path.
-2. **Revive the dead "Export DOM" debug button in DEBUG builds** — `OriginalSnapshotView.swift:56-64`
-   ships a DEBUG-only `ShareLink` that exports `recipe.originalImportText` as raw HTML, but it's been
-   silently dead since PR #45 (`docs/efforts/lean-original-provenance.md`): every production capture
-   call site (`RecipeModels.swift:216`, `WebRecipeCaptureClient.swift:272`) uses the
-   `preserveRawImportHTML` default of `false`, so `originalImportText` is always `nil` and the
-   `if let originalImportDOMExport` guard never renders the button — in *any* build config, not just
-   Release. Jon confirmed (2026-07-01) he wants DEBUG builds only to keep preserving the raw HTML for
-   this tool, with Release/sync payload staying lean as PR #45 intended. Fix: pass
-   `preserveRawImportHTML: true` from those two call sites gated behind `#if DEBUG`/`#else false
-   #endif` (don't just flip the function default — that would undo the sync-payload leanness PR #45
-   was for). Small, deterministic, no device testing needed; standalone.
 
 Comment ingestion stays in `docs/open-questions.md` until it is a scoped effort.
 
