@@ -2,7 +2,7 @@ import CustomDump
 import Dependencies
 import Foundation
 import Testing
-import YesChefCore
+@testable import YesChefCore
 
 extension RecipeCoreTests {
   @Suite
@@ -119,6 +119,25 @@ extension RecipeCoreTests {
         expectNoDifference(hero.displayData != nil, true)
         expectNoDifference(hero.thumbnailData != nil, true)
       }
+    }
+
+    @Test
+    func declaredOversizedHeroImageResponseIsRejectedBeforeReadingBody() throws {
+      let url = try #require(URL(string: "https://example.com/images/huge.jpg"))
+      let response = URLResponse(
+        url: url,
+        mimeType: "image/jpeg",
+        expectedContentLength: 13,
+        textEncodingName: nil
+      )
+
+      do {
+        try WebRecipeCaptureClient.validateImageContentLength(response, maxBytes: 12)
+      } catch let error as WebRecipeCaptureClientError {
+        expectNoDifference(error, .imageTooLarge(maxBytes: 12))
+        return
+      }
+      Issue.record("Expected oversized image response to be rejected.")
     }
 
     private static func heroImageData() throws -> Data {

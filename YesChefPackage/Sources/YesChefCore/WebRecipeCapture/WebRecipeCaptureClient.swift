@@ -230,19 +230,36 @@ extension WebRecipeCaptureClient: DependencyKey {
           "Mozilla/5.0 AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
           forHTTPHeaderField: "User-Agent"
         )
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (bytes, response) = try await URLSession.shared.bytes(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
           throw WebRecipeCaptureClientError.missingHTTPResponse
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
           throw WebRecipeCaptureClientError.invalidHTTPStatus(httpResponse.statusCode)
         }
-        guard data.count <= maxImageResponseBytes else {
-          throw WebRecipeCaptureClientError.imageTooLarge(maxBytes: maxImageResponseBytes)
+        try Self.validateImageContentLength(response, maxBytes: maxImageResponseBytes)
+        var data = Data()
+        if response.expectedContentLength > 0 {
+          data.reserveCapacity(Int(min(response.expectedContentLength, Int64(maxImageResponseBytes))))
+        }
+        for try await byte in bytes {
+          data.append(byte)
+          guard data.count <= maxImageResponseBytes else {
+            throw WebRecipeCaptureClientError.imageTooLarge(maxBytes: maxImageResponseBytes)
+          }
         }
         return data
       }
     )
+  }
+
+  static func validateImageContentLength(_ response: URLResponse, maxBytes: Int) throws {
+    let expectedContentLength = response.expectedContentLength
+    guard expectedContentLength == -1
+      || expectedContentLength <= Int64(maxBytes)
+    else {
+      throw WebRecipeCaptureClientError.imageTooLarge(maxBytes: maxBytes)
+    }
   }
 
   public static var testValue: Self {

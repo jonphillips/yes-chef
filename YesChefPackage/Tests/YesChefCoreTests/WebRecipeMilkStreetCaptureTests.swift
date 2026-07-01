@@ -147,6 +147,49 @@ extension RecipeCoreTests {
       )
     }
 
+    @Test
+    func printTemplateOrphanHeadingDoesNotClaimBodyFallbackIngredients() throws {
+      let page = WebRecipePageParser.parse(
+        html: """
+          <html>
+            <body>
+              <section class="RecipePrintTemplate_ingredients___ZF2C">
+                <ul>
+                  <li class="RecipePrintTemplate_ingredientHeading__1DhMz">For the print-only sauce:</li>
+                  <li class="RecipePrintTemplate_ingredientItem___G_Bm">
+                    <span class="RecipePrintTemplate_ingredientAmount__gkIv1">1</span>
+                  </li>
+                </ul>
+              </section>
+              <section class="RecipeBodyContent_ingredients__abc">
+                <ul>
+                  <li class="RecipeBodyContent_ingredientItemBlockItem__u6TPv">
+                    <div class="RecipeBodyContent_ingredientItemBlock__tK0sj">
+                      <div class="RecipeBodyContent_ingredientItemBlock__amount__od5ej">2</div>
+                      <div class="RecipeBodyContent_ingredientItemBlock__description__a9B4I">
+                        <p data-p="true">cups cooked rice</p>
+                      </div>
+                    </div>
+                  </li>
+                </ul>
+              </section>
+            </body>
+          </html>
+          """,
+        sourceURL: URL(string: "https://www.177milkstreet.com/recipes/orphan-print-heading"),
+        capturedAt: Date(timeIntervalSinceReferenceDate: 804_380_000)
+      )
+
+      expectNoDifference(
+        page.ingredientSections,
+        [
+          ParsedRecipeIngredientSection(
+            lines: ["2 cups cooked rice"]
+          ),
+        ]
+      )
+    }
+
     private static func fixtureHTML(_ name: String) throws -> String {
       try String(contentsOf: fixtureURL.appendingPathComponent("\(name).html"), encoding: .utf8)
     }
