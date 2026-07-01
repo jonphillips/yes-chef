@@ -55,8 +55,9 @@ Comment ingestion stays in `docs/open-questions.md` until it is a scoped effort.
 made — it's now the active milestone ([`milestones/M4-icloud-sync.md`](milestones/M4-icloud-sync.md),
 Phase E). The full build order is authored (S1 lean provenance → S2 CloudKit setup + `SyncEngine`
 wiring, off → S3 dedup-on-read hardening → S4 clean cutover/flip → S5 two-device verification).
-Modeling stays sync-safe and deferred (no canonical-ingredient work before the flip). Architect to
-land **ADR-0010** ratifying the milestone.
+Modeling stays sync-safe and deferred (no canonical-ingredient work before the flip). Ratified by
+[ADR-0010](decisions/ADR-0010-cloudkit-sync-enablement.md); M3 recorded in
+[ADR-0009](decisions/ADR-0009-in-app-authenticated-browser-capture.md).
 
 ## Current Checkpoint
 

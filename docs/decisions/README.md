@@ -13,3 +13,5 @@ plus any app-specific calls.
 - [ADR-0006](ADR-0006-taxonomy-source-and-library-placement.md) — Categories stay flexible; source, author, placement, and recipe families are typed concepts
 - [ADR-0007](ADR-0007-web-recipe-capture-engine.md) — Web recipe capture harvests Galavant's parser now and converges on a shared package later
 - [ADR-0008](ADR-0008-curated-collections.md) — Curated collections are a new sibling of Menu (editorial indexes); reserved now, built post-sync (Proposed)
+- [ADR-0009](ADR-0009-in-app-authenticated-browser-capture.md) — In-app authenticated browser capture (rendered logged-in DOM) via WebExtractorKit; never store credentials
+- [ADR-0010](ADR-0010-cloudkit-sync-enablement.md) — CloudKit sync enablement specifics: BLOB→CKAsset, lean original-provenance, upsert + dedup-on-read, clean cutover

@@ -42,7 +42,7 @@ milestone is **enablement + hygiene + cutover, not remodeling**:
 - **BLOBs auto-promote to `CKAsset` unconditionally** (verified in SQLiteData 1.6.6 `setBytes`) —
   the ~1 MB per-record limit applies only to a record's own fields, **not** assets, so hero/photo
   bytes and `originalSnapshot` sync correctly **with no schema change** (verified in the SQLiteData
-  1.6.6 source this session; captured in ADR-0010, forthcoming).
+  1.6.6 source this session; captured in [ADR-0010](../decisions/ADR-0010-cloudkit-sync-enablement.md)).
 
 ## The CloudKit laws (ADR-0002 — bind every synced table)
 
@@ -209,12 +209,14 @@ eventual-consistency-on-real-devices).
 
 ## ADR
 
-Architect lands **ADR-0010 — CloudKit sync enablement** (ratifying this milestone on top of the
-already-Accepted ADR-0002): confirms BLOB→`CKAsset` behavior, the lean-`originalSnapshot` decision,
-the dedup-on-read strategy, and the clean-cutover runbook (dev→prod one-way deploy, empty-store
-flip, re-import). Reference it as forthcoming until landed.
+Ratified by [**ADR-0010 — CloudKit sync enablement**](../decisions/ADR-0010-cloudkit-sync-enablement.md)
+(on top of the already-Accepted [ADR-0002](../decisions/ADR-0002-cloudkit-sync-no-server.md)):
+confirms BLOB→`CKAsset` behavior, the lean-`originalSnapshot` decision, the upsert + dedup-on-read
+strategy, and the clean-cutover runbook (dev→prod one-way deploy, empty-store flip, re-import).
 
 ---
 *Authored 2026-06-30 from the iCloud sync planning session. Companion docs:
-[`../efforts/lean-original-provenance.md`], ADR-0002 (decision), ADR-0003 (sharing, deferred),
-ADR-0010 (enablement specifics — forthcoming).*
+[`../efforts/lean-original-provenance.md`](../efforts/lean-original-provenance.md),
+[ADR-0002](../decisions/ADR-0002-cloudkit-sync-no-server.md) (decision),
+[ADR-0003](../decisions/ADR-0003-private-libraries-recipe-transfer.md) (sharing, deferred),
+[ADR-0010](../decisions/ADR-0010-cloudkit-sync-enablement.md) (enablement specifics).*
