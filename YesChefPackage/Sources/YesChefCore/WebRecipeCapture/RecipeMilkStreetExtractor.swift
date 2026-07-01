@@ -7,11 +7,24 @@ enum RecipeMilkStreetExtractor {
   private static let printIngredientDescriptionSelector = "[class*=RecipePrintTemplate_ingredientDescription]"
   private static let bodyIngredientAmountSelector = "[class*=RecipeBodyContent_ingredientItemBlock__amount]"
   private static let bodyIngredientDescriptionSelector = "[class*=RecipeBodyContent_ingredientItemBlock__description]"
+  private static let bodyIngredientItemSelector = "[class*=RecipeBodyContent_ingredientItemBlockItem__]"
+  private static let bodyIngredientHeadingItemSelector = "[class*=RecipeBodyContent_ingredientSectionHeadingItemContainer__]"
+  private static let lineHeadingTitleSelector = "[class*=LineHeading_title__]"
   private static let printInstructionContentSelector = "[class*=RecipePrintTemplate_instructionContent]"
   private static let bodyInstructionContentSelector = "[class*=RecipeBodyContent_instructionContent]"
+  private static let summaryBodySelector = "[class*=RecipeSummaryContent_body__]"
+  private static let tipSelector = "[role=note][aria-label=Tip]"
+  private static let tipDescriptionSelector = "[class*=Tip_description__]"
+  private static let itemLabelListItemSelector = "[class*=ItemLabelList_item__]"
+  private static let itemLabelSelector = "[class*=ItemLabelList_label__]"
+  private static let itemValueSelector = "[class*=ItemLabelList_value__]"
 
   static func extract(from document: Document, into builder: inout RecipeParseBuilder) {
     guard isMilkStreet(builder.sourceURL) || hasMilkStreetTemplate(in: document) else { return }
+
+    extractSummary(from: document, into: &builder)
+    extractSummaryFacts(from: document, into: &builder)
+    extractTips(from: document, into: &builder)
 
     if !extractIngredients(
       from: document,
@@ -19,12 +32,7 @@ enum RecipeMilkStreetExtractor {
       descriptionSelector: printIngredientDescriptionSelector,
       into: &builder
     ) {
-      _ = extractIngredients(
-        from: document,
-        amountSelector: bodyIngredientAmountSelector,
-        descriptionSelector: bodyIngredientDescriptionSelector,
-        into: &builder
-      )
+      _ = extractBodyIngredients(from: document, into: &builder)
     }
 
     let printSteps = instructionLines(in: document, selector: printInstructionContentSelector)
@@ -46,6 +54,46 @@ enum RecipeMilkStreetExtractor {
       || ((try? document.select(bodyIngredientAmountSelector).isEmpty()) == false)
   }
 
+  private static func extractSummary(from document: Document, into builder: inout RecipeParseBuilder) {
+    for element in (try? document.select(summaryBodySelector).array()) ?? [] {
+      let paragraphs = ((try? element.select("p").array()) ?? []).compactMap(elementText)
+      let summary = paragraphs.isEmpty ? elementText(element) : paragraphs.joined(separator: "\n\n")
+      builder.votes.add(.summary, summary, priority: RecipeAttributeVotes.jsonLDPriority)
+    }
+  }
+
+  private static func extractSummaryFacts(from document: Document, into builder: inout RecipeParseBuilder) {
+    for element in (try? document.select(itemLabelListItemSelector).array()) ?? [] {
+      guard
+        let label = firstDescendantText(in: element, selector: itemLabelSelector)?.lowercased(),
+        let value = firstDescendantText(in: element, selector: itemValueSelector)
+      else { continue }
+
+      switch label {
+      case "makes":
+        builder.votes.add(.servingsText, value, priority: RecipeAttributeVotes.jsonLDPriority)
+      case "prep time":
+        builder.votes.add(.prepTime, value, priority: RecipeAttributeVotes.jsonLDPriority)
+      case "cook time":
+        builder.votes.add(.cookTime, value, priority: RecipeAttributeVotes.jsonLDPriority)
+      case "total time":
+        builder.votes.add(.totalTime, value, priority: RecipeAttributeVotes.jsonLDPriority)
+      default:
+        continue
+      }
+    }
+  }
+
+  private static func extractTips(from document: Document, into builder: inout RecipeParseBuilder) {
+    for element in (try? document.select(tipSelector).array()) ?? [] {
+      let description = firstDescendantText(in: element, selector: tipDescriptionSelector)
+        ?? elementText(element)
+      if let description {
+        builder.addEditorialBlock(label: "Tip", text: description)
+      }
+    }
+  }
+
   private static func extractIngredients(
     from document: Document,
     amountSelector: String,
@@ -62,6 +110,31 @@ enum RecipeMilkStreetExtractor {
       builder.addIngredient(joinedIngredient(amount: amountText, description: descriptionText))
       foundIngredient = true
     }
+    return foundIngredient
+  }
+
+  private static func extractBodyIngredients(
+    from document: Document,
+    into builder: inout RecipeParseBuilder
+  ) -> Bool {
+    let selector = "\(bodyIngredientHeadingItemSelector), \(bodyIngredientItemSelector)"
+    let elements = (try? document.select(selector).array()) ?? []
+    var foundIngredient = false
+
+    for element in elements {
+      if matches(element, selector: bodyIngredientHeadingItemSelector) {
+        builder.addIngredient(firstDescendantText(in: element, selector: lineHeadingTitleSelector))
+        continue
+      }
+
+      guard matches(element, selector: bodyIngredientItemSelector),
+        let description = firstDescendantText(in: element, selector: bodyIngredientDescriptionSelector)
+      else { continue }
+      let amount = firstDescendantText(in: element, selector: bodyIngredientAmountSelector)
+      builder.addIngredient(joinedIngredient(amount: amount, description: description))
+      foundIngredient = true
+    }
+
     return foundIngredient
   }
 
@@ -103,6 +176,11 @@ enum RecipeMilkStreetExtractor {
       .filter { !$0.isEmpty }
       .joined(separator: " ")
     return normalized.isEmpty ? nil : normalized
+  }
+
+  private static func firstDescendantText(in element: Element, selector: String) -> String? {
+    guard let descendant = try? element.select(selector).first() else { return nil }
+    return elementText(descendant)
   }
 
   private static func nextElementSibling(of element: Element) -> Element? {
