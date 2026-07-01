@@ -79,7 +79,7 @@ final class ShareCaptureModel {
   }
 
   var hasUnsavedReviewChanges: Bool {
-    draft != nil && !isCommitting && !didSave
+    draft != nil && !didSave
   }
 
   var editorialBlocks: [ParsedRecipeEditorialBlock] {

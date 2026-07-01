@@ -369,7 +369,7 @@ final class RecipeCaptureModel {
   }
 
   var hasUnsavedReviewChanges: Bool {
-    draft != nil && !isCommitting
+    draft != nil
   }
 
   var editorialBlocks: [ParsedRecipeEditorialBlock] {
