@@ -1,10 +1,12 @@
 # Current Handoff
 
-Last updated: July 1, 2026 (**PR #47 architect-approved → M4 Slice 3 (logical-uniqueness
-hardening) is DONE**; on-device sync round-trip now **confirmed** for the main-app capture path
-(sim in-app browser capture → device). Next Up = **M4 share-extension iCloud entitlement hotfix**
-— the extension crashes on every share because it constructs a `SyncEngine` for a container it
-isn't entitled to; must land before the S4 Production flip.
+Last updated: July 1, 2026 (**PR #48 merged → share-extension launch crash FIXED** (entitlement
+hotfix). But device testing during review revealed the extension→CloudKit round-trip is **still
+broken by a separate, deeper issue**: extension-written recipes save locally but never upload.
+Next Up = **M4 share-extension write-not-enqueued fix** — SQLiteData defers the stopped engine's
+`PendingRecordZoneChange` write to a fire-and-forget Task that `completeRequest` kills; must land
+before the S4 Production flip. On-device sync round-trip remains **confirmed only for the main-app
+capture path** (sim in-app browser capture → device); the extension path is **not** yet confirmed.
 
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
@@ -16,30 +18,51 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **M4 (iCloud sync) — share-extension iCloud entitlement hotfix (P1, pre-S4)** — the
-  `YesChefShareExtension` crashes on launch on device: the share sheet slides up blank, hangs, and
-  dismisses. Root cause: `bootstrapDatabaseForShareExtension()` uses `.configured(startImmediately:
-  false)`, which in SQLiteData's `SyncEngine.init` **eagerly** constructs `CKContainer(identifier:)`
-  + two `CKSyncEngine`s (`startImmediately:false` only skips the network `start()`, not the
-  container build). But `YesChefShareExtension/YesChefShareExtension.entitlements` carries **only the
-  app group** — no `com.apple.developer.icloud-container-identifiers`. Building CloudKit objects for
-  an unentitled container raises an **ObjC exception**, which the Swift `do/catch` in
-  `ShareViewController.viewDidLoad` cannot catch → process crash. This is a **latent S2 gap, not a
-  #47 regression** (the extension entitlements haven't changed since M2 S4). Fires on **every** share
-  regardless of the sync opt-in, since the extension builds the engine unconditionally.
-  **Fix:** add to the extension entitlements the same iCloud keys the app already has
-  (`com.apple.developer.icloud-container-identifiers` = `iCloud.com.jonphillips.yeschef`,
-  `com.apple.developer.icloud-services` = `[CloudKit]`); keep the app group; **do not** add
-  `aps-environment` or a remote-notification background mode (the extension must never take push).
-  Confirm the extension's App ID has the CloudKit container capability enabled in the portal (the
-  `iCloud.com.jonphillips.yeschef` container already exists — verified in the Dev dashboard).
-  `xcodegen generate`, confirm `CODE_SIGN_ENTITLEMENTS` still points at the extension entitlements.
-  **Preserve the guardrail:** the extension still constructs with `startImmediately: false` and must
-  never call `start()` / network (**construct ≠ run**) — this is entitlement-only, no bootstrap-mode
-  change. **Verify (device):** share a recipe from Safari → sheet renders and saves (no crash);
-  foreground the app with sync enabled → the shared recipe lands in the Dev Private DB custom zone
-  (`co.pointfree.SQLiteData.defaultZone`) and round-trips to a second device. `swift test` +
-  `check-drift.sh` (both should be unaffected). Dispatchable now.
+- **M4 (iCloud sync) — share-extension write not enqueued for CloudKit upload (P1, pre-S4)** —
+  extension-shared recipes commit to the shared DB (they show in the app) but **never upload to
+  CloudKit**, so they don't round-trip to other devices. Confirmed on device 2026-07-01: the shared
+  recipe is absent from the Dev Private DB (`co.pointfree.SQLiteData.defaultZone`) even though the
+  main app logs a full `willSend/didSendChanges` cycle (it sends unrelated rows); main-app in-app
+  capture round-trips fine. **NOT an entitlement/account issue** — PR #48 fixed the launch crash, and
+  the sim + device are on the same iCloud account.
+  **Root cause (traced through SQLiteData source):** the extension constructs a *stopped* engine
+  (`startImmediately: false`), so `isRunning == false`. The SQL trigger fires on the extension's
+  write and writes the durable `SyncMetadata` row synchronously — **but** the trigger's
+  `didUpdate`/`didDelete` callback, when `isRunning == false`, does **not** persist the
+  `PendingRecordZoneChange` (the row the main-app uploader consumes) synchronously; it defers it to a
+  fire-and-forget `Task { userDatabase.write { … } }`
+  (`sqlite-data/Sources/SQLiteData/CloudKit/SyncEngine.swift:823-838`, carrying the upstream
+  `// TODO: Perform this work in a trigger instead of a task`). `ShareCaptureModel.saveButtonTapped`
+  calls `extensionContext.completeRequest(...)` immediately after `database.write` returns
+  (`ShareViewController.swift:113`), tearing the process down **before that Task commits** → the
+  `PendingRecordZoneChange` is lost. On main-app `start()`, `enqueueLocallyPendingChanges()`
+  (`SyncEngine.swift:645`) reads an empty pending table → nothing uploads. The "new record type ⇒
+  full-table upload" fallback doesn't rescue it because `recipes` already exists in CloudKit. This is
+  the exact link the S2 note flagged as "no unit test covers." See [[extension-sync-construct-not-run]].
+  **Fix direction (respects construct ≠ run / no-network):** the extension must not `completeRequest`
+  until the deferred pending-change is durably written — after `database.write`, bounded-poll the
+  attached `sqliteDataCloudKit` `PendingRecordZoneChange` table until the expected change(s) land
+  (short timeout, then complete anyway so a save is never blocked forever). Still **no `start()` /
+  no networking / no `aps-environment`** in the extension. Also file the upstream `TODO` with
+  PointFree (the clean fix is theirs: persist the pending change in the trigger synchronously).
+  **Rejected:** extension calling `start()` / `sendChanges` (violates the guardrail + 120 MB budget +
+  no push). **Verify (device):** share a recipe from Safari (no crash — that's #48), foreground the
+  app with sync enabled → the recipe now appears in the Dev Private DB custom zone and round-trips to
+  a second device. This is the one link no unit test covers, so a **device round-trip is the DoD** —
+  a green `swift test` is necessary but not sufficient. `swift test` + `check-drift.sh` should be
+  unaffected. Dispatchable now.
+
+M4 — share-extension iCloud entitlement hotfix — **DONE** (PR #48 merged, `5e8be14`):
+
+- Added the iCloud container + CloudKit-service entitlements to `YesChefShareExtension` (app group
+  preserved; no `aps-environment` / background modes). Fixes the launch crash: `SyncEngine.init`
+  eagerly builds `CKContainer(identifier:)` even with `startImmediately: false`, and an unentitled
+  container threw an uncatchable ObjC exception (blank share sheet → hang → dismiss). Entitlement-only,
+  no bootstrap-mode change; stable across `xcodegen` (referenced via `CODE_SIGN_ENTITLEMENTS`).
+- **Crash fixed, but round-trip still broken** — device testing during review found the extension
+  saves locally but never uploads (see Next Up: the stopped-engine `PendingRecordZoneChange` is
+  deferred to a Task that `completeRequest` kills). #48 was the necessary first half, not the whole
+  slice.
 
 M4 Slice 3 — logical-uniqueness hardening (upsert + dedup-on-read) — **DONE** (PR #47,
 architect-approved):
