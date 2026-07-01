@@ -1,8 +1,8 @@
 # Current Handoff
 
-Last updated: June 30, 2026 (**PR #44 merged → M3 authenticated browser capture is DONE**. Pivoted
-to the iCloud sync gate: milestone authored at
-[`milestones/M4-icloud-sync.md`](milestones/M4-icloud-sync.md); Next Up = its Slice 1).
+Last updated: June 30, 2026 (**PR #45 merged → M4 Slice 1 (lean original-provenance) is DONE**.
+Next Up = M4 Slice 2, CloudKit project setup + `SyncEngine` wiring, started OFF —
+[`milestones/M4-icloud-sync.md`](milestones/M4-icloud-sync.md) § Slice 2).
 
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
@@ -14,14 +14,24 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **M4 (iCloud sync) — Slice 1: Lean original-provenance** —
-  [`milestones/M4-icloud-sync.md`](milestones/M4-icloud-sync.md) § Slice 1, full spec in
-  [`efforts/lean-original-provenance.md`](efforts/lean-original-provenance.md). Strip embedded photo
-  JPEG bytes from the **snapshot** encoder (`RecipeBundleCoding.snapshotData`) and stop persisting
-  raw import HTML (`originalImportText`) in release — both would needlessly ride the synced recipe
-  record. Do **not** touch the transfer `RecipeBundle`. Split the compare-to-original view out as a
-  later slice; it doesn't gate sync. No DDL. This is the first, independent, must-precede-the-
-  re-import step of the sync milestone. Dispatchable now.
+- **M4 (iCloud sync) — Slice 2: CloudKit project setup + `SyncEngine` wiring (started OFF)** —
+  [`milestones/M4-icloud-sync.md`](milestones/M4-icloud-sync.md) § Slice 2. Wire sync end-to-end
+  against the CloudKit **dev** environment but keep it **opt-in / off for real data** until the
+  cutover (Slice 4). Additive Xcode entitlements via **XcodeGen `project.yml`** (iCloud + CloudKit
+  container, `aps-environment`, `UIBackgroundModes = remote-notification`; defer `CKSharingSupported`);
+  `attachMetadatabase()` + a `SyncEngine(startsImmediately: false)` in `bootstrapDatabase`
+  (`Schema.swift`) enumerating **every** synced `@Table` explicitly; a launch gate for local-only
+  when there's no iCloud account. The **share extension must not run its own engine** — confirm the
+  main app's engine picks up extension-written rows (raise `question-for-architect` if not). Verify
+  round-trip in the CloudKit **dev** dashboard on device; do **not** point at Production. Dispatchable now.
+
+M4 Slice 1 — lean original-provenance — **DONE** (PR #45 merged):
+
+- `RecipeBundleCoding.snapshotData` now strips `originalImportText` and photo `displayData`/
+  `thumbnailData` from the snapshot blob (metadata + `imageDataReference` retained); import/capture
+  bundle creation defaults `originalImportText == nil` via a test-only `preserveRawImportHTML` seam.
+  Transfer `RecipeBundle` untouched (photo bytes still transfer). Snapshot is passive provenance —
+  no production consumer of `decodeSnapshot`. Compare-to-original view still deferred to a later slice.
 
 M3 authenticated browser capture — **DONE** (PR #44 merged, `2f5b588`):
 
@@ -46,8 +56,7 @@ Drawn into **Next Up** one at a time; this is not a dispatch target.
    "real-device jetsam check": the decode itself is already memory-safe via
    `CGImageSourceCreateThumbnailAtIndex` + `kCGImageSourceThumbnailMaxPixelSize` downsampling in
    `RecipePhotoProcessor`, which never materializes the full-resolution bitmap, so the residual gap
-   is the unbounded *download* buffer, not the decode.) May be folded opportunistically into M4
-   Slice 1 (both touch the capture/image path), or taken standalone.
+   is the unbounded *download* buffer, not the decode.) Standalone; not on the sync critical path.
 
 Comment ingestion stays in `docs/open-questions.md` until it is a scoped effort.
 
