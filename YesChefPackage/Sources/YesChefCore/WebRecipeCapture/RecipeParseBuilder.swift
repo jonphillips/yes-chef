@@ -8,6 +8,7 @@ struct RecipeParseBuilder {
   private(set) var ingredients: [String] = []
   private(set) var instructionSections: [ParsedRecipeInstructionSection] = []
   private(set) var editorialBlocks: [ParsedRecipeEditorialBlock] = []
+  private var sawTruncatedStructuredData = false
 
   let sourceURL: URL?
   let originalHTML: String
@@ -57,11 +58,17 @@ struct RecipeParseBuilder {
     editorialBlocks.append(block)
   }
 
+  mutating func markTruncatedStructuredData() {
+    sawTruncatedStructuredData = true
+  }
+
   func build(capturedAt: Date) -> ParsedRecipePage {
     let prepTime = votes.winner(.prepTime).flatMap(RecipeDurationParser.minutes)
     let cookTime = votes.winner(.cookTime).flatMap(RecipeDurationParser.minutes)
     let totalTime = votes.winner(.totalTime).flatMap(RecipeDurationParser.minutes)
     let ingredientSections = Self.sectionedIngredients(ingredients)
+    let missingIngredients = ingredientSections.allSatisfy(\.lines.isEmpty)
+    let missingInstructions = instructionSections.allSatisfy(\.steps.isEmpty)
     var warnings: [WebRecipeCaptureWarning] = []
     let hasStructuredRecipe = schemaTypes.contains("Recipe")
       || !ingredients.isEmpty
@@ -71,9 +78,12 @@ struct RecipeParseBuilder {
       || cookTime != nil
       || totalTime != nil
     if !hasStructuredRecipe { warnings.append(.noStructuredRecipeData) }
+    if sawTruncatedStructuredData, missingIngredients || missingInstructions {
+      warnings.append(.truncatedStructuredData)
+    }
     if votes.winner(.title) == nil { warnings.append(.untitledRecipe) }
-    if ingredientSections.allSatisfy(\.lines.isEmpty) { warnings.append(.noIngredients) }
-    if instructionSections.allSatisfy(\.steps.isEmpty) { warnings.append(.noInstructions) }
+    if missingIngredients { warnings.append(.noIngredients) }
+    if missingInstructions { warnings.append(.noInstructions) }
 
     return ParsedRecipePage(
       sourceURL: resolvedSourceURL(),

@@ -7,7 +7,19 @@ enum RecipeJSONLDExtractor {
     for script in scripts {
       guard let top = jsonObject(from: script.data()) else { continue }
       for node in recipeNodes(in: top) {
-        mine(node, into: &builder)
+        mineIfComplete(node, into: &builder)
+      }
+    }
+
+    let metas = (try? document.select("meta[name]").array()) ?? []
+    for meta in metas {
+      guard ((try? meta.attr("name")) ?? "").lowercased() == "application/ld+json",
+        let content = try? meta.attr("content"),
+        !content.isEmpty,
+        let top = jsonObject(from: content)
+      else { continue }
+      for node in recipeNodes(in: top) {
+        mineIfComplete(node, into: &builder)
       }
     }
   }
@@ -46,7 +58,12 @@ enum RecipeJSONLDExtractor {
     typeStrings(dict["@type"]).contains { RecipeSchemaOrg.recipeTypes.contains($0) }
   }
 
-  private static func mine(_ node: [String: Any], into builder: inout RecipeParseBuilder) {
+  private static func mineIfComplete(_ node: [String: Any], into builder: inout RecipeParseBuilder) {
+    if isTruncated(node) {
+      builder.markTruncatedStructuredData()
+      return
+    }
+
     for type in typeStrings(node["@type"]) { builder.addSchemaType(type) }
     for (property, attribute) in RecipeSchemaOrg.scalarProperties {
       if property == "aggregateRating" {
@@ -59,6 +76,11 @@ enum RecipeJSONLDExtractor {
     for image in imageStrings(node["image"]) { builder.addImage(image) }
     for ingredient in flatStrings(node["recipeIngredient"]) { builder.addIngredient(ingredient) }
     mineInstructions(node["recipeInstructions"], into: &builder)
+  }
+
+  private static func isTruncated(_ node: [String: Any]) -> Bool {
+    let recipeText = flatStrings(node["recipeIngredient"]) + instructionStrings(node["recipeInstructions"])
+    return recipeText.contains(where: isTruncationSentinel)
   }
 
   private static func mineInstructions(_ value: Any?, into builder: inout RecipeParseBuilder) {
@@ -140,6 +162,17 @@ enum RecipeJSONLDExtractor {
     default:
       return firstString(value)
     }
+  }
+
+  private static func isTruncationSentinel(_ text: String) -> Bool {
+    let normalized = text
+      .replacingOccurrences(of: "\u{2026}", with: "...")
+      .components(separatedBy: .whitespacesAndNewlines)
+      .filter { !$0.isEmpty }
+      .joined(separator: " ")
+      .lowercased()
+    return normalized.contains("sign up for full access")
+      || normalized.hasPrefix("... and more")
   }
 
   private static func cleanedJSON(_ raw: String) -> Data? {

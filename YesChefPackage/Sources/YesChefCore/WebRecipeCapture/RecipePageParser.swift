@@ -17,6 +17,7 @@ public enum WebRecipePageParser {
     RecipeJSONLDExtractor.extract(from: document, into: &builder)
     RecipeMetaExtractor.extract(from: document, into: &builder)
     RecipeMicrodataExtractor.extract(from: document, into: &builder)
+    RecipeMilkStreetExtractor.extract(from: document, into: &builder)
     RecipeBodyImageExtractor.extract(from: document, into: &builder)
     RecipeEditorialProseExtractor.extract(from: document, into: &builder)
 

@@ -640,6 +640,7 @@ private struct SanitizedSiteCase {
   static func all() throws -> [Self] {
     [
       try seriousEatsJSONLD(),
+      try milkStreetGochujang(),
       try smittenKitchenMicrodata(),
       try kitchnOpenGraph(),
       try kingArthurUnicode(),
@@ -657,6 +658,18 @@ private struct SanitizedSiteCase {
       expectedInstructionSectionNames: ["Roast", "Assemble"],
       expectedWarnings: [],
       expectsRenderedFallback: false
+    )
+  }
+
+  static func milkStreetGochujang() throws -> Self {
+    Self(
+      sourceURL: try #require(URL(string: "https://www.177milkstreet.com/recipes/gochujang-stir-fried-pork-celery")),
+      fetchHTML: try fixtureHTML("milk-street-gochujang"),
+      expectedTitle: "Gochujang Stir-Fried Pork and Celery",
+      expectedSourceName: "Milk Street",
+      expectedIngredientSectionNames: [nil],
+      expectedInstructionSectionNames: [nil],
+      expectedWarnings: []
     )
   }
 
