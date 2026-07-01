@@ -21,13 +21,20 @@ extension DependencyValues {
   public mutating func bootstrapDatabaseForShareExtension() throws {
     @Dependency(\.context) var context
     let databasePath: String?
+    let syncMode: YesChefCloudSync.BootstrapMode
     switch context {
     case .live:
       databasePath = try YesChefDatabaseStorage.prepareLiveSharedStoreForExtension().path
+      syncMode = .configured(startImmediately: false)
     case .preview, .test:
       databasePath = nil
+      syncMode = .disabled
     }
-    try bootstrapDatabase(path: databasePath, syncMode: .disabled)
+    try bootstrapDatabase(path: databasePath, syncMode: syncMode)
+  }
+
+  public mutating func bootstrapDatabaseForShareExtension(path: String?) throws {
+    try bootstrapDatabase(path: path, syncMode: .configured(startImmediately: false))
   }
 
   public mutating func bootstrapDatabase(path: String?) throws {
@@ -276,6 +283,7 @@ extension DependencyValues {
         ADD COLUMN "parentCategoryID" TEXT
         """)
         .execute(db)
+      // Fresh installs use the loose CloudKit-compatible parent ID; existing DBs converge below.
 
       try #sql("""
         CREATE INDEX "index_categories_on_parentCategoryID" ON "categories"("parentCategoryID")

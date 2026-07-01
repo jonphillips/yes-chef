@@ -21,32 +21,6 @@ public enum YesChefCloudSync {
   public static let enabledEnvironmentKey = "YES_CHEF_CLOUDKIT_SYNC_ENABLED"
   public static let enabledLaunchArgument = "-YesChefCloudKitSyncEnabled"
 
-  public static let syncedTableNames = [
-    Recipe.tableName,
-    RecipeSource.tableName,
-    IngredientSection.tableName,
-    IngredientLine.tableName,
-    InstructionSection.tableName,
-    InstructionStep.tableName,
-    RecipeNote.tableName,
-    RecipePhoto.tableName,
-    Tag.tableName,
-    Category.tableName,
-    Equipment.tableName,
-    RecipeTag.tableName,
-    RecipeCategory.tableName,
-    RecipeEquipment.tableName,
-    RecipeImportRef.tableName,
-    MealPlanItem.tableName,
-    Menu.tableName,
-    MenuItem.tableName,
-    MenuPlacement.tableName,
-    GroceryList.tableName,
-    GroceryItem.tableName,
-    GroceryItemSource.tableName,
-    PantryItem.tableName,
-  ]
-
   public static func isManuallyEnabled(
     defaults: UserDefaults = .standard,
     environment: [String: String] = ProcessInfo.processInfo.environment,

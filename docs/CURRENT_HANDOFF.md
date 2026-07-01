@@ -19,11 +19,12 @@ task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
   against the CloudKit **dev** environment but keep it **opt-in / off for real data** until the
   cutover (Slice 4). Additive Xcode entitlements via **XcodeGen `project.yml`** (iCloud + CloudKit
   container, `aps-environment`, `UIBackgroundModes = remote-notification`; defer `CKSharingSupported`);
-  `attachMetadatabase()` + a `SyncEngine(startsImmediately: false)` in `bootstrapDatabase`
+  `attachMetadatabase()` + a `SyncEngine(startImmediately: false)` in `bootstrapDatabase`
   (`Schema.swift`) enumerating **every** synced `@Table` explicitly; a launch gate for local-only
-  when there's no iCloud account. The **share extension must not run its own engine** — confirm the
-  main app's engine picks up extension-written rows (raise `question-for-architect` if not). Verify
-  round-trip in the CloudKit **dev** dashboard on device; do **not** point at Production. Dispatchable now.
+  when there's no iCloud account. The **share extension may construct a stopped engine** only to
+  install triggers/write `SyncMetadata`, but must never start/network; confirm the main app picks up
+  extension-written metadata. Verify round-trip in the CloudKit **dev** dashboard on device; do
+  **not** point at Production. Dispatchable now.
 
 M4 Slice 1 — lean original-provenance — **DONE** (PR #45 merged):
 
