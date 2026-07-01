@@ -7,6 +7,7 @@ enum RecipeMilkStreetExtractor {
   private static let printIngredientDescriptionSelector = "[class*=RecipePrintTemplate_ingredientDescription]"
   private static let printIngredientHeadingSelector = "[class*=RecipePrintTemplate_ingredientHeading]"
   private static let printIngredientItemSelector = "[class*=RecipePrintTemplate_ingredientItem]"
+  private static let printIngredientRowSelector = "[class*=RecipePrintTemplate_ingredientRow]"
   private static let bodyIngredientAmountSelector = "[class*=RecipeBodyContent_ingredientItemBlock__amount]"
   private static let bodyIngredientDescriptionSelector = "[class*=RecipeBodyContent_ingredientItemBlock__description]"
   private static let bodyIngredientItemSelector = "[class*=RecipeBodyContent_ingredientItemBlockItem__]"
@@ -28,8 +29,24 @@ enum RecipeMilkStreetExtractor {
     extractSummaryFacts(from: document, into: &builder)
     extractTips(from: document, into: &builder)
 
-    if !extractPrintIngredients(from: document, into: &builder) {
-      _ = extractBodyIngredients(from: document, into: &builder)
+    let printSelectors = IngredientExtractionSelectors(
+      headingSelector: printIngredientHeadingSelector,
+      itemSelector: "\(printIngredientItemSelector), \(printIngredientRowSelector)",
+      amountSelector: printIngredientAmountSelector,
+      descriptionSelector: printIngredientDescriptionSelector,
+      headingText: elementText
+    )
+    let bodySelectors = IngredientExtractionSelectors(
+      headingSelector: bodyIngredientHeadingItemSelector,
+      itemSelector: bodyIngredientItemSelector,
+      amountSelector: bodyIngredientAmountSelector,
+      descriptionSelector: bodyIngredientDescriptionSelector,
+      headingText: { element in
+        firstDescendantText(in: element, selector: lineHeadingTitleSelector)
+      }
+    )
+    if !extractIngredients(from: document, into: &builder, selectors: printSelectors) {
+      _ = extractIngredients(from: document, into: &builder, selectors: bodySelectors)
     }
 
     let printSteps = instructionLines(in: document, selector: printInstructionContentSelector)
@@ -91,82 +108,37 @@ enum RecipeMilkStreetExtractor {
     }
   }
 
-  private static func extractPrintIngredients(
+  private static func extractIngredients(
     from document: Document,
-    into builder: inout RecipeParseBuilder
+    into builder: inout RecipeParseBuilder,
+    selectors: IngredientExtractionSelectors
   ) -> Bool {
-    let selector = "\(printIngredientHeadingSelector), \(printIngredientItemSelector)"
+    let selector = "\(selectors.headingSelector), \(selectors.itemSelector)"
     let elements = (try? document.select(selector).array()) ?? []
+    var lines: [String] = []
     var foundIngredient = false
 
     for element in elements {
-      if matches(element, selector: printIngredientHeadingSelector) {
-        builder.addIngredient(elementText(element))
+      if matches(element, selector: selectors.headingSelector) {
+        if let heading = selectors.headingText(element) {
+          lines.append(heading)
+        }
         continue
       }
 
-      guard matches(element, selector: printIngredientItemSelector),
-        let description = firstDescendantText(in: element, selector: printIngredientDescriptionSelector)
+      guard matches(element, selector: selectors.itemSelector),
+        let description = firstDescendantText(in: element, selector: selectors.descriptionSelector)
       else { continue }
-      let amount = firstDescendantText(in: element, selector: printIngredientAmountSelector)
-      builder.addIngredient(joinedIngredient(amount: amount, description: description))
+      let amount = firstDescendantText(in: element, selector: selectors.amountSelector)
+      lines.append(joinedIngredient(amount: amount, description: description))
       foundIngredient = true
     }
 
-    if foundIngredient { return true }
-
-    let amountElements = (try? document.select(printIngredientAmountSelector).array()) ?? []
-    for amountElement in amountElements {
-      guard let description = descriptionElement(for: amountElement, selector: printIngredientDescriptionSelector),
-        let descriptionText = elementText(description)
-      else { continue }
-      let amountText = elementText(amountElement)
-      builder.addIngredient(joinedIngredient(amount: amountText, description: descriptionText))
-      foundIngredient = true
+    guard foundIngredient else { return false }
+    for line in lines {
+      builder.addIngredient(line)
     }
     return foundIngredient
-  }
-
-  private static func extractBodyIngredients(
-    from document: Document,
-    into builder: inout RecipeParseBuilder
-  ) -> Bool {
-    let selector = "\(bodyIngredientHeadingItemSelector), \(bodyIngredientItemSelector)"
-    let elements = (try? document.select(selector).array()) ?? []
-    var foundIngredient = false
-
-    for element in elements {
-      if matches(element, selector: bodyIngredientHeadingItemSelector) {
-        builder.addIngredient(firstDescendantText(in: element, selector: lineHeadingTitleSelector))
-        continue
-      }
-
-      guard matches(element, selector: bodyIngredientItemSelector),
-        let description = firstDescendantText(in: element, selector: bodyIngredientDescriptionSelector)
-      else { continue }
-      let amount = firstDescendantText(in: element, selector: bodyIngredientAmountSelector)
-      builder.addIngredient(joinedIngredient(amount: amount, description: description))
-      foundIngredient = true
-    }
-
-    return foundIngredient
-  }
-
-  private static func descriptionElement(for amountElement: Element, selector: String) -> Element? {
-    if let parent = amountElement.parent(),
-      let scoped = try? parent.select(selector).first()
-    {
-      return scoped
-    }
-    var sibling = nextElementSibling(of: amountElement)
-    while let element = sibling {
-      if matches(element, selector: selector) { return element }
-      if let descendant = try? element.select(selector).first() {
-        return descendant
-      }
-      sibling = nextElementSibling(of: element)
-    }
-    return nil
   }
 
   private static func instructionLines(in document: Document, selector: String) -> [String] {
@@ -197,23 +169,28 @@ enum RecipeMilkStreetExtractor {
     return elementText(descendant)
   }
 
-  private static func nextElementSibling(of element: Element) -> Element? {
-    guard let siblings = element.parent()?.children().array(),
-      let index = siblings.firstIndex(where: { $0 === element }),
-      siblings.indices.contains(index + 1)
-    else { return nil }
-    return siblings[index + 1]
-  }
-
   private static func matches(_ element: Element, selector: String) -> Bool {
-    guard let fragment = classFragment(in: selector) else { return false }
-    return ((try? element.attr("class")) ?? "").contains(fragment)
+    let className = (try? element.attr("class")) ?? ""
+    return selector.split(separator: ",").contains { selector in
+      guard let fragment = classFragment(in: String(selector)) else { return false }
+      return className.contains(fragment)
+    }
   }
 
   private static func classFragment(in selector: String) -> String? {
+    let selector = selector.trimmingCharacters(in: .whitespacesAndNewlines)
     guard let start = selector.range(of: "[class*=")?.upperBound,
       let end = selector[start...].firstIndex(of: "]")
     else { return nil }
     return String(selector[start..<end])
+      .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+  }
+
+  private struct IngredientExtractionSelectors {
+    var headingSelector: String
+    var itemSelector: String
+    var amountSelector: String
+    var descriptionSelector: String
+    var headingText: (Element) -> String?
   }
 }
