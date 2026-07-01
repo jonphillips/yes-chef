@@ -1,14 +1,11 @@
 # Current Handoff
 
-Last updated: July 1, 2026 (**M4 share-extension iCloud round-trip CONFIRMED end-to-end on device.**
-Share from the extension → tap the app icon to reopen → recipe uploads to CloudKit. PR #49 carried
-both halves (producer wait + consumer foreground re-drain); the final missing piece was an
-**enablement gate** — `isManuallyEnabled` was set only by the volatile Xcode launch-arg, so a
-non-Xcode launch (icon tap / extension handoff, exactly how Jon tests) had sync OFF and the engine
-never started to drain the extension's pending rows. Folded into #49:
-`persistManualEnablementFromLaunchEnvironment()` mirrors the dev flag into persistent `UserDefaults`
-at app `init()`. **This closes the CloudSync effort.** Next Up = **needs a conversation with Jon —
-do not infer.**)
+Last updated: July 1, 2026 (**Milk Street sections/Tip/summary/time (PR #52) and the DEBUG Export
+DOM revival (PR #51) both architect-approved and merged.** Three of four follow-on gaps from PR #50
+dogfooding are fixed and fixture-tested: Tip callout, real per-recipe summary outranking site
+boilerplate, and servings/cook-time (with a unicode-vulgar-fraction normalizer for values like
+`"1½ hours"`). The fourth — ingredient subsection headings — is **not** a missing-markup limitation;
+architect review root-caused it as a branch-selection bug, see Next Up below.)
 
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
@@ -20,37 +17,26 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **Revive the dead "Export DOM" debug button in DEBUG builds** — `OriginalSnapshotView.swift:56-64`
-  ships a DEBUG-only `ShareLink` that exports `recipe.originalImportText` as raw HTML, silently dead
-  since PR #45 (`docs/efforts/lean-original-provenance.md`): both production capture call sites
-  (`RecipeModels.swift:216`, `WebRecipeCaptureClient.swift:272`) use the `preserveRawImportHTML`
-  default of `false`, so `originalImportText` is always `nil` and the button's `if let
-  originalImportDOMExport` guard never renders — in *any* build config. Jon confirmed (2026-07-01) he
-  wants DEBUG builds only to keep preserving the raw HTML for this tool, Release/sync payload staying
-  lean as PR #45 intended. Pass `preserveRawImportHTML: true` from those two call sites gated behind
-  `#if DEBUG`/`#else false #endif` — don't just flip the function default, that would undo the
-  sync-payload leanness PR #45 was for. Small, deterministic, no device testing needed; standalone.
-
-**Blocked on Jon, not this dispatch — needs a sanitized authenticated fixture:**
-`docs/efforts/milk-street-sections-tip-summary.md`. Dogfooding PR #50 against a second
-real recipe (chicken-peanut-red-chili-sauce-pollo-encacahuatado) found four gaps beyond
-that effort's scope — all stem from the same root cause (the JSON-LD node is truncated,
-so nothing else feeds `.summary`/`.servingsText`/`.cookTime`/etc.): (1) ingredient
-subsections (`FOR THE CHICKEN AND BROTH:`) are dropped — mechanism is ready
-(`addIngredient` → `IngredientSectionHeading.sections` already promotes colon-terminated
-headings for free) but the real heading markup is server-gated and unavailable outside
-Jon's session; (2) the "Tip" callout isn't captured — root-caused and ready to implement
-(`[class*=Tip_Tip__]` / `[role=note][aria-label=Tip]`, confirmed live and
-unauthenticated, same shape as `addEditorialBlock`); (3) the opening-paragraph summary
-resolves to Milk Street's generic site-wide meta description instead of the real
-per-recipe intro paragraph (`RecipeSummaryContent_body__*`, also confirmed live and
-unauthenticated); (4) servings and cook/prep time aren't captured — root-caused to an
-`ItemLabelList_item__*` label/value list (also unauthenticated), but the value text uses
-unicode vulgar fractions (`"1½ hours"`) that `RecipeDurationParser` can't parse yet, so
-that needs a small fraction-normalization fix first. **Ask Jon for a sanitized
-authenticated capture of the chicken-peanut recipe** (same "View Original" path used for
-the original gochujang fixture) to pin the ingredient-heading selector, then dispatch all
-four together.
+- **Fix ingredient-subsection headings dropped on the print-template path** —
+  `RecipeMilkStreetExtractor.extract` (`RecipeMilkStreetExtractor.swift:22-34`) tries
+  `extractIngredients` against `RecipePrintTemplate_*` selectors first, and only falls back to
+  `extractBodyIngredients` (the function PR #52 taught to recognize
+  `RecipeBodyContent_ingredientSectionHeadingItemContainer__*` / `LineHeading_title__*` headings)
+  when the print-template pass finds **zero** ingredients. Jon's own gochujang capture (PR #50's
+  fixture) proves real Milk Street pages render `RecipePrintTemplate_*` markup with amount+
+  description pairs, so on his chicken-peanut capture the print-template branch almost certainly
+  succeeded and the body fallback — the only place that understands headings — never ran.
+  Ingredients came through; headings silently didn't. This is a code gap, not a Milk Street
+  display limitation. **The real DOM export already exists** — Jon gave Codex the chicken-peanut
+  recipe via the DEBUG "Export DOM" button (just revived in PR #51) on the booted iPad Pro
+  simulator (`iPad Pro 13-inch (M5) (16GB)`, UDID `B9E64A9C-0D66-4061-A3B6-39AB8E0A806F`); pull it
+  from that simulator's filesystem rather than asking Jon to re-capture. Inspect the print-template
+  markup for heading rows (may use a different class than `LineHeading_title__`); either teach
+  `extractIngredients`'s print-template path to recognize them the same way `extractBodyIngredients`
+  does, or restructure so heading detection isn't fallback-only. Extend
+  `milk-street-chicken-peanut.html`/its test to cover the print-template branch specifically (the
+  current fixture only exercises `RecipeBodyContent_*`, which is why this branch-selection bug
+  passed CI).
 
   **Queued next (parking lot, not dispatched — planned 2026-07-01):**
   - **NYT "Reader Feedback" — comment ingestion + LLM curation** —
@@ -68,15 +54,25 @@ four together.
     pantry thresholds, dialog-free); spec = [[grocery-pantry-threshold-design]] (Phase E).
   - Full context in the `post-sync-next-tracks` memory.
 
+Milk Street sections/Tip/summary/time — **DONE** (PR #52, `codex/milk-street-sections-tip-summary`;
+architect-approved 2026-07-01, merged): real per-recipe summary (`RecipeSummaryContent_body__*`)
+outranking site-boilerplate meta description, Tip callout captured as an editorial block
+(`[role=note][aria-label=Tip]`), servings/prep/cook/total time from `ItemLabelList_item__*`, and a
+`RecipeDurationParser` unicode-vulgar-fraction normalizer (`"1½ hours"` → 90 min) — all fixture-
+tested against a sanitized `milk-street-chicken-peanut.html`. **Architect review found the fourth
+gap (ingredient subsection headings) is a branch-selection bug, not a missing-markup limitation** —
+see Next Up above.
+
+Revive DEBUG DOM export — **DONE** (PR #51, `codex/revive-debug-dom-export`; architect-approved
+2026-07-01, merged): `preserveRawImportHTML: true` gated `#if DEBUG` at both production capture call
+sites, Release stays lean (PR #45 intent preserved).
+
 Milk Street parser hardening — **DONE** (PR #50, `codex/milk-street-parser-hardening`;
 architect-approved 2026-07-01, merged): meta-tag JSON-LD reading gated on truncation-sentinel
 detection, a `RecipePrintTemplate_*`/`RecipeBodyContent_*` DOM fallback extractor
 (`RecipeMilkStreetExtractor`, amount+description join, empty-amount tolerant), the new
 `truncatedStructuredData` warning, and sanitized recovered/truncated-only fixtures. Correctly
 scoped to the original gochujang reference capture; NYT teaser regression stays green.
-**Dogfooding against a second recipe found four follow-on gaps** (ingredient subsections, a
-Tip callout, a generic-boilerplate summary, and missing servings/cook time) — see the
-blocked-on-Jon item above in Next Up.
 
 M4 — share-extension iCloud sync (producer wait + consumer re-drain + enablement persistence) —
 **DONE** (PR #49, `codex/m4-share-extension-pending-upload`; architect-approved 2026-07-01, round-trip

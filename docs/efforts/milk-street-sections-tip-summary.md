@@ -2,8 +2,14 @@
 
 **Type:** Follow-on hardening (Milk Street DOM fallback, post-PR #50 dogfooding)
 **Owner:** Codex (implement) · Jon (architect/review)
-**Status:** Drafting — three of four gaps root-caused with real markup; ingredient
-subsection heading needs an authenticated fixture from Jon.
+**Status:** Gaps 2-4 (Tip callout, real summary, servings/cook-time) shipped in PR #52,
+architect-approved and merged 2026-07-01. Gap 1 (ingredient subsection headings) is
+**not fixture-blocked** — architect review re-scoped it as a branch-selection bug (the
+print-template ingredient path has no heading logic, only the fallback path PR #52 added
+does; real Milk Street pages hit the print-template path first). Jon already gave Codex
+the chicken-peanut authenticated capture via the DEBUG Export DOM button (PR #51) on the
+booted iPad Pro simulator (UDID `B9E64A9C-0D66-4061-A3B6-39AB8E0A806F`) — pull it from
+there, no new fixture needed. See `docs/CURRENT_HANDOFF.md` Next Up for the dispatch.
 
 ## Context
 
@@ -34,14 +40,19 @@ heading text as its own `builder.addIngredient("FOR THE CHICKEN AND BROTH:")` li
 document order relative to the rows it precedes, sectioning falls out for free — same
 mechanism Paprika import already relies on.
 
-**Blocked on a fixture.** I confirmed via an unauthenticated fetch of the live chicken
-recipe that Milk Street server-gates the entire ingredients DOM (both
-`RecipePrintTemplate_*` and `RecipeBodyContent_*` blocks render empty/absent without a
-logged-in session — the print template shell was present but childless). I can't recover
-the real heading element/class from outside Jon's session, so this needs the same
-treatment as the original effort: **Jon supplies a sanitized authenticated capture** (View
-Source or the existing "View Original" capture path) showing the heading markup, so the
-selector can be pinned to a real class-prefix rather than guessed.
+**Update (post-PR #52, architect review):** PR #52 implemented this heading passthrough,
+but only inside `extractBodyIngredients` (the `RecipeBodyContent_*` fallback path) — it's
+fixture-tested and correct in isolation. The bug: `extract()` only calls
+`extractBodyIngredients` when the print-template pass (`extractIngredients` against
+`RecipePrintTemplate_*` selectors, which has no heading logic at all) finds zero
+ingredients. Jon's own gochujang capture (PR #50's fixture) shows real Milk Street pages
+populate `RecipePrintTemplate_*` with amount+description pairs, so on a real page that
+branch wins and the heading-aware fallback never runs — ingredients render, headings
+silently don't. This is not a fixture-availability problem: Jon already gave Codex the
+chicken-peanut authenticated capture via the DEBUG Export DOM button (PR #51) on the
+booted iPad Pro simulator (UDID `B9E64A9C-0D66-4061-A3B6-39AB8E0A806F`). Pull it from
+there and either teach the print-template path about headings too, or restructure so
+heading detection runs regardless of which ingredient source wins.
 
 ## 2. Tip callout not captured
 
