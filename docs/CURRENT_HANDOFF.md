@@ -36,11 +36,16 @@ Done on `codex/editorial-prose-notes` (PR #44, in review):
 
 Drawn into **Next Up** one at a time; this is not a dispatch target.
 
-1. **Real-device jetsam check for share-extension hero hydration** — the share extension runs
-   under a ~120 MB limit; a 12 MB download + `RecipePhotoProcessor` decode was never exercised
-   on device (simulator doesn't enforce jetsam). Validate with a large hero before this path is
-   leaned on; a memory kill is the one failure mode the `catch → return draft` fallback doesn't
-   cover. Carry-forward from PR #43 review.
+1. **Early `expectedContentLength` guard on hero download** — `WebRecipeCaptureClient.fetchImageData`
+   (`WebRecipeCaptureClient.swift:227`) enforces the 12 MB `maxImageResponseBytes` cap only *after*
+   `URLSession.shared.data` has fully buffered the response (`:233→:240`), so it doesn't bound peak
+   download memory in the ~120 MB share extension — an oversized body is downloaded in full, then
+   rejected. Add a one-line `response.expectedContentLength` pre-check to bail before buffering an
+   oversized image. Small, deterministic, no device testing needed. (Supersedes the earlier
+   "real-device jetsam check": the decode itself is already memory-safe via
+   `CGImageSourceCreateThumbnailAtIndex` + `kCGImageSourceThumbnailMaxPixelSize` downsampling in
+   `RecipePhotoProcessor`, which never materializes the full-resolution bitmap, so the residual gap
+   is the unbounded *download* buffer, not the decode.)
 2. **Lean original-provenance (sync prep)** — `docs/efforts/lean-original-provenance.md`. The
    `originalSnapshot` blob embeds redundant photo JPEG bytes (base64) and `originalImportText`
    carries raw page HTML that only a DEBUG tool reads — both would needlessly ride the synced
