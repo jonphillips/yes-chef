@@ -96,7 +96,7 @@ extension RecipeCoreTests {
       expectNoDifference(bundle.recipe.totalTimeMinutes, 82)
       expectNoDifference(bundle.recipe.rating, 4)
       expectNoDifference(bundle.recipe.difficulty, nil)
-      expectNoDifference(bundle.recipe.originalImportText?.contains("schema.org/Recipe"), true)
+      expectNoDifference(bundle.recipe.originalImportText, nil)
       expectNoDifference(bundle.source?.name, "Example Kitchen")
       expectNoDifference(bundle.source?.url, "https://example.com/pasta?from=fixture&unit=test")
       expectNoDifference(bundle.source?.author, nil)
@@ -110,8 +110,20 @@ extension RecipeCoreTests {
       let snapshotData = try #require(bundle.recipe.originalSnapshot)
       let snapshot = try RecipeBundleCoding.decodeSnapshot(snapshotData)
       expectNoDifference(snapshot.recipe.title, "Weeknight Tomato Pasta")
+      expectNoDifference(snapshot.recipe.originalImportText, nil)
       expectNoDifference(snapshot.ingredients, pasta.ingredients)
       expectNoDifference(snapshot.categories, ["Dinner", "Pasta"])
+
+      var preservingUUIDs = SampleUUIDSequence(start: 1_100)
+      let preservingBundle = try pasta.makeRecipeBundle(
+        now: now,
+        uuid: { preservingUUIDs.next() },
+        preserveRawImportHTML: true
+      )
+      expectNoDifference(preservingBundle.recipe.originalImportText?.contains("schema.org/Recipe"), true)
+      let preservingSnapshotData = try #require(preservingBundle.recipe.originalSnapshot)
+      let preservingSnapshot = try RecipeBundleCoding.decodeSnapshot(preservingSnapshotData)
+      expectNoDifference(preservingSnapshot.recipe.originalImportText, nil)
     }
 
     @Test
@@ -279,7 +291,7 @@ extension RecipeCoreTests {
       expectNoDifference(importResult.outcome, .imported)
       expectNoDifference(importResult.warnings, [])
       expectNoDifference(imported.recipe.title, "Photo Board Curry")
-      expectNoDifference(imported.recipe.originalImportText?.contains("Photo Board Curry"), true)
+      expectNoDifference(imported.recipe.originalImportText, nil)
       expectNoDifference(imported.ingredientLines.map(\.originalText), ["see attached photo"])
       expectNoDifference(imported.instructionSteps.map(\.text), ["See attached photo."])
       expectNoDifference(imported.categories.map(\.name), ["Import Fixture"])

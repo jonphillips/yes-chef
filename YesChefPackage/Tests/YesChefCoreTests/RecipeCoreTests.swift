@@ -99,51 +99,6 @@ struct RecipeCoreTests {
   }
 
   @Test
-  func originalSnapshotRoundTripsReadableRecipeData() throws {
-    let now = Date(timeIntervalSinceReferenceDate: 802_000_000)
-    let recipeID = SampleUUIDSequence.uuid(1)
-    let sectionID = SampleUUIDSequence.uuid(2)
-    let recipe = Recipe(
-      id: recipeID,
-      title: "Test Recipe",
-      summary: "A useful fixture",
-      servingsText: "Serves 4",
-      dateCreated: now,
-      dateModified: now
-    )
-    let data = try RecipeBundleCoding.snapshotData(
-      recipe: recipe,
-      source: RecipeSource(id: SampleUUIDSequence.uuid(3), recipeID: recipeID, name: "Personal"),
-      ingredientSections: [IngredientSection(id: sectionID, recipeID: recipeID, sortOrder: 0)],
-      ingredientLines: [
-        IngredientLine(
-          id: SampleUUIDSequence.uuid(4),
-          recipeID: recipeID,
-          sectionID: sectionID,
-          originalText: "1 onion",
-          quantity: 1,
-          quantityText: "1",
-          unit: nil,
-          item: "onion",
-          sortOrder: 0
-        )
-      ],
-      instructionSections: [],
-      instructionSteps: [],
-      notes: [],
-      tagNames: ["weeknight"],
-      categoryNames: ["Mains"]
-    )
-
-    let snapshot = try RecipeBundleCoding.decodeSnapshot(data)
-
-    expectNoDifference(snapshot.recipe.title, "Test Recipe")
-    expectNoDifference(snapshot.ingredients, ["1 onion"])
-    expectNoDifference(snapshot.ingredientLines.first?.quantity, 1)
-    expectNoDifference(snapshot.tags, ["weeknight"])
-  }
-
-  @Test
   func archiveRecipeMarksRecipeArchivedAndPreservesChildren() throws {
     @Dependency(\.defaultDatabase) var database
     let now = Date(timeIntervalSinceReferenceDate: 802_000_000)

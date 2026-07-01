@@ -75,7 +75,7 @@ extension RecipeCoreTests {
       expectNoDifference(bundle.recipe.cookTimeMinutes, 40)
       expectNoDifference(bundle.recipe.totalTimeMinutes, 55)
       expectNoDifference(bundle.recipe.rating, 5)
-      expectNoDifference(bundle.recipe.originalImportText?.contains("Lemon Chicken"), true)
+      expectNoDifference(bundle.recipe.originalImportText, nil)
       expectNoDifference(bundle.source?.name, "Example Kitchen")
       expectNoDifference(bundle.source?.url, "https://example.com/recipes/lemon-chicken")
       expectNoDifference(bundle.source?.author, "Jamie Example")
@@ -101,9 +101,21 @@ extension RecipeCoreTests {
       let snapshotData = try #require(bundle.recipe.originalSnapshot)
       let snapshot = try RecipeBundleCoding.decodeSnapshot(snapshotData)
       expectNoDifference(snapshot.recipe.title, "Lemon Chicken")
+      expectNoDifference(snapshot.recipe.originalImportText, nil)
       expectNoDifference(snapshot.ingredients, bundle.ingredients)
       expectNoDifference(snapshot.notes, [])
       expectNoDifference(snapshot.photos.map(\.sourceURL), ["https://example.com/images/lemon-chicken.jpg"])
+
+      var preservingUUIDs = SampleUUIDSequence(start: 21_100)
+      let preservingBundle = try page.makeRecipeBundle(
+        now: now,
+        uuid: { preservingUUIDs.next() },
+        preserveRawImportHTML: true
+      )
+      expectNoDifference(preservingBundle.recipe.originalImportText?.contains("Lemon Chicken"), true)
+      let preservingSnapshotData = try #require(preservingBundle.recipe.originalSnapshot)
+      let preservingSnapshot = try RecipeBundleCoding.decodeSnapshot(preservingSnapshotData)
+      expectNoDifference(preservingSnapshot.recipe.originalImportText, nil)
     }
 
     @Test
@@ -217,7 +229,7 @@ extension RecipeCoreTests {
         let recipe = try #require(try Recipe.find(importResult.recipeID).fetchOne(db))
         let source = try #require(try RecipeSource.fetchAll(db).first { $0.recipeID == recipe.id })
         expectNoDifference(recipe.title, "Lemon Chicken")
-        expectNoDifference(recipe.originalImportText, Fixtures.jsonLDRecipe)
+        expectNoDifference(recipe.originalImportText, nil)
         expectNoDifference(source.url, sourceURL.absoluteString)
       }
     }
@@ -430,7 +442,7 @@ extension RecipeCoreTests {
           let recipe = try #require(try Recipe.find(firstResult.recipeID).fetchOne(db))
           let source = try #require(try RecipeSource.fetchAll(db).first { $0.recipeID == recipe.id })
           expectNoDifference(recipe.title, siteCase.expectedTitle)
-          expectNoDifference(recipe.originalImportText, siteCase.expectedOriginalHTML)
+          expectNoDifference(recipe.originalImportText, nil)
           expectNoDifference(source.name, siteCase.expectedSourceName)
           expectNoDifference(source.url, siteCase.sourceURL.absoluteString)
         }
@@ -461,7 +473,7 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func declaredNonUTF8CharsetPreservesOriginalHTMLBytesThroughCommit() async throws {
+    func declaredNonUTF8CharsetDefaultsHTMLStorageOffAndPreserveOptionKeepsBytes() async throws {
       @Dependency(\.defaultDatabase) var database
       let sourceURL = try #require(URL(string: "https://www.kingarthurbaking.com/recipes/cafe-toast"))
       let html = """
@@ -515,8 +527,16 @@ extension RecipeCoreTests {
       try await database.read { db in
         let recipe = try #require(try Recipe.find(result.recipeID).fetchOne(db))
         expectNoDifference(recipe.title, "Caf\u{00E9} Breakfast Toast")
-        expectNoDifference(recipe.originalImportText?.data(using: .isoLatin1), data)
+        expectNoDifference(recipe.originalImportText, nil)
       }
+
+      let preservingUUIDs = LockedSampleUUIDSequence(start: 27_100)
+      let preservingBundle = try draft.page.makeRecipeBundle(
+        now: Date(timeIntervalSinceReferenceDate: 804_300_060),
+        uuid: { preservingUUIDs.next() },
+        preserveRawImportHTML: true
+      )
+      expectNoDifference(preservingBundle.recipe.originalImportText?.data(using: .isoLatin1), data)
     }
 
     @Test

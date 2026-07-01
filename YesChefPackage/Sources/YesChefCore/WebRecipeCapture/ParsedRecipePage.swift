@@ -135,7 +135,8 @@ public struct ParsedRecipePage: Equatable, Sendable {
 
   public func makeRecipeBundle(
     now: Date,
-    uuid: () -> UUID
+    uuid: () -> UUID,
+    preserveRawImportHTML: Bool = false
   ) throws -> RecipeBundleCoding.RecipeBundle {
     let recipeID = uuid()
     let ingredientSections = makeIngredientSections(recipeID: recipeID, uuid: uuid)
@@ -176,7 +177,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
       rating: rating,
       dateCreated: now,
       dateModified: now,
-      originalImportText: originalHTML
+      originalImportText: preserveRawImportHTML ? originalHTML : nil
     )
     recipe.originalSnapshot = try RecipeBundleCoding.snapshotData(
       recipe: recipe,

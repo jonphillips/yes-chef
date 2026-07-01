@@ -882,6 +882,8 @@ public enum RecipeBundleCoding {
     equipment: [Equipment] = [],
     recipeEquipment: [RecipeEquipment] = []
   ) throws -> Data {
+    var recipe = recipe
+    recipe.originalImportText = nil
     let snapshot = RecipeBundle(
       recipe: recipe,
       source: source,
@@ -890,7 +892,7 @@ public enum RecipeBundleCoding {
       instructionSections: instructionSections,
       instructionSteps: instructionSteps.sorted { $0.sortOrder < $1.sortOrder },
       recipeNotes: notes.sorted { $0.dateCreated < $1.dateCreated },
-      photos: photos.sorted { $0.sortOrder < $1.sortOrder },
+      photos: leanSnapshotPhotos(photos),
       tagNames: tagNames,
       categoryNames: categoryNames,
       equipment: equipment,
@@ -903,6 +905,17 @@ public enum RecipeBundleCoding {
 
   public static func decodeSnapshot(_ data: Data) throws -> RecipeBundle {
     try JSONDecoder().decode(RecipeBundle.self, from: data)
+  }
+
+  private static func leanSnapshotPhotos(_ photos: [RecipePhoto]) -> [RecipePhoto] {
+    photos
+      .sorted { $0.sortOrder < $1.sortOrder }
+      .map { photo in
+        var photo = photo
+        photo.displayData = nil
+        photo.thumbnailData = nil
+        return photo
+      }
   }
 }
 
