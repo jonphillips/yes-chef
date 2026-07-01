@@ -1,12 +1,13 @@
 # Current Handoff
 
-Last updated: July 1, 2026 (**PR #48 merged → share-extension launch crash FIXED** (entitlement
-hotfix). But device testing during review revealed the extension→CloudKit round-trip is **still
-broken by a separate, deeper issue**: extension-written recipes save locally but never upload.
-Next Up = **M4 share-extension write-not-enqueued fix** — SQLiteData defers the stopped engine's
-`PendingRecordZoneChange` write to a fire-and-forget Task that `completeRequest` kills; must land
-before the S4 Production flip. On-device sync round-trip remains **confirmed only for the main-app
-capture path** (sim in-app browser capture → device); the extension path is **not** yet confirmed.
+Last updated: July 1, 2026 (**PR #49 (producer-side fix) is necessary but NOT sufficient** — device
+still fails. Diagnosis traced a **second, consumer-side** defect: the main app drains
+`PendingRecordZoneChange` only inside `start()`, which runs once in `YesChefApp.init()`, so an
+already-running engine never picks up the row the extension wrote. Next Up = **M4 share-extension
+consumer-side re-drain** — on scene `.active`, cycle the engine (`stop()`+`start()`) when pending
+changes exist, so extension-written rows upload. Must land with #49 before the S4 Production flip.
+On-device sync round-trip remains **confirmed only for the main-app capture path** (sim in-app
+browser capture → device); the extension path is **not** yet confirmed.
 
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
@@ -18,39 +19,60 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **M4 (iCloud sync) — share-extension write not enqueued for CloudKit upload (P1, pre-S4)** —
+- **M4 (iCloud sync) — share-extension recipes still don't upload; consumer-side re-drain (P1, pre-S4)** —
   extension-shared recipes commit to the shared DB (they show in the app) but **never upload to
-  CloudKit**, so they don't round-trip to other devices. Confirmed on device 2026-07-01: the shared
-  recipe is absent from the Dev Private DB (`co.pointfree.SQLiteData.defaultZone`) even though the
-  main app logs a full `willSend/didSendChanges` cycle (it sends unrelated rows); main-app in-app
-  capture round-trips fine. **NOT an entitlement/account issue** — PR #48 fixed the launch crash, and
-  the sim + device are on the same iCloud account.
-  **Root cause (traced through SQLiteData source):** the extension constructs a *stopped* engine
-  (`startImmediately: false`), so `isRunning == false`. The SQL trigger fires on the extension's
-  write and writes the durable `SyncMetadata` row synchronously — **but** the trigger's
-  `didUpdate`/`didDelete` callback, when `isRunning == false`, does **not** persist the
-  `PendingRecordZoneChange` (the row the main-app uploader consumes) synchronously; it defers it to a
-  fire-and-forget `Task { userDatabase.write { … } }`
-  (`sqlite-data/Sources/SQLiteData/CloudKit/SyncEngine.swift:823-838`, carrying the upstream
-  `// TODO: Perform this work in a trigger instead of a task`). `ShareCaptureModel.saveButtonTapped`
-  calls `extensionContext.completeRequest(...)` immediately after `database.write` returns
-  (`ShareViewController.swift:113`), tearing the process down **before that Task commits** → the
-  `PendingRecordZoneChange` is lost. On main-app `start()`, `enqueueLocallyPendingChanges()`
-  (`SyncEngine.swift:645`) reads an empty pending table → nothing uploads. The "new record type ⇒
-  full-table upload" fallback doesn't rescue it because `recipes` already exists in CloudKit. This is
-  the exact link the S2 note flagged as "no unit test covers." See [[extension-sync-construct-not-run]].
-  **Fix direction (respects construct ≠ run / no-network):** the extension must not `completeRequest`
-  until the deferred pending-change is durably written — after `database.write`, bounded-poll the
-  attached `sqliteDataCloudKit` `PendingRecordZoneChange` table until the expected change(s) land
-  (short timeout, then complete anyway so a save is never blocked forever). Still **no `start()` /
-  no networking / no `aps-environment`** in the extension. Also file the upstream `TODO` with
-  PointFree (the clean fix is theirs: persist the pending change in the trigger synchronously).
-  **Rejected:** extension calling `start()` / `sendChanges` (violates the guardrail + 120 MB budget +
-  no push). **Verify (device):** share a recipe from Safari (no crash — that's #48), foreground the
-  app with sync enabled → the recipe now appears in the Dev Private DB custom zone and round-trips to
-  a second device. This is the one link no unit test covers, so a **device round-trip is the DoD** —
-  a green `swift test` is necessary but not sufficient. `swift test` + `check-drift.sh` should be
-  unaffected. Dispatchable now.
+  CloudKit**. PR #49 fixed the **producer** half (below) but device testing still fails, because there
+  is a **second, consumer-side defect** in the main app. Fix this half on the **main-app side only**;
+  the extension guardrail (construct ≠ run, no network) is unchanged. See
+  [[extension-sync-construct-not-run]].
+  **Root cause (consumer side, traced through SQLiteData source + app code):** the "this record needs
+  uploading" bridge between the two processes is the `PendingRecordZoneChange` table. The **only** code
+  that drains it into a live CKSyncEngine is `enqueueLocallyPendingChanges()`
+  (`sqlite-data/…/SyncEngine.swift:645`), which is `private` and runs **only** inside `start()` (via
+  `uploadRecordsToCloudKit`, `:629`→`:537`); `start()` early-returns when already `isRunning`. A
+  *running* engine never re-reads that table — CKSyncEngine pulls from its own in-memory state via
+  `nextRecordZoneChangeBatch`, not from our pending table. The main app calls `start()` **exactly
+  once**, in `YesChefApp.init()` (`YesChefApp/YesChefApp.swift:22-24`). So the common device flow
+  breaks: launch app (engine running) → background (suspend, not kill) → share from Safari (extension
+  durably writes the `PendingRecordZoneChange` row, thanks to #49) → **foreground = resume, not
+  relaunch → `init()` doesn't re-run → `start()` not called again → pending row never drained →
+  recipe never uploads.** The recipe still *appears* via `DatabaseChangeBeacon` (UI refresh only),
+  which is the misleading symptom. In-app browser capture works because the main app's engine is
+  already `isRunning`, so its `didUpdate` adds the change to live state directly (never touching the
+  pending table). Ruled out: both processes share the same app-group DB **and** the same sibling
+  metadatabase file (`.SQLiteData.metadata-….sqlite`, derived from the shared path at
+  `SyncEngine.swift:2135`), so cross-process visibility is fine. NB: a full **cold-launch** after the
+  share *would* drain (start() re-runs), but nobody kills the app between sharing and reopening — the
+  feature is effectively broken regardless.
+  **Fix (chosen — main-app foreground re-drain, public API only):** on scene phase `.active`, if sync
+  is manually enabled **and** `YesChefCloudSync.pendingRecordZoneChangeCount(in:) > 0` (helper already
+  landed in #49), cycle the engine: `stop()` then `start()`. `start()` re-runs
+  `enqueueLocallyPendingChanges()` → drains the extension's row → uploads. Gate on pending-count so it
+  only fires right after a share import, not on every foreground (avoid stop/start churn + re-fetch
+  storms). Wire it where the app already observes lifecycle (add a `scenePhase` observer to the
+  `WindowGroup` / `AppContainer`, or fold into the existing `DatabaseChangeBeacon` observer). **PR #49
+  stays required** — no durable pending row = nothing to drain; land both halves together so the
+  device round-trip can pass. **Rejected:** extension calling `start()`/`sendChanges` (guardrail + 120
+  MB budget + no push); the SyncMetadata-touch alternative (`enqueueUnknownRecordsForCloudKit`-style)
+  — more robust but couples us to SQLiteData internal schema. Also file the upstream issue: SQLiteData
+  should (a) persist the pending change in the trigger synchronously (existing `// TODO` at
+  `SyncEngine.swift:823-838`) and (b) expose a public "drain persisted pending changes into a running
+  engine" entrypoint so consumers don't have to stop/start. **Verify (device — this is the DoD):**
+  share a recipe from Safari (no crash — that's #48), foreground the already-running app with sync
+  enabled → the recipe appears in the Dev Private DB custom zone (`…SQLiteData.defaultZone`) and
+  round-trips to a second device. A green `swift test` is necessary but **not** sufficient. `swift
+  test` + `check-drift.sh` should be unaffected. Dispatchable now.
+
+  **Producer half — DONE in PR #49 (`codex/m4-share-extension-pending-upload`, open):** the extension
+  constructs a *stopped* engine, so on write the trigger's `didUpdate` callback defers the
+  `PendingRecordZoneChange` insert to a fire-and-forget `Task { userDatabase.write { … } }`
+  (`SyncEngine.swift:823-838`, upstream `// TODO: Perform this work in a trigger instead of a task`);
+  `completeRequest` used to tear the process down before that Task committed → row lost.
+  `ShareCaptureModel.saveButtonTapped` now bounded-polls `pendingRecordZoneChangeCount` until the row
+  lands before `completeRequest` (short timeout, then completes anyway so a save never blocks). Adds
+  `YesChefCloudSync.pendingRecordZoneChangeCount` / `waitForPendingRecordZoneChanges` + a regression
+  test. Still no `start()` / no networking / no `aps-environment` in the extension. **Correct but
+  insufficient alone** — needs the consumer-side re-drain above; merge them as one landable unit.
 
 M4 — share-extension iCloud entitlement hotfix — **DONE** (PR #48 merged, `5e8be14`):
 
