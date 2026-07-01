@@ -35,9 +35,33 @@ public enum YesChefCloudSync {
     arguments: [String] = ProcessInfo.processInfo.arguments
   ) -> Bool {
     defaults.bool(forKey: enabledDefaultsKey)
-      || environment[enabledEnvironmentKey] == "1"
+      || isEnabledViaLaunchEnvironment(environment: environment, arguments: arguments)
+  }
+
+  static func isEnabledViaLaunchEnvironment(
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    arguments: [String] = ProcessInfo.processInfo.arguments
+  ) -> Bool {
+    environment[enabledEnvironmentKey] == "1"
       || environment[enabledEnvironmentKey]?.lowercased() == "true"
       || arguments.contains(enabledLaunchArgument)
+  }
+
+  /// Mirrors the dev-only launch flag (`-YesChefCloudKitSyncEnabled` / `YES_CHEF_CLOUDKIT_SYNC_ENABLED`)
+  /// into the persistent defaults domain.
+  ///
+  /// The launch argument/environment only lives in the volatile `NSArgumentDomain`, so it is present
+  /// solely for launches from Xcode. Without persisting it, a normal relaunch (tapping the app icon,
+  /// or being handed back from the share extension) sees `isManuallyEnabled == false`, the sync engine
+  /// never starts, and pending record-zone changes written by the share extension never drain.
+  public static func persistManualEnablementFromLaunchEnvironment(
+    defaults: UserDefaults = .standard,
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    arguments: [String] = ProcessInfo.processInfo.arguments
+  ) {
+    guard isEnabledViaLaunchEnvironment(environment: environment, arguments: arguments)
+    else { return }
+    defaults.set(true, forKey: enabledDefaultsKey)
   }
 
   public static func makeSyncEngine(
