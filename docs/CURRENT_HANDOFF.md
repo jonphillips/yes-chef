@@ -30,7 +30,7 @@ task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
 M4 Slice 2 — CloudKit `SyncEngine` wiring (started OFF) — **DONE** (PR #46, architect-approved):
 
-- Additive CloudKit **dev** entitlements (iCloud container `iCloud.com.jon.yeschef`, CloudKit
+- Additive CloudKit **dev** entitlements (iCloud container `iCloud.com.jonphillips.yeschef`, CloudKit
   service, `aps-environment`, `UIBackgroundModes = remote-notification`) via XcodeGen.
   `attachMetadatabase()` + `SyncEngine(startImmediately: false)` in `bootstrapDatabase` enumerating
   all 23 synced `@Table`s; iCloud account-status launch gate; sync opt-in defaults **OFF**. Share

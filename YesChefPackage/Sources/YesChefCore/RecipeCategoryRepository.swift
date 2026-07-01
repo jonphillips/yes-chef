@@ -210,6 +210,7 @@ extension RecipeRepository {
     uuid: () -> UUID
   ) throws {
     var existingCategories = try Category.fetchAll(db)
+    try reconcileDuplicateCategories(in: db, categories: &existingCategories)
     let existingRecipeCategories = try RecipeCategory.where { $0.recipeID.eq(recipeID) }.fetchAll(db)
     var keptRecipeCategoryIDs: Set<RecipeCategory.ID> = []
 
@@ -277,5 +278,69 @@ extension RecipeRepository {
     for row in rows where !keptIDs.contains(row.id) {
       try #sql("DELETE FROM \"recipeCategories\" WHERE \"id\" = \(bind: row.id)").execute(db)
     }
+  }
+
+  private static func reconcileDuplicateCategories(
+    in db: Database,
+    categories: inout [Category]
+  ) throws {
+    var didMerge = true
+    while didMerge {
+      didMerge = false
+      let groups = Dictionary(grouping: categories, by: CategoryLogicalKey.init)
+      for group in groups.values where group.count > 1 {
+        let sortedGroup = group.sorted(by: areCategoriesInCanonicalOrder)
+        guard let canonicalCategory = sortedGroup.first else { continue }
+        let duplicateCategories = sortedGroup.dropFirst()
+        let duplicateCategoryIDs = Set(duplicateCategories.map(\.id))
+
+        for var child in categories where child.parentCategoryID.map(duplicateCategoryIDs.contains) == true {
+          child.parentCategoryID = canonicalCategory.id
+          try Category.upsert { child }.execute(db)
+        }
+
+        for var recipeCategory in try RecipeCategory.fetchAll(db) where duplicateCategoryIDs.contains(recipeCategory.categoryID) {
+          let hasCanonicalRecipeCategory = try RecipeCategory.fetchAll(db).contains {
+            $0.recipeID == recipeCategory.recipeID && $0.categoryID == canonicalCategory.id
+          }
+          if hasCanonicalRecipeCategory {
+            try RecipeCategory.find(recipeCategory.id).delete().execute(db)
+          } else {
+            recipeCategory.categoryID = canonicalCategory.id
+            try RecipeCategory.upsert { recipeCategory }.execute(db)
+          }
+        }
+
+        for category in duplicateCategories {
+          try Category.find(category.id).delete().execute(db)
+        }
+
+        categories = try Category.fetchAll(db)
+        didMerge = true
+        break
+      }
+    }
+  }
+
+  private static func areCategoriesInCanonicalOrder(_ lhs: Category, _ rhs: Category) -> Bool {
+    if lhs.dateCreated != rhs.dateCreated {
+      return lhs.dateCreated < rhs.dateCreated
+    }
+    if lhs.sortOrder != rhs.sortOrder {
+      return lhs.sortOrder < rhs.sortOrder
+    }
+    return lhs.id.uuidString < rhs.id.uuidString
+  }
+}
+
+private struct CategoryLogicalKey: Hashable {
+  var parentCategoryID: Category.ID?
+  var normalizedName: String
+
+  init(category: Category) {
+    self.parentCategoryID = category.parentCategoryID
+    self.normalizedName = category.name
+      .folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
+      .trimmingCharacters(in: .whitespacesAndNewlines)
   }
 }

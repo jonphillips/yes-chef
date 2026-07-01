@@ -154,7 +154,7 @@ public enum GroceryRepository {
     uuid: () -> UUID
   ) throws -> GroceryList.ID {
     let lists = try GroceryList.fetchAll(db).sorted(by: areGroceryListsInIncreasingOrder)
-    if let defaultList = lists.first(where: \.isDefault) {
+    if let defaultList = try reconciledDefaultList(in: db, lists: lists, now: now) {
       return defaultList.id
     }
     if let firstList = lists.first {
@@ -754,9 +754,7 @@ public enum PantryRepository {
     matching title: String,
     in db: Database
   ) throws -> PantryItem? {
-    let key = title.groceryConsolidationKey
-    return try PantryItem.fetchAll(db)
-      .first { $0.title.groceryConsolidationKey == key }
+    try canonicalPantryItem(matching: title, in: db)
   }
 
   private static func nextPantrySortOrder(in db: Database) throws -> Int {
@@ -1067,7 +1065,7 @@ private func formatGroceryQuantity(_ quantity: Double) -> String {
   return String(format: "%g", quantity)
 }
 
-private extension String {
+extension String {
   var nonEmptyGroceryText: String? {
     let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
@@ -1084,7 +1082,7 @@ private extension String {
   }
 }
 
-private extension Optional where Wrapped == String {
+extension Optional where Wrapped == String {
   var groceryConsolidationKey: String? {
     flatMap(\.groceryConsolidationKey)
   }

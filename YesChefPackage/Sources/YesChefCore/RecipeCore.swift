@@ -524,6 +524,7 @@ public enum RecipeRepository {
     uuid: () -> UUID
   ) throws {
     var existingTags = try Tag.fetchAll(db)
+    try reconcileDuplicateTags(in: db, tags: &existingTags)
     let existingRecipeTags = try RecipeTag.where { $0.recipeID.eq(recipeID) }.fetchAll(db)
     var keptRecipeTagIDs: Set<RecipeTag.ID> = []
 
@@ -727,6 +728,47 @@ public enum RecipeRepository {
     }
   }
 
+  private static func reconcileDuplicateTags(
+    in db: Database,
+    tags: inout [Tag]
+  ) throws {
+    let groups = Dictionary(grouping: tags, by: { $0.name.normalizedLogicalName })
+    for group in groups.values where group.count > 1 {
+      let sortedGroup = group.sorted(by: areTagsInCanonicalOrder)
+      guard let canonicalTag = sortedGroup.first else { continue }
+      let duplicateTags = sortedGroup.dropFirst()
+      let duplicateTagIDs = Set(duplicateTags.map(\.id))
+
+      for var recipeTag in try RecipeTag.fetchAll(db) where duplicateTagIDs.contains(recipeTag.tagID) {
+        let hasCanonicalRecipeTag = try RecipeTag.fetchAll(db).contains {
+          $0.recipeID == recipeTag.recipeID && $0.tagID == canonicalTag.id
+        }
+        if hasCanonicalRecipeTag {
+          try RecipeTag.find(recipeTag.id).delete().execute(db)
+        } else {
+          recipeTag.tagID = canonicalTag.id
+          try RecipeTag.upsert { recipeTag }.execute(db)
+        }
+      }
+
+      for tag in duplicateTags {
+        try Tag.find(tag.id).delete().execute(db)
+      }
+    }
+
+    tags = try Tag.fetchAll(db)
+  }
+
+  private static func areTagsInCanonicalOrder(_ lhs: Tag, _ rhs: Tag) -> Bool {
+    if lhs.dateCreated != rhs.dateCreated {
+      return lhs.dateCreated < rhs.dateCreated
+    }
+    if lhs.sortOrder != rhs.sortOrder {
+      return lhs.sortOrder < rhs.sortOrder
+    }
+    return lhs.id.uuidString < rhs.id.uuidString
+  }
+
   private static func totalTime(prep: Int?, cook: Int?) -> Int? {
     switch (prep, cook) {
     case let (prep?, cook?): prep + cook
@@ -920,6 +962,11 @@ public enum RecipeBundleCoding {
 }
 
 private extension String {
+  var normalizedLogicalName: String {
+    folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
   var nonEmpty: String? {
     let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
