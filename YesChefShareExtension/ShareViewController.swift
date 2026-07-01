@@ -16,7 +16,11 @@ final class ShareViewController: UIViewController {
       }
       let model = ShareCaptureModel(extensionContext: extensionContext)
       self.model = model
-      embed(ShareCaptureView(model: model))
+      embed(
+        ShareCaptureView(model: model) { [weak self] isModalInPresentation in
+          self?.isModalInPresentation = isModalInPresentation
+        }
+      )
       Task { await model.loadSharedPage() }
     } catch {
       embed(ShareSetupRequiredView(message: error.localizedDescription) { [weak self] in
@@ -63,6 +67,7 @@ final class ShareCaptureModel {
   var errorMessage: String?
   var isLoading = false
   var isCommitting = false
+  var isShowingDiscardConfirmation = false
   var didSave = false
 
   init(extensionContext: NSExtensionContext?) {
@@ -71,6 +76,10 @@ final class ShareCaptureModel {
 
   var canSave: Bool {
     draft != nil && !isLoading && !isCommitting && !didSave
+  }
+
+  var hasUnsavedReviewChanges: Bool {
+    draft != nil && !isCommitting && !didSave
   }
 
   var editorialBlocks: [ParsedRecipeEditorialBlock] {
@@ -126,6 +135,14 @@ final class ShareCaptureModel {
   }
 
   func cancelButtonTapped() {
+    guard hasUnsavedReviewChanges else {
+      discardCaptureButtonTapped()
+      return
+    }
+    isShowingDiscardConfirmation = true
+  }
+
+  func discardCaptureButtonTapped() {
     extensionContext?.completeRequest(returningItems: nil)
   }
 
@@ -153,7 +170,8 @@ final class ShareCaptureModel {
 }
 
 private struct ShareCaptureView: View {
-  let model: ShareCaptureModel
+  @Bindable var model: ShareCaptureModel
+  var setModalInPresentation: (Bool) -> Void
 
   var body: some View {
     NavigationStack {
@@ -193,6 +211,25 @@ private struct ShareCaptureView: View {
           .disabled(!model.canSave)
         }
       }
+    }
+    .confirmationDialog(
+      "Discard this captured recipe?",
+      isPresented: $model.isShowingDiscardConfirmation,
+      titleVisibility: .visible
+    ) {
+      Button("Discard Capture", role: .destructive) {
+        model.discardCaptureButtonTapped()
+      }
+      Button("Keep Editing", role: .cancel) {}
+    } message: {
+      Text("Your review edits have not been saved.")
+    }
+    .interactiveDismissDisabled(model.hasUnsavedReviewChanges)
+    .onAppear {
+      setModalInPresentation(model.hasUnsavedReviewChanges)
+    }
+    .onChange(of: model.hasUnsavedReviewChanges) { _, hasUnsavedReviewChanges in
+      setModalInPresentation(hasUnsavedReviewChanges)
     }
   }
 }

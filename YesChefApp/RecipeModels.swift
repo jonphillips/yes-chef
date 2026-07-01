@@ -355,6 +355,7 @@ final class RecipeCaptureModel {
   var draft: WebRecipeCaptureDraft?
   var errorMessage: String?
   var isShowingError = false
+  var isShowingDiscardConfirmation = false
   var isPresentingBrowser = false
   var isFetching = false
   var isCommitting = false
@@ -367,6 +368,10 @@ final class RecipeCaptureModel {
     draft != nil && !isFetching && !isCommitting
   }
 
+  var hasUnsavedReviewChanges: Bool {
+    draft != nil && !isCommitting
+  }
+
   var editorialBlocks: [ParsedRecipeEditorialBlock] {
     get { draft?.page.editorialBlocks ?? [] }
     set { draft?.page.editorialBlocks = newValue }
@@ -377,9 +382,16 @@ final class RecipeCaptureModel {
     draft = nil
     errorMessage = nil
     isShowingError = false
+    isShowingDiscardConfirmation = false
     isPresentingBrowser = false
     isFetching = false
     isCommitting = false
+  }
+
+  func cancelButtonTapped() -> Bool {
+    guard hasUnsavedReviewChanges else { return true }
+    isShowingDiscardConfirmation = true
+    return false
   }
 
   func pastedText(_ text: String) {
