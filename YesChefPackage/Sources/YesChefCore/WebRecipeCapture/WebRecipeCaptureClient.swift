@@ -269,7 +269,16 @@ extension RecipeRepository {
     now: Date,
     uuid: () -> UUID
   ) throws -> RecipeImportBundleResult {
-    let bundle = try draft.page.makeRecipeBundle(now: now, uuid: uuid)
+#if DEBUG
+    let preserveRawImportHTML = true
+#else
+    let preserveRawImportHTML = false
+#endif
+    let bundle = try draft.page.makeRecipeBundle(
+      now: now,
+      uuid: uuid,
+      preserveRawImportHTML: preserveRawImportHTML
+    )
     return try importBundle(bundle, in: db, now: now, uuid: uuid)
   }
 }

@@ -212,8 +212,17 @@ final class RecipeImportModel {
     let importDate = now
     let makeUUID = uuid
     let parseResult = try await PaprikaImportWorkspace.parseExport(from: sourceURL)
+#if DEBUG
+    let preserveRawImportHTML = true
+#else
+    let preserveRawImportHTML = false
+#endif
     let bundles = try parseResult.recipes.map { recipe in
-      try recipe.makeRecipeBundle(now: importDate, uuid: { makeUUID() })
+      try recipe.makeRecipeBundle(
+        now: importDate,
+        uuid: { makeUUID() },
+        preserveRawImportHTML: preserveRawImportHTML
+      )
     }
     let preview = try await database.read { db in
       RecipeRepository.previewImportBundles(
