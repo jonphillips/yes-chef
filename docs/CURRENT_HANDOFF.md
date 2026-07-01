@@ -1,9 +1,10 @@
 # Current Handoff
 
-Last updated: July 1, 2026 (**PR #46 architect-approved → M4 Slice 2 (CloudKit `SyncEngine`
-wiring, started OFF) is DONE** — on-device dev round-trip still owed before the S4 flip, not a
-blocker for S3). Next Up = M4 Slice 3, logical-uniqueness hardening (upsert + dedup-on-read) —
-[`milestones/M4-icloud-sync.md`](milestones/M4-icloud-sync.md) § Slice 3).
+Last updated: July 1, 2026 (**PR #47 architect-approved → M4 Slice 3 (logical-uniqueness
+hardening) is DONE**; on-device sync round-trip now **confirmed** for the main-app capture path
+(sim in-app browser capture → device). Next Up = **M4 share-extension iCloud entitlement hotfix**
+— the extension crashes on every share because it constructs a `SyncEngine` for a container it
+isn't entitled to; must land before the S4 Production flip.
 
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
@@ -15,18 +16,47 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **M4 (iCloud sync) — Slice 3: logical-uniqueness hardening (upsert + dedup-on-read)** —
-  [`milestones/M4-icloud-sync.md`](milestones/M4-icloud-sync.md) § Slice 3. With no unique indexes,
-  offline two-device inserts can create duplicate rows for the same logical key; make reads
-  deterministic and self-healing. **Import identity** (`recipeImportRef`, composed normalized
-  `sourceURL` + `title`): make the import path an **upsert** and add **dedup-on-read** — when >1 row
-  shares a key, pick one deterministically (lowest `id` / earliest `dateCreated`) and a cleanup pass
-  deletes the losers, re-pointing any `recipeID` references; reuse M1's composed-identity logic.
-  **Audit other logically-unique data** for the same hazard (default `GroceryList` `isDefault`,
-  `Tag`/`Category` by name, `PantryItem` by title) and record a per-entity dedup decision (a
-  duplicate default list is a real bug; two same-named tags may be tolerable). **Tests:** seed
-  duplicates (simulating two offline inserts), assert dedup converges to one row deterministically
-  and references survive. No device testing needed — pure convergence logic. Dispatchable now.
+- **M4 (iCloud sync) — share-extension iCloud entitlement hotfix (P1, pre-S4)** — the
+  `YesChefShareExtension` crashes on launch on device: the share sheet slides up blank, hangs, and
+  dismisses. Root cause: `bootstrapDatabaseForShareExtension()` uses `.configured(startImmediately:
+  false)`, which in SQLiteData's `SyncEngine.init` **eagerly** constructs `CKContainer(identifier:)`
+  + two `CKSyncEngine`s (`startImmediately:false` only skips the network `start()`, not the
+  container build). But `YesChefShareExtension/YesChefShareExtension.entitlements` carries **only the
+  app group** — no `com.apple.developer.icloud-container-identifiers`. Building CloudKit objects for
+  an unentitled container raises an **ObjC exception**, which the Swift `do/catch` in
+  `ShareViewController.viewDidLoad` cannot catch → process crash. This is a **latent S2 gap, not a
+  #47 regression** (the extension entitlements haven't changed since M2 S4). Fires on **every** share
+  regardless of the sync opt-in, since the extension builds the engine unconditionally.
+  **Fix:** add to the extension entitlements the same iCloud keys the app already has
+  (`com.apple.developer.icloud-container-identifiers` = `iCloud.com.jonphillips.yeschef`,
+  `com.apple.developer.icloud-services` = `[CloudKit]`); keep the app group; **do not** add
+  `aps-environment` or a remote-notification background mode (the extension must never take push).
+  Confirm the extension's App ID has the CloudKit container capability enabled in the portal (the
+  `iCloud.com.jonphillips.yeschef` container already exists — verified in the Dev dashboard).
+  `xcodegen generate`, confirm `CODE_SIGN_ENTITLEMENTS` still points at the extension entitlements.
+  **Preserve the guardrail:** the extension still constructs with `startImmediately: false` and must
+  never call `start()` / network (**construct ≠ run**) — this is entitlement-only, no bootstrap-mode
+  change. **Verify (device):** share a recipe from Safari → sheet renders and saves (no crash);
+  foreground the app with sync enabled → the shared recipe lands in the Dev Private DB custom zone
+  (`co.pointfree.SQLiteData.defaultZone`) and round-trips to a second device. `swift test` +
+  `check-drift.sh` (both should be unaffected). Dispatchable now.
+
+M4 Slice 3 — logical-uniqueness hardening (upsert + dedup-on-read) — **DONE** (PR #47,
+architect-approved):
+
+- Source-backed `recipeImportRef` duplicates converge on read: pick the earliest ref
+  deterministically (`dateCreated` → `id` → `recipeID`), delete duplicate imported recipes, and
+  repoint `MealPlanItem`/`MenuItem` (`ON DELETE SET NULL`) + `GroceryItemSource` (no FK) `recipeID`
+  references to the survivor before deleting losers (FK cascade cleans the losers' child rows).
+  Title-only collisions stay data-preserving (title alone too weak to prove identity). Same
+  converge-on-read pattern for duplicate default `GroceryList` (`isDefault`), `PantryItem` titles,
+  `Tag` names, and sibling `Category` names (children re-parented to the survivor). Preview path is
+  non-mutating. 100 tests green incl. seeded-duplicate `LogicalUniquenessTests`.
+- **Non-blocking follow-ups noted in review** (fold into a later slice, not dispatched): default-list
+  convergence only self-heals via `ensureDefaultList` (direct `isDefault` readers can briefly show
+  two default badges post-sync); the merge relies on GRDB's default `foreign_keys = ON` to clean
+  loser child rows (worth a one-line comment at the delete site); the `default:` (>1 matching ref)
+  branch in `importBundle` is now dead for source-backed keys.
 
 M4 Slice 2 — CloudKit `SyncEngine` wiring (started OFF) — **DONE** (PR #46, architect-approved):
 
@@ -40,10 +70,17 @@ M4 Slice 2 — CloudKit `SyncEngine` wiring (started OFF) — **DONE** (PR #46, 
   `categories.parentCategoryID` loosened from a self-referential FK to a plain UUID column
   (SQLiteData rejects the self-FK as a schema cycle). Drift test derives both sides from the live DB
   (installed sync triggers vs. `sqlite_master` tables) so a new unsynced `@Table` fails the test.
-- **Still owed before S4 (the Production flip), not a prerequisite for S3:** on-device CloudKit
-  **dev** round-trip — capture a recipe via the **share extension**, foreground the main app with
-  sync enabled, confirm it lands in the dev dashboard and round-trips on relaunch. This is the one
-  link no unit test covers: that the main app actually uploads extension-written metadata.
+- **On-device dev round-trip — partially confirmed (2026-07-01):** main-app **in-app browser
+  capture** round-trips (2 recipes captured on the sim appeared on a second device; record types
+  materialized in the Dev Private DB). Enablement is opt-in only (no in-app toggle): set
+  UserDefaults `YesChefCloudKitSyncEnabled` / env `YES_CHEF_CLOUDKIT_SYNC_ENABLED=1` / launch arg
+  `-YesChefCloudKitSyncEnabled`, on a device signed into iCloud. Dashboard note: synced rows live in
+  the **Private** DB custom zone `co.pointfree.SQLiteData.defaultZone` (not Public/`_defaultZone`);
+  the console's "Type is not marked indexable" is a query-UI limitation, not a sync failure — record
+  types appearing = a successful push.
+- **Still owed before S4:** the **share-extension** capture round-trip — blocked on the entitlement
+  hotfix above (extension currently crashes before it can write). This is the one link no unit test
+  covers: that the main app actually uploads extension-written metadata.
 
 M4 Slice 1 — lean original-provenance — **DONE** (PR #45 merged):
 
