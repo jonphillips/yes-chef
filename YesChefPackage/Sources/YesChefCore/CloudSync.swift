@@ -16,7 +16,7 @@ public enum YesChefCloudSync {
     case failed(String)
   }
 
-  public static let containerIdentifier = "iCloud.com.jon.yeschef"
+  public static let containerIdentifier = "iCloud.com.jonphillips.yeschef"
   public static let enabledDefaultsKey = "YesChefCloudKitSyncEnabled"
   public static let enabledEnvironmentKey = "YES_CHEF_CLOUDKIT_SYNC_ENABLED"
   public static let enabledLaunchArgument = "-YesChefCloudKitSyncEnabled"

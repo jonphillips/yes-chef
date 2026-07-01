@@ -150,6 +150,18 @@ rows for the same logical key. Make reads deterministic and self-healing.
    deterministically and references survive. This is the "test with seeded duplicates" step from the
    plan.
 
+Implementation audit decisions:
+
+- Source-backed `recipeImportRef` duplicates are a bug: keep the earliest ref, delete duplicate
+  imported recipes, and repoint meal-plan/menu/grocery `recipeID` references to the survivor.
+  Title-only import collisions remain data-preserving: they are still allowed to import as separate
+  recipes because normalized title alone is too weak to prove identity.
+- Duplicate default grocery lists are a bug: keep every list, but converge to one `isDefault` row.
+- Duplicate pantry titles are a bug: keep the canonical title row, merge missing notes, and delete
+  duplicate pantry rows.
+- Duplicate tag names and duplicate sibling category names are a bug: merge them into the canonical
+  row, repoint recipe join rows, and preserve category children by moving them under the survivor.
+
 **Verify:** unit tests green; `swift test` + `check-drift.sh`.
 
 ---

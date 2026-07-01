@@ -339,7 +339,7 @@ extension RecipeRepository {
     titleOnlyBatchCount: Int
   ) throws -> RecipeImportBundleResult {
     let key = importIdentityKey(for: bundle)
-    let matchingRefs = matchingImportRefs(for: key, in: importRefs)
+    let matchingRefs = try matchingImportRefs(for: key, in: db, importRefs: &importRefs)
 
     if key.isTitleOnly {
       if titleOnlyBatchCount > 1, matchingRefs.count == titleOnlyBatchCount {
@@ -504,7 +504,7 @@ extension RecipeRepository {
     titleOnlyBatchCount: Int
   ) -> RecipeImportPreviewResult {
     let key = importIdentityKey(for: bundle)
-    let matchingRefs = matchingImportRefs(for: key, in: importRefs)
+    let matchingRefs = matchingImportRefsForPreview(for: key, in: importRefs)
 
     if key.isTitleOnly {
       if titleOnlyBatchCount > 1, matchingRefs.count == titleOnlyBatchCount {
@@ -554,12 +554,81 @@ extension RecipeRepository {
 
   private static func matchingImportRefs(
     for key: RecipeImportIdentityKey,
+    in db: Database,
+    importRefs: inout [RecipeImportRef]
+  ) throws -> [RecipeImportRef] {
+    let refs = rawMatchingImportRefs(for: key, in: importRefs)
+    guard !key.isTitleOnly, refs.count > 1 else { return refs }
+
+    let canonicalRef = refs[0]
+    let duplicateRefs = Array(refs.dropFirst())
+    try mergeDuplicateImportedRecipes(
+      canonicalRecipeID: canonicalRef.recipeID,
+      duplicateRecipeIDs: Set(duplicateRefs.map(\.recipeID)).subtracting([canonicalRef.recipeID]),
+      in: db
+    )
+    for ref in duplicateRefs {
+      try RecipeImportRef.find(ref.id).delete().execute(db)
+    }
+
+    let duplicateRefIDs = Set(duplicateRefs.map(\.id))
+    importRefs.removeAll { duplicateRefIDs.contains($0.id) }
+    return [canonicalRef]
+  }
+
+  private static func matchingImportRefsForPreview(
+    for key: RecipeImportIdentityKey,
+    in importRefs: [RecipeImportRef]
+  ) -> [RecipeImportRef] {
+    let refs = rawMatchingImportRefs(for: key, in: importRefs)
+    guard !key.isTitleOnly, refs.count > 1 else { return refs }
+    return Array(refs.prefix(1))
+  }
+
+  private static func rawMatchingImportRefs(
+    for key: RecipeImportIdentityKey,
     in importRefs: [RecipeImportRef]
   ) -> [RecipeImportRef] {
     importRefs.filter {
       $0.normalizedTitle == key.normalizedTitle
         && $0.normalizedSourceURL == key.normalizedSourceURL
     }
+    .sorted(by: areImportRefsInCanonicalOrder)
+  }
+
+  private static func mergeDuplicateImportedRecipes(
+    canonicalRecipeID: Recipe.ID,
+    duplicateRecipeIDs: Set<Recipe.ID>,
+    in db: Database
+  ) throws {
+    guard !duplicateRecipeIDs.isEmpty else { return }
+
+    for var item in try MealPlanItem.fetchAll(db) where item.recipeID.map(duplicateRecipeIDs.contains) == true {
+      item.recipeID = canonicalRecipeID
+      try MealPlanItem.upsert { item }.execute(db)
+    }
+    for var item in try MenuItem.fetchAll(db) where item.recipeID.map(duplicateRecipeIDs.contains) == true {
+      item.recipeID = canonicalRecipeID
+      try MenuItem.upsert { item }.execute(db)
+    }
+    for var source in try GroceryItemSource.fetchAll(db) where source.recipeID.map(duplicateRecipeIDs.contains) == true {
+      source.recipeID = canonicalRecipeID
+      try GroceryItemSource.upsert { source }.execute(db)
+    }
+
+    for recipeID in duplicateRecipeIDs {
+      try Recipe.find(recipeID).delete().execute(db)
+    }
+  }
+
+  private static func areImportRefsInCanonicalOrder(_ lhs: RecipeImportRef, _ rhs: RecipeImportRef) -> Bool {
+    if lhs.dateCreated != rhs.dateCreated {
+      return lhs.dateCreated < rhs.dateCreated
+    }
+    if lhs.id != rhs.id {
+      return lhs.id.uuidString < rhs.id.uuidString
+    }
+    return lhs.recipeID.uuidString < rhs.recipeID.uuidString
   }
 
   private static func titleOnlyCollisionWarning(title: String) -> RecipeImportWarning {
