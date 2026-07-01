@@ -73,6 +73,11 @@ final class ShareCaptureModel {
     draft != nil && !isLoading && !isCommitting && !didSave
   }
 
+  var editorialBlocks: [ParsedRecipeEditorialBlock] {
+    get { draft?.page.editorialBlocks ?? [] }
+    set { draft?.page.editorialBlocks = newValue }
+  }
+
   func loadSharedPage() async {
     isLoading = true
     defer { isLoading = false }
@@ -88,7 +93,7 @@ final class ShareCaptureModel {
   }
 
   func saveButtonTapped() async {
-    guard let draft else { return }
+    guard let draft = curatedDraftForSave() else { return }
     isCommitting = true
     defer { isCommitting = false }
 
@@ -115,6 +120,28 @@ final class ShareCaptureModel {
   func cancelButtonTapped() {
     extensionContext?.completeRequest(returningItems: nil)
   }
+
+  func updateEditorialBlockText(_ text: String, at index: Int) {
+    guard editorialBlocks.indices.contains(index) else { return }
+    var blocks = editorialBlocks
+    blocks[index].text = text
+    editorialBlocks = blocks
+  }
+
+  func removeEditorialBlocks(atOffsets offsets: IndexSet) {
+    var blocks = editorialBlocks
+    blocks.remove(atOffsets: offsets)
+    editorialBlocks = blocks
+  }
+
+  private func curatedDraftForSave() -> WebRecipeCaptureDraft? {
+    guard var draft else { return nil }
+    draft.page.editorialBlocks = draft.page.editorialBlocks
+      .map { ParsedRecipeEditorialBlock(label: $0.label, text: $0.text) }
+      .filter { !$0.text.isEmpty }
+    self.draft = draft
+    return draft
+  }
 }
 
 private struct ShareCaptureView: View {
@@ -128,7 +155,7 @@ private struct ShareCaptureView: View {
             ProgressView("Reading shared page")
           }
         } else if let draft = model.draft {
-          ShareCaptureReviewSections(draft: draft)
+          ShareCaptureReviewSections(model: model, draft: draft)
         } else {
           Section {
             Text(model.errorMessage ?? "Could not read that recipe page.")
@@ -163,6 +190,7 @@ private struct ShareCaptureView: View {
 }
 
 private struct ShareCaptureReviewSections: View {
+  @Bindable var model: ShareCaptureModel
   let draft: WebRecipeCaptureDraft
 
   private var page: ParsedRecipePage {
@@ -210,10 +238,38 @@ private struct ShareCaptureReviewSections: View {
       }
     }
 
+    if let heroImage {
+      Section("Photo") {
+        Image(uiImage: heroImage)
+          .resizable()
+          .scaledToFit()
+          .frame(maxHeight: 220)
+          .clipShape(RoundedRectangle(cornerRadius: 8))
+      }
+    }
+
     if !page.warnings.isEmpty {
       Section("Warnings") {
         Text(page.warnings.map(\.shareReviewTitle).joined(separator: "\n"))
           .foregroundStyle(.secondary)
+      }
+    }
+
+    if !model.editorialBlocks.isEmpty {
+      Section("Notes") {
+        ForEach(model.editorialBlocks.indices, id: \.self) { index in
+          VStack(alignment: .leading, spacing: 8) {
+            Text(model.editorialBlocks[index].label)
+              .font(.headline)
+              .foregroundStyle(.secondary)
+            TextField("Note", text: editorialBlockTextBinding(at: index), axis: .vertical)
+              .lineLimit(3...8)
+          }
+          .padding(.vertical, 4)
+        }
+        .onDelete { offsets in
+          model.removeEditorialBlocks(atOffsets: offsets)
+        }
       }
     }
 
@@ -247,6 +303,22 @@ private struct ShareCaptureReviewSections: View {
         return section.lines
       }
       .joined(separator: "\n")
+  }
+
+  private var heroImage: UIImage? {
+    guard let heroURL = page.imageURLs.first,
+      let photo = page.processedImages[heroURL]
+    else { return nil }
+    return UIImage(data: photo.thumbnailData ?? photo.displayData)
+  }
+
+  private func editorialBlockTextBinding(at index: Int) -> Binding<String> {
+    Binding {
+      guard model.editorialBlocks.indices.contains(index) else { return "" }
+      return model.editorialBlocks[index].text
+    } set: { text in
+      model.updateEditorialBlockText(text, at: index)
+    }
   }
 
   private var instructionText: String {

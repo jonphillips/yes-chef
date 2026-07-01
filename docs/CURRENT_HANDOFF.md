@@ -1,6 +1,8 @@
 # Current Handoff
 
-Last updated: June 30, 2026 (hero image bytes merged — PR #43).
+Last updated: June 30, 2026 (editorial prose + notes/hero review UI shipped on
+`codex/editorial-prose-notes` → PR #44; notes show/edit/delete + hero preview landed on **both**
+the share-extension and in-app capture review screens).
 
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
@@ -12,24 +14,40 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
+- **(Empty — pending M3-capture-done confirmation and iCloud-sync planning.)** With PR #44 in
+  review, the next dispatch target is the M3 wrap + pivot to iCloud sync planning; the architect
+  curates it once #44 merges. Do not infer — STOP and ask Jon if dispatched against an empty
+  Next Up.
+
+Done on `codex/editorial-prose-notes` (PR #44, in review):
+
 - **Capture editorial prose blocks** ("Why This Recipe Works" / "Before You Begin") —
-  `docs/efforts/editorial-prose.md`. M3 S5 follow-on: schema-first parser drops the
-  editorial blocks because they live only in the page-body DOM, never in JSON-LD. Needs a
-  scoped DOM scrape mapped to recipe notes. The brief carries verified anchors + design.
+  `docs/efforts/editorial-prose.md`. Shipped a scoped DOM scrape (`RecipeEditorialProseExtractor`)
+  mapping the blocks to labeled recipe notes, schema-first parser untouched; covered by
+  `WebRecipeEditorialProseTests`.
+- **Show & curate notes + hero image in the review UIs** —
+  `docs/efforts/share-review-notes-and-image.md`. Notes are now shown with inline edit + per-block
+  delete, and a read-only hero preview, in **both** the share-extension review
+  (`ShareViewController`) **and** the in-app browser capture review (`RecipeCaptureView`). The
+  in-app parity was a scope extension over the original share-only brief (Jon's call at review);
+  the brief records it. Emptied notes drop at save/bundle time.
 
 ## Ready Efforts (queue)
 
 Drawn into **Next Up** one at a time; this is not a dispatch target.
 
-1. **Show the hero image in the share-extension review UI** — `ShareCaptureReviewSections`
-   (`YesChefShareExtension/ShareViewController.swift`) renders text only; the draft is now
-   hydrated in `loadSharedPage`, so a preview can read
-   `draft.page.processedImages[heroURL]?.thumbnailData ?? .displayData`. Small, additive.
-2. **Real-device jetsam check for share-extension hero hydration** — the share extension runs
+1. **Real-device jetsam check for share-extension hero hydration** — the share extension runs
    under a ~120 MB limit; a 12 MB download + `RecipePhotoProcessor` decode was never exercised
    on device (simulator doesn't enforce jetsam). Validate with a large hero before this path is
    leaned on; a memory kill is the one failure mode the `catch → return draft` fallback doesn't
    cover. Carry-forward from PR #43 review.
+2. **Lean original-provenance (sync prep)** — `docs/efforts/lean-original-provenance.md`. The
+   `originalSnapshot` blob embeds redundant photo JPEG bytes (base64) and `originalImportText`
+   carries raw page HTML that only a DEBUG tool reads — both would needlessly ride the synced
+   recipe record. Strip image bytes from the snapshot encoder, stop persisting raw HTML in
+   release, and (separable follow-on) turn the "Original" view into a compare-to-original drift
+   view. No DDL. **Should land before the clean re-import that precedes the sync flip** so the
+   synced store is lean from day one. Derived from the iCloud sync planning session.
 
 Comment ingestion stays in `docs/open-questions.md` until it is a scoped effort.
 

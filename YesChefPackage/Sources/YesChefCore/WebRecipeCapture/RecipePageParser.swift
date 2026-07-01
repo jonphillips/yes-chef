@@ -18,6 +18,7 @@ public enum WebRecipePageParser {
     RecipeMetaExtractor.extract(from: document, into: &builder)
     RecipeMicrodataExtractor.extract(from: document, into: &builder)
     RecipeBodyImageExtractor.extract(from: document, into: &builder)
+    RecipeEditorialProseExtractor.extract(from: document, into: &builder)
 
     var page = builder.build(capturedAt: capturedAt)
     if let cleaned = cleanedBodyText(from: document) {
