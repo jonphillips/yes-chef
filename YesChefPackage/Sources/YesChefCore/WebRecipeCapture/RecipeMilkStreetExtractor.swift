@@ -5,6 +5,8 @@ enum RecipeMilkStreetExtractor {
   private static let hostSuffix = "177milkstreet.com"
   private static let printIngredientAmountSelector = "[class*=RecipePrintTemplate_ingredientAmount]"
   private static let printIngredientDescriptionSelector = "[class*=RecipePrintTemplate_ingredientDescription]"
+  private static let printIngredientHeadingSelector = "[class*=RecipePrintTemplate_ingredientHeading]"
+  private static let printIngredientItemSelector = "[class*=RecipePrintTemplate_ingredientItem]"
   private static let bodyIngredientAmountSelector = "[class*=RecipeBodyContent_ingredientItemBlock__amount]"
   private static let bodyIngredientDescriptionSelector = "[class*=RecipeBodyContent_ingredientItemBlock__description]"
   private static let bodyIngredientItemSelector = "[class*=RecipeBodyContent_ingredientItemBlockItem__]"
@@ -26,12 +28,7 @@ enum RecipeMilkStreetExtractor {
     extractSummaryFacts(from: document, into: &builder)
     extractTips(from: document, into: &builder)
 
-    if !extractIngredients(
-      from: document,
-      amountSelector: printIngredientAmountSelector,
-      descriptionSelector: printIngredientDescriptionSelector,
-      into: &builder
-    ) {
+    if !extractPrintIngredients(from: document, into: &builder) {
       _ = extractBodyIngredients(from: document, into: &builder)
     }
 
@@ -94,16 +91,33 @@ enum RecipeMilkStreetExtractor {
     }
   }
 
-  private static func extractIngredients(
+  private static func extractPrintIngredients(
     from document: Document,
-    amountSelector: String,
-    descriptionSelector: String,
     into builder: inout RecipeParseBuilder
   ) -> Bool {
-    let amountElements = (try? document.select(amountSelector).array()) ?? []
+    let selector = "\(printIngredientHeadingSelector), \(printIngredientItemSelector)"
+    let elements = (try? document.select(selector).array()) ?? []
     var foundIngredient = false
+
+    for element in elements {
+      if matches(element, selector: printIngredientHeadingSelector) {
+        builder.addIngredient(elementText(element))
+        continue
+      }
+
+      guard matches(element, selector: printIngredientItemSelector),
+        let description = firstDescendantText(in: element, selector: printIngredientDescriptionSelector)
+      else { continue }
+      let amount = firstDescendantText(in: element, selector: printIngredientAmountSelector)
+      builder.addIngredient(joinedIngredient(amount: amount, description: description))
+      foundIngredient = true
+    }
+
+    if foundIngredient { return true }
+
+    let amountElements = (try? document.select(printIngredientAmountSelector).array()) ?? []
     for amountElement in amountElements {
-      guard let description = descriptionElement(for: amountElement, selector: descriptionSelector),
+      guard let description = descriptionElement(for: amountElement, selector: printIngredientDescriptionSelector),
         let descriptionText = elementText(description)
       else { continue }
       let amountText = elementText(amountElement)
