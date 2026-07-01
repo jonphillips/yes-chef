@@ -1,8 +1,8 @@
 # Current Handoff
 
-Last updated: June 30, 2026 (editorial prose + notes/hero review UI shipped on
-`codex/editorial-prose-notes` → PR #44; notes show/edit/delete + hero preview landed on **both**
-the share-extension and in-app capture review screens).
+Last updated: June 30, 2026 (**PR #44 merged → M3 authenticated browser capture is DONE**. Pivoted
+to the iCloud sync gate: milestone authored at
+[`milestones/M4-icloud-sync.md`](milestones/M4-icloud-sync.md); Next Up = its Slice 1).
 
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
@@ -14,23 +14,24 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **(Empty — pending M3-capture-done confirmation and iCloud-sync planning.)** With PR #44 in
-  review, the next dispatch target is the M3 wrap + pivot to iCloud sync planning; the architect
-  curates it once #44 merges. Do not infer — STOP and ask Jon if dispatched against an empty
-  Next Up.
+- **M4 (iCloud sync) — Slice 1: Lean original-provenance** —
+  [`milestones/M4-icloud-sync.md`](milestones/M4-icloud-sync.md) § Slice 1, full spec in
+  [`efforts/lean-original-provenance.md`](efforts/lean-original-provenance.md). Strip embedded photo
+  JPEG bytes from the **snapshot** encoder (`RecipeBundleCoding.snapshotData`) and stop persisting
+  raw import HTML (`originalImportText`) in release — both would needlessly ride the synced recipe
+  record. Do **not** touch the transfer `RecipeBundle`. Split the compare-to-original view out as a
+  later slice; it doesn't gate sync. No DDL. This is the first, independent, must-precede-the-
+  re-import step of the sync milestone. Dispatchable now.
 
-Done on `codex/editorial-prose-notes` (PR #44, in review):
+M3 authenticated browser capture — **DONE** (PR #44 merged, `2f5b588`):
 
 - **Capture editorial prose blocks** ("Why This Recipe Works" / "Before You Begin") —
-  `docs/efforts/editorial-prose.md`. Shipped a scoped DOM scrape (`RecipeEditorialProseExtractor`)
-  mapping the blocks to labeled recipe notes, schema-first parser untouched; covered by
-  `WebRecipeEditorialProseTests`.
+  `docs/efforts/editorial-prose.md`. Scoped DOM scrape (`RecipeEditorialProseExtractor`) mapping the
+  blocks to labeled recipe notes, schema-first parser untouched; `WebRecipeEditorialProseTests`.
 - **Show & curate notes + hero image in the review UIs** —
-  `docs/efforts/share-review-notes-and-image.md`. Notes are now shown with inline edit + per-block
-  delete, and a read-only hero preview, in **both** the share-extension review
-  (`ShareViewController`) **and** the in-app browser capture review (`RecipeCaptureView`). The
-  in-app parity was a scope extension over the original share-only brief (Jon's call at review);
-  the brief records it. Emptied notes drop at save/bundle time.
+  `docs/efforts/share-review-notes-and-image.md`. Notes shown with inline edit + per-block delete,
+  plus a read-only hero preview, in **both** the share-extension review (`ShareViewController`) and
+  the in-app browser capture review (`RecipeCaptureView`). Emptied notes drop at save/bundle time.
 
 ## Ready Efforts (queue)
 
@@ -45,21 +46,17 @@ Drawn into **Next Up** one at a time; this is not a dispatch target.
    "real-device jetsam check": the decode itself is already memory-safe via
    `CGImageSourceCreateThumbnailAtIndex` + `kCGImageSourceThumbnailMaxPixelSize` downsampling in
    `RecipePhotoProcessor`, which never materializes the full-resolution bitmap, so the residual gap
-   is the unbounded *download* buffer, not the decode.)
-2. **Lean original-provenance (sync prep)** — `docs/efforts/lean-original-provenance.md`. The
-   `originalSnapshot` blob embeds redundant photo JPEG bytes (base64) and `originalImportText`
-   carries raw page HTML that only a DEBUG tool reads — both would needlessly ride the synced
-   recipe record. Strip image bytes from the snapshot encoder, stop persisting raw HTML in
-   release, and (separable follow-on) turn the "Original" view into a compare-to-original drift
-   view. No DDL. **Should land before the clean re-import that precedes the sync flip** so the
-   synced store is lean from day one. Derived from the iCloud sync planning session.
+   is the unbounded *download* buffer, not the decode.) May be folded opportunistically into M4
+   Slice 1 (both touch the capture/image path), or taken standalone.
 
 Comment ingestion stays in `docs/open-questions.md` until it is a scoped effort.
 
-**Looming fork (Jon's call, not a dispatch target):** with M3 capture follow-ons wrapping,
-the iCloud sync/backup gate is the next milestone — the one-way gate everything precedes.
-Editorial prose is the last queued M3 capture feature; weigh sync before pulling further
-feature work, since modeling is sync-safe and can follow.
+**Fork resolved (2026-06-30):** M3 capture is done and the pivot to the **iCloud sync gate** is
+made — it's now the active milestone ([`milestones/M4-icloud-sync.md`](milestones/M4-icloud-sync.md),
+Phase E). The full build order is authored (S1 lean provenance → S2 CloudKit setup + `SyncEngine`
+wiring, off → S3 dedup-on-read hardening → S4 clean cutover/flip → S5 two-device verification).
+Modeling stays sync-safe and deferred (no canonical-ingredient work before the flip). Architect to
+land **ADR-0010** ratifying the milestone.
 
 ## Current Checkpoint
 
