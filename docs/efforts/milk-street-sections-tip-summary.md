@@ -1,8 +1,8 @@
-# Effort: Milk Street capture — ingredient subsections, Tip callout, real summary
+# Effort: Milk Street capture — sections, Tip callout, opening paragraph, servings/time
 
 **Type:** Follow-on hardening (Milk Street DOM fallback, post-PR #50 dogfooding)
 **Owner:** Codex (implement) · Jon (architect/review)
-**Status:** Drafting — two of three gaps root-caused with real markup; ingredient
+**Status:** Drafting — three of four gaps root-caused with real markup; ingredient
 subsection heading needs an authenticated fixture from Jon.
 
 ## Context
@@ -13,8 +13,10 @@ its scoped effort — meta-tag JSON-LD teaser detection, the `RecipePrintTemplat
 it's correct against the gochujang reference capture. Merged as-is.
 
 Jon's next real capture (`chicken-peanut-red-chili-sauce-pollo-encacahuatado`) has shape
-the gochujang fixture didn't exercise: ingredient subsections and a "Tip" callout, plus a
-useless meta-description summary. All three are new findings, not regressions.
+the gochujang fixture didn't exercise: ingredient subsections, a "Tip" callout, a real
+opening paragraph, and servings/cook time — all dropped because the JSON-LD node is
+truncated (see PR #50) and nothing else feeds `.summary`/`.servingsText`/`.cookTime`/
+`.prepTime`/`.totalTime`. All four are new findings, not regressions.
 
 ## 1. Ingredient subsections not captured
 
@@ -70,7 +72,7 @@ text if the description class also churns), and calls
 box (e.g., one per prep stage); `addEditorialBlock` already dedupes identical blocks and
 the review UI already renders multiple editorial blocks, so no new UI is needed.
 
-## 3. Summary is generic site boilerplate
+## 3. Opening paragraph / summary is generic site boilerplate
 
 Confirmed live: `<meta name="description">`, `og:description`, and
 `twitter:description` all carry the exact same static sentence —
@@ -100,19 +102,67 @@ wrong) so it outranks the generic meta description. Do **not** special-case-stri
 the boilerplate sentence to suppress it — voting in real content at higher priority is
 the general fix and doesn't rot if Milk Street tweaks the boilerplate wording.
 
+## 4. Servings and cook time not captured
+
+Also root-caused live and unauthenticated. Same `RecipeSummaryContent_inner` region
+carries a label/value list right above the opening paragraph:
+
+```html
+<div class="ItemLabelList_ItemLabelList__9en9X">
+  <ul class="ItemLabelList_list__bt4OJ">
+    <li class="ItemLabelList_item__fwQWl">
+      <div class="ItemLabelList_labelValueContainer__VN230">
+        <div class="ItemLabelList_label__MprQe">Makes</div>
+        <div class="ItemLabelList_value__TEwUR">4-6 servings</div>
+      </div>
+    </li>
+    <li class="ItemLabelList_item__fwQWl">
+      <div class="ItemLabelList_labelValueContainer__VN230">
+        <div class="ItemLabelList_label__MprQe">Cook Time</div>
+        <div class="ItemLabelList_value__TEwUR">1½ hours</div>
+      </div>
+    </li>
+  </ul>
+</div>
+```
+
+Nothing populates `.servingsText`/`.prepTime`/`.cookTime`/`.totalTime` today because
+those all come from JSON-LD `scalarProperties` (`RecipeSchemaOrg.swift:12-15`), and the
+node is truncated on this page. Fix: walk `[class*=ItemLabelList_item__]`, read the
+label/value pair, and map known labels case-insensitively — `Makes` → `builder.votes.add(
+.servingsText, value)`, `Prep Time` → `.prepTime`, `Cook Time` → `.cookTime`, `Total
+Time` → `.totalTime` (this recipe only shows `Makes`/`Cook Time`; other recipes may show
+different subsets, so don't assume all four are always present).
+
+**Watch out — unicode vulgar fractions break duration parsing today.** The value text
+uses glyphs like `½` (U+00BD), not `1/2` or `1.5`. `RecipeDurationParser.looseMinutes`
+(`RecipeDurationParser.swift:20-37`) requires an ASCII-digit token immediately before the
+unit (`(\d+(?:\.\d+)?)\s*(hours?|...)`), so `"1½ hours"` matches nothing and
+`cookTimeMinutes` silently comes back `nil` even once the value is wired up. This needs a
+small normalization pass — map the common vulgar-fraction glyphs (¼ ½ ¾ ⅓ ⅔ ⅛ ⅜ ⅝ ⅞) to
+their decimal value before the existing regex runs. Scope this to `RecipeDurationParser`
+only; `IngredientParser`'s own fraction handling (ASCII `/` only, `IngredientParser.swift:
+120-129`) has the same gap for ingredient amounts like `"2½ pounds..."` but that's a
+pre-existing, broader issue (affects quantity-based grocery consolidation, not this
+capture effort) — worth its own follow-up, not bundled here.
+
 ## Scope decisions
 
 - **In scope:** Tip callout → editorial block (root-caused, ready to implement); real
-  `RecipeSummaryContent_body` summary vote (root-caused, ready to implement); ingredient
-  subsection heading passthrough via `addIngredient` (mechanism ready, selector blocked on
-  a Jon-supplied authenticated fixture).
-- **Out of scope:** a general subsection/aside DOM engine for other sites — same
-  per-site-playbook posture as the parent effort.
+  `RecipeSummaryContent_body` summary vote (root-caused, ready to implement);
+  `ItemLabelList` → servings/prep/cook/total time votes (root-caused, ready to implement,
+  needs the vulgar-fraction normalization above); ingredient subsection heading
+  passthrough via `addIngredient` (mechanism ready, selector blocked on a Jon-supplied
+  authenticated fixture).
+- **Out of scope:** a general subsection/aside DOM engine for other sites (same
+  per-site-playbook posture as the parent effort); fixing unicode vulgar-fraction
+  handling in `IngredientParser` for ingredient quantities (separate, broader issue).
 - **Verification:** extend the existing gochujang/chicken-style fixtures (or add a new
   sanitized `milk-street-chicken-peanut.html` once Jon supplies the authenticated
-  ingredients markup) covering all three: sectioned ingredients with a named heading, a
-  captured Tip editorial block, and `summary` resolving to the real intro paragraph
-  instead of the site tagline.
+  ingredients markup) covering all four: sectioned ingredients with a named heading, a
+  captured Tip editorial block, `summary` resolving to the real intro paragraph instead
+  of the site tagline, and `servingsText`/`cookTimeMinutes` populated from a
+  vulgar-fraction value like `"1½ hours"`.
 
 ## Next step
 
@@ -122,6 +172,6 @@ subsection heading selector can be pinned to real markup before dispatch.
 
 ---
 *Follow-on to `docs/efforts/parser-hardening-truncated-structured-data.md` (PR #50,
-merged). Tip and summary markup verified via a live unauthenticated fetch of
-`177milkstreet.com/recipes/chicken-peanut-red-chili-sauce-pollo-encacahuatado`; the
-ingredients DOM is confirmed server-gated and unavailable from that same fetch.*
+merged). Tip, summary, and servings/time markup verified via a live unauthenticated
+fetch of `177milkstreet.com/recipes/chicken-peanut-red-chili-sauce-pollo-encacahuatado`;
+the ingredients DOM is confirmed server-gated and unavailable from that same fetch.*

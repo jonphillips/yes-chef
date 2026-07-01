@@ -22,19 +22,24 @@ task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
 **Blocked on Jon — needs a sanitized authenticated fixture before dispatch:**
 `docs/efforts/milk-street-sections-tip-summary.md`. Dogfooding PR #50 against a second
-real recipe (chicken-peanut-red-chili-sauce-pollo-encacahuatado) found three gaps beyond
-that effort's scope: (1) ingredient subsections (`FOR THE CHICKEN AND BROTH:`) are
-dropped — mechanism is ready (`addIngredient` → `IngredientSectionHeading.sections`
-already promotes colon-terminated headings for free) but the real heading markup is
-server-gated and unavailable outside Jon's session; (2) the "Tip" callout isn't
-captured — root-caused and ready to implement (`[class*=Tip_Tip__]` /
-`[role=note][aria-label=Tip]`, confirmed live and unauthenticated, same shape as
-`addEditorialBlock`); (3) the recipe summary resolves to Milk Street's generic
-site-wide meta description instead of the real per-recipe intro paragraph
-(`RecipeSummaryContent_body__*`, also confirmed live and unauthenticated). **Ask Jon
-for a sanitized authenticated capture of the chicken-peanut recipe** (same "View
-Original" path used for the original gochujang fixture) to pin the ingredient-heading
-selector, then dispatch all three together.
+real recipe (chicken-peanut-red-chili-sauce-pollo-encacahuatado) found four gaps beyond
+that effort's scope — all stem from the same root cause (the JSON-LD node is truncated,
+so nothing else feeds `.summary`/`.servingsText`/`.cookTime`/etc.): (1) ingredient
+subsections (`FOR THE CHICKEN AND BROTH:`) are dropped — mechanism is ready
+(`addIngredient` → `IngredientSectionHeading.sections` already promotes colon-terminated
+headings for free) but the real heading markup is server-gated and unavailable outside
+Jon's session; (2) the "Tip" callout isn't captured — root-caused and ready to implement
+(`[class*=Tip_Tip__]` / `[role=note][aria-label=Tip]`, confirmed live and
+unauthenticated, same shape as `addEditorialBlock`); (3) the opening-paragraph summary
+resolves to Milk Street's generic site-wide meta description instead of the real
+per-recipe intro paragraph (`RecipeSummaryContent_body__*`, also confirmed live and
+unauthenticated); (4) servings and cook/prep time aren't captured — root-caused to an
+`ItemLabelList_item__*` label/value list (also unauthenticated), but the value text uses
+unicode vulgar fractions (`"1½ hours"`) that `RecipeDurationParser` can't parse yet, so
+that needs a small fraction-normalization fix first. **Ask Jon for a sanitized
+authenticated capture of the chicken-peanut recipe** (same "View Original" path used for
+the original gochujang fixture) to pin the ingredient-heading selector, then dispatch all
+four together.
 
   **Queued next (parking lot, not dispatched — planned 2026-07-01):**
   - **NYT "Reader Feedback" — comment ingestion + LLM curation** —
@@ -58,8 +63,9 @@ detection, a `RecipePrintTemplate_*`/`RecipeBodyContent_*` DOM fallback extracto
 (`RecipeMilkStreetExtractor`, amount+description join, empty-amount tolerant), the new
 `truncatedStructuredData` warning, and sanitized recovered/truncated-only fixtures. Correctly
 scoped to the original gochujang reference capture; NYT teaser regression stays green.
-**Dogfooding against a second recipe found three follow-on gaps** (ingredient subsections, a
-Tip callout, and a generic-boilerplate summary) — see the blocked-on-Jon item above in Next Up.
+**Dogfooding against a second recipe found four follow-on gaps** (ingredient subsections, a
+Tip callout, a generic-boilerplate summary, and missing servings/cook time) — see the
+blocked-on-Jon item above in Next Up.
 
 M4 — share-extension iCloud sync (producer wait + consumer re-drain + enablement persistence) —
 **DONE** (PR #49, `codex/m4-share-extension-pending-upload`; architect-approved 2026-07-01, round-trip
