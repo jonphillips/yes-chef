@@ -96,6 +96,7 @@
 		76C7E4899A1093E58F713C2F /* OriginalSnapshotView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OriginalSnapshotView.swift; sourceTree = "<group>"; };
 		7871BB8EDB397A338B979FCD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7E41495E4A6E6C414ED69A0C /* YesChefShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = YesChefShareExtension.entitlements; sourceTree = "<group>"; };
+		7ED8C4BF9300184ABE4E59A5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8281916C17EA01F6099FA119 /* RecipeListViewOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeListViewOptions.swift; sourceTree = "<group>"; };
 		85D49CBB7931A65D53EC1654 /* AppNavigationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNavigationModels.swift; sourceTree = "<group>"; };
 		B49D2E9B66A731DB272F063C /* MealCalendarModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCalendarModels.swift; sourceTree = "<group>"; };
@@ -190,6 +191,7 @@
 				5ECE090CEFE3F26041ED2617 /* FormFields.swift */,
 				21092B09A19EF04372E6A66D /* GroceryModels.swift */,
 				27FA69A8957E5DC8A49A9E3F /* GroceryViews.swift */,
+				7ED8C4BF9300184ABE4E59A5 /* Info.plist */,
 				B49D2E9B66A731DB272F063C /* MealCalendarModels.swift */,
 				76A768628F1345FDF66EDC49 /* MealCalendarViews.swift */,
 				7090DA55279458851517DD5A /* MenuModels.swift */,
@@ -392,10 +394,8 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7MQEE539G9;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Yes Chef";
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = YesChefApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -418,10 +418,8 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7MQEE539G9;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Yes Chef";
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = YesChefApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

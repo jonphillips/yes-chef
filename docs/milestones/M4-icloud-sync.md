@@ -111,21 +111,21 @@ data** until the cutover (Slice 4).
    - `attachMetadatabase()` in `prepareDatabase` (so `SyncMetadata` is queryable; without it,
      `no such table: sqlitedata_icloud_metadata`).
    - After `defaultDatabase = database`, set
-     `defaultSyncEngine = try SyncEngine(for: database, tables: <every synced @Table>, startsImmediately: false)`.
+     `defaultSyncEngine = try SyncEngine(for: database, tables: <every synced @Table>, startImmediately: false)`.
    - **Enumerate the synced table list explicitly** — all current `@Table` types
      (`Recipe`, `RecipeSource`, `IngredientSection`, `IngredientLine`, `InstructionSection`,
      `InstructionStep`, `RecipeNote`, `RecipePhoto`, `Tag`, `Category`, `Equipment`, `RecipeTag`,
      `RecipeCategory`, `RecipeEquipment`, `RecipeImportRef`, `MealPlanItem`, `Menu`, `MenuItem`,
      `MenuPlacement`, `GroceryList`, `GroceryItem`, `GroceryItemSource`, `PantryItem`). Confirm the
      list against `Models.swift` at build time — a missed table silently stays local.
-   - `startsImmediately: false` + a launch gate so the app runs **local-only** when there's no
+   - `startImmediately: false` + a launch gate so the app runs **local-only** when there's no
      iCloud account (graceful degradation — no crash, no login prompt).
    - Guard debug query-tracing against `SyncEngine.isSynchronizing` so sync SQL doesn't spew.
-3. **Share extension is a second writer — verify, don't assume.** `YesChefShareExtension` writes to
-   the **App Group shared store**. The `SyncEngine` is owned by the **main app**; the extension must
-   **not** run its own engine. Confirm the main app's engine picks up extension-written rows on next
-   launch/foreground (the metadatabase + triggers live in the shared store). If extension writes
-   don't sync, **raise `question-for-architect`** before working around it.
+3. **Share extension is a second writer — install triggers, don't network.** `YesChefShareExtension`
+   writes to the **App Group shared store**. It may construct a
+   `SyncEngine(startImmediately: false)` only to install SQLiteData's sync triggers and write
+   `SyncMetadata`; it must never start the engine or perform CloudKit network work. The main app's
+   engine owns sync upload/download and picks up extension-written metadata on next launch/foreground.
 4. **Verify (dev env, throwaway store, device):** on a device signed into iCloud, with sync manually
    enabled, create a recipe → confirm it appears in the CloudKit **dev** dashboard; relaunch →
    confirms it round-trips. Do **not** point at Production yet. Build the iOS-27 iPad sim; `swift
@@ -165,7 +165,7 @@ Slice 2 gate. **Order is load-bearing.**
    synced-record shape is final (lean `originalSnapshot`, all intended tables).
 2. **Wipe local → empty store.** Fresh install / erase the app so the first Production sync uploads
    a **clean** zone (first sync pushes all existing local rows).
-3. **Enable sync** — remove the `startsImmediately: false` gate (or flip the opt-in), pointed at
+3. **Enable sync** — remove the `startImmediately: false` gate (or flip the opt-in), pointed at
    Production.
 4. **Re-import the real library** into the clean synced store. **Asset-heavy** (every photo is a
    separate `CKAsset` upload) — do it on wifi and let it run; it is not instant.

@@ -49,7 +49,7 @@ uses `dateCreated`/`dateModified`, not CloudKit's forbidden `creationDate`/`modi
    store, and **re-import** the real library. The pipeline is the asset; local data is disposable.
    First sync is asset-heavy (each photo is a separate `CKAsset` upload) — a wifi/bulk operation.
 
-5. **Sync is opt-in and degrades gracefully.** `SyncEngine(startsImmediately: false)` plus a launch
+5. **Sync is opt-in and degrades gracefully.** `SyncEngine(startImmediately: false)` plus a launch
    gate so the app runs **local-only** with no iCloud account (no login prompt, no crash). There is
    **no column-level** sync exclusion — the engine takes a table list; to keep data local, split it
    into a table not handed to the engine.
@@ -59,9 +59,10 @@ uses `dateCreated`/`dateModified`, not CloudKit's forbidden `creationDate`/`modi
 - The schema audit means no pre-flip migration of primary keys or column names — the risky,
   irreversible work is already done. `originalSnapshot` leaning is the only synced-record shape
   change, and it must land before the Production deploy.
-- The **share extension is a second writer** into the App Group store; the **main app owns the
-  `SyncEngine`** and picks up extension-written rows — the extension must not run its own engine
-  (verify during S2).
+- The **share extension is a second writer** into the App Group store. It may construct a
+  `SyncEngine(startImmediately: false)` only to install SQLiteData's sync triggers and write
+  `SyncMetadata`; it must never start the engine or perform CloudKit network work. The **main app
+  owns sync upload/download** and picks up extension-written metadata.
 - Verification is **eventual-consistency-on-real-devices** (two devices, one iCloud account) with no
   server logs; simulator iCloud is unreliable.
 - **Sharing stays out** (Family Cookbook, [ADR-0003](ADR-0003-private-libraries-recipe-transfer.md)):
