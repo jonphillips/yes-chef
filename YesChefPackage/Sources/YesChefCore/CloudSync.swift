@@ -83,6 +83,44 @@ public enum YesChefCloudSync {
       return .failed(String(describing: error))
     }
   }
+
+  public static func pendingRecordZoneChangeCount(in database: any DatabaseWriter) async throws -> Int {
+    try await database.read { db in
+      try pendingRecordZoneChangeCount(in: db)
+    }
+  }
+
+  public static func pendingRecordZoneChangeCount(in db: Database) throws -> Int {
+    try #sql(
+      """
+      SELECT COUNT(*)
+      FROM "sqlitedata_icloud"."sqlitedata_icloud_pendingRecordZoneChanges"
+      """,
+      as: Int.self
+    )
+    .fetchOne(db) ?? 0
+  }
+
+  public static func waitForPendingRecordZoneChanges(
+    in database: any DatabaseWriter,
+    exceeding previousCount: Int,
+    timeout: Duration = .seconds(1),
+    pollInterval: Duration = .milliseconds(25)
+  ) async throws -> Bool {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: timeout)
+
+    while true {
+      let currentCount = try await pendingRecordZoneChangeCount(in: database)
+      if currentCount > previousCount {
+        return true
+      }
+      guard clock.now < deadline else {
+        return false
+      }
+      try await Task.sleep(for: pollInterval)
+    }
+  }
 }
 
 private extension CKAccountStatus {

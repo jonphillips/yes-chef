@@ -128,6 +128,43 @@ extension RecipeCoreTests {
       }
       #expect(!extensionBootstrap.syncEngine.isRunning)
     }
+
+    @Test
+    func shareExtensionConnectionEnqueuesStoppedEnginePendingChanges() async throws {
+      let databaseURL = try temporaryCloudSyncDatabaseURL()
+      let recipeID = SampleUUIDSequence.uuid(602)
+
+      let extensionBootstrap = try cloudSyncTestShareExtensionBootstrap(at: databaseURL)
+      let pendingChangeCount = try await YesChefCloudSync.pendingRecordZoneChangeCount(
+        in: extensionBootstrap.database
+      )
+
+      try await extensionBootstrap.database.write { db in
+        try Recipe.insert {
+          Recipe(
+            id: recipeID,
+            title: "Share Extension Pending Upload",
+            dateCreated: Date(timeIntervalSinceReferenceDate: 813_200_000),
+            dateModified: Date(timeIntervalSinceReferenceDate: 813_200_000)
+          )
+        }
+        .execute(db)
+      }
+
+      let didEnqueue = try await YesChefCloudSync.waitForPendingRecordZoneChanges(
+        in: extensionBootstrap.database,
+        exceeding: pendingChangeCount,
+        timeout: .seconds(1),
+        pollInterval: .milliseconds(10)
+      )
+      let finalPendingChangeCount = try await YesChefCloudSync.pendingRecordZoneChangeCount(
+        in: extensionBootstrap.database
+      )
+
+      #expect(didEnqueue)
+      #expect(finalPendingChangeCount > pendingChangeCount)
+      #expect(!extensionBootstrap.syncEngine.isRunning)
+    }
   }
 }
 

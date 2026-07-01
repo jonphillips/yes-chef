@@ -100,12 +100,20 @@ final class ShareCaptureModel {
     do {
       let importDate = now
       let makeUUID = uuid
-      _ = try await database.write { db in
+      let pendingChangeCountBeforeSave = try? await YesChefCloudSync
+        .pendingRecordZoneChangeCount(in: database)
+      let result = try await database.write { db in
         try RecipeRepository.importCapturedRecipe(
           draft,
           in: db,
           now: importDate,
           uuid: { makeUUID() }
+        )
+      }
+      if result.outcome == .imported, let pendingChangeCountBeforeSave {
+        _ = try? await YesChefCloudSync.waitForPendingRecordZoneChanges(
+          in: database,
+          exceeding: pendingChangeCountBeforeSave
         )
       }
       DatabaseChangeBeacon.post()
