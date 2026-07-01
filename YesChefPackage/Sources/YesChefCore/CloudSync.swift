@@ -16,6 +16,14 @@ public enum YesChefCloudSync {
     case failed(String)
   }
 
+  public enum PendingRecordZoneRedrainResult: Equatable, Sendable {
+    case disabled
+    case noPendingChanges
+    case unavailable(String)
+    case restarted
+    case failed(String)
+  }
+
   public static let containerIdentifier = "iCloud.com.jonphillips.yeschef"
   public static let enabledDefaultsKey = "YesChefCloudKitSyncEnabled"
   public static let enabledEnvironmentKey = "YES_CHEF_CLOUDKIT_SYNC_ENABLED"
@@ -79,6 +87,57 @@ public enum YesChefCloudSync {
       @Dependency(\.defaultSyncEngine) var syncEngine
       try await syncEngine.start()
       return .started
+    } catch {
+      return .failed(String(describing: error))
+    }
+  }
+
+  public static func redrainPendingRecordZoneChangesIfManuallyEnabled(
+    defaults: UserDefaults = .standard,
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    arguments: [String] = ProcessInfo.processInfo.arguments,
+    database providedDatabase: (any DatabaseWriter)? = nil,
+    accountStatus providedAccountStatus: (() async throws -> CKAccountStatus)? = nil,
+    stopSyncEngine: (() -> Void)? = nil,
+    startSyncEngine: (() async throws -> Void)? = nil
+  ) async -> PendingRecordZoneRedrainResult {
+    guard isManuallyEnabled(defaults: defaults, environment: environment, arguments: arguments)
+    else { return .disabled }
+
+    do {
+      let database: any DatabaseWriter
+      if let providedDatabase {
+        database = providedDatabase
+      } else {
+        @Dependency(\.defaultDatabase) var defaultDatabase
+        database = defaultDatabase
+      }
+      let pendingChangeCount = try await pendingRecordZoneChangeCount(in: database)
+      guard pendingChangeCount > 0
+      else { return .noPendingChanges }
+
+      let accountStatus: CKAccountStatus
+      if let providedAccountStatus {
+        accountStatus = try await providedAccountStatus()
+      } else {
+        accountStatus = try await CKContainer(identifier: containerIdentifier).accountStatus()
+      }
+      guard accountStatus == .available
+      else { return .unavailable(accountStatus.syncDescription) }
+
+      if let stopSyncEngine {
+        stopSyncEngine()
+      } else {
+        @Dependency(\.defaultSyncEngine) var syncEngine
+        syncEngine.stop()
+      }
+      if let startSyncEngine {
+        try await startSyncEngine()
+      } else {
+        @Dependency(\.defaultSyncEngine) var syncEngine
+        try await syncEngine.start()
+      }
+      return .restarted
     } catch {
       return .failed(String(describing: error))
     }

@@ -20,9 +20,16 @@ struct ExternalDatabaseChangeReloadModifier: ViewModifier {
       .onChange(of: scenePhase) { _, phase in
         guard phase == .active else { return }
         Task {
-          await reloadObservingModels()
+          await sceneBecameActive()
         }
       }
+  }
+
+  private func sceneBecameActive() async {
+    async let pendingSyncRedrain = YesChefCloudSync
+      .redrainPendingRecordZoneChangesIfManuallyEnabled()
+    await reloadObservingModels()
+    _ = await pendingSyncRedrain
   }
 
   @MainActor private func reloadObservingModels() async {

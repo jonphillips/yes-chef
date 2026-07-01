@@ -1,3 +1,4 @@
+import CloudKit
 import CustomDump
 import Dependencies
 import Foundation
@@ -165,7 +166,86 @@ extension RecipeCoreTests {
       #expect(finalPendingChangeCount > pendingChangeCount)
       #expect(!extensionBootstrap.syncEngine.isRunning)
     }
+
+    @Test
+    func foregroundRedrainRestartsSyncOnlyWhenManualSyncEnabledAndPendingChangesExist() async throws {
+      let defaults = try #require(UserDefaults(suiteName: "YesChefCloudSyncTests-\(UUID().uuidString)"))
+      defaults.set(true, forKey: YesChefCloudSync.enabledDefaultsKey)
+      let databaseURL = try temporaryCloudSyncDatabaseURL()
+      let recipeID = SampleUUIDSequence.uuid(603)
+      let extensionBootstrap = try cloudSyncTestShareExtensionBootstrap(at: databaseURL)
+      let pendingChangeCount = try await YesChefCloudSync.pendingRecordZoneChangeCount(
+        in: extensionBootstrap.database
+      )
+
+      try await extensionBootstrap.database.write { db in
+        try Recipe.insert {
+          Recipe(
+            id: recipeID,
+            title: "Share Extension Foreground Redrain",
+            dateCreated: Date(timeIntervalSinceReferenceDate: 813_300_000),
+            dateModified: Date(timeIntervalSinceReferenceDate: 813_300_000)
+          )
+        }
+        .execute(db)
+      }
+
+      let didEnqueue = try await YesChefCloudSync.waitForPendingRecordZoneChanges(
+        in: extensionBootstrap.database,
+        exceeding: pendingChangeCount,
+        timeout: .seconds(1),
+        pollInterval: .milliseconds(10)
+      )
+      #expect(didEnqueue)
+
+      let probe = SyncRestartProbe()
+      let result = await YesChefCloudSync.redrainPendingRecordZoneChangesIfManuallyEnabled(
+        defaults: defaults,
+        environment: [:],
+        arguments: [],
+        database: extensionBootstrap.database,
+        accountStatus: { .available },
+        stopSyncEngine: { probe.stopCallCount += 1 },
+        startSyncEngine: { probe.startCallCount += 1 }
+      )
+
+      #expect(result == .restarted)
+      #expect(probe.stopCallCount == 1)
+      #expect(probe.startCallCount == 1)
+    }
+
+    @Test
+    func foregroundRedrainSkipsRestartWhenThereAreNoPendingChanges() async throws {
+      let defaults = try #require(UserDefaults(suiteName: "YesChefCloudSyncTests-\(UUID().uuidString)"))
+      defaults.set(true, forKey: YesChefCloudSync.enabledDefaultsKey)
+      let extensionBootstrap = try cloudSyncTestShareExtensionBootstrap(
+        at: temporaryCloudSyncDatabaseURL()
+      )
+      let probe = SyncRestartProbe()
+
+      let result = await YesChefCloudSync.redrainPendingRecordZoneChangesIfManuallyEnabled(
+        defaults: defaults,
+        environment: [:],
+        arguments: [],
+        database: extensionBootstrap.database,
+        accountStatus: {
+          Issue.record("Account status should not be checked without pending changes.")
+          return .available
+        },
+        stopSyncEngine: { probe.stopCallCount += 1 },
+        startSyncEngine: { probe.startCallCount += 1 }
+      )
+
+      #expect(result == .noPendingChanges)
+      #expect(probe.stopCallCount == 0)
+      #expect(probe.startCallCount == 0)
+    }
   }
+}
+
+private final class SyncRestartProbe {
+  var stopCallCount = 0
+  var startCallCount = 0
 }
 
 private func temporaryCloudSyncDatabaseURL() throws -> URL {
