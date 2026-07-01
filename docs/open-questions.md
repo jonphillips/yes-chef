@@ -88,10 +88,70 @@ cut the sugar", "came out flat") — not the whole thread.
   2. *How to judge "valuable."* **Jon-reviews** (a review/share-sheet pass over the top N)
      vs **LLM triage** that distills the top comments into a recipe note. Connects to the
      already-noted photo→LLM fallback and the existing review-before-commit flow.
+- **Which surface can even do the sort+load (clarified 2026-06-30).** Three capture
+  surfaces, and only one can run the interactive "sort → Most Helpful → tap Load More ×N →
+  scrape" flow:
+  1. *In-app `WebPage` browser* (`YesChefApp/RecipeModels.swift:288` `WebPage.browser()`,
+     `BrowserViews.swift`) — the app owns this WebKit view and can inject JS to drive controls,
+     await lazy-loads, and read the resulting DOM. **This is the only surface where automated
+     ranked-comment loading can ship.** It is option (a) below, done properly.
+  2. *iPad share extension* (`YesChefShareExtension`) — passive. `SharePreprocessor.js` runs
+     **once** in the host Safari page and returns `{url, document.documentElement.outerHTML}`;
+     `ShareViewController` imports no WebKit and cannot click/sort/scroll. The **only** way
+     loaded comments reach it is if Jon manually sorts + taps Load-More *in Safari first*, then
+     shares the expanded DOM. Weaker, human-in-the-loop variant of (a).
+  3. *Claude-in-Chrome MCP (Jon's Mac)* — desktop prototyping only; does not ship. Useful to
+     drive a real NYT page and **harvest a "Most Helpful, fully loaded" DOM fixture** — exactly
+     the artifact this question says we lack.
+- **NYT is the strong first target (clarified 2026-06-30, Jon).** Capture is always
+  **authenticated** — Jon captures as a logged-in subscriber, never a logged-out scrape (the
+  logged-out-still-exposes-data quirk is trivia, not a strategy). That makes option (a)
+  user-driven the natural fit for NYT: in the in-app authenticated browser he can tap "Most
+  Helpful," let the full thread load, and scrape the ranked comment DOM — the ranking and
+  volume the feature needs are available *because* he's signed in. So the auth-gating worry in
+  axis 1 largely dissolves for the sites Jon actually uses; the ToS/PII storage concern below
+  still stands.
 - **Constraints:** comments are third-party user content — PII (display names/initials),
   plus copyright/ToS questions for *storing and re-displaying* them, and a sanitization
   step on ingest (the ATK capture already pulled in 4 commenters' names and Jon's own `JP`
   avatar). Post-M3 enrichment idea; not in the current milestone arc.
+
+## In-app capture — per-site behavior playbooks & review-UX sturdiness
+
+Two linked threads Jon raised 2026-06-30, both anchored to the **in-app `WebPage` browser**
+(the only ship-able interactive surface — see the comment-ingestion question above and
+ADR-0009). Post-sync; **do not front-load over the iCloud gate** (see
+`[[post-browser-sync-vs-features-tension]]`).
+
+- **Per-site "capture playbooks" as a superpower (Jon's framing).** Turbocharge the in-app
+  browser with small, named, per-host behaviors: Milk Street → DOM print-template fallback
+  (`docs/efforts/parser-hardening-truncated-structured-data.md`); NYT → sort comments to Most
+  Helpful + Load-More + scrape; ATK → editorial-prose scrape (`docs/efforts/editorial-prose.md`).
+  These are the **same site-specific-DOM brittleness class** as the editorial-prose and
+  comment-ingestion ideas — hashed CSS-module classes the publisher can rotate, lazy-load
+  timing, layout shift. So the design constraint is: keep them a **registry of declarative,
+  named, fixture-tested playbooks that degrade gracefully to schema-first**, not a pile of
+  imperative per-site hacks. The Milk Street DOM fallback is effectively playbook #1 — build
+  the seam so #2 (NYT) slots in without a rewrite. JS injection runs as the authenticated user;
+  note the ToS/automation questions alongside the existing comment PII/storage ones.
+- **Is the review surface sturdy/large enough? (verified concern, 2026-06-30).** Both
+  review-before-commit surfaces are **dismiss-fragile today**: `interactiveDismissDisabled`
+  appears **nowhere** in the app or extension, and `ShareViewController` never sets
+  `isModalInPresentation`. So an in-progress capture/review can be lost to a swipe-down or an
+  errant backdrop tap — and the share payload is one-shot (recovering means re-navigating in
+  Safari). As scrape+review grows (comments, per-site playbooks, multi-section edits, image
+  pick), a swipe-away half-sheet is the wrong container.
+  - *Cheap near-term hardening (sync-agnostic, could land anytime):* guard the review sheet
+    with `interactiveDismissDisabled(true)` / `isModalInPresentation` while there are unsaved
+    edits, plus an explicit Cancel-with-confirm.
+  - *Richer future:* graduate the in-app review from `.sheet` to a full-screen
+    `NavigationStack` presentation (precedent exists — `RecipeLibraryView.swift:40`
+    `.fullScreenCover` for `presentedRecipeID`).
+  - *Division of labor:* the share extension is inherently space/lifetime/memory-constrained
+    (system card, one-shot payload, no long-running work per
+    `[[extension-sync-construct-not-run]]`), so keep it **lean — capture + quick confirm +
+    hand off** — and put the **rich interactive review and the per-site playbooks in the
+    in-app path**. Don't fight the platform by building the complex review inside the extension.
 
 ## Menus / planning model
 
