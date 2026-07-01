@@ -20,8 +20,46 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **(Next Up is intentionally empty — the CloudSync effort just closed. Discuss the next milestone
-  with Jon before dispatching; do not infer a task.)**
+**Blocked on Jon — needs a sanitized authenticated fixture before dispatch:**
+`docs/efforts/milk-street-sections-tip-summary.md`. Dogfooding PR #50 against a second
+real recipe (chicken-peanut-red-chili-sauce-pollo-encacahuatado) found three gaps beyond
+that effort's scope: (1) ingredient subsections (`FOR THE CHICKEN AND BROTH:`) are
+dropped — mechanism is ready (`addIngredient` → `IngredientSectionHeading.sections`
+already promotes colon-terminated headings for free) but the real heading markup is
+server-gated and unavailable outside Jon's session; (2) the "Tip" callout isn't
+captured — root-caused and ready to implement (`[class*=Tip_Tip__]` /
+`[role=note][aria-label=Tip]`, confirmed live and unauthenticated, same shape as
+`addEditorialBlock`); (3) the recipe summary resolves to Milk Street's generic
+site-wide meta description instead of the real per-recipe intro paragraph
+(`RecipeSummaryContent_body__*`, also confirmed live and unauthenticated). **Ask Jon
+for a sanitized authenticated capture of the chicken-peanut recipe** (same "View
+Original" path used for the original gochujang fixture) to pin the ingredient-heading
+selector, then dispatch all three together.
+
+  **Queued next (parking lot, not dispatched — planned 2026-07-01):**
+  - **NYT "Reader Feedback" — comment ingestion + LLM curation** —
+    `docs/efforts/reader-feedback-comment-ingestion.md`. New, larger effort: in-app
+    `WebPage` browser playbook to scrape "Most Helpful" comments (anonymized at
+    extraction), first client-side LLM integration (personal Claude API key, Keychain),
+    global editable curation prompt in Settings, new `RecipeNoteType.readerFeedback`.
+    Six-slice build order in the doc, starting with review-sheet dismiss-fragility
+    hardening. Explicitly designed so the LLM curates (selects/trims distinct quoted
+    tips) rather than synthesizes them into a flattened consensus summary.
+  - **Dogfood the core loop on two devices** — capture ~15–20 real recipes via the extension, cook
+    from them (phone captures / iPad cooks, which also exercises the untested multi-device
+    dedup-on-read convergence). The most annoying gaps found here choose the real next milestone.
+  - **Recipe → grocery list w/ pantry checking** — make it slick early (canonical-key merge, static
+    pantry thresholds, dialog-free); spec = [[grocery-pantry-threshold-design]] (Phase E).
+  - Full context in the `post-sync-next-tracks` memory.
+
+Milk Street parser hardening — **DONE** (PR #50, `codex/milk-street-parser-hardening`;
+architect-approved 2026-07-01, merged): meta-tag JSON-LD reading gated on truncation-sentinel
+detection, a `RecipePrintTemplate_*`/`RecipeBodyContent_*` DOM fallback extractor
+(`RecipeMilkStreetExtractor`, amount+description join, empty-amount tolerant), the new
+`truncatedStructuredData` warning, and sanitized recovered/truncated-only fixtures. Correctly
+scoped to the original gochujang reference capture; NYT teaser regression stays green.
+**Dogfooding against a second recipe found three follow-on gaps** (ingredient subsections, a
+Tip callout, and a generic-boilerplate summary) — see the blocked-on-Jon item above in Next Up.
 
 M4 — share-extension iCloud sync (producer wait + consumer re-drain + enablement persistence) —
 **DONE** (PR #49, `codex/m4-share-extension-pending-upload`; architect-approved 2026-07-01, round-trip
