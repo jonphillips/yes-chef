@@ -19,6 +19,9 @@ struct YesChefApp: App {
         fetchImageData: WebRecipeCaptureClient.liveValue.fetchImageData
       )
     }
+    Task {
+      _ = await YesChefCloudSync.startIfManuallyEnabled()
+    }
     DatabaseChangeBeacon.startObserving()
   }
 

@@ -27,6 +27,16 @@ targets:
     deploymentTarget: "27.0"
     sources:
       - path: YesChefApp
+    info:
+      path: YesChefApp/Info.plist
+      properties:
+        CFBundleDisplayName: Yes Chef
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UIApplicationSupportsIndirectInputEvents: true
+        UIBackgroundModes:
+          - remote-notification
+        UILaunchScreen: {}
     dependencies:
       - package: YesChefPackage
         product: YesChefCore
@@ -47,10 +57,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: YesChefApp/YesChef.entitlements
         DEVELOPMENT_TEAM: 7MQEE539G9
         CURRENT_PROJECT_VERSION: "1"
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Yes Chef
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        GENERATE_INFOPLIST_FILE: NO
         MARKETING_VERSION: "1.0"
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor

@@ -6,13 +6,16 @@ extension DependencyValues {
   public mutating func bootstrapDatabase() throws {
     @Dependency(\.context) var context
     let databasePath: String?
+    let syncMode: YesChefCloudSync.BootstrapMode
     switch context {
     case .live:
       databasePath = try YesChefDatabaseStorage.prepareLiveSharedStore().path
+      syncMode = .configured(startImmediately: false)
     case .preview, .test:
       databasePath = nil
+      syncMode = .disabled
     }
-    try bootstrapDatabase(path: databasePath)
+    try bootstrapDatabase(path: databasePath, syncMode: syncMode)
   }
 
   public mutating func bootstrapDatabaseForShareExtension() throws {
@@ -24,11 +27,23 @@ extension DependencyValues {
     case .preview, .test:
       databasePath = nil
     }
-    try bootstrapDatabase(path: databasePath)
+    try bootstrapDatabase(path: databasePath, syncMode: .disabled)
   }
 
   public mutating func bootstrapDatabase(path: String?) throws {
-    let database = try SQLiteData.defaultDatabase(path: path)
+    try bootstrapDatabase(path: path, syncMode: .disabled)
+  }
+
+  public mutating func bootstrapDatabase(
+    path: String?,
+    syncMode: YesChefCloudSync.BootstrapMode
+  ) throws {
+    var configuration = Configuration()
+    configuration.prepareDatabase { db in
+      try db.attachMetadatabase(containerIdentifier: YesChefCloudSync.containerIdentifier)
+    }
+
+    let database = try SQLiteData.defaultDatabase(path: path, configuration: configuration)
     var migrator = DatabaseMigrator()
     #if DEBUG
       migrator.eraseDatabaseOnSchemaChange = true
@@ -258,7 +273,43 @@ extension DependencyValues {
 
       try #sql("""
         ALTER TABLE "categories"
-        ADD COLUMN "parentCategoryID" TEXT REFERENCES "categories"("id") ON DELETE SET NULL
+        ADD COLUMN "parentCategoryID" TEXT
+        """)
+        .execute(db)
+
+      try #sql("""
+        CREATE INDEX "index_categories_on_parentCategoryID" ON "categories"("parentCategoryID")
+        """)
+        .execute(db)
+    }
+
+    migrator.registerMigration("Loosen category parent reference for CloudKit sync") { db in
+      try #sql("""
+        DROP INDEX IF EXISTS "index_categories_on_parentCategoryID"
+        """)
+        .execute(db)
+
+      try #sql("""
+        ALTER TABLE "categories"
+        RENAME COLUMN "parentCategoryID" TO "legacyParentCategoryID"
+        """)
+        .execute(db)
+
+      try #sql("""
+        ALTER TABLE "categories"
+        ADD COLUMN "parentCategoryID" TEXT
+        """)
+        .execute(db)
+
+      try #sql("""
+        UPDATE "categories"
+        SET "parentCategoryID" = "legacyParentCategoryID"
+        """)
+        .execute(db)
+
+      try #sql("""
+        ALTER TABLE "categories"
+        DROP COLUMN "legacyParentCategoryID"
         """)
         .execute(db)
 
@@ -460,5 +511,14 @@ extension DependencyValues {
 
     try migrator.migrate(database)
     defaultDatabase = database
+    switch syncMode {
+    case .disabled:
+      break
+    case let .configured(startImmediately):
+      defaultSyncEngine = try YesChefCloudSync.makeSyncEngine(
+        for: database,
+        startImmediately: startImmediately
+      )
+    }
   }
 }
