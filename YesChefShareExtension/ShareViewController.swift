@@ -443,6 +443,8 @@ private extension WebRecipeCaptureWarning {
     switch self {
     case .noStructuredRecipeData:
       "No structured recipe data found."
+    case .truncatedStructuredData:
+      "Structured recipe data appears truncated."
     case .untitledRecipe:
       "No title found."
     case .noIngredients:

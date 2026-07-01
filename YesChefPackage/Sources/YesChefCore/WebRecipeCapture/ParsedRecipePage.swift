@@ -36,6 +36,7 @@ public struct ParsedRecipeEditorialBlock: Equatable, Sendable {
 
 public enum WebRecipeCaptureWarning: String, Equatable, Sendable {
   case noStructuredRecipeData
+  case truncatedStructuredData
   case untitledRecipe
   case noIngredients
   case noInstructions
