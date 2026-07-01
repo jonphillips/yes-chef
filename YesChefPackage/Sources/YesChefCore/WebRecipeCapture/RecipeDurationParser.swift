@@ -18,7 +18,7 @@ enum RecipeDurationParser {
   }
 
   private static func looseMinutes(_ text: String) -> Int? {
-    let lower = text.lowercased()
+    let lower = normalizeVulgarFractions(in: text.lowercased())
     let pattern = #"(\d+(?:\.\d+)?)\s*(hours?|hrs?|h|minutes?|mins?|m)\b"#
     guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
     let range = NSRange(lower.startIndex..<lower.endIndex, in: lower)
@@ -34,6 +34,45 @@ enum RecipeDurationParser {
       return result + (unit.hasPrefix("h") ? value * 60 : value)
     }
     return total == 0 ? nil : Int(total.rounded())
+  }
+
+  private static func normalizeVulgarFractions(in text: String) -> String {
+    var result = ""
+    for character in text {
+      guard let fraction = vulgarFractionValue(character) else {
+        result.append(character)
+        continue
+      }
+
+      if result.last?.isNumber == true {
+        result.append(String(fraction.dropFirst()))
+      } else if result.last?.isWhitespace == true,
+        result.dropLast().last(where: { !$0.isWhitespace })?.isNumber == true
+      {
+        while result.last?.isWhitespace == true {
+          result.removeLast()
+        }
+        result.append(String(fraction.dropFirst()))
+      } else {
+        result.append(fraction)
+      }
+    }
+    return result
+  }
+
+  private static func vulgarFractionValue(_ character: Character) -> String? {
+    switch character {
+    case "\u{00BC}": return "0.25"
+    case "\u{00BD}": return "0.5"
+    case "\u{00BE}": return "0.75"
+    case "\u{2153}": return "0.333"
+    case "\u{2154}": return "0.667"
+    case "\u{215B}": return "0.125"
+    case "\u{215C}": return "0.375"
+    case "\u{215D}": return "0.625"
+    case "\u{215E}": return "0.875"
+    default: return nil
+    }
   }
 
   private static func firstMatch(

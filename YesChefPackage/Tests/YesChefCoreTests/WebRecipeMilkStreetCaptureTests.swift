@@ -60,6 +60,75 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func domFallbackRecoversSectionsTipSummaryAndTime() throws {
+      let sourceURL = try #require(URL(string: "https://www.177milkstreet.com/recipes/chicken-peanut-red-chili-sauce-pollo-encacahuatado"))
+
+      let page = WebRecipePageParser.parse(
+        html: try Self.fixtureHTML("milk-street-chicken-peanut"),
+        sourceURL: sourceURL,
+        capturedAt: Date(timeIntervalSinceReferenceDate: 804_370_000)
+      )
+      let expectedTitle = "Chicken with Peanut and Red Chili Sauce (Pollo Encacahuatado)"
+      let expectedSummary = [
+        "According to Jorge Fritz and Beto Estúa of Casa Jacaranda cooking school in Mexico City,",
+        "there is disagreement about whether encacahuatado is a true mole. We'll let the experts decide",
+        "and debate, but we can say the dish does have delicious mole-like qualities: nuts and seeds as",
+        "the foundation and dried chilies and spices providing layered, complex flavor.",
+      ].joined(separator: " ")
+      let expectedTip = [
+        "Don't worry about salted versus unsalted peanuts in this recipe. Either will work. However,",
+        "if your peanuts are extremely high in sodium, don't add any salt at all to the blender.",
+      ].joined(separator: " ")
+
+      expectNoDifference(page.title, expectedTitle)
+      expectNoDifference(page.summary, expectedSummary)
+      expectNoDifference(page.servingsText, "4-6 servings")
+      expectNoDifference(page.cookTimeMinutes, 90)
+      expectNoDifference(
+        page.ingredientSections,
+        [
+          ParsedRecipeIngredientSection(
+            name: "For the chicken and broth",
+            lines: [
+              "2½ pounds bone-in, skin-on chicken breasts or thighs, skin removed",
+              "3 medium garlic cloves, smashed and peeled",
+              "Kosher salt and ground black pepper",
+            ]
+          ),
+          ParsedRecipeIngredientSection(
+            name: "For the sauce and to serve",
+            lines: [
+              "¾ cup roasted peanuts, plus chopped peanuts to serve",
+              "3 guajillo chilies, stemmed and seeded",
+            ]
+          ),
+        ]
+      )
+      expectNoDifference(
+        page.instructionSections,
+        [
+          ParsedRecipeInstructionSection(
+            steps: [
+              "In a large pot, combine the chicken, garlic, onion, bay and oregano with water to cover.",
+              "Meanwhile, toast the tomatoes, garlic and chilies until fragrant and lightly charred.",
+              "Blend the peanuts, chilies and broth until smooth, then simmer with the chicken.",
+            ]
+          ),
+        ]
+      )
+      expectNoDifference(
+        page.editorialBlocks,
+        [
+          ParsedRecipeEditorialBlock(
+            label: "Tip",
+            text: expectedTip
+          ),
+        ]
+      )
+      expectNoDifference(page.warnings, [])
+    }
+
+    @Test
     func truncatedMetaJSONLDWithoutDOMFallbackStaysUnusable() throws {
       let page = WebRecipePageParser.parse(
         html: try Self.fixtureHTML("milk-street-truncated-json-ld"),
