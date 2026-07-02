@@ -256,6 +256,10 @@ consider making them non-optional to match the full-replace semantics.
 
 ### Slice 8 — Scale a recipe by a multiplier (double/triple), show resulting servings
 
+**DONE — implemented (2026-07-02).** The recipe scaling sheet now offers direct 1x/2x/3x
+multiplier buttons alongside the existing servings wheel, and displays the resulting servings
+summary whenever scaling is active.
+
 Today scaling is driven through the servings concept. Add a direct multiplier (×2, ×3, …, and/or
 free multiplier) that scales ingredient quantities, and **display the resulting servings count**
 after scaling so the servings still read correctly. Do not remove servings-based scaling; add
@@ -263,6 +267,10 @@ the multiplier as a parallel, more direct control. **Done when:** Jon can double
 directly and see the resulting servings.
 
 ### Slice 9 — Add an image to a manually-entered recipe
+
+**DONE — implemented (2026-07-02).** The manual recipe editor now includes a Photos picker with
+preview, processes the selected image through the existing recipe-photo processor, persists it as a
+user hero photo on save, and includes the photo in the recipe's original snapshot.
 
 The manual recipe editor has no way to attach a photo. Add a photo picker (reuse the existing
 image storage/processing path — ADR-0005; hero images already sync as CKAssets, so no schema

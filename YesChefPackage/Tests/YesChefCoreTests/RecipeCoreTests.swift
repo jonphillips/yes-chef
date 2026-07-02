@@ -261,6 +261,54 @@ struct RecipeCoreTests {
   }
 
   @Test
+  func savePersistsPendingUserHeroPhoto() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 802_350_000)
+    let photoID = SampleUUIDSequence.uuid(650)
+    let sourceData = Data([0x01, 0x02, 0x03, 0x04])
+    let processedPhoto = RecipePhotoProcessor.process(
+      sourceData: sourceData,
+      sourcePath: "Photo Library.jpg",
+      kind: .hero
+    )
+    var uuids = SampleUUIDSequence(start: 651)
+
+    try database.write { db in
+      let recipeID = try RecipeRepository.save(
+        draft: RecipeEditorDraft(
+          title: "Photo Soup",
+          ingredientText: "1 onion",
+          instructionText: "Cook.",
+          pendingPhotos: [
+            RecipeEditorPhotoDraft(
+              id: photoID,
+              processedPhoto: processedPhoto,
+              originalSourcePath: "Photo Library.jpg",
+              kind: .hero,
+              source: .user
+            )
+          ]
+        ),
+        in: db,
+        now: now,
+        uuid: { uuids.next() }
+      )
+
+      let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+      let photo = try #require(detail.photos.first)
+      expectNoDifference(photo.id, photoID)
+      expectNoDifference(photo.kind, .hero)
+      expectNoDifference(photo.source, .user)
+      expectNoDifference(photo.imageDataReference, "recipePhotos/\(photoID.uuidString)")
+      expectNoDifference(photo.displayData, processedPhoto.displayData)
+      expectNoDifference(photo.thumbnailData, processedPhoto.thumbnailData)
+      expectNoDifference(photo.mediaType, processedPhoto.mediaType)
+      expectNoDifference(photo.checksum, processedPhoto.checksum)
+      expectNoDifference(photo.originalSourcePath, "Photo Library.jpg")
+    }
+  }
+
+  @Test
   func saveCreatesHierarchicalCategoryPathsForDisplayAndFiltering() throws {
     @Dependency(\.defaultDatabase) var database
     let now = Date(timeIntervalSinceReferenceDate: 802_400_000)

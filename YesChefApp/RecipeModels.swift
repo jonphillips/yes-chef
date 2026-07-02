@@ -877,6 +877,11 @@ final class RecipeDetailModel {
     return "\(ScaleText.mixedNumber(scaledServings)) \(ScaleText.servingUnit(scaledServings)) · \(factor)"
   }
 
+  var scaledServingsSummary: String? {
+    guard let scaledServings else { return nil }
+    return "\(ScaleText.mixedNumber(scaledServings)) \(ScaleText.servingUnit(scaledServings))"
+  }
+
   func scaleButtonTapped() {
     syncScalePickerFromCurrentScale()
     destination = .scaling
@@ -884,6 +889,11 @@ final class RecipeDetailModel {
 
   func resetScaleButtonTapped() {
     scaleFactor = 1
+    syncScalePickerFromCurrentScale()
+  }
+
+  func multiplierButtonTapped(_ multiplier: Double) {
+    scaleFactor = multiplier
     syncScalePickerFromCurrentScale()
   }
 
@@ -1001,93 +1011,6 @@ enum ScaleText {
 
   static func servingUnit(_ value: Double) -> String {
     value == 1 ? "serving" : "servings"
-  }
-}
-
-@Observable
-@MainActor
-final class RecipeEditorModel {
-  let recipeID: Recipe.ID?
-
-  @ObservationIgnored
-  @Dependency(\.date.now) private var now
-  @ObservationIgnored
-  @Dependency(\.defaultDatabase) private var database
-  @ObservationIgnored
-  @Dependency(\.uuid) private var uuid
-  @ObservationIgnored
-  @Fetch var detail: RecipeDetailData?
-  @ObservationIgnored
-  @Fetch(CategoryListRequest(), animation: .default) var categories: [YesChefCore.Category] = []
-
-  var draft = RecipeEditorDraft()
-  var errorMessage: String?
-  var isShowingError = false
-  private var hasLoadedDraft = false
-
-  init(recipeID: Recipe.ID?) {
-    self.recipeID = recipeID
-    if let recipeID {
-      _detail = Fetch(wrappedValue: nil, RecipeDetailRequest(recipeID: recipeID), animation: .default)
-    } else {
-      _detail = Fetch(wrappedValue: nil)
-    }
-  }
-
-  var isSavingDisabled: Bool {
-    draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-  }
-
-  var categoryRows: [CategoryHierarchy.DisplayRow] {
-    CategoryHierarchy.displayRows(from: categories)
-  }
-
-  var selectedCategoryIDs: Set<YesChefCore.Category.ID> {
-    draft.selectedCategoryIDs ?? []
-  }
-
-  var selectedCategorySummary: String {
-    let selectedRows = categoryRows.filter { selectedCategoryIDs.contains($0.category.id) }
-    guard !selectedRows.isEmpty else { return "No categories" }
-    return selectedRows.map(\.displayName).joined(separator: ", ")
-  }
-
-  func detailChanged(_ detail: RecipeDetailData?) {
-    guard !hasLoadedDraft, let detail else { return }
-    draft = RecipeEditorDraft(detail: detail)
-    hasLoadedDraft = true
-  }
-
-  func categorySelectionButtonTapped(_ categoryID: YesChefCore.Category.ID) {
-    var categoryIDs = selectedCategoryIDs
-    if categoryIDs.contains(categoryID) {
-      categoryIDs.remove(categoryID)
-    } else {
-      categoryIDs.insert(categoryID)
-    }
-    draft.selectedCategoryIDs = categoryIDs
-    draft.categoryNames = categoryRows
-      .filter { categoryIDs.contains($0.category.id) }
-      .map(\.displayName)
-      .joined(separator: ", ")
-  }
-
-  func saveButtonTapped() -> Bool {
-    do {
-      _ = try database.write { db in
-        try RecipeRepository.save(
-          draft: draft,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
-      }
-      return true
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
-      return false
-    }
   }
 }
 
