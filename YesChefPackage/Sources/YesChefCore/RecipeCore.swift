@@ -87,6 +87,7 @@ public struct RecipeEditorDraft: Equatable, Sendable {
   public var selectedCategoryIDs: Set<Category.ID>?
   public var originalSnapshot: Data?
   public var dateCreated: Date?
+  public var pendingPhotos: [RecipeEditorPhotoDraft]
 
   public init(
     id: Recipe.ID? = nil,
@@ -115,7 +116,8 @@ public struct RecipeEditorDraft: Equatable, Sendable {
     categoryNames: String = "",
     selectedCategoryIDs: Set<Category.ID>? = nil,
     originalSnapshot: Data? = nil,
-    dateCreated: Date? = nil
+    dateCreated: Date? = nil,
+    pendingPhotos: [RecipeEditorPhotoDraft] = []
   ) {
     self.id = id
     self.title = title
@@ -144,6 +146,7 @@ public struct RecipeEditorDraft: Equatable, Sendable {
     self.selectedCategoryIDs = selectedCategoryIDs
     self.originalSnapshot = originalSnapshot
     self.dateCreated = dateCreated
+    self.pendingPhotos = pendingPhotos
   }
 
   public init(detail: RecipeDetailData) {
@@ -193,8 +196,34 @@ public struct RecipeEditorDraft: Equatable, Sendable {
       categoryNames: detail.categoryDisplayNames.joined(separator: ", "),
       selectedCategoryIDs: Set(detail.categories.map(\.id)),
       originalSnapshot: detail.recipe.originalSnapshot,
-      dateCreated: detail.recipe.dateCreated
+      dateCreated: detail.recipe.dateCreated,
+      pendingPhotos: []
     )
+  }
+}
+
+public struct RecipeEditorPhotoDraft: Identifiable, Equatable, Sendable {
+  public var id: UUID
+  public var processedPhoto: ProcessedRecipePhoto
+  public var originalSourcePath: String?
+  public var kind: RecipePhotoKind
+  public var caption: String?
+  public var source: PhotoSource
+
+  public init(
+    id: UUID,
+    processedPhoto: ProcessedRecipePhoto,
+    originalSourcePath: String? = nil,
+    kind: RecipePhotoKind = .hero,
+    caption: String? = nil,
+    source: PhotoSource = .user
+  ) {
+    self.id = id
+    self.processedPhoto = processedPhoto
+    self.originalSourcePath = originalSourcePath
+    self.kind = kind
+    self.caption = caption
+    self.source = source
   }
 }
 
@@ -358,6 +387,12 @@ public enum RecipeRepository {
       with: reconciledInstructionSteps
     )
     let snapshotNotes = (existingDetail?.notes.filter { $0.noteType != .general } ?? []) + generalNotes
+    let photos = mergedPhotos(
+      existingDetail?.photos ?? [],
+      pendingPhotos: draft.pendingPhotos,
+      recipeID: recipeID,
+      now: now
+    )
     let categoryNames = try categoryNames(from: draft, in: db)
 
     if recipe.originalSnapshot == nil {
@@ -371,7 +406,7 @@ public enum RecipeRepository {
         notes: snapshotNotes,
         tagNames: draft.tagNames.listNames,
         categoryNames: categoryNames,
-        photos: existingDetail?.photos ?? [],
+        photos: photos,
         equipment: existingDetail?.equipment ?? [],
         recipeEquipment: existingDetail?.recipeEquipment ?? []
       )
@@ -393,6 +428,7 @@ public enum RecipeRepository {
     )
     try reconcileTags(draft.tagNames.listNames, recipeID: recipeID, in: db, now: now, uuid: uuid)
     try reconcileCategories(from: draft, recipeID: recipeID, in: db, now: now, uuid: uuid)
+    try reconcilePhotos(photos, existingPhotos: existingDetail?.photos ?? [], in: db)
 
     return recipeID
   }

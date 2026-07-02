@@ -469,6 +469,25 @@ private struct ScalePanel: View {
       }
 
       VStack(alignment: .leading, spacing: 8) {
+        Text("Multiplier")
+          .font(.subheadline.bold())
+
+        HStack(spacing: 8) {
+          ForEach([1.0, 2.0, 3.0], id: \.self) { multiplier in
+            Button {
+              model.multiplierButtonTapped(multiplier)
+            } label: {
+              Text(ScaleText.factor(multiplier))
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(model.scaleFactor == multiplier ? .accentColor : nil)
+            .accessibilityAddTraits(model.scaleFactor == multiplier ? .isSelected : [])
+          }
+        }
+      }
+
+      VStack(alignment: .leading, spacing: 8) {
         Text(model.baseServings == nil ? "Scale" : "Servings")
           .font(.subheadline.bold())
 
@@ -504,6 +523,10 @@ private struct ScalePanel: View {
 
       LabeledContent("Scale", value: ScaleText.factor(model.scaleFactor))
         .font(.subheadline)
+      if let scaledServingsSummary = model.scaledServingsSummary {
+        LabeledContent("Resulting servings", value: scaledServingsSummary)
+          .font(.subheadline)
+      }
 
       HStack {
         LabeledContent("Units", value: "Default")

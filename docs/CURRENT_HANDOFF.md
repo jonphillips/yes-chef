@@ -16,29 +16,17 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-- **Dogfood fixes — batch 1, Slice 7 — Edit a grocery item (name + amount).**
-  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) §Slices 8–9. Two
-  independent, self-contained UX wins — do both, in order, in this one dispatch/PR:
-  - **Slice 8 — Scale a recipe by a multiplier.** Add a direct ×2/×3 (and/or free) multiplier that
-    scales ingredient quantities and **displays the resulting servings count** after scaling. Add it
-    as a parallel control — do **not** remove servings-based scaling. **Done when:** Jon can
-    double/triple a recipe directly and see the resulting servings.
-  - **Slice 9 — Add an image to a manually-entered recipe.** Add a photo picker to the manual recipe
-    editor, reusing the existing image storage/processing path (ADR-0005; hero images already sync as
-    CKAssets — no schema change). **Done when:** a manually-created recipe can have a hero image added,
-    and it displays and syncs like a captured one.
-
-  **After this:** batch 1 is complete. The Slice 7 delete-source-clobbers-amount-edit follow-up is
-  parked in the effort doc for a later grocery slice — **not** part of this dispatch.
+No active dispatch target. Stop and ask Jon for the next effort before starting new work.
 
 ## Ready Efforts (queue)
 
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target.
 
-- **Dogfood fixes — batch 1 (bugs + near-term UX)** — closing out.
-  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md). Slices 1–7 done (see
-  [DONE-LOG](DONE-LOG.md) / effort doc); Slices 8–9 are Next Up (last of the batch).
+- **Dogfood fixes — batch 1 (bugs + near-term UX)** — complete.
+  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md). The Slice 7
+  delete-source-clobbers-amount-edit follow-up remains parked in the effort doc for a later grocery
+  slice.
 
 - **Recipe → grocery list w/ pantry checking** (Phase E) — make it slick early (canonical-key merge,
   static pantry thresholds, dialog-free); spec = [[grocery-pantry-threshold-design]]. Lower priority

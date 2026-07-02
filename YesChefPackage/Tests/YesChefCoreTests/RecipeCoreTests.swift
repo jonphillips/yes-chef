@@ -261,6 +261,124 @@ struct RecipeCoreTests {
   }
 
   @Test
+  func savePersistsPendingUserHeroPhoto() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 802_350_000)
+    let photoID = SampleUUIDSequence.uuid(650)
+    let sourceData = Data([0x01, 0x02, 0x03, 0x04])
+    let processedPhoto = RecipePhotoProcessor.process(
+      sourceData: sourceData,
+      sourcePath: "Photo Library.jpg",
+      kind: .hero
+    )
+    var uuids = SampleUUIDSequence(start: 651)
+
+    try database.write { db in
+      let recipeID = try RecipeRepository.save(
+        draft: RecipeEditorDraft(
+          title: "Photo Soup",
+          ingredientText: "1 onion",
+          instructionText: "Cook.",
+          pendingPhotos: [
+            RecipeEditorPhotoDraft(
+              id: photoID,
+              processedPhoto: processedPhoto,
+              originalSourcePath: "Photo Library.jpg",
+              kind: .hero,
+              source: .user
+            )
+          ]
+        ),
+        in: db,
+        now: now,
+        uuid: { uuids.next() }
+      )
+
+      let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+      let photo = try #require(detail.photos.first)
+      expectNoDifference(photo.id, photoID)
+      expectNoDifference(photo.kind, .hero)
+      expectNoDifference(photo.source, .user)
+      expectNoDifference(photo.imageDataReference, "recipePhotos/\(photoID.uuidString)")
+      expectNoDifference(photo.displayData, processedPhoto.displayData)
+      expectNoDifference(photo.thumbnailData, processedPhoto.thumbnailData)
+      expectNoDifference(photo.mediaType, processedPhoto.mediaType)
+      expectNoDifference(photo.checksum, processedPhoto.checksum)
+      expectNoDifference(photo.originalSourcePath, "Photo Library.jpg")
+    }
+  }
+
+  @Test
+  func saveReplacingUserHeroPhotoDeletesSupersededHeroPhoto() throws {
+    @Dependency(\.defaultDatabase) var database
+    let createdAt = Date(timeIntervalSinceReferenceDate: 802_360_000)
+    let modifiedAt = Date(timeIntervalSinceReferenceDate: 802_360_100)
+    let originalPhotoID = SampleUUIDSequence.uuid(660)
+    let replacementPhotoID = SampleUUIDSequence.uuid(661)
+    let originalPhoto = RecipePhotoProcessor.process(
+      sourceData: Data([0x01, 0x02, 0x03, 0x04]),
+      sourcePath: "Original.jpg",
+      kind: .hero
+    )
+    let replacementPhoto = RecipePhotoProcessor.process(
+      sourceData: Data([0x05, 0x06, 0x07, 0x08]),
+      sourcePath: "Replacement.jpg",
+      kind: .hero
+    )
+    var uuids = SampleUUIDSequence(start: 662)
+
+    try database.write { db in
+      let recipeID = try RecipeRepository.save(
+        draft: RecipeEditorDraft(
+          title: "Change Photo Pasta",
+          ingredientText: "1 pound pasta",
+          instructionText: "Boil.",
+          pendingPhotos: [
+            RecipeEditorPhotoDraft(
+              id: originalPhotoID,
+              processedPhoto: originalPhoto,
+              originalSourcePath: "Original.jpg",
+              kind: .hero,
+              source: .user
+            )
+          ]
+        ),
+        in: db,
+        now: createdAt,
+        uuid: { uuids.next() }
+      )
+      let originalDetail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+      expectNoDifference(originalDetail.photos.map(\.id), [originalPhotoID])
+
+      var editDraft = RecipeEditorDraft(detail: originalDetail)
+      editDraft.pendingPhotos = [
+        RecipeEditorPhotoDraft(
+          id: replacementPhotoID,
+          processedPhoto: replacementPhoto,
+          originalSourcePath: "Replacement.jpg",
+          kind: .hero,
+          source: .user
+        )
+      ]
+      _ = try RecipeRepository.save(
+        draft: editDraft,
+        in: db,
+        now: modifiedAt,
+        uuid: { uuids.next() }
+      )
+
+      let updatedDetail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+      expectNoDifference(updatedDetail.photos.map(\.id), [replacementPhotoID])
+      expectNoDifference(updatedDetail.photos.map(\.originalSourcePath), ["Replacement.jpg"])
+
+      let storedPhotoIDs = try RecipePhoto.fetchAll(db)
+        .filter { $0.recipeID == recipeID }
+        .map(\.id)
+      expectNoDifference(storedPhotoIDs, [replacementPhotoID])
+    }
+  }
+
+  @Test
   func saveCreatesHierarchicalCategoryPathsForDisplayAndFiltering() throws {
     @Dependency(\.defaultDatabase) var database
     let now = Date(timeIntervalSinceReferenceDate: 802_400_000)

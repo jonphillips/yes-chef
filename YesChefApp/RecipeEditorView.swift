@@ -1,8 +1,11 @@
+import PhotosUI
 import SwiftUI
+import UIKit
 import YesChefCore
 
 struct RecipeEditorView: View {
   @State private var model: RecipeEditorModel
+  @State private var selectedHeroPhotoItem: PhotosPickerItem?
   @Environment(\.dismiss) private var dismiss
 
   init(recipeID: Recipe.ID?) {
@@ -18,6 +21,13 @@ struct RecipeEditorView: View {
         StackedTextField(title: "Subtitle", text: $model.draft.subtitle)
         StackedTextField(title: "Summary", text: $model.draft.summary, axis: .vertical)
         Toggle("Favorite", isOn: $model.draft.favorite)
+      }
+
+      Section("Photo") {
+        RecipeHeroPhotoPickerRow(
+          model: model,
+          selectedItem: $selectedHeroPhotoItem
+        )
       }
 
       Section("Source") {
@@ -106,6 +116,75 @@ struct RecipeEditorView: View {
     } message: {
       Text(model.errorMessage ?? "")
     }
+  }
+}
+
+private struct RecipeHeroPhotoPickerRow: View {
+  let model: RecipeEditorModel
+  @Binding var selectedItem: PhotosPickerItem?
+
+  var body: some View {
+    let hasPhoto = model.heroPhotoPreviewData != nil
+
+    VStack(alignment: .leading, spacing: 12) {
+      if let data = model.heroPhotoPreviewData {
+        RecipeHeroPhotoPreview(data: data)
+      }
+
+      PhotosPicker(selection: $selectedItem, matching: .images) {
+        Label(hasPhoto ? "Change Photo" : "Add Photo", systemImage: "photo.badge.plus")
+      }
+      .onChange(of: selectedItem) { _, item in
+        guard let item else { return }
+        Task {
+          do {
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+              selectedItem = nil
+              return
+            }
+            await model.heroPhotoSelected(
+              sourceData: data,
+              sourcePath: sourcePath(for: item)
+            )
+          } catch {
+            model.heroPhotoSelectionFailed(error)
+          }
+          selectedItem = nil
+        }
+      }
+    }
+  }
+
+  private func sourcePath(for item: PhotosPickerItem) -> String {
+    guard let fileExtension = item.supportedContentTypes.first?.preferredFilenameExtension else {
+      return "Photo Library"
+    }
+    return "Photo Library.\(fileExtension)"
+  }
+}
+
+private struct RecipeHeroPhotoPreview: View {
+  let data: Data
+
+  var body: some View {
+    ZStack {
+      RoundedRectangle(cornerRadius: 8)
+        .fill(.quaternary)
+
+      if let image = UIImage(data: data) {
+        Image(uiImage: image)
+          .resizable()
+          .scaledToFill()
+      } else {
+        Image(systemName: "photo")
+          .font(.title)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .frame(maxWidth: .infinity)
+    .frame(height: 180)
+    .clipShape(.rect(cornerRadius: 8))
+    .accessibilityLabel(Text("Recipe photo"))
   }
 }
 
