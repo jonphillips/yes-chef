@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 2, 2026
+Last updated: July 2, 2026 (Slice 1 lift approved; Next Up = Slice 2 make-ahead)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -20,12 +20,11 @@ PR); do all listed, in order.
 actionable-chat pattern. Full spec: [`docs/efforts/actionable-chat-make-ahead.md`](efforts/actionable-chat-make-ahead.md).
 Decision: [`docs/decisions/ADR-0011-actionable-chat-make-ahead.md`](decisions/ADR-0011-actionable-chat-make-ahead.md).
 
-Do the slices **in order**:
-1. **Slice 1 — the lift** (`GalavantAI` → shared `packages/LLMClientKit`; a *move* not a copy). Three
-   repos, three commits/PRs: **1a** create the package in jon-platform + EXTRACTION-NOTES row; **1b**
-   galavant path-dep + delete + `import LLMClientKit` (use a **worktree** if parallel); **1c** yes-chef
-   path-dep + **delete** its minimal `ModelClient`/`ClaudeAPIClient`, migrate `AISettingsView` onto the
-   package's `APIKeyStore`, rewire the app to `TieredModelClient.live`. Prereq for Slice 2.
+**Slice 1 — the lift is done and architect-approved (2026-07-02):** jon-platform PR #17 (new
+`packages/LLMClientKit`), galavant PR #48 (retire `GalavantAI`), yes-chef PR #67 (adopt +
+`TieredModelClient.live`); merge jon-platform first. Details in [`docs/DONE-LOG.md`](DONE-LOG.md).
+**Next Up is Slice 2:**
+
 2. **Slice 2 — the abstraction + make-ahead** (yes-chef): additive `Recipe.makeAhead` column; a general
    `(extract → commit)` apply-action **catalog** (make-ahead = verb #1, not hardcoded); `MakeAheadPlan` +
    `MakeAheadPlanClient` (mirror `PlaceDiscoveryClient`); tested `applyMakeAheadPlan`; `RecipeChatContext`

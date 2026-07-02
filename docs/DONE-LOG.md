@@ -10,6 +10,32 @@ Newest first.
 
 ---
 
+## Actionable chat (ADR-0011) — Slice 1: the lift
+
+**Slice 1 of the actionable-chat lift, architect-approved 2026-07-02** (3 PRs; merge jon-platform
+first). Moved the shared model-client stack out of galavant into a new home package and adopted it in
+both apps — a *move*, not a copy.
+
+- **jon-platform PR #17** — new `packages/LLMClientKit` (source of truth): `ModelClient` /
+  `TieredModelClient`, Anthropic/OpenAI/on-device clients, wires, `JSONValue`, `ModelTool`, keychain
+  `APIKeyStore`, full tests, EXTRACTION-NOTES row. Review verified a faithful lift: every non-`APIKeyStore`
+  diff vs the `GalavantAI` originals is doc-reference retargeting only (ADR-0014→`ai-model-access.md`,
+  ADR-0017/0018→`actionable-chat.md`, both present at `docs/ios/`).
+- **galavant PR #48** — retire in-repo `GalavantAI`, path-dep on LLMClientKit, repoint imports
+  (−1,900 net). No leftover `import GalavantAI`.
+- **yes-chef PR #67** — delete minimal `ModelClient` / `ClaudeAPIClient` / `ClaudeAPIKeyStorage`, adopt
+  the package's `APIKeyStore`, wire `TieredModelClient.live` (−511 net). No dangling refs.
+
+Adopters use a relative path dep (`../../../jon-platform/packages/LLMClientKit`) — harvest-now/
+converge-later (ADR-0007); converging to a versioned dependency is a later follow-up.
+
+**Known one-time cost (accepted, not fixed):** LLMClientKit's `APIKeyStore` migrates galavant's legacy
+keychain service but not yes-chef's old one (service `com.jon.yeschef.ai.anthropic` / account
+`claude-api-key` → now `com.jonphillips.llmclientkit.apikeys` / account `anthropic`). Existing yes-chef
+installs must re-enter the Claude key once per device. Accepted — private app, recoverable, not worth code.
+
+---
+
 ## Dogfood fixes — batch 1
 
 **Slice 6 (PR #62), architect-approved 2026-07-02.** A **Share List** action in the grocery
