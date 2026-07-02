@@ -1,7 +1,12 @@
 # Current Handoff
 
-Last updated: July 2, 2026 (**Reader Feedback Slice 4 (PR #57) architect-approved — Dogfood fixes
-batch 1 is now the Codex dispatch target, Slice 1 first.** Slice 4 shipped the app's first LLM
+Last updated: July 2, 2026 (**Dogfood batch 1 Slice 1 (PR #58) architect-approved — Next Up is now
+Slice 2 (add-to-meal/grocery targets the viewed recipe, with confirmation).** Slice 1 shipped the
+gated-presenter pattern so add sheets + all six full-screen-recipe toolbar affordances present
+in-context (`AppDestinationPresentation.swift`). The review also surfaced a Slice 3 scope call from
+Jon — *archive means gone*: archiving a recipe cascades to remove its meal-plan and menu-dish
+placements, and the destructive action is renamed "Archive" (folded into the Slice 3 spec). Earlier
+context follows. **Reader Feedback Slice 4 (PR #57) architect-approved.** Slice 4 shipped the app's first LLM
 integration: a domain-free `ModelClient` boundary + minimal Claude Messages API wire client in
 `YesChefCore` (injectable `Transport`, no network in tests, 114 tests green) plus app-side Keychain
 storage for a personal Claude API key (synchronizable iCloud-Keychain generic-password item, entered
@@ -31,36 +36,38 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **Dogfood fixes — batch 1, Slice 1 — Add-to-Grocery / add sheets don't present over a
-  full-screen recipe.** [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md)
-  §Slice 1. **Now the Codex dispatch target** — Reader Feedback Slice 4 is architect-approved
-  (PR #57), the pre-agreed trigger to promote this batch (Jon, 2026-07-02; bugs 1–3 first, one slice
-  at a time). Bug: recipes open via `.fullScreenCover` (`RecipeLibraryView.swift:40`,
-  `presentedRecipeID`), but the ingredient-selection sheet is attached at `RecipeLibraryView.swift:289`
-  on the view *underneath* the cover, so a sheet requested from a covered view is queued until the
-  cover dismisses — the tap "does nothing" until you back out.
-  1. Present the grocery/add sheet from within (or above) the full-screen recipe presentation so it
-     appears in-context.
-  2. Audit every affordance reachable from the full-screen recipe for the same trap.
+- **Dogfood fixes — batch 1, Slice 2 — Add-to-Meal / Add-to-Grocery act on the viewed recipe, with
+  confirmation.** [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md)
+  §Slice 2. **The Codex dispatch target.** From an open recipe, the "add to meal"/"add to grocery"
+  affordance is confusing — no confirmation that *this* recipe was added, and if the target isn't at
+  the top of a list it's unclear what got added. Make the action target **the recipe you're
+  viewing** and show an explicit confirmation (which recipe + where); don't make the user re-pick
+  from a list the recipe they're already looking at. Coordinate with the Slice 1 presenter pattern
+  (`AppDestinationPresentation.swift`) so the confirmation surface presents correctly over the
+  full-screen recipe. **Done when:** adding to meal/grocery from an open recipe confirms the specific
+  recipe added, unambiguously.
 
-  **In review — PR #58, extension required (architect, 2026-07-02).** The first pass (`5772ed8`)
-  fixed Add-to-Grocery + Add-to-Plan with a correct gated-presenter pattern
-  (`AppDestinationPresentation.swift`), but left **four** more `RecipeDetailView` toolbar actions
-  trapped — Edit, Start Cooking, View Original, Delete all set `recipeModel.destination`, whose
-  presenters live only on the root and stay queued under the cover. Since recipes open full-screen
-  from the Meal Calendar and Menus, these are live dead buttons. **Extend the same PR #58 branch**
-  per the checklist in [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md)
-  §Slice 1 → *Extend the slice*: add a `recipeDetailDestinations` modifier for
-  `editRecipe`/`cookingMode`/`originalSnapshot`/`deleteRecipe`, attach it to `RecipeFullScreenCover`,
-  and gate the root copies on `presentedRecipeID == nil`.
+  **Remaining batch-1 order after this:** Slice 3 (archive handling — see below), then UX Slices 4–9
+  (browser clear-URL, list search reachability, share grocery as text, edit a grocery item, ×2/×3
+  recipe multiplier, add image to a manual recipe). Draw one slice into Next Up at a time.
 
-  **Done when:** every toolbar affordance on a full-screen recipe — Add-to-Grocery, Add-to-Plan,
-  Edit, Start Cooking, View Original, Delete — presents immediately, in-context, from the Meal
-  Calendar, a Menu, *and* the library. **Remaining batch-1 order after
-  this:** Slice 2 (add-to-meal/grocery targets the viewed recipe, with confirmation), Slice 3
-  (archived recipes get restore/purge), then UX Slices 4–9 (browser clear-URL, list search
-  reachability, share grocery as text, edit a grocery item, ×2/×3 recipe multiplier, add image to a
-  manual recipe). Draw one slice into Next Up at a time.
+  **Slice 3 now carries a scope decision (Jon, 2026-07-02): archive means GONE.** From the PR #58
+  review — "Delete Recipe" is a soft-delete (`RecipeCore.archive`), and `archived` is honored
+  inconsistently: the recipe list and calendar/menu *add-pickers* filter it, but already-scheduled
+  meal-plan items and menu dishes resolve by ID with no archived check, so an archived recipe keeps
+  rendering on its date / in its menu and stays tappable into a live archived detail. **Decision:
+  archiving cascades** — remove the recipe's meal-plan *and* menu-dish placements at archive time
+  (calendar is forward-planning; menus lean historical but archive intent is unambiguously "gone
+  everywhere"; restore brings back the recipe, not placements). Also **adopt "Archive" as the
+  user-facing term** for the destructive recipe action. Full spec folded into
+  [`dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) §Slice 3.
+
+- **Just landed — Slice 1 (PR #58), architect-approved; Jon merging (2026-07-02).** Add sheets + all six
+  full-screen-recipe toolbar affordances (Add-to-Grocery, Add-to-Plan, Edit, Start Cooking, View
+  Original, Delete) now present in-context via the shared gated-presenter pattern in
+  `AppDestinationPresentation.swift` (root presenters gated on `presentedRecipeID == nil`,
+  re-attached ungated inside `RecipeFullScreenCover`). Also updated the active-simulator target to
+  `iPad Pro 13-inch (M5) (16GB)`.
 
   **Still parked (not dispatched):**
   - **Dogfood the core loop on two devices** — capture ~15–20 real recipes via the extension, cook
