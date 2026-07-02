@@ -1,6 +1,25 @@
 # Current Handoff
 
-Last updated: July 1, 2026 (**Reader Feedback Slice 1 (PR #55) architect-approved and merged** —
+Last updated: July 2, 2026 (**Reader Feedback Slice 3 (PR #56) architect-approved — Slice 4 is now
+the Codex dispatch target.** Slice 3 shipped the host-keyed "Load Comments" browser action + bounded
+NYT playbook (JS clicks Most Helpful, then "Show more comments" ≤4×) and a pure, fixture-tested
+`RecipeReaderCommentExtractor` producing `[RawComment { text, helpfulCount }]`. Architect verified the
+substance, not just the green run: the fixture has exactly 76 `note_note__` cards / bodies /
+recommendation-count spans (1:1), full-integer counts matching the test's expected values, the single
+nested reply keys on a distinct class so it isn't double-counted, and anonymization is *structural* —
+the extractor only reads `note_noteBody__ > p` and never touches the `note_noteOwner__` name span.
+Keys on stable structure (`#notes_section` + `note_note__` prefix), not drift-prone hash suffixes, as
+flagged. Three **non-blocking** notes deferred to Slice 5: (a) the anonymization test is weak —
+whole-text `==` to a name, essentially never true; assert `contains` a placeholder substring instead;
+(b) `helpfulCount`'s digit-filter would misparse abbreviated `"6.3K"`-style counts — fine for today's
+full-integer NYT render, wants a one-line comment on the assumption; (c) the extractor is dormant
+(test-only) until Slice 5 wires it into review — expected, not dead code. Prior context: **Reader
+Feedback Slice 2 fixture landed** (2026-07-01) — the architect sanitized Jon's authenticated "Most
+Helpful, fully loaded" NYT capture (Lemony White Bean Soup) into
+`Tests/YesChefCoreTests/Fixtures/WebRecipeCapture/SanitizedSites/nyt-comments.html` (recipe JSON-LD +
+verbatim `<section id="notes_section">`, 76 cards, synthetic commenter names, JSON-LD `review` PII
+array dropped, no auth material present). **Reader Feedback Slice 1
+(PR #55) architect-approved and merged** —
 confirmation-dialog-gated Cancel plus `interactiveDismissDisabled`/`isModalInPresentation` for the
 in-app capture sheet and share-extension review, keyed off a new `hasUnsavedReviewChanges`.
 Architect review caught a gap before sign-off: the dismiss-guard excluded `isCommitting`, so
@@ -24,16 +43,22 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **Reader Feedback Slice 2 — harvest the real NYT comment-thread fixture.**
-  `docs/efforts/reader-feedback-comment-ingestion.md` §Slice 2. **Blocked, not a Codex
-  dispatch target yet:** needs Jon to sort an authenticated NYT Cooking recipe to Most
-  Helpful, click Load More a few times, and pull the live DOM off-device (Web Inspector →
-  Copy Element on `<html>`, not View Source — the comments are JS-loaded, so the
-  server-rendered source won't have them). Architect sanitizes (scrub cookies/tokens/account
-  markup/commenter PII) into
-  `Tests/YesChefCoreTests/Fixtures/WebRecipeCapture/SanitizedSites/nyt-comments.html`. Once
-  that fixture lands, **Slice 3** (named "Load Comments" browser playbook + host-keyed
-  comment extractor) becomes the real Next Up for Codex.
+- **Reader Feedback Slice 4 — Claude API client + Keychain key storage.**
+  `docs/efforts/reader-feedback-comment-ingestion.md` §Slice 4. **Now a real Codex dispatch
+  target** — Slice 3 landed (see below). First LLM integration and first network-calling,
+  key-bearing component in the app. Per `docs/FUTURE_INTELLIGENCE_AND_PLANNING.md` §7.4 the app
+  has no server (ADR-0002), so this is a direct client-side call with a personal API key:
+  1. A **minimal Claude API client** — plain HTTP call; check whether a package dependency is
+     already vendored before adding one. Build it **generically** (reusable infra for other §7.2
+     "good AI uses" — make-ahead extraction, substitutions — not comment-triage-specific).
+     Default to the latest capable Claude model.
+  2. **Personal API key in Keychain**, entered via a new field in the existing `SettingsView`
+     (`YesChefApp/RecipeLibraryView.swift:593`).
+
+  **Open question to confirm at dispatch:** whether the client belongs in `YesChefCore`
+  (host-testable, no network in tests) or app-layer only, given it's the first network/key-bearing
+  component. Lean `YesChefCore` for the pure request/response shaping (testable) with the actual
+  `URLSession` call injected, so tests never hit the network — but let the implementer justify.
 
   **Still parked (not dispatched):**
   - **Dogfood the core loop on two devices** — capture ~15–20 real recipes via the extension, cook
@@ -46,6 +71,27 @@ task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
     pantry thresholds, dialog-free); spec = [[grocery-pantry-threshold-design]] (Phase E). Lower
     priority than Reader Feedback per Jon's stated intent (2026-07-01).
   - Full context in the `post-sync-next-tracks` memory.
+
+Reader Feedback Slice 3 — NYT comment capture playbook + host-keyed extractor — **DONE** (PR #56,
+`codex/reader-feedback-comment-playbook`; architect-approved 2026-07-02): host-keyed **"Load
+Comments"** action in `BrowserWorkspaceView` (separate from Capture) driving a bounded NYT playbook
+(`BrowserCommentLoadingPlaybook` in `RecipeModels.swift` — clicks Most Helpful, then "Show more
+comments" ≤4×, keyed on `cooking.nytimes.com`), plus a pure, fixture-tested
+`RecipeReaderCommentExtractor` (`YesChefCore`, SwiftSoup, no WebKit) producing
+`[RawComment { text, helpfulCount }]`. Architect verified the fixture math (76 cards/bodies/count
+spans 1:1, full-integer counts matching the test, distinct-class reply not double-counted) and that
+anonymization is structural (reads only `note_noteBody__ > p`, never the owner span). Keys on stable
+structure, not hash suffixes. Extractor is intentionally dormant (test-only) until Slice 5 wires it
+into review. **Non-blocking follow-ups deferred to Slice 5:** (a) strengthen the anonymization test
+(`contains` a placeholder substring, not whole-text `==`); (b) comment the `helpfulCount` digit-filter
+assumption that counts render as full integers, not abbreviated `"6.3K"`.
+
+Reader Feedback Slice 2 — harvest the real NYT comment-thread fixture — **DONE** (architect
+sanitization step, not a PR/Codex slice; 2026-07-01): Jon captured the authenticated "Most Helpful,
+fully loaded" DOM for Lemony White Bean Soup off-device; the architect sanitized it into
+`Tests/YesChefCoreTests/Fixtures/WebRecipeCapture/SanitizedSites/nyt-comments.html` (recipe JSON-LD
++ verbatim `<section id="notes_section">`, 76 cards, synthetic commenter names, JSON-LD `review` PII
+array dropped, no auth material present). Real Slice 3 selectors are captured in Next Up above.
 
 Reader Feedback Slice 1 — review-sheet dismiss-fragility hardening — **DONE** (PR #55,
 `codex/reader-feedback-review-dismiss-hardening`; architect-approved and merged 2026-07-01):
@@ -204,7 +250,15 @@ M3 authenticated browser capture — **DONE** (PR #44 merged, `2f5b588`):
 
 Drawn into **Next Up** one at a time; this is not a dispatch target.
 
-_(empty — the `expectedContentLength` guard was drawn into the cleanup slice in Next Up above.)_
+- **Dogfood fixes — batch 1 (bugs + near-term UX)** —
+  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md). Jon's first
+  dogfooding pass (2026-07-02): 3 verified bugs (add-sheet-doesn't-present-over-full-screen-recipe,
+  add-to-meal has no confirmation / wrong target, archived recipes invisible with no restore/purge)
+  + 6 small self-contained UX wins (browser clear-URL, recipe-list search reachability, share
+  grocery as text, edit a grocery item, direct ×2/×3 recipe multiplier, add image to a manual
+  recipe). **Jon's instruction (2026-07-02): this whole batch is the next set of efforts once
+  Reader Feedback Slice 4 is architect-approved** — promote it into Next Up then, bugs (Slices 1–3)
+  first. Not a dispatch target until that approval lands.
 
 Comment ingestion stays in `docs/open-questions.md` until it is a scoped effort.
 
