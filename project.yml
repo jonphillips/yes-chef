@@ -1,6 +1,6 @@
 name: YesChef
 options:
-  bundleIdPrefix: com.jon
+  bundleIdPrefix: com.jonphillips
   deploymentTarget:
     iOS: "27.0"
 packages:
@@ -52,7 +52,7 @@ targets:
         embed: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.jon.yeschef
+        PRODUCT_BUNDLE_IDENTIFIER: com.jonphillips.yeschef
         PRODUCT_NAME: YesChef
         CODE_SIGN_ENTITLEMENTS: YesChefApp/YesChef.entitlements
         DEVELOPMENT_TEAM: 7MQEE539G9
@@ -72,7 +72,7 @@ targets:
         product: YesChefCore
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.jon.yeschef.share-extension
+        PRODUCT_BUNDLE_IDENTIFIER: com.jonphillips.yeschef.share-extension
         PRODUCT_NAME: YesChefShareExtension
         CODE_SIGN_ENTITLEMENTS: YesChefShareExtension/YesChefShareExtension.entitlements
         DEVELOPMENT_TEAM: 7MQEE539G9
