@@ -50,7 +50,8 @@ struct AppContainer: View {
         recipeID: recipeID,
         recipeModel: recipeModel,
         mealCalendarModel: mealCalendarModel,
-        groceryModel: groceryModel
+        groceryModel: groceryModel,
+        toastCenter: toastCenter
       )
     }
     .mealCalendarItemEditorDestination(
@@ -223,6 +224,7 @@ private struct RecipeFullScreenCover: View {
   let recipeModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
+  let toastCenter: AppToastCenter
 
   var body: some View {
     NavigationStack {
@@ -240,6 +242,11 @@ private struct RecipeFullScreenCover: View {
         }
       }
     }
+    .overlay(alignment: .top) {
+      AppToastOverlay(toastCenter: toastCenter)
+        .ignoresSafeArea(.keyboard)
+    }
+    .sensoryFeedback(.success, trigger: toastCenter.feedbackTrigger)
     .mealCalendarItemEditorDestination(mealCalendarModel: mealCalendarModel)
     .groceryDestinations(
       groceryModel: groceryModel,
