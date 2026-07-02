@@ -1,7 +1,17 @@
 # Current Handoff
 
-Last updated: July 2, 2026 (**Dogfood batch 1 Slice 5 (PR #61) architect-approved — Next Up is now
-Slice 6 (share the grocery list as text).** Slice 5 kept the recipe-list search field reachable by
+Last updated: July 2, 2026 (**Dogfood batch 1 Slice 6 (PR #62) architect-approved, pending merge —
+Next Up is now Slice 7 (edit a grocery item).** Slice 6 added a **Share List** action to the grocery
+detail actions menu via a native `ShareLink`, backed by a pure `GroceryListPlainTextRenderer` in
+`YesChefCore` (subject = list title). The renderer's **To Buy / Purchased** grouping and order are
+driven from the same `selectedItemRows` the `GroceryDetailView` sections use, so the shared text
+matches on-screen order/grouping exactly; quantity+unit, then title, with aisle/notes in parens.
+Pure/sync-safe (no persistence, no schema change), fixture-tested (grouping+empty cases); package
+builds, 2 new tests + full suite green. Authored by Jon directly (not Codex — Codex out of tokens).
+*(Non-blocking: the `selectedListShareText` fallback string is dead code — the ShareLink only renders
+inside `if let selectedList`, and `selectedListRow` is nil only with zero lists. When Phase E
+store-section grouping lands, extend the renderer to reflect sections — dependency noted, not
+blocking.)* Prior context: **Slice 5 (PR #61)** kept the recipe-list search field reachable by
 pinning the native nav-bar search drawer (`.searchable(placement: .navigationBarDrawer(displayMode:
 .always))` on the shared `RecipeListView`) so it no longer scrolls away with the list. One-line,
 idiomatic view change — reuses the existing `.searchable` binding, no new state/scroll-tracking/custom
@@ -55,16 +65,26 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **Dogfood fixes — batch 1, Slice 6 — Share the grocery list as text.**
-  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) §Slice 6. **The Codex
-  dispatch target.** Add a Share action to a grocery list that produces a plain-text rendering
-  (respecting current order/grouping) into the system share sheet. Small, self-contained, no new
-  architecture. **Done when:** the grocery list can be shared as readable text to Messages/Notes/etc.
-  *(When Phase E store-section grouping lands, the text export should reflect the sections — note the
-  dependency, don't block on it.)*
+- **Dogfood fixes — batch 1, Slice 7 — Edit a grocery item (name + amount).**
+  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) §Slice 7. **The Codex
+  dispatch target.** Grocery rows can't be edited today. Add an edit affordance for a grocery item's
+  **name** and **amount/quantity**, kept compatible with the source-provenance model — a manual edit
+  to a *generated* row must not silently corrupt its `GroceryItemSource` breakdown. Decide and test
+  the interaction (e.g. an edited row detaches to a custom/edited state, or the edit is preserved
+  distinctly) and **flag the provenance interaction in the PR.** **Done when:** name and amount are
+  editable and the change persists without breaking the source breakdown.
 
-  **Remaining batch-1 order after this:** UX Slices 7–9 (edit a grocery item, ×2/×3 recipe
-  multiplier, add image to a manual recipe). Draw one slice into Next Up at a time.
+  **Remaining batch-1 order after this:** UX Slices 8–9 (×2/×3 recipe multiplier, add image to a
+  manual recipe). Draw one slice into Next Up at a time.
+
+- **Just landed — Slice 6 (PR #62), architect-approved, pending merge (2026-07-02).** A **Share List**
+  action in the grocery detail actions menu (`GroceryViews.swift`) via native `ShareLink`, backed by a
+  pure `GroceryListPlainTextRenderer` (`YesChefCore`). Grouping/order come from the same
+  `selectedItemRows` the detail view sections use, so shared text mirrors the on-screen To Buy /
+  Purchased split exactly. Sync-safe (no persistence/schema change), fixture-tested; package + 2 new
+  tests green. Review found no blockers. Authored by Jon directly (Codex out of tokens). Non-blocking:
+  the `selectedListShareText` nil-list fallback is dead code (menu only renders with a list selected);
+  extend the renderer for store sections when Phase E lands.
 
 - **Just landed — Slice 5 (PR #61), architect-approved (2026-07-02).** Pinned the recipe-list search
   drawer via `.searchable(placement: .navigationBarDrawer(displayMode: .always))` on the shared
