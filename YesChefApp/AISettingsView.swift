@@ -1,6 +1,10 @@
+import Dependencies
+import LLMClientKit
 import SwiftUI
 
 struct AISettingsView: View {
+  @Dependency(\.apiKeyStore) private var apiKeyStore
+
   @State private var apiKey = ""
   @State private var status: AISettingsStatus?
 
@@ -25,7 +29,7 @@ struct AISettingsView: View {
         }
         .disabled(apiKey.isEmpty)
       } footer: {
-        Text("Stored in iCloud Keychain and used only for direct Claude API calls from this device.")
+        Text("Stored in iCloud Keychain and used only for direct frontier model calls from this device.")
       }
 
       if let status {
@@ -42,32 +46,20 @@ struct AISettingsView: View {
   }
 
   private func loadAPIKey() {
-    do {
-      apiKey = try ClaudeAPIKeyStorage.apiKey() ?? ""
-      status = apiKey.isEmpty ? nil : .saved
-    } catch {
-      status = .failed(error.localizedDescription)
-    }
+    apiKey = apiKeyStore.key(.anthropic) ?? ""
+    status = apiKey.isEmpty ? nil : .saved
   }
 
   private func saveAPIKey() {
-    do {
-      try ClaudeAPIKeyStorage.saveAPIKey(apiKey)
-      apiKey = try ClaudeAPIKeyStorage.apiKey() ?? ""
-      status = apiKey.isEmpty ? .cleared : .saved
-    } catch {
-      status = .failed(error.localizedDescription)
-    }
+    apiKeyStore.setKey(apiKey, for: .anthropic)
+    apiKey = apiKeyStore.key(.anthropic) ?? ""
+    status = apiKey.isEmpty ? .cleared : .saved
   }
 
   private func clearAPIKey() {
-    do {
-      try ClaudeAPIKeyStorage.deleteAPIKey()
-      apiKey = ""
-      status = .cleared
-    } catch {
-      status = .failed(error.localizedDescription)
-    }
+    apiKeyStore.setKey(nil, for: .anthropic)
+    apiKey = ""
+    status = .cleared
   }
 }
 

@@ -16,12 +16,14 @@ let package = Package(
     .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.0.0"),
     .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
     .package(url: "https://github.com/scinfu/SwiftSoup", from: "2.7.0"),
+    .package(path: "../../../jon-platform/packages/LLMClientKit"),
   ],
   targets: [
     .target(
       name: "YesChefCore",
       dependencies: [
         .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "LLMClientKit", package: "LLMClientKit"),
         .product(name: "SQLiteData", package: "sqlite-data"),
         .product(name: "SwiftSoup", package: "SwiftSoup"),
       ]
