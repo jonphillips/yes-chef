@@ -146,6 +146,7 @@ struct GroceryDetailView: View {
 
             GroceryListActionsMenu(
               row: selectedList,
+              shareText: model.selectedListShareText,
               purchasedItemCount: purchasedRows.count,
               totalItemCount: model.selectedItemRows.count,
               listCount: model.listRows.count,
@@ -214,6 +215,7 @@ private struct GrocerySourceMenu: View {
 
 private struct GroceryListActionsMenu: View {
   let row: GroceryListRowData
+  var shareText: String
   var purchasedItemCount: Int
   var totalItemCount: Int
   var listCount: Int
@@ -221,6 +223,10 @@ private struct GroceryListActionsMenu: View {
 
   var body: some View {
     Menu {
+      ShareLink(item: shareText, subject: Text(row.list.title)) {
+        Label("Share List", systemImage: "square.and.arrow.up")
+      }
+
       Button {
         model.editListButtonTapped(listID: row.id)
       } label: {
