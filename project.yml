@@ -8,6 +8,8 @@ packages:
     path: YesChefPackage
   WebExtractorKit:
     path: ../../jon-platform/packages/WebExtractorKit
+  LLMClientKit:
+    path: ../../jon-platform/packages/LLMClientKit
   CasePaths:
     url: https://github.com/pointfreeco/swift-case-paths
     from: 1.0.0
@@ -42,6 +44,8 @@ targets:
         product: YesChefCore
       - package: WebExtractorKit
         product: WebExtractorKit
+      - package: LLMClientKit
+        product: LLMClientKit
       - package: CasePaths
         product: CasePaths
       - package: SwiftNavigation

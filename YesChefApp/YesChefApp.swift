@@ -1,3 +1,4 @@
+import LLMClientKit
 import SwiftUI
 import WebExtractorKit
 import YesChefCore
@@ -18,15 +19,7 @@ struct YesChefApp: App {
         },
         fetchImageData: WebRecipeCaptureClient.liveValue.fetchImageData
       )
-      $0.modelClient = ClaudeAPIClient(
-        apiKey: {
-          guard let apiKey = try ClaudeAPIKeyStorage.apiKey() else {
-            throw ClaudeAPIClientError.missingAPIKey
-          }
-          return apiKey
-        }
-      )
-      .modelClient
+      $0.modelClient = TieredModelClient.live
     }
     YesChefCloudSync.persistManualEnablementFromLaunchEnvironment()
     Task {
