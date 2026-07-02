@@ -38,6 +38,7 @@ enum AppSection: String, CaseIterable, Identifiable {
 }
 
 enum SettingsPane: String, CaseIterable, Identifiable {
+  case ai
   case categories
   case pantry
 
@@ -45,6 +46,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
 
   var title: String {
     switch self {
+    case .ai: "AI"
     case .categories: "Categories"
     case .pantry: "Pantry"
     }
@@ -52,6 +54,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
 
   var systemImage: String {
     switch self {
+    case .ai: "sparkles"
     case .categories: "folder"
     case .pantry: "list.bullet"
     }

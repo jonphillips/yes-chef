@@ -18,6 +18,15 @@ struct YesChefApp: App {
         },
         fetchImageData: WebRecipeCaptureClient.liveValue.fetchImageData
       )
+      $0.modelClient = ClaudeAPIClient(
+        apiKey: {
+          guard let apiKey = try ClaudeAPIKeyStorage.apiKey() else {
+            throw ClaudeAPIClientError.missingAPIKey
+          }
+          return apiKey
+        }
+      )
+      .modelClient
     }
     YesChefCloudSync.persistManualEnablementFromLaunchEnvironment()
     Task {
