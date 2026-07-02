@@ -38,10 +38,38 @@ queues a sheet requested from a view already covered by a `fullScreenCover` unti
 dismisses — so the tap "does nothing" until you back out.
 
 **Fix direction:** present the grocery/add sheet from within (or above) the full-screen recipe
-presentation, so it appears in-context. Audit every add/shop/plan affordance reachable from the
-full-screen recipe for the same trap (the `plan` and `groceries` toolbar actions on recipe
-detail likely share it). **Done when:** tapping Add-to-Grocery from a full-screen recipe (from
-the calendar *and* from the library) opens the selection sheet immediately, over the recipe.
+presentation, so it appears in-context. Audit every affordance reachable from the full-screen
+recipe for the same trap.
+
+**Implementation status (PR #58, in review):** the first pass (commit `5772ed8`) extracted the
+meal-editor and grocery presenters into `YesChefApp/AppDestinationPresentation.swift`, attached
+them to `RecipeFullScreenCover`, and gated the root copies on `presentedRecipeID == nil`. The
+gating pattern is correct (exactly one presenter live per destination — no double-present
+window). But it only covered 2 of the ~6 toolbar affordances on
+[`RecipeDetailView.swift`](../../YesChefApp/RecipeDetailView.swift).
+
+**Extend the slice (architect, 2026-07-02):** four more `RecipeDetailView` toolbar actions set
+**`recipeModel.destination`**, whose presenters live *only* on the root `AppContainer` and are
+still trapped under the cover. Recipes open full-screen whenever tapped from the **Meal Calendar**
+or a **Menu** (`onRecipeSelected` → `presentedRecipeID`), so these are live dead buttons there:
+
+  | Affordance | Trigger (`RecipeDetailView.swift`) | Root-only presenter (`RecipeLibraryView.swift`) |
+  |---|---|---|
+  | Edit | `libraryModel.editButtonTapped` (:68) | `.editRecipe` sheet (:92) |
+  | Start Cooking | `libraryModel.cookButtonTapped` (:172) | `.cookingMode` sheet (:97) |
+  | View Original | `libraryModel.originalSnapshotButtonTapped` (:140) | `.originalSnapshot` sheet (:102) |
+  | Delete | `libraryModel.deleteButtonTapped` (:74) | `.deleteRecipe` confirmationDialog (:107) |
+
+  Apply the same pattern already used in this PR: add a `recipeDetailDestinations`-style modifier
+  (covering `editRecipe`, `cookingMode`, `originalSnapshot`, `deleteRecipe`) in
+  `AppDestinationPresentation.swift`, attach it to `RecipeFullScreenCover`, and gate the root
+  copies on `presentedRecipeID == nil`. The `RecipeDetailModel` scaling sheet
+  (`RecipeDetailView.swift:194`) is already inside the cover — leave it. Push to the same PR #58
+  branch.
+
+**Done when:** every toolbar affordance on a recipe opened full-screen — Add-to-Grocery,
+Add-to-Plan, Edit, Start Cooking, View Original, Delete — presents immediately, in-context over
+the recipe, from the Meal Calendar, a Menu, *and* the library.
 
 ### Slice 2 — Add-to-Meal / Add-to-Grocery act on the viewed recipe, with confirmation
 
@@ -78,6 +106,32 @@ archived recipes with **Restore** (`archived = false`) and **Delete permanently*
 `Recipe.delete`, FK-cascading its children). Keep it low-prominence. **Done when:** Jon can find,
 restore, and permanently delete archived recipes; permanent delete removes the row (and its
 child rows) so it stops syncing.
+
+**Dangling references — archive means GONE (Jon, 2026-07-02).** Surfaced from the PR #58 review:
+`archived` is honored inconsistently. The recipe list and the calendar/menu *add-pickers* filter
+it ([`RecipeLibraryListState.swift:321`](../../YesChefApp/RecipeLibraryListState.swift),
+[`MealCalendarModels.swift:114`](../../YesChefApp/MealCalendarModels.swift),
+[`MenuModels.swift:41`](../../YesChefApp/MenuModels.swift)), but *already-scheduled* meal-plan
+items and menu dishes resolve the recipe by ID with **no** archived check, so an archived recipe
+keeps rendering on its scheduled date / in its menu and stays tappable into a live, fully
+interactive archived detail.
+
+Decision: **archiving cascades — remove the recipe's meal-plan placements *and* menu-dish
+placements at archive time.** The meal calendar is forward-planning (not a log), and although
+menus lean historical, Jon's intent on archive is unambiguously "gone everywhere"; restore brings
+back the recipe, not its placements (cheap to re-add). Enforce this so no future view has to
+remember to filter:
+- On archive, delete the recipe's meal-plan item rows and menu-dish rows (same transaction as the
+  archive flip; must be sync-safe — deletes replicate).
+- Adopt **"Archive"** as the user-facing term for the destructive recipe action (button +
+  confirmation copy), replacing "Delete Recipe" / "Delete X from your recipe library?", so the
+  label matches the recoverable-but-gone behavior.
+- Belt-and-suspenders: guard the item/dish *resolution* path against archived recipes too, so a
+  stale or mid-sync reference can never re-open a live archived detail.
+
+**Done when:** archiving a recipe removes it from the library, its calendar dates, and any menus in
+one step; nothing left tappable resolves an archived recipe; the action reads as "Archive"; and the
+Archived view can restore (recipe only) or permanently purge.
 
 ---
 

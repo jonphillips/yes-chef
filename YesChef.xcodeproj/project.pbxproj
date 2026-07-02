@@ -34,6 +34,7 @@
 		A53A9EE95AC871F9F6B627C5 /* RecipeLibraryListState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3B1C7A7E48A8FFE074A05E0 /* RecipeLibraryListState.swift */; };
 		A7663D81E209037F796813A4 /* CategoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA4CA05A4077E714D63D297 /* CategoryModels.swift */; };
 		A9FBE5AA277DCBB1A66A417E /* GroceryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27FA69A8957E5DC8A49A9E3F /* GroceryViews.swift */; };
+		AEEFD13CB08E83C9958ACC8E /* AppDestinationPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10717DBD3251B160509FD4E9 /* AppDestinationPresentation.swift */; };
 		B7E58D7FBEB23C7DDDBA0DD1 /* AppNavigationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85D49CBB7931A65D53EC1654 /* AppNavigationModels.swift */; };
 		C4460AA94AC3679029FA4CBC /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C469ECE48285073F98E35D10 /* ShareViewController.swift */; };
 		CB4F5CEA046A10EF5FDE0892 /* RecipeDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CCF32B5108C44892607FF3B /* RecipeDetailView.swift */; };
@@ -77,6 +78,7 @@
 		07FEC345E664B62E662EA479 /* YesChefPackage */ = {isa = PBXFileReference; lastKnownFileType = folder; path = YesChefPackage; sourceTree = SOURCE_ROOT; };
 		0BA4CA05A4077E714D63D297 /* CategoryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryModels.swift; sourceTree = "<group>"; };
 		0D2AA2B9A5B2A2F4EFDE5A0C /* AppExternalDatabaseChangeReload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppExternalDatabaseChangeReload.swift; sourceTree = "<group>"; };
+		10717DBD3251B160509FD4E9 /* AppDestinationPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDestinationPresentation.swift; sourceTree = "<group>"; };
 		1ACC051A4D7294E6FDE5632A /* CookingModeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookingModeView.swift; sourceTree = "<group>"; };
 		21092B09A19EF04372E6A66D /* GroceryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryModels.swift; sourceTree = "<group>"; };
 		26A031F93AA06D9ADCD5C36D /* MenuViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuViews.swift; sourceTree = "<group>"; };
@@ -181,6 +183,7 @@
 		FF68A2423DEA9C441CDBB15A /* YesChefApp */ = {
 			isa = PBXGroup;
 			children = (
+				10717DBD3251B160509FD4E9 /* AppDestinationPresentation.swift */,
 				0D2AA2B9A5B2A2F4EFDE5A0C /* AppExternalDatabaseChangeReload.swift */,
 				85D49CBB7931A65D53EC1654 /* AppNavigationModels.swift */,
 				7871BB8EDB397A338B979FCD /* Assets.xcassets */,
@@ -342,6 +345,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AEEFD13CB08E83C9958ACC8E /* AppDestinationPresentation.swift in Sources */,
 				6E4C21A5E580147F1C8A1B94 /* AppExternalDatabaseChangeReload.swift in Sources */,
 				B7E58D7FBEB23C7DDDBA0DD1 /* AppNavigationModels.swift in Sources */,
 				587E4FEB200F87C5D6A066B1 /* BrowserViews.swift in Sources */,
