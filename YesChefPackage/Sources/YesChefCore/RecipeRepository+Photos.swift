@@ -2,12 +2,16 @@ import Foundation
 import SQLiteData
 
 extension RecipeRepository {
-  static func savePendingPhotos(
+  static func reconcilePhotos(
     _ photos: [RecipePhoto],
     existingPhotos: [RecipePhoto],
     in db: Database
   ) throws {
+    let desiredPhotoIDs = Set(photos.map(\.id))
     let existingPhotoIDs = Set(existingPhotos.map(\.id))
+    for photo in existingPhotos where !desiredPhotoIDs.contains(photo.id) {
+      try RecipePhoto.find(photo.id).delete().execute(db)
+    }
     for photo in photos where !existingPhotoIDs.contains(photo.id) {
       try RecipePhoto.insert { photo }.execute(db)
     }
@@ -19,7 +23,11 @@ extension RecipeRepository {
     recipeID: Recipe.ID,
     now: Date
   ) -> [RecipePhoto] {
-    let firstPendingSortOrder = (existingPhotos.map(\.sortOrder).min() ?? 0) - pendingPhotos.count
+    let replacesExistingHero = pendingPhotos.contains { $0.kind == .hero }
+    let retainedPhotos = existingPhotos.filter { photo in
+      !(replacesExistingHero && photo.kind == .hero)
+    }
+    let firstPendingSortOrder = (retainedPhotos.map(\.sortOrder).min() ?? 0) - pendingPhotos.count
     let newPhotos = pendingPhotos.enumerated().map { index, pendingPhoto in
       RecipePhoto(
         id: pendingPhoto.id,
@@ -39,7 +47,7 @@ extension RecipeRepository {
         dateCreated: now
       )
     }
-    return (existingPhotos + newPhotos)
+    return (retainedPhotos + newPhotos)
       .sorted { lhs, rhs in
         if lhs.kind != rhs.kind {
           return lhs.kind == .hero

@@ -428,7 +428,7 @@ public enum RecipeRepository {
     )
     try reconcileTags(draft.tagNames.listNames, recipeID: recipeID, in: db, now: now, uuid: uuid)
     try reconcileCategories(from: draft, recipeID: recipeID, in: db, now: now, uuid: uuid)
-    try savePendingPhotos(photos, existingPhotos: existingDetail?.photos ?? [], in: db)
+    try reconcilePhotos(photos, existingPhotos: existingDetail?.photos ?? [], in: db)
 
     return recipeID
   }
