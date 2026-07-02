@@ -43,6 +43,11 @@ private struct GroceryDestinationsModifier: ViewModifier {
           GroceryItemEditorView(model: groceryModel)
         }
       }
+      .sheet(item: gatedBinding($groceryModel.destination.editItem, enabled: isPresentationEnabled), id: \.self) { itemID in
+        NavigationStack {
+          GroceryItemEditorView(model: groceryModel, itemID: itemID)
+        }
+      }
       .sheet(isPresented: gatedBinding($groceryModel.destination.addPantryItem, enabled: isPresentationEnabled)) {
         NavigationStack {
           PantryItemEditorView(model: groceryModel)
