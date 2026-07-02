@@ -45,11 +45,10 @@ struct AppContainer: View {
         groceryModel: groceryModel
       )
     }
-    .sheet(item: $mealCalendarModel.destination.itemEditor, id: \.self) { context in
-      NavigationStack {
-        MealPlanItemEditorView(model: mealCalendarModel, context: context)
-      }
-    }
+    .mealCalendarItemEditorDestination(
+      mealCalendarModel: mealCalendarModel,
+      isPresentationEnabled: presentedRecipeID == nil
+    )
     .sheet(isPresented: $menuModel.destination.addMenu) {
       NavigationStack {
         MenuEditorView(model: menuModel)
@@ -67,7 +66,8 @@ struct AppContainer: View {
     }
     .groceryDestinations(
       groceryModel: groceryModel,
-      mealCalendarModel: mealCalendarModel
+      mealCalendarModel: mealCalendarModel,
+      isPresentationEnabled: presentedRecipeID == nil
     )
     .sheet(isPresented: $recipeModel.destination.addRecipe) {
       NavigationStack {
@@ -250,105 +250,10 @@ private struct RecipeFullScreenCover: View {
         }
       }
     }
-  }
-}
-
-private struct GroceryDestinationsModifier: ViewModifier {
-  let groceryModel: GroceryLibraryModel
-  let mealCalendarModel: MealCalendarModel
-
-  func body(content: Content) -> some View {
-    @Bindable var groceryModel = groceryModel
-
-    content
-      .sheet(isPresented: $groceryModel.destination.addList) {
-        NavigationStack {
-          GroceryListEditorView(model: groceryModel)
-        }
-      }
-      .sheet(item: $groceryModel.destination.editList, id: \.self) { listID in
-        NavigationStack {
-          GroceryListEditorView(model: groceryModel, listID: listID)
-        }
-      }
-      .sheet(isPresented: $groceryModel.destination.addCustomItem) {
-        NavigationStack {
-          GroceryItemEditorView(model: groceryModel)
-        }
-      }
-      .sheet(isPresented: $groceryModel.destination.addPantryItem) {
-        NavigationStack {
-          PantryItemEditorView(model: groceryModel)
-        }
-      }
-      .sheet(item: $groceryModel.destination.editPantryItem, id: \.self) { itemID in
-        NavigationStack {
-          PantryItemEditorView(model: groceryModel, itemID: itemID)
-        }
-      }
-      .sheet(item: $groceryModel.destination.selectIngredients, id: \.self) { context in
-        NavigationStack {
-          GroceryIngredientSelectionView(
-            model: groceryModel,
-            context: context,
-            choices: groceryModel.ingredientChoices(
-              for: context,
-              mealRows: mealCalendarModel.itemRows
-            ),
-            mealRows: mealCalendarModel.itemRows,
-            pantryStaples: groceryModel.pantryStapleNames
-          )
-        }
-      }
-      .confirmationDialog(
-        "Clear Purchased?",
-        item: $groceryModel.destination.clearPurchased,
-        titleVisibility: .visible
-      ) { listID in
-        Button("Clear Purchased", role: .destructive) {
-          groceryModel.confirmClearPurchasedButtonTapped(listID: listID)
-        }
-        Button("Cancel", role: .cancel) {}
-      } message: { listID in
-        Text("Remove purchased items from \(groceryModel.title(forList: listID))?")
-      }
-      .confirmationDialog(
-        "Clear Grocery List?",
-        item: $groceryModel.destination.clearAll,
-        titleVisibility: .visible
-      ) { listID in
-        Button("Clear All", role: .destructive) {
-          groceryModel.confirmClearAllButtonTapped(listID: listID)
-        }
-        Button("Cancel", role: .cancel) {}
-      } message: { listID in
-        Text("Remove every item from \(groceryModel.title(forList: listID))?")
-      }
-      .confirmationDialog(
-        "Delete Grocery List?",
-        item: $groceryModel.destination.deleteList,
-        titleVisibility: .visible
-      ) { listID in
-        Button("Delete List", role: .destructive) {
-          groceryModel.confirmDeleteListButtonTapped(listID: listID)
-        }
-        Button("Cancel", role: .cancel) {}
-      } message: { listID in
-        Text("Delete \(groceryModel.title(forList: listID)) and its grocery items?")
-      }
-  }
-}
-
-private extension View {
-  func groceryDestinations(
-    groceryModel: GroceryLibraryModel,
-    mealCalendarModel: MealCalendarModel
-  ) -> some View {
-    modifier(
-      GroceryDestinationsModifier(
-        groceryModel: groceryModel,
-        mealCalendarModel: mealCalendarModel
-      )
+    .mealCalendarItemEditorDestination(mealCalendarModel: mealCalendarModel)
+    .groceryDestinations(
+      groceryModel: groceryModel,
+      mealCalendarModel: mealCalendarModel
     )
   }
 }

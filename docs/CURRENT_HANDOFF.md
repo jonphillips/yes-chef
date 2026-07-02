@@ -378,10 +378,10 @@ Deferred from this slice:
 Before checkpointing UI work:
 
 - Run `xcodegen generate` after adding Swift source files.
-- Build `YesChef` for `iPad Air 13-inch (M4)`.
+- Build `YesChef` for `iPad Pro 13-inch (M5) (16GB)`.
 - Run `scripts/check-drift.sh`.
 - Install and launch on both active iOS 27 simulators:
-  - `iPad Air 13-inch (M4)`
+  - `iPad Pro 13-inch (M5) (16GB)`
   - `iPhone 17 Pro`
 
 Jon performs the primary UI testing pass.
