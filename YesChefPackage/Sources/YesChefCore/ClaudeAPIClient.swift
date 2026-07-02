@@ -26,7 +26,7 @@ public enum ClaudeAPIClientError: Error, Equatable, LocalizedError, Sendable {
 public struct ClaudeAPIClient: Sendable {
   public typealias Transport = @Sendable (URLRequest) async throws -> (Data, URLResponse)
 
-  public static let defaultModel = "claude-fable-5"
+  public static let defaultModel = "claude-opus-4-8"
   public static let apiVersion = "2023-06-01"
 
   private var apiKey: @Sendable () throws -> String
