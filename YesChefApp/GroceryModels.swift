@@ -18,6 +18,7 @@ final class GroceryLibraryModel {
     case clearAll(CoreGroceryList.ID)
     case clearPurchased(CoreGroceryList.ID)
     case deleteList(CoreGroceryList.ID)
+    case editItem(GroceryItem.ID)
     case editList(CoreGroceryList.ID)
     case editPantryItem(PantryItem.ID)
     case selectIngredients(GroceryIngredientSelectionContext)
@@ -114,6 +115,10 @@ final class GroceryLibraryModel {
     destination = .addCustomItem
   }
 
+  func editItemButtonTapped(itemID: GroceryItem.ID) {
+    destination = .editItem(itemID)
+  }
+
   func editListButtonTapped(listID: CoreGroceryList.ID) {
     destination = .editList(listID)
   }
@@ -188,45 +193,6 @@ final class GroceryLibraryModel {
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
-    }
-  }
-
-  func saveCustomItemButtonTapped(
-    title: String,
-    quantityText: String,
-    unit: String,
-    aisle: String,
-    notes: String
-  ) -> Bool {
-    do {
-      let selectedListID = selectedListID
-      let listID = try database.write { db in
-        let listID = try selectedOrDefaultGroceryListID(
-          selectedListID,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
-        try GroceryRepository.addCustomItem(
-          title: title,
-          quantityText: quantityText,
-          unit: unit,
-          aisle: aisle,
-          notes: notes,
-          groceryListID: listID,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
-        return listID
-      }
-      self.selectedListID = listID
-      destination = nil
-      return true
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
-      return false
     }
   }
 
@@ -622,6 +588,75 @@ final class GroceryLibraryModel {
 }
 
 extension GroceryLibraryModel {
+  func saveCustomItemButtonTapped(
+    title: String,
+    quantityText: String,
+    unit: String,
+    aisle: String,
+    notes: String
+  ) -> Bool {
+    do {
+      let selectedListID = selectedListID
+      let listID = try database.write { db in
+        let listID = try selectedOrDefaultGroceryListID(
+          selectedListID,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+        try GroceryRepository.addCustomItem(
+          title: title,
+          quantityText: quantityText,
+          unit: unit,
+          aisle: aisle,
+          notes: notes,
+          groceryListID: listID,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+        return listID
+      }
+      self.selectedListID = listID
+      destination = nil
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
+  func saveItemButtonTapped(
+    itemID: GroceryItem.ID,
+    title: String,
+    quantityText: String,
+    unit: String,
+    aisle: String,
+    notes: String
+  ) -> Bool {
+    do {
+      try database.write { db in
+        try GroceryRepository.updateItem(
+          itemID: itemID,
+          title: title,
+          quantityText: quantityText,
+          unit: unit,
+          aisle: aisle,
+          notes: notes,
+          in: db,
+          now: now
+        )
+      }
+      destination = nil
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
   var selectedListShareText: String {
     guard let selectedListRow else { return "Grocery List\n\nNo grocery items." }
     return GroceryListPlainTextRenderer.render(

@@ -289,6 +289,9 @@ private struct GroceryItemsSection: View {
             deleteItem: {
               model.deleteButtonTapped(itemID: row.id)
             },
+            editItem: {
+              model.editItemButtonTapped(itemID: row.id)
+            },
             deleteSource: { sourceID in
               model.deleteSourceButtonTapped(sourceID: sourceID)
             },
@@ -308,6 +311,13 @@ private struct GroceryItemsSection: View {
             .tint(.green)
           }
           .swipeActions {
+            Button {
+              model.editItemButtonTapped(itemID: row.id)
+            } label: {
+              Label("Edit", systemImage: "pencil")
+            }
+            .tint(.blue)
+
             Button(role: .destructive) {
               model.deleteButtonTapped(itemID: row.id)
             } label: {
@@ -324,6 +334,7 @@ private struct GroceryItemRowView: View {
   let row: GroceryItemRowData
   var togglePurchased: () -> Void
   var deleteItem: () -> Void
+  var editItem: () -> Void
   var deleteSource: (GroceryItemSource.ID) -> Void
   var deleteContribution: (GroceryItemSource.ID) -> Void
   var addToPantry: () -> Void
@@ -371,6 +382,7 @@ private struct GroceryItemRowView: View {
       GroceryItemActionsMenu(
         row: row,
         addToPantry: addToPantry,
+        editItem: editItem,
         deleteItem: deleteItem,
         deleteContribution: deleteContribution
       )
@@ -394,11 +406,18 @@ private struct GroceryItemRowView: View {
 private struct GroceryItemActionsMenu: View {
   let row: GroceryItemRowData
   var addToPantry: () -> Void
+  var editItem: () -> Void
   var deleteItem: () -> Void
   var deleteContribution: (GroceryItemSource.ID) -> Void
 
   var body: some View {
     Menu {
+      Button {
+        editItem()
+      } label: {
+        Label("Edit Item", systemImage: "pencil")
+      }
+
       Button {
         addToPantry()
       } label: {
@@ -798,6 +817,20 @@ struct GroceryItemEditorView: View {
   @State private var notes = ""
 
   let model: GroceryLibraryModel
+  let itemID: GroceryItem.ID?
+
+  init(model: GroceryLibraryModel, itemID: GroceryItem.ID? = nil) {
+    self.model = model
+    self.itemID = itemID
+    let item = itemID.flatMap { id in
+      model.itemRows.first { $0.id == id }?.item
+    }
+    _title = State(initialValue: item?.title ?? "")
+    _quantityText = State(initialValue: item?.quantityText ?? "")
+    _unit = State(initialValue: item?.unit ?? "")
+    _aisle = State(initialValue: item?.aisle ?? "")
+    _notes = State(initialValue: item?.notes ?? "")
+  }
 
   private var isSaveDisabled: Bool {
     title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -813,7 +846,7 @@ struct GroceryItemEditorView: View {
         StackedTextEditor(title: "Notes", text: $notes, minHeight: 90)
       }
     }
-    .navigationTitle("Add Grocery Item")
+    .navigationTitle(itemID == nil ? "Add Grocery Item" : "Edit Grocery Item")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {
@@ -823,13 +856,25 @@ struct GroceryItemEditorView: View {
       }
       ToolbarItem(placement: .confirmationAction) {
         Button("Save") {
-          if model.saveCustomItemButtonTapped(
-            title: title,
-            quantityText: quantityText,
-            unit: unit,
-            aisle: aisle,
-            notes: notes
-          ) {
+          let didSave = if let itemID {
+            model.saveItemButtonTapped(
+              itemID: itemID,
+              title: title,
+              quantityText: quantityText,
+              unit: unit,
+              aisle: aisle,
+              notes: notes
+            )
+          } else {
+            model.saveCustomItemButtonTapped(
+              title: title,
+              quantityText: quantityText,
+              unit: unit,
+              aisle: aisle,
+              notes: notes
+            )
+          }
+          if didSave {
             dismiss()
           }
         }
