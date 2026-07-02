@@ -69,6 +69,10 @@ struct AppContainer: View {
       mealCalendarModel: mealCalendarModel,
       isPresentationEnabled: presentedRecipeID == nil
     )
+    .recipeDetailDestinations(
+      recipeModel: recipeModel,
+      isPresentationEnabled: presentedRecipeID == nil
+    )
     .sheet(isPresented: $recipeModel.destination.addRecipe) {
       NavigationStack {
         RecipeEditorView(recipeID: nil)
@@ -88,33 +92,6 @@ struct AppContainer: View {
       NavigationStack {
         RecipeFilterView(model: recipeModel)
       }
-    }
-    .sheet(item: $recipeModel.destination.editRecipe, id: \.self) { (recipeID: Recipe.ID) in
-      NavigationStack {
-        RecipeEditorView(recipeID: recipeID)
-      }
-    }
-    .sheet(item: $recipeModel.destination.cookingMode, id: \.self) { (recipeID: Recipe.ID) in
-      NavigationStack {
-        CookingModeView(model: CookingModeModel(recipeID: recipeID))
-      }
-    }
-    .sheet(item: $recipeModel.destination.originalSnapshot, id: \.self) { (recipeID: Recipe.ID) in
-      NavigationStack {
-        OriginalSnapshotView(recipe: recipeModel.recipeRows.first { $0.recipe.id == recipeID }?.recipe)
-      }
-    }
-    .confirmationDialog(
-      "Delete Recipe?",
-      item: $recipeModel.destination.deleteRecipe,
-      titleVisibility: .visible
-    ) { recipeID in
-      Button("Delete Recipe", role: .destructive) {
-        recipeModel.confirmDeleteRecipeButtonTapped(recipeID: recipeID)
-      }
-      Button("Cancel", role: .cancel) {}
-    } message: { recipeID in
-      Text("Delete \(recipeModel.title(for: recipeID)) from your recipe library?")
     }
     .confirmationDialog(
       "Remove Meal Plan Item?",
@@ -255,6 +232,7 @@ private struct RecipeFullScreenCover: View {
       groceryModel: groceryModel,
       mealCalendarModel: mealCalendarModel
     )
+    .recipeDetailDestinations(recipeModel: recipeModel)
   }
 }
 

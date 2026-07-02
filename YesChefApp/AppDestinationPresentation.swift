@@ -130,6 +130,52 @@ private struct GroceryDestinationsModifier: ViewModifier {
   }
 }
 
+private struct RecipeDetailDestinationsModifier: ViewModifier {
+  let recipeModel: RecipeLibraryModel
+  var isPresentationEnabled: Bool
+
+  func body(content: Content) -> some View {
+    @Bindable var recipeModel = recipeModel
+
+    content
+      .sheet(item: presentationBinding($recipeModel.destination.editRecipe), id: \.self) { recipeID in
+        NavigationStack {
+          RecipeEditorView(recipeID: recipeID)
+        }
+      }
+      .sheet(item: presentationBinding($recipeModel.destination.cookingMode), id: \.self) { recipeID in
+        NavigationStack {
+          CookingModeView(model: CookingModeModel(recipeID: recipeID))
+        }
+      }
+      .sheet(item: presentationBinding($recipeModel.destination.originalSnapshot), id: \.self) { recipeID in
+        NavigationStack {
+          OriginalSnapshotView(recipe: recipeModel.recipeRows.first { $0.recipe.id == recipeID }?.recipe)
+        }
+      }
+      .confirmationDialog(
+        "Delete Recipe?",
+        item: presentationBinding($recipeModel.destination.deleteRecipe),
+        titleVisibility: .visible
+      ) { recipeID in
+        Button("Delete Recipe", role: .destructive) {
+          recipeModel.confirmDeleteRecipeButtonTapped(recipeID: recipeID)
+        }
+        Button("Cancel", role: .cancel) {}
+      } message: { recipeID in
+        Text("Delete \(recipeModel.title(for: recipeID)) from your recipe library?")
+      }
+  }
+
+  private func presentationBinding<Value>(_ binding: Binding<Value?>) -> Binding<Value?> {
+    Binding {
+      isPresentationEnabled ? binding.wrappedValue : nil
+    } set: { newValue in
+      binding.wrappedValue = newValue
+    }
+  }
+}
+
 extension View {
   func mealCalendarItemEditorDestination(
     mealCalendarModel: MealCalendarModel,
@@ -152,6 +198,18 @@ extension View {
       GroceryDestinationsModifier(
         groceryModel: groceryModel,
         mealCalendarModel: mealCalendarModel,
+        isPresentationEnabled: isPresentationEnabled
+      )
+    )
+  }
+
+  func recipeDetailDestinations(
+    recipeModel: RecipeLibraryModel,
+    isPresentationEnabled: Bool = true
+  ) -> some View {
+    modifier(
+      RecipeDetailDestinationsModifier(
+        recipeModel: recipeModel,
         isPresentationEnabled: isPresentationEnabled
       )
     )
