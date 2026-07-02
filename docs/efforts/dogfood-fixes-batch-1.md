@@ -83,7 +83,25 @@ user re-pick from a list the recipe they're already looking at. Coordinate with 
 confirmation surface itself presents correctly over the recipe. **Done when:** adding to
 meal/grocery from an open recipe confirms the specific recipe added, unambiguously.
 
+**DONE — architect-approved (PR #59, 2026-07-02).** `MealPlanItemDraftContext.locksRecipeSelection`
+locks the editor to the viewed recipe when launched from recipe detail; add-to-meal and grocery-add
+both fire an in-context confirmation via the Slice 1 gated-presenter modifiers. Approval carried two
+follow-ups now folded into Slice 3: dedupe the `presentationBinding` helpers, and swap the modal
+"OK" confirmations for a transient toast (see Slice 3 § Also fold in).
+
 ### Slice 3 — Archived recipes are invisible with no restore/purge
+
+**DONE — architect-approved (PR #60, 2026-07-02).** Archive cascades (deletes meal-plan + menu-dish
+placements in the same sync-safe write via `RecipeRepository.archive`), resolution paths are guarded
+belt-and-suspenders (`fetchDetail`/calendar/menu drop archived references; taps gate on
+`row.recipe?.id`), the action reads **"Archive"**, and **Settings ▸ Archived Recipes** restores
+(recipe only) or permanently purges (FK-cascading `Recipe.delete`). Both fold-ins landed: deduped
+`gatedBinding` free functions and a root-level `@Observable` toast (haptic + VoiceOver +
+Reduce-Motion). Two review blockers fixed on-branch — toast occlusion over the full-screen recipe
+cover (toast overlay now also inside `RecipeFullScreenCover`), and an unrelated `xcodegen`
+bundle-ID/scheme sweep (reverted; `project.yml` realigned to `com.jonphillips.yeschef`;
+`check-drift.sh` now guards bundle IDs). Non-blocking watch item: possible double haptic from two
+`.sensoryFeedback` modifiers on the shared toast trigger.
 
 **Symptom (Jon):** deleting a recipe silently *archives* it — it's not really gone, and there's
 no way to see, restore, or truly delete it.
@@ -133,11 +151,54 @@ remember to filter:
 one step; nothing left tappable resolves an archived recipe; the action reads as "Archive"; and the
 Archived view can restore (recipe only) or permanently purge.
 
+**Also fold into this slice (Jon, 2026-07-02 — from the PR #59 review):**
+
+1. **Consolidate the duplicated `presentationBinding` helpers.** `AppDestinationPresentation.swift`
+   now carries three near-identical `private func presentationBinding` copies (one per modifier,
+   plus the `Binding<Bool>` variant). Extract the gating logic into a single shared free function
+   (e.g. `func gatedBinding<Value>(_ binding: Binding<Value?>, enabled: Bool) -> Binding<Value?>`
+   and a `Bool` sibling) in a small navigation-helpers file, and have all presenters call it. Pure
+   refactor — no behavior change.
+
+2. **Replace the "OK"-dismissed add confirmations with a transient in-app notification (toast).**
+   Jon is fine with the confirmations themselves but doesn't want to dismiss a modal for every
+   positive action — he wants a brief flash that appears and auto-clears. Scope:
+   - **No first-party SwiftUI toast/HUD/banner exists as of iOS 27** (verified against Apple's
+     SDK 27 release notes — the only new presentation APIs are the `alert`/`confirmationDialog`
+     `item:` overloads this batch already uses). So build one small reusable component.
+   - **Single app-level presenter, not per-host.** Add one `@Observable` toast center (a short
+     message + optional style, with a queue or replace-latest policy) rendered **once at the app
+     root** via `.overlay(alignment: .top)` (top or bottom — Jon's call in review). View models
+     `post(...)` to it instead of setting a `destination` alert case. This deliberately decouples
+     the confirmation from the sheet/host that triggered it — which also **retires the sheet→alert
+     same-host handoff** flagged in the PR #59 review (the toast no longer rides the dismissing
+     sheet's presentation).
+   - **Behavior:** auto-dismiss ~2s; tap/swipe to dismiss early; restart/replace on a new message.
+     Animate in/out with `.transition(.move(edge:).combined(with: .opacity))`, and honor Reduce
+     Motion (cross-fade instead of slide).
+   - **Feedback + a11y:** pair with `.sensoryFeedback(.success, trigger:)` for the haptic, and post
+     an `AccessibilityNotification.Announcement` so VoiceOver reads the message (it auto-dismisses,
+     so a passive label won't be caught).
+   - **Migrate the Slice 2 confirmations:** remove the `MealPlanRecipeAddConfirmation` /
+     `GroceryAddConfirmation` `destination` cases and their `.alert(...)` modifiers, and post the
+     same copy (recipe + destination) through the toast center instead.
+   - **Keep destructive confirmations modal.** This toast is for *positive, reversible* "done"
+     feedback only. Archive, permanent-delete, clear-list, etc. **stay** real confirmation dialogs —
+     do not convert those.
+
 ---
 
 ## Near-term UX wins (small, self-contained)
 
 ### Slice 4 — Browser: clear-URL (X) button
+
+**DONE — architect-approved (jon-platform PR #16, 2026-07-02).** Shipped in the shared
+`WebExtractorKit` package (jon-platform repo, not yes-chef): a trailing `xmark.circle.fill` clear
+button on `WebBrowserView`'s address bar. Shows when the field has content while editing
+(`!addressText.isEmpty`) or a page is loaded when not (`page.url != nil`); `clearAddress()` empties
+the field and focuses it for the replacement URL/search, and the visibility predicate flips so the
+button hides itself once cleared. Clean 23-line view-chrome change, no new architecture; review found
+no blockers. Package tests (8) + both sim builds + `check-drift.sh` green.
 
 Add a trailing clear button to the browser URL field that empties the current URL/address.
 Small. **Done when:** one tap clears the field.

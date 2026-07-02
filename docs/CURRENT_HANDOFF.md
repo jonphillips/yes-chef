@@ -1,12 +1,29 @@
 # Current Handoff
 
-Last updated: July 2, 2026 (**Dogfood batch 1 Slice 1 (PR #58) architect-approved — Next Up is now
-Slice 2 (add-to-meal/grocery targets the viewed recipe, with confirmation).** Slice 1 shipped the
-gated-presenter pattern so add sheets + all six full-screen-recipe toolbar affordances present
-in-context (`AppDestinationPresentation.swift`). The review also surfaced a Slice 3 scope call from
-Jon — *archive means gone*: archiving a recipe cascades to remove its meal-plan and menu-dish
-placements, and the destructive action is renamed "Archive" (folded into the Slice 3 spec). Earlier
-context follows. **Reader Feedback Slice 4 (PR #57) architect-approved.** Slice 4 shipped the app's first LLM
+Last updated: July 2, 2026 (**Dogfood batch 1 Slice 4 (jon-platform PR #16) architect-approved — Next
+Up is now Slice 5 (recipe-list search reachability).** Slice 4 added a trailing `xmark.circle.fill`
+clear button to the shared `WebExtractorKit` `WebBrowserView` address bar — note this slice shipped in
+the **jon-platform** repo, not yes-chef, since the browser chrome is a shared package. The button
+shows whenever the field has content (editing) or a page is loaded (not editing), and one tap empties
+the field + focuses it so the replacement URL/search can be typed immediately. Visibility logic is
+correct and self-cancelling (clearing enters editing with an empty field, which hides the button
+again); clean 23-line view-chrome change, no new architecture. Package tests (8) + both iPad/iPhone
+sim builds + `check-drift.sh` (111 core tests) green. Prior context: **Slice 3 (PR #60)** made archive
+mean *gone*: archiving a recipe deletes
+its meal-plan and menu-dish placements in the same sync-safe write, guards the calendar/menu/detail
+resolution paths against archived references, renames the destructive action to **"Archive"**, and
+adds a **Settings ▸ Archived Recipes** view to restore (recipe only) or permanently purge
+(FK-cascading delete). It also folded in the two Slice 2 review items: the `presentationBinding`
+helpers are deduped into shared `gatedBinding` free functions, and the modal "OK" add-confirmations
+became a root-level `@Observable` **toast** (haptic + VoiceOver + Reduce-Motion). **Review found two
+blockers, both fixed on-branch:** (1) the toast was occluded by the full-screen recipe cover —
+resolved by also rendering the shared toast overlay inside `RecipeFullScreenCover`; (2) `xcodegen`
+had swept a bundle-ID flip (`com.jonphillips`→`com.jon`) + scheme churn into the pbxproj — resolved
+by realigning `project.yml` back to `com.jonphillips.yeschef` (preserving app identity + the
+`iCloud.com.jonphillips.yeschef` container) and adding a `check-drift.sh` guard. 111 core tests
+green. Prior context: **Slice 1
+(PR #58)** shipped the gated-presenter pattern so add sheets + all six full-screen-recipe toolbar
+affordances present in-context (`AppDestinationPresentation.swift`). Earlier context follows. **Reader Feedback Slice 4 (PR #57) architect-approved.** Slice 4 shipped the app's first LLM
 integration: a domain-free `ModelClient` boundary + minimal Claude Messages API wire client in
 `YesChefCore` (injectable `Transport`, no network in tests, 114 tests green) plus app-side Keychain
 storage for a personal Claude API key (synchronizable iCloud-Keychain generic-password item, entered
@@ -36,35 +53,46 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **Dogfood fixes — batch 1, Slice 2 — Add-to-Meal / Add-to-Grocery act on the viewed recipe, with
-  confirmation.** [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md)
-  §Slice 2. **The Codex dispatch target.** From an open recipe, the "add to meal"/"add to grocery"
-  affordance is confusing — no confirmation that *this* recipe was added, and if the target isn't at
-  the top of a list it's unclear what got added. Make the action target **the recipe you're
-  viewing** and show an explicit confirmation (which recipe + where); don't make the user re-pick
-  from a list the recipe they're already looking at. Coordinate with the Slice 1 presenter pattern
-  (`AppDestinationPresentation.swift`) so the confirmation surface presents correctly over the
-  full-screen recipe. **Done when:** adding to meal/grocery from an open recipe confirms the specific
-  recipe added, unambiguously.
+- **Dogfood fixes — batch 1, Slice 5 — Recipe list: keep search reachable / scroll-to-top.**
+  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) §Slice 5. **The Codex
+  dispatch target.** Search currently scrolls away with the list — either pin the search field so it
+  stays reachable, or add a fast scroll-to-top affordance (verify whether tap-status-bar already
+  covers this on iOS; add an explicit control if not). Small, self-contained, no new architecture.
+  **Done when:** Jon can get back to search / the top of a long recipe list without manually
+  scrolling all the way up.
 
-  **Remaining batch-1 order after this:** Slice 3 (archive handling — see below), then UX Slices 4–9
-  (browser clear-URL, list search reachability, share grocery as text, edit a grocery item, ×2/×3
-  recipe multiplier, add image to a manual recipe). Draw one slice into Next Up at a time.
+  **Remaining batch-1 order after this:** UX Slices 6–9 (share grocery as text, edit a grocery item,
+  ×2/×3 recipe multiplier, add image to a manual recipe). Draw one slice into Next Up at a time.
 
-  **Slice 3 now carries a scope decision (Jon, 2026-07-02): archive means GONE.** From the PR #58
-  review — "Delete Recipe" is a soft-delete (`RecipeCore.archive`), and `archived` is honored
-  inconsistently: the recipe list and calendar/menu *add-pickers* filter it, but already-scheduled
-  meal-plan items and menu dishes resolve by ID with no archived check, so an archived recipe keeps
-  rendering on its date / in its menu and stays tappable into a live archived detail. **Decision:
-  archiving cascades** — remove the recipe's meal-plan *and* menu-dish placements at archive time
-  (calendar is forward-planning; menus lean historical but archive intent is unambiguously "gone
-  everywhere"; restore brings back the recipe, not placements). Also **adopt "Archive" as the
-  user-facing term** for the destructive recipe action. Full spec folded into
-  [`dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) §Slice 3.
+- **Just landed — Slice 4 (jon-platform PR #16), architect-approved (2026-07-02).** Trailing
+  `xmark.circle.fill` clear button on the shared `WebExtractorKit` `WebBrowserView` address bar
+  (`packages/WebExtractorKit/Sources/WebExtractorKit/WebBrowserView.swift`). Shipped in **jon-platform**
+  (shared browser chrome), not this repo. Visibility: `!addressText.isEmpty` while editing, `page.url
+  != nil` when not; `clearAddress()` empties the field and focuses it, and the predicate then flips so
+  the button hides itself right after clearing. Review found no blockers — clean, minimal view chrome.
+  No new test (pure view logic; rides the manual sim verification). Non-blocking note: when a page is
+  loaded the X is a persistent "start a new navigation" affordance, not an edit-clear — matches the
+  dogfood ask.
 
-- **Just landed — Slice 1 (PR #58), architect-approved; Jon merging (2026-07-02).** Add sheets + all six
+- **Just landed — Slice 3 (PR #60), architect-approved (2026-07-02).** Archive-means-gone cascade +
+  resolution guards + **Settings ▸ Archived Recipes** (restore / permanent-delete) + root-level
+  toast, with the two Slice 2 follow-ups (deduped `gatedBinding`, modal→toast). Two review blockers
+  fixed on-branch: toast occlusion over the full-screen recipe cover (now also rendered inside
+  `RecipeFullScreenCover`), and an unrelated `xcodegen` bundle-ID/scheme sweep (reverted; `project.yml`
+  realigned to `com.jonphillips.yeschef`; `check-drift.sh` now guards the bundle IDs). **Non-blocking
+  watch item:** two `.sensoryFeedback` modifiers now observe the same toast trigger, so adds from a
+  full-screen recipe may double-buzz — eyeball during dogfooding and gate one if it's noticeable.
+
+- **Just landed — Slice 2 (PR #59), architect-approved (2026-07-02).** The meal editor locks to the
+  viewed recipe when launched from recipe detail (`MealPlanItemDraftContext.locksRecipeSelection`),
+  and add-to-meal / add-to-grocery fire in-context confirmations via the Slice 1 gated presenters.
+  Correct and consistent with Slice 1; review found no blockers. One UI-pass watch item: the
+  confirmation is a sheet→alert handoff on the same host (the app already proves this works via the
+  capture-summary alert), and Slice 3 retires it entirely by moving to a root-level toast.
+
+- **Slice 1 (PR #58), architect-approved and merged (2026-07-02).** Add sheets + all six
   full-screen-recipe toolbar affordances (Add-to-Grocery, Add-to-Plan, Edit, Start Cooking, View
-  Original, Delete) now present in-context via the shared gated-presenter pattern in
+  Original, Delete) present in-context via the shared gated-presenter pattern in
   `AppDestinationPresentation.swift` (root presenters gated on `presentedRecipeID == nil`,
   re-attached ungated inside `RecipeFullScreenCover`). Also updated the active-simulator target to
   `iPad Pro 13-inch (M5) (16GB)`.
