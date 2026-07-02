@@ -517,6 +517,14 @@ extension DependencyValues {
       }
     }
 
+    migrator.registerMigration("Add recipe make-ahead field") { db in
+      try #sql("""
+        ALTER TABLE "recipes"
+        ADD COLUMN "makeAhead" TEXT
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     defaultDatabase = database
     switch syncMode {

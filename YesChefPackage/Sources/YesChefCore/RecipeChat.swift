@@ -1,0 +1,364 @@
+import Dependencies
+import Foundation
+import LLMClientKit
+import Observation
+
+public let recipeChatCustomInstructionsKey = "recipeChatCustomInstructions"
+
+public struct RecipeChatInstructions: Sendable {
+  public var current: @Sendable () -> String
+
+  public init(current: @escaping @Sendable () -> String) {
+    self.current = current
+  }
+}
+
+extension RecipeChatInstructions: DependencyKey {
+  public static let liveValue = RecipeChatInstructions {
+    UserDefaults.standard.string(forKey: recipeChatCustomInstructionsKey) ?? ""
+  }
+
+  public static let testValue = RecipeChatInstructions { "" }
+  public static let previewValue = RecipeChatInstructions { "" }
+}
+
+extension DependencyValues {
+  public var recipeChatInstructions: RecipeChatInstructions {
+    get { self[RecipeChatInstructions.self] }
+    set { self[RecipeChatInstructions.self] = newValue }
+  }
+}
+
+public enum RecipeChatContext: Equatable, Sendable {
+  case recipe(RecipeChatRecipeContext)
+
+  public var title: String {
+    switch self {
+    case let .recipe(context): context.title.isEmpty ? "this recipe" : context.title
+    }
+  }
+
+  public func serialized() -> String {
+    switch self {
+    case let .recipe(context): context.serialized()
+    }
+  }
+}
+
+public struct RecipeChatRecipeContext: Equatable, Sendable {
+  public var title: String
+  public var subtitle: String?
+  public var summary: String?
+  public var servingsText: String?
+  public var yieldText: String?
+  public var prepTimeMinutes: Int?
+  public var cookTimeMinutes: Int?
+  public var totalTimeMinutes: Int?
+  public var ingredientSections: [RecipeChatSection]
+  public var instructionSections: [RecipeChatSection]
+  public var notes: [String]
+  public var makeAhead: String?
+
+  public init(
+    title: String,
+    subtitle: String? = nil,
+    summary: String? = nil,
+    servingsText: String? = nil,
+    yieldText: String? = nil,
+    prepTimeMinutes: Int? = nil,
+    cookTimeMinutes: Int? = nil,
+    totalTimeMinutes: Int? = nil,
+    ingredientSections: [RecipeChatSection] = [],
+    instructionSections: [RecipeChatSection] = [],
+    notes: [String] = [],
+    makeAhead: String? = nil
+  ) {
+    self.title = title
+    self.subtitle = subtitle
+    self.summary = summary
+    self.servingsText = servingsText
+    self.yieldText = yieldText
+    self.prepTimeMinutes = prepTimeMinutes
+    self.cookTimeMinutes = cookTimeMinutes
+    self.totalTimeMinutes = totalTimeMinutes
+    self.ingredientSections = ingredientSections
+    self.instructionSections = instructionSections
+    self.notes = notes
+    self.makeAhead = makeAhead
+  }
+
+  public init(detail: RecipeDetailData) {
+    let ingredientLinesBySection = Dictionary(grouping: detail.ingredientLines) { $0.sectionID }
+    let instructionStepsBySection = Dictionary(grouping: detail.instructionSteps) { $0.sectionID }
+    self.init(
+      title: detail.recipe.title,
+      subtitle: detail.recipe.subtitle,
+      summary: detail.recipe.summary,
+      servingsText: detail.recipe.servingsText,
+      yieldText: detail.recipe.yieldText,
+      prepTimeMinutes: detail.recipe.prepTimeMinutes,
+      cookTimeMinutes: detail.recipe.cookTimeMinutes,
+      totalTimeMinutes: detail.recipe.totalTimeMinutes,
+      ingredientSections: detail.ingredientSections
+        .sorted { $0.sortOrder < $1.sortOrder }
+        .map { section in
+          RecipeChatSection(
+            name: section.name,
+            lines: (ingredientLinesBySection[section.id] ?? [])
+              .sorted { $0.sortOrder < $1.sortOrder }
+              .map(\.originalText)
+          )
+        }
+        .filter { !$0.lines.isEmpty },
+      instructionSections: detail.instructionSections
+        .sorted { $0.sortOrder < $1.sortOrder }
+        .map { section in
+          RecipeChatSection(
+            name: section.name,
+            lines: (instructionStepsBySection[section.id] ?? [])
+              .sorted { $0.sortOrder < $1.sortOrder }
+              .map(\.text)
+          )
+        }
+        .filter { !$0.lines.isEmpty },
+      notes: detail.notes
+        .filter { $0.noteType == .general }
+        .sorted { $0.dateCreated < $1.dateCreated }
+        .map(\.text),
+      makeAhead: detail.recipe.makeAhead
+    )
+  }
+
+  public func serialized() -> String {
+    var lines = ["The user is looking at this recipe:"]
+    lines.append("- Title: \(title.isEmpty ? "(untitled)" : title)")
+    if let subtitle { lines.append("- Subtitle: \(subtitle)") }
+    if let summary { lines.append("- Summary: \(summary)") }
+    if let servingsText { lines.append("- Servings: \(servingsText)") }
+    if let yieldText { lines.append("- Yield: \(yieldText)") }
+    if let prepTimeMinutes { lines.append("- Prep time: \(prepTimeMinutes) minutes") }
+    if let cookTimeMinutes { lines.append("- Cook time: \(cookTimeMinutes) minutes") }
+    if let totalTimeMinutes { lines.append("- Total time: \(totalTimeMinutes) minutes") }
+    append(sections: ingredientSections, title: "Ingredients", to: &lines)
+    append(sections: instructionSections, title: "Instructions", to: &lines)
+    if !notes.isEmpty {
+      lines.append("Notes:")
+      for note in notes {
+        lines.append("- \(note.replacingOccurrences(of: "\n", with: " "))")
+      }
+    }
+    if let makeAhead {
+      lines.append("Current make-ahead section:")
+      lines.append(makeAhead)
+    }
+    return lines.joined(separator: "\n")
+  }
+
+  private func append(sections: [RecipeChatSection], title: String, to lines: inout [String]) {
+    guard !sections.isEmpty else { return }
+    lines.append("\(title):")
+    for section in sections {
+      if let name = section.name, !name.isEmpty {
+        lines.append("- \(name):")
+        for line in section.lines { lines.append("  - \(line)") }
+      } else {
+        for line in section.lines { lines.append("- \(line)") }
+      }
+    }
+  }
+}
+
+public struct RecipeChatSection: Equatable, Sendable {
+  public var name: String?
+  public var lines: [String]
+
+  public init(name: String? = nil, lines: [String]) {
+    self.name = name
+    self.lines = lines
+  }
+}
+
+public struct RecipeChatMessage: Identifiable, Sendable, Equatable {
+  public enum Role: Sendable, Equatable {
+    case user
+    case assistant
+  }
+
+  public let id: UUID
+  public var role: Role
+  public var text: String
+
+  public init(id: UUID = UUID(), role: Role, text: String) {
+    self.id = id
+    self.role = role
+    self.text = text
+  }
+}
+
+@MainActor
+public struct ChatApplyAction<Payload: Sendable> {
+  public var title: String
+  public var extract: (_ messages: [RecipeChatMessage]) async throws -> Payload
+  public var commit: @MainActor (_ payload: Payload) async throws -> Void
+
+  public init(
+    title: String,
+    extract: @escaping (_ messages: [RecipeChatMessage]) async throws -> Payload,
+    commit: @escaping @MainActor (_ payload: Payload) async throws -> Void
+  ) {
+    self.title = title
+    self.extract = extract
+    self.commit = commit
+  }
+
+  public func run(messages: [RecipeChatMessage]) async throws -> Payload {
+    let payload = try await extract(messages)
+    try await commit(payload)
+    return payload
+  }
+}
+
+public struct AnyChatApplyAction: Identifiable {
+  public var id: String { title }
+  public var title: String
+  public var run: @MainActor (_ messages: [RecipeChatMessage]) async throws -> String?
+
+  @MainActor
+  public init<Payload>(
+    _ action: ChatApplyAction<Payload>,
+    renderedSummary: @escaping @MainActor (Payload) -> String?
+  ) {
+    self.title = action.title
+    self.run = { messages in
+      let payload = try await action.run(messages: messages)
+      return renderedSummary(payload)
+    }
+  }
+}
+
+@MainActor
+@Observable
+public final class RecipeChatModel: Identifiable {
+  public let id = UUID()
+  public let context: RecipeChatContext
+  public private(set) var messages: [RecipeChatMessage] = []
+  public var useFrontier = false
+  public var selectedProvider: FrontierProvider = .anthropic
+  public private(set) var isResponding = false
+  public private(set) var errorText: String?
+
+  @ObservationIgnored @Dependency(\.modelClient) private var modelClient
+  @ObservationIgnored @Dependency(\.apiKeyStore) private var apiKeyStore
+  @ObservationIgnored @Dependency(\.recipeChatInstructions) private var chatInstructions
+
+  public init(context: RecipeChatContext) {
+    self.context = context
+    if let first = availableProviders.first { selectedProvider = first }
+  }
+
+  public var frontierAvailable: Bool { !availableProviders.isEmpty }
+
+  public var availableProviders: [FrontierProvider] {
+    FrontierProvider.allCases.filter { apiKeyStore.key($0) != nil }
+  }
+
+  public var activeTier: ModelTier {
+    useFrontier && apiKeyStore.key(selectedProvider) != nil
+      ? .frontier(selectedProvider) : .onDevice
+  }
+
+  public var sendsToProvider: Bool {
+    if case .frontier = activeTier { return true }
+    return false
+  }
+
+  public func send(_ text: String) async {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, !isResponding else { return }
+    messages.append(RecipeChatMessage(role: .user, text: trimmed))
+    isResponding = true
+    errorText = nil
+    defer { isResponding = false }
+
+    let index = appendAssistantPlaceholder()
+    do {
+      if case .frontier = activeTier {
+        let response = try await modelClient.complete(
+          ModelRequest(tier: activeTier, system: systemPrompt(), messages: history(), maxTokens: 2048)
+        )
+        messages[index].text = response.text.isEmpty ? "(No response.)" : response.text
+      } else {
+        let request = ModelRequest(
+          tier: activeTier,
+          system: systemPrompt(),
+          messages: history(),
+          maxTokens: 1024
+        )
+        for try await chunk in modelClient.stream(request) {
+          messages[index].text += chunk.text
+        }
+        if messages[index].text.isEmpty {
+          messages[index].text = "(No response.)"
+        }
+      }
+    } catch {
+      removePlaceholderIfEmpty(at: index)
+      errorText = describe(error)
+    }
+  }
+
+  public func systemPrompt() -> String {
+    let base = """
+      You are a concise, practical cooking assistant inside a private recipe app.
+      Discuss the recipe the user is looking at, described below. Help with timing,
+      prep, substitutions, troubleshooting, and planning. You propose and explain;
+      you never claim to have edited or saved the recipe yourself.
+
+      Answer in short plain-prose paragraphs. Use inline Markdown links when useful.
+      Do not use headings, tables, horizontal rules, or bold section labels; the panel is narrow.
+
+      \(context.serialized())
+      """
+    let custom = chatInstructions.current().trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !custom.isEmpty else { return base }
+    return """
+      \(base)
+
+      Additional standing instructions from the user (honor these unless they conflict with the rules above):
+      \(custom)
+      """
+  }
+
+  private func history() -> [ModelMessage] {
+    messages.map { message in
+      ModelMessage(role: message.role == .user ? .user : .assistant, text: message.text)
+    }
+  }
+
+  private func appendAssistantPlaceholder() -> Int {
+    messages.append(RecipeChatMessage(role: .assistant, text: ""))
+    return messages.count - 1
+  }
+
+  private func removePlaceholderIfEmpty(at index: Int) {
+    if messages.indices.contains(index),
+      messages[index].role == .assistant,
+      messages[index].text.isEmpty
+    {
+      messages.remove(at: index)
+    }
+  }
+
+  private func describe(_ error: any Error) -> String {
+    switch error {
+    case ModelClientError.onDeviceUnavailable:
+      "On-device intelligence is not available on this device yet."
+    case ModelClientError.frontierUnavailable:
+      "No frontier model key is configured."
+    case let ModelClientError.http(status, message):
+      "The model returned an error (\(status))." + (message.map { " \($0)" } ?? "")
+    default:
+      "Something went wrong reaching the model."
+    }
+  }
+}
