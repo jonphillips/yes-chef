@@ -203,6 +203,7 @@ public enum RecipeRepository {
     guard let recipe = try (Recipe.where { $0.id.eq(recipeID) })
       .fetchOne(db)
     else { return nil }
+    guard !recipe.archived else { return nil }
 
     let ingredientSections = try (IngredientSection.where { $0.recipeID.eq(recipeID) })
       .order { $0.sortOrder }
@@ -397,11 +398,27 @@ public enum RecipeRepository {
   }
 
   public static func archive(recipeID: Recipe.ID, in db: Database, now: Date) throws {
+    try #sql("DELETE FROM \"mealPlanItems\" WHERE \"recipeID\" = \(bind: recipeID)")
+      .execute(db)
+    try #sql("DELETE FROM \"menuItems\" WHERE \"recipeID\" = \(bind: recipeID)")
+      .execute(db)
     try Recipe.find(recipeID).update {
       $0.archived = true
       $0.dateModified = now
     }
     .execute(db)
+  }
+
+  public static func restore(recipeID: Recipe.ID, in db: Database, now: Date) throws {
+    try Recipe.find(recipeID).update {
+      $0.archived = false
+      $0.dateModified = now
+    }
+    .execute(db)
+  }
+
+  public static func permanentlyDelete(recipeID: Recipe.ID, in db: Database) throws {
+    try Recipe.find(recipeID).delete().execute(db)
   }
 
   private static func categoryNames(from draft: RecipeEditorDraft, in db: Database) throws -> [String] {

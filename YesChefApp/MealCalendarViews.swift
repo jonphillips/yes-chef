@@ -783,7 +783,7 @@ private struct MealPlanSlotSection: View {
   }
 
   private func recipeAction(for row: MealPlanItemRowData) -> (() -> Void)? {
-    guard let recipeID = row.item.recipeID, let onRecipeSelected else { return nil }
+    guard let recipeID = row.recipe?.id, let onRecipeSelected else { return nil }
     return {
       onRecipeSelected(recipeID)
     }

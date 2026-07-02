@@ -55,7 +55,14 @@ public struct MenuListRequest: FetchKeyRequest {
   public init() {}
 
   public func fetch(_ db: Database) throws -> [MenuRowData] {
-    let itemsByMenuID = Dictionary(grouping: try MenuItem.fetchAll(db), by: \.menuID)
+    let activeRecipeIDs = Set(try Recipe.fetchAll(db).filter { !$0.archived }.map(\.id))
+    let itemsByMenuID = Dictionary(
+      grouping: try MenuItem.fetchAll(db).filter { item in
+        guard item.kind == .recipe, let recipeID = item.recipeID else { return true }
+        return activeRecipeIDs.contains(recipeID)
+      },
+      by: \.menuID
+    )
     let placementsByMenuID = Dictionary(grouping: try MenuPlacement.fetchAll(db), by: \.menuID)
 
     return try Menu.fetchAll(db)
@@ -82,14 +89,22 @@ public struct MenuDetailRequest: FetchKeyRequest {
   public func fetch(_ db: Database) throws -> MenuDetailData? {
     guard let menu = try Menu.find(menuID).fetchOne(db) else { return nil }
 
-    let recipesByID = Dictionary(uniqueKeysWithValues: try Recipe.fetchAll(db).map { ($0.id, $0) })
+    let recipesByID = Dictionary(
+      uniqueKeysWithValues: try Recipe.fetchAll(db)
+        .filter { !$0.archived }
+        .map { ($0.id, $0) }
+    )
     let itemRows = try MenuItem
       .where { $0.menuID.eq(menuID) }
       .fetchAll(db)
-      .map { item in
-        MenuItemRowData(
+      .compactMap { item in
+        let recipe = item.recipeID.flatMap { recipesByID[$0] }
+        if item.kind == .recipe && item.recipeID != nil && recipe == nil {
+          return nil
+        }
+        return MenuItemRowData(
           item: item,
-          recipe: item.recipeID.flatMap { recipesByID[$0] }
+          recipe: recipe
         )
       }
       .sorted(by: areMenuItemRowsInIncreasingOrder)
@@ -149,7 +164,7 @@ public enum MenuRepository {
   ) throws -> MenuItem.ID {
     let menu = try requireMenu(menuID, in: db)
     try validateDayOffset(dayOffset, for: menu)
-    guard let recipe = try Recipe.find(recipeID).fetchOne(db) else {
+    guard let recipe = try Recipe.find(recipeID).fetchOne(db), !recipe.archived else {
       throw MenuRepositoryError.recipeNotFound(recipeID)
     }
 

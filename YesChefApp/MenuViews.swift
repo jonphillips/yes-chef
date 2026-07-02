@@ -350,7 +350,7 @@ private struct MenuDishRowView: View {
 
   var body: some View {
     Group {
-      if let recipeID = row.item.recipeID, let onRecipeSelected {
+      if let recipeID = row.recipe?.id, let onRecipeSelected {
         Button {
           onRecipeSelected(recipeID)
         } label: {
