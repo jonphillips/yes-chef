@@ -16,7 +16,24 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-No active dispatch target. Stop and ask Jon for the next effort before starting new work.
+**Actionable chat — the lift + make-ahead (ADR-0011).** First cross-app instance of the
+actionable-chat pattern. Full spec: [`docs/efforts/actionable-chat-make-ahead.md`](efforts/actionable-chat-make-ahead.md).
+Decision: [`docs/decisions/ADR-0011-actionable-chat-make-ahead.md`](decisions/ADR-0011-actionable-chat-make-ahead.md).
+
+Do the slices **in order**:
+1. **Slice 1 — the lift** (`GalavantAI` → shared `packages/LLMClientKit`; a *move* not a copy). Three
+   repos, three commits/PRs: **1a** create the package in jon-platform + EXTRACTION-NOTES row; **1b**
+   galavant path-dep + delete + `import LLMClientKit` (use a **worktree** if parallel); **1c** yes-chef
+   path-dep + **delete** its minimal `ModelClient`/`ClaudeAPIClient`, migrate `AISettingsView` onto the
+   package's `APIKeyStore`, rewire the app to `TieredModelClient.live`. Prereq for Slice 2.
+2. **Slice 2 — the abstraction + make-ahead** (yes-chef): additive `Recipe.makeAhead` column; a general
+   `(extract → commit)` apply-action **catalog** (make-ahead = verb #1, not hardcoded); `MakeAheadPlan` +
+   `MakeAheadPlanClient` (mirror `PlaceDiscoveryClient`); tested `applyMakeAheadPlan`; `RecipeChatContext`
+   + `RecipeChatModel` (mirror `GalavantChat`) with markdown + editable pre-prompt parity; panel + button
+   + "Make-ahead" section in `RecipeDetailView`.
+
+Invariant (do not violate): the model proposes/structures; the **tap** is the only write. See the effort
+doc for per-slice acceptance and the read-first list.
 
 ## Ready Efforts (queue)
 

@@ -15,3 +15,4 @@ plus any app-specific calls.
 - [ADR-0008](ADR-0008-curated-collections.md) — Curated collections are a new sibling of Menu (editorial indexes); reserved now, built post-sync (Proposed)
 - [ADR-0009](ADR-0009-in-app-authenticated-browser-capture.md) — In-app authenticated browser capture (rendered logged-in DOM) via WebExtractorKit; never store credentials
 - [ADR-0010](ADR-0010-cloudkit-sync-enablement.md) — CloudKit sync enablement specifics: BLOB→CKAsset, lean original-provenance, upsert + dedup-on-read, clean cutover
+- [ADR-0011](ADR-0011-actionable-chat-make-ahead.md) — Actionable chat (first cross-app instance): seeded recipe chat + typed `(extract → commit)` apply-action catalog; first verb make-ahead → new `Recipe.makeAhead` field; lifts `GalavantAI` → shared `LLMClientKit` (Accepted)
