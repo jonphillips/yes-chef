@@ -29,8 +29,10 @@ slice, when approved to build, *becomes* an effort — usually a thin pointer
 
 `CURRENT_HANDOFF.md` has two distinct parts:
 
-- **Next Up** — exactly **one** designated effort, named, with a pointer to its brief. This is
-  the single dispatch target. Jon and the architect curate it; the coding agent never chooses it.
+- **Next Up** — the single dispatch target. Usually one designated effort with a pointer to its
+  brief, but it **may bundle several cohesive slices** into one dispatch (one PR) — see the batching
+  rule below. Either way it is *one* dispatch. Jon and the architect curate it; the coding agent
+  never chooses it.
 - **Ready Efforts** — the ordered queue of scoped, ready briefs. Not a dispatch target; it is
   where Next Up is drawn from.
 
@@ -45,6 +47,19 @@ Rules:
    the effort brief (or the milestone slice it points to), not in chat.
 4. **The handoff points, it does not duplicate.** For slices already specced in a milestone doc,
    the brief references that section rather than copying it, so there is one source of truth.
+5. **Batch cohesive slices by default.** Each dispatch pays a large fixed tax — cold-start, reading
+   the house rules, re-exploring the codebase, and PR ceremony — that scales with the *number of
+   dispatches*, not the amount of work. So the architect's default when curating Next Up is to
+   **bundle cohesive slices into one dispatch/PR**, decoupling review granularity (stay fine) from
+   dispatch granularity (amortize). Bundle when slices **share files and a mental model**; keep them
+   separate when a slice has a real chance of being wrong or of changing direction based on a prior
+   slice's outcome (batching is amortization — only a win when the whole batch is likely right). When
+   a dispatch bundles slices, Next Up lists them in order and the agent does all of them under one PR.
+   The architect still thinks and reviews at slice resolution.
+6. **Keep the handoff lean; archive the rest.** `CURRENT_HANDOFF.md` holds only Next Up, the Ready
+   queue, and the Verification Pattern. Completed-slice history, the implemented-behavior checkpoint,
+   and strategic background live in `docs/DONE-LOG.md` (append-on-approval, read-rarely). No dispatch
+   instruction points at `DONE-LOG.md` — it is a human archive, kept out of working context on purpose.
 
 ## Development Priorities
 
