@@ -9,29 +9,13 @@ private struct MealCalendarItemEditorDestinationModifier: ViewModifier {
 
     content
       .sheet(
-        item: presentationBinding($mealCalendarModel.destination.itemEditor),
+        item: gatedBinding($mealCalendarModel.destination.itemEditor, enabled: isPresentationEnabled),
         id: \.self
       ) { context in
         NavigationStack {
           MealPlanItemEditorView(model: mealCalendarModel, context: context)
         }
       }
-      .alert(
-        "Added to Meal Calendar",
-        item: presentationBinding($mealCalendarModel.destination.addRecipeConfirmation)
-      ) { _ in
-        Button("OK") {}
-      } message: { confirmation in
-        Text(confirmation.message)
-      }
-  }
-
-  private func presentationBinding<Value>(_ binding: Binding<Value?>) -> Binding<Value?> {
-    Binding {
-      isPresentationEnabled ? binding.wrappedValue : nil
-    } set: { newValue in
-      binding.wrappedValue = newValue
-    }
   }
 }
 
@@ -44,32 +28,32 @@ private struct GroceryDestinationsModifier: ViewModifier {
     @Bindable var groceryModel = groceryModel
 
     content
-      .sheet(isPresented: presentationBinding($groceryModel.destination.addList)) {
+      .sheet(isPresented: gatedBinding($groceryModel.destination.addList, enabled: isPresentationEnabled)) {
         NavigationStack {
           GroceryListEditorView(model: groceryModel)
         }
       }
-      .sheet(item: presentationBinding($groceryModel.destination.editList), id: \.self) { listID in
+      .sheet(item: gatedBinding($groceryModel.destination.editList, enabled: isPresentationEnabled), id: \.self) { listID in
         NavigationStack {
           GroceryListEditorView(model: groceryModel, listID: listID)
         }
       }
-      .sheet(isPresented: presentationBinding($groceryModel.destination.addCustomItem)) {
+      .sheet(isPresented: gatedBinding($groceryModel.destination.addCustomItem, enabled: isPresentationEnabled)) {
         NavigationStack {
           GroceryItemEditorView(model: groceryModel)
         }
       }
-      .sheet(isPresented: presentationBinding($groceryModel.destination.addPantryItem)) {
+      .sheet(isPresented: gatedBinding($groceryModel.destination.addPantryItem, enabled: isPresentationEnabled)) {
         NavigationStack {
           PantryItemEditorView(model: groceryModel)
         }
       }
-      .sheet(item: presentationBinding($groceryModel.destination.editPantryItem), id: \.self) { itemID in
+      .sheet(item: gatedBinding($groceryModel.destination.editPantryItem, enabled: isPresentationEnabled), id: \.self) { itemID in
         NavigationStack {
           PantryItemEditorView(model: groceryModel, itemID: itemID)
         }
       }
-      .sheet(item: presentationBinding($groceryModel.destination.selectIngredients), id: \.self) { context in
+      .sheet(item: gatedBinding($groceryModel.destination.selectIngredients, enabled: isPresentationEnabled), id: \.self) { context in
         NavigationStack {
           GroceryIngredientSelectionView(
             model: groceryModel,
@@ -83,17 +67,9 @@ private struct GroceryDestinationsModifier: ViewModifier {
           )
         }
       }
-      .alert(
-        "Added to Grocery List",
-        item: presentationBinding($groceryModel.destination.addConfirmation)
-      ) { _ in
-        Button("OK") {}
-      } message: { confirmation in
-        Text(confirmation.message)
-      }
       .confirmationDialog(
         "Clear Purchased?",
-        item: presentationBinding($groceryModel.destination.clearPurchased),
+        item: gatedBinding($groceryModel.destination.clearPurchased, enabled: isPresentationEnabled),
         titleVisibility: .visible
       ) { listID in
         Button("Clear Purchased", role: .destructive) {
@@ -105,7 +81,7 @@ private struct GroceryDestinationsModifier: ViewModifier {
       }
       .confirmationDialog(
         "Clear Grocery List?",
-        item: presentationBinding($groceryModel.destination.clearAll),
+        item: gatedBinding($groceryModel.destination.clearAll, enabled: isPresentationEnabled),
         titleVisibility: .visible
       ) { listID in
         Button("Clear All", role: .destructive) {
@@ -117,7 +93,7 @@ private struct GroceryDestinationsModifier: ViewModifier {
       }
       .confirmationDialog(
         "Delete Grocery List?",
-        item: presentationBinding($groceryModel.destination.deleteList),
+        item: gatedBinding($groceryModel.destination.deleteList, enabled: isPresentationEnabled),
         titleVisibility: .visible
       ) { listID in
         Button("Delete List", role: .destructive) {
@@ -129,21 +105,6 @@ private struct GroceryDestinationsModifier: ViewModifier {
       }
   }
 
-  private func presentationBinding(_ binding: Binding<Bool>) -> Binding<Bool> {
-    Binding {
-      isPresentationEnabled && binding.wrappedValue
-    } set: { newValue in
-      binding.wrappedValue = newValue
-    }
-  }
-
-  private func presentationBinding<Value>(_ binding: Binding<Value?>) -> Binding<Value?> {
-    Binding {
-      isPresentationEnabled ? binding.wrappedValue : nil
-    } set: { newValue in
-      binding.wrappedValue = newValue
-    }
-  }
 }
 
 private struct RecipeDetailDestinationsModifier: ViewModifier {
@@ -154,41 +115,45 @@ private struct RecipeDetailDestinationsModifier: ViewModifier {
     @Bindable var recipeModel = recipeModel
 
     content
-      .sheet(item: presentationBinding($recipeModel.destination.editRecipe), id: \.self) { recipeID in
+      .sheet(item: gatedBinding($recipeModel.destination.editRecipe, enabled: isPresentationEnabled), id: \.self) { recipeID in
         NavigationStack {
           RecipeEditorView(recipeID: recipeID)
         }
       }
-      .sheet(item: presentationBinding($recipeModel.destination.cookingMode), id: \.self) { recipeID in
+      .sheet(item: gatedBinding($recipeModel.destination.cookingMode, enabled: isPresentationEnabled), id: \.self) { recipeID in
         NavigationStack {
           CookingModeView(model: CookingModeModel(recipeID: recipeID))
         }
       }
-      .sheet(item: presentationBinding($recipeModel.destination.originalSnapshot), id: \.self) { recipeID in
+      .sheet(item: gatedBinding($recipeModel.destination.originalSnapshot, enabled: isPresentationEnabled), id: \.self) { recipeID in
         NavigationStack {
           OriginalSnapshotView(recipe: recipeModel.recipeRows.first { $0.recipe.id == recipeID }?.recipe)
         }
       }
       .confirmationDialog(
-        "Delete Recipe?",
-        item: presentationBinding($recipeModel.destination.deleteRecipe),
+        "Archive Recipe?",
+        item: gatedBinding($recipeModel.destination.deleteRecipe, enabled: isPresentationEnabled),
         titleVisibility: .visible
       ) { recipeID in
-        Button("Delete Recipe", role: .destructive) {
+        Button("Archive", role: .destructive) {
           recipeModel.confirmDeleteRecipeButtonTapped(recipeID: recipeID)
         }
         Button("Cancel", role: .cancel) {}
       } message: { recipeID in
-        Text("Delete \(recipeModel.title(for: recipeID)) from your recipe library?")
+        Text("Archive \(recipeModel.title(for: recipeID))? It will be removed from meal plans and menus.")
       }
-  }
-
-  private func presentationBinding<Value>(_ binding: Binding<Value?>) -> Binding<Value?> {
-    Binding {
-      isPresentationEnabled ? binding.wrappedValue : nil
-    } set: { newValue in
-      binding.wrappedValue = newValue
-    }
+      .confirmationDialog(
+        "Delete Permanently?",
+        item: gatedBinding($recipeModel.destination.deleteArchivedRecipe, enabled: isPresentationEnabled),
+        titleVisibility: .visible
+      ) { recipeID in
+        Button("Delete Permanently", role: .destructive) {
+          recipeModel.confirmDeleteArchivedRecipeButtonTapped(recipeID: recipeID)
+        }
+        Button("Cancel", role: .cancel) {}
+      } message: { recipeID in
+        Text("Permanently delete \(recipeModel.title(for: recipeID))? This cannot be undone.")
+      }
   }
 }
 

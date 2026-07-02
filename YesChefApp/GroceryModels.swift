@@ -15,7 +15,6 @@ final class GroceryLibraryModel {
     case addCustomItem
     case addList
     case addPantryItem
-    case addConfirmation(GroceryAddConfirmation)
     case clearAll(CoreGroceryList.ID)
     case clearPurchased(CoreGroceryList.ID)
     case deleteList(CoreGroceryList.ID)
@@ -47,6 +46,11 @@ final class GroceryLibraryModel {
   var selectedListID: CoreGroceryList.ID?
   var errorMessage: String?
   var isShowingError = false
+  var toastCenter: AppToastCenter?
+
+  init(toastCenter: AppToastCenter? = nil) {
+    self.toastCenter = toastCenter
+  }
 
   var selectedListRow: GroceryListRowData? {
     if let selectedListID,
@@ -508,13 +512,13 @@ final class GroceryLibraryModel {
         return listID
       }
       self.selectedListID = listID
-      destination = .addConfirmation(
+      toastCenter?.postSuccess(
         GroceryAddConfirmation(
           sourceTitle: context.title,
           sourceSubtitle: context.subtitle,
           listTitle: title(forList: listID),
           ingredientCount: selectedIngredientLineIDs.count
-        )
+        ).message
       )
       return true
     } catch {

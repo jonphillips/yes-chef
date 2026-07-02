@@ -73,7 +73,7 @@ struct RecipeDetailView: View {
           Button(role: .destructive) {
             libraryModel.deleteButtonTapped(recipeID: model.recipeID)
           } label: {
-            Label("Delete Recipe", systemImage: "trash")
+            Label("Archive", systemImage: "archivebox")
           }
         } label: {
           Label("More", systemImage: "ellipsis.circle")

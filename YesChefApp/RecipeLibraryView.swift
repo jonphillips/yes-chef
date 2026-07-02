@@ -8,14 +8,22 @@ import YesChefCore
 
 struct AppContainer: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+  @State private var toastCenter: AppToastCenter
   @State private var recipeModel = RecipeLibraryModel()
   @State private var browserModel = BrowserModel()
-  @State private var mealCalendarModel = MealCalendarModel()
+  @State private var mealCalendarModel: MealCalendarModel
   @State private var menuModel = MenuLibraryModel()
-  @State private var groceryModel = GroceryLibraryModel()
+  @State private var groceryModel: GroceryLibraryModel
   @State private var selectedSection: AppSection? = .recipes
   @State private var selectedSettingsPane: SettingsPane? = .categories
   @State private var presentedRecipeID: Recipe.ID?
+
+  init() {
+    let toastCenter = AppToastCenter()
+    _toastCenter = State(wrappedValue: toastCenter)
+    _mealCalendarModel = State(wrappedValue: MealCalendarModel(toastCenter: toastCenter))
+    _groceryModel = State(wrappedValue: GroceryLibraryModel(toastCenter: toastCenter))
+  }
 
   var body: some View {
     @Bindable var recipeModel = recipeModel
@@ -42,7 +50,8 @@ struct AppContainer: View {
         recipeID: recipeID,
         recipeModel: recipeModel,
         mealCalendarModel: mealCalendarModel,
-        groceryModel: groceryModel
+        groceryModel: groceryModel,
+        toastCenter: toastCenter
       )
     }
     .mealCalendarItemEditorDestination(
@@ -185,6 +194,11 @@ struct AppContainer: View {
         }
       }
     }
+    .overlay(alignment: .top) {
+      AppToastOverlay(toastCenter: toastCenter)
+        .ignoresSafeArea(.keyboard)
+    }
+    .sensoryFeedback(.success, trigger: toastCenter.feedbackTrigger)
     .externalDatabaseChangeReload(
       recipeModel: recipeModel,
       browserModel: browserModel,
@@ -210,6 +224,7 @@ private struct RecipeFullScreenCover: View {
   let recipeModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
+  let toastCenter: AppToastCenter
 
   var body: some View {
     NavigationStack {
@@ -227,6 +242,11 @@ private struct RecipeFullScreenCover: View {
         }
       }
     }
+    .overlay(alignment: .top) {
+      AppToastOverlay(toastCenter: toastCenter)
+        .ignoresSafeArea(.keyboard)
+    }
+    .sensoryFeedback(.success, trigger: toastCenter.feedbackTrigger)
     .mealCalendarItemEditorDestination(mealCalendarModel: mealCalendarModel)
     .groceryDestinations(
       groceryModel: groceryModel,
@@ -321,6 +341,7 @@ private struct AppMainLayout: View {
         case .settings:
           SettingsDetailPane(
             selectedPane: selectedSettingsPane,
+            model: recipeModel,
             groceryModel: groceryModel
           )
         }
@@ -493,6 +514,7 @@ private struct SettingsView: View {
       Section("Library") {
         categoryRow
         pantryRow
+        archivedRecipesRow
       }
 
       Section("Import & Export") {
@@ -547,10 +569,28 @@ private struct SettingsView: View {
       }
     }
   }
+
+  @ViewBuilder private var archivedRecipesRow: some View {
+    if let selectedPane {
+      Button {
+        selectedPane.wrappedValue = .archivedRecipes
+      } label: {
+        SettingsPane.archivedRecipes.label
+      }
+      .foregroundStyle(.primary)
+    } else {
+      NavigationLink {
+        ArchivedRecipesView(model: model)
+      } label: {
+        SettingsPane.archivedRecipes.label
+      }
+    }
+  }
 }
 
 private struct SettingsDetailPane: View {
   let selectedPane: SettingsPane?
+  let model: RecipeLibraryModel
   let groceryModel: GroceryLibraryModel
 
   var body: some View {
@@ -562,6 +602,10 @@ private struct SettingsDetailPane: View {
     case .pantry:
       NavigationStack {
         PantrySettingsView(model: groceryModel)
+      }
+    case .archivedRecipes:
+      NavigationStack {
+        ArchivedRecipesView(model: model)
       }
     case nil:
       ContentUnavailableView("Settings", systemImage: AppSection.settings.systemImage)
@@ -608,7 +652,7 @@ private struct RecipeListView: View {
               Button {
                 model.deleteButtonTapped(recipeID: row.recipe.id)
               } label: {
-                Label("Delete", systemImage: "trash")
+                Label("Archive", systemImage: "archivebox")
               }
               .tint(.red)
             }
@@ -623,7 +667,7 @@ private struct RecipeListView: View {
                 Button {
                   model.deleteButtonTapped(recipeID: row.recipe.id)
                 } label: {
-                  Label("Delete", systemImage: "trash")
+                  Label("Archive", systemImage: "archivebox")
                 }
                 .tint(.red)
               }
@@ -739,6 +783,72 @@ private struct RecipeListView: View {
     var presets = savedListPresets
     presets.removeAll { $0.id == preset.id }
     savedListPresets = presets
+  }
+}
+
+private struct ArchivedRecipesView: View {
+  let model: RecipeLibraryModel
+
+  var body: some View {
+    List {
+      if model.archivedRecipeRows.isEmpty {
+        ContentUnavailableView("No Archived Recipes", systemImage: "archivebox")
+          .frame(maxWidth: .infinity, minHeight: 280)
+      } else {
+        ForEach(model.archivedRecipeRows) { row in
+          ArchivedRecipeRow(model: model, row: row)
+            .swipeActions(edge: .leading) {
+              Button {
+                model.restoreArchivedRecipeButtonTapped(recipeID: row.recipe.id)
+              } label: {
+                Label("Restore", systemImage: "arrow.uturn.backward")
+              }
+              .tint(.green)
+            }
+            .swipeActions {
+              Button(role: .destructive) {
+                model.deleteArchivedRecipeButtonTapped(recipeID: row.recipe.id)
+              } label: {
+                Label("Delete Permanently", systemImage: "trash")
+              }
+            }
+        }
+      }
+    }
+    .navigationTitle("Archived Recipes")
+  }
+}
+
+private struct ArchivedRecipeRow: View {
+  let model: RecipeLibraryModel
+  let row: RecipeListRowData
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(row.recipe.title)
+        .font(.headline)
+      Text("Archived \(row.recipe.dateModified, format: .dateTime.month(.abbreviated).day().year())")
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+      if let source = row.source?.name ?? row.source?.publicationName {
+        Text(source)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .contextMenu {
+      Button {
+        model.restoreArchivedRecipeButtonTapped(recipeID: row.recipe.id)
+      } label: {
+        Label("Restore", systemImage: "arrow.uturn.backward")
+      }
+      Button(role: .destructive) {
+        model.deleteArchivedRecipeButtonTapped(recipeID: row.recipe.id)
+      } label: {
+        Label("Delete Permanently", systemImage: "trash")
+      }
+    }
   }
 }
 

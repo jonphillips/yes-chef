@@ -11,7 +11,6 @@ import YesChefCore
 final class MealCalendarModel {
   @CasePathable
   enum Destination {
-    case addRecipeConfirmation(MealPlanRecipeAddConfirmation)
     case itemEditor(MealPlanItemDraftContext)
     case deleteItem(MealPlanItem.ID)
   }
@@ -35,9 +34,11 @@ final class MealCalendarModel {
   var selectedDate: Date
   var errorMessage: String?
   var isShowingError = false
+  var toastCenter: AppToastCenter?
 
-  init(selectedDate: Date = Date()) {
+  init(selectedDate: Date = Date(), toastCenter: AppToastCenter? = nil) {
     self.selectedDate = Calendar.autoupdatingCurrent.startOfDay(for: selectedDate)
+    self.toastCenter = toastCenter
   }
 
   var periodTitle: String {
@@ -215,12 +216,12 @@ final class MealCalendarModel {
       applyOptimisticRows(result.1, updatedItemIDs: [result.0])
       selectedDate = scheduledDate
       if itemID == nil {
-        destination = .addRecipeConfirmation(
+        toastCenter?.postSuccess(
           MealPlanRecipeAddConfirmation(
             recipeTitle: title(forRecipe: recipeID),
             date: scheduledDate,
             mealSlot: mealSlot
-          )
+          ).message
         )
       } else {
         destination = nil
