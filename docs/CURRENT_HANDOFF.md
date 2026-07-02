@@ -1,14 +1,16 @@
 # Current Handoff
 
-Last updated: July 2, 2026 (**Dogfood batch 1 Slice 4 (jon-platform PR #16) architect-approved — Next
-Up is now Slice 5 (recipe-list search reachability).** Slice 4 added a trailing `xmark.circle.fill`
-clear button to the shared `WebExtractorKit` `WebBrowserView` address bar — note this slice shipped in
-the **jon-platform** repo, not yes-chef, since the browser chrome is a shared package. The button
-shows whenever the field has content (editing) or a page is loaded (not editing), and one tap empties
-the field + focuses it so the replacement URL/search can be typed immediately. Visibility logic is
-correct and self-cancelling (clearing enters editing with an empty field, which hides the button
-again); clean 23-line view-chrome change, no new architecture. Package tests (8) + both iPad/iPhone
-sim builds + `check-drift.sh` (111 core tests) green. Prior context: **Slice 3 (PR #60)** made archive
+Last updated: July 2, 2026 (**Dogfood batch 1 Slice 5 (PR #61) architect-approved — Next Up is now
+Slice 6 (share the grocery list as text).** Slice 5 kept the recipe-list search field reachable by
+pinning the native nav-bar search drawer (`.searchable(placement: .navigationBarDrawer(displayMode:
+.always))` on the shared `RecipeListView`) so it no longer scrolls away with the list. One-line,
+idiomatic view change — reuses the existing `.searchable` binding, no new state/scroll-tracking/custom
+control; applies to both the `.navigation` and `.selection` hosts and doesn't conflict with the top
+`safeAreaInset` status bar. Both iPad/iPhone sim builds + `check-drift.sh` (111 core tests) green;
+review found no blockers. Prior context: **Slice 4 (jon-platform PR #16)** added a trailing
+`xmark.circle.fill` clear button to the shared `WebExtractorKit` `WebBrowserView` address bar (shipped
+in the **jon-platform** repo, not yes-chef, since the browser chrome is a shared package). Prior
+context: **Slice 3 (PR #60)** made archive
 mean *gone*: archiving a recipe deletes
 its meal-plan and menu-dish placements in the same sync-safe write, guards the calendar/menu/detail
 resolution paths against archived references, renames the destructive action to **"Archive"**, and
@@ -53,16 +55,23 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **Dogfood fixes — batch 1, Slice 5 — Recipe list: keep search reachable / scroll-to-top.**
-  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) §Slice 5. **The Codex
-  dispatch target.** Search currently scrolls away with the list — either pin the search field so it
-  stays reachable, or add a fast scroll-to-top affordance (verify whether tap-status-bar already
-  covers this on iOS; add an explicit control if not). Small, self-contained, no new architecture.
-  **Done when:** Jon can get back to search / the top of a long recipe list without manually
-  scrolling all the way up.
+- **Dogfood fixes — batch 1, Slice 6 — Share the grocery list as text.**
+  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) §Slice 6. **The Codex
+  dispatch target.** Add a Share action to a grocery list that produces a plain-text rendering
+  (respecting current order/grouping) into the system share sheet. Small, self-contained, no new
+  architecture. **Done when:** the grocery list can be shared as readable text to Messages/Notes/etc.
+  *(When Phase E store-section grouping lands, the text export should reflect the sections — note the
+  dependency, don't block on it.)*
 
-  **Remaining batch-1 order after this:** UX Slices 6–9 (share grocery as text, edit a grocery item,
-  ×2/×3 recipe multiplier, add image to a manual recipe). Draw one slice into Next Up at a time.
+  **Remaining batch-1 order after this:** UX Slices 7–9 (edit a grocery item, ×2/×3 recipe
+  multiplier, add image to a manual recipe). Draw one slice into Next Up at a time.
+
+- **Just landed — Slice 5 (PR #61), architect-approved (2026-07-02).** Pinned the recipe-list search
+  drawer via `.searchable(placement: .navigationBarDrawer(displayMode: .always))` on the shared
+  `RecipeListView` so search no longer scrolls away with the list. One-line, idiomatic view change —
+  reuses the existing `.searchable` binding, no new state/scroll-tracking/custom control; applies to
+  both `.navigation` and `.selection` hosts and doesn't conflict with the top `safeAreaInset` status
+  bar. Both iPad/iPhone sim builds + `check-drift.sh` (111 core tests) green; review found no blockers.
 
 - **Just landed — Slice 4 (jon-platform PR #16), architect-approved (2026-07-02).** Trailing
   `xmark.circle.fill` clear button on the shared `WebExtractorKit` `WebBrowserView` address bar

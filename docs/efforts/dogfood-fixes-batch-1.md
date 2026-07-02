@@ -205,6 +205,13 @@ Small. **Done when:** one tap clears the field.
 
 ### Slice 5 — Recipe list: keep search reachable / scroll-to-top
 
+**DONE — architect-approved (PR #61, 2026-07-02).** Pinned the native nav-bar search drawer via
+`.searchable(placement: .navigationBarDrawer(displayMode: .always))` on the shared `RecipeListView`,
+so the search field no longer scrolls away with the list. One-line, idiomatic view change — reuses
+the existing `.searchable` binding, no new state/scroll-tracking/custom control; applies to both the
+`.navigation` and `.selection` hosts and doesn't conflict with the top `safeAreaInset` status bar.
+Both iPad/iPhone sim builds + `check-drift.sh` (111 core tests) green. Review found no blockers.
+
 Search currently scrolls away with the list. Either pin the search field so it stays reachable,
 or add a fast scroll-to-top affordance (tap status bar already does some of this on iOS — verify;
 if insufficient, add an explicit control). **Done when:** Jon can get back to search/top of a
