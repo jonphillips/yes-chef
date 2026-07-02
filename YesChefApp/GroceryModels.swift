@@ -621,6 +621,16 @@ final class GroceryLibraryModel {
   }
 }
 
+extension GroceryLibraryModel {
+  var selectedListShareText: String {
+    guard let selectedListRow else { return "Grocery List\n\nNo grocery items." }
+    return GroceryListPlainTextRenderer.render(
+      list: selectedListRow.list,
+      rows: selectedItemRows
+    )
+  }
+}
+
 struct GroceryIngredientSelectionContext: Hashable, Sendable {
   enum Source: Hashable, Sendable {
     case recipe(Recipe.ID)
