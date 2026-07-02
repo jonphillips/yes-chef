@@ -676,7 +676,11 @@ private struct RecipeListView: View {
       }
     }
     .navigationTitle("Recipes")
-    .searchable(text: $model.searchText, prompt: "Search recipes")
+    .searchable(
+      text: $model.searchText,
+      placement: .navigationBarDrawer(displayMode: .always),
+      prompt: "Search recipes"
+    )
     .safeAreaInset(edge: .top, spacing: 0) {
       RecipeListStatusBar(model: model)
     }
