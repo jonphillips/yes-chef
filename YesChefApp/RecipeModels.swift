@@ -16,6 +16,7 @@ final class RecipeLibraryModel {
     case cookingMode(Recipe.ID)
     case originalSnapshot(Recipe.ID)
     case deleteRecipe(Recipe.ID)
+    case deleteArchivedRecipe(Recipe.ID)
     case filterRecipes
     case importReview
     case captureSummary(WebRecipeCaptureSummary)
@@ -169,6 +170,48 @@ final class RecipeLibraryModel {
     do {
       try database.write { db in
         try RecipeRepository.archive(recipeID: recipeID, in: db, now: now)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  var archivedRecipeRows: [RecipeListRowData] {
+    recipeRows
+      .filter { $0.recipe.archived }
+      .sorted {
+        if $0.recipe.dateModified != $1.recipe.dateModified {
+          return $0.recipe.dateModified > $1.recipe.dateModified
+        }
+        return $0.recipe.title.localizedStandardCompare($1.recipe.title) == .orderedAscending
+      }
+  }
+
+  func restoreArchivedRecipeButtonTapped(recipeID: Recipe.ID) {
+    do {
+      try database.write { db in
+        try RecipeRepository.restore(recipeID: recipeID, in: db, now: now)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func deleteArchivedRecipeButtonTapped(recipeID: Recipe.ID) {
+    destination = .deleteArchivedRecipe(recipeID)
+  }
+
+  func confirmDeleteArchivedRecipeButtonTapped(recipeID: Recipe.ID) {
+    destination = nil
+    if selectedRecipeID == recipeID {
+      selectedRecipeID = nil
+    }
+
+    do {
+      try database.write { db in
+        try RecipeRepository.permanentlyDelete(recipeID: recipeID, in: db)
       }
     } catch {
       errorMessage = String(describing: error)

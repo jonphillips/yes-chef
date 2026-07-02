@@ -153,12 +153,49 @@ ADR-0009). Post-sync; **do not front-load over the iCloud gate** (see
     hand off** — and put the **rich interactive review and the per-site playbooks in the
     in-app path**. Don't fight the platform by building the complex review inside the extension.
 
+## Recipe ingredient authoring — formatting fidelity (dogfood, 2026-07-02)
+
+Jon, first dogfooding pass: ingredient entry has **no formatting flexibility**. Section
+headers automatically get bullet points too; there's no bold/italic; and pasting a
+formatted ingredient list from ChatGPT loses its structure. Open design fork — pick a
+direction before anyone builds:
+
+- **Markdown-authored ingredients?** Let the ingredient/notes fields accept Markdown and
+  render it — cheapest, but collides with the structured `IngredientLine`/`IngredientSection`
+  model (headers are already a first-class concept; bullets are applied by the renderer, which
+  is why headers wrongly get one).
+- **A tiny inline formatter** (bold/italic, and a "this line is a header, not an item" toggle)
+  over the existing structured model — keeps structure, adds emphasis, fixes the header-gets-a-
+  bullet bug directly.
+- **Smart paste** — when text is pasted (esp. from ChatGPT), detect and preserve its
+  structure (headers vs. items vs. emphasis) into the structured model rather than flattening.
+  Overlaps the parser / canonical-ingredient work but is an *authoring* concern, not a
+  shopping-merge one — keep them separate.
+
+The immediate, uncontroversial sub-bug (headers rendering with a bullet) may be worth pulling
+out as a small fix even before the larger direction is chosen. Not in the current arc; needs a
+decision first.
+
 ## Menus / planning model
 
 - Does the Menus subsystem need its own ADR, and what is the canonical provenance
   model linking recipe → menu → menu placement → calendar item → grocery source?
 - Is "menu" vs "meal plan" vs "cooking plan" a clean three-concept split, or do two
   of them collapse?
+- **Dated menus + upcoming/previous + on the planner (dogfood, 2026-07-02).** Jon wants to
+  apply a **date** to a menu; the Menus list should split into **upcoming** vs **previous**;
+  and dated menus should appear on the meal planner. Foundation partly exists — `menuPlacements`
+  already put a menu on the calendar — but a first-class menu **date** field + list sectioning is
+  net-new. Net-new feature, not designed yet.
+- **Menu guests, searchable (dogfood, 2026-07-02).** Jon wants to record a menu's guests and
+  have them searchable. Decision needed: a dedicated `guests` field (enables future guest
+  search/reuse — favored) vs. stuffing it into free-text notes. Net-new, needs a small model
+  decision.
+- **Multi-add groceries by tapping a calendar day (dogfood, 2026-07-02).** Tap a day on the
+  meal calendar and add *all* that day's items to the grocery list at once. **Verify against
+  existing behavior first** — add-from-calendar-range/day generation already exists
+  (`GroceryModels`/repository); this may be a UX-surfacing gap rather than net-new. Scope after
+  confirming what the current add-from-calendar-day flow already does.
 
 ## Sync
 

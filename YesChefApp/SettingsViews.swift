@@ -31,6 +31,7 @@ struct SettingsView: View {
       Section("Library") {
         categoryRow
         pantryRow
+        archivedRecipesRow
       }
 
       Section("AI") {
@@ -106,10 +107,28 @@ struct SettingsView: View {
       }
     }
   }
+
+  @ViewBuilder private var archivedRecipesRow: some View {
+    if let selectedPane {
+      Button {
+        selectedPane.wrappedValue = .archivedRecipes
+      } label: {
+        SettingsPane.archivedRecipes.label
+      }
+      .foregroundStyle(.primary)
+    } else {
+      NavigationLink {
+        ArchivedRecipesView(model: model)
+      } label: {
+        SettingsPane.archivedRecipes.label
+      }
+    }
+  }
 }
 
 struct SettingsDetailPane: View {
   let selectedPane: SettingsPane?
+  let model: RecipeLibraryModel
   let groceryModel: GroceryLibraryModel
 
   var body: some View {
@@ -125,6 +144,10 @@ struct SettingsDetailPane: View {
     case .pantry:
       NavigationStack {
         PantrySettingsView(model: groceryModel)
+      }
+    case .archivedRecipes:
+      NavigationStack {
+        ArchivedRecipesView(model: model)
       }
     case nil:
       ContentUnavailableView("Settings", systemImage: AppSection.settings.systemImage)

@@ -222,7 +222,7 @@ extension RecipeLibraryModel {
   }
 
   var selectedRecipe: Recipe? {
-    recipeRows.first { $0.recipe.id == selectedRecipeID }?.recipe
+    recipeRows.first { $0.recipe.id == selectedRecipeID && !$0.recipe.archived }?.recipe
   }
 
   func filterButtonTapped() {

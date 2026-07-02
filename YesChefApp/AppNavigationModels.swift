@@ -41,6 +41,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
   case ai
   case categories
   case pantry
+  case archivedRecipes
 
   var id: Self { self }
 
@@ -49,6 +50,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case .ai: "AI"
     case .categories: "Categories"
     case .pantry: "Pantry"
+    case .archivedRecipes: "Archived Recipes"
     }
   }
 
@@ -57,6 +59,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case .ai: "sparkles"
     case .categories: "folder"
     case .pantry: "list.bullet"
+    case .archivedRecipes: "archivebox"
     }
   }
 

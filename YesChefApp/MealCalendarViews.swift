@@ -316,7 +316,12 @@ struct MealPlanItemEditorView: View {
   }
 
   private var allowsMultipleRecipeSelection: Bool {
-    !context.isEditing
+    !context.isEditing && !context.locksRecipeSelection
+  }
+
+  private var selectedRecipeRow: RecipeListRowData? {
+    guard let recipeID = context.recipeID else { return nil }
+    return model.availableRecipeRows.first { $0.recipe.id == recipeID }
   }
 
   var body: some View {
@@ -345,25 +350,35 @@ struct MealPlanItemEditorView: View {
       switch kind {
       case .recipe:
         Section("Recipe") {
-          StackedTextField(title: "Find Recipes", text: $recipeSearchText)
-            .textInputAutocapitalization(.never)
-
-          if model.availableRecipeRows.isEmpty {
+          if context.locksRecipeSelection, let selectedRecipeRow {
+            MealPlanRecipeSelectionRow(
+              row: selectedRecipeRow,
+              isSelected: true,
+              allowsMultipleSelection: false
+            )
+          } else if context.locksRecipeSelection {
+            ContentUnavailableView("Recipe Not Found", systemImage: "fork.knife")
+          } else if model.availableRecipeRows.isEmpty {
             ContentUnavailableView("No Recipes", systemImage: "book.closed")
-          } else if filteredRecipeRows.isEmpty {
-            ContentUnavailableView.search(text: recipeSearchText)
           } else {
-            ForEach(filteredRecipeRows) { row in
-              Button {
-                recipeSelectionButtonTapped(row.recipe.id)
-              } label: {
-                MealPlanRecipeSelectionRow(
-                  row: row,
-                  isSelected: selectedRecipeIDs.contains(row.recipe.id),
-                  allowsMultipleSelection: allowsMultipleRecipeSelection
-                )
+            StackedTextField(title: "Find Recipes", text: $recipeSearchText)
+              .textInputAutocapitalization(.never)
+
+            if filteredRecipeRows.isEmpty {
+              ContentUnavailableView.search(text: recipeSearchText)
+            } else {
+              ForEach(filteredRecipeRows) { row in
+                Button {
+                  recipeSelectionButtonTapped(row.recipe.id)
+                } label: {
+                  MealPlanRecipeSelectionRow(
+                    row: row,
+                    isSelected: selectedRecipeIDs.contains(row.recipe.id),
+                    allowsMultipleSelection: allowsMultipleRecipeSelection
+                  )
+                }
+                .foregroundStyle(.primary)
               }
-              .foregroundStyle(.primary)
             }
           }
         }
@@ -406,7 +421,17 @@ struct MealPlanItemEditorView: View {
   private func saveButtonTapped() {
     switch kind {
     case .recipe:
-      if context.isEditing {
+      if context.locksRecipeSelection {
+        guard let recipeID = context.recipeID else { return }
+        if model.saveRecipeItemButtonTapped(
+          recipeID: recipeID,
+          date: scheduledDate,
+          mealSlot: mealSlot,
+          notes: notes
+        ) {
+          dismiss()
+        }
+      } else if context.isEditing {
         guard let selectedRecipeID = selectedRecipeIDs.first else { return }
         if model.saveRecipeItemButtonTapped(
           itemID: context.itemID,
@@ -758,7 +783,7 @@ private struct MealPlanSlotSection: View {
   }
 
   private func recipeAction(for row: MealPlanItemRowData) -> (() -> Void)? {
-    guard let recipeID = row.item.recipeID, let onRecipeSelected else { return nil }
+    guard let recipeID = row.recipe?.id, let onRecipeSelected else { return nil }
     return {
       onRecipeSelected(recipeID)
     }

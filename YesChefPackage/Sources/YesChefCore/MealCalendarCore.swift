@@ -70,7 +70,11 @@ public struct MealCalendarRequest: FetchKeyRequest {
   public init() {}
 
   public func fetch(_ db: Database) throws -> [MealPlanItemRowData] {
-    let recipesByID = Dictionary(uniqueKeysWithValues: try Recipe.fetchAll(db).map { ($0.id, $0) })
+    let recipesByID = Dictionary(
+      uniqueKeysWithValues: try Recipe.fetchAll(db)
+        .filter { !$0.archived }
+        .map { ($0.id, $0) }
+    )
     let sourcesByRecipeID = Dictionary(grouping: try RecipeSource.fetchAll(db), by: \.recipeID)
     let photoRows = try RecipePhoto
       .select {
@@ -97,9 +101,12 @@ public struct MealCalendarRequest: FetchKeyRequest {
       }
     }
 
-    let manualRows = try MealPlanItem.fetchAll(db)
-      .map { item in
+    let manualRows: [MealPlanItemRowData] = try MealPlanItem.fetchAll(db)
+      .compactMap { item -> MealPlanItemRowData? in
         let recipe = item.recipeID.flatMap { recipesByID[$0] }
+        if item.kind == .recipe && item.recipeID != nil && recipe == nil {
+          return nil
+        }
         return MealPlanItemRowData(
           item: item,
           recipe: recipe,
@@ -153,6 +160,9 @@ public struct MealCalendarRequest: FetchKeyRequest {
           dateModified: menuItem.dateModified
         )
         let recipe = menuItem.recipeID.flatMap { recipesByID[$0] }
+        if menuItem.kind == .recipe && menuItem.recipeID != nil && recipe == nil {
+          return nil
+        }
         return MealPlanItemRowData(
           item: item,
           recipe: recipe,
@@ -178,7 +188,7 @@ public enum MealCalendarRepository {
     now: Date,
     uuid: () -> UUID
   ) throws -> MealPlanItem.ID {
-    guard let recipe = try Recipe.find(recipeID).fetchOne(db) else {
+    guard let recipe = try Recipe.find(recipeID).fetchOne(db), !recipe.archived else {
       throw MealCalendarRepositoryError.recipeNotFound(recipeID)
     }
 
@@ -265,7 +275,7 @@ public enum MealCalendarRepository {
     guard var item = try MealPlanItem.find(itemID).fetchOne(db) else {
       throw MealCalendarRepositoryError.itemNotFound(itemID)
     }
-    guard let recipe = try Recipe.find(recipeID).fetchOne(db) else {
+    guard let recipe = try Recipe.find(recipeID).fetchOne(db), !recipe.archived else {
       throw MealCalendarRepositoryError.recipeNotFound(recipeID)
     }
 

@@ -1,18 +1,49 @@
 # Current Handoff
 
-Last updated: July 1, 2026 (**Reader Feedback Slice 1 (PR #55) architect-approved and merged** —
-confirmation-dialog-gated Cancel plus `interactiveDismissDisabled`/`isModalInPresentation` for the
-in-app capture sheet and share-extension review, keyed off a new `hasUnsavedReviewChanges`.
-Architect review caught a gap before sign-off: the dismiss-guard excluded `isCommitting`, so
-swipe-to-dismiss stayed unlocked during the in-flight save/CloudKit-sync-wait even though the
-toolbar Cancel button was independently disabled for that state. **The fix (commit `51cfed1`) was
-pushed directly to `main` as a follow-up** — it was committed locally but not pushed before PR #55's
-merge button was clicked, so the merged PR briefly shipped without it; confirmed fixed on `main` now,
-108 tests green. **Next up is Slice 2** — harvesting a real NYT "Most Helpful, fully loaded"
-comment-thread DOM fixture — but it's **not yet a Codex dispatch target**: it needs Jon to capture
-the post-interaction DOM and hand it to the architect for sanitization first, same pattern as every
-prior authenticated-site fixture. Two-device sync dogfooding stays parked — blocked on Apple shipping
-iOS Beta 3 and Jon's simulator-pass feedback still marinating — so it isn't gating the next dispatch.)
+Last updated: July 2, 2026 (**Dogfood batch 1 Slice 5 (PR #61) architect-approved — Next Up is now
+Slice 6 (share the grocery list as text).** Slice 5 kept the recipe-list search field reachable by
+pinning the native nav-bar search drawer (`.searchable(placement: .navigationBarDrawer(displayMode:
+.always))` on the shared `RecipeListView`) so it no longer scrolls away with the list. One-line,
+idiomatic view change — reuses the existing `.searchable` binding, no new state/scroll-tracking/custom
+control; applies to both the `.navigation` and `.selection` hosts and doesn't conflict with the top
+`safeAreaInset` status bar. Both iPad/iPhone sim builds + `check-drift.sh` (111 core tests) green;
+review found no blockers. Prior context: **Slice 4 (jon-platform PR #16)** added a trailing
+`xmark.circle.fill` clear button to the shared `WebExtractorKit` `WebBrowserView` address bar (shipped
+in the **jon-platform** repo, not yes-chef, since the browser chrome is a shared package). Prior
+context: **Slice 3 (PR #60)** made archive
+mean *gone*: archiving a recipe deletes
+its meal-plan and menu-dish placements in the same sync-safe write, guards the calendar/menu/detail
+resolution paths against archived references, renames the destructive action to **"Archive"**, and
+adds a **Settings ▸ Archived Recipes** view to restore (recipe only) or permanently purge
+(FK-cascading delete). It also folded in the two Slice 2 review items: the `presentationBinding`
+helpers are deduped into shared `gatedBinding` free functions, and the modal "OK" add-confirmations
+became a root-level `@Observable` **toast** (haptic + VoiceOver + Reduce-Motion). **Review found two
+blockers, both fixed on-branch:** (1) the toast was occluded by the full-screen recipe cover —
+resolved by also rendering the shared toast overlay inside `RecipeFullScreenCover`; (2) `xcodegen`
+had swept a bundle-ID flip (`com.jonphillips`→`com.jon`) + scheme churn into the pbxproj — resolved
+by realigning `project.yml` back to `com.jonphillips.yeschef` (preserving app identity + the
+`iCloud.com.jonphillips.yeschef` container) and adding a `check-drift.sh` guard. 111 core tests
+green. Prior context: **Slice 1
+(PR #58)** shipped the gated-presenter pattern so add sheets + all six full-screen-recipe toolbar
+affordances present in-context (`AppDestinationPresentation.swift`). Earlier context follows. **Reader Feedback Slice 4 (PR #57) architect-approved.** Slice 4 shipped the app's first LLM
+integration: a domain-free `ModelClient` boundary + minimal Claude Messages API wire client in
+`YesChefCore` (injectable `Transport`, no network in tests, 114 tests green) plus app-side Keychain
+storage for a personal Claude API key (synchronizable iCloud-Keychain generic-password item, entered
+in a new **Settings ▸ AI** pane) and `modelClient` wired to read the key at call time. **Architect
+review changed the default model from `claude-fable-5` to `claude-opus-4-8`** (commit `8b3b817`,
+pushed to the PR branch): Fable 5 returns 400 under zero-data-retention orgs, costs 2×, and runs
+bio/cyber refusal classifiers — none of which fit a personal-key recipe app; Opus 4.8 is the standard
+default and per-request override via `ModelRequest.model` is unchanged. One **non-blocking** follow-up
+deferred to Slice 5: `ClaudeAPIClient.complete` branches only on HTTP status, so a 200 response with
+`stop_reason: "refusal"` (or `max_tokens`) yields silent empty text — guard or document when the
+extractor consumes it. PR #57 is approved and ready to merge; **this handoff promotes the pre-agreed
+Dogfood batch 1 into Next Up per Jon's 2026-07-02 instruction** (bugs, Slices 1–3, first; one slice at
+a time). Prior context: **Reader Feedback Slice 3 (PR #56)** shipped the host-keyed "Load Comments"
+NYT playbook + fixture-tested `RecipeReaderCommentExtractor` (`[RawComment { text, helpfulCount }]`),
+which stays dormant until **Slice 5** wires triage into review — where the three Slice-3 nits (weak
+anonymization test, `helpfulCount` `"6.3K"` digit-filter assumption, and now the refusal/stop-reason
+guard) also land. Two-device sync dogfooding stays parked — blocked on Apple shipping iOS Beta 3 and
+Jon's simulator-pass feedback still marinating — so it isn't gating the next dispatch.)
 
 Use this as the short entry point when starting a fresh Yes Chef conversation.
 `docs/AGENTS.md` remains the authoritative project/agent guide.
@@ -24,16 +55,56 @@ Use this as the short entry point when starting a fresh Yes Chef conversation.
 missing, or ambiguous, the agent must **STOP and ask Jon — never infer the next
 task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-- **Reader Feedback Slice 2 — harvest the real NYT comment-thread fixture.**
-  `docs/efforts/reader-feedback-comment-ingestion.md` §Slice 2. **Blocked, not a Codex
-  dispatch target yet:** needs Jon to sort an authenticated NYT Cooking recipe to Most
-  Helpful, click Load More a few times, and pull the live DOM off-device (Web Inspector →
-  Copy Element on `<html>`, not View Source — the comments are JS-loaded, so the
-  server-rendered source won't have them). Architect sanitizes (scrub cookies/tokens/account
-  markup/commenter PII) into
-  `Tests/YesChefCoreTests/Fixtures/WebRecipeCapture/SanitizedSites/nyt-comments.html`. Once
-  that fixture lands, **Slice 3** (named "Load Comments" browser playbook + host-keyed
-  comment extractor) becomes the real Next Up for Codex.
+- **Dogfood fixes — batch 1, Slice 6 — Share the grocery list as text.**
+  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) §Slice 6. **The Codex
+  dispatch target.** Add a Share action to a grocery list that produces a plain-text rendering
+  (respecting current order/grouping) into the system share sheet. Small, self-contained, no new
+  architecture. **Done when:** the grocery list can be shared as readable text to Messages/Notes/etc.
+  *(When Phase E store-section grouping lands, the text export should reflect the sections — note the
+  dependency, don't block on it.)*
+
+  **Remaining batch-1 order after this:** UX Slices 7–9 (edit a grocery item, ×2/×3 recipe
+  multiplier, add image to a manual recipe). Draw one slice into Next Up at a time.
+
+- **Just landed — Slice 5 (PR #61), architect-approved (2026-07-02).** Pinned the recipe-list search
+  drawer via `.searchable(placement: .navigationBarDrawer(displayMode: .always))` on the shared
+  `RecipeListView` so search no longer scrolls away with the list. One-line, idiomatic view change —
+  reuses the existing `.searchable` binding, no new state/scroll-tracking/custom control; applies to
+  both `.navigation` and `.selection` hosts and doesn't conflict with the top `safeAreaInset` status
+  bar. Both iPad/iPhone sim builds + `check-drift.sh` (111 core tests) green; review found no blockers.
+
+- **Just landed — Slice 4 (jon-platform PR #16), architect-approved (2026-07-02).** Trailing
+  `xmark.circle.fill` clear button on the shared `WebExtractorKit` `WebBrowserView` address bar
+  (`packages/WebExtractorKit/Sources/WebExtractorKit/WebBrowserView.swift`). Shipped in **jon-platform**
+  (shared browser chrome), not this repo. Visibility: `!addressText.isEmpty` while editing, `page.url
+  != nil` when not; `clearAddress()` empties the field and focuses it, and the predicate then flips so
+  the button hides itself right after clearing. Review found no blockers — clean, minimal view chrome.
+  No new test (pure view logic; rides the manual sim verification). Non-blocking note: when a page is
+  loaded the X is a persistent "start a new navigation" affordance, not an edit-clear — matches the
+  dogfood ask.
+
+- **Just landed — Slice 3 (PR #60), architect-approved (2026-07-02).** Archive-means-gone cascade +
+  resolution guards + **Settings ▸ Archived Recipes** (restore / permanent-delete) + root-level
+  toast, with the two Slice 2 follow-ups (deduped `gatedBinding`, modal→toast). Two review blockers
+  fixed on-branch: toast occlusion over the full-screen recipe cover (now also rendered inside
+  `RecipeFullScreenCover`), and an unrelated `xcodegen` bundle-ID/scheme sweep (reverted; `project.yml`
+  realigned to `com.jonphillips.yeschef`; `check-drift.sh` now guards the bundle IDs). **Non-blocking
+  watch item:** two `.sensoryFeedback` modifiers now observe the same toast trigger, so adds from a
+  full-screen recipe may double-buzz — eyeball during dogfooding and gate one if it's noticeable.
+
+- **Just landed — Slice 2 (PR #59), architect-approved (2026-07-02).** The meal editor locks to the
+  viewed recipe when launched from recipe detail (`MealPlanItemDraftContext.locksRecipeSelection`),
+  and add-to-meal / add-to-grocery fire in-context confirmations via the Slice 1 gated presenters.
+  Correct and consistent with Slice 1; review found no blockers. One UI-pass watch item: the
+  confirmation is a sheet→alert handoff on the same host (the app already proves this works via the
+  capture-summary alert), and Slice 3 retires it entirely by moving to a root-level toast.
+
+- **Slice 1 (PR #58), architect-approved and merged (2026-07-02).** Add sheets + all six
+  full-screen-recipe toolbar affordances (Add-to-Grocery, Add-to-Plan, Edit, Start Cooking, View
+  Original, Delete) present in-context via the shared gated-presenter pattern in
+  `AppDestinationPresentation.swift` (root presenters gated on `presentedRecipeID == nil`,
+  re-attached ungated inside `RecipeFullScreenCover`). Also updated the active-simulator target to
+  `iPad Pro 13-inch (M5) (16GB)`.
 
   **Still parked (not dispatched):**
   - **Dogfood the core loop on two devices** — capture ~15–20 real recipes via the extension, cook
@@ -46,6 +117,41 @@ task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
     pantry thresholds, dialog-free); spec = [[grocery-pantry-threshold-design]] (Phase E). Lower
     priority than Reader Feedback per Jon's stated intent (2026-07-01).
   - Full context in the `post-sync-next-tracks` memory.
+
+Reader Feedback Slice 4 — Claude API client + Keychain key storage — **ARCHITECT-APPROVED, PENDING
+MERGE** (PR #57, `codex/reader-feedback-claude-client-keychain`; approved 2026-07-02). Domain-free
+`ModelClient` + `ClaudeAPIClient` in `YesChefCore` (Claude Messages API request/response shaping,
+injectable `Transport`, four tests that never hit the wire), app-side `ClaudeAPIKeyStorage`
+(synchronizable iCloud-Keychain generic-password item, `kSecAttrAccessibleAfterFirstUnlock`, never
+logged), a **Settings ▸ AI** pane with save/clear, and `modelClient` wired to read the Keychain key at
+call time. Architect found one blocker and fixed it in-branch: default model was `claude-fable-5` →
+`claude-opus-4-8` (commit `8b3b817`; Fable's ZDR 400s / 2× cost / bio+cyber refusal classifiers don't
+fit a personal-key app, and the standard default is Opus 4.8). Non-blocking, deferred to Slice 5:
+`complete` returns silent empty text on a 200 `refusal`/`max_tokens` stop reason — guard or document
+when the extractor consumes the response. Keychain iCloud sync is intentional (multi-device
+dogfooding). **Mark DONE once PR #57 merges** — the model-default fix is pushed to the PR branch but
+not yet an ancestor of `main`.
+
+Reader Feedback Slice 3 — NYT comment capture playbook + host-keyed extractor — **DONE** (PR #56,
+`codex/reader-feedback-comment-playbook`; architect-approved 2026-07-02): host-keyed **"Load
+Comments"** action in `BrowserWorkspaceView` (separate from Capture) driving a bounded NYT playbook
+(`BrowserCommentLoadingPlaybook` in `RecipeModels.swift` — clicks Most Helpful, then "Show more
+comments" ≤4×, keyed on `cooking.nytimes.com`), plus a pure, fixture-tested
+`RecipeReaderCommentExtractor` (`YesChefCore`, SwiftSoup, no WebKit) producing
+`[RawComment { text, helpfulCount }]`. Architect verified the fixture math (76 cards/bodies/count
+spans 1:1, full-integer counts matching the test, distinct-class reply not double-counted) and that
+anonymization is structural (reads only `note_noteBody__ > p`, never the owner span). Keys on stable
+structure, not hash suffixes. Extractor is intentionally dormant (test-only) until Slice 5 wires it
+into review. **Non-blocking follow-ups deferred to Slice 5:** (a) strengthen the anonymization test
+(`contains` a placeholder substring, not whole-text `==`); (b) comment the `helpfulCount` digit-filter
+assumption that counts render as full integers, not abbreviated `"6.3K"`.
+
+Reader Feedback Slice 2 — harvest the real NYT comment-thread fixture — **DONE** (architect
+sanitization step, not a PR/Codex slice; 2026-07-01): Jon captured the authenticated "Most Helpful,
+fully loaded" DOM for Lemony White Bean Soup off-device; the architect sanitized it into
+`Tests/YesChefCoreTests/Fixtures/WebRecipeCapture/SanitizedSites/nyt-comments.html` (recipe JSON-LD
++ verbatim `<section id="notes_section">`, 76 cards, synthetic commenter names, JSON-LD `review` PII
+array dropped, no auth material present). Real Slice 3 selectors are captured in Next Up above.
 
 Reader Feedback Slice 1 — review-sheet dismiss-fragility hardening — **DONE** (PR #55,
 `codex/reader-feedback-review-dismiss-hardening`; architect-approved and merged 2026-07-01):
@@ -204,7 +310,14 @@ M3 authenticated browser capture — **DONE** (PR #44 merged, `2f5b588`):
 
 Drawn into **Next Up** one at a time; this is not a dispatch target.
 
-_(empty — the `expectedContentLength` guard was drawn into the cleanup slice in Next Up above.)_
+- **Dogfood fixes — batch 1 (bugs + near-term UX)** — **PROMOTED 2026-07-02** (Reader Feedback
+  Slice 4 approved, PR #57). [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md).
+  Jon's first dogfooding pass (2026-07-02): 3 verified bugs (add-sheet-doesn't-present-over-full-screen-recipe,
+  add-to-meal has no confirmation / wrong target, archived recipes invisible with no restore/purge)
+  + 6 small self-contained UX wins (browser clear-URL, recipe-list search reachability, share
+  grocery as text, edit a grocery item, direct ×2/×3 recipe multiplier, add image to a manual
+  recipe). **Slice 1 is now the dispatch target in § Next Up above**; draw the remaining slices
+  (2–3 bugs, then UX 4–9) into Next Up one at a time as each lands, bugs first.
 
 Comment ingestion stays in `docs/open-questions.md` until it is a scoped effort.
 
@@ -320,10 +433,10 @@ Deferred from this slice:
 Before checkpointing UI work:
 
 - Run `xcodegen generate` after adding Swift source files.
-- Build `YesChef` for `iPad Air 13-inch (M4)`.
+- Build `YesChef` for `iPad Pro 13-inch (M5) (16GB)`.
 - Run `scripts/check-drift.sh`.
 - Install and launch on both active iOS 27 simulators:
-  - `iPad Air 13-inch (M4)`
+  - `iPad Pro 13-inch (M5) (16GB)`
   - `iPhone 17 Pro`
 
 Jon performs the primary UI testing pass.

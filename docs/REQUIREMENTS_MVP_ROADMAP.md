@@ -802,6 +802,15 @@ The app should eventually distinguish:
 - Scaled version.
 - Notes from each time cooked.
 
+### Companion Surfaces (Apple Watch)
+
+Requested by Jon in the first dogfooding pass (2026-07-02): an **Apple Watch app for the
+grocery list** — glanceable, check-off-while-shopping. Natural once the grocery list is
+trustworthy (post Phase E consolidation/pantry and store-section grouping) and sync is solid
+(done). A read/check-off Watch surface over the synced grocery list; not a full editor.
+Platform-companion work, deferred — distinct from the "Android / Web app" out-of-scope line in
+§10 (those are non-Apple platforms; a Watch app is a first-party companion surface).
+
 ## 10. Out of Scope for Early Development
 
 Do not implement early unless explicitly requested:

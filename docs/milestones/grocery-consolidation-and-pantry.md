@@ -126,8 +126,25 @@ Invariants at merge:
 | **On-device model normalization at ingest** | the photo/LLM capture milestone (§7.4, M2 "Out of scope") | This milestone makes the *parser* populate the canonical key deterministically; the model swaps in behind the same column later, no engine change |
 | **Depletion / on-hand quantity / inventory** | nowhere (explicit non-goal, §14) | Crosses the settled boundary; would need its own ADR and a different product stance |
 | **Full unit normalization for display/scaling** (perfect conversions everywhere) | Phase E scaling work | The compare layer here is bounded to "is the total over the threshold" + same-unit merge; it need not render perfect quantities |
-| **Aisle/store-section inference** | later grocery polish | Independent concern; canonical key is the prerequisite, not this milestone's job |
+| **Aisle/store-section inference + user-defined aisles** | later grocery polish (see note below) | Independent concern; canonical key is the prerequisite, not this milestone's job |
 | **Per-recipe (vs per-shop) threshold mode** | revisit only if Jon wants it | Decided: threshold is evaluated on the **consolidated shop total** — that's the "do I have enough" question |
+
+## Dogfood validation + the "later grocery polish" that follows (2026-07-02)
+
+Jon's first dogfooding pass **confirmed the core premise of this milestone**: *"Salt to taste"
+does not get picked up* — exactly the exact-string-match brittleness the canonical key retires.
+That's this milestone as specced; no scope change.
+
+Two related asks from the same pass are the concrete content of the **"later grocery polish"**
+row above — a **follow-on** to this milestone (canonical key is their prerequisite), not part of it:
+
+- **Group the grocery list by store section / aisle.**
+- **User-defined "Aisles" available as a dropdown** when editing an item.
+
+Sequence them after this milestone lands (they need the one canonical key + a place to hang an
+aisle on the canonical ingredient). Track here so they aren't lost; author a build order when
+they come up. The grocery-list **text share** (dogfood batch 1) should reflect these sections
+once they exist.
 
 ## Architecture & module layout
 

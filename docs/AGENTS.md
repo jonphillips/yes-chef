@@ -156,7 +156,7 @@ These are now project rules, not preferences:
    brittle simulator-driving or screenshot automation unless explicitly asked.
    Jon will do the primary UI testing pass, even when that makes the loop slower.
 9. After app UI changes, install the fresh build on both iOS 27 simulators Jon
-   is actively testing: `iPad Air 13-inch (M4)` and `iPhone 17 Pro`.
+   is actively testing: `iPad Pro 13-inch (M5) (16GB)` and `iPhone 17 Pro`.
 
 ## Data Preservation Rules
 

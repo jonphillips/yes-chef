@@ -46,6 +46,11 @@ final class GroceryLibraryModel {
   var selectedListID: CoreGroceryList.ID?
   var errorMessage: String?
   var isShowingError = false
+  var toastCenter: AppToastCenter?
+
+  init(toastCenter: AppToastCenter? = nil) {
+    self.toastCenter = toastCenter
+  }
 
   var selectedListRow: GroceryListRowData? {
     if let selectedListID,
@@ -507,7 +512,14 @@ final class GroceryLibraryModel {
         return listID
       }
       self.selectedListID = listID
-      destination = nil
+      toastCenter?.postSuccess(
+        GroceryAddConfirmation(
+          sourceTitle: context.title,
+          sourceSubtitle: context.subtitle,
+          listTitle: title(forList: listID),
+          ingredientCount: selectedIngredientLineIDs.count
+        ).message
+      )
       return true
     } catch {
       errorMessage = String(describing: error)
@@ -619,6 +631,36 @@ struct GroceryIngredientSelectionContext: Hashable, Sendable {
   var source: Source
   var title: String
   var subtitle: String?
+}
+
+struct GroceryAddConfirmation: Identifiable, Hashable, Sendable {
+  var sourceTitle: String
+  var sourceSubtitle: String?
+  var listTitle: String
+  var ingredientCount: Int?
+
+  var id: String {
+    [
+      sourceSubtitle,
+      sourceTitle,
+      listTitle,
+      ingredientCount.map { String($0) }
+    ]
+      .compactMap(\.self)
+      .joined(separator: "|")
+  }
+
+  var message: String {
+    if let ingredientCount {
+      return "Added \(ingredientCount.formatted()) \(ingredientNoun(for: ingredientCount)) from \"\(sourceTitle)\" to \"\(listTitle)\"."
+    } else {
+      return "Added \"\(sourceTitle)\" to \"\(listTitle)\"."
+    }
+  }
+
+  private func ingredientNoun(for count: Int) -> String {
+    count == 1 ? "ingredient" : "ingredients"
+  }
 }
 
 private func selectedOrDefaultGroceryListID(
