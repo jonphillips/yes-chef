@@ -17,26 +17,28 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 PR); do all listed, in order.
 
 - **Dogfood fixes — batch 1, Slice 7 — Edit a grocery item (name + amount).**
-  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) §Slice 7. Grocery rows
-  can't be edited today. Add an edit affordance for a grocery item's **name** and
-  **amount/quantity**, kept compatible with the source-provenance model — a manual edit to a
-  *generated* row must not silently corrupt its `GroceryItemSource` breakdown. Decide and test the
-  interaction (e.g. an edited row detaches to a custom/edited state, or the edit is preserved
-  distinctly) and **flag the provenance interaction in the PR.** **Done when:** name and amount are
-  editable and the change persists without breaking the source breakdown.
+  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) §Slices 8–9. Two
+  independent, self-contained UX wins — do both, in order, in this one dispatch/PR:
+  - **Slice 8 — Scale a recipe by a multiplier.** Add a direct ×2/×3 (and/or free) multiplier that
+    scales ingredient quantities and **displays the resulting servings count** after scaling. Add it
+    as a parallel control — do **not** remove servings-based scaling. **Done when:** Jon can
+    double/triple a recipe directly and see the resulting servings.
+  - **Slice 9 — Add an image to a manually-entered recipe.** Add a photo picker to the manual recipe
+    editor, reusing the existing image storage/processing path (ADR-0005; hero images already sync as
+    CKAssets — no schema change). **Done when:** a manually-created recipe can have a hero image added,
+    and it displays and syncs like a captured one.
 
-  **Remaining batch-1 order after this:** UX Slices 8–9 (×2/×3 recipe multiplier, add image to a
-  manual recipe). These are independent one-file view tweaks — **candidates to batch into a single
-  dispatch/PR** (see `docs/AGENTS.md` § Work Intake & Dispatch on batching cohesive slices).
+  **After this:** batch 1 is complete. The Slice 7 delete-source-clobbers-amount-edit follow-up is
+  parked in the effort doc for a later grocery slice — **not** part of this dispatch.
 
 ## Ready Efforts (queue)
 
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target.
 
-- **Dogfood fixes — batch 1 (bugs + near-term UX)** — in progress.
-  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md). Slices 1–6 done (see
-  [DONE-LOG](DONE-LOG.md)); Slice 7 is Next Up; Slices 8–9 remain.
+- **Dogfood fixes — batch 1 (bugs + near-term UX)** — closing out.
+  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md). Slices 1–7 done (see
+  [DONE-LOG](DONE-LOG.md) / effort doc); Slices 8–9 are Next Up (last of the batch).
 
 - **Recipe → grocery list w/ pantry checking** (Phase E) — make it slick early (canonical-key merge,
   static pantry thresholds, dialog-free); spec = [[grocery-pantry-threshold-design]]. Lower priority

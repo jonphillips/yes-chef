@@ -233,6 +233,27 @@ interaction: e.g. an edited row detaches to a custom/edited state, or the edit i
 distinctly). **Flag the provenance interaction in the PR.** **Done when:** name and amount are
 editable and the change persists without breaking the source breakdown.
 
+**DONE — architect-approved (PR #65, 2026-07-02).** Edit affordance on grocery rows (item-actions
+menu + trailing swipe), reusing `GroceryItemEditorView` via an `itemID:` init and a new
+`GroceryRepository.updateItem`. Editing display fields clears the cached numeric `GroceryItem.quantity`,
+so the addRecipe **consolidation** path (`canCombineQuantity` needs both sides non-nil) won't silently
+add onto a manually-overridden total; `GroceryItemSource` rows are left untouched. Meets Done-when.
+
+**Follow-up (architect flag, 2026-07-02) — delete-source clobbers a manual amount edit.** The
+provenance handling covers the generation/consolidation path but not the **source-removal** path.
+After a manual amount edit (`quantity = nil`, `quantityText = "…"`), removing a contribution via
+**Remove source / Remove contribution** routes through `deleteGroceryItemSources`
+([`GroceryCore.swift:817`](../../YesChefPackage/Sources/YesChefCore/GroceryCore.swift)), which
+recomputes from the ingredient lines (`generatedQuantity(for:)`, ignoring the cleared
+`item.quantity`) and **overwrites** `item.quantity`/`item.quantityText` — silently discarding the
+manual amount (the edited title survives; nothing is corrupted, the source breakdown stays intact).
+Narrow case ("edit amount, then remove one of several contributions"); shipped as-is. Fold a fix into
+a later grocery slice: either guard the recompute so it won't clobber a manually-overridden amount, or
+accept-and-document the revert. Also minor: `GroceryRepository.updateItem` makes
+`quantityText/unit/aisle/notes` optional-with-default-`nil` while `title` is required — the sole
+caller passes all fields, but a future `updateItem(itemID:title:…)` call would silently wipe the rest;
+consider making them non-optional to match the full-replace semantics.
+
 ### Slice 8 — Scale a recipe by a multiplier (double/triple), show resulting servings
 
 Today scaling is driven through the servings concept. Add a direct multiplier (×2, ×3, …, and/or
