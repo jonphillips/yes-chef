@@ -41,11 +41,22 @@ task.** See `docs/AGENTS.md` § Work Intake & Dispatch.
   cover dismisses — the tap "does nothing" until you back out.
   1. Present the grocery/add sheet from within (or above) the full-screen recipe presentation so it
      appears in-context.
-  2. Audit every add/shop/plan affordance reachable from the full-screen recipe for the same trap
-     (the `plan` and `groceries` toolbar actions on recipe detail likely share it).
+  2. Audit every affordance reachable from the full-screen recipe for the same trap.
 
-  **Done when:** tapping Add-to-Grocery from a full-screen recipe — from the calendar *and* from the
-  library — opens the selection sheet immediately, over the recipe. **Remaining batch-1 order after
+  **In review — PR #58, extension required (architect, 2026-07-02).** The first pass (`5772ed8`)
+  fixed Add-to-Grocery + Add-to-Plan with a correct gated-presenter pattern
+  (`AppDestinationPresentation.swift`), but left **four** more `RecipeDetailView` toolbar actions
+  trapped — Edit, Start Cooking, View Original, Delete all set `recipeModel.destination`, whose
+  presenters live only on the root and stay queued under the cover. Since recipes open full-screen
+  from the Meal Calendar and Menus, these are live dead buttons. **Extend the same PR #58 branch**
+  per the checklist in [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md)
+  §Slice 1 → *Extend the slice*: add a `recipeDetailDestinations` modifier for
+  `editRecipe`/`cookingMode`/`originalSnapshot`/`deleteRecipe`, attach it to `RecipeFullScreenCover`,
+  and gate the root copies on `presentedRecipeID == nil`.
+
+  **Done when:** every toolbar affordance on a full-screen recipe — Add-to-Grocery, Add-to-Plan,
+  Edit, Start Cooking, View Original, Delete — presents immediately, in-context, from the Meal
+  Calendar, a Menu, *and* the library. **Remaining batch-1 order after
   this:** Slice 2 (add-to-meal/grocery targets the viewed recipe, with confirmation), Slice 3
   (archived recipes get restore/purge), then UX Slices 4–9 (browser clear-URL, list search
   reachability, share grocery as text, edit a grocery item, ×2/×3 recipe multiplier, add image to a

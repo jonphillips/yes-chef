@@ -38,10 +38,38 @@ queues a sheet requested from a view already covered by a `fullScreenCover` unti
 dismisses — so the tap "does nothing" until you back out.
 
 **Fix direction:** present the grocery/add sheet from within (or above) the full-screen recipe
-presentation, so it appears in-context. Audit every add/shop/plan affordance reachable from the
-full-screen recipe for the same trap (the `plan` and `groceries` toolbar actions on recipe
-detail likely share it). **Done when:** tapping Add-to-Grocery from a full-screen recipe (from
-the calendar *and* from the library) opens the selection sheet immediately, over the recipe.
+presentation, so it appears in-context. Audit every affordance reachable from the full-screen
+recipe for the same trap.
+
+**Implementation status (PR #58, in review):** the first pass (commit `5772ed8`) extracted the
+meal-editor and grocery presenters into `YesChefApp/AppDestinationPresentation.swift`, attached
+them to `RecipeFullScreenCover`, and gated the root copies on `presentedRecipeID == nil`. The
+gating pattern is correct (exactly one presenter live per destination — no double-present
+window). But it only covered 2 of the ~6 toolbar affordances on
+[`RecipeDetailView.swift`](../../YesChefApp/RecipeDetailView.swift).
+
+**Extend the slice (architect, 2026-07-02):** four more `RecipeDetailView` toolbar actions set
+**`recipeModel.destination`**, whose presenters live *only* on the root `AppContainer` and are
+still trapped under the cover. Recipes open full-screen whenever tapped from the **Meal Calendar**
+or a **Menu** (`onRecipeSelected` → `presentedRecipeID`), so these are live dead buttons there:
+
+  | Affordance | Trigger (`RecipeDetailView.swift`) | Root-only presenter (`RecipeLibraryView.swift`) |
+  |---|---|---|
+  | Edit | `libraryModel.editButtonTapped` (:68) | `.editRecipe` sheet (:92) |
+  | Start Cooking | `libraryModel.cookButtonTapped` (:172) | `.cookingMode` sheet (:97) |
+  | View Original | `libraryModel.originalSnapshotButtonTapped` (:140) | `.originalSnapshot` sheet (:102) |
+  | Delete | `libraryModel.deleteButtonTapped` (:74) | `.deleteRecipe` confirmationDialog (:107) |
+
+  Apply the same pattern already used in this PR: add a `recipeDetailDestinations`-style modifier
+  (covering `editRecipe`, `cookingMode`, `originalSnapshot`, `deleteRecipe`) in
+  `AppDestinationPresentation.swift`, attach it to `RecipeFullScreenCover`, and gate the root
+  copies on `presentedRecipeID == nil`. The `RecipeDetailModel` scaling sheet
+  (`RecipeDetailView.swift:194`) is already inside the cover — leave it. Push to the same PR #58
+  branch.
+
+**Done when:** every toolbar affordance on a recipe opened full-screen — Add-to-Grocery,
+Add-to-Plan, Edit, Start Cooking, View Original, Delete — presents immediately, in-context over
+the recipe, from the Meal Calendar, a Menu, *and* the library.
 
 ### Slice 2 — Add-to-Meal / Add-to-Grocery act on the viewed recipe, with confirmation
 
