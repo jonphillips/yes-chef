@@ -15,6 +15,7 @@ final class GroceryLibraryModel {
     case addCustomItem
     case addList
     case addPantryItem
+    case addConfirmation(GroceryAddConfirmation)
     case clearAll(CoreGroceryList.ID)
     case clearPurchased(CoreGroceryList.ID)
     case deleteList(CoreGroceryList.ID)
@@ -507,7 +508,14 @@ final class GroceryLibraryModel {
         return listID
       }
       self.selectedListID = listID
-      destination = nil
+      destination = .addConfirmation(
+        GroceryAddConfirmation(
+          sourceTitle: context.title,
+          sourceSubtitle: context.subtitle,
+          listTitle: title(forList: listID),
+          ingredientCount: selectedIngredientLineIDs.count
+        )
+      )
       return true
     } catch {
       errorMessage = String(describing: error)
@@ -619,6 +627,36 @@ struct GroceryIngredientSelectionContext: Hashable, Sendable {
   var source: Source
   var title: String
   var subtitle: String?
+}
+
+struct GroceryAddConfirmation: Identifiable, Hashable, Sendable {
+  var sourceTitle: String
+  var sourceSubtitle: String?
+  var listTitle: String
+  var ingredientCount: Int?
+
+  var id: String {
+    [
+      sourceSubtitle,
+      sourceTitle,
+      listTitle,
+      ingredientCount.map { String($0) }
+    ]
+      .compactMap(\.self)
+      .joined(separator: "|")
+  }
+
+  var message: String {
+    if let ingredientCount {
+      return "Added \(ingredientCount.formatted()) \(ingredientNoun(for: ingredientCount)) from \"\(sourceTitle)\" to \"\(listTitle)\"."
+    } else {
+      return "Added \"\(sourceTitle)\" to \"\(listTitle)\"."
+    }
+  }
+
+  private func ingredientNoun(for count: Int) -> String {
+    count == 1 ? "ingredient" : "ingredients"
+  }
 }
 
 private func selectedOrDefaultGroceryListID(

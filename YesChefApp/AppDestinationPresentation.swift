@@ -16,6 +16,14 @@ private struct MealCalendarItemEditorDestinationModifier: ViewModifier {
           MealPlanItemEditorView(model: mealCalendarModel, context: context)
         }
       }
+      .alert(
+        "Added to Meal Calendar",
+        item: presentationBinding($mealCalendarModel.destination.addRecipeConfirmation)
+      ) { _ in
+        Button("OK") {}
+      } message: { confirmation in
+        Text(confirmation.message)
+      }
   }
 
   private func presentationBinding<Value>(_ binding: Binding<Value?>) -> Binding<Value?> {
@@ -74,6 +82,14 @@ private struct GroceryDestinationsModifier: ViewModifier {
             pantryStaples: groceryModel.pantryStapleNames
           )
         }
+      }
+      .alert(
+        "Added to Grocery List",
+        item: presentationBinding($groceryModel.destination.addConfirmation)
+      ) { _ in
+        Button("OK") {}
+      } message: { confirmation in
+        Text(confirmation.message)
       }
       .confirmationDialog(
         "Clear Purchased?",

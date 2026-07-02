@@ -11,6 +11,7 @@ import YesChefCore
 final class MealCalendarModel {
   @CasePathable
   enum Destination {
+    case addRecipeConfirmation(MealPlanRecipeAddConfirmation)
     case itemEditor(MealPlanItemDraftContext)
     case deleteItem(MealPlanItem.ID)
   }
@@ -213,7 +214,17 @@ final class MealCalendarModel {
       }
       applyOptimisticRows(result.1, updatedItemIDs: [result.0])
       selectedDate = scheduledDate
-      destination = nil
+      if itemID == nil {
+        destination = .addRecipeConfirmation(
+          MealPlanRecipeAddConfirmation(
+            recipeTitle: title(forRecipe: recipeID),
+            date: scheduledDate,
+            mealSlot: mealSlot
+          )
+        )
+      } else {
+        destination = nil
+      }
       return true
     } catch {
       errorMessage = String(describing: error)
@@ -329,6 +340,10 @@ final class MealCalendarModel {
 
   func title(for itemID: MealPlanItem.ID) -> String {
     itemRows.first { $0.item.id == itemID }?.displayTitle ?? "this item"
+  }
+
+  func title(forRecipe recipeID: Recipe.ID) -> String {
+    recipeRows.first { $0.recipe.id == recipeID }?.recipe.title ?? "this recipe"
   }
 
   func rows(on date: Date) -> [MealPlanItemRowData] {
@@ -470,6 +485,24 @@ struct MealPlanItemDraftContext: Hashable, Sendable {
 
   var isEditing: Bool {
     itemID != nil
+  }
+
+  var locksRecipeSelection: Bool {
+    !isEditing && recipeID != nil
+  }
+}
+
+struct MealPlanRecipeAddConfirmation: Identifiable, Hashable, Sendable {
+  var recipeTitle: String
+  var date: Date
+  var mealSlot: MealPlanItemSlot
+
+  var id: String {
+    "\(recipeTitle)|\(date.timeIntervalSinceReferenceDate)|\(mealSlot.rawValue)"
+  }
+
+  var message: String {
+    "Added \"\(recipeTitle)\" to \(mealSlot.title) on \(date.formatted(.dateTime.month(.wide).day().year()))."
   }
 }
 
