@@ -26,6 +26,9 @@ struct BrowserWorkspaceView: View {
         BrowserCaptureAccessory(
           page: page,
           isCapturing: model.isCapturing,
+          isLoadingComments: model.isLoadingComments,
+          supportsCommentLoading: BrowserCommentLoadingPlaybook.playbook(for: page.url) != nil,
+          onLoadComments: { await model.loadCommentsButtonTapped(page: page) },
           onCapture: onCapture
         )
       },
@@ -52,19 +55,45 @@ struct BrowserWorkspaceView: View {
 private struct BrowserCaptureAccessory: View {
   let page: WebPage
   let isCapturing: Bool
+  let isLoadingComments: Bool
+  let supportsCommentLoading: Bool
+  let onLoadComments: () async -> Void
   let onCapture: (WebPage) async -> Void
 
   var body: some View {
-    Button {
-      Task { await captureButtonTapped() }
-    } label: {
-      if isCapturing {
-        ProgressView()
-      } else {
-        Label("Capture", systemImage: "plus.circle")
+    HStack(spacing: 16) {
+      if supportsCommentLoading {
+        Button {
+          Task { await loadCommentsButtonTapped() }
+        } label: {
+          if isLoadingComments {
+            ProgressView()
+          } else {
+            Label("Load Comments", systemImage: "text.bubble")
+          }
+        }
+        .disabled(isBusy || page.url == nil || page.isLoading)
       }
+
+      Button {
+        Task { await captureButtonTapped() }
+      } label: {
+        if isCapturing {
+          ProgressView()
+        } else {
+          Label("Capture", systemImage: "plus.circle")
+        }
+      }
+      .disabled(isBusy || page.url == nil || page.isLoading)
     }
-    .disabled(isCapturing || page.url == nil || page.isLoading)
+  }
+
+  private var isBusy: Bool {
+    isCapturing || isLoadingComments
+  }
+
+  private func loadCommentsButtonTapped() async {
+    await onLoadComments()
   }
 
   private func captureButtonTapped() async {
