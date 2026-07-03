@@ -24,9 +24,9 @@ extension PantryRepository {
     matching title: String,
     in db: Database
   ) throws -> PantryItem? {
-    let key = title.groceryConsolidationKey
+    let key = CanonicalIngredient.canonicalName(title)
     let items = try PantryItem.fetchAll(db)
-      .filter { $0.title.groceryConsolidationKey == key }
+      .filter { CanonicalIngredient.canonicalName($0.title) == key }
       .sorted(by: arePantryItemsInCanonicalOrder)
     guard var canonicalItem = items.first else { return nil }
 
