@@ -10,6 +10,32 @@ Newest first.
 
 ---
 
+## Cooking workspace — Slice A (the split + dense reader)
+
+**Architect-approved 2026-07-03** — yes-chef [PR #73](https://github.com/jonphillips/yes-chef/pull/73).
+First of two slices; implements [ADR-0011](decisions/ADR-0011-actionable-chat-make-ahead.md). Re-presents
+`RecipeDetailView` from a photo-forward reader + chat `.sheet` into a **detented draggable split**.
+
+- **Split host, context-general.** New `RecipeChatWorkspace.swift`: a `ChatWorkspaceSplit` that takes a
+  `RecipeChatContext` + a `(RecipeChatModel) -> [AnyChatApplyAction]` catalog closure (not welded to
+  `RecipeDetailView`), a visible grabber that snaps to three detents (reader-only / balanced / chat-dive)
+  with per-device `@AppStorage` persistence and a VoiceOver adjustable cycler. `RecipeChatModel` re-hosted
+  from the sheet into the inspector pane; chat behavior unchanged. iPad-only split; iPhone keeps the sheet.
+- **Width-responsive reader.** `RecipeReaderView` renders off its own width, not device class: dense
+  two-column (ingredients | directions) ≥ 640pt, segmented ingredients/directions toggle below — so the
+  chat-dive detent reuses the narrow layout instead of a third design. Scale control lives in the toolbar.
+- **Polish pass (Jon's device feedback, same PR):** thumbnail → reused `RecipePhotoGallery` sheet →
+  full-screen enlarge (reference-document scans now included in `displayablePhotos`); chat host wording
+  driven off `RecipeChatContext` (subject / prompt / context-header copy); duplicate AI-tier selector
+  removed from the split (embedded-header only); **Focus toggle** collapses the recipe-list column to
+  `.detailOnly` via `NavigationSplitViewVisibility`.
+- **Deferred to Slice B / roadmap:** action-verb strings still hardcoded (`"Saving make-ahead…"` — Slice B
+  reshapes that surface); reader photo affordances (manual set-as-cover, pinch-zoom) → effort doc roadmap.
+
+Effort doc: [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) § Slice A.
+
+---
+
 ## Dogfood fixes — batch 2 (multiplier clip + AI provider picker)
 
 **Merged 2026-07-03** — yes-chef [PR #71](https://github.com/jonphillips/yes-chef/pull/71). Two

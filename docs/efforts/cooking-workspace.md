@@ -3,9 +3,9 @@
 **Type:** UI re-presentation + generalization of the shipped make-ahead chat (PR #68) and the batch-2
 provider picker. **Not a from-scratch build.**
 **Owner:** Codex (implement, per slice) · Claude (architect/review) · Jon (product/review)
-**Status:** Spec'd 2026-07-03 (design converged with Jon; sketches in chat). **Not yet dispatched** —
-awaiting Jon's greenlight. **Starts after batch 2 merges** (it re-touches `RecipeDetailView.swift`,
-`RecipeChat.swift`, `AISettingsView.swift` that batch 2 also edits — sequence to avoid conflicts).
+**Status:** **Slice A shipped + approved 2026-07-03** (PR #73 → DONE-LOG) — the split, dense reader,
+context-general host, and Jon's device-feedback polish. **Slice B is now the dispatch target** (see
+`CURRENT_HANDOFF.md` § Next Up).
 **Decision it implements:** [ADR-0011](../decisions/ADR-0011-actionable-chat-make-ahead.md) + its
 **Amendment 1** (selection-scoped apply-actions, Accepted 2026-07-03). Design record:
 `open-questions.md` § "Dogfooding — AI chat + recipe reader (2026-07-03)".
@@ -133,6 +133,19 @@ map onto the two motions ADR-0011 already named:
   a **second context**.
 - **Meal Planner context** — a `.mealPlan(...)` case; verbs TBD.
 - **Chef It Up** (`Recipe.chefItUp`) — the second recipe field, per ADR-0011.
+
+### Reader photo affordances (roadmap — Jon, 2026-07-03, from Slice A device pass)
+
+Surfaced testing Slice A; not part of A or B. Anchored here (moved out of `open-questions.md`).
+
+- **Manual "set as cover" / thumbnail selection.** The reader thumbnail is chosen by a heuristic
+  (`primaryDisplayPhoto`: high-res → `.hero` → lowest `sortOrder`). It can pick a **scanned
+  reference-document page over a pretty photo** when the nice shot is a `.gallery` kind (ties the scan at
+  kind-rank 1) or is lower-res than the scan (resolution wins before kind — so even a `.hero` can lose).
+  Let the user pick and persist the cover; a user override, not a re-tune of the sort.
+- **Pinch-to-zoom (+ pan) in the full-screen photo viewer.** `RecipePhotoFullScreenView` currently only
+  scale-to-fits; add magnification so scanned pages and detailed photos are legible. The enlarge flow
+  (thumbnail → gallery → full-screen) otherwise works well.
 
 **Net-new cost (honest):** the grabber + detent gesture + persistence + VoiceOver cycler, and the
 width-responsive reader flip (half-owed for iPhone anyway). The selection + review card revises types

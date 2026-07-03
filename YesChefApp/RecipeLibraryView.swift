@@ -258,6 +258,8 @@ private struct RecipeFullScreenCover: View {
 }
 
 private struct AppMainLayout: View {
+  @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
+
   let horizontalSizeClass: UserInterfaceSizeClass?
   let recipeModel: RecipeLibraryModel
   let browserModel: BrowserModel
@@ -303,7 +305,7 @@ private struct AppMainLayout: View {
       }
     } else {
       let columnSection = AppMainColumnSection(selectedSection ?? .recipes) ?? .recipes
-      NavigationSplitView {
+      NavigationSplitView(columnVisibility: $columnVisibility) {
         AppSidebar(selection: $selectedSection)
       } content: {
         switch columnSection {
@@ -326,7 +328,8 @@ private struct AppMainLayout: View {
           RecipeDetailColumn(
             model: recipeModel,
             mealCalendarModel: mealCalendarModel,
-            groceryModel: groceryModel
+            groceryModel: groceryModel,
+            columnVisibility: $columnVisibility
           )
         case .groceries:
           GroceryDetailColumn(
@@ -468,6 +471,7 @@ private struct RecipeDetailColumn: View {
   let model: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
+  @Binding var columnVisibility: NavigationSplitViewVisibility
 
   var body: some View {
     if let recipe = model.selectedRecipe {
@@ -475,12 +479,18 @@ private struct RecipeDetailColumn: View {
         recipeID: recipe.id,
         libraryModel: model,
         mealCalendarModel: mealCalendarModel,
-        groceryModel: groceryModel
+        groceryModel: groceryModel,
+        isFocusActive: columnVisibility == .detailOnly,
+        focusButtonTapped: focusButtonTapped
       )
         .id(recipe.id)
     } else {
       ContentUnavailableView("Select a Recipe", systemImage: "fork.knife")
     }
+  }
+
+  private func focusButtonTapped() {
+    columnVisibility = columnVisibility == .detailOnly ? .doubleColumn : .detailOnly
   }
 }
 

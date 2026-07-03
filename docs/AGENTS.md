@@ -170,8 +170,11 @@ These are now project rules, not preferences:
 8. Codex owns compiler/package verification and should not spend project time on
    brittle simulator-driving or screenshot automation unless explicitly asked.
    Jon will do the primary UI testing pass, even when that makes the loop slower.
-9. After app UI changes, install the fresh build on both iOS 27 simulators Jon
-   is actively testing: `iPad Pro 13-inch (M5) (16GB)` and `iPhone 17 Pro`.
+9. Verify lean by default: build once + `scripts/check-drift.sh`, then hand off. Do **not**
+   install/launch on simulators as a routine step — that build/install loop is the main time
+   cost and Jon does the device pass on `iPad Pro 13-inch (M5) (16GB)` and `iPhone 17 Pro`
+   regardless. Only boot/install a simulator when a change can't be confirmed from build +
+   tests, and say why. See the Verification Pattern in `CURRENT_HANDOFF.md`.
 
 ## Data Preservation Rules
 
