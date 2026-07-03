@@ -10,6 +10,43 @@ Newest first.
 
 ---
 
+## Cooking workspace — Slice B (selection-scoped apply-actions + review card)
+
+**Architect-approved 2026-07-03** — yes-chef [PR #74](https://github.com/jonphillips/yes-chef/pull/74).
+Second/final slice of the cooking-workspace effort; realizes
+[ADR-0011](decisions/ADR-0011-actionable-chat-make-ahead.md) Amendment 1. Makes *what the model writes*
+precise and human-chosen: a selected span (or the whole last reply as fallback) drives extraction, and
+nothing lands in the reader until a review card is committed.
+
+- **Type change** (`RecipeChat.swift`): `ChatApplyAction.extract` / `AnyChatApplyAction.run` go from
+  `(_ messages: [RecipeChatMessage])` to `(_ selection: String, _ context: [RecipeChatMessage])`; `run`
+  now returns `[ChatApplyReviewItem]` and **no longer commits** — commit is deferred to the review card.
+  The make-ahead extractor takes `selection` as the primary subject, conversation as background
+  (per-verb context scope, Amendment 1).
+- **Selection arms the action bar** (`RecipeChatWorkspace.swift`): assistant messages render in a
+  selectable text view; a selection targets that span, **empty selection falls back to the whole last
+  assistant reply** (precision override, never a dead-button gate). The bar shows what it will act on.
+- **Review-before-commit card**, inspector-resident: tapping an action runs `extract`, stages the decoded
+  result as a Commit / Discard card; Commit lands in the reader in place, no chat turn writes on its own.
+  Staged as a **list** (N=1 for make-ahead today) so Menu's multi-card motion slots in later without a
+  rewrite — multi-card UI itself not built.
+- **Action-verb strings folded off the action** (`extractingTitle` / `committingTitle` /
+  `committedTitle`), retiring Slice A's hardcoded `"Saving make-ahead…"` / `"Saved to Make-ahead"`.
+- **Architect-review fix folded into the PR:** selection was resolved against the raw markdown string
+  while the text view displays the parsed string, garbling selections over any formatted reply and
+  resetting in-progress selections on re-render; now read from the displayed text and compared
+  rendered-to-rendered.
+
+Codex authored the implementation; ran out of credits before the PR, so the architect reviewed, fixed,
+and opened it. Verified: `swift build` clean, `swift test` 131 pass (incl. new
+`stagedMakeAheadReviewItemWritesOnlyWhenCommitted` proving `run` stages nothing to the DB — only
+`item.commit()` writes), check-drift clean. App target build + device UI pass are Jon's.
+
+Effort doc: [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) § Slice B — **effort now
+complete** (Menu/Planner chat verbs + reader photo affordances named there as later efforts).
+
+---
+
 ## Cooking workspace — Slice A (the split + dense reader)
 
 **Architect-approved 2026-07-03** — yes-chef [PR #73](https://github.com/jonphillips/yes-chef/pull/73).

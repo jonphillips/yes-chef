@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 3, 2026 (Cooking workspace Slice A approved, PR #73 → DONE-LOG; Next Up = Slice B — selection-scoped apply-actions + review card, ADR-0011 Amendment 1. Lean verification is now the default; reader photo affordances roadmapped in the effort doc.)
+Last updated: July 3, 2026 (Cooking workspace Slice B approved, PR #74 → DONE-LOG — cooking-workspace effort complete; Next Up = Phase E (grocery/pantry). Lean verification is the default; Menu/Planner chat verbs + reader photo affordances roadmapped in the effort doc.)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -16,23 +16,17 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Cooking workspace — Slice B (selection-scoped apply-actions + review card).** Full spec:
-[`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) § Slice B, implementing
-[ADR-0011](decisions/ADR-0011-actionable-chat-make-ahead.md) Amendment 1. Slice A shipped the split +
-dense reader + context-general host (PR #73). Now make *what the model writes* precise and human-chosen:
-change `ChatApplyAction.extract` / `AnyChatApplyAction.run` from `(_ messages: [RecipeChatMessage])` to
-`(_ selection: String, _ context: [RecipeChatMessage])`; text-selection over assistant messages arms the
-action bar; **empty selection falls back to the whole last assistant reply** (selection is a precision
-override, never a dead-button gate). Add the **review-before-commit card** in the inspector
-(Commit / Discard; Commit lands in the reader in place — no chat turn writes on its own). Stage the review
-surface as a **list** of committable results (N = 1 for make-ahead today) so Menu's multi-card motion
-slots in later without a rewrite — don't build the multi-card UI. Now that the host is context-general,
-**fold in the action-verb strings** Slice A deliberately left (`"Saving make-ahead…"` / `"Saved to
-Make-ahead"` — drive them off the action, not hardcoded), since Slice B reshapes that surface anyway.
-Own PR. In-memory-DB test the commit; `swift build` the package (FM bundle can't run here).
+**Recipe → grocery list w/ pantry checking (Phase E).** Full spec: [[grocery-pantry-threshold-design]].
+Make it slick early — canonical-key merge across recipes, static pantry thresholds, dialog-free (no
+inventory). Lower priority than the (now-complete) dogfood/cooking-workspace work per Jon's stated intent
+(2026-07-01), so slice scope is open — **STOP and confirm the first slice's shape with Jon before
+dispatching** rather than inferring it from the design memo.
 
-Then: **Phase E (grocery/pantry)** — [[grocery-pantry-threshold-design]] — while Jon experiments with the
-new chat/make-ahead tools.
+The cooking-workspace effort is **complete** (Slices A + B shipped, PRs #73 / #74 → DONE-LOG). Its named
+follow-ons — **Menu + Meal-Planner chat verbs** and **reader photo affordances** (manual set-as-cover,
+pinch-zoom) — live in [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) as separate
+later efforts; the host was built context-general to receive them. Jon is dogfooding the new
+chat/make-ahead tools, which may reprioritize.
 
 ## Ready Efforts (queue)
 
@@ -43,14 +37,13 @@ target.
   delete-source-clobbers-amount-edit follow-up remains parked in
   [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) for a later grocery slice.
 
-- **Cooking workspace** — Slice A complete (PR #73 → DONE-LOG); **Slice B is now Next Up**. Full spec
-  [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md). Menu + Meal-Planner chat and the
-  reader **photo affordances** (manual set-as-cover, pinch-zoom in the viewer) are named there as later
-  efforts (host built context-general to receive them).
+- **Recipe → grocery list w/ pantry checking** (Phase E) — **now Next Up**. Make it slick early
+  (canonical-key merge, static pantry thresholds, dialog-free); spec = [[grocery-pantry-threshold-design]].
 
-- **Recipe → grocery list w/ pantry checking** (Phase E) — make it slick early (canonical-key merge,
-  static pantry thresholds, dialog-free); spec = [[grocery-pantry-threshold-design]]. Lower priority
-  than the dogfood batch per Jon's stated intent (2026-07-01).
+- **Cooking workspace** — **complete** (Slices A + B, PRs #73 / #74 → DONE-LOG). Menu + Meal-Planner chat
+  verbs and the reader **photo affordances** (manual set-as-cover, pinch-zoom in the viewer) are named in
+  [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) as later efforts (host built
+  context-general to receive them).
 
 **Parked (not dispatched):**
 - **Dogfood the core loop on two devices** — capture ~15–20 real recipes via the extension, cook from
