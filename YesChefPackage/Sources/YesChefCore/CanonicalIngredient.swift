@@ -1,0 +1,149 @@
+import Foundation
+
+public enum CanonicalIngredient {
+  public static let defaultPantryStaples: [String] = [
+    "avocado oil",
+    "black pepper",
+    "canola oil",
+    "cooking oil",
+    "cooking spray",
+    "extra virgin olive oil",
+    "fine sea salt",
+    "freshly ground pepper",
+    "freshly ground black pepper",
+    "ground black pepper",
+    "ice",
+    "ice cubes",
+    "kosher salt",
+    "neutral oil",
+    "nonstick cooking spray",
+    "olive oil",
+    "pepper",
+    "salt",
+    "salt and pepper",
+    "salt and freshly ground black pepper",
+    "sea salt",
+    "table salt",
+    "vegetable oil",
+    "water",
+    "white pepper",
+  ]
+
+  private static let aliases: [String: String] = [
+    "anchovy filet": "anchovies",
+    "anchovy filets": "anchovies",
+    "anchovy fillet": "anchovies",
+    "anchovy fillets": "anchovies",
+    "anchovies": "anchovies",
+    "green onion": "green onions",
+    "green onions": "green onions",
+    "scallion": "green onions",
+    "scallions": "green onions",
+    "tomato": "tomatoes",
+    "tomatoes": "tomatoes",
+  ]
+
+  private static let leadingDescriptors: Set<String> = [
+    "chopped",
+    "crushed",
+    "diced",
+    "fresh",
+    "freshly",
+    "grated",
+    "ground",
+    "large",
+    "medium",
+    "minced",
+    "small",
+    "sliced",
+  ]
+
+  public static func canonicalName(_ text: String?) -> String? {
+    guard let text else { return nil }
+    let base = baseText(text)
+    let normalized = normalize(base)
+    guard !normalized.isEmpty else { return nil }
+
+    if let alias = aliases[normalized] {
+      return alias
+    }
+
+    let stripped = strippingLeadingDescriptors(from: normalized)
+    if let alias = aliases[stripped] {
+      return alias
+    }
+
+    let singular = lightlySingularized(stripped)
+    if let alias = aliases[singular] {
+      return alias
+    }
+    return singular
+  }
+
+  static func displayName(_ text: String) -> String {
+    let original = text.nonEmptyGroceryText ?? text
+    let normalized = normalize(baseText(text))
+    if let alias = aliases[normalized] {
+      return alias
+    }
+
+    let stripped = strippingLeadingDescriptors(from: normalized)
+    if let alias = aliases[stripped] {
+      return alias
+    }
+
+    let singular = lightlySingularized(stripped)
+    if let alias = aliases[singular] {
+      return alias
+    }
+    return original
+  }
+
+  static func canonicalText(_ text: String?) -> String? {
+    guard let text else { return nil }
+    let normalized = normalize(text)
+    return normalized.isEmpty ? nil : normalized
+  }
+
+  private static func baseText(_ text: String) -> String {
+    let separators = [",", "(", ";"]
+    return separators.reduce(text) { partial, separator in
+      partial.components(separatedBy: separator).first ?? partial
+    }
+  }
+
+  private static func normalize(_ text: String) -> String {
+    text
+      .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+      .replacingOccurrences(of: "-", with: " ")
+      .split(whereSeparator: \.isWhitespace)
+      .joined(separator: " ")
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private static func strippingLeadingDescriptors(from text: String) -> String {
+    var words = text.split(separator: " ").map(String.init)
+    while let first = words.first, leadingDescriptors.contains(first) {
+      words.removeFirst()
+    }
+    return words.joined(separator: " ")
+  }
+
+  private static func lightlySingularized(_ text: String) -> String {
+    let words = text.split(separator: " ").map(String.init)
+    guard var last = words.last else { return text }
+
+    if last.hasSuffix("ies"), last.count > 3 {
+      last = String(last.dropLast(3)) + "y"
+    } else if last.hasSuffix("oes"), last.count > 3 {
+      last = String(last.dropLast(2))
+    } else if last.hasSuffix("s"),
+              !last.hasSuffix("ss"),
+              !last.hasSuffix("us"),
+              last.count > 3 {
+      last = String(last.dropLast())
+    }
+
+    return (words.dropLast() + [last]).joined(separator: " ")
+  }
+}

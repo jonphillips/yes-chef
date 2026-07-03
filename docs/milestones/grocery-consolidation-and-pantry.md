@@ -185,8 +185,8 @@ the PR, don't assume).
 `main` is protected — every slice is a branch + PR, green at merge. Tick the box in the PR that
 completes it. Slices are ordered so each is independently shippable and testable.
 
-- [ ] Slice 1 — One canonical key + alias/override table (dissolve the one-offs)
-- [ ] Slice 2 — Same-dimension `Measure` compare/merge (bounded)
+- [x] Slice 1 — One canonical key + alias/override table (dissolve the one-offs)
+- [x] Slice 2 — Same-dimension `Measure` compare/merge (bounded)
 - [ ] Slice 3 — Pantry policy model (unlimited default + optional threshold), migration-aware
 - [ ] Slice 4 — `PantrySuppression` pure function + grocery-list review section (no dialog)
 

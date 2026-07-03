@@ -488,8 +488,13 @@ public enum GroceryRepository {
       groceryListID: groceryListID,
       in: db
     ) {
-      item.quantity = combinedQuantity(item.quantity, draft.quantity)
-      item.quantityText = item.quantity.map(formatGroceryQuantity)
+      if let itemMeasure = item.measure,
+         let draftMeasure = draft.measure,
+         let mergedMeasure = itemMeasure.merged(with: draftMeasure) {
+        item.quantity = mergedMeasure.quantity
+        item.quantityText = formatGroceryQuantity(mergedMeasure.quantity)
+        item.unit = mergedMeasure.unit?.nonEmptyGroceryText
+      }
       item.dateModified = now
       try GroceryItem.upsert { item }.execute(db)
       try insertSource(source, groceryItemID: item.id, in: db)
@@ -766,7 +771,7 @@ public enum PantryRepository {
     var uniqueTitles: [String] = []
     for title in titles {
       guard let title = title.nonEmptyGroceryText,
-            let key = title.groceryConsolidationKey,
+            let key = CanonicalIngredient.canonicalName(title),
             !seen.contains(key)
       else { continue }
       seen.insert(key)
@@ -814,9 +819,14 @@ private func deleteGroceryItemSources(
       continue
     }
 
-    if let recalculatedQuantity = try generatedQuantity(for: remainingSources, in: db) {
-      item.quantity = recalculatedQuantity
-      item.quantityText = formatGroceryQuantity(recalculatedQuantity)
+    if let recalculatedMeasure = try generatedMeasure(for: remainingSources, in: db) {
+      item.quantity = recalculatedMeasure.quantity
+      item.quantityText = formatGroceryQuantity(recalculatedMeasure.quantity)
+      item.unit = recalculatedMeasure.unit?.nonEmptyGroceryText
+    } else {
+      item.quantity = nil
+      item.quantityText = nil
+      item.unit = nil
     }
     item.dateModified = now
     try GroceryItem.upsert { item }.execute(db)
@@ -850,6 +860,10 @@ private struct GroceryGeneratedItemDraft {
     self.unit = line.unit?.nonEmptyGroceryText
     self.aisle = line.shoppingCategory?.nonEmptyGroceryText
     self.notes = line.groceryNotes
+  }
+
+  var measure: Measure? {
+    quantity.map { Measure(quantity: $0, unit: unit) }
   }
 }
 
@@ -976,16 +990,27 @@ func areMenuItemsInIncreasingOrder(_ lhs: MenuItem, _ rhs: MenuItem) -> Bool {
 
 private extension GroceryItem {
   func canConsolidate(with draft: GroceryGeneratedItemDraft) -> Bool {
-    title.groceryConsolidationKey == draft.title.groceryConsolidationKey
-      && unit.groceryConsolidationKey == draft.unit.groceryConsolidationKey
-      && aisle.groceryConsolidationKey == draft.aisle.groceryConsolidationKey
-      && notes.groceryConsolidationKey == draft.notes.groceryConsolidationKey
-      && canCombineQuantity(
-        quantity,
-        quantityText: quantityText,
-        with: draft.quantity,
-        quantityText: draft.quantityText
-      )
+    CanonicalIngredient.canonicalName(title) == CanonicalIngredient.canonicalName(draft.title)
+      && CanonicalIngredient.canonicalText(aisle) == CanonicalIngredient.canonicalText(draft.aisle)
+      && CanonicalIngredient.canonicalText(notes) == CanonicalIngredient.canonicalText(draft.notes)
+      && canMergeMeasure(with: draft)
+  }
+
+  var measure: Measure? {
+    quantity.map { Measure(quantity: $0, unit: unit) }
+  }
+
+  func canMergeMeasure(with draft: GroceryGeneratedItemDraft) -> Bool {
+    switch (measure, draft.measure) {
+    case let (.some(lhs), .some(rhs)):
+      return lhs.merged(with: rhs) != nil
+
+    case (.none, .none):
+      return quantityText == nil && draft.quantityText == nil
+
+    default:
+      return false
+    }
   }
 }
 
@@ -997,7 +1022,7 @@ public extension IngredientLine {
 
 private extension IngredientLine {
   var groceryItemTitle: String {
-    canonicalGroceryItemTitle(item?.nonEmptyGroceryText ?? originalText)
+    CanonicalIngredient.displayName(item?.nonEmptyGroceryText ?? originalText)
   }
 
   var groceryQuantityText: String? {
@@ -1012,40 +1037,11 @@ private extension IngredientLine {
   }
 }
 
-private func canonicalGroceryItemTitle(_ title: String) -> String {
-  switch title.groceryConsolidationKey {
-  case "anchovy fillet", "anchovy fillets", "anchovy filet", "anchovy filets":
-    return "anchovies"
-  default:
-    return title
-  }
-}
-
-private func canCombineQuantity(
-  _ lhs: Double?,
-  quantityText lhsQuantityText: String?,
-  with rhs: Double?,
-  quantityText rhsQuantityText: String?
-) -> Bool {
-  if lhs != nil, rhs != nil {
-    return true
-  }
-  return lhs == nil
-    && rhs == nil
-    && lhsQuantityText == nil
-    && rhsQuantityText == nil
-}
-
-private func combinedQuantity(_ lhs: Double?, _ rhs: Double?) -> Double? {
-  guard let lhs, let rhs else { return nil }
-  return lhs + rhs
-}
-
-private func generatedQuantity(
+private func generatedMeasure(
   for sources: [GroceryItemSource],
   in db: Database
-) throws -> Double? {
-  var quantity: Double?
+) throws -> Measure? {
+  var measure: Measure?
   for source in sources {
     guard let lineID = source.ingredientLineID,
           let line = try IngredientLine.find(lineID).fetchOne(db),
@@ -1053,9 +1049,15 @@ private func generatedQuantity(
     else {
       return nil
     }
-    quantity = (quantity ?? 0) + lineQuantity
+    let lineMeasure = Measure(quantity: lineQuantity, unit: line.unit)
+    if let existingMeasure = measure {
+      guard let mergedMeasure = existingMeasure.merged(with: lineMeasure) else { return nil }
+      measure = mergedMeasure
+    } else {
+      measure = lineMeasure
+    }
   }
-  return quantity
+  return measure
 }
 
 private func formatGroceryQuantity(_ quantity: Double) -> String {
@@ -1069,21 +1071,5 @@ extension String {
   var nonEmptyGroceryText: String? {
     let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
-  }
-
-  var groceryConsolidationKey: String? {
-    let collapsedWhitespace = split(whereSeparator: \.isWhitespace).joined(separator: " ")
-    let trimmed = collapsedWhitespace.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return nil }
-    return trimmed.folding(
-      options: [.caseInsensitive, .diacriticInsensitive],
-      locale: Locale(identifier: "en_US_POSIX")
-    )
-  }
-}
-
-extension Optional where Wrapped == String {
-  var groceryConsolidationKey: String? {
-    flatMap(\.groceryConsolidationKey)
   }
 }
