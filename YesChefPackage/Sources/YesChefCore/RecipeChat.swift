@@ -4,6 +4,7 @@ import LLMClientKit
 import Observation
 
 public let recipeChatCustomInstructionsKey = "recipeChatCustomInstructions"
+public let recipeChatFrontierProviderKey = "recipeChatFrontierProvider"
 
 public struct RecipeChatInstructions: Sendable {
   public var current: @Sendable () -> String
@@ -26,6 +27,41 @@ extension DependencyValues {
   public var recipeChatInstructions: RecipeChatInstructions {
     get { self[RecipeChatInstructions.self] }
     set { self[RecipeChatInstructions.self] = newValue }
+  }
+}
+
+public struct RecipeChatProviderPreference: Sendable {
+  public var current: @Sendable () -> FrontierProvider?
+  public var set: @Sendable (FrontierProvider) -> Void
+
+  public init(
+    current: @escaping @Sendable () -> FrontierProvider?,
+    set: @escaping @Sendable (FrontierProvider) -> Void
+  ) {
+    self.current = current
+    self.set = set
+  }
+}
+
+extension RecipeChatProviderPreference: DependencyKey {
+  public static let liveValue = RecipeChatProviderPreference(
+    current: {
+      UserDefaults.standard.string(forKey: recipeChatFrontierProviderKey)
+        .flatMap(FrontierProvider.init(rawValue:))
+    },
+    set: { provider in
+      UserDefaults.standard.set(provider.rawValue, forKey: recipeChatFrontierProviderKey)
+    }
+  )
+
+  public static let testValue = RecipeChatProviderPreference(current: { nil }, set: { _ in })
+  public static let previewValue = RecipeChatProviderPreference(current: { nil }, set: { _ in })
+}
+
+extension DependencyValues {
+  public var recipeChatProviderPreference: RecipeChatProviderPreference {
+    get { self[RecipeChatProviderPreference.self] }
+    set { self[RecipeChatProviderPreference.self] = newValue }
   }
 }
 
@@ -266,17 +302,22 @@ public final class RecipeChatModel: Identifiable {
   public let context: RecipeChatContext
   public private(set) var messages: [RecipeChatMessage] = []
   public var useFrontier = false
-  public var selectedProvider: FrontierProvider = .anthropic
+  public var selectedProvider: FrontierProvider = .anthropic {
+    didSet {
+      providerPreference.set(selectedProvider)
+    }
+  }
   public private(set) var isResponding = false
   public private(set) var errorText: String?
 
   @ObservationIgnored @Dependency(\.modelClient) private var modelClient
   @ObservationIgnored @Dependency(\.apiKeyStore) private var apiKeyStore
   @ObservationIgnored @Dependency(\.recipeChatInstructions) private var chatInstructions
+  @ObservationIgnored @Dependency(\.recipeChatProviderPreference) private var providerPreference
 
   public init(context: RecipeChatContext) {
     self.context = context
-    if let first = availableProviders.first { selectedProvider = first }
+    selectedProvider = defaultProvider()
   }
 
   public var frontierAvailable: Bool { !availableProviders.isEmpty }
@@ -378,5 +419,13 @@ public final class RecipeChatModel: Identifiable {
 
   private func describe(_ error: any Error) -> String {
     RecipeChatErrorText.describe(error)
+  }
+
+  private func defaultProvider() -> FrontierProvider {
+    let availableProviders = availableProviders
+    if let preferred = providerPreference.current(), availableProviders.contains(preferred) {
+      return preferred
+    }
+    return availableProviders.first ?? .anthropic
   }
 }
