@@ -823,6 +823,10 @@ private func deleteGroceryItemSources(
       item.quantity = recalculatedMeasure.quantity
       item.quantityText = formatGroceryQuantity(recalculatedMeasure.quantity)
       item.unit = recalculatedMeasure.unit?.nonEmptyGroceryText
+    } else {
+      item.quantity = nil
+      item.quantityText = nil
+      item.unit = nil
     }
     item.dateModified = now
     try GroceryItem.upsert { item }.execute(db)

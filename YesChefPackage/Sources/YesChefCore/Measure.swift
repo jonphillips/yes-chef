@@ -26,6 +26,10 @@ public struct Measure: Equatable, Sendable {
   }
 
   public func merged(with other: Measure) -> Measure? {
+    if Self.normalizedUnit(unit) == Self.normalizedUnit(other.unit) {
+      return Measure(quantity: quantity + other.quantity, unit: unit)
+    }
+
     guard let lhsDefinition = Self.unitDefinition(for: unit),
           let rhsDefinition = Self.unitDefinition(for: other.unit),
           lhsDefinition.dimension == rhsDefinition.dimension
@@ -40,6 +44,10 @@ public struct Measure: Equatable, Sendable {
   }
 
   public func compare(to threshold: Measure) -> Comparison {
+    if Self.normalizedUnit(unit) == Self.normalizedUnit(threshold.unit) {
+      return quantity > threshold.quantity ? .over : .underOrEqual
+    }
+
     guard let lhsDefinition = Self.unitDefinition(for: unit),
           let rhsDefinition = Self.unitDefinition(for: threshold.unit),
           lhsDefinition.dimension == rhsDefinition.dimension

@@ -1,6 +1,7 @@
 import CustomDump
 import Dependencies
 import Foundation
+import SQLiteData
 import Testing
 import YesChefCore
 
@@ -43,11 +44,15 @@ extension RecipeCoreTests {
       )
       expectNoDifference(
         Measure(quantity: 1, unit: "splash").merged(with: Measure(quantity: 1, unit: "splash")),
-        nil
+        Measure(quantity: 2, unit: "splash")
       )
       expectNoDifference(
         Measure(quantity: 1, unit: "splash").compare(to: Measure(quantity: 1, unit: "cup")),
         .incomparable
+      )
+      expectNoDifference(
+        Measure(quantity: 2, unit: "splash").compare(to: Measure(quantity: 1, unit: "splash")),
+        .over
       )
     }
 
@@ -257,9 +262,138 @@ extension RecipeCoreTests {
         expectNoDifference(sugarRows.map(\.item.unit), ["cup", "lb"])
         expectNoDifference(sugarRows.flatMap(\.sources).map(\.ingredientLineID), [volumeSugarID, weightSugarID].map(Optional.some))
 
-        let wineRows = rows.filter { $0.item.title == "wine" }
-        expectNoDifference(wineRows.map(\.item.unit), ["splash", "splash"])
-        expectNoDifference(wineRows.flatMap(\.sources).map(\.ingredientLineID), [firstUnknownID, secondUnknownID].map(Optional.some))
+        let wineRow = try #require(rows.first { $0.item.title == "wine" })
+        expectNoDifference(rows.filter { $0.item.title == "wine" }.count, 1)
+        expectNoDifference(wineRow.item.quantity, 2)
+        expectNoDifference(wineRow.item.quantityText, "2")
+        expectNoDifference(wineRow.item.unit, "splash")
+        expectNoDifference(wineRow.sources.map(\.ingredientLineID), [firstUnknownID, secondUnknownID].map(Optional.some))
+      }
+    }
+
+    @Test
+    func deletingSourceClearsLegacyIncompatibleQuantityInsteadOfLeavingStaleTotal() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 821_200_000)
+      let modifiedAt = Date(timeIntervalSinceReferenceDate: 821_201_000)
+      let listID = SampleUUIDSequence.uuid(48_001)
+      let itemID = SampleUUIDSequence.uuid(48_002)
+      let firstRecipeID = SampleUUIDSequence.uuid(48_101)
+      let firstSectionID = SampleUUIDSequence.uuid(48_102)
+      let volumeSugarID = SampleUUIDSequence.uuid(48_103)
+      let secondRecipeID = SampleUUIDSequence.uuid(48_201)
+      let secondSectionID = SampleUUIDSequence.uuid(48_202)
+      let weightSugarID = SampleUUIDSequence.uuid(48_203)
+      let thirdRecipeID = SampleUUIDSequence.uuid(48_301)
+      let thirdSectionID = SampleUUIDSequence.uuid(48_302)
+      let deletedSugarID = SampleUUIDSequence.uuid(48_303)
+      let deletedSourceID = SampleUUIDSequence.uuid(48_403)
+
+      try database.write { db in
+        try GroceryList.insert {
+          GroceryList(id: listID, title: "Legacy", sortOrder: 0, dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+        try GroceryItem.insert {
+          GroceryItem(
+            id: itemID,
+            groceryListID: listID,
+            title: "sugar",
+            quantity: 99,
+            quantityText: "99",
+            unit: "cup",
+            sortOrder: 0,
+            dateCreated: now,
+            dateModified: now
+          )
+        }
+        .execute(db)
+        try insertRecipeFixture(
+          recipeID: firstRecipeID,
+          sectionID: firstSectionID,
+          title: "Tea",
+          lines: [
+            IngredientLine(
+              id: volumeSugarID,
+              recipeID: firstRecipeID,
+              sectionID: firstSectionID,
+              originalText: "1 cup sugar",
+              quantity: 1,
+              quantityText: "1",
+              unit: "cup",
+              item: "sugar",
+              sortOrder: 0
+            )
+          ],
+          now: now,
+          in: db
+        )
+        try insertRecipeFixture(
+          recipeID: secondRecipeID,
+          sectionID: secondSectionID,
+          title: "Cake",
+          lines: [
+            IngredientLine(
+              id: weightSugarID,
+              recipeID: secondRecipeID,
+              sectionID: secondSectionID,
+              originalText: "1 lb sugar",
+              quantity: 1,
+              quantityText: "1",
+              unit: "lb",
+              item: "sugar",
+              sortOrder: 0
+            )
+          ],
+          now: now,
+          in: db
+        )
+        try insertRecipeFixture(
+          recipeID: thirdRecipeID,
+          sectionID: thirdSectionID,
+          title: "Sauce",
+          lines: [
+            IngredientLine(
+              id: deletedSugarID,
+              recipeID: thirdRecipeID,
+              sectionID: thirdSectionID,
+              originalText: "1 splash sugar",
+              quantity: 1,
+              quantityText: "1",
+              unit: "splash",
+              item: "sugar",
+              sortOrder: 0
+            )
+          ],
+          now: now,
+          in: db
+        )
+        for (sourceID, recipeID, lineID) in [
+          (SampleUUIDSequence.uuid(48_401), firstRecipeID, volumeSugarID),
+          (SampleUUIDSequence.uuid(48_402), secondRecipeID, weightSugarID),
+          (deletedSourceID, thirdRecipeID, deletedSugarID),
+        ] {
+          try GroceryItemSource.insert {
+            GroceryItemSource(
+              id: sourceID,
+              groceryItemID: itemID,
+              origin: .recipe,
+              recipeID: recipeID,
+              ingredientLineID: lineID,
+              sourceTitle: "Legacy",
+              dateCreated: now
+            )
+          }
+          .execute(db)
+        }
+
+        try GroceryRepository.deleteSource(sourceID: deletedSourceID, in: db, now: modifiedAt)
+
+        let item = try #require(try GroceryItem.find(itemID).fetchOne(db))
+        expectNoDifference(item.quantity, nil)
+        expectNoDifference(item.quantityText, nil)
+        expectNoDifference(item.unit, nil)
+        expectNoDifference(item.dateModified, modifiedAt)
       }
     }
   }
