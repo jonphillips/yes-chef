@@ -190,6 +190,18 @@ completes it. Slices are ordered so each is independently shippable and testable
 - [ ] Slice 3 — Pantry policy model (unlimited default + optional threshold), migration-aware
 - [ ] Slice 4 — `PantrySuppression` pure function + grocery-list review section (no dialog)
 
+> **Architect amendment (2026-07-03, confirmed with Jon).** Two decisions that override the
+> letter of the slices below:
+> 1. **First dispatch batches Slice 1 + Slice 2** into one PR. Both are pure-core `YesChefCore`
+>    with no UI and no user-visible behavior change, so they ship together and front-load the whole
+>    deterministic engine before the schema (Slice 3) and payoff UI (Slice 4).
+> 2. **The cached `canonicalName` column is deferred to Slice 3.** Slice 1 computes the canonical
+>    key **on read** (zero migration) — the key unification does not depend on the cache. The cached
+>    `canonicalName` column on `IngredientLine`/`GroceryItem` lands in **Slice 3's** migration,
+>    alongside the new `PantryItem` policy columns, so there is **one** synced-schema change and one
+>    sync-zone flag for the whole milestone instead of two. Wherever Slice 1 below says "cache it as
+>    `canonicalName`," read it as "compute it on read; the cache is Slice 3."
+
 ### Slice 1 — One canonical key + alias/override table
 
 Introduce `CanonicalIngredient.canonicalName(_:)` — the **single** normalizer (whitespace,
@@ -218,7 +230,10 @@ it can't do exactly.
 
 Add `isUnlimited` (default **true**), `thresholdQuantity`, `thresholdUnit` to `PantryItem` with
 a **migration-aware** backfill (existing pantry items → `isUnlimited = true`, so current
-suppression is unchanged). Editor UI: a per-item control — *Always have it (never show)* /
+suppression is unchanged). **Per the architect amendment, this slice also adds the cached
+`canonicalName: String?` column to `IngredientLine`/`GroceryItem`** (deferred out of Slice 1),
+backfilled from existing rows via the Slice-1 normalizer so nothing already hidden becomes
+visible — one migration carries both. Re-point the compute-on-read call sites at the cached column. Editor UI: a per-item control — *Always have it (never show)* /
 *Remind me if a recipe needs more than [qty][unit]* / *Always confirm*. **The threshold control
 is only offered for measure-unit items (volume/weight); count-y items (garlic cloves) show only
 unlimited-or-shop** (Decision #6 — a "½ clove" threshold is nonsense). **Tests:** migration
