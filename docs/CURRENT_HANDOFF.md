@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 3, 2026 (Recipe-multiplier A+B approved, PR #69 → DONE-LOG; Next Up = Slice C per-placement persisted scale)
+Last updated: July 3, 2026 (Dogfood batch 2 merged, PR #71 → DONE-LOG; Next Up = Cooking workspace Slice A. Workspace design converged with Jon + spec'd; ADR-0011 Amendment 1 Accepted; Menu/Planner chat named as later efforts)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -16,18 +16,17 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Recipe-multiplier rework — Slice C (per-placement persisted scale).** Slices A+B approved and merging
-(PR #69: unicode-fraction parse fix + dial-as-multiplier). Full spec:
-[`docs/efforts/recipe-multiplier-rework.md`](efforts/recipe-multiplier-rework.md) § Slice C. Add additive,
-sync-safe `viewScale: Double` (default 1.0) to `recipes` and `scale: Double` (default 1.0) to `menuItems`
-and `mealPlanItems` (one migration); introduce a small injected `ScaleContext`
-(`.recipe(id)`/`.menuItem(id)`/`.mealPlanItem(id)`) so `RecipeDetailModel` reads the initial factor from,
-and writes changes back to, the storage site the context names — one read/write seam, not a branch per
-screen. Locked: bare-recipe scale **syncs** (recipes column); scales round-trip through iCloud.
-**Investigation first (do before building):** confirm whether the menu/planner surfaces route into recipe
-detail today (all three `RecipeDetailView(` constructions currently live in `RecipeLibraryView.swift`;
-`MenuViews`/`MealCalendarViews` may not open detail at all) — sizing that navigation is the one part that
-can grow beyond "add a column."
+**Cooking workspace — Slice A (the split + dense reader).** Full spec:
+[`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) § Slice A. Re-present
+`RecipeDetailView`: replace the photo-forward reader + chat `.sheet` with the **detented draggable split**
+— a width-responsive reader (two-column ≥ threshold in both iPad orientations; iPhone segmented
+ingredients/directions layout when narrow) + the existing `RecipeChatModel` re-hosted into the inspector
+pane (no chat *behavior* change in this slice). Scale control → toolbar (structurally supersedes batch 2's
+tactical clip fix). Grabber + detents (reader-only / balanced / chat-dive) + persistence + a VoiceOver
+detent-cycler. **iPad-only split**; iPhone keeps chat as a separate presentation. **Build the host
+context-general** (takes a `RecipeChatContext` + catalog — do not weld into `RecipeDetailView`) so Menu +
+Meal-Planner chat (Jon, 2026-07-03) slot in later. Then **Slice B** (selection-scoped apply-actions +
+review card, ADR-0011 Amendment 1) as its own PR.
 
 Then: **Phase E (grocery/pantry)** — [[grocery-pantry-threshold-design]] — while Jon experiments with the
 new chat/make-ahead tools.
@@ -37,10 +36,13 @@ new chat/make-ahead tools.
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target.
 
-- **Dogfood fixes — batch 1 (bugs + near-term UX)** — complete.
-  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md). The Slice 7
-  delete-source-clobbers-amount-edit follow-up remains parked in the effort doc for a later grocery
-  slice.
+- **Dogfood fixes — batches 1 & 2** — complete (PR #66, PR #71 → DONE-LOG). The batch-1 Slice 7
+  delete-source-clobbers-amount-edit follow-up remains parked in
+  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) for a later grocery slice.
+
+- **Cooking workspace** — now **Next Up (Slice A)**; full spec
+  [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md). Menu + Meal-Planner chat named
+  there as later efforts (host built context-general to receive them).
 
 - **Recipe → grocery list w/ pantry checking** (Phase E) — make it slick early (canonical-key merge,
   static pantry thresholds, dialog-free); spec = [[grocery-pantry-threshold-design]]. Lower priority

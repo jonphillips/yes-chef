@@ -190,3 +190,54 @@ and can proceed in Galavant in parallel with our Slices 1–2.
 - **B — commit target:** **new additive `Recipe.makeAhead: String?` column** (Jon).
 - **C — Slice 1 scope for Yes Chef:** **migrate** the minimal AI stack onto the shared package
   now — one boundary (Jon).
+
+## Amendment 1 — selection-scoped apply-actions
+
+Status: **Accepted** — 2026-07-03 (Jon signed off same day, from his first dogfooding pass over the
+shipped make-ahead chat, PR #68; sub-question leans ratified). This revises the apply-action input
+surface described in the Decision (§2d) and galavant ADR-0031's `(extract → commit)` shape; it does
+**not** touch the invariant (the tap is still the only write) or the commit side.
+
+### The problem the shipped shape has
+
+Slice 2 defined each apply-action's `extract` over **the whole conversation**
+(`extract: ([ChatMessage]) → T`). Dogfooding shows this is the wrong granularity. Frontier chat does
+not answer in discrete, individually-commit-able units — a single assistant reply might contain
+three candidate side dishes, or a make-ahead plan *and* two riffs Jon doesn't want. "Distill the
+conversation" then has to guess which part of which turn the human actually meant. The human already
+knows; the UI just isn't letting them say it.
+
+### Decision (proposed)
+
+The payload of an apply-action is a **user-selected text span**, not the conversation. The
+conversation remains available as *context*, but the thing the verb operates on is what the human
+highlighted.
+
+- **Input shape changes** from `([ChatMessage]) → T` to something like
+  `(selection: String, context: [ChatMessage]) → T`. The selection is the subject; the conversation
+  is background the extractor may lean on. `ChatApplyAction` (the generic catalog type) carries this
+  shape; make-ahead and every future verb inherit it.
+- **The panel gains text selection over assistant messages.** Highlighting text in a reply is the
+  gesture that arms the buttons; with nothing selected the catalog buttons are disabled (or fall
+  back to whole-last-reply — an open sub-question below). This keeps the invariant intact — the tap
+  is still the only write — while making *what* gets written precise and human-chosen.
+- **Why this is an ADR amendment, not a tweak:** it changes the portable contract. Yes Chef is the
+  first real instance and the proving ground that feeds galavant ADR-0031 and the eventual
+  jon-platform cross-app ADR, so the `(extract → commit)` shape those inherit must be
+  selection-scoped from the point it's proven here. Building it as a silent code change would let the
+  cross-app pattern ossify around the wrong granularity.
+
+### Sub-questions — resolved 2026-07-03 (Jon)
+
+- **Empty selection behavior:** **fall back to "the whole last assistant reply."** The common case
+  stays one tap; a text selection is the *precision override* when the human wants to narrow a
+  multi-item reply. Buttons are never dead just because nothing is highlighted.
+- **Extractor context scope:** **decided per-verb, via the action's own `extract`.** Not a global
+  rule. The selection is always the subject; whether the extractor also leans on the surrounding
+  conversation vs. only the selection + seeded recipe is the verb's choice (make-ahead may want the
+  back-and-forth; a focused card-distill usually treats the rest of the chat as noise). The generic
+  `ChatApplyAction` shape passes both `selection` and `context` so each verb can use or ignore the
+  conversation.
+- **Ships with the unified cooking workspace** (open-questions.md, Dogfooding 2026-07-03):
+  selection-to-action is only ergonomic when chat and recipe are both visible, so this amendment is
+  built **as part of the workspace effort**, not a standalone slice.

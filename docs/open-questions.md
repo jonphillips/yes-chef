@@ -176,6 +176,92 @@ The immediate, uncontroversial sub-bug (headers rendering with a bullet) may be 
 out as a small fix even before the larger direction is chosen. Not in the current arc; needs a
 decision first.
 
+## Dogfooding — AI chat + recipe reader (2026-07-03)
+
+First dogfooding pass over the shipped make-ahead chat (PR #68) and the recipe reader (screenshots:
+full-screen Paprika as the density reference; Yes Chef full-screen "Done" view). Six items, sorted
+bug → cheap → effort. **Sequencing decision (Jon, 2026-07-03):** the dense reader and the slide-in
+chat are **one unified "cooking workspace" effort**, not separate slices — they both rewrite how
+`RecipeDetailView` presents, so design them together (needs a layout sketch before dispatch).
+
+- **[Bug] Scale multiplier falls off the bottom in full-screen.** The scale control lives in the
+  `Menu` ("Scale Ingredients", `RecipeDetailView.swift` `ScalePanel`, ~line 674) anchored bottom-
+  right; in the full-screen presentation it clips below the viewport and becomes unusable. Small
+  Codex fix — folds into a dogfood batch, no design needed.
+
+- **[Cheap — backend already exists] Provider picker: Claude *or* ChatGPT, both keys in Settings.**
+  Galavant has this. The Slice 1 lift already gave us `OpenAIModelClient`/`OpenAIWire` and a
+  multi-provider `APIKeyStore` in LLMClientKit — `AISettingsView` only *surfaces* `.anthropic` today
+  (`AISettingsView.swift:58`). So this is: add an OpenAI key field + a stored per-conversation
+  provider preference that `RecipeChatModel`'s frontier tier reads. No new backend; mirror Galavant's
+  UI. Dispatch-ready alongside the multiplier bug as **dogfood batch 2**.
+
+- **[Effort — the cooking workspace, unified] Dense reader + chat inspector on one draggable split,
+  used simultaneously.** Design converged with Jon 2026-07-03 (sketches in chat). Three coupled wants,
+  plus the resolved presentation model below.
+  1. *Dense cooking reader.* When actually cooking, Jon wants Paprika's information-density
+     (everything visible/scannable, photo displayed smaller) — not the current photo-forward reader.
+     The deliverable is **density**: tight ingredient/step layout, scale always reachable, no wasted
+     vertical space.
+  2. *Chat as a side inspector worked **alongside** the recipe, never modal, never full-screen.* Chat
+     is `.sheet(item:)` today (`RecipeDetailView.swift:98`) — modal, so you can't touch the recipe
+     underneath. The reader must stay visible for the whole interaction, or it's "chatting about a
+     recipe" rather than "cooking with an assistant."
+  3. *"Start Cooking" is deliberately **not** the primary affordance (design principle, bank it).*
+     Jon: "no one actually cooks with blinders on" — you look ahead, re-check ingredients, think two
+     steps out. Step-by-step is at most a secondary mode; the reader is a dense *reference* surface,
+     not a wizard.
+
+  **Resolved design decisions (2026-07-03):**
+  - **Scale control → toolbar** (pinned, always reachable). This is the *structural* fix for the
+     full-screen clip bug; batch 2's fix is only tactical.
+  - **Reader is width-responsive, not device-responsive.** Two-column (ingredients | directions) in
+     **both** iPad orientations; below a width threshold it flips to the **iPhone layout — a
+     Paprika-style segmented ingredients/directions toggle** (Jon confirms Paprika's segmented control
+     is acceptable on iPhone). Keying the layout off *current width* (not device class) is what makes
+     the draggable split cheap — the narrow layout already has to exist for iPhone.
+  - **Detented draggable split (Jon's idea, 2026-07-03), not two modes.** A draggable grabber (the
+     divider) snaps to detents — *balanced* (default) / *chat-dive* (chat wide, reader collapsed to the
+     segmented compact layout so its content stays usable) / *reader-only* (chat closed, reader
+     full-width). This dissolves the earlier inspector-vs-focus-mode fork into one continuous control.
+     **Discipline: snap-to-detents, not free continuous resize** — free-drag split panes aren't an iOS
+     idiom; detents share the sheet-`presentationDetents` muscle. Persist the last detent. **iPad only**
+     (landscape + portrait); iPhone has no room to split, so there chat is a separate push/sheet and the
+     reader is its normal segmented self. Needs a **visible grabber** (discoverability) and a **VoiceOver
+     alternative** that cycles detents (a custom divider isn't self-evident to assistive tech).
+  - **Provider picker lives in the chat header** ("Claude ▾"), per-conversation, one tap — richer than
+     batch 2 strictly needs (batch 2 only adds the keys + a stored preference); this surfaces it in the
+     workspace.
+  - **The apply-action "control center" is inspector-resident, not a separate screen.** Selection arms a
+     compact action bar; tapping an action stages the extracted result as a **transient review card**
+     in the inspector (Commit / Discard) — the one surface that may borrow extra room (grow taller / pop
+     as a popover over the reader) because it's momentary. **The commit lands in the reader on the left**,
+     in place. The tap on Commit is the only write (ADR-0011 invariant + Amendment 1 selection-scoping).
+
+  **Spec'd:** [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) (Slice A = split +
+  width-responsive reader; Slice B = selection-scoped apply-actions). Starts after batch 2 merges;
+  awaiting Jon's dispatch greenlight.
+
+  **Same window on Menu + Meal Planner (Jon, 2026-07-03) — shapes the host now, built later.** Jon wants
+  the chat window on a **Menu** ("full make-ahead plan for this menu", "what dish is this menu missing?",
+  "good apps with this menu") and the **Meal Planner**. This is the forcing function for building the
+  workspace host **context-general** (a `RecipeChatContext.menu(...)`/`.mealPlan(...)` case + a
+  screen-supplied verb catalog), not welded into `RecipeDetailView`. The menu verbs map onto the two
+  motions ADR-0011 already named: **cross-dish make-ahead** (distill → a menu-level commit target, a
+  Menus-model decision) and **"missing dish"/"good apps"** (suggestion cards → one-tap add menu item —
+  the second motion + second context). So the review surface is designed to stage a **list** of
+  committable results (N=1 for recipe make-ahead today). Named/deferred as **separate efforts** in the
+  cooking-workspace effort doc; not built in the recipe workspace slice.
+
+- **[Effort — revises ADR-0011] Selection-scoped apply-actions.** See the drafted **Amendment 1** on
+  [ADR-0011](decisions/ADR-0011-actionable-chat-make-ahead.md) (Proposed 2026-07-03, awaiting Jon).
+  The shipped design feeds the *whole conversation* to `extract`; Jon's dogfooding insight is that
+  models don't answer in discrete commit-able units (one reply may hold three side dishes), so the
+  apply-action input should be a **highlighted text span** (conversation as context, selection as the
+  payload) and the buttons react to what's selected. A genuine evolution of the actionable-chat
+  invariant — Yes Chef is the proving ground that feeds jon-platform, so it's an ADR amendment, not a
+  silent code change.
+
 ## Menus / planning model
 
 - Does the Menus subsystem need its own ADR, and what is the canonical provenance
