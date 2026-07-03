@@ -37,27 +37,36 @@ public struct MakeAheadStep: Equatable, Sendable, Identifiable {
 }
 
 public struct MakeAheadPlanClient: Sendable {
-  public var extract: @Sendable (_ messages: [RecipeChatMessage], _ context: String) async throws -> MakeAheadPlan
+  public var extract: @Sendable (
+    _ messages: [RecipeChatMessage],
+    _ context: String,
+    _ tier: ModelTier
+  ) async throws -> MakeAheadPlan
 
   public init(
-    extract: @escaping @Sendable (_ messages: [RecipeChatMessage], _ context: String) async throws -> MakeAheadPlan
+    extract: @escaping @Sendable (
+      _ messages: [RecipeChatMessage],
+      _ context: String,
+      _ tier: ModelTier
+    ) async throws -> MakeAheadPlan
   ) {
     self.extract = extract
   }
 
   public func callAsFunction(
     messages: [RecipeChatMessage],
-    context: String
+    context: String,
+    tier: ModelTier
   ) async throws -> MakeAheadPlan {
-    try await extract(messages, context)
+    try await extract(messages, context, tier)
   }
 }
 
 extension MakeAheadPlanClient: DependencyKey {
-  public static let liveValue = MakeAheadPlanClient { messages, context in
+  public static let liveValue = MakeAheadPlanClient { messages, context, tier in
     @Dependency(\.modelClient) var modelClient
     let request = ModelRequest(
-      tier: .frontier(.anthropic),
+      tier: tier,
       system: instructions,
       prompt: prompt(messages: messages, context: context),
       maxTokens: 2048
@@ -66,7 +75,7 @@ extension MakeAheadPlanClient: DependencyKey {
     return parse(response.text)
   }
 
-  public static let testValue = MakeAheadPlanClient { _, _ in
+  public static let testValue = MakeAheadPlanClient { _, _, _ in
     MakeAheadPlan()
   }
 

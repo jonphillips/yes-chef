@@ -914,7 +914,7 @@ final class RecipeDetailModel {
     let action = ChatApplyAction<MakeAheadPlan>(
       title: "Summarize make-ahead → Make-ahead section",
       extract: { messages in
-        try await client(messages: messages, context: context)
+        try await client(messages: messages, context: context, tier: chatModel.activeTier)
       },
       commit: { [weak self] plan in
         try self?.commitMakeAheadPlan(plan)
@@ -981,7 +981,7 @@ final class RecipeDetailModel {
   }
 }
 
-private enum RecipeDetailError: Error, CustomStringConvertible {
+private enum RecipeDetailError: Error, CustomStringConvertible, LocalizedError {
   case emptyMakeAheadPlan
 
   var description: String {
@@ -990,6 +990,8 @@ private enum RecipeDetailError: Error, CustomStringConvertible {
       "The assistant did not find a make-ahead plan to save."
     }
   }
+
+  var errorDescription: String? { description }
 }
 
 enum ScaleFraction: String, CaseIterable, Identifiable {

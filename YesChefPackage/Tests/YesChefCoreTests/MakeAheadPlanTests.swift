@@ -1,6 +1,7 @@
 import CustomDump
 import Dependencies
 import Foundation
+import LLMClientKit
 import Testing
 import YesChefCore
 
@@ -67,6 +68,55 @@ extension RecipeCoreTests {
         Just before dinner: Dress the salad.
         """
       )
+    }
+
+    @Test
+    @MainActor
+    func recipeChatSendDoesNotIncludeAssistantPlaceholderInRequest() async {
+      let recorder = ModelRequestRecorder()
+
+      await withDependencies {
+        $0.modelClient = StubModelClient { request in
+          await recorder.append(request)
+          return ModelResponse(text: "Yes, make the sauce a day ahead.")
+        }
+      } operation: {
+        let model = RecipeChatModel(
+          context: .recipe(RecipeChatRecipeContext(title: "Tomato Sauce"))
+        )
+
+        await model.send("Can I make this ahead?")
+
+        let request = await recorder.first()
+        expectNoDifference(request?.messages, [.user("Can I make this ahead?")])
+        expectNoDifference(model.messages.map(\.role), [.user, .assistant])
+        expectNoDifference(
+          model.messages.map(\.text),
+          ["Can I make this ahead?", "Yes, make the sauce a day ahead."]
+        )
+      }
+    }
+
+    @Test
+    func makeAheadClientSendsRequestedModelTier() async throws {
+      let recorder = ModelRequestRecorder()
+
+      try await withDependencies {
+        $0.modelClient = StubModelClient { request in
+          await recorder.append(request)
+          return ModelResponse(text: #"{"steps":[]}"#)
+        }
+      } operation: {
+        let client = MakeAheadPlanClient.liveValue
+        _ = try await client(
+          messages: [RecipeChatMessage(role: .user, text: "Can I prep this ahead?")],
+          context: "Recipe context",
+          tier: .frontier(.openai)
+        )
+      }
+
+      let request = await recorder.first()
+      expectNoDifference(request?.tier, .frontier(.openai))
     }
 
     @Test
@@ -242,5 +292,17 @@ extension RecipeCoreTests {
         expectNoDifference(recipe.makeAhead, "Morning of: Chop the vegetables.")
       }
     }
+  }
+}
+
+private actor ModelRequestRecorder {
+  private var requests: [ModelRequest] = []
+
+  func append(_ request: ModelRequest) {
+    requests.append(request)
+  }
+
+  func first() -> ModelRequest? {
+    requests.first
   }
 }

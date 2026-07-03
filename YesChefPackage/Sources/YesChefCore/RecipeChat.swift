@@ -198,12 +198,12 @@ public struct RecipeChatMessage: Identifiable, Sendable, Equatable {
 @MainActor
 public struct ChatApplyAction<Payload: Sendable> {
   public var title: String
-  public var extract: (_ messages: [RecipeChatMessage]) async throws -> Payload
+  public var extract: @MainActor (_ messages: [RecipeChatMessage]) async throws -> Payload
   public var commit: @MainActor (_ payload: Payload) async throws -> Void
 
   public init(
     title: String,
-    extract: @escaping (_ messages: [RecipeChatMessage]) async throws -> Payload,
+    extract: @escaping @MainActor (_ messages: [RecipeChatMessage]) async throws -> Payload,
     commit: @escaping @MainActor (_ payload: Payload) async throws -> Void
   ) {
     self.title = title
@@ -232,6 +232,29 @@ public struct AnyChatApplyAction: Identifiable {
     self.run = { messages in
       let payload = try await action.run(messages: messages)
       return renderedSummary(payload)
+    }
+  }
+}
+
+public enum RecipeChatErrorText {
+  public static func describe(_ error: any Error) -> String {
+    switch error {
+    case ModelClientError.onDeviceUnavailable:
+      "On-device intelligence is not available on this device yet."
+    case ModelClientError.frontierUnavailable:
+      "No frontier model key is configured."
+    case let ModelClientError.http(status, message):
+      "The model returned an error (\(status))." + (message.map { " \($0)" } ?? "")
+    case ModelClientError.malformedResponse:
+      "The model returned a response the app could not read."
+    default:
+      if let localizedError = error as? any LocalizedError,
+        let description = localizedError.errorDescription
+      {
+        description
+      } else {
+        "Something went wrong reaching the model."
+      }
     }
   }
 }
@@ -280,18 +303,19 @@ public final class RecipeChatModel: Identifiable {
     errorText = nil
     defer { isResponding = false }
 
+    let requestMessages = history()
     let index = appendAssistantPlaceholder()
     do {
       if case .frontier = activeTier {
         let response = try await modelClient.complete(
-          ModelRequest(tier: activeTier, system: systemPrompt(), messages: history(), maxTokens: 2048)
+          ModelRequest(tier: activeTier, system: systemPrompt(), messages: requestMessages, maxTokens: 2048)
         )
         messages[index].text = response.text.isEmpty ? "(No response.)" : response.text
       } else {
         let request = ModelRequest(
           tier: activeTier,
           system: systemPrompt(),
-          messages: history(),
+          messages: requestMessages,
           maxTokens: 1024
         )
         for try await chunk in modelClient.stream(request) {
@@ -330,8 +354,11 @@ public final class RecipeChatModel: Identifiable {
   }
 
   private func history() -> [ModelMessage] {
-    messages.map { message in
-      ModelMessage(role: message.role == .user ? .user : .assistant, text: message.text)
+    messages.compactMap { message in
+      guard !message.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        return nil
+      }
+      return ModelMessage(role: message.role == .user ? .user : .assistant, text: message.text)
     }
   }
 
@@ -350,15 +377,6 @@ public final class RecipeChatModel: Identifiable {
   }
 
   private func describe(_ error: any Error) -> String {
-    switch error {
-    case ModelClientError.onDeviceUnavailable:
-      "On-device intelligence is not available on this device yet."
-    case ModelClientError.frontierUnavailable:
-      "No frontier model key is configured."
-    case let ModelClientError.http(status, message):
-      "The model returned an error (\(status))." + (message.map { " \($0)" } ?? "")
-    default:
-      "Something went wrong reaching the model."
-    }
+    RecipeChatErrorText.describe(error)
   }
 }

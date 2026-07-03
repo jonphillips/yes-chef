@@ -420,7 +420,7 @@ private struct RecipeChatPanel: View {
         actionSummary = summary
       }
     } catch {
-      actionError = String(describing: error)
+      actionError = RecipeChatErrorText.describe(error)
     }
   }
 }
