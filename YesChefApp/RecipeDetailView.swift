@@ -698,7 +698,6 @@ private struct ScalePanel: View {
             ForEach(ScaleFraction.allCases) { fraction in
               Text(fraction.label)
                 .tag(fraction)
-                .disabled(model.scaleWholePart == 0 && fraction.value < ScaleFraction.minimumScale)
             }
           }
           .pickerStyle(.wheel)

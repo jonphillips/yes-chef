@@ -945,11 +945,6 @@ final class RecipeDetailModel {
     syncScalePickerFromCurrentScale()
   }
 
-  func multiplierButtonTapped(_ multiplier: Double) {
-    scaleFactor = multiplier
-    syncScalePickerFromCurrentScale()
-  }
-
   func scalePickerChanged() {
     var value = Double(scaleWholePart) + scaleFraction.value
     if value < ScaleFraction.minimumScale {
