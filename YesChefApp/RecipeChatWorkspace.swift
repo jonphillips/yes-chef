@@ -545,10 +545,10 @@ private struct SelectableAssistantText: UIViewRepresentable {
   }
 
   func updateUIView(_ textView: UITextView, context: Context) {
-    context.coordinator.text = text
     context.coordinator.selectedText = $selectedText
-    if textView.attributedText?.string != text {
-      textView.attributedText = Self.attributedText(for: text)
+    let rendered = Self.attributedText(for: text)
+    if textView.attributedText?.string != rendered.string {
+      textView.attributedText = rendered
     }
   }
 
@@ -581,7 +581,6 @@ private struct SelectableAssistantText: UIViewRepresentable {
   }
 
   final class Coordinator: NSObject, UITextViewDelegate {
-    var text: String = ""
     var selectedText: Binding<String>
 
     init(selectedText: Binding<String>) {
@@ -589,11 +588,14 @@ private struct SelectableAssistantText: UIViewRepresentable {
     }
 
     func textViewDidChangeSelection(_ textView: UITextView) {
-      guard let range = Range(textView.selectedRange, in: text) else {
+      guard
+        let selectedRange = textView.selectedTextRange,
+        let selected = textView.text(in: selectedRange)
+      else {
         selectedText.wrappedValue = ""
         return
       }
-      selectedText.wrappedValue = String(text[range])
+      selectedText.wrappedValue = selected
     }
   }
 }
