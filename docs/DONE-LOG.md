@@ -10,6 +10,43 @@ Newest first.
 
 ---
 
+## Dogfood fixes — batch 2 (multiplier clip + AI provider picker)
+
+**Merged 2026-07-03** — yes-chef [PR #71](https://github.com/jonphillips/yes-chef/pull/71). Two
+design-free slices; ran in parallel with the cooking-workspace design.
+
+- **Slice 1 — full-screen scale-multiplier clip fix:** the scale control no longer clips off the bottom
+  in the full-screen recipe presentation (tactical fix; the cooking-workspace effort relocates the
+  control to the toolbar structurally).
+- **Slice 2 — AI provider picker:** `AISettingsView` now holds both a Claude and a ChatGPT (OpenAI) key
+  against the multi-provider `APIKeyStore`; a stored `RecipeChatProviderPreference`
+  (`recipeChatFrontierProviderKey`) lets the recipe chat pick its frontier provider
+  (`RecipeChatModel.selectedProvider` / `availableProviders` / `activeTier`). No new backend — surfaced
+  LLMClientKit's existing `OpenAIModelClient`; mirrors Galavant's provider-picker shape.
+
+Effort doc: [`docs/efforts/dogfood-fixes-batch-2.md`](efforts/dogfood-fixes-batch-2.md).
+
+---
+
+## Recipe-multiplier rework — Slice C (per-placement persisted scale)
+
+**Architect-approved 2026-07-03** — yes-chef [PR #70](https://github.com/jonphillips/yes-chef/pull/70).
+Final slice of the dogfood-driven multiplier rework; closes the effort.
+
+- Additive, sync-safe scale columns via one migration (`Schema.swift`): `viewScale` on `recipes`,
+  `scale` on `menuItems` and `mealPlanItems` (all default `1.0`). New `RecipeScaleCore` +
+  `RecipeScaleFormatting` seam and a small injected `ScaleContext` (`.recipe`/`.menuItem`/
+  `.mealPlanItem`) so `RecipeDetailModel` reads the initial factor from — and writes changes back to —
+  the storage site the context names (one read/write seam, not a branch per screen). Bare-recipe scale
+  round-trips through iCloud. `RecipeScaleTests` added.
+- Investigation confirmed the menu/planner navigation into recipe detail; all three `RecipeDetailView(`
+  constructions were routed through the `ScaleContext` seam (`RecipeLibraryView`/`MenuViews`/
+  `MealCalendarViews`).
+
+Effort doc: [`docs/efforts/recipe-multiplier-rework.md`](efforts/recipe-multiplier-rework.md) — **complete**.
+
+---
+
 ## Recipe-multiplier rework — Slices A+B (parse fix + dial-as-multiplier)
 
 **Architect-approved 2026-07-03** — yes-chef [PR #69](https://github.com/jonphillips/yes-chef/pull/69).
