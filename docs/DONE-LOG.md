@@ -10,6 +10,40 @@ Newest first.
 
 ---
 
+## Dogfood fixes — batch 3 (ingredient structure · Chef It Up + Serve With · substitution · keep-awake)
+
+**Architect-approved 2026-07-03** — yes-chef [PR #75](https://github.com/jonphillips/yes-chef/pull/75).
+Four cohesive slices in one PR, all from Jon's 2026-07-03 dogfooding. Effort doc:
+[`docs/efforts/dogfood-fixes-batch-3.md`](efforts/dogfood-fixes-batch-3.md).
+
+- **Slice 1 — ingredient list honors headers/sections/spacing.** `ingredientLineList` stopped
+  hardcoding `"• "` on every line: `IngredientLine.isHeader` renders as a bold, bullet-less heading;
+  `IngredientSection.name` renders as a subsection heading with spacing (`ingredientGroups`). The editor
+  exposes the first section's title plus a per-line Header toggle; out-of-scope sections round-trip
+  untouched. No schema change — the model already carried it.
+- **Slice 2 — AI verbs Chef It Up + Serve With, verb buttons collapsed to an "Apply…" `Menu`.** Both
+  mirror the make-ahead pattern end-to-end (additive-nullable `Recipe.chefItUp: String?` /
+  `Recipe.serveWith: Data?`, structured extract client + pure commit op + catalog entry + own reader
+  section with clear-as-undo). Serve With is a `{title, note}` accompaniment **list** with identity
+  (`ServeWithItem.id`), each independently removable — *not* a Recipe row (promote-later seam left open).
+- **Slice 3 — ingredient substitution, per-line, reveal-on-tap.** Additive-nullable
+  `IngredientLine.substitution: String?`; a subtle swap glyph reveals the sub inline so the list stays
+  scannable. Entry is from the ingredient row ("Find Substitute"), model proposes → explicit review sheet
+  → tap writes `line.substitution`; manual set/clear via the editor. Clear = undo.
+- **Slice 4 — keep the screen awake in the cook/reader presentation only.** New
+  `keepsScreenAwakeWhilePresented()` modifier disables the idle timer while `.active`, restores it on
+  background (`scenePhase`) and disappear; applied to `RecipeReaderView` + `CookingModeView`, not global.
+
+New sync-safe columns (all additive-nullable, no unique index, UUID PKs; `serveWith` BLOB syncs as a
+CKAsset like `originalSnapshot`, [[sqlitedata-blob-cloudkit-asset]]). Codex authored; architect reviewed.
+Verified: `swift build` clean, `swift test` 135 pass (new enrichment-parse, commit/independent-undo,
+substitution-write, and editor-structure round-trip tests), check-drift clean. Non-blocking notes handed
+to Jon's device pass: keep-awake re-assert when backing out of cooking into the still-present reader;
+read-only substitution review sheet; editing a line's text drops its metadata; incidental `viewScale`
+preservation on edit. Menu/Meal-Planner chat verbs and reader photo affordances remain later efforts.
+
+---
+
 ## Cooking workspace — Slice B (selection-scoped apply-actions + review card)
 
 **Architect-approved 2026-07-03** — yes-chef [PR #74](https://github.com/jonphillips/yes-chef/pull/74).

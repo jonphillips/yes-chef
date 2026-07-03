@@ -1,6 +1,8 @@
 # Current Handoff
 
-Last updated: July 3, 2026 (Cooking workspace Slice B approved, PR #74 → DONE-LOG — cooking-workspace effort complete; Next Up = Phase E (grocery/pantry). Lean verification is the default; Menu/Planner chat verbs + reader photo affordances roadmapped in the effort doc.)
+Last updated: July 3, 2026 (Dogfood batch 3 approved, PR #75 → DONE-LOG — ingredient structure + AI
+verbs + substitution + keep-awake shipped. Next Up = Phase E (grocery/pantry); confirm first-slice shape
+with Jon before dispatching. Lean verification is the default.)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -18,27 +20,30 @@ PR); do all listed, in order.
 
 **Recipe → grocery list w/ pantry checking (Phase E).** Full spec: [[grocery-pantry-threshold-design]].
 Make it slick early — canonical-key merge across recipes, static pantry thresholds, dialog-free (no
-inventory). Lower priority than the (now-complete) dogfood/cooking-workspace work per Jon's stated intent
-(2026-07-01), so slice scope is open — **STOP and confirm the first slice's shape with Jon before
+inventory). Slice scope is open — **STOP and confirm the first slice's shape with Jon before
 dispatching** rather than inferring it from the design memo.
 
-The cooking-workspace effort is **complete** (Slices A + B shipped, PRs #73 / #74 → DONE-LOG). Its named
-follow-ons — **Menu + Meal-Planner chat verbs** and **reader photo affordances** (manual set-as-cover,
-pinch-zoom) — live in [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) as separate
-later efforts; the host was built context-general to receive them. Jon is dogfooding the new
-chat/make-ahead tools, which may reprioritize.
+Dogfood batch 3 is **complete** (ingredient structure · Chef It Up + Serve With · substitution ·
+keep-awake; PR #75 → DONE-LOG). The cooking-workspace effort is **complete** (Slices A + B shipped,
+PRs #73 / #74 → DONE-LOG). Its named
+follow-ons — **Menu + Meal-Planner chat verbs** and **reader photo affordances** — live in
+[`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) as separate later efforts.
 
 ## Ready Efforts (queue)
 
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target.
 
+- **Recipe → grocery list w/ pantry checking** (Phase E) — **now Next Up**. Make it slick early
+  (canonical-key merge, static pantry thresholds, dialog-free); spec = [[grocery-pantry-threshold-design]].
+  Slice scope still open — confirm the first slice's shape with Jon first.
+
+- **Dogfood fixes — batch 3** — complete (PR #75 → DONE-LOG; ingredient structure · Chef It Up +
+  Serve With · substitution · keep-awake). Non-blocking device-pass notes recorded in the DONE-LOG entry.
+
 - **Dogfood fixes — batches 1 & 2** — complete (PR #66, PR #71 → DONE-LOG). The batch-1 Slice 7
   delete-source-clobbers-amount-edit follow-up remains parked in
   [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) for a later grocery slice.
-
-- **Recipe → grocery list w/ pantry checking** (Phase E) — **now Next Up**. Make it slick early
-  (canonical-key merge, static pantry thresholds, dialog-free); spec = [[grocery-pantry-threshold-design]].
 
 - **Cooking workspace** — **complete** (Slices A + B, PRs #73 / #74 → DONE-LOG). Menu + Meal-Planner chat
   verbs and the reader **photo affordances** (manual set-as-cover, pinch-zoom in the viewer) are named in
