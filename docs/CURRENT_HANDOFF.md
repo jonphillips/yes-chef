@@ -1,8 +1,8 @@
 # Current Handoff
 
-Last updated: July 3, 2026 (Dogfood batch 3 approved, PR #75 → DONE-LOG — ingredient structure + AI
-verbs + substitution + keep-awake shipped. Next Up = Phase E (grocery/pantry); confirm first-slice shape
-with Jon before dispatching. Lean verification is the default.)
+Last updated: July 3, 2026 (Dogfood batch 3 approved, PR #75 → DONE-LOG. Next Up = Phase E, first
+dispatch shaped with Jon: Slice 1 + 2 batched (canonical key + `Measure`, pure-core, no migration;
+`canonicalName` cache deferred to Slice 3). Ready to dispatch to Codex. Lean verification is the default.)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -18,10 +18,26 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Recipe → grocery list w/ pantry checking (Phase E).** Full spec: [[grocery-pantry-threshold-design]].
-Make it slick early — canonical-key merge across recipes, static pantry thresholds, dialog-free (no
-inventory). Slice scope is open — **STOP and confirm the first slice's shape with Jon before
-dispatching** rather than inferring it from the design memo.
+**Phase E — grocery/pantry, first dispatch: Slice 1 + Slice 2 batched.** Full spec + build order:
+[`docs/milestones/grocery-consolidation-and-pantry.md`](milestones/grocery-consolidation-and-pantry.md)
+(read it and the **architect amendment 2026-07-03** near "The slices"; boundaries in
+FUTURE_INTELLIGENCE §7.5/§13/§14). One PR, both slices, pure-core `YesChefCore`, **no UI, no schema
+migration**:
+- **Slice 1 — one canonical key + alias table.** Introduce `CanonicalIngredient.canonicalName(_:)` as
+  the single normalizer + a **data** alias/override table (replacing the `anchovy → anchovies` `switch`
+  at `GroceryCore.swift:1015` and absorbing the `defaultStaples` list). Re-point `canConsolidate` and
+  `isPantryStaple` at this one key; delete/collapse `groceryConsolidationKey` and `normalizedPantryText`.
+  **Compute the key on read — do NOT add a `canonicalName` column** (that cache is deferred to Slice 3
+  per the amendment). No behavior change: nothing hidden today becomes visible.
+- **Slice 2 — bounded `Measure` compare/merge.** Known units → dimension (volume/weight/count) with
+  conversion factors; `merge` combines only same-dimension known units (`8 oz + 1 lb → 24 oz`),
+  else rows stay separate; `compare(total, threshold) → .over/.underOrEqual/.incomparable`. No
+  cross-dimension guessing, no invented factors.
+- **Tests, no UI/model:** anchovy pair + scallion/green-onion + a plural pair merge via the alias table
+  with no code branch; both old normalizers' behaviors preserved; within-dimension merges; cross-dim /
+  unknown-unit pairs report incomparable. Guard the **no-inventory** boundary (§14) — static rules only.
+- **Do NOT build** Slice 3 (pantry policy + the deferred `canonicalName` migration) or Slice 4
+  (`PantrySuppression` + review UI) — those are the next dispatches.
 
 Dogfood batch 3 is **complete** (ingredient structure · Chef It Up + Serve With · substitution ·
 keep-awake; PR #75 → DONE-LOG). The cooking-workspace effort is **complete** (Slices A + B shipped,
@@ -34,9 +50,11 @@ follow-ons — **Menu + Meal-Planner chat verbs** and **reader photo affordances
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target.
 
-- **Recipe → grocery list w/ pantry checking** (Phase E) — **now Next Up**. Make it slick early
-  (canonical-key merge, static pantry thresholds, dialog-free); spec = [[grocery-pantry-threshold-design]].
-  Slice scope still open — confirm the first slice's shape with Jon first.
+- **Recipe → grocery list w/ pantry checking** (Phase E) — **now Next Up**, first dispatch = Slice 1 + 2
+  batched (canonical key + `Measure`, pure-core, no migration; `canonicalName` cache deferred to Slice 3).
+  Build order + architect amendment (2026-07-03) in
+  [`docs/milestones/grocery-consolidation-and-pantry.md`](milestones/grocery-consolidation-and-pantry.md);
+  design rationale = [[grocery-pantry-threshold-design]]. Slices 3–4 follow as later dispatches.
 
 - **Dogfood fixes — batch 3** — complete (PR #75 → DONE-LOG; ingredient structure · Chef It Up +
   Serve With · substitution · keep-awake). Non-blocking device-pass notes recorded in the DONE-LOG entry.
