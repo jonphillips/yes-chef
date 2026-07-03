@@ -878,8 +878,7 @@ final class RecipeDetailModel {
   var displayablePhotos: [RecipePhoto] {
     detail?.photos
       .filter { photo in
-        photo.kind != .referenceDocument
-          && (photo.displayData != nil || photo.thumbnailData != nil)
+        photo.displayData != nil || photo.thumbnailData != nil
       } ?? []
   }
 

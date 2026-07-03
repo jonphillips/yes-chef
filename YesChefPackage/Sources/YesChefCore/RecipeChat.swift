@@ -74,6 +74,30 @@ public enum RecipeChatContext: Equatable, Sendable {
     }
   }
 
+  public var subject: String {
+    switch self {
+    case .recipe: "recipe"
+    }
+  }
+
+  public var promptSubjectDescription: String {
+    switch self {
+    case .recipe: "the recipe the user is looking at"
+    }
+  }
+
+  public var seededContextDescription: String {
+    switch self {
+    case .recipe: "Seeded with the recipe on screen."
+    }
+  }
+
+  public var providerContextWarning: String {
+    switch self {
+    case .recipe: "Recipe context leaves the device for this conversation."
+    }
+  }
+
   public func serialized() -> String {
     switch self {
     case let .recipe(context): context.serialized()
@@ -375,7 +399,7 @@ public final class RecipeChatModel: Identifiable {
   public func systemPrompt() -> String {
     let base = """
       You are a concise, practical cooking assistant inside a private recipe app.
-      Discuss the recipe the user is looking at, described below. Help with timing,
+      Discuss \(context.promptSubjectDescription), described below. Help with timing,
       prep, substitutions, troubleshooting, and planning. You propose and explain;
       you never claim to have edited or saved the recipe yourself.
 

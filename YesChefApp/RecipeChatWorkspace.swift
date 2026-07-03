@@ -259,7 +259,7 @@ struct RecipeChatPanel: View {
         }
 
         HStack(alignment: .bottom, spacing: 8) {
-          TextField("Ask about this recipe", text: $draft, axis: .vertical)
+          TextField("Ask about this \(chatModel.context.subject)", text: $draft, axis: .vertical)
             .textFieldStyle(.roundedBorder)
             .lineLimit(1...4)
             .onSubmit {
@@ -283,8 +283,10 @@ struct RecipeChatPanel: View {
     .navigationTitle(chatModel.context.title)
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
-      ToolbarItem(placement: .topBarTrailing) {
-        ChatTierMenu(chatModel: chatModel)
+      if !showsEmbeddedHeader {
+        ToolbarItem(placement: .topBarTrailing) {
+          ChatTierMenu(chatModel: chatModel)
+        }
       }
     }
   }
@@ -328,8 +330,8 @@ private struct ChatContextHeader: View {
         .foregroundStyle(.secondary)
       Text(
         chatModel.sendsToProvider
-          ? "Recipe context leaves the device for this conversation."
-          : "Seeded with the recipe on screen."
+          ? chatModel.context.providerContextWarning
+          : chatModel.context.seededContextDescription
       )
         .font(.footnote)
         .foregroundStyle(.secondary)

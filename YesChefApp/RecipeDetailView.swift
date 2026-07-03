@@ -10,18 +10,24 @@ struct RecipeDetailView: View {
   let libraryModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
+  let isFocusActive: Bool
+  let focusButtonTapped: (() -> Void)?
 
   init(
     recipeID: Recipe.ID,
     scaleContext: ScaleContext? = nil,
     libraryModel: RecipeLibraryModel,
     mealCalendarModel: MealCalendarModel,
-    groceryModel: GroceryLibraryModel
+    groceryModel: GroceryLibraryModel,
+    isFocusActive: Bool = false,
+    focusButtonTapped: (() -> Void)? = nil
   ) {
     _model = State(wrappedValue: RecipeDetailModel(recipeID: recipeID, scaleContext: scaleContext))
     self.libraryModel = libraryModel
     self.mealCalendarModel = mealCalendarModel
     self.groceryModel = groceryModel
+    self.isFocusActive = isFocusActive
+    self.focusButtonTapped = focusButtonTapped
   }
 
   var body: some View {
@@ -38,6 +44,16 @@ struct RecipeDetailView: View {
     }
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {
+        if isSplitEnabled, let focusButtonTapped {
+          Button {
+            focusButtonTapped()
+          } label: {
+            Label(
+              "Focus",
+              systemImage: isFocusActive ? "rectangle.expand" : "arrow.up.left.and.arrow.down.right"
+            )
+          }
+        }
         if !model.ingredientLines.isEmpty {
           Button {
             model.scaleButtonTapped()
@@ -153,6 +169,7 @@ private struct RecipeReaderView: View {
   let libraryModel: RecipeLibraryModel
 
   @State private var compactSection: CompactSection = .ingredients
+  @State private var isPhotoGalleryPresented = false
 
   var body: some View {
     GeometryReader { proxy in
@@ -168,6 +185,23 @@ private struct RecipeReaderView: View {
         } else {
           ContentUnavailableView("Recipe Not Found", systemImage: "fork.knife")
             .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+        }
+      }
+    }
+    .sheet(isPresented: $isPhotoGalleryPresented) {
+      NavigationStack {
+        ScrollView {
+          RecipePhotoGallery(photos: model.displayablePhotos)
+            .padding()
+        }
+        .navigationTitle("Photos")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+          ToolbarItem(placement: .cancellationAction) {
+            Button("Done") {
+              isPhotoGalleryPresented = false
+            }
+          }
         }
       }
     }
@@ -196,8 +230,10 @@ private struct RecipeReaderView: View {
           }
         }
         Spacer(minLength: 12)
-        if let photo = model.primaryDisplayPhoto {
-          RecipeReaderThumbnail(photo: photo)
+        if !model.displayablePhotos.isEmpty, let photo = model.primaryDisplayPhoto {
+          RecipeReaderThumbnail(photo: photo) {
+            isPhotoGalleryPresented = true
+          }
         }
       }
     }
@@ -425,12 +461,17 @@ private extension RecipeDetailModel {
 
 private struct RecipeReaderThumbnail: View {
   let photo: RecipePhoto
+  let action: () -> Void
 
   var body: some View {
     if let data = photo.thumbnailData ?? photo.displayData {
-      RecipePhotoFrame(data: data, aspectRatio: 1)
-        .frame(width: 112, height: 112)
-        .accessibilityLabel(Text(photo.caption ?? "Recipe photo"))
+      Button(action: action) {
+        RecipePhotoFrame(data: data, aspectRatio: 1)
+          .frame(width: 112, height: 112)
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(Text(photo.caption ?? "Recipe photo"))
+      .accessibilityHint(Text("Opens photo gallery."))
     }
   }
 }
@@ -492,6 +533,7 @@ private extension Optional where Wrapped == String {
 private struct RecipePhotoGallery: View {
   let photos: [RecipePhoto]
   @State private var selectedPhotoID: RecipePhoto.ID?
+  @State private var enlargedPhoto: RecipePhoto?
 
   private var selectedPhoto: RecipePhoto? {
     if let selectedPhotoID, let photo = photos.first(where: { $0.id == selectedPhotoID }) {
@@ -503,9 +545,15 @@ private struct RecipePhotoGallery: View {
   var body: some View {
     if let selectedPhoto, let data = selectedPhoto.displayData ?? selectedPhoto.thumbnailData {
       VStack(alignment: .leading, spacing: 10) {
-        RecipePhotoFrame(data: data, aspectRatio: selectedPhoto.displayAspectRatio)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .accessibilityLabel(Text(selectedPhoto.caption ?? "Recipe photo"))
+        Button {
+          enlargedPhoto = selectedPhoto
+        } label: {
+          RecipePhotoFrame(data: data, aspectRatio: selectedPhoto.displayAspectRatio)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(selectedPhoto.caption ?? "Recipe photo"))
+        .accessibilityHint(Text("Opens enlarged photo."))
 
         if let caption = selectedPhoto.caption {
           Text(caption)
@@ -542,6 +590,41 @@ private struct RecipePhotoGallery: View {
           .scrollIndicators(.hidden)
         }
       }
+      .fullScreenCover(item: $enlargedPhoto) { photo in
+        RecipePhotoFullScreenView(photo: photo)
+      }
+    }
+  }
+}
+
+private struct RecipePhotoFullScreenView: View {
+  @Environment(\.dismiss) private var dismiss
+  let photo: RecipePhoto
+
+  var body: some View {
+    ZStack {
+      Color.black
+        .ignoresSafeArea()
+
+      if let data = photo.displayData ?? photo.thumbnailData {
+        RecipePhotoImage(data: data)
+          .aspectRatio(photo.displayAspectRatio, contentMode: .fit)
+          .padding()
+          .accessibilityLabel(Text(photo.caption ?? "Recipe photo"))
+      }
+    }
+    .overlay(alignment: .topTrailing) {
+      Button {
+        dismiss()
+      } label: {
+        Image(systemName: "xmark.circle.fill")
+          .font(.largeTitle)
+          .symbolRenderingMode(.hierarchical)
+          .foregroundStyle(.white)
+      }
+      .buttonStyle(.plain)
+      .padding()
+      .accessibilityLabel(Text("Close"))
     }
   }
 }
