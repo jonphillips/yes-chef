@@ -1,3 +1,4 @@
+import LLMClientKit
 import SwiftUI
 import SwiftUINavigation
 import UIKit
@@ -62,6 +63,21 @@ struct RecipeDetailView: View {
     }
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {
+        if !model.ingredientLines.isEmpty {
+          Button {
+            model.scaleButtonTapped()
+          } label: {
+            Label(model.scaleSummary, systemImage: "slider.horizontal.3")
+          }
+          .popover(
+            isPresented: $model.destination.scaling,
+            attachmentAnchor: .rect(.bounds),
+            arrowEdge: .top
+          ) {
+            ScalePanel(model: model)
+              .presentationCompactAdaptation(.popover)
+          }
+        }
         Button {
           model.chatButtonTapped()
         } label: {
@@ -212,20 +228,9 @@ struct RecipeDetailView: View {
         Text("Ingredients")
           .font(.title2.bold())
         Spacer()
-        Button {
-          model.scaleButtonTapped()
-        } label: {
-          Label(model.scaleSummary, systemImage: "slider.horizontal.3")
-        }
-        .buttonStyle(.bordered)
-        .popover(
-          isPresented: $model.destination.scaling,
-          attachmentAnchor: .rect(.bounds),
-          arrowEdge: .top
-        ) {
-          ScalePanel(model: model)
-            .presentationCompactAdaptation(.popover)
-        }
+        Text(model.scaleSummary)
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
       }
       let groups = model.ingredientGroups
       VStack(alignment: .leading, spacing: 12) {
@@ -395,13 +400,7 @@ private struct RecipeChatPanel: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {
-        if chatModel.frontierAvailable {
-          Toggle(isOn: $chatModel.useFrontier) {
-            Label("Use frontier model", systemImage: "network")
-          }
-          .toggleStyle(.button)
-          .accessibilityHint(Text("When enabled, recipe context leaves the device."))
-        }
+        ChatTierMenu(chatModel: chatModel)
       }
     }
   }
@@ -437,14 +436,68 @@ private struct ChatContextHeader: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      Label(chatModel.sendsToProvider ? "Frontier model" : "On-device", systemImage: chatModel.sendsToProvider ? "network" : "iphone")
+      Label(
+        chatModel.sendsToProvider ? chatModel.selectedProvider.displayName : "On-device",
+        systemImage: chatModel.sendsToProvider ? "network" : "iphone"
+      )
         .font(.caption.bold())
         .foregroundStyle(.secondary)
-      Text(chatModel.sendsToProvider ? "Recipe context leaves the device for this conversation." : "Seeded with the recipe on screen.")
+      Text(
+        chatModel.sendsToProvider
+          ? "Recipe context leaves the device for this conversation."
+          : "Seeded with the recipe on screen."
+      )
         .font(.footnote)
         .foregroundStyle(.secondary)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+}
+
+private struct ChatTierMenu: View {
+  let chatModel: RecipeChatModel
+
+  @AppStorage(recipeChatFrontierProviderKey)
+  private var preferredProviderRaw = FrontierProvider.anthropic.rawValue
+
+  var body: some View {
+    @Bindable var chatModel = chatModel
+
+    Menu {
+      Button {
+        chatModel.useFrontier = false
+      } label: {
+        Label("On-device (private)", systemImage: "iphone")
+        if !chatModel.sendsToProvider {
+          Image(systemName: "checkmark")
+        }
+      }
+
+      ForEach(FrontierProvider.allCases) { provider in
+        Button {
+          preferredProviderRaw = provider.rawValue
+          chatModel.selectedProvider = provider
+          chatModel.useFrontier = true
+        } label: {
+          Label("\(provider.displayName) (sends data off device)", systemImage: "network")
+          if chatModel.sendsToProvider, chatModel.selectedProvider == provider {
+            Image(systemName: "checkmark")
+          }
+        }
+        .disabled(!chatModel.availableProviders.contains(provider))
+      }
+    } label: {
+      HStack(spacing: 4) {
+        Image(systemName: chatModel.sendsToProvider ? "network" : "iphone")
+          .foregroundStyle(chatModel.sendsToProvider ? .blue : .green)
+        Text(chatModel.sendsToProvider ? chatModel.selectedProvider.displayName : "On-device")
+          .font(.subheadline)
+        Image(systemName: "chevron.up.chevron.down")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .accessibilityHint(Text("Choose whether recipe context stays on device or is sent to a configured provider."))
   }
 }
 

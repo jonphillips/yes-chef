@@ -2,6 +2,7 @@ import CustomDump
 import Dependencies
 import Foundation
 import LLMClientKit
+import Synchronization
 import Testing
 import YesChefCore
 
@@ -117,6 +118,66 @@ extension RecipeCoreTests {
 
       let request = await recorder.first()
       expectNoDifference(request?.tier, .frontier(.openai))
+    }
+
+    @Test
+    @MainActor
+    func recipeChatDefaultsToOnlyConfiguredProvider() {
+      withDependencies {
+        $0.apiKeyStore = apiKeyStore([.openai: "sk-openai"])
+      } operation: {
+        let model = RecipeChatModel(
+          context: .recipe(RecipeChatRecipeContext(title: "Tomato Sauce"))
+        )
+
+        model.useFrontier = true
+
+        expectNoDifference(model.selectedProvider, .openai)
+        expectNoDifference(model.activeTier, .frontier(.openai))
+      }
+    }
+
+    @Test
+    @MainActor
+    func recipeChatUsesStoredProviderWhenConfigured() {
+      withDependencies {
+        $0.apiKeyStore = apiKeyStore([.anthropic: "sk-ant", .openai: "sk-openai"])
+        $0.recipeChatProviderPreference = RecipeChatProviderPreference(
+          current: { .openai },
+          set: { _ in }
+        )
+      } operation: {
+        let model = RecipeChatModel(
+          context: .recipe(RecipeChatRecipeContext(title: "Tomato Sauce"))
+        )
+
+        model.useFrontier = true
+
+        expectNoDifference(model.selectedProvider, .openai)
+        expectNoDifference(model.activeTier, .frontier(.openai))
+      }
+    }
+
+    @Test
+    @MainActor
+    func recipeChatPersistsSelectedProvider() {
+      let storedProvider = Mutex<FrontierProvider?>(nil)
+
+      withDependencies {
+        $0.apiKeyStore = apiKeyStore([.anthropic: "sk-ant", .openai: "sk-openai"])
+        $0.recipeChatProviderPreference = RecipeChatProviderPreference(
+          current: { storedProvider.withLock { $0 } },
+          set: { provider in storedProvider.withLock { $0 = provider } }
+        )
+      } operation: {
+        let model = RecipeChatModel(
+          context: .recipe(RecipeChatRecipeContext(title: "Tomato Sauce"))
+        )
+
+        model.selectedProvider = .openai
+
+        expectNoDifference(storedProvider.withLock { $0 }, .openai)
+      }
     }
 
     @Test
@@ -293,6 +354,14 @@ extension RecipeCoreTests {
       }
     }
   }
+}
+
+private func apiKeyStore(_ keys: [FrontierProvider: String]) -> APIKeyStore {
+  let storage = Mutex(keys)
+  return APIKeyStore(
+    read: { provider in storage.withLock { $0[provider] } },
+    write: { provider, key in storage.withLock { $0[provider] = key } }
+  )
 }
 
 private actor ModelRequestRecorder {
