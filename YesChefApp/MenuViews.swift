@@ -5,7 +5,7 @@ import YesChefCore
 struct MenusStack: View {
   let model: MenuLibraryModel
   let recipeModel: RecipeLibraryModel
-  var onRecipeSelected: ((Recipe.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
     @Bindable var model = model
@@ -94,7 +94,7 @@ private struct MenuRowView: View {
 struct MenuDetailColumn: View {
   let model: MenuLibraryModel
   let recipeModel: RecipeLibraryModel
-  var onRecipeSelected: ((Recipe.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
     if let menuID = model.selectedMenuID {
@@ -114,7 +114,7 @@ struct MenuDetailColumn: View {
 struct MenuDetailView: View {
   let model: MenuLibraryModel
   let recipeModel: RecipeLibraryModel
-  var onRecipeSelected: ((Recipe.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   @State private var detailModel: MenuDetailModel
   @State private var isShowingRecipeBrowser = false
 
@@ -122,7 +122,7 @@ struct MenuDetailView: View {
     model: MenuLibraryModel,
     recipeModel: RecipeLibraryModel,
     menuID: CoreMenu.ID,
-    onRecipeSelected: ((Recipe.ID) -> Void)? = nil
+    onRecipeSelected: ((RecipeDetailPresentation) -> Void)? = nil
   ) {
     self.model = model
     self.recipeModel = recipeModel
@@ -224,7 +224,7 @@ private struct MenuDishList: View {
   let model: MenuLibraryModel
   let menu: CoreMenu
   let detail: MenuDetailData
-  var onRecipeSelected: ((Recipe.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -266,7 +266,7 @@ private struct MenuDaySection: View {
   let dayOffset: Int
   let scheduledDate: Date?
   let rows: [MenuItemRowData]
-  var onRecipeSelected: ((Recipe.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -346,13 +346,18 @@ private struct MenuDaySection: View {
 
 private struct MenuDishRowView: View {
   let row: MenuItemRowData
-  var onRecipeSelected: ((Recipe.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
     Group {
       if let recipeID = row.recipe?.id, let onRecipeSelected {
         Button {
-          onRecipeSelected(recipeID)
+          onRecipeSelected(
+            RecipeDetailPresentation(
+              recipeID: recipeID,
+              scaleContext: .menuItem(row.item.id)
+            )
+          )
         } label: {
           rowContent
         }
@@ -397,7 +402,7 @@ private struct MenuDishRowView: View {
 
 private struct MenuRecipeBrowserPanel: View {
   let recipeModel: RecipeLibraryModel
-  var onRecipeSelected: ((Recipe.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
     @Bindable var recipeModel = recipeModel
@@ -438,7 +443,7 @@ private struct MenuRecipeBrowserPanel: View {
         } else {
           ForEach(recipeModel.visibleRecipeRows) { row in
             Button {
-              onRecipeSelected?(row.recipe.id)
+              onRecipeSelected?(RecipeDetailPresentation(recipeID: row.recipe.id))
             } label: {
               RecipeListRow(
                 row: row,

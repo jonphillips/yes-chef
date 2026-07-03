@@ -16,7 +16,7 @@ struct AppContainer: View {
   @State private var groceryModel: GroceryLibraryModel
   @State private var selectedSection: AppSection? = .recipes
   @State private var selectedSettingsPane: SettingsPane? = .categories
-  @State private var presentedRecipeID: Recipe.ID?
+  @State private var presentedRecipe: RecipeDetailPresentation?
 
   init() {
     let toastCenter = AppToastCenter()
@@ -41,13 +41,13 @@ struct AppContainer: View {
       selectedSection: $selectedSection,
       selectedSettingsPane: $selectedSettingsPane,
       onBrowserCapture: browserCaptureButtonTapped,
-      onRecipeSelected: { recipeID in
-        presentedRecipeID = recipeID
+      onRecipeSelected: { presentation in
+        presentedRecipe = presentation
       }
     )
-    .fullScreenCover(item: $presentedRecipeID, id: \.self) { recipeID in
+    .fullScreenCover(item: $presentedRecipe) { presentation in
       RecipeFullScreenCover(
-        recipeID: recipeID,
+        presentation: presentation,
         recipeModel: recipeModel,
         mealCalendarModel: mealCalendarModel,
         groceryModel: groceryModel,
@@ -56,7 +56,7 @@ struct AppContainer: View {
     }
     .mealCalendarItemEditorDestination(
       mealCalendarModel: mealCalendarModel,
-      isPresentationEnabled: presentedRecipeID == nil
+      isPresentationEnabled: presentedRecipe == nil
     )
     .sheet(isPresented: $menuModel.destination.addMenu) {
       NavigationStack {
@@ -76,11 +76,11 @@ struct AppContainer: View {
     .groceryDestinations(
       groceryModel: groceryModel,
       mealCalendarModel: mealCalendarModel,
-      isPresentationEnabled: presentedRecipeID == nil
+      isPresentationEnabled: presentedRecipe == nil
     )
     .recipeDetailDestinations(
       recipeModel: recipeModel,
-      isPresentationEnabled: presentedRecipeID == nil
+      isPresentationEnabled: presentedRecipe == nil
     )
     .sheet(isPresented: $recipeModel.destination.addRecipe) {
       NavigationStack {
@@ -220,7 +220,7 @@ struct AppContainer: View {
 
 private struct RecipeFullScreenCover: View {
   @Environment(\.dismiss) private var dismiss
-  let recipeID: Recipe.ID
+  let presentation: RecipeDetailPresentation
   let recipeModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
@@ -229,7 +229,8 @@ private struct RecipeFullScreenCover: View {
   var body: some View {
     NavigationStack {
       RecipeDetailView(
-        recipeID: recipeID,
+        recipeID: presentation.recipeID,
+        scaleContext: presentation.scaleContext,
         libraryModel: recipeModel,
         mealCalendarModel: mealCalendarModel,
         groceryModel: groceryModel
@@ -266,7 +267,7 @@ private struct AppMainLayout: View {
   @Binding var selectedSection: AppSection?
   @Binding var selectedSettingsPane: SettingsPane?
   let onBrowserCapture: (WebPage) async -> Void
-  var onRecipeSelected: (Recipe.ID) -> Void
+  var onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   var body: some View {
     if horizontalSizeClass == .compact {
@@ -386,7 +387,7 @@ private struct AppCompactTabView: View {
   let groceryModel: GroceryLibraryModel
   let onBrowserCapture: (WebPage) async -> Void
   let onMenuSelected: (CoreMenu.ID) -> Void
-  let onRecipeSelected: (Recipe.ID) -> Void
+  let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   var body: some View {
     TabView(selection: $selection) {

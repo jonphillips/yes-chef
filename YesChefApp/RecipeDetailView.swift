@@ -11,11 +11,12 @@ struct RecipeDetailView: View {
 
   init(
     recipeID: Recipe.ID,
+    scaleContext: ScaleContext? = nil,
     libraryModel: RecipeLibraryModel,
     mealCalendarModel: MealCalendarModel,
     groceryModel: GroceryLibraryModel
   ) {
-    _model = State(wrappedValue: RecipeDetailModel(recipeID: recipeID))
+    _model = State(wrappedValue: RecipeDetailModel(recipeID: recipeID, scaleContext: scaleContext))
     self.libraryModel = libraryModel
     self.mealCalendarModel = mealCalendarModel
     self.groceryModel = groceryModel
@@ -53,6 +54,12 @@ struct RecipeDetailView: View {
     }
     .navigationTitle("")
     .navigationBarTitleDisplayMode(.inline)
+    .onAppear {
+      model.persistedScaleChanged(model.persistedScale)
+    }
+    .onChange(of: model.persistedScale) { _, persistedScale in
+      model.persistedScaleChanged(persistedScale)
+    }
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {
         Button {

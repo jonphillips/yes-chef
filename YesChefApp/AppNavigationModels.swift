@@ -1,4 +1,19 @@
 import SwiftUI
+import YesChefCore
+
+struct RecipeDetailPresentation: Hashable, Identifiable {
+  var recipeID: Recipe.ID
+  var scaleContext: ScaleContext
+
+  init(recipeID: Recipe.ID, scaleContext: ScaleContext? = nil) {
+    self.recipeID = recipeID
+    self.scaleContext = scaleContext ?? .recipe(recipeID)
+  }
+
+  var id: String {
+    "\(recipeID.uuidString):\(scaleContext.id)"
+  }
+}
 
 enum AppSection: String, CaseIterable, Identifiable {
   case recipes

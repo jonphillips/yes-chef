@@ -29,6 +29,7 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
   public var originalImportText: String?
   public var originalSnapshot: Data?
   public var makeAhead: String?
+  public var viewScale: Double
 
   public init(
     id: UUID,
@@ -56,7 +57,8 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     timesCooked: Int = 0,
     originalImportText: String? = nil,
     originalSnapshot: Data? = nil,
-    makeAhead: String? = nil
+    makeAhead: String? = nil,
+    viewScale: Double = 1.0
   ) {
     self.id = id
     self.title = title
@@ -84,6 +86,7 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     self.originalImportText = originalImportText
     self.originalSnapshot = originalSnapshot
     self.makeAhead = makeAhead
+    self.viewScale = viewScale
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -113,6 +116,7 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     case originalImportText
     case originalSnapshot
     case makeAhead
+    case viewScale
   }
 
   public init(from decoder: Decoder) throws {
@@ -143,7 +147,8 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
       timesCooked: try container.decodeIfPresent(Int.self, forKey: .timesCooked) ?? 0,
       originalImportText: try container.decodeIfPresent(String.self, forKey: .originalImportText),
       originalSnapshot: try container.decodeIfPresent(Data.self, forKey: .originalSnapshot),
-      makeAhead: try container.decodeIfPresent(String.self, forKey: .makeAhead)
+      makeAhead: try container.decodeIfPresent(String.self, forKey: .makeAhead),
+      viewScale: try container.decodeIfPresent(Double.self, forKey: .viewScale) ?? 1.0
     )
   }
 }
@@ -173,6 +178,7 @@ public struct MealPlanItem: Codable, Identifiable, Equatable, Sendable {
   public var sortOrder: Int
   public var dateCreated: Date
   public var dateModified: Date
+  public var scale: Double
 
   public init(
     id: UUID,
@@ -186,7 +192,8 @@ public struct MealPlanItem: Codable, Identifiable, Equatable, Sendable {
     endTime: Date? = nil,
     sortOrder: Int,
     dateCreated: Date,
-    dateModified: Date
+    dateModified: Date,
+    scale: Double = 1.0
   ) {
     self.id = id
     self.kind = kind
@@ -200,6 +207,7 @@ public struct MealPlanItem: Codable, Identifiable, Equatable, Sendable {
     self.sortOrder = sortOrder
     self.dateCreated = dateCreated
     self.dateModified = dateModified
+    self.scale = scale
   }
 }
 
@@ -298,6 +306,7 @@ public struct MenuItem: Codable, Identifiable, Equatable, Sendable {
   public var sortOrder: Int
   public var dateCreated: Date
   public var dateModified: Date
+  public var scale: Double
 
   public init(
     id: UUID,
@@ -310,7 +319,8 @@ public struct MenuItem: Codable, Identifiable, Equatable, Sendable {
     notes: String? = nil,
     sortOrder: Int,
     dateCreated: Date,
-    dateModified: Date
+    dateModified: Date,
+    scale: Double = 1.0
   ) {
     self.id = id
     self.menuID = menuID
@@ -323,6 +333,7 @@ public struct MenuItem: Codable, Identifiable, Equatable, Sendable {
     self.sortOrder = sortOrder
     self.dateCreated = dateCreated
     self.dateModified = dateModified
+    self.scale = scale
   }
 }
 
