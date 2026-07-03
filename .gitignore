@@ -7,4 +7,6 @@ xcuserdata/
 *.xcuserstate
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
+# Xcode workspace's derived SwiftPM state; YesChefPackage/Package.resolved is the tracked lock
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 import-inbox/
