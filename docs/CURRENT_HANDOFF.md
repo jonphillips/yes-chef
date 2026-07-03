@@ -1,8 +1,8 @@
 # Current Handoff
 
-Last updated: July 3, 2026 (Dogfood batch 3 approved, PR #75 → DONE-LOG. Next Up = Phase E, first
-dispatch shaped with Jon: Slice 1 + 2 batched (canonical key + `Measure`, pure-core, no migration;
-`canonicalName` cache deferred to Slice 3). Ready to dispatch to Codex. Lean verification is the default.)
+Last updated: July 3, 2026 (Phase E Slice 1 + 2 approved, PR #77 → DONE-LOG. Next Up = Phase E Slice 3 —
+pantry policy model + the deferred `canonicalName` cache migration (one synced-schema change; **must-flag
+the sync-zone implications in the PR**). Ready to dispatch to Codex. Lean verification is the default.)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -18,28 +18,35 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Phase E — grocery/pantry, first dispatch: Slice 1 + Slice 2 batched.** Full spec + build order:
+**Phase E — grocery/pantry, Slice 3: pantry policy model + the deferred `canonicalName` migration.**
+Full spec + build order:
 [`docs/milestones/grocery-consolidation-and-pantry.md`](milestones/grocery-consolidation-and-pantry.md)
-(read it and the **architect amendment 2026-07-03** near "The slices"; boundaries in
-FUTURE_INTELLIGENCE §7.5/§13/§14). One PR, both slices, pure-core `YesChefCore`, **no UI, no schema
-migration**:
-- **Slice 1 — one canonical key + alias table.** Introduce `CanonicalIngredient.canonicalName(_:)` as
-  the single normalizer + a **data** alias/override table (replacing the `anchovy → anchovies` `switch`
-  at `GroceryCore.swift:1015` and absorbing the `defaultStaples` list). Re-point `canConsolidate` and
-  `isPantryStaple` at this one key; delete/collapse `groceryConsolidationKey` and `normalizedPantryText`.
-  **Compute the key on read — do NOT add a `canonicalName` column** (that cache is deferred to Slice 3
-  per the amendment). No behavior change: nothing hidden today becomes visible.
-- **Slice 2 — bounded `Measure` compare/merge.** Known units → dimension (volume/weight/count) with
-  conversion factors; `merge` combines only same-dimension known units (`8 oz + 1 lb → 24 oz`),
-  else rows stay separate; `compare(total, threshold) → .over/.underOrEqual/.incomparable`. No
-  cross-dimension guessing, no invented factors.
-- **Tests, no UI/model:** anchovy pair + scallion/green-onion + a plural pair merge via the alias table
-  with no code branch; both old normalizers' behaviors preserved; within-dimension merges; cross-dim /
-  unknown-unit pairs report incomparable. Guard the **no-inventory** boundary (§14) — static rules only.
-- **Do NOT build** Slice 3 (pantry policy + the deferred `canonicalName` migration) or Slice 4
-  (`PantrySuppression` + review UI) — those are the next dispatches.
+(read the **Slice 3** section and the **architect amendment 2026-07-03** near "The slices"; boundaries in
+FUTURE_INTELLIGENCE §7.5/§13/§14). One PR — this is the milestone's **single synced-schema change**, so
+it carries both the pantry policy columns and the `canonicalName` cache deferred out of Slice 1:
+- **Pantry policy on `PantryItem`.** Add `isUnlimited: Bool` (default **true** — new items never show),
+  `thresholdQuantity: Double?`, `thresholdUnit: String?` (both nil when unlimited or when threshold 0 =
+  "always confirm"). **Migration-aware backfill:** existing pantry items → `isUnlimited = true` so current
+  suppression is unchanged. Threshold is a **static rule — no depletion / on-hand / inventory anywhere**
+  (§14 boundary, the one most likely to erode — guard it in code and tests).
+- **The deferred `canonicalName` cache.** Add `canonicalName: String?` to `IngredientLine` / `GroceryItem`,
+  backfilled from existing rows via the Slice-1 `CanonicalIngredient.canonicalName(_:)` so nothing already
+  hidden becomes visible. Re-point the Slice-1 compute-on-read call sites at the cached column. **One
+  migration carries both** the policy and the cache.
+- **Editor UI:** a per-item control — *Always have it (never show)* / *Remind me if a recipe needs more
+  than [qty][unit]* / *Always confirm*. **Threshold control is offered only for measure-unit items**
+  (volume/weight); count-y items (garlic cloves) show only unlimited-or-shop (Decision #6 — a "½ clove"
+  threshold is nonsense).
+- **Tests:** migration preserves current behavior; the three policy states round-trip; threshold 0 =
+  always confirm; a count-y item exposes no threshold field; the `canonicalName` backfill hides nothing new.
+- **MUST-FLAG in the PR:** the schema change vs. the sync milestone's CloudKit zone — confirm the
+  zone implications, don't assume ([[sqlitedata-blob-cloudkit-asset]]: additive-nullable columns, UUID PKs,
+  no unique index → sync-safe, but state it explicitly).
+- **Do NOT build** Slice 4 (`PantrySuppression` pure function + grocery-list review UI) — that is the
+  next and final dispatch for this milestone.
 
-Dogfood batch 3 is **complete** (ingredient structure · Chef It Up + Serve With · substitution ·
+Phase E Slice 1 + 2 (canonical key + `Measure`) is **complete** (PR #77 → DONE-LOG). Dogfood batch 3 is
+**complete** (ingredient structure · Chef It Up + Serve With · substitution ·
 keep-awake; PR #75 → DONE-LOG). The cooking-workspace effort is **complete** (Slices A + B shipped,
 PRs #73 / #74 → DONE-LOG). Its named
 follow-ons — **Menu + Meal-Planner chat verbs** and **reader photo affordances** — live in
@@ -50,11 +57,12 @@ follow-ons — **Menu + Meal-Planner chat verbs** and **reader photo affordances
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target.
 
-- **Recipe → grocery list w/ pantry checking** (Phase E) — **now Next Up**, first dispatch = Slice 1 + 2
-  batched (canonical key + `Measure`, pure-core, no migration; `canonicalName` cache deferred to Slice 3).
-  Build order + architect amendment (2026-07-03) in
+- **Recipe → grocery list w/ pantry checking** (Phase E) — in progress. Slice 1 + 2 (canonical key +
+  `Measure`) **complete** (PR #77 → DONE-LOG). **Now Next Up = Slice 3** (pantry policy model + the
+  deferred `canonicalName` migration — the milestone's single synced-schema change). Build order +
+  architect amendment (2026-07-03) in
   [`docs/milestones/grocery-consolidation-and-pantry.md`](milestones/grocery-consolidation-and-pantry.md);
-  design rationale = [[grocery-pantry-threshold-design]]. Slices 3–4 follow as later dispatches.
+  design rationale = [[grocery-pantry-threshold-design]]. Slice 4 (`PantrySuppression` + review UI) follows.
 
 - **Dogfood fixes — batch 3** — complete (PR #75 → DONE-LOG; ingredient structure · Chef It Up +
   Serve With · substitution · keep-awake). Non-blocking device-pass notes recorded in the DONE-LOG entry.

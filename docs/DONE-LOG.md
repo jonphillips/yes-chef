@@ -10,6 +10,31 @@ Newest first.
 
 ---
 
+## Phase E — grocery/pantry, first dispatch: Slice 1 + Slice 2 (canonical key + `Measure`)
+
+**Architect-approved 2026-07-03** — yes-chef [PR #77](https://github.com/jonphillips/yes-chef/pull/77).
+Both pure-core `YesChefCore` slices in one PR, no UI, no schema migration (the `canonicalName` cache
+column stays deferred to Slice 3 per the 2026-07-03 architect amendment). Milestone build order:
+[`docs/milestones/grocery-consolidation-and-pantry.md`](milestones/grocery-consolidation-and-pantry.md).
+
+- **Slice 1 — one canonical key + data alias table.** New `CanonicalIngredient.canonicalName(_:)` is the
+  single normalizer (case/diacritic fold, hyphen-collapse, leading-descriptor strip, light
+  singularization) with a **data** alias table (anchovy variants → `anchovies`, scallion/green onion,
+  tomato pair). `canConsolidate` and `isPantryStaple` re-pointed at it; the `anchovy` `switch`,
+  `groceryConsolidationKey`, and `normalizedPantryText` all deleted (zero dangling refs). Computed on read.
+- **Slice 2 — bounded `Measure` compare/merge.** Known units → dimension (volume/weight/count) with
+  conversion factors; `merged` combines same-dimension known units (`8 oz + 1 lb → 24 oz`) and, after
+  review, **same-string units even when unknown to the table** (`splash + splash`); `compare → .over /
+  .underOrEqual / .incomparable`. Cross-dimension pairs stay separate, no invented factors.
+
+Review caught one regression before merge: the first cut required both units be in the dimension table,
+so identical-but-unknown units (head/sprig/stalk/splash) stopped consolidating — a behavior the
+`keep-incompatible-separate` test had locked in. Codex fixed it (859576f "Fix same-unit grocery measure
+merging") to merge equal normalized unit strings and flip the wine assertion to a single merged row.
+Codex authored; architect reviewed. Verified: `swift build`/`swift test` green, check-drift clean.
+
+---
+
 ## Dogfood fixes — batch 3 (ingredient structure · Chef It Up + Serve With · substitution · keep-awake)
 
 **Architect-approved 2026-07-03** — yes-chef [PR #75](https://github.com/jonphillips/yes-chef/pull/75).
