@@ -38,6 +38,7 @@ public struct MakeAheadStep: Equatable, Sendable, Identifiable {
 
 public struct MakeAheadPlanClient: Sendable {
   public var extract: @Sendable (
+    _ selection: String,
     _ messages: [RecipeChatMessage],
     _ context: String,
     _ tier: ModelTier
@@ -45,6 +46,7 @@ public struct MakeAheadPlanClient: Sendable {
 
   public init(
     extract: @escaping @Sendable (
+      _ selection: String,
       _ messages: [RecipeChatMessage],
       _ context: String,
       _ tier: ModelTier
@@ -54,28 +56,29 @@ public struct MakeAheadPlanClient: Sendable {
   }
 
   public func callAsFunction(
+    selection: String,
     messages: [RecipeChatMessage],
     context: String,
     tier: ModelTier
   ) async throws -> MakeAheadPlan {
-    try await extract(messages, context, tier)
+    try await extract(selection, messages, context, tier)
   }
 }
 
 extension MakeAheadPlanClient: DependencyKey {
-  public static let liveValue = MakeAheadPlanClient { messages, context, tier in
+  public static let liveValue = MakeAheadPlanClient { selection, messages, context, tier in
     @Dependency(\.modelClient) var modelClient
     let request = ModelRequest(
       tier: tier,
       system: instructions,
-      prompt: prompt(messages: messages, context: context),
+      prompt: prompt(selection: selection, messages: messages, context: context),
       maxTokens: 2048
     )
     let response = try await modelClient.complete(request)
     return parse(response.text)
   }
 
-  public static let testValue = MakeAheadPlanClient { _, _, _ in
+  public static let testValue = MakeAheadPlanClient { _, _, _, _ in
     MakeAheadPlan()
   }
 
@@ -87,7 +90,7 @@ extension MakeAheadPlanClient: DependencyKey {
     Prefer a short, useful plan. Return {"steps":[]} when there is no make-ahead strategy to save.
     """
 
-  static func prompt(messages: [RecipeChatMessage], context: String) -> String {
+  static func prompt(selection: String, messages: [RecipeChatMessage], context: String) -> String {
     let conversation = messages.isEmpty
       ? "(No conversation yet.)"
       : messages.map { "\($0.role.promptLabel): \($0.text)" }.joined(separator: "\n")
@@ -95,10 +98,14 @@ extension MakeAheadPlanClient: DependencyKey {
       Recipe context:
       \(context)
 
+      User-selected subject:
+      \(selection)
+
       Conversation so far:
       \(conversation)
 
-      Distill the conversation into the make-ahead JSON object.
+      Distill the selected subject into the make-ahead JSON object. Use the conversation only as background
+      when it clarifies what the selected subject means.
       """
   }
 

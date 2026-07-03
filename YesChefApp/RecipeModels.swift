@@ -922,8 +922,13 @@ final class RecipeDetailModel {
     let client = makeAheadPlanClient
     let action = ChatApplyAction<MakeAheadPlan>(
       title: "Summarize make-ahead → Make-ahead section",
-      extract: { messages in
-        try await client(messages: messages, context: context, tier: chatModel.activeTier)
+      extractingTitle: "Summarizing make-ahead...",
+      reviewTitle: "Review make-ahead",
+      commitTitle: "Commit to Make-ahead",
+      committingTitle: "Saving make-ahead...",
+      committedTitle: "Saved to Make-ahead",
+      extract: { selection, messages in
+        try await client(selection: selection, messages: messages, context: context, tier: chatModel.activeTier)
       },
       commit: { [weak self] plan in
         try self?.commitMakeAheadPlan(plan)

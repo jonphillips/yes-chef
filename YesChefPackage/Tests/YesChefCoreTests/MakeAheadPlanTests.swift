@@ -110,6 +110,7 @@ extension RecipeCoreTests {
       } operation: {
         let client = MakeAheadPlanClient.liveValue
         _ = try await client(
+          selection: "Make the sauce a day ahead.",
           messages: [RecipeChatMessage(role: .user, text: "Can I prep this ahead?")],
           context: "Recipe context",
           tier: .frontier(.openai)
@@ -118,6 +119,7 @@ extension RecipeCoreTests {
 
       let request = await recorder.first()
       expectNoDifference(request?.tier, .frontier(.openai))
+      #expect(request?.messages.first?.text.contains("User-selected subject:\nMake the sauce a day ahead.") == true)
     }
 
     @Test
@@ -312,6 +314,74 @@ extension RecipeCoreTests {
         let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
         expectNoDifference(recipe.makeAhead, nil)
         expectNoDifference(recipe.dateModified, clearedAt)
+      }
+    }
+
+    @Test
+    @MainActor
+    func stagedMakeAheadReviewItemWritesOnlyWhenCommitted() async throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 823_000_000)
+      let committedAt = now.addingTimeInterval(60)
+      let recipeID = SampleUUIDSequence.uuid(660)
+      var extractedSelection: String?
+      var extractedContext: [RecipeChatMessage] = []
+
+      try await database.write { db in
+        try Recipe.insert {
+          Recipe(
+            id: recipeID,
+            title: "Tomato Sauce",
+            dateCreated: now,
+            dateModified: now
+          )
+        }
+        .execute(db)
+      }
+
+      let action = ChatApplyAction<MakeAheadPlan>(
+        title: "Summarize make-ahead → Make-ahead section",
+        extractingTitle: "Summarizing make-ahead...",
+        reviewTitle: "Review make-ahead",
+        commitTitle: "Commit to Make-ahead",
+        committingTitle: "Saving make-ahead...",
+        committedTitle: "Saved to Make-ahead",
+        extract: { selection, context in
+          extractedSelection = selection
+          extractedContext = context
+          return MakeAheadPlan(
+            steps: [
+              MakeAheadStep(when: "Day before", task: "Make the sauce.")
+            ]
+          )
+        },
+        commit: { plan in
+          try await database.write { db in
+            try RecipeRepository.applyMakeAheadPlan(plan, to: recipeID, in: db, now: committedAt)
+          }
+        }
+      )
+      let erased = AnyChatApplyAction(action) { $0.rendered() }
+      let messages = [
+        RecipeChatMessage(role: .assistant, text: "Make the sauce a day ahead. Also grate cheese.")
+      ]
+
+      let items = try await erased.run("Make the sauce a day ahead.", messages)
+
+      expectNoDifference(extractedSelection, "Make the sauce a day ahead.")
+      expectNoDifference(extractedContext, messages)
+      expectNoDifference(items.map(\.summary), ["Day before: Make the sauce."])
+      try await database.read { db in
+        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+        expectNoDifference(recipe.makeAhead, nil)
+      }
+
+      try await items[0].commit()
+
+      try await database.read { db in
+        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+        expectNoDifference(recipe.makeAhead, "Day before: Make the sauce.")
+        expectNoDifference(recipe.dateModified, committedAt)
       }
     }
 

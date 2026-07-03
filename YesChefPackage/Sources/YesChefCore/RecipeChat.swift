@@ -258,30 +258,70 @@ public struct RecipeChatMessage: Identifiable, Sendable, Equatable {
 @MainActor
 public struct ChatApplyAction<Payload: Sendable> {
   public var title: String
-  public var extract: @MainActor (_ messages: [RecipeChatMessage]) async throws -> Payload
+  public var extractingTitle: String
+  public var reviewTitle: String
+  public var commitTitle: String
+  public var committingTitle: String
+  public var committedTitle: String
+  public var extract: @MainActor (_ selection: String, _ context: [RecipeChatMessage]) async throws -> Payload
   public var commit: @MainActor (_ payload: Payload) async throws -> Void
 
   public init(
     title: String,
-    extract: @escaping @MainActor (_ messages: [RecipeChatMessage]) async throws -> Payload,
+    extractingTitle: String,
+    reviewTitle: String,
+    commitTitle: String = "Commit",
+    committingTitle: String,
+    committedTitle: String,
+    extract: @escaping @MainActor (_ selection: String, _ context: [RecipeChatMessage]) async throws -> Payload,
     commit: @escaping @MainActor (_ payload: Payload) async throws -> Void
   ) {
     self.title = title
+    self.extractingTitle = extractingTitle
+    self.reviewTitle = reviewTitle
+    self.commitTitle = commitTitle
+    self.committingTitle = committingTitle
+    self.committedTitle = committedTitle
     self.extract = extract
     self.commit = commit
   }
 
-  public func run(messages: [RecipeChatMessage]) async throws -> Payload {
-    let payload = try await extract(messages)
-    try await commit(payload)
-    return payload
+}
+
+public struct ChatApplyReviewItem: Identifiable {
+  public let id: UUID
+  public var title: String
+  public var summary: String
+  public var commitTitle: String
+  public var committingTitle: String
+  public var committedTitle: String
+  public var commit: @MainActor () async throws -> Void
+
+  public init(
+    id: UUID = UUID(),
+    title: String,
+    summary: String,
+    commitTitle: String,
+    committingTitle: String,
+    committedTitle: String,
+    commit: @escaping @MainActor () async throws -> Void
+  ) {
+    self.id = id
+    self.title = title
+    self.summary = summary
+    self.commitTitle = commitTitle
+    self.committingTitle = committingTitle
+    self.committedTitle = committedTitle
+    self.commit = commit
   }
 }
 
 public struct AnyChatApplyAction: Identifiable {
   public var id: String { title }
   public var title: String
-  public var run: @MainActor (_ messages: [RecipeChatMessage]) async throws -> String?
+  public var extractingTitle: String
+  public var run: @MainActor (_ selection: String, _ context: [RecipeChatMessage]) async throws
+    -> [ChatApplyReviewItem]
 
   @MainActor
   public init<Payload>(
@@ -289,9 +329,25 @@ public struct AnyChatApplyAction: Identifiable {
     renderedSummary: @escaping @MainActor (Payload) -> String?
   ) {
     self.title = action.title
-    self.run = { messages in
-      let payload = try await action.run(messages: messages)
-      return renderedSummary(payload)
+    self.extractingTitle = action.extractingTitle
+    self.run = { selection, context in
+      let payload = try await action.extract(selection, context)
+      guard
+        let summary = renderedSummary(payload)?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !summary.isEmpty
+      else { return [] }
+      return [
+        ChatApplyReviewItem(
+          title: action.reviewTitle,
+          summary: summary,
+          commitTitle: action.commitTitle,
+          committingTitle: action.committingTitle,
+          committedTitle: action.committedTitle,
+          commit: {
+            try await action.commit(payload)
+          }
+        )
+      ]
     }
   }
 }

@@ -1,5 +1,6 @@
 import LLMClientKit
 import SwiftUI
+import UIKit
 import YesChefCore
 
 enum ChatWorkspaceDetent: String, CaseIterable {
@@ -192,8 +193,11 @@ struct RecipeChatPanel: View {
   var showsEmbeddedHeader = false
 
   @State private var draft = ""
+  @State private var selectedAssistantText = ""
   @State private var applyingActionID: AnyChatApplyAction.ID?
-  @State private var actionSummary: String?
+  @State private var committingReviewItemID: ChatApplyReviewItem.ID?
+  @State private var stagedReviewItems: [ChatApplyReviewItem] = []
+  @State private var actionSummary: ChatCommittedActionSummary?
   @State private var actionError: String?
 
   var body: some View {
@@ -218,11 +222,11 @@ struct RecipeChatPanel: View {
           LazyVStack(alignment: .leading, spacing: 12) {
             ChatContextHeader(chatModel: chatModel)
             ForEach(chatModel.messages) { message in
-              ChatMessageBubble(message: message)
+              ChatMessageBubble(message: message, selectedAssistantText: $selectedAssistantText)
                 .id(message.id)
             }
             if let actionSummary {
-              ChatActionSummary(text: actionSummary)
+              ChatActionSummary(summary: actionSummary)
             }
             if let error = chatModel.errorText ?? actionError {
               Label(error, systemImage: "exclamationmark.triangle")
@@ -244,18 +248,40 @@ struct RecipeChatPanel: View {
       Divider()
 
       VStack(alignment: .leading, spacing: 12) {
+        if !stagedReviewItems.isEmpty {
+          ChatApplyReviewList(
+            items: stagedReviewItems,
+            committingItemID: committingReviewItemID,
+            commit: { item in
+              Task { await commit(item) }
+            },
+            discard: { item in
+              discard(item)
+            }
+          )
+        }
+
+        if let actionSubject {
+          ChatActionSubjectView(subject: actionSubject)
+        }
+
         ForEach(applyActions) { action in
           Button {
             Task { await run(action) }
           } label: {
             Label(
-              applyingActionID == action.id ? "Saving make-ahead..." : action.title,
+              applyingActionID == action.id ? action.extractingTitle : action.title,
               systemImage: applyingActionID == action.id ? "hourglass" : "text.badge.checkmark"
             )
             .frame(maxWidth: .infinity, alignment: .leading)
           }
           .buttonStyle(.bordered)
-          .disabled(chatModel.isResponding || applyingActionID != nil)
+          .disabled(
+            chatModel.isResponding
+              || applyingActionID != nil
+              || committingReviewItemID != nil
+              || actionSubject == nil
+          )
         }
 
         HStack(alignment: .bottom, spacing: 8) {
@@ -297,23 +323,61 @@ struct RecipeChatPanel: View {
     draft = ""
     actionSummary = nil
     actionError = nil
+    stagedReviewItems = []
     await chatModel.send(text)
   }
 
   @MainActor
   private func run(_ action: AnyChatApplyAction) async {
+    guard let actionSubject else { return }
     applyingActionID = action.id
     actionSummary = nil
     actionError = nil
     defer { applyingActionID = nil }
 
     do {
-      if let summary = try await action.run(chatModel.messages) {
-        actionSummary = summary
+      let items = try await action.run(actionSubject.text, chatModel.messages)
+      guard !items.isEmpty else {
+        actionError = "The assistant did not return anything to review."
+        return
       }
+      stagedReviewItems = items
     } catch {
       actionError = RecipeChatErrorText.describe(error)
     }
+  }
+
+  @MainActor
+  private func commit(_ item: ChatApplyReviewItem) async {
+    committingReviewItemID = item.id
+    actionError = nil
+    defer { committingReviewItemID = nil }
+
+    do {
+      try await item.commit()
+      stagedReviewItems.removeAll { $0.id == item.id }
+      actionSummary = ChatCommittedActionSummary(title: item.committedTitle, text: item.summary)
+    } catch {
+      actionError = RecipeChatErrorText.describe(error)
+    }
+  }
+
+  @MainActor
+  private func discard(_ item: ChatApplyReviewItem) {
+    stagedReviewItems.removeAll { $0.id == item.id }
+  }
+
+  private var actionSubject: ChatActionSubject? {
+    let selected = selectedAssistantText.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !selected.isEmpty {
+      return ChatActionSubject(source: .selection, text: selected)
+    }
+    guard
+      let reply = chatModel.messages.last(where: { $0.role == .assistant })?.text
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      !reply.isEmpty
+    else { return nil }
+    return ChatActionSubject(source: .latestReply, text: reply)
   }
 }
 
@@ -387,15 +451,58 @@ private struct ChatTierMenu: View {
   }
 }
 
+private struct ChatActionSubject: Equatable {
+  enum Source {
+    case selection
+    case latestReply
+  }
+
+  var source: Source
+  var text: String
+
+  var label: String {
+    switch source {
+    case .selection: "Acting on your selection"
+    case .latestReply: "Acting on latest reply"
+    }
+  }
+
+  var snippet: String {
+    let flattened = text
+      .replacingOccurrences(of: "\n", with: " ")
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    guard flattened.count > 120 else { return flattened }
+    return "\(flattened.prefix(120))..."
+  }
+}
+
+private struct ChatActionSubjectView: View {
+  let subject: ChatActionSubject
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(subject.label)
+        .font(.caption.bold())
+        .foregroundStyle(.secondary)
+      Text(subject.snippet)
+        .font(.caption)
+        .lineLimit(2)
+        .foregroundStyle(.secondary)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+}
+
 private struct ChatMessageBubble: View {
   let message: RecipeChatMessage
+  @Binding var selectedAssistantText: String
 
   var body: some View {
     HStack {
       if message.role == .user {
         Spacer(minLength: 48)
       }
-      Text(LocalizedStringKey(message.text))
+      bubbleContent
         .padding(10)
         .background(
           message.role == .user ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.12),
@@ -406,17 +513,174 @@ private struct ChatMessageBubble: View {
       }
     }
   }
+
+  @ViewBuilder
+  private var bubbleContent: some View {
+    switch message.role {
+    case .user:
+      Text(LocalizedStringKey(message.text))
+    case .assistant:
+      SelectableAssistantText(text: message.text, selectedText: $selectedAssistantText)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+}
+
+private struct SelectableAssistantText: UIViewRepresentable {
+  let text: String
+  @Binding var selectedText: String
+
+  func makeUIView(context: Context) -> UITextView {
+    let textView = IntrinsicTextView()
+    textView.backgroundColor = .clear
+    textView.delegate = context.coordinator
+    textView.isEditable = false
+    textView.isScrollEnabled = false
+    textView.isSelectable = true
+    textView.textContainerInset = .zero
+    textView.textContainer.lineFragmentPadding = 0
+    textView.adjustsFontForContentSizeCategory = true
+    textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    return textView
+  }
+
+  func updateUIView(_ textView: UITextView, context: Context) {
+    context.coordinator.text = text
+    context.coordinator.selectedText = $selectedText
+    if textView.attributedText?.string != text {
+      textView.attributedText = Self.attributedText(for: text)
+    }
+  }
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator(selectedText: $selectedText)
+  }
+
+  private static func attributedText(for text: String) -> NSAttributedString {
+    let attributedString: AttributedString
+    do {
+      attributedString = try AttributedString(
+        markdown: text,
+        options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+      )
+    } catch {
+      attributedString = AttributedString(text)
+    }
+
+    let mutable = NSMutableAttributedString(attributedString)
+    let fullRange = NSRange(location: 0, length: mutable.length)
+    mutable.enumerateAttribute(.font, in: fullRange) { value, range, _ in
+      guard value == nil else { return }
+      mutable.addAttribute(.font, value: UIFont.preferredFont(forTextStyle: .body), range: range)
+    }
+    mutable.enumerateAttribute(.foregroundColor, in: fullRange) { value, range, _ in
+      guard value == nil else { return }
+      mutable.addAttribute(.foregroundColor, value: UIColor.label, range: range)
+    }
+    return mutable
+  }
+
+  final class Coordinator: NSObject, UITextViewDelegate {
+    var text: String = ""
+    var selectedText: Binding<String>
+
+    init(selectedText: Binding<String>) {
+      self.selectedText = selectedText
+    }
+
+    func textViewDidChangeSelection(_ textView: UITextView) {
+      guard let range = Range(textView.selectedRange, in: text) else {
+        selectedText.wrappedValue = ""
+        return
+      }
+      selectedText.wrappedValue = String(text[range])
+    }
+  }
+}
+
+private final class IntrinsicTextView: UITextView {
+  override var intrinsicContentSize: CGSize {
+    CGSize(width: UIView.noIntrinsicMetric, height: contentSize.height)
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    invalidateIntrinsicContentSize()
+  }
+}
+
+private struct ChatCommittedActionSummary: Equatable {
+  var title: String
+  var text: String
+}
+
+private struct ChatApplyReviewList: View {
+  let items: [ChatApplyReviewItem]
+  let committingItemID: ChatApplyReviewItem.ID?
+  let commit: (ChatApplyReviewItem) -> Void
+  let discard: (ChatApplyReviewItem) -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      ForEach(items) { item in
+        ChatApplyReviewCard(
+          item: item,
+          isCommitting: committingItemID == item.id,
+          commit: { commit(item) },
+          discard: { discard(item) }
+        )
+      }
+    }
+  }
+}
+
+private struct ChatApplyReviewCard: View {
+  let item: ChatApplyReviewItem
+  let isCommitting: Bool
+  let commit: () -> Void
+  let discard: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Label(item.title, systemImage: "checklist")
+        .font(.caption.bold())
+      Text(item.summary)
+        .font(.callout)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      HStack {
+        Button(role: .cancel, action: discard) {
+          Label("Discard", systemImage: "trash")
+        }
+        .buttonStyle(.bordered)
+        .disabled(isCommitting)
+
+        Spacer(minLength: 8)
+
+        Button(action: commit) {
+          Label(
+            isCommitting ? item.committingTitle : item.commitTitle,
+            systemImage: isCommitting ? "hourglass" : "checkmark.circle"
+          )
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(isCommitting)
+      }
+    }
+    .padding(10)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(.tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+  }
 }
 
 private struct ChatActionSummary: View {
-  let text: String
+  let summary: ChatCommittedActionSummary
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      Label("Saved to Make-ahead", systemImage: "checkmark.circle")
+      Label(summary.title, systemImage: "checkmark.circle")
         .font(.caption.bold())
         .foregroundStyle(.green)
-      Text(text)
+      Text(summary.text)
         .font(.callout)
     }
     .padding(10)
