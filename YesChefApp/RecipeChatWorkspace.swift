@@ -265,24 +265,26 @@ struct RecipeChatPanel: View {
           ChatActionSubjectView(subject: actionSubject)
         }
 
-        ForEach(applyActions) { action in
-          Button {
-            Task { await run(action) }
-          } label: {
-            Label(
-              applyingActionID == action.id ? action.extractingTitle : action.title,
-              systemImage: applyingActionID == action.id ? "hourglass" : "text.badge.checkmark"
-            )
-            .frame(maxWidth: .infinity, alignment: .leading)
+        Menu {
+          ForEach(applyActions) { action in
+            Button {
+              Task { await run(action) }
+            } label: {
+              Label(action.title, systemImage: "text.badge.checkmark")
+            }
           }
-          .buttonStyle(.bordered)
-          .disabled(
-            chatModel.isResponding
-              || applyingActionID != nil
-              || committingReviewItemID != nil
-              || actionSubject == nil
-          )
+        } label: {
+          Label(applyMenuTitle, systemImage: applyingActionID == nil ? "wand.and.stars" : "hourglass")
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .buttonStyle(.bordered)
+        .disabled(
+          applyActions.isEmpty
+            || chatModel.isResponding
+            || applyingActionID != nil
+            || committingReviewItemID != nil
+            || actionSubject == nil
+        )
 
         HStack(alignment: .bottom, spacing: 8) {
           TextField("Ask about this \(chatModel.context.subject)", text: $draft, axis: .vertical)
@@ -378,6 +380,13 @@ struct RecipeChatPanel: View {
       !reply.isEmpty
     else { return nil }
     return ChatActionSubject(source: .latestReply, text: reply)
+  }
+
+  private var applyMenuTitle: String {
+    guard let applyingActionID, let action = applyActions.first(where: { $0.id == applyingActionID }) else {
+      return "Apply..."
+    }
+    return action.extractingTitle
   }
 }
 

@@ -9,6 +9,8 @@ It is inspired by Paprika-style recipe management but is not intended to be a di
 ## House Style and Guidelines
 Shared style and architectural guidelines are available in ~/code/jon-platform directory. Start with AGENTS.md there. Nothing in this document should override those guidelines unless we discuss. If you cannot access this directory and information, you must alert me.
 
+**Progress reporting:** narrate exceptions, not routine. Default to silence while an expected build/test/command runs — no per-phase heartbeats. Speak up for blockers, surprises, decision points, deviations, and failures. See `~/code/jon-platform/docs/agent-workflow.md` § "Progress reporting".
+
 ## Work Intake & Dispatch
 
 There is **one front door** for "what do I work on": `docs/CURRENT_HANDOFF.md`. Work flows

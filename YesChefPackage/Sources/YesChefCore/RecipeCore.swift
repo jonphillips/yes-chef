@@ -59,174 +59,6 @@ public struct RecipeDetailRequest: FetchKeyRequest {
   }
 }
 
-public struct RecipeEditorDraft: Equatable, Sendable {
-  public var id: Recipe.ID?
-  public var title: String
-  public var subtitle: String
-  public var summary: String
-  public var sourceName: String
-  public var sourceURL: String
-  public var sourceAuthor: String
-  public var sourcePublicationName: String
-  public var sourceBookTitle: String
-  public var sourcePageNumber: String
-  public var sourceNotes: String
-  public var servingsText: String
-  public var yieldText: String
-  public var prepTimeMinutes: Int
-  public var cookTimeMinutes: Int
-  public var cuisine: String
-  public var course: String
-  public var libraryPlacement: RecipeLibraryPlacement
-  public var favorite: Bool
-  public var ingredientText: String
-  public var instructionText: String
-  public var noteText: String
-  public var tagNames: String
-  public var categoryNames: String
-  public var selectedCategoryIDs: Set<Category.ID>?
-  public var originalSnapshot: Data?
-  public var dateCreated: Date?
-  public var pendingPhotos: [RecipeEditorPhotoDraft]
-
-  public init(
-    id: Recipe.ID? = nil,
-    title: String = "",
-    subtitle: String = "",
-    summary: String = "",
-    sourceName: String = "",
-    sourceURL: String = "",
-    sourceAuthor: String = "",
-    sourcePublicationName: String = "",
-    sourceBookTitle: String = "",
-    sourcePageNumber: String = "",
-    sourceNotes: String = "",
-    servingsText: String = "",
-    yieldText: String = "",
-    prepTimeMinutes: Int = 0,
-    cookTimeMinutes: Int = 0,
-    cuisine: String = "",
-    course: String = "",
-    libraryPlacement: RecipeLibraryPlacement = .main,
-    favorite: Bool = false,
-    ingredientText: String = "",
-    instructionText: String = "",
-    noteText: String = "",
-    tagNames: String = "",
-    categoryNames: String = "",
-    selectedCategoryIDs: Set<Category.ID>? = nil,
-    originalSnapshot: Data? = nil,
-    dateCreated: Date? = nil,
-    pendingPhotos: [RecipeEditorPhotoDraft] = []
-  ) {
-    self.id = id
-    self.title = title
-    self.subtitle = subtitle
-    self.summary = summary
-    self.sourceName = sourceName
-    self.sourceURL = sourceURL
-    self.sourceAuthor = sourceAuthor
-    self.sourcePublicationName = sourcePublicationName
-    self.sourceBookTitle = sourceBookTitle
-    self.sourcePageNumber = sourcePageNumber
-    self.sourceNotes = sourceNotes
-    self.servingsText = servingsText
-    self.yieldText = yieldText
-    self.prepTimeMinutes = prepTimeMinutes
-    self.cookTimeMinutes = cookTimeMinutes
-    self.cuisine = cuisine
-    self.course = course
-    self.libraryPlacement = libraryPlacement
-    self.favorite = favorite
-    self.ingredientText = ingredientText
-    self.instructionText = instructionText
-    self.noteText = noteText
-    self.tagNames = tagNames
-    self.categoryNames = categoryNames
-    self.selectedCategoryIDs = selectedCategoryIDs
-    self.originalSnapshot = originalSnapshot
-    self.dateCreated = dateCreated
-    self.pendingPhotos = pendingPhotos
-  }
-
-  public init(detail: RecipeDetailData) {
-    let firstIngredientSectionID = detail.ingredientSections.sorted { $0.sortOrder < $1.sortOrder }.first?.id
-    let editableIngredientLines = firstIngredientSectionID.map { sectionID in
-      detail.ingredientLines.filter { $0.sectionID == sectionID }
-    } ?? detail.ingredientLines
-    let firstInstructionSectionID = detail.instructionSections.sorted { $0.sortOrder < $1.sortOrder }.first?.id
-    let editableInstructionSteps = firstInstructionSectionID.map { sectionID in
-      detail.instructionSteps.filter { $0.sectionID == sectionID }
-    } ?? detail.instructionSteps
-
-    self.init(
-      id: detail.recipe.id,
-      title: detail.recipe.title,
-      subtitle: detail.recipe.subtitle ?? "",
-      summary: detail.recipe.summary ?? "",
-      sourceName: detail.source?.name ?? "",
-      sourceURL: detail.source?.url ?? "",
-      sourceAuthor: detail.source?.author ?? "",
-      sourcePublicationName: detail.source?.publicationName ?? "",
-      sourceBookTitle: detail.source?.bookTitle ?? "",
-      sourcePageNumber: detail.source?.pageNumber ?? "",
-      sourceNotes: detail.source?.sourceNotes ?? "",
-      servingsText: detail.recipe.servingsText ?? "",
-      yieldText: detail.recipe.yieldText ?? "",
-      prepTimeMinutes: detail.recipe.prepTimeMinutes ?? 0,
-      cookTimeMinutes: detail.recipe.cookTimeMinutes ?? 0,
-      cuisine: detail.recipe.cuisine ?? "",
-      course: detail.recipe.course ?? "",
-      libraryPlacement: detail.recipe.libraryPlacement,
-      favorite: detail.recipe.favorite,
-      ingredientText: editableIngredientLines
-        .sorted { $0.sortOrder < $1.sortOrder }
-        .map(\.originalText)
-        .joined(separator: "\n"),
-      instructionText: editableInstructionSteps
-        .sorted { $0.sortOrder < $1.sortOrder }
-        .map(\.text)
-        .joined(separator: "\n\n"),
-      noteText: detail.notes
-        .filter { $0.noteType == .general }
-        .sorted { $0.dateCreated < $1.dateCreated }
-        .map(\.text)
-        .joined(separator: "\n\n"),
-      tagNames: detail.tags.map(\.name).joined(separator: ", "),
-      categoryNames: detail.categoryDisplayNames.joined(separator: ", "),
-      selectedCategoryIDs: Set(detail.categories.map(\.id)),
-      originalSnapshot: detail.recipe.originalSnapshot,
-      dateCreated: detail.recipe.dateCreated,
-      pendingPhotos: []
-    )
-  }
-}
-
-public struct RecipeEditorPhotoDraft: Identifiable, Equatable, Sendable {
-  public var id: UUID
-  public var processedPhoto: ProcessedRecipePhoto
-  public var originalSourcePath: String?
-  public var kind: RecipePhotoKind
-  public var caption: String?
-  public var source: PhotoSource
-
-  public init(
-    id: UUID,
-    processedPhoto: ProcessedRecipePhoto,
-    originalSourcePath: String? = nil,
-    kind: RecipePhotoKind = .hero,
-    caption: String? = nil,
-    source: PhotoSource = .user
-  ) {
-    self.id = id
-    self.processedPhoto = processedPhoto
-    self.originalSourcePath = originalSourcePath
-    self.kind = kind
-    self.caption = caption
-    self.source = source
-  }
-}
-
 public enum RecipeRepository {
   public static func fetchDetail(recipeID: Recipe.ID, in db: Database) throws -> RecipeDetailData? {
     guard let recipe = try (Recipe.where { $0.id.eq(recipeID) })
@@ -311,17 +143,22 @@ public enum RecipeRepository {
     let existingInstructionSection = existingDetail?.instructionSections.sorted { $0.sortOrder < $1.sortOrder }.first
     let ingredientSection = existingIngredientSection
       ?? IngredientSection(id: uuid(), recipeID: recipeID, name: nil, sortOrder: 0)
+    var editableIngredientSection = ingredientSection
+    editableIngredientSection.name = draft.ingredientSectionName.nonEmpty
     let instructionSection = existingInstructionSection
       ?? InstructionSection(id: uuid(), recipeID: recipeID, name: nil, sortOrder: 0)
     let ingredientLines = IngredientParser.lines(
       from: draft.ingredientText,
       recipeID: recipeID,
-      sectionID: ingredientSection.id,
+      sectionID: editableIngredientSection.id,
       uuid: uuid
     )
-    let reconciledIngredientLines = reconcileIngredientLines(
-      ingredientLines,
-      existing: existingDetail?.ingredientLines.filter { $0.sectionID == ingredientSection.id } ?? []
+    let reconciledIngredientLines = applyIngredientLineDrafts(
+      draft.ingredientLineDrafts,
+      to: reconcileIngredientLines(
+        ingredientLines,
+        existing: existingDetail?.ingredientLines.filter { $0.sectionID == editableIngredientSection.id } ?? []
+      )
     )
     let instructionSteps = InstructionParser.steps(
       from: draft.instructionText,
@@ -361,7 +198,8 @@ public enum RecipeRepository {
       dateCreated: dateCreated,
       dateModified: now,
       originalSnapshot: draft.originalSnapshot,
-      makeAhead: existingDetail?.recipe.makeAhead
+      makeAhead: existingDetail?.recipe.makeAhead, chefItUp: existingDetail?.recipe.chefItUp,
+      serveWith: existingDetail?.recipe.serveWith, viewScale: existingDetail?.recipe.viewScale ?? 1.0
     )
     let source = sourceFromDraft(
       draft,
@@ -371,11 +209,11 @@ public enum RecipeRepository {
     )
     let snapshotIngredientSections = mergedSections(
       existingDetail?.ingredientSections ?? [],
-      replacing: ingredientSection
+      replacing: editableIngredientSection
     )
     let snapshotIngredientLines = mergedIngredientLines(
       existingDetail?.ingredientLines ?? [],
-      replacingSectionID: ingredientSection.id,
+      replacingSectionID: editableIngredientSection.id,
       with: reconciledIngredientLines
     )
     let snapshotInstructionSections = mergedSections(
@@ -417,9 +255,9 @@ public enum RecipeRepository {
     try replaceSource(source, recipeID: recipeID, in: db)
     try saveEditableChildren(
       recipeID: recipeID,
-      ingredientSection: ingredientSection,
+      ingredientSection: editableIngredientSection,
       ingredientLines: reconciledIngredientLines,
-      existingIngredientLines: existingDetail?.ingredientLines.filter { $0.sectionID == ingredientSection.id } ?? [],
+      existingIngredientLines: existingDetail?.ingredientLines.filter { $0.sectionID == editableIngredientSection.id } ?? [],
       instructionSection: instructionSection,
       instructionSteps: reconciledInstructionSteps,
       existingInstructionSteps: existingDetail?.instructionSteps.filter { $0.sectionID == instructionSection.id } ?? [],
@@ -602,37 +440,6 @@ public enum RecipeRepository {
     try deleteMissingRows(existingRecipeTags, keeping: keptRecipeTagIDs, in: db)
   }
 
-  private static func reconcileIngredientLines(
-    _ parsedLines: [IngredientLine],
-    existing existingLines: [IngredientLine]
-  ) -> [IngredientLine] {
-    var unmatchedExistingLines = existingLines.sorted { $0.sortOrder < $1.sortOrder }
-    return parsedLines.map { parsedLine in
-      guard let matchIndex = unmatchedExistingLines.firstIndex(where: { $0.originalText == parsedLine.originalText })
-      else { return parsedLine }
-
-      let existingLine = unmatchedExistingLines.remove(at: matchIndex)
-      return IngredientLine(
-        id: existingLine.id,
-        recipeID: parsedLine.recipeID,
-        sectionID: parsedLine.sectionID,
-        originalText: parsedLine.originalText,
-        quantity: parsedLine.quantity ?? existingLine.quantity,
-        quantityText: parsedLine.quantityText ?? existingLine.quantityText,
-        unit: parsedLine.unit ?? existingLine.unit,
-        item: parsedLine.item ?? existingLine.item,
-        preparation: parsedLine.preparation ?? existingLine.preparation,
-        comment: parsedLine.comment ?? existingLine.comment,
-        isOptional: parsedLine.isOptional,
-        shoppingCategory: existingLine.shoppingCategory,
-        doNotShop: parsedLine.doNotShop || existingLine.doNotShop,
-        isHeader: parsedLine.isHeader,
-        sortOrder: parsedLine.sortOrder,
-        confidence: mergedConfidence(parsedLine.confidence, existingLine.confidence)
-      )
-    }
-  }
-
   private static func reconcileInstructionSteps(
     _ parsedSteps: [InstructionStep],
     existing existingSteps: [InstructionStep]
@@ -681,18 +488,6 @@ public enum RecipeRepository {
         dateCreated: dateCreated,
         dateModified: now
       )
-    }
-  }
-
-  private static func mergedConfidence(
-    _ parsedConfidence: ParseConfidence?,
-    _ existingConfidence: ParseConfidence?
-  ) -> ParseConfidence? {
-    switch parsedConfidence {
-    case .high, .medium:
-      parsedConfidence
-    case .low, nil:
-      existingConfidence ?? parsedConfidence
     }
   }
 
@@ -1067,6 +862,69 @@ private extension String {
     components(separatedBy: "\n\n")
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
       .filter { !$0.isEmpty }
+  }
+}
+
+private func applyIngredientLineDrafts(
+  _ drafts: [RecipeIngredientLineDraft],
+  to lines: [IngredientLine]
+) -> [IngredientLine] {
+  var unmatchedDrafts = drafts.sorted { $0.sortOrder < $1.sortOrder }
+  return lines.map { line in
+    var line = line
+    let matchIndex = unmatchedDrafts.firstIndex { draft in
+      draft.id == line.id
+        || (draft.originalText == line.originalText && draft.sortOrder == line.sortOrder)
+    }
+    guard let matchIndex else { return line }
+    let draft = unmatchedDrafts.remove(at: matchIndex)
+    line.isHeader = draft.isHeader
+    line.substitution = draft.substitution.nonEmpty
+    return line
+  }
+}
+
+private func reconcileIngredientLines(
+  _ parsedLines: [IngredientLine],
+  existing existingLines: [IngredientLine]
+) -> [IngredientLine] {
+  var unmatchedExistingLines = existingLines.sorted { $0.sortOrder < $1.sortOrder }
+  return parsedLines.map { parsedLine in
+    guard let matchIndex = unmatchedExistingLines.firstIndex(where: { $0.originalText == parsedLine.originalText })
+    else { return parsedLine }
+
+    let existingLine = unmatchedExistingLines.remove(at: matchIndex)
+    return IngredientLine(
+      id: existingLine.id,
+      recipeID: parsedLine.recipeID,
+      sectionID: parsedLine.sectionID,
+      originalText: parsedLine.originalText,
+      quantity: parsedLine.quantity ?? existingLine.quantity,
+      quantityText: parsedLine.quantityText ?? existingLine.quantityText,
+      unit: parsedLine.unit ?? existingLine.unit,
+      item: parsedLine.item ?? existingLine.item,
+      preparation: parsedLine.preparation ?? existingLine.preparation,
+      comment: parsedLine.comment ?? existingLine.comment,
+      isOptional: parsedLine.isOptional,
+      shoppingCategory: existingLine.shoppingCategory,
+      doNotShop: parsedLine.doNotShop || existingLine.doNotShop,
+      isHeader: parsedLine.isHeader,
+      substitution: existingLine.substitution,
+      sortOrder: parsedLine.sortOrder,
+      confidence: mergedConfidence(parsedLine.confidence, existingLine.confidence)
+    )
+  }
+}
+
+private func mergedConfidence(
+  _ parsedConfidence: ParseConfidence?,
+  _ existingConfidence: ParseConfidence?
+) -> ParseConfidence? {
+  switch parsedConfidence {
+  case .high, .medium:
+    parsedConfidence
+  case .low, nil:
+    existingConfidence ?? parsedConfidence
   }
 }
 

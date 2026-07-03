@@ -545,6 +545,26 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Add recipe enrichment and ingredient substitutions") { db in
+      try #sql("""
+        ALTER TABLE "recipes"
+        ADD COLUMN "chefItUp" TEXT
+        """)
+        .execute(db)
+
+      try #sql("""
+        ALTER TABLE "recipes"
+        ADD COLUMN "serveWith" BLOB
+        """)
+        .execute(db)
+
+      try #sql("""
+        ALTER TABLE "ingredientLines"
+        ADD COLUMN "substitution" TEXT
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     defaultDatabase = database
     switch syncMode {

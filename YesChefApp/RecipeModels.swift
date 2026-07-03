@@ -819,8 +819,6 @@ final class RecipeDetailModel {
   @ObservationIgnored
   @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored
-  @Dependency(\.makeAheadPlanClient) private var makeAheadPlanClient
-  @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
   @ObservationIgnored
   @Fetch var persistedScale: Double?
@@ -831,6 +829,8 @@ final class RecipeDetailModel {
   var scaleFactor = 1.0
   var scaleWholePart = 1
   var scaleFraction = ScaleFraction.none
+  var pendingSubstitution: PendingIngredientSubstitution?
+  var isFindingSubstitution = false
   private var lastAppliedPersistedScale: Double?
 
   init(recipeID: Recipe.ID, scaleContext: ScaleContext? = nil) {
@@ -888,6 +888,16 @@ final class RecipeDetailModel {
       : nil
   }
 
+  var chefItUp: String? {
+    recipe?.chefItUp?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+      ? recipe?.chefItUp
+      : nil
+  }
+
+  var serveWithItems: [ServeWithItem] {
+    ServeWithCoding.decode(recipe?.serveWith)
+  }
+
   var baseServings: Double? {
     recipe?.servings
   }
@@ -915,32 +925,6 @@ final class RecipeDetailModel {
   func chatButtonTapped() {
     guard let detail else { return }
     destination = .chat(RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail))))
-  }
-
-  func applyActionCatalog(for chatModel: RecipeChatModel) -> [AnyChatApplyAction] {
-    let context = chatModel.context.serialized()
-    let client = makeAheadPlanClient
-    let action = ChatApplyAction<MakeAheadPlan>(
-      title: "Summarize make-ahead → Make-ahead section",
-      extractingTitle: "Summarizing make-ahead...",
-      reviewTitle: "Review make-ahead",
-      commitTitle: "Commit to Make-ahead",
-      committingTitle: "Saving make-ahead...",
-      committedTitle: "Saved to Make-ahead",
-      extract: { selection, messages in
-        try await client(selection: selection, messages: messages, context: context, tier: chatModel.activeTier)
-      },
-      commit: { [weak self] plan in
-        try self?.commitMakeAheadPlan(plan)
-      }
-    )
-    return [
-      AnyChatApplyAction(action) { plan in
-        plan.rendered().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-          ? nil
-          : plan.rendered()
-      }
-    ]
   }
 
   func clearMakeAheadButtonTapped() {
@@ -1002,27 +986,6 @@ final class RecipeDetailModel {
     }
   }
 
-  private func commitMakeAheadPlan(_ plan: MakeAheadPlan) throws {
-    guard !plan.rendered().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-      throw RecipeDetailError.emptyMakeAheadPlan
-    }
-    try database.write { db in
-      try RecipeRepository.applyMakeAheadPlan(plan, to: recipeID, in: db, now: now)
-    }
-  }
-}
-
-private enum RecipeDetailError: Error, CustomStringConvertible, LocalizedError {
-  case emptyMakeAheadPlan
-
-  var description: String {
-    switch self {
-    case .emptyMakeAheadPlan:
-      "The assistant did not find a make-ahead plan to save."
-    }
-  }
-
-  var errorDescription: String? { description }
 }
 
 @Observable

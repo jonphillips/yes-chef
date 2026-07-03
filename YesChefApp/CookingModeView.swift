@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 import YesChefCore
 
 struct CookingModeView: View {
@@ -79,15 +78,12 @@ struct CookingModeView: View {
       .frame(maxWidth: 860, alignment: .leading)
     }
     .navigationTitle("Cooking")
+    .keepsScreenAwakeWhilePresented()
     .onAppear {
       model.detailChanged(model.detail)
-      UIApplication.shared.isIdleTimerDisabled = true
     }
     .onChange(of: model.detail) { _, detail in
       model.detailChanged(detail)
-    }
-    .onDisappear {
-      UIApplication.shared.isIdleTimerDisabled = false
     }
   }
 }

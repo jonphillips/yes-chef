@@ -29,6 +29,8 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
   public var originalImportText: String?
   public var originalSnapshot: Data?
   public var makeAhead: String?
+  public var chefItUp: String?
+  public var serveWith: Data?
   public var viewScale: Double
 
   public init(
@@ -58,6 +60,8 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     originalImportText: String? = nil,
     originalSnapshot: Data? = nil,
     makeAhead: String? = nil,
+    chefItUp: String? = nil,
+    serveWith: Data? = nil,
     viewScale: Double = 1.0
   ) {
     self.id = id
@@ -86,6 +90,8 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     self.originalImportText = originalImportText
     self.originalSnapshot = originalSnapshot
     self.makeAhead = makeAhead
+    self.chefItUp = chefItUp
+    self.serveWith = serveWith
     self.viewScale = viewScale
   }
 
@@ -116,6 +122,8 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     case originalImportText
     case originalSnapshot
     case makeAhead
+    case chefItUp
+    case serveWith
     case viewScale
   }
 
@@ -148,8 +156,22 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
       originalImportText: try container.decodeIfPresent(String.self, forKey: .originalImportText),
       originalSnapshot: try container.decodeIfPresent(Data.self, forKey: .originalSnapshot),
       makeAhead: try container.decodeIfPresent(String.self, forKey: .makeAhead),
+      chefItUp: try container.decodeIfPresent(String.self, forKey: .chefItUp),
+      serveWith: try container.decodeIfPresent(Data.self, forKey: .serveWith),
       viewScale: try container.decodeIfPresent(Double.self, forKey: .viewScale) ?? 1.0
     )
+  }
+}
+
+public struct ServeWithItem: Codable, Identifiable, Equatable, Sendable {
+  public var id: UUID
+  public var title: String
+  public var note: String?
+
+  public init(id: UUID, title: String, note: String? = nil) {
+    self.id = id
+    self.title = title
+    self.note = note
   }
 }
 
@@ -638,6 +660,7 @@ public struct IngredientLine: Codable, Identifiable, Equatable, Sendable {
   public var shoppingCategory: String?
   public var doNotShop: Bool
   public var isHeader: Bool
+  public var substitution: String?
   public var sortOrder: Int
   public var confidence: ParseConfidence?
 
@@ -656,6 +679,7 @@ public struct IngredientLine: Codable, Identifiable, Equatable, Sendable {
     shoppingCategory: String? = nil,
     doNotShop: Bool = false,
     isHeader: Bool = false,
+    substitution: String? = nil,
     sortOrder: Int,
     confidence: ParseConfidence? = nil
   ) {
@@ -673,6 +697,7 @@ public struct IngredientLine: Codable, Identifiable, Equatable, Sendable {
     self.shoppingCategory = shoppingCategory
     self.doNotShop = doNotShop
     self.isHeader = isHeader
+    self.substitution = substitution
     self.sortOrder = sortOrder
     self.confidence = confidence
   }
