@@ -683,28 +683,9 @@ private struct ScalePanel: View {
         Text("Multiplier")
           .font(.subheadline.bold())
 
-        HStack(spacing: 8) {
-          ForEach([1.0, 2.0, 3.0], id: \.self) { multiplier in
-            Button {
-              model.multiplierButtonTapped(multiplier)
-            } label: {
-              Text(ScaleText.factor(multiplier))
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .tint(model.scaleFactor == multiplier ? .accentColor : nil)
-            .accessibilityAddTraits(model.scaleFactor == multiplier ? .isSelected : [])
-          }
-        }
-      }
-
-      VStack(alignment: .leading, spacing: 8) {
-        Text(model.baseServings == nil ? "Scale" : "Servings")
-          .font(.subheadline.bold())
-
         HStack(spacing: 0) {
-          Picker("Whole", selection: $model.scaleWholePart) {
-            ForEach(1...10, id: \.self) { whole in
+          Picker("Whole multiplier", selection: $model.scaleWholePart) {
+            ForEach(0...10, id: \.self) { whole in
               Text("\(whole)")
                 .tag(whole)
             }
@@ -732,10 +713,10 @@ private struct ScalePanel: View {
         model.scalePickerChanged()
       }
 
-      LabeledContent("Scale", value: ScaleText.factor(model.scaleFactor))
+      LabeledContent("Multiplier", value: ScaleText.factor(model.scaleFactor))
         .font(.subheadline)
       if let scaledServingsSummary = model.scaledServingsSummary {
-        LabeledContent("Resulting servings", value: scaledServingsSummary)
+        LabeledContent("Makes", value: "~\(scaledServingsSummary)")
           .font(.subheadline)
       }
 

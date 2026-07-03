@@ -873,9 +873,22 @@ public enum IngredientScaler {
   }
 
   private static func format(_ value: Double) -> String {
-    if value.rounded() == value {
-      return "\(Int(value))"
+    let rounded = value.rounded()
+    if abs(value - rounded) < 0.01 {
+      return "\(Int(rounded))"
     }
+
+    let whole = Int(value.rounded(.down))
+    let fractionValue = value - Double(whole)
+    if let fraction = commonFractions.min(by: { lhs, rhs in
+      abs(lhs.value - fractionValue) < abs(rhs.value - fractionValue)
+    }), abs(fraction.value - fractionValue) < 0.01 {
+      if whole == 0 {
+        return fraction.label
+      }
+      return "\(whole) \(fraction.label)"
+    }
+
     return value.formatted(.number.precision(.fractionLength(0...2)))
   }
 
@@ -883,6 +896,24 @@ public enum IngredientScaler {
     guard quantity != 1, !unit.hasSuffix("s") else { return unit }
     return unit + "s"
   }
+
+  private static let commonFractions: [(value: Double, label: String)] = [
+    (1.0 / 8.0, "⅛"),
+    (1.0 / 6.0, "⅙"),
+    (1.0 / 5.0, "⅕"),
+    (1.0 / 4.0, "¼"),
+    (1.0 / 3.0, "⅓"),
+    (3.0 / 8.0, "⅜"),
+    (2.0 / 5.0, "⅖"),
+    (1.0 / 2.0, "½"),
+    (3.0 / 5.0, "⅗"),
+    (5.0 / 8.0, "⅝"),
+    (2.0 / 3.0, "⅔"),
+    (3.0 / 4.0, "¾"),
+    (4.0 / 5.0, "⅘"),
+    (5.0 / 6.0, "⅚"),
+    (7.0 / 8.0, "⅞"),
+  ]
 }
 
 public enum ServingParser {

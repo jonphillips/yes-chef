@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 2, 2026 (Slice 1 lift approved; Next Up = Slice 2 make-ahead)
+Last updated: July 3, 2026 (Recipe-multiplier A+B approved, PR #69 → DONE-LOG; Next Up = Slice C per-placement persisted scale)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -16,23 +16,21 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Actionable chat — the lift + make-ahead (ADR-0011).** First cross-app instance of the
-actionable-chat pattern. Full spec: [`docs/efforts/actionable-chat-make-ahead.md`](efforts/actionable-chat-make-ahead.md).
-Decision: [`docs/decisions/ADR-0011-actionable-chat-make-ahead.md`](decisions/ADR-0011-actionable-chat-make-ahead.md).
+**Recipe-multiplier rework — Slice C (per-placement persisted scale).** Slices A+B approved and merging
+(PR #69: unicode-fraction parse fix + dial-as-multiplier). Full spec:
+[`docs/efforts/recipe-multiplier-rework.md`](efforts/recipe-multiplier-rework.md) § Slice C. Add additive,
+sync-safe `viewScale: Double` (default 1.0) to `recipes` and `scale: Double` (default 1.0) to `menuItems`
+and `mealPlanItems` (one migration); introduce a small injected `ScaleContext`
+(`.recipe(id)`/`.menuItem(id)`/`.mealPlanItem(id)`) so `RecipeDetailModel` reads the initial factor from,
+and writes changes back to, the storage site the context names — one read/write seam, not a branch per
+screen. Locked: bare-recipe scale **syncs** (recipes column); scales round-trip through iCloud.
+**Investigation first (do before building):** confirm whether the menu/planner surfaces route into recipe
+detail today (all three `RecipeDetailView(` constructions currently live in `RecipeLibraryView.swift`;
+`MenuViews`/`MealCalendarViews` may not open detail at all) — sizing that navigation is the one part that
+can grow beyond "add a column."
 
-**Slice 1 — the lift is done and architect-approved (2026-07-02):** jon-platform PR #17 (new
-`packages/LLMClientKit`), galavant PR #48 (retire `GalavantAI`), yes-chef PR #67 (adopt +
-`TieredModelClient.live`); merge jon-platform first. Details in [`docs/DONE-LOG.md`](DONE-LOG.md).
-**Next Up is Slice 2:**
-
-2. **Slice 2 — the abstraction + make-ahead** (yes-chef): additive `Recipe.makeAhead` column; a general
-   `(extract → commit)` apply-action **catalog** (make-ahead = verb #1, not hardcoded); `MakeAheadPlan` +
-   `MakeAheadPlanClient` (mirror `PlaceDiscoveryClient`); tested `applyMakeAheadPlan`; `RecipeChatContext`
-   + `RecipeChatModel` (mirror `GalavantChat`) with markdown + editable pre-prompt parity; panel + button
-   + "Make-ahead" section in `RecipeDetailView`.
-
-Invariant (do not violate): the model proposes/structures; the **tap** is the only write. See the effort
-doc for per-slice acceptance and the read-first list.
+Then: **Phase E (grocery/pantry)** — [[grocery-pantry-threshold-design]] — while Jon experiments with the
+new chat/make-ahead tools.
 
 ## Ready Efforts (queue)
 

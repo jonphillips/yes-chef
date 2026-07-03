@@ -50,6 +50,15 @@ public enum IngredientParser {
       )
     }
 
+    if let quantity = mixedNumberValue(first) {
+      return parsedQuantity(
+        quantity: quantity,
+        quantityText: first,
+        remainingTokens: Array(tokens.dropFirst()),
+        preparation: parts.preparation
+      )
+    }
+
     if let quantity = Double(first) ?? fractionValue(first) {
       return parsedQuantity(
         quantity: quantity,
@@ -118,6 +127,10 @@ public enum IngredientParser {
   }
 
   private static func fractionValue(_ text: String) -> Double? {
+    if text.count == 1, let character = text.first, let value = vulgarFractions[character] {
+      return value
+    }
+
     let parts = text.split(separator: "/")
     guard
       parts.count == 2,
@@ -128,10 +141,39 @@ public enum IngredientParser {
     return numerator / denominator
   }
 
+  private static func mixedNumberValue(_ text: String) -> Double? {
+    guard
+      let fractionCharacter = text.last,
+      let fraction = vulgarFractions[fractionCharacter]
+    else { return nil }
+
+    let wholeText = text.dropLast()
+    guard !wholeText.isEmpty, let whole = Double(wholeText) else { return nil }
+    return whole + fraction
+  }
+
   private static func nonEmpty(_ text: String) -> String? {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
   }
+
+  private static let vulgarFractions: [Character: Double] = [
+    "¼": 1.0 / 4.0,
+    "½": 1.0 / 2.0,
+    "¾": 3.0 / 4.0,
+    "⅓": 1.0 / 3.0,
+    "⅔": 2.0 / 3.0,
+    "⅛": 1.0 / 8.0,
+    "⅜": 3.0 / 8.0,
+    "⅝": 5.0 / 8.0,
+    "⅞": 7.0 / 8.0,
+    "⅕": 1.0 / 5.0,
+    "⅖": 2.0 / 5.0,
+    "⅗": 3.0 / 5.0,
+    "⅘": 4.0 / 5.0,
+    "⅙": 1.0 / 6.0,
+    "⅚": 5.0 / 6.0,
+  ]
 
   private static let units: Set<String> = [
     "bag",

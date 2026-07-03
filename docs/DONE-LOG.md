@@ -10,6 +10,61 @@ Newest first.
 
 ---
 
+## Recipe-multiplier rework — Slices A+B (parse fix + dial-as-multiplier)
+
+**Architect-approved 2026-07-03** — yes-chef [PR #69](https://github.com/jonphillips/yes-chef/pull/69).
+First two slices of the dogfood-driven multiplier rework; Slice C (per-placement persisted scale) remains
+Next Up.
+
+- **Slice A (unicode-fraction parse, pure `YesChefCore`):** `IngredientParser` now maps vulgar-fraction
+  glyphs (¼ ½ ¾ ⅓ ⅔ ⅛ … ⅕/⅙ family) to decimals and handles spaced (`1 ¼`), unspaced (`1¼`), and
+  glyph-only (`⅓`) mixed numbers via a new `mixedNumberValue` branch. `IngredientScaler.format` renders
+  scaled results back as mixed-number fractions (`2 ½`) with a 0–2-decimal fallback. Focused parser/scaler
+  regression tests added.
+- **Slice B (dials become the multiplier):** `scalePickerChanged` sets `scaleFactor` directly;
+  `setScaledServings` / target-servings math removed. Whole-number range and `nearestSelection` start at 0
+  so sub-1× steps (⅓×/½×/¾×) are reachable, clamped to `minimumScale` (⅓) to block 0×. Servings became a
+  read-only derived "Makes ~N" line (hidden when unparseable); picker relabeled around the multiplier and
+  the 1×/2×/3× quick buttons retired.
+
+**Review:** approved; two minor findings Jon fixed himself before merge — dead `multiplierButtonTapped(_:)`
+left orphaned after the quick buttons were removed, and an inert `.disabled()` on the `.wheel` picker rows
+(the real clamp lives in `scalePickerChanged`). Duplicated fraction tables across the module boundary
+(`IngredientScaler.commonFractions` vs `ScaleText`/`ScaleFraction`) noted as acceptable, not a change request.
+
+Effort doc: [`docs/efforts/recipe-multiplier-rework.md`](efforts/recipe-multiplier-rework.md).
+
+---
+
+## Actionable chat (ADR-0011) — Slice 2: the abstraction + make-ahead
+
+**Slice 2 (the final slice of the actionable-chat effort), architect-approved 2026-07-02** —
+yes-chef [PR #68](https://github.com/jonphillips/yes-chef/pull/68). First cross-app instance of the
+actionable-chat pattern landed end-to-end in yes-chef.
+
+- Additive `Recipe.makeAhead` TEXT column + migration (additive, sync-safe); editor-save preserves it.
+- `MakeAheadPlan` + `MakeAheadPlanClient` (defensive JSON extraction, mirrors `PlaceDiscoveryClient`);
+  tested `RecipeRepository.applyMakeAheadPlan` / `clearMakeAhead`.
+- General `(extract → commit)` apply-action **catalog** (`ChatApplyAction` / `AnyChatApplyAction`) —
+  make-ahead is verb #1, not hardcoded. Invariant held: model proposes/structures, the **tap** is the
+  only write.
+- `RecipeChatContext` + `RecipeChatModel` (seeded from the on-screen recipe), chat panel + "Chat"
+  button + dedicated "Make-ahead" section + clear affordance in `RecipeDetailView`; editable chat
+  pre-prompt in AI settings.
+
+**Review (3 findings, all fixed on the branch before approval):** (1) HIGH — `send()` built the model
+request *after* appending the empty assistant placeholder, so the frontier path put an empty-content
+assistant message on the Anthropic wire (400 every turn); fixed by capturing `history()` before the
+placeholder. (2) MEDIUM — apply action hardcoded `.frontier(.anthropic)` instead of the chat's tier;
+fixed by threading `tier` through `MakeAheadPlanClient`, with a regression test. (3) LOW — apply errors
+dumped raw enum values; fixed by extracting the shared `RecipeChatErrorText.describe`.
+
+Effort doc: [`docs/efforts/actionable-chat-make-ahead.md`](efforts/actionable-chat-make-ahead.md).
+Remaining named-but-deferred work (Galavant adoption = ADR-0031 Slice 3; jon-platform cross-app ADR =
+Slice 4) lives in other repos, "after the shape holds here."
+
+---
+
 ## Actionable chat (ADR-0011) — Slice 1: the lift
 
 **Slice 1 of the actionable-chat lift, architect-approved 2026-07-02** (3 PRs; merge jon-platform

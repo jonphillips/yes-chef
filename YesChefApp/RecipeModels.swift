@@ -945,28 +945,18 @@ final class RecipeDetailModel {
     syncScalePickerFromCurrentScale()
   }
 
-  func multiplierButtonTapped(_ multiplier: Double) {
-    scaleFactor = multiplier
-    syncScalePickerFromCurrentScale()
-  }
-
-  func setScaledServings(_ servings: Double) {
-    guard let baseServings, baseServings > 0 else { return }
-    scaleFactor = servings / baseServings
-  }
-
   func scalePickerChanged() {
-    let value = Double(scaleWholePart) + scaleFraction.value
-    if baseServings == nil {
-      scaleFactor = value
-    } else {
-      setScaledServings(value)
+    var value = Double(scaleWholePart) + scaleFraction.value
+    if value < ScaleFraction.minimumScale {
+      scaleWholePart = 0
+      scaleFraction = .oneThird
+      value = ScaleFraction.minimumScale
     }
+    scaleFactor = value
   }
 
   private func syncScalePickerFromCurrentScale() {
-    let value = scaledServings ?? scaleFactor
-    let selection = ScaleFraction.nearestSelection(to: value)
+    let selection = ScaleFraction.nearestSelection(to: scaleFactor)
     scaleWholePart = selection.whole
     scaleFraction = selection.fraction
   }
@@ -1009,13 +999,13 @@ enum ScaleFraction: String, CaseIterable, Identifiable {
   var label: String {
     switch self {
     case .none: "-"
-    case .oneHalf: "1/2"
-    case .oneThird: "1/3"
-    case .oneFourth: "1/4"
-    case .oneFifth: "1/5"
-    case .oneEighth: "1/8"
-    case .twoThirds: "2/3"
-    case .threeFourths: "3/4"
+    case .oneHalf: "½"
+    case .oneThird: "⅓"
+    case .oneFourth: "¼"
+    case .oneFifth: "⅕"
+    case .oneEighth: "⅛"
+    case .twoThirds: "⅔"
+    case .threeFourths: "¾"
     }
   }
 
@@ -1037,9 +1027,10 @@ enum ScaleFraction: String, CaseIterable, Identifiable {
     var bestFraction = ScaleFraction.none
     var bestDistance = Double.greatestFiniteMagnitude
 
-    for whole in 1...10 {
+    for whole in 0...10 {
       for fraction in ScaleFraction.allCases {
         let candidate = Double(whole) + fraction.value
+        guard candidate >= minimumScale else { continue }
         let distance = abs(candidate - value)
         if distance < bestDistance {
           bestWhole = whole
@@ -1051,12 +1042,13 @@ enum ScaleFraction: String, CaseIterable, Identifiable {
 
     return (bestWhole, bestFraction)
   }
+
+  static var minimumScale: Double { oneThird.value }
 }
 
 enum ScaleText {
   static func factor(_ factor: Double) -> String {
-    if factor == 1 { return "1x" }
-    return "\(number(factor))x"
+    "×\(mixedNumber(factor))"
   }
 
   static func number(_ value: Double) -> String {
