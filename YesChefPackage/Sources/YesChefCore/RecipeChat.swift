@@ -118,6 +118,8 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
   public var instructionSections: [RecipeChatSection]
   public var notes: [String]
   public var makeAhead: String?
+  public var chefItUp: String?
+  public var serveWith: [ServeWithItem]
 
   public init(
     title: String,
@@ -131,7 +133,9 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
     ingredientSections: [RecipeChatSection] = [],
     instructionSections: [RecipeChatSection] = [],
     notes: [String] = [],
-    makeAhead: String? = nil
+    makeAhead: String? = nil,
+    chefItUp: String? = nil,
+    serveWith: [ServeWithItem] = []
   ) {
     self.title = title
     self.subtitle = subtitle
@@ -145,6 +149,8 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
     self.instructionSections = instructionSections
     self.notes = notes
     self.makeAhead = makeAhead
+    self.chefItUp = chefItUp
+    self.serveWith = serveWith
   }
 
   public init(detail: RecipeDetailData) {
@@ -185,7 +191,9 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
         .filter { $0.noteType == .general }
         .sorted { $0.dateCreated < $1.dateCreated }
         .map(\.text),
-      makeAhead: detail.recipe.makeAhead
+      makeAhead: detail.recipe.makeAhead,
+      chefItUp: detail.recipe.chefItUp,
+      serveWith: ServeWithCoding.decode(detail.recipe.serveWith)
     )
   }
 
@@ -210,6 +218,20 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
     if let makeAhead {
       lines.append("Current make-ahead section:")
       lines.append(makeAhead)
+    }
+    if let chefItUp {
+      lines.append("Current Chef It Up section:")
+      lines.append(chefItUp)
+    }
+    if !serveWith.isEmpty {
+      lines.append("Current Serve With section:")
+      for item in serveWith {
+        if let note = item.note {
+          lines.append("- \(item.title): \(note)")
+        } else {
+          lines.append("- \(item.title)")
+        }
+      }
     }
     return lines.joined(separator: "\n")
   }

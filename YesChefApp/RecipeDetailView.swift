@@ -111,6 +111,19 @@ struct RecipeDetailView: View {
         )
       }
     }
+    .sheet(item: $model.pendingSubstitution) { pending in
+      NavigationStack {
+        IngredientSubstitutionReviewView(
+          pending: pending,
+          save: {
+            model.savePendingSubstitutionButtonTapped()
+          },
+          cancel: {
+            model.pendingSubstitution = nil
+          }
+        )
+      }
+    }
     .alert("Recipe Update Failed", isPresented: $model.isShowingError) {
       Button("OK", role: .cancel) {}
     } message: {
@@ -170,6 +183,7 @@ private struct RecipeReaderView: View {
 
   @State private var compactSection: CompactSection = .ingredients
   @State private var isPhotoGalleryPresented = false
+  @State private var revealedSubstitutionIDs: Set<IngredientLine.ID> = []
 
   var body: some View {
     GeometryReader { proxy in
@@ -205,6 +219,7 @@ private struct RecipeReaderView: View {
         }
       }
     }
+    .keepsScreenAwakeWhilePresented()
   }
 
   private func header(_ recipe: Recipe) -> some View {
@@ -322,6 +337,12 @@ private struct RecipeReaderView: View {
           if let makeAhead = model.makeAhead {
             makeAheadSection(makeAhead)
           }
+          if let chefItUp = model.chefItUp {
+            chefItUpSection(chefItUp)
+          }
+          if !model.serveWithItems.isEmpty {
+            serveWithSection(model.serveWithItems)
+          }
           if !model.instructionSteps.isEmpty {
             instructions
           }
@@ -346,6 +367,12 @@ private struct RecipeReaderView: View {
         VStack(alignment: .leading, spacing: 18) {
           if let makeAhead = model.makeAhead {
             makeAheadSection(makeAhead)
+          }
+          if let chefItUp = model.chefItUp {
+            chefItUpSection(chefItUp)
+          }
+          if !model.serveWithItems.isEmpty {
+            serveWithSection(model.serveWithItems)
           }
           if !model.instructionSteps.isEmpty {
             instructions
@@ -393,8 +420,28 @@ private struct RecipeReaderView: View {
   private func ingredientLineList(_ lines: [IngredientLine]) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       ForEach(lines) { line in
-        Text("• \(IngredientScaler.scaledText(for: line, factor: model.scaleFactor))")
-          .font(.body)
+        IngredientLineRow(
+          line: line,
+          scaledText: IngredientScaler.scaledText(for: line, factor: model.scaleFactor),
+          isSubstitutionRevealed: revealedSubstitutionIDs.contains(line.id),
+          isFindingSubstitution: model.isFindingSubstitution,
+          toggleSubstitution: {
+            if revealedSubstitutionIDs.contains(line.id) {
+              revealedSubstitutionIDs.remove(line.id)
+            } else {
+              revealedSubstitutionIDs.insert(line.id)
+            }
+          },
+          findSubstitute: {
+            Task {
+              await model.findSubstituteButtonTapped(lineID: line.id)
+            }
+          },
+          clearSubstitution: {
+            model.clearSubstitutionButtonTapped(lineID: line.id)
+            revealedSubstitutionIDs.remove(line.id)
+          }
+        )
       }
     }
   }
@@ -436,6 +483,54 @@ private struct RecipeReaderView: View {
     }
   }
 
+  private func chefItUpSection(_ chefItUp: String) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack(alignment: .firstTextBaseline) {
+        Text("Chef It Up")
+          .font(.title2.bold())
+        Spacer()
+        Button(role: .destructive) {
+          model.clearChefItUpButtonTapped()
+        } label: {
+          Label("Clear", systemImage: "xmark.circle")
+        }
+        .buttonStyle(.bordered)
+      }
+      Text(chefItUp)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+
+  private func serveWithSection(_ items: [ServeWithItem]) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Serve With")
+        .font(.title2.bold())
+      VStack(alignment: .leading, spacing: 10) {
+        ForEach(items) { item in
+          HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+              Text(item.title)
+                .font(.headline)
+              if let note = item.note {
+                Text(note)
+                  .font(.callout)
+                  .foregroundStyle(.secondary)
+              }
+            }
+            Spacer(minLength: 8)
+            Button(role: .destructive) {
+              model.removeServeWithButtonTapped(item.id)
+            } label: {
+              Image(systemName: "xmark.circle")
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(Text("Remove \(item.title)"))
+          }
+        }
+      }
+    }
+  }
+
   private func notesView(_ notes: [RecipeNote]) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Notes")
@@ -448,6 +543,95 @@ private struct RecipeReaderView: View {
           Text(note.text)
         }
         .padding(.vertical, 4)
+      }
+    }
+  }
+}
+
+private struct IngredientLineRow: View {
+  let line: IngredientLine
+  let scaledText: String
+  let isSubstitutionRevealed: Bool
+  let isFindingSubstitution: Bool
+  let toggleSubstitution: () -> Void
+  let findSubstitute: () -> Void
+  let clearSubstitution: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 5) {
+      HStack(alignment: .firstTextBaseline, spacing: 8) {
+        if line.isHeader {
+          Text(line.originalText.trimmingCharacters(in: CharacterSet(charactersIn: ":").union(.whitespacesAndNewlines)))
+            .font(.headline)
+        } else {
+          Text("•")
+            .foregroundStyle(.secondary)
+          Text(scaledText)
+            .font(.body)
+        }
+
+        if line.substitution?.nonEmpty != nil {
+          Button(action: toggleSubstitution) {
+            Image(systemName: "arrow.triangle.2.circlepath")
+              .font(.caption)
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel(Text(isSubstitutionRevealed ? "Hide substitution" : "Show substitution"))
+        }
+
+        Spacer(minLength: 8)
+
+        if !line.isHeader {
+          Menu {
+            Button(action: findSubstitute) {
+              Label("Find Substitute", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .disabled(isFindingSubstitution)
+            if line.substitution?.nonEmpty != nil {
+              Button(role: .destructive, action: clearSubstitution) {
+                Label("Clear Substitute", systemImage: "xmark.circle")
+              }
+            }
+          } label: {
+            Image(systemName: "ellipsis.circle")
+          }
+          .menuStyle(.button)
+          .accessibilityLabel(Text("Ingredient actions"))
+        }
+      }
+
+      if isSubstitutionRevealed, let substitution = line.substitution?.nonEmpty {
+        Text(substitution)
+          .font(.callout)
+          .foregroundStyle(.secondary)
+          .padding(.leading, 22)
+      }
+    }
+  }
+}
+
+private struct IngredientSubstitutionReviewView: View {
+  let pending: PendingIngredientSubstitution
+  let save: () -> Void
+  let cancel: () -> Void
+
+  var body: some View {
+    Form {
+      Section("Ingredient") {
+        Text(pending.ingredientText)
+      }
+      Section("Substitution") {
+        Text(pending.substitution)
+      }
+    }
+    .navigationTitle("Review Substitute")
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .cancellationAction) {
+        Button("Cancel", action: cancel)
+      }
+      ToolbarItem(placement: .confirmationAction) {
+        Button("Save", action: save)
       }
     }
   }

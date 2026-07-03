@@ -67,12 +67,20 @@ struct RecipeEditorView: View {
       }
 
       Section("Ingredients") {
+        StackedTextField(title: "Section title", text: $model.draft.ingredientSectionName)
         StackedTextEditor(
           title: "Ingredients",
           text: $model.draft.ingredientText,
           minHeight: 180,
           font: .body.monospacedDigit()
         )
+        .onChange(of: model.draft.ingredientText) { _, _ in
+          model.ingredientTextChanged()
+        }
+
+        ForEach($model.draft.ingredientLineDrafts) { $line in
+          IngredientLineStructureEditor(line: $line)
+        }
       }
 
       Section("Instructions") {
@@ -241,6 +249,20 @@ private struct RecipeSourceEditorView: View {
     }
     .navigationTitle("Source")
     .navigationBarTitleDisplayMode(.inline)
+  }
+}
+
+private struct IngredientLineStructureEditor: View {
+  @Binding var line: RecipeIngredientLineDraft
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(line.originalText)
+        .font(.subheadline)
+      Toggle("Header", isOn: $line.isHeader)
+      StackedTextField(title: "Substitution", text: $line.substitution, axis: .vertical)
+    }
+    .padding(.vertical, 4)
   }
 }
 

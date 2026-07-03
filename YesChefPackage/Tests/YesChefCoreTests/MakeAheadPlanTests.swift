@@ -72,6 +72,34 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func enrichmentClientsParseFocusedJSON() {
+      expectNoDifference(
+        ChefItUpPlanClient.parse(#"{"text":"Brown the butter before mixing it into the batter."}"#),
+        ChefItUpPlan(text: "Brown the butter before mixing it into the batter.")
+      )
+      expectNoDifference(
+        ServeWithPlanClient.parse(
+          """
+          {"items":[
+            {"title":"Cilantro-scallion rice","note":"Stir in butter right before serving."},
+            {"title":"Cucumber salad"}
+          ]}
+          """
+        ),
+        ServeWithPlan(
+          items: [
+            ServeWithSuggestion(title: "Cilantro-scallion rice", note: "Stir in butter right before serving."),
+            ServeWithSuggestion(title: "Cucumber salad"),
+          ]
+        )
+      )
+      expectNoDifference(
+        IngredientSubstitutionClient.parse(#"{"text":"Use 1 tsp flour plus 2 tsp fine cornmeal."}"#),
+        IngredientSubstitutionSuggestion(text: "Use 1 tsp flour plus 2 tsp fine cornmeal.")
+      )
+    }
+
+    @Test
     @MainActor
     func recipeChatSendDoesNotIncludeAssistantPlaceholderInRequest() async {
       let recorder = ModelRequestRecorder()
@@ -314,6 +342,113 @@ extension RecipeCoreTests {
         let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
         expectNoDifference(recipe.makeAhead, nil)
         expectNoDifference(recipe.dateModified, clearedAt)
+      }
+    }
+
+    @Test
+    func recipeEnrichmentWritesOwnFieldsAndUndoRemovesIndependently() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 825_000_000)
+      let modifiedAt = now.addingTimeInterval(60)
+      let removedAt = now.addingTimeInterval(120)
+      let recipeID = SampleUUIDSequence.uuid(36_201)
+      var uuids = SampleUUIDSequence(start: 36_300)
+
+      try database.write { db in
+        try Recipe.insert {
+          Recipe(id: recipeID, title: "Chili", dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+
+        try RecipeRepository.applyChefItUpPlan(
+          ChefItUpPlan(text: "Toast the spices in oil before adding the tomatoes."),
+          to: recipeID,
+          in: db,
+          now: modifiedAt
+        )
+        try RecipeRepository.appendServeWithPlan(
+          ServeWithPlan(
+            items: [
+              ServeWithSuggestion(title: "Lime crema", note: "Spoon over each bowl."),
+              ServeWithSuggestion(title: "Skillet cornbread"),
+            ]
+          ),
+          to: recipeID,
+          in: db,
+          now: modifiedAt,
+          uuid: { uuids.next() }
+        )
+      }
+
+      let firstServeWithID: ServeWithItem.ID = try database.read { db in
+        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+        let serveWith = ServeWithCoding.decode(recipe.serveWith)
+        expectNoDifference(recipe.chefItUp, "Toast the spices in oil before adding the tomatoes.")
+        expectNoDifference(
+          serveWith.map { ServeWithSuggestion(title: $0.title, note: $0.note) },
+          [
+            ServeWithSuggestion(title: "Lime crema", note: "Spoon over each bowl."),
+            ServeWithSuggestion(title: "Skillet cornbread"),
+          ]
+        )
+        return try #require(serveWith.first?.id)
+      }
+
+      try database.write { db in
+        try RecipeRepository.clearChefItUp(recipeID: recipeID, in: db, now: removedAt)
+        try RecipeRepository.removeServeWithItem(firstServeWithID, recipeID: recipeID, in: db, now: removedAt)
+      }
+
+      try database.read { db in
+        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+        expectNoDifference(recipe.chefItUp, nil)
+        expectNoDifference(ServeWithCoding.decode(recipe.serveWith).map(\.title), ["Skillet cornbread"])
+        expectNoDifference(recipe.dateModified, removedAt)
+      }
+    }
+
+    @Test
+    func ingredientSubstitutionWritesLineAndBumpsRecipeModifiedDate() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 826_000_000)
+      let modifiedAt = now.addingTimeInterval(60)
+      let recipeID = SampleUUIDSequence.uuid(36_401)
+      let sectionID = SampleUUIDSequence.uuid(36_402)
+      let lineID = SampleUUIDSequence.uuid(36_403)
+
+      try database.write { db in
+        try Recipe.insert {
+          Recipe(id: recipeID, title: "Tortillas", dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+        try IngredientSection.insert {
+          IngredientSection(id: sectionID, recipeID: recipeID, sortOrder: 0)
+        }
+        .execute(db)
+        try IngredientLine.insert {
+          IngredientLine(
+            id: lineID,
+            recipeID: recipeID,
+            sectionID: sectionID,
+            originalText: "1 Tbsp masa harina",
+            sortOrder: 0
+          )
+        }
+        .execute(db)
+        try RecipeRepository.setIngredientSubstitution(
+          "1 tsp flour plus 2 tsp fine cornmeal",
+          lineID: lineID,
+          recipeID: recipeID,
+          now: modifiedAt,
+          in: db
+        )
+      }
+
+      try database.read { db in
+        let line = try #require(try IngredientLine.find(lineID).fetchOne(db))
+        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+        expectNoDifference(line.substitution, "1 tsp flour plus 2 tsp fine cornmeal")
+        expectNoDifference(recipe.dateModified, modifiedAt)
       }
     }
 
