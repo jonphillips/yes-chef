@@ -35,6 +35,9 @@ struct RecipeDetailView: View {
           if !model.ingredientLines.isEmpty {
             ingredients
           }
+          if let makeAhead = model.makeAhead {
+            makeAheadSection(makeAhead)
+          }
           if !model.instructionSteps.isEmpty {
             instructions
           }
@@ -52,6 +55,11 @@ struct RecipeDetailView: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {
+        Button {
+          model.chatButtonTapped()
+        } label: {
+          Label("Chat", systemImage: "sparkles")
+        }
         Button {
           mealCalendarModel.addRecipeToPlanButtonTapped(recipeID: model.recipeID)
         } label: {
@@ -79,6 +87,19 @@ struct RecipeDetailView: View {
           Label("More", systemImage: "ellipsis.circle")
         }
       }
+    }
+    .sheet(item: $model.destination.chat) { chatModel in
+      NavigationStack {
+        RecipeChatPanel(
+          chatModel: chatModel,
+          applyActions: model.applyActionCatalog(for: chatModel)
+        )
+      }
+    }
+    .alert("Recipe Update Failed", isPresented: $model.isShowingError) {
+      Button("OK", role: .cancel) {}
+    } message: {
+      Text(model.errorMessage ?? "Something went wrong.")
     }
   }
 
@@ -247,6 +268,24 @@ struct RecipeDetailView: View {
     }
   }
 
+  private func makeAheadSection(_ makeAhead: String) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack(alignment: .firstTextBaseline) {
+        Text("Make-ahead")
+          .font(.title2.bold())
+        Spacer()
+        Button(role: .destructive) {
+          model.clearMakeAheadButtonTapped()
+        } label: {
+          Label("Clear", systemImage: "xmark.circle")
+        }
+        .buttonStyle(.bordered)
+      }
+      Text(makeAhead)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+
   private func notesView(_ notes: [RecipeNote]) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Notes")
@@ -263,6 +302,178 @@ struct RecipeDetailView: View {
     }
   }
 
+}
+
+private struct RecipeChatPanel: View {
+  let chatModel: RecipeChatModel
+  let applyActions: [AnyChatApplyAction]
+
+  @State private var draft = ""
+  @State private var applyingActionID: AnyChatApplyAction.ID?
+  @State private var actionSummary: String?
+  @State private var actionError: String?
+
+  var body: some View {
+    @Bindable var chatModel = chatModel
+
+    VStack(spacing: 0) {
+      ScrollViewReader { proxy in
+        ScrollView {
+          LazyVStack(alignment: .leading, spacing: 12) {
+            ChatContextHeader(chatModel: chatModel)
+            ForEach(chatModel.messages) { message in
+              ChatMessageBubble(message: message)
+                .id(message.id)
+            }
+            if let actionSummary {
+              ChatActionSummary(text: actionSummary)
+            }
+            if let error = chatModel.errorText ?? actionError {
+              Label(error, systemImage: "exclamationmark.triangle")
+                .font(.footnote)
+                .foregroundStyle(.red)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+          }
+          .padding()
+        }
+        .onChange(of: chatModel.messages.count) { _, _ in
+          guard let lastID = chatModel.messages.last?.id else { return }
+          withAnimation {
+            proxy.scrollTo(lastID, anchor: .bottom)
+          }
+        }
+      }
+
+      Divider()
+
+      VStack(alignment: .leading, spacing: 12) {
+        ForEach(applyActions) { action in
+          Button {
+            Task { await run(action) }
+          } label: {
+            Label(
+              applyingActionID == action.id ? "Saving make-ahead..." : action.title,
+              systemImage: applyingActionID == action.id ? "hourglass" : "text.badge.checkmark"
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+          }
+          .buttonStyle(.bordered)
+          .disabled(chatModel.isResponding || applyingActionID != nil)
+        }
+
+        HStack(alignment: .bottom, spacing: 8) {
+          TextField("Ask about this recipe", text: $draft, axis: .vertical)
+            .textFieldStyle(.roundedBorder)
+            .lineLimit(1...4)
+            .onSubmit {
+              Task { await sendDraft() }
+            }
+
+          Button {
+            Task { await sendDraft() }
+          } label: {
+            Image(systemName: "arrow.up.circle.fill")
+              .font(.title2)
+          }
+          .buttonStyle(.plain)
+          .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || chatModel.isResponding)
+          .accessibilityLabel(Text("Send"))
+        }
+      }
+      .padding()
+      .background(.background)
+    }
+    .navigationTitle(chatModel.context.title)
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .topBarTrailing) {
+        if chatModel.frontierAvailable {
+          Toggle(isOn: $chatModel.useFrontier) {
+            Label("Use frontier model", systemImage: "network")
+          }
+          .toggleStyle(.button)
+          .accessibilityHint(Text("When enabled, recipe context leaves the device."))
+        }
+      }
+    }
+  }
+
+  private func sendDraft() async {
+    let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return }
+    draft = ""
+    actionSummary = nil
+    actionError = nil
+    await chatModel.send(text)
+  }
+
+  @MainActor
+  private func run(_ action: AnyChatApplyAction) async {
+    applyingActionID = action.id
+    actionSummary = nil
+    actionError = nil
+    defer { applyingActionID = nil }
+
+    do {
+      if let summary = try await action.run(chatModel.messages) {
+        actionSummary = summary
+      }
+    } catch {
+      actionError = RecipeChatErrorText.describe(error)
+    }
+  }
+}
+
+private struct ChatContextHeader: View {
+  let chatModel: RecipeChatModel
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Label(chatModel.sendsToProvider ? "Frontier model" : "On-device", systemImage: chatModel.sendsToProvider ? "network" : "iphone")
+        .font(.caption.bold())
+        .foregroundStyle(.secondary)
+      Text(chatModel.sendsToProvider ? "Recipe context leaves the device for this conversation." : "Seeded with the recipe on screen.")
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+}
+
+private struct ChatMessageBubble: View {
+  let message: RecipeChatMessage
+
+  var body: some View {
+    HStack {
+      if message.role == .user {
+        Spacer(minLength: 48)
+      }
+      Text(LocalizedStringKey(message.text))
+        .padding(10)
+        .background(message.role == .user ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+      if message.role == .assistant {
+        Spacer(minLength: 48)
+      }
+    }
+  }
+}
+
+private struct ChatActionSummary: View {
+  let text: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Label("Saved to Make-ahead", systemImage: "checkmark.circle")
+        .font(.caption.bold())
+        .foregroundStyle(.green)
+      Text(text)
+        .font(.callout)
+    }
+    .padding(10)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+  }
 }
 
 private struct SourceMetadataView: View {

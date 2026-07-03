@@ -1,10 +1,12 @@
 import Dependencies
 import LLMClientKit
+import YesChefCore
 import SwiftUI
 
 struct AISettingsView: View {
   @Dependency(\.apiKeyStore) private var apiKeyStore
 
+  @AppStorage(recipeChatCustomInstructionsKey) private var chatInstructions = ""
   @State private var apiKey = ""
   @State private var status: AISettingsStatus?
 
@@ -37,6 +39,13 @@ struct AISettingsView: View {
           Label(status.title, systemImage: status.systemImage)
             .foregroundStyle(status.foregroundStyle)
         }
+      }
+
+      Section {
+        TextEditor(text: $chatInstructions)
+          .frame(minHeight: 120)
+      } footer: {
+        Text("Added to the recipe chat system prompt before each conversation.")
       }
     }
     .navigationTitle("AI")

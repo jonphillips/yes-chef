@@ -1,4 +1,5 @@
 import CasePaths
+import Dependencies
 import Observation
 import SwiftUI
 import WebExtractorKit
@@ -807,14 +808,23 @@ final class RecipeDetailModel {
   @CasePathable
   enum Destination {
     case scaling
+    case chat(RecipeChatModel)
   }
 
   let recipeID: Recipe.ID
 
   @ObservationIgnored
+  @Dependency(\.date.now) private var now
+  @ObservationIgnored
+  @Dependency(\.defaultDatabase) private var database
+  @ObservationIgnored
+  @Dependency(\.makeAheadPlanClient) private var makeAheadPlanClient
+  @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
 
   var destination: Destination?
+  var errorMessage: String?
+  var isShowingError = false
   var scaleFactor = 1.0
   var scaleWholePart = 1
   var scaleFraction = ScaleFraction.none
@@ -863,6 +873,12 @@ final class RecipeDetailModel {
       } ?? []
   }
 
+  var makeAhead: String? {
+    recipe?.makeAhead?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+      ? recipe?.makeAhead
+      : nil
+  }
+
   var baseServings: Double? {
     recipe?.servings
   }
@@ -885,6 +901,43 @@ final class RecipeDetailModel {
   func scaleButtonTapped() {
     syncScalePickerFromCurrentScale()
     destination = .scaling
+  }
+
+  func chatButtonTapped() {
+    guard let detail else { return }
+    destination = .chat(RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail))))
+  }
+
+  func applyActionCatalog(for chatModel: RecipeChatModel) -> [AnyChatApplyAction] {
+    let context = chatModel.context.serialized()
+    let client = makeAheadPlanClient
+    let action = ChatApplyAction<MakeAheadPlan>(
+      title: "Summarize make-ahead → Make-ahead section",
+      extract: { messages in
+        try await client(messages: messages, context: context, tier: chatModel.activeTier)
+      },
+      commit: { [weak self] plan in
+        try self?.commitMakeAheadPlan(plan)
+      }
+    )
+    return [
+      AnyChatApplyAction(action) { plan in
+        plan.rendered().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+          ? nil
+          : plan.rendered()
+      }
+    ]
+  }
+
+  func clearMakeAheadButtonTapped() {
+    do {
+      try database.write { db in
+        try RecipeRepository.clearMakeAhead(recipeID: recipeID, in: db, now: now)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
   }
 
   func resetScaleButtonTapped() {
@@ -917,6 +970,28 @@ final class RecipeDetailModel {
     scaleWholePart = selection.whole
     scaleFraction = selection.fraction
   }
+
+  private func commitMakeAheadPlan(_ plan: MakeAheadPlan) throws {
+    guard !plan.rendered().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      throw RecipeDetailError.emptyMakeAheadPlan
+    }
+    try database.write { db in
+      try RecipeRepository.applyMakeAheadPlan(plan, to: recipeID, in: db, now: now)
+    }
+  }
+}
+
+private enum RecipeDetailError: Error, CustomStringConvertible, LocalizedError {
+  case emptyMakeAheadPlan
+
+  var description: String {
+    switch self {
+    case .emptyMakeAheadPlan:
+      "The assistant did not find a make-ahead plan to save."
+    }
+  }
+
+  var errorDescription: String? { description }
 }
 
 enum ScaleFraction: String, CaseIterable, Identifiable {

@@ -360,7 +360,8 @@ public enum RecipeRepository {
       libraryPlacement: draft.libraryPlacement,
       dateCreated: dateCreated,
       dateModified: now,
-      originalSnapshot: draft.originalSnapshot
+      originalSnapshot: draft.originalSnapshot,
+      makeAhead: existingDetail?.recipe.makeAhead
     )
     let source = sourceFromDraft(
       draft,

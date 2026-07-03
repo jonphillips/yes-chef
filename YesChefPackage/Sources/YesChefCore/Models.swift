@@ -28,6 +28,7 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
   public var timesCooked: Int
   public var originalImportText: String?
   public var originalSnapshot: Data?
+  public var makeAhead: String?
 
   public init(
     id: UUID,
@@ -54,7 +55,8 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     lastCookedAt: Date? = nil,
     timesCooked: Int = 0,
     originalImportText: String? = nil,
-    originalSnapshot: Data? = nil
+    originalSnapshot: Data? = nil,
+    makeAhead: String? = nil
   ) {
     self.id = id
     self.title = title
@@ -81,6 +83,7 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     self.timesCooked = timesCooked
     self.originalImportText = originalImportText
     self.originalSnapshot = originalSnapshot
+    self.makeAhead = makeAhead
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -109,6 +112,7 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     case timesCooked
     case originalImportText
     case originalSnapshot
+    case makeAhead
   }
 
   public init(from decoder: Decoder) throws {
@@ -138,7 +142,8 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
       lastCookedAt: try container.decodeIfPresent(Date.self, forKey: .lastCookedAt),
       timesCooked: try container.decodeIfPresent(Int.self, forKey: .timesCooked) ?? 0,
       originalImportText: try container.decodeIfPresent(String.self, forKey: .originalImportText),
-      originalSnapshot: try container.decodeIfPresent(Data.self, forKey: .originalSnapshot)
+      originalSnapshot: try container.decodeIfPresent(Data.self, forKey: .originalSnapshot),
+      makeAhead: try container.decodeIfPresent(String.self, forKey: .makeAhead)
     )
   }
 }
