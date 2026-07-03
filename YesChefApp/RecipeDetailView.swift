@@ -1,10 +1,11 @@
-import LLMClientKit
 import SwiftUI
 import SwiftUINavigation
 import UIKit
 import YesChefCore
 
 struct RecipeDetailView: View {
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+  @AppStorage(ChatWorkspaceDetent.storageKey) private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   @State private var model: RecipeDetailModel
   let libraryModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
@@ -26,33 +27,7 @@ struct RecipeDetailView: View {
   var body: some View {
     @Bindable var model = model
 
-    ScrollView {
-      if let recipe = model.recipe {
-        VStack(alignment: .leading, spacing: 24) {
-          header(recipe)
-          if !model.displayablePhotos.isEmpty {
-            RecipePhotoGallery(photos: model.displayablePhotos)
-          }
-          metadata(recipe)
-          if !model.ingredientLines.isEmpty {
-            ingredients
-          }
-          if let makeAhead = model.makeAhead {
-            makeAheadSection(makeAhead)
-          }
-          if !model.instructionSteps.isEmpty {
-            instructions
-          }
-          if !model.visibleNotes.isEmpty {
-            notesView(model.visibleNotes)
-          }
-        }
-        .padding()
-        .frame(maxWidth: 860, alignment: .leading)
-      } else {
-        ContentUnavailableView("Recipe Not Found", systemImage: "fork.knife")
-      }
-    }
+    detailContent
     .navigationTitle("")
     .navigationBarTitleDisplayMode(.inline)
     .onAppear {
@@ -79,10 +54,11 @@ struct RecipeDetailView: View {
           }
         }
         Button {
-          model.chatButtonTapped()
+          chatButtonTapped()
         } label: {
           Label("Chat", systemImage: "sparkles")
         }
+        .disabled(model.detail == nil)
         Button {
           mealCalendarModel.addRecipeToPlanButtonTapped(recipeID: model.recipeID)
         } label: {
@@ -126,23 +102,103 @@ struct RecipeDetailView: View {
     }
   }
 
-  private func header(_ recipe: Recipe) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack(alignment: .firstTextBaseline) {
-        Text(recipe.title)
-          .font(.largeTitle.bold())
-        if recipe.favorite {
-          Image(systemName: "star.fill")
-            .foregroundStyle(.yellow)
+  @ViewBuilder
+  private var detailContent: some View {
+    if isSplitEnabled, let detail = model.detail {
+      ChatWorkspaceSplit(
+        context: .recipe(RecipeChatRecipeContext(detail: detail)),
+        detentRaw: $chatWorkspaceDetentRaw,
+        applyActions: { chatModel in
+          model.applyActionCatalog(for: chatModel)
+        }
+      ) {
+        RecipeReaderView(model: model, libraryModel: libraryModel)
+      }
+    } else {
+      RecipeReaderView(model: model, libraryModel: libraryModel)
+    }
+  }
+
+  private var isSplitEnabled: Bool {
+    UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass != .compact
+  }
+
+  private func chatButtonTapped() {
+    if isSplitEnabled {
+      chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
+    } else {
+      model.chatButtonTapped()
+    }
+  }
+}
+
+private struct RecipeReaderView: View {
+  private enum CompactSection: String, CaseIterable, Identifiable {
+    case ingredients
+    case directions
+
+    var id: Self { self }
+
+    var title: String {
+      switch self {
+      case .ingredients: "Ingredients"
+      case .directions: "Directions"
+      }
+    }
+  }
+
+  private let twoColumnThreshold: CGFloat = 640
+
+  let model: RecipeDetailModel
+  let libraryModel: RecipeLibraryModel
+
+  @State private var compactSection: CompactSection = .ingredients
+
+  var body: some View {
+    GeometryReader { proxy in
+      ScrollView {
+        if let recipe = model.recipe {
+          VStack(alignment: .leading, spacing: 16) {
+            header(recipe)
+            metadata(recipe)
+            recipeBody(isTwoColumn: proxy.size.width >= twoColumnThreshold)
+          }
+          .padding()
+          .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+          ContentUnavailableView("Recipe Not Found", systemImage: "fork.knife")
+            .frame(maxWidth: .infinity, minHeight: proxy.size.height)
         }
       }
-      if let subtitle = recipe.subtitle {
-        Text(subtitle)
-          .font(.title3)
-          .foregroundStyle(.secondary)
-      }
-      if let summary = recipe.summary {
-        Text(summary)
+    }
+  }
+
+  private func header(_ recipe: Recipe) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(alignment: .top, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
+          HStack(alignment: .firstTextBaseline) {
+            Text(recipe.title)
+              .font(.title.bold())
+            if recipe.favorite {
+              Image(systemName: "star.fill")
+                .foregroundStyle(.yellow)
+            }
+          }
+          if let subtitle = recipe.subtitle {
+            Text(subtitle)
+              .font(.headline)
+              .foregroundStyle(.secondary)
+          }
+          if let summary = recipe.summary {
+            Text(summary)
+              .font(.callout)
+          }
+        }
+        Spacer(minLength: 12)
+        if let photo = model.primaryDisplayPhoto {
+          RecipeReaderThumbnail(photo: photo)
+        }
       }
     }
   }
@@ -218,6 +274,52 @@ struct RecipeDetailView: View {
       Label("Start Cooking", systemImage: "flame")
     }
     .buttonStyle(.borderedProminent)
+  }
+
+  @ViewBuilder
+  private func recipeBody(isTwoColumn: Bool) -> some View {
+    if isTwoColumn {
+      HStack(alignment: .top, spacing: 24) {
+        ingredients
+          .frame(maxWidth: .infinity, alignment: .topLeading)
+        VStack(alignment: .leading, spacing: 18) {
+          if let makeAhead = model.makeAhead {
+            makeAheadSection(makeAhead)
+          }
+          if !model.instructionSteps.isEmpty {
+            instructions
+          }
+          if !model.visibleNotes.isEmpty {
+            notesView(model.visibleNotes)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+      }
+    } else {
+      Picker("Recipe section", selection: $compactSection) {
+        ForEach(CompactSection.allCases) { section in
+          Text(section.title).tag(section)
+        }
+      }
+      .pickerStyle(.segmented)
+
+      switch compactSection {
+      case .ingredients:
+        ingredients
+      case .directions:
+        VStack(alignment: .leading, spacing: 18) {
+          if let makeAhead = model.makeAhead {
+            makeAheadSection(makeAhead)
+          }
+          if !model.instructionSteps.isEmpty {
+            instructions
+          }
+          if !model.visibleNotes.isEmpty {
+            notesView(model.visibleNotes)
+          }
+        }
+      }
+    }
   }
 
   private var ingredients: some View {
@@ -313,226 +415,23 @@ struct RecipeDetailView: View {
       }
     }
   }
-
 }
 
-private struct RecipeChatPanel: View {
-  let chatModel: RecipeChatModel
-  let applyActions: [AnyChatApplyAction]
-
-  @State private var draft = ""
-  @State private var applyingActionID: AnyChatApplyAction.ID?
-  @State private var actionSummary: String?
-  @State private var actionError: String?
-
-  var body: some View {
-    @Bindable var chatModel = chatModel
-
-    VStack(spacing: 0) {
-      ScrollViewReader { proxy in
-        ScrollView {
-          LazyVStack(alignment: .leading, spacing: 12) {
-            ChatContextHeader(chatModel: chatModel)
-            ForEach(chatModel.messages) { message in
-              ChatMessageBubble(message: message)
-                .id(message.id)
-            }
-            if let actionSummary {
-              ChatActionSummary(text: actionSummary)
-            }
-            if let error = chatModel.errorText ?? actionError {
-              Label(error, systemImage: "exclamationmark.triangle")
-                .font(.footnote)
-                .foregroundStyle(.red)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-          }
-          .padding()
-        }
-        .onChange(of: chatModel.messages.count) { _, _ in
-          guard let lastID = chatModel.messages.last?.id else { return }
-          withAnimation {
-            proxy.scrollTo(lastID, anchor: .bottom)
-          }
-        }
-      }
-
-      Divider()
-
-      VStack(alignment: .leading, spacing: 12) {
-        ForEach(applyActions) { action in
-          Button {
-            Task { await run(action) }
-          } label: {
-            Label(
-              applyingActionID == action.id ? "Saving make-ahead..." : action.title,
-              systemImage: applyingActionID == action.id ? "hourglass" : "text.badge.checkmark"
-            )
-            .frame(maxWidth: .infinity, alignment: .leading)
-          }
-          .buttonStyle(.bordered)
-          .disabled(chatModel.isResponding || applyingActionID != nil)
-        }
-
-        HStack(alignment: .bottom, spacing: 8) {
-          TextField("Ask about this recipe", text: $draft, axis: .vertical)
-            .textFieldStyle(.roundedBorder)
-            .lineLimit(1...4)
-            .onSubmit {
-              Task { await sendDraft() }
-            }
-
-          Button {
-            Task { await sendDraft() }
-          } label: {
-            Image(systemName: "arrow.up.circle.fill")
-              .font(.title2)
-          }
-          .buttonStyle(.plain)
-          .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || chatModel.isResponding)
-          .accessibilityLabel(Text("Send"))
-        }
-      }
-      .padding()
-      .background(.background)
-    }
-    .navigationTitle(chatModel.context.title)
-    .navigationBarTitleDisplayMode(.inline)
-    .toolbar {
-      ToolbarItem(placement: .topBarTrailing) {
-        ChatTierMenu(chatModel: chatModel)
-      }
-    }
-  }
-
-  private func sendDraft() async {
-    let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !text.isEmpty else { return }
-    draft = ""
-    actionSummary = nil
-    actionError = nil
-    await chatModel.send(text)
-  }
-
-  @MainActor
-  private func run(_ action: AnyChatApplyAction) async {
-    applyingActionID = action.id
-    actionSummary = nil
-    actionError = nil
-    defer { applyingActionID = nil }
-
-    do {
-      if let summary = try await action.run(chatModel.messages) {
-        actionSummary = summary
-      }
-    } catch {
-      actionError = RecipeChatErrorText.describe(error)
-    }
+private extension RecipeDetailModel {
+  var primaryDisplayPhoto: RecipePhoto? {
+    displayablePhotos.min { lhs, rhs in lhs.displaySortKey < rhs.displaySortKey }
   }
 }
 
-private struct ChatContextHeader: View {
-  let chatModel: RecipeChatModel
+private struct RecipeReaderThumbnail: View {
+  let photo: RecipePhoto
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Label(
-        chatModel.sendsToProvider ? chatModel.selectedProvider.displayName : "On-device",
-        systemImage: chatModel.sendsToProvider ? "network" : "iphone"
-      )
-        .font(.caption.bold())
-        .foregroundStyle(.secondary)
-      Text(
-        chatModel.sendsToProvider
-          ? "Recipe context leaves the device for this conversation."
-          : "Seeded with the recipe on screen."
-      )
-        .font(.footnote)
-        .foregroundStyle(.secondary)
+    if let data = photo.thumbnailData ?? photo.displayData {
+      RecipePhotoFrame(data: data, aspectRatio: 1)
+        .frame(width: 112, height: 112)
+        .accessibilityLabel(Text(photo.caption ?? "Recipe photo"))
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-  }
-}
-
-private struct ChatTierMenu: View {
-  let chatModel: RecipeChatModel
-
-  @AppStorage(recipeChatFrontierProviderKey)
-  private var preferredProviderRaw = FrontierProvider.anthropic.rawValue
-
-  var body: some View {
-    @Bindable var chatModel = chatModel
-
-    Menu {
-      Button {
-        chatModel.useFrontier = false
-      } label: {
-        Label("On-device (private)", systemImage: "iphone")
-        if !chatModel.sendsToProvider {
-          Image(systemName: "checkmark")
-        }
-      }
-
-      ForEach(FrontierProvider.allCases) { provider in
-        Button {
-          preferredProviderRaw = provider.rawValue
-          chatModel.selectedProvider = provider
-          chatModel.useFrontier = true
-        } label: {
-          Label("\(provider.displayName) (sends data off device)", systemImage: "network")
-          if chatModel.sendsToProvider, chatModel.selectedProvider == provider {
-            Image(systemName: "checkmark")
-          }
-        }
-        .disabled(!chatModel.availableProviders.contains(provider))
-      }
-    } label: {
-      HStack(spacing: 4) {
-        Image(systemName: chatModel.sendsToProvider ? "network" : "iphone")
-          .foregroundStyle(chatModel.sendsToProvider ? .blue : .green)
-        Text(chatModel.sendsToProvider ? chatModel.selectedProvider.displayName : "On-device")
-          .font(.subheadline)
-        Image(systemName: "chevron.up.chevron.down")
-          .font(.caption2)
-          .foregroundStyle(.secondary)
-      }
-    }
-    .accessibilityHint(Text("Choose whether recipe context stays on device or is sent to a configured provider."))
-  }
-}
-
-private struct ChatMessageBubble: View {
-  let message: RecipeChatMessage
-
-  var body: some View {
-    HStack {
-      if message.role == .user {
-        Spacer(minLength: 48)
-      }
-      Text(LocalizedStringKey(message.text))
-        .padding(10)
-        .background(message.role == .user ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
-      if message.role == .assistant {
-        Spacer(minLength: 48)
-      }
-    }
-  }
-}
-
-private struct ChatActionSummary: View {
-  let text: String
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Label("Saved to Make-ahead", systemImage: "checkmark.circle")
-        .font(.caption.bold())
-        .foregroundStyle(.green)
-      Text(text)
-        .font(.callout)
-    }
-    .padding(10)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
   }
 }
 
