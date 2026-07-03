@@ -612,6 +612,10 @@ private struct PantryItemRowView: View {
           .font(.subheadline)
           .foregroundStyle(.secondary)
       }
+
+      Text(item.policy.pantrySummary)
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.vertical, 4)
@@ -745,59 +749,6 @@ struct GroceryListEditorView: View {
             listID: listID,
             title: title,
             remindersListName: remindersListName
-          ) {
-            dismiss()
-          }
-        }
-        .disabled(isSaveDisabled)
-      }
-    }
-  }
-}
-
-struct PantryItemEditorView: View {
-  @Environment(\.dismiss) private var dismiss
-  @State private var title = ""
-  @State private var notes = ""
-
-  let model: GroceryLibraryModel
-  let itemID: PantryItem.ID?
-
-  init(model: GroceryLibraryModel, itemID: PantryItem.ID? = nil) {
-    self.model = model
-    self.itemID = itemID
-    let item = itemID.flatMap { id in
-      model.pantryItems.first { $0.id == id }
-    }
-    _title = State(initialValue: item?.title ?? "")
-    _notes = State(initialValue: item?.notes ?? "")
-  }
-
-  private var isSaveDisabled: Bool {
-    title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-  }
-
-  var body: some View {
-    Form {
-      Section("Pantry Item") {
-        StackedTextField(title: "Name", text: $title, prompt: "Sugar")
-        StackedTextEditor(title: "Notes", text: $notes, minHeight: 90)
-      }
-    }
-    .navigationTitle(itemID == nil ? "Add Pantry Item" : "Edit Pantry Item")
-    .navigationBarTitleDisplayMode(.inline)
-    .toolbar {
-      ToolbarItem(placement: .cancellationAction) {
-        Button("Cancel") {
-          dismiss()
-        }
-      }
-      ToolbarItem(placement: .confirmationAction) {
-        Button("Save") {
-          if model.savePantryItemButtonTapped(
-            itemID: itemID,
-            title: title,
-            notes: notes
           ) {
             dismiss()
           }

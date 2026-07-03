@@ -565,6 +565,40 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Add pantry policy and cached canonical names") { db in
+      try #sql("""
+        ALTER TABLE "pantryItems"
+        ADD COLUMN "isUnlimited" INTEGER NOT NULL ON CONFLICT REPLACE DEFAULT 1
+        """)
+        .execute(db)
+
+      try #sql("""
+        ALTER TABLE "pantryItems"
+        ADD COLUMN "thresholdQuantity" REAL
+        """)
+        .execute(db)
+
+      try #sql("""
+        ALTER TABLE "pantryItems"
+        ADD COLUMN "thresholdUnit" TEXT
+        """)
+        .execute(db)
+
+      try #sql("""
+        ALTER TABLE "ingredientLines"
+        ADD COLUMN "canonicalName" TEXT
+        """)
+        .execute(db)
+
+      try #sql("""
+        ALTER TABLE "groceryItems"
+        ADD COLUMN "canonicalName" TEXT
+        """)
+        .execute(db)
+
+      try GroceryCanonicalNameCache.backfill(in: db)
+    }
+
     try migrator.migrate(database)
     defaultDatabase = database
     switch syncMode {

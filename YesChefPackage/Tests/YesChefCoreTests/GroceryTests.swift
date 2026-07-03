@@ -555,6 +555,7 @@ extension RecipeCoreTests {
           itemID: sugarID,
           title: "Brown sugar",
           notes: "Light or dark",
+          policy: .unlimited,
           in: db,
           now: modifiedAt
         )

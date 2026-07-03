@@ -25,6 +25,11 @@ public struct Measure: Equatable, Sendable {
     Self.unitDefinition(for: unit)?.dimension
   }
 
+  public static func recognizedDimension(for unit: String?) -> Dimension? {
+    guard normalizedUnit(unit) != nil else { return nil }
+    return unitDefinition(for: unit)?.dimension
+  }
+
   public func merged(with other: Measure) -> Measure? {
     if Self.normalizedUnit(unit) == Self.normalizedUnit(other.unit) {
       return Measure(quantity: quantity + other.quantity, unit: unit)
