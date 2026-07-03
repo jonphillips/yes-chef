@@ -525,6 +525,26 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Add per-placement recipe scale") { db in
+      try #sql("""
+        ALTER TABLE "recipes"
+        ADD COLUMN "viewScale" REAL NOT NULL ON CONFLICT REPLACE DEFAULT 1.0
+        """)
+        .execute(db)
+
+      try #sql("""
+        ALTER TABLE "menuItems"
+        ADD COLUMN "scale" REAL NOT NULL ON CONFLICT REPLACE DEFAULT 1.0
+        """)
+        .execute(db)
+
+      try #sql("""
+        ALTER TABLE "mealPlanItems"
+        ADD COLUMN "scale" REAL NOT NULL ON CONFLICT REPLACE DEFAULT 1.0
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     defaultDatabase = database
     switch syncMode {

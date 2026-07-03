@@ -812,6 +812,7 @@ final class RecipeDetailModel {
   }
 
   let recipeID: Recipe.ID
+  let scaleContext: ScaleContext
 
   @ObservationIgnored
   @Dependency(\.date.now) private var now
@@ -821,6 +822,8 @@ final class RecipeDetailModel {
   @Dependency(\.makeAheadPlanClient) private var makeAheadPlanClient
   @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
+  @ObservationIgnored
+  @Fetch var persistedScale: Double?
 
   var destination: Destination?
   var errorMessage: String?
@@ -828,10 +831,17 @@ final class RecipeDetailModel {
   var scaleFactor = 1.0
   var scaleWholePart = 1
   var scaleFraction = ScaleFraction.none
+  private var lastAppliedPersistedScale: Double?
 
-  init(recipeID: Recipe.ID) {
+  init(recipeID: Recipe.ID, scaleContext: ScaleContext? = nil) {
     self.recipeID = recipeID
+    self.scaleContext = scaleContext ?? .recipe(recipeID)
     _detail = Fetch(wrappedValue: nil, RecipeDetailRequest(recipeID: recipeID), animation: .default)
+    _persistedScale = Fetch(
+      wrappedValue: nil,
+      RecipeScaleRequest(context: self.scaleContext),
+      animation: .default
+    )
   }
 
   var recipe: Recipe? {
@@ -941,7 +951,7 @@ final class RecipeDetailModel {
   }
 
   func resetScaleButtonTapped() {
-    scaleFactor = 1
+    setScaleFactor(1, persist: true)
     syncScalePickerFromCurrentScale()
   }
 
@@ -952,13 +962,40 @@ final class RecipeDetailModel {
       scaleFraction = .oneThird
       value = ScaleFraction.minimumScale
     }
-    scaleFactor = value
+    setScaleFactor(value, persist: true)
+  }
+
+  func persistedScaleChanged(_ persistedScale: Double?) {
+    guard let persistedScale else { return }
+    guard lastAppliedPersistedScale != persistedScale else { return }
+    lastAppliedPersistedScale = persistedScale
+    setScaleFactor(persistedScale, persist: false)
+    syncScalePickerFromCurrentScale()
   }
 
   private func syncScalePickerFromCurrentScale() {
     let selection = ScaleFraction.nearestSelection(to: scaleFactor)
     scaleWholePart = selection.whole
     scaleFraction = selection.fraction
+  }
+
+  private func setScaleFactor(_ scaleFactor: Double, persist: Bool) {
+    guard self.scaleFactor != scaleFactor else { return }
+    self.scaleFactor = scaleFactor
+    guard persist else { return }
+    persistScaleFactor()
+  }
+
+  private func persistScaleFactor() {
+    do {
+      try database.write { db in
+        try RecipeScaleRepository.setScale(scaleFactor, for: scaleContext, in: db)
+      }
+      lastAppliedPersistedScale = scaleFactor
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
   }
 
   private func commitMakeAheadPlan(_ plan: MakeAheadPlan) throws {
@@ -982,103 +1019,6 @@ private enum RecipeDetailError: Error, CustomStringConvertible, LocalizedError {
   }
 
   var errorDescription: String? { description }
-}
-
-enum ScaleFraction: String, CaseIterable, Identifiable {
-  case none
-  case oneHalf
-  case oneThird
-  case oneFourth
-  case oneFifth
-  case oneEighth
-  case twoThirds
-  case threeFourths
-
-  var id: Self { self }
-
-  var label: String {
-    switch self {
-    case .none: "-"
-    case .oneHalf: "½"
-    case .oneThird: "⅓"
-    case .oneFourth: "¼"
-    case .oneFifth: "⅕"
-    case .oneEighth: "⅛"
-    case .twoThirds: "⅔"
-    case .threeFourths: "¾"
-    }
-  }
-
-  var value: Double {
-    switch self {
-    case .none: 0
-    case .oneHalf: 1.0 / 2.0
-    case .oneThird: 1.0 / 3.0
-    case .oneFourth: 1.0 / 4.0
-    case .oneFifth: 1.0 / 5.0
-    case .oneEighth: 1.0 / 8.0
-    case .twoThirds: 2.0 / 3.0
-    case .threeFourths: 3.0 / 4.0
-    }
-  }
-
-  static func nearestSelection(to value: Double) -> (whole: Int, fraction: ScaleFraction) {
-    var bestWhole = 1
-    var bestFraction = ScaleFraction.none
-    var bestDistance = Double.greatestFiniteMagnitude
-
-    for whole in 0...10 {
-      for fraction in ScaleFraction.allCases {
-        let candidate = Double(whole) + fraction.value
-        guard candidate >= minimumScale else { continue }
-        let distance = abs(candidate - value)
-        if distance < bestDistance {
-          bestWhole = whole
-          bestFraction = fraction
-          bestDistance = distance
-        }
-      }
-    }
-
-    return (bestWhole, bestFraction)
-  }
-
-  static var minimumScale: Double { oneThird.value }
-}
-
-enum ScaleText {
-  static func factor(_ factor: Double) -> String {
-    "×\(mixedNumber(factor))"
-  }
-
-  static func number(_ value: Double) -> String {
-    if value.rounded() == value {
-      return "\(Int(value))"
-    }
-    return value.formatted(.number.precision(.fractionLength(0...2)))
-  }
-
-  static func mixedNumber(_ value: Double) -> String {
-    let whole = Int(value.rounded(.down))
-    let fractionValue = value - Double(whole)
-    let fraction = ScaleFraction.allCases
-      .filter { $0 != .none }
-      .min { lhs, rhs in
-        abs(lhs.value - fractionValue) < abs(rhs.value - fractionValue)
-      }
-
-    guard let fraction, abs(fraction.value - fractionValue) < 0.01 else {
-      return number(value)
-    }
-    if whole == 0 {
-      return fraction.label
-    }
-    return "\(whole) \(fraction.label)"
-  }
-
-  static func servingUnit(_ value: Double) -> String {
-    value == 1 ? "serving" : "servings"
-  }
 }
 
 @Observable

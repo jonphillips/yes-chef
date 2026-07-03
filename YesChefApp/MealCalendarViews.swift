@@ -5,7 +5,7 @@ import YesChefCore
 struct MealCalendarStack: View {
   let model: MealCalendarModel
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
-  var onRecipeSelected: ((Recipe.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
     NavigationStack {
@@ -22,7 +22,7 @@ struct MealCalendarStack: View {
 struct MealCalendarWorkspaceView: View {
   let model: MealCalendarModel
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
-  var onRecipeSelected: ((Recipe.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
     GeometryReader { geometry in
@@ -66,7 +66,7 @@ struct MealCalendarPlannerView: View {
   let model: MealCalendarModel
   var showsSelectedDayAgenda: Bool
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
-  var onRecipeSelected: ((Recipe.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
     MealCalendarStackedContent(
@@ -90,7 +90,7 @@ private struct MealCalendarWideWorkspace: View {
   let agendaWidth: CGFloat
   let weekCellMinHeight: CGFloat
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
-  var onRecipeSelected: ((Recipe.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
     HStack(spacing: 0) {
@@ -125,7 +125,7 @@ private struct MealCalendarStackedContent: View {
   var weekCellMinHeight: CGFloat
   var maxContentWidth: CGFloat?
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
-  var onRecipeSelected: ((Recipe.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
     ScrollView {
@@ -162,7 +162,7 @@ private struct MealCalendarCalendarBody: View {
   var monthCellMinHeight: CGFloat
   var weekCellMinHeight: CGFloat
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
-  var onRecipeSelected: ((Recipe.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
     switch model.displayMode {
@@ -184,7 +184,7 @@ private struct MealCalendarCalendarBody: View {
 private struct MealCalendarAgendaRail: View {
   let model: MealCalendarModel
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
-  var onRecipeSelected: ((Recipe.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
     ScrollView {
@@ -233,7 +233,7 @@ struct MealCalendarDayAgendaView: View {
   let model: MealCalendarModel
   var showsHeader: Bool
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
-  var onRecipeSelected: ((Recipe.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   private var occupiedMealSlots: [MealPlanItemSlot] {
     MealPlanItemSlot.allCases.filter { !model.rows(on: model.selectedDate, mealSlot: $0).isEmpty }
@@ -747,7 +747,7 @@ private struct MealPlanSlotSection: View {
   let mealSlot: MealPlanItemSlot
   let rows: [MealPlanItemRowData]
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
-  var onRecipeSelected: ((Recipe.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -785,8 +785,20 @@ private struct MealPlanSlotSection: View {
   private func recipeAction(for row: MealPlanItemRowData) -> (() -> Void)? {
     guard let recipeID = row.recipe?.id, let onRecipeSelected else { return nil }
     return {
-      onRecipeSelected(recipeID)
+      onRecipeSelected(
+        RecipeDetailPresentation(
+          recipeID: recipeID,
+          scaleContext: scaleContext(for: row)
+        )
+      )
     }
+  }
+
+  private func scaleContext(for row: MealPlanItemRowData) -> ScaleContext {
+    if let menuItem = row.menuItem {
+      return .menuItem(menuItem.id)
+    }
+    return .mealPlanItem(row.item.id)
   }
 
   private func sourceAction(for row: MealPlanItemRowData) -> (() -> Void)? {

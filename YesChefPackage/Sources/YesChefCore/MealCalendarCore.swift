@@ -157,7 +157,8 @@ public struct MealCalendarRequest: FetchKeyRequest {
           notes: menuItem.notes,
           sortOrder: menuItem.sortOrder,
           dateCreated: menuItem.dateCreated,
-          dateModified: menuItem.dateModified
+          dateModified: menuItem.dateModified,
+          scale: menuItem.scale
         )
         let recipe = menuItem.recipeID.flatMap { recipesByID[$0] }
         if menuItem.kind == .recipe && menuItem.recipeID != nil && recipe == nil {
