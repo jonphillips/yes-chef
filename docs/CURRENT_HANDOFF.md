@@ -1,8 +1,8 @@
 # Current Handoff
 
-Last updated: July 3, 2026 (Phase E Slice 3 approved, PR #79 → DONE-LOG. Next Up = Phase E Slice 4 —
-`PantrySuppression` pure function + grocery-list review section (the milestone's payoff, no schema, no
-dialog). Ready to dispatch to Codex. Lean verification is the default.)
+Last updated: July 3, 2026 (Phase E Slice 4 approved, PR #80 → DONE-LOG. **This closes the entire
+grocery/pantry milestone** — all four slices shipped. **Next Up is intentionally empty: Jon picks the next
+dispatch target from the Ready queue.** Lean verification is the default.)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -18,31 +18,19 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Phase E — grocery/pantry, Slice 4: `PantrySuppression` + grocery-list review section.** The
-milestone's payoff — and its **final** slice. Full spec + build order:
-[`docs/milestones/grocery-consolidation-and-pantry.md`](milestones/grocery-consolidation-and-pantry.md)
-(read the **Slice 4** section, the **Definition of done** scenarios, and Decisions #2/#4/#7; boundaries in
-FUTURE_INTELLIGENCE §7.5/§13/§14). **No schema change** this slice — it consumes the Slice 3 columns:
-- **Pure `PantrySuppression.evaluate(list:policies:)`** over the **consolidated** list →
-  `{ shown, assumedInPantry, needsReview }`. Unlimited match → `assumedInPantry`; threshold match with total
-  **over or incomparable** → `needsReview`; threshold match **under** → `assumedInPantry`. Runs on the
-  **cross-recipe consolidated total**, not per line (Decision #4). Incomparable units **fail safe to
-  surfacing** (DoD #4). No model call on this path.
-- **Wire into `GroceryModels` / `GroceryViews`:** a quiet **"Assumed in pantry"** section with one-tap
-  add-back, and **promoted "You may need more — X (total)"** rows. **No blocking dialog anywhere.**
-  `isPurchased` untouched (assumed-in-pantry is a distinct derived state, never written to the purchased flag).
-- **Add-back is one-shot for the list** — moves a row to `shown` for that list only; it does **not** edit the
-  pantry item's policy (Decision #7). A persistent "actually shop this" is a deliberate edit in the editor.
-- **Tests (pure, no UI/model):** unlimited never shown; threshold under hidden, over surfaced; **cross-recipe
-  total** over threshold surfaces though each line is under; incomparable units surface; add-back moves one
-  row to `shown` and leaves policy untouched.
-- **Done when:** the Definition-of-done scenarios all pass, suppression is a pure function, nothing is a modal.
-  This **completes the grocery/pantry milestone** — tick the last box in the milestone doc.
+**None — awaiting Jon's pick.** The grocery/pantry milestone (Phase E) closed with Slice 4 (PR #80 →
+DONE-LOG), so there is **no inferred next slice**. Per the dispatch rule above, do **not** guess: Jon selects
+the next dispatch target from the **Ready Efforts** queue below (leading candidates: **actionable-chat /
+LLMClientKit lift** — see [[actionable-chat-effort]]; **two-device dogfood** once iOS Beta 3 lands). Once
+chosen, expand it here into a concrete slice list before dispatching.
 
-Phase E Slice 3 (pantry policy + `canonicalName` cache migration) is **complete** (PR #79 → DONE-LOG); two
-device-pass/release follow-ups recorded there (app-target build never ran in CI; promote the new CloudKit
-fields to the production schema before a prod cut). Phase E Slice 1 + 2 (canonical key + `Measure`) is
-**complete** (PR #77 → DONE-LOG). Dogfood batch 3 is
+**Standing release follow-up carried from Phase E (not a dispatch on its own):** before any prod/TestFlight
+cut, promote the Slice 3 pantry-policy + `canonicalName` CloudKit fields to the **production** schema, and
+note the app target (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
+
+Phase E is **fully complete** — Slice 4 (`PantrySuppression` + review UI, PR #80 → DONE-LOG), Slice 3
+(pantry policy + `canonicalName` migration, PR #79 → DONE-LOG), Slices 1 + 2 (canonical key + `Measure`,
+PR #77 → DONE-LOG). Dogfood batch 3 is
 **complete** (ingredient structure · Chef It Up + Serve With · substitution ·
 keep-awake; PR #75 → DONE-LOG). The cooking-workspace effort is **complete** (Slices A + B shipped,
 PRs #73 / #74 → DONE-LOG). Its named
@@ -54,12 +42,14 @@ follow-ons — **Menu + Meal-Planner chat verbs** and **reader photo affordances
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target.
 
-- **Recipe → grocery list w/ pantry checking** (Phase E) — in progress. Slices 1–3 (canonical key +
-  `Measure` + pantry policy/`canonicalName` migration) **complete** (PRs #77, #79 → DONE-LOG). **Now Next Up =
-  Slice 4** (`PantrySuppression` pure function + grocery-list review UI — the payoff and **final** slice,
-  no schema change). Build order in
-  [`docs/milestones/grocery-consolidation-and-pantry.md`](milestones/grocery-consolidation-and-pantry.md);
-  design rationale = [[grocery-pantry-threshold-design]]. Slice 4 closes the milestone.
+- **Recipe → grocery list w/ pantry checking** (Phase E) — **complete.** All four slices shipped: canonical
+  key + `Measure` (PR #77), pantry policy + `canonicalName` migration (PR #79), `PantrySuppression` + review
+  UI (PR #80) — all → DONE-LOG. Design rationale = [[grocery-pantry-threshold-design]]. Standing release
+  follow-up (promote CloudKit fields to prod schema) noted under Next Up.
+
+- **Actionable-chat / LLMClientKit lift** — a leading next candidate. Lift `GalavantAI` → shared
+  `LLMClientKit`, then the make-ahead extract→commit verb (ADR-0011); retires the minimal ModelClient just
+  built. See [[actionable-chat-effort]] and [[chat-verb-commit-shapes]] before scoping into slices.
 
 - **Dogfood fixes — batch 3** — complete (PR #75 → DONE-LOG; ingredient structure · Chef It Up +
   Serve With · substitution · keep-awake). Non-blocking device-pass notes recorded in the DONE-LOG entry.

@@ -10,6 +10,36 @@ Newest first.
 
 ---
 
+## Phase E — grocery/pantry, Slice 4: `PantrySuppression` + grocery-list review section
+
+**Architect-approved 2026-07-03** — yes-chef [PR #80](https://github.com/jonphillips/yes-chef/pull/80).
+The milestone's **payoff and final slice** — no schema change, consumes the Slice 3 columns. **This
+completes the grocery/pantry milestone** (last box ticked in
+[`docs/milestones/grocery-consolidation-and-pantry.md`](milestones/grocery-consolidation-and-pantry.md)).
+Design rationale = [[grocery-pantry-threshold-design]].
+
+- **Pure `PantrySuppression.evaluate(list:policies:)`** over the consolidated list → `{ shown,
+  assumedInPantry, needsReview }`. Unlimited → `assumedInPantry`; threshold total **over/incomparable** →
+  `needsReview`; threshold **under** → `assumedInPantry`; `alwaysConfirm` → `shown`. Runs on the cross-recipe
+  consolidated total; incomparable units **fail safe to surfacing**; no model call on the path. Both sides key
+  through the one `CanonicalIngredient.canonicalName` normalizer.
+- **Add-back is one-shot, per-list, in-memory** — `pantryAddBackItemIDsByListID` moves a row to `shown` for
+  that list only and never edits the pantry item's policy (Decision #7). Cleared when the item is deleted.
+- **UI:** promoted **"You may need more"** review Section + a quiet **"Assumed in pantry"** `DisclosureGroup`
+  with one-tap add-back. `isPurchased` never written (assumed is a distinct derived state). Share/plain-text
+  excludes assumed rows. Empty-section guard moved into `GroceryItemsSection` — no stray headers.
+- **Tests (pure, no UI/model):** unlimited never shown; threshold under hidden / over surfaced; cross-recipe
+  total over threshold; incomparable units surface; add-back moves one row to `shown` and leaves policy
+  untouched. CI green (153 tests + SwiftLint).
+
+**Non-blocking follow-ups** (fold into a later grocery slice, not merge blockers): review headline uses a
+hyphen vs the spec's em-dash `— X (total)`; `thresholdUsesCrossRecipeConsolidatedTotal` hardcodes the total
+rather than deriving it from its sources (it exercises threshold-on-total, the right unit for this function,
+not the consolidation summation itself). Standing Slice-3 release follow-up still applies: promote the pantry
++ `canonicalName` CloudKit fields to the **production** schema before any prod/TestFlight cut.
+
+---
+
 ## Phase E — grocery/pantry, Slice 3: pantry policy model + `canonicalName` cache migration
 
 **Architect-approved 2026-07-03** — yes-chef [PR #79](https://github.com/jonphillips/yes-chef/pull/79).
