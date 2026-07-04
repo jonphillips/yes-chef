@@ -30,6 +30,7 @@ extension GroceryRepository {
       || item.notes != notes
 
     item.title = title
+    item.canonicalName = CanonicalIngredient.canonicalName(title)
     item.quantityText = quantityText
     item.unit = unit
     item.aisle = aisle

@@ -416,6 +416,7 @@ public struct GroceryItem: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID
   public var groceryListID: GroceryList.ID
   public var title: String
+  public var canonicalName: String?
   public var quantity: Double?
   public var quantityText: String?
   public var unit: String?
@@ -431,6 +432,7 @@ public struct GroceryItem: Codable, Identifiable, Equatable, Sendable {
     id: UUID,
     groceryListID: GroceryList.ID,
     title: String,
+    canonicalName: String? = nil,
     quantity: Double? = nil,
     quantityText: String? = nil,
     unit: String? = nil,
@@ -445,6 +447,7 @@ public struct GroceryItem: Codable, Identifiable, Equatable, Sendable {
     self.id = id
     self.groceryListID = groceryListID
     self.title = title
+    self.canonicalName = canonicalName
     self.quantity = quantity
     self.quantityText = quantityText
     self.unit = unit
@@ -544,6 +547,9 @@ public struct PantryItem: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID
   public var title: String
   public var notes: String?
+  public var isUnlimited: Bool
+  public var thresholdQuantity: Double?
+  public var thresholdUnit: String?
   public var sortOrder: Int
   public var dateCreated: Date
   public var dateModified: Date
@@ -552,6 +558,9 @@ public struct PantryItem: Codable, Identifiable, Equatable, Sendable {
     id: UUID,
     title: String,
     notes: String? = nil,
+    isUnlimited: Bool = true,
+    thresholdQuantity: Double? = nil,
+    thresholdUnit: String? = nil,
     sortOrder: Int,
     dateCreated: Date,
     dateModified: Date
@@ -559,9 +568,20 @@ public struct PantryItem: Codable, Identifiable, Equatable, Sendable {
     self.id = id
     self.title = title
     self.notes = notes
+    self.isUnlimited = isUnlimited
+    self.thresholdQuantity = thresholdQuantity
+    self.thresholdUnit = thresholdUnit
     self.sortOrder = sortOrder
     self.dateCreated = dateCreated
     self.dateModified = dateModified
+  }
+
+  public var policy: PantryPolicy {
+    PantryPolicy.normalized(
+      isUnlimited: isUnlimited,
+      thresholdQuantity: thresholdQuantity,
+      thresholdUnit: thresholdUnit
+    )
   }
 }
 
@@ -654,6 +674,7 @@ public struct IngredientLine: Codable, Identifiable, Equatable, Sendable {
   public var quantityText: String?
   public var unit: String?
   public var item: String?
+  public var canonicalName: String?
   public var preparation: String?
   public var comment: String?
   public var isOptional: Bool
@@ -673,6 +694,7 @@ public struct IngredientLine: Codable, Identifiable, Equatable, Sendable {
     quantityText: String? = nil,
     unit: String? = nil,
     item: String? = nil,
+    canonicalName: String? = nil,
     preparation: String? = nil,
     comment: String? = nil,
     isOptional: Bool = false,
@@ -691,6 +713,7 @@ public struct IngredientLine: Codable, Identifiable, Equatable, Sendable {
     self.quantityText = quantityText
     self.unit = unit
     self.item = item
+    self.canonicalName = canonicalName
     self.preparation = preparation
     self.comment = comment
     self.isOptional = isOptional
