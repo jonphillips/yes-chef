@@ -356,6 +356,49 @@ final class MealCalendarModel {
     rows(on: date).filter { $0.item.mealSlot == mealSlot }
   }
 
+  func applyActionCatalog(for chatModel: RecipeChatModel) -> [AnyChatApplyAction] {
+    @Dependency(\.mealPlanComplementClient) var mealPlanComplementClient
+
+    let context = chatModel.context.serialized()
+    let dayTitle = selectedDateTitle
+    let scheduledDate = selectedDate
+    let complementAction = ChatApplyAction<MealPlanComplementPlan>(
+      title: "What complements this day? -> Meal plan items",
+      extractingTitle: "Finding complements...",
+      reviewTitle: "Review complement",
+      commitTitle: "Add to Meal Plan",
+      committingTitle: "Adding to meal plan...",
+      committedTitle: "Added to Meal Plan",
+      extract: { selection, messages in
+        try await mealPlanComplementClient(
+          selection: selection,
+          messages: messages,
+          context: context,
+          tier: chatModel.activeTier
+        )
+      },
+      commit: { _ in
+      }
+    )
+
+    return [
+      AnyChatApplyAction(complementAction) { [weak self] plan in
+        plan.items.map { suggestion in
+          ChatApplyReviewItem(
+            title: suggestion.title,
+            summary: suggestion.rendered(dayTitle: dayTitle),
+            commitTitle: complementAction.commitTitle,
+            committingTitle: complementAction.committingTitle,
+            committedTitle: complementAction.committedTitle,
+            commit: {
+              try self?.commitComplementSuggestion(suggestion, on: scheduledDate)
+            }
+          )
+        }
+      }
+    ]
+  }
+
   func isSelectedDate(_ date: Date) -> Bool {
     calendar.isDate(startOfDay(date), inSameDayAs: selectedDate)
   }
@@ -414,6 +457,23 @@ final class MealCalendarModel {
 
   private func startOfDay(_ date: Date) -> Date {
     calendar.startOfDay(for: date)
+  }
+
+  private func commitComplementSuggestion(
+    _ suggestion: MealPlanComplementSuggestion,
+    on scheduledDate: Date
+  ) throws {
+    let result = try database.write { db in
+      let itemID = try MealCalendarRepository.addComplementItem(
+        suggestion,
+        on: startOfDay(scheduledDate),
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
+      return (itemID, try MealCalendarRequest().fetch(db))
+    }
+    applyOptimisticRows(result.1, updatedItemIDs: [result.0])
   }
 
   private func applyOptimisticRows(
