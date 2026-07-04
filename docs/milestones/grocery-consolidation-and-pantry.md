@@ -188,7 +188,7 @@ completes it. Slices are ordered so each is independently shippable and testable
 - [x] Slice 1 — One canonical key + alias/override table (dissolve the one-offs)
 - [x] Slice 2 — Same-dimension `Measure` compare/merge (bounded)
 - [x] Slice 3 — Pantry policy model (unlimited default + optional threshold), migration-aware
-- [ ] Slice 4 — `PantrySuppression` pure function + grocery-list review section (no dialog)
+- [x] Slice 4 — `PantrySuppression` pure function + grocery-list review section (no dialog)
 
 > **Architect amendment (2026-07-03, confirmed with Jon).** Two decisions that override the
 > letter of the slices below:

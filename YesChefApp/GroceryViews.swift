@@ -83,16 +83,9 @@ struct GroceryDetailView: View {
     mealCalendarModel.selectedDayRows.filter { $0.item.kind == .recipe && $0.item.recipeID != nil }
   }
 
-  private var unpurchasedRows: [GroceryItemRowData] {
-    model.selectedItemRows.filter { !$0.item.isPurchased }
-  }
-
-  private var purchasedRows: [GroceryItemRowData] {
-    model.selectedItemRows.filter(\.item.isPurchased)
-  }
-
   var body: some View {
     @Bindable var model = model
+    let displaySections = model.selectedDisplaySections
 
     Group {
       if let selectedList = model.selectedListRow {
@@ -108,25 +101,33 @@ struct GroceryDetailView: View {
             }
           }
 
-          if model.selectedItemRows.isEmpty {
+          if displaySections.isEmpty {
             Section {
               ContentUnavailableView("No Grocery Items", systemImage: "cart")
                 .frame(maxWidth: .infinity, minHeight: 220)
             }
           } else {
-            GroceryItemsSection(
-              title: "To Buy",
-              rows: unpurchasedRows,
+            GroceryPantryReviewSection(
+              rows: displaySections.needsReviewRows,
               model: model
             )
 
-            if !purchasedRows.isEmpty {
-              GroceryItemsSection(
-                title: "Purchased",
-                rows: purchasedRows,
-                model: model
-              )
-            }
+            GroceryItemsSection(
+              title: "To Buy",
+              rows: displaySections.toBuyRows,
+              model: model
+            )
+
+            GroceryAssumedPantrySection(
+              rows: displaySections.assumedInPantryRows,
+              model: model
+            )
+
+            GroceryItemsSection(
+              title: "Purchased",
+              rows: displaySections.purchasedRows,
+              model: model
+            )
           }
         }
         .navigationTitle(selectedList.list.title)
@@ -147,8 +148,8 @@ struct GroceryDetailView: View {
             GroceryListActionsMenu(
               row: selectedList,
               shareText: model.selectedListShareText,
-              purchasedItemCount: purchasedRows.count,
-              totalItemCount: model.selectedItemRows.count,
+              purchasedItemCount: displaySections.purchasedRows.count,
+              totalItemCount: displaySections.shoppingRows.count + displaySections.assumedInPantryRows.count,
               listCount: model.listRows.count,
               model: model
             )
@@ -330,8 +331,10 @@ private struct GroceryItemsSection: View {
   }
 }
 
-private struct GroceryItemRowView: View {
+struct GroceryItemRowView: View {
   let row: GroceryItemRowData
+  var headline: String? = nil
+  var includesQuantityInDetail = true
   var togglePurchased: () -> Void
   var deleteItem: () -> Void
   var editItem: () -> Void
@@ -352,7 +355,7 @@ private struct GroceryItemRowView: View {
       .accessibilityLabel(row.item.isPurchased ? "Mark unpurchased" : "Mark purchased")
 
       VStack(alignment: .leading, spacing: 6) {
-        Text(row.item.title)
+        Text(headline ?? row.item.title)
           .font(.headline)
           .strikethrough(row.item.isPurchased)
           .foregroundStyle(row.item.isPurchased ? .secondary : .primary)
@@ -392,8 +395,7 @@ private struct GroceryItemRowView: View {
 
   private var detailText: String? {
     [
-      row.item.quantityText,
-      row.item.unit,
+      includesQuantityInDetail ? groceryQuantityText(for: row.item) : nil,
       row.item.aisle.map { "· \($0)" },
       row.item.notes.map { "· \($0)" },
     ]
@@ -401,6 +403,16 @@ private struct GroceryItemRowView: View {
     .joined(separator: " ")
     .nonEmptyGroceryViewText
   }
+}
+
+private func groceryQuantityText(for item: GroceryItem) -> String? {
+  [
+    item.quantityText,
+    item.unit,
+  ]
+  .compactMap { $0?.nonEmptyGroceryViewText }
+  .joined(separator: " ")
+  .nonEmptyGroceryViewText
 }
 
 private struct GroceryItemActionsMenu: View {

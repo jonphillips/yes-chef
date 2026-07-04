@@ -48,6 +48,7 @@ final class GroceryLibraryModel {
   var errorMessage: String?
   var isShowingError = false
   var toastCenter: AppToastCenter?
+  var pantryAddBackItemIDsByListID: [CoreGroceryList.ID: Set<GroceryItem.ID>] = [:]
 
   init(toastCenter: AppToastCenter? = nil) {
     self.toastCenter = toastCenter
@@ -68,6 +69,22 @@ final class GroceryLibraryModel {
 
   var pantryStapleNames: [String] {
     pantryItems.map(\.title)
+  }
+
+  var selectedDisplaySections: GroceryDisplaySections {
+    guard let selectedListID = selectedListRow?.id else {
+      return GroceryDisplaySections()
+    }
+    let evaluation = PantrySuppression.evaluate(
+      list: selectedItemRows,
+      policies: pantryItems
+    )
+    return GroceryDisplaySections(
+      suppression: PantrySuppression.addBack(
+        itemIDs: pantryAddBackItemIDsByListID[selectedListID] ?? [],
+        to: evaluation
+      )
+    )
   }
 
   var availableMenuRows: [MenuRowData] {
@@ -343,10 +360,16 @@ final class GroceryLibraryModel {
       try database.write { db in
         try GroceryRepository.deleteItem(itemID: itemID, in: db)
       }
+      removePantryAddBack(itemID: itemID)
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
     }
+  }
+
+  func addBackAssumedPantryItemButtonTapped(itemID: GroceryItem.ID) {
+    guard let listID = selectedListRow?.id else { return }
+    pantryAddBackItemIDsByListID[listID, default: []].insert(itemID)
   }
 
   func deleteSourceButtonTapped(sourceID: GroceryItemSource.ID) {
@@ -664,8 +687,44 @@ extension GroceryLibraryModel {
     guard let selectedListRow else { return "Grocery List\n\nNo grocery items." }
     return GroceryListPlainTextRenderer.render(
       list: selectedListRow.list,
-      rows: selectedItemRows
+      rows: selectedDisplaySections.shoppingRows
     )
+  }
+
+  private func removePantryAddBack(itemID: GroceryItem.ID) {
+    for listID in Array(pantryAddBackItemIDsByListID.keys) {
+      pantryAddBackItemIDsByListID[listID]?.remove(itemID)
+      if pantryAddBackItemIDsByListID[listID]?.isEmpty == true {
+        pantryAddBackItemIDsByListID[listID] = nil
+      }
+    }
+  }
+}
+
+struct GroceryDisplaySections: Equatable {
+  var needsReviewRows: [GroceryItemRowData] = []
+  var toBuyRows: [GroceryItemRowData] = []
+  var purchasedRows: [GroceryItemRowData] = []
+  var assumedInPantryRows: [GroceryItemRowData] = []
+
+  init() {}
+
+  init(suppression: PantrySuppression.Evaluation) {
+    needsReviewRows = suppression.needsReview.filter { !$0.item.isPurchased }
+    toBuyRows = suppression.shown.filter { !$0.item.isPurchased }
+    purchasedRows = suppression.shoppingRows.filter(\.item.isPurchased)
+    assumedInPantryRows = suppression.assumedInPantry
+  }
+
+  var shoppingRows: [GroceryItemRowData] {
+    needsReviewRows + toBuyRows + purchasedRows
+  }
+
+  var isEmpty: Bool {
+    needsReviewRows.isEmpty
+      && toBuyRows.isEmpty
+      && purchasedRows.isEmpty
+      && assumedInPantryRows.isEmpty
   }
 }
 
