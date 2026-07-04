@@ -253,7 +253,7 @@ struct MealCalendarDayAgendaView: View {
         ChatWorkspaceSplit(
           context: mealPlanChatContext,
           detentRaw: $chatWorkspaceDetentRaw,
-          applyActions: { _ in [] }
+          applyActions: { chatModel in model.applyActionCatalog(for: chatModel) }
         ) {
           ScrollView {
             agendaContent
@@ -271,7 +271,7 @@ struct MealCalendarDayAgendaView: View {
       NavigationStack {
         RecipeChatPanel(
           chatModel: chatModel,
-          applyActions: []
+          applyActions: model.applyActionCatalog(for: chatModel)
         )
       }
     }
@@ -322,18 +322,7 @@ struct MealCalendarDayAgendaView: View {
   }
 
   private var chatContextIdentity: String {
-    let rowFingerprints = model.selectedDayRows.map { row in
-      [
-        row.id.rawValue,
-        row.displayTitle,
-        row.item.kind.rawValue,
-        row.item.mealSlot.rawValue,
-        row.item.notes ?? "",
-        String(row.item.dateModified.timeIntervalSinceReferenceDate),
-      ].joined(separator: "|")
-    }
-    .joined(separator: ",")
-    return "\(model.selectedDate.timeIntervalSinceReferenceDate):\(rowFingerprints)"
+    String(model.selectedDate.timeIntervalSinceReferenceDate)
   }
 
   private func chatButtonTapped() {

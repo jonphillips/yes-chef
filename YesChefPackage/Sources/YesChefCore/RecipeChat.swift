@@ -134,13 +134,6 @@ public struct MealPlanChatContext: Equatable, Sendable {
     self.items = items
   }
 
-  public init(date: Date, items: [MealPlanChatItemContext] = []) {
-    self.init(
-      title: date.formatted(.dateTime.weekday(.wide).month(.wide).day()),
-      items: items
-    )
-  }
-
   public init(title: String, rows: [MealPlanItemRowData]) {
     self.init(title: title, items: rows.map { MealPlanChatItemContext(row: $0) })
   }
@@ -311,11 +304,11 @@ public struct MealPlanChatItemContext: Equatable, Sendable {
       scheduledDate: row.item.scheduledDate,
       mealSlot: row.item.mealSlot,
       sortOrder: row.item.sortOrder,
-      keyIngredients: row.item.kind == .recipe ? row.recipeIngredientLines : [],
-      prepTimeMinutes: row.item.kind == .recipe ? row.recipe?.prepTimeMinutes : nil,
-      cookTimeMinutes: row.item.kind == .recipe ? row.recipe?.cookTimeMinutes : nil,
-      totalTimeMinutes: row.item.kind == .recipe ? row.recipe?.totalTimeMinutes : nil,
-      makeAhead: row.item.kind == .recipe ? row.recipe?.makeAhead : nil,
+      keyIngredients: row.recipeIngredientLines,
+      prepTimeMinutes: row.recipe?.prepTimeMinutes,
+      cookTimeMinutes: row.recipe?.cookTimeMinutes,
+      totalTimeMinutes: row.recipe?.totalTimeMinutes,
+      makeAhead: row.recipe?.makeAhead,
       notes: row.item.notes
     )
   }

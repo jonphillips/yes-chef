@@ -285,6 +285,33 @@ public enum MealCalendarRepository {
     return item.id
   }
 
+  @discardableResult
+  public static func addComplementItem(
+    _ suggestion: MealPlanComplementSuggestion,
+    on scheduledDate: Date,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> MealPlanItem.ID {
+    guard let title = suggestion.title.nonEmptyMealCalendarText else {
+      throw MealCalendarRepositoryError.emptyTitle
+    }
+
+    let item = MealPlanItem(
+      id: uuid(),
+      kind: .note,
+      title: title,
+      scheduledDate: scheduledDate,
+      mealSlot: suggestion.mealSlot,
+      notes: nil,
+      sortOrder: try nextSortOrder(on: scheduledDate, mealSlot: suggestion.mealSlot, in: db),
+      dateCreated: now,
+      dateModified: now
+    )
+    try MealPlanItem.insert { item }.execute(db)
+    return item.id
+  }
+
   public static func updateRecipeItem(
     itemID: MealPlanItem.ID,
     recipeID: Recipe.ID,

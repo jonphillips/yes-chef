@@ -156,6 +156,54 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func mealPlanChatContextNotesBudgetTruncation() {
+      let scheduledDate = Date(timeIntervalSinceReferenceDate: 805_650_000)
+      let now = Date(timeIntervalSinceReferenceDate: 805_660_000)
+      let rows = (0..<10).map { index in
+        let recipeID = SampleUUIDSequence.uuid(5_500 + index)
+        return MealPlanItemRowData(
+          item: MealPlanItem(
+            id: SampleUUIDSequence.uuid(5_600 + index),
+            kind: .recipe,
+            recipeID: recipeID,
+            title: "Dish \(index)",
+            scheduledDate: scheduledDate,
+            mealSlot: .dinner,
+            sortOrder: index,
+            dateCreated: now,
+            dateModified: now
+          ),
+          recipe: Recipe(
+            id: recipeID,
+            title: "Dish \(index)",
+            dateCreated: now,
+            dateModified: now
+          ),
+          recipeIngredientLines: [
+            "long ingredient \(index)-0 with enough words to matter",
+            "long ingredient \(index)-1 with enough words to matter",
+            "long ingredient \(index)-2 with enough words to matter",
+            "long ingredient \(index)-3 with enough words to matter"
+          ]
+        )
+      }
+      let context = MealPlanChatContext(
+        title: "Tuesday, July 8",
+        rows: rows
+      )
+
+      let serialized = context.serialized(characterBudget: 900)
+
+      #expect(serialized.count <= 900)
+      #expect(serialized.contains("Ingredient lists were omitted to stay within the context budget."))
+      #expect(
+        serialized.contains("lower-priority meal plan item(s) were omitted to stay within the context budget.")
+      )
+      #expect(serialized.contains("- Dish 0"))
+      #expect(!serialized.contains("- Dish 9"))
+    }
+
+    @Test
     func addsMultipleRecipeItemsToMealCalendar() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 803_050_000)
