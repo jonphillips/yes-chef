@@ -1,8 +1,8 @@
 # Current Handoff
 
-Last updated: July 3, 2026 (Phase E Slice 4 approved, PR #80 → DONE-LOG. **This closes the entire
-grocery/pantry milestone** — all four slices shipped. **Next Up is intentionally empty: Jon picks the next
-dispatch target from the Ready queue.** Lean verification is the default.)
+Last updated: July 4, 2026 (**ADR-0012 Slice 1 shipped** — `.menu` context + grounded chat, PR #81 →
+merged to main, approved. **Next Up = ADR-0012 Slice 2** — the menu prep-plan verb → `Menu.prepPlan`
+(additive `Data?` BLOB, first schema touch of this effort). Lean verification is the default.)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -18,14 +18,29 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**None — awaiting Jon's pick.** The grocery/pantry milestone (Phase E) closed with Slice 4 (PR #80 →
-DONE-LOG), so there is **no inferred next slice**. Per the dispatch rule above, do **not** guess: Jon selects
-the next dispatch target from the **Ready Efforts** queue below. Genuinely-open named candidates:
-**Menu + Meal-Planner chat verbs** and **reader photo affordances** (both in
-[`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md)), or the parked **two-device dogfood**
-once iOS Beta 3 lands. (The actionable-chat / LLMClientKit lift is **already complete** — Slices 1–2 + the
-Chef It Up / Serve With / substitution verbs, PRs #73–#75 → DONE-LOG; not a candidate.) Once chosen, expand
-it here into a concrete slice list before dispatching.
+**ADR-0012 Slice 2 — the menu prep-plan verb → `Menu.prepPlan`.** Read
+[`docs/decisions/ADR-0012-menu-actionable-chat.md`](decisions/ADR-0012-menu-actionable-chat.md) first —
+Accepted, five decisions resolved, do not re-open them. S1 (`.menu` context + grounded chat) shipped in
+PR #81; this dispatch is **S2 only** (S3 complement is a **separate later dispatch** — do not build it here).
+
+S2 concretely (ADR-0012 Decisions #1 + #4):
+- Add the additive column **`Menu.prepPlan: Data?`** — a Codable BLOB of
+  `PrepPlanStep { when: String; task: String; sourceDish: MenuItem.ID? }`. `when` stays a **String**
+  (relative-day label, e.g. "morning of day 2"); `sourceDish` is a **nullable** `MenuItem.ID` back-pointer.
+  Additive-nullable, sync-safe — this is the **`serveWith` storage pattern**, not new infra
+  ([[sqlitedata-blob-cloudkit-asset]]). No reserved columns, no unique index.
+- Add the **prep-plan apply-action + review card** to the menu apply-action catalog (which S1 left empty),
+  routed through the existing staging card so **the tap writes** — no chat turn mutates the menu on its own.
+- The verb **composes and sequences the existing per-recipe `makeAhead` notes** already fed into the S1
+  serialization; it must **not** re-generate per-dish make-ahead prose (Decision #4, vocabulary hygiene:
+  "prep plan" ≠ "make-ahead").
+- Add the menu **prep-plan section**: timeline/checklist render of the stored steps, plus **regenerate** and
+  **clear** affordances. The plan is a **passive snapshot** — do not auto-recompute on menu edits; the
+  `sourceDish` back-pointer only makes staleness detectable (ADR-0010 provenance posture).
+
+Classify commit shape before extending later verbs: [[chat-verb-commit-shapes]] (prep-plan is a structured
+staged-list commit, not one-field-per-verb). **Schema note:** this is the first schema touch of the effort —
+fold it into the standing "promote CloudKit fields to prod schema before any TestFlight cut" follow-up below.
 
 **Standing release follow-up carried from Phase E (not a dispatch on its own):** before any prod/TestFlight
 cut, promote the Slice 3 pantry-policy + `canonicalName` CloudKit fields to the **production** schema, and
@@ -63,10 +78,18 @@ target.
   delete-source-clobbers-amount-edit follow-up remains parked in
   [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) for a later grocery slice.
 
-- **Cooking workspace** — **complete** (Slices A + B, PRs #73 / #74 → DONE-LOG). Menu + Meal-Planner chat
-  verbs and the reader **photo affordances** (manual set-as-cover, pinch-zoom in the viewer) are named in
-  [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) as later efforts (host built
-  context-general to receive them).
+- **Menu actionable chat** (ADR-0012, **Accepted** 2026-07-03) — the Menu-scope instance of actionable
+  chat. **S1 shipped** (`.menu` context + composite grounding + grounded chat, PR #81 → DONE-LOG, no schema).
+  **S2 is now in Next Up** (prep-plan verb → `Menu.prepPlan`). S3 complement verb → inserts a `MenuItem` is
+  the remaining slice. The Planner-day (`MealPlanItem`, absolute-date) version is a **separate follow-on
+  ADR**, not this effort. Design + all five resolved decisions in
+  [`docs/decisions/ADR-0012-menu-actionable-chat.md`](decisions/ADR-0012-menu-actionable-chat.md).
+
+- **Cooking workspace** — **complete** (Slices A + B, PRs #73 / #74 → DONE-LOG). Its Menu chat-verbs
+  follow-on is now its own effort above (ADR-0012). The reader **photo affordances** (manual set-as-cover,
+  pinch-zoom in the viewer) remain a named later effort in
+  [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) (host built context-general to
+  receive them).
 
 **Parked (not dispatched):**
 - **Dogfood the core loop on two devices** — capture ~15–20 real recipes via the extension, cook from
