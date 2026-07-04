@@ -13,6 +13,7 @@ extension RecipeCoreTests {
       let now = Date(timeIntervalSinceReferenceDate: 804_100_000)
       let startDate = Date(timeIntervalSinceReferenceDate: 804_200_000)
       let recipeID = SampleUUIDSequence.uuid(9_001)
+      let ingredientSectionID = SampleUUIDSequence.uuid(9_002)
       var uuids = SampleUUIDSequence(start: 9_100)
 
       try database.write { db in
@@ -22,6 +23,25 @@ extension RecipeCoreTests {
             title: "Menu Chicken",
             dateCreated: now,
             dateModified: now
+          )
+        }
+        .execute(db)
+        try IngredientSection.insert {
+          IngredientSection(
+            id: ingredientSectionID,
+            recipeID: recipeID,
+            name: nil,
+            sortOrder: 0
+          )
+        }
+        .execute(db)
+        try IngredientLine.insert {
+          IngredientLine(
+            id: SampleUUIDSequence.uuid(9_003),
+            recipeID: recipeID,
+            sectionID: ingredientSectionID,
+            originalText: "1 chicken",
+            sortOrder: 0
           )
         }
         .execute(db)
@@ -69,8 +89,133 @@ extension RecipeCoreTests {
         expectNoDifference(detail.itemRows.map(\.id), [recipeItemID, noteItemID])
         expectNoDifference(detail.itemRows.map(\.displayTitle), ["Menu Chicken", "Leftover lunch"])
         expectNoDifference(detail.itemRows.map(\.item.notes), ["Grill outside", "Use extra chicken"])
+        expectNoDifference(detail.itemRows[0].recipeIngredientLines, ["1 chicken"])
+        expectNoDifference(detail.itemRows[1].recipeIngredientLines, [])
         expectNoDifference(detail.placements.map(\.id), [placementID])
       }
+    }
+
+    @Test
+    func menuChatContextSerializesDishSummariesAndMakeAhead() {
+      let menuID = SampleUUIDSequence.uuid(13_000)
+      let recipeID = SampleUUIDSequence.uuid(13_001)
+      let itemID = SampleUUIDSequence.uuid(13_002)
+      let now = Date(timeIntervalSinceReferenceDate: 805_100_000)
+      let detail = MenuDetailData(
+        menu: Menu(
+          id: menuID,
+          title: "Birthday Menu",
+          notes: "Mostly grill outside.",
+          dayCount: 2,
+          dateCreated: now,
+          dateModified: now
+        ),
+        itemRows: [
+          MenuItemRowData(
+            item: MenuItem(
+              id: itemID,
+              menuID: menuID,
+              kind: .recipe,
+              recipeID: recipeID,
+              title: "Soy Chicken",
+              dayOffset: 1,
+              mealSlot: .dinner,
+              notes: "Serve sliced.",
+              sortOrder: 0,
+              dateCreated: now,
+              dateModified: now
+            ),
+            recipe: Recipe(
+              id: recipeID,
+              title: "Soy Chicken",
+              prepTimeMinutes: 20,
+              cookTimeMinutes: 45,
+              totalTimeMinutes: 65,
+              dateCreated: now,
+              dateModified: now,
+              makeAhead: "Marinate the chicken overnight.\nBring to room temperature before grilling."
+            ),
+            recipeIngredientLines: [
+              "2 pounds chicken thighs",
+              "1/2 cup soy sauce",
+              "4 cloves garlic"
+            ]
+          )
+        ]
+      )
+
+      let serialized = RecipeChatContext.menu(MenuChatContext(detail: detail)).serialized()
+
+      #expect(serialized.contains("- Title: Birthday Menu"))
+      #expect(serialized.contains("- Day: 2 (dayOffset 1)"))
+      #expect(serialized.contains("- Meal slot: Dinner"))
+      #expect(serialized.contains("- Prep time: 20 minutes"))
+      #expect(serialized.contains("    - 2 pounds chicken thighs"))
+      #expect(serialized.contains("- Menu item notes: Serve sliced."))
+      #expect(
+        serialized.contains(
+          "Existing recipe make-ahead note, verbatim:\n"
+            + "Marinate the chicken overnight.\n"
+            + "Bring to room temperature before grilling."
+        )
+      )
+    }
+
+    @Test
+    func menuChatContextNotesBudgetTruncation() {
+      let menuID = SampleUUIDSequence.uuid(14_000)
+      let now = Date(timeIntervalSinceReferenceDate: 805_200_000)
+      let rows = (0..<10).map { index in
+        let recipeID = SampleUUIDSequence.uuid(14_100 + index)
+        return MenuItemRowData(
+          item: MenuItem(
+            id: SampleUUIDSequence.uuid(14_200 + index),
+            menuID: menuID,
+            kind: .recipe,
+            recipeID: recipeID,
+            title: "Dish \(index)",
+            dayOffset: 0,
+            mealSlot: .dinner,
+            sortOrder: index,
+            dateCreated: now,
+            dateModified: now
+          ),
+          recipe: Recipe(
+            id: recipeID,
+            title: "Dish \(index)",
+            dateCreated: now,
+            dateModified: now
+          ),
+          recipeIngredientLines: [
+            "long ingredient \(index)-0 with enough words to matter",
+            "long ingredient \(index)-1 with enough words to matter",
+            "long ingredient \(index)-2 with enough words to matter",
+            "long ingredient \(index)-3 with enough words to matter"
+          ]
+        )
+      }
+      let context = MenuChatContext(
+        detail: MenuDetailData(
+          menu: Menu(
+            id: menuID,
+            title: "Oversized Menu",
+            dayCount: 1,
+            dateCreated: now,
+            dateModified: now
+          ),
+          itemRows: rows
+        )
+      )
+
+      let serialized = context.serialized(characterBudget: 900)
+
+      #expect(serialized.count <= 900)
+      #expect(serialized.contains("Ingredient lists were omitted to stay within the context budget."))
+      #expect(
+        serialized.contains("lower-priority menu item(s) were omitted to stay within the context budget.")
+      )
+      #expect(serialized.contains("- Dish 0"))
+      #expect(!serialized.contains("- Dish 9"))
     }
 
     @Test

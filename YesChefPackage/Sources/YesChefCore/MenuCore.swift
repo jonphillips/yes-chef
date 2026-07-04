@@ -34,10 +34,16 @@ public struct MenuDetailData: Equatable, Sendable {
 public struct MenuItemRowData: Identifiable, Equatable, Sendable {
   public var item: MenuItem
   public var recipe: Recipe?
+  public var recipeIngredientLines: [String]
 
-  public init(item: MenuItem, recipe: Recipe? = nil) {
+  public init(
+    item: MenuItem,
+    recipe: Recipe? = nil,
+    recipeIngredientLines: [String] = []
+  ) {
     self.item = item
     self.recipe = recipe
+    self.recipeIngredientLines = recipeIngredientLines
   }
 
   public var id: MenuItem.ID { item.id }
@@ -94,6 +100,12 @@ public struct MenuDetailRequest: FetchKeyRequest {
         .filter { !$0.archived }
         .map { ($0.id, $0) }
     )
+    let recipeIDs = Set(recipesByID.keys)
+    let ingredientLinesByRecipeID = Dictionary(
+      grouping: try IngredientLine.fetchAll(db)
+        .filter { recipeIDs.contains($0.recipeID) },
+      by: \.recipeID
+    )
     let itemRows = try MenuItem
       .where { $0.menuID.eq(menuID) }
       .fetchAll(db)
@@ -104,7 +116,12 @@ public struct MenuDetailRequest: FetchKeyRequest {
         }
         return MenuItemRowData(
           item: item,
-          recipe: recipe
+          recipe: recipe,
+          recipeIngredientLines: recipe.map { recipe in
+            (ingredientLinesByRecipeID[recipe.id] ?? [])
+              .sorted { $0.sortOrder < $1.sortOrder }
+              .map(\.originalText)
+          } ?? []
         )
       }
       .sorted(by: areMenuItemRowsInIncreasingOrder)
