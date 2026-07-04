@@ -337,8 +337,7 @@ final class MenuDetailModel {
           tier: chatModel.activeTier
         )
       },
-      commit: { [weak self] plan in
-        try self?.commitComplementPlan(plan)
+      commit: { _ in
       }
     )
     let prepPlanAction = ChatApplyAction<MenuPrepPlan>(
@@ -393,23 +392,6 @@ final class MenuDetailModel {
     }
   }
 
-  private func commitComplementPlan(_ plan: MenuComplementPlan) throws {
-    guard !plan.items.isEmpty else {
-      throw MenuDetailError.emptyComplementSuggestion
-    }
-    try database.write { db in
-      for suggestion in plan.items {
-        try MenuRepository.addComplementItem(
-          suggestion,
-          to: menuID,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
-      }
-    }
-  }
-
   private func commitComplementSuggestion(_ suggestion: MenuComplementSuggestion) throws {
     _ = try database.write { db in
       try MenuRepository.addComplementItem(
@@ -424,13 +406,10 @@ final class MenuDetailModel {
 }
 
 private enum MenuDetailError: Error, CustomStringConvertible, LocalizedError {
-  case emptyComplementSuggestion
   case emptyPrepPlan
 
   var description: String {
     switch self {
-    case .emptyComplementSuggestion:
-      "The assistant did not find a menu item to add."
     case .emptyPrepPlan:
       "The assistant did not find a prep plan to save."
     }

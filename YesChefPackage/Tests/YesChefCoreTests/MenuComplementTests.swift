@@ -33,7 +33,7 @@ extension RecipeCoreTests {
               mealSlot: .dinner
             ),
             MenuComplementSuggestion(
-              kind: .recipe,
+              kind: .note,
               title: "Cardamom buns",
               dayOffset: 1,
               mealSlot: .breakfast

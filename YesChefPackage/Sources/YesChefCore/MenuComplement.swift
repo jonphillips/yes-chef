@@ -132,13 +132,8 @@ extension MenuComplementClient: DependencyKey {
           let mealSlot = (element["mealSlot"] as? String).flatMap(MealPlanItemSlot.init(menuComplementRawValue:))
         else { return nil }
 
-        let kind = (element["kind"] as? String)
-          .flatMap(MealPlanItemKind.init(menuComplementRawValue:))
-          .flatMap { $0 == .reservation ? nil : $0 }
-          ?? .note
-
         return MenuComplementSuggestion(
-          kind: kind,
+          kind: .note,
           title: title,
           dayOffset: dayOffset,
           mealSlot: mealSlot
@@ -164,12 +159,6 @@ extension DependencyValues {
   public var menuComplementClient: MenuComplementClient {
     get { self[MenuComplementClient.self] }
     set { self[MenuComplementClient.self] = newValue }
-  }
-}
-
-private extension MealPlanItemKind {
-  init?(menuComplementRawValue: String) {
-    self.init(rawValue: menuComplementRawValue.normalizedMenuComplementEnumValue)
   }
 }
 
