@@ -198,8 +198,11 @@ public enum RecipeRepository {
       dateCreated: dateCreated,
       dateModified: now,
       originalSnapshot: draft.originalSnapshot,
-      makeAhead: existingDetail?.recipe.makeAhead, chefItUp: existingDetail?.recipe.chefItUp,
-      serveWith: existingDetail?.recipe.serveWith, viewScale: existingDetail?.recipe.viewScale ?? 1.0
+      makeAhead: existingDetail?.recipe.makeAhead,
+      chefItUp: existingDetail?.recipe.chefItUp,
+      serveWith: existingDetail?.recipe.serveWith,
+      viewScale: existingDetail?.recipe.viewScale ?? 1.0,
+      coverPhotoID: existingDetail?.recipe.coverPhotoID
     )
     let source = sourceFromDraft(
       draft,
@@ -287,6 +290,19 @@ public enum RecipeRepository {
   public static func restore(recipeID: Recipe.ID, in db: Database, now: Date) throws {
     try Recipe.find(recipeID).update {
       $0.archived = false
+      $0.dateModified = now
+    }
+    .execute(db)
+  }
+
+  public static func setCoverPhotoID(
+    _ coverPhotoID: RecipePhoto.ID?,
+    recipeID: Recipe.ID,
+    in db: Database,
+    now: Date
+  ) throws {
+    try Recipe.find(recipeID).update {
+      $0.coverPhotoID = coverPhotoID
       $0.dateModified = now
     }
     .execute(db)

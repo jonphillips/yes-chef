@@ -607,6 +607,15 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Add recipe cover photo pointer") { db in
+      // Loose pointer: a real FK creates a recipes <-> recipePhotos cycle that SQLiteData sync rejects.
+      try #sql("""
+        ALTER TABLE "recipes"
+        ADD COLUMN "coverPhotoID" TEXT
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     defaultDatabase = database
     switch syncMode {

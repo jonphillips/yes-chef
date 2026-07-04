@@ -10,6 +10,10 @@ extension RecipeRepository {
     let desiredPhotoIDs = Set(photos.map(\.id))
     let existingPhotoIDs = Set(existingPhotos.map(\.id))
     for photo in existingPhotos where !desiredPhotoIDs.contains(photo.id) {
+      try Recipe
+        .where { $0.coverPhotoID.eq(photo.id) }
+        .update { $0.coverPhotoID = #bind(nil as RecipePhoto.ID?) }
+        .execute(db)
       try RecipePhoto.find(photo.id).delete().execute(db)
     }
     for photo in photos where !existingPhotoIDs.contains(photo.id) {
