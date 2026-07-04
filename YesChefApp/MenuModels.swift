@@ -285,6 +285,17 @@ final class MenuLibraryModel {
       isShowingError = true
     }
   }
+
+  func clearPrepPlanButtonTapped(menuID: CoreMenu.ID) {
+    do {
+      try database.write { db in
+        try MenuRepository.clearPrepPlan(menuID: menuID, in: db, now: now)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
 }
 
 @Observable
@@ -293,12 +304,71 @@ final class MenuDetailModel {
   let menuID: CoreMenu.ID
 
   @ObservationIgnored
+  @Dependency(\.date.now) private var now
+  @ObservationIgnored
+  @Dependency(\.defaultDatabase) private var database
+  @ObservationIgnored
   @Fetch var detail: MenuDetailData?
 
   init(menuID: CoreMenu.ID) {
     self.menuID = menuID
     _detail = Fetch(wrappedValue: nil, MenuDetailRequest(menuID: menuID), animation: .default)
   }
+
+  func applyActionCatalog(for chatModel: RecipeChatModel) -> [AnyChatApplyAction] {
+    @Dependency(\.menuPrepPlanClient) var menuPrepPlanClient
+
+    let context = chatModel.context.serialized()
+    let prepPlanAction = ChatApplyAction<MenuPrepPlan>(
+      title: "Build prep plan -> Prep Plan section",
+      extractingTitle: "Building prep plan...",
+      reviewTitle: "Review prep plan",
+      commitTitle: "Commit to Prep Plan",
+      committingTitle: "Saving prep plan...",
+      committedTitle: "Saved to Prep Plan",
+      extract: { selection, messages in
+        try await menuPrepPlanClient(
+          selection: selection,
+          messages: messages,
+          context: context,
+          tier: chatModel.activeTier
+        )
+      },
+      commit: { [weak self] plan in
+        try self?.commitPrepPlan(plan)
+      }
+    )
+
+    return [
+      AnyChatApplyAction(prepPlanAction) { plan in
+        plan.rendered().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+          ? nil
+          : plan.rendered()
+      }
+    ]
+  }
+
+  private func commitPrepPlan(_ plan: MenuPrepPlan) throws {
+    guard !plan.steps.isEmpty else {
+      throw MenuDetailError.emptyPrepPlan
+    }
+    try database.write { db in
+      try MenuRepository.applyPrepPlan(plan, to: menuID, in: db, now: now)
+    }
+  }
+}
+
+private enum MenuDetailError: Error, CustomStringConvertible, LocalizedError {
+  case emptyPrepPlan
+
+  var description: String {
+    switch self {
+    case .emptyPrepPlan:
+      "The assistant did not find a prep plan to save."
+    }
+  }
+
+  var errorDescription: String? { description }
 }
 
 enum MenuListStyle {

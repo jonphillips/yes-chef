@@ -228,6 +228,7 @@ public struct MenuChatContext: Equatable, Sendable {
     lines.append("Menu item summaries:")
     for item in items {
       lines.append("- \(item.title.isEmpty ? "(untitled)" : item.title)")
+      lines.append("  - Menu item ID: \(item.id.uuidString)")
       lines.append("  - Kind: \(item.kind.title)")
       lines.append("  - Day: \(item.dayOffset + 1) (dayOffset \(item.dayOffset))")
       lines.append("  - Meal slot: \(item.mealSlot.title)")

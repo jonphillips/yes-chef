@@ -147,6 +147,7 @@ extension RecipeCoreTests {
       let serialized = RecipeChatContext.menu(MenuChatContext(detail: detail)).serialized()
 
       #expect(serialized.contains("- Title: Birthday Menu"))
+      #expect(serialized.contains("- Menu item ID: \(itemID.uuidString)"))
       #expect(serialized.contains("- Day: 2 (dayOffset 1)"))
       #expect(serialized.contains("- Meal slot: Dinner"))
       #expect(serialized.contains("- Prep time: 20 minutes"))
