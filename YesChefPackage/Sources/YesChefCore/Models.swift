@@ -295,6 +295,7 @@ public struct Menu: Codable, Identifiable, Equatable, Sendable {
   public var title: String
   public var notes: String?
   public var dayCount: Int
+  public var prepPlan: Data?
   public var dateCreated: Date
   public var dateModified: Date
 
@@ -303,6 +304,7 @@ public struct Menu: Codable, Identifiable, Equatable, Sendable {
     title: String,
     notes: String? = nil,
     dayCount: Int,
+    prepPlan: Data? = nil,
     dateCreated: Date,
     dateModified: Date
   ) {
@@ -310,6 +312,7 @@ public struct Menu: Codable, Identifiable, Equatable, Sendable {
     self.title = title
     self.notes = notes
     self.dayCount = dayCount
+    self.prepPlan = prepPlan
     self.dateCreated = dateCreated
     self.dateModified = dateModified
   }

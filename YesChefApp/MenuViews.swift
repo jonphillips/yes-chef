@@ -143,19 +143,23 @@ struct MenuDetailView: View {
             ChatWorkspaceSplit(
               context: .menu(MenuChatContext(detail: detail)),
               detentRaw: $chatWorkspaceDetentRaw,
-              applyActions: { _ in [] }
+              applyActions: { chatModel in detailModel.applyActionCatalog(for: chatModel) }
             ) {
               MenuDetailReader(
                 model: model,
+                detailModel: detailModel,
                 detail: detail,
-                onRecipeSelected: onRecipeSelected
+                onRecipeSelected: onRecipeSelected,
+                regeneratePrepPlan: chatButtonTapped
               )
             }
           } else {
             MenuDetailReader(
               model: model,
+              detailModel: detailModel,
               detail: detail,
-              onRecipeSelected: onRecipeSelected
+              onRecipeSelected: onRecipeSelected,
+              regeneratePrepPlan: chatButtonTapped
             )
           }
         }
@@ -205,7 +209,7 @@ struct MenuDetailView: View {
       NavigationStack {
         RecipeChatPanel(
           chatModel: chatModel,
-          applyActions: []
+          applyActions: detailModel.applyActionCatalog(for: chatModel)
         )
       }
     }
@@ -227,13 +231,23 @@ struct MenuDetailView: View {
 
 private struct MenuDetailReader: View {
   let model: MenuLibraryModel
+  let detailModel: MenuDetailModel
   let detail: MenuDetailData
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  var regeneratePrepPlan: () -> Void
 
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
         MenuDetailHeader(detail: detail)
+        MenuPrepPlanSection(
+          menu: detail.menu,
+          itemRows: detail.itemRows,
+          clearPrepPlan: {
+            model.clearPrepPlanButtonTapped(menuID: detailModel.menuID)
+          },
+          regeneratePrepPlan: regeneratePrepPlan
+        )
         MenuDishList(
           model: model,
           menu: detail.menu,
@@ -249,6 +263,78 @@ private struct MenuDetailReader: View {
       .padding()
       .frame(maxWidth: 900, alignment: .leading)
       .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+}
+
+private struct MenuPrepPlanSection: View {
+  let menu: CoreMenu
+  let itemRows: [MenuItemRowData]
+  var clearPrepPlan: () -> Void
+  var regeneratePrepPlan: () -> Void
+
+  private var steps: [PrepPlanStep] {
+    MenuPrepPlanCoding.decode(menu.prepPlan)
+  }
+
+  private var dishTitlesByID: [MenuItem.ID: String] {
+    Dictionary(uniqueKeysWithValues: itemRows.map { ($0.id, $0.displayTitle) })
+  }
+
+  var body: some View {
+    if !steps.isEmpty {
+      VStack(alignment: .leading, spacing: 12) {
+        HStack(alignment: .firstTextBaseline) {
+          Text("Prep Plan")
+            .font(.title2.weight(.semibold))
+
+          Spacer()
+
+          Button {
+            regeneratePrepPlan()
+          } label: {
+            Label("Regenerate", systemImage: "sparkles")
+          }
+          .buttonStyle(.bordered)
+
+          Button(role: .destructive) {
+            clearPrepPlan()
+          } label: {
+            Label("Clear", systemImage: "xmark.circle")
+          }
+          .buttonStyle(.bordered)
+        }
+
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+            HStack(alignment: .top, spacing: 12) {
+              Image(systemName: "checklist")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+
+              VStack(alignment: .leading, spacing: 4) {
+                Text(step.when)
+                  .font(.headline)
+                Text(step.task)
+                if let sourceDish = step.sourceDish, let title = dishTitlesByID[sourceDish] {
+                  Label(title, systemImage: "fork.knife")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+              }
+
+              Spacer(minLength: 8)
+            }
+            .padding(.vertical, 12)
+
+            if index < steps.count - 1 {
+              Divider()
+                .padding(.leading, 44)
+            }
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+      }
     }
   }
 }

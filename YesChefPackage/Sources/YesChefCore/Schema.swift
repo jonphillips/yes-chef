@@ -599,6 +599,14 @@ extension DependencyValues {
       try GroceryCanonicalNameCache.backfill(in: db)
     }
 
+    migrator.registerMigration("Add menu prep plan") { db in
+      try #sql("""
+        ALTER TABLE "menus"
+        ADD COLUMN "prepPlan" BLOB
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     defaultDatabase = database
     switch syncMode {
