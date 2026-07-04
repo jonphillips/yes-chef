@@ -20,9 +20,12 @@ PR); do all listed, in order.
 
 **None — awaiting Jon's pick.** The grocery/pantry milestone (Phase E) closed with Slice 4 (PR #80 →
 DONE-LOG), so there is **no inferred next slice**. Per the dispatch rule above, do **not** guess: Jon selects
-the next dispatch target from the **Ready Efforts** queue below (leading candidates: **actionable-chat /
-LLMClientKit lift** — see [[actionable-chat-effort]]; **two-device dogfood** once iOS Beta 3 lands). Once
-chosen, expand it here into a concrete slice list before dispatching.
+the next dispatch target from the **Ready Efforts** queue below. Genuinely-open named candidates:
+**Menu + Meal-Planner chat verbs** and **reader photo affordances** (both in
+[`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md)), or the parked **two-device dogfood**
+once iOS Beta 3 lands. (The actionable-chat / LLMClientKit lift is **already complete** — Slices 1–2 + the
+Chef It Up / Serve With / substitution verbs, PRs #73–#75 → DONE-LOG; not a candidate.) Once chosen, expand
+it here into a concrete slice list before dispatching.
 
 **Standing release follow-up carried from Phase E (not a dispatch on its own):** before any prod/TestFlight
 cut, promote the Slice 3 pantry-policy + `canonicalName` CloudKit fields to the **production** schema, and
@@ -47,9 +50,11 @@ target.
   UI (PR #80) — all → DONE-LOG. Design rationale = [[grocery-pantry-threshold-design]]. Standing release
   follow-up (promote CloudKit fields to prod schema) noted under Next Up.
 
-- **Actionable-chat / LLMClientKit lift** — a leading next candidate. Lift `GalavantAI` → shared
-  `LLMClientKit`, then the make-ahead extract→commit verb (ADR-0011); retires the minimal ModelClient just
-  built. See [[actionable-chat-effort]] and [[chat-verb-commit-shapes]] before scoping into slices.
+- **Actionable chat / LLMClientKit** (ADR-0011) — **complete.** The lift (Slice 1, 3 repos) + make-ahead
+  (Slice 2) + Chef It Up / Serve With / per-line substitution shipped 2026-07-02/03 (PRs #73–#75 →
+  DONE-LOG); `LLMClientKit` is a live path-dep. Remaining named-later verbs (**Menu + Meal-Planner chat
+  verbs**) live in [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md); classify each new
+  verb's commit shape first ([[chat-verb-commit-shapes]]).
 
 - **Dogfood fixes — batch 3** — complete (PR #75 → DONE-LOG; ingredient structure · Chef It Up +
   Serve With · substitution · keep-awake). Non-blocking device-pass notes recorded in the DONE-LOG entry.
