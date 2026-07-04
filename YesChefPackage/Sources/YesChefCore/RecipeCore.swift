@@ -903,6 +903,9 @@ private func reconcileIngredientLines(
       quantityText: parsedLine.quantityText ?? existingLine.quantityText,
       unit: parsedLine.unit ?? existingLine.unit,
       item: parsedLine.item ?? existingLine.item,
+      canonicalName: parsedLine.canonicalName
+        ?? existingLine.canonicalName
+        ?? CanonicalIngredient.canonicalName((parsedLine.item ?? existingLine.item) ?? parsedLine.originalText),
       preparation: parsedLine.preparation ?? existingLine.preparation,
       comment: parsedLine.comment ?? existingLine.comment,
       isOptional: parsedLine.isOptional,

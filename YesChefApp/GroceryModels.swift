@@ -218,7 +218,8 @@ final class GroceryLibraryModel {
   func savePantryItemButtonTapped(
     itemID: PantryItem.ID? = nil,
     title: String,
-    notes: String
+    notes: String,
+    policy: PantryPolicy
   ) -> Bool {
     do {
       try database.write { db in
@@ -227,6 +228,7 @@ final class GroceryLibraryModel {
             itemID: itemID,
             title: title,
             notes: notes,
+            policy: policy,
             in: db,
             now: now
           )
@@ -234,6 +236,7 @@ final class GroceryLibraryModel {
           try PantryRepository.addItem(
             title: title,
             notes: notes,
+            policy: policy,
             in: db,
             now: now,
             uuid: { uuid() }

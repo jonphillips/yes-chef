@@ -288,6 +288,7 @@ public enum GroceryRepository {
       id: uuid(),
       groceryListID: groceryListID,
       title: title,
+      canonicalName: CanonicalIngredient.canonicalName(title),
       quantityText: quantityText?.nonEmptyGroceryText,
       unit: unit?.nonEmptyGroceryText,
       aisle: aisle?.nonEmptyGroceryText,
@@ -505,6 +506,7 @@ public enum GroceryRepository {
       id: uuid(),
       groceryListID: groceryListID,
       title: draft.title,
+      canonicalName: draft.canonicalName,
       quantity: draft.quantity,
       quantityText: draft.quantityText,
       unit: draft.unit,
@@ -668,6 +670,7 @@ public enum PantryRepository {
   public static func addItem(
     title: String,
     notes: String? = nil,
+    policy: PantryPolicy? = nil,
     in db: Database,
     now: Date,
     uuid: () -> UUID
@@ -678,18 +681,35 @@ public enum PantryRepository {
 
     if var existingItem = try pantryItem(matching: title, in: db) {
       let notes = notes?.nonEmptyGroceryText
+      var didChange = false
       if let notes, existingItem.notes != notes {
         existingItem.notes = notes
+        didChange = true
+      }
+      if let storageValues = policy?.storageValues,
+         existingItem.isUnlimited != storageValues.isUnlimited
+          || existingItem.thresholdQuantity != storageValues.thresholdQuantity
+          || existingItem.thresholdUnit != storageValues.thresholdUnit {
+        existingItem.isUnlimited = storageValues.isUnlimited
+        existingItem.thresholdQuantity = storageValues.thresholdQuantity
+        existingItem.thresholdUnit = storageValues.thresholdUnit
+        didChange = true
+      }
+      if didChange {
         existingItem.dateModified = now
         try PantryItem.upsert { existingItem }.execute(db)
       }
       return existingItem.id
     }
 
+    let storageValues = (policy ?? .unlimited).storageValues
     let item = PantryItem(
       id: uuid(),
       title: title,
       notes: notes?.nonEmptyGroceryText,
+      isUnlimited: storageValues.isUnlimited,
+      thresholdQuantity: storageValues.thresholdQuantity,
+      thresholdUnit: storageValues.thresholdUnit,
       sortOrder: try nextPantrySortOrder(in: db),
       dateCreated: now,
       dateModified: now
@@ -702,6 +722,7 @@ public enum PantryRepository {
     itemID: PantryItem.ID,
     title: String,
     notes: String? = nil,
+    policy: PantryPolicy,
     in db: Database,
     now: Date
   ) throws {
@@ -720,6 +741,10 @@ public enum PantryRepository {
 
     item.title = title
     item.notes = notes?.nonEmptyGroceryText
+    let storageValues = policy.storageValues
+    item.isUnlimited = storageValues.isUnlimited
+    item.thresholdQuantity = storageValues.thresholdQuantity
+    item.thresholdUnit = storageValues.thresholdUnit
     item.dateModified = now
     try PantryItem.upsert { item }.execute(db)
   }
@@ -847,6 +872,7 @@ struct GroceryItemSourceDraft {
 
 private struct GroceryGeneratedItemDraft {
   var title: String
+  var canonicalName: String?
   var quantity: Double?
   var quantityText: String?
   var unit: String?
@@ -855,6 +881,7 @@ private struct GroceryGeneratedItemDraft {
 
   init(line: IngredientLine) {
     self.title = line.groceryItemTitle
+    self.canonicalName = line.canonicalIngredientName ?? CanonicalIngredient.canonicalName(line.groceryItemTitle)
     self.quantity = line.quantity
     self.quantityText = line.groceryQuantityText
     self.unit = line.unit?.nonEmptyGroceryText
@@ -990,7 +1017,7 @@ func areMenuItemsInIncreasingOrder(_ lhs: MenuItem, _ rhs: MenuItem) -> Bool {
 
 private extension GroceryItem {
   func canConsolidate(with draft: GroceryGeneratedItemDraft) -> Bool {
-    CanonicalIngredient.canonicalName(title) == CanonicalIngredient.canonicalName(draft.title)
+    canonicalIngredientName == draft.canonicalName
       && CanonicalIngredient.canonicalText(aisle) == CanonicalIngredient.canonicalText(draft.aisle)
       && CanonicalIngredient.canonicalText(notes) == CanonicalIngredient.canonicalText(draft.notes)
       && canMergeMeasure(with: draft)

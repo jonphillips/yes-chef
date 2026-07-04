@@ -23,6 +23,7 @@ public enum IngredientParser {
           quantityText: parsed.quantityText,
           unit: parsed.unit,
           item: parsed.item,
+          canonicalName: CanonicalIngredient.canonicalName(parsed.item ?? text),
           preparation: parsed.preparation,
           isOptional: text.localizedCaseInsensitiveContains("optional"),
           doNotShop: Self.doNotShop(text),
