@@ -882,6 +882,13 @@ final class RecipeDetailModel {
       } ?? []
   }
 
+  var primaryDisplayPhoto: RecipePhoto? {
+    RecipePhotoCover.coverPhoto(
+      coverPhotoID: recipe?.coverPhotoID,
+      from: displayablePhotos
+    )
+  }
+
   var makeAhead: String? {
     recipe?.makeAhead?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
       ? recipe?.makeAhead
@@ -931,6 +938,22 @@ final class RecipeDetailModel {
     do {
       try database.write { db in
         try RecipeRepository.clearMakeAhead(recipeID: recipeID, in: db, now: now)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func coverPhotoButtonTapped(_ coverPhotoID: RecipePhoto.ID?) {
+    do {
+      try database.write { db in
+        try RecipeRepository.setCoverPhotoID(
+          coverPhotoID,
+          recipeID: recipeID,
+          in: db,
+          now: now
+        )
       }
     } catch {
       errorMessage = String(describing: error)

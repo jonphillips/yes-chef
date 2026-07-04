@@ -32,6 +32,7 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
   public var chefItUp: String?
   public var serveWith: Data?
   public var viewScale: Double
+  public var coverPhotoID: RecipePhoto.ID?
 
   public init(
     id: UUID,
@@ -62,7 +63,8 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     makeAhead: String? = nil,
     chefItUp: String? = nil,
     serveWith: Data? = nil,
-    viewScale: Double = 1.0
+    viewScale: Double = 1.0,
+    coverPhotoID: RecipePhoto.ID? = nil
   ) {
     self.id = id
     self.title = title
@@ -93,6 +95,7 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     self.chefItUp = chefItUp
     self.serveWith = serveWith
     self.viewScale = viewScale
+    self.coverPhotoID = coverPhotoID
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -125,6 +128,7 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     case chefItUp
     case serveWith
     case viewScale
+    case coverPhotoID
   }
 
   public init(from decoder: Decoder) throws {
@@ -158,7 +162,8 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
       makeAhead: try container.decodeIfPresent(String.self, forKey: .makeAhead),
       chefItUp: try container.decodeIfPresent(String.self, forKey: .chefItUp),
       serveWith: try container.decodeIfPresent(Data.self, forKey: .serveWith),
-      viewScale: try container.decodeIfPresent(Double.self, forKey: .viewScale) ?? 1.0
+      viewScale: try container.decodeIfPresent(Double.self, forKey: .viewScale) ?? 1.0,
+      coverPhotoID: try container.decodeIfPresent(RecipePhoto.ID.self, forKey: .coverPhotoID)
     )
   }
 }

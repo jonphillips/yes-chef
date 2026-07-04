@@ -205,7 +205,11 @@ private struct RecipeReaderView: View {
     .sheet(isPresented: $isPhotoGalleryPresented) {
       NavigationStack {
         ScrollView {
-          RecipePhotoGallery(photos: model.displayablePhotos)
+          RecipePhotoGallery(
+            photos: model.displayablePhotos,
+            coverPhotoID: model.recipe?.coverPhotoID,
+            setCoverPhoto: { model.coverPhotoButtonTapped($0) }
+          )
             .padding()
         }
         .navigationTitle("Photos")
@@ -637,29 +641,6 @@ private struct IngredientSubstitutionReviewView: View {
   }
 }
 
-private extension RecipeDetailModel {
-  var primaryDisplayPhoto: RecipePhoto? {
-    displayablePhotos.min { lhs, rhs in lhs.displaySortKey < rhs.displaySortKey }
-  }
-}
-
-private struct RecipeReaderThumbnail: View {
-  let photo: RecipePhoto
-  let action: () -> Void
-
-  var body: some View {
-    if let data = photo.thumbnailData ?? photo.displayData {
-      Button(action: action) {
-        RecipePhotoFrame(data: data, aspectRatio: 1)
-          .frame(width: 112, height: 112)
-      }
-      .buttonStyle(.plain)
-      .accessibilityLabel(Text(photo.caption ?? "Recipe photo"))
-      .accessibilityHint(Text("Opens photo gallery."))
-    }
-  }
-}
-
 private struct SourceMetadataView: View {
   let source: RecipeSource
 
@@ -711,182 +692,6 @@ private extension String {
 private extension Optional where Wrapped == String {
   var nonEmpty: String? {
     flatMap(\.nonEmpty)
-  }
-}
-
-private struct RecipePhotoGallery: View {
-  let photos: [RecipePhoto]
-  @State private var selectedPhotoID: RecipePhoto.ID?
-  @State private var enlargedPhoto: RecipePhoto?
-
-  private var selectedPhoto: RecipePhoto? {
-    if let selectedPhotoID, let photo = photos.first(where: { $0.id == selectedPhotoID }) {
-      return photo
-    }
-    return photos.min { lhs, rhs in lhs.displaySortKey < rhs.displaySortKey }
-  }
-
-  var body: some View {
-    if let selectedPhoto, let data = selectedPhoto.displayData ?? selectedPhoto.thumbnailData {
-      VStack(alignment: .leading, spacing: 10) {
-        Button {
-          enlargedPhoto = selectedPhoto
-        } label: {
-          RecipePhotoFrame(data: data, aspectRatio: selectedPhoto.displayAspectRatio)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(selectedPhoto.caption ?? "Recipe photo"))
-        .accessibilityHint(Text("Opens enlarged photo."))
-
-        if let caption = selectedPhoto.caption {
-          Text(caption)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .lineLimit(3)
-        }
-
-        if photos.count > 1 {
-          ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-              ForEach(photos) { photo in
-                if let thumbnailData = photo.thumbnailData ?? photo.displayData {
-                  Button {
-                    selectedPhotoID = photo.id
-                  } label: {
-                    RecipePhotoFrame(data: thumbnailData, aspectRatio: 1)
-                      .frame(width: 76, height: 76)
-                      .overlay {
-                        RoundedRectangle(cornerRadius: 8)
-                          .stroke(
-                            photo.id == selectedPhoto.id ? Color.accentColor : Color.clear,
-                            lineWidth: 3
-                          )
-                      }
-                  }
-                  .buttonStyle(.plain)
-                  .accessibilityLabel(Text(photo.caption ?? "Recipe photo"))
-                }
-              }
-            }
-            .padding(.vertical, 2)
-          }
-          .scrollIndicators(.hidden)
-        }
-      }
-      .fullScreenCover(item: $enlargedPhoto) { photo in
-        RecipePhotoFullScreenView(photo: photo)
-      }
-    }
-  }
-}
-
-private struct RecipePhotoFullScreenView: View {
-  @Environment(\.dismiss) private var dismiss
-  let photo: RecipePhoto
-
-  var body: some View {
-    ZStack {
-      Color.black
-        .ignoresSafeArea()
-
-      if let data = photo.displayData ?? photo.thumbnailData {
-        RecipePhotoImage(data: data)
-          .aspectRatio(photo.displayAspectRatio, contentMode: .fit)
-          .padding()
-          .accessibilityLabel(Text(photo.caption ?? "Recipe photo"))
-      }
-    }
-    .overlay(alignment: .topTrailing) {
-      Button {
-        dismiss()
-      } label: {
-        Image(systemName: "xmark.circle.fill")
-          .font(.largeTitle)
-          .symbolRenderingMode(.hierarchical)
-          .foregroundStyle(.white)
-      }
-      .buttonStyle(.plain)
-      .padding()
-      .accessibilityLabel(Text("Close"))
-    }
-  }
-}
-
-private extension RecipePhoto {
-  var displaySortKey: PhotoDisplaySortKey {
-    PhotoDisplaySortKey(
-      isLowResolution: isLowResolution,
-      kindRank: kind == .hero ? 0 : 1,
-      sortOrder: sortOrder
-    )
-  }
-
-  var displayAspectRatio: CGFloat {
-    guard kind == .referenceDocument else { return 16.0 / 10.0 }
-    guard
-      let pixelWidth,
-      let pixelHeight,
-      pixelWidth > 0,
-      pixelHeight > 0
-    else {
-      return 3.0 / 4.0
-    }
-    return Swift.min(Swift.max(CGFloat(pixelWidth) / CGFloat(pixelHeight), 0.65), 1.4)
-  }
-
-  var isLowResolution: Bool {
-    Swift.max(pixelWidth ?? 0, pixelHeight ?? 0) < 700
-  }
-}
-
-private struct PhotoDisplaySortKey: Comparable {
-  var isLowResolution: Bool
-  var kindRank: Int
-  var sortOrder: Int
-
-  static func < (lhs: Self, rhs: Self) -> Bool {
-    if lhs.isLowResolution != rhs.isLowResolution {
-      return !lhs.isLowResolution
-    }
-    if lhs.kindRank != rhs.kindRank {
-      return lhs.kindRank < rhs.kindRank
-    }
-    return lhs.sortOrder < rhs.sortOrder
-  }
-}
-
-private struct RecipePhotoFrame: View {
-  let data: Data
-  let aspectRatio: CGFloat
-
-  var body: some View {
-    Color.clear
-      .aspectRatio(aspectRatio, contentMode: .fit)
-      .overlay {
-        RecipePhotoImage(data: data)
-          .padding(1)
-      }
-      .clipShape(RoundedRectangle(cornerRadius: 8))
-      .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-  }
-}
-
-private struct RecipePhotoImage: View {
-  let data: Data
-
-  var body: some View {
-    if let image = UIImage(data: data) {
-      Image(uiImage: image)
-        .resizable()
-        .scaledToFit()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    } else {
-      Image(systemName: "photo")
-        .font(.title)
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
   }
 }
 
