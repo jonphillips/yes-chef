@@ -13,6 +13,7 @@ extension RecipeCoreTests {
       let now = Date(timeIntervalSinceReferenceDate: 803_000_000)
       let scheduledDate = Date(timeIntervalSinceReferenceDate: 803_100_000)
       let recipeID = SampleUUIDSequence.uuid(5_001)
+      let ingredientSectionID = SampleUUIDSequence.uuid(5_002)
       var uuids = SampleUUIDSequence(start: 5_100)
 
       try database.write { db in
@@ -22,6 +23,25 @@ extension RecipeCoreTests {
             title: "Planner Chicken",
             dateCreated: now,
             dateModified: now
+          )
+        }
+        .execute(db)
+        try IngredientSection.insert {
+          IngredientSection(
+            id: ingredientSectionID,
+            recipeID: recipeID,
+            name: nil,
+            sortOrder: 0
+          )
+        }
+        .execute(db)
+        try IngredientLine.insert {
+          IngredientLine(
+            id: SampleUUIDSequence.uuid(5_003),
+            recipeID: recipeID,
+            sectionID: ingredientSectionID,
+            originalText: "1 pound chicken thighs",
+            sortOrder: 0
           )
         }
         .execute(db)
@@ -53,9 +73,86 @@ extension RecipeCoreTests {
         expectNoDifference(rows.map(\.displayTitle), ["Planner Chicken", "Use leftovers"])
         expectNoDifference(rows.map(\.item.sortOrder), [0, 1])
         expectNoDifference(rows.first?.recipe?.id, recipeID)
+        expectNoDifference(rows.first?.recipeIngredientLines, ["1 pound chicken thighs"])
         expectNoDifference(rows.first?.item.title, "Planner Chicken")
         expectNoDifference(rows.last?.recipe, nil)
       }
+    }
+
+    @Test
+    func mealPlanChatContextSerializesSelectedDaySummariesAndMakeAhead() {
+      let recipeID = SampleUUIDSequence.uuid(5_401)
+      let recipeItemID = SampleUUIDSequence.uuid(5_402)
+      let noteItemID = SampleUUIDSequence.uuid(5_403)
+      let scheduledDate = Date(timeIntervalSinceReferenceDate: 805_500_000)
+      let now = Date(timeIntervalSinceReferenceDate: 805_600_000)
+      let context = MealPlanChatContext(
+        title: "Tuesday, July 8",
+        rows: [
+          MealPlanItemRowData(
+            item: MealPlanItem(
+              id: noteItemID,
+              kind: .note,
+              title: "Buy ice",
+              scheduledDate: scheduledDate,
+              mealSlot: .snack,
+              notes: "For drinks.",
+              sortOrder: 1,
+              dateCreated: now,
+              dateModified: now
+            )
+          ),
+          MealPlanItemRowData(
+            item: MealPlanItem(
+              id: recipeItemID,
+              kind: .recipe,
+              recipeID: recipeID,
+              title: "Soy Chicken",
+              scheduledDate: scheduledDate,
+              mealSlot: .dinner,
+              notes: "Serve sliced.",
+              sortOrder: 0,
+              dateCreated: now,
+              dateModified: now
+            ),
+            recipe: Recipe(
+              id: recipeID,
+              title: "Soy Chicken",
+              prepTimeMinutes: 20,
+              cookTimeMinutes: 45,
+              totalTimeMinutes: 65,
+              dateCreated: now,
+              dateModified: now,
+              makeAhead: "Marinate the chicken overnight.\nBring to room temperature before grilling."
+            ),
+            recipeIngredientLines: [
+              "2 pounds chicken thighs",
+              "1/2 cup soy sauce",
+              "4 cloves garlic"
+            ]
+          )
+        ]
+      )
+
+      let serialized = RecipeChatContext.mealPlan(context).serialized()
+
+      #expect(serialized.contains("- Date: Tuesday, July 8"))
+      #expect(serialized.contains("- Meal plan item ID: meal:\(recipeItemID.uuidString)"))
+      #expect(serialized.contains("- Kind: Recipe"))
+      #expect(serialized.contains("- Meal slot: Dinner"))
+      #expect(serialized.contains("- Prep time: 20 minutes"))
+      #expect(serialized.contains("    - 2 pounds chicken thighs"))
+      #expect(serialized.contains("- Meal plan item notes: Serve sliced."))
+      #expect(serialized.contains("- Buy ice"))
+      #expect(serialized.contains("- Kind: Note"))
+      #expect(!serialized.contains("For drinks.\n  - Existing recipe make-ahead note"))
+      #expect(
+        serialized.contains(
+          "Existing recipe make-ahead note, verbatim:\n"
+            + "Marinate the chicken overnight.\n"
+            + "Bring to room temperature before grilling."
+        )
+      )
     }
 
     @Test

@@ -22,6 +22,7 @@ public struct MealPlanItemRowID: Hashable, Sendable, CustomStringConvertible {
 public struct MealPlanItemRowData: Identifiable, Equatable, Sendable {
   public var item: MealPlanItem
   public var recipe: Recipe?
+  public var recipeIngredientLines: [String]
   public var source: RecipeSource?
   public var thumbnailData: Data?
   public var menu: Menu?
@@ -31,6 +32,7 @@ public struct MealPlanItemRowData: Identifiable, Equatable, Sendable {
   public init(
     item: MealPlanItem,
     recipe: Recipe? = nil,
+    recipeIngredientLines: [String] = [],
     source: RecipeSource? = nil,
     thumbnailData: Data? = nil,
     menu: Menu? = nil,
@@ -39,6 +41,7 @@ public struct MealPlanItemRowData: Identifiable, Equatable, Sendable {
   ) {
     self.item = item
     self.recipe = recipe
+    self.recipeIngredientLines = recipeIngredientLines
     self.source = source
     self.thumbnailData = thumbnailData
     self.menu = menu
@@ -75,6 +78,12 @@ public struct MealCalendarRequest: FetchKeyRequest {
         .filter { !$0.archived }
         .map { ($0.id, $0) }
     )
+    let recipeIDs = Set(recipesByID.keys)
+    let ingredientLinesByRecipeID = Dictionary(
+      grouping: try IngredientLine.fetchAll(db)
+        .filter { recipeIDs.contains($0.recipeID) },
+      by: \.recipeID
+    )
     let sourcesByRecipeID = Dictionary(grouping: try RecipeSource.fetchAll(db), by: \.recipeID)
     let photoRows = try RecipePhoto
       .select {
@@ -110,6 +119,11 @@ public struct MealCalendarRequest: FetchKeyRequest {
         return MealPlanItemRowData(
           item: item,
           recipe: recipe,
+          recipeIngredientLines: recipe.map { recipe in
+            (ingredientLinesByRecipeID[recipe.id] ?? [])
+              .sorted { $0.sortOrder < $1.sortOrder }
+              .map(\.originalText)
+          } ?? [],
           source: recipe.map { sourcesByRecipeID[$0.id]?.first } ?? nil,
           thumbnailData: recipe.flatMap { thumbnailsByRecipeID[$0.id]?.listImageData }
         )
@@ -118,6 +132,7 @@ public struct MealCalendarRequest: FetchKeyRequest {
     let menuRows = try projectedMenuRows(
       db,
       recipesByID: recipesByID,
+      ingredientLinesByRecipeID: ingredientLinesByRecipeID,
       sourcesByRecipeID: sourcesByRecipeID,
       thumbnailsByRecipeID: thumbnailsByRecipeID
     )
@@ -129,6 +144,7 @@ public struct MealCalendarRequest: FetchKeyRequest {
   private func projectedMenuRows(
     _ db: Database,
     recipesByID: [Recipe.ID: Recipe],
+    ingredientLinesByRecipeID: [Recipe.ID: [IngredientLine]],
     sourcesByRecipeID: [Recipe.ID: [RecipeSource]],
     thumbnailsByRecipeID: [Recipe.ID: MealCalendarPhotoRow]
   ) throws -> [MealPlanItemRowData] {
@@ -167,6 +183,11 @@ public struct MealCalendarRequest: FetchKeyRequest {
         return MealPlanItemRowData(
           item: item,
           recipe: recipe,
+          recipeIngredientLines: recipe.map { recipe in
+            (ingredientLinesByRecipeID[recipe.id] ?? [])
+              .sorted { $0.sortOrder < $1.sortOrder }
+              .map(\.originalText)
+          } ?? [],
           source: recipe.map { sourcesByRecipeID[$0.id]?.first } ?? nil,
           thumbnailData: recipe.flatMap { thumbnailsByRecipeID[$0.id]?.listImageData },
           menu: menu,
