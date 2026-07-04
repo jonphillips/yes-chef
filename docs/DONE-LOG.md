@@ -10,6 +10,42 @@ Newest first.
 
 ---
 
+## Menu actionable chat (ADR-0012) — Slice 1: `.menu` context + grounded chat
+
+**Architect-approved 2026-07-04** — yes-chef [PR #81](https://github.com/jonphillips/yes-chef/pull/81).
+The Menu-scope instance of actionable chat (parent ADR-0011). **S1 proves composite grounding cheaply**:
+one chat context over N dishes at once, seeded and conversational, **no commit verb and no schema change**.
+Critique ("what's conceptually wrong with this menu") works immediately as grounded chat — S1's payoff
+(Decision #5). Design + five resolved decisions in
+[`docs/decisions/ADR-0012-menu-actionable-chat.md`](decisions/ADR-0012-menu-actionable-chat.md).
+
+- **Additive `case menu(MenuChatContext)`** on `RecipeChatContext` (`RecipeChat.swift`), mirroring
+  `case recipe(...)`; every enum switch updated, no default-case shortcuts. Menu-specific prompt/header/
+  provider-warning copy alongside.
+- **Composite grounding serialization (Decision #4):** one structured summary per `MenuItem` — title,
+  capped key ingredients, prep/cook/total times, `dayOffset` + `mealSlot`, and each recipe's **existing
+  `makeAhead` note verbatim** (the only field not newline-stripped, labelled "verbatim" for the model — it
+  *composes* per-recipe make-aheads, does not re-derive them). Chat order == on-screen order.
+- **Budget guardrail (Decision #4):** shrink ingredient caps 8→0 across all dishes first, then drop dishes
+  from the tail (sorted ascending by day/slot/sortOrder, so lowest-`sortOrder`/earliest dishes are preserved
+  longest). Any truncation is **always noted in the seeded context**, never silent.
+- **Wired the existing context-general split** (`ChatWorkspaceSplit`) into the Menu screen with an
+  **empty apply-action catalog** + compact chat-sheet fallback — a faithful mirror of `RecipeDetailView`'s
+  wiring. `recipeIngredientLines` added to the `MenuItemRowData` **read-model only** (no `@Table`, no
+  migration → sync-safe by construction). Shared system-prompt copy generalized "…edited or saved the recipe
+  yourself" → "…anything yourself" for the composite subject.
+- **Tests:** menu-chat serialization (dish summaries + verbatim multi-line make-ahead), budget-truncation
+  notes (both notes fire; earliest dish survives, latest dropped), and menu-ingredient read-model plumbing.
+  Lean verify (swift test + one iPad build + check-drift).
+
+**Non-blocking follow-ups** (not merge blockers): `MenuDetailRequest` loads the full `IngredientLine` table
+then filters in memory — consistent with the pre-existing `Recipe.fetchAll` in the same function, but a `.where`
+candidate to fold into the parked `m1-s3-deferred-review-nits` fetch cleanup. Sort comparator is duplicated
+across `MenuItemRowData` and `MenuChatItemContext` (distinct types; a shared helper is optional). Device pass
+(iPad regular-width split reveal + Chat button + compact sheet) is Jon's.
+
+---
+
 ## Phase E — grocery/pantry, Slice 4: `PantrySuppression` + grocery-list review section
 
 **Architect-approved 2026-07-03** — yes-chef [PR #80](https://github.com/jonphillips/yes-chef/pull/80).
