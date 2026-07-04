@@ -236,6 +236,41 @@ public enum MenuRepository {
   }
 
   @discardableResult
+  public static func addComplementItem(
+    _ suggestion: MenuComplementSuggestion,
+    to menuID: Menu.ID,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> MenuItem.ID {
+    let menu = try requireMenu(menuID, in: db)
+    try validateDayOffset(suggestion.dayOffset, for: menu)
+    guard let title = suggestion.title.nonEmptyMenuText else {
+      throw MenuRepositoryError.emptyTitle
+    }
+
+    let item = MenuItem(
+      id: uuid(),
+      menuID: menuID,
+      kind: suggestion.kind == .reservation ? .note : suggestion.kind,
+      title: title,
+      dayOffset: suggestion.dayOffset,
+      mealSlot: suggestion.mealSlot,
+      notes: nil,
+      sortOrder: try nextSortOrder(
+        menuID: menuID,
+        dayOffset: suggestion.dayOffset,
+        mealSlot: suggestion.mealSlot,
+        in: db
+      ),
+      dateCreated: now,
+      dateModified: now
+    )
+    try MenuItem.insert { item }.execute(db)
+    return item.id
+  }
+
+  @discardableResult
   public static func placeMenu(
     menuID: Menu.ID,
     startDate: Date,

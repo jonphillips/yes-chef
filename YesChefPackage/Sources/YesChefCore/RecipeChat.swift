@@ -586,10 +586,7 @@ public struct AnyChatApplyAction: Identifiable {
     _ action: ChatApplyAction<Payload>,
     renderedSummary: @escaping @MainActor (Payload) -> String?
   ) {
-    self.title = action.title
-    self.extractingTitle = action.extractingTitle
-    self.run = { selection, context in
-      let payload = try await action.extract(selection, context)
+    self.init(action) { payload in
       guard
         let summary = renderedSummary(payload)?.trimmingCharacters(in: .whitespacesAndNewlines),
         !summary.isEmpty
@@ -606,6 +603,19 @@ public struct AnyChatApplyAction: Identifiable {
           }
         )
       ]
+    }
+  }
+
+  @MainActor
+  public init<Payload>(
+    _ action: ChatApplyAction<Payload>,
+    reviewItems: @escaping @MainActor (Payload) -> [ChatApplyReviewItem]
+  ) {
+    self.title = action.title
+    self.extractingTitle = action.extractingTitle
+    self.run = { selection, context in
+      let payload = try await action.extract(selection, context)
+      return reviewItems(payload)
     }
   }
 }

@@ -306,6 +306,8 @@ final class MenuDetailModel {
   @ObservationIgnored
   @Dependency(\.date.now) private var now
   @ObservationIgnored
+  @Dependency(\.uuid) private var uuid
+  @ObservationIgnored
   @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored
   @Fetch var detail: MenuDetailData?
@@ -316,9 +318,29 @@ final class MenuDetailModel {
   }
 
   func applyActionCatalog(for chatModel: RecipeChatModel) -> [AnyChatApplyAction] {
+    @Dependency(\.menuComplementClient) var menuComplementClient
     @Dependency(\.menuPrepPlanClient) var menuPrepPlanClient
 
     let context = chatModel.context.serialized()
+    let complementAction = ChatApplyAction<MenuComplementPlan>(
+      title: "What complements this? -> Menu items",
+      extractingTitle: "Finding complements...",
+      reviewTitle: "Review complement",
+      commitTitle: "Add to Menu",
+      committingTitle: "Adding to menu...",
+      committedTitle: "Added to Menu",
+      extract: { selection, messages in
+        try await menuComplementClient(
+          selection: selection,
+          messages: messages,
+          context: context,
+          tier: chatModel.activeTier
+        )
+      },
+      commit: { [weak self] plan in
+        try self?.commitComplementPlan(plan)
+      }
+    )
     let prepPlanAction = ChatApplyAction<MenuPrepPlan>(
       title: "Build prep plan -> Prep Plan section",
       extractingTitle: "Building prep plan...",
@@ -340,6 +362,20 @@ final class MenuDetailModel {
     )
 
     return [
+      AnyChatApplyAction(complementAction) { [weak self] plan in
+        plan.items.map { suggestion in
+          ChatApplyReviewItem(
+            title: suggestion.title,
+            summary: suggestion.rendered(),
+            commitTitle: complementAction.commitTitle,
+            committingTitle: complementAction.committingTitle,
+            committedTitle: complementAction.committedTitle,
+            commit: {
+              try self?.commitComplementSuggestion(suggestion)
+            }
+          )
+        }
+      },
       AnyChatApplyAction(prepPlanAction) { plan in
         plan.rendered().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
           ? nil
@@ -356,13 +392,45 @@ final class MenuDetailModel {
       try MenuRepository.applyPrepPlan(plan, to: menuID, in: db, now: now)
     }
   }
+
+  private func commitComplementPlan(_ plan: MenuComplementPlan) throws {
+    guard !plan.items.isEmpty else {
+      throw MenuDetailError.emptyComplementSuggestion
+    }
+    try database.write { db in
+      for suggestion in plan.items {
+        try MenuRepository.addComplementItem(
+          suggestion,
+          to: menuID,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+    }
+  }
+
+  private func commitComplementSuggestion(_ suggestion: MenuComplementSuggestion) throws {
+    _ = try database.write { db in
+      try MenuRepository.addComplementItem(
+        suggestion,
+        to: menuID,
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
+    }
+  }
 }
 
 private enum MenuDetailError: Error, CustomStringConvertible, LocalizedError {
+  case emptyComplementSuggestion
   case emptyPrepPlan
 
   var description: String {
     switch self {
+    case .emptyComplementSuggestion:
+      "The assistant did not find a menu item to add."
     case .emptyPrepPlan:
       "The assistant did not find a prep plan to save."
     }
