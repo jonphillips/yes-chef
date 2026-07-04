@@ -10,6 +10,33 @@ Newest first.
 
 ---
 
+## Phase E — grocery/pantry, Slice 3: pantry policy model + `canonicalName` cache migration
+
+**Architect-approved 2026-07-03** — yes-chef [PR #79](https://github.com/jonphillips/yes-chef/pull/79).
+The milestone's **single synced-schema change**, carrying both the pantry policy columns and the
+`canonicalName` cache deferred out of Slice 1. Milestone build order:
+[`docs/milestones/grocery-consolidation-and-pantry.md`](milestones/grocery-consolidation-and-pantry.md).
+
+- **Pantry policy on `PantryItem`.** New `PantryPolicy` enum (`unlimited` / `threshold(qty,unit)` /
+  `alwaysConfirm`) over three columns: `isUnlimited: Bool` (default **true**), `thresholdQuantity: Double?`,
+  `thresholdUnit: String?`. `storageValues`/`normalized` re-validate on both write and read, so threshold 0
+  or a non-measure unit collapses to `alwaysConfirm`. Threshold offered only for volume/weight units
+  (`canUseThreshold`, enforced in core **and** the editor UI). Static rule only — no depletion/inventory.
+- **The `canonicalName` cache.** Added to `IngredientLine` / `GroceryItem`, populated at parse/generation
+  and backfilled by `GroceryCanonicalNameCache.backfill`; `canConsolidate` / `isPantryStaple` re-pointed at
+  the cached column with a `canonicalName ?? compute` fallback so nil rows still resolve.
+- **Editor UI:** new `PantryViews.swift` — segmented *Always have it / Remind me / Always confirm*; quantity
+  field hidden for count units; row summary shows the policy.
+- **Sync-safe:** additive columns, UUID PKs untouched, no unique index. The one non-null column uses
+  `NOT NULL ON CONFLICT REPLACE DEFAULT 1` so an older-schema peer's record backfills to `unlimited` instead
+  of aborting the insert ([[sqlitedata-blob-cloudkit-asset]]).
+
+**Two device-pass / release follow-ups** (flagged in the PR, not merge blockers): (1) the app target
+(`PantryViews.swift` + `GroceryViews.swift`) was not compiled in this environment — Jon's build/device pass
+covers it; (2) promote the new CloudKit fields to the **production** schema before any prod/TestFlight cut.
+
+---
+
 ## Phase E — grocery/pantry, first dispatch: Slice 1 + Slice 2 (canonical key + `Measure`)
 
 **Architect-approved 2026-07-03** — yes-chef [PR #77](https://github.com/jonphillips/yes-chef/pull/77).
