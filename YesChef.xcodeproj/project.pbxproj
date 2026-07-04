@@ -43,6 +43,7 @@
 		A53A9EE95AC871F9F6B627C5 /* RecipeLibraryListState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3B1C7A7E48A8FFE074A05E0 /* RecipeLibraryListState.swift */; };
 		A7663D81E209037F796813A4 /* CategoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA4CA05A4077E714D63D297 /* CategoryModels.swift */; };
 		A9FBE5AA277DCBB1A66A417E /* GroceryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27FA69A8957E5DC8A49A9E3F /* GroceryViews.swift */; };
+		AE11AE8D6A7D9F8E06642477 /* GroceryPantryReviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C2EE75870C5C9AAD099505 /* GroceryPantryReviewViews.swift */; };
 		AEEFD13CB08E83C9958ACC8E /* AppDestinationPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10717DBD3251B160509FD4E9 /* AppDestinationPresentation.swift */; };
 		B25C46B6E82993FF7971FCE0 /* SettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A4FCB37DBBA09D6123D7989 /* SettingsViews.swift */; };
 		B7E58D7FBEB23C7DDDBA0DD1 /* AppNavigationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85D49CBB7931A65D53EC1654 /* AppNavigationModels.swift */; };
@@ -93,6 +94,7 @@
 		10717DBD3251B160509FD4E9 /* AppDestinationPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDestinationPresentation.swift; sourceTree = "<group>"; };
 		18FECD94C6F2E120A02EE0A6 /* IdleTimerDisabledModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdleTimerDisabledModifier.swift; sourceTree = "<group>"; };
 		1ACC051A4D7294E6FDE5632A /* CookingModeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookingModeView.swift; sourceTree = "<group>"; };
+		20C2EE75870C5C9AAD099505 /* GroceryPantryReviewViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryPantryReviewViews.swift; sourceTree = "<group>"; };
 		21092B09A19EF04372E6A66D /* GroceryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryModels.swift; sourceTree = "<group>"; };
 		26A031F93AA06D9ADCD5C36D /* MenuViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuViews.swift; sourceTree = "<group>"; };
 		27FA69A8957E5DC8A49A9E3F /* GroceryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryViews.swift; sourceTree = "<group>"; };
@@ -220,6 +222,7 @@
 				1ACC051A4D7294E6FDE5632A /* CookingModeView.swift */,
 				5ECE090CEFE3F26041ED2617 /* FormFields.swift */,
 				21092B09A19EF04372E6A66D /* GroceryModels.swift */,
+				20C2EE75870C5C9AAD099505 /* GroceryPantryReviewViews.swift */,
 				27FA69A8957E5DC8A49A9E3F /* GroceryViews.swift */,
 				18FECD94C6F2E120A02EE0A6 /* IdleTimerDisabledModifier.swift */,
 				7ED8C4BF9300184ABE4E59A5 /* Info.plist */,
@@ -393,6 +396,7 @@
 				D59746CB074FDFB47B624AA1 /* CookingModeView.swift in Sources */,
 				F476873699D33AE440049145 /* FormFields.swift in Sources */,
 				91DE45EFBB52B916289EEB1D /* GroceryModels.swift in Sources */,
+				AE11AE8D6A7D9F8E06642477 /* GroceryPantryReviewViews.swift in Sources */,
 				A9FBE5AA277DCBB1A66A417E /* GroceryViews.swift in Sources */,
 				26A54D34845DADD8C9E1493D /* IdleTimerDisabledModifier.swift in Sources */,
 				866C7FBB7E3079ECED997DEB /* MealCalendarModels.swift in Sources */,
