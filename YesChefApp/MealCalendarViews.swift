@@ -145,6 +145,7 @@ private struct MealCalendarStackedContent: View {
           MealCalendarDayAgendaView(
             model: model,
             showsHeader: true,
+            allowsChatWorkspace: false,
             onMenuSelected: onMenuSelected,
             onRecipeSelected: onRecipeSelected
           )
@@ -174,6 +175,7 @@ private struct MealCalendarCalendarBody: View {
       MealCalendarDayAgendaView(
         model: model,
         showsHeader: true,
+        allowsChatWorkspace: true,
         onMenuSelected: onMenuSelected,
         onRecipeSelected: onRecipeSelected
       )
@@ -191,6 +193,7 @@ private struct MealCalendarAgendaRail: View {
       MealCalendarDayAgendaView(
         model: model,
         showsHeader: true,
+        allowsChatWorkspace: false,
         onMenuSelected: onMenuSelected,
         onRecipeSelected: onRecipeSelected
       )
@@ -230,19 +233,54 @@ private struct MealCalendarNavigationToolbar: ToolbarContent {
 }
 
 struct MealCalendarDayAgendaView: View {
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+  @AppStorage(ChatWorkspaceDetent.storageKey)
+  private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   let model: MealCalendarModel
   var showsHeader: Bool
+  var allowsChatWorkspace = true
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  @State private var compactChatModel: RecipeChatModel?
 
   private var occupiedMealSlots: [MealPlanItemSlot] {
     MealPlanItemSlot.allCases.filter { !model.rows(on: model.selectedDate, mealSlot: $0).isEmpty }
   }
 
   var body: some View {
+    Group {
+      if isSplitEnabled {
+        ChatWorkspaceSplit(
+          context: mealPlanChatContext,
+          detentRaw: $chatWorkspaceDetentRaw,
+          applyActions: { _ in [] }
+        ) {
+          ScrollView {
+            agendaContent
+              .padding()
+              .frame(maxWidth: .infinity, alignment: .leading)
+          }
+        }
+        .id(chatContextIdentity)
+        .frame(minHeight: 560)
+      } else {
+        agendaContent
+      }
+    }
+    .sheet(item: $compactChatModel) { chatModel in
+      NavigationStack {
+        RecipeChatPanel(
+          chatModel: chatModel,
+          applyActions: []
+        )
+      }
+    }
+  }
+
+  private var agendaContent: some View {
     VStack(alignment: .leading, spacing: 16) {
       if showsHeader {
-        MealCalendarDayHeader(model: model)
+        MealCalendarDayHeader(model: model, chat: chatButtonTapped)
       }
 
       if model.selectedDayRows.isEmpty {
@@ -265,6 +303,44 @@ struct MealCalendarDayAgendaView: View {
           }
         }
       }
+    }
+  }
+
+  private var mealPlanChatContext: RecipeChatContext {
+    .mealPlan(
+      MealPlanChatContext(
+        title: model.selectedDateTitle,
+        rows: model.selectedDayRows
+      )
+    )
+  }
+
+  private var isSplitEnabled: Bool {
+    allowsChatWorkspace
+      && UIDevice.current.userInterfaceIdiom == .pad
+      && horizontalSizeClass != .compact
+  }
+
+  private var chatContextIdentity: String {
+    let rowFingerprints = model.selectedDayRows.map { row in
+      [
+        row.id.rawValue,
+        row.displayTitle,
+        row.item.kind.rawValue,
+        row.item.mealSlot.rawValue,
+        row.item.notes ?? "",
+        String(row.item.dateModified.timeIntervalSinceReferenceDate),
+      ].joined(separator: "|")
+    }
+    .joined(separator: ",")
+    return "\(model.selectedDate.timeIntervalSinceReferenceDate):\(rowFingerprints)"
+  }
+
+  private func chatButtonTapped() {
+    if isSplitEnabled {
+      chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
+    } else {
+      compactChatModel = RecipeChatModel(context: mealPlanChatContext)
     }
   }
 }
@@ -704,6 +780,7 @@ private struct MealCalendarChip: View {
 
 private struct MealCalendarDayHeader: View {
   let model: MealCalendarModel
+  var chat: () -> Void
 
   var body: some View {
     HStack(alignment: .firstTextBaseline) {
@@ -715,6 +792,12 @@ private struct MealCalendarDayHeader: View {
           .foregroundStyle(.secondary)
       }
       Spacer()
+      Button {
+        chat()
+      } label: {
+        Label("Chat", systemImage: "sparkles")
+      }
+      .buttonStyle(.bordered)
       Menu {
         Button {
           model.addItemButtonTapped(kind: .recipe)

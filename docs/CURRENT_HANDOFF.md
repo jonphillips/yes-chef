@@ -1,9 +1,9 @@
 # Current Handoff
 
-Last updated: July 4, 2026 (**ADR-0013 Accepted** — Meal-Planner actionable chat, D1–D3 ratified.
-**Next Up = ADR-0013 Slice 1** — `.mealPlan` chat context + selected-day grounded chat, no commit verb,
-no schema (dispatchable to Codex). ADR-0012 fully complete (S3, PR #83 → merged). Lean verification is
-the default.)
+Last updated: July 4, 2026 (**ADR-0013 S1 done** — `.mealPlan` context + selected-day grounded chat
+shipped, PR #85 → merged, approved. **Next Up = ADR-0013 S2** — day-scoped complement verb → inserts a
+`MealPlanItem`, no schema (dispatchable to Codex). ADR-0012 fully complete (S3, PR #83 → merged). Lean
+verification is the default.)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -19,33 +19,45 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**ADR-0013 Slice 1 — `.mealPlan` chat context + selected-day grounded chat (no commit verb).** Read
+**ADR-0013 Slice 2 — day-scoped complement verb → inserts a `MealPlanItem`.** Read
 [`docs/decisions/ADR-0013-meal-planner-actionable-chat.md`](decisions/ADR-0013-meal-planner-actionable-chat.md)
-first — **Accepted**, D1–D6 resolved, do not re-open them. This is the planner instance of actionable chat,
-the follow-on ADR-0012 named. It mirrors **ADR-0012 S1** (the `.menu` context slice, PR #81) on the
-absolute-date planner surface. This dispatch is **S1 only**; the complement verb is S2. **No schema change.**
+first — **Accepted**, D1–D6 resolved, do not re-open them. S1 (`.mealPlan` context + grounded chat, empty
+`applyActions`) shipped in PR #85. This slice fills the apply-action catalog. It is the planner instance of
+the **ADR-0012 S3 menu complement verb** — mirror that shape. **No schema change.**
 
-S1 concretely:
-- Add **`case mealPlan(MealPlanChatContext)`** to `RecipeChatContext` (additive enum case, alongside
-  `.recipe`/`.menu`), with a `serialized()` that builds the **selected-day composite grounding** (ADR-0013
-  D1 + D6): one structured summary per `MealPlanItem` on the subject day — the day's **absolute date rendered
-  as weekday + date** ("Tuesday, July 8"), `mealSlot`, title, and for recipe-kind items the key ingredients
-  (capped), prep/cook/total times, and the recipe's existing `makeAhead` verbatim. Same budget guardrail as
-  ADR-0012 D4 (summaries only, never full bodies); N is a single day, so this is cheap. Model the context
-  type and its serializer on `MenuChatContext`.
-- **Host the existing `ChatWorkspaceSplit`** in `MealCalendarDayAgendaView`, scoped to
-  `MealCalendarModel.selectedDate` — the same wiring `MenuViews` uses (`ChatWorkspaceSplit(context:...,
-  applyActions:)` + a compact `RecipeChatModel` path). The apply-action catalog is **empty this slice**
-  (`applyActions: { _ in [] }`) — S2 fills it. **Critique works immediately as plain chat** (D5): with the
-  day seeded, "what's missing / what's wrong on Tuesday" is answered conversationally for free, no verb.
-- **No commit path, no schema, no repository change** this slice. The tap-writes invariant is trivially held
-  because there is nothing to commit yet.
+S2 concretely:
+- **The complement verb** (D4): "what would go well with *this Tuesday*" → the model proposes dishes; each
+  proposal emits its **own** review card (the ADR-0012 S3 multi-item `AnyChatApplyAction(_:reviewItems:)`
+  erasure), and the tap inserts one `MealPlanItem` per accepted card onto the selected day's
+  `scheduledDate`, reusing the `MealCalendarRepository` insert path (the `addRecipeItem`/note-add sibling
+  with `nextSortOrder(on:mealSlot:)`). The model picks **`mealSlot` only** (D2) — the day is fixed; no
+  free-text date parsing.
+- **recipeID invariant — coerce every suggestion to `.note`** ([[menu-item-recipe-id-invariant]], D4): this
+  write path can't resolve a suggested title to a real `Recipe`, and a `.recipe`-kind row with nil
+  `recipeID` renders broken/non-navigable. Collapse `.recipe`/`.reservation` → `.note`, exactly as the menu
+  complement parser does. Classify commit shape per [[chat-verb-commit-shapes]] before wiring (per-item
+  insert → `MealPlanItem`).
+- **Wire the catalog into the existing host** — replace S1's `applyActions: { _ in [] }` in
+  `MealCalendarDayAgendaView` with the planner catalog closure (mirror `MenuDetailModel.applyActionCatalog(for:)`).
+- **No schema, no new storage home** — this is D6-clean (no planner prep-plan; that's a possible later ADR).
+  Committed `MealPlanItem`s are ordinary sync-safe rows.
 
-Reuse the ADR-0012 S1 shapes throughout (context case + serializer + split host). Classify commit shape only
-when S2 lands (per-item insert → `MealPlanItem`; [[chat-verb-commit-shapes]] / [[menu-item-recipe-id-invariant]]).
-
-**Next after this (not this dispatch): ADR-0013 S2** — the complement verb → inserts a `MealPlanItem` onto the
-selected day (coerce to `.note`), reusing the `MealCalendarRepository` insert path. No schema change.
+**Carry-over from the S1 review (fold these into this slice):**
+- **Reseed caveat (verify, don't just assume).** `MealCalendarDayAgendaView` gives the split a
+  `.id(chatContextIdentity)` whose fingerprint includes each row's `notes`/`dateModified`, so the chat
+  reseeds — **discarding the in-progress conversation** — whenever the day's row set changes, not only on
+  day-switch. A complement commit inserts a row onto the selected day → it **will** trip that `.id` and can
+  tear the chat down mid-apply, yanking the just-applied suggestion out from under the user. Confirm the
+  review-card commit flow survives the reseed (or adjust the fingerprint / apply path so applying a
+  suggestion doesn't destroy the conversation).
+- **Nit 1 — budget-trimming test.** S1 copied `MenuChatContext`'s budget serializer (stride-down + drop-items)
+  into `MealPlanChatContext` verbatim but only tested the happy path. Add a mirror of
+  `menuChatContextNotesBudgetTruncation` (`MenuTests.swift`) exercising ingredient-cap + item-omission notes.
+- **Nit 2 — mirror divergence.** `MealPlanChatItemContext.init(row:)` gates every recipe field behind
+  `row.item.kind == .recipe`; the sibling `MenuChatItemContext.init(row:)` doesn't. Harmless, but the two
+  should read identically — align them.
+- **Nit 3 — dead init.** `MealPlanChatContext.init(date:)` is unused by the app, untested, and formats the
+  date differently from `selectedDateTitle`. Drop it (or test it) so the format skew can't bite later.
 
 **Standing release follow-up carried from Phase E (not a dispatch on its own):** before any prod/TestFlight
 cut, promote to the **production** schema both the Phase E Slice 3 pantry-policy + `canonicalName` CloudKit

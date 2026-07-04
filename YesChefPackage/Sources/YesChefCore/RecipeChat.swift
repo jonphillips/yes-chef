@@ -66,11 +66,13 @@ extension DependencyValues {
 }
 
 public enum RecipeChatContext: Equatable, Sendable {
+  case mealPlan(MealPlanChatContext)
   case menu(MenuChatContext)
   case recipe(RecipeChatRecipeContext)
 
   public var title: String {
     switch self {
+    case let .mealPlan(context): context.title
     case let .menu(context): context.title.isEmpty ? "this menu" : context.title
     case let .recipe(context): context.title.isEmpty ? "this recipe" : context.title
     }
@@ -78,6 +80,7 @@ public enum RecipeChatContext: Equatable, Sendable {
 
   public var subject: String {
     switch self {
+    case .mealPlan: "meal plan"
     case .menu: "menu"
     case .recipe: "recipe"
     }
@@ -85,6 +88,7 @@ public enum RecipeChatContext: Equatable, Sendable {
 
   public var promptSubjectDescription: String {
     switch self {
+    case .mealPlan: "the meal plan day the user is looking at"
     case .menu: "the menu the user is looking at"
     case .recipe: "the recipe the user is looking at"
     }
@@ -92,6 +96,7 @@ public enum RecipeChatContext: Equatable, Sendable {
 
   public var seededContextDescription: String {
     switch self {
+    case let .mealPlan(context): context.seededContextDescription
     case let .menu(context): context.seededContextDescription
     case .recipe: "Seeded with the recipe on screen."
     }
@@ -99,6 +104,7 @@ public enum RecipeChatContext: Equatable, Sendable {
 
   public var providerContextWarning: String {
     switch self {
+    case .mealPlan: "Meal plan context leaves the device for this conversation."
     case .menu: "Menu context leaves the device for this conversation."
     case .recipe: "Recipe context leaves the device for this conversation."
     }
@@ -106,10 +112,238 @@ public enum RecipeChatContext: Equatable, Sendable {
 
   public func serialized() -> String {
     switch self {
+    case let .mealPlan(context): context.serialized()
     case let .menu(context): context.serialized()
     case let .recipe(context): context.serialized()
     }
   }
+}
+
+public struct MealPlanChatContext: Equatable, Sendable {
+  public static let defaultIngredientLimit = 8
+  public static let serializedCharacterBudget = 12_000
+
+  public var title: String
+  public var items: [MealPlanChatItemContext]
+
+  public init(
+    title: String,
+    items: [MealPlanChatItemContext] = []
+  ) {
+    self.title = title
+    self.items = items
+  }
+
+  public init(date: Date, items: [MealPlanChatItemContext] = []) {
+    self.init(
+      title: date.formatted(.dateTime.weekday(.wide).month(.wide).day()),
+      items: items
+    )
+  }
+
+  public init(title: String, rows: [MealPlanItemRowData]) {
+    self.init(title: title, items: rows.map { MealPlanChatItemContext(row: $0) })
+  }
+
+  public var seededContextDescription: String {
+    let budgeted = budgetedSerialization(characterBudget: Self.serializedCharacterBudget)
+    guard !budgeted.notes.isEmpty else {
+      return "Seeded with \(title) meal plan item summaries."
+    }
+    return "Seeded with \(title) meal plan item summaries. \(budgeted.notes.joined(separator: " "))"
+  }
+
+  public func serialized(characterBudget: Int = Self.serializedCharacterBudget) -> String {
+    budgetedSerialization(characterBudget: characterBudget).text
+  }
+
+  private func budgetedSerialization(characterBudget: Int) -> MealPlanChatSerializedContext {
+    let sortedItems = items.sorted(by: areMealPlanChatItemsInIncreasingOrder)
+    for ingredientLimit in stride(from: Self.defaultIngredientLimit, through: 0, by: -1) {
+      let candidate = renderedContext(
+        items: sortedItems,
+        ingredientLimit: ingredientLimit,
+        omittedItemCount: 0
+      )
+      if candidate.text.count <= characterBudget || ingredientLimit == 0 {
+        if candidate.text.count <= characterBudget {
+          return candidate
+        }
+        break
+      }
+    }
+
+    var includedItems = sortedItems
+    while !includedItems.isEmpty {
+      includedItems.removeLast()
+      let candidate = renderedContext(
+        items: includedItems,
+        ingredientLimit: 0,
+        omittedItemCount: sortedItems.count - includedItems.count
+      )
+      if candidate.text.count <= characterBudget {
+        return candidate
+      }
+    }
+
+    return renderedContext(
+      items: [],
+      ingredientLimit: 0,
+      omittedItemCount: sortedItems.count
+    )
+  }
+
+  private func renderedContext(
+    items: [MealPlanChatItemContext],
+    ingredientLimit: Int,
+    omittedItemCount: Int
+  ) -> MealPlanChatSerializedContext {
+    var budgetNotes: [String] = []
+    let ingredientListsWereTrimmed = items.contains { $0.keyIngredients.count > ingredientLimit }
+    if ingredientListsWereTrimmed {
+      budgetNotes.append(
+        ingredientLimit > 0
+          ? "Ingredient lists are capped at \(ingredientLimit) lines per meal plan item."
+          : "Ingredient lists were omitted to stay within the context budget."
+      )
+    }
+    if omittedItemCount > 0 {
+      budgetNotes.append(
+        "\(omittedItemCount) lower-priority meal plan item(s) were omitted to stay within the context budget."
+      )
+    }
+
+    var lines = ["The user is looking at this meal plan day:"]
+    lines.append("- Date: \(title.isEmpty ? "(unspecified day)" : title)")
+    if !budgetNotes.isEmpty {
+      lines.append("Context budget notes:")
+      for note in budgetNotes {
+        lines.append("- \(note)")
+      }
+    }
+    guard !items.isEmpty else {
+      lines.append("Meal plan items: none included.")
+      return MealPlanChatSerializedContext(text: lines.joined(separator: "\n"), notes: budgetNotes)
+    }
+
+    lines.append("Meal plan item summaries:")
+    for item in items {
+      lines.append("- \(item.title.isEmpty ? "(untitled)" : item.title)")
+      lines.append("  - Meal plan item ID: \(item.id.rawValue)")
+      lines.append("  - Kind: \(item.kind.title)")
+      lines.append("  - Date: \(title.isEmpty ? "(unspecified day)" : title)")
+      lines.append("  - Meal slot: \(item.mealSlot.title)")
+      if let prepTimeMinutes = item.prepTimeMinutes {
+        lines.append("  - Prep time: \(prepTimeMinutes) minutes")
+      }
+      if let cookTimeMinutes = item.cookTimeMinutes {
+        lines.append("  - Cook time: \(cookTimeMinutes) minutes")
+      }
+      if let totalTimeMinutes = item.totalTimeMinutes {
+        lines.append("  - Total time: \(totalTimeMinutes) minutes")
+      }
+      let ingredients = Array(item.keyIngredients.prefix(ingredientLimit))
+      if !ingredients.isEmpty {
+        lines.append("  - Key ingredients:")
+        for ingredient in ingredients {
+          lines.append("    - \(ingredient.replacingOccurrences(of: "\n", with: " "))")
+        }
+      }
+      if let notes = item.notes {
+        lines.append("  - Meal plan item notes: \(notes.replacingOccurrences(of: "\n", with: " "))")
+      }
+      if let makeAhead = item.makeAhead {
+        lines.append("  - Existing recipe make-ahead note, verbatim:")
+        lines.append(makeAhead)
+      }
+    }
+    return MealPlanChatSerializedContext(text: lines.joined(separator: "\n"), notes: budgetNotes)
+  }
+}
+
+public struct MealPlanChatItemContext: Equatable, Sendable {
+  public var id: MealPlanItemRowID
+  public var title: String
+  public var kind: MealPlanItemKind
+  public var scheduledDate: Date
+  public var mealSlot: MealPlanItemSlot
+  public var sortOrder: Int
+  public var keyIngredients: [String]
+  public var prepTimeMinutes: Int?
+  public var cookTimeMinutes: Int?
+  public var totalTimeMinutes: Int?
+  public var makeAhead: String?
+  public var notes: String?
+
+  public init(
+    id: MealPlanItemRowID,
+    title: String,
+    kind: MealPlanItemKind,
+    scheduledDate: Date,
+    mealSlot: MealPlanItemSlot,
+    sortOrder: Int,
+    keyIngredients: [String] = [],
+    prepTimeMinutes: Int? = nil,
+    cookTimeMinutes: Int? = nil,
+    totalTimeMinutes: Int? = nil,
+    makeAhead: String? = nil,
+    notes: String? = nil
+  ) {
+    self.id = id
+    self.title = title
+    self.kind = kind
+    self.scheduledDate = scheduledDate
+    self.mealSlot = mealSlot
+    self.sortOrder = sortOrder
+    self.keyIngredients = keyIngredients
+    self.prepTimeMinutes = prepTimeMinutes
+    self.cookTimeMinutes = cookTimeMinutes
+    self.totalTimeMinutes = totalTimeMinutes
+    self.makeAhead = makeAhead
+    self.notes = notes
+  }
+
+  public init(row: MealPlanItemRowData) {
+    self.init(
+      id: row.id,
+      title: row.displayTitle,
+      kind: row.item.kind,
+      scheduledDate: row.item.scheduledDate,
+      mealSlot: row.item.mealSlot,
+      sortOrder: row.item.sortOrder,
+      keyIngredients: row.item.kind == .recipe ? row.recipeIngredientLines : [],
+      prepTimeMinutes: row.item.kind == .recipe ? row.recipe?.prepTimeMinutes : nil,
+      cookTimeMinutes: row.item.kind == .recipe ? row.recipe?.cookTimeMinutes : nil,
+      totalTimeMinutes: row.item.kind == .recipe ? row.recipe?.totalTimeMinutes : nil,
+      makeAhead: row.item.kind == .recipe ? row.recipe?.makeAhead : nil,
+      notes: row.item.notes
+    )
+  }
+}
+
+private struct MealPlanChatSerializedContext: Equatable {
+  var text: String
+  var notes: [String]
+}
+
+private func areMealPlanChatItemsInIncreasingOrder(
+  _ lhs: MealPlanChatItemContext,
+  _ rhs: MealPlanChatItemContext
+) -> Bool {
+  if lhs.scheduledDate != rhs.scheduledDate {
+    return lhs.scheduledDate < rhs.scheduledDate
+  }
+  if lhs.mealSlot.sortOrder != rhs.mealSlot.sortOrder {
+    return lhs.mealSlot.sortOrder < rhs.mealSlot.sortOrder
+  }
+  if lhs.sortOrder != rhs.sortOrder {
+    return lhs.sortOrder < rhs.sortOrder
+  }
+  let titleComparison = lhs.title.localizedStandardCompare(rhs.title)
+  if titleComparison != .orderedSame {
+    return titleComparison == .orderedAscending
+  }
+  return lhs.id.rawValue < rhs.id.rawValue
 }
 
 public struct MenuChatContext: Equatable, Sendable {
