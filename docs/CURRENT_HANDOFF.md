@@ -1,8 +1,9 @@
 # Current Handoff
 
-Last updated: July 4, 2026 (**ADR-0012 Slice 1 shipped** — `.menu` context + grounded chat, PR #81 →
-merged to main, approved. **Next Up = ADR-0012 Slice 2** — the menu prep-plan verb → `Menu.prepPlan`
-(additive `Data?` BLOB, first schema touch of this effort). Lean verification is the default.)
+Last updated: July 4, 2026 (**ADR-0012 Slice 2 shipped** — menu prep-plan verb → `Menu.prepPlan`
+(additive `Data?` BLOB, first schema touch of this effort), PR #82 → merged to main, approved.
+**Next Up = ADR-0012 Slice 3** — the complement verb → inserts a `MenuItem`. Lean verification is the
+default.)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -18,32 +19,27 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**ADR-0012 Slice 2 — the menu prep-plan verb → `Menu.prepPlan`.** Read
+**ADR-0012 Slice 3 — the complement verb → inserts a `MenuItem`.** Read
 [`docs/decisions/ADR-0012-menu-actionable-chat.md`](decisions/ADR-0012-menu-actionable-chat.md) first —
-Accepted, five decisions resolved, do not re-open them. S1 (`.menu` context + grounded chat) shipped in
-PR #81; this dispatch is **S2 only** (S3 complement is a **separate later dispatch** — do not build it here).
+Accepted, five decisions resolved, do not re-open them. S1 (`.menu` context + grounded chat, PR #81) and
+S2 (prep-plan verb → `Menu.prepPlan`, PR #82) shipped; this dispatch is **S3 only** — the last slice of the
+effort. The Planner-day (`MealPlanItem`, absolute-date) version is a **separate follow-on ADR**, not this.
 
-S2 concretely (ADR-0012 Decisions #1 + #4):
-- Add the additive column **`Menu.prepPlan: Data?`** — a Codable BLOB of
-  `PrepPlanStep { when: String; task: String; sourceDish: MenuItem.ID? }`. `when` stays a **String**
-  (relative-day label, e.g. "morning of day 2"); `sourceDish` is a **nullable** `MenuItem.ID` back-pointer.
-  Additive-nullable, sync-safe — this is the **`serveWith` storage pattern**, not new infra
-  ([[sqlitedata-blob-cloudkit-asset]]). No reserved columns, no unique index.
-- Add the **prep-plan apply-action + review card** to the menu apply-action catalog (which S1 left empty),
-  routed through the existing staging card so **the tap writes** — no chat turn mutates the menu on its own.
-- The verb **composes and sequences the existing per-recipe `makeAhead` notes** already fed into the S1
-  serialization; it must **not** re-generate per-dish make-ahead prose (Decision #4, vocabulary hygiene:
-  "prep plan" ≠ "make-ahead").
-- Add the menu **prep-plan section**: timeline/checklist render of the stored steps, plus **regenerate** and
-  **clear** affordances. The plan is a **passive snapshot** — do not auto-recompute on menu edits; the
-  `sourceDish` back-pointer only makes staleness detectable (ADR-0010 provenance posture).
-
-Classify commit shape before extending later verbs: [[chat-verb-commit-shapes]] (prep-plan is a structured
-staged-list commit, not one-field-per-verb). **Schema note:** this is the first schema touch of the effort —
-fold it into the standing "promote CloudKit fields to prod schema before any TestFlight cut" follow-up below.
+S3 concretely (ADR-0012 Decision #2):
+- Add the **"what would complement…" verb** to the menu apply-action catalog: the model proposes dishes,
+  and the tap **inserts a `MenuItem`** (`kind`, `title`, `dayOffset`, `mealSlot`) onto this menu via the
+  existing review card. This is the **Serve-With motion at menu scale** — suggestion cards → commit shape is
+  a per-item insert, **not** a one-field blob ([[chat-verb-commit-shapes]]). No schema change: committed
+  `MenuItem`s are ordinary rows, already sync-safe.
+- Advisory-only was **rejected** (Decision #2) — a verb earns its name only by writing; grounded advice is
+  already covered by S1 chat + the critique path (Decision #5). Route every insert through the review card so
+  **the tap writes** — no chat turn mutates the menu on its own.
+- Reuse the S2 catalog wiring in `MenuDetailModel.applyActionCatalog(for:)`; classify the commit shape first
+  (per-item insert, `AnyChatApplyAction` may emit **multiple** review items — one per proposed dish).
 
 **Standing release follow-up carried from Phase E (not a dispatch on its own):** before any prod/TestFlight
-cut, promote the Slice 3 pantry-policy + `canonicalName` CloudKit fields to the **production** schema, and
+cut, promote to the **production** schema both the Phase E Slice 3 pantry-policy + `canonicalName` CloudKit
+fields **and** the ADR-0012 S2 `Menu.prepPlan` BLOB (PR #82 — the effort's first schema touch), and
 note the app target (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 
 Phase E is **fully complete** — Slice 4 (`PantrySuppression` + review UI, PR #80 → DONE-LOG), Slice 3
@@ -80,8 +76,9 @@ target.
 
 - **Menu actionable chat** (ADR-0012, **Accepted** 2026-07-03) — the Menu-scope instance of actionable
   chat. **S1 shipped** (`.menu` context + composite grounding + grounded chat, PR #81 → DONE-LOG, no schema).
-  **S2 is now in Next Up** (prep-plan verb → `Menu.prepPlan`). S3 complement verb → inserts a `MenuItem` is
-  the remaining slice. The Planner-day (`MealPlanItem`, absolute-date) version is a **separate follow-on
+  **S2 shipped** (prep-plan verb → `Menu.prepPlan`, PR #82 → DONE-LOG; the effort's first schema touch).
+  **S3 is now in Next Up** — the complement verb → inserts a `MenuItem`, the effort's last slice. The
+  Planner-day (`MealPlanItem`, absolute-date) version is a **separate follow-on
   ADR**, not this effort. Design + all five resolved decisions in
   [`docs/decisions/ADR-0012-menu-actionable-chat.md`](decisions/ADR-0012-menu-actionable-chat.md).
 

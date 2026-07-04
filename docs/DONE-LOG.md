@@ -10,6 +10,41 @@ Newest first.
 
 ---
 
+## Menu actionable chat (ADR-0012) — Slice 2: prep-plan verb → `Menu.prepPlan`
+
+**Architect-approved 2026-07-04** — yes-chef [PR #82](https://github.com/jonphillips/yes-chef/pull/82).
+The flagship commit verb of the Menu-scope effort and its **first schema touch**. Composes the S1 composite
+grounding into a stored, staged pre-prep plan across all the menu's dishes. The tap-writes invariant holds —
+extract → review card → commit, no chat turn mutates the menu. Design + five resolved decisions in
+[`docs/decisions/ADR-0012-menu-actionable-chat.md`](decisions/ADR-0012-menu-actionable-chat.md).
+
+- **Additive `Menu.prepPlan: Data?`** (Decision #1) — a Codable BLOB of
+  `PrepPlanStep { when: String; task: String; sourceDish: MenuItem.ID? }`. `when` is a free-text relative-day
+  label ("morning of day 2"); `sourceDish` is a **nullable** `MenuItem.ID` back-pointer. Added via `ALTER TABLE
+  "menus" ADD COLUMN "prepPlan" BLOB` — byte-for-byte the `serveWith` migration pattern. Additive-nullable,
+  sync-safe; BLOB→CKAsset unconditional ([[sqlitedata-blob-cloudkit-asset]]). No reserved cols, no unique index.
+- **`MenuPrepPlanClient` + apply-action/review card** (Decision #4): the system prompt **composes and
+  sequences the existing per-recipe `makeAhead` notes** from the S1 context and is explicit — *do not invent or
+  rewrite per-dish make-ahead prose*. Vocabulary hygiene held (ADR-0006): "prep plan" ≠ "make-ahead" in copy and
+  identifiers. `MenuItem.ID` now seeded into the menu chat context so the model can return `sourceDish`
+  back-pointers. `parse` reuses the shared `jsonObjectSlice ?? jsonArraySlice` idiom (mirrors `MakeAheadPlan`).
+- **`MenuDetailModel.applyActionCatalog(for:)`** — a faithful analog of `RecipeDetailModel+Enrichment`
+  (same `[weak self]` commit, tier/context plumbing). S1 left the menu catalog empty; S2 fills it. Menu **prep-plan
+  section**: timeline/checklist render, source-dish labels, **regenerate** + **clear** affordances. **Passive
+  snapshot** — no auto-recompute on menu edits; `sourceDish` only makes staleness *detectable* (ADR-0010 posture).
+- **Tests:** parse (nullable + malformed-drop), encode/decode round-trip, `encode([]) → nil`, model-tier + menu
+  context plumbing, staged no-write-until-commit, apply/clear persistence with `dateModified`. Lean verify
+  (swift test 159 green + one iPad build + check-drift).
+
+**Non-blocking follow-ups** (not merge blockers): `MenuDetailError.emptyPrepPlan` is effectively unreachable
+(`AnyChatApplyAction` already filters empty rendered summaries) — harmless defensive guard. The prep-plan
+**section is hidden while empty**, so the initial build entry is the chat workspace only (Regenerate reopens
+chat); a "Build a prep plan" empty-state affordance is a possible later nicety — Jon's device-pass call.
+**Standing schema follow-up:** promote the `Menu.prepPlan` BLOB to the production schema before any TestFlight
+cut (folded into the standing Phase E prod-schema promotion in `CURRENT_HANDOFF.md`).
+
+---
+
 ## Menu actionable chat (ADR-0012) — Slice 1: `.menu` context + grounded chat
 
 **Architect-approved 2026-07-04** — yes-chef [PR #81](https://github.com/jonphillips/yes-chef/pull/81).
