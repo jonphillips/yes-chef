@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 import YesChefCore
 
@@ -112,11 +113,15 @@ struct MenuDetailColumn: View {
 }
 
 struct MenuDetailView: View {
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+  @AppStorage(ChatWorkspaceDetent.storageKey)
+  private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   let model: MenuLibraryModel
   let recipeModel: RecipeLibraryModel
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   @State private var detailModel: MenuDetailModel
   @State private var isShowingRecipeBrowser = false
+  @State private var compactChatModel: RecipeChatModel?
 
   init(
     model: MenuLibraryModel,
@@ -133,24 +138,26 @@ struct MenuDetailView: View {
   var body: some View {
     Group {
       if let detail = detailModel.detail {
-        ScrollView {
-          VStack(alignment: .leading, spacing: 24) {
-            MenuDetailHeader(detail: detail)
-            MenuDishList(
+        Group {
+          if isSplitEnabled {
+            ChatWorkspaceSplit(
+              context: .menu(MenuChatContext(detail: detail)),
+              detentRaw: $chatWorkspaceDetentRaw,
+              applyActions: { _ in [] }
+            ) {
+              MenuDetailReader(
+                model: model,
+                detail: detail,
+                onRecipeSelected: onRecipeSelected
+              )
+            }
+          } else {
+            MenuDetailReader(
               model: model,
-              menu: detail.menu,
               detail: detail,
               onRecipeSelected: onRecipeSelected
             )
-            MenuPlacementList(
-              model: model,
-              menu: detail.menu,
-              placements: detail.placements
-            )
           }
-          .padding()
-          .frame(maxWidth: 900, alignment: .leading)
-          .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(detail.menu.title)
       } else {
@@ -164,6 +171,11 @@ struct MenuDetailView: View {
             isShowingRecipeBrowser.toggle()
           } label: {
             Label("Browse Recipes", systemImage: "sidebar.right")
+          }
+          Button {
+            chatButtonTapped()
+          } label: {
+            Label("Chat", systemImage: "sparkles")
           }
           Button {
             model.addItemButtonTapped(menu: menu)
@@ -188,6 +200,55 @@ struct MenuDetailView: View {
       } else {
         ContentUnavailableView("Recipes", systemImage: "book.closed")
       }
+    }
+    .sheet(item: $compactChatModel) { chatModel in
+      NavigationStack {
+        RecipeChatPanel(
+          chatModel: chatModel,
+          applyActions: []
+        )
+      }
+    }
+  }
+
+  private var isSplitEnabled: Bool {
+    UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass != .compact
+  }
+
+  private func chatButtonTapped() {
+    guard let detail = detailModel.detail else { return }
+    if isSplitEnabled {
+      chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
+    } else {
+      compactChatModel = RecipeChatModel(context: .menu(MenuChatContext(detail: detail)))
+    }
+  }
+}
+
+private struct MenuDetailReader: View {
+  let model: MenuLibraryModel
+  let detail: MenuDetailData
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 24) {
+        MenuDetailHeader(detail: detail)
+        MenuDishList(
+          model: model,
+          menu: detail.menu,
+          detail: detail,
+          onRecipeSelected: onRecipeSelected
+        )
+        MenuPlacementList(
+          model: model,
+          menu: detail.menu,
+          placements: detail.placements
+        )
+      }
+      .padding()
+      .frame(maxWidth: 900, alignment: .leading)
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 }
