@@ -1,9 +1,9 @@
 # Current Handoff
 
-Last updated: July 4, 2026 (**ADR-0013 S1 done** — `.mealPlan` context + selected-day grounded chat
-shipped, PR #85 → merged, approved. **Next Up = ADR-0013 S2** — day-scoped complement verb → inserts a
-`MealPlanItem`, no schema (dispatchable to Codex). ADR-0012 fully complete (S3, PR #83 → merged). Lean
-verification is the default.)
+Last updated: July 4, 2026 (**ADR-0013 complete** — S2 day-scoped complement verb → inserts a `.note`
+`MealPlanItem`, PR #86 → approved (S1 was PR #85); both slices shipped, zero schema. **Next Up = Reader
+photo affordances** — manual set-as-cover (the effort's first schema touch) + full-screen pinch-zoom;
+two cohesive slices, one dispatch. Lean verification is the default.)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -19,49 +19,33 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**ADR-0013 Slice 2 — day-scoped complement verb → inserts a `MealPlanItem`.** Read
-[`docs/decisions/ADR-0013-meal-planner-actionable-chat.md`](decisions/ADR-0013-meal-planner-actionable-chat.md)
-first — **Accepted**, D1–D6 resolved, do not re-open them. S1 (`.mealPlan` context + grounded chat, empty
-`applyActions`) shipped in PR #85. This slice fills the apply-action catalog. It is the planner instance of
-the **ADR-0012 S3 menu complement verb** — mirror that shape. **No schema change.**
+**Reader photo affordances — two cohesive slices, one dispatch.** Full design + decisions in
+[`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) § "Reader photo affordances" — read
+that section first. Both surfaced from the Slice A device pass; independent but cohesive, so do **both, in
+order** in one PR. **Read first:** `RecipeDetailView.swift` — `primaryDisplayPhoto` + the private
+`displaySortKey` heuristic, `RecipePhotoGallery` (its own default-selection heuristic), and
+`RecipePhotoFullScreenView`.
 
-S2 concretely:
-- **The complement verb** (D4): "what would go well with *this Tuesday*" → the model proposes dishes; each
-  proposal emits its **own** review card (the ADR-0012 S3 multi-item `AnyChatApplyAction(_:reviewItems:)`
-  erasure), and the tap inserts one `MealPlanItem` per accepted card onto the selected day's
-  `scheduledDate`, reusing the `MealCalendarRepository` insert path (the `addRecipeItem`/note-add sibling
-  with `nextSortOrder(on:mealSlot:)`). The model picks **`mealSlot` only** (D2) — the day is fixed; no
-  free-text date parsing.
-- **recipeID invariant — coerce every suggestion to `.note`** ([[menu-item-recipe-id-invariant]], D4): this
-  write path can't resolve a suggested title to a real `Recipe`, and a `.recipe`-kind row with nil
-  `recipeID` renders broken/non-navigable. Collapse `.recipe`/`.reservation` → `.note`, exactly as the menu
-  complement parser does. Classify commit shape per [[chat-verb-commit-shapes]] before wiring (per-item
-  insert → `MealPlanItem`).
-- **Wire the catalog into the existing host** — replace S1's `applyActions: { _ in [] }` in
-  `MealCalendarDayAgendaView` with the planner catalog closure (mirror `MenuDetailModel.applyActionCatalog(for:)`).
-- **No schema, no new storage home** — this is D6-clean (no planner prep-plan; that's a possible later ADR).
-  Committed `MealPlanItem`s are ordinary sync-safe rows.
-
-**Carry-over from the S1 review (fold these into this slice):**
-- **Reseed caveat (verify, don't just assume).** `MealCalendarDayAgendaView` gives the split a
-  `.id(chatContextIdentity)` whose fingerprint includes each row's `notes`/`dateModified`, so the chat
-  reseeds — **discarding the in-progress conversation** — whenever the day's row set changes, not only on
-  day-switch. A complement commit inserts a row onto the selected day → it **will** trip that `.id` and can
-  tear the chat down mid-apply, yanking the just-applied suggestion out from under the user. Confirm the
-  review-card commit flow survives the reseed (or adjust the fingerprint / apply path so applying a
-  suggestion doesn't destroy the conversation).
-- **Nit 1 — budget-trimming test.** S1 copied `MenuChatContext`'s budget serializer (stride-down + drop-items)
-  into `MealPlanChatContext` verbatim but only tested the happy path. Add a mirror of
-  `menuChatContextNotesBudgetTruncation` (`MenuTests.swift`) exercising ingredient-cap + item-omission notes.
-- **Nit 2 — mirror divergence.** `MealPlanChatItemContext.init(row:)` gates every recipe field behind
-  `row.item.kind == .recipe`; the sibling `MenuChatItemContext.init(row:)` doesn't. Harmless, but the two
-  should read identically — align them.
-- **Nit 3 — dead init.** `MealPlanChatContext.init(date:)` is unused by the app, untested, and formats the
-  date differently from `selectedDateTitle`. Drop it (or test it) so the format skew can't bite later.
+- **Slice 1 — manual "set as cover" (user override, persisted, sync-safe).** The reader cover is picked by
+  `displaySortKey` and can choose a scanned reference page / low-res shot over the nice photo. Add a
+  user override. **Storage home (decided, architect):** a new nullable column **`Recipe.coverPhotoID`**
+  pointing to the chosen `RecipePhoto` — mirror the existing loose recipe-pointer shape
+  (`TEXT REFERENCES "recipePhotos"("id") ON DELETE SET NULL`, same as `menuItems.recipeID`), so deleting
+  the photo auto-nulls the cover and the heuristic resumes. **Not** a `RecipePhoto.isCover` bool (a
+  multi-row flag invites two-covers sync conflicts; a single scalar resolves last-writer-wins). Additive,
+  CloudKit-safe; bump `Recipe.dateModified` on set/clear. **Factor the resolver into `YesChefCore`** as a
+  pure `coverPhoto(...)` function (override wins → else `displaySortKey` fallback for nil **and**
+  dangling/not-yet-synced ids) and **unit-test the three cases** (this logic is FoundationModels-free, so
+  a core test runs under `swift test` here). Point both the reader thumbnail and the gallery default at
+  the one resolver. UI: a "Set as Cover" / "Use Automatic" affordance on the selected photo. iPad + iPhone.
+- **Slice 2 — pinch-to-zoom + pan in `RecipePhotoFullScreenView` (no schema).** It only scale-to-fits;
+  scanned pages aren't legible. Add `MagnifyGesture` + simultaneous drag-to-pan (clamped), double-tap to
+  reset, close button still reachable. Pure view change — no schema, no core logic. iPad + iPhone.
 
 **Standing release follow-up carried from Phase E (not a dispatch on its own):** before any prod/TestFlight
-cut, promote to the **production** schema both the Phase E Slice 3 pantry-policy + `canonicalName` CloudKit
-fields **and** the ADR-0012 S2 `Menu.prepPlan` BLOB (PR #82 — the effort's first schema touch), and
+cut, promote to the **production** schema the Phase E Slice 3 pantry-policy + `canonicalName` CloudKit
+fields, the ADR-0012 S2 `Menu.prepPlan` BLOB (PR #82), **and** the reader-photo-affordances
+`Recipe.coverPhotoID` column (Next Up — the effort's first schema touch), and
 note the app target (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 
 Phase E is **fully complete** — Slice 4 (`PantrySuppression` + review UI, PR #80 → DONE-LOG), Slice 3
@@ -104,12 +88,11 @@ target.
   **separate follow-on ADR** (now ADR-0013, Accepted — in Next Up). Design + all five resolved decisions in
   [`docs/decisions/ADR-0012-menu-actionable-chat.md`](decisions/ADR-0012-menu-actionable-chat.md).
 
-- **Meal-Planner actionable chat** (ADR-0013, **Accepted** 2026-07-04) — the planner instance of actionable
-  chat over `MealPlanItem`'s absolute `scheduledDate`; the ADR-0012 planner follow-on. **S1 is in Next Up**
-  (`.mealPlan` context + selected-day grounded chat, no schema); **S2** = complement verb → inserts a
-  `MealPlanItem` on the selected day (coerce to `.note`, no schema). Two slices, zero schema touch. Day-scoped
-  (D1), inserts land on the subject day with model-picked slot (D2), no planner prep-plan verb (D3, no
-  container table). Design in
+- **Meal-Planner actionable chat** (ADR-0013, **Accepted** 2026-07-04) — **complete.** Both slices shipped,
+  zero schema: S1 (`.mealPlan` context + selected-day grounded chat, PR #85 → DONE-LOG) and S2 (complement
+  verb → inserts a `.note` `MealPlanItem` on the selected day, PR #86 → DONE-LOG). Day-scoped (D1), inserts
+  land on the subject day with model-picked slot (D2), no planner prep-plan verb (D3, no container table).
+  Design in
   [`docs/decisions/ADR-0013-meal-planner-actionable-chat.md`](decisions/ADR-0013-meal-planner-actionable-chat.md).
 
 - **Cooking workspace** — **complete** (Slices A + B, PRs #73 / #74 → DONE-LOG). Its Menu chat-verbs

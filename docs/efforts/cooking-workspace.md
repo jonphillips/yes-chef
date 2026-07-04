@@ -3,9 +3,10 @@
 **Type:** UI re-presentation + generalization of the shipped make-ahead chat (PR #68) and the batch-2
 provider picker. **Not a from-scratch build.**
 **Owner:** Codex (implement, per slice) · Claude (architect/review) · Jon (product/review)
-**Status:** **Slice A shipped + approved 2026-07-03** (PR #73 → DONE-LOG) — the split, dense reader,
-context-general host, and Jon's device-feedback polish. **Slice B is now the dispatch target** (see
-`CURRENT_HANDOFF.md` § Next Up).
+**Status:** **Slices A + B shipped + approved** (PRs #73 / #74 → DONE-LOG) — the split, dense reader,
+context-general host, and selection-scoped apply-actions. The Menu/Planner chat-verb follow-ons also
+shipped (ADR-0012, ADR-0013 — both complete). **The reader photo affordances (below) are now the dispatch
+target** (see `CURRENT_HANDOFF.md` § Next Up).
 **Decision it implements:** [ADR-0011](../decisions/ADR-0011-actionable-chat-make-ahead.md) + its
 **Amendment 1** (selection-scoped apply-actions, Accepted 2026-07-03). Design record:
 `open-questions.md` § "Dogfooding — AI chat + recipe reader (2026-07-03)".
@@ -134,18 +135,58 @@ map onto the two motions ADR-0011 already named:
 - **Meal Planner context** — a `.mealPlan(...)` case; verbs TBD.
 - **Chef It Up** (`Recipe.chefItUp`) — the second recipe field, per ADR-0011.
 
-### Reader photo affordances (roadmap — Jon, 2026-07-03, from Slice A device pass)
+### Reader photo affordances (ACTIVE dispatch — promoted from roadmap 2026-07-04)
 
-Surfaced testing Slice A; not part of A or B. Anchored here (moved out of `open-questions.md`).
+Surfaced testing Slice A. **Now the dispatch target** (`CURRENT_HANDOFF.md` § Next Up). Two cohesive,
+independent slices in **one Codex dispatch** — do both, in order, in one PR.
 
-- **Manual "set as cover" / thumbnail selection.** The reader thumbnail is chosen by a heuristic
-  (`primaryDisplayPhoto`: high-res → `.hero` → lowest `sortOrder`). It can pick a **scanned
-  reference-document page over a pretty photo** when the nice shot is a `.gallery` kind (ties the scan at
-  kind-rank 1) or is lower-res than the scan (resolution wins before kind — so even a `.hero` can lose).
-  Let the user pick and persist the cover; a user override, not a re-tune of the sort.
-- **Pinch-to-zoom (+ pan) in the full-screen photo viewer.** `RecipePhotoFullScreenView` currently only
-  scale-to-fits; add magnification so scanned pages and detailed photos are legible. The enlarge flow
-  (thumbnail → gallery → full-screen) otherwise works well.
+**Read first:** `RecipeDetailView.swift` — `primaryDisplayPhoto` (~line 641) + the private `displaySortKey`
+heuristic (`isLowResolution` → `kindRank` → `sortOrder`), `RecipePhotoGallery` (its *own* default-selection
+heuristic, ~line 726), and `RecipePhotoFullScreenView` (~line 784). The heuristic today: high-res beats
+low-res, then `.hero` beats other kinds, then lowest `sortOrder`.
+
+#### Slice 1 — manual "set as cover" (user override, persisted, sync-safe)
+
+The reader cover is chosen by `displaySortKey` and can pick a **scanned reference page over a pretty
+photo** (the nice shot loses when it's a `.gallery` kind that ties the scan at kind-rank 1, or is lower-res
+than the scan — resolution wins before kind, so even a `.hero` can lose). Let the user override it; the
+override is a per-recipe pointer, **not** a re-tune of the sort.
+
+- **Storage home (decided — architect).** A new nullable column **`Recipe.coverPhotoID`** pointing to the
+  chosen `RecipePhoto`. Mirror the existing loose recipe-pointer shape:
+  `ALTER TABLE "recipes" ADD COLUMN "coverPhotoID" TEXT REFERENCES "recipePhotos"("id") ON DELETE SET NULL`
+  (same as `menuItems.recipeID` / `mealPlanItems.recipeID`). Deleting the photo auto-nulls the cover → the
+  heuristic resumes for free. **Rejected:** a `RecipePhoto.isCover` bool — a multi-row flag invites
+  two-covers sync conflicts; a single scalar on the recipe resolves last-writer-wins naturally. Additive,
+  nullable, CloudKit-safe. This is the effort's **first schema touch** → add to the standing prod-schema
+  promotion follow-up in `CURRENT_HANDOFF.md`. Bump `Recipe.dateModified` on every set/clear so sync
+  propagates and conflicts resolve last-writer-wins.
+- **Resolution (factor into core + unit-test).** Move cover resolution into `YesChefCore` as a pure
+  function `coverPhoto(coverPhotoID:from:)` (or similar): if `coverPhotoID` resolves to a photo in the
+  displayable set → use it; **else fall back to the existing `displaySortKey` heuristic** — covering nil
+  **and** a set-but-not-yet-synced/dangling id (never blank). This logic is FoundationModels-free, so a
+  core unit test **runs** under `swift test` here — cover the three cases (override wins / nil falls back /
+  dangling falls back). Point **both** the reader thumbnail (`primaryDisplayPhoto`) and the gallery's
+  default selection (`RecipePhotoGallery.selectedPhoto`) at the same resolver so "cover" is consistent
+  everywhere. (`displaySortKey` itself is unchanged — the override sits *in front of* it.)
+- **UI.** A "Set as Cover" affordance on the selected gallery photo (and/or in the full-screen viewer) —
+  context menu or button; writes `coverPhotoID` via a model/repository method. Offer "Use Automatic"
+  (clear back to nil) when a manual cover is set. iPad + iPhone.
+- **Acceptance.** A recipe whose scan currently wins the thumbnail → set a real photo as cover → the reader
+  thumbnail **and** the gallery default both switch to it and persist across relaunch; delete the cover
+  photo → thumbnail falls back to the heuristic; core unit tests green.
+
+#### Slice 2 — pinch-to-zoom + pan in the full-screen viewer (no schema)
+
+`RecipePhotoFullScreenView` only scale-to-fits; scanned pages and detailed photos aren't legible. The
+enlarge flow (thumbnail → gallery → full-screen) otherwise works well.
+
+- Add a magnify gesture (`MagnifyGesture`) + simultaneous drag-to-pan, clamped so the image can't be lost
+  off-screen; double-tap toggles fit ↔ zoomed (reset). Keep the existing close button reachable at any
+  zoom. iPad + iPhone; VoiceOver unaffected (the image already carries a label). **Pure view change — no
+  schema, no core logic.**
+- **Acceptance.** Open a scanned page full-screen → pinch to zoom and pan to read fine print → double-tap
+  resets → close works at any zoom.
 
 **Net-new cost (honest):** the grabber + detent gesture + persistence + VoiceOver cycler, and the
 width-responsive reader flip (half-owed for iPhone anyway). The selection + review card revises types
