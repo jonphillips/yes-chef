@@ -1,9 +1,9 @@
 # Current Handoff
 
-Last updated: July 4, 2026 (**ADR-0012 Slice 2 shipped** — menu prep-plan verb → `Menu.prepPlan`
-(additive `Data?` BLOB, first schema touch of this effort), PR #82 → merged to main, approved.
-**Next Up = ADR-0012 Slice 3** — the complement verb → inserts a `MenuItem`. Lean verification is the
-default.)
+Last updated: July 4, 2026 (**ADR-0013 Accepted** — Meal-Planner actionable chat, D1–D3 ratified.
+**Next Up = ADR-0013 Slice 1** — `.mealPlan` chat context + selected-day grounded chat, no commit verb,
+no schema (dispatchable to Codex). ADR-0012 fully complete (S3, PR #83 → merged). Lean verification is
+the default.)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -19,23 +19,33 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**ADR-0012 Slice 3 — the complement verb → inserts a `MenuItem`.** Read
-[`docs/decisions/ADR-0012-menu-actionable-chat.md`](decisions/ADR-0012-menu-actionable-chat.md) first —
-Accepted, five decisions resolved, do not re-open them. S1 (`.menu` context + grounded chat, PR #81) and
-S2 (prep-plan verb → `Menu.prepPlan`, PR #82) shipped; this dispatch is **S3 only** — the last slice of the
-effort. The Planner-day (`MealPlanItem`, absolute-date) version is a **separate follow-on ADR**, not this.
+**ADR-0013 Slice 1 — `.mealPlan` chat context + selected-day grounded chat (no commit verb).** Read
+[`docs/decisions/ADR-0013-meal-planner-actionable-chat.md`](decisions/ADR-0013-meal-planner-actionable-chat.md)
+first — **Accepted**, D1–D6 resolved, do not re-open them. This is the planner instance of actionable chat,
+the follow-on ADR-0012 named. It mirrors **ADR-0012 S1** (the `.menu` context slice, PR #81) on the
+absolute-date planner surface. This dispatch is **S1 only**; the complement verb is S2. **No schema change.**
 
-S3 concretely (ADR-0012 Decision #2):
-- Add the **"what would complement…" verb** to the menu apply-action catalog: the model proposes dishes,
-  and the tap **inserts a `MenuItem`** (`kind`, `title`, `dayOffset`, `mealSlot`) onto this menu via the
-  existing review card. This is the **Serve-With motion at menu scale** — suggestion cards → commit shape is
-  a per-item insert, **not** a one-field blob ([[chat-verb-commit-shapes]]). No schema change: committed
-  `MenuItem`s are ordinary rows, already sync-safe.
-- Advisory-only was **rejected** (Decision #2) — a verb earns its name only by writing; grounded advice is
-  already covered by S1 chat + the critique path (Decision #5). Route every insert through the review card so
-  **the tap writes** — no chat turn mutates the menu on its own.
-- Reuse the S2 catalog wiring in `MenuDetailModel.applyActionCatalog(for:)`; classify the commit shape first
-  (per-item insert, `AnyChatApplyAction` may emit **multiple** review items — one per proposed dish).
+S1 concretely:
+- Add **`case mealPlan(MealPlanChatContext)`** to `RecipeChatContext` (additive enum case, alongside
+  `.recipe`/`.menu`), with a `serialized()` that builds the **selected-day composite grounding** (ADR-0013
+  D1 + D6): one structured summary per `MealPlanItem` on the subject day — the day's **absolute date rendered
+  as weekday + date** ("Tuesday, July 8"), `mealSlot`, title, and for recipe-kind items the key ingredients
+  (capped), prep/cook/total times, and the recipe's existing `makeAhead` verbatim. Same budget guardrail as
+  ADR-0012 D4 (summaries only, never full bodies); N is a single day, so this is cheap. Model the context
+  type and its serializer on `MenuChatContext`.
+- **Host the existing `ChatWorkspaceSplit`** in `MealCalendarDayAgendaView`, scoped to
+  `MealCalendarModel.selectedDate` — the same wiring `MenuViews` uses (`ChatWorkspaceSplit(context:...,
+  applyActions:)` + a compact `RecipeChatModel` path). The apply-action catalog is **empty this slice**
+  (`applyActions: { _ in [] }`) — S2 fills it. **Critique works immediately as plain chat** (D5): with the
+  day seeded, "what's missing / what's wrong on Tuesday" is answered conversationally for free, no verb.
+- **No commit path, no schema, no repository change** this slice. The tap-writes invariant is trivially held
+  because there is nothing to commit yet.
+
+Reuse the ADR-0012 S1 shapes throughout (context case + serializer + split host). Classify commit shape only
+when S2 lands (per-item insert → `MealPlanItem`; [[chat-verb-commit-shapes]] / [[menu-item-recipe-id-invariant]]).
+
+**Next after this (not this dispatch): ADR-0013 S2** — the complement verb → inserts a `MealPlanItem` onto the
+selected day (coerce to `.note`), reusing the `MealCalendarRepository` insert path. No schema change.
 
 **Standing release follow-up carried from Phase E (not a dispatch on its own):** before any prod/TestFlight
 cut, promote to the **production** schema both the Phase E Slice 3 pantry-policy + `canonicalName` CloudKit
@@ -47,8 +57,8 @@ Phase E is **fully complete** — Slice 4 (`PantrySuppression` + review UI, PR #
 PR #77 → DONE-LOG). Dogfood batch 3 is
 **complete** (ingredient structure · Chef It Up + Serve With · substitution ·
 keep-awake; PR #75 → DONE-LOG). The cooking-workspace effort is **complete** (Slices A + B shipped,
-PRs #73 / #74 → DONE-LOG). Its named
-follow-ons — **Menu + Meal-Planner chat verbs** and **reader photo affordances** — live in
+PRs #73 / #74 → DONE-LOG). Its **Menu chat-verbs** follow-on shipped as ADR-0012 (complete). Its remaining
+named follow-ons — **Meal-Planner chat verbs** and **reader photo affordances** — live in
 [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) as separate later efforts.
 
 ## Ready Efforts (queue)
@@ -63,9 +73,10 @@ target.
 
 - **Actionable chat / LLMClientKit** (ADR-0011) — **complete.** The lift (Slice 1, 3 repos) + make-ahead
   (Slice 2) + Chef It Up / Serve With / per-line substitution shipped 2026-07-02/03 (PRs #73–#75 →
-  DONE-LOG); `LLMClientKit` is a live path-dep. Remaining named-later verbs (**Menu + Meal-Planner chat
-  verbs**) live in [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md); classify each new
-  verb's commit shape first ([[chat-verb-commit-shapes]]).
+  DONE-LOG); `LLMClientKit` is a live path-dep. The **Menu** verb instance shipped as ADR-0012 (complete,
+  above). The one remaining named-later verb — **Meal-Planner chat verbs** (`MealPlanItem`, absolute-date) —
+  lives in [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md); classify each new verb's
+  commit shape first ([[chat-verb-commit-shapes]]).
 
 - **Dogfood fixes — batch 3** — complete (PR #75 → DONE-LOG; ingredient structure · Chef It Up +
   Serve With · substitution · keep-awake). Non-blocking device-pass notes recorded in the DONE-LOG entry.
@@ -74,13 +85,20 @@ target.
   delete-source-clobbers-amount-edit follow-up remains parked in
   [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) for a later grocery slice.
 
-- **Menu actionable chat** (ADR-0012, **Accepted** 2026-07-03) — the Menu-scope instance of actionable
-  chat. **S1 shipped** (`.menu` context + composite grounding + grounded chat, PR #81 → DONE-LOG, no schema).
-  **S2 shipped** (prep-plan verb → `Menu.prepPlan`, PR #82 → DONE-LOG; the effort's first schema touch).
-  **S3 is now in Next Up** — the complement verb → inserts a `MenuItem`, the effort's last slice. The
-  Planner-day (`MealPlanItem`, absolute-date) version is a **separate follow-on
-  ADR**, not this effort. Design + all five resolved decisions in
+- **Menu actionable chat** (ADR-0012, **Accepted** 2026-07-03) — **complete.** All three slices shipped:
+  S1 (`.menu` context + composite grounding + grounded chat, PR #81 → DONE-LOG, no schema), S2 (prep-plan verb
+  → `Menu.prepPlan`, PR #82 → DONE-LOG; the effort's first schema touch), S3 (complement verb → inserts a
+  `MenuItem`, PR #83 → DONE-LOG, no schema). The Planner-day (`MealPlanItem`, absolute-date) version is a
+  **separate follow-on ADR** (now ADR-0013, Accepted — in Next Up). Design + all five resolved decisions in
   [`docs/decisions/ADR-0012-menu-actionable-chat.md`](decisions/ADR-0012-menu-actionable-chat.md).
+
+- **Meal-Planner actionable chat** (ADR-0013, **Accepted** 2026-07-04) — the planner instance of actionable
+  chat over `MealPlanItem`'s absolute `scheduledDate`; the ADR-0012 planner follow-on. **S1 is in Next Up**
+  (`.mealPlan` context + selected-day grounded chat, no schema); **S2** = complement verb → inserts a
+  `MealPlanItem` on the selected day (coerce to `.note`, no schema). Two slices, zero schema touch. Day-scoped
+  (D1), inserts land on the subject day with model-picked slot (D2), no planner prep-plan verb (D3, no
+  container table). Design in
+  [`docs/decisions/ADR-0013-meal-planner-actionable-chat.md`](decisions/ADR-0013-meal-planner-actionable-chat.md).
 
 - **Cooking workspace** — **complete** (Slices A + B, PRs #73 / #74 → DONE-LOG). Its Menu chat-verbs
   follow-on is now its own effort above (ADR-0012). The reader **photo affordances** (manual set-as-cover,

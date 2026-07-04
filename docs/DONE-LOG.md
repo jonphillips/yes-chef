@@ -10,6 +10,41 @@ Newest first.
 
 ---
 
+## Menu actionable chat (ADR-0012) — Slice 3: complement verb → inserts a `MenuItem`
+
+**Architect-approved 2026-07-04** — yes-chef [PR #83](https://github.com/jonphillips/yes-chef/pull/83).
+The **effort's last slice — ADR-0012 is now fully complete** (S1 grounded chat #81, S2 prep-plan #82, S3
+complement #83). The "what would complement…" verb: the model proposes dishes, and the tap inserts a
+`MenuItem` onto the menu via the existing review card (Decision #2). Serve-With motion at menu scale; the
+tap-writes invariant holds — no chat turn mutates the menu. **No schema change** — committed `MenuItem`s are
+ordinary rows, already sync-safe. Design + five resolved decisions in
+[`docs/decisions/ADR-0012-menu-actionable-chat.md`](decisions/ADR-0012-menu-actionable-chat.md).
+
+- **Per-item insert commit shape** ([[chat-verb-commit-shapes]]) — one extracted payload emits **multiple**
+  review cards, one per proposed dish, each committing independently. Added a second
+  `AnyChatApplyAction(_:reviewItems:)` erasure initializer (the existing `renderedSummary:` single-card path
+  refactored to route through it); rides the host's existing `ChatApplyReviewList` `ForEach` with **no host
+  changes**. `MenuComplementClient` + `MenuComplementPlan`/`MenuComplementSuggestion`; `parse` reuses the shared
+  `jsonObjectSlice ?? jsonArraySlice` idiom.
+- **`MenuRepository.addComplementItem`** — a faithful analog of `addNoteItem` (requireMenu → validateDayOffset →
+  `nonEmptyMenuText` → `nextSortOrder`), inserting an ordinary `MenuItem`. Wired into
+  `MenuDetailModel.applyActionCatalog(for:)` alongside the S2 prep-plan action.
+- **Review-feedback fix** (commit `56bc1ac`, folded before merge): the parser now **coerces every suggestion to
+  `.note`** — a `.recipe`-kind row with no `recipeID` would violate the recipe⟹`recipeID` invariant the manual
+  editor enforces (Save disabled without a selected recipe), rendering a book-icon row that is non-navigable and
+  non-draggable. This write path can't attach a `recipeID`, so `.recipe`/`.reservation` both collapse to `.note`.
+  Also removed the **dead batch-commit path** (`commitComplementPlan` / `MenuDetailError.emptyComplementSuggestion`)
+  — the `reviewItems:` erasure never calls `action.commit`; each card commits via `commitComplementSuggestion`.
+- **Tests:** parse (whitespace-trim, `.recipe`→`.note` coercion, slot/title drops), model-tier + menu context
+  plumbing, staged no-write-until-committed-card, repository ordering + `invalidDayOffset` validation. Lean verify
+  (swift test 163 green + one iPad build + check-drift).
+
+**Non-blocking follow-up** (not a merge blocker): out-of-range `dayOffset` is only rejected at commit
+(`validateDayOffset` throws on tap) — the parser can't range-check without menu context, and the review card
+surfaces the error, so it's acceptable. Left as-is.
+
+---
+
 ## Menu actionable chat (ADR-0012) — Slice 2: prep-plan verb → `Menu.prepPlan`
 
 **Architect-approved 2026-07-04** — yes-chef [PR #82](https://github.com/jonphillips/yes-chef/pull/82).
