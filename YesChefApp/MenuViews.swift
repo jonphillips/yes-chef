@@ -7,6 +7,7 @@ struct MenusStack: View {
   let model: MenuLibraryModel
   let recipeModel: RecipeLibraryModel
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
 
   var body: some View {
     @Bindable var model = model
@@ -18,7 +19,8 @@ struct MenusStack: View {
             model: model,
             recipeModel: recipeModel,
             menuID: menuID,
-            onRecipeSelected: onRecipeSelected
+            onRecipeSelected: onRecipeSelected,
+            onCookSessionRequested: onCookSessionRequested
           )
             .id(menuID)
         }
@@ -96,6 +98,7 @@ struct MenuDetailColumn: View {
   let model: MenuLibraryModel
   let recipeModel: RecipeLibraryModel
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
 
   var body: some View {
     if let menuID = model.selectedMenuID {
@@ -103,7 +106,8 @@ struct MenuDetailColumn: View {
         model: model,
         recipeModel: recipeModel,
         menuID: menuID,
-        onRecipeSelected: onRecipeSelected
+        onRecipeSelected: onRecipeSelected,
+        onCookSessionRequested: onCookSessionRequested
       )
         .id(menuID)
     } else {
@@ -119,6 +123,7 @@ struct MenuDetailView: View {
   let model: MenuLibraryModel
   let recipeModel: RecipeLibraryModel
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
   @State private var detailModel: MenuDetailModel
   @State private var isShowingRecipeBrowser = false
   @State private var compactChatModel: RecipeChatModel?
@@ -127,11 +132,13 @@ struct MenuDetailView: View {
     model: MenuLibraryModel,
     recipeModel: RecipeLibraryModel,
     menuID: CoreMenu.ID,
-    onRecipeSelected: ((RecipeDetailPresentation) -> Void)? = nil
+    onRecipeSelected: ((RecipeDetailPresentation) -> Void)? = nil,
+    onCookSessionRequested: ((CookSessionPresentation) -> Void)? = nil
   ) {
     self.model = model
     self.recipeModel = recipeModel
     self.onRecipeSelected = onRecipeSelected
+    self.onCookSessionRequested = onCookSessionRequested
     _detailModel = State(wrappedValue: MenuDetailModel(menuID: menuID))
   }
 
@@ -171,6 +178,13 @@ struct MenuDetailView: View {
     .toolbar {
       if let menu = detailModel.detail?.menu {
         ToolbarItemGroup(placement: .primaryAction) {
+          if let cookSessionPresentation {
+            Button {
+              onCookSessionRequested?(cookSessionPresentation)
+            } label: {
+              Label("Cook these", systemImage: "flame")
+            }
+          }
           Button {
             isShowingRecipeBrowser.toggle()
           } label: {
@@ -219,6 +233,10 @@ struct MenuDetailView: View {
     UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass != .compact
   }
 
+  private var cookSessionPresentation: CookSessionPresentation? {
+    detailModel.detail.flatMap(CookSessionPresentation.init(menuDetail:))
+  }
+
   private func chatButtonTapped() {
     guard let detail = detailModel.detail else { return }
     if isSplitEnabled {
@@ -226,6 +244,25 @@ struct MenuDetailView: View {
     } else {
       compactChatModel = RecipeChatModel(context: .menu(MenuChatContext(detail: detail)))
     }
+  }
+}
+
+private extension CookSessionPresentation {
+  init?(menuDetail detail: MenuDetailData) {
+    let items = detail.itemRows.compactMap(CookSessionItem.init(menuItemRow:))
+    guard !items.isEmpty else { return nil }
+    self.init(title: detail.menu.title, items: items)
+  }
+}
+
+private extension CookSessionItem {
+  init?(menuItemRow row: MenuItemRowData) {
+    guard row.item.kind == .recipe, let recipeID = row.recipe?.id else { return nil }
+    self.init(
+      recipeID: recipeID,
+      scaleContext: .menuItem(row.item.id),
+      title: row.displayTitle
+    )
   }
 }
 
