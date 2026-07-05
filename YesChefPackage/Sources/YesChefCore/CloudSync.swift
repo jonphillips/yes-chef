@@ -94,6 +94,7 @@ public enum YesChefCloudSync {
         GroceryItem.self,
         GroceryItemSource.self,
         PantryItem.self,
+        AISettingsRecord.self,
       containerIdentifier: containerIdentifier,
       startImmediately: startImmediately
     )

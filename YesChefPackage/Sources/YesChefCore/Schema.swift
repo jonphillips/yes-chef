@@ -653,6 +653,21 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Create synced AI settings") { db in
+      try #sql("""
+        CREATE TABLE "aiSettings" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "tasteProfile" TEXT NOT NULL DEFAULT '',
+          "chefItUpPreference" TEXT NOT NULL DEFAULT '',
+          "serveWithPreference" TEXT NOT NULL DEFAULT '',
+          "makeAheadPrepPlanPreference" TEXT NOT NULL DEFAULT '',
+          "complementsPreference" TEXT NOT NULL DEFAULT '',
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)
@@ -666,6 +681,14 @@ extension DependencyValues {
         for: database,
         startImmediately: startImmediately
       )
+    }
+  }
+
+  public mutating func migrateLegacyAISettingsIfNeeded(tasteProfile: String?) throws {
+    @Dependency(\.defaultDatabase) var database
+    @Dependency(\.date.now) var now
+    try database.write { db in
+      try AISettingsRepository.migrateLegacyTasteProfileIfNeeded(tasteProfile, in: db, now: now)
     }
   }
 }

@@ -197,6 +197,35 @@ public enum ChatSubjectKind: String, Codable, QueryBindable, QueryDecodable, Sen
   case mealPlanDay
 }
 
+@Table("aiSettings")
+public struct AISettingsRecord: Codable, Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var tasteProfile: String
+  public var chefItUpPreference: String
+  public var serveWithPreference: String
+  public var makeAheadPrepPlanPreference: String
+  public var complementsPreference: String
+  public var dateModified: Date
+
+  public init(
+    id: UUID,
+    tasteProfile: String = "",
+    chefItUpPreference: String = "",
+    serveWithPreference: String = "",
+    makeAheadPrepPlanPreference: String = "",
+    complementsPreference: String = "",
+    dateModified: Date
+  ) {
+    self.id = id
+    self.tasteProfile = tasteProfile
+    self.chefItUpPreference = chefItUpPreference
+    self.serveWithPreference = serveWithPreference
+    self.makeAheadPrepPlanPreference = makeAheadPrepPlanPreference
+    self.complementsPreference = complementsPreference
+    self.dateModified = dateModified
+  }
+}
+
 @Table("chatMessages")
 public struct ChatMessageRecord: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID

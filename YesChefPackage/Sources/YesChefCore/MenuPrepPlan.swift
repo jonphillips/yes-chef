@@ -77,7 +77,9 @@ extension MenuPrepPlanClient: DependencyKey {
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, context: context),
-      maxTokens: 2048
+      maxTokens: 2048,
+      reasoningEffort: .high,
+      promptPreferenceKey: AIPromptPreferenceKind.makeAheadPrepPlan.rawValue
     )
     let response = try await modelClient.complete(request)
     return parse(response.text)

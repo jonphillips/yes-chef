@@ -76,6 +76,8 @@ extension RecipeCoreTests {
 
       let request = await recorder.first()
       expectNoDifference(request?.tier, .frontier(.anthropic))
+      expectNoDifference(request?.reasoningEffort, .high)
+      expectNoDifference(request?.promptPreferenceKey, AIPromptPreferenceKind.makeAheadPrepPlan.rawValue)
       #expect(request?.messages.first?.text.contains("Menu context:\nMenu context") == true)
       #expect(request?.messages.first?.text.contains("User-selected subject:\nSequence the prep.") == true)
     }
