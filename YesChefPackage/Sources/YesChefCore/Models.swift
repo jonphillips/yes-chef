@@ -191,6 +191,41 @@ public enum RecipeDifficulty: String, Codable, QueryBindable, QueryDecodable, Se
   case hard
 }
 
+public enum ChatSubjectKind: String, Codable, QueryBindable, QueryDecodable, Sendable {
+  case recipe
+  case menu
+  case mealPlanDay
+}
+
+@Table("chatMessages")
+public struct ChatMessageRecord: Codable, Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var subjectKind: ChatSubjectKind
+  public var subjectID: String
+  public var role: RecipeChatMessage.Role
+  public var text: String
+  public var createdAt: Date
+  public var sortOrder: Int
+
+  public init(
+    id: UUID,
+    subjectKind: ChatSubjectKind,
+    subjectID: String,
+    role: RecipeChatMessage.Role,
+    text: String,
+    createdAt: Date,
+    sortOrder: Int
+  ) {
+    self.id = id
+    self.subjectKind = subjectKind
+    self.subjectID = subjectID
+    self.role = role
+    self.text = text
+    self.createdAt = createdAt
+    self.sortOrder = sortOrder
+  }
+}
+
 @Table("mealPlanItems")
 public struct MealPlanItem: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID
