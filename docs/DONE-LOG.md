@@ -10,6 +10,26 @@ Newest first.
 
 ---
 
+## Multi-recipe cook session — ADR-0016 (Reader-hosted, not Cooking Mode)
+
+**Architect-approved + merged 2026-07-05** — yes-chef [PR #93](https://github.com/jonphillips/yes-chef/pull/93).
+**Zero schema.** Ships a **cook session**: an ordered `[(Recipe.ID, ScaleContext)]` drawn from a planner day
+*or* a menu, each recipe rendered in the **existing Reader**, with a pinned **chip-strip switcher**, a
+**keep-alive** paged host (all per-recipe Readers stay mounted so switching doesn't reset scroll/scale, D4),
+**session-only "done"** that shrinks the strip, keep-awake through the cook, and **per-placement `ScaleContext`
+threaded** so a placement's pre-set scale flows straight through (D5). Recipe-kind items only; `.note`/
+reservation rows filtered ([[menu-item-recipe-id-invariant]], D6). Entered via **"Cook these"** on a planner
+day and on a Menu. Not Cooking Mode (left untouched), no voice (D7). Design + D1–D7 in
+[ADR-0016](decisions/ADR-0016-multi-recipe-cook-session.md).
+
+- **Layout fold-in** (same PR, per review): "Cook these" gave `MealCalendarDayHeader` three labeled buttons
+  that overflowed the fixed-width agenda rail; wrapped in `ViewThatFits(in: .horizontal)` with a
+  title-over-buttons stacked fallback, `titleBlock`/`actionButtons` extracted, `cookSession` made an optional
+  closure, and the `CookSessionPresentation` build deduped into one computed prop.
+- **Codex follow-up PR #94 was a wasted effort — rejected by Jon**, not merged.
+
+---
+
 ## Cooking reader + planner follow-ons — independent reader columns + day-scoped make-ahead verb
 
 **Architect-approved 2026-07-05** — yes-chef [PR #91](https://github.com/jonphillips/yes-chef/pull/91).

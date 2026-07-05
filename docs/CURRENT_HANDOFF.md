@@ -2,7 +2,9 @@
 
 Last updated: July 5, 2026 (**Next Up = ADR-0016 cook session — layout fold-in on PR #93.** S1+S2 are
 implemented in PR #93 (open); architect review approved the feature and flagged one day-header layout
-regression to fold into the *same* PR before merge. Details below. Zero schema, lean verification.)
+regression to fold into the *same* PR before merge. Details below. Zero schema, lean verification.
+**Two design dispatches now queued behind #93** — AI config (ADR-0017/0018) then Menu overhaul
+(ADR-0012 Amdt 1 + `efforts/menu-planning-ux.md`); see Ready Efforts.)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -18,23 +20,34 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Multi-recipe cook session — ADR-0016 (Accepted 2026-07-05).** S1 (`CookSessionModel` + `CookSessionView`:
-chip-strip switcher over a **keep-alive** paged host of per-recipe Readers, keep-awake, session-only "done")
-and S2 (**"Cook these"** on a planner day *and* a Menu; per-placement `ScaleContext` threaded, recipe-kind
-items only) are **implemented in PR #93 (open)**. Review confirmed keep-alive paging (D4), scale threading
-(D5), and filtering (D6) are all correct.
+**AI configuration & transparency — ADR-0017 + ADR-0018 (both Accepted 2026-07-05).** One PR (next is
+**#95**), cross-repo: shared **`LLMClientKit`** + Yes Chef call sites + `AISettingsView` + jon-platform
+`docs/ios/ai-model-access.md`. Do all slices, in order:
 
-**One layout fold-in remains before merge** (fold into PR #93, not a new PR): adding "Cook these" gave
-`MealCalendarDayHeader` three labeled buttons, which overflow the fixed-width agenda rail — title mangles,
-buttons collapse (visible in Jon's screenshot). Fix = wrap the header in `ViewThatFits(in: .horizontal)`
-(single row → title-over-buttons stacked fallback), extract `titleBlock`/`actionButtons`, make `cookSession`
-an optional closure, and dedupe the `CookSessionPresentation` build into one `cookSessionPresentation`
-computed prop. Then Jon's device pass (iPad both orientations + iPhone), then merge → ADR-0016 done.
+- **S1 (`LLMClientKit`)** — frontier default → **`gpt-5.5`**, retire `gpt-5.2-chat-latest`; add
+  provider-agnostic `ReasoningEffort` + `ModelRequest.reasoningEffort`; `OpenAIWire` emits top-level
+  `reasoning_effort` when set, omits when `nil` (Chat Completions shape — verify field name at build);
+  one wire test (present-when-set / absent-when-nil). Update `ai-model-access.md` §2.
+- **S2 — effort per feature** (ADR-0017 D3 table): **live recipe chat = `medium`** (extract-ready, Jon's
+  call), lookups/substitution/capture `low`, Chef It Up / Serve With / make-ahead / prep-plan `high`,
+  complements `medium`.
+- **S3 — show the active model** read-only in `AISettingsView` (one row per provider).
+- **S4 — taste profile** (ADR-0018 Layer A): promote the lone `recipeChatCustomInstructionsKey` field to a
+  profile injected at the `TieredModelClient` boundary → reaches **every** generative call (fixes the
+  recipe-chat-only gap, `RecipeChat.swift:981`). **Synced settings** (D4) — a sync/schema touch that must
+  clear the live-schema audit ([[extension-sync-construct-not-run]]), **not zero-schema**.
+- **S5 — per-task preferences** (ADR-0018 Layer B): the ~4 generative-judgment fields; `taskKind` on the
+  request vs. per-call-site append is the implementer's call (D3). **No raw task prompts exposed.**
 
-Design + D1–D7 in
-[`docs/decisions/ADR-0016-multi-recipe-cook-session.md`](decisions/ADR-0016-multi-recipe-cook-session.md).
+Fallback if too heavy: split S1–S4 (infra + profile) from S5 (per-task fields). Design in
+[ADR-0017](decisions/ADR-0017-llm-model-and-reasoning-effort.md) +
+[ADR-0018](decisions/ADR-0018-prompt-customization-taste-profile.md).
 
-The remaining cooking-workspace follow-on (**Meal-Planner chat verbs**, broader) stays parked in the Ready
+**On deck (dispatch ②, do not start yet): Menu planning overhaul** — ADR-0012 Amendment 1 +
+[`efforts/menu-planning-ux.md`](efforts/menu-planning-ux.md).
+
+ADR-0016 multi-recipe cook session is **done** (PR #93 merged 2026-07-05 → DONE-LOG; Codex's follow-up
+PR #94 was a wasted effort, rejected). The Meal-Planner chat-verbs follow-on stays parked in the Ready
 Efforts queue below, not a dispatch target.
 
 **Standing release follow-up carried from Phase E (not a dispatch — a pre-cut ops step Jon runs).** We stay
@@ -42,8 +55,9 @@ in the CloudKit **Development** environment (dev stance) so the schema keeps evo
 **Production** is additive-only and permanently locks those record types, so it is deliberately **held**
 until an actual prod/TestFlight cut — not something to dispatch now. At that cut, deploy to the production
 schema the Phase E Slice 3 pantry-policy + `canonicalName` fields, the ADR-0012 S2 `Menu.prepPlan` BLOB
-(PR #82), **and** the reader-photo-affordances `Recipe.coverPhotoID` column (PR #87); and note the app
-target (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
+(PR #82), the reader-photo-affordances `Recipe.coverPhotoID` column (PR #87), **and** the ADR-0018 synced
+AI-preferences column(s) landing in PR #95; and note the app target (`PantryViews.swift` /
+`GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 
 Phase E is **fully complete** — Slice 4 (`PantrySuppression` + review UI, PR #80 → DONE-LOG), Slice 3
 (pantry policy + `canonicalName` migration, PR #79 → DONE-LOG), Slices 1 + 2 (canonical key + `Measure`,
@@ -62,6 +76,15 @@ the broader **Meal-Planner chat verbs** effort — lives in
 
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target.
+
+**On deck — dispatch ② (do not start until dispatch ①/PR #95 is in): Menu planning overhaul**
+([ADR-0012 Amendment 1](decisions/ADR-0012-menu-actionable-chat.md) +
+[`efforts/menu-planning-ux.md`](efforts/menu-planning-ux.md)) — one PR, sequenced slices:
+tier-aware context budget + prep-plan-in-context + living-artifact refinement (kills "AI sees one
+dish"); swipe-delete/move (iOS 27 `swipeActions()`); inline meal-slot pill; full-screen menu focus;
+toolbar reorg (drop redundant ✨, move Add/Place into a left-aligned in-detail set, Place also edits
+day-count). **Drag-drop reorder parked** as a named follow-on (swipe-move is the interim). Benefits
+from dispatch ①'s `high`-effort `MenuPrepPlan` but doesn't hard-block on it.
 
 - **Recipe → grocery list w/ pantry checking** (Phase E) — **complete.** All four slices shipped: canonical
   key + `Measure` (PR #77), pantry policy + `canonicalName` migration (PR #79), `PantrySuppression` + review
