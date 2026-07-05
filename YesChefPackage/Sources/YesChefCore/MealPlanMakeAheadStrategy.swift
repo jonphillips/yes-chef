@@ -1,0 +1,230 @@
+import Dependencies
+import Foundation
+import LLMClientKit
+import SQLiteData
+
+public struct MealPlanMakeAheadStrategy: Equatable, Sendable {
+  public var title: String
+  public var mealSlot: MealPlanItemSlot
+  public var steps: [MealPlanMakeAheadStep]
+
+  public init(
+    title: String = "Make-ahead strategy",
+    mealSlot: MealPlanItemSlot = .dinner,
+    steps: [MealPlanMakeAheadStep] = []
+  ) {
+    self.title = title
+    self.mealSlot = mealSlot
+    self.steps = steps
+  }
+
+  public func rendered() -> String {
+    guard !steps.isEmpty else { return "" }
+    var lines = ["\(title) - \(mealSlot.title)"]
+    lines.append(contentsOf: steps.map(\.rendered))
+    return lines.joined(separator: "\n")
+  }
+
+  public func renderedNotes() -> String {
+    steps.map(\.rendered).joined(separator: "\n")
+  }
+}
+
+public struct MealPlanMakeAheadStep: Equatable, Sendable {
+  public var when: String
+  public var task: String
+  public var sourceItem: String?
+
+  public init(when: String, task: String, sourceItem: String? = nil) {
+    self.when = when
+    self.task = task
+    self.sourceItem = sourceItem
+  }
+
+  public var rendered: String {
+    "\(when): \(task)"
+  }
+}
+
+public struct MealPlanMakeAheadStrategyClient: Sendable {
+  public var extract: @Sendable (
+    _ selection: String,
+    _ messages: [RecipeChatMessage],
+    _ context: String,
+    _ tier: ModelTier
+  ) async throws -> MealPlanMakeAheadStrategy
+
+  public init(
+    extract: @escaping @Sendable (
+      _ selection: String,
+      _ messages: [RecipeChatMessage],
+      _ context: String,
+      _ tier: ModelTier
+    ) async throws -> MealPlanMakeAheadStrategy
+  ) {
+    self.extract = extract
+  }
+
+  public func callAsFunction(
+    selection: String,
+    messages: [RecipeChatMessage],
+    context: String,
+    tier: ModelTier
+  ) async throws -> MealPlanMakeAheadStrategy {
+    try await extract(selection, messages, context, tier)
+  }
+}
+
+extension MealPlanMakeAheadStrategyClient: DependencyKey {
+  public static let liveValue = MealPlanMakeAheadStrategyClient { selection, messages, context, tier in
+    @Dependency(\.modelClient) var modelClient
+    let request = ModelRequest(
+      tier: tier,
+      system: instructions,
+      prompt: prompt(selection: selection, messages: messages, context: context),
+      maxTokens: 2048
+    )
+    let response = try await modelClient.complete(request)
+    return parse(response.text)
+  }
+
+  public static let testValue = MealPlanMakeAheadStrategyClient { _, _, _, _ in
+    MealPlanMakeAheadStrategy()
+  }
+
+  static let instructions = """
+    You distill a cooking conversation into a day-scoped make-ahead strategy for one meal plan day.
+    Return ONLY strict JSON:
+    {"title":"Make-ahead strategy","mealSlot":"dinner","steps":[{"when":"relative timing label","task":"concrete kitchen task","sourceItem":"meal plan item ID or null"}]}.
+    Sequence and select distinct prep steps across the day's recipes. Lean on existing recipe make-ahead notes from
+    the meal plan context when present. Do not flatten multiple recipes into one blob, do not rewrite entire recipes,
+    and do not invent per-recipe make-ahead prose. Use sourceItem only when the step clearly comes from one meal plan
+    item ID in the context; use null when the step spans items or the source is unclear. The date is fixed by the
+    meal plan context; do not invent or return dates. Allowed mealSlot values are "breakfast", "lunch", "dinner",
+    and "snack". Return {"steps":[]} when there is no strategy to save.
+    """
+
+  static func prompt(selection: String, messages: [RecipeChatMessage], context: String) -> String {
+    let conversation = messages.isEmpty
+      ? "(No conversation yet.)"
+      : messages.map { "\($0.role.promptLabel): \($0.text)" }.joined(separator: "\n")
+    return """
+      Meal plan day context:
+      \(context)
+
+      User-selected subject:
+      \(selection)
+
+      Conversation so far:
+      \(conversation)
+
+      Distill the selected subject into one day-level make-ahead strategy note. Use the conversation only as
+      background when it clarifies how to sequence the distinct prep steps already grounded in the meal plan day.
+      """
+  }
+
+  public static func parse(_ text: String) -> MealPlanMakeAheadStrategy {
+    guard
+      let json = jsonObjectSlice(text) ?? jsonArraySlice(text),
+      let data = json.data(using: .utf8),
+      let raw = try? JSONSerialization.jsonObject(with: data)
+    else { return MealPlanMakeAheadStrategy() }
+
+    let object = raw as? [String: Any]
+    let elements: [[String: Any]]
+    if let object {
+      elements = object["steps"] as? [[String: Any]] ?? []
+    } else {
+      elements = raw as? [[String: Any]] ?? []
+    }
+
+    let title = (object?["title"] as? String)?.cleanedMealPlanMakeAheadText ?? "Make-ahead strategy"
+    let mealSlot = (object?["mealSlot"] as? String)
+      .flatMap(MealPlanItemSlot.init(mealPlanMakeAheadRawValue:)) ?? .dinner
+
+    return MealPlanMakeAheadStrategy(
+      title: title,
+      mealSlot: mealSlot,
+      steps: elements.compactMap { element in
+        guard
+          let when = (element["when"] as? String)?.cleanedMealPlanMakeAheadText,
+          let task = (element["task"] as? String)?.cleanedMealPlanMakeAheadText
+        else { return nil }
+        return MealPlanMakeAheadStep(
+          when: when,
+          task: task,
+          sourceItem: (element["sourceItem"] as? String)?.cleanedMealPlanMakeAheadText
+        )
+      }
+    )
+  }
+
+  private static func jsonObjectSlice(_ text: String) -> String? {
+    guard let open = text.firstIndex(of: "{"), let close = text.lastIndex(of: "}"), open < close
+    else { return nil }
+    return String(text[open...close])
+  }
+
+  private static func jsonArraySlice(_ text: String) -> String? {
+    guard let open = text.firstIndex(of: "["), let close = text.lastIndex(of: "]"), open < close
+    else { return nil }
+    return String(text[open...close])
+  }
+}
+
+extension DependencyValues {
+  public var mealPlanMakeAheadStrategyClient: MealPlanMakeAheadStrategyClient {
+    get { self[MealPlanMakeAheadStrategyClient.self] }
+    set { self[MealPlanMakeAheadStrategyClient.self] = newValue }
+  }
+}
+
+extension MealCalendarRepository {
+  @discardableResult
+  public static func addMakeAheadStrategyNote(
+    _ strategy: MealPlanMakeAheadStrategy,
+    on scheduledDate: Date,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> MealPlanItem.ID {
+    guard !strategy.steps.isEmpty else {
+      throw MealCalendarRepositoryError.emptyMakeAheadStrategy
+    }
+    return try addNoteItem(
+      title: strategy.title,
+      notes: strategy.renderedNotes(),
+      on: scheduledDate,
+      mealSlot: strategy.mealSlot,
+      in: db,
+      now: now,
+      uuid: uuid
+    )
+  }
+}
+
+private extension MealPlanItemSlot {
+  init?(mealPlanMakeAheadRawValue: String) {
+    self.init(rawValue: mealPlanMakeAheadRawValue.normalizedMealPlanMakeAheadEnumValue)
+  }
+}
+
+private extension RecipeChatMessage.Role {
+  var promptLabel: String {
+    switch self {
+    case .user: "User"
+    case .assistant: "Assistant"
+    }
+  }
+}
+
+private extension String {
+  var cleanedMealPlanMakeAheadText: String? {
+    let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+  }
+
+  var normalizedMealPlanMakeAheadEnumValue: String {
+    trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+  }
+}

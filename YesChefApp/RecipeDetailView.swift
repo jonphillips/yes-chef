@@ -173,19 +173,51 @@ private struct RecipeReaderView: View {
 
   var body: some View {
     GeometryReader { proxy in
-      ScrollView {
-        if let recipe = model.recipe {
-          VStack(alignment: .leading, spacing: 16) {
-            header(recipe)
-            metadata(recipe)
-            recipeBody(isTwoColumn: proxy.size.width >= twoColumnThreshold)
+      if let recipe = model.recipe {
+        let isTwoColumn = proxy.size.width >= twoColumnThreshold
+        if isTwoColumn {
+          VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 16) {
+              header(recipe)
+              metadata(recipe)
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Divider()
+
+            HStack(alignment: .top, spacing: 0) {
+              ScrollView {
+                ingredients
+                  .padding()
+                  .frame(maxWidth: .infinity, alignment: .topLeading)
+              }
+              .frame(maxWidth: .infinity)
+
+              Divider()
+
+              ScrollView {
+                directionsColumn
+                  .padding()
+                  .frame(maxWidth: .infinity, alignment: .topLeading)
+              }
+              .frame(maxWidth: .infinity)
+            }
           }
-          .padding()
-          .frame(maxWidth: .infinity, alignment: .leading)
         } else {
-          ContentUnavailableView("Recipe Not Found", systemImage: "fork.knife")
-            .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+          ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+              header(recipe)
+              metadata(recipe)
+              compactRecipeBody
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+          }
         }
+      } else {
+        ContentUnavailableView("Recipe Not Found", systemImage: "fork.knife")
+          .frame(maxWidth: .infinity, minHeight: proxy.size.height)
       }
     }
     .sheet(isPresented: $isPhotoGalleryPresented) {
@@ -318,59 +350,39 @@ private struct RecipeReaderView: View {
   }
 
   @ViewBuilder
-  private func recipeBody(isTwoColumn: Bool) -> some View {
-    if isTwoColumn {
-      HStack(alignment: .top, spacing: 24) {
-        ingredients
-          .frame(maxWidth: .infinity, alignment: .topLeading)
-        VStack(alignment: .leading, spacing: 18) {
-          if let makeAhead = model.makeAhead {
-            makeAheadSection(makeAhead)
-          }
-          if let chefItUp = model.chefItUp {
-            chefItUpSection(chefItUp)
-          }
-          if !model.serveWithItems.isEmpty {
-            serveWithSection(model.serveWithItems)
-          }
-          if !model.instructionSteps.isEmpty {
-            instructions
-          }
-          if !model.visibleNotes.isEmpty {
-            notesView(model.visibleNotes)
-          }
-        }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+  private var compactRecipeBody: some View {
+    Picker("Recipe section", selection: $compactSection) {
+      ForEach(CompactSection.allCases) { section in
+        Text(section.title).tag(section)
       }
-    } else {
-      Picker("Recipe section", selection: $compactSection) {
-        ForEach(CompactSection.allCases) { section in
-          Text(section.title).tag(section)
-        }
-      }
-      .pickerStyle(.segmented)
+    }
+    .pickerStyle(.segmented)
 
-      switch compactSection {
-      case .ingredients:
-        ingredients
-      case .directions:
-        VStack(alignment: .leading, spacing: 18) {
-          if let makeAhead = model.makeAhead {
-            makeAheadSection(makeAhead)
-          }
-          if let chefItUp = model.chefItUp {
-            chefItUpSection(chefItUp)
-          }
-          if !model.serveWithItems.isEmpty {
-            serveWithSection(model.serveWithItems)
-          }
-          if !model.instructionSteps.isEmpty {
-            instructions
-          }
-          if !model.visibleNotes.isEmpty {
-            notesView(model.visibleNotes)
-          }
-        }
+    switch compactSection {
+    case .ingredients:
+      ingredients
+    case .directions:
+      directionsColumn
+    }
+  }
+
+  @ViewBuilder
+  private var directionsColumn: some View {
+    VStack(alignment: .leading, spacing: 18) {
+      if let makeAhead = model.makeAhead {
+        makeAheadSection(makeAhead)
+      }
+      if let chefItUp = model.chefItUp {
+        chefItUpSection(chefItUp)
+      }
+      if !model.serveWithItems.isEmpty {
+        serveWithSection(model.serveWithItems)
+      }
+      if !model.instructionSteps.isEmpty {
+        instructions
+      }
+      if !model.visibleNotes.isEmpty {
+        notesView(model.visibleNotes)
       }
     }
   }

@@ -391,6 +391,7 @@ public enum MealCalendarRepository {
 }
 
 public enum MealCalendarRepositoryError: Error, Equatable, Sendable {
+  case emptyMakeAheadStrategy
   case emptyTitle
   case itemNotFound(MealPlanItem.ID)
   case recipeNotFound(Recipe.ID)
