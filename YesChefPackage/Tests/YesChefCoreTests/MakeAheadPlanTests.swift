@@ -101,6 +101,7 @@ extension RecipeCoreTests {
       let recorder = ModelRequestRecorder()
 
       await withDependencies {
+        $0.uuid = .incrementing
         $0.modelClient = StubModelClient { request in
           await recorder.append(request)
           return ModelResponse(text: "Yes, make the sauce a day ahead.")

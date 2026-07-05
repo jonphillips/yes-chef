@@ -306,6 +306,7 @@ struct MealCalendarDayAgendaView: View {
     .mealPlan(
       MealPlanChatContext(
         title: model.selectedDateTitle,
+        subjectDate: model.selectedDate,
         rows: model.selectedDayRows
       )
     )

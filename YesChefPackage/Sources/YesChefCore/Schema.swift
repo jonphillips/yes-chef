@@ -616,6 +616,28 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Create local chat persistence") { db in
+      try #sql("""
+        CREATE TABLE "chatMessages" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "subjectKind" TEXT NOT NULL,
+          "subjectID" TEXT NOT NULL,
+          "role" TEXT NOT NULL,
+          "text" TEXT NOT NULL,
+          "createdAt" TEXT NOT NULL,
+          "sortOrder" INTEGER NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      for statement in [
+        #"CREATE INDEX "index_chatMessages_on_subjectKind_subjectID_sortOrder" ON "chatMessages"("subjectKind", "subjectID", "sortOrder")"#,
+        #"CREATE INDEX "index_chatMessages_on_createdAt" ON "chatMessages"("createdAt")"#,
+      ] {
+        try db.execute(sql: statement)
+      }
+    }
+
     migrator.registerMigration("Remove ingredient substitutions") { db in
       try #sql("""
         ALTER TABLE "ingredientLines"
@@ -632,6 +654,9 @@ extension DependencyValues {
     }
 
     try migrator.migrate(database)
+    try database.write { db in
+      try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)
+    }
     defaultDatabase = database
     switch syncMode {
     case .disabled:

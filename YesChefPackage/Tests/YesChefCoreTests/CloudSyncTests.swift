@@ -24,12 +24,17 @@ extension RecipeCoreTests {
 
       // Derive the expected set from the live schema, not a literal, so a new
       // @Table added to the schema but never wired into makeSyncEngine fails
-      // here instead of silently staying local.
+      // here instead of silently staying local. Chat persistence is the explicit
+      // local-only exception from ADR-0015.
       let modelTableNames = try mainDatabase.read { db in
         try schemaTableNames(in: db)
       }
+      let localOnlyTableNames = ["chatMessages"]
 
-      expectNoDifference(actualTableNames, modelTableNames)
+      expectNoDifference(
+        actualTableNames,
+        modelTableNames.filter { !localOnlyTableNames.contains($0) }
+      )
     }
 
     @Test

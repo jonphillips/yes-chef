@@ -2,6 +2,7 @@ import Dependencies
 import Foundation
 import LLMClientKit
 import Observation
+import SQLiteData
 
 public let recipeChatCustomInstructionsKey = "recipeChatCustomInstructions"
 public let recipeChatFrontierProviderKey = "recipeChatFrontierProvider"
@@ -124,18 +125,21 @@ public struct MealPlanChatContext: Equatable, Sendable {
   public static let serializedCharacterBudget = 12_000
 
   public var title: String
+  public var subjectDate: Date?
   public var items: [MealPlanChatItemContext]
 
   public init(
     title: String,
+    subjectDate: Date? = nil,
     items: [MealPlanChatItemContext] = []
   ) {
     self.title = title
+    self.subjectDate = subjectDate
     self.items = items
   }
 
-  public init(title: String, rows: [MealPlanItemRowData]) {
-    self.init(title: title, items: rows.map { MealPlanChatItemContext(row: $0) })
+  public init(title: String, subjectDate: Date? = nil, rows: [MealPlanItemRowData]) {
+    self.init(title: title, subjectDate: subjectDate, items: rows.map { MealPlanChatItemContext(row: $0) })
   }
 
   public var seededContextDescription: String {
@@ -343,17 +347,20 @@ public struct MenuChatContext: Equatable, Sendable {
   public static let defaultIngredientLimit = 8
   public static let serializedCharacterBudget = 12_000
 
+  public var menuID: Menu.ID?
   public var title: String
   public var notes: String?
   public var dayCount: Int
   public var items: [MenuChatItemContext]
 
   public init(
+    menuID: Menu.ID? = nil,
     title: String,
     notes: String? = nil,
     dayCount: Int,
     items: [MenuChatItemContext] = []
   ) {
+    self.menuID = menuID
     self.title = title
     self.notes = notes
     self.dayCount = dayCount
@@ -362,6 +369,7 @@ public struct MenuChatContext: Equatable, Sendable {
 
   public init(detail: MenuDetailData) {
     self.init(
+      menuID: detail.menu.id,
       title: detail.menu.title,
       notes: detail.menu.notes,
       dayCount: detail.menu.dayCount,
@@ -569,6 +577,7 @@ private func areMenuChatItemsInIncreasingOrder(
 }
 
 public struct RecipeChatRecipeContext: Equatable, Sendable {
+  public var recipeID: Recipe.ID?
   public var title: String
   public var subtitle: String?
   public var summary: String?
@@ -585,6 +594,7 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
   public var serveWith: [ServeWithItem]
 
   public init(
+    recipeID: Recipe.ID? = nil,
     title: String,
     subtitle: String? = nil,
     summary: String? = nil,
@@ -600,6 +610,7 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
     chefItUp: String? = nil,
     serveWith: [ServeWithItem] = []
   ) {
+    self.recipeID = recipeID
     self.title = title
     self.subtitle = subtitle
     self.summary = summary
@@ -620,6 +631,7 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
     let ingredientLinesBySection = Dictionary(grouping: detail.ingredientLines) { $0.sectionID }
     let instructionStepsBySection = Dictionary(grouping: detail.instructionSteps) { $0.sectionID }
     self.init(
+      recipeID: detail.recipe.id,
       title: detail.recipe.title,
       subtitle: detail.recipe.subtitle,
       summary: detail.recipe.summary,
@@ -724,7 +736,7 @@ public struct RecipeChatSection: Equatable, Sendable {
 }
 
 public struct RecipeChatMessage: Identifiable, Sendable, Equatable {
-  public enum Role: Sendable, Equatable {
+  public enum Role: String, Codable, QueryBindable, QueryDecodable, Sendable, Equatable {
     case user
     case assistant
   }
@@ -889,10 +901,14 @@ public final class RecipeChatModel: Identifiable {
   @ObservationIgnored @Dependency(\.apiKeyStore) private var apiKeyStore
   @ObservationIgnored @Dependency(\.recipeChatInstructions) private var chatInstructions
   @ObservationIgnored @Dependency(\.recipeChatProviderPreference) private var providerPreference
+  @ObservationIgnored @Dependency(\.defaultDatabase) private var database
+  @ObservationIgnored @Dependency(\.date.now) private var now
+  @ObservationIgnored @Dependency(\.uuid) private var uuid
 
   public init(context: RecipeChatContext) {
     self.context = context
     selectedProvider = defaultProvider()
+    loadPersistedThread()
   }
 
   public var frontierAvailable: Bool { !availableProviders.isEmpty }
@@ -914,10 +930,13 @@ public final class RecipeChatModel: Identifiable {
   public func send(_ text: String) async {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty, !isResponding else { return }
-    messages.append(RecipeChatMessage(role: .user, text: trimmed))
+    messages.append(RecipeChatMessage(id: uuid(), role: .user, text: trimmed))
     isResponding = true
     errorText = nil
-    defer { isResponding = false }
+    defer {
+      isResponding = false
+      persistCurrentThread()
+    }
 
     let requestMessages = history()
     let index = appendAssistantPlaceholder()
@@ -979,7 +998,7 @@ public final class RecipeChatModel: Identifiable {
   }
 
   private func appendAssistantPlaceholder() -> Int {
-    messages.append(RecipeChatMessage(role: .assistant, text: ""))
+    messages.append(RecipeChatMessage(id: uuid(), role: .assistant, text: ""))
     return messages.count - 1
   }
 
@@ -994,6 +1013,31 @@ public final class RecipeChatModel: Identifiable {
 
   private func describe(_ error: any Error) -> String {
     RecipeChatErrorText.describe(error)
+  }
+
+  private func loadPersistedThread() {
+    guard let subject = context.persistenceSubject else { return }
+    do {
+      messages = try database.write { db in
+        try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: now), in: db)
+        return try RecipeChatStore.fetchMessages(for: subject, in: db)
+      }
+    } catch {
+      errorText = "Could not load the saved chat for this \(context.subject)."
+    }
+  }
+
+  private func persistCurrentThread() {
+    guard let subject = context.persistenceSubject else { return }
+    do {
+      try database.write { db in
+        try RecipeChatStore.replaceMessages(messages, for: subject, in: db, now: now)
+      }
+    } catch {
+      if errorText == nil {
+        errorText = "Could not save this chat locally."
+      }
+    }
   }
 
   private func defaultProvider() -> FrontierProvider {
