@@ -121,7 +121,7 @@ struct ChatWorkspaceSplit<Reader: View>: View {
   }
 
   private func proposedChatWidth(base: CGFloat, translation: CGFloat, totalWidth: CGFloat) -> CGFloat {
-    let maximum = max(0, totalWidth - ChatWorkspaceDivider.dividerWidth - 360)
+    let maximum = max(0, totalWidth - ChatWorkspaceDivider.dividerWidth - ChatWorkspaceMetrics.minimumSegmentedReaderWidth)
     return min(max(base - translation, 0), maximum)
   }
 
@@ -131,9 +131,18 @@ struct ChatWorkspaceSplit<Reader: View>: View {
     case .readerOnly:
       return 0
     case .balanced:
-      return min(max(totalWidth * 0.34, 340), min(460, available * 0.5))
+      return min(
+        max(totalWidth * ChatWorkspaceMetrics.balancedWidthFraction, ChatWorkspaceMetrics.balancedMinimumChatWidth),
+        min(
+          ChatWorkspaceMetrics.balancedMaximumChatWidth,
+          available * ChatWorkspaceMetrics.balancedAvailableWidthLimit
+        )
+      )
     case .chatDive:
-      return min(max(totalWidth * 0.48, 440), available * 0.58)
+      return min(
+        max(totalWidth * ChatWorkspaceMetrics.chatDiveWidthFraction, ChatWorkspaceMetrics.chatDiveMinimumChatWidth),
+        available
+      )
     }
   }
 
@@ -147,6 +156,18 @@ struct ChatWorkspaceSplit<Reader: View>: View {
   private func cycleDetent() {
     currentDetent = currentDetent.next
   }
+}
+
+private enum ChatWorkspaceMetrics {
+  static let balancedMinimumChatWidth: CGFloat = 340
+  static let balancedMaximumChatWidth: CGFloat = 460
+  static let balancedWidthFraction: CGFloat = 0.34
+  static let balancedAvailableWidthLimit: CGFloat = 0.5
+  static let chatDiveMinimumChatWidth: CGFloat = 440
+  // Dogfood batch 4: chat-dive should settle at roughly three quarters of iPad width.
+  static let chatDiveWidthFraction: CGFloat = 0.75
+  // 37.5% of RecipeReaderView's 640pt two-column threshold, preserving a narrow segmented reader.
+  static let minimumSegmentedReaderWidth: CGFloat = 240
 }
 
 private struct ChatWorkspaceDivider: View {
@@ -559,6 +580,13 @@ private struct SelectableAssistantText: UIViewRepresentable {
     if textView.attributedText?.string != rendered.string {
       textView.attributedText = rendered
     }
+  }
+
+  func sizeThatFits(_ proposal: ProposedViewSize, uiView textView: UITextView, context: Context) -> CGSize? {
+    guard let width = proposal.width else { return nil }
+    let targetSize = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
+    let fittingSize = textView.sizeThatFits(targetSize)
+    return CGSize(width: width, height: fittingSize.height)
   }
 
   func makeCoordinator() -> Coordinator {

@@ -260,7 +260,6 @@ private struct IngredientLineStructureEditor: View {
       Text(line.originalText)
         .font(.subheadline)
       Toggle("Header", isOn: $line.isHeader)
-      StackedTextField(title: "Substitution", text: $line.substitution, axis: .vertical)
     }
     .padding(.vertical, 4)
   }

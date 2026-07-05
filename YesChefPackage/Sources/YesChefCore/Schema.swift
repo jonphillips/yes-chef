@@ -616,6 +616,21 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Remove ingredient substitutions") { db in
+      try #sql("""
+        ALTER TABLE "ingredientLines"
+        DROP COLUMN "substitution"
+        """)
+        .execute(db)
+
+      try #sql("""
+        UPDATE "recipeNotes"
+        SET "noteType" = 'adaptation'
+        WHERE "noteType" = 'substitution'
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     defaultDatabase = database
     switch syncMode {

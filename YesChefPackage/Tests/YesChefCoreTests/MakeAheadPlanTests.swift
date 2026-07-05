@@ -93,10 +93,6 @@ extension RecipeCoreTests {
           ]
         )
       )
-      expectNoDifference(
-        IngredientSubstitutionClient.parse(#"{"text":"Use 1 tsp flour plus 2 tsp fine cornmeal."}"#),
-        IngredientSubstitutionSuggestion(text: "Use 1 tsp flour plus 2 tsp fine cornmeal.")
-      )
     }
 
     @Test
@@ -404,51 +400,6 @@ extension RecipeCoreTests {
         expectNoDifference(recipe.chefItUp, nil)
         expectNoDifference(ServeWithCoding.decode(recipe.serveWith).map(\.title), ["Skillet cornbread"])
         expectNoDifference(recipe.dateModified, removedAt)
-      }
-    }
-
-    @Test
-    func ingredientSubstitutionWritesLineAndBumpsRecipeModifiedDate() throws {
-      @Dependency(\.defaultDatabase) var database
-      let now = Date(timeIntervalSinceReferenceDate: 826_000_000)
-      let modifiedAt = now.addingTimeInterval(60)
-      let recipeID = SampleUUIDSequence.uuid(36_401)
-      let sectionID = SampleUUIDSequence.uuid(36_402)
-      let lineID = SampleUUIDSequence.uuid(36_403)
-
-      try database.write { db in
-        try Recipe.insert {
-          Recipe(id: recipeID, title: "Tortillas", dateCreated: now, dateModified: now)
-        }
-        .execute(db)
-        try IngredientSection.insert {
-          IngredientSection(id: sectionID, recipeID: recipeID, sortOrder: 0)
-        }
-        .execute(db)
-        try IngredientLine.insert {
-          IngredientLine(
-            id: lineID,
-            recipeID: recipeID,
-            sectionID: sectionID,
-            originalText: "1 Tbsp masa harina",
-            sortOrder: 0
-          )
-        }
-        .execute(db)
-        try RecipeRepository.setIngredientSubstitution(
-          "1 tsp flour plus 2 tsp fine cornmeal",
-          lineID: lineID,
-          recipeID: recipeID,
-          now: modifiedAt,
-          in: db
-        )
-      }
-
-      try database.read { db in
-        let line = try #require(try IngredientLine.find(lineID).fetchOne(db))
-        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
-        expectNoDifference(line.substitution, "1 tsp flour plus 2 tsp fine cornmeal")
-        expectNoDifference(recipe.dateModified, modifiedAt)
       }
     }
 
