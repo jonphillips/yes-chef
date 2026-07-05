@@ -358,6 +358,7 @@ final class MealCalendarModel {
 
   func applyActionCatalog(for chatModel: RecipeChatModel) -> [AnyChatApplyAction] {
     @Dependency(\.mealPlanComplementClient) var mealPlanComplementClient
+    @Dependency(\.mealPlanMakeAheadStrategyClient) var mealPlanMakeAheadStrategyClient
 
     let context = chatModel.context.serialized()
     let dayTitle = selectedDateTitle
@@ -371,6 +372,24 @@ final class MealCalendarModel {
       committedTitle: "Added to Meal Plan",
       extract: { selection, messages in
         try await mealPlanComplementClient(
+          selection: selection,
+          messages: messages,
+          context: context,
+          tier: chatModel.activeTier
+        )
+      },
+      commit: { _ in
+      }
+    )
+    let makeAheadAction = ChatApplyAction<MealPlanMakeAheadStrategy>(
+      title: "Build make-ahead strategy -> Meal plan note",
+      extractingTitle: "Building make-ahead strategy...",
+      reviewTitle: "Review make-ahead strategy",
+      commitTitle: "Add Strategy Note",
+      committingTitle: "Adding strategy note...",
+      committedTitle: "Added Strategy Note",
+      extract: { selection, messages in
+        try await mealPlanMakeAheadStrategyClient(
           selection: selection,
           messages: messages,
           context: context,
@@ -395,6 +414,22 @@ final class MealCalendarModel {
             }
           )
         }
+      },
+      AnyChatApplyAction(makeAheadAction) { [weak self] strategy in
+        let summary = strategy.rendered().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !summary.isEmpty else { return [] }
+        return [
+          ChatApplyReviewItem(
+            title: strategy.title,
+            summary: summary,
+            commitTitle: makeAheadAction.commitTitle,
+            committingTitle: makeAheadAction.committingTitle,
+            committedTitle: makeAheadAction.committedTitle,
+            commit: {
+              try self?.commitMakeAheadStrategy(strategy, on: scheduledDate)
+            }
+          )
+        ]
       }
     ]
   }
@@ -466,6 +501,23 @@ final class MealCalendarModel {
     let result = try database.write { db in
       let itemID = try MealCalendarRepository.addComplementItem(
         suggestion,
+        on: startOfDay(scheduledDate),
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
+      return (itemID, try MealCalendarRequest().fetch(db))
+    }
+    applyOptimisticRows(result.1, updatedItemIDs: [result.0])
+  }
+
+  private func commitMakeAheadStrategy(
+    _ strategy: MealPlanMakeAheadStrategy,
+    on scheduledDate: Date
+  ) throws {
+    let result = try database.write { db in
+      let itemID = try MealCalendarRepository.addMakeAheadStrategyNote(
+        strategy,
         on: startOfDay(scheduledDate),
         in: db,
         now: now,
