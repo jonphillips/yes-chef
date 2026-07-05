@@ -296,7 +296,7 @@ struct MealCalendarDayAgendaView: View {
       if showsHeader {
         MealCalendarDayHeader(
           model: model,
-          cookSession: cookSessionButtonTapped,
+          cookSession: cookSessionAction,
           chat: chatButtonTapped
         )
       }
@@ -344,12 +344,18 @@ struct MealCalendarDayAgendaView: View {
     String(model.selectedDate.timeIntervalSinceReferenceDate)
   }
 
+  private var cookSessionPresentation: CookSessionPresentation? {
+    CookSessionPresentation(plannerTitle: model.selectedDateTitle, rows: model.selectedDayRows)
+  }
+
+  private var cookSessionAction: (() -> Void)? {
+    guard cookSessionPresentation != nil else { return nil }
+    return cookSessionButtonTapped
+  }
+
   private func cookSessionButtonTapped() {
-    guard let presentation = CookSessionPresentation(
-      plannerTitle: model.selectedDateTitle,
-      rows: model.selectedDayRows
-    ) else { return }
-    onCookSessionRequested?(presentation)
+    guard let cookSessionPresentation else { return }
+    onCookSessionRequested?(cookSessionPresentation)
   }
 
   private func chatButtonTapped() {
@@ -796,49 +802,80 @@ private struct MealCalendarChip: View {
 
 private struct MealCalendarDayHeader: View {
   let model: MealCalendarModel
-  var cookSession: () -> Void
+  var cookSession: (() -> Void)?
   var chat: () -> Void
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline) {
-      VStack(alignment: .leading, spacing: 6) {
-        Text(model.selectedDateTitle)
-          .font(.largeTitle.bold())
-        Text(itemCountTitle)
-          .font(.subheadline)
-          .foregroundStyle(.secondary)
+    ViewThatFits(in: .horizontal) {
+      // Wide: title and all actions on one row.
+      HStack(alignment: .firstTextBaseline) {
+        titleBlock
+        Spacer()
+        cookButton
+        chatButton
+        addMenu
       }
-      Spacer()
-      if CookSessionPresentation(plannerTitle: model.selectedDateTitle, rows: model.selectedDayRows) != nil {
-        Button {
-          cookSession()
-        } label: {
-          Label("Cook these", systemImage: "flame")
+      // Narrow (agenda rail): title, then "Cook these" on its own line, then Chat + Add.
+      VStack(alignment: .leading, spacing: 12) {
+        titleBlock
+        if cookSession != nil {
+          cookButton
+            .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.borderedProminent)
+        HStack {
+          chatButton
+          addMenu
+          Spacer()
+        }
       }
-      Button {
-        chat()
-      } label: {
-        Label("Chat", systemImage: "sparkles")
-      }
-      .buttonStyle(.bordered)
-      Menu {
-        Button {
-          model.addItemButtonTapped(kind: .recipe)
-        } label: {
-          Label("Recipe", systemImage: MealPlanItemKind.recipe.systemImage)
-        }
-        Button {
-          model.addItemButtonTapped(kind: .note)
-        } label: {
-          Label("Note", systemImage: MealPlanItemKind.note.systemImage)
-        }
-      } label: {
-        Label("Add", systemImage: "plus")
+    }
+  }
+
+  private var titleBlock: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text(model.selectedDateTitle)
+        .font(.largeTitle.bold())
+      Text(itemCountTitle)
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  @ViewBuilder
+  private var cookButton: some View {
+    if let cookSession {
+      Button(action: cookSession) {
+        Label("Cook these", systemImage: "flame")
       }
       .buttonStyle(.borderedProminent)
     }
+  }
+
+  private var chatButton: some View {
+    Button {
+      chat()
+    } label: {
+      Label("Chat", systemImage: "sparkles")
+    }
+    .buttonStyle(.bordered)
+  }
+
+  private var addMenu: some View {
+    Menu {
+      Button {
+        model.addItemButtonTapped(kind: .recipe)
+      } label: {
+        Label("Recipe", systemImage: MealPlanItemKind.recipe.systemImage)
+      }
+      Button {
+        model.addItemButtonTapped(kind: .note)
+      } label: {
+        Label("Add Note", systemImage: MealPlanItemKind.note.systemImage)
+      }
+    } label: {
+      Label("Add", systemImage: "plus")
+    }
+    .buttonStyle(.borderedProminent)
   }
 
   private var itemCountTitle: String {
