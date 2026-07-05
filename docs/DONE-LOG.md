@@ -10,6 +10,35 @@ Newest first.
 
 ---
 
+## Cooking reader + planner follow-ons — independent reader columns + day-scoped make-ahead verb
+
+**Architect-approved 2026-07-05** — yes-chef [PR #91](https://github.com/jonphillips/yes-chef/pull/91).
+The cooking-workspace effort's queued dogfood follow-ons, two cohesive slices in one dispatch, **zero
+schema**. **Slice 1 — independently-scrollable dense-reader columns:** the two-column iPad reader now pins a
+fixed masthead (`header` + `metadata` above a `Divider`) over an `HStack` of two independent `ScrollView`s,
+so a long ingredient list and long directions scroll separately instead of sharing one scroll. The refactor
+split `recipeBody(isTwoColumn:)` into `compactRecipeBody` (picker/segmented) + a shared `directionsColumn`,
+so the directions content is defined once and reused by both layouts; the narrow/segmented path is behaviorally
+unchanged. Pure UI. **Slice 2 — day-scoped planner make-ahead verb:** a "Build make-ahead strategy" chat verb
+over the selected planner day synthesizes a sequenced prep strategy across the day's recipes, leaning on saved
+`makeAhead` notes. **Commit shape** ([[chat-verb-commit-shapes]]) = a `.note` `MealPlanItem` via the existing
+`addNoteItem` — **no schema field** (ADR-0013's no-planner-container holds), `recipeID == nil` per
+[[menu-item-recipe-id-invariant]]. Mirrors `complementAction`: empty `ChatApplyAction.commit`, real write in
+the `ChatApplyReviewItem.commit`; parse failure degrades to empty steps → no review item → nothing written.
+Structured steps (not a flattened blob) per [[llm-curation-not-synthesis]]. New `MealPlanMakeAheadStrategy`
+model + `MealPlanMakeAheadStrategyClient` + parser + `MealCalendarRepository.addMakeAheadStrategyNote`, with
+parse / tier-and-context-plumbing / staged-write-only-on-commit / day-ordering tests.
+
+- **Non-blocking review note** (architect, folded forward, not filed as a bug): `MealPlanMakeAheadStep.sourceItem`
+  is plumbed end to end (system prompt → JSON schema → parse → struct → test) but not yet rendered — kept as
+  latent provenance for a future reconcile-against-day-items pass; a one-line comment on the field records the
+  intent so raw item IDs never leak into note text. Decide keep-vs-drop when the broader Meal-Planner chat-verbs
+  effort lands.
+- **iPad device pass** (Jon): confirm the fixed masthead + independent column scroll feels right in both
+  orientations (a tall header now permanently occupies vertical room above the columns).
+
+---
+
 ## Chat persistence (ADR-0015) — local-only, per-subject, 1-month prune
 
 **Architect-approved 2026-07-05** — yes-chef [PR #89](https://github.com/jonphillips/yes-chef/pull/89).

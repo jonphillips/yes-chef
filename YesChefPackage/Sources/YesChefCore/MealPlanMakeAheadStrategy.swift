@@ -33,6 +33,8 @@ public struct MealPlanMakeAheadStrategy: Equatable, Sendable {
 public struct MealPlanMakeAheadStep: Equatable, Sendable {
   public var when: String
   public var task: String
+  // Latent provenance: the meal plan item ID this step came from. Parsed and retained but not yet
+  // rendered — kept for a future reconcile-against-day-items pass, so raw IDs never reach note text.
   public var sourceItem: String?
 
   public init(when: String, task: String, sourceItem: String? = nil) {
