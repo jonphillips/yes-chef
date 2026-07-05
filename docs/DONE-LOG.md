@@ -10,6 +10,31 @@ Newest first.
 
 ---
 
+## Chat persistence (ADR-0015) — local-only, per-subject, 1-month prune
+
+**Architect-approved 2026-07-05** — yes-chef [PR #89](https://github.com/jonphillips/yes-chef/pull/89).
+Chat is no longer ephemeral: a new local-only `chatMessages` SQLite table persists a thread **per subject**
+— recipe id / menu id / planner day — so a conversation survives navigation, dismiss, and relaunch, and the
+"same" subject opened from a different surface (reader vs. meal-planner) reopens the *same* thread (fixes
+both "gone the minute I look away" and blank-on-surface-switch). **Local-only** — the table is deliberately
+excluded from `YesChefCloudSync.makeSyncEngine`; the CloudSync live-schema audit test was amended to treat
+`chatMessages` as the declared local-only exception (so the "new @Table silently stays local" tripwire stays
+intact). **1-month time-based prune** — messages older than ~30 days are dropped on bootstrap and on every
+chat write. Subject identity added to the recipe/menu/planner chat contexts (optional ids → graceful
+"don't persist" when absent; all app call sites use the `detail:` initializers, so ids are populated).
+`RecipeChatModel` loads the persisted thread on init and re-saves the whole thread in `send`'s `defer` after
+the assistant text completes (empty placeholders are skipped). `RecipeChatMessage.Role` gained
+`String`/`Codable`/`QueryBindable` conformances for storage. Design + resolved opens (SQLite-table-the-
+SyncEngine-ignores; distill-into-the-recipe guardrail untouched — pure storage, no new nudge) in
+[`docs/decisions/ADR-0015-chat-persistence.md`](decisions/ADR-0015-chat-persistence.md).
+
+- **Non-blocking review notes** (architect, folded forward, not filed as bugs): prune uses a Swift-side
+  `fetchAll().filter` rather than a SQL `where createdAt < cutoff`, so the `createdAt` index it creates is
+  currently ornamental; `loadPersistedThread` runs a synchronous main-actor DB write (the prune) on every
+  chat open. Both imperceptible at dogfood scale — fold into a later chat slice if chat volume grows.
+
+---
+
 ## Reader photo affordances — set-as-cover + full-screen zoom
 
 **Shipped 2026-07-04** — yes-chef [PR #87](https://github.com/jonphillips/yes-chef/pull/87). The cooking-
