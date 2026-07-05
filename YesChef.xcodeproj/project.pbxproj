@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		00574373DEDB973C1C8CEB58 /* YesChefCore in Frameworks */ = {isa = PBXBuildFile; productRef = 1DD8AB1F6A8008B5A5EFE56E /* YesChefCore */; };
+		0428A2992F17EBEB4BF5644F /* MealCalendarDayHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50F87C9475E4E92D549DA40 /* MealCalendarDayHeader.swift */; };
 		0448097B16770EDEA54D2BE8 /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = F6DB8F903598A87E2AA0443F /* CasePaths */; };
 		0E82B1425855BBD9736BDFD7 /* RecipeFilterPickerViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8DD44679AA1444215DC743E /* RecipeFilterPickerViews.swift */; };
 		15FC79679962B0C395487A81 /* RecipeListViewOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8281916C17EA01F6099FA119 /* RecipeListViewOptions.swift */; };
@@ -140,6 +141,7 @@
 		E48B9ACFF26E71C15146E3E9 /* RecipeListPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeListPresets.swift; sourceTree = "<group>"; };
 		E8DD44679AA1444215DC743E /* RecipeFilterPickerViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeFilterPickerViews.swift; sourceTree = "<group>"; };
 		ED3C57E4D25E07B0D4161163 /* CategoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryViews.swift; sourceTree = "<group>"; };
+		F50F87C9475E4E92D549DA40 /* MealCalendarDayHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCalendarDayHeader.swift; sourceTree = "<group>"; };
 		F9FE33039715323689ED24FD /* RecipeCategoryFilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeCategoryFilterView.swift; sourceTree = "<group>"; };
 		FC48B146F8E70CD1E9903EBC /* YesChef.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = YesChef.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FE43F12069919277037EDE55 /* RecipeDetailModel+Enrichment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecipeDetailModel+Enrichment.swift"; sourceTree = "<group>"; };
@@ -231,6 +233,7 @@
 				27FA69A8957E5DC8A49A9E3F /* GroceryViews.swift */,
 				18FECD94C6F2E120A02EE0A6 /* IdleTimerDisabledModifier.swift */,
 				7ED8C4BF9300184ABE4E59A5 /* Info.plist */,
+				F50F87C9475E4E92D549DA40 /* MealCalendarDayHeader.swift */,
 				B49D2E9B66A731DB272F063C /* MealCalendarModels.swift */,
 				76A768628F1345FDF66EDC49 /* MealCalendarViews.swift */,
 				7090DA55279458851517DD5A /* MenuModels.swift */,
@@ -406,6 +409,7 @@
 				AE11AE8D6A7D9F8E06642477 /* GroceryPantryReviewViews.swift in Sources */,
 				A9FBE5AA277DCBB1A66A417E /* GroceryViews.swift in Sources */,
 				26A54D34845DADD8C9E1493D /* IdleTimerDisabledModifier.swift in Sources */,
+				0428A2992F17EBEB4BF5644F /* MealCalendarDayHeader.swift in Sources */,
 				866C7FBB7E3079ECED997DEB /* MealCalendarModels.swift in Sources */,
 				F3F3ED67EB4980A43151000F /* MealCalendarViews.swift in Sources */,
 				D778483B6523AB97BDE06ED6 /* MenuModels.swift in Sources */,
