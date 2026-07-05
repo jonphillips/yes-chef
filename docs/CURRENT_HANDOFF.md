@@ -1,9 +1,10 @@
 # Current Handoff
 
-Last updated: July 4, 2026 (**Dogfood batch 4 complete** — shared-chat truncation fix + planner layout nits
-+ full ingredient-substitution removal incl. the synced column, PR #88. **Next Up = Chat persistence**
-(ADR-0015, Accepted) — persist chat locally, per-subject, 1-month prune; off the sync spine so it may precede
-launch work. Lean verification is the default.)
+Last updated: July 5, 2026 (**Chat persistence complete** — ADR-0015 shipped: local-only per-subject
+`chatMessages` store, 1-month prune, excluded from the SyncEngine, PR #89 → DONE-LOG. **Next Up =
+cooking-workspace reader + planner follow-ons** (two cohesive slices, one PR, **zero schema**):
+independently-scrollable dense-reader columns + a day-scoped planner make-ahead verb. Lean verification is
+the default.)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -19,22 +20,31 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Chat persistence (ADR-0015 — Accepted 2026-07-04).** Full design in
-[`docs/decisions/ADR-0015-chat-persistence.md`](decisions/ADR-0015-chat-persistence.md) — read that first.
-Persist chat to disk so a thread survives navigation / dismiss / relaunch, keyed **one-thread-per-subject**
-(recipe id / menu id / planner day) so every surface sharing a subject opens the same thread — fixing both
-"gone the minute I look away" and blank-on-surface-switch. **Local-only** — does **not** ride CloudKit;
-**1-month time-based prune** (drop messages older than ~30 days on launch/write). Off the sync spine, so it
-may precede the launch/sync work. **Read first:** `RecipeChatWorkspace.swift` and the in-memory chat model in
-`YesChefCore/RecipeChat.swift` that holds messages today; `Schema.swift` for where the local-only store table
-lands. Resolve the two impl-detail opens from the ADR at dispatch (SQLite table the SyncEngine is told to
-ignore vs. a separate lightweight store; the distill-into-the-recipe guardrail).
+**Cooking-workspace reader + planner follow-ons (two cohesive slices, one PR — zero schema).** Both are
+queued dogfood follow-ons in [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) — read that
+first. Batched deliberately to keep schema mutable (see the dev-stance note below). Do both, in order:
 
-**Standing release follow-up carried from Phase E (not a dispatch on its own):** before any prod/TestFlight
-cut, promote to the **production** schema the Phase E Slice 3 pantry-policy + `canonicalName` CloudKit
-fields, the ADR-0012 S2 `Menu.prepPlan` BLOB (PR #82), **and** the reader-photo-affordances
-`Recipe.coverPhotoID` column (PR #87), and
-note the app target (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
+1. **Independently-scrollable dense-reader columns** (§ Slice A "Queued reader polish"). In the two-column
+   iPad reader, ingredients and directions share one scroll today; give each column its own `ScrollView`
+   so a long ingredient list and long instructions scroll separately. The narrow/segmented layout is
+   unaffected (only one column is visible there). Pure UI, no schema.
+2. **Day-scoped planner make-ahead verb** (§ "Out of scope → Meal Planner context"). A "make-ahead
+   strategy" chat verb over *all* items on the selected planner day — synthesize a prep sequence across the
+   day's recipes, leaning on each recipe's saved `makeAhead` where present. **Classify the commit shape
+   first** ([[chat-verb-commit-shapes]]): land it as a **no-commit advisory or a `.note` `MealPlanItem`** on
+   the day — ADR-0013 already established there's **no planner container table**, so do **not** add a schema
+   field. Respect [[llm-curation-not-synthesis]]: sequence/select distinct prep steps, never flatten the
+   recipes into one blob.
+
+Both are iPad-primary — Jon's device pass covers both orientations. Verify per the Verification Pattern.
+
+**Standing release follow-up carried from Phase E (not a dispatch — a pre-cut ops step Jon runs).** We stay
+in the CloudKit **Development** environment (dev stance) so the schema keeps evolving freely; promoting to
+**Production** is additive-only and permanently locks those record types, so it is deliberately **held**
+until an actual prod/TestFlight cut — not something to dispatch now. At that cut, deploy to the production
+schema the Phase E Slice 3 pantry-policy + `canonicalName` fields, the ADR-0012 S2 `Menu.prepPlan` BLOB
+(PR #82), **and** the reader-photo-affordances `Recipe.coverPhotoID` column (PR #87); and note the app
+target (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 
 Phase E is **fully complete** — Slice 4 (`PantrySuppression` + review UI, PR #80 → DONE-LOG), Slice 3
 (pantry policy + `canonicalName` migration, PR #79 → DONE-LOG), Slices 1 + 2 (canonical key + `Measure`,
@@ -91,15 +101,16 @@ target.
   DONE-LOG). Two dogfood follow-ons folded into
   [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md): a **day-scoped make-ahead verb** for
   the meal planner (§ "Out of scope → Meal Planner") and **separately-scrollable ingredients/directions** in
-  the dense reader (§ Slice A). Both queued, not dispatched.
+  the dense reader (§ Slice A). Both **promoted to Next Up** (combined, one PR, zero schema).
 
 - **Recipe text normalization** — a "normalize recipe" function (de-cap old all-caps Milk Street imports,
   strip manual instruction numbers now that we auto-number). **Unscoped** — no natural existing effort home;
   parked in [`docs/open-questions.md`](open-questions.md) until scoped. Interacts with ADR-0014 (text-editing
   model), so sequence them.
 
-- **Chat persistence** (ADR-0015, **Accepted** 2026-07-04) — **promoted to Next Up** (see above). Design in
-  [`docs/decisions/ADR-0015-chat-persistence.md`](decisions/ADR-0015-chat-persistence.md).
+- **Chat persistence** (ADR-0015, **Accepted** 2026-07-04) — **complete** (PR #89 → DONE-LOG): local-only
+  per-subject `chatMessages` store, 1-month prune, excluded from the SyncEngine (guarded by the live-schema
+  audit test). Design in [`docs/decisions/ADR-0015-chat-persistence.md`](decisions/ADR-0015-chat-persistence.md).
 
 - **Dogfood fixes — batch 4** — complete (PR #88 → DONE-LOG; shared-chat truncation fix · planner layout
   nits · full ingredient-substitution removal incl. the synced column).
