@@ -1,10 +1,9 @@
 # Current Handoff
 
-Last updated: July 5, 2026 (**Chat persistence complete** — ADR-0015 shipped: local-only per-subject
-`chatMessages` store, 1-month prune, excluded from the SyncEngine, PR #89 → DONE-LOG. **Next Up =
-cooking-workspace reader + planner follow-ons** (two cohesive slices, one PR, **zero schema**):
-independently-scrollable dense-reader columns + a day-scoped planner make-ahead verb. Lean verification is
-the default.)
+Last updated: July 5, 2026 (**Next Up = ADR-0016 multi-recipe cook session** — Accepted 2026-07-05, Jon
+greenlit build-not-sketch. Two slices, **zero schema**: cook a planner day's (or menu's) recipes together in
+the existing Reader with a chip-strip switcher + session-only "done"; **not** Cooking Mode; **no voice**.
+Lean verification is the default.)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -20,23 +19,24 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Cooking-workspace reader + planner follow-ons (two cohesive slices, one PR — zero schema).** Both are
-queued dogfood follow-ons in [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) — read that
-first. Batched deliberately to keep schema mutable (see the dev-stance note below). Do both, in order:
+**Multi-recipe cook session — ADR-0016 (Accepted 2026-07-05).** Cook the recipes on a planner day (or a
+menu) together, each in the **existing Reader**, with a pinned **chip-strip switcher** (tap + swipe) and
+**session-only "done"** that shrinks the strip; per-recipe scroll/checkmarks/scale preserved across switches.
+Reuses `RecipeDetailView(recipeID:scaleContext:…)` per recipe; per-placement `ScaleContext` threaded through
+(**zero new scaling code**); recipe-kind items only ([[menu-item-recipe-id-invariant]]). **Not** Cooking Mode
+(left untouched), **no voice** (dropped by design). **Two slices, zero schema** — bundle both in one dispatch:
+- **S1** — `CookSessionModel` + `CookSessionView` (chip strip over a **keep-alive** paged host of per-recipe
+  Readers; keep-awake on) + **"Cook these"** entry on a planner day (`itemsForDay`, `.mealPlanItem` scale).
+- **S2** — the same **"Cook these"** entry on a Menu (menu's recipe items, `.menuItem` scale); pure reuse of
+  S1's `CookSessionView`.
 
-1. **Independently-scrollable dense-reader columns** (§ Slice A "Queued reader polish"). In the two-column
-   iPad reader, ingredients and directions share one scroll today; give each column its own `ScrollView`
-   so a long ingredient list and long instructions scroll separately. The narrow/segmented layout is
-   unaffected (only one column is visible there). Pure UI, no schema.
-2. **Day-scoped planner make-ahead verb** (§ "Out of scope → Meal Planner context"). A "make-ahead
-   strategy" chat verb over *all* items on the selected planner day — synthesize a prep sequence across the
-   day's recipes, leaning on each recipe's saved `makeAhead` where present. **Classify the commit shape
-   first** ([[chat-verb-commit-shapes]]): land it as a **no-commit advisory or a `.note` `MealPlanItem`** on
-   the day — ADR-0013 already established there's **no planner container table**, so do **not** add a schema
-   field. Respect [[llm-curation-not-synthesis]]: sequence/select distinct prep steps, never flatten the
-   recipes into one blob.
+Design + all seven resolved decisions (D1–D7) in
+[`docs/decisions/ADR-0016-multi-recipe-cook-session.md`](decisions/ADR-0016-multi-recipe-cook-session.md).
+Keep-alive paging (D4) is the one real SwiftUI constraint — don't conditionally construct one Reader at a
+time or per-recipe `@State` resets on every switch. iPad + iPhone.
 
-Both are iPad-primary — Jon's device pass covers both orientations. Verify per the Verification Pattern.
+The remaining cooking-workspace follow-on (**Meal-Planner chat verbs**, broader) stays parked in the Ready
+Efforts queue below, not a dispatch target.
 
 **Standing release follow-up carried from Phase E (not a dispatch — a pre-cut ops step Jon runs).** We stay
 in the CloudKit **Development** environment (dev stance) so the schema keeps evolving freely; promoting to
@@ -53,9 +53,10 @@ PR #77 → DONE-LOG). Dogfood batch 3 is
 keep-awake; PR #75 → DONE-LOG), and **batch 4** is complete (shared-chat truncation fix · planner layout
 nits · full ingredient-substitution removal incl. the synced column; PR #88 → DONE-LOG). The
 cooking-workspace effort is **complete** (Slices A + B shipped,
-PRs #73 / #74 → DONE-LOG). Its **Menu chat-verbs** follow-on shipped as ADR-0012 (complete), and its
-**reader photo affordances** shipped (PR #87 → DONE-LOG). Its one remaining named follow-on —
-**Meal-Planner chat verbs** (now incl. a day-scoped make-ahead verb) — lives in
+PRs #73 / #74 → DONE-LOG). Its **Menu chat-verbs** follow-on shipped as ADR-0012 (complete), its
+**reader photo affordances** shipped (PR #87 → DONE-LOG), and its **independently-scrollable dense-reader
+columns + day-scoped make-ahead verb** shipped (PR #91 → DONE-LOG). Its one remaining named follow-on —
+the broader **Meal-Planner chat verbs** effort — lives in
 [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) as a separate later effort.
 
 ## Ready Efforts (queue)
