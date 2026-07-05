@@ -72,7 +72,9 @@ extension MenuComplementClient: DependencyKey {
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, context: context),
-      maxTokens: 1536
+      maxTokens: 1536,
+      reasoningEffort: .medium,
+      promptPreferenceKey: AIPromptPreferenceKind.complements.rawValue
     )
     let response = try await modelClient.complete(request)
     return parse(response.text)

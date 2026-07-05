@@ -86,7 +86,9 @@ extension ChefItUpPlanClient: DependencyKey {
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, context: context),
-      maxTokens: 2048
+      maxTokens: 2048,
+      reasoningEffort: .high,
+      promptPreferenceKey: AIPromptPreferenceKind.chefItUp.rawValue
     )
     let response = try await modelClient.complete(request)
     return parse(response.text)
@@ -153,7 +155,9 @@ extension ServeWithPlanClient: DependencyKey {
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, context: context),
-      maxTokens: 2048
+      maxTokens: 2048,
+      reasoningEffort: .high,
+      promptPreferenceKey: AIPromptPreferenceKind.serveWith.rawValue
     )
     let response = try await modelClient.complete(request)
     return parse(response.text)

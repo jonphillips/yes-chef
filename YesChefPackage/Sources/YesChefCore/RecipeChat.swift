@@ -4,33 +4,6 @@ import LLMClientKit
 import Observation
 import SQLiteData
 
-public let recipeChatCustomInstructionsKey = "recipeChatCustomInstructions"
-public let recipeChatFrontierProviderKey = "recipeChatFrontierProvider"
-
-public struct RecipeChatInstructions: Sendable {
-  public var current: @Sendable () -> String
-
-  public init(current: @escaping @Sendable () -> String) {
-    self.current = current
-  }
-}
-
-extension RecipeChatInstructions: DependencyKey {
-  public static let liveValue = RecipeChatInstructions {
-    UserDefaults.standard.string(forKey: recipeChatCustomInstructionsKey) ?? ""
-  }
-
-  public static let testValue = RecipeChatInstructions { "" }
-  public static let previewValue = RecipeChatInstructions { "" }
-}
-
-extension DependencyValues {
-  public var recipeChatInstructions: RecipeChatInstructions {
-    get { self[RecipeChatInstructions.self] }
-    set { self[RecipeChatInstructions.self] = newValue }
-  }
-}
-
 public struct RecipeChatProviderPreference: Sendable {
   public var current: @Sendable () -> FrontierProvider?
   public var set: @Sendable (FrontierProvider) -> Void
@@ -899,7 +872,6 @@ public final class RecipeChatModel: Identifiable {
 
   @ObservationIgnored @Dependency(\.modelClient) private var modelClient
   @ObservationIgnored @Dependency(\.apiKeyStore) private var apiKeyStore
-  @ObservationIgnored @Dependency(\.recipeChatInstructions) private var chatInstructions
   @ObservationIgnored @Dependency(\.recipeChatProviderPreference) private var providerPreference
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored @Dependency(\.date.now) private var now
@@ -943,7 +915,13 @@ public final class RecipeChatModel: Identifiable {
     do {
       if case .frontier = activeTier {
         let response = try await modelClient.complete(
-          ModelRequest(tier: activeTier, system: systemPrompt(), messages: requestMessages, maxTokens: 2048)
+          ModelRequest(
+            tier: activeTier,
+            system: systemPrompt(),
+            messages: requestMessages,
+            maxTokens: 2048,
+            reasoningEffort: .medium
+          )
         )
         messages[index].text = response.text.isEmpty ? "(No response.)" : response.text
       } else {
@@ -951,7 +929,8 @@ public final class RecipeChatModel: Identifiable {
           tier: activeTier,
           system: systemPrompt(),
           messages: requestMessages,
-          maxTokens: 1024
+          maxTokens: 1024,
+          reasoningEffort: .medium
         )
         for try await chunk in modelClient.stream(request) {
           messages[index].text += chunk.text
@@ -978,14 +957,7 @@ public final class RecipeChatModel: Identifiable {
 
       \(context.serialized())
       """
-    let custom = chatInstructions.current().trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !custom.isEmpty else { return base }
-    return """
-      \(base)
-
-      Additional standing instructions from the user (honor these unless they conflict with the rules above):
-      \(custom)
-      """
+    return base
   }
 
   private func history() -> [ModelMessage] {

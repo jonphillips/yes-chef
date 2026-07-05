@@ -115,12 +115,57 @@ extension RecipeCoreTests {
 
         let request = await recorder.first()
         expectNoDifference(request?.messages, [.user("Can I make this ahead?")])
+        expectNoDifference(request?.reasoningEffort, .medium)
         expectNoDifference(model.messages.map(\.role), [.user, .assistant])
         expectNoDifference(
           model.messages.map(\.text),
           ["Can I make this ahead?", "Yes, make the sauce a day ahead."]
         )
       }
+    }
+
+    @Test
+    func enrichmentClientsSendHighEffortAndTaskPreferenceKeys() async throws {
+      let recorder = ModelRequestRecorder()
+
+      try await withDependencies {
+        $0.modelClient = StubModelClient { request in
+          await recorder.append(request)
+          return ModelResponse(text: #"{"text":""}"#)
+        }
+      } operation: {
+        let chefItUp = ChefItUpPlanClient.liveValue
+        _ = try await chefItUp(
+          selection: "Make it special.",
+          messages: [],
+          context: "Recipe context",
+          tier: .frontier(.openai)
+        )
+      }
+
+      let chefItUpRequest = await recorder.first()
+      expectNoDifference(chefItUpRequest?.reasoningEffort, .high)
+      expectNoDifference(chefItUpRequest?.promptPreferenceKey, AIPromptPreferenceKind.chefItUp.rawValue)
+
+      let serveWithRecorder = ModelRequestRecorder()
+      try await withDependencies {
+        $0.modelClient = StubModelClient { request in
+          await serveWithRecorder.append(request)
+          return ModelResponse(text: #"{"items":[]}"#)
+        }
+      } operation: {
+        let serveWith = ServeWithPlanClient.liveValue
+        _ = try await serveWith(
+          selection: "Suggest sides.",
+          messages: [],
+          context: "Recipe context",
+          tier: .frontier(.openai)
+        )
+      }
+
+      let serveWithRequest = await serveWithRecorder.first()
+      expectNoDifference(serveWithRequest?.reasoningEffort, .high)
+      expectNoDifference(serveWithRequest?.promptPreferenceKey, AIPromptPreferenceKind.serveWith.rawValue)
     }
 
     @Test
@@ -144,6 +189,8 @@ extension RecipeCoreTests {
 
       let request = await recorder.first()
       expectNoDifference(request?.tier, .frontier(.openai))
+      expectNoDifference(request?.reasoningEffort, .high)
+      expectNoDifference(request?.promptPreferenceKey, AIPromptPreferenceKind.makeAheadPrepPlan.rawValue)
       #expect(request?.messages.first?.text.contains("User-selected subject:\nMake the sauce a day ahead.") == true)
     }
 

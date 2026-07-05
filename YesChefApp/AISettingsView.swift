@@ -1,30 +1,84 @@
-import Dependencies
 import LLMClientKit
-import Observation
-import YesChefCore
 import SwiftUI
+import YesChefCore
 
 struct AISettingsView: View {
-  @AppStorage(recipeChatCustomInstructionsKey) private var chatInstructions = ""
   @State private var model = AISettingsModel()
+  @State private var isTaskPreferencesExpanded = false
 
   var body: some View {
+    @Bindable var model = model
+
     Form {
       modelTierSection
+      activeModelsSection
 
       ForEach(model.providers) { provider in
         keySection(for: provider)
       }
 
       Section {
-        TextEditor(text: $chatInstructions)
-          .frame(minHeight: 120)
+        StackedTextEditor(
+          title: "Taste Profile",
+          text: $model.tasteProfile,
+          minHeight: 140
+        )
       } footer: {
-        Text("Added to the recipe chat system prompt before each conversation.")
+        Text("Shapes every AI reply unless it conflicts with the task rules.")
+      }
+
+      Section {
+        DisclosureGroup(isExpanded: $isTaskPreferencesExpanded) {
+          StackedTextEditor(
+            title: "Chef It Up",
+            text: $model.chefItUpPreference,
+            minHeight: 90
+          )
+          StackedTextEditor(
+            title: "Serve With",
+            text: $model.serveWithPreference,
+            minHeight: 90
+          )
+          StackedTextEditor(
+            title: "Make-ahead & Prep Plans",
+            text: $model.makeAheadPrepPlanPreference,
+            minHeight: 90
+          )
+          StackedTextEditor(
+            title: "Complements",
+            text: $model.complementsPreference,
+            minHeight: 90
+          )
+        } label: {
+          Label("Per-task Preferences", systemImage: "slider.horizontal.3")
+        }
+      } footer: {
+        Text("Optional preferences for judgment tasks. The app's task prompts stay fixed.")
+      }
+
+      Section {
+        Button {
+          model.savePreferencesButtonTapped()
+        } label: {
+          Label("Save Preferences", systemImage: "square.and.arrow.down")
+        }
+        .disabled(!model.hasUnsavedPreferenceChanges)
       }
     }
     .navigationTitle("AI")
     .task { model.onAppear() }
+    .alert(
+      "AI Settings Error",
+      isPresented: $model.isShowingError,
+      actions: {
+        Button("OK", role: .cancel) {}
+      },
+      message: {
+        if let errorMessage = model.errorMessage {
+          Text(errorMessage)
+        }
+      }
+    )
   }
 
   private var modelTierSection: some View {
@@ -65,6 +119,14 @@ struct AISettingsView: View {
         "Each frontier provider uses your own API key, stored in iCloud Keychain. "
           + "Configure more than one to switch providers per conversation."
       )
+    }
+  }
+
+  private var activeModelsSection: some View {
+    Section("Active models") {
+      ForEach(model.providers) { provider in
+        LabeledContent(provider.displayName, value: provider.defaultModel)
+      }
     }
   }
 
@@ -121,61 +183,5 @@ struct AISettingsView: View {
     case .anthropic: "sk-ant-..."
     case .openai: "sk-..."
     }
-  }
-}
-
-@MainActor
-@Observable
-private final class AISettingsModel {
-  var keyInputs: [FrontierProvider: String] = [:]
-  private(set) var storedProviders: Set<FrontierProvider> = []
-  private(set) var keyPreviews: [FrontierProvider: String] = [:]
-
-  @ObservationIgnored @Dependency(\.apiKeyStore) private var apiKeyStore
-
-  let providers = FrontierProvider.allCases
-
-  func onAppear() {
-    refresh()
-  }
-
-  func hasStoredKey(_ provider: FrontierProvider) -> Bool {
-    storedProviders.contains(provider)
-  }
-
-  func keyPreview(for provider: FrontierProvider) -> String? {
-    keyPreviews[provider]
-  }
-
-  func keyInput(for provider: FrontierProvider) -> String {
-    keyInputs[provider] ?? ""
-  }
-
-  func setKeyInput(_ value: String, for provider: FrontierProvider) {
-    keyInputs[provider] = value
-  }
-
-  func canSave(_ provider: FrontierProvider) -> Bool {
-    !keyInput(for: provider).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-  }
-
-  func save(_ provider: FrontierProvider) {
-    apiKeyStore.setKey(keyInputs[provider], for: provider)
-    keyInputs[provider] = ""
-    refresh()
-  }
-
-  func clear(_ provider: FrontierProvider) {
-    apiKeyStore.setKey(nil, for: provider)
-    keyInputs[provider] = ""
-    refresh()
-  }
-
-  private func refresh() {
-    storedProviders = Set(providers.filter { apiKeyStore.key($0) != nil })
-    keyPreviews = Dictionary(
-      uniqueKeysWithValues: providers.compactMap { provider in
-        apiKeyStore.maskedKey(provider).map { (provider, $0) }
-      })
   }
 }
