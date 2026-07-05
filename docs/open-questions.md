@@ -3,6 +3,29 @@
 Live ambiguities and recently-resolved decisions. Resolved items stay here briefly
 (dated) so the reasoning is durable, then graduate into the relevant doc or ADR.
 
+## Resolved — 2026-07-04 (dogfood pass)
+
+- **Kill the ingredient-substitution feature entirely, column included.** The AI suggestion path was a
+  bust (suggested vegetable broth for whole milk in a baking dish). Removal spans the AI verb, the noisy
+  per-ingredient menu, the review sheet, the manual editor field, **and** the synced
+  `IngredientLine.substitution` column via a destructive `DROP COLUMN` migration. **Full removal is only
+  acceptable because iCloud sync is not yet live** — the additive-only CloudKit discipline protects
+  *deployed* schema, and there's no production deployment to protect; the same drop would be off-limits
+  post-launch. Substitutions were stored **per-recipe** (column on `IngredientLine`, non-optional
+  `recipeID`, no shared ingredient catalog), so nothing cross-recipe is affected. → Dogfood batch 4, Slice 3
+  ([`efforts/dogfood-fixes-batch-4.md`](efforts/dogfood-fixes-batch-4.md)).
+- **Two design questions promoted to ADRs (discussion open, not decided):** recipe text editing model —
+  header toggles vs. inline bold/italic ([`decisions/ADR-0014-recipe-text-editing-model.md`](decisions/ADR-0014-recipe-text-editing-model.md));
+  and chat persistence/history — chat is ephemeral today ([`decisions/ADR-0015-chat-persistence.md`](decisions/ADR-0015-chat-persistence.md)).
+
+## Live — recipe normalization ("normalize recipe" function)
+
+- **Unscoped.** Jon (dogfood 2026-07-04): a one-tap "normalize recipe" that de-caps old all-caps Milk Street
+  imports and strips manual instruction numbers (we now auto-number). No natural existing effort home; parked
+  here until scoped. **Sequence with [ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md)** — both
+  touch the same recipe text, and normalization's interaction with any future user styling must be decided
+  together. Likely an LLM enrichment/one-tap action rather than a chat verb; classify before slicing.
+
 ## Resolved — 2026-06-28
 
 - **Web recipe capture is its own milestone (M2), before sync.** A share extension is

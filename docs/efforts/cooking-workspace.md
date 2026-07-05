@@ -5,8 +5,10 @@ provider picker. **Not a from-scratch build.**
 **Owner:** Codex (implement, per slice) · Claude (architect/review) · Jon (product/review)
 **Status:** **Slices A + B shipped + approved** (PRs #73 / #74 → DONE-LOG) — the split, dense reader,
 context-general host, and selection-scoped apply-actions. The Menu/Planner chat-verb follow-ons also
-shipped (ADR-0012, ADR-0013 — both complete). **The reader photo affordances (below) are now the dispatch
-target** (see `CURRENT_HANDOFF.md` § Next Up).
+shipped (ADR-0012, ADR-0013 — both complete). **The reader photo affordances (below) shipped** (PR #87 →
+DONE-LOG). Two dogfood-sourced follow-ons remain **queued** here (not dispatched): a **day-scoped
+make-ahead verb** for the meal planner (§ "Out of scope → Meal Planner context") and
+**separately-scrollable ingredients/directions** in the dense reader (§ Slice A).
 **Decision it implements:** [ADR-0011](../decisions/ADR-0011-actionable-chat-make-ahead.md) + its
 **Amendment 1** (selection-scoped apply-actions, Accepted 2026-07-03). Design record:
 `open-questions.md` § "Dogfooding — AI chat + recipe reader (2026-07-03)".
@@ -75,6 +77,12 @@ from `.sheet` into the inspector pane.
   detent; chat works exactly as it does today, just docked in the inspector. iPhone unchanged except
   chat presentation. `swiftui-specialist`/`swiftui-pro` checkpoint on the split + reader.
 
+> **Queued reader polish (dogfood 2026-07-04, not yet dispatched):** in the two-column dense reader,
+> **ingredients and directions should scroll independently** — today they share one scroll. Give each
+> column its own `ScrollView` so a long ingredient list and long instructions scroll separately on iPad
+> (the narrow/segmented layout is unaffected — only one is visible at a time there). Small, self-contained;
+> fold into the next reader slice.
+
 ## SLICE B — selection-scoped apply-actions (ADR-0011 Amendment 1)
 
 Make *what the model writes* precise and human-chosen. Revises the catalog input from "the whole
@@ -132,13 +140,20 @@ map onto the two motions ADR-0011 already named:
   The other motion (galavant ADR-0030 proactive cards): structured cards, each **one-tap added as a
   lightweight menu item** (commit = add menu item). Validates that the catalog spans **both motions** and
   a **second context**.
-- **Meal Planner context** — a `.mealPlan(...)` case; verbs TBD.
+- **Meal Planner context** — a `.mealPlan(...)` case shipped (ADR-0013: grounded chat + complement verb).
+  **Queued follow-on verb (dogfood 2026-07-04):** a **day-scoped "make-ahead strategy" for all items on a
+  planner day** — synthesize a prep sequence across *all* the day's recipes, **leveraging each recipe's
+  saved `makeAhead`** where present but reasoning across the combined set. Distill motion, cross-recipe (the
+  planner analogue of the Menu make-ahead verb). Classify commit shape first ([[chat-verb-commit-shapes]]) —
+  likely a no-commit advisory or a per-day note, not a per-recipe field write. Respect
+  [[llm-curation-not-synthesis]]: sequence/select distinct prep steps, don't flatten the recipes into one
+  blob.
 - **Chef It Up** (`Recipe.chefItUp`) — the second recipe field, per ADR-0011.
 
-### Reader photo affordances (ACTIVE dispatch — promoted from roadmap 2026-07-04)
+### Reader photo affordances (SHIPPED — PR #87 → DONE-LOG, 2026-07-04)
 
-Surfaced testing Slice A. **Now the dispatch target** (`CURRENT_HANDOFF.md` § Next Up). Two cohesive,
-independent slices in **one Codex dispatch** — do both, in order, in one PR.
+Surfaced testing Slice A; shipped in one dispatch (PR #87): manual set-as-cover (`Recipe.coverPhotoID`) +
+full-screen pinch-zoom. Design record retained below for reference. Two cohesive, independent slices.
 
 **Read first:** `RecipeDetailView.swift` — `primaryDisplayPhoto` (~line 641) + the private `displaySortKey`
 heuristic (`isLowResolution` → `kindRank` → `sortOrder`), `RecipePhotoGallery` (its *own* default-selection
