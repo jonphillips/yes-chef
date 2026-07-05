@@ -951,7 +951,7 @@ public final class RecipeChatModel: Identifiable {
     let base = """
       You are a concise, practical cooking assistant inside a private recipe app.
       Discuss \(context.promptSubjectDescription), described below. Help with timing,
-      prep, substitutions, troubleshooting, and planning. You propose and explain;
+      prep, troubleshooting, and planning. You propose and explain;
       you never claim to have edited or saved anything yourself.
 
       Answer in short plain-prose paragraphs. Use inline Markdown links when useful.

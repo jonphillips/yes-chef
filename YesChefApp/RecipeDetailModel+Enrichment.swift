@@ -2,14 +2,6 @@ import Dependencies
 import Foundation
 import YesChefCore
 
-struct PendingIngredientSubstitution: Identifiable, Equatable {
-  var lineID: IngredientLine.ID
-  var ingredientText: String
-  var substitution: String
-
-  var id: IngredientLine.ID { lineID }
-}
-
 extension RecipeDetailModel {
   func applyActionCatalog(for chatModel: RecipeChatModel) -> [AnyChatApplyAction] {
     @Dependency(\.makeAheadPlanClient) var makeAheadPlanClient
@@ -100,74 +92,6 @@ extension RecipeDetailModel {
     }
   }
 
-  func findSubstituteButtonTapped(lineID: IngredientLine.ID) async {
-    @Dependency(\.ingredientSubstitutionClient) var ingredientSubstitutionClient
-
-    guard
-      let detail,
-      let line = detail.ingredientLines.first(where: { $0.id == lineID })
-    else { return }
-
-    isFindingSubstitution = true
-    defer { isFindingSubstitution = false }
-
-    do {
-      let suggestion = try await ingredientSubstitutionClient(
-        ingredient: line.originalText,
-        context: RecipeChatRecipeContext(detail: detail).serialized(),
-        tier: .onDevice
-      )
-      let text = suggestion.text.trimmingCharacters(in: .whitespacesAndNewlines)
-      guard !text.isEmpty else {
-        throw RecipeDetailError.emptyIngredientSubstitution
-      }
-      pendingSubstitution = PendingIngredientSubstitution(
-        lineID: line.id,
-        ingredientText: line.originalText,
-        substitution: text
-      )
-    } catch {
-      errorMessage = RecipeChatErrorText.describe(error)
-      isShowingError = true
-    }
-  }
-
-  func savePendingSubstitutionButtonTapped() {
-    @Dependency(\.date.now) var now
-    @Dependency(\.defaultDatabase) var database
-
-    guard let pendingSubstitution else { return }
-    do {
-      try database.write { db in
-        try RecipeRepository.setIngredientSubstitution(
-          pendingSubstitution.substitution,
-          lineID: pendingSubstitution.lineID,
-          recipeID: recipeID,
-          now: now,
-          in: db
-        )
-      }
-      self.pendingSubstitution = nil
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
-    }
-  }
-
-  func clearSubstitutionButtonTapped(lineID: IngredientLine.ID) {
-    @Dependency(\.date.now) var now
-    @Dependency(\.defaultDatabase) var database
-
-    do {
-      try database.write { db in
-        try RecipeRepository.setIngredientSubstitution(nil, lineID: lineID, recipeID: recipeID, now: now, in: db)
-      }
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
-    }
-  }
-
   private func commitMakeAheadPlan(_ plan: MakeAheadPlan) throws {
     @Dependency(\.date.now) var now
     @Dependency(\.defaultDatabase) var database
@@ -212,7 +136,6 @@ private enum RecipeDetailError: Error, CustomStringConvertible, LocalizedError {
   case emptyMakeAheadPlan
   case emptyChefItUpPlan
   case emptyServeWithPlan
-  case emptyIngredientSubstitution
 
   var description: String {
     switch self {
@@ -222,8 +145,6 @@ private enum RecipeDetailError: Error, CustomStringConvertible, LocalizedError {
       "The assistant did not find a Chef It Up plan to save."
     case .emptyServeWithPlan:
       "The assistant did not find any accompaniments to save."
-    case .emptyIngredientSubstitution:
-      "The assistant did not find a substitution to save."
     }
   }
 

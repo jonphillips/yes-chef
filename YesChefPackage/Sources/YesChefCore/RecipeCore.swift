@@ -895,7 +895,6 @@ private func applyIngredientLineDrafts(
     guard let matchIndex else { return line }
     let draft = unmatchedDrafts.remove(at: matchIndex)
     line.isHeader = draft.isHeader
-    line.substitution = draft.substitution.nonEmpty
     return line
   }
 }
@@ -928,7 +927,6 @@ private func reconcileIngredientLines(
       shoppingCategory: existingLine.shoppingCategory,
       doNotShop: parsedLine.doNotShop || existingLine.doNotShop,
       isHeader: parsedLine.isHeader,
-      substitution: existingLine.substitution,
       sortOrder: parsedLine.sortOrder,
       confidence: mergedConfidence(parsedLine.confidence, existingLine.confidence)
     )

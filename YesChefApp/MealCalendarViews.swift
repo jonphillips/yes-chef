@@ -255,14 +255,10 @@ struct MealCalendarDayAgendaView: View {
           detentRaw: $chatWorkspaceDetentRaw,
           applyActions: { chatModel in model.applyActionCatalog(for: chatModel) }
         ) {
-          ScrollView {
-            agendaContent
-              .padding()
-              .frame(maxWidth: .infinity, alignment: .leading)
-          }
+          agendaContent
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .id(chatContextIdentity)
-        .frame(minHeight: 560)
       } else {
         agendaContent
       }

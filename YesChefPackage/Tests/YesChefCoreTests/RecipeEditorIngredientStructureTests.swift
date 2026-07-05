@@ -48,7 +48,6 @@ extension RecipeCoreTests {
             recipeID: recipeID,
             sectionID: extraSectionID,
             originalText: "2 cups powdered sugar",
-            substitution: "1 3/4 cups superfine sugar, pulsed",
             sortOrder: 0
           )
         }
@@ -58,7 +57,6 @@ extension RecipeCoreTests {
         var draft = RecipeEditorDraft(detail: detail)
         draft.ingredientSectionName = "Cake"
         draft.ingredientLineDrafts[0].isHeader = true
-        draft.ingredientLineDrafts[0].substitution = "Use cake flour for a softer crumb."
 
         try RecipeRepository.save(
           draft: draft,
@@ -74,8 +72,7 @@ extension RecipeCoreTests {
 
         expectNoDifference(editableSection.name, "Cake")
         expectNoDifference(editableLine.isHeader, true)
-        expectNoDifference(editableLine.substitution, "Use cake flour for a softer crumb.")
-        expectNoDifference(extraLine.substitution, "1 3/4 cups superfine sugar, pulsed")
+        expectNoDifference(extraLine.originalText, "2 cups powdered sugar")
       }
     }
   }

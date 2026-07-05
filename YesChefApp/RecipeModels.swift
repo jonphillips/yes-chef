@@ -829,8 +829,6 @@ final class RecipeDetailModel {
   var scaleFactor = 1.0
   var scaleWholePart = 1
   var scaleFraction = ScaleFraction.none
-  var pendingSubstitution: PendingIngredientSubstitution?
-  var isFindingSubstitution = false
   private var lastAppliedPersistedScale: Double?
 
   init(recipeID: Recipe.ID, scaleContext: ScaleContext? = nil) {

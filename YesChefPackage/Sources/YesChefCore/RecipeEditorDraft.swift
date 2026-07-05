@@ -158,20 +158,17 @@ public struct RecipeIngredientLineDraft: Identifiable, Equatable, Sendable {
   public var id: UUID
   public var originalText: String
   public var isHeader: Bool
-  public var substitution: String
   public var sortOrder: Int
 
   public init(
     id: UUID,
     originalText: String,
     isHeader: Bool = false,
-    substitution: String = "",
     sortOrder: Int
   ) {
     self.id = id
     self.originalText = originalText
     self.isHeader = isHeader
-    self.substitution = substitution
     self.sortOrder = sortOrder
   }
 
@@ -180,7 +177,6 @@ public struct RecipeIngredientLineDraft: Identifiable, Equatable, Sendable {
       id: line.id,
       originalText: line.originalText,
       isHeader: line.isHeader,
-      substitution: line.substitution ?? "",
       sortOrder: line.sortOrder
     )
   }

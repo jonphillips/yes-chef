@@ -1,9 +1,9 @@
 # Current Handoff
 
-Last updated: July 4, 2026 (**ADR-0013 complete** — S2 day-scoped complement verb → inserts a `.note`
-`MealPlanItem`, PR #86 → approved (S1 was PR #85); both slices shipped, zero schema. **Next Up = Reader
-photo affordances** — manual set-as-cover (the effort's first schema touch) + full-screen pinch-zoom;
-two cohesive slices, one dispatch. Lean verification is the default.)
+Last updated: July 4, 2026 (**Dogfood batch 4 complete** — shared-chat truncation fix + planner layout nits
++ full ingredient-substitution removal incl. the synced column, PR #88. **Next Up = Chat persistence**
+(ADR-0015, Accepted) — persist chat locally, per-subject, 1-month prune; off the sync spine so it may precede
+launch work. Lean verification is the default.)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -19,43 +19,34 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Reader photo affordances — two cohesive slices, one dispatch.** Full design + decisions in
-[`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) § "Reader photo affordances" — read
-that section first. Both surfaced from the Slice A device pass; independent but cohesive, so do **both, in
-order** in one PR. **Read first:** `RecipeDetailView.swift` — `primaryDisplayPhoto` + the private
-`displaySortKey` heuristic, `RecipePhotoGallery` (its own default-selection heuristic), and
-`RecipePhotoFullScreenView`.
-
-- **Slice 1 — manual "set as cover" (user override, persisted, sync-safe).** The reader cover is picked by
-  `displaySortKey` and can choose a scanned reference page / low-res shot over the nice photo. Add a
-  user override. **Storage home (decided, architect):** a new nullable column **`Recipe.coverPhotoID`**
-  pointing to the chosen `RecipePhoto` — mirror the existing loose recipe-pointer shape
-  (`TEXT REFERENCES "recipePhotos"("id") ON DELETE SET NULL`, same as `menuItems.recipeID`), so deleting
-  the photo auto-nulls the cover and the heuristic resumes. **Not** a `RecipePhoto.isCover` bool (a
-  multi-row flag invites two-covers sync conflicts; a single scalar resolves last-writer-wins). Additive,
-  CloudKit-safe; bump `Recipe.dateModified` on set/clear. **Factor the resolver into `YesChefCore`** as a
-  pure `coverPhoto(...)` function (override wins → else `displaySortKey` fallback for nil **and**
-  dangling/not-yet-synced ids) and **unit-test the three cases** (this logic is FoundationModels-free, so
-  a core test runs under `swift test` here). Point both the reader thumbnail and the gallery default at
-  the one resolver. UI: a "Set as Cover" / "Use Automatic" affordance on the selected photo. iPad + iPhone.
-- **Slice 2 — pinch-to-zoom + pan in `RecipePhotoFullScreenView` (no schema).** It only scale-to-fits;
-  scanned pages aren't legible. Add `MagnifyGesture` + simultaneous drag-to-pan (clamped), double-tap to
-  reset, close button still reachable. Pure view change — no schema, no core logic. iPad + iPhone.
+**Chat persistence (ADR-0015 — Accepted 2026-07-04).** Full design in
+[`docs/decisions/ADR-0015-chat-persistence.md`](decisions/ADR-0015-chat-persistence.md) — read that first.
+Persist chat to disk so a thread survives navigation / dismiss / relaunch, keyed **one-thread-per-subject**
+(recipe id / menu id / planner day) so every surface sharing a subject opens the same thread — fixing both
+"gone the minute I look away" and blank-on-surface-switch. **Local-only** — does **not** ride CloudKit;
+**1-month time-based prune** (drop messages older than ~30 days on launch/write). Off the sync spine, so it
+may precede the launch/sync work. **Read first:** `RecipeChatWorkspace.swift` and the in-memory chat model in
+`YesChefCore/RecipeChat.swift` that holds messages today; `Schema.swift` for where the local-only store table
+lands. Resolve the two impl-detail opens from the ADR at dispatch (SQLite table the SyncEngine is told to
+ignore vs. a separate lightweight store; the distill-into-the-recipe guardrail).
 
 **Standing release follow-up carried from Phase E (not a dispatch on its own):** before any prod/TestFlight
 cut, promote to the **production** schema the Phase E Slice 3 pantry-policy + `canonicalName` CloudKit
 fields, the ADR-0012 S2 `Menu.prepPlan` BLOB (PR #82), **and** the reader-photo-affordances
-`Recipe.coverPhotoID` column (Next Up — the effort's first schema touch), and
+`Recipe.coverPhotoID` column (PR #87), and
 note the app target (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 
 Phase E is **fully complete** — Slice 4 (`PantrySuppression` + review UI, PR #80 → DONE-LOG), Slice 3
 (pantry policy + `canonicalName` migration, PR #79 → DONE-LOG), Slices 1 + 2 (canonical key + `Measure`,
 PR #77 → DONE-LOG). Dogfood batch 3 is
 **complete** (ingredient structure · Chef It Up + Serve With · substitution ·
-keep-awake; PR #75 → DONE-LOG). The cooking-workspace effort is **complete** (Slices A + B shipped,
-PRs #73 / #74 → DONE-LOG). Its **Menu chat-verbs** follow-on shipped as ADR-0012 (complete). Its remaining
-named follow-ons — **Meal-Planner chat verbs** and **reader photo affordances** — live in
-[`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) as separate later efforts.
+keep-awake; PR #75 → DONE-LOG), and **batch 4** is complete (shared-chat truncation fix · planner layout
+nits · full ingredient-substitution removal incl. the synced column; PR #88 → DONE-LOG). The
+cooking-workspace effort is **complete** (Slices A + B shipped,
+PRs #73 / #74 → DONE-LOG). Its **Menu chat-verbs** follow-on shipped as ADR-0012 (complete), and its
+**reader photo affordances** shipped (PR #87 → DONE-LOG). Its one remaining named follow-on —
+**Meal-Planner chat verbs** (now incl. a day-scoped make-ahead verb) — lives in
+[`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) as a separate later effort.
 
 ## Ready Efforts (queue)
 
@@ -96,10 +87,26 @@ target.
   [`docs/decisions/ADR-0013-meal-planner-actionable-chat.md`](decisions/ADR-0013-meal-planner-actionable-chat.md).
 
 - **Cooking workspace** — **complete** (Slices A + B, PRs #73 / #74 → DONE-LOG). Its Menu chat-verbs
-  follow-on is now its own effort above (ADR-0012). The reader **photo affordances** (manual set-as-cover,
-  pinch-zoom in the viewer) remain a named later effort in
-  [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) (host built context-general to
-  receive them).
+  follow-on is now its own effort above (ADR-0012); its reader **photo affordances** shipped (PR #87 →
+  DONE-LOG). Two dogfood follow-ons folded into
+  [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md): a **day-scoped make-ahead verb** for
+  the meal planner (§ "Out of scope → Meal Planner") and **separately-scrollable ingredients/directions** in
+  the dense reader (§ Slice A). Both queued, not dispatched.
+
+- **Recipe text normalization** — a "normalize recipe" function (de-cap old all-caps Milk Street imports,
+  strip manual instruction numbers now that we auto-number). **Unscoped** — no natural existing effort home;
+  parked in [`docs/open-questions.md`](open-questions.md) until scoped. Interacts with ADR-0014 (text-editing
+  model), so sequence them.
+
+- **Chat persistence** (ADR-0015, **Accepted** 2026-07-04) — **promoted to Next Up** (see above). Design in
+  [`docs/decisions/ADR-0015-chat-persistence.md`](decisions/ADR-0015-chat-persistence.md).
+
+- **Dogfood fixes — batch 4** — complete (PR #88 → DONE-LOG; shared-chat truncation fix · planner layout
+  nits · full ingredient-substitution removal incl. the synced column).
+
+- **Open design ADRs (discussion, not yet Accepted)** — [ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md)
+  recipe text editing (header toggles vs. rich text / bold-italic). Opened from the 2026-07-04 dogfood pass;
+  decide with Jon before any implementation.
 
 **Parked (not dispatched):**
 - **Dogfood the core loop on two devices** — capture ~15–20 real recipes via the extension, cook from

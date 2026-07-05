@@ -10,6 +10,22 @@ Newest first.
 
 ---
 
+## Reader photo affordances — set-as-cover + full-screen zoom
+
+**Shipped 2026-07-04** — yes-chef [PR #87](https://github.com/jonphillips/yes-chef/pull/87). The cooking-
+workspace effort's reader follow-on, two cohesive slices in one dispatch. **Slice 1 — manual "set as
+cover":** a new nullable `Recipe.coverPhotoID TEXT REFERENCES "recipePhotos"("id") ON DELETE SET NULL`
+(deleting the photo auto-nulls the cover → the `displaySortKey` heuristic resumes), resolved by a pure
+`YesChefCore` cover function (override wins → else heuristic fallback for nil **and** dangling/unsynced ids),
+unit-tested for the three cases; both the reader thumbnail and gallery default point at the one resolver;
+"Set as Cover" / "Use Automatic" affordance. **The effort's first schema touch** — additive, nullable,
+CloudKit-safe; added to the standing prod-schema promotion follow-up in `CURRENT_HANDOFF.md`. **Slice 2 —
+pinch-to-zoom + pan** in `RecipePhotoFullScreenView` (`MagnifyGesture` + clamped drag, double-tap reset),
+no schema. Design record in [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) §
+"Reader photo affordances". (Handoff bump did not ride in #87; repaired in the batch-4 PR.)
+
+---
+
 ## Menu actionable chat (ADR-0012) — Slice 3: complement verb → inserts a `MenuItem`
 
 **Architect-approved 2026-07-04** — yes-chef [PR #83](https://github.com/jonphillips/yes-chef/pull/83).

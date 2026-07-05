@@ -50,14 +50,6 @@ public struct ServeWithSuggestion: Equatable, Sendable {
   }
 }
 
-public struct IngredientSubstitutionSuggestion: Equatable, Sendable {
-  public var text: String
-
-  public init(text: String) {
-    self.text = text
-  }
-}
-
 public struct ChefItUpPlanClient: Sendable {
   public var extract: @Sendable (
     _ selection: String,
@@ -200,70 +192,6 @@ extension ServeWithPlanClient: DependencyKey {
   }
 }
 
-public struct IngredientSubstitutionClient: Sendable {
-  public var extract: @Sendable (
-    _ ingredient: String,
-    _ context: String,
-    _ tier: ModelTier
-  ) async throws -> IngredientSubstitutionSuggestion
-
-  public init(
-    extract: @escaping @Sendable (
-      _ ingredient: String,
-      _ context: String,
-      _ tier: ModelTier
-    ) async throws -> IngredientSubstitutionSuggestion
-  ) {
-    self.extract = extract
-  }
-
-  public func callAsFunction(
-    ingredient: String,
-    context: String,
-    tier: ModelTier
-  ) async throws -> IngredientSubstitutionSuggestion {
-    try await extract(ingredient, context, tier)
-  }
-}
-
-extension IngredientSubstitutionClient: DependencyKey {
-  public static let liveValue = IngredientSubstitutionClient { ingredient, context, tier in
-    @Dependency(\.modelClient) var modelClient
-    let request = ModelRequest(
-      tier: tier,
-      system: instructions,
-      prompt: """
-        Recipe context:
-        \(context)
-
-        Ingredient needing a substitute:
-        \(ingredient)
-
-        Return the JSON object.
-        """,
-      maxTokens: 512
-    )
-    let response = try await modelClient.complete(request)
-    return parse(response.text)
-  }
-
-  public static let testValue = IngredientSubstitutionClient { _, _, _ in
-    IngredientSubstitutionSuggestion(text: "")
-  }
-
-  static let instructions = """
-    You suggest one practical ingredient substitution for the selected ingredient in this recipe.
-    Return ONLY strict JSON: {"text":"short substitution text"}.
-    Include quantities only when the recipe context supports them. Return {"text":""} when no useful substitute is available.
-    """
-
-  public static func parse(_ text: String) -> IngredientSubstitutionSuggestion {
-    let object = jsonObject(text)
-    let value = object?["text"] as? String ?? text
-    return IngredientSubstitutionSuggestion(text: value.cleanedEnrichmentText ?? "")
-  }
-}
-
 extension DependencyValues {
   public var chefItUpPlanClient: ChefItUpPlanClient {
     get { self[ChefItUpPlanClient.self] }
@@ -273,11 +201,6 @@ extension DependencyValues {
   public var serveWithPlanClient: ServeWithPlanClient {
     get { self[ServeWithPlanClient.self] }
     set { self[ServeWithPlanClient.self] = newValue }
-  }
-
-  public var ingredientSubstitutionClient: IngredientSubstitutionClient {
-    get { self[IngredientSubstitutionClient.self] }
-    set { self[IngredientSubstitutionClient.self] = newValue }
   }
 }
 
@@ -321,23 +244,6 @@ extension RecipeRepository {
     let recipe = try Recipe.find(recipeID).fetchOne(db)
     let items = ServeWithCoding.decode(recipe?.serveWith).filter { $0.id != itemID }
     try updateServeWith(items, recipeID: recipeID, in: db, now: now)
-  }
-
-  public static func setIngredientSubstitution(
-    _ substitution: String?,
-    lineID: IngredientLine.ID,
-    recipeID: Recipe.ID,
-    now: Date,
-    in db: Database
-  ) throws {
-    try IngredientLine.find(lineID).update {
-      $0.substitution = substitution?.nonEmptyEnrichmentText
-    }
-    .execute(db)
-    try Recipe.find(recipeID).update {
-      $0.dateModified = now
-    }
-    .execute(db)
   }
 
   private static func updateChefItUp(

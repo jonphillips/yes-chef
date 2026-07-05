@@ -689,7 +689,6 @@ public struct IngredientLine: Codable, Identifiable, Equatable, Sendable {
   public var shoppingCategory: String?
   public var doNotShop: Bool
   public var isHeader: Bool
-  public var substitution: String?
   public var sortOrder: Int
   public var confidence: ParseConfidence?
 
@@ -709,7 +708,6 @@ public struct IngredientLine: Codable, Identifiable, Equatable, Sendable {
     shoppingCategory: String? = nil,
     doNotShop: Bool = false,
     isHeader: Bool = false,
-    substitution: String? = nil,
     sortOrder: Int,
     confidence: ParseConfidence? = nil
   ) {
@@ -728,7 +726,6 @@ public struct IngredientLine: Codable, Identifiable, Equatable, Sendable {
     self.shoppingCategory = shoppingCategory
     self.doNotShop = doNotShop
     self.isHeader = isHeader
-    self.substitution = substitution
     self.sortOrder = sortOrder
     self.confidence = confidence
   }
@@ -823,7 +820,6 @@ public enum RecipeNoteType: String, Codable, QueryBindable, QueryDecodable, Send
   case serving
   case equipment
   case scaling
-  case substitution
   case wine
   case retrospective
   case warning
