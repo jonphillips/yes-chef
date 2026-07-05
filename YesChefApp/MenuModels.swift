@@ -16,6 +16,8 @@ final class MenuLibraryModel {
     case addMenu
     case addItem(MenuItemDraftContext)
     case placeMenu(MenuPlacementDraftContext)
+    case deleteMenu(MenuDeletionContext)
+    case deleteItem(MenuItemDeletionContext)
     case deletePlacement(MenuPlacementDeletionContext)
   }
 
@@ -78,13 +80,32 @@ final class MenuLibraryModel {
     )
   }
 
-  func placeMenuButtonTapped(menu: CoreMenu) {
+  func editItemButtonTapped(menu: CoreMenu, row: MenuItemRowData) {
+    destination = .addItem(
+      MenuItemDraftContext(
+        itemID: row.id,
+        menuID: menu.id,
+        menuTitle: menu.title,
+        dayCount: menu.dayCount,
+        kind: row.item.kind,
+        dayOffset: row.item.dayOffset,
+        mealSlot: row.item.mealSlot,
+        recipeID: row.item.recipeID,
+        noteTitle: row.item.kind == .recipe ? "" : row.item.title,
+        notes: row.item.notes ?? ""
+      )
+    )
+  }
+
+  func placeMenuButtonTapped(menu: CoreMenu, minimumDayCount: Int = 1) {
     destination = .placeMenu(
       MenuPlacementDraftContext(
         menuID: menu.id,
         menuTitle: menu.title,
         placementID: nil,
-        startDate: Calendar.autoupdatingCurrent.startOfDay(for: now)
+        startDate: Calendar.autoupdatingCurrent.startOfDay(for: now),
+        dayCount: menu.dayCount,
+        minimumDayCount: minimumDayCount
       )
     )
   }
@@ -140,6 +161,34 @@ final class MenuLibraryModel {
     }
   }
 
+  func updateRecipeItemButtonTapped(
+    itemID: MenuItem.ID,
+    recipeID: Recipe.ID,
+    dayOffset: Int,
+    mealSlot: MealPlanItemSlot,
+    notes: String
+  ) -> Bool {
+    do {
+      try database.write { db in
+        try MenuRepository.updateRecipeItem(
+          itemID: itemID,
+          recipeID: recipeID,
+          dayOffset: dayOffset,
+          mealSlot: mealSlot,
+          notes: notes,
+          in: db,
+          now: now
+        )
+      }
+      destination = nil
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
   func addRecipesToMenu(
     recipeIDs: [Recipe.ID],
     menuID: CoreMenu.ID,
@@ -171,13 +220,15 @@ final class MenuLibraryModel {
 
   func moveMenuItem(
     itemID: MenuItem.ID,
-    toDayOffset dayOffset: Int
+    toDayOffset dayOffset: Int,
+    mealSlot: MealPlanItemSlot? = nil
   ) -> Bool {
     do {
       try database.write { db in
         try MenuRepository.moveItem(
           itemID: itemID,
           toDayOffset: dayOffset,
+          mealSlot: mealSlot,
           in: db,
           now: now
         )
@@ -187,6 +238,56 @@ final class MenuLibraryModel {
       errorMessage = String(describing: error)
       isShowingError = true
       return false
+    }
+  }
+
+  func deleteMenuButtonTapped(_ row: MenuRowData) {
+    destination = .deleteMenu(
+      MenuDeletionContext(
+        menuID: row.id,
+        menuTitle: row.menu.title,
+        itemCount: row.itemCount,
+        placementCount: row.placementCount
+      )
+    )
+  }
+
+  func confirmDeleteMenuButtonTapped(_ context: MenuDeletionContext) {
+    destination = nil
+
+    do {
+      try database.write { db in
+        try MenuRepository.deleteMenu(menuID: context.menuID, in: db)
+      }
+      if selectedMenuID == context.menuID {
+        selectedMenuID = nil
+      }
+      navigationPath.removeAll { $0 == context.menuID }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func deleteMenuItemButtonTapped(_ row: MenuItemRowData) {
+    destination = .deleteItem(
+      MenuItemDeletionContext(
+        itemID: row.id,
+        title: row.displayTitle
+      )
+    )
+  }
+
+  func confirmDeleteMenuItemButtonTapped(_ context: MenuItemDeletionContext) {
+    destination = nil
+
+    do {
+      try database.write { db in
+        try MenuRepository.deleteItem(itemID: context.itemID, in: db)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
     }
   }
 
@@ -219,13 +320,43 @@ final class MenuLibraryModel {
     }
   }
 
-  func editPlacementButtonTapped(menu: CoreMenu, placement: MenuPlacement) {
+  func updateNoteItemButtonTapped(
+    itemID: MenuItem.ID,
+    title: String,
+    notes: String,
+    dayOffset: Int,
+    mealSlot: MealPlanItemSlot
+  ) -> Bool {
+    do {
+      try database.write { db in
+        try MenuRepository.updateNoteItem(
+          itemID: itemID,
+          title: title,
+          notes: notes,
+          dayOffset: dayOffset,
+          mealSlot: mealSlot,
+          in: db,
+          now: now
+        )
+      }
+      destination = nil
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
+  func editPlacementButtonTapped(menu: CoreMenu, placement: MenuPlacement, minimumDayCount: Int = 1) {
     destination = .placeMenu(
       MenuPlacementDraftContext(
         menuID: menu.id,
         menuTitle: menu.title,
         placementID: placement.id,
-        startDate: placement.startDate
+        startDate: placement.startDate,
+        dayCount: menu.dayCount,
+        minimumDayCount: minimumDayCount
       )
     )
   }
@@ -244,6 +375,12 @@ final class MenuLibraryModel {
     do {
       let startDate = Calendar.autoupdatingCurrent.startOfDay(for: startDate)
       _ = try database.write { db in
+        try MenuRepository.updateMenuDayCount(
+          menuID: context.menuID,
+          dayCount: context.dayCount,
+          in: db,
+          now: now
+        )
         if let placementID = context.placementID {
           try MenuRepository.updateMenuPlacement(
             placementID: placementID,
@@ -321,7 +458,7 @@ final class MenuDetailModel {
     @Dependency(\.menuComplementClient) var menuComplementClient
     @Dependency(\.menuPrepPlanClient) var menuPrepPlanClient
 
-    let context = chatModel.context.serialized()
+    let context = chatModel.context.serialized(for: chatModel.activeTier)
     let complementAction = ChatApplyAction<MenuComplementPlan>(
       title: "What complements this? -> Menu items",
       extractingTitle: "Finding complements...",
@@ -424,6 +561,7 @@ enum MenuListStyle {
 }
 
 struct MenuItemDraftContext: Hashable, Sendable {
+  var itemID: MenuItem.ID?
   var menuID: CoreMenu.ID
   var menuTitle: String
   var dayCount: Int
@@ -431,6 +569,10 @@ struct MenuItemDraftContext: Hashable, Sendable {
   var dayOffset: Int = 0
   var mealSlot: MealPlanItemSlot = .dinner
   var recipeID: Recipe.ID?
+  var noteTitle: String = ""
+  var notes: String = ""
+
+  var isEditing: Bool { itemID != nil }
 }
 
 struct MenuPlacementDraftContext: Hashable, Sendable {
@@ -438,8 +580,26 @@ struct MenuPlacementDraftContext: Hashable, Sendable {
   var menuTitle: String
   var placementID: MenuPlacement.ID?
   var startDate: Date
+  var dayCount: Int
+  var minimumDayCount: Int
 
   var isEditing: Bool { placementID != nil }
+}
+
+struct MenuDeletionContext: Identifiable, Hashable, Sendable {
+  var menuID: CoreMenu.ID
+  var menuTitle: String
+  var itemCount: Int
+  var placementCount: Int
+
+  var id: CoreMenu.ID { menuID }
+}
+
+struct MenuItemDeletionContext: Identifiable, Hashable, Sendable {
+  var itemID: MenuItem.ID
+  var title: String
+
+  var id: MenuItem.ID { itemID }
 }
 
 struct MenuPlacementDeletionContext: Identifiable, Hashable, Sendable {

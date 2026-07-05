@@ -270,6 +270,70 @@ public enum MenuRepository {
     return item.id
   }
 
+  public static func updateRecipeItem(
+    itemID: MenuItem.ID,
+    recipeID: Recipe.ID,
+    dayOffset: Int,
+    mealSlot: MealPlanItemSlot,
+    notes: String?,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard var item = try MenuItem.find(itemID).fetchOne(db) else {
+      throw MenuRepositoryError.menuItemNotFound(itemID)
+    }
+    let menu = try requireMenu(item.menuID, in: db)
+    try validateDayOffset(dayOffset, for: menu)
+    guard let recipe = try Recipe.find(recipeID).fetchOne(db), !recipe.archived else {
+      throw MenuRepositoryError.recipeNotFound(recipeID)
+    }
+
+    let isMoving = item.dayOffset != dayOffset || item.mealSlot != mealSlot
+    item.kind = .recipe
+    item.recipeID = recipeID
+    item.title = recipe.title
+    item.dayOffset = dayOffset
+    item.mealSlot = mealSlot
+    item.notes = notes?.nonEmptyMenuText
+    item.sortOrder = isMoving
+      ? try nextSortOrder(menuID: item.menuID, dayOffset: dayOffset, mealSlot: mealSlot, in: db)
+      : item.sortOrder
+    item.dateModified = now
+    try MenuItem.upsert { item }.execute(db)
+  }
+
+  public static func updateNoteItem(
+    itemID: MenuItem.ID,
+    title: String,
+    notes: String?,
+    dayOffset: Int,
+    mealSlot: MealPlanItemSlot,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard var item = try MenuItem.find(itemID).fetchOne(db) else {
+      throw MenuRepositoryError.menuItemNotFound(itemID)
+    }
+    let menu = try requireMenu(item.menuID, in: db)
+    try validateDayOffset(dayOffset, for: menu)
+    guard let title = title.nonEmptyMenuText else {
+      throw MenuRepositoryError.emptyTitle
+    }
+
+    let isMoving = item.dayOffset != dayOffset || item.mealSlot != mealSlot
+    item.kind = .note
+    item.recipeID = nil
+    item.title = title
+    item.dayOffset = dayOffset
+    item.mealSlot = mealSlot
+    item.notes = notes?.nonEmptyMenuText
+    item.sortOrder = isMoving
+      ? try nextSortOrder(menuID: item.menuID, dayOffset: dayOffset, mealSlot: mealSlot, in: db)
+      : item.sortOrder
+    item.dateModified = now
+    try MenuItem.upsert { item }.execute(db)
+  }
+
   @discardableResult
   public static func placeMenu(
     menuID: Menu.ID,
@@ -302,6 +366,29 @@ public enum MenuRepository {
     try MenuPlacement.upsert { placement }.execute(db)
   }
 
+  public static func updateMenuDayCount(
+    menuID: Menu.ID,
+    dayCount: Int,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard dayCount > 0 else {
+      throw MenuRepositoryError.invalidDayCount
+    }
+    var menu = try requireMenu(menuID, in: db)
+    let highestOccupiedDayOffset = try MenuItem
+      .where { $0.menuID.eq(menuID) }
+      .fetchAll(db)
+      .map(\.dayOffset)
+      .max()
+    if let highestOccupiedDayOffset, highestOccupiedDayOffset >= dayCount {
+      throw MenuRepositoryError.invalidDayCount
+    }
+    menu.dayCount = dayCount
+    menu.dateModified = now
+    try Menu.upsert { menu }.execute(db)
+  }
+
   public static func moveItem(
     itemID: MenuItem.ID,
     toDayOffset dayOffset: Int,
@@ -326,6 +413,22 @@ public enum MenuRepository {
     try MenuItem.upsert { item }.execute(db)
   }
 
+  public static func deleteItem(
+    itemID: MenuItem.ID,
+    in db: Database
+  ) throws {
+    _ = try requireMenuItem(itemID, in: db)
+    try MenuItem.find(itemID).delete().execute(db)
+  }
+
+  public static func deleteMenu(
+    menuID: Menu.ID,
+    in db: Database
+  ) throws {
+    _ = try requireMenu(menuID, in: db)
+    try Menu.find(menuID).delete().execute(db)
+  }
+
   public static func deleteMenuPlacement(
     placementID: MenuPlacement.ID,
     in db: Database
@@ -339,6 +442,13 @@ public enum MenuRepository {
       throw MenuRepositoryError.menuNotFound(menuID)
     }
     return menu
+  }
+
+  private static func requireMenuItem(_ itemID: MenuItem.ID, in db: Database) throws -> MenuItem {
+    guard let item = try MenuItem.find(itemID).fetchOne(db) else {
+      throw MenuRepositoryError.menuItemNotFound(itemID)
+    }
+    return item
   }
 
   private static func requirePlacement(

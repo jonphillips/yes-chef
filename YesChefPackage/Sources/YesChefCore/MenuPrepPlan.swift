@@ -90,12 +90,14 @@ extension MenuPrepPlanClient: DependencyKey {
   }
 
   static let instructions = """
-    You distill a cooking conversation into a staged prep plan for one multi-day menu.
+    You refine a staged prep plan for one multi-day menu from the current menu context and conversation.
     Return ONLY strict JSON:
     {"steps":[{"when":"relative timing label","task":"concrete kitchen task","sourceDish":"menu item UUID or null"}]}.
-    Compose and sequence the existing per-recipe make-ahead notes from the menu context. Do not invent or rewrite
-    per-dish make-ahead prose. Use sourceDish only when the step clearly comes from one menu item ID in the context;
-    use null when a step spans dishes or the source is unclear. Return {"steps":[]} when there is no prep plan to save.
+    The menu context may include a Current prep plan. Treat it as the artifact being edited: preserve useful existing
+    steps, apply the user's requested refinements, and return the full proposed replacement plan. Compose and sequence
+    the existing per-recipe make-ahead notes from the menu context. Do not invent or rewrite per-dish make-ahead prose.
+    Use sourceDish only when the step clearly comes from one menu item ID in the context; use null when a step spans
+    dishes or the source is unclear. Return {"steps":[]} when there is no prep plan to save.
     """
 
   static func prompt(selection: String, messages: [RecipeChatMessage], context: String) -> String {
@@ -112,8 +114,8 @@ extension MenuPrepPlanClient: DependencyKey {
       Conversation so far:
       \(conversation)
 
-      Distill the selected subject into the menu prep-plan JSON object. Use the conversation only as background
-      when it clarifies how to sequence the existing make-ahead notes.
+      Refine the menu prep plan into a full replacement JSON object. Use any Current prep plan in the menu context as
+      the starting artifact, and use the conversation only when it clarifies the requested edits or sequencing.
       """
   }
 
