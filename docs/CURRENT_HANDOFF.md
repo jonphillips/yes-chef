@@ -1,9 +1,8 @@
 # Current Handoff
 
-Last updated: July 5, 2026 (**Next Up = ADR-0016 multi-recipe cook session** — Accepted 2026-07-05, Jon
-greenlit build-not-sketch. Two slices, **zero schema**: cook a planner day's (or menu's) recipes together in
-the existing Reader with a chip-strip switcher + session-only "done"; **not** Cooking Mode; **no voice**.
-Lean verification is the default.)
+Last updated: July 5, 2026 (**Next Up = ADR-0016 cook session — layout fold-in on PR #93.** S1+S2 are
+implemented in PR #93 (open); architect review approved the feature and flagged one day-header layout
+regression to fold into the *same* PR before merge. Details below. Zero schema, lean verification.)
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -19,21 +18,21 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Multi-recipe cook session — ADR-0016 (Accepted 2026-07-05).** Cook the recipes on a planner day (or a
-menu) together, each in the **existing Reader**, with a pinned **chip-strip switcher** (tap + swipe) and
-**session-only "done"** that shrinks the strip; per-recipe scroll/checkmarks/scale preserved across switches.
-Reuses `RecipeDetailView(recipeID:scaleContext:…)` per recipe; per-placement `ScaleContext` threaded through
-(**zero new scaling code**); recipe-kind items only ([[menu-item-recipe-id-invariant]]). **Not** Cooking Mode
-(left untouched), **no voice** (dropped by design). **Two slices, zero schema** — bundle both in one dispatch:
-- **S1** — `CookSessionModel` + `CookSessionView` (chip strip over a **keep-alive** paged host of per-recipe
-  Readers; keep-awake on) + **"Cook these"** entry on a planner day (`itemsForDay`, `.mealPlanItem` scale).
-- **S2** — the same **"Cook these"** entry on a Menu (menu's recipe items, `.menuItem` scale); pure reuse of
-  S1's `CookSessionView`.
+**Multi-recipe cook session — ADR-0016 (Accepted 2026-07-05).** S1 (`CookSessionModel` + `CookSessionView`:
+chip-strip switcher over a **keep-alive** paged host of per-recipe Readers, keep-awake, session-only "done")
+and S2 (**"Cook these"** on a planner day *and* a Menu; per-placement `ScaleContext` threaded, recipe-kind
+items only) are **implemented in PR #93 (open)**. Review confirmed keep-alive paging (D4), scale threading
+(D5), and filtering (D6) are all correct.
 
-Design + all seven resolved decisions (D1–D7) in
+**One layout fold-in remains before merge** (fold into PR #93, not a new PR): adding "Cook these" gave
+`MealCalendarDayHeader` three labeled buttons, which overflow the fixed-width agenda rail — title mangles,
+buttons collapse (visible in Jon's screenshot). Fix = wrap the header in `ViewThatFits(in: .horizontal)`
+(single row → title-over-buttons stacked fallback), extract `titleBlock`/`actionButtons`, make `cookSession`
+an optional closure, and dedupe the `CookSessionPresentation` build into one `cookSessionPresentation`
+computed prop. Then Jon's device pass (iPad both orientations + iPhone), then merge → ADR-0016 done.
+
+Design + D1–D7 in
 [`docs/decisions/ADR-0016-multi-recipe-cook-session.md`](decisions/ADR-0016-multi-recipe-cook-session.md).
-Keep-alive paging (D4) is the one real SwiftUI constraint — don't conditionally construct one Reader at a
-time or per-recipe `@State` resets on every switch. iPad + iPhone.
 
 The remaining cooking-workspace follow-on (**Meal-Planner chat verbs**, broader) stays parked in the Ready
 Efforts queue below, not a dispatch target.

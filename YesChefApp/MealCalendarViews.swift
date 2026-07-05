@@ -6,6 +6,7 @@ struct MealCalendarStack: View {
   let model: MealCalendarModel
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
 
   var body: some View {
     NavigationStack {
@@ -13,7 +14,8 @@ struct MealCalendarStack: View {
         model: model,
         showsSelectedDayAgenda: true,
         onMenuSelected: onMenuSelected,
-        onRecipeSelected: onRecipeSelected
+        onRecipeSelected: onRecipeSelected,
+        onCookSessionRequested: onCookSessionRequested
       )
     }
   }
@@ -23,6 +25,7 @@ struct MealCalendarWorkspaceView: View {
   let model: MealCalendarModel
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
 
   var body: some View {
     GeometryReader { geometry in
@@ -32,7 +35,8 @@ struct MealCalendarWorkspaceView: View {
           agendaWidth: agendaWidth(for: geometry.size.width),
           weekCellMinHeight: weekCellHeight(for: geometry.size.height),
           onMenuSelected: onMenuSelected,
-          onRecipeSelected: onRecipeSelected
+          onRecipeSelected: onRecipeSelected,
+          onCookSessionRequested: onCookSessionRequested
         )
       } else {
         MealCalendarStackedContent(
@@ -42,7 +46,8 @@ struct MealCalendarWorkspaceView: View {
           weekCellMinHeight: 260,
           maxContentWidth: 1120,
           onMenuSelected: onMenuSelected,
-          onRecipeSelected: onRecipeSelected
+          onRecipeSelected: onRecipeSelected,
+          onCookSessionRequested: onCookSessionRequested
         )
       }
     }
@@ -67,6 +72,7 @@ struct MealCalendarPlannerView: View {
   var showsSelectedDayAgenda: Bool
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
 
   var body: some View {
     MealCalendarStackedContent(
@@ -76,7 +82,8 @@ struct MealCalendarPlannerView: View {
       weekCellMinHeight: 240,
       maxContentWidth: 980,
       onMenuSelected: onMenuSelected,
-      onRecipeSelected: onRecipeSelected
+      onRecipeSelected: onRecipeSelected,
+      onCookSessionRequested: onCookSessionRequested
     )
     .navigationTitle("Meal Calendar")
     .toolbar {
@@ -91,6 +98,7 @@ private struct MealCalendarWideWorkspace: View {
   let weekCellMinHeight: CGFloat
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
 
   var body: some View {
     HStack(spacing: 0) {
@@ -101,7 +109,8 @@ private struct MealCalendarWideWorkspace: View {
         weekCellMinHeight: weekCellMinHeight,
         maxContentWidth: nil,
         onMenuSelected: onMenuSelected,
-        onRecipeSelected: onRecipeSelected
+        onRecipeSelected: onRecipeSelected,
+        onCookSessionRequested: onCookSessionRequested
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -110,7 +119,8 @@ private struct MealCalendarWideWorkspace: View {
       MealCalendarAgendaRail(
         model: model,
         onMenuSelected: onMenuSelected,
-        onRecipeSelected: onRecipeSelected
+        onRecipeSelected: onRecipeSelected,
+        onCookSessionRequested: onCookSessionRequested
       )
         .frame(width: agendaWidth)
     }
@@ -126,6 +136,7 @@ private struct MealCalendarStackedContent: View {
   var maxContentWidth: CGFloat?
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
 
   var body: some View {
     ScrollView {
@@ -137,7 +148,8 @@ private struct MealCalendarStackedContent: View {
           monthCellMinHeight: monthCellMinHeight,
           weekCellMinHeight: weekCellMinHeight,
           onMenuSelected: onMenuSelected,
-          onRecipeSelected: onRecipeSelected
+          onRecipeSelected: onRecipeSelected,
+          onCookSessionRequested: onCookSessionRequested
         )
 
         if showsSelectedDayAgenda, model.displayMode != .day {
@@ -147,7 +159,8 @@ private struct MealCalendarStackedContent: View {
             showsHeader: true,
             allowsChatWorkspace: false,
             onMenuSelected: onMenuSelected,
-            onRecipeSelected: onRecipeSelected
+            onRecipeSelected: onRecipeSelected,
+            onCookSessionRequested: onCookSessionRequested
           )
         }
       }
@@ -164,6 +177,7 @@ private struct MealCalendarCalendarBody: View {
   var weekCellMinHeight: CGFloat
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
 
   var body: some View {
     switch model.displayMode {
@@ -177,7 +191,8 @@ private struct MealCalendarCalendarBody: View {
         showsHeader: true,
         allowsChatWorkspace: true,
         onMenuSelected: onMenuSelected,
-        onRecipeSelected: onRecipeSelected
+        onRecipeSelected: onRecipeSelected,
+        onCookSessionRequested: onCookSessionRequested
       )
     }
   }
@@ -187,6 +202,7 @@ private struct MealCalendarAgendaRail: View {
   let model: MealCalendarModel
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
 
   var body: some View {
     ScrollView {
@@ -195,7 +211,8 @@ private struct MealCalendarAgendaRail: View {
         showsHeader: true,
         allowsChatWorkspace: false,
         onMenuSelected: onMenuSelected,
-        onRecipeSelected: onRecipeSelected
+        onRecipeSelected: onRecipeSelected,
+        onCookSessionRequested: onCookSessionRequested
       )
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -241,6 +258,7 @@ struct MealCalendarDayAgendaView: View {
   var allowsChatWorkspace = true
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
   @State private var compactChatModel: RecipeChatModel?
 
   private var occupiedMealSlots: [MealPlanItemSlot] {
@@ -276,7 +294,11 @@ struct MealCalendarDayAgendaView: View {
   private var agendaContent: some View {
     VStack(alignment: .leading, spacing: 16) {
       if showsHeader {
-        MealCalendarDayHeader(model: model, chat: chatButtonTapped)
+        MealCalendarDayHeader(
+          model: model,
+          cookSession: cookSessionAction,
+          chat: chatButtonTapped
+        )
       }
 
       if model.selectedDayRows.isEmpty {
@@ -320,6 +342,20 @@ struct MealCalendarDayAgendaView: View {
 
   private var chatContextIdentity: String {
     String(model.selectedDate.timeIntervalSinceReferenceDate)
+  }
+
+  private var cookSessionPresentation: CookSessionPresentation? {
+    CookSessionPresentation(plannerTitle: model.selectedDateTitle, rows: model.selectedDayRows)
+  }
+
+  private var cookSessionAction: (() -> Void)? {
+    guard cookSessionPresentation != nil else { return nil }
+    return cookSessionButtonTapped
+  }
+
+  private func cookSessionButtonTapped() {
+    guard let cookSessionPresentation else { return }
+    onCookSessionRequested?(cookSessionPresentation)
   }
 
   private func chatButtonTapped() {
@@ -766,40 +802,80 @@ private struct MealCalendarChip: View {
 
 private struct MealCalendarDayHeader: View {
   let model: MealCalendarModel
+  var cookSession: (() -> Void)?
   var chat: () -> Void
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline) {
-      VStack(alignment: .leading, spacing: 6) {
-        Text(model.selectedDateTitle)
-          .font(.largeTitle.bold())
-        Text(itemCountTitle)
-          .font(.subheadline)
-          .foregroundStyle(.secondary)
+    ViewThatFits(in: .horizontal) {
+      // Wide: title and all actions on one row.
+      HStack(alignment: .firstTextBaseline) {
+        titleBlock
+        Spacer()
+        cookButton
+        chatButton
+        addMenu
       }
-      Spacer()
-      Button {
-        chat()
-      } label: {
-        Label("Chat", systemImage: "sparkles")
+      // Narrow (agenda rail): title, then "Cook these" on its own line, then Chat + Add.
+      VStack(alignment: .leading, spacing: 12) {
+        titleBlock
+        if cookSession != nil {
+          cookButton
+            .frame(maxWidth: .infinity)
+        }
+        HStack {
+          chatButton
+          addMenu
+          Spacer()
+        }
       }
-      .buttonStyle(.bordered)
-      Menu {
-        Button {
-          model.addItemButtonTapped(kind: .recipe)
-        } label: {
-          Label("Recipe", systemImage: MealPlanItemKind.recipe.systemImage)
-        }
-        Button {
-          model.addItemButtonTapped(kind: .note)
-        } label: {
-          Label("Note", systemImage: MealPlanItemKind.note.systemImage)
-        }
-      } label: {
-        Label("Add", systemImage: "plus")
+    }
+  }
+
+  private var titleBlock: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text(model.selectedDateTitle)
+        .font(.largeTitle.bold())
+      Text(itemCountTitle)
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  @ViewBuilder
+  private var cookButton: some View {
+    if let cookSession {
+      Button(action: cookSession) {
+        Label("Cook these", systemImage: "flame")
       }
       .buttonStyle(.borderedProminent)
     }
+  }
+
+  private var chatButton: some View {
+    Button {
+      chat()
+    } label: {
+      Label("Chat", systemImage: "sparkles")
+    }
+    .buttonStyle(.bordered)
+  }
+
+  private var addMenu: some View {
+    Menu {
+      Button {
+        model.addItemButtonTapped(kind: .recipe)
+      } label: {
+        Label("Recipe", systemImage: MealPlanItemKind.recipe.systemImage)
+      }
+      Button {
+        model.addItemButtonTapped(kind: .note)
+      } label: {
+        Label("Add Note", systemImage: MealPlanItemKind.note.systemImage)
+      }
+    } label: {
+      Label("Add", systemImage: "plus")
+    }
+    .buttonStyle(.borderedProminent)
   }
 
   private var itemCountTitle: String {
@@ -808,6 +884,25 @@ private struct MealCalendarDayHeader: View {
     case 1: "1 item scheduled"
     default: "\(model.selectedDayRows.count) items scheduled"
     }
+  }
+}
+
+private extension CookSessionPresentation {
+  init?(plannerTitle: String, rows: [MealPlanItemRowData]) {
+    let items = rows.compactMap(CookSessionItem.init(mealPlanRow:))
+    guard !items.isEmpty else { return nil }
+    self.init(title: plannerTitle, items: items)
+  }
+}
+
+private extension CookSessionItem {
+  init?(mealPlanRow row: MealPlanItemRowData) {
+    guard row.item.kind == .recipe, let recipeID = row.recipe?.id else { return nil }
+    self.init(
+      recipeID: recipeID,
+      scaleContext: row.menuItem.map { .menuItem($0.id) } ?? .mealPlanItem(row.item.id),
+      title: row.displayTitle
+    )
   }
 }
 

@@ -15,6 +15,23 @@ struct RecipeDetailPresentation: Hashable, Identifiable {
   }
 }
 
+struct CookSessionItem: Hashable, Identifiable {
+  var recipeID: Recipe.ID
+  var scaleContext: ScaleContext
+  var title: String
+
+  var id: String { scaleContext.id }
+}
+
+struct CookSessionPresentation: Hashable, Identifiable {
+  var title: String
+  var items: [CookSessionItem]
+
+  var id: String {
+    ([title] + items.map(\.id)).joined(separator: "|")
+  }
+}
+
 enum AppSection: String, CaseIterable, Identifiable {
   case recipes
   case browser

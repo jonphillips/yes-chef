@@ -12,6 +12,7 @@ struct RecipeDetailView: View {
   let groceryModel: GroceryLibraryModel
   let isFocusActive: Bool
   let focusButtonTapped: (() -> Void)?
+  let showsStartCookingButton: Bool
 
   init(
     recipeID: Recipe.ID,
@@ -20,7 +21,8 @@ struct RecipeDetailView: View {
     mealCalendarModel: MealCalendarModel,
     groceryModel: GroceryLibraryModel,
     isFocusActive: Bool = false,
-    focusButtonTapped: (() -> Void)? = nil
+    focusButtonTapped: (() -> Void)? = nil,
+    showsStartCookingButton: Bool = true
   ) {
     _model = State(wrappedValue: RecipeDetailModel(recipeID: recipeID, scaleContext: scaleContext))
     self.libraryModel = libraryModel
@@ -28,6 +30,7 @@ struct RecipeDetailView: View {
     self.groceryModel = groceryModel
     self.isFocusActive = isFocusActive
     self.focusButtonTapped = focusButtonTapped
+    self.showsStartCookingButton = showsStartCookingButton
   }
 
   var body: some View {
@@ -128,10 +131,18 @@ struct RecipeDetailView: View {
           model.applyActionCatalog(for: chatModel)
         }
       ) {
-        RecipeReaderView(model: model, libraryModel: libraryModel)
+        RecipeReaderView(
+          model: model,
+          libraryModel: libraryModel,
+          showsStartCookingButton: showsStartCookingButton
+        )
       }
     } else {
-      RecipeReaderView(model: model, libraryModel: libraryModel)
+      RecipeReaderView(
+        model: model,
+        libraryModel: libraryModel,
+        showsStartCookingButton: showsStartCookingButton
+      )
     }
   }
 
@@ -167,6 +178,7 @@ private struct RecipeReaderView: View {
 
   let model: RecipeDetailModel
   let libraryModel: RecipeLibraryModel
+  let showsStartCookingButton: Bool
 
   @State private var compactSection: CompactSection = .ingredients
   @State private var isPhotoGalleryPresented = false
@@ -282,12 +294,16 @@ private struct RecipeReaderView: View {
         HStack(alignment: .center, spacing: 12) {
           recipeStats(recipe)
           Spacer(minLength: 12)
-          startCookingButton(recipe)
+          if showsStartCookingButton {
+            startCookingButton(recipe)
+          }
         }
 
         VStack(alignment: .leading, spacing: 10) {
           recipeStats(recipe)
-          startCookingButton(recipe)
+          if showsStartCookingButton {
+            startCookingButton(recipe)
+          }
         }
       }
 
