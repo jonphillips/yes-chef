@@ -126,6 +126,28 @@ one-field-per-verb corrupts the model and the UI):
 - **Follow-on effort (separate ADR) — Planner-day version** over `MealPlanItem` with the absolute
   date dimension (Decision #3).
 
+## Amendment 1 — Menu AI context: tier-aware budget, prep plan in-context, living-artifact refinement
+
+Accepted 2026-07-05 (design session with Jon). Ships in the **menu planning overhaul** dispatch
+(`docs/efforts/menu-planning-ux.md`), not the original slices. Three fixes to how the menu chat is
+grounded, all in `MenuChatContext` (`RecipeChat.swift`) + the prep-plan flow:
+
+- **A1 — The 12K character budget is tier-aware, not a flat cap.** `serializedCharacterBudget = 12_000`
+  is our own arbitrary constant (characters, ~3K tokens) — **unrelated to any API limit**; gpt-5.5 takes
+  1M tokens. It was sized for the *weakest tier* (on-device, small context), and that starvation is the
+  real cause of "the AI only sees one dish": when verbatim make-ahead notes overflow 12K, the serializer
+  **drops whole dishes from the end** until one survives. Fix: budget **by tier** — small for on-device,
+  one-to-two orders larger for frontier (100K+ chars is still trivial vs 1M tokens) — and clip make-ahead
+  notes to a per-dish share instead of verbatim-or-drop, so **every dish stays represented**.
+- **A2 — The prep plan is in the context.** `MenuChatContext` today carries title/notes/dayCount/items
+  but **not `menu.prepPlan`** — so when asked to refine the plan, the model can't see it. Add the rendered
+  prep plan to the serialization. This is the single change that unblocks iterative refinement.
+- **A3 — The prep plan is a living artifact, not a one-shot field.** With A2 in place, reframe
+  "Regenerate": the chat **reads the current plan and proposes edits against it** (converse → propose →
+  Apply commits), instead of re-deriving from scratch. Pairs with ADR-0017's `high`-effort `MenuPrepPlan`.
+
+Invariant unchanged: the model proposes and structures; the human's tap is the only write.
+
 ## Related
 
 - ADR-0011 (the recipe-scope parent), ADR-0010 (sync/BLOB playbook), ADR-0006 (vocabulary hygiene).
