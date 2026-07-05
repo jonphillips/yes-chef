@@ -10,6 +10,43 @@ Newest first.
 
 ---
 
+## AI configuration & transparency — ADR-0017 (model + effort) + ADR-0018 (taste profile)
+
+**Architect-approved 2026-07-05** — cross-repo: yes-chef
+[PR #96](https://github.com/jonphillips/yes-chef/pull/96) + jon-platform
+[PR #23](https://github.com/jonphillips/jon-platform/pull/23) (`LLMClientKit`). **Synced-schema touch**
+(new `aiSettings` table; ships to the prod schema at the next cut). Separated the two knobs that were
+conflated — **model = capability floor, `reasoning_effort` = the per-task depth/cost dial** — then:
+
+- **Model (ADR-0017 S1):** frontier OpenAI default → **`gpt-5.5`**, `gpt-5.2-chat-latest` retired. Added a
+  provider-agnostic **`ReasoningEffort`** enum + `ModelRequest.reasoningEffort`; `OpenAIWire` emits a
+  top-level **`reasoning_effort`** string when set and **omits it when `nil`** (Chat Completions shape).
+  Anthropic/on-device ignore it. Wire test covers present-when-set / absent-when-nil.
+- **Effort per feature (S2, D3 table):** assigned on **all 9 frontier call sites** — live/streaming recipe
+  chat `medium` (extract-ready, Jon's call), Chef It Up / Serve With / make-ahead / prep-plan `high`,
+  menu/meal complements `medium`. (The D3 table's `substitution`/`capture-parse` = `low` rows have no live
+  call site — substitution was removed in PR #88; capture parse isn't a frontier `ModelRequest` — so
+  9-site coverage is complete.)
+- **Active model shown (S3, D4):** read-only "Active models" rows in `AISettingsView`, one per provider.
+- **Taste profile at the boundary (ADR-0018 S4, D1):** promoted the lone device-local
+  `recipeChatCustomInstructions` field to a **synced** taste profile stitched into `system` at the
+  **`TieredModelClient`** boundary (in both `complete` and `stream`), so it reaches **every** generative
+  call — closing the recipe-chat-only gap. Legacy `@AppStorage` value migrated on launch.
+- **Per-task preferences (S5, D2/D3):** ~4 optional free-text fields (Chef It Up, Serve With, make-ahead /
+  prep plan, complements) threaded via an opaque `promptPreferenceKey` on the request that the app maps to
+  its synced settings; append **behind** the engineering prompt. Lookup tasks get no field. **No raw task
+  prompts exposed** (D-rule: app owns contracts, user owns preferences).
+- **Sync/schema:** new synced `aiSettings` table wired into `makeSyncEngine` **and** the schema, clearing
+  the `CloudSyncTests` live-schema audit ([[extension-sync-construct-not-run]]); migration lives in the
+  shared bootstrap so the share extension's DB gets it too.
+
+Design in [ADR-0017](decisions/ADR-0017-llm-model-and-reasoning-effort.md) +
+[ADR-0018](decisions/ADR-0018-prompt-customization-taste-profile.md). Non-blocking watch-items: singleton
+settings row is row-level last-writer-wins across devices (fine for settings); `ReasoningEffort.none/.xhigh`
+are unused and unverified against the live OpenAI wire (deferred to Jon's build, per ADR).
+
+---
+
 ## Multi-recipe cook session — ADR-0016 (Reader-hosted, not Cooking Mode)
 
 **Architect-approved + merged 2026-07-05** — yes-chef [PR #93](https://github.com/jonphillips/yes-chef/pull/93).
