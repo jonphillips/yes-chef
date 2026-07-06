@@ -633,7 +633,7 @@ public enum RecipeChatErrorText {
 @Observable
 public final class RecipeChatModel: Identifiable {
   public let id = UUID()
-  public let context: RecipeChatContext
+  public private(set) var context: RecipeChatContext
   public private(set) var messages: [RecipeChatMessage] = []
   public var useFrontier = false
   public var selectedProvider: FrontierProvider = .anthropic {
@@ -655,6 +655,19 @@ public final class RecipeChatModel: Identifiable {
     self.context = context
     selectedProvider = defaultProvider()
     loadPersistedThread()
+  }
+
+  public func updateContext(_ context: RecipeChatContext) {
+    guard self.context != context else { return }
+    let previousSubject = self.context.persistenceSubject
+    let nextSubject = context.persistenceSubject
+    if previousSubject != nextSubject {
+      persistCurrentThread()
+    }
+    self.context = context
+    if previousSubject != nextSubject {
+      loadPersistedThread()
+    }
   }
 
   public var frontierAvailable: Bool { !availableProviders.isEmpty }

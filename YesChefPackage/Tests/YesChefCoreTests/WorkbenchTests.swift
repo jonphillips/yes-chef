@@ -54,6 +54,16 @@ extension RecipeCoreTests {
         expectNoDifference(detail.candidateRows.map(\.displayTitle), ["Birria One"])
         expectNoDifference(detail.candidateRows[0].recipeDetail?.ingredientLines.map(\.originalText), ["3 pounds chuck roast"])
 
+        try WorkbenchRepository.updateWorkbenchTitle(
+          workbenchID: workbenchID,
+          title: "  Weeknight Birria  ",
+          in: db,
+          now: now.addingTimeInterval(30)
+        )
+        let renamedDetail = try #require(try WorkbenchDetailRequest(workbenchID: workbenchID).fetch(db))
+        expectNoDifference(renamedDetail.workbench.title, "Weeknight Birria")
+        expectNoDifference(renamedDetail.workbench.dateModified, now.addingTimeInterval(30))
+
         try WorkbenchRepository.updateCandidateAnnotation(
           candidateID: detail.candidateRows[0].id,
           annotation: "  strong consommé  ",
@@ -150,6 +160,64 @@ extension RecipeCoreTests {
         )
       )
       _ = now
+    }
+
+    @Test @MainActor
+    func recipeChatModelRefreshesWorkbenchContextWithoutReplacingThread() {
+      let workbenchID = SampleUUIDSequence.uuid(23_001)
+      let firstCandidateID = SampleUUIDSequence.uuid(23_101)
+      let secondCandidateID = SampleUUIDSequence.uuid(23_102)
+
+      withDependencies {
+        $0.date.now = Date(timeIntervalSinceReferenceDate: 806_400_000)
+      } operation: {
+        let model = RecipeChatModel(
+          context: .workbench(
+            WorkbenchChatContext(
+              workbenchID: workbenchID,
+              title: "Cookies",
+              candidates: [
+                WorkbenchCandidateChatContext(
+                  id: firstCandidateID,
+                  title: "Crisp Cookie",
+                  sortOrder: 0,
+                  ingredientSections: [RecipeChatSection(name: nil, lines: ["butter"])],
+                  instructionSections: [RecipeChatSection(name: nil, lines: ["Bake until crisp."])]
+                )
+              ]
+            )
+          )
+        )
+
+        model.updateContext(
+          .workbench(
+            WorkbenchChatContext(
+              workbenchID: workbenchID,
+              title: "Cookies",
+              candidates: [
+                WorkbenchCandidateChatContext(
+                  id: firstCandidateID,
+                  title: "Crisp Cookie",
+                  sortOrder: 0,
+                  ingredientSections: [RecipeChatSection(name: nil, lines: ["butter"])],
+                  instructionSections: [RecipeChatSection(name: nil, lines: ["Bake until crisp."])]
+                ),
+                WorkbenchCandidateChatContext(
+                  id: secondCandidateID,
+                  title: "Chewy Cookie",
+                  sortOrder: 1,
+                  ingredientSections: [RecipeChatSection(name: nil, lines: ["brown sugar"])],
+                  instructionSections: [RecipeChatSection(name: nil, lines: ["Rest the dough."])]
+                )
+              ]
+            )
+          )
+        )
+
+        let prompt = model.systemPrompt()
+        #expect(prompt.contains("- Chewy Cookie"))
+        #expect(prompt.contains("Rest the dough."))
+      }
     }
   }
 }

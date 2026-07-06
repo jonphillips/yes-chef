@@ -98,10 +98,16 @@ private struct WorkbenchRowView: View {
 
 struct WorkbenchDetailColumn: View {
   let model: WorkbenchLibraryModel
+  var isFocusActive = false
+  var focusButtonTapped: (() -> Void)?
 
   var body: some View {
     if let workbenchID = model.selectedWorkbenchID {
-      WorkbenchDetailView(workbenchID: workbenchID)
+      WorkbenchDetailView(
+        workbenchID: workbenchID,
+        isFocusActive: isFocusActive,
+        focusButtonTapped: focusButtonTapped
+      )
         .id(workbenchID)
     } else {
       ContentUnavailableView("Select a Workbench", systemImage: "hammer")
@@ -114,9 +120,17 @@ struct WorkbenchDetailView: View {
   @AppStorage(ChatWorkspaceDetent.storageKey) private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   @State private var model: WorkbenchDetailModel
   @State private var compactChatModel: RecipeChatModel?
+  let isFocusActive: Bool
+  let focusButtonTapped: (() -> Void)?
 
-  init(workbenchID: Workbench.ID) {
+  init(
+    workbenchID: Workbench.ID,
+    isFocusActive: Bool = false,
+    focusButtonTapped: (() -> Void)? = nil
+  ) {
     _model = State(wrappedValue: WorkbenchDetailModel(workbenchID: workbenchID))
+    self.isFocusActive = isFocusActive
+    self.focusButtonTapped = focusButtonTapped
   }
 
   var body: some View {
@@ -145,6 +159,16 @@ struct WorkbenchDetailView: View {
     .toolbar {
       if model.detail != nil {
         ToolbarItemGroup(placement: .primaryAction) {
+          if horizontalSizeClass != .compact, let focusButtonTapped {
+            Button {
+              focusButtonTapped()
+            } label: {
+              Label(
+                "Focus",
+                systemImage: isFocusActive ? "rectangle.expand" : "arrow.up.left.and.arrow.down.right"
+              )
+            }
+          }
           Button {
             model.addCandidatesButtonTapped()
           } label: {
@@ -186,14 +210,22 @@ private struct WorkbenchReader: View {
   let model: WorkbenchDetailModel
   let detail: WorkbenchDetailData
 
+  @State private var titleText = ""
   @State private var notesText = ""
 
   var body: some View {
     List {
       Section {
         VStack(alignment: .leading, spacing: 10) {
-          Text(detail.workbench.title)
+          StackedTextField(title: "Title", text: $titleText)
             .font(.title2.weight(.semibold))
+          Button {
+            model.saveTitleButtonTapped(titleText)
+          } label: {
+            Label("Save Title", systemImage: "square.and.arrow.down")
+          }
+          .buttonStyle(.bordered)
+          .disabled(titleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
           TextEditor(text: $notesText)
             .frame(minHeight: 80)
             .overlay(alignment: .topLeading) {
@@ -235,7 +267,11 @@ private struct WorkbenchReader: View {
       }
     }
     .onAppear {
+      titleText = detail.workbench.title
       notesText = detail.workbench.notes ?? ""
+    }
+    .onChange(of: detail.workbench.title) { _, title in
+      titleText = title
     }
     .onChange(of: detail.workbench.notes) { _, notes in
       notesText = notes ?? ""
@@ -297,10 +333,11 @@ private struct WorkbenchCandidatePickerView: View {
   @Environment(\.dismiss) private var dismiss
   let model: WorkbenchDetailModel
   @State private var selection: Set<Recipe.ID> = []
+  @State private var searchText = ""
 
   var body: some View {
     List(selection: $selection) {
-      ForEach(model.availableRecipeRows) { row in
+      ForEach(filteredRecipeRows) { row in
         RecipeListRow(
           row: row,
           options: RecipeListViewOptions(
@@ -315,6 +352,11 @@ private struct WorkbenchCandidatePickerView: View {
     }
     .environment(\.editMode, .constant(.active))
     .navigationTitle("Add Candidates")
+    .searchable(
+      text: $searchText,
+      placement: .navigationBarDrawer(displayMode: .always),
+      prompt: "Search recipes"
+    )
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {
         Button("Cancel") {
@@ -329,6 +371,14 @@ private struct WorkbenchCandidatePickerView: View {
         }
         .disabled(selection.isEmpty)
       }
+    }
+  }
+
+  private var filteredRecipeRows: [RecipeListRowData] {
+    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !query.isEmpty else { return model.availableRecipeRows }
+    return model.availableRecipeRows.filter { row in
+      row.recipe.title.localizedStandardContains(query)
     }
   }
 }

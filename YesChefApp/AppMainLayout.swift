@@ -85,7 +85,13 @@ struct AppMainLayout: View {
             columnVisibility: $columnVisibility
           )
         case .workbenches:
-          WorkbenchDetailColumn(model: workbenchModel)
+          WorkbenchDetailColumn(
+            model: workbenchModel,
+            isFocusActive: columnVisibility == .detailOnly,
+            focusButtonTapped: {
+              columnVisibility = columnVisibility == .detailOnly ? .doubleColumn : .detailOnly
+            }
+          )
         case .groceries:
           GroceryDetailColumn(
             model: groceryModel,
