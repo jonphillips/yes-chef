@@ -689,7 +689,6 @@ public final class RecipeChatModel: Identifiable {
   @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.uuid) private var uuid
   @ObservationIgnored private var responseTask: Task<Void, Never>?
-  @ObservationIgnored private var assistantResponseID: RecipeChatMessage.ID?
 
   public init(context: RecipeChatContext) {
     self.context = context
@@ -760,14 +759,12 @@ public final class RecipeChatModel: Identifiable {
     errorText = nil
     defer {
       responseTask = nil
-      assistantResponseID = nil
       isResponding = false
       persistCurrentThread()
     }
 
     let requestMessages = history()
     let assistantID = appendAssistantPlaceholder()
-    assistantResponseID = assistantID
     do {
       if case .frontier = activeTier {
         let response = try await modelClient.complete(
