@@ -25,6 +25,10 @@ public struct RecipeChatSubject: Equatable, Hashable, Sendable {
     let day = components.day ?? 0
     return Self(kind: .mealPlanDay, id: String(format: "%04d-%02d-%02d", year, month, day))
   }
+
+  public static func workbench(_ id: Workbench.ID) -> Self {
+    Self(kind: .workbench, id: id.uuidString)
+  }
 }
 
 extension RecipeChatContext {
@@ -33,6 +37,7 @@ extension RecipeChatContext {
     case let .mealPlan(context): context.persistenceSubject
     case let .menu(context): context.persistenceSubject
     case let .recipe(context): context.persistenceSubject
+    case let .workbench(context): context.persistenceSubject
     }
   }
 }
@@ -52,6 +57,12 @@ extension MenuChatContext {
 extension RecipeChatRecipeContext {
   public var persistenceSubject: RecipeChatSubject? {
     recipeID.map(RecipeChatSubject.recipe)
+  }
+}
+
+extension WorkbenchChatContext {
+  public var persistenceSubject: RecipeChatSubject? {
+    workbenchID.map(RecipeChatSubject.workbench)
   }
 }
 

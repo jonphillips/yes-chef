@@ -4,8 +4,8 @@
 UI. Reuses the Recipe stack (reader/editor/scaling/images/sync), the chat split host, the staging card,
 and LLMClientKit. **Not** an overload of Menu/Collection.
 **Owner:** Codex (implement, per slice) · Claude (architect/review) · Jon (product/review)
-**Status:** **Queued** (one effort, sequenced slices; **dispatch S1 alone first** — it de-risks grounding
-+ UX before any synthesis). Milestone-sized: do **not** bundle all slices into one PR.
+**Status:** **S1 implemented; S2 queued next** (one effort, sequenced slices; S1 de-risked grounding +
+UX before any synthesis). Milestone-sized: do **not** bundle all slices into one PR.
 **Decisions it implements:** [ADR-0019](../decisions/ADR-0019-recipe-design-studies.md) — whole, incl.
 **Amendments 1 (durable workbench + workbench log) and 2 (name ratified)**. Design record: the
 2026-07-05 design conversation.
@@ -43,7 +43,7 @@ additive-nullable, defaults `main`) to hide in-progress working recipes from bro
 
 ## Slice plan
 
-- **S1 — the entity + candidate selector + grounded chat, NO synthesis, NO working recipe.** *(de-risks
+- **S1 — implemented: the entity + candidate selector + grounded chat, NO synthesis, NO working recipe.** *(de-risks
   the whole effort; ship and dogfood before betting on the draft verb.)*
   - Migration + `@Table` models: **`Workbench`** (`id`, `title` = the target concept, `notes: String?`,
     `draftRecipeID: UUID?` soft FK — null in S1, `sortOrder`, `dateCreated`, `dateModified`) and

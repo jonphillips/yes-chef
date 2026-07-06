@@ -668,6 +668,43 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Create workbench schema") { db in
+      try #sql("""
+        CREATE TABLE "workbenches" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "title" TEXT NOT NULL,
+          "notes" TEXT,
+          "draftRecipeID" TEXT REFERENCES "recipes"("id") ON DELETE SET NULL,
+          "sortOrder" INTEGER NOT NULL,
+          "dateCreated" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      try #sql("""
+        CREATE TABLE "workbenchCandidates" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "workbenchID" TEXT NOT NULL REFERENCES "workbenches"("id") ON DELETE CASCADE,
+          "recipeID" TEXT REFERENCES "recipes"("id") ON DELETE SET NULL,
+          "recipeTitleSnapshot" TEXT NOT NULL,
+          "annotation" TEXT,
+          "sortOrder" INTEGER NOT NULL,
+          "dateCreated" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      for statement in [
+        #"CREATE INDEX "index_workbenches_on_sortOrder" ON "workbenches"("sortOrder")"#,
+        #"CREATE INDEX "index_workbenches_on_draftRecipeID" ON "workbenches"("draftRecipeID")"#,
+        #"CREATE INDEX "index_workbenchCandidates_on_workbenchID" ON "workbenchCandidates"("workbenchID")"#,
+        #"CREATE INDEX "index_workbenchCandidates_on_recipeID" ON "workbenchCandidates"("recipeID")"#,
+      ] {
+        try db.execute(sql: statement)
+      }
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)
