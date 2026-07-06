@@ -23,6 +23,7 @@ final class RecipeLibraryModel {
     case captureSummary(WebRecipeCaptureSummary)
     case importSummary(RecipeImportSummary)
     case backupSupplementSummary(RecipeBackupSupplementSummary)
+    case workbench(WorkbenchPresentation)
   }
 
   @ObservationIgnored
@@ -55,6 +56,8 @@ final class RecipeLibraryModel {
   var selectedCourse: String?
   var selectedSourceNames: Set<String> = []
   var selectedAuthorNames: Set<String> = []
+  var isSelectingWorkbenchRecipes = false
+  var selectedWorkbenchRecipeIDs: Set<Recipe.ID> = []
 
   func reloadAfterExternalChange() async {
     try? await $recipeRows.load()
@@ -62,6 +65,43 @@ final class RecipeLibraryModel {
 
   func addRecipeButtonTapped() {
     destination = .addRecipe
+  }
+
+  func workbenchSelectionButtonTapped() {
+    selectedWorkbenchRecipeIDs = []
+    isSelectingWorkbenchRecipes = true
+  }
+
+  func cancelWorkbenchSelectionButtonTapped() {
+    selectedWorkbenchRecipeIDs = []
+    isSelectingWorkbenchRecipes = false
+  }
+
+  func workbenchTheseButtonTapped() {
+    let recipeIDs = selectedWorkbenchRecipeIDs
+    guard !recipeIDs.isEmpty else { return }
+    let selectedRows = recipeRows.filter { recipeIDs.contains($0.recipe.id) && !$0.recipe.archived }
+    let title = selectedRows.count == 1
+      ? selectedRows[0].recipe.title
+      : "Recipe Workbench"
+
+    do {
+      let workbenchID = try database.write { db in
+        try WorkbenchRepository.addWorkbench(
+          title: title,
+          candidateRecipeIDs: selectedRows.map(\.recipe.id),
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+      selectedWorkbenchRecipeIDs = []
+      isSelectingWorkbenchRecipes = false
+      destination = .workbench(WorkbenchPresentation(workbenchID: workbenchID))
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
   }
 
   func captureRecipeButtonTapped() {
@@ -809,6 +849,7 @@ final class RecipeDetailModel {
   enum Destination {
     case scaling
     case chat(RecipeChatModel)
+    case workbench(WorkbenchPresentation)
   }
 
   let recipeID: Recipe.ID
@@ -818,6 +859,8 @@ final class RecipeDetailModel {
   @Dependency(\.date.now) private var now
   @ObservationIgnored
   @Dependency(\.defaultDatabase) private var database
+  @ObservationIgnored
+  @Dependency(\.uuid) private var uuid
   @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
   @ObservationIgnored
@@ -930,6 +973,25 @@ final class RecipeDetailModel {
   func chatButtonTapped() {
     guard let detail else { return }
     destination = .chat(RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail))))
+  }
+
+  func openWorkbenchButtonTapped() {
+    guard let recipe = detail?.recipe else { return }
+    do {
+      let workbenchID = try database.write { db in
+        try WorkbenchRepository.addWorkbench(
+          title: recipe.title,
+          candidateRecipeIDs: [recipe.id],
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+      destination = .workbench(WorkbenchPresentation(workbenchID: workbenchID))
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
   }
 
   func clearMakeAheadButtonTapped() {

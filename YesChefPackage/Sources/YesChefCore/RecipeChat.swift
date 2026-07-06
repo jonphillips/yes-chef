@@ -43,12 +43,14 @@ public enum RecipeChatContext: Equatable, Sendable {
   case mealPlan(MealPlanChatContext)
   case menu(MenuChatContext)
   case recipe(RecipeChatRecipeContext)
+  case workbench(WorkbenchChatContext)
 
   public var title: String {
     switch self {
     case let .mealPlan(context): context.title
     case let .menu(context): context.title.isEmpty ? "this menu" : context.title
     case let .recipe(context): context.title.isEmpty ? "this recipe" : context.title
+    case let .workbench(context): context.title.isEmpty ? "this workbench" : context.title
     }
   }
 
@@ -57,6 +59,7 @@ public enum RecipeChatContext: Equatable, Sendable {
     case .mealPlan: "meal plan"
     case .menu: "menu"
     case .recipe: "recipe"
+    case .workbench: "workbench"
     }
   }
 
@@ -65,6 +68,7 @@ public enum RecipeChatContext: Equatable, Sendable {
     case .mealPlan: "the meal plan day the user is looking at"
     case .menu: "the menu the user is looking at"
     case .recipe: "the recipe the user is looking at"
+    case .workbench: "the recipe workbench the user is looking at"
     }
   }
 
@@ -73,6 +77,7 @@ public enum RecipeChatContext: Equatable, Sendable {
     case let .mealPlan(context): context.seededContextDescription
     case let .menu(context): context.seededContextDescription
     case .recipe: "Seeded with the recipe on screen."
+    case let .workbench(context): context.seededContextDescription
     }
   }
 
@@ -81,6 +86,7 @@ public enum RecipeChatContext: Equatable, Sendable {
     case .mealPlan: "Meal plan context leaves the device for this conversation."
     case .menu: "Menu context leaves the device for this conversation."
     case .recipe: "Recipe context leaves the device for this conversation."
+    case .workbench: "Workbench context leaves the device for this conversation."
     }
   }
 
@@ -89,6 +95,7 @@ public enum RecipeChatContext: Equatable, Sendable {
     case let .mealPlan(context): context.serialized()
     case let .menu(context): context.serialized(for: tier)
     case let .recipe(context): context.serialized()
+    case let .workbench(context): context.serialized(for: tier)
     }
   }
 }

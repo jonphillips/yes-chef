@@ -1,7 +1,7 @@
 # Current Handoff
 
-Last updated: July 6, 2026 (**Next Up = Recipe Workbench Slice 1** — new entity + candidate selector +
-grounded "compare these" chat, no synthesis; `efforts/recipe-workbench.md`, ADR-0019. **Meal-Planner chat
+Last updated: July 6, 2026 (**Next Up = Recipe Workbench Slice 2** — draft verb → real working recipe +
+`libraryPlacement`; `efforts/recipe-workbench.md`, ADR-0019. **Meal-Planner chat
 verbs** demoted back to the Ready Efforts queue — still pending, just not the immediate target. **Menu planning
 overhaul (ADR-0012 Amdt 1) is done** — [yes-chef #98](https://github.com/jonphillips/yes-chef/pull/98),
 build-green, pending Jon's device pass → DONE-LOG. **AI config (ADR-0017/0018) is done** — cross-repo PRs
@@ -23,26 +23,23 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Recipe Workbench — Slice 1 (ADR-0019 + `efforts/recipe-workbench.md`).** A new first-class entity for
-iterating N candidate recipes toward "the one true recipe." Slice 1 is deliberately **de-risking: the
-entity + candidate selector + grounded chat, with NO synthesis and NO working recipe yet.**
+**Recipe Workbench — Slice 2 (ADR-0019 + `efforts/recipe-workbench.md`).** Slice 1 is implemented:
+`Workbench` + `WorkbenchCandidate`, candidate picker, editable annotations, and grounded `.workbench` chat.
+Next dispatch is the draft verb that turns a workbench into a real working recipe.
 
-- New `@Table` models + additive migration: **`Workbench`** (`id`, `title`, `notes: String?`,
-  `draftRecipeID: UUID?` soft FK — null in S1, `sortOrder`, `dateCreated`, `dateModified`) and
-  **`WorkbenchCandidate`** (`id`, `workbenchID` FK cascade, `recipeID: UUID?` soft FK,
-  `recipeTitleSnapshot: String`, `annotation: String?`, `sortOrder`, `dateCreated`). Candidates optional.
-- Entry points: **"Open a workbench"** from a single recipe **and** **"Workbench these"** from a library
-  **multi-select**. Workbench screen lists candidates (editable annotation) + hosts the existing chat split
-  via a new **`case workbench(...)`** on `RecipeChatContext` + a `WorkbenchChatContext`.
-- **Depth-focused grounding (ADR-0019 D2 — inverted budget):** full ingredients + steps for a *small*
-  candidate set (soft-cap ~5), tier-aware; cap N rather than truncate any candidate's method.
-- **"Compare / strengths & weaknesses" works immediately as plain chat** — zero commit surface. Stop here
-  for review; **S2 (draft verb → real working recipe + `libraryPlacement`) and S3 (workbench log) are the
-  next dispatches, not this one.**
+- Add the synthesis apply-action + review card that writes a **new `Recipe`**, links it via
+  `Workbench.draftRecipeID`, captures the pristine `originalSnapshot`, and opens the result in the existing
+  `RecipeDetailView` reader/editor. Use `high` effort (ADR-0017).
+- Add the additive `recipes.libraryPlacement` column (`main | reference` shape decided as "future → now")
+  so in-progress working recipes stay out of default browse until promoted. New working recipes should be
+  non-`main`; "Promote to library" flips them to `main`.
+- Guardrail: the draft must be a coherent editorial choice with rationale referencing candidates — **not** a
+  blended average of every candidate. The model proposes; the review tap writes.
+- Stop at S2. **S3** is the durable workbench log (`WorkbenchLogEntry` + save-to-log tap), not part of this
+  dispatch.
 
 **Sync-safe, post-sync** (UUID PKs, soft FKs + denormalized snapshots, read-time dedup, additive
-migration). **The model proposes; the tap writes** — no S1 commit surface anyway. Full slice detail +
-resolved review calls in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md);
+migrations). Full slice detail + resolved review calls in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md);
 design in [ADR-0019](decisions/ADR-0019-recipe-design-studies.md) (whole, incl. both amendments).
 
 **Menu planning overhaul (ADR-0012 Amendment 1 + `efforts/menu-planning-ux.md`) is done** —
@@ -98,10 +95,9 @@ target.
 ([yes-chef #98](https://github.com/jonphillips/yes-chef/pull/98), build-green; pending Jon's device pass →
 DONE-LOG). All five slices shipped; drag-drop dish reorder stays parked as the named follow-on.
 
-**Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — **Slice 1 promoted to Next Up**
-(2026-07-06). Remaining slices stay queued: **S2** draft verb → real working recipe + `libraryPlacement`
-promotion (decided); **S3** the `WorkbenchLogEntry` durable log + save-to-log tap. Milestone-sized —
-dispatch **one slice at a time**, S1 first. Design in
+**Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — **Slice 1 implemented; Slice 2 promoted
+to Next Up** (2026-07-06). Remaining slices stay queued after S2: **S3** the `WorkbenchLogEntry` durable
+log + save-to-log tap. Milestone-sized — dispatch **one slice at a time**. Design in
 [ADR-0019](decisions/ADR-0019-recipe-design-studies.md).
 
 **Meal-Planner chat verbs** (ADR-0013 follow-on + `efforts/cooking-workspace.md`) — **demoted back to the

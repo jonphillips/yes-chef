@@ -192,6 +192,7 @@ public enum RecipeDifficulty: String, Codable, QueryBindable, QueryDecodable, Se
 }
 
 public enum ChatSubjectKind: String, Codable, QueryBindable, QueryDecodable, Sendable {
+  case workbench
   case recipe
   case menu
   case mealPlanDay

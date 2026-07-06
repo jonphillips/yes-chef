@@ -96,6 +96,11 @@ struct RecipeDetailView: View {
           Label("Edit", systemImage: "square.and.pencil")
         }
         Menu {
+          Button {
+            model.openWorkbenchButtonTapped()
+          } label: {
+            Label("Open a Workbench", systemImage: "hammer")
+          }
           Button(role: .destructive) {
             libraryModel.deleteButtonTapped(recipeID: model.recipeID)
           } label: {
@@ -112,6 +117,11 @@ struct RecipeDetailView: View {
           chatModel: chatModel,
           applyActions: model.applyActionCatalog(for: chatModel)
         )
+      }
+    }
+    .sheet(item: $model.destination.workbench) { presentation in
+      NavigationStack {
+        WorkbenchDetailView(workbenchID: presentation.workbenchID)
       }
     }
     .alert("Recipe Update Failed", isPresented: $model.isShowingError) {

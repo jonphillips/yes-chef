@@ -15,6 +15,12 @@ struct RecipeDetailPresentation: Hashable, Identifiable {
   }
 }
 
+struct WorkbenchPresentation: Hashable, Identifiable {
+  var workbenchID: Workbench.ID
+
+  var id: Workbench.ID { workbenchID }
+}
+
 struct CookSessionItem: Hashable, Identifiable {
   var recipeID: Recipe.ID
   var scaleContext: ScaleContext
@@ -34,6 +40,7 @@ struct CookSessionPresentation: Hashable, Identifiable {
 
 enum AppSection: String, CaseIterable, Identifiable {
   case recipes
+  case workbenches
   case browser
   case mealCalendar
   case groceries
@@ -49,6 +56,7 @@ enum AppSection: String, CaseIterable, Identifiable {
   var title: String {
     switch self {
     case .recipes: "Recipes"
+    case .workbenches: "Workbenches"
     case .browser: "Browser"
     case .mealCalendar: "Meal Calendar"
     case .groceries: "Groceries"
@@ -60,6 +68,7 @@ enum AppSection: String, CaseIterable, Identifiable {
   var systemImage: String {
     switch self {
     case .recipes: "book.closed"
+    case .workbenches: "hammer"
     case .browser: "safari"
     case .mealCalendar: "calendar"
     case .groceries: "cart"

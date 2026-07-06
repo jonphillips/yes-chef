@@ -5,6 +5,7 @@ struct ExternalDatabaseChangeReloadModifier: ViewModifier {
   @Environment(\.scenePhase) private var scenePhase
 
   let recipeModel: RecipeLibraryModel
+  let workbenchModel: WorkbenchLibraryModel
   let browserModel: BrowserModel
   let mealCalendarModel: MealCalendarModel
   let menuModel: MenuLibraryModel
@@ -34,6 +35,7 @@ struct ExternalDatabaseChangeReloadModifier: ViewModifier {
 
   @MainActor private func reloadObservingModels() async {
     await recipeModel.reloadAfterExternalChange()
+    await workbenchModel.reloadAfterExternalChange()
     await browserModel.reloadAfterExternalChange()
     await mealCalendarModel.reloadAfterExternalChange()
     await menuModel.reloadAfterExternalChange()
@@ -44,6 +46,7 @@ struct ExternalDatabaseChangeReloadModifier: ViewModifier {
 extension View {
   func externalDatabaseChangeReload(
     recipeModel: RecipeLibraryModel,
+    workbenchModel: WorkbenchLibraryModel,
     browserModel: BrowserModel,
     mealCalendarModel: MealCalendarModel,
     menuModel: MenuLibraryModel,
@@ -52,6 +55,7 @@ extension View {
     modifier(
       ExternalDatabaseChangeReloadModifier(
         recipeModel: recipeModel,
+        workbenchModel: workbenchModel,
         browserModel: browserModel,
         mealCalendarModel: mealCalendarModel,
         menuModel: menuModel,
