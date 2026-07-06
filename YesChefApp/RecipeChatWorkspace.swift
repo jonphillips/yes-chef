@@ -256,12 +256,6 @@ struct RecipeChatPanel: View {
             if let actionSummary {
               ChatActionSummary(summary: actionSummary)
             }
-            if let error = chatModel.errorText ?? actionError {
-              Label(error, systemImage: "exclamationmark.triangle")
-                .font(.footnote)
-                .foregroundStyle(.red)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
           }
           .padding()
         }
@@ -276,6 +270,10 @@ struct RecipeChatPanel: View {
       Divider()
 
       VStack(alignment: .leading, spacing: 12) {
+        if let error = chatModel.errorText ?? actionError {
+          ChatErrorBanner(message: error)
+        }
+
         if !stagedReviewItems.isEmpty {
           ChatApplyReviewList(
             items: stagedReviewItems,
@@ -761,5 +759,18 @@ private struct ChatActionSummary: View {
     .padding(10)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+  }
+}
+
+private struct ChatErrorBanner: View {
+  let message: String
+
+  var body: some View {
+    Label(message, systemImage: "exclamationmark.triangle.fill")
+      .font(.footnote)
+      .foregroundStyle(.red)
+      .padding(10)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
   }
 }

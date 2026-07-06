@@ -328,6 +328,34 @@ public enum WorkbenchRepository {
     return recipeID
   }
 
+  /// Detach the working recipe so the workbench can draft again. Always clears the (soft-FK)
+  /// `draftRecipeID` link — deleting the recipe alone would leave the link dangling and keep the
+  /// draft action disabled. The recipe row itself is deleted only while it's still an unpromoted
+  /// `.reference` draft (scratch, cascades to its children); once promoted to `.main` it's a real
+  /// library recipe the cook chose to keep, so it's only unlinked, not deleted. Returns the deleted
+  /// recipe id when a scratch draft was removed, `nil` when a promoted recipe was merely unlinked.
+  @discardableResult
+  public static func removeDraftRecipe(
+    workbenchID: Workbench.ID,
+    in db: Database,
+    now: Date
+  ) throws -> Recipe.ID? {
+    var workbench = try requireWorkbench(workbenchID, in: db)
+    guard let recipeID = workbench.draftRecipeID else {
+      throw WorkbenchRepositoryError.missingDraftRecipe(workbenchID)
+    }
+
+    workbench.draftRecipeID = nil
+    workbench.dateModified = now
+    try Workbench.upsert { workbench }.execute(db)
+
+    if let recipe = try Recipe.find(recipeID).fetchOne(db), recipe.libraryPlacement == .reference {
+      try RecipeRepository.permanentlyDelete(recipeID: recipeID, in: db)
+      return recipeID
+    }
+    return nil
+  }
+
   private static func requireWorkbench(_ workbenchID: Workbench.ID, in db: Database) throws -> Workbench {
     guard let workbench = try Workbench.find(workbenchID).fetchOne(db) else {
       throw WorkbenchRepositoryError.workbenchNotFound(workbenchID)

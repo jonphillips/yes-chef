@@ -1,7 +1,10 @@
 # Current Handoff
 
-Last updated: July 6, 2026 (**Next Up = Recipe Workbench S2** — draft verb + `libraryPlacement` +
-workbench task framing: the first real commit surface. **Chat controls is done** —
+Last updated: July 6, 2026 (**Next Up = Recipe Workbench S3** — durable `WorkbenchLogEntry` log +
+save-to-log tap. **Workbench S2 is done** — [yes-chef #107](https://github.com/jonphillips/yes-chef/pull/107),
+architect-approved + build-green, pending Jon's device pass → DONE-LOG: the draft verb (working recipe as a
+`.reference` recipe + promote-to-`main` + reused task framing), **plus a post-review dogfood-hardening batch
+on the same branch** (below; includes a cross-repo LLMClientKit timeout bump). **Chat controls is done** —
 [yes-chef #105](https://github.com/jonphillips/yes-chef/pull/105), architect-approved + Jon device-passed
 2026-07-06 → DONE-LOG: persisted frontier/on-device tier, clear, and stop/interrupt in the shared panel.
 **Workbench S1 polish + grounding fix is done** —
@@ -43,35 +46,40 @@ I used anywhere"), `clear()` + confirm button (disposable scratch, no undo), and
 (send↔stop off `isResponding`, cancellation checked on both tiers). Seam discipline held (ADR-0020) — generic
 model methods + shared-panel controls, no domain pattern-match, no lift yet.
 
-**Recipe Workbench — S2 (the dispatch target).** The draft verb that turns a workbench
-into a real working recipe — the first real commit surface:
+**Recipe Workbench — S3 (the dispatch target).** The durable workbench log — ship the store +
+manual/curate path **before** the AI-generated verbs (ADR-0019 Amdt 1):
 
-- Synthesis apply-action + review card that writes a **new `Recipe`**, links it via
-  `Workbench.draftRecipeID`, captures the pristine `originalSnapshot`, and opens the result in the existing
-  `RecipeDetailView` reader/editor. `high` effort (ADR-0017). Route the write through the staging card —
-  the model proposes, the tap writes.
-- Additive `recipes.libraryPlacement` column (`main | reference`, "future → now") so in-progress working
-  recipes stay out of default browse until promoted. New working recipes non-`main`; "Promote to library"
-  flips to `main`.
-- Guardrail: the draft must be a coherent editorial choice with rationale referencing candidates — **not**
-  a blended average of every candidate ([[llm-curation-not-synthesis]]).
-- **Workbench task framing (do this first, it's cheap and it grounds everything below).** Today the
-  `.workbench` chat gets the candidate *data* but the generic recipe/menu framing ("Help with timing, prep,
-  troubleshooting, and planning") — the model is never told *what a workbench is for*. Add a per-context
-  task-framing string on `RecipeChatContext` (empty for `.recipe`/`.menu`; the paragraph below for
-  `.workbench`) and insert it into `systemPrompt()` where that generic line sits. Define it **once** and
-  reuse the same string as the spine of the draft-verb apply-action prompt, so free chat and the commit path
-  can't drift on what "synthesize" means. Exact wording:
-  > The user is assembling candidate versions of a dish to compare them, reconcile their differences, and
-  > reason toward one working recipe. Help them see how the candidates differ and what's worth borrowing
-  > from each — don't blend everything into a bland average. The working recipe needn't be a single
-  > monolithic version: the user may want a base recipe plus a few deliberate variations, and those
-  > variations can live inside the one working recipe.
+- Migration + model **`WorkbenchLogEntry`** (`id`, `workbenchID` FK cascade, extensible
+  `kind: rationale | experiment | fork | observation | note`, `body: String`, `outcome: String?` for tried
+  experiments, `relatedRecipeID: UUID?` soft FK, `sortOrder`, `dateCreated`). Editable/deletable, append-only
+  in practice. Additive-nullable ⇒ sync-safe.
+- Log surface on the workbench screen (dated, typed entries) + a **"save to workbench log"** tap that
+  distills an entry from the ephemeral chat (ADR-0015 ~1-month) into the durable log — the two-histories
+  bridge (ADR-0019 A2/A4).
+- Ship the store + manual/curate path first; AI-*generated* experiment/fork entries layer on later as
+  dogfooding shapes them (new `kind` or new compose path = no migration).
 
-  (The taste profile is already appended to every request at the client boundary as "honor unless it
-  conflicts with the task rules," so this framing's "don't average" rule correctly outranks a stray
-  taste-profile line — no extra plumbing needed.)
-- Stop at S2. **S3** (durable `WorkbenchLogEntry` log + save-to-log tap) stays queued behind it.
+**Recipe Workbench — S2 is done** — [yes-chef #107](https://github.com/jonphillips/yes-chef/pull/107),
+architect-approved + build-green, pending Jon's device pass → DONE-LOG. The
+draft verb turns a workbench into a real working recipe (the first commit surface): a synthesis apply-action
++ review card writes a **new `Recipe`**, links it via `Workbench.draftRecipeID`, captures the pristine
+`originalSnapshot`, and opens it in `RecipeDetailView`. New working recipes land at
+`libraryPlacement: .reference` (out of default browse) with a one-tap **"Promote to library"** flip to
+`.main`. The workbench task-framing string is defined **once** on `RecipeChatContext` and reused as the
+spine of the draft-verb prompt, so free chat and the commit path can't drift; `high` effort (ADR-0017), with
+the curation-not-average guardrail ([[llm-curation-not-synthesis]]) enforced in the prompt.
+
+**Dogfood-hardening rode the same branch** (2026-07-06, architect-built, pending Jon's device pass; 206
+package tests + drift green, app-target build green). Two repos: **jon-platform** — LLMClientKit frontier
+`URLSession` request/resource timeout raised (300s/600s) so a `high`-effort synthesis isn't clipped mid-reason
+(needs its own commit there). **yes-chef** — draft-verb budget raised to 16k with truncation surfaced as a
+real retryable error (not a silent empty draft); a persistent chat **error banner** + explicit timeout/offline
+messages; and a **remove / re-draft** affordance on the working recipe (deletes an unpromoted `.reference`
+scratch draft, only unlinks a promoted `.main` recipe, always clears the soft-FK link so drafting re-enables).
+Effort locked at **`high`** — dogfood-validated as a clear quality step over `medium`. Dogfood-surfaced
+follow-ons parked in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md): synthesis-shaped draft
+action (not gated on the last reply), **AI effort/tier as a user-facing setting** (ADR-0017/0018 territory),
+and a tabbed candidate/working-recipe quick-view.
 
 **Sync-safe, post-sync** (UUID PKs, soft FKs + denormalized snapshots, read-time dedup, additive
 migrations). Full slice detail + resolved review calls in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md);

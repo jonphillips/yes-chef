@@ -116,6 +116,7 @@ final class WorkbenchDetailModel {
   var destination: Destination?
   var errorMessage: String?
   var isShowingError = false
+  var isConfirmingRemoveWorkingRecipe = false
 
   init(workbenchID: Workbench.ID, openRecipe: @escaping (Recipe.ID) -> Void = { _ in }) {
     self.workbenchID = workbenchID
@@ -159,6 +160,30 @@ final class WorkbenchDetailModel {
         )
       }
       openRecipe(recipeID)
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  /// Whether the current working recipe has been promoted to the main library. Drives the
+  /// remove-confirmation wording: a promoted recipe is only unlinked (it stays in the library),
+  /// an unpromoted `.reference` draft is deleted outright.
+  var workingRecipeIsPromoted: Bool {
+    detail?.draftRecipeDetail?.recipe.libraryPlacement == .main
+  }
+
+  func removeWorkingRecipeButtonTapped() {
+    guard detail?.workbench.draftRecipeID != nil else { return }
+    isConfirmingRemoveWorkingRecipe = true
+  }
+
+  func confirmRemoveWorkingRecipe() {
+    isConfirmingRemoveWorkingRecipe = false
+    do {
+      try database.write { db in
+        try WorkbenchRepository.removeDraftRecipe(workbenchID: workbenchID, in: db, now: now)
+      }
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true

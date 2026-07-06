@@ -2,6 +2,22 @@ import Dependencies
 import Foundation
 import LLMClientKit
 
+public enum WorkbenchDraftRecipeError: Error, Equatable, LocalizedError {
+  /// The model exhausted its token budget (usually on reasoning) before finishing the recipe.
+  case responseTruncated
+  /// The model returned text, but no recipe could be read from it.
+  case responseUnreadable
+
+  public var errorDescription: String? {
+    switch self {
+    case .responseTruncated:
+      "The model ran out of room before it finished the working recipe. Try again."
+    case .responseUnreadable:
+      "The model's response couldn't be read as a working recipe. Try again."
+    }
+  }
+}
+
 public struct WorkbenchDraftRecipe: Equatable, Sendable {
   public var title: String
   public var subtitle: String?
@@ -145,11 +161,28 @@ extension WorkbenchDraftRecipeClient: DependencyKey {
     let request = ModelRequest(
       tier: tier,
       system: instructions,
+      // A reasoning model shares `max_completion_tokens` between thinking and output, so the draft
+      // needs headroom for both — 4096 let reasoning starve the JSON body. Billing is per token
+      // *used*, not the ceiling, so this generous cap only removes truncation, it doesn't raise cost.
+      // Effort is `.high` deliberately: drafting the working recipe is a user-initiated synthesis where
+      // a good answer is worth a slow one — this is a personal app, not a request-bound server, so the
+      // frontier session grants a generous request timeout to match (LLMClientKit `URLSession.frontier`).
+      // Surfacing effort as a user control is the real fix (see efforts/recipe-workbench.md).
       prompt: prompt(selection: selection, messages: messages, context: context),
-      maxTokens: 4096,
+      maxTokens: 16_384,
       reasoningEffort: .high
     )
     let response = try await modelClient.complete(request)
+    let trimmed = response.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    // Distinguish a real failure from a deliberate "no recipe yet" (which comes back as valid
+    // JSON with an empty title). A budget-exhausted or empty response is a retryable failure;
+    // a non-empty response with no decodable JSON object is an unreadable one.
+    if wasTruncated(response) || trimmed.isEmpty {
+      throw WorkbenchDraftRecipeError.responseTruncated
+    }
+    guard jsonObject(in: response.text) != nil else {
+      throw WorkbenchDraftRecipeError.responseUnreadable
+    }
     return parse(response.text)
   }
 
@@ -185,17 +218,35 @@ extension WorkbenchDraftRecipeClient: DependencyKey {
       Conversation so far:
       \(conversation)
 
-      Draft the working recipe JSON object. Use the selected subject as the main instruction when it is specific;
-      otherwise use the conversation and workbench context to choose the most coherent draft.
+      Draft the working recipe JSON object by synthesizing the workbench candidates and the full conversation
+      above. Treat the user-selected subject, if any, only as an optional focus hint — never as the sole
+      instruction — and ignore it entirely when it is a greeting, acknowledgement, or otherwise not a
+      substantive request about the dish.
       """
   }
 
-  public static func parse(_ text: String) -> WorkbenchDraftRecipe {
+  /// Provider-agnostic budget-exhaustion signal: OpenAI reports `length`, Anthropic
+  /// `max_tokens` when the completion is cut off at `max_completion_tokens`/`max_tokens`.
+  static func wasTruncated(_ response: ModelResponse) -> Bool {
+    switch response.stopReason {
+    case "length", "max_tokens": true
+    default: false
+    }
+  }
+
+  static func jsonObject(in text: String) -> [String: Any]? {
     guard
       let json = jsonObjectSlice(text),
       let data = json.data(using: .utf8),
       let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     else {
+      return nil
+    }
+    return object
+  }
+
+  public static func parse(_ text: String) -> WorkbenchDraftRecipe {
+    guard let object = jsonObject(in: text) else {
       return WorkbenchDraftRecipe(title: "", rationale: "")
     }
 

@@ -213,6 +213,25 @@ struct WorkbenchDetailView: View {
     } message: {
       Text(model.errorMessage ?? "")
     }
+    .confirmationDialog(
+      model.workingRecipeIsPromoted ? "Remove Working Recipe?" : "Delete Working Recipe?",
+      isPresented: $model.isConfirmingRemoveWorkingRecipe,
+      titleVisibility: .visible
+    ) {
+      Button(
+        model.workingRecipeIsPromoted ? "Remove from Workbench" : "Delete Draft",
+        role: .destructive
+      ) {
+        model.confirmRemoveWorkingRecipe()
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text(
+        model.workingRecipeIsPromoted
+          ? "This detaches the recipe from this workbench so you can draft a new one. The recipe stays in your library."
+          : "This deletes the draft working recipe so you can draft a new one. This can't be undone."
+      )
+    }
   }
 
   private var isSplitEnabled: Bool {
@@ -270,6 +289,9 @@ private struct WorkbenchReader: View {
             },
             promote: {
               model.promoteWorkingRecipeButtonTapped()
+            },
+            remove: {
+              model.removeWorkingRecipeButtonTapped()
             }
           )
         } else {
@@ -316,6 +338,7 @@ private struct WorkingRecipeRow: View {
   let recipe: Recipe
   let open: () -> Void
   let promote: () -> Void
+  let remove: () -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -350,6 +373,18 @@ private struct WorkingRecipeRow: View {
           }
           .buttonStyle(.borderedProminent)
         }
+
+        Spacer(minLength: 8)
+
+        Button(role: .destructive) {
+          remove()
+        } label: {
+          Label("Remove", systemImage: "trash")
+            .labelStyle(.iconOnly)
+        }
+        .buttonStyle(.bordered)
+        .tint(.red)
+        .accessibilityLabel(Text("Remove working recipe"))
       }
     }
     .padding(.vertical, 4)

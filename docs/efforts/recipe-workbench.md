@@ -123,6 +123,37 @@ additive-nullable, defaults `main`) to hide in-progress working recipes from bro
   deliberate hand-pick; no rule seeding (ADR-0019 D3).
 - **AI-generated log entries** as a first-class verb family — reserved by the `kind` enum, layered post-S3
   from dogfooding, not built up front.
+- **Working-recipe lifecycle: remove / re-draft — LANDED 2026-07-06 (dogfood-surfaced, pending device pass).**
+  S2 shipped create + promote + open but no way to undo, so the workbench was one-shot. Added
+  `WorkbenchRepository.removeDraftRecipe` + a Remove affordance on `WorkingRecipeRow` with a
+  confirmation: it always clears the (soft-FK) `draftRecipeID` link so the draft action re-enables (avoiding
+  the dangling-pointer trap of deleting the recipe alone), deletes the recipe only while it's an unpromoted
+  `.reference` scratch draft (cascades to children), and merely unlinks a promoted `.main` recipe so it stays
+  in the library. Re-draft = remove, then use the Apply menu again. Still open: a one-tap *overwrite* (remove
+  + re-draft in a single action) if dogfooding wants it.
+- **Quick-view of candidates + working recipe together, tabbed (meals/menus pattern).** Reuse the tabbed
+  interface from the meal/menu surfaces to eyeball a workbench's candidates and its working recipe
+  side-by-side without drilling into each. UX/navigation follow-on, lower urgency than the lifecycle gap.
+- **Synthesis-shaped apply-action (draft verb should not be gated on the latest reply).** The shared
+  apply-action "subject" mechanism (`RecipeChatWorkspace`) is built around *acting on one assistant reply*:
+  the Apply menu is disabled until a last reply exists, the auto-`.latestReply` fills the subject slot, and
+  the "Acting on latest reply" chip frames it. That fits per-reply verbs (Chef-It-Up, Serve-With) but fits a
+  *synthesis* verb poorly — the working-recipe draft should be enabled whenever the workbench has candidates
+  and should synthesize from the full conversation + all candidates, with any user selection as an optional
+  focus only. Interim fix landed (2026-07-06): the draft prompt now explicitly synthesizes from candidates +
+  full conversation and ignores the subject when it's a greeting/acknowledgement, so a heartbeat reply can't
+  hijack the draft. The proper fix is a distinct action shape (enabled by workbench state, no last-reply
+  gate, no misleading chip) — a small slice, not folded into the S2 fix branch.
+- **Surface AI effort (and tier) as a user-facing setting, not a per-call-site code constant.** We churned
+  the draft verb's `reasoningEffort` (high → medium → high) in code across one session because it's really a
+  *product* judgment about quality-vs-latency, and the guiding principle is Jon's: this is a personal app,
+  not a request-bound server — a user-initiated AI action can take minutes if the answer is good, so favor
+  quality and let the clock stretch (the frontier session now grants a generous timeout to match). The right
+  home is the existing `AISettingsView` from ADR-0017/0018 (which already carries per-feature effort in code
+  + a read-only active-model view): promote per-feature effort — at least for the heavy verbs (draft,
+  judgment) — to a user-adjustable control, and pair it with a per-request timeout so quick chat can fail
+  fast while a heavy synthesis waits. This is an AI-config slice (ADR-0018 territory), not workbench-specific;
+  noted here because the workbench draft verb is what surfaced it.
 
 ## Resolved at review (Jon, 2026-07-06)
 

@@ -663,6 +663,11 @@ public enum RecipeChatErrorText {
       "The model returned an error (\(status))." + (message.map { " \($0)" } ?? "")
     case ModelClientError.malformedResponse:
       "The model returned a response the app could not read."
+    case let urlError as URLError where urlError.code == .timedOut:
+      "The request timed out — the model took too long to respond. Try again in a moment."
+    case let urlError as URLError
+      where urlError.code == .notConnectedToInternet || urlError.code == .cannotConnectToHost:
+      "Couldn't reach the model — check your internet connection and try again."
     default:
       if let localizedError = error as? any LocalizedError,
         let description = localizedError.errorDescription
