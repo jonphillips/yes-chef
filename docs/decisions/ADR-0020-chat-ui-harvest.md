@@ -5,8 +5,16 @@ Extends [ADR-0011](ADR-0011-actionable-chat-make-ahead.md) (the LLMClientKit lif
 boundary) with the *presentation* layer. Follows the harvest-now/converge-later pattern established
 for the capture engine ([[galavant-capture-engine-reuse]], ADR-0007): dogfood in one app, lift to
 jon-platform once the shape is proven and a second real consumer exists. Yes Chef is the **first real
-consumer** of the chat shell; Galavant is the intended second, but has no honest chat instance yet — so
-extracting now would pre-abstract against a single consumer.
+consumer** of the chat shell; Galavant is the intended second.
+
+> **Correction (2026-07-06 convergence audit — [`docs/audits/2026-07-06-convergence-audit.md`] in
+> jon-platform):** this ADR's original premise — "Galavant has no honest chat instance yet" — is
+> **stale**. Galavant now has a working but minimal chat panel (`ChatPanelView` over
+> `GalavantChat.ChatModel`); the raw-markdown parity fix and the tier picker already landed there,
+> though stop/clear, apply-actions, and persistence are still absent. So gate (b) below (a second
+> real consumer) is **largely met** — extraction is still *not yet*, but the hold now rests on gate
+> (a) (panel churn) alone, not on the absence of a second consumer. Signal to lift: the next chat
+> papercut fixed twice.
 
 ## Context
 

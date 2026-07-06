@@ -1,69 +1,107 @@
 import CloudKit
+import CloudSyncKit
 import Dependencies
-import Foundation
 import SQLiteData
 
+/// Yes Chef's binding of the shared `CloudSync` core (jon-platform ADR-0003). The
+/// sync-control logic — the enablement gate, gated start, scene redrain, and the
+/// `PendingRecordZoneChange` poll — now lives once in `CloudSyncKit`, shared with
+/// galavant (both apps had forked it line-for-line). This thin facade holds the two
+/// things that are genuinely Yes Chef's: its `CloudSyncConfiguration` (container id +
+/// gate keys) and `makeSyncEngine`, which lists the app's synced `@Table` types and so
+/// can't lift. Everything else forwards to `CloudSync`, passing `configuration`.
 public enum YesChefCloudSync {
-  public enum BootstrapMode: Sendable {
-    case disabled
-    case configured(startImmediately: Bool)
-  }
+  /// The per-app constants — the only thing that differed from galavant's copy.
+  public static let configuration = CloudSyncConfiguration(
+    containerIdentifier: "iCloud.com.jonphillips.yeschef",
+    enabledDefaultsKey: "YesChefCloudKitSyncEnabled",
+    enabledEnvironmentKey: "YES_CHEF_CLOUDKIT_SYNC_ENABLED",
+    enabledLaunchArgument: "-YesChefCloudKitSyncEnabled"
+  )
 
-  public enum StartResult: Equatable, Sendable {
-    case disabled
-    case unavailable(String)
-    case started
-    case failed(String)
-  }
+  public typealias BootstrapMode = CloudSync.BootstrapMode
+  public typealias StartResult = CloudSync.StartResult
+  public typealias PendingRecordZoneRedrainResult = CloudSync.PendingRecordZoneRedrainResult
 
-  public enum PendingRecordZoneRedrainResult: Equatable, Sendable {
-    case disabled
-    case noPendingChanges
-    case unavailable(String)
-    case restarted
-    case failed(String)
-  }
+  public static var containerIdentifier: String { configuration.containerIdentifier }
+  public static var enabledDefaultsKey: String { configuration.enabledDefaultsKey }
 
-  public static let containerIdentifier = "iCloud.com.jonphillips.yeschef"
-  public static let enabledDefaultsKey = "YesChefCloudKitSyncEnabled"
-  public static let enabledEnvironmentKey = "YES_CHEF_CLOUDKIT_SYNC_ENABLED"
-  public static let enabledLaunchArgument = "-YesChefCloudKitSyncEnabled"
+  // MARK: Enablement gate (forwarded)
 
   public static func isManuallyEnabled(
     defaults: UserDefaults = .standard,
     environment: [String: String] = ProcessInfo.processInfo.environment,
     arguments: [String] = ProcessInfo.processInfo.arguments
   ) -> Bool {
-    defaults.bool(forKey: enabledDefaultsKey)
-      || isEnabledViaLaunchEnvironment(environment: environment, arguments: arguments)
+    CloudSync.isManuallyEnabled(
+      configuration: configuration, defaults: defaults, environment: environment,
+      arguments: arguments
+    )
   }
 
-  static func isEnabledViaLaunchEnvironment(
-    environment: [String: String] = ProcessInfo.processInfo.environment,
-    arguments: [String] = ProcessInfo.processInfo.arguments
-  ) -> Bool {
-    environment[enabledEnvironmentKey] == "1"
-      || environment[enabledEnvironmentKey]?.lowercased() == "true"
-      || arguments.contains(enabledLaunchArgument)
+  public static func setManuallyEnabled(_ enabled: Bool, defaults: UserDefaults = .standard) {
+    CloudSync.setManuallyEnabled(enabled, configuration: configuration, defaults: defaults)
   }
 
-  /// Mirrors the dev-only launch flag (`-YesChefCloudKitSyncEnabled` / `YES_CHEF_CLOUDKIT_SYNC_ENABLED`)
-  /// into the persistent defaults domain.
-  ///
-  /// The launch argument/environment only lives in the volatile `NSArgumentDomain`, so it is present
-  /// solely for launches from Xcode. Without persisting it, a normal relaunch (tapping the app icon,
-  /// or being handed back from the share extension) sees `isManuallyEnabled == false`, the sync engine
-  /// never starts, and pending record-zone changes written by the share extension never drain.
   public static func persistManualEnablementFromLaunchEnvironment(
     defaults: UserDefaults = .standard,
     environment: [String: String] = ProcessInfo.processInfo.environment,
     arguments: [String] = ProcessInfo.processInfo.arguments
   ) {
-    guard isEnabledViaLaunchEnvironment(environment: environment, arguments: arguments)
-    else { return }
-    defaults.set(true, forKey: enabledDefaultsKey)
+    CloudSync.persistManualEnablementFromLaunchEnvironment(
+      configuration: configuration, defaults: defaults, environment: environment,
+      arguments: arguments
+    )
   }
 
+  // MARK: Start / redrain / pending (forwarded)
+
+  public static func startIfManuallyEnabled() async -> StartResult {
+    await CloudSync.startIfManuallyEnabled(configuration: configuration)
+  }
+
+  public static func redrainPendingRecordZoneChangesIfManuallyEnabled(
+    defaults: UserDefaults = .standard,
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    arguments: [String] = ProcessInfo.processInfo.arguments,
+    database providedDatabase: (any DatabaseWriter)? = nil,
+    accountStatus providedAccountStatus: (() async throws -> CKAccountStatus)? = nil,
+    stopSyncEngine: (() -> Void)? = nil,
+    startSyncEngine: (() async throws -> Void)? = nil
+  ) async -> PendingRecordZoneRedrainResult {
+    await CloudSync.redrainPendingRecordZoneChangesIfManuallyEnabled(
+      configuration: configuration, defaults: defaults, environment: environment,
+      arguments: arguments, database: providedDatabase,
+      accountStatus: providedAccountStatus, stopSyncEngine: stopSyncEngine,
+      startSyncEngine: startSyncEngine
+    )
+  }
+
+  public static func pendingRecordZoneChangeCount(in database: any DatabaseWriter) async throws -> Int {
+    try await CloudSync.pendingRecordZoneChangeCount(in: database)
+  }
+
+  public static func pendingRecordZoneChangeCount(in db: Database) throws -> Int {
+    try CloudSync.pendingRecordZoneChangeCount(in: db)
+  }
+
+  public static func waitForPendingRecordZoneChanges(
+    in database: any DatabaseWriter,
+    exceeding previousCount: Int,
+    timeout: Duration = .seconds(1),
+    pollInterval: Duration = .milliseconds(25)
+  ) async throws -> Bool {
+    try await CloudSync.waitForPendingRecordZoneChanges(
+      in: database, exceeding: previousCount, timeout: timeout, pollInterval: pollInterval
+    )
+  }
+
+  // MARK: Engine construction (domain-bound — stays here)
+
+  /// Construct the sync engine over Yes Chef's synced tables. This is the one method
+  /// that can't lift: it names the app's `@Table` types. Every product a synced table
+  /// belongs to must be registered here (and in `project.yml` deps) or a regenerate
+  /// silently drops it.
   public static func makeSyncEngine(
     for database: any DatabaseWriter,
     startImmediately: Bool
@@ -97,133 +135,8 @@ public enum YesChefCloudSync {
         GroceryItemSource.self,
         PantryItem.self,
         AISettingsRecord.self,
-      containerIdentifier: containerIdentifier,
+      containerIdentifier: configuration.containerIdentifier,
       startImmediately: startImmediately
     )
-  }
-
-  public static func startIfManuallyEnabled() async -> StartResult {
-    guard isManuallyEnabled()
-    else { return .disabled }
-
-    do {
-      let accountStatus = try await CKContainer(identifier: containerIdentifier).accountStatus()
-      guard accountStatus == .available
-      else { return .unavailable(accountStatus.syncDescription) }
-
-      @Dependency(\.defaultSyncEngine) var syncEngine
-      try await syncEngine.start()
-      return .started
-    } catch {
-      return .failed(String(describing: error))
-    }
-  }
-
-  public static func redrainPendingRecordZoneChangesIfManuallyEnabled(
-    defaults: UserDefaults = .standard,
-    environment: [String: String] = ProcessInfo.processInfo.environment,
-    arguments: [String] = ProcessInfo.processInfo.arguments,
-    database providedDatabase: (any DatabaseWriter)? = nil,
-    accountStatus providedAccountStatus: (() async throws -> CKAccountStatus)? = nil,
-    stopSyncEngine: (() -> Void)? = nil,
-    startSyncEngine: (() async throws -> Void)? = nil
-  ) async -> PendingRecordZoneRedrainResult {
-    guard isManuallyEnabled(defaults: defaults, environment: environment, arguments: arguments)
-    else { return .disabled }
-
-    do {
-      let database: any DatabaseWriter
-      if let providedDatabase {
-        database = providedDatabase
-      } else {
-        @Dependency(\.defaultDatabase) var defaultDatabase
-        database = defaultDatabase
-      }
-      let pendingChangeCount = try await pendingRecordZoneChangeCount(in: database)
-      guard pendingChangeCount > 0
-      else { return .noPendingChanges }
-
-      let accountStatus: CKAccountStatus
-      if let providedAccountStatus {
-        accountStatus = try await providedAccountStatus()
-      } else {
-        accountStatus = try await CKContainer(identifier: containerIdentifier).accountStatus()
-      }
-      guard accountStatus == .available
-      else { return .unavailable(accountStatus.syncDescription) }
-
-      if let stopSyncEngine {
-        stopSyncEngine()
-      } else {
-        @Dependency(\.defaultSyncEngine) var syncEngine
-        syncEngine.stop()
-      }
-      if let startSyncEngine {
-        try await startSyncEngine()
-      } else {
-        @Dependency(\.defaultSyncEngine) var syncEngine
-        try await syncEngine.start()
-      }
-      return .restarted
-    } catch {
-      return .failed(String(describing: error))
-    }
-  }
-
-  public static func pendingRecordZoneChangeCount(in database: any DatabaseWriter) async throws -> Int {
-    try await database.read { db in
-      try pendingRecordZoneChangeCount(in: db)
-    }
-  }
-
-  public static func pendingRecordZoneChangeCount(in db: Database) throws -> Int {
-    try #sql(
-      """
-      SELECT COUNT(*)
-      FROM "sqlitedata_icloud"."sqlitedata_icloud_pendingRecordZoneChanges"
-      """,
-      as: Int.self
-    )
-    .fetchOne(db) ?? 0
-  }
-
-  public static func waitForPendingRecordZoneChanges(
-    in database: any DatabaseWriter,
-    exceeding previousCount: Int,
-    timeout: Duration = .seconds(1),
-    pollInterval: Duration = .milliseconds(25)
-  ) async throws -> Bool {
-    let clock = ContinuousClock()
-    let deadline = clock.now.advanced(by: timeout)
-
-    while true {
-      let currentCount = try await pendingRecordZoneChangeCount(in: database)
-      if currentCount > previousCount {
-        return true
-      }
-      guard clock.now < deadline else {
-        return false
-      }
-      try await Task.sleep(for: pollInterval)
-    }
-  }
-}
-
-private extension CKAccountStatus {
-  var syncDescription: String {
-    switch self {
-    case .available:
-      "available"
-    case .couldNotDetermine:
-      "couldNotDetermine"
-    case .noAccount:
-      "noAccount"
-    case .restricted:
-      "restricted"
-    case .temporarilyUnavailable:
-      "temporarilyUnavailable"
-    @unknown default:
-      "unknown"
-    }
   }
 }
