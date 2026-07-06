@@ -208,6 +208,11 @@ struct WorkbenchDetailView: View {
         )
       }
     }
+    .sheet(item: $model.destination.logEntryEditor) { editorState in
+      NavigationStack {
+        WorkbenchLogEntryEditorView(model: model, editorState: editorState)
+      }
+    }
     .alert("Workbench Error", isPresented: $model.isShowingError) {
       Button("OK") {}
     } message: {
@@ -303,6 +308,40 @@ private struct WorkbenchReader: View {
       }
 
       Section {
+        if detail.logEntries.isEmpty {
+          ContentUnavailableView("No Log Entries", systemImage: "text.badge.plus")
+            .frame(maxWidth: .infinity, minHeight: 160)
+        } else {
+          ForEach(detail.logEntries) { entry in
+            Button {
+              model.editLogEntryButtonTapped(entry)
+            } label: {
+              WorkbenchLogEntryRow(entry: entry)
+            }
+            .buttonStyle(.plain)
+          }
+          .onDelete { offsets in
+            for offset in offsets {
+              guard detail.logEntries.indices.contains(offset) else { continue }
+              model.deleteLogEntryButtonTapped(entryID: detail.logEntries[offset].id)
+            }
+          }
+        }
+      } header: {
+        HStack {
+          Text("Workbench Log")
+          Spacer()
+          Button {
+            model.addLogEntryButtonTapped()
+          } label: {
+            Label("Add Log Entry", systemImage: "plus")
+              .labelStyle(.iconOnly)
+          }
+          .accessibilityLabel(Text("Add log entry"))
+        }
+      }
+
+      Section {
         if detail.candidateRows.isEmpty {
           ContentUnavailableView("No Candidates", systemImage: "list.bullet.rectangle")
             .frame(maxWidth: .infinity, minHeight: 220)
@@ -331,6 +370,38 @@ private struct WorkbenchReader: View {
     .onChange(of: detail.workbench.notes) { _, notes in
       notesText = notes ?? ""
     }
+  }
+}
+
+private struct WorkbenchLogEntryRow: View {
+  let entry: WorkbenchLogEntry
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(alignment: .firstTextBaseline, spacing: 8) {
+        Label(entry.kind.title, systemImage: entry.kind.systemImage)
+          .font(.caption.bold())
+          .foregroundStyle(.secondary)
+        Spacer(minLength: 8)
+        Text(entry.dateCreated, format: .dateTime.month(.abbreviated).day().year().hour().minute())
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+      Text(entry.body)
+        .font(.body)
+        .foregroundStyle(.primary)
+      if let outcome = entry.outcome {
+        VStack(alignment: .leading, spacing: 3) {
+          Text("Outcome")
+            .font(.caption.bold())
+            .foregroundStyle(.secondary)
+          Text(outcome)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        }
+      }
+    }
+    .padding(.vertical, 4)
   }
 }
 
@@ -388,6 +459,56 @@ private struct WorkingRecipeRow: View {
       }
     }
     .padding(.vertical, 4)
+  }
+}
+
+private struct WorkbenchLogEntryEditorView: View {
+  @Environment(\.dismiss) private var dismiss
+  let model: WorkbenchDetailModel
+  @State private var editorState: WorkbenchLogEntryEditorState
+
+  init(model: WorkbenchDetailModel, editorState: WorkbenchLogEntryEditorState) {
+    self.model = model
+    _editorState = State(wrappedValue: editorState)
+  }
+
+  var body: some View {
+    Form {
+      Section {
+        Picker("Kind", selection: $editorState.kind) {
+          ForEach(WorkbenchLogEntryKind.allCases, id: \.self) { kind in
+            Text(kind.title).tag(kind)
+          }
+        }
+        .pickerStyle(.menu)
+
+        StackedFormField(title: "Body") {
+          TextEditor(text: $editorState.body)
+            .frame(minHeight: 140)
+        }
+
+        StackedFormField(title: "Outcome") {
+          TextEditor(text: $editorState.outcome)
+            .frame(minHeight: 90)
+        }
+      }
+    }
+    .navigationTitle(editorState.entryID == nil ? "New Log Entry" : "Edit Log Entry")
+    .toolbar {
+      ToolbarItem(placement: .cancellationAction) {
+        Button("Cancel") {
+          dismiss()
+        }
+      }
+      ToolbarItem(placement: .confirmationAction) {
+        Button("Save") {
+          if model.saveLogEntryButtonTapped(editorState) {
+            dismiss()
+          }
+        }
+        .disabled(editorState.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+      }
+    }
   }
 }
 
@@ -526,6 +647,18 @@ struct WorkbenchEditorView: View {
         }
         .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
       }
+    }
+  }
+}
+
+private extension WorkbenchLogEntryKind {
+  var systemImage: String {
+    switch self {
+    case .rationale: "lightbulb"
+    case .experiment: "flask"
+    case .fork: "arrow.triangle.branch"
+    case .observation: "eye"
+    case .note: "note.text"
     }
   }
 }

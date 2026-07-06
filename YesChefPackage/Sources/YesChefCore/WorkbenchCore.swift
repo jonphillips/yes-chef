@@ -59,6 +59,77 @@ public struct WorkbenchCandidate: Codable, Identifiable, Equatable, Sendable {
   }
 }
 
+public enum WorkbenchLogEntryKind: String, CaseIterable, Codable, QueryBindable, QueryDecodable, Sendable {
+  case rationale
+  case experiment
+  case fork
+  case observation
+  case note
+
+  public var id: String { rawValue }
+
+  public var title: String {
+    switch self {
+    case .rationale: "Rationale"
+    case .experiment: "Experiment"
+    case .fork: "Fork"
+    case .observation: "Observation"
+    case .note: "Note"
+    }
+  }
+}
+
+@Table("workbenchLog")
+public struct WorkbenchLogEntry: Codable, Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var workbenchID: Workbench.ID
+  public var kind: WorkbenchLogEntryKind
+  public var body: String
+  public var outcome: String?
+  public var relatedRecipeID: Recipe.ID?
+  public var sortOrder: Int
+  public var dateCreated: Date
+
+  public init(
+    id: UUID,
+    workbenchID: Workbench.ID,
+    kind: WorkbenchLogEntryKind,
+    body: String,
+    outcome: String? = nil,
+    relatedRecipeID: Recipe.ID? = nil,
+    sortOrder: Int,
+    dateCreated: Date
+  ) {
+    self.id = id
+    self.workbenchID = workbenchID
+    self.kind = kind
+    self.body = body
+    self.outcome = outcome
+    self.relatedRecipeID = relatedRecipeID
+    self.sortOrder = sortOrder
+    self.dateCreated = dateCreated
+  }
+}
+
+public struct WorkbenchLogEntryDraft: Equatable, Sendable {
+  public var kind: WorkbenchLogEntryKind
+  public var body: String
+  public var outcome: String?
+  public var relatedRecipeID: Recipe.ID?
+
+  public init(
+    kind: WorkbenchLogEntryKind = .note,
+    body: String,
+    outcome: String? = nil,
+    relatedRecipeID: Recipe.ID? = nil
+  ) {
+    self.kind = kind
+    self.body = body
+    self.outcome = outcome
+    self.relatedRecipeID = relatedRecipeID
+  }
+}
+
 public struct WorkbenchRowData: Identifiable, Equatable, Sendable {
   public var workbench: Workbench
   public var candidateCount: Int
@@ -74,15 +145,18 @@ public struct WorkbenchRowData: Identifiable, Equatable, Sendable {
 public struct WorkbenchDetailData: Equatable, Sendable {
   public var workbench: Workbench
   public var candidateRows: [WorkbenchCandidateRowData]
+  public var logEntries: [WorkbenchLogEntry]
   public var draftRecipeDetail: RecipeDetailData?
 
   public init(
     workbench: Workbench,
     candidateRows: [WorkbenchCandidateRowData] = [],
+    logEntries: [WorkbenchLogEntry] = [],
     draftRecipeDetail: RecipeDetailData? = nil
   ) {
     self.workbench = workbench
     self.candidateRows = candidateRows
+    self.logEntries = logEntries
     self.draftRecipeDetail = draftRecipeDetail
   }
 }
@@ -143,8 +217,12 @@ public struct WorkbenchDetailRequest: FetchKeyRequest {
         recipeDetail: try candidate.recipeID.flatMap { try RecipeRepository.fetchDetail(recipeID: $0, in: db) }
       )
     }
+    let logEntries = try WorkbenchLogEntry
+      .where { $0.workbenchID.eq(workbenchID) }
+      .fetchAll(db)
+      .sorted(by: areWorkbenchLogEntriesInIncreasingOrder)
 
-    return WorkbenchDetailData(workbench: workbench, candidateRows: candidateRows)
+    return WorkbenchDetailData(workbench: workbench, candidateRows: candidateRows, logEntries: logEntries)
       .withDraftRecipeDetail(try workbench.draftRecipeID.flatMap { try RecipeRepository.fetchDetail(recipeID: $0, in: db) })
   }
 }
@@ -285,6 +363,71 @@ public enum WorkbenchRepository {
   }
 
   @discardableResult
+  public static func addLogEntry(
+    _ draft: WorkbenchLogEntryDraft,
+    to workbenchID: Workbench.ID,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> WorkbenchLogEntry.ID {
+    guard let body = draft.body.nonEmptyWorkbenchText else {
+      throw WorkbenchRepositoryError.emptyLogEntry
+    }
+    var workbench = try requireWorkbench(workbenchID, in: db)
+    let entryID = uuid()
+    let sortOrder = try nextLogEntrySortOrder(workbenchID: workbenchID, in: db)
+    try WorkbenchLogEntry.insert {
+      WorkbenchLogEntry(
+        id: entryID,
+        workbenchID: workbenchID,
+        kind: draft.kind,
+        body: body,
+        outcome: draft.outcome?.nonEmptyWorkbenchText,
+        relatedRecipeID: draft.relatedRecipeID,
+        sortOrder: sortOrder,
+        dateCreated: now
+      )
+    }
+    .execute(db)
+    workbench.dateModified = now
+    try Workbench.upsert { workbench }.execute(db)
+    return entryID
+  }
+
+  public static func updateLogEntry(
+    entryID: WorkbenchLogEntry.ID,
+    draft: WorkbenchLogEntryDraft,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard let body = draft.body.nonEmptyWorkbenchText else {
+      throw WorkbenchRepositoryError.emptyLogEntry
+    }
+    var entry = try requireLogEntry(entryID, in: db)
+    entry.kind = draft.kind
+    entry.body = body
+    entry.outcome = draft.outcome?.nonEmptyWorkbenchText
+    entry.relatedRecipeID = draft.relatedRecipeID
+    try WorkbenchLogEntry.upsert { entry }.execute(db)
+
+    var workbench = try requireWorkbench(entry.workbenchID, in: db)
+    workbench.dateModified = now
+    try Workbench.upsert { workbench }.execute(db)
+  }
+
+  public static func deleteLogEntry(
+    entryID: WorkbenchLogEntry.ID,
+    in db: Database,
+    now: Date
+  ) throws {
+    let entry = try requireLogEntry(entryID, in: db)
+    try WorkbenchLogEntry.find(entryID).delete().execute(db)
+    var workbench = try requireWorkbench(entry.workbenchID, in: db)
+    workbench.dateModified = now
+    try Workbench.upsert { workbench }.execute(db)
+  }
+
+  @discardableResult
   public static func createDraftRecipe(
     _ draftRecipe: WorkbenchDraftRecipe,
     for workbenchID: Workbench.ID,
@@ -356,6 +499,13 @@ public enum WorkbenchRepository {
     return nil
   }
 
+  private static func requireLogEntry(_ entryID: WorkbenchLogEntry.ID, in db: Database) throws -> WorkbenchLogEntry {
+    guard let entry = try WorkbenchLogEntry.find(entryID).fetchOne(db) else {
+      throw WorkbenchRepositoryError.logEntryNotFound(entryID)
+    }
+    return entry
+  }
+
   private static func requireWorkbench(_ workbenchID: Workbench.ID, in db: Database) throws -> Workbench {
     guard let workbench = try Workbench.find(workbenchID).fetchOne(db) else {
       throw WorkbenchRepositoryError.workbenchNotFound(workbenchID)
@@ -384,12 +534,22 @@ public enum WorkbenchRepository {
       .map(\.sortOrder)
       .max() ?? -1) + 1
   }
+
+  private static func nextLogEntrySortOrder(workbenchID: Workbench.ID, in db: Database) throws -> Int {
+    (try WorkbenchLogEntry
+      .where { $0.workbenchID.eq(workbenchID) }
+      .fetchAll(db)
+      .map(\.sortOrder)
+      .max() ?? -1) + 1
+  }
 }
 
 public enum WorkbenchRepositoryError: Error, Equatable, Sendable {
   case emptyTitle
+  case emptyLogEntry
   case workbenchNotFound(Workbench.ID)
   case candidateNotFound(WorkbenchCandidate.ID)
+  case logEntryNotFound(WorkbenchLogEntry.ID)
   case recipeNotFound(Recipe.ID)
   case draftRecipeAlreadyExists(Recipe.ID)
   case missingDraftRecipe(Workbench.ID)
@@ -401,6 +561,7 @@ private extension WorkbenchDetailData {
     WorkbenchDetailData(
       workbench: workbench,
       candidateRows: candidateRows,
+      logEntries: logEntries,
       draftRecipeDetail: draftRecipeDetail
     )
   }
@@ -419,6 +580,19 @@ private func areWorkbenchRowsInIncreasingOrder(_ lhs: WorkbenchRowData, _ rhs: W
 private func areWorkbenchCandidatesInIncreasingOrder(
   _ lhs: WorkbenchCandidate,
   _ rhs: WorkbenchCandidate
+) -> Bool {
+  if lhs.sortOrder != rhs.sortOrder {
+    return lhs.sortOrder < rhs.sortOrder
+  }
+  if lhs.dateCreated != rhs.dateCreated {
+    return lhs.dateCreated < rhs.dateCreated
+  }
+  return lhs.id.uuidString < rhs.id.uuidString
+}
+
+private func areWorkbenchLogEntriesInIncreasingOrder(
+  _ lhs: WorkbenchLogEntry,
+  _ rhs: WorkbenchLogEntry
 ) -> Bool {
   if lhs.sortOrder != rhs.sortOrder {
     return lhs.sortOrder < rhs.sortOrder

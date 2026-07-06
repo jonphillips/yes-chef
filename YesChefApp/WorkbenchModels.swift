@@ -97,6 +97,7 @@ final class WorkbenchDetailModel {
   enum Destination {
     case addCandidates
     case chat(RecipeChatModel)
+    case logEntryEditor(WorkbenchLogEntryEditorState)
   }
 
   let workbenchID: Workbench.ID
@@ -191,35 +192,58 @@ final class WorkbenchDetailModel {
   }
 
   func applyActionCatalog(for chatModel: RecipeChatModel) -> [AnyChatApplyAction] {
-    guard detail?.workbench.draftRecipeID == nil else { return [] }
     @Dependency(\.workbenchDraftRecipeClient) var workbenchDraftRecipeClient
 
-    let context = chatModel.context.serialized(for: chatModel.activeTier)
-    let draftAction = ChatApplyAction<WorkbenchDraftRecipe>(
-      title: "Draft working recipe -> Working recipe",
-      extractingTitle: "Drafting working recipe...",
-      reviewTitle: "Review working recipe",
-      commitTitle: "Create Working Recipe",
-      committingTitle: "Creating working recipe...",
-      committedTitle: "Created Working Recipe",
-      extract: { selection, messages in
-        try await workbenchDraftRecipeClient(
-          selection: selection,
-          messages: messages,
-          context: context,
-          tier: chatModel.activeTier
-        )
+    let logAction = ChatApplyAction<WorkbenchLogEntryDraft>(
+      title: "Save to Workbench Log",
+      extractingTitle: "Preparing log entry...",
+      reviewTitle: "Review workbench log entry",
+      commitTitle: "Save to Log",
+      committingTitle: "Saving to log...",
+      committedTitle: "Saved to Workbench Log",
+      extract: { selection, _ in
+        WorkbenchLogEntryDraft(kind: .note, body: selection)
       },
-      commit: { [weak self] draftRecipe in
-        try self?.commitDraftRecipe(draftRecipe)
+      commit: { [weak self] draft in
+        try self?.commitLogEntry(draft)
       }
     )
-
-    return [
-      AnyChatApplyAction(draftAction) { draftRecipe in
-        draftRecipe.isEmpty ? nil : draftRecipe.renderedReview()
+    var actions = [
+      AnyChatApplyAction(logAction) { draft in
+        draft.renderedReview()
       }
     ]
+
+    if detail?.workbench.draftRecipeID == nil {
+      let context = chatModel.context.serialized(for: chatModel.activeTier)
+      let draftAction = ChatApplyAction<WorkbenchDraftRecipe>(
+        title: "Draft working recipe -> Working recipe",
+        extractingTitle: "Drafting working recipe...",
+        reviewTitle: "Review working recipe",
+        commitTitle: "Create Working Recipe",
+        committingTitle: "Creating working recipe...",
+        committedTitle: "Created Working Recipe",
+        extract: { selection, messages in
+          try await workbenchDraftRecipeClient(
+            selection: selection,
+            messages: messages,
+            context: context,
+            tier: chatModel.activeTier
+          )
+        },
+        commit: { [weak self] draftRecipe in
+          try self?.commitDraftRecipe(draftRecipe)
+        }
+      )
+
+      actions.append(
+        AnyChatApplyAction(draftAction) { draftRecipe in
+          draftRecipe.isEmpty ? nil : draftRecipe.renderedReview()
+        }
+      )
+    }
+
+    return actions
   }
 
   func saveNotesButtonTapped(_ notes: String) {
@@ -301,6 +325,60 @@ final class WorkbenchDetailModel {
     }
   }
 
+  func addLogEntryButtonTapped() {
+    destination = .logEntryEditor(WorkbenchLogEntryEditorState())
+  }
+
+  func editLogEntryButtonTapped(_ entry: WorkbenchLogEntry) {
+    destination = .logEntryEditor(WorkbenchLogEntryEditorState(entry: entry))
+  }
+
+  func saveLogEntryButtonTapped(_ editorState: WorkbenchLogEntryEditorState) -> Bool {
+    let draft = WorkbenchLogEntryDraft(
+      kind: editorState.kind,
+      body: editorState.body,
+      outcome: editorState.outcome,
+      relatedRecipeID: editorState.relatedRecipeID
+    )
+    do {
+      try database.write { db in
+        if let entryID = editorState.entryID {
+          try WorkbenchRepository.updateLogEntry(
+            entryID: entryID,
+            draft: draft,
+            in: db,
+            now: now
+          )
+        } else {
+          try WorkbenchRepository.addLogEntry(
+            draft,
+            to: workbenchID,
+            in: db,
+            now: now,
+            uuid: { uuid() }
+          )
+        }
+      }
+      destination = nil
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
+  func deleteLogEntryButtonTapped(entryID: WorkbenchLogEntry.ID) {
+    do {
+      try database.write { db in
+        try WorkbenchRepository.deleteLogEntry(entryID: entryID, in: db, now: now)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
   private func commitDraftRecipe(_ draftRecipe: WorkbenchDraftRecipe) throws {
     guard !draftRecipe.isEmpty else {
       throw WorkbenchDetailError.emptyDraftRecipe
@@ -315,6 +393,18 @@ final class WorkbenchDetailModel {
       )
     }
     openRecipe(recipeID)
+  }
+
+  private func commitLogEntry(_ draft: WorkbenchLogEntryDraft) throws {
+    try database.write { db in
+      try WorkbenchRepository.addLogEntry(
+        draft,
+        to: workbenchID,
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
+    }
   }
 }
 
@@ -337,4 +427,38 @@ struct WorkbenchDeletionContext: Identifiable, Hashable, Sendable {
   var candidateCount: Int
 
   var id: Workbench.ID { workbenchID }
+}
+
+struct WorkbenchLogEntryEditorState: Identifiable, Hashable, Sendable {
+  var entryID: WorkbenchLogEntry.ID?
+  var kind: WorkbenchLogEntryKind = .note
+  var body = ""
+  var outcome = ""
+  var relatedRecipeID: Recipe.ID?
+
+  var id: String {
+    entryID?.uuidString ?? "new"
+  }
+
+  init() {}
+
+  init(entry: WorkbenchLogEntry) {
+    entryID = entry.id
+    kind = entry.kind
+    body = entry.body
+    outcome = entry.outcome ?? ""
+    relatedRecipeID = entry.relatedRecipeID
+  }
+}
+
+private extension WorkbenchLogEntryDraft {
+  func renderedReview() -> String? {
+    let body = self.body.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !body.isEmpty else { return nil }
+    var lines = ["\(kind.title): \(body)"]
+    if let outcome = outcome?.trimmingCharacters(in: .whitespacesAndNewlines), !outcome.isEmpty {
+      lines.append("Outcome: \(outcome)")
+    }
+    return lines.joined(separator: "\n\n")
+  }
 }

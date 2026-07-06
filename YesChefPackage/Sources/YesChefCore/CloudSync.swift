@@ -130,6 +130,7 @@ public enum YesChefCloudSync {
         MenuPlacement.self,
         Workbench.self,
         WorkbenchCandidate.self,
+        WorkbenchLogEntry.self,
         GroceryList.self,
         GroceryItem.self,
         GroceryItemSource.self,

@@ -118,6 +118,94 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func workbenchLogEntriesAreEditableDeletableAndOrdered() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 806_250_000)
+      var uuids = SampleUUIDSequence(start: 21_200)
+
+      try database.write { db in
+        let workbenchID = try WorkbenchRepository.addWorkbench(
+          title: "Birria",
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        let firstEntryID = try WorkbenchRepository.addLogEntry(
+          WorkbenchLogEntryDraft(kind: .rationale, body: "  Keep the chile paste thick.  "),
+          to: workbenchID,
+          in: db,
+          now: now.addingTimeInterval(10),
+          uuid: { uuids.next() }
+        )
+        let secondEntryID = try WorkbenchRepository.addLogEntry(
+          WorkbenchLogEntryDraft(
+            kind: .experiment,
+            body: "Toast chiles longer.",
+            outcome: "  Better aroma, no texture change.  "
+          ),
+          to: workbenchID,
+          in: db,
+          now: now.addingTimeInterval(20),
+          uuid: { uuids.next() }
+        )
+
+        var detail = try #require(try WorkbenchDetailRequest(workbenchID: workbenchID).fetch(db))
+        expectNoDifference(detail.logEntries.map(\.id), [firstEntryID, secondEntryID])
+        expectNoDifference(detail.logEntries.map(\.kind), [.rationale, .experiment])
+        expectNoDifference(detail.logEntries.map(\.body), ["Keep the chile paste thick.", "Toast chiles longer."])
+        expectNoDifference(detail.logEntries[1].outcome, "Better aroma, no texture change.")
+
+        try WorkbenchRepository.updateLogEntry(
+          entryID: firstEntryID,
+          draft: WorkbenchLogEntryDraft(kind: .observation, body: "Dry toast was worth keeping."),
+          in: db,
+          now: now.addingTimeInterval(30)
+        )
+
+        detail = try #require(try WorkbenchDetailRequest(workbenchID: workbenchID).fetch(db))
+        expectNoDifference(detail.logEntries[0].kind, .observation)
+        expectNoDifference(detail.logEntries[0].body, "Dry toast was worth keeping.")
+
+        try WorkbenchRepository.deleteLogEntry(
+          entryID: secondEntryID,
+          in: db,
+          now: now.addingTimeInterval(40)
+        )
+
+        detail = try #require(try WorkbenchDetailRequest(workbenchID: workbenchID).fetch(db))
+        expectNoDifference(detail.logEntries.map(\.id), [firstEntryID])
+      }
+    }
+
+    @Test
+    func deletingWorkbenchCascadesLogEntries() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 806_260_000)
+      var uuids = SampleUUIDSequence(start: 21_300)
+
+      try database.write { db in
+        let workbenchID = try WorkbenchRepository.addWorkbench(
+          title: "Cookies",
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let entryID = try WorkbenchRepository.addLogEntry(
+          WorkbenchLogEntryDraft(kind: .note, body: "Try less sugar."),
+          to: workbenchID,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        try WorkbenchRepository.deleteWorkbench(workbenchID: workbenchID, in: db)
+
+        #expect(try WorkbenchLogEntry.find(entryID).fetchOne(db) == nil)
+      }
+    }
+
+    @Test
     func workbenchChatSerializesFullIncludedCandidatesAndCapsBreadth() {
       let now = Date(timeIntervalSinceReferenceDate: 806_300_000)
       let candidates = (0..<6).map { index in
@@ -142,6 +230,16 @@ extension RecipeCoreTests {
         workbenchID: SampleUUIDSequence.uuid(22_001),
         title: "Birria",
         notes: "Find the best consommé.",
+        logEntries: [
+          WorkbenchLogEntryChatContext(
+            id: SampleUUIDSequence.uuid(22_050),
+            kind: .rationale,
+            body: "Keep a focused consommé instead of blending every candidate.",
+            outcome: nil,
+            sortOrder: 0,
+            dateCreated: now
+          )
+        ],
         candidates: candidates
       )
 
@@ -149,6 +247,9 @@ extension RecipeCoreTests {
 
       #expect(serialized.contains("- Title: Birria"))
       #expect(serialized.contains("- Workbench notes: Find the best consommé."))
+      #expect(serialized.contains("Workbench log:"))
+      #expect(serialized.contains("- Rationale"))
+      #expect(serialized.contains("Keep a focused consommé instead of blending every candidate."))
       #expect(serialized.contains("- Candidate 0"))
       #expect(serialized.contains("  - Cook annotation: Best texture."))
       #expect(serialized.contains("      - Toast chiles 0."))

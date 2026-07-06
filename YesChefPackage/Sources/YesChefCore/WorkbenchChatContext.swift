@@ -11,6 +11,7 @@ public struct WorkbenchChatContext: Equatable, Sendable {
   public var title: String
   public var notes: String?
   public var draftRecipe: RecipeChatRecipeContext?
+  public var logEntries: [WorkbenchLogEntryChatContext]
   public var candidates: [WorkbenchCandidateChatContext]
 
   public init(
@@ -18,12 +19,14 @@ public struct WorkbenchChatContext: Equatable, Sendable {
     title: String,
     notes: String? = nil,
     draftRecipe: RecipeChatRecipeContext? = nil,
+    logEntries: [WorkbenchLogEntryChatContext] = [],
     candidates: [WorkbenchCandidateChatContext] = []
   ) {
     self.workbenchID = workbenchID
     self.title = title
     self.notes = notes
     self.draftRecipe = draftRecipe
+    self.logEntries = logEntries
     self.candidates = candidates
   }
 
@@ -33,6 +36,7 @@ public struct WorkbenchChatContext: Equatable, Sendable {
       title: detail.workbench.title,
       notes: detail.workbench.notes,
       draftRecipe: detail.draftRecipeDetail.map(RecipeChatRecipeContext.init(detail:)),
+      logEntries: detail.logEntries.map(WorkbenchLogEntryChatContext.init(entry:)),
       candidates: detail.candidateRows.map(WorkbenchCandidateChatContext.init(row:))
     )
   }
@@ -97,6 +101,7 @@ public struct WorkbenchChatContext: Equatable, Sendable {
       lines.append("Current working recipe:")
       lines.append(draftRecipe.serialized())
     }
+    appendLogEntries(to: &lines)
     if !budgetNotes.isEmpty {
       lines.append("Context budget notes:")
       for note in budgetNotes {
@@ -158,6 +163,61 @@ public struct WorkbenchChatContext: Equatable, Sendable {
         }
       }
     }
+  }
+
+  private func appendLogEntries(to lines: inout [String]) {
+    guard !logEntries.isEmpty else { return }
+    lines.append("Workbench log:")
+    for entry in logEntries.sorted(by: areWorkbenchLogEntriesInIncreasingOrder) {
+      lines.append("- \(entry.kind.title) (\(entry.dateCreated.formatted(date: .abbreviated, time: .shortened))):")
+      lines.append("  - \(entry.body.replacingOccurrences(of: "\n", with: " "))")
+      if let outcome = entry.outcome {
+        lines.append("  - Outcome: \(outcome.replacingOccurrences(of: "\n", with: " "))")
+      }
+      if let relatedRecipeID = entry.relatedRecipeID {
+        lines.append("  - Related recipe ID: \(relatedRecipeID.uuidString)")
+      }
+    }
+  }
+}
+
+public struct WorkbenchLogEntryChatContext: Equatable, Sendable {
+  public var id: WorkbenchLogEntry.ID
+  public var kind: WorkbenchLogEntryKind
+  public var body: String
+  public var outcome: String?
+  public var relatedRecipeID: Recipe.ID?
+  public var sortOrder: Int
+  public var dateCreated: Date
+
+  public init(
+    id: WorkbenchLogEntry.ID,
+    kind: WorkbenchLogEntryKind,
+    body: String,
+    outcome: String? = nil,
+    relatedRecipeID: Recipe.ID? = nil,
+    sortOrder: Int,
+    dateCreated: Date
+  ) {
+    self.id = id
+    self.kind = kind
+    self.body = body
+    self.outcome = outcome
+    self.relatedRecipeID = relatedRecipeID
+    self.sortOrder = sortOrder
+    self.dateCreated = dateCreated
+  }
+
+  public init(entry: WorkbenchLogEntry) {
+    self.init(
+      id: entry.id,
+      kind: entry.kind,
+      body: entry.body,
+      outcome: entry.outcome,
+      relatedRecipeID: entry.relatedRecipeID,
+      sortOrder: entry.sortOrder,
+      dateCreated: entry.dateCreated
+    )
   }
 }
 
@@ -237,6 +297,19 @@ public struct WorkbenchCandidateChatContext: Equatable, Sendable {
 private struct WorkbenchChatSerializedContext: Equatable {
   var text: String
   var notes: [String]
+}
+
+private func areWorkbenchLogEntriesInIncreasingOrder(
+  _ lhs: WorkbenchLogEntryChatContext,
+  _ rhs: WorkbenchLogEntryChatContext
+) -> Bool {
+  if lhs.sortOrder != rhs.sortOrder {
+    return lhs.sortOrder < rhs.sortOrder
+  }
+  if lhs.dateCreated != rhs.dateCreated {
+    return lhs.dateCreated < rhs.dateCreated
+  }
+  return lhs.id.uuidString < rhs.id.uuidString
 }
 
 private func areWorkbenchChatCandidatesInIncreasingOrder(
