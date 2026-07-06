@@ -1,7 +1,8 @@
 # Current Handoff
 
-Last updated: July 5, 2026 (**Next Up = Meal-Planner chat verbs** — the last remaining actionable-chat
-verb instance; `efforts/cooking-workspace.md` § "Out of scope → Meal Planner context". **Menu planning
+Last updated: July 6, 2026 (**Next Up = Recipe Workbench Slice 1** — new entity + candidate selector +
+grounded "compare these" chat, no synthesis; `efforts/recipe-workbench.md`, ADR-0019. **Meal-Planner chat
+verbs** demoted back to the Ready Efforts queue — still pending, just not the immediate target. **Menu planning
 overhaul (ADR-0012 Amdt 1) is done** — [yes-chef #98](https://github.com/jonphillips/yes-chef/pull/98),
 build-green, pending Jon's device pass → DONE-LOG. **AI config (ADR-0017/0018) is done** — cross-repo PRs
 [yes-chef #96](https://github.com/jonphillips/yes-chef/pull/96) +
@@ -22,19 +23,27 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Meal-Planner chat verbs — ADR-0013 follow-on + `efforts/cooking-workspace.md` (§ "Out of scope → Meal
-Planner context").** The one remaining named actionable-chat verb instance; the `.mealPlan` context
-already ships grounded chat + a complement verb (ADR-0013). Queued follow-on verb (dogfood 2026-07-04):
+**Recipe Workbench — Slice 1 (ADR-0019 + `efforts/recipe-workbench.md`).** A new first-class entity for
+iterating N candidate recipes toward "the one true recipe." Slice 1 is deliberately **de-risking: the
+entity + candidate selector + grounded chat, with NO synthesis and NO working recipe yet.**
 
-- **Day-scoped "make-ahead strategy"** for all items on a planner day — synthesize a prep sequence across
-  *all* that day's recipes, leveraging each recipe's saved `makeAhead` where present but reasoning across
-  the combined set. Distill motion, cross-recipe (the planner analogue of the Menu make-ahead verb).
+- New `@Table` models + additive migration: **`Workbench`** (`id`, `title`, `notes: String?`,
+  `draftRecipeID: UUID?` soft FK — null in S1, `sortOrder`, `dateCreated`, `dateModified`) and
+  **`WorkbenchCandidate`** (`id`, `workbenchID` FK cascade, `recipeID: UUID?` soft FK,
+  `recipeTitleSnapshot: String`, `annotation: String?`, `sortOrder`, `dateCreated`). Candidates optional.
+- Entry points: **"Open a workbench"** from a single recipe **and** **"Workbench these"** from a library
+  **multi-select**. Workbench screen lists candidates (editable annotation) + hosts the existing chat split
+  via a new **`case workbench(...)`** on `RecipeChatContext` + a `WorkbenchChatContext`.
+- **Depth-focused grounding (ADR-0019 D2 — inverted budget):** full ingredients + steps for a *small*
+  candidate set (soft-cap ~5), tier-aware; cap N rather than truncate any candidate's method.
+- **"Compare / strengths & weaknesses" works immediately as plain chat** — zero commit surface. Stop here
+  for review; **S2 (draft verb → real working recipe + `libraryPlacement`) and S3 (workbench log) are the
+  next dispatches, not this one.**
 
-**Classify the commit shape first** ([[chat-verb-commit-shapes]]) — likely a no-commit advisory or a
-per-day note, **not** a per-recipe field write. Respect [[llm-curation-not-synthesis]]: sequence/select
-distinct prep steps, don't flatten the day's recipes into one blob. Design in
-[ADR-0013](decisions/ADR-0013-meal-planner-actionable-chat.md) +
-[`efforts/cooking-workspace.md`](efforts/cooking-workspace.md).
+**Sync-safe, post-sync** (UUID PKs, soft FKs + denormalized snapshots, read-time dedup, additive
+migration). **The model proposes; the tap writes** — no S1 commit surface anyway. Full slice detail +
+resolved review calls in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md);
+design in [ADR-0019](decisions/ADR-0019-recipe-design-studies.md) (whole, incl. both amendments).
 
 **Menu planning overhaul (ADR-0012 Amendment 1 + `efforts/menu-planning-ux.md`) is done** —
 [yes-chef #98](https://github.com/jonphillips/yes-chef/pull/98) (build-green), all five slices shipped
@@ -89,8 +98,19 @@ target.
 ([yes-chef #98](https://github.com/jonphillips/yes-chef/pull/98), build-green; pending Jon's device pass →
 DONE-LOG). All five slices shipped; drag-drop dish reorder stays parked as the named follow-on.
 
-**Meal-Planner chat verbs** (ADR-0013 follow-on + `efforts/cooking-workspace.md`) — **promoted to Next
-Up** (menu overhaul now done). Full detail lives in Next Up above.
+**Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — **Slice 1 promoted to Next Up**
+(2026-07-06). Remaining slices stay queued: **S2** draft verb → real working recipe + `libraryPlacement`
+promotion (decided); **S3** the `WorkbenchLogEntry` durable log + save-to-log tap. Milestone-sized —
+dispatch **one slice at a time**, S1 first. Design in
+[ADR-0019](decisions/ADR-0019-recipe-design-studies.md).
+
+**Meal-Planner chat verbs** (ADR-0013 follow-on + `efforts/cooking-workspace.md`) — **demoted back to the
+queue** (2026-07-06; Recipe Workbench S1 took the target). Still the one remaining named actionable-chat
+verb instance: a day-scoped **"make-ahead strategy"** across all of a planner day's recipes (dogfood
+2026-07-04). Classify the commit shape first ([[chat-verb-commit-shapes]]) — likely no-commit advisory or
+a per-day note, not a per-recipe write; respect [[llm-curation-not-synthesis]]. Design in
+[ADR-0013](decisions/ADR-0013-meal-planner-actionable-chat.md) +
+[`efforts/cooking-workspace.md`](efforts/cooking-workspace.md).
 
 - **AI configuration & transparency** (ADR-0017 + ADR-0018) — **complete** (architect-approved 2026-07-05;
   cross-repo PRs [yes-chef #96](https://github.com/jonphillips/yes-chef/pull/96) +
