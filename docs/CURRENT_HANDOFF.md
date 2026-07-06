@@ -1,9 +1,12 @@
 # Current Handoff
 
-Last updated: July 6, 2026 (**Next Up = Recipe Workbench — grounding fix + S1 polish** — chat-grounding
-verify/fix + editable title + candidate-picker search + full-screen focus; immediately dogfoodable. **S2**
-(draft verb + `libraryPlacement`) split into the next dispatch right behind it. `efforts/recipe-workbench.md`,
-ADR-0019. **Meal-Planner chat
+Last updated: July 6, 2026 (**Next Up = Chat controls** — a small app-wide chat-UX slice: persist the
+frontier/on-device tier so chat stops resetting to on-device, plus clear + stop/interrupt controls in the
+shared panel. **Recipe Workbench S2** (draft verb + `libraryPlacement`) is the dispatch right behind it.
+**Workbench S1 polish + grounding fix is done** —
+[yes-chef #103](https://github.com/jonphillips/yes-chef/pull/103), architect-approved, build-green,
+pending Jon's device pass → DONE-LOG. `efforts/recipe-workbench.md`, ADR-0019, ADR-0020 (chat UI harvest).
+**Meal-Planner chat
 verbs** demoted back to the Ready Efforts queue — still pending, just not the immediate target. **Menu planning
 overhaul (ADR-0012 Amdt 1) is done** — [yes-chef #98](https://github.com/jonphillips/yes-chef/pull/98),
 build-green, pending Jon's device pass → DONE-LOG. **AI config (ADR-0017/0018) is done** — cross-repo PRs
@@ -25,38 +28,42 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Recipe Workbench — grounding fix + S1 polish (ADR-0019 + `efforts/recipe-workbench.md`).** Slice 1 landed
-([yes-chef #101](https://github.com/jonphillips/yes-chef/pull/101), architect-approved): `Workbench` +
-`WorkbenchCandidate`, candidate picker, editable annotations, grounded `.workbench` chat, both entry
-points. This dispatch makes S1 **immediately dogfoodable** — the chat-grounding fix + three review
-papercuts, all pure app-layer UX (no schema, no core-model change). Do all, in order:
+**Recipe Workbench — S1 done.** Slice 1 landed
+([yes-chef #101](https://github.com/jonphillips/yes-chef/pull/101)); grounding fix + S1 polish landed
+([yes-chef #103](https://github.com/jonphillips/yes-chef/pull/103), architect-approved): shared
+`ChatWorkspaceSplit` now refreshes the chat model's context `onChange` (recipe/menu benefit too), editable
+title, candidate-picker search, full-screen focus. Build-green; pending Jon's device pass → DONE-LOG.
 
-- **(0) Chat grounding — verify + fix.** Jon reports the workbench chat "can't see the recipes." The
-  wiring is correct on *initial* open (candidate ingredients + steps reach `systemPrompt()` via
-  `WorkbenchChatContext.serialized(for: activeTier)`), **but** `ChatWorkspaceSplit` snapshots the context
-  in `@State` at first appearance ([`RecipeChatWorkspace.swift`](../YesChefApp/RecipeChatWorkspace.swift)
-  line ~55) and never refreshes it — so candidates added *after* the chat pane appears are invisible to
-  the model, and the context goes stale for the life of the view. Repro on device, then fix: refresh the
-  chat model's `context` when the workbench detail changes (e.g. re-init `ChatWorkspaceSplit` via `.id()`
-  keyed on a candidate-set signature, or expose a `context` setter on `RecipeChatModel` the view updates
-  `onChange`). Confirm the same staleness isn't silently biting recipe/menu chat.
-- **(1) Editable workbench title.** `WorkbenchReader` renders the title read-only; the multi-select
-  "Workbench These" path auto-titles "Recipe Workbench" with no rename. Add `WorkbenchRepository`
-  `updateWorkbenchTitle` (sibling of `updateWorkbenchNotes`, reuse `nonEmptyWorkbenchText`, bump
-  `dateModified`) + a rename affordance in the reader.
-- **(2) Search in the Add Candidates picker.** `WorkbenchCandidatePickerView` lists all recipes with no
-  filter — unusable against a 2000-recipe library. Add a `.searchable` title filter over
-  `availableRecipeRows` (mirror the recipe-library search).
-- **(3) Full-screen focus for a selected workbench.** Mirror Menu: `MenuDetailColumn` takes
-  `isFocusActive: columnVisibility == .detailOnly` + `focusButtonTapped` flipping
-  `.detailOnly`/`.doubleColumn` in `AppMainLayout`; `WorkbenchDetailColumn` takes only `model`. Wire the
-  same binding through `WorkbenchDetailColumn` → `WorkbenchDetailView` + a focus toolbar button
-  (regular-width iPad only).
-- **Stop here for review + dogfood.** **S2** (draft verb + `libraryPlacement`) is the very next dispatch —
-  detailed below — **not** part of this PR.
+**Chat controls (the dispatch target) — small, app-wide chat-UX slice.** All chat surfaces (recipe, menu,
+workbench, meal-plan) share **one** model class (`RecipeChatModel`) and **one** shared panel
+(`RecipeChatPanel`, wrapped by `ChatWorkspaceSplit` on iPad), so each of these lands once and every surface
+inherits it. Do all three; keep the affordances in the **shared panel**, never per-surface toolbars:
 
-**Recipe Workbench — S2 (the next dispatch, not this one).** The draft verb that turns a workbench into a
-real working recipe — the first real commit surface:
+- **(1) Persist the model tier.** Today `RecipeChatModel` persists *which* frontier provider was picked
+  (`selectedProvider` → `recipeChatProviderPreference`) but **not** `useFrontier` — it defaults to `false`
+  on every init, so every new chat window resets to on-device. Add a sibling persisted preference for
+  `useFrontier` (mirror `RecipeChatProviderPreference` exactly: one `UserDefaults` key, seed in `init`
+  like `selectedProvider = defaultProvider()`, write back in a `didSet`). One global key ⇒ "remember the
+  last model I used anywhere in the app" falls out. Guard: only honor persisted-frontier when
+  `frontierAvailable` (a key exists); `activeTier` already degrades to on-device otherwise (belt +
+  suspenders).
+- **(2) Clear.** Add `clear()` on the model (`messages.removeAll()` + `RecipeChatStore.replaceMessages([],
+  …)` for the subject) and a clear button in the shared panel. Lightweight confirm ("Clear this chat?");
+  no undo machinery — the transcript is disposable scratch (the durable memory is the recipe/log, i.e.
+  S2/S3). Destructive-of-scratch only.
+- **(3) Stop / interrupt.** `send()` is currently a bare `async` with no `Task` handle. Hold the `Task`
+  when send fires; add `stop()` that cancels it and finalizes the empty assistant placeholder; flip the
+  input button send↔stop off the existing `isResponding` flag. Cancellation propagates on both paths
+  (frontier `complete` is a URLSession await; on-device stream honors `task.cancel()` via
+  `continuation.onTermination`).
+- **Seam discipline (ADR-0020).** Write this slice *as if the panel already lived in the future
+  `LLMChatUI` package*: the shell talks only to the model's public surface + generic context accessors —
+  **no** domain-case pattern-match, **no** SQLite reach. Adding `clear()`/`stop()` as generic model
+  methods + controls in the shared panel *hardens* the lift seam for free. Do **not** lift to jon-platform
+  now — that waits for panel stability + a real Galavant chat consumer (ADR-0020).
+
+**Recipe Workbench — S2 (the dispatch right behind Chat controls).** The draft verb that turns a workbench
+into a real working recipe — the first real commit surface:
 
 - Synthesis apply-action + review card that writes a **new `Recipe`**, links it via
   `Workbench.draftRecipeID`, captures the pristine `originalSnapshot`, and opens the result in the existing
@@ -67,6 +74,22 @@ real working recipe — the first real commit surface:
   flips to `main`.
 - Guardrail: the draft must be a coherent editorial choice with rationale referencing candidates — **not**
   a blended average of every candidate ([[llm-curation-not-synthesis]]).
+- **Workbench task framing (do this first, it's cheap and it grounds everything below).** Today the
+  `.workbench` chat gets the candidate *data* but the generic recipe/menu framing ("Help with timing, prep,
+  troubleshooting, and planning") — the model is never told *what a workbench is for*. Add a per-context
+  task-framing string on `RecipeChatContext` (empty for `.recipe`/`.menu`; the paragraph below for
+  `.workbench`) and insert it into `systemPrompt()` where that generic line sits. Define it **once** and
+  reuse the same string as the spine of the draft-verb apply-action prompt, so free chat and the commit path
+  can't drift on what "synthesize" means. Exact wording:
+  > The user is assembling candidate versions of a dish to compare them, reconcile their differences, and
+  > reason toward one working recipe. Help them see how the candidates differ and what's worth borrowing
+  > from each — don't blend everything into a bland average. The working recipe needn't be a single
+  > monolithic version: the user may want a base recipe plus a few deliberate variations, and those
+  > variations can live inside the one working recipe.
+
+  (The taste profile is already appended to every request at the client boundary as "honor unless it
+  conflicts with the task rules," so this framing's "don't average" rule correctly outranks a stray
+  taste-profile line — no extra plumbing needed.)
 - Stop at S2. **S3** (durable `WorkbenchLogEntry` log + save-to-log tap) stays queued behind it.
 
 **Sync-safe, post-sync** (UUID PKs, soft FKs + denormalized snapshots, read-time dedup, additive
@@ -127,11 +150,23 @@ target.
 DONE-LOG). All five slices shipped; drag-drop dish reorder stays parked as the named follow-on.
 
 **Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — **Slice 1 landed (PR #101, approved);
-grounding fix + S1 polish promoted to Next Up** (2026-07-06): chat-grounding fix + editable title + picker
-search + full-screen focus, immediately dogfoodable. Split from S2 to keep merge boundaries tight. **S2**
-(draft verb + `libraryPlacement`) is the dispatch right behind; **S3** (`WorkbenchLogEntry` durable log +
+grounding fix + S1 polish landed (PR #103, approved, 2026-07-06)** — chat-grounding fix + editable title +
+picker search + full-screen focus, now dogfoodable. **S2** (draft verb + `libraryPlacement` + workbench
+task framing) is the dispatch behind the Chat-controls slice; **S3** (`WorkbenchLogEntry` durable log +
 save-to-log tap) queued after. Milestone-sized — one slice at a time. Design in
 [ADR-0019](decisions/ADR-0019-recipe-design-studies.md).
+
+**On-device chat context overflow — robustness** (surfaced 2026-07-06 dogfooding a large taste profile in
+workbench chat; Apple `FoundationModels` threw `exceededContextWindowSize` after one turn). Two real bugs,
+lower priority now that tier-memory lets you live on frontier: **(a)** the taste profile is appended to
+`system` **unbudgeted** at the client boundary (jon-platform `TieredModelClient` →
+`appendingPromptPreferences`), outside `WorkbenchChatContext`'s 24k-char accounting — a large one is pure
+uncounted overhead; **(b)** the on-device fitter (`OnDeviceModelClient.fit`) only trims the *prompt tail*
+and reserves `system` whole, so when `system` (base + context + taste profile) alone exceeds Apple's
+~4k-token window it cannot recover. Fix: budget context + taste profile into the on-device window (not just
+the prompt tail), lower the 24k on-device candidate budget to something realistic, and catch
+`exceededContextWindowSize` to surface "too big for on-device — switch to a frontier model" instead of a raw
+error. Cross-repo (jon-platform LLMClientKit + Yes Chef budgets).
 
 **Meal-Planner chat verbs** (ADR-0013 follow-on + `efforts/cooking-workspace.md`) — **demoted back to the
 queue** (2026-07-06; Recipe Workbench S1 took the target). Still the one remaining named actionable-chat
