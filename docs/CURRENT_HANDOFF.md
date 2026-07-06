@@ -1,8 +1,9 @@
 # Current Handoff
 
-Last updated: July 5, 2026 (**Next Up = Menu planning overhaul** — ADR-0012 Amdt 1 +
-`efforts/menu-planning-ux.md`; one PR, sequenced slices, benefits from the new `high`-effort
-`MenuPrepPlan`. **AI config (ADR-0017/0018) is done** — architect-approved, cross-repo PRs
+Last updated: July 5, 2026 (**Next Up = Meal-Planner chat verbs** — the last remaining actionable-chat
+verb instance; `efforts/cooking-workspace.md` § "Out of scope → Meal Planner context". **Menu planning
+overhaul (ADR-0012 Amdt 1) is done** — [yes-chef #98](https://github.com/jonphillips/yes-chef/pull/98),
+build-green, pending Jon's device pass → DONE-LOG. **AI config (ADR-0017/0018) is done** — cross-repo PRs
 [yes-chef #96](https://github.com/jonphillips/yes-chef/pull/96) +
 [jon-platform #23](https://github.com/jonphillips/jon-platform/pull/23), pending Jon's device pass →
 DONE-LOG. Details below.)
@@ -21,21 +22,25 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Menu planning overhaul — ADR-0012 Amendment 1 + `efforts/menu-planning-ux.md`.** One PR, sequenced
-slices — do all listed, in order:
+**Meal-Planner chat verbs — ADR-0013 follow-on + `efforts/cooking-workspace.md` (§ "Out of scope → Meal
+Planner context").** The one remaining named actionable-chat verb instance; the `.mealPlan` context
+already ships grounded chat + a complement verb (ADR-0013). Queued follow-on verb (dogfood 2026-07-04):
 
-- **Tier-aware context budget + prep-plan-in-context + living-artifact refinement** — kills "AI sees one
-  dish"; the menu chat now grounds on the whole menu (and its prep plan) and refines it in place.
-- **Swipe-delete / swipe-move** on menu items (iOS 27 `swipeActions()`). **Drag-drop reorder is parked** as
-  a named follow-on — swipe-move is the interim.
-- **Inline meal-slot pill** on menu items.
-- **Full-screen menu focus** mode.
-- **Toolbar reorg** — drop the redundant ✨, move Add/Place into a left-aligned in-detail set (Place also
-  edits the day-count).
+- **Day-scoped "make-ahead strategy"** for all items on a planner day — synthesize a prep sequence across
+  *all* that day's recipes, leveraging each recipe's saved `makeAhead` where present but reasoning across
+  the combined set. Distill motion, cross-recipe (the planner analogue of the Menu make-ahead verb).
 
-Benefits from dispatch ①'s new `high`-effort `MenuPrepPlan` but doesn't hard-block on it. Design in
-[ADR-0012 Amendment 1](decisions/ADR-0012-menu-actionable-chat.md) +
-[`efforts/menu-planning-ux.md`](efforts/menu-planning-ux.md).
+**Classify the commit shape first** ([[chat-verb-commit-shapes]]) — likely a no-commit advisory or a
+per-day note, **not** a per-recipe field write. Respect [[llm-curation-not-synthesis]]: sequence/select
+distinct prep steps, don't flatten the day's recipes into one blob. Design in
+[ADR-0013](decisions/ADR-0013-meal-planner-actionable-chat.md) +
+[`efforts/cooking-workspace.md`](efforts/cooking-workspace.md).
+
+**Menu planning overhaul (ADR-0012 Amendment 1 + `efforts/menu-planning-ux.md`) is done** —
+[yes-chef #98](https://github.com/jonphillips/yes-chef/pull/98) (build-green), all five slices shipped
+(tier-aware AI context + prep-plan-in-context + living-artifact refinement · swipe-delete/move · inline
+meal-slot pill · full-screen focus · toolbar reorg). Pending Jon's device pass → DONE-LOG. Drag-drop
+reorder of dishes stays parked as the named follow-on (swipe-move is the interim).
 
 **AI configuration & transparency — ADR-0017 + ADR-0018 — is done** (architect-approved 2026-07-05,
 cross-repo [yes-chef #96](https://github.com/jonphillips/yes-chef/pull/96) +
@@ -80,8 +85,12 @@ the broader **Meal-Planner chat verbs** effort — lives in
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target.
 
-**Menu planning overhaul** (ADR-0012 Amendment 1 + `efforts/menu-planning-ux.md`) — **promoted to Next
-Up** (dispatch ①/AI-config now done). Full slice list lives in Next Up above.
+**Menu planning overhaul** (ADR-0012 Amendment 1 + `efforts/menu-planning-ux.md`) — **complete**
+([yes-chef #98](https://github.com/jonphillips/yes-chef/pull/98), build-green; pending Jon's device pass →
+DONE-LOG). All five slices shipped; drag-drop dish reorder stays parked as the named follow-on.
+
+**Meal-Planner chat verbs** (ADR-0013 follow-on + `efforts/cooking-workspace.md`) — **promoted to Next
+Up** (menu overhaul now done). Full detail lives in Next Up above.
 
 - **AI configuration & transparency** (ADR-0017 + ADR-0018) — **complete** (architect-approved 2026-07-05;
   cross-repo PRs [yes-chef #96](https://github.com/jonphillips/yes-chef/pull/96) +
