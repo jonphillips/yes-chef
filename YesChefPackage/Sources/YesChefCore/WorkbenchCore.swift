@@ -74,13 +74,16 @@ public struct WorkbenchRowData: Identifiable, Equatable, Sendable {
 public struct WorkbenchDetailData: Equatable, Sendable {
   public var workbench: Workbench
   public var candidateRows: [WorkbenchCandidateRowData]
+  public var draftRecipeDetail: RecipeDetailData?
 
   public init(
     workbench: Workbench,
-    candidateRows: [WorkbenchCandidateRowData] = []
+    candidateRows: [WorkbenchCandidateRowData] = [],
+    draftRecipeDetail: RecipeDetailData? = nil
   ) {
     self.workbench = workbench
     self.candidateRows = candidateRows
+    self.draftRecipeDetail = draftRecipeDetail
   }
 }
 
@@ -142,6 +145,7 @@ public struct WorkbenchDetailRequest: FetchKeyRequest {
     }
 
     return WorkbenchDetailData(workbench: workbench, candidateRows: candidateRows)
+      .withDraftRecipeDetail(try workbench.draftRecipeID.flatMap { try RecipeRepository.fetchDetail(recipeID: $0, in: db) })
   }
 }
 
@@ -280,6 +284,78 @@ public enum WorkbenchRepository {
     try Workbench.find(workbenchID).delete().execute(db)
   }
 
+  @discardableResult
+  public static func createDraftRecipe(
+    _ draftRecipe: WorkbenchDraftRecipe,
+    for workbenchID: Workbench.ID,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> Recipe.ID {
+    var workbench = try requireWorkbench(workbenchID, in: db)
+    if let draftRecipeID = workbench.draftRecipeID {
+      throw WorkbenchRepositoryError.draftRecipeAlreadyExists(draftRecipeID)
+    }
+
+    let recipeID = try RecipeRepository.save(
+      draft: draftRecipe.editorDraft(libraryPlacement: .reference),
+      in: db,
+      now: now,
+      uuid: uuid
+    )
+    workbench.draftRecipeID = recipeID
+    workbench.dateModified = now
+    try Workbench.upsert { workbench }.execute(db)
+    return recipeID
+  }
+
+  @discardableResult
+  public static func promoteDraftRecipe(
+    workbenchID: Workbench.ID,
+    in db: Database,
+    now: Date
+  ) throws -> Recipe.ID {
+    var workbench = try requireWorkbench(workbenchID, in: db)
+    guard let recipeID = workbench.draftRecipeID else {
+      throw WorkbenchRepositoryError.missingDraftRecipe(workbenchID)
+    }
+    guard try Recipe.find(recipeID).fetchOne(db) != nil else {
+      throw WorkbenchRepositoryError.draftRecipeNotFound(recipeID)
+    }
+    try RecipeRepository.setLibraryPlacement(.main, recipeID: recipeID, in: db, now: now)
+    workbench.dateModified = now
+    try Workbench.upsert { workbench }.execute(db)
+    return recipeID
+  }
+
+  /// Detach the working recipe so the workbench can draft again. Always clears the (soft-FK)
+  /// `draftRecipeID` link — deleting the recipe alone would leave the link dangling and keep the
+  /// draft action disabled. The recipe row itself is deleted only while it's still an unpromoted
+  /// `.reference` draft (scratch, cascades to its children); once promoted to `.main` it's a real
+  /// library recipe the cook chose to keep, so it's only unlinked, not deleted. Returns the deleted
+  /// recipe id when a scratch draft was removed, `nil` when a promoted recipe was merely unlinked.
+  @discardableResult
+  public static func removeDraftRecipe(
+    workbenchID: Workbench.ID,
+    in db: Database,
+    now: Date
+  ) throws -> Recipe.ID? {
+    var workbench = try requireWorkbench(workbenchID, in: db)
+    guard let recipeID = workbench.draftRecipeID else {
+      throw WorkbenchRepositoryError.missingDraftRecipe(workbenchID)
+    }
+
+    workbench.draftRecipeID = nil
+    workbench.dateModified = now
+    try Workbench.upsert { workbench }.execute(db)
+
+    if let recipe = try Recipe.find(recipeID).fetchOne(db), recipe.libraryPlacement == .reference {
+      try RecipeRepository.permanentlyDelete(recipeID: recipeID, in: db)
+      return recipeID
+    }
+    return nil
+  }
+
   private static func requireWorkbench(_ workbenchID: Workbench.ID, in db: Database) throws -> Workbench {
     guard let workbench = try Workbench.find(workbenchID).fetchOne(db) else {
       throw WorkbenchRepositoryError.workbenchNotFound(workbenchID)
@@ -315,6 +391,19 @@ public enum WorkbenchRepositoryError: Error, Equatable, Sendable {
   case workbenchNotFound(Workbench.ID)
   case candidateNotFound(WorkbenchCandidate.ID)
   case recipeNotFound(Recipe.ID)
+  case draftRecipeAlreadyExists(Recipe.ID)
+  case missingDraftRecipe(Workbench.ID)
+  case draftRecipeNotFound(Recipe.ID)
+}
+
+private extension WorkbenchDetailData {
+  func withDraftRecipeDetail(_ draftRecipeDetail: RecipeDetailData?) -> WorkbenchDetailData {
+    WorkbenchDetailData(
+      workbench: workbench,
+      candidateRows: candidateRows,
+      draftRecipeDetail: draftRecipeDetail
+    )
+  }
 }
 
 private func areWorkbenchRowsInIncreasingOrder(_ lhs: WorkbenchRowData, _ rhs: WorkbenchRowData) -> Bool {

@@ -4,6 +4,7 @@ import YesChefCore
 
 struct WorkbenchesStack: View {
   let model: WorkbenchLibraryModel
+  var onRecipeSelected: (RecipeDetailPresentation) -> Void = { _ in }
 
   var body: some View {
     @Bindable var model = model
@@ -11,7 +12,7 @@ struct WorkbenchesStack: View {
     NavigationStack(path: $model.navigationPath) {
       WorkbenchListView(model: model, style: .navigation)
         .navigationDestination(for: Workbench.ID.self) { workbenchID in
-          WorkbenchDetailView(workbenchID: workbenchID)
+          WorkbenchDetailView(workbenchID: workbenchID, onRecipeSelected: onRecipeSelected)
             .id(workbenchID)
         }
     }
@@ -98,6 +99,7 @@ private struct WorkbenchRowView: View {
 
 struct WorkbenchDetailColumn: View {
   let model: WorkbenchLibraryModel
+  var onRecipeSelected: (RecipeDetailPresentation) -> Void = { _ in }
   var isFocusActive = false
   var focusButtonTapped: (() -> Void)?
 
@@ -105,6 +107,7 @@ struct WorkbenchDetailColumn: View {
     if let workbenchID = model.selectedWorkbenchID {
       WorkbenchDetailView(
         workbenchID: workbenchID,
+        onRecipeSelected: onRecipeSelected,
         isFocusActive: isFocusActive,
         focusButtonTapped: focusButtonTapped
       )
@@ -125,10 +128,16 @@ struct WorkbenchDetailView: View {
 
   init(
     workbenchID: Workbench.ID,
+    onRecipeSelected: @escaping (RecipeDetailPresentation) -> Void = { _ in },
     isFocusActive: Bool = false,
     focusButtonTapped: (() -> Void)? = nil
   ) {
-    _model = State(wrappedValue: WorkbenchDetailModel(workbenchID: workbenchID))
+    _model = State(
+      wrappedValue: WorkbenchDetailModel(
+        workbenchID: workbenchID,
+        openRecipe: { recipeID in onRecipeSelected(RecipeDetailPresentation(recipeID: recipeID)) }
+      )
+    )
     self.isFocusActive = isFocusActive
     self.focusButtonTapped = focusButtonTapped
   }
@@ -143,7 +152,9 @@ struct WorkbenchDetailView: View {
             ChatWorkspaceSplit(
               context: .workbench(WorkbenchChatContext(detail: detail)),
               detentRaw: $chatWorkspaceDetentRaw,
-              applyActions: { _ in [] }
+              applyActions: { chatModel in
+                model.applyActionCatalog(for: chatModel)
+              }
             ) {
               WorkbenchReader(model: model, detail: detail)
             }
@@ -191,13 +202,35 @@ struct WorkbenchDetailView: View {
     }
     .sheet(item: $model.destination.chat) { chatModel in
       NavigationStack {
-        RecipeChatPanel(chatModel: chatModel, applyActions: [])
+        RecipeChatPanel(
+          chatModel: chatModel,
+          applyActions: model.applyActionCatalog(for: chatModel)
+        )
       }
     }
     .alert("Workbench Error", isPresented: $model.isShowingError) {
       Button("OK") {}
     } message: {
       Text(model.errorMessage ?? "")
+    }
+    .confirmationDialog(
+      model.workingRecipeIsPromoted ? "Remove Working Recipe?" : "Delete Working Recipe?",
+      isPresented: $model.isConfirmingRemoveWorkingRecipe,
+      titleVisibility: .visible
+    ) {
+      Button(
+        model.workingRecipeIsPromoted ? "Remove from Workbench" : "Delete Draft",
+        role: .destructive
+      ) {
+        model.confirmRemoveWorkingRecipe()
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text(
+        model.workingRecipeIsPromoted
+          ? "This detaches the recipe from this workbench so you can draft a new one. The recipe stays in your library."
+          : "This deletes the draft working recipe so you can draft a new one. This can't be undone."
+      )
     }
   }
 
@@ -248,6 +281,28 @@ private struct WorkbenchReader: View {
       }
 
       Section {
+        if let draftRecipe = detail.draftRecipeDetail?.recipe {
+          WorkingRecipeRow(
+            recipe: draftRecipe,
+            open: {
+              model.openWorkingRecipeButtonTapped()
+            },
+            promote: {
+              model.promoteWorkingRecipeButtonTapped()
+            },
+            remove: {
+              model.removeWorkingRecipeButtonTapped()
+            }
+          )
+        } else {
+          ContentUnavailableView("No Working Recipe", systemImage: "doc.badge.plus")
+            .frame(maxWidth: .infinity, minHeight: 160)
+        }
+      } header: {
+        Text("Working Recipe")
+      }
+
+      Section {
         if detail.candidateRows.isEmpty {
           ContentUnavailableView("No Candidates", systemImage: "list.bullet.rectangle")
             .frame(maxWidth: .infinity, minHeight: 220)
@@ -276,6 +331,63 @@ private struct WorkbenchReader: View {
     .onChange(of: detail.workbench.notes) { _, notes in
       notesText = notes ?? ""
     }
+  }
+}
+
+private struct WorkingRecipeRow: View {
+  let recipe: Recipe
+  let open: () -> Void
+  let promote: () -> Void
+  let remove: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      VStack(alignment: .leading, spacing: 4) {
+        Text(recipe.title)
+          .font(.headline)
+        if let summary = recipe.summary {
+          Text(summary)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .lineLimit(3)
+        }
+        if recipe.libraryPlacement == .reference {
+          Label("Reference", systemImage: "books.vertical")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+      HStack {
+        Button {
+          open()
+        } label: {
+          Label("Open", systemImage: "doc.text")
+        }
+        .buttonStyle(.bordered)
+
+        if recipe.libraryPlacement != .main {
+          Button {
+            promote()
+          } label: {
+            Label("Promote to Library", systemImage: "arrow.up.forward.app")
+          }
+          .buttonStyle(.borderedProminent)
+        }
+
+        Spacer(minLength: 8)
+
+        Button(role: .destructive) {
+          remove()
+        } label: {
+          Label("Remove", systemImage: "trash")
+            .labelStyle(.iconOnly)
+        }
+        .buttonStyle(.bordered)
+        .tint(.red)
+        .accessibilityLabel(Text("Remove working recipe"))
+      }
+    }
+    .padding(.vertical, 4)
   }
 }
 

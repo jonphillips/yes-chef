@@ -1,6 +1,7 @@
 import CustomDump
 import Dependencies
 import Foundation
+import LLMClientKit
 import Testing
 import YesChefCore
 
@@ -160,6 +161,264 @@ extension RecipeCoreTests {
         )
       )
       _ = now
+    }
+
+    @Test @MainActor
+    func workbenchPromptUsesTaskFraming() {
+      let model = RecipeChatModel(
+        context: .workbench(
+          WorkbenchChatContext(
+            title: "Cookies",
+            candidates: [
+              WorkbenchCandidateChatContext(
+                id: SampleUUIDSequence.uuid(24_001),
+                title: "Chewy Cookie",
+                sortOrder: 0
+              )
+            ]
+          )
+        )
+      )
+
+      let prompt = model.systemPrompt()
+
+      #expect(prompt.contains(RecipeChatContext.workbenchTaskFraming))
+      #expect(prompt.contains("don't blend everything into a bland average"))
+    }
+
+    @Test
+    func parsesWorkbenchDraftRecipeJSON() {
+      let proposal = WorkbenchDraftRecipeClient.parse(
+        """
+        Here is the draft:
+        {"title":"Weeknight Birria","summary":"Chile-forward and practical.","servingsText":"6 servings","prepTimeMinutes":30,"cookTimeMinutes":180,"ingredientSectionName":"Birria","ingredientLines":["3 lb chuck roast","4 guajillo chiles"],"instructionLines":["Toast and soak chiles.","Braise beef until tender."],"notes":["Variation: keep a hotter salsa on the side."],"rationale":"Borrows Candidate A's chile paste and Candidate B's oven braise; rejects Candidate C's watery blend."}
+        """
+      )
+
+      expectNoDifference(proposal.title, "Weeknight Birria")
+      expectNoDifference(proposal.prepTimeMinutes, 30)
+      expectNoDifference(proposal.ingredientLines, ["3 lb chuck roast", "4 guajillo chiles"])
+      expectNoDifference(proposal.instructionLines, ["Toast and soak chiles.", "Braise beef until tender."])
+      #expect(proposal.rationale.contains("Candidate A"))
+    }
+
+    @Test
+    func draftClientThrowsWhenResponseIsBudgetTruncated() async throws {
+      // Reasoning ate the token budget: empty body with a truncation stop reason.
+      await withDependencies {
+        $0.modelClient = StubModelClient { _ in ModelResponse(text: "", stopReason: "length") }
+      } operation: {
+        await #expect(throws: WorkbenchDraftRecipeError.responseTruncated) {
+          try await WorkbenchDraftRecipeClient.liveValue(
+            selection: "",
+            messages: [],
+            context: "Workbench: Birria",
+            tier: .frontier(.openai)
+          )
+        }
+      }
+    }
+
+    @Test
+    func draftClientThrowsWhenResponseHasNoReadableJSON() async throws {
+      await withDependencies {
+        $0.modelClient = StubModelClient { _ in
+          ModelResponse(text: "I can't build a recipe from this.", stopReason: "stop")
+        }
+      } operation: {
+        await #expect(throws: WorkbenchDraftRecipeError.responseUnreadable) {
+          try await WorkbenchDraftRecipeClient.liveValue(
+            selection: "",
+            messages: [],
+            context: "Workbench: Birria",
+            tier: .frontier(.openai)
+          )
+        }
+      }
+    }
+
+    @Test
+    func draftClientReturnsEmptyDraftForDeliberateNoRecipe() async throws {
+      // A genuine "nothing to draft yet" is valid JSON with an empty title — not an error.
+      let draft = try await withDependencies {
+        $0.modelClient = StubModelClient { _ in
+          ModelResponse(
+            text: #"{"title":"","ingredientLines":[],"instructionLines":[],"rationale":""}"#,
+            stopReason: "stop"
+          )
+        }
+      } operation: {
+        try await WorkbenchDraftRecipeClient.liveValue(
+          selection: "",
+          messages: [],
+          context: "Workbench: Birria",
+          tier: .frontier(.openai)
+        )
+      }
+
+      #expect(draft.isEmpty)
+    }
+
+    @Test
+    func createsReferenceDraftRecipeLinksWorkbenchAndCapturesSnapshot() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 806_500_000)
+      var uuids = SampleUUIDSequence(start: 25_000)
+
+      let draft = WorkbenchDraftRecipe(
+        title: "Weeknight Birria",
+        summary: "Chile-forward and practical.",
+        servingsText: "6 servings",
+        prepTimeMinutes: 30,
+        cookTimeMinutes: 180,
+        ingredientSectionName: "Birria",
+        ingredientLines: ["3 lb chuck roast", "4 guajillo chiles"],
+        instructionLines: ["Toast and soak chiles.", "Braise beef until tender."],
+        notes: ["Variation: keep a hotter salsa on the side."],
+        rationale: "Borrows Candidate A's chile paste and Candidate B's oven braise."
+      )
+
+      try database.write { db in
+        let workbenchID = try WorkbenchRepository.addWorkbench(
+          title: "Birria",
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        let recipeID = try WorkbenchRepository.createDraftRecipe(
+          draft,
+          for: workbenchID,
+          in: db,
+          now: now.addingTimeInterval(10),
+          uuid: { uuids.next() }
+        )
+        let detail = try #require(try WorkbenchDetailRequest(workbenchID: workbenchID).fetch(db))
+        let recipe = try #require(detail.draftRecipeDetail?.recipe)
+
+        expectNoDifference(detail.workbench.draftRecipeID, recipeID)
+        expectNoDifference(recipe.title, "Weeknight Birria")
+        expectNoDifference(recipe.libraryPlacement, .reference)
+        #expect(recipe.originalSnapshot != nil)
+        expectNoDifference(
+          detail.draftRecipeDetail?.ingredientLines.map(\.originalText),
+          ["3 lb chuck roast", "4 guajillo chiles"]
+        )
+        expectNoDifference(
+          detail.draftRecipeDetail?.instructionSteps.map(\.text),
+          ["Toast and soak chiles.", "Braise beef until tender."]
+        )
+
+        let snapshotData = try #require(recipe.originalSnapshot)
+        let snapshot = try RecipeBundleCoding.decodeSnapshot(snapshotData)
+        expectNoDifference(snapshot.recipe.libraryPlacement, .reference)
+        #expect(snapshot.notes.contains { $0.contains("Borrows Candidate A") })
+      }
+    }
+
+    @Test
+    func promotesWorkbenchDraftRecipeToMainLibrary() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 806_600_000)
+      var uuids = SampleUUIDSequence(start: 26_000)
+
+      try database.write { db in
+        let workbenchID = try WorkbenchRepository.addWorkbench(
+          title: "Cookies",
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let recipeID = try WorkbenchRepository.createDraftRecipe(
+          WorkbenchDraftRecipe(
+            title: "Brown Butter Cookies",
+            ingredientLines: ["1 cup brown butter"],
+            instructionLines: ["Bake until set."],
+            rationale: "Uses Candidate A's brown butter."
+          ),
+          for: workbenchID,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        try WorkbenchRepository.promoteDraftRecipe(
+          workbenchID: workbenchID,
+          in: db,
+          now: now.addingTimeInterval(60)
+        )
+
+        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+        expectNoDifference(recipe.libraryPlacement, .main)
+        expectNoDifference(recipe.dateModified, now.addingTimeInterval(60))
+      }
+    }
+
+    @Test
+    func removingUnpromotedDraftDeletesRecipeAndClearsLink() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 806_700_000)
+      var uuids = SampleUUIDSequence(start: 27_000)
+
+      try database.write { db in
+        let workbenchID = try WorkbenchRepository.addWorkbench(
+          title: "Cookies", in: db, now: now, uuid: { uuids.next() }
+        )
+        let recipeID = try WorkbenchRepository.createDraftRecipe(
+          WorkbenchDraftRecipe(
+            title: "Brown Butter Cookies",
+            ingredientLines: ["1 cup brown butter"],
+            instructionLines: ["Bake until set."],
+            rationale: "Uses Candidate A's brown butter."
+          ),
+          for: workbenchID, in: db, now: now, uuid: { uuids.next() }
+        )
+
+        let removed = try WorkbenchRepository.removeDraftRecipe(
+          workbenchID: workbenchID, in: db, now: now.addingTimeInterval(30)
+        )
+
+        expectNoDifference(removed, recipeID)
+        // Scratch draft is gone, and the link is cleared so the workbench can draft again.
+        #expect(try Recipe.find(recipeID).fetchOne(db) == nil)
+        let workbench = try #require(try Workbench.find(workbenchID).fetchOne(db))
+        #expect(workbench.draftRecipeID == nil)
+      }
+    }
+
+    @Test
+    func removingPromotedDraftKeepsRecipeAndOnlyUnlinks() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 806_800_000)
+      var uuids = SampleUUIDSequence(start: 28_000)
+
+      try database.write { db in
+        let workbenchID = try WorkbenchRepository.addWorkbench(
+          title: "Cookies", in: db, now: now, uuid: { uuids.next() }
+        )
+        let recipeID = try WorkbenchRepository.createDraftRecipe(
+          WorkbenchDraftRecipe(
+            title: "Brown Butter Cookies",
+            ingredientLines: ["1 cup brown butter"],
+            instructionLines: ["Bake until set."],
+            rationale: "Uses Candidate A's brown butter."
+          ),
+          for: workbenchID, in: db, now: now, uuid: { uuids.next() }
+        )
+        try WorkbenchRepository.promoteDraftRecipe(
+          workbenchID: workbenchID, in: db, now: now
+        )
+
+        let removed = try WorkbenchRepository.removeDraftRecipe(
+          workbenchID: workbenchID, in: db, now: now.addingTimeInterval(30)
+        )
+
+        // A promoted recipe is kept in the library; only the workbench link is cleared.
+        #expect(removed == nil)
+        #expect(try Recipe.find(recipeID).fetchOne(db) != nil)
+        let workbench = try #require(try Workbench.find(workbenchID).fetchOne(db))
+        #expect(workbench.draftRecipeID == nil)
+      }
     }
 
     @Test @MainActor

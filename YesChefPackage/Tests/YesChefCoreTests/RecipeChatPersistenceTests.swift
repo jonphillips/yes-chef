@@ -7,6 +7,22 @@ import YesChefCore
 
 extension RecipeCoreTests {
   @Suite
+  struct RecipeChatErrorTextTests {
+    @Test
+    func timeoutErrorGetsActionableMessage() {
+      let message = RecipeChatErrorText.describe(URLError(.timedOut))
+      #expect(message.contains("timed out"))
+      #expect(message.contains("Try again"))
+    }
+
+    @Test
+    func offlineErrorMentionsConnection() {
+      let message = RecipeChatErrorText.describe(URLError(.notConnectedToInternet))
+      #expect(message.contains("internet connection"))
+    }
+  }
+
+  @Suite
   struct RecipeChatPersistenceTests {
     @Test
     @MainActor

@@ -13,6 +13,7 @@ struct RecipeDetailView: View {
   let isFocusActive: Bool
   let focusButtonTapped: (() -> Void)?
   let showsStartCookingButton: Bool
+  let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   init(
     recipeID: Recipe.ID,
@@ -22,7 +23,8 @@ struct RecipeDetailView: View {
     groceryModel: GroceryLibraryModel,
     isFocusActive: Bool = false,
     focusButtonTapped: (() -> Void)? = nil,
-    showsStartCookingButton: Bool = true
+    showsStartCookingButton: Bool = true,
+    onRecipeSelected: @escaping (RecipeDetailPresentation) -> Void = { _ in }
   ) {
     _model = State(wrappedValue: RecipeDetailModel(recipeID: recipeID, scaleContext: scaleContext))
     self.libraryModel = libraryModel
@@ -31,6 +33,7 @@ struct RecipeDetailView: View {
     self.isFocusActive = isFocusActive
     self.focusButtonTapped = focusButtonTapped
     self.showsStartCookingButton = showsStartCookingButton
+    self.onRecipeSelected = onRecipeSelected
   }
 
   var body: some View {
@@ -121,7 +124,10 @@ struct RecipeDetailView: View {
     }
     .sheet(item: $model.destination.workbench) { presentation in
       NavigationStack {
-        WorkbenchDetailView(workbenchID: presentation.workbenchID)
+        WorkbenchDetailView(
+          workbenchID: presentation.workbenchID,
+          onRecipeSelected: onRecipeSelected
+        )
       }
     }
     .alert("Recipe Update Failed", isPresented: $model.isShowingError) {
