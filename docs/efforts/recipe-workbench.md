@@ -4,8 +4,8 @@
 UI. Reuses the Recipe stack (reader/editor/scaling/images/sync), the chat split host, the staging card,
 and LLMClientKit. **Not** an overload of Menu/Collection.
 **Owner:** Codex (implement, per slice) · Claude (architect/review) · Jon (product/review)
-**Status:** **S1 implemented; S2 queued next** (one effort, sequenced slices; S1 de-risked grounding +
-UX before any synthesis). Milestone-sized: do **not** bundle all slices into one PR.
+**Status:** **S1, chat controls, S2, and S3 all shipped** (→ DONE-LOG). The store + curate arc is complete;
+remaining workbench work is the parked follow-ons below. Milestone-sized: do **not** bundle all slices into one PR.
 **Decisions it implements:** [ADR-0019](../decisions/ADR-0019-recipe-design-studies.md) — whole, incl.
 **Amendments 1 (durable workbench + workbench log) and 2 (name ratified)**. Design record: the
 2026-07-05 design conversation.
@@ -123,6 +123,20 @@ additive-nullable, defaults `main`) to hide in-progress working recipes from bro
   deliberate hand-pick; no rule seeding (ADR-0019 D3).
 - **AI-generated log entries** as a first-class verb family — reserved by the `kind` enum, layered post-S3
   from dogfooding, not built up front.
+- **S3 review notes (deferred, non-blocking; PR [#110](https://github.com/jonphillips/yes-chef/pull/110), architect-approved + Jon device-passed 2026-07-06).**
+  - **Log entries count toward the chat-context budget but are never trimmed themselves.** In
+    `WorkbenchChatContext.renderedContext`, the log is measured inside the candidate-trimming loop, so a
+    growing log crowds out candidates first but can't shrink — an append-only log could eventually overflow
+    the on-device window even after all candidates are dropped. Fold into the on-device context-overflow
+    robustness work (budget/trim the log alongside candidates + taste profile), not a standalone slice.
+  - **`relatedRecipeID` is plumbed but not user-reachable and un-denormalized.** No picker sets it in the
+    editor, and unlike `WorkbenchCandidate` (`recipeTitleSnapshot`) it carries no title snapshot — the chat
+    context emits a bare `Related recipe ID: <uuid>` and it dangles silently if the recipe is deleted.
+    Acceptable now (reserved for the later AI-generated fork/experiment entries); when those land, give it a
+    denormalized title snapshot like candidates have.
+  - **Chat "Save to Workbench Log" is a raw copy, not a distillation** (kind coerced to `.note`, no
+    kind/outcome set pre-commit; editable afterward). In scope for S3 (manual/curate first); the "distilled"
+    curate path is an AI-generated-entry follow-on.
 - **Working-recipe lifecycle: remove / re-draft — LANDED 2026-07-06 (dogfood-surfaced, pending device pass).**
   S2 shipped create + promote + open but no way to undo, so the workbench was one-shot. Added
   `WorkbenchRepository.removeDraftRecipe` + a Remove affordance on `WorkingRecipeRow` with a

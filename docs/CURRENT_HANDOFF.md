@@ -1,8 +1,9 @@
 # Current Handoff
 
-Last updated: July 6, 2026 (**Next Up = Recipe Workbench S3** — durable `WorkbenchLogEntry` log +
-save-to-log tap.) Recently completed and moved to [`docs/DONE-LOG.md`](DONE-LOG.md): Workbench S2 +
-dogfood-hardening ([#107](https://github.com/jonphillips/yes-chef/pull/107)), chat controls
+Last updated: July 6, 2026 (**Next Up = batched slice: on-device context-overflow robustness +
+synthesis-shaped apply-action**.) Recently completed and moved to [`docs/DONE-LOG.md`](DONE-LOG.md):
+Workbench S3 durable log ([#110](https://github.com/jonphillips/yes-chef/pull/110), Jon device-passed),
+Workbench S2 + dogfood-hardening ([#107](https://github.com/jonphillips/yes-chef/pull/107)), chat controls
 ([#105](https://github.com/jonphillips/yes-chef/pull/105), Jon device-passed), Workbench S1 + grounding
 fix/polish ([#101](https://github.com/jonphillips/yes-chef/pull/101) /
 [#103](https://github.com/jonphillips/yes-chef/pull/103)), and the menu-planning overhaul
@@ -22,22 +23,31 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Recipe Workbench — S3.** The durable workbench log — ship the store + manual/curate path **before**
-the AI-generated verbs (ADR-0019 Amdt 1):
+**Batched slice — two cohesive chat-robustness pieces in one PR** (do both, in order):
 
-- Migration + model **`WorkbenchLogEntry`** (`id`, `workbenchID` FK cascade, extensible
-  `kind: rationale | experiment | fork | observation | note`, `body: String`, `outcome: String?` for tried
-  experiments, `relatedRecipeID: UUID?` soft FK, `sortOrder`, `dateCreated`). Editable/deletable, append-only
-  in practice. Additive-nullable ⇒ sync-safe.
-- Log surface on the workbench screen (dated, typed entries) + a **"save to workbench log"** tap that
-  distills an entry from the ephemeral chat (ADR-0015 ~1-month) into the durable log — the two-histories
-  bridge (ADR-0019 A2/A4).
-- Ship the store + manual/curate path first; AI-*generated* experiment/fork entries layer on later as
-  dogfooding shapes them (new `kind` or new compose path = no migration).
+**(1) On-device chat context overflow — robustness.** Surfaced 2026-07-06 dogfooding a large taste profile in
+workbench chat; Apple `FoundationModels` threw `exceededContextWindowSize` after one turn. Two real bugs:
+**(a)** the taste profile is appended to `system` **unbudgeted** at the client boundary (jon-platform
+`TieredModelClient` → `appendingPromptPreferences`), outside `WorkbenchChatContext`'s 24k-char accounting — a
+large one is pure uncounted overhead; **(b)** the on-device fitter (`OnDeviceModelClient.fit`) only trims the
+*prompt tail* and reserves `system` whole, so when `system` (base + context + taste profile) alone exceeds
+Apple's ~4k-token window it cannot recover. Fix: budget context + taste profile into the on-device window (not
+just the prompt tail), lower the 24k on-device candidate budget to something realistic, and catch
+`exceededContextWindowSize` to surface "too big for on-device — switch to a frontier model" instead of a raw
+error. **While here, also budget/trim the workbench log** — S3 (PR #110) added it to the serialized context
+inside the candidate-trim loop but it is never trimmed itself, so a growing log can crowd out all candidates
+and still overflow (see `efforts/recipe-workbench.md` S3 review notes). Cross-repo (jon-platform LLMClientKit +
+Yes Chef budgets).
 
-Sync-safe, post-sync (UUID PKs, soft FKs + denormalized snapshots, additive migrations). Full slice detail
-+ resolved review calls in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md); design in
-[ADR-0019](decisions/ADR-0019-recipe-design-studies.md) (whole, incl. both amendments).
+**(2) Synthesis-shaped apply-action** (workbench draft verb should not be gated on the latest reply). The
+shared apply-action "subject" mechanism (`RecipeChatWorkspace`) is built around *acting on one assistant
+reply*: the Apply menu is disabled until a last reply exists, the auto-`.latestReply` fills the subject slot,
+and the "Acting on latest reply" chip frames it — which fits per-reply verbs (Chef-It-Up, Serve-With) but fits
+a *synthesis* verb poorly. The working-recipe draft should be enabled whenever the workbench has candidates and
+synthesize from the full conversation + all candidates, with any user selection an optional focus only (an
+interim prompt-side fix landed 2026-07-06; the proper fix is a distinct action shape — enabled by workbench
+state, no last-reply gate, no misleading chip). Full write-up in
+[`efforts/recipe-workbench.md`](efforts/recipe-workbench.md) parked follow-ons.
 
 **Standing release follow-up (not a dispatch — a pre-cut ops step Jon runs).** We stay in the CloudKit
 **Development** environment (dev stance) so the schema keeps evolving freely; promoting to **Production** is
@@ -52,22 +62,10 @@ app target (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's d
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
-**Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — S1, chat controls, and S2 shipped
-(→ DONE-LOG); **S3** (`WorkbenchLogEntry` durable log + save-to-log tap) is the current **Next Up**.
-Milestone-sized — one slice at a time. Dogfood-surfaced follow-ons (synthesis-shaped draft action, AI
-effort/tier as a user-facing setting, tabbed candidate/working-recipe quick-view) parked in the effort doc.
-
-**On-device chat context overflow — robustness** (surfaced 2026-07-06 dogfooding a large taste profile in
-workbench chat; Apple `FoundationModels` threw `exceededContextWindowSize` after one turn). Two real bugs,
-lower priority now that tier-memory lets you live on frontier: **(a)** the taste profile is appended to
-`system` **unbudgeted** at the client boundary (jon-platform `TieredModelClient` →
-`appendingPromptPreferences`), outside `WorkbenchChatContext`'s 24k-char accounting — a large one is pure
-uncounted overhead; **(b)** the on-device fitter (`OnDeviceModelClient.fit`) only trims the *prompt tail*
-and reserves `system` whole, so when `system` (base + context + taste profile) alone exceeds Apple's
-~4k-token window it cannot recover. Fix: budget context + taste profile into the on-device window (not just
-the prompt tail), lower the 24k on-device candidate budget to something realistic, and catch
-`exceededContextWindowSize` to surface "too big for on-device — switch to a frontier model" instead of a raw
-error. Cross-repo (jon-platform LLMClientKit + Yes Chef budgets).
+**Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — S1, chat controls, S2, and S3 all shipped
+(→ DONE-LOG); the store + curate arc is complete. The **synthesis-shaped apply-action** follow-on is drawn
+into the current Next Up (item 2); the rest stay parked in the effort doc (AI effort/tier as a user-facing
+setting, tabbed candidate/working-recipe quick-view, AI-generated log entries, the S3 review notes).
 
 **Meal-Planner chat verbs** (ADR-0013 follow-on + `efforts/cooking-workspace.md`) — the one remaining named
 actionable-chat verb instance. Classify each new verb's commit shape first ([[chat-verb-commit-shapes]]) —
@@ -86,7 +84,7 @@ recipe text editing (header toggles vs. rich text / bold-italic), opened from th
 and [ADR-0021](decisions/ADR-0021-recipe-variations.md) recipe variations (named deltas on a base recipe,
 selected in the reader → folds into method display + grocery; ingredients structured, method as prose,
 selection persisted-not-synced; closes ADR-0019 D1(c)'s promote-target gap), opened from Workbench S1
-dogfooding 2026-07-06 — **milestone-sized, must not derail Workbench S3; dogfood more before slicing.**
+dogfooding 2026-07-06 — **milestone-sized; dogfood more before slicing.**
 Decide with Jon before any implementation.
 
 **Parked (not dispatched):**

@@ -10,6 +10,27 @@ Newest first.
 
 ---
 
+## Recipe Workbench — S3 (durable workbench log)
+
+**Architect-approved + Jon device-passed 2026-07-06** — yes-chef
+[PR #110](https://github.com/jonphillips/yes-chef/pull/110). The durable-history primitive (ADR-0019 Amdt 1):
+a synced **`WorkbenchLogEntry`** table (`workbenchLog`) with an extensible
+`kind: rationale | experiment | fork | observation | note`, `body`, `outcome?`, soft `relatedRecipeID?`,
+`sortOrder`, `dateCreated`, cascade-owned under its workbench. Repository CRUD (add/update/delete, empty-body
+guard, whitespace normalization, `dateModified` bump, `max+1` ordering) mirrors the candidate operations; a
+Workbench Log section on the detail screen renders dated typed rows (edit-on-tap, swipe-to-delete) with a
+manual add/edit editor; the log is grounded into `WorkbenchChatContext`; and a chat **"Save to Workbench Log"**
+apply-action distills selected/latest assistant text into the log through the existing review-before-commit
+surface. Ships the **store + manual/curate path first** — AI-*generated* experiment/fork entries layer on later
+(new `kind` / compose path = no migration). Sync-safe (additive-nullable table, UUID PK, no unique index,
+cascade FK matching `workbenchCandidates`, soft `relatedRecipeID`). 208 package tests + drift green; app-target
+`xcodebuild` couldn't complete in CI (simdiskimaged crash) so the SwiftUI was closed by Jon's device pass.
+Three non-blocking review notes parked in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md): the log
+isn't self-trimmed against the chat-context budget (fold into on-device overflow work); `relatedRecipeID` is
+plumbed but has no UI/title-snapshot yet; the chat-save path is a raw copy, not yet a distillation.
+
+---
+
 ## Recipe Workbench — S2 (draft verb) + dogfood-hardening batch
 
 **Architect-approved + build-green 2026-07-06** — yes-chef
