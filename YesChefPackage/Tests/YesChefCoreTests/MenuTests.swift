@@ -96,10 +96,11 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func menuChatContextSerializesDishSummariesAndMakeAhead() {
+    func menuChatContextSerializesDishSummariesAndMakeAhead() throws {
       let menuID = SampleUUIDSequence.uuid(13_000)
       let recipeID = SampleUUIDSequence.uuid(13_001)
       let itemID = SampleUUIDSequence.uuid(13_002)
+      let prepSourceID = SampleUUIDSequence.uuid(13_003)
       let now = Date(timeIntervalSinceReferenceDate: 805_100_000)
       let detail = MenuDetailData(
         menu: Menu(
@@ -107,6 +108,13 @@ extension RecipeCoreTests {
           title: "Birthday Menu",
           notes: "Mostly grill outside.",
           dayCount: 2,
+          prepPlan: try MenuPrepPlanCoding.encode([
+            PrepPlanStep(
+              when: "Day before",
+              task: "Marinate the chicken.",
+              sourceDish: prepSourceID
+            )
+          ]),
           dateCreated: now,
           dateModified: now
         ),
@@ -147,6 +155,9 @@ extension RecipeCoreTests {
       let serialized = RecipeChatContext.menu(MenuChatContext(detail: detail)).serialized()
 
       #expect(serialized.contains("- Title: Birthday Menu"))
+      #expect(serialized.contains("Current prep plan:"))
+      #expect(serialized.contains("- Day before: Marinate the chicken."))
+      #expect(serialized.contains("  - Source menu item ID: \(prepSourceID.uuidString)"))
       #expect(serialized.contains("- Menu item ID: \(itemID.uuidString)"))
       #expect(serialized.contains("- Day: 2 (dayOffset 1)"))
       #expect(serialized.contains("- Meal slot: Dinner"))

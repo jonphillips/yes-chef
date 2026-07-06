@@ -43,12 +43,26 @@ struct MenuListView: View {
             NavigationLink(value: row.id) {
               MenuRowView(row: row)
             }
+            .swipeActions {
+              Button(role: .destructive) {
+                model.deleteMenuButtonTapped(row)
+              } label: {
+                Label("Delete", systemImage: "trash")
+              }
+            }
           }
         }
       case .selection:
         List(model.menuRows, selection: $model.selectedMenuID) { row in
           MenuRowView(row: row)
             .tag(row.id)
+            .swipeActions {
+              Button(role: .destructive) {
+                model.deleteMenuButtonTapped(row)
+              } label: {
+                Label("Delete", systemImage: "trash")
+              }
+            }
         }
       }
     }
@@ -99,6 +113,8 @@ struct MenuDetailColumn: View {
   let recipeModel: RecipeLibraryModel
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
+  var isFocusActive = false
+  var focusButtonTapped: (() -> Void)?
 
   var body: some View {
     if let menuID = model.selectedMenuID {
@@ -107,7 +123,9 @@ struct MenuDetailColumn: View {
         recipeModel: recipeModel,
         menuID: menuID,
         onRecipeSelected: onRecipeSelected,
-        onCookSessionRequested: onCookSessionRequested
+        onCookSessionRequested: onCookSessionRequested,
+        isFocusActive: isFocusActive,
+        focusButtonTapped: focusButtonTapped
       )
         .id(menuID)
     } else {
@@ -124,6 +142,8 @@ struct MenuDetailView: View {
   let recipeModel: RecipeLibraryModel
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
+  var isFocusActive = false
+  var focusButtonTapped: (() -> Void)?
   @State private var detailModel: MenuDetailModel
   @State private var isShowingRecipeBrowser = false
   @State private var compactChatModel: RecipeChatModel?
@@ -133,12 +153,16 @@ struct MenuDetailView: View {
     recipeModel: RecipeLibraryModel,
     menuID: CoreMenu.ID,
     onRecipeSelected: ((RecipeDetailPresentation) -> Void)? = nil,
-    onCookSessionRequested: ((CookSessionPresentation) -> Void)? = nil
+    onCookSessionRequested: ((CookSessionPresentation) -> Void)? = nil,
+    isFocusActive: Bool = false,
+    focusButtonTapped: (() -> Void)? = nil
   ) {
     self.model = model
     self.recipeModel = recipeModel
     self.onRecipeSelected = onRecipeSelected
     self.onCookSessionRequested = onCookSessionRequested
+    self.isFocusActive = isFocusActive
+    self.focusButtonTapped = focusButtonTapped
     _detailModel = State(wrappedValue: MenuDetailModel(menuID: menuID))
   }
 
@@ -176,8 +200,18 @@ struct MenuDetailView: View {
       }
     }
     .toolbar {
-      if let menu = detailModel.detail?.menu {
+      if detailModel.detail != nil {
         ToolbarItemGroup(placement: .primaryAction) {
+          if horizontalSizeClass != .compact, let focusButtonTapped {
+            Button {
+              focusButtonTapped()
+            } label: {
+              Label(
+                "Focus",
+                systemImage: isFocusActive ? "rectangle.expand" : "arrow.up.left.and.arrow.down.right"
+              )
+            }
+          }
           if let cookSessionPresentation {
             Button {
               onCookSessionRequested?(cookSessionPresentation)
@@ -190,20 +224,12 @@ struct MenuDetailView: View {
           } label: {
             Label("Browse Recipes", systemImage: "sidebar.right")
           }
-          Button {
-            chatButtonTapped()
-          } label: {
-            Label("Chat", systemImage: "sparkles")
-          }
-          Button {
-            model.addItemButtonTapped(menu: menu)
-          } label: {
-            Label("Add Dish", systemImage: "plus")
-          }
-          Button {
-            model.placeMenuButtonTapped(menu: menu)
-          } label: {
-            Label("Place", systemImage: "calendar.badge.plus")
+          if !isSplitEnabled {
+            Button {
+              chatButtonTapped()
+            } label: {
+              Label("Chat", systemImage: "sparkles")
+            }
           }
         }
       }
@@ -294,6 +320,7 @@ private struct MenuDetailReader: View {
         MenuPlacementList(
           model: model,
           menu: detail.menu,
+          minimumDayCount: max((detail.itemRows.map(\.item.dayOffset).max() ?? 0) + 1, 1),
           placements: detail.placements
         )
       }
@@ -301,6 +328,7 @@ private struct MenuDetailReader: View {
       .frame(maxWidth: 900, alignment: .leading)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .swipeActionsContainer()
   }
 }
 
@@ -404,186 +432,6 @@ private struct MenuDetailHeader: View {
   }
 }
 
-private struct MenuDishList: View {
-  let model: MenuLibraryModel
-  let menu: CoreMenu
-  let detail: MenuDetailData
-  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      Text("Dishes")
-        .font(.title2.weight(.semibold))
-
-      ForEach(0..<detail.menu.dayCount, id: \.self) { dayOffset in
-        MenuDaySection(
-          model: model,
-          menu: menu,
-          dayNumber: dayOffset + 1,
-          dayOffset: dayOffset,
-          scheduledDate: scheduledDate(for: dayOffset),
-          rows: detail.itemRows.filter { $0.item.dayOffset == dayOffset },
-          onRecipeSelected: onRecipeSelected
-        )
-      }
-    }
-  }
-
-  private var placedStartDate: Date? {
-    detail.placements.count == 1 ? detail.placements[0].startDate : nil
-  }
-
-  private func scheduledDate(for dayOffset: Int) -> Date? {
-    guard let placedStartDate else { return nil }
-    return Calendar.autoupdatingCurrent.date(
-      byAdding: .day,
-      value: dayOffset,
-      to: placedStartDate
-    )
-  }
-}
-
-private struct MenuDaySection: View {
-  let model: MenuLibraryModel
-  let menu: CoreMenu
-  let dayNumber: Int
-  let dayOffset: Int
-  let scheduledDate: Date?
-  let rows: [MenuItemRowData]
-  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      HStack(alignment: .firstTextBaseline) {
-        dayTitle
-          .font(.headline)
-          .foregroundStyle(.secondary)
-
-        Spacer()
-
-        Button {
-          model.addItemButtonTapped(
-            menu: menu,
-            kind: .recipe,
-            dayOffset: dayOffset,
-            mealSlot: .dinner
-          )
-        } label: {
-          Label("Add Recipe to Day \(dayNumber)", systemImage: "plus.circle")
-            .labelStyle(.iconOnly)
-        }
-        .accessibilityLabel("Add recipe to Day \(dayNumber)")
-      }
-
-      if rows.isEmpty {
-        Text("No dishes")
-          .font(.subheadline)
-          .foregroundStyle(.secondary)
-          .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-      } else {
-        VStack(spacing: 0) {
-          ForEach(rows) { row in
-            MenuDishRowView(row: row, onRecipeSelected: onRecipeSelected)
-            if row.id != rows.last?.id {
-              Divider()
-                .padding(.leading, 44)
-            }
-          }
-        }
-        .background(.background)
-        .clipShape(.rect(cornerRadius: 8))
-        .overlay {
-          RoundedRectangle(cornerRadius: 8)
-            .stroke(.quaternary)
-        }
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .contentShape(Rectangle())
-    .dropDestination(for: MenuDraggedRecipe.self) { recipes, _ -> Bool in
-      return model.addRecipesToMenu(
-        recipeIDs: recipes.map(\.recipeID),
-        menuID: menu.id,
-        dayOffset: dayOffset,
-        mealSlot: .dinner
-      )
-    }
-    .dropDestination(for: MenuDraggedMenuItem.self) { items, _ in
-      let sameMenuItems = items.filter { $0.menuID == menu.id }
-      guard !sameMenuItems.isEmpty else { return false }
-      return sameMenuItems.allSatisfy { item in
-        model.moveMenuItem(itemID: item.itemID, toDayOffset: dayOffset)
-      }
-    }
-  }
-
-  private var dayTitle: Text {
-    guard let scheduledDate else {
-      return Text("Day \(dayNumber)")
-    }
-
-    let weekday = scheduledDate.formatted(.dateTime.weekday(.wide))
-    let date = scheduledDate.formatted(.dateTime.month(.wide).day().year())
-    return Text("\(weekday) - \(date) (Day \(dayNumber))")
-  }
-}
-
-private struct MenuDishRowView: View {
-  let row: MenuItemRowData
-  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
-
-  var body: some View {
-    Group {
-      if let recipeID = row.recipe?.id, let onRecipeSelected {
-        Button {
-          onRecipeSelected(
-            RecipeDetailPresentation(
-              recipeID: recipeID,
-              scaleContext: .menuItem(row.item.id)
-            )
-          )
-        } label: {
-          rowContent
-        }
-        .buttonStyle(.plain)
-        .draggable(
-          MenuDraggedMenuItem(
-            menuID: row.item.menuID,
-            itemID: row.item.id
-          )
-        )
-      } else {
-        rowContent
-      }
-    }
-  }
-
-  private var rowContent: some View {
-    HStack(alignment: .top, spacing: 12) {
-      Image(systemName: row.item.kind.systemImage)
-        .font(.title3)
-        .foregroundStyle(.secondary)
-        .frame(width: 32, height: 32)
-
-      VStack(alignment: .leading, spacing: 5) {
-        Text(row.displayTitle)
-          .font(.headline)
-        Label(row.item.mealSlot.title, systemImage: row.item.mealSlot.systemImage)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-        if let notes = row.displayNotes {
-          Text(notes)
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-        }
-      }
-
-      Spacer()
-    }
-    .padding(12)
-  }
-}
-
 private struct MenuRecipeBrowserPanel: View {
   let recipeModel: RecipeLibraryModel
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
@@ -649,86 +497,6 @@ private struct MenuRecipeBrowserPanel: View {
   }
 }
 
-private struct MenuDraggedRecipe: Codable, Transferable {
-  var recipeID: Recipe.ID
-
-  static var transferRepresentation: some TransferRepresentation {
-    CodableRepresentation(contentType: .yesChefMenuRecipe)
-  }
-}
-
-private struct MenuDraggedMenuItem: Codable, Transferable {
-  var menuID: CoreMenu.ID
-  var itemID: MenuItem.ID
-
-  static var transferRepresentation: some TransferRepresentation {
-    CodableRepresentation(contentType: .yesChefMenuItem)
-  }
-}
-
-private extension UTType {
-  static let yesChefMenuRecipe = UTType(exportedAs: "com.jon.yeschef.menu-recipe")
-  static let yesChefMenuItem = UTType(exportedAs: "com.jon.yeschef.menu-item")
-}
-
-private struct MenuPlacementList: View {
-  let model: MenuLibraryModel
-  let menu: CoreMenu
-  let placements: [MenuPlacement]
-
-  var body: some View {
-    if !placements.isEmpty {
-      VStack(alignment: .leading, spacing: 12) {
-        Text("Calendar")
-          .font(.title2.weight(.semibold))
-
-        VStack(spacing: 0) {
-          ForEach(placements) { placement in
-            HStack(spacing: 12) {
-              Label {
-                Text(placement.startDate, format: .dateTime.weekday(.wide).month(.wide).day())
-              } icon: {
-                Image(systemName: "calendar.badge.checkmark")
-              }
-
-              Spacer()
-
-              Menu {
-                Button {
-                  model.editPlacementButtonTapped(menu: menu, placement: placement)
-                } label: {
-                  Label("Change Start Date", systemImage: "calendar")
-                }
-                Button(role: .destructive) {
-                  model.deletePlacementButtonTapped(menu: menu, placement: placement)
-                } label: {
-                  Label("Remove from Calendar", systemImage: "trash")
-                }
-              } label: {
-                Label("Placement Actions", systemImage: "ellipsis.circle")
-                  .labelStyle(.iconOnly)
-              }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-
-            if placement.id != placements.last?.id {
-              Divider()
-                .padding(.leading, 44)
-            }
-          }
-        }
-        .background(.background)
-        .clipShape(.rect(cornerRadius: 8))
-        .overlay {
-          RoundedRectangle(cornerRadius: 8)
-            .stroke(.quaternary)
-        }
-      }
-    }
-  }
-}
-
 struct MenuEditorView: View {
   @Environment(\.dismiss) private var dismiss
   @State private var title = ""
@@ -789,6 +557,8 @@ struct MenuItemEditorView: View {
     _dayOffset = State(wrappedValue: context.dayOffset)
     _mealSlot = State(wrappedValue: context.mealSlot)
     _selectedRecipeID = State(wrappedValue: context.recipeID)
+    _noteTitle = State(wrappedValue: context.noteTitle)
+    _notes = State(wrappedValue: context.notes)
   }
 
   private var dayOffsets: [Int] {
@@ -879,7 +649,7 @@ struct MenuItemEditorView: View {
         }
       }
     }
-    .navigationTitle("Add Dish")
+    .navigationTitle(context.isEditing ? "Edit Dish" : "Add Dish")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {
@@ -900,24 +670,48 @@ struct MenuItemEditorView: View {
     switch kind {
     case .recipe:
       guard let selectedRecipeID else { return }
-      if model.saveRecipeItemButtonTapped(
-        menuID: context.menuID,
-        recipeID: selectedRecipeID,
-        dayOffset: dayOffset,
-        mealSlot: mealSlot,
-        notes: notes
-      ) {
-        dismiss()
+      if let itemID = context.itemID {
+        if model.updateRecipeItemButtonTapped(
+          itemID: itemID,
+          recipeID: selectedRecipeID,
+          dayOffset: dayOffset,
+          mealSlot: mealSlot,
+          notes: notes
+        ) {
+          dismiss()
+        }
+      } else {
+        if model.saveRecipeItemButtonTapped(
+          menuID: context.menuID,
+          recipeID: selectedRecipeID,
+          dayOffset: dayOffset,
+          mealSlot: mealSlot,
+          notes: notes
+        ) {
+          dismiss()
+        }
       }
     case .note, .reservation:
-      if model.saveNoteItemButtonTapped(
-        menuID: context.menuID,
-        title: noteTitle,
-        notes: notes,
-        dayOffset: dayOffset,
-        mealSlot: mealSlot
-      ) {
-        dismiss()
+      if let itemID = context.itemID {
+        if model.updateNoteItemButtonTapped(
+          itemID: itemID,
+          title: noteTitle,
+          notes: notes,
+          dayOffset: dayOffset,
+          mealSlot: mealSlot
+        ) {
+          dismiss()
+        }
+      } else {
+        if model.saveNoteItemButtonTapped(
+          menuID: context.menuID,
+          title: noteTitle,
+          notes: notes,
+          dayOffset: dayOffset,
+          mealSlot: mealSlot
+        ) {
+          dismiss()
+        }
       }
     }
   }
@@ -962,6 +756,7 @@ private struct MenuRecipeSelectionRow: View {
 struct MenuPlacementEditorView: View {
   @Environment(\.dismiss) private var dismiss
   @State private var startDate: Date
+  @State private var dayCount: Int
 
   let model: MenuLibraryModel
   let context: MenuPlacementDraftContext
@@ -970,12 +765,14 @@ struct MenuPlacementEditorView: View {
     self.model = model
     self.context = context
     _startDate = State(wrappedValue: context.startDate)
+    _dayCount = State(wrappedValue: context.dayCount)
   }
 
   var body: some View {
     Form {
       Section(context.menuTitle) {
         DatePicker("Start Date", selection: $startDate, displayedComponents: .date)
+        Stepper("Days: \(dayCount)", value: $dayCount, in: context.minimumDayCount...14)
       }
     }
     .navigationTitle(context.isEditing ? "Edit Placement" : "Place Menu")
@@ -988,7 +785,9 @@ struct MenuPlacementEditorView: View {
       }
       ToolbarItem(placement: .confirmationAction) {
         Button("Save") {
-          if model.savePlacementButtonTapped(context: context, startDate: startDate) {
+          var updatedContext = context
+          updatedContext.dayCount = dayCount
+          if model.savePlacementButtonTapped(context: updatedContext, startDate: startDate) {
             dismiss()
           }
         }

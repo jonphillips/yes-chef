@@ -128,6 +128,30 @@ struct AppContainer: View {
       Text("Remove \(mealCalendarModel.title(for: itemID)) from your meal calendar?")
     }
     .confirmationDialog(
+      "Delete Menu?",
+      item: $menuModel.destination.deleteMenu,
+      titleVisibility: .visible
+    ) { context in
+      Button("Delete Menu", role: .destructive) {
+        menuModel.confirmDeleteMenuButtonTapped(context)
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: { context in
+      Text(deleteMenuMessage(context))
+    }
+    .confirmationDialog(
+      "Remove Dish?",
+      item: $menuModel.destination.deleteItem,
+      titleVisibility: .visible
+    ) { context in
+      Button("Remove Dish", role: .destructive) {
+        menuModel.confirmDeleteMenuItemButtonTapped(context)
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: { context in
+      Text("Remove \(context.title) from this menu?")
+    }
+    .confirmationDialog(
       "Remove Menu from Calendar?",
       item: $menuModel.destination.deletePlacement,
       titleVisibility: .visible
@@ -395,7 +419,11 @@ private struct AppMainLayout: View {
             model: menuModel,
             recipeModel: recipeModel,
             onRecipeSelected: onRecipeSelected,
-            onCookSessionRequested: onCookSessionRequested
+            onCookSessionRequested: onCookSessionRequested,
+            isFocusActive: columnVisibility == .detailOnly,
+            focusButtonTapped: {
+              columnVisibility = columnVisibility == .detailOnly ? .doubleColumn : .detailOnly
+            }
           )
         case .settings:
           SettingsDetailPane(
@@ -412,6 +440,23 @@ private struct AppMainLayout: View {
     menuModel.selectMenu(menuID)
     selectedSection = .menus
   }
+
+}
+
+private func deleteMenuMessage(_ context: MenuDeletionContext) -> String {
+  var details: [String] = []
+  if context.itemCount > 0 {
+    details.append(context.itemCount == 1 ? "1 dish" : "\(context.itemCount) dishes")
+  }
+  if context.placementCount > 0 {
+    details.append(
+      context.placementCount == 1 ? "1 calendar placement" : "\(context.placementCount) calendar placements"
+    )
+  }
+  guard !details.isEmpty else {
+    return "Delete \(context.menuTitle)?"
+  }
+  return "Delete \(context.menuTitle) and its \(details.joined(separator: " and "))?"
 }
 
 private enum AppMainColumnSection {
