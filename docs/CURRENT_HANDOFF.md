@@ -218,8 +218,12 @@ a per-day note, not a per-recipe write; respect [[llm-curation-not-synthesis]]. 
   nits · full ingredient-substitution removal incl. the synced column).
 
 - **Open design ADRs (discussion, not yet Accepted)** — [ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md)
-  recipe text editing (header toggles vs. rich text / bold-italic). Opened from the 2026-07-04 dogfood pass;
-  decide with Jon before any implementation.
+  recipe text editing (header toggles vs. rich text / bold-italic), opened from the 2026-07-04 dogfood pass;
+  and [ADR-0021](decisions/ADR-0021-recipe-variations.md) recipe variations (named deltas on a base recipe,
+  selected in the reader → folds into method display + grocery; ingredients structured, method as prose,
+  selection persisted-not-synced; closes ADR-0019 D1(c)'s promote-target gap), opened from Workbench S1
+  dogfooding 2026-07-06 — **milestone-sized, must not derail Workbench S2; dogfood more before slicing.**
+  Decide with Jon before any implementation.
 
 **Parked (not dispatched):**
 - **Dogfood the core loop on two devices** — capture ~15–20 real recipes via the extension, cook from
