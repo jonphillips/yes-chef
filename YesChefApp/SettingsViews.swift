@@ -1,4 +1,5 @@
 import SwiftUI
+import YesChefCore
 
 struct SettingsStack: View {
   let model: RecipeLibraryModel
@@ -15,6 +16,8 @@ struct SettingsView: View {
   let model: RecipeLibraryModel
   let groceryModel: GroceryLibraryModel
   private let selectedPane: Binding<SettingsPane?>?
+  @State private var syncHealth = SyncHealthModel()
+  @Environment(\.scenePhase) private var scenePhase
 
   init(
     model: RecipeLibraryModel,
@@ -28,6 +31,10 @@ struct SettingsView: View {
 
   var body: some View {
     Form {
+      // Above Library so "am I actually syncing?" is the first thing Settings answers
+      // — silent degradation is fine for dev, not for cross-device use (ADR-0003).
+      SyncStatusSection(model: syncHealth)
+
       Section("Library") {
         categoryRow
         pantryRow
@@ -55,6 +62,23 @@ struct SettingsView: View {
       }
     }
     .navigationTitle("Settings")
+    // Refresh the sync signals on appear, on scene activation (the same hook that
+    // drives the pending-change redrain), and on cross-process DB changes.
+    .task { await syncHealth.refresh() }
+    .task {
+      for await _ in NotificationCenter.default.notifications(named: DatabaseChangeBeacon.didChange) {
+        await syncHealth.refresh()
+      }
+    }
+    .onChange(of: scenePhase) { _, phase in
+      guard phase == .active else { return }
+      Task { await syncHealth.refresh() }
+    }
+    // When a sync cycle finishes (the engine's observable activity flips), re-read the
+    // pending count so "Syncing…" clears to "Up to date" as changes drain.
+    .onChange(of: syncHealth.isSynchronizing) { _, _ in
+      Task { await syncHealth.refresh() }
+    }
   }
 
   @ViewBuilder private var categoryRow: some View {
