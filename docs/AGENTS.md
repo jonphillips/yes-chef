@@ -210,6 +210,14 @@ when feasible. It runs the focused SwiftLint drift gate from jon-platform's
 `docs/ios/drift-control.md` and the Swift package tests. Use it instead of scheduled
 or broad "hunt for drift" sweeps; code review should stay scoped to the diff.
 
+`check-drift.sh` runs `swift test` and covers the default slice — most work needs no
+`xcodebuild` at all (see guardrails #8/#9). Only run an app build when a change carries
+real app/UI compile risk, and when you do, run it through `scripts/xcodebuild-summary.sh`
+(same args as `xcodebuild`), never raw `xcodebuild` in chat. The wrapper writes the full
+log to a file and surfaces only errors/warnings/verdict, so build noise stays out of
+context. Reach for the raw, unfiltered log only while actively diagnosing a compiler
+failure.
+
 When completing a milestone slice as the coding worker, finish the handoff by committing,
 pushing the branch, and opening a pull request for Jon as architect unless explicitly told
 not to. Keep unrelated working-tree changes out of the slice PR. Use direct `gh` commands
