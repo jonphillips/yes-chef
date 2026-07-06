@@ -257,6 +257,21 @@ public enum WorkbenchRepository {
     try Workbench.upsert { workbench }.execute(db)
   }
 
+  public static func updateWorkbenchTitle(
+    workbenchID: Workbench.ID,
+    title: String,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard let title = title.nonEmptyWorkbenchText else {
+      throw WorkbenchRepositoryError.emptyTitle
+    }
+    var workbench = try requireWorkbench(workbenchID, in: db)
+    workbench.title = title
+    workbench.dateModified = now
+    try Workbench.upsert { workbench }.execute(db)
+  }
+
   public static func deleteWorkbench(
     workbenchID: Workbench.ID,
     in db: Database

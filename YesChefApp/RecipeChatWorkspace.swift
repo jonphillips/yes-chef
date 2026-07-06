@@ -36,6 +36,7 @@ enum ChatWorkspaceDetent: String, CaseIterable {
 }
 
 struct ChatWorkspaceSplit<Reader: View>: View {
+  let context: RecipeChatContext
   let detentRaw: Binding<String>
   let applyActions: (RecipeChatModel) -> [AnyChatApplyAction]
   let reader: Reader
@@ -49,6 +50,7 @@ struct ChatWorkspaceSplit<Reader: View>: View {
     applyActions: @escaping (RecipeChatModel) -> [AnyChatApplyAction],
     @ViewBuilder reader: () -> Reader
   ) {
+    self.context = context
     self.detentRaw = detentRaw
     self.applyActions = applyActions
     self.reader = reader()
@@ -104,6 +106,9 @@ struct ChatWorkspaceSplit<Reader: View>: View {
       }
       .animation(.snappy(duration: 0.22), value: currentDetent)
       .frame(width: proxy.size.width, height: proxy.size.height, alignment: .leading)
+    }
+    .onChange(of: context) { _, context in
+      chatModel.updateContext(context)
     }
   }
 

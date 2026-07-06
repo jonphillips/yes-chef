@@ -157,6 +157,22 @@ final class WorkbenchDetailModel {
     }
   }
 
+  func saveTitleButtonTapped(_ title: String) {
+    do {
+      try database.write { db in
+        try WorkbenchRepository.updateWorkbenchTitle(
+          workbenchID: workbenchID,
+          title: title,
+          in: db,
+          now: now
+        )
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
   func addCandidatesButtonTapped(recipeIDs: Set<Recipe.ID>) -> Bool {
     do {
       try database.write { db in
