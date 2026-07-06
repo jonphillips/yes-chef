@@ -87,6 +87,7 @@ struct AppMainLayout: View {
         case .workbenches:
           WorkbenchDetailColumn(
             model: workbenchModel,
+            onRecipeSelected: onRecipeSelected,
             isFocusActive: columnVisibility == .detailOnly,
             focusButtonTapped: {
               columnVisibility = columnVisibility == .detailOnly ? .doubleColumn : .detailOnly
@@ -192,11 +193,12 @@ private struct AppCompactTabView: View {
       RecipesStack(
         model: recipeModel,
         mealCalendarModel: mealCalendarModel,
-        groceryModel: groceryModel
+        groceryModel: groceryModel,
+        onRecipeSelected: onRecipeSelected
       )
         .tabItem { AppSection.recipes.label }
         .tag(AppSection.recipes as AppSection?)
-      WorkbenchesStack(model: workbenchModel)
+      WorkbenchesStack(model: workbenchModel, onRecipeSelected: onRecipeSelected)
         .tabItem { AppSection.workbenches.label }
         .tag(AppSection.workbenches as AppSection?)
       BrowserStack(
@@ -250,6 +252,7 @@ private struct RecipesStack: View {
   let model: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
+  let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   var body: some View {
     NavigationStack {
@@ -259,7 +262,8 @@ private struct RecipesStack: View {
             recipeID: recipeID,
             libraryModel: model,
             mealCalendarModel: mealCalendarModel,
-            groceryModel: groceryModel
+            groceryModel: groceryModel,
+            onRecipeSelected: onRecipeSelected
           )
             .id(recipeID)
         }
@@ -281,7 +285,10 @@ private struct RecipeDetailColumn: View {
         mealCalendarModel: mealCalendarModel,
         groceryModel: groceryModel,
         isFocusActive: columnVisibility == .detailOnly,
-        focusButtonTapped: focusButtonTapped
+        focusButtonTapped: focusButtonTapped,
+        onRecipeSelected: { presentation in
+          model.selectedRecipeID = presentation.recipeID
+        }
       )
         .id(recipe.id)
     } else {

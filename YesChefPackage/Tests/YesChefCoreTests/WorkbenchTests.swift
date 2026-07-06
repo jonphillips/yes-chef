@@ -163,6 +163,140 @@ extension RecipeCoreTests {
     }
 
     @Test @MainActor
+    func workbenchPromptUsesTaskFraming() {
+      let model = RecipeChatModel(
+        context: .workbench(
+          WorkbenchChatContext(
+            title: "Cookies",
+            candidates: [
+              WorkbenchCandidateChatContext(
+                id: SampleUUIDSequence.uuid(24_001),
+                title: "Chewy Cookie",
+                sortOrder: 0
+              )
+            ]
+          )
+        )
+      )
+
+      let prompt = model.systemPrompt()
+
+      #expect(prompt.contains(RecipeChatContext.workbenchTaskFraming))
+      #expect(prompt.contains("don't blend everything into a bland average"))
+    }
+
+    @Test
+    func parsesWorkbenchDraftRecipeJSON() {
+      let proposal = WorkbenchDraftRecipeClient.parse(
+        """
+        Here is the draft:
+        {"title":"Weeknight Birria","summary":"Chile-forward and practical.","servingsText":"6 servings","prepTimeMinutes":30,"cookTimeMinutes":180,"ingredientSectionName":"Birria","ingredientLines":["3 lb chuck roast","4 guajillo chiles"],"instructionLines":["Toast and soak chiles.","Braise beef until tender."],"notes":["Variation: keep a hotter salsa on the side."],"rationale":"Borrows Candidate A's chile paste and Candidate B's oven braise; rejects Candidate C's watery blend."}
+        """
+      )
+
+      expectNoDifference(proposal.title, "Weeknight Birria")
+      expectNoDifference(proposal.prepTimeMinutes, 30)
+      expectNoDifference(proposal.ingredientLines, ["3 lb chuck roast", "4 guajillo chiles"])
+      expectNoDifference(proposal.instructionLines, ["Toast and soak chiles.", "Braise beef until tender."])
+      #expect(proposal.rationale.contains("Candidate A"))
+    }
+
+    @Test
+    func createsReferenceDraftRecipeLinksWorkbenchAndCapturesSnapshot() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 806_500_000)
+      var uuids = SampleUUIDSequence(start: 25_000)
+
+      let draft = WorkbenchDraftRecipe(
+        title: "Weeknight Birria",
+        summary: "Chile-forward and practical.",
+        servingsText: "6 servings",
+        prepTimeMinutes: 30,
+        cookTimeMinutes: 180,
+        ingredientSectionName: "Birria",
+        ingredientLines: ["3 lb chuck roast", "4 guajillo chiles"],
+        instructionLines: ["Toast and soak chiles.", "Braise beef until tender."],
+        notes: ["Variation: keep a hotter salsa on the side."],
+        rationale: "Borrows Candidate A's chile paste and Candidate B's oven braise."
+      )
+
+      try database.write { db in
+        let workbenchID = try WorkbenchRepository.addWorkbench(
+          title: "Birria",
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        let recipeID = try WorkbenchRepository.createDraftRecipe(
+          draft,
+          for: workbenchID,
+          in: db,
+          now: now.addingTimeInterval(10),
+          uuid: { uuids.next() }
+        )
+        let detail = try #require(try WorkbenchDetailRequest(workbenchID: workbenchID).fetch(db))
+        let recipe = try #require(detail.draftRecipeDetail?.recipe)
+
+        expectNoDifference(detail.workbench.draftRecipeID, recipeID)
+        expectNoDifference(recipe.title, "Weeknight Birria")
+        expectNoDifference(recipe.libraryPlacement, .reference)
+        #expect(recipe.originalSnapshot != nil)
+        expectNoDifference(
+          detail.draftRecipeDetail?.ingredientLines.map(\.originalText),
+          ["3 lb chuck roast", "4 guajillo chiles"]
+        )
+        expectNoDifference(
+          detail.draftRecipeDetail?.instructionSteps.map(\.text),
+          ["Toast and soak chiles.", "Braise beef until tender."]
+        )
+
+        let snapshotData = try #require(recipe.originalSnapshot)
+        let snapshot = try RecipeBundleCoding.decodeSnapshot(snapshotData)
+        expectNoDifference(snapshot.recipe.libraryPlacement, .reference)
+        #expect(snapshot.notes.contains { $0.contains("Borrows Candidate A") })
+      }
+    }
+
+    @Test
+    func promotesWorkbenchDraftRecipeToMainLibrary() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 806_600_000)
+      var uuids = SampleUUIDSequence(start: 26_000)
+
+      try database.write { db in
+        let workbenchID = try WorkbenchRepository.addWorkbench(
+          title: "Cookies",
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let recipeID = try WorkbenchRepository.createDraftRecipe(
+          WorkbenchDraftRecipe(
+            title: "Brown Butter Cookies",
+            ingredientLines: ["1 cup brown butter"],
+            instructionLines: ["Bake until set."],
+            rationale: "Uses Candidate A's brown butter."
+          ),
+          for: workbenchID,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        try WorkbenchRepository.promoteDraftRecipe(
+          workbenchID: workbenchID,
+          in: db,
+          now: now.addingTimeInterval(60)
+        )
+
+        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+        expectNoDifference(recipe.libraryPlacement, .main)
+        expectNoDifference(recipe.dateModified, now.addingTimeInterval(60))
+      }
+    }
+
+    @Test @MainActor
     func recipeChatModelRefreshesWorkbenchContextWithoutReplacingThread() {
       let workbenchID = SampleUUIDSequence.uuid(23_001)
       let firstCandidateID = SampleUUIDSequence.uuid(23_101)

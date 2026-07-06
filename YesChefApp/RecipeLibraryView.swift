@@ -120,7 +120,12 @@ struct AppContainer: View {
     }
     .sheet(item: $recipeModel.destination.workbench) { presentation in
       NavigationStack {
-        WorkbenchDetailView(workbenchID: presentation.workbenchID)
+        WorkbenchDetailView(
+          workbenchID: presentation.workbenchID,
+          onRecipeSelected: { recipePresentation in
+            presentedRecipe = recipePresentation
+          }
+        )
       }
     }
     .sheet(isPresented: $workbenchModel.destination.addWorkbench) {

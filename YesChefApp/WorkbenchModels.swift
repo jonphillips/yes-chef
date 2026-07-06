@@ -1,5 +1,6 @@
 import CasePaths
 import Dependencies
+import Foundation
 import Observation
 import SQLiteData
 import YesChefCore
@@ -99,6 +100,7 @@ final class WorkbenchDetailModel {
   }
 
   let workbenchID: Workbench.ID
+  @ObservationIgnored private let openRecipe: (Recipe.ID) -> Void
 
   @ObservationIgnored
   @Dependency(\.date.now) private var now
@@ -115,8 +117,9 @@ final class WorkbenchDetailModel {
   var errorMessage: String?
   var isShowingError = false
 
-  init(workbenchID: Workbench.ID) {
+  init(workbenchID: Workbench.ID, openRecipe: @escaping (Recipe.ID) -> Void = { _ in }) {
     self.workbenchID = workbenchID
+    self.openRecipe = openRecipe
     _detail = Fetch(wrappedValue: nil, WorkbenchDetailRequest(workbenchID: workbenchID), animation: .default)
   }
 
@@ -139,6 +142,59 @@ final class WorkbenchDetailModel {
   func chatButtonTapped() {
     guard let detail else { return }
     destination = .chat(RecipeChatModel(context: .workbench(WorkbenchChatContext(detail: detail))))
+  }
+
+  func openWorkingRecipeButtonTapped() {
+    guard let recipeID = detail?.workbench.draftRecipeID else { return }
+    openRecipe(recipeID)
+  }
+
+  func promoteWorkingRecipeButtonTapped() {
+    do {
+      let recipeID = try database.write { db in
+        try WorkbenchRepository.promoteDraftRecipe(
+          workbenchID: workbenchID,
+          in: db,
+          now: now
+        )
+      }
+      openRecipe(recipeID)
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func applyActionCatalog(for chatModel: RecipeChatModel) -> [AnyChatApplyAction] {
+    guard detail?.workbench.draftRecipeID == nil else { return [] }
+    @Dependency(\.workbenchDraftRecipeClient) var workbenchDraftRecipeClient
+
+    let context = chatModel.context.serialized(for: chatModel.activeTier)
+    let draftAction = ChatApplyAction<WorkbenchDraftRecipe>(
+      title: "Draft working recipe -> Working recipe",
+      extractingTitle: "Drafting working recipe...",
+      reviewTitle: "Review working recipe",
+      commitTitle: "Create Working Recipe",
+      committingTitle: "Creating working recipe...",
+      committedTitle: "Created Working Recipe",
+      extract: { selection, messages in
+        try await workbenchDraftRecipeClient(
+          selection: selection,
+          messages: messages,
+          context: context,
+          tier: chatModel.activeTier
+        )
+      },
+      commit: { [weak self] draftRecipe in
+        try self?.commitDraftRecipe(draftRecipe)
+      }
+    )
+
+    return [
+      AnyChatApplyAction(draftAction) { draftRecipe in
+        draftRecipe.isEmpty ? nil : draftRecipe.renderedReview()
+      }
+    ]
   }
 
   func saveNotesButtonTapped(_ notes: String) {
@@ -219,6 +275,35 @@ final class WorkbenchDetailModel {
       isShowingError = true
     }
   }
+
+  private func commitDraftRecipe(_ draftRecipe: WorkbenchDraftRecipe) throws {
+    guard !draftRecipe.isEmpty else {
+      throw WorkbenchDetailError.emptyDraftRecipe
+    }
+    let recipeID = try database.write { db in
+      try WorkbenchRepository.createDraftRecipe(
+        draftRecipe,
+        for: workbenchID,
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
+    }
+    openRecipe(recipeID)
+  }
+}
+
+private enum WorkbenchDetailError: Error, CustomStringConvertible, LocalizedError {
+  case emptyDraftRecipe
+
+  var description: String {
+    switch self {
+    case .emptyDraftRecipe:
+      "The assistant did not find a working recipe to save."
+    }
+  }
+
+  var errorDescription: String? { description }
 }
 
 struct WorkbenchDeletionContext: Identifiable, Hashable, Sendable {

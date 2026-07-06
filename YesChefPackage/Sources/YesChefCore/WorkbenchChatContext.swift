@@ -10,17 +10,20 @@ public struct WorkbenchChatContext: Equatable, Sendable {
   public var workbenchID: Workbench.ID?
   public var title: String
   public var notes: String?
+  public var draftRecipe: RecipeChatRecipeContext?
   public var candidates: [WorkbenchCandidateChatContext]
 
   public init(
     workbenchID: Workbench.ID? = nil,
     title: String,
     notes: String? = nil,
+    draftRecipe: RecipeChatRecipeContext? = nil,
     candidates: [WorkbenchCandidateChatContext] = []
   ) {
     self.workbenchID = workbenchID
     self.title = title
     self.notes = notes
+    self.draftRecipe = draftRecipe
     self.candidates = candidates
   }
 
@@ -29,6 +32,7 @@ public struct WorkbenchChatContext: Equatable, Sendable {
       workbenchID: detail.workbench.id,
       title: detail.workbench.title,
       notes: detail.workbench.notes,
+      draftRecipe: detail.draftRecipeDetail.map(RecipeChatRecipeContext.init(detail:)),
       candidates: detail.candidateRows.map(WorkbenchCandidateChatContext.init(row:))
     )
   }
@@ -88,6 +92,10 @@ public struct WorkbenchChatContext: Equatable, Sendable {
     lines.append("- Title: \(title.isEmpty ? "(untitled)" : title)")
     if let notes {
       lines.append("- Workbench notes: \(notes.replacingOccurrences(of: "\n", with: " "))")
+    }
+    if let draftRecipe {
+      lines.append("Current working recipe:")
+      lines.append(draftRecipe.serialized())
     }
     if !budgetNotes.isEmpty {
       lines.append("Context budget notes:")

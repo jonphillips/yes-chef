@@ -73,6 +73,10 @@ extension DependencyValues {
 }
 
 public enum RecipeChatContext: Equatable, Sendable {
+  public static let workbenchTaskFraming = """
+    The user is assembling candidate versions of a dish to compare them, reconcile their differences, and reason toward one working recipe. Help them see how the candidates differ and what's worth borrowing from each - don't blend everything into a bland average. The working recipe needn't be a single monolithic version: the user may want a base recipe plus a few deliberate variations, and those variations can live inside the one working recipe.
+    """
+
   case mealPlan(MealPlanChatContext)
   case menu(MenuChatContext)
   case recipe(RecipeChatRecipeContext)
@@ -111,6 +115,15 @@ public enum RecipeChatContext: Equatable, Sendable {
     case let .menu(context): context.seededContextDescription
     case .recipe: "Seeded with the recipe on screen."
     case let .workbench(context): context.seededContextDescription
+    }
+  }
+
+  public var taskFraming: String {
+    switch self {
+    case .workbench:
+      Self.workbenchTaskFraming
+    case .mealPlan, .menu, .recipe:
+      ""
     }
   }
 
@@ -808,11 +821,15 @@ public final class RecipeChatModel: Identifiable {
   }
 
   public func systemPrompt() -> String {
+    let taskFraming = context.taskFraming.isEmpty
+      ? """
+        Help with timing, prep, troubleshooting, and planning.
+        """
+      : context.taskFraming
     let base = """
       You are a concise, practical cooking assistant inside a private recipe app.
-      Discuss \(context.promptSubjectDescription), described below. Help with timing,
-      prep, troubleshooting, and planning. You propose and explain;
-      you never claim to have edited or saved anything yourself.
+      Discuss \(context.promptSubjectDescription), described below. \(taskFraming)
+      You propose and explain; you never claim to have edited or saved anything yourself.
 
       Answer in short plain-prose paragraphs. Use inline Markdown links when useful.
       Do not use headings, tables, horizontal rules, or bold section labels; the panel is narrow.

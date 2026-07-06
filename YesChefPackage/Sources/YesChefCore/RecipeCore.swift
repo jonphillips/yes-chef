@@ -295,6 +295,19 @@ public enum RecipeRepository {
     .execute(db)
   }
 
+  public static func setLibraryPlacement(
+    _ libraryPlacement: RecipeLibraryPlacement,
+    recipeID: Recipe.ID,
+    in db: Database,
+    now: Date
+  ) throws {
+    try Recipe.find(recipeID).update {
+      $0.libraryPlacement = libraryPlacement
+      $0.dateModified = now
+    }
+    .execute(db)
+  }
+
   public static func setCoverPhotoID(
     _ coverPhotoID: RecipePhoto.ID?,
     recipeID: Recipe.ID,
