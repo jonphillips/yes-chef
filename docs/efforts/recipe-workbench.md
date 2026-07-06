@@ -38,8 +38,8 @@ a log entry on its own — every write routes through the staging card.
 Every new table: UUID PK, **no unique index** beyond PK, all cross-record refs **soft** (`ON DELETE SET
 NULL`) and backed by a **denormalized title snapshot**, duplicate-ref resolution at **read time**. This is
 a **post-sync** feature — the tolerance is exercised, not merely reserved. Additive migrations only;
-nothing mutates existing tables (the optional `libraryPlacement` for hiding an in-progress working recipe
-is the one already-planned exception, and only if S2 needs it).
+the one existing-table touch is the **`libraryPlacement` column on `recipes`** in S2 (decided 2026-07-06,
+additive-nullable, defaults `main`) to hide in-progress working recipes from browse.
 
 ## Slice plan
 
@@ -69,8 +69,11 @@ is the one already-planned exception, and only if S2 needs it).
   - **Synthesis guardrail (ADR-0019):** the draft must be a coherent editorial *choice* with a stated
     rationale referencing candidates — **not** a blended average of all candidates. Honors
     [[llm-curation-not-synthesis]] by emitting a structured Recipe, distinct choices preserved.
-  - If in-progress working recipes should stay out of default browse, use `libraryPlacement`
-    (promotes it "future → now"); confirm with Jon before adding the column.
+  - **Decided (Jon, 2026-07-06): promote `libraryPlacement` "future → now"** (DATA_MODEL §2.4,
+    `main | reference`) and set the new working recipe to a non-`main` placement so **in-progress working
+    recipes stay out of the default browse list** until the cook promotes one. This is the effort's second
+    schema touch (additive column on `recipes`); sync-safe (additive-nullable, defaults `main`). "Promote to
+    library" is a one-tap flip to `main`.
 
 - **S3 — the workbench log (the durable-history primitive; ADR-0019 Amdt 1).** *Ship the store + curate
   path before the generated verbs.*
@@ -97,9 +100,10 @@ is the one already-planned exception, and only if S2 needs it).
 - **AI-generated log entries** as a first-class verb family — reserved by the `kind` enum, layered post-S3
   from dogfooding, not built up front.
 
-## Open items for Jon at review
+## Resolved at review (Jon, 2026-07-06)
 
-- **S3 ordering call:** store + curate path first (recommended) vs. prove the log with a generated verb
-  first (ADR-0019 Amdt 1 slice-delta).
-- **`libraryPlacement` in S2:** OK to promote it "future → now" to hide in-progress working recipes, or
-  keep working recipes visible in browse for v1?
+- **S3 ordering** → **store + curate path first** (the recommendation): S3 ships the `WorkbenchLogEntry`
+  table + log surface + the *save-to-workbench-log* tap; AI-*generated* experiment/fork entries layer on
+  from dogfooding (new `kind` / compose path = no migration).
+- **`libraryPlacement` in S2** → **promote "future → now"** and hide in-progress working recipes from
+  default browse until promoted (see the S2 "Decided" bullet). Additive column on `recipes`, sync-safe.
