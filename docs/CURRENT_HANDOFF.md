@@ -1,22 +1,12 @@
 # Current Handoff
 
 Last updated: July 6, 2026 (**Next Up = Recipe Workbench S3** — durable `WorkbenchLogEntry` log +
-save-to-log tap. **Workbench S2 is done** — [yes-chef #107](https://github.com/jonphillips/yes-chef/pull/107),
-architect-approved + build-green, pending Jon's device pass → DONE-LOG: the draft verb (working recipe as a
-`.reference` recipe + promote-to-`main` + reused task framing), **plus a post-review dogfood-hardening batch
-on the same branch** (below; includes a cross-repo LLMClientKit timeout bump). **Chat controls is done** —
-[yes-chef #105](https://github.com/jonphillips/yes-chef/pull/105), architect-approved + Jon device-passed
-2026-07-06 → DONE-LOG: persisted frontier/on-device tier, clear, and stop/interrupt in the shared panel.
-**Workbench S1 polish + grounding fix is done** —
-[yes-chef #103](https://github.com/jonphillips/yes-chef/pull/103), architect-approved, build-green,
-pending Jon's device pass → DONE-LOG. `efforts/recipe-workbench.md`, ADR-0019, ADR-0020 (chat UI harvest).
-**Meal-Planner chat
-verbs** demoted back to the Ready Efforts queue — still pending, just not the immediate target. **Menu planning
-overhaul (ADR-0012 Amdt 1) is done** — [yes-chef #98](https://github.com/jonphillips/yes-chef/pull/98),
-build-green, pending Jon's device pass → DONE-LOG. **AI config (ADR-0017/0018) is done** — cross-repo PRs
-[yes-chef #96](https://github.com/jonphillips/yes-chef/pull/96) +
-[jon-platform #23](https://github.com/jonphillips/jon-platform/pull/23), pending Jon's device pass →
-DONE-LOG. Details below.)
+save-to-log tap.) Recently completed and moved to [`docs/DONE-LOG.md`](DONE-LOG.md): Workbench S2 +
+dogfood-hardening ([#107](https://github.com/jonphillips/yes-chef/pull/107)), chat controls
+([#105](https://github.com/jonphillips/yes-chef/pull/105), Jon device-passed), Workbench S1 + grounding
+fix/polish ([#101](https://github.com/jonphillips/yes-chef/pull/101) /
+[#103](https://github.com/jonphillips/yes-chef/pull/103)), and the menu-planning overhaul
+([#98](https://github.com/jonphillips/yes-chef/pull/98)).
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -32,22 +22,8 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Recipe Workbench — S1 done.** Slice 1 landed
-([yes-chef #101](https://github.com/jonphillips/yes-chef/pull/101)); grounding fix + S1 polish landed
-([yes-chef #103](https://github.com/jonphillips/yes-chef/pull/103), architect-approved): shared
-`ChatWorkspaceSplit` now refreshes the chat model's context `onChange` (recipe/menu benefit too), editable
-title, candidate-picker search, full-screen focus. Build-green; pending Jon's device pass → DONE-LOG.
-
-**Chat controls — done** ([yes-chef #105](https://github.com/jonphillips/yes-chef/pull/105),
-architect-approved + Jon device-passed 2026-07-06 → DONE-LOG). All three affordances landed in the **shared
-panel** (`RecipeChatPanel`), so every chat surface inherited them at once: persisted `useFrontier` tier (new
-`RecipeChatTierPreference`, mirrors `RecipeChatProviderPreference`; one global key ⇒ "remember the last model
-I used anywhere"), `clear()` + confirm button (disposable scratch, no undo), and `stop()`/interrupt
-(send↔stop off `isResponding`, cancellation checked on both tiers). Seam discipline held (ADR-0020) — generic
-model methods + shared-panel controls, no domain pattern-match, no lift yet.
-
-**Recipe Workbench — S3 (the dispatch target).** The durable workbench log — ship the store +
-manual/curate path **before** the AI-generated verbs (ADR-0019 Amdt 1):
+**Recipe Workbench — S3.** The durable workbench log — ship the store + manual/curate path **before**
+the AI-generated verbs (ADR-0019 Amdt 1):
 
 - Migration + model **`WorkbenchLogEntry`** (`id`, `workbenchID` FK cascade, extensible
   `kind: rationale | experiment | fork | observation | note`, `body: String`, `outcome: String?` for tried
@@ -59,91 +35,27 @@ manual/curate path **before** the AI-generated verbs (ADR-0019 Amdt 1):
 - Ship the store + manual/curate path first; AI-*generated* experiment/fork entries layer on later as
   dogfooding shapes them (new `kind` or new compose path = no migration).
 
-**Recipe Workbench — S2 is done** — [yes-chef #107](https://github.com/jonphillips/yes-chef/pull/107),
-architect-approved + build-green, pending Jon's device pass → DONE-LOG. The
-draft verb turns a workbench into a real working recipe (the first commit surface): a synthesis apply-action
-+ review card writes a **new `Recipe`**, links it via `Workbench.draftRecipeID`, captures the pristine
-`originalSnapshot`, and opens it in `RecipeDetailView`. New working recipes land at
-`libraryPlacement: .reference` (out of default browse) with a one-tap **"Promote to library"** flip to
-`.main`. The workbench task-framing string is defined **once** on `RecipeChatContext` and reused as the
-spine of the draft-verb prompt, so free chat and the commit path can't drift; `high` effort (ADR-0017), with
-the curation-not-average guardrail ([[llm-curation-not-synthesis]]) enforced in the prompt.
+Sync-safe, post-sync (UUID PKs, soft FKs + denormalized snapshots, additive migrations). Full slice detail
++ resolved review calls in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md); design in
+[ADR-0019](decisions/ADR-0019-recipe-design-studies.md) (whole, incl. both amendments).
 
-**Dogfood-hardening rode the same branch** (2026-07-06, architect-built, pending Jon's device pass; 206
-package tests + drift green, app-target build green). Two repos: **jon-platform** — LLMClientKit frontier
-`URLSession` request/resource timeout raised (300s/600s) so a `high`-effort synthesis isn't clipped mid-reason
-(needs its own commit there). **yes-chef** — draft-verb budget raised to 16k with truncation surfaced as a
-real retryable error (not a silent empty draft); a persistent chat **error banner** + explicit timeout/offline
-messages; and a **remove / re-draft** affordance on the working recipe (deletes an unpromoted `.reference`
-scratch draft, only unlinks a promoted `.main` recipe, always clears the soft-FK link so drafting re-enables).
-Effort locked at **`high`** — dogfood-validated as a clear quality step over `medium`. Dogfood-surfaced
-follow-ons parked in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md): synthesis-shaped draft
-action (not gated on the last reply), **AI effort/tier as a user-facing setting** (ADR-0017/0018 territory),
-and a tabbed candidate/working-recipe quick-view.
-
-**Sync-safe, post-sync** (UUID PKs, soft FKs + denormalized snapshots, read-time dedup, additive
-migrations). Full slice detail + resolved review calls in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md);
-design in [ADR-0019](decisions/ADR-0019-recipe-design-studies.md) (whole, incl. both amendments).
-
-**Menu planning overhaul (ADR-0012 Amendment 1 + `efforts/menu-planning-ux.md`) is done** —
-[yes-chef #98](https://github.com/jonphillips/yes-chef/pull/98) (build-green), all five slices shipped
-(tier-aware AI context + prep-plan-in-context + living-artifact refinement · swipe-delete/move · inline
-meal-slot pill · full-screen focus · toolbar reorg). Pending Jon's device pass → DONE-LOG. Drag-drop
-reorder of dishes stays parked as the named follow-on (swipe-move is the interim).
-
-**AI configuration & transparency — ADR-0017 + ADR-0018 — is done** (architect-approved 2026-07-05,
-cross-repo [yes-chef #96](https://github.com/jonphillips/yes-chef/pull/96) +
-[jon-platform #23](https://github.com/jonphillips/jon-platform/pull/23); pending Jon's device pass → then
-DONE-LOG). Shipped: `gpt-5.5` default + retired `gpt-5.2-chat-latest`; provider-agnostic `ReasoningEffort`
-on `ModelRequest` (OpenAI wire emits top-level `reasoning_effort`, omits when `nil`); per-feature effort on
-all 9 frontier call sites (chat `medium`, judgment `high`, complements `medium`); taste profile + ~4
-per-task preferences injected at the `TieredModelClient` boundary so they reach **every** generative call
-(closes the recipe-chat-only gap); synced `aiSettings` table that clears the live-schema audit
-([[extension-sync-construct-not-run]]); read-only active-model rows in `AISettingsView`. **Standing
-release follow-up: the synced AI-preferences column ships to the prod schema at the next cut (noted
-below).**
-
-ADR-0016 multi-recipe cook session is **done** (PR #93 merged 2026-07-05 → DONE-LOG; Codex's follow-up
-PR #94 was a wasted effort, rejected). The Meal-Planner chat-verbs follow-on stays parked in the Ready
-Efforts queue below, not a dispatch target.
-
-**Standing release follow-up carried from Phase E (not a dispatch — a pre-cut ops step Jon runs).** We stay
-in the CloudKit **Development** environment (dev stance) so the schema keeps evolving freely; promoting to
-**Production** is additive-only and permanently locks those record types, so it is deliberately **held**
-until an actual prod/TestFlight cut — not something to dispatch now. At that cut, deploy to the production
-schema the Phase E Slice 3 pantry-policy + `canonicalName` fields, the ADR-0012 S2 `Menu.prepPlan` BLOB
-(PR #82), the reader-photo-affordances `Recipe.coverPhotoID` column (PR #87), **and** the ADR-0018 synced
-`aiSettings` table (PR #96); and note the app target (`PantryViews.swift` /
-`GroceryViews.swift`) compiles only in Jon's device pass, not CI.
-
-Phase E is **fully complete** — Slice 4 (`PantrySuppression` + review UI, PR #80 → DONE-LOG), Slice 3
-(pantry policy + `canonicalName` migration, PR #79 → DONE-LOG), Slices 1 + 2 (canonical key + `Measure`,
-PR #77 → DONE-LOG). Dogfood batch 3 is
-**complete** (ingredient structure · Chef It Up + Serve With · substitution ·
-keep-awake; PR #75 → DONE-LOG), and **batch 4** is complete (shared-chat truncation fix · planner layout
-nits · full ingredient-substitution removal incl. the synced column; PR #88 → DONE-LOG). The
-cooking-workspace effort is **complete** (Slices A + B shipped,
-PRs #73 / #74 → DONE-LOG). Its **Menu chat-verbs** follow-on shipped as ADR-0012 (complete), its
-**reader photo affordances** shipped (PR #87 → DONE-LOG), and its **independently-scrollable dense-reader
-columns + day-scoped make-ahead verb** shipped (PR #91 → DONE-LOG). Its one remaining named follow-on —
-the broader **Meal-Planner chat verbs** effort — lives in
-[`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) as a separate later effort.
+**Standing release follow-up (not a dispatch — a pre-cut ops step Jon runs).** We stay in the CloudKit
+**Development** environment (dev stance) so the schema keeps evolving freely; promoting to **Production** is
+additive-only and permanently locks those record types, so it is deliberately **held** until an actual
+prod/TestFlight cut. At that cut, deploy to the production schema the Phase E Slice 3 pantry-policy +
+`canonicalName` fields, the ADR-0012 S2 `Menu.prepPlan` BLOB (PR #82), the reader-photo-affordances
+`Recipe.coverPhotoID` column (PR #87), **and** the ADR-0018 synced `aiSettings` table (PR #96); and note the
+app target (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 
 ## Ready Efforts (queue)
 
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
-target.
+target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
-**Menu planning overhaul** (ADR-0012 Amendment 1 + `efforts/menu-planning-ux.md`) — **complete**
-([yes-chef #98](https://github.com/jonphillips/yes-chef/pull/98), build-green; pending Jon's device pass →
-DONE-LOG). All five slices shipped; drag-drop dish reorder stays parked as the named follow-on.
-
-**Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — **Slice 1 landed (PR #101, approved);
-grounding fix + S1 polish landed (PR #103, approved, 2026-07-06)** — chat-grounding fix + editable title +
-picker search + full-screen focus, now dogfoodable. **S2** (draft verb + `libraryPlacement` + workbench
-task framing) is the current dispatch target (Chat controls shipped, PR #105); **S3** (`WorkbenchLogEntry`
-durable log + save-to-log tap) queued after. Milestone-sized — one slice at a time. Design in
-[ADR-0019](decisions/ADR-0019-recipe-design-studies.md).
+**Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — S1, chat controls, and S2 shipped
+(→ DONE-LOG); **S3** (`WorkbenchLogEntry` durable log + save-to-log tap) is the current **Next Up**.
+Milestone-sized — one slice at a time. Dogfood-surfaced follow-ons (synthesis-shaped draft action, AI
+effort/tier as a user-facing setting, tabbed candidate/working-recipe quick-view) parked in the effort doc.
 
 **On-device chat context overflow — robustness** (surfaced 2026-07-06 dogfooding a large taste profile in
 workbench chat; Apple `FoundationModels` threw `exceededContextWindowSize` after one turn). Two real bugs,
@@ -157,81 +69,25 @@ the prompt tail), lower the 24k on-device candidate budget to something realisti
 `exceededContextWindowSize` to surface "too big for on-device — switch to a frontier model" instead of a raw
 error. Cross-repo (jon-platform LLMClientKit + Yes Chef budgets).
 
-**Meal-Planner chat verbs** (ADR-0013 follow-on + `efforts/cooking-workspace.md`) — **demoted back to the
-queue** (2026-07-06; Recipe Workbench S1 took the target). Still the one remaining named actionable-chat
-verb instance: a day-scoped **"make-ahead strategy"** across all of a planner day's recipes (dogfood
-2026-07-04). Classify the commit shape first ([[chat-verb-commit-shapes]]) — likely no-commit advisory or
-a per-day note, not a per-recipe write; respect [[llm-curation-not-synthesis]]. Design in
-[ADR-0013](decisions/ADR-0013-meal-planner-actionable-chat.md) +
-[`efforts/cooking-workspace.md`](efforts/cooking-workspace.md).
+**Meal-Planner chat verbs** (ADR-0013 follow-on + `efforts/cooking-workspace.md`) — the one remaining named
+actionable-chat verb instance. Classify each new verb's commit shape first ([[chat-verb-commit-shapes]]) —
+likely no-commit advisory or a per-day note, not a per-recipe write; respect [[llm-curation-not-synthesis]].
+Design in [ADR-0013](decisions/ADR-0013-meal-planner-actionable-chat.md) +
+[`efforts/cooking-workspace.md`](efforts/cooking-workspace.md). (Note: the day-scoped make-ahead-strategy
+verb this entry used to name already shipped in PR #91 → DONE-LOG; confirm with Jon what verb scope remains.)
 
-- **AI configuration & transparency** (ADR-0017 + ADR-0018) — **complete** (architect-approved 2026-07-05;
-  cross-repo PRs [yes-chef #96](https://github.com/jonphillips/yes-chef/pull/96) +
-  [jon-platform #23](https://github.com/jonphillips/jon-platform/pull/23); pending Jon's device pass →
-  DONE-LOG). `gpt-5.5` default + `ReasoningEffort` knob + per-feature effort + boundary-injected taste
-  profile / per-task preferences (synced `aiSettings` table). Design in
-  [ADR-0017](decisions/ADR-0017-llm-model-and-reasoning-effort.md) +
-  [ADR-0018](decisions/ADR-0018-prompt-customization-taste-profile.md).
+**Recipe text normalization** — a "normalize recipe" function (de-cap old all-caps Milk Street imports,
+strip manual instruction numbers now that we auto-number). **Unscoped** — no natural existing effort home;
+parked in [`docs/open-questions.md`](open-questions.md) until scoped. Interacts with ADR-0014 (text-editing
+model), so sequence them.
 
-- **Recipe → grocery list w/ pantry checking** (Phase E) — **complete.** All four slices shipped: canonical
-  key + `Measure` (PR #77), pantry policy + `canonicalName` migration (PR #79), `PantrySuppression` + review
-  UI (PR #80) — all → DONE-LOG. Design rationale = [[grocery-pantry-threshold-design]]. Standing release
-  follow-up (promote CloudKit fields to prod schema) noted under Next Up.
-
-- **Actionable chat / LLMClientKit** (ADR-0011) — **complete.** The lift (Slice 1, 3 repos) + make-ahead
-  (Slice 2) + Chef It Up / Serve With / per-line substitution shipped 2026-07-02/03 (PRs #73–#75 →
-  DONE-LOG); `LLMClientKit` is a live path-dep. The **Menu** verb instance shipped as ADR-0012 (complete,
-  above). The one remaining named-later verb — **Meal-Planner chat verbs** (`MealPlanItem`, absolute-date) —
-  lives in [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md); classify each new verb's
-  commit shape first ([[chat-verb-commit-shapes]]).
-
-- **Dogfood fixes — batch 3** — complete (PR #75 → DONE-LOG; ingredient structure · Chef It Up +
-  Serve With · substitution · keep-awake). Non-blocking device-pass notes recorded in the DONE-LOG entry.
-
-- **Dogfood fixes — batches 1 & 2** — complete (PR #66, PR #71 → DONE-LOG). The batch-1 Slice 7
-  delete-source-clobbers-amount-edit follow-up remains parked in
-  [`docs/efforts/dogfood-fixes-batch-1.md`](efforts/dogfood-fixes-batch-1.md) for a later grocery slice.
-
-- **Menu actionable chat** (ADR-0012, **Accepted** 2026-07-03) — **complete.** All three slices shipped:
-  S1 (`.menu` context + composite grounding + grounded chat, PR #81 → DONE-LOG, no schema), S2 (prep-plan verb
-  → `Menu.prepPlan`, PR #82 → DONE-LOG; the effort's first schema touch), S3 (complement verb → inserts a
-  `MenuItem`, PR #83 → DONE-LOG, no schema). The Planner-day (`MealPlanItem`, absolute-date) version is a
-  **separate follow-on ADR** (now ADR-0013, Accepted — in Next Up). Design + all five resolved decisions in
-  [`docs/decisions/ADR-0012-menu-actionable-chat.md`](decisions/ADR-0012-menu-actionable-chat.md).
-
-- **Meal-Planner actionable chat** (ADR-0013, **Accepted** 2026-07-04) — **complete.** Both slices shipped,
-  zero schema: S1 (`.mealPlan` context + selected-day grounded chat, PR #85 → DONE-LOG) and S2 (complement
-  verb → inserts a `.note` `MealPlanItem` on the selected day, PR #86 → DONE-LOG). Day-scoped (D1), inserts
-  land on the subject day with model-picked slot (D2), no planner prep-plan verb (D3, no container table).
-  Design in
-  [`docs/decisions/ADR-0013-meal-planner-actionable-chat.md`](decisions/ADR-0013-meal-planner-actionable-chat.md).
-
-- **Cooking workspace** — **complete** (Slices A + B, PRs #73 / #74 → DONE-LOG). Its Menu chat-verbs
-  follow-on is now its own effort above (ADR-0012); its reader **photo affordances** shipped (PR #87 →
-  DONE-LOG). Two dogfood follow-ons folded into
-  [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md): a **day-scoped make-ahead verb** for
-  the meal planner (§ "Out of scope → Meal Planner") and **separately-scrollable ingredients/directions** in
-  the dense reader (§ Slice A). Both **promoted to Next Up** (combined, one PR, zero schema).
-
-- **Recipe text normalization** — a "normalize recipe" function (de-cap old all-caps Milk Street imports,
-  strip manual instruction numbers now that we auto-number). **Unscoped** — no natural existing effort home;
-  parked in [`docs/open-questions.md`](open-questions.md) until scoped. Interacts with ADR-0014 (text-editing
-  model), so sequence them.
-
-- **Chat persistence** (ADR-0015, **Accepted** 2026-07-04) — **complete** (PR #89 → DONE-LOG): local-only
-  per-subject `chatMessages` store, 1-month prune, excluded from the SyncEngine (guarded by the live-schema
-  audit test). Design in [`docs/decisions/ADR-0015-chat-persistence.md`](decisions/ADR-0015-chat-persistence.md).
-
-- **Dogfood fixes — batch 4** — complete (PR #88 → DONE-LOG; shared-chat truncation fix · planner layout
-  nits · full ingredient-substitution removal incl. the synced column).
-
-- **Open design ADRs (discussion, not yet Accepted)** — [ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md)
-  recipe text editing (header toggles vs. rich text / bold-italic), opened from the 2026-07-04 dogfood pass;
-  and [ADR-0021](decisions/ADR-0021-recipe-variations.md) recipe variations (named deltas on a base recipe,
-  selected in the reader → folds into method display + grocery; ingredients structured, method as prose,
-  selection persisted-not-synced; closes ADR-0019 D1(c)'s promote-target gap), opened from Workbench S1
-  dogfooding 2026-07-06 — **milestone-sized, must not derail Workbench S2; dogfood more before slicing.**
-  Decide with Jon before any implementation.
+**Open design ADRs (discussion, not yet Accepted)** — [ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md)
+recipe text editing (header toggles vs. rich text / bold-italic), opened from the 2026-07-04 dogfood pass;
+and [ADR-0021](decisions/ADR-0021-recipe-variations.md) recipe variations (named deltas on a base recipe,
+selected in the reader → folds into method display + grocery; ingredients structured, method as prose,
+selection persisted-not-synced; closes ADR-0019 D1(c)'s promote-target gap), opened from Workbench S1
+dogfooding 2026-07-06 — **milestone-sized, must not derail Workbench S3; dogfood more before slicing.**
+Decide with Jon before any implementation.
 
 **Parked (not dispatched):**
 - **Dogfood the core loop on two devices** — capture ~15–20 real recipes via the extension, cook from

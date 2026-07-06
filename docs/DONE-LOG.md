@@ -10,6 +10,67 @@ Newest first.
 
 ---
 
+## Recipe Workbench — S2 (draft verb) + dogfood-hardening batch
+
+**Architect-approved + build-green 2026-07-06** — yes-chef
+[PR #107](https://github.com/jonphillips/yes-chef/pull/107). Pending Jon's device pass. **S2 draft verb**
+turns a workbench into a real working recipe (the first commit surface): a synthesis apply-action + review
+card writes a **new `Recipe`**, links it via `Workbench.draftRecipeID`, captures the pristine
+`originalSnapshot`, and opens it in `RecipeDetailView`. New working recipes land at
+`libraryPlacement: .reference` (out of default browse) with a one-tap **"Promote to library"** flip to
+`.main`. The workbench task-framing string is defined **once** on `RecipeChatContext` and reused as the
+spine of the draft-verb prompt so free chat and the commit path can't drift; `high` effort (ADR-0017),
+curation-not-average guardrail ([[llm-curation-not-synthesis]]) enforced in the prompt.
+
+**Dogfood-hardening rode the same branch** (206 package tests + drift green, app-target build green). Two
+repos: **jon-platform** — LLMClientKit frontier `URLSession` request/resource timeouts raised (300s/600s)
+so a `high`-effort synthesis isn't clipped mid-reason. **yes-chef** — draft-verb budget raised to 16k with
+truncation surfaced as a real retryable error (not a silent empty draft); a persistent chat **error banner**
++ explicit timeout/offline messages; and a **remove / re-draft** affordance on the working recipe (deletes
+an unpromoted `.reference` scratch draft, only unlinks a promoted `.main` recipe, always clears the soft-FK
+link so drafting re-enables). Effort locked at **`high`** — dogfood-validated as a clear quality step over
+`medium`. Sync-safe (UUID PKs, soft FKs + denormalized snapshots, additive migrations). Dogfood-surfaced
+follow-ons parked in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md): synthesis-shaped draft
+action (not gated on the last reply), AI effort/tier as a user-facing setting (ADR-0017/0018), tabbed
+candidate/working-recipe quick-view. Design in
+[ADR-0019](decisions/ADR-0019-recipe-design-studies.md) (whole, incl. both amendments).
+
+---
+
+## Recipe Workbench — chat controls (persisted tier · clear · stop)
+
+**Architect-approved + Jon device-passed 2026-07-06** — yes-chef
+[PR #105](https://github.com/jonphillips/yes-chef/pull/105). All three affordances landed in the **shared
+panel** (`RecipeChatPanel`), so every chat surface inherited them at once: persisted `useFrontier` tier (new
+`RecipeChatTierPreference`, mirrors `RecipeChatProviderPreference`; one global key ⇒ "remember the last model
+I used anywhere"), `clear()` + confirm button (disposable scratch, no undo), and `stop()`/interrupt
+(send↔stop off `isResponding`, cancellation checked on both tiers). Seam discipline held (ADR-0020) — generic
+model methods + shared-panel controls, no domain pattern-match, no lift yet.
+
+---
+
+## Recipe Workbench — S1 + grounding fix + S1 polish
+
+**Architect-approved + build-green 2026-07-06** — yes-chef
+[PR #101](https://github.com/jonphillips/yes-chef/pull/101) (S1) +
+[PR #103](https://github.com/jonphillips/yes-chef/pull/103) (grounding fix + polish). Pending Jon's device
+pass. Slice 1 landed the workbench shell; the grounding fix + polish made it dogfoodable: the shared
+`ChatWorkspaceSplit` now refreshes the chat model's context `onChange` (recipe/menu benefit too), editable
+title, candidate-picker search, full-screen focus. Docs: `efforts/recipe-workbench.md`, ADR-0019, ADR-0020
+(chat UI harvest).
+
+---
+
+## Menu planning overhaul (ADR-0012 Amendment 1)
+
+**Build-green 2026-07-06** — yes-chef [PR #98](https://github.com/jonphillips/yes-chef/pull/98). Pending
+Jon's device pass. All five slices shipped: tier-aware AI context + prep-plan-in-context + living-artifact
+refinement · swipe-delete/move · inline meal-slot pill · full-screen focus · toolbar reorg. Drag-drop
+reorder of dishes stays parked as the named follow-on (swipe-move is the interim). Effort doc
+[`efforts/menu-planning-ux.md`](efforts/menu-planning-ux.md).
+
+---
+
 ## AI configuration & transparency — ADR-0017 (model + effort) + ADR-0018 (taste profile)
 
 **Architect-approved 2026-07-05** — cross-repo: yes-chef
