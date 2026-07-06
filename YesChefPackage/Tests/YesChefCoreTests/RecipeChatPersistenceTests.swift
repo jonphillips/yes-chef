@@ -94,6 +94,30 @@ extension RecipeCoreTests {
     }
 
     @Test
+    @MainActor
+    func clearRemovesPersistedChatForSubject() async {
+      let recipeID = SampleUUIDSequence.uuid(706)
+
+      await withDependencies {
+        $0.date.now = Date(timeIntervalSinceReferenceDate: 820_450_000)
+        $0.uuid = .incrementing
+        $0.modelClient = StubModelClient.constant("Use low heat.")
+      } operation: {
+        let first = RecipeChatModel(
+          context: .recipe(RecipeChatRecipeContext(recipeID: recipeID, title: "Tomato Sauce"))
+        )
+        await first.send("How do I avoid scorching?")
+
+        first.clear()
+
+        let second = RecipeChatModel(
+          context: .recipe(RecipeChatRecipeContext(recipeID: recipeID, title: "Tomato Sauce"))
+        )
+        expectNoDifference(second.messages, [])
+      }
+    }
+
+    @Test
     func chatStorePrunesMessagesOlderThanRetention() throws {
       @Dependency(\.defaultDatabase) var database
       let subject = RecipeChatSubject.recipe(SampleUUIDSequence.uuid(703))

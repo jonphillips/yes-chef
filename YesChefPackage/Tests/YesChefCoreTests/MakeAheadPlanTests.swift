@@ -255,6 +255,68 @@ extension RecipeCoreTests {
     }
 
     @Test
+    @MainActor
+    func recipeChatUsesStoredFrontierTierWhenConfigured() {
+      withDependencies {
+        $0.apiKeyStore = apiKeyStore([.openai: "sk-openai"])
+        $0.recipeChatTierPreference = RecipeChatTierPreference(
+          current: { true },
+          set: { _ in }
+        )
+      } operation: {
+        let model = RecipeChatModel(
+          context: .recipe(RecipeChatRecipeContext(title: "Tomato Sauce"))
+        )
+
+        expectNoDifference(model.useFrontier, true)
+        expectNoDifference(model.activeTier, .frontier(.openai))
+      }
+    }
+
+    @Test
+    @MainActor
+    func recipeChatIgnoresStoredFrontierTierWithoutConfiguredProvider() {
+      withDependencies {
+        $0.apiKeyStore = apiKeyStore([:])
+        $0.recipeChatTierPreference = RecipeChatTierPreference(
+          current: { true },
+          set: { _ in }
+        )
+      } operation: {
+        let model = RecipeChatModel(
+          context: .recipe(RecipeChatRecipeContext(title: "Tomato Sauce"))
+        )
+
+        expectNoDifference(model.useFrontier, false)
+        expectNoDifference(model.activeTier, .onDevice)
+      }
+    }
+
+    @Test
+    @MainActor
+    func recipeChatPersistsFrontierTierChoice() {
+      let storedUseFrontier = Mutex<Bool?>(nil)
+
+      withDependencies {
+        $0.apiKeyStore = apiKeyStore([.openai: "sk-openai"])
+        $0.recipeChatTierPreference = RecipeChatTierPreference(
+          current: { storedUseFrontier.withLock { $0 } },
+          set: { useFrontier in storedUseFrontier.withLock { $0 = useFrontier } }
+        )
+      } operation: {
+        let model = RecipeChatModel(
+          context: .recipe(RecipeChatRecipeContext(title: "Tomato Sauce"))
+        )
+
+        model.useFrontier = true
+        expectNoDifference(storedUseFrontier.withLock { $0 }, true)
+
+        model.useFrontier = false
+        expectNoDifference(storedUseFrontier.withLock { $0 }, false)
+      }
+    }
+
+    @Test
     func recipeChatContextSerializesRecipeDetail() throws {
       let now = Date(timeIntervalSinceReferenceDate: 820_000_000)
       let recipeID = SampleUUIDSequence.uuid(600)
