@@ -5,6 +5,7 @@ import SQLiteData
 
 public let legacyRecipeChatCustomInstructionsKey = "recipeChatCustomInstructions"
 public let recipeChatFrontierProviderKey = "recipeChatFrontierProvider"
+public let recipeChatUseFrontierKey = "recipeChatUseFrontier"
 
 public enum AIPromptPreferenceKind: String, CaseIterable, Identifiable, Sendable {
   case chefItUp

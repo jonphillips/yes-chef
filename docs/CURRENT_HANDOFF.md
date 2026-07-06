@@ -1,8 +1,9 @@
 # Current Handoff
 
-Last updated: July 6, 2026 (**Next Up = Chat controls** — a small app-wide chat-UX slice: persist the
-frontier/on-device tier so chat stops resetting to on-device, plus clear + stop/interrupt controls in the
-shared panel. **Recipe Workbench S2** (draft verb + `libraryPlacement`) is the dispatch right behind it.
+Last updated: July 6, 2026 (**Next Up = Recipe Workbench S2** — draft verb + `libraryPlacement` +
+workbench task framing: the first real commit surface. **Chat controls is done** —
+[yes-chef #105](https://github.com/jonphillips/yes-chef/pull/105), architect-approved + Jon device-passed
+2026-07-06 → DONE-LOG: persisted frontier/on-device tier, clear, and stop/interrupt in the shared panel.
 **Workbench S1 polish + grounding fix is done** —
 [yes-chef #103](https://github.com/jonphillips/yes-chef/pull/103), architect-approved, build-green,
 pending Jon's device pass → DONE-LOG. `efforts/recipe-workbench.md`, ADR-0019, ADR-0020 (chat UI harvest).
@@ -34,35 +35,15 @@ PR); do all listed, in order.
 `ChatWorkspaceSplit` now refreshes the chat model's context `onChange` (recipe/menu benefit too), editable
 title, candidate-picker search, full-screen focus. Build-green; pending Jon's device pass → DONE-LOG.
 
-**Chat controls (the dispatch target) — small, app-wide chat-UX slice.** All chat surfaces (recipe, menu,
-workbench, meal-plan) share **one** model class (`RecipeChatModel`) and **one** shared panel
-(`RecipeChatPanel`, wrapped by `ChatWorkspaceSplit` on iPad), so each of these lands once and every surface
-inherits it. Do all three; keep the affordances in the **shared panel**, never per-surface toolbars:
+**Chat controls — done** ([yes-chef #105](https://github.com/jonphillips/yes-chef/pull/105),
+architect-approved + Jon device-passed 2026-07-06 → DONE-LOG). All three affordances landed in the **shared
+panel** (`RecipeChatPanel`), so every chat surface inherited them at once: persisted `useFrontier` tier (new
+`RecipeChatTierPreference`, mirrors `RecipeChatProviderPreference`; one global key ⇒ "remember the last model
+I used anywhere"), `clear()` + confirm button (disposable scratch, no undo), and `stop()`/interrupt
+(send↔stop off `isResponding`, cancellation checked on both tiers). Seam discipline held (ADR-0020) — generic
+model methods + shared-panel controls, no domain pattern-match, no lift yet.
 
-- **(1) Persist the model tier.** Today `RecipeChatModel` persists *which* frontier provider was picked
-  (`selectedProvider` → `recipeChatProviderPreference`) but **not** `useFrontier` — it defaults to `false`
-  on every init, so every new chat window resets to on-device. Add a sibling persisted preference for
-  `useFrontier` (mirror `RecipeChatProviderPreference` exactly: one `UserDefaults` key, seed in `init`
-  like `selectedProvider = defaultProvider()`, write back in a `didSet`). One global key ⇒ "remember the
-  last model I used anywhere in the app" falls out. Guard: only honor persisted-frontier when
-  `frontierAvailable` (a key exists); `activeTier` already degrades to on-device otherwise (belt +
-  suspenders).
-- **(2) Clear.** Add `clear()` on the model (`messages.removeAll()` + `RecipeChatStore.replaceMessages([],
-  …)` for the subject) and a clear button in the shared panel. Lightweight confirm ("Clear this chat?");
-  no undo machinery — the transcript is disposable scratch (the durable memory is the recipe/log, i.e.
-  S2/S3). Destructive-of-scratch only.
-- **(3) Stop / interrupt.** `send()` is currently a bare `async` with no `Task` handle. Hold the `Task`
-  when send fires; add `stop()` that cancels it and finalizes the empty assistant placeholder; flip the
-  input button send↔stop off the existing `isResponding` flag. Cancellation propagates on both paths
-  (frontier `complete` is a URLSession await; on-device stream honors `task.cancel()` via
-  `continuation.onTermination`).
-- **Seam discipline (ADR-0020).** Write this slice *as if the panel already lived in the future
-  `LLMChatUI` package*: the shell talks only to the model's public surface + generic context accessors —
-  **no** domain-case pattern-match, **no** SQLite reach. Adding `clear()`/`stop()` as generic model
-  methods + controls in the shared panel *hardens* the lift seam for free. Do **not** lift to jon-platform
-  now — that waits for panel stability + a real Galavant chat consumer (ADR-0020).
-
-**Recipe Workbench — S2 (the dispatch right behind Chat controls).** The draft verb that turns a workbench
+**Recipe Workbench — S2 (the dispatch target).** The draft verb that turns a workbench
 into a real working recipe — the first real commit surface:
 
 - Synthesis apply-action + review card that writes a **new `Recipe`**, links it via
@@ -152,8 +133,8 @@ DONE-LOG). All five slices shipped; drag-drop dish reorder stays parked as the n
 **Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — **Slice 1 landed (PR #101, approved);
 grounding fix + S1 polish landed (PR #103, approved, 2026-07-06)** — chat-grounding fix + editable title +
 picker search + full-screen focus, now dogfoodable. **S2** (draft verb + `libraryPlacement` + workbench
-task framing) is the dispatch behind the Chat-controls slice; **S3** (`WorkbenchLogEntry` durable log +
-save-to-log tap) queued after. Milestone-sized — one slice at a time. Design in
+task framing) is the current dispatch target (Chat controls shipped, PR #105); **S3** (`WorkbenchLogEntry`
+durable log + save-to-log tap) queued after. Milestone-sized — one slice at a time. Design in
 [ADR-0019](decisions/ADR-0019-recipe-design-studies.md).
 
 **On-device chat context overflow — robustness** (surfaced 2026-07-06 dogfooding a large taste profile in

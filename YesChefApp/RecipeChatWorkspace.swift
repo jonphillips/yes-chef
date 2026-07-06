@@ -225,6 +225,7 @@ struct RecipeChatPanel: View {
   @State private var stagedReviewItems: [ChatApplyReviewItem] = []
   @State private var actionSummary: ChatCommittedActionSummary?
   @State private var actionError: String?
+  @State private var confirmingClearChat = false
 
   var body: some View {
     @Bindable var chatModel = chatModel
@@ -236,6 +237,7 @@ struct RecipeChatPanel: View {
             .font(.headline)
             .lineLimit(1)
           Spacer(minLength: 8)
+          clearChatButton
           ChatTierMenu(chatModel: chatModel)
         }
         .padding([.horizontal, .top])
@@ -321,14 +323,18 @@ struct RecipeChatPanel: View {
             }
 
           Button {
-            Task { await sendDraft() }
+            if chatModel.isResponding {
+              chatModel.stop()
+            } else {
+              Task { await sendDraft() }
+            }
           } label: {
-            Image(systemName: "arrow.up.circle.fill")
+            Image(systemName: chatModel.isResponding ? "stop.circle.fill" : "arrow.up.circle.fill")
               .font(.title2)
           }
           .buttonStyle(.plain)
-          .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || chatModel.isResponding)
-          .accessibilityLabel(Text("Send"))
+          .disabled(!chatModel.isResponding && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          .accessibilityLabel(Text(chatModel.isResponding ? "Stop" : "Send"))
         }
       }
       .padding()
@@ -339,9 +345,20 @@ struct RecipeChatPanel: View {
     .toolbar {
       if !showsEmbeddedHeader {
         ToolbarItem(placement: .topBarTrailing) {
+          clearChatButton
+        }
+        ToolbarItem(placement: .topBarTrailing) {
           ChatTierMenu(chatModel: chatModel)
         }
       }
+    }
+    .alert("Clear this chat?", isPresented: $confirmingClearChat) {
+      Button("Clear Chat", role: .destructive) {
+        clearChat()
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("This removes the scratch transcript for this \(chatModel.context.subject).")
     }
   }
 
@@ -414,6 +431,24 @@ struct RecipeChatPanel: View {
     }
     return action.extractingTitle
   }
+
+  private var clearChatButton: some View {
+    Button {
+      confirmingClearChat = true
+    } label: {
+      Image(systemName: "trash")
+    }
+    .disabled(chatModel.messages.isEmpty || chatModel.isResponding)
+    .accessibilityLabel(Text("Clear Chat"))
+  }
+
+  private func clearChat() {
+    selectedAssistantText = ""
+    stagedReviewItems = []
+    actionSummary = nil
+    actionError = nil
+    chatModel.clear()
+  }
 }
 
 private struct ChatContextHeader: View {
@@ -442,9 +477,6 @@ private struct ChatContextHeader: View {
 private struct ChatTierMenu: View {
   let chatModel: RecipeChatModel
 
-  @AppStorage(recipeChatFrontierProviderKey)
-  private var preferredProviderRaw = FrontierProvider.anthropic.rawValue
-
   var body: some View {
     @Bindable var chatModel = chatModel
 
@@ -460,7 +492,6 @@ private struct ChatTierMenu: View {
 
       ForEach(FrontierProvider.allCases) { provider in
         Button {
-          preferredProviderRaw = provider.rawValue
           chatModel.selectedProvider = provider
           chatModel.useFrontier = true
         } label: {

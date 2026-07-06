@@ -32,10 +32,43 @@ extension RecipeChatProviderPreference: DependencyKey {
   public static let previewValue = RecipeChatProviderPreference(current: { nil }, set: { _ in })
 }
 
+public struct RecipeChatTierPreference: Sendable {
+  public var current: @Sendable () -> Bool?
+  public var set: @Sendable (Bool) -> Void
+
+  public init(
+    current: @escaping @Sendable () -> Bool?,
+    set: @escaping @Sendable (Bool) -> Void
+  ) {
+    self.current = current
+    self.set = set
+  }
+}
+
+extension RecipeChatTierPreference: DependencyKey {
+  public static let liveValue = RecipeChatTierPreference(
+    current: {
+      guard UserDefaults.standard.object(forKey: recipeChatUseFrontierKey) != nil else { return nil }
+      return UserDefaults.standard.bool(forKey: recipeChatUseFrontierKey)
+    },
+    set: { useFrontier in
+      UserDefaults.standard.set(useFrontier, forKey: recipeChatUseFrontierKey)
+    }
+  )
+
+  public static let testValue = RecipeChatTierPreference(current: { nil }, set: { _ in })
+  public static let previewValue = RecipeChatTierPreference(current: { nil }, set: { _ in })
+}
+
 extension DependencyValues {
   public var recipeChatProviderPreference: RecipeChatProviderPreference {
     get { self[RecipeChatProviderPreference.self] }
     set { self[RecipeChatProviderPreference.self] = newValue }
+  }
+
+  public var recipeChatTierPreference: RecipeChatTierPreference {
+    get { self[RecipeChatTierPreference.self] }
+    set { self[RecipeChatTierPreference.self] = newValue }
   }
 }
 
@@ -635,7 +668,11 @@ public final class RecipeChatModel: Identifiable {
   public let id = UUID()
   public private(set) var context: RecipeChatContext
   public private(set) var messages: [RecipeChatMessage] = []
-  public var useFrontier = false
+  public var useFrontier = false {
+    didSet {
+      tierPreference.set(useFrontier)
+    }
+  }
   public var selectedProvider: FrontierProvider = .anthropic {
     didSet {
       providerPreference.set(selectedProvider)
@@ -647,14 +684,21 @@ public final class RecipeChatModel: Identifiable {
   @ObservationIgnored @Dependency(\.modelClient) private var modelClient
   @ObservationIgnored @Dependency(\.apiKeyStore) private var apiKeyStore
   @ObservationIgnored @Dependency(\.recipeChatProviderPreference) private var providerPreference
+  @ObservationIgnored @Dependency(\.recipeChatTierPreference) private var tierPreference
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.uuid) private var uuid
+  @ObservationIgnored private var responseTask: Task<Void, Never>?
 
   public init(context: RecipeChatContext) {
     self.context = context
     selectedProvider = defaultProvider()
+    useFrontier = defaultUseFrontier()
     loadPersistedThread()
+  }
+
+  deinit {
+    responseTask?.cancel()
   }
 
   public func updateContext(_ context: RecipeChatContext) {
@@ -688,17 +732,39 @@ public final class RecipeChatModel: Identifiable {
 
   public func send(_ text: String) async {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty, !isResponding else { return }
+    guard !trimmed.isEmpty, !isResponding, responseTask == nil else { return }
+
+    let task = Task { @MainActor [weak self] in
+      guard let self else { return }
+      await self.completeSend(trimmed)
+    }
+    responseTask = task
+    await task.value
+  }
+
+  public func stop() {
+    responseTask?.cancel()
+  }
+
+  public func clear() {
+    guard !isResponding else { return }
+    messages.removeAll()
+    errorText = nil
+    persistCurrentThread()
+  }
+
+  private func completeSend(_ trimmed: String) async {
     messages.append(RecipeChatMessage(id: uuid(), role: .user, text: trimmed))
     isResponding = true
     errorText = nil
     defer {
+      responseTask = nil
       isResponding = false
       persistCurrentThread()
     }
 
     let requestMessages = history()
-    let index = appendAssistantPlaceholder()
+    let assistantID = appendAssistantPlaceholder()
     do {
       if case .frontier = activeTier {
         let response = try await modelClient.complete(
@@ -710,7 +776,12 @@ public final class RecipeChatModel: Identifiable {
             reasoningEffort: .medium
           )
         )
-        messages[index].text = response.text.isEmpty ? "(No response.)" : response.text
+        try Task.checkCancellation()
+        setAssistantText(
+          id: assistantID,
+          text: response.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "(No response.)" : response.text
+        )
       } else {
         let request = ModelRequest(
           tier: activeTier,
@@ -720,14 +791,18 @@ public final class RecipeChatModel: Identifiable {
           reasoningEffort: .medium
         )
         for try await chunk in modelClient.stream(request) {
-          messages[index].text += chunk.text
+          try Task.checkCancellation()
+          appendAssistantText(id: assistantID, text: chunk.text)
         }
-        if messages[index].text.isEmpty {
-          messages[index].text = "(No response.)"
+        try Task.checkCancellation()
+        if assistantText(id: assistantID).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+          setAssistantText(id: assistantID, text: "(No response.)")
         }
       }
+    } catch is CancellationError {
+      removePlaceholderIfEmpty(id: assistantID)
     } catch {
-      removePlaceholderIfEmpty(at: index)
+      removePlaceholderIfEmpty(id: assistantID)
       errorText = describe(error)
     }
   }
@@ -756,15 +831,33 @@ public final class RecipeChatModel: Identifiable {
     }
   }
 
-  private func appendAssistantPlaceholder() -> Int {
-    messages.append(RecipeChatMessage(id: uuid(), role: .assistant, text: ""))
-    return messages.count - 1
+  private func appendAssistantPlaceholder() -> RecipeChatMessage.ID {
+    let id = uuid()
+    messages.append(RecipeChatMessage(id: id, role: .assistant, text: ""))
+    return id
   }
 
-  private func removePlaceholderIfEmpty(at index: Int) {
-    if messages.indices.contains(index),
-      messages[index].role == .assistant,
-      messages[index].text.isEmpty
+  private func assistantText(id: RecipeChatMessage.ID) -> String {
+    messages.first { $0.id == id && $0.role == .assistant }?.text ?? ""
+  }
+
+  private func appendAssistantText(id: RecipeChatMessage.ID, text: String) {
+    guard
+      let index = messages.firstIndex(where: { $0.id == id && $0.role == .assistant })
+    else { return }
+    messages[index].text += text
+  }
+
+  private func setAssistantText(id: RecipeChatMessage.ID, text: String) {
+    guard
+      let index = messages.firstIndex(where: { $0.id == id && $0.role == .assistant })
+    else { return }
+    messages[index].text = text
+  }
+
+  private func removePlaceholderIfEmpty(id: RecipeChatMessage.ID) {
+    if let index = messages.firstIndex(where: { $0.id == id && $0.role == .assistant }),
+      messages[index].text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     {
       messages.remove(at: index)
     }
@@ -805,5 +898,9 @@ public final class RecipeChatModel: Identifiable {
       return preferred
     }
     return availableProviders.first ?? .anthropic
+  }
+
+  private func defaultUseFrontier() -> Bool {
+    frontierAvailable && tierPreference.current() == true
   }
 }
