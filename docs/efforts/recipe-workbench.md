@@ -59,10 +59,34 @@ additive-nullable, defaults `main`) to hide in-progress working recipes from bro
     instruction steps for a *small* candidate set (soft-cap ~5); tier-aware budget, but spend it on
     **depth-per-candidate**, not breadth — cap N rather than truncating any candidate's method.
   - **"Compare / what is each trying to do / strengths & weaknesses" works immediately as plain chat** —
-    zero commit surface (ADR-0019 D-table row 1). No schema beyond the two tables. **This is the dispatch
-    target; stop here for review.**
+    zero commit surface (ADR-0019 D-table row 1). No schema beyond the two tables. Shipped in
+    [yes-chef #101](https://github.com/jonphillips/yes-chef/pull/101) (architect-approved).
 
-- **S2 — the draft verb → a real working recipe (settles/executes D1(b)).**
+- **S1 polish + grounding fix — its own dispatch, ahead of S2 (Jon, 2026-07-06).** Makes S1 immediately
+  dogfoodable; split from S2 to keep merge boundaries tight (S2 is the next dispatch). These four are pure
+  app-layer UX (no schema change):
+  - **Chat grounding — verify + fix.** Reported symptom: workbench chat "can't see the recipes." Wiring is
+    correct on *initial* open (candidate ingredients + steps reach `RecipeChatModel.systemPrompt()` via
+    `WorkbenchChatContext.serialized(for:)`), **but** `ChatWorkspaceSplit` snapshots the context in `@State`
+    at first appearance and never refreshes — so candidates added *after* the chat pane appears are invisible
+    and the context goes stale. Repro on device, then refresh the chat context when workbench detail changes
+    (`.id()` keyed on a candidate-set signature, or a `context` setter updated `onChange`). Check recipe/menu
+    chat aren't silently affected.
+  - **Editable workbench title.** `WorkbenchReader` shows the title read-only, and the multi-select
+    "Workbench These" path auto-titles "Recipe Workbench" with no rename. Add an `updateWorkbenchTitle`
+    repository method (sibling of `updateWorkbenchNotes`, reuse `nonEmptyWorkbenchText`, bump `dateModified`)
+    + a rename affordance in the reader.
+  - **Search in the Add Candidates picker.** `WorkbenchCandidatePickerView` lists every recipe unfiltered —
+    unusable at library scale. Add a `.searchable` title filter over `availableRecipeRows` (mirror the
+    recipe-library search).
+  - **Full-screen focus for a selected workbench.** Mirror Menu: `MenuDetailColumn` takes
+    `isFocusActive: columnVisibility == .detailOnly` + `focusButtonTapped` toggling
+    `.detailOnly`/`.doubleColumn` in `AppMainLayout`; `WorkbenchDetailColumn` takes only `model`. Wire the
+    same binding through `WorkbenchDetailColumn` → `WorkbenchDetailView` + a focus toolbar button
+    (regular-width iPad only).
+
+- **S2 — the draft verb → a real working recipe (settles/executes D1(b)).** *(The dispatch right after the
+  grounding-fix + polish PR — Jon, 2026-07-06. First real commit surface; stop before S3.)*
   - Synthesis apply-action + review card that writes a **new `Recipe`** and links it via
     `Workbench.draftRecipeID`; capture `originalSnapshot` (pristine first synthesis) for provenance; open
     it in the existing `RecipeDetailView` reader/editor. `high` effort (ADR-0017).

@@ -1,7 +1,9 @@
 # Current Handoff
 
-Last updated: July 6, 2026 (**Next Up = Recipe Workbench Slice 2** — draft verb → real working recipe +
-`libraryPlacement`; `efforts/recipe-workbench.md`, ADR-0019. **Meal-Planner chat
+Last updated: July 6, 2026 (**Next Up = Recipe Workbench — grounding fix + S1 polish** — chat-grounding
+verify/fix + editable title + candidate-picker search + full-screen focus; immediately dogfoodable. **S2**
+(draft verb + `libraryPlacement`) split into the next dispatch right behind it. `efforts/recipe-workbench.md`,
+ADR-0019. **Meal-Planner chat
 verbs** demoted back to the Ready Efforts queue — still pending, just not the immediate target. **Menu planning
 overhaul (ADR-0012 Amdt 1) is done** — [yes-chef #98](https://github.com/jonphillips/yes-chef/pull/98),
 build-green, pending Jon's device pass → DONE-LOG. **AI config (ADR-0017/0018) is done** — cross-repo PRs
@@ -23,20 +25,49 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Recipe Workbench — Slice 2 (ADR-0019 + `efforts/recipe-workbench.md`).** Slice 1 is implemented:
-`Workbench` + `WorkbenchCandidate`, candidate picker, editable annotations, and grounded `.workbench` chat.
-Next dispatch is the draft verb that turns a workbench into a real working recipe.
+**Recipe Workbench — grounding fix + S1 polish (ADR-0019 + `efforts/recipe-workbench.md`).** Slice 1 landed
+([yes-chef #101](https://github.com/jonphillips/yes-chef/pull/101), architect-approved): `Workbench` +
+`WorkbenchCandidate`, candidate picker, editable annotations, grounded `.workbench` chat, both entry
+points. This dispatch makes S1 **immediately dogfoodable** — the chat-grounding fix + three review
+papercuts, all pure app-layer UX (no schema, no core-model change). Do all, in order:
 
-- Add the synthesis apply-action + review card that writes a **new `Recipe`**, links it via
+- **(0) Chat grounding — verify + fix.** Jon reports the workbench chat "can't see the recipes." The
+  wiring is correct on *initial* open (candidate ingredients + steps reach `systemPrompt()` via
+  `WorkbenchChatContext.serialized(for: activeTier)`), **but** `ChatWorkspaceSplit` snapshots the context
+  in `@State` at first appearance ([`RecipeChatWorkspace.swift`](../YesChefApp/RecipeChatWorkspace.swift)
+  line ~55) and never refreshes it — so candidates added *after* the chat pane appears are invisible to
+  the model, and the context goes stale for the life of the view. Repro on device, then fix: refresh the
+  chat model's `context` when the workbench detail changes (e.g. re-init `ChatWorkspaceSplit` via `.id()`
+  keyed on a candidate-set signature, or expose a `context` setter on `RecipeChatModel` the view updates
+  `onChange`). Confirm the same staleness isn't silently biting recipe/menu chat.
+- **(1) Editable workbench title.** `WorkbenchReader` renders the title read-only; the multi-select
+  "Workbench These" path auto-titles "Recipe Workbench" with no rename. Add `WorkbenchRepository`
+  `updateWorkbenchTitle` (sibling of `updateWorkbenchNotes`, reuse `nonEmptyWorkbenchText`, bump
+  `dateModified`) + a rename affordance in the reader.
+- **(2) Search in the Add Candidates picker.** `WorkbenchCandidatePickerView` lists all recipes with no
+  filter — unusable against a 2000-recipe library. Add a `.searchable` title filter over
+  `availableRecipeRows` (mirror the recipe-library search).
+- **(3) Full-screen focus for a selected workbench.** Mirror Menu: `MenuDetailColumn` takes
+  `isFocusActive: columnVisibility == .detailOnly` + `focusButtonTapped` flipping
+  `.detailOnly`/`.doubleColumn` in `AppMainLayout`; `WorkbenchDetailColumn` takes only `model`. Wire the
+  same binding through `WorkbenchDetailColumn` → `WorkbenchDetailView` + a focus toolbar button
+  (regular-width iPad only).
+- **Stop here for review + dogfood.** **S2** (draft verb + `libraryPlacement`) is the very next dispatch —
+  detailed below — **not** part of this PR.
+
+**Recipe Workbench — S2 (the next dispatch, not this one).** The draft verb that turns a workbench into a
+real working recipe — the first real commit surface:
+
+- Synthesis apply-action + review card that writes a **new `Recipe`**, links it via
   `Workbench.draftRecipeID`, captures the pristine `originalSnapshot`, and opens the result in the existing
-  `RecipeDetailView` reader/editor. Use `high` effort (ADR-0017).
-- Add the additive `recipes.libraryPlacement` column (`main | reference` shape decided as "future → now")
-  so in-progress working recipes stay out of default browse until promoted. New working recipes should be
-  non-`main`; "Promote to library" flips them to `main`.
-- Guardrail: the draft must be a coherent editorial choice with rationale referencing candidates — **not** a
-  blended average of every candidate. The model proposes; the review tap writes.
-- Stop at S2. **S3** is the durable workbench log (`WorkbenchLogEntry` + save-to-log tap), not part of this
-  dispatch.
+  `RecipeDetailView` reader/editor. `high` effort (ADR-0017). Route the write through the staging card —
+  the model proposes, the tap writes.
+- Additive `recipes.libraryPlacement` column (`main | reference`, "future → now") so in-progress working
+  recipes stay out of default browse until promoted. New working recipes non-`main`; "Promote to library"
+  flips to `main`.
+- Guardrail: the draft must be a coherent editorial choice with rationale referencing candidates — **not**
+  a blended average of every candidate ([[llm-curation-not-synthesis]]).
+- Stop at S2. **S3** (durable `WorkbenchLogEntry` log + save-to-log tap) stays queued behind it.
 
 **Sync-safe, post-sync** (UUID PKs, soft FKs + denormalized snapshots, read-time dedup, additive
 migrations). Full slice detail + resolved review calls in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md);
@@ -95,9 +126,11 @@ target.
 ([yes-chef #98](https://github.com/jonphillips/yes-chef/pull/98), build-green; pending Jon's device pass →
 DONE-LOG). All five slices shipped; drag-drop dish reorder stays parked as the named follow-on.
 
-**Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — **Slice 1 implemented; Slice 2 promoted
-to Next Up** (2026-07-06). Remaining slices stay queued after S2: **S3** the `WorkbenchLogEntry` durable
-log + save-to-log tap. Milestone-sized — dispatch **one slice at a time**. Design in
+**Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — **Slice 1 landed (PR #101, approved);
+grounding fix + S1 polish promoted to Next Up** (2026-07-06): chat-grounding fix + editable title + picker
+search + full-screen focus, immediately dogfoodable. Split from S2 to keep merge boundaries tight. **S2**
+(draft verb + `libraryPlacement`) is the dispatch right behind; **S3** (`WorkbenchLogEntry` durable log +
+save-to-log tap) queued after. Milestone-sized — one slice at a time. Design in
 [ADR-0019](decisions/ADR-0019-recipe-design-studies.md).
 
 **Meal-Planner chat verbs** (ADR-0013 follow-on + `efforts/cooking-workspace.md`) — **demoted back to the
