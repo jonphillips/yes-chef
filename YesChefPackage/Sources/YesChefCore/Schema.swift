@@ -705,6 +705,29 @@ extension DependencyValues {
       }
     }
 
+    migrator.registerMigration("Create workbench log") { db in
+      try #sql("""
+        CREATE TABLE "workbenchLog" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "workbenchID" TEXT NOT NULL REFERENCES "workbenches"("id") ON DELETE CASCADE,
+          "kind" TEXT NOT NULL,
+          "body" TEXT NOT NULL,
+          "outcome" TEXT,
+          "relatedRecipeID" TEXT,
+          "sortOrder" INTEGER NOT NULL,
+          "dateCreated" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      for statement in [
+        #"CREATE INDEX "index_workbenchLog_on_workbenchID" ON "workbenchLog"("workbenchID")"#,
+        #"CREATE INDEX "index_workbenchLog_on_relatedRecipeID" ON "workbenchLog"("relatedRecipeID")"#,
+      ] {
+        try db.execute(sql: statement)
+      }
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)
