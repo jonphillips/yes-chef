@@ -62,6 +62,16 @@ candidate/working-recipe quick-view shipped as S4's *Full* segment. The **synthe
 follow-on is the current Next Up; the rest stay parked in the effort doc (AI effort/tier as a user-facing
 setting, AI-generated log entries, the S3 review notes).
 
+**LLM-aligned Compare matrix** ([ADR-0022](decisions/ADR-0022-llm-aligned-compare-matrix.md) +
+`efforts/compare-alignment.md`) — **milestone-sized, proposed (needs a design session)**. The deterministic
+`comparisonKey` ([#114](https://github.com/jonphillips/yes-chef/pull/114)) hits its ceiling on real recipes;
+an LLM aligner clusters ingredient rows by culinary role (chicken breast ≡ thigh, `chile`/`chiles`/`chilies`
+one row, `morita` ≈ `chipotle`) and orders by role ("protein at top"). The interesting decision is the
+**boundary**: LLM drives *presentational* alignment on the read-only, self-correcting Compare surface;
+grocery consolidation stays deterministic (determinism-at-merge). Structured-out/verbatim-cells, cached
+per candidate-set, deterministic fallback. **S1 is a no-LLM parse fix** (singularizer `chilies→chily` bug +
+dual-unit quantity leak) that stands alone and improves the fallback now.
+
 **Meal-Planner chat verbs** (ADR-0013 follow-on + `efforts/cooking-workspace.md`) — the one remaining named
 actionable-chat verb instance. Classify each new verb's commit shape first ([[chat-verb-commit-shapes]]) —
 likely no-commit advisory or a per-day note, not a per-recipe write; respect [[llm-curation-not-synthesis]].
