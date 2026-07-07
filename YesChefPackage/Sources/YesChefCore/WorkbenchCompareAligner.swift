@@ -2,6 +2,27 @@ import Dependencies
 import Foundation
 import LLMClientKit
 
+public struct WorkbenchAlignedComparison: Sendable, Equatable {
+  public enum Source: Sendable, Equatable {
+    case aligned
+    case fallback(FallbackReason)
+  }
+
+  public enum FallbackReason: Sendable, Equatable {
+    case emptyResponse
+    case malformed
+    case truncated
+  }
+
+  public var comparison: IngredientComparison
+  public var source: Source
+
+  public init(comparison: IngredientComparison, source: Source) {
+    self.comparison = comparison
+    self.source = source
+  }
+}
+
 public struct WorkbenchCompareAlignerClient: Sendable {
   /// Semantically aligns ingredient lines into the existing compare matrix shape.
   ///
@@ -13,14 +34,14 @@ public struct WorkbenchCompareAlignerClient: Sendable {
     _ working: RecipeDetailData?,
     _ candidates: [RecipeDetailData],
     _ tier: ModelTier
-  ) async throws -> IngredientComparison
+  ) async throws -> WorkbenchAlignedComparison
 
   public init(
     align: @escaping @Sendable (
       _ working: RecipeDetailData?,
       _ candidates: [RecipeDetailData],
       _ tier: ModelTier
-    ) async throws -> IngredientComparison
+    ) async throws -> WorkbenchAlignedComparison
   ) {
     self.align = align
   }
@@ -29,7 +50,7 @@ public struct WorkbenchCompareAlignerClient: Sendable {
     working: RecipeDetailData?,
     candidates: [RecipeDetailData],
     tier: ModelTier
-  ) async throws -> IngredientComparison {
+  ) async throws -> WorkbenchAlignedComparison {
     try await align(working, candidates, tier)
   }
 }
@@ -37,21 +58,33 @@ public struct WorkbenchCompareAlignerClient: Sendable {
 extension WorkbenchCompareAlignerClient: DependencyKey {
   public static let liveValue = WorkbenchCompareAlignerClient { working, candidates, tier in
     @Dependency(\.modelClient) var modelClient
+    let deterministic = WorkbenchCompare.ingredientComparison(working: working, candidates: candidates)
     let request = ModelRequest(
       tier: tier,
       system: instructions,
       prompt: prompt(working: working, candidates: candidates),
-      maxTokens: 4096,
+      maxTokens: responseTokenBudget(working: working, candidates: candidates),
       reasoningEffort: .medium,
       promptPreferenceKey: nil
     )
     let response = try await modelClient.complete(request)
-    return parse(response.text, working: working, candidates: candidates)
-      ?? WorkbenchCompare.ingredientComparison(working: working, candidates: candidates)
+    if wasTruncated(response) {
+      return WorkbenchAlignedComparison(comparison: deterministic, source: .fallback(.truncated))
+    }
+    if let comparison = parse(response.text, working: working, candidates: candidates) {
+      return WorkbenchAlignedComparison(comparison: comparison, source: .aligned)
+    }
+    return WorkbenchAlignedComparison(
+      comparison: deterministic,
+      source: .fallback(classifyFallbackReason(response.text))
+    )
   }
 
   public static let testValue = WorkbenchCompareAlignerClient { working, candidates, _ in
-    WorkbenchCompare.ingredientComparison(working: working, candidates: candidates)
+    WorkbenchAlignedComparison(
+      comparison: WorkbenchCompare.ingredientComparison(working: working, candidates: candidates),
+      source: .aligned
+    )
   }
 
   static let instructions = """
@@ -81,6 +114,32 @@ extension WorkbenchCompareAlignerClient: DependencyKey {
 
     Return the ordered alignment JSON only.
     """
+  }
+
+  static func wasTruncated(_ response: ModelResponse) -> Bool {
+    guard let stopReason = response.stopReason?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !stopReason.isEmpty
+    else { return false }
+    return switch stopReason.lowercased() {
+    case "length", "max_tokens": true
+    default: false
+    }
+  }
+
+  static func classifyFallbackReason(_ text: String) -> WorkbenchAlignedComparison.FallbackReason {
+    if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      return .emptyResponse
+    }
+    guard
+      let json = jsonObjectSlice(text),
+      let data = json.data(using: .utf8),
+      let raw = try? JSONSerialization.jsonObject(with: data),
+      let object = raw as? [String: Any],
+      let rawRows = object["rows"] as? [[String: Any]]
+    else {
+      return .malformed
+    }
+    return rawRows.isEmpty ? .emptyResponse : .malformed
   }
 
   public static func parse(
@@ -218,6 +277,25 @@ extension WorkbenchCompareAlignerClient: DependencyKey {
     guard let open = text.firstIndex(of: "{"), let close = text.lastIndex(of: "}"), open < close
     else { return nil }
     return String(text[open...close])
+  }
+
+  private static func responseTokenBudget(
+    working: RecipeDetailData?,
+    candidates: [RecipeDetailData]
+  ) -> Int {
+    let lineCount = orderedSources(working: working, candidates: candidates)
+      .map { nonHeaderLines(in: $0.detail).count }
+      .reduce(0, +)
+    return min(16_384, max(8_192, lineCount * 192))
+  }
+}
+
+public extension WorkbenchAlignedComparison.Source {
+  var isFallback: Bool {
+    if case .fallback = self {
+      return true
+    }
+    return false
   }
 }
 

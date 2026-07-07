@@ -17,15 +17,15 @@ struct CompareAlignmentKey: Hashable, Sendable {
 final class WorkbenchCompareAlignmentModel {
   @ObservationIgnored @Dependency(\.workbenchCompareAligner) private var aligner
 
-  private var cache: [CompareAlignmentKey: IngredientComparison] = [:]
+  private var cache: [CompareAlignmentKey: WorkbenchAlignedComparison] = [:]
   private var loadToken = 0
 
   var currentKey: CompareAlignmentKey?
-  var currentComparison: IngredientComparison?
+  var currentOutcome: WorkbenchAlignedComparison?
   var isAligning = false
   var showsBasicViewAffordance = false
 
-  func cachedComparison(for key: CompareAlignmentKey) -> IngredientComparison? {
+  func cachedOutcome(for key: CompareAlignmentKey) -> WorkbenchAlignedComparison? {
     cache[key]
   }
 
@@ -56,9 +56,9 @@ final class WorkbenchCompareAlignmentModel {
     currentKey = key
 
     if !refresh, let cached = cache[key] {
-      currentComparison = cached
+      currentOutcome = cached
       isAligning = false
-      showsBasicViewAffordance = false
+      showsBasicViewAffordance = cached.source.isFallback
       return
     }
 
@@ -66,18 +66,18 @@ final class WorkbenchCompareAlignmentModel {
       cache.removeValue(forKey: key)
     }
 
-    currentComparison = nil
+    currentOutcome = nil
     isAligning = true
     showsBasicViewAffordance = false
 
     do {
-      let comparison = try await aligner(working: working, candidates: candidates, tier: tier)
+      let outcome = try await aligner(working: working, candidates: candidates, tier: tier)
       try Task.checkCancellation()
       guard token == loadToken else { return }
-      cache[key] = comparison
-      currentComparison = comparison
+      cache[key] = outcome
+      currentOutcome = outcome
       isAligning = false
-      showsBasicViewAffordance = false
+      showsBasicViewAffordance = outcome.source.isFallback
     } catch is CancellationError {
       guard token == loadToken else { return }
       isAligning = false

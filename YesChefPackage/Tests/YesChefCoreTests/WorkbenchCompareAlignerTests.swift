@@ -9,10 +9,10 @@ extension RecipeCoreTests {
   @Suite
   struct WorkbenchCompareAlignerTests {
     @Test
-    func alignerMergesSemanticRowsAndKeepsVerbatimCellsInModelOrder() async throws {
+    func alignerReturnsAlignedOutcomeForWellFormedCompleteResponse() async throws {
       let fixture = BirriaFixture()
 
-      let comparison = try await alignedComparison(
+      let outcome = try await alignedOutcome(
         fixture: fixture,
         response: """
           {"rows":[
@@ -51,6 +51,9 @@ extension RecipeCoreTests {
           ]}
           """
       )
+      let comparison = outcome.comparison
+
+      expectNoDifference(outcome.source, .aligned)
 
       expectNoDifference(
         comparison.columns.map(\.title),
@@ -88,10 +91,13 @@ extension RecipeCoreTests {
     func alignerAccountsForEveryNonHeaderLinePerColumn() async throws {
       let fixture = BirriaFixture()
 
-      let comparison = try await alignedComparison(
+      let outcome = try await alignedOutcome(
         fixture: fixture,
         response: fixture.semanticResponse
       )
+      let comparison = outcome.comparison
+
+      expectNoDifference(outcome.source, .aligned)
 
       for columnIndex in comparison.columns.indices {
         let source = fixture.sources[columnIndex]
@@ -113,7 +119,7 @@ extension RecipeCoreTests {
       let fixture = BirriaFixture()
       let fabricatedLineID = SampleUUIDSequence.uuid(61_999)
 
-      let comparison = try await alignedComparison(
+      let outcome = try await alignedOutcome(
         fixture: fixture,
         response: """
           {"rows":[
@@ -128,6 +134,9 @@ extension RecipeCoreTests {
           ]}
           """
       )
+      let comparison = outcome.comparison
+
+      expectNoDifference(outcome.source, .aligned)
 
       expectNoDifference(comparison.rows.map(\.cells), [["2 pounds chicken breast, cubed", nil, nil]])
       #expect(comparison.columns[1].otherLines.contains("2 pounds boneless chicken thighs"))
@@ -138,7 +147,7 @@ extension RecipeCoreTests {
       let fixture = BirriaFixture()
       let chickenBreastID = fixture.workingLine("2 pounds chicken breast, cubed").id
 
-      let comparison = try await alignedComparison(
+      let outcome = try await alignedOutcome(
         fixture: fixture,
         response: """
           {"rows":[
@@ -159,6 +168,9 @@ extension RecipeCoreTests {
           ]}
           """
       )
+      let comparison = outcome.comparison
+
+      expectNoDifference(outcome.source, .aligned)
 
       expectNoDifference(comparison.rows.map(\.label), ["Chicken"])
       expectNoDifference(
@@ -168,22 +180,63 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func alignerFallsBackToDeterministicComparisonForMalformedModelOutput() async throws {
+    func alignerFallsBackAsMalformedForMalformedJSON() async throws {
       let fixture = BirriaFixture()
       let expected = WorkbenchCompare.ingredientComparison(
         working: fixture.working,
         candidates: [fixture.candidate, fixture.secondCandidate]
       )
 
-      let malformed = try await alignedComparison(fixture: fixture, response: "Here are some rows.")
-      let empty = try await alignedComparison(fixture: fixture, response: #"{"rows":[]}"#)
+      let outcome = try await alignedOutcome(fixture: fixture, response: "Here are some rows.")
 
-      expectNoDifference(malformed, expected)
-      expectNoDifference(empty, expected)
+      expectNoDifference(outcome.source, .fallback(.malformed))
+      expectNoDifference(outcome.comparison, expected)
     }
 
     @Test
-    func alignerRequestUsesMediumReasoningLargeTokenBudgetRawLinesAndNoPromptPreference() async throws {
+    func alignerFallsBackAsEmptyResponseForEmptyTextOrEmptyRows() async throws {
+      let fixture = BirriaFixture()
+      let expected = WorkbenchCompare.ingredientComparison(
+        working: fixture.working,
+        candidates: [fixture.candidate, fixture.secondCandidate]
+      )
+
+      let emptyText = try await alignedOutcome(fixture: fixture, response: "   ")
+      let emptyRows = try await alignedOutcome(fixture: fixture, response: #"{"rows":[]}"#)
+
+      expectNoDifference(emptyText.source, .fallback(.emptyResponse))
+      expectNoDifference(emptyText.comparison, expected)
+      expectNoDifference(emptyRows.source, .fallback(.emptyResponse))
+      expectNoDifference(emptyRows.comparison, expected)
+    }
+
+    @Test
+    func alignerFallsBackAsTruncatedWhenStopReasonSignalsCutoffEvenIfBodyParses() async throws {
+      let fixture = BirriaFixture()
+      let expected = WorkbenchCompare.ingredientComparison(
+        working: fixture.working,
+        candidates: [fixture.candidate, fixture.secondCandidate]
+      )
+
+      let maxTokens = try await alignedOutcome(
+        fixture: fixture,
+        response: fixture.semanticResponse,
+        stopReason: "max_tokens"
+      )
+      let length = try await alignedOutcome(
+        fixture: fixture,
+        response: fixture.semanticResponse,
+        stopReason: "LENGTH"
+      )
+
+      expectNoDifference(maxTokens.source, .fallback(.truncated))
+      expectNoDifference(maxTokens.comparison, expected)
+      expectNoDifference(length.source, .fallback(.truncated))
+      expectNoDifference(length.comparison, expected)
+    }
+
+    @Test
+    func alignerRequestUsesMediumReasoningScaledTokenBudgetRawLinesAndNoPromptPreference() async throws {
       let recorder = ModelRequestRecorder()
       let recipeID = SampleUUIDSequence.uuid(62_000)
       let sectionID = SampleUUIDSequence.uuid(62_001)
@@ -233,7 +286,7 @@ extension RecipeCoreTests {
       let request = await recorder.first()
       expectNoDifference(request?.tier, .frontier(.openai))
       expectNoDifference(request?.reasoningEffort, .medium)
-      expectNoDifference(request?.maxTokens, 4096)
+      expectNoDifference(request?.maxTokens, 8_192)
       expectNoDifference(request?.promptPreferenceKey, nil)
       #expect(request?.messages.first?.text.contains("4 lb / 1.8 kg beef chuck roast") == true)
       #expect(request?.messages.first?.text.contains(lineID.uuidString) == true)
@@ -242,12 +295,15 @@ extension RecipeCoreTests {
       #expect(request?.messages.first?.text.contains("For the meat") == false)
     }
 
-    private func alignedComparison(
+    private func alignedOutcome(
       fixture: BirriaFixture,
-      response: String
-    ) async throws -> IngredientComparison {
+      response: String,
+      stopReason: String? = "stop"
+    ) async throws -> WorkbenchAlignedComparison {
       try await withDependencies {
-        $0.modelClient = StubModelClient.constant(response)
+        $0.modelClient = StubModelClient { _ in
+          ModelResponse(text: response, stopReason: stopReason)
+        }
       } operation: {
         let client = WorkbenchCompareAlignerClient.liveValue
         return try await client(

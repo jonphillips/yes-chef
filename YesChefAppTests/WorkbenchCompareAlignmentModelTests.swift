@@ -49,8 +49,8 @@ struct WorkbenchCompareAlignmentModelTests {
 
     let state = await MainActor.run {
       (
-        model.cachedComparison(for: key),
-        model.currentComparison,
+        model.cachedOutcome(for: key),
+        model.currentOutcome,
         model.isAligning,
         model.showsBasicViewAffordance
       )
@@ -58,6 +58,42 @@ struct WorkbenchCompareAlignmentModelTests {
 
     #expect(state.0 == nil)
     #expect(state.1 == nil)
+    #expect(state.2 == false)
+    #expect(state.3 == true)
+  }
+
+  @Test
+  func fallbackOutcomeSetsAndKeepsBasicViewAffordanceFromCache() async {
+    let working = detail(recipeID: uuid("77777777-7777-7777-7777-777777777777"), lineText: "1 cup tomatoes")
+    let candidate = detail(recipeID: uuid("88888888-8888-8888-8888-888888888888"), lineText: "2 cups tomatoes")
+    let key = CompareAlignmentKey(working: working, candidates: [candidate])
+    let model = await MainActor.run { WorkbenchCompareAlignmentModel() }
+    let deterministic = WorkbenchCompare.ingredientComparison(working: working, candidates: [candidate])
+
+    await withDependencies {
+      $0.workbenchCompareAligner = WorkbenchCompareAlignerClient { _, _, _ in
+        WorkbenchAlignedComparison(
+          comparison: deterministic,
+          source: .fallback(.malformed)
+        )
+      }
+    } operation: {
+      await model.ingredientsSegmentAppeared(working: working, candidates: [candidate], tier: .onDevice)
+      await model.ingredientsSegmentAppeared(working: working, candidates: [candidate], tier: .onDevice)
+    }
+
+    let state = await MainActor.run {
+      (
+        model.cachedOutcome(for: key),
+        model.currentOutcome,
+        model.isAligning,
+        model.showsBasicViewAffordance
+      )
+    }
+
+    #expect(state.0?.source == .fallback(.malformed))
+    #expect(state.0?.comparison == deterministic)
+    #expect(state.1?.source == .fallback(.malformed))
     #expect(state.2 == false)
     #expect(state.3 == true)
   }

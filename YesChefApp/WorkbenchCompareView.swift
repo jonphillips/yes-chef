@@ -35,28 +35,33 @@ struct WorkbenchCompareView: View {
     WorkbenchCompare.ingredientComparison(working: workingDetail, candidates: candidateDetails)
   }
 
-  private var cachedComparison: IngredientComparison? {
-    alignmentModel.cachedComparison(for: alignmentKey)
+  private var cachedOutcome: WorkbenchAlignedComparison? {
+    alignmentModel.cachedOutcome(for: alignmentKey)
   }
 
-  private var alignedComparison: IngredientComparison? {
-    alignmentModel.currentKey == alignmentKey ? alignmentModel.currentComparison : nil
+  private var currentOutcome: WorkbenchAlignedComparison? {
+    alignmentModel.currentKey == alignmentKey ? alignmentModel.currentOutcome : nil
+  }
+
+  private var displayedOutcome: WorkbenchAlignedComparison? {
+    cachedOutcome ?? currentOutcome
   }
 
   private var comparison: IngredientComparison {
-    cachedComparison ?? alignedComparison ?? deterministicComparison
+    displayedOutcome?.comparison ?? deterministicComparison
   }
 
   private var isAligning: Bool {
-    cachedComparison == nil
+    cachedOutcome == nil
       && alignmentModel.currentKey == alignmentKey
       && alignmentModel.isAligning
   }
 
   private var showsBasicViewAffordance: Bool {
-    cachedComparison == nil
-      && alignmentModel.currentKey == alignmentKey
-      && alignmentModel.showsBasicViewAffordance
+    if let displayedOutcome {
+      return displayedOutcome.source.isFallback
+    }
+    return alignmentModel.currentKey == alignmentKey && alignmentModel.showsBasicViewAffordance
   }
 
   private var fullRecipes: [WorkbenchCompareRecipe] {
