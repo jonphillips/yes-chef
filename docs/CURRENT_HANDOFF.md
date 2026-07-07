@@ -1,8 +1,11 @@
 # Current Handoff
 
 Last updated: July 6, 2026 (**Next Up = the synthesis-shaped apply-action** — the draft verb's own action
-shape). Recently completed: **Workbench S4 — Compare** (the ingredient-diff matrix + *Full* flip-through,
-app-layer only, in review — completes the Workbench build arc S1–S4). Earlier, moved to
+shape). Recently completed: **Compare-key granularity** (a second, coarser `CanonicalIngredient.comparisonKey`
+the Workbench Compare matrix aligns on — `fresh`/`frozen`/`dried` variants now share one base row with the form
+in the cells; grocery key untouched, no schema; core-only, in review; `efforts/comparison-key-granularity.md`)
+and **Workbench S4 — Compare** (the ingredient-diff matrix + *Full* flip-through, app-layer only —
+completes the Workbench build arc S1–S4). Earlier, moved to
 [`docs/DONE-LOG.md`](DONE-LOG.md):
 Workbench S3 durable log ([#110](https://github.com/jonphillips/yes-chef/pull/110), Jon device-passed),
 Workbench S2 + dogfood-hardening ([#107](https://github.com/jonphillips/yes-chef/pull/107)), chat controls

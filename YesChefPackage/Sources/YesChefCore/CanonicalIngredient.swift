@@ -58,6 +58,30 @@ public enum CanonicalIngredient {
     "sliced",
   ]
 
+  /// State/form words the **grocery** key deliberately keeps (`fresh` vs `frozen` are different SKUs)
+  /// but the **compare matrix** ignores — the matrix aligns on the base ingredient and lets each cell
+  /// carry the form. See `comparisonKey`. Cost-of-error is asymmetric: a false merge is expensive on
+  /// the shop but cheap and self-evident in the matrix (the cells show `fresh` vs `frozen`).
+  private static let comparisonFormModifiers: Set<String> = [
+    "boneless",
+    "bottled",
+    "canned",
+    "cooked",
+    "cured",
+    "dried",
+    "fresh",
+    "frozen",
+    "jarred",
+    "packed",
+    "raw",
+    "ripe",
+    "roasted",
+    "skinless",
+    "smoked",
+    "toasted",
+    "whole",
+  ]
+
   public static func canonicalName(_ text: String?) -> String? {
     guard let text else { return nil }
     let base = baseText(text)
@@ -74,6 +98,34 @@ public enum CanonicalIngredient {
     }
 
     let singular = lightlySingularized(stripped)
+    if let alias = aliases[singular] {
+      return alias
+    }
+    return singular
+  }
+
+  /// A **coarser** key than `canonicalName`, used only by the Workbench Compare matrix to align rows.
+  /// A strict coarsening: same alias/singularize pipeline, but form/state words (`fresh`, `frozen`,
+  /// `dried`, `canned`…) and prep/size descriptors are stripped from **any** position, so variants of
+  /// one ingredient share a row and the difference shows in the cells. Never feed this to grocery
+  /// consolidation or pantry matching — those must keep `fresh`/`frozen`/`dried` distinct.
+  public static func comparisonKey(_ text: String?) -> String? {
+    guard let text else { return nil }
+    let base = baseText(text)
+    let normalized = normalize(base)
+    guard !normalized.isEmpty else { return nil }
+
+    if let alias = aliases[normalized] {
+      return alias
+    }
+
+    let stripped = strippingModifiers(from: normalized)
+    if !stripped.isEmpty, let alias = aliases[stripped] {
+      return alias
+    }
+
+    let candidate = stripped.isEmpty ? normalized : stripped
+    let singular = lightlySingularized(candidate)
     if let alias = aliases[singular] {
       return alias
     }
@@ -126,6 +178,14 @@ public enum CanonicalIngredient {
     while let first = words.first, leadingDescriptors.contains(first) {
       words.removeFirst()
     }
+    return words.joined(separator: " ")
+  }
+
+  /// Drop prep/size descriptors and form/state words from **any** position — the compare key's extra
+  /// coarsening step over the grocery key's leading-only strip.
+  private static func strippingModifiers(from text: String) -> String {
+    let removable = leadingDescriptors.union(comparisonFormModifiers)
+    let words = text.split(separator: " ").map(String.init).filter { !removable.contains($0) }
     return words.joined(separator: " ")
   }
 

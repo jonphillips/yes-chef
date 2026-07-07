@@ -18,6 +18,37 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func comparisonKeyCoarsensFormWhileGroceryKeyKeepsItSplit() {
+      // The compare key drops form/state words so variants share a matrix row…
+      expectNoDifference(
+        CanonicalIngredient.comparisonKey("dried ancho chiles"),
+        CanonicalIngredient.comparisonKey("ancho chiles")
+      )
+      expectNoDifference(
+        CanonicalIngredient.comparisonKey("frozen spinach"),
+        CanonicalIngredient.comparisonKey("fresh spinach")
+      )
+      expectNoDifference(CanonicalIngredient.comparisonKey("frozen spinach"), "spinach")
+      // …descriptors strip from any position, not just the front…
+      expectNoDifference(
+        CanonicalIngredient.comparisonKey("medium garlic cloves"),
+        CanonicalIngredient.comparisonKey("garlic cloves")
+      )
+      // …and aliases still resolve.
+      expectNoDifference(CanonicalIngredient.comparisonKey("scallions"), "green onions")
+
+      // But the grocery key deliberately keeps state distinct — a wrong SKU on the shop is expensive.
+      #expect(
+        CanonicalIngredient.canonicalName("frozen spinach")
+          != CanonicalIngredient.canonicalName("fresh spinach")
+      )
+      #expect(
+        CanonicalIngredient.canonicalName("dried ancho chiles")
+          != CanonicalIngredient.canonicalName("ancho chiles")
+      )
+    }
+
+    @Test
     func preservesExistingPantryStapleMatchingBehavior() {
       for (offset, title) in GroceryPantryAssumptions.defaultStaples.enumerated() {
         expectNoDifference(

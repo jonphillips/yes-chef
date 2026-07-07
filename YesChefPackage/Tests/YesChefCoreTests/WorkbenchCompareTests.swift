@@ -24,10 +24,11 @@ extension RecipeCoreTests {
       // Working pinned first, candidates follow.
       expectNoDifference(comparison.columns.map(\.role), [.working, .candidate])
       expectNoDifference(comparison.columns.map(\.title), ["Weeknight Birria", "Classic Birria"])
-      // Working-recipe order first, then candidate-only keys.
+      // Working-recipe order first, then candidate-only keys. Labels are the coarse base (the compare
+      // key made presentable), so plurals read as their singular head.
       expectNoDifference(
         comparison.rows.map(\.label),
-        ["Chuck roast", "Guajillo chiles", "Onion", "Ancho chiles", "Tomatoes"]
+        ["Chuck roast", "Guajillo chile", "Onion", "Ancho chile", "Tomatoes"]
       )
       // Shared ingredient lines up on one row; absence reads as an honest blank.
       expectNoDifference(
@@ -38,6 +39,33 @@ extension RecipeCoreTests {
           ["1 onion", "1 onion"],
           [nil, "1 ancho chiles"],
           [nil, "1 tomatoes"],
+        ]
+      )
+      #expect(!comparison.hasOtherLines)
+    }
+
+    @Test
+    func compareMergesFormVariantsOntoOneBaseRowWithFormInTheCells() {
+      let working = makeCompareDetail(
+        seed: 34_000,
+        title: "Skillet Greens",
+        items: ["fresh spinach", "dried ancho chiles"]
+      )
+      let candidate = makeCompareDetail(
+        seed: 35_000,
+        title: "Braised Greens",
+        items: ["frozen spinach", "ancho chiles"]
+      )
+
+      let comparison = WorkbenchCompare.ingredientComparison(working: working, candidates: [candidate])
+
+      // fresh/frozen and dried/(plain) collapse to one base row each — the difference is in the cells.
+      expectNoDifference(comparison.rows.map(\.label), ["Spinach", "Ancho chile"])
+      expectNoDifference(
+        comparison.rows.map(\.cells),
+        [
+          ["1 fresh spinach", "1 frozen spinach"],
+          ["1 dried ancho chiles", "1 ancho chiles"],
         ]
       )
       #expect(!comparison.hasOtherLines)

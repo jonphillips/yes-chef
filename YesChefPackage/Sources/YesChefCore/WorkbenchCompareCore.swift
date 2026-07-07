@@ -85,10 +85,12 @@ public enum WorkbenchCompare {
       }
     }
 
+    // The row header is the coarse base (the comparison key made presentable), not any one recipe's
+    // authored line — so the same row reads "Spinach" whether a column said "fresh" or "frozen"; the
+    // form lives in the cells.
     let rows = orderedKeys.map { key -> IngredientMatrixRow in
-      let label = builds.first { $0.labelByKey[key] != nil }?.labelByKey[key] ?? key.capitalizingFirstLetter
       let cells = builds.map { $0.cellsByKey[key] }
-      return IngredientMatrixRow(id: key, label: label, cells: cells)
+      return IngredientMatrixRow(id: key, label: key.capitalizingFirstLetter, cells: cells)
     }
 
     // Free the per-build lookup tables now that rows are materialized.
@@ -102,7 +104,6 @@ public enum WorkbenchCompare {
     var column: IngredientMatrixColumn
     var orderedKeys: [String]
     var cellsByKey: [String: String]
-    var labelByKey: [String: String]
   }
 
   private static func buildColumn(
@@ -115,21 +116,19 @@ public enum WorkbenchCompare {
     // canonical key (e.g. "2 tomatoes" + "1 can crushed tomatoes") are ambiguous and both go to other.
     var keyCounts: [String: Int] = [:]
     for line in lines {
-      if let key = line.canonicalIngredientName {
+      if let key = line.comparisonAlignmentKey {
         keyCounts[key, default: 0] += 1
       }
     }
 
     var orderedKeys: [String] = []
     var cellsByKey: [String: String] = [:]
-    var labelByKey: [String: String] = [:]
     var otherLines: [String] = []
 
     for line in lines {
       guard let text = line.comparisonCellText else { continue }
-      if let key = line.canonicalIngredientName, keyCounts[key] == 1 {
+      if let key = line.comparisonAlignmentKey, keyCounts[key] == 1 {
         cellsByKey[key] = text
-        labelByKey[key] = line.comparisonRowLabel(canonicalKey: key)
         orderedKeys.append(key)
       } else {
         otherLines.append(text)
@@ -144,8 +143,7 @@ public enum WorkbenchCompare {
         otherLines: otherLines
       ),
       orderedKeys: orderedKeys,
-      cellsByKey: cellsByKey,
-      labelByKey: labelByKey
+      cellsByKey: cellsByKey
     )
   }
 }
@@ -156,10 +154,10 @@ private extension IngredientLine {
     originalText.trimmingCharacters(in: .whitespacesAndNewlines).nonEmptyCompareText
   }
 
-  /// The row label: the parsed item when we have one, otherwise the canonical key made presentable.
-  func comparisonRowLabel(canonicalKey: String) -> String {
-    (item?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmptyCompareText ?? canonicalKey)
-      .capitalizingFirstLetter
+  /// The row-alignment key for the matrix — the **coarse** compare key (drops form/state words), not
+  /// the cached grocery `canonicalName`. Computed on read; no schema, no cache.
+  var comparisonAlignmentKey: String? {
+    CanonicalIngredient.comparisonKey(item ?? originalText)
   }
 }
 
