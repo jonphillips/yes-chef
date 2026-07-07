@@ -16,6 +16,9 @@ struct WorkbenchCompareView: View {
   let detail: WorkbenchDetailData
   let alignmentModel: WorkbenchCompareAlignmentModel
   let tier: ModelTier
+  /// Dismisses Compare and opens the workbench chat (already seeded with every candidate's
+  /// ingredients) so the cook can talk through the differences. Nil hides the affordance.
+  var onDiscuss: (() -> Void)?
   @Environment(\.dismiss) private var dismiss
   @State private var segment: Segment = .ingredients
 
@@ -103,6 +106,15 @@ struct WorkbenchCompareView: View {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") {
             dismiss()
+          }
+        }
+        if let onDiscuss {
+          ToolbarItem(placement: .topBarLeading) {
+            Button {
+              onDiscuss()
+            } label: {
+              Label("Chat", systemImage: "sparkles")
+            }
           }
         }
         if segment == .ingredients {

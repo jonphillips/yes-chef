@@ -125,6 +125,7 @@ struct WorkbenchDetailView: View {
   @State private var model: WorkbenchDetailModel
   @State private var compactChatModel: RecipeChatModel?
   @State private var compareTier: ModelTier = .onDevice
+  @State private var pendingChatAfterCompare = false
   let isFocusActive: Bool
   let focusButtonTapped: (() -> Void)?
 
@@ -242,10 +243,16 @@ struct WorkbenchDetailView: View {
     }
     // Full-screen focus cover on regular-width iPad (no third pane — the chat split owns the detail);
     // a sheet on compact iPhone. Same responsive Compare view either way.
-    .fullScreenCover(isPresented: isRegularWidth ? $model.isShowingCompare : .constant(false)) {
+    .fullScreenCover(
+      isPresented: isRegularWidth ? $model.isShowingCompare : .constant(false),
+      onDismiss: openPendingChat
+    ) {
       compareCover
     }
-    .sheet(isPresented: isRegularWidth ? .constant(false) : $model.isShowingCompare) {
+    .sheet(
+      isPresented: isRegularWidth ? .constant(false) : $model.isShowingCompare,
+      onDismiss: openPendingChat
+    ) {
       compareCover
     }
   }
@@ -255,9 +262,27 @@ struct WorkbenchDetailView: View {
       WorkbenchCompareView(
         detail: detail,
         alignmentModel: model.compareAlignmentModel,
-        tier: compareTier
+        tier: compareTier,
+        onDiscuss: discussComparison
       )
     }
+  }
+
+  /// Compare is modal, so we can't layer the chat on top of it cleanly. Instead we dismiss
+  /// Compare and open the chat once the cover is gone (see `openPendingChat`), avoiding the
+  /// present-while-dismissing race SwiftUI hits with back-to-back modals.
+  private func discussComparison() {
+    pendingChatAfterCompare = true
+    model.isShowingCompare = false
+  }
+
+  private func openPendingChat() {
+    guard pendingChatAfterCompare else { return }
+    pendingChatAfterCompare = false
+    // On iPad the chat split is always mounted — dismissing Compare already reveals it. Only
+    // compact width, where chat lives behind a toolbar button, needs the sheet opened.
+    guard !isSplitEnabled else { return }
+    model.chatButtonTapped()
   }
 
   private var isRegularWidth: Bool {

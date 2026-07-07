@@ -68,7 +68,7 @@ extension WorkbenchCompareAlignerClient: DependencyKey {
       promptPreferenceKey: nil
     )
     let response = try await modelClient.complete(request)
-    if wasTruncated(response) {
+    if response.wasTruncated {
       return WorkbenchAlignedComparison(comparison: deterministic, source: .fallback(.truncated))
     }
     if let comparison = parse(response.text, working: working, candidates: candidates) {
@@ -114,16 +114,6 @@ extension WorkbenchCompareAlignerClient: DependencyKey {
 
     Return the ordered alignment JSON only.
     """
-  }
-
-  static func wasTruncated(_ response: ModelResponse) -> Bool {
-    guard let stopReason = response.stopReason?.trimmingCharacters(in: .whitespacesAndNewlines),
-      !stopReason.isEmpty
-    else { return false }
-    return switch stopReason.lowercased() {
-    case "length", "max_tokens": true
-    default: false
-    }
   }
 
   static func classifyFallbackReason(_ text: String) -> WorkbenchAlignedComparison.FallbackReason {

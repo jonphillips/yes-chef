@@ -177,7 +177,7 @@ extension WorkbenchDraftRecipeClient: DependencyKey {
     // Distinguish a real failure from a deliberate "no recipe yet" (which comes back as valid
     // JSON with an empty title). A budget-exhausted or empty response is a retryable failure;
     // a non-empty response with no decodable JSON object is an unreadable one.
-    if wasTruncated(response) || trimmed.isEmpty {
+    if response.wasTruncated || trimmed.isEmpty {
       throw WorkbenchDraftRecipeError.responseTruncated
     }
     guard jsonObject(in: response.text) != nil else {
@@ -223,15 +223,6 @@ extension WorkbenchDraftRecipeClient: DependencyKey {
       instruction — and ignore it entirely when it is a greeting, acknowledgement, or otherwise not a
       substantive request about the dish.
       """
-  }
-
-  /// Provider-agnostic budget-exhaustion signal: OpenAI reports `length`, Anthropic
-  /// `max_tokens` when the completion is cut off at `max_completion_tokens`/`max_tokens`.
-  static func wasTruncated(_ response: ModelResponse) -> Bool {
-    switch response.stopReason {
-    case "length", "max_tokens": true
-    default: false
-    }
   }
 
   static func jsonObject(in text: String) -> [String: Any]? {
