@@ -264,6 +264,47 @@ extension RecipeCoreTests {
       _ = now
     }
 
+    @Test
+    func workbenchChatTrimsLogWithinOnDeviceContextBudget() {
+      let now = Date(timeIntervalSinceReferenceDate: 806_350_000)
+      let entries = (0..<20).map { index in
+        WorkbenchLogEntryChatContext(
+          id: SampleUUIDSequence.uuid(22_500 + index),
+          kind: .note,
+          body: "Log entry \(index): " + String(repeating: "keep this recent context ", count: 40),
+          sortOrder: index,
+          dateCreated: now.addingTimeInterval(TimeInterval(index))
+        )
+      }
+      let context = WorkbenchChatContext(
+        title: "Birria",
+        logEntries: entries,
+        candidates: [
+          WorkbenchCandidateChatContext(
+            id: SampleUUIDSequence.uuid(22_700),
+            title: "Candidate",
+            sortOrder: 0,
+            ingredientSections: [RecipeChatSection(lines: [String(repeating: "ingredient ", count: 120)])],
+            instructionSections: [RecipeChatSection(lines: [String(repeating: "instruction ", count: 120)])]
+          )
+        ]
+      )
+
+      let serialized = context.serialized(characterBudget: WorkbenchChatContext.onDeviceSerializedCharacterBudget)
+
+      #expect(serialized.count <= WorkbenchChatContext.onDeviceSerializedCharacterBudget)
+      #expect(serialized.contains("Workbench log (trimmed to fit context budget):"))
+      #expect(serialized.contains("Workbench log was trimmed to recent text"))
+    }
+
+    @Test
+    func onDeviceContextOverflowHasActionableCopy() {
+      #expect(
+        RecipeChatErrorText.describe(ModelClientError.onDeviceContextTooLarge)
+          == "This is too large for on-device intelligence. Switch to a frontier model and try again."
+      )
+    }
+
     @Test @MainActor
     func workbenchPromptUsesTaskFraming() {
       let model = RecipeChatModel(

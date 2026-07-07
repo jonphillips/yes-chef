@@ -1,7 +1,7 @@
 # Current Handoff
 
-Last updated: July 6, 2026 (**Next Up = batched slice: on-device context-overflow robustness +
-synthesis-shaped apply-action**.) Recently completed and moved to [`docs/DONE-LOG.md`](DONE-LOG.md):
+Last updated: July 6, 2026 (**Next Up = Workbench S4: Compare (the ingredient-diff matrix)**.) Recently
+completed and moved to [`docs/DONE-LOG.md`](DONE-LOG.md):
 Workbench S3 durable log ([#110](https://github.com/jonphillips/yes-chef/pull/110), Jon device-passed),
 Workbench S2 + dogfood-hardening ([#107](https://github.com/jonphillips/yes-chef/pull/107)), chat controls
 ([#105](https://github.com/jonphillips/yes-chef/pull/105), Jon device-passed), Workbench S1 + grounding
@@ -23,31 +23,18 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Batched slice — two cohesive chat-robustness pieces in one PR** (do both, in order):
-
-**(1) On-device chat context overflow — robustness.** Surfaced 2026-07-06 dogfooding a large taste profile in
-workbench chat; Apple `FoundationModels` threw `exceededContextWindowSize` after one turn. Two real bugs:
-**(a)** the taste profile is appended to `system` **unbudgeted** at the client boundary (jon-platform
-`TieredModelClient` → `appendingPromptPreferences`), outside `WorkbenchChatContext`'s 24k-char accounting — a
-large one is pure uncounted overhead; **(b)** the on-device fitter (`OnDeviceModelClient.fit`) only trims the
-*prompt tail* and reserves `system` whole, so when `system` (base + context + taste profile) alone exceeds
-Apple's ~4k-token window it cannot recover. Fix: budget context + taste profile into the on-device window (not
-just the prompt tail), lower the 24k on-device candidate budget to something realistic, and catch
-`exceededContextWindowSize` to surface "too big for on-device — switch to a frontier model" instead of a raw
-error. **While here, also budget/trim the workbench log** — S3 (PR #110) added it to the serialized context
-inside the candidate-trim loop but it is never trimmed itself, so a growing log can crowd out all candidates
-and still overflow (see `efforts/recipe-workbench.md` S3 review notes). Cross-repo (jon-platform LLMClientKit +
-Yes Chef budgets).
-
-**(2) Synthesis-shaped apply-action** (workbench draft verb should not be gated on the latest reply). The
-shared apply-action "subject" mechanism (`RecipeChatWorkspace`) is built around *acting on one assistant
-reply*: the Apply menu is disabled until a last reply exists, the auto-`.latestReply` fills the subject slot,
-and the "Acting on latest reply" chip frames it — which fits per-reply verbs (Chef-It-Up, Serve-With) but fits
-a *synthesis* verb poorly. The working-recipe draft should be enabled whenever the workbench has candidates and
-synthesize from the full conversation + all candidates, with any user selection an optional focus only (an
-interim prompt-side fix landed 2026-07-06; the proper fix is a distinct action shape — enabled by workbench
-state, no last-reply gate, no misleading chip). Full write-up in
-[`efforts/recipe-workbench.md`](efforts/recipe-workbench.md) parked follow-ons.
+**Workbench S4 — Compare (the ingredient-diff matrix).** App-layer only — no migration, no new fetch, no sync
+touch. Full spec in `efforts/recipe-workbench.md` (slice plan → S4); read it before starting. In brief: an
+aligned ingredient matrix — rows = canonical ingredients, columns = recipes, each cell = that recipe's
+`IngredientLine` (blank cell = ingredient absent) — with the working recipe pinned as a frozen first column
+while candidates scroll horizontally. The data is already loaded in `WorkbenchDetailData` (`WorkbenchCore.swift`
+~L145), so Compare is a pure read. Load-bearing alignment rule: align only on exact `canonicalName` match
+(`CanonicalIngredient.canonicalName(_:)`, as grocery dedup does); unmatched/ambiguous lines drop to a
+per-column "other" tail, never force-merged — a wrong alignment is worse than an honest blank. Nav: a "Compare"
+button in the Candidates section header (`WorkbenchViews.swift` ~L184) → full-screen `.detailOnly` cover on
+iPad (no third pane — the chat split owns the detail), sheet + horizontal pager on iPhone. Segmented control:
+Ingredients | Full — Ingredients (the matrix) ships this slice; Full (the tabbed whole-recipe quick-view)
+folds in as the second segment, same PR or fast follow.
 
 **Standing release follow-up (not a dispatch — a pre-cut ops step Jon runs).** We stay in the CloudKit
 **Development** environment (dev stance) so the schema keeps evolving freely; promoting to **Production** is

@@ -287,8 +287,8 @@ struct RecipeChatPanel: View {
           )
         }
 
-        if let actionSubject {
-          ChatActionSubjectView(subject: actionSubject)
+        if let visibleActionSubject {
+          ChatActionSubjectView(subject: visibleActionSubject)
         }
 
         Menu {
@@ -298,6 +298,7 @@ struct RecipeChatPanel: View {
             } label: {
               Label(action.title, systemImage: "text.badge.checkmark")
             }
+            .disabled(!canRun(action))
           }
         } label: {
           Label(applyMenuTitle, systemImage: applyingActionID == nil ? "wand.and.stars" : "hourglass")
@@ -309,7 +310,7 @@ struct RecipeChatPanel: View {
             || chatModel.isResponding
             || applyingActionID != nil
             || committingReviewItemID != nil
-            || actionSubject == nil
+            || !applyActions.contains(where: canRun)
         )
 
         HStack(alignment: .bottom, spacing: 8) {
@@ -372,14 +373,15 @@ struct RecipeChatPanel: View {
 
   @MainActor
   private func run(_ action: AnyChatApplyAction) async {
-    guard let actionSubject else { return }
+    let subject = actionSubject(for: action)
+    guard !action.requiresSubject || subject != nil else { return }
     applyingActionID = action.id
     actionSummary = nil
     actionError = nil
     defer { applyingActionID = nil }
 
     do {
-      let items = try await action.run(actionSubject.text, chatModel.messages)
+      let items = try await action.run(subject?.text ?? "", chatModel.messages)
       guard !items.isEmpty else {
         actionError = "The assistant did not return anything to review."
         return
@@ -410,11 +412,35 @@ struct RecipeChatPanel: View {
     stagedReviewItems.removeAll { $0.id == item.id }
   }
 
-  private var actionSubject: ChatActionSubject? {
+  private var visibleActionSubject: ChatActionSubject? {
+    if let selectionSubject {
+      return selectionSubject
+    }
+    guard !applyActions.isEmpty, applyActions.allSatisfy(\.requiresSubject) else { return nil }
+    return latestReplySubject
+  }
+
+  private func actionSubject(for action: AnyChatApplyAction) -> ChatActionSubject? {
+    if let selectionSubject {
+      return selectionSubject
+    }
+    guard action.requiresSubject else { return nil }
+    return latestReplySubject
+  }
+
+  private func canRun(_ action: AnyChatApplyAction) -> Bool {
+    !action.requiresSubject || actionSubject(for: action) != nil
+  }
+
+  private var selectionSubject: ChatActionSubject? {
     let selected = selectedAssistantText.trimmingCharacters(in: .whitespacesAndNewlines)
     if !selected.isEmpty {
       return ChatActionSubject(source: .selection, text: selected)
     }
+    return nil
+  }
+
+  private var latestReplySubject: ChatActionSubject? {
     guard
       let reply = chatModel.messages.last(where: { $0.role == .assistant })?.text
         .trimmingCharacters(in: .whitespacesAndNewlines),
