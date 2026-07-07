@@ -12,6 +12,9 @@ packages:
     path: ../../jon-platform/packages/LLMClientKit
   CloudSyncKit:
     path: ../../jon-platform/packages/CloudSyncKit
+  Dependencies:
+    url: https://github.com/pointfreeco/swift-dependencies
+    from: 1.0.0
   CasePaths:
     url: https://github.com/pointfreeco/swift-case-paths
     from: 1.0.0
@@ -88,11 +91,34 @@ targets:
         INFOPLIST_FILE: YesChefShareExtension/Info.plist
         MARKETING_VERSION: "1.0"
         APPLICATION_EXTENSION_API_ONLY: YES
+  YesChefTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "27.0"
+    sources:
+      - path: YesChefAppTests
+    dependencies:
+      - target: YesChef
+      - package: YesChefPackage
+        product: YesChefCore
+      - package: LLMClientKit
+        product: LLMClientKit
+      - package: Dependencies
+        product: DependenciesTestSupport
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jonphillips.yeschef.tests
+        DEVELOPMENT_TEAM: 7MQEE539G9
+        GENERATE_INFOPLIST_FILE: YES
 schemes:
   YesChef:
     build:
       targets:
         YesChef: all
         YesChefShareExtension: all
+    test:
+      config: Debug
+      targets:
+        - name: YesChefTests
     run:
       config: Debug
