@@ -4,8 +4,9 @@
 UI. Reuses the Recipe stack (reader/editor/scaling/images/sync), the chat split host, the staging card,
 and LLMClientKit. **Not** an overload of Menu/Collection.
 **Owner:** Codex (implement, per slice) · Claude (architect/review) · Jon (product/review)
-**Status:** **S1, chat controls, S2, and S3 all shipped** (→ DONE-LOG). The store + curate arc is complete;
-remaining workbench work is the parked follow-ons below. Milestone-sized: do **not** bundle all slices into one PR.
+**Status:** **S1, chat controls, S2, and S3 all shipped** (→ DONE-LOG). The store + curate arc is complete.
+**S4 (Compare — the ingredient-diff matrix) is specced and next up** (app-layer only, no schema/sync touch).
+Beyond it, only the parked follow-ons below remain. Milestone-sized: do **not** bundle all slices into one PR.
 **Decisions it implements:** [ADR-0019](../decisions/ADR-0019-recipe-design-studies.md) — whole, incl.
 **Amendments 1 (durable workbench + workbench log) and 2 (name ratified)**. Design record: the
 2026-07-05 design conversation.
@@ -111,6 +112,39 @@ additive-nullable, defaults `main`) to hide in-progress working recipes from bro
   - S3 ships the **store + manual/curate path first**; AI-*generated* experiment/fork entries layer on as
     dogfooding shapes them (new `kind` or new compose path = no migration).
 
+- **S4 — Compare (the ingredient-diff surface; folds in the parked tabbed quick-view).** *App-layer
+  only — no migration, no new fetch, no sync touch (that's the whole point). Its own dispatch; the logic
+  is testable in isolation without a device pass.*
+  - **The data is already loaded — Compare is a pure read.** Every candidate row and the working recipe
+    already carry a full `RecipeDetailData` (`ingredientSections` + `ingredientLines`) inside
+    `WorkbenchDetailData` (`WorkbenchCore.swift`, ~L145). Compare reads what workbench detail already holds —
+    **no `RecipeDetailRequest`, no schema, no `libraryPlacement`/sync implication.**
+  - **Aligned ingredient matrix (Option B), working recipe pinned.** Rows = canonical ingredients,
+    columns = recipes, each cell = that recipe's `IngredientLine` for that ingredient (quantity/text as
+    authored); a **blank cell = ingredient absent**. The **working recipe is a frozen first column**
+    (accent-tinted) that stays put while candidates scroll horizontally — with the soft cap of ~5 candidates
+    + working = up to 6 columns, 3–4 fit on iPad without scrolling. This is the diff the cook asked for:
+    presence/absence reads as blanks, quantity differences line up on a single row instead of scattered
+    across columns.
+  - **Alignment rule (load-bearing — get this right or the feature lies).** Align **only on exact
+    `canonicalName` match** — the `CanonicalIngredient.canonicalName(_:)` normalizer already used by grocery
+    dedup + pantry-matching, so alignment quality is a known quantity, not a new gamble. Anything that
+    doesn't canonicalize, or collides ambiguously, drops to a **per-column "other" tail** — **never
+    force-merged onto a shared row.** A wrong alignment is worse than an honest blank. This is also what makes
+    Option B degrade *into* Option A (plain parallel columns) when keys are sparse, rather than failing.
+  - **Segmented control: Ingredients | Full.** *Ingredients* (the matrix) ships in this slice. *Full* =
+    the parked tabbed whole-recipe quick-view (one recipe at a time, directions included) — its scope folds
+    in here as the second segment. Design them as one Compare surface; *Full* may land in the same PR or a
+    fast follow (implementer's call), but it is no longer a standalone parked item.
+  - **Navigation:** a **"Compare" button in the Candidates section header** (`WorkbenchViews.swift`, beside
+    "Add Candidates" ~L184), enabled once there are ≥2 comparable items (candidates, or candidates +
+    working). Present as a **full-screen cover reusing the S1-polish `.detailOnly` focus pattern** on regular-
+    width iPad — **do not add a third pane**, the chat split owns the detail column; a **sheet with a
+    horizontal pager** on iPhone. Same view, responsive.
+  - **Reuse:** `RecipeDetailData.ingredientLines` (already loaded), `CanonicalIngredient.canonicalName(_:)`
+    (the alignment key), the `.detailOnly`/`.doubleColumn` focus toggle from S1 polish (`AppMainLayout`), and
+    the `IngredientSection`/`IngredientLine` display formatting the reader already uses.
+
 ## Out of scope / parked follow-ons
 
 - **Rival full working recipes side-by-side** ("could go this way, could go that" as *materialized*
@@ -145,9 +179,10 @@ additive-nullable, defaults `main`) to hide in-progress working recipes from bro
   `.reference` scratch draft (cascades to children), and merely unlinks a promoted `.main` recipe so it stays
   in the library. Re-draft = remove, then use the Apply menu again. Still open: a one-tap *overwrite* (remove
   + re-draft in a single action) if dogfooding wants it.
-- **Quick-view of candidates + working recipe together, tabbed (meals/menus pattern).** Reuse the tabbed
-  interface from the meal/menu surfaces to eyeball a workbench's candidates and its working recipe
-  side-by-side without drilling into each. UX/navigation follow-on, lower urgency than the lifecycle gap.
+- **Quick-view of candidates + working recipe together, tabbed (meals/menus pattern).** **Promoted into
+  S4** as the *Full* segment of the Compare surface (see the slice plan) — no longer a standalone parked
+  item. The tabbed whole-recipe flip-through is the "I need the directions too" companion to S4's ingredient
+  matrix; both live behind one Compare entry point.
 - **Synthesis-shaped apply-action (draft verb should not be gated on the latest reply).** The shared
   apply-action "subject" mechanism (`RecipeChatWorkspace`) is built around *acting on one assistant reply*:
   the Apply menu is disabled until a last reply exists, the auto-`.latestReply` fills the subject slot, and
