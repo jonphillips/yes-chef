@@ -228,7 +228,7 @@ private enum CompareMetrics {
   static let cellPadding: CGFloat = 10
 }
 
-private struct IngredientMatrixView: View {
+struct IngredientMatrixView: View {
   let comparison: IngredientComparison
   @State private var rowHeights: [String: CGFloat] = [:]
 

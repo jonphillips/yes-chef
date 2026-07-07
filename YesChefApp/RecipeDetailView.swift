@@ -130,6 +130,15 @@ struct RecipeDetailView: View {
         )
       }
     }
+    .adjustmentReviewPresentation(
+      item: $model.destination.adjustmentReview,
+      usesFullScreenCover: isSplitEnabled
+    ) { review in
+      RecipeAdjustmentReviewView(
+        review: review,
+        overwrite: { model.overwriteAdjustmentButtonTapped($0) }
+      )
+    }
     .alert("Recipe Update Failed", isPresented: $model.isShowingError) {
       Button("OK", role: .cancel) {}
     } message: {
@@ -345,6 +354,14 @@ private struct RecipeReaderView: View {
           libraryModel.originalSnapshotButtonTapped(recipeID: recipe.id)
         } label: {
           Label("View Original", systemImage: "doc.text.magnifyingglass")
+        }
+        .buttonStyle(.bordered)
+      }
+      if model.adjustmentRestorePoint != nil {
+        Button {
+          model.undoLastAdjustmentButtonTapped()
+        } label: {
+          Label("Undo Adjustment", systemImage: "arrow.uturn.backward")
         }
         .buttonStyle(.bordered)
       }
@@ -634,6 +651,21 @@ private extension String {
 private extension Optional where Wrapped == String {
   var nonEmpty: String? {
     flatMap(\.nonEmpty)
+  }
+}
+
+private extension View {
+  @ViewBuilder
+  func adjustmentReviewPresentation<Item: Identifiable, Content: View>(
+    item: Binding<Item?>,
+    usesFullScreenCover: Bool,
+    @ViewBuilder content: @escaping (Item) -> Content
+  ) -> some View {
+    if usesFullScreenCover {
+      fullScreenCover(item: item, content: content)
+    } else {
+      sheet(item: item, content: content)
+    }
   }
 }
 

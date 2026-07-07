@@ -10,6 +10,43 @@ Newest first.
 
 ---
 
+## Recipe edit proposals — S1 (the "Adjust this recipe" verb + section-aware overwrite/undo)
+
+**Architect-reviewed + Jon device-passed 2026-07-07** — yes-chef PR #122 (this slice). Implements
+[ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) S1 (which extends
+[ADR-0021](decisions/ADR-0021-recipe-variations.md)); `efforts/recipe-edit-proposals.md`. **Schema-free** —
+no migration, no synced column. The **first chat verb that edits a recipe's canonical ingredients/method**
+(Make-ahead/Chef-It-Up/Serve-With only ever wrote additive sidecar sections; the workbench draft only
+*creates*). Made safe by construction: the model writes only to a transient preview, never to a stored
+recipe, until a human tap.
+
+Landed as two passes on branch `codex/adjust-recipe-s1`. **Pass 1** built the primitive: a `.adjustRecipe`
+apply-action on `RecipeDetailModel.applyActionCatalog` (so it lands on **every recipe and the workbench
+working recipe** at once, ADR-0023 D1); a **delta extractor** (`RecipeAdjustment.swift`) mirroring
+`WorkbenchDraftRecipeClient` that emits a **structured delta** in ADR-0021 D2's closed op vocabulary
+(`add`/`remove`/`substitute`/`scale` + prose method note / whole-step replacement — never a re-blended
+recipe, [[llm-curation-not-synthesis]]), `high` effort with a `maxTokens: 16_384` budget that covers
+reasoning **and** output and throws on truncation ([[reasoning-budget-starves-output]]); a **side-by-side
+review** (`RecipeAdjustmentReviewView.swift`) reusing `WorkbenchCompare` canonical-name alignment (full-screen
+cover on iPad, sheet on iPhone); and **overwrite-in-place** guarded by a **device-local, in-memory,
+sync-excluded** one-level undo restore point (`RecipeBundleCoding` snapshot — the pristine `originalSnapshot`
+provenance column is left untouched, ADR-0023 D5).
+
+**Pass 2 (section-aware revision)** fixed the pass-1 limitation that only the *first* ingredient/instruction
+section was edited (it round-tripped through a single `ingredientText`). It now mutates the detail's
+`[IngredientLine]`/`[InstructionStep]` arrays **in place across all sections**, preserving each line's
+`id`/`sectionID`/`sortOrder` (the ID-preservation S2 variation-anchoring wants); adds an optional `sectionName`
+to the `add` op (case-insensitive match, else first section); a private `replaceEditableChildren` multi-section
+overwrite/restore writer (atomic delete+insert of the recipe's own children — general notes only, so
+provenance/photos/tags/categories/source/adaptation notes stay untouched); and a **latent-bug fix** to
+`restoreRecipeAdjustment` so undo restores the **full multi-section** recipe instead of collapsing it to one
+section. Core-tested (`RecipeAdjustmentTests` — cross-section apply, two-section overwrite, and the
+two-section undo that broke before). **OQ4 held**: the plain-recipe and workbench-working-recipe paths are the
+same `Recipe`+delta code, no fork. Review caught + fixed a `file_length` overflow (structs/methods split into
+`RecipeDetailModel+Adjustment.swift`) and a `.first`-without-fallback build regression before merge.
+
+---
+
 ## LLM-aligned Compare matrix (ADR-0022) — shipped S1–S4 + Compare→chat affordance
 
 **Architect-reviewed + merged 2026-07-07** — yes-chef PRs [#116](https://github.com/jonphillips/yes-chef/pull/116)–[#120](https://github.com/jonphillips/yes-chef/pull/120).
