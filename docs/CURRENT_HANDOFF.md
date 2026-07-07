@@ -1,7 +1,9 @@
 # Current Handoff
 
-Last updated: July 6, 2026 (**Next Up = Workbench S4: Compare (the ingredient-diff matrix)**.) Recently
-completed and moved to [`docs/DONE-LOG.md`](DONE-LOG.md):
+Last updated: July 6, 2026 (**Next Up = the synthesis-shaped apply-action** — the draft verb's own action
+shape). Recently completed: **Workbench S4 — Compare** (the ingredient-diff matrix + *Full* flip-through,
+app-layer only, in review — completes the Workbench build arc S1–S4). Earlier, moved to
+[`docs/DONE-LOG.md`](DONE-LOG.md):
 Workbench S3 durable log ([#110](https://github.com/jonphillips/yes-chef/pull/110), Jon device-passed),
 Workbench S2 + dogfood-hardening ([#107](https://github.com/jonphillips/yes-chef/pull/107)), chat controls
 ([#105](https://github.com/jonphillips/yes-chef/pull/105), Jon device-passed), Workbench S1 + grounding
@@ -23,18 +25,20 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Workbench S4 — Compare (the ingredient-diff matrix).** App-layer only — no migration, no new fetch, no sync
-touch. Full spec in `efforts/recipe-workbench.md` (slice plan → S4); read it before starting. In brief: an
-aligned ingredient matrix — rows = canonical ingredients, columns = recipes, each cell = that recipe's
-`IngredientLine` (blank cell = ingredient absent) — with the working recipe pinned as a frozen first column
-while candidates scroll horizontally. The data is already loaded in `WorkbenchDetailData` (`WorkbenchCore.swift`
-~L145), so Compare is a pure read. Load-bearing alignment rule: align only on exact `canonicalName` match
-(`CanonicalIngredient.canonicalName(_:)`, as grocery dedup does); unmatched/ambiguous lines drop to a
-per-column "other" tail, never force-merged — a wrong alignment is worse than an honest blank. Nav: a "Compare"
-button in the Candidates section header (`WorkbenchViews.swift` ~L184) → full-screen `.detailOnly` cover on
-iPad (no third pane — the chat split owns the detail), sheet + horizontal pager on iPhone. Segmented control:
-Ingredients | Full — Ingredients (the matrix) ships this slice; Full (the tabbed whole-recipe quick-view)
-folds in as the second segment, same PR or fast follow.
+**Synthesis-shaped apply-action — the draft verb's own action shape.** App-layer only, small slice. Full spec
+in `efforts/recipe-workbench.md` (Out of scope / parked follow-ons → "Synthesis-shaped apply-action"); read it
+before starting. The problem: the shared apply-action "subject" mechanism (`RecipeChatWorkspace`) is built
+around *acting on one assistant reply* — the Apply menu is gated on a last reply existing, auto-fills the
+subject with `.latestReply`, and frames it with an "Acting on latest reply" chip. That fits per-reply verbs
+(Chef-It-Up, Serve-With) but fits the *synthesis* draft verb poorly: the working-recipe draft should be enabled
+whenever the workbench has candidates and synthesize from the **full conversation + all candidates**, with any
+user selection as an optional focus only. An interim fix already landed (the draft prompt ignores greeting/
+acknowledgement subjects so a heartbeat reply can't hijack it); this slice is the **proper** fix — a distinct
+action shape enabled by workbench state, with **no last-reply gate and no misleading chip**. The draft action is
+built in `WorkbenchDetailModel.applyActionCatalog` (`WorkbenchModels.swift`) via `AnyChatApplyAction(...,
+requiresSubject: false)`; the gating/chip live in `RecipeChatWorkspace.swift`. Keep the existing S2 draft
+behavior (create `.reference` working recipe, link `draftRecipeID`, capture `originalSnapshot`, open in reader)
+intact — this is a UX/action-shape refinement, not a data change.
 
 **Standing release follow-up (not a dispatch — a pre-cut ops step Jon runs).** We stay in the CloudKit
 **Development** environment (dev stance) so the schema keeps evolving freely; promoting to **Production** is
@@ -49,10 +53,11 @@ app target (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's d
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
-**Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — S1, chat controls, S2, and S3 all shipped
-(→ DONE-LOG); the store + curate arc is complete. The **synthesis-shaped apply-action** follow-on is drawn
-into the current Next Up (item 2); the rest stay parked in the effort doc (AI effort/tier as a user-facing
-setting, tabbed candidate/working-recipe quick-view, AI-generated log entries, the S3 review notes).
+**Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — S1, chat controls, S2, S3, and S4 all shipped
+(S1–S3 → DONE-LOG; S4 Compare in review); the store + curate + compare arc is complete, and the tabbed
+candidate/working-recipe quick-view shipped as S4's *Full* segment. The **synthesis-shaped apply-action**
+follow-on is the current Next Up; the rest stay parked in the effort doc (AI effort/tier as a user-facing
+setting, AI-generated log entries, the S3 review notes).
 
 **Meal-Planner chat verbs** (ADR-0013 follow-on + `efforts/cooking-workspace.md`) — the one remaining named
 actionable-chat verb instance. Classify each new verb's commit shape first ([[chat-verb-commit-shapes]]) —

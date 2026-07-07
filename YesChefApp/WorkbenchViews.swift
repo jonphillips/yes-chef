@@ -237,6 +237,24 @@ struct WorkbenchDetailView: View {
           : "This deletes the draft working recipe so you can draft a new one. This can't be undone."
       )
     }
+    // Full-screen focus cover on regular-width iPad (no third pane — the chat split owns the detail);
+    // a sheet on compact iPhone. Same responsive Compare view either way.
+    .fullScreenCover(isPresented: isRegularWidth ? $model.isShowingCompare : .constant(false)) {
+      compareCover
+    }
+    .sheet(isPresented: isRegularWidth ? .constant(false) : $model.isShowingCompare) {
+      compareCover
+    }
+  }
+
+  @ViewBuilder private var compareCover: some View {
+    if let detail = model.detail {
+      WorkbenchCompareView(detail: detail)
+    }
+  }
+
+  private var isRegularWidth: Bool {
+    horizontalSizeClass != .compact
   }
 
   private var isSplitEnabled: Bool {
@@ -357,7 +375,16 @@ private struct WorkbenchReader: View {
           }
         }
       } header: {
-        Text("Candidates")
+        HStack {
+          Text("Candidates")
+          Spacer()
+          Button {
+            model.compareButtonTapped()
+          } label: {
+            Label("Compare", systemImage: "square.split.2x2")
+          }
+          .disabled(!model.canCompare)
+        }
       }
     }
     .onAppear {

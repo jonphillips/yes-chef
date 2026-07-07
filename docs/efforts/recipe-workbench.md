@@ -4,9 +4,11 @@
 UI. Reuses the Recipe stack (reader/editor/scaling/images/sync), the chat split host, the staging card,
 and LLMClientKit. **Not** an overload of Menu/Collection.
 **Owner:** Codex (implement, per slice) · Claude (architect/review) · Jon (product/review)
-**Status:** **S1, chat controls, S2, and S3 all shipped** (→ DONE-LOG). The store + curate arc is complete.
-**S4 (Compare — the ingredient-diff matrix) is specced and next up** (app-layer only, no schema/sync touch).
-Beyond it, only the parked follow-ons below remain. Milestone-sized: do **not** bundle all slices into one PR.
+**Status:** **S1, chat controls, S2, S3, and S4 all shipped** (S1–S3 → DONE-LOG; S4 in review). The store,
+curate, and compare arc is complete. **S4 (Compare — the ingredient-diff matrix) landed** app-layer only (no
+migration/fetch/sync touch): a pure-read aligned matrix + a whole-recipe *Full* flip-through, both behind one
+Compare entry point. Beyond it, only the parked follow-ons below remain. Milestone-sized: do **not** bundle all
+slices into one PR.
 **Decisions it implements:** [ADR-0019](../decisions/ADR-0019-recipe-design-studies.md) — whole, incl.
 **Amendments 1 (durable workbench + workbench log) and 2 (name ratified)**. Design record: the
 2026-07-05 design conversation.
@@ -112,9 +114,13 @@ additive-nullable, defaults `main`) to hide in-progress working recipes from bro
   - S3 ships the **store + manual/curate path first**; AI-*generated* experiment/fork entries layer on as
     dogfooding shapes them (new `kind` or new compose path = no migration).
 
-- **S4 — Compare (the ingredient-diff surface; folds in the parked tabbed quick-view).** *App-layer
+- **S4 — implemented: Compare (the ingredient-diff surface; folds in the parked tabbed quick-view).** *App-layer
   only — no migration, no new fetch, no sync touch (that's the whole point). Its own dispatch; the logic
-  is testable in isolation without a device pass.*
+  is testable in isolation without a device pass.* Shipped as a pure `WorkbenchCompare.ingredientComparison`
+  read (`WorkbenchCompareCore.swift`) with unit tests + a responsive `WorkbenchCompareView` (full-screen cover
+  on iPad, sheet on iPhone), reached from a **Compare** button in the Candidates header (enabled at ≥2
+  comparable recipes). Both the *Ingredients* matrix and the *Full* whole-recipe flip-through landed in the
+  same PR.
   - **The data is already loaded — Compare is a pure read.** Every candidate row and the working recipe
     already carry a full `RecipeDetailData` (`ingredientSections` + `ingredientLines`) inside
     `WorkbenchDetailData` (`WorkbenchCore.swift`, ~L145). Compare reads what workbench detail already holds —
@@ -179,10 +185,10 @@ additive-nullable, defaults `main`) to hide in-progress working recipes from bro
   `.reference` scratch draft (cascades to children), and merely unlinks a promoted `.main` recipe so it stays
   in the library. Re-draft = remove, then use the Apply menu again. Still open: a one-tap *overwrite* (remove
   + re-draft in a single action) if dogfooding wants it.
-- **Quick-view of candidates + working recipe together, tabbed (meals/menus pattern).** **Promoted into
-  S4** as the *Full* segment of the Compare surface (see the slice plan) — no longer a standalone parked
-  item. The tabbed whole-recipe flip-through is the "I need the directions too" companion to S4's ingredient
-  matrix; both live behind one Compare entry point.
+- **Quick-view of candidates + working recipe together, tabbed (meals/menus pattern). — SHIPPED in S4** as
+  the *Full* segment of the Compare surface (a recipe picker + whole-recipe scroll with ingredients and
+  directions; `WorkbenchCompareView`). The "I need the directions too" companion to S4's ingredient matrix;
+  both live behind one Compare entry point.
 - **Synthesis-shaped apply-action (draft verb should not be gated on the latest reply).** The shared
   apply-action "subject" mechanism (`RecipeChatWorkspace`) is built around *acting on one assistant reply*:
   the Apply menu is disabled until a last reply exists, the auto-`.latestReply` fills the subject slot, and

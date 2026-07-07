@@ -28,6 +28,7 @@
 		587E4FEB200F87C5D6A066B1 /* BrowserViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6695544EB0BE23557D34BFA5 /* BrowserViews.swift */; };
 		58947ACE0A30F7F3182C5833 /* AISettingsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F3ADFFD14E222AAFF380E6 /* AISettingsModel.swift */; };
 		5A3CE29C1018A68874A977A2 /* RecipeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76906E88E579D71619461798 /* RecipeEditorView.swift */; };
+		5D89C590DAD9C0F7917D0A9F /* WorkbenchCompareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ADDB4E672F69BB9AD2EB58F /* WorkbenchCompareView.swift */; };
 		5FF287DEA72793C3CDA1ACD1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7871BB8EDB397A338B979FCD /* Assets.xcassets */; };
 		625B8E1A949829F1536C3C7C /* RecipeEditorModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C250D0CBA2170B99AE070A1 /* RecipeEditorModels.swift */; };
 		627BE832B346246A69355F57 /* SyncHealthModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EA663A481CAE11E140B6830 /* SyncHealthModel.swift */; };
@@ -114,6 +115,7 @@
 		3CCF32B5108C44892607FF3B /* RecipeDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeDetailView.swift; sourceTree = "<group>"; };
 		3EA663A481CAE11E140B6830 /* SyncHealthModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncHealthModel.swift; sourceTree = "<group>"; };
 		46B9BCF538013B597BB0D401 /* RecipeListRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeListRow.swift; sourceTree = "<group>"; };
+		4ADDB4E672F69BB9AD2EB58F /* WorkbenchCompareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchCompareView.swift; sourceTree = "<group>"; };
 		56E450B24DC7459A2108DDFF /* RecipeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeModels.swift; sourceTree = "<group>"; };
 		56F66618C21D85EE42AB4DEB /* PaprikaImportWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaprikaImportWorkspace.swift; sourceTree = "<group>"; };
 		5ECE090CEFE3F26041ED2617 /* FormFields.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormFields.swift; sourceTree = "<group>"; };
@@ -283,6 +285,7 @@
 				8A4FCB37DBBA09D6123D7989 /* SettingsViews.swift */,
 				3EA663A481CAE11E140B6830 /* SyncHealthModel.swift */,
 				D9653CACD31CEA3DBF5F722E /* SyncStatusSection.swift */,
+				4ADDB4E672F69BB9AD2EB58F /* WorkbenchCompareView.swift */,
 				993185593DBEA80FD058C270 /* WorkbenchModels.swift */,
 				A809D8DA30A2274B2B0E1982 /* WorkbenchViews.swift */,
 				2CBD5500A3AAE5279A9F007F /* YesChef.entitlements */,
@@ -468,6 +471,7 @@
 				B25C46B6E82993FF7971FCE0 /* SettingsViews.swift in Sources */,
 				627BE832B346246A69355F57 /* SyncHealthModel.swift in Sources */,
 				33D3721651F83CF0864328C4 /* SyncStatusSection.swift in Sources */,
+				5D89C590DAD9C0F7917D0A9F /* WorkbenchCompareView.swift in Sources */,
 				EDF8C533F173768E0A3C6487 /* WorkbenchModels.swift in Sources */,
 				A8CFCA1AA97D00A5DEB1BE7D /* WorkbenchViews.swift in Sources */,
 				33DD122054891894F173D788 /* YesChefApp.swift in Sources */,

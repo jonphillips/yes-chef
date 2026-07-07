@@ -118,6 +118,7 @@ final class WorkbenchDetailModel {
   var errorMessage: String?
   var isShowingError = false
   var isConfirmingRemoveWorkingRecipe = false
+  var isShowingCompare = false
 
   init(workbenchID: Workbench.ID, openRecipe: @escaping (Recipe.ID) -> Void = { _ in }) {
     self.workbenchID = workbenchID
@@ -139,6 +140,23 @@ final class WorkbenchDetailModel {
 
   func addCandidatesButtonTapped() {
     destination = .addCandidates
+  }
+
+  /// Recipes with loaded ingredient data available to compare — the working recipe (if any) plus
+  /// every candidate whose recipe still resolves. Compare needs at least two.
+  var comparableColumnCount: Int {
+    guard let detail else { return 0 }
+    return (detail.draftRecipeDetail != nil ? 1 : 0)
+      + detail.candidateRows.filter { $0.recipeDetail != nil }.count
+  }
+
+  var canCompare: Bool {
+    comparableColumnCount >= 2
+  }
+
+  func compareButtonTapped() {
+    guard canCompare else { return }
+    isShowingCompare = true
   }
 
   func chatButtonTapped() {
