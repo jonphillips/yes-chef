@@ -1,3 +1,4 @@
+import LLMClientKit
 import SwiftUI
 import YesChefCore
 
@@ -13,14 +14,49 @@ struct WorkbenchCompareView: View {
   }
 
   let detail: WorkbenchDetailData
+  let alignmentModel: WorkbenchCompareAlignmentModel
+  let tier: ModelTier
   @Environment(\.dismiss) private var dismiss
   @State private var segment: Segment = .ingredients
 
+  private var workingDetail: RecipeDetailData? {
+    detail.draftRecipeDetail
+  }
+
+  private var candidateDetails: [RecipeDetailData] {
+    detail.candidateRows.compactMap(\.recipeDetail)
+  }
+
+  private var alignmentKey: CompareAlignmentKey {
+    CompareAlignmentKey(working: workingDetail, candidates: candidateDetails)
+  }
+
+  private var deterministicComparison: IngredientComparison {
+    WorkbenchCompare.ingredientComparison(working: workingDetail, candidates: candidateDetails)
+  }
+
+  private var cachedComparison: IngredientComparison? {
+    alignmentModel.cachedComparison(for: alignmentKey)
+  }
+
+  private var alignedComparison: IngredientComparison? {
+    alignmentModel.currentKey == alignmentKey ? alignmentModel.currentComparison : nil
+  }
+
   private var comparison: IngredientComparison {
-    WorkbenchCompare.ingredientComparison(
-      working: detail.draftRecipeDetail,
-      candidates: detail.candidateRows.compactMap(\.recipeDetail)
-    )
+    cachedComparison ?? alignedComparison ?? deterministicComparison
+  }
+
+  private var isAligning: Bool {
+    cachedComparison == nil
+      && alignmentModel.currentKey == alignmentKey
+      && alignmentModel.isAligning
+  }
+
+  private var showsBasicViewAffordance: Bool {
+    cachedComparison == nil
+      && alignmentModel.currentKey == alignmentKey
+      && alignmentModel.showsBasicViewAffordance
   }
 
   private var fullRecipes: [WorkbenchCompareRecipe] {
@@ -40,6 +76,9 @@ struct WorkbenchCompareView: View {
         switch segment {
         case .ingredients:
           IngredientMatrixView(comparison: comparison)
+            .task(id: alignmentKey) {
+              await ingredientsSegmentAppeared()
+            }
         case .full:
           WorkbenchCompareFullView(recipes: fullRecipes)
         }
@@ -61,8 +100,49 @@ struct WorkbenchCompareView: View {
             dismiss()
           }
         }
+        if segment == .ingredients {
+          ToolbarItemGroup(placement: .topBarTrailing) {
+            if isAligning {
+              ProgressView()
+                .controlSize(.small)
+                .accessibilityLabel(Text("Aligning"))
+            }
+            if showsBasicViewAffordance {
+              Text("Showing basic view")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(Color.secondary.opacity(0.12)))
+            }
+            Button {
+              Task {
+                await refreshButtonTapped()
+              }
+            } label: {
+              Label("Refresh", systemImage: "arrow.clockwise")
+            }
+            .disabled(isAligning)
+          }
+        }
       }
     }
+  }
+
+  private func ingredientsSegmentAppeared() async {
+    await alignmentModel.ingredientsSegmentAppeared(
+      working: workingDetail,
+      candidates: candidateDetails,
+      tier: tier
+    )
+  }
+
+  private func refreshButtonTapped() async {
+    await alignmentModel.refreshButtonTapped(
+      working: workingDetail,
+      candidates: candidateDetails,
+      tier: tier
+    )
   }
 }
 

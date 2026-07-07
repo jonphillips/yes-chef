@@ -119,6 +119,7 @@ final class WorkbenchDetailModel {
   var isShowingError = false
   var isConfirmingRemoveWorkingRecipe = false
   var isShowingCompare = false
+  let compareAlignmentModel = WorkbenchCompareAlignmentModel()
 
   init(workbenchID: Workbench.ID, openRecipe: @escaping (Recipe.ID) -> Void = { _ in }) {
     self.workbenchID = workbenchID

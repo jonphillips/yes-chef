@@ -1,3 +1,4 @@
+import LLMClientKit
 import SwiftUI
 import UIKit
 import YesChefCore
@@ -123,6 +124,7 @@ struct WorkbenchDetailView: View {
   @AppStorage(ChatWorkspaceDetent.storageKey) private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   @State private var model: WorkbenchDetailModel
   @State private var compactChatModel: RecipeChatModel?
+  @State private var compareTier: ModelTier = .onDevice
   let isFocusActive: Bool
   let focusButtonTapped: (() -> Void)?
 
@@ -152,6 +154,7 @@ struct WorkbenchDetailView: View {
             ChatWorkspaceSplit(
               context: .workbench(WorkbenchChatContext(detail: detail)),
               detentRaw: $chatWorkspaceDetentRaw,
+              activeTierChanged: { compareTier = $0 },
               applyActions: { chatModel in
                 model.applyActionCatalog(for: chatModel)
               }
@@ -249,7 +252,11 @@ struct WorkbenchDetailView: View {
 
   @ViewBuilder private var compareCover: some View {
     if let detail = model.detail {
-      WorkbenchCompareView(detail: detail)
+      WorkbenchCompareView(
+        detail: detail,
+        alignmentModel: model.compareAlignmentModel,
+        tier: compareTier
+      )
     }
   }
 

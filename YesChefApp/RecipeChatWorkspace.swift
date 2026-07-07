@@ -38,6 +38,7 @@ enum ChatWorkspaceDetent: String, CaseIterable {
 struct ChatWorkspaceSplit<Reader: View>: View {
   let context: RecipeChatContext
   let detentRaw: Binding<String>
+  let activeTierChanged: (ModelTier) -> Void
   let applyActions: (RecipeChatModel) -> [AnyChatApplyAction]
   let reader: Reader
 
@@ -47,11 +48,13 @@ struct ChatWorkspaceSplit<Reader: View>: View {
   init(
     context: RecipeChatContext,
     detentRaw: Binding<String>,
+    activeTierChanged: @escaping (ModelTier) -> Void = { _ in },
     applyActions: @escaping (RecipeChatModel) -> [AnyChatApplyAction],
     @ViewBuilder reader: () -> Reader
   ) {
     self.context = context
     self.detentRaw = detentRaw
+    self.activeTierChanged = activeTierChanged
     self.applyActions = applyActions
     self.reader = reader()
     _chatModel = State(wrappedValue: RecipeChatModel(context: context))
@@ -109,6 +112,12 @@ struct ChatWorkspaceSplit<Reader: View>: View {
     }
     .onChange(of: context) { _, context in
       chatModel.updateContext(context)
+    }
+    .onAppear {
+      activeTierChanged(chatModel.activeTier)
+    }
+    .onChange(of: chatModel.activeTier) { _, tier in
+      activeTierChanged(tier)
     }
   }
 

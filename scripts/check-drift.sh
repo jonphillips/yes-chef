@@ -15,7 +15,9 @@ bundle_id_lines="$(
 unexpected_bundle_ids="$(printf '%s\n' "$bundle_id_lines" | awk '
   /PRODUCT_BUNDLE_IDENTIFIER/ {
     value = $NF
-    if (value != "com.jonphillips.yeschef" && value != "com.jonphillips.yeschef.share-extension") {
+    if (value != "com.jonphillips.yeschef" &&
+        value != "com.jonphillips.yeschef.share-extension" &&
+        value != "com.jonphillips.yeschef.tests") {
       print
     }
   }
@@ -28,6 +30,7 @@ $unexpected_bundle_ids
 Expected only:
 - com.jonphillips.yeschef
 - com.jonphillips.yeschef.share-extension
+- com.jonphillips.yeschef.tests
 EOF
   exit 1
 fi
