@@ -12,7 +12,7 @@ Newest first.
 
 ## Recipe edit proposals — S1 (the "Adjust this recipe" verb + section-aware overwrite/undo)
 
-**Architect-reviewed + Jon device-passed 2026-07-07** — yes-chef PR #NNN (this slice). Implements
+**Architect-reviewed + Jon device-passed 2026-07-07** — yes-chef PR #122 (this slice). Implements
 [ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) S1 (which extends
 [ADR-0021](decisions/ADR-0021-recipe-variations.md)); `efforts/recipe-edit-proposals.md`. **Schema-free** —
 no migration, no synced column. The **first chat verb that edits a recipe's canonical ingredients/method**
