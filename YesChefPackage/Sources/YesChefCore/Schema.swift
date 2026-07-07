@@ -728,6 +728,41 @@ extension DependencyValues {
       }
     }
 
+    migrator.registerMigration("Create recipe variations") { db in
+      try #sql("""
+        CREATE TABLE "recipeVariations" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "recipeID" TEXT NOT NULL REFERENCES "recipes"("id") ON DELETE CASCADE,
+          "name" TEXT NOT NULL,
+          "note" TEXT,
+          "sortIndex" INTEGER NOT NULL,
+          "deltas" BLOB,
+          "origin" TEXT,
+          "dateCreated" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      try #sql("""
+        CREATE TABLE "recipeActiveVariations" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "recipeID" TEXT NOT NULL REFERENCES "recipes"("id") ON DELETE CASCADE,
+          "variationID" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      for statement in [
+        #"CREATE INDEX "index_recipeVariations_on_recipeID" ON "recipeVariations"("recipeID")"#,
+        #"CREATE INDEX "index_recipeVariations_on_recipeID_sortIndex" ON "recipeVariations"("recipeID", "sortIndex")"#,
+        #"CREATE INDEX "index_recipeActiveVariations_on_recipeID" ON "recipeActiveVariations"("recipeID")"#,
+      ] {
+        try db.execute(sql: statement)
+      }
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

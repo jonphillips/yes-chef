@@ -51,6 +51,47 @@ extension RecipeDetailModel {
     }
   }
 
+  func keepAdjustmentAsVariationButtonTapped(
+    _ review: RecipeAdjustmentReviewState,
+    name: String
+  ) -> Bool {
+    do {
+      try database.write { db in
+        _ = try RecipeRepository.keepAdjustmentProposalAsVariation(
+          review.proposal,
+          recipeID: recipeID,
+          name: name,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+      destination = nil
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
+  func activeVariationSelectionChanged(_ variationID: RecipeVariation.ID?) {
+    do {
+      try database.write { db in
+        try RecipeRepository.setActiveVariation(
+          variationID,
+          recipeID: recipeID,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
   func undoLastAdjustmentButtonTapped() {
     guard let restorePoint = adjustmentRestorePoint else { return }
     do {

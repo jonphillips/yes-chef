@@ -8,6 +8,9 @@ public enum RecipeAdjustmentError: Error, Equatable, LocalizedError {
   case responseUnreadable
   case emptyProposal
   case missingRecipe(Recipe.ID)
+  case missingVariation(RecipeVariation.ID)
+  case variationPayloadUnreadable(RecipeVariation.ID)
+  case variationNeedsReview(String, String)
   case unresolvedIngredient(String)
   case unresolvedInstructionStep(String)
 
@@ -21,6 +24,12 @@ public enum RecipeAdjustmentError: Error, Equatable, LocalizedError {
       "The assistant did not find a concrete recipe adjustment to review."
     case .missingRecipe:
       "The recipe could not be found."
+    case .missingVariation:
+      "The variation could not be found."
+    case .variationPayloadUnreadable:
+      "The variation could not be read."
+    case let .variationNeedsReview(name, reason):
+      "\"\(name)\" needs review before this recipe can be overwritten: \(reason)"
     case let .unresolvedIngredient(text):
       "The adjustment references an ingredient that could not be matched: \(text)"
     case let .unresolvedInstructionStep(text):
@@ -29,7 +38,7 @@ public enum RecipeAdjustmentError: Error, Equatable, LocalizedError {
   }
 }
 
-public struct RecipeAdjustmentProposal: Equatable, Sendable {
+public struct RecipeAdjustmentProposal: Codable, Equatable, Sendable {
   public var summary: String
   public var ingredientOps: [RecipeIngredientDelta]
   public var methodNote: String?
@@ -147,14 +156,53 @@ public struct RecipeAdjustmentProposal: Equatable, Sendable {
   }
 }
 
-public enum RecipeIngredientDelta: Equatable, Sendable {
+public struct RecipeVariationPayload: Codable, Equatable, Sendable {
+  public var ingredientOps: [RecipeIngredientDelta]
+  public var methodStepReplacements: [RecipeMethodStepReplacement]
+
+  public init(
+    ingredientOps: [RecipeIngredientDelta],
+    methodStepReplacements: [RecipeMethodStepReplacement]
+  ) {
+    self.ingredientOps = ingredientOps
+    self.methodStepReplacements = methodStepReplacements
+  }
+
+  public init(proposal: RecipeAdjustmentProposal) {
+    self.init(
+      ingredientOps: proposal.ingredientOps,
+      methodStepReplacements: proposal.methodStepReplacements
+    )
+  }
+
+  public func encodedData() throws -> Data {
+    try JSONEncoder().encode(self)
+  }
+
+  public static func decode(_ data: Data?, variationID: RecipeVariation.ID) throws -> Self {
+    guard let data else { return Self(ingredientOps: [], methodStepReplacements: []) }
+    do {
+      return try JSONDecoder().decode(Self.self, from: data)
+    } catch {
+      throw RecipeAdjustmentError.variationPayloadUnreadable(variationID)
+    }
+  }
+}
+
+public enum RecipeVariationIngredientHighlight: Equatable, Sendable {
+  case added
+  case removed
+  case changed
+}
+
+public enum RecipeIngredientDelta: Codable, Equatable, Sendable {
   case add(line: String, sectionName: String?)
   case remove(RecipeIngredientReference)
   case substitute(RecipeIngredientReference, line: String)
   case scale(RecipeIngredientReference, line: String)
 }
 
-public struct RecipeIngredientReference: Equatable, Sendable {
+public struct RecipeIngredientReference: Codable, Equatable, Sendable {
   public var id: IngredientLine.ID?
   public var originalText: String?
 
@@ -180,7 +228,7 @@ public struct RecipeIngredientReference: Equatable, Sendable {
   }
 }
 
-public struct RecipeMethodStepReplacement: Equatable, Sendable {
+public struct RecipeMethodStepReplacement: Codable, Equatable, Sendable {
   public var id: InstructionStep.ID?
   public var stepNumber: Int?
   public var originalText: String?
@@ -404,6 +452,7 @@ extension RecipeRepository {
     }
     let restorePoint = try adjustmentRestorePoint(for: detail)
     let proposedDetail = try proposal.proposedDetail(applyingTo: detail, now: now, uuid: uuid)
+    try validateVariationsCanRebase(detail.variations, onto: proposedDetail)
     try Recipe.upsert { proposedDetail.recipe }.execute(db)
     try replaceEditableChildren(
       recipeID: recipeID,
@@ -415,6 +464,66 @@ extension RecipeRepository {
       in: db
     )
     return restorePoint
+  }
+
+  public static func keepAdjustmentProposalAsVariation(
+    _ proposal: RecipeAdjustmentProposal,
+    recipeID: Recipe.ID,
+    name: String,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> RecipeVariation {
+    guard let detail = try fetchDetail(recipeID: recipeID, in: db) else {
+      throw RecipeAdjustmentError.missingRecipe(recipeID)
+    }
+    let variationID = uuid()
+    let variation = RecipeVariation(
+      id: variationID,
+      recipeID: recipeID,
+      name: variationName(name, fallback: proposal.summary),
+      note: proposal.methodNote?.nonEmptyAdjustmentText,
+      sortIndex: try nextVariationSortIndex(recipeID: recipeID, in: db),
+      deltas: try RecipeVariationPayload(proposal: proposal).encodedData(),
+      origin: .chat,
+      dateCreated: now,
+      dateModified: now
+    )
+    _ = try detail.resolved(applying: variation)
+    try RecipeVariation.insert { variation }.execute(db)
+    try setActiveVariation(variation.id, recipeID: recipeID, in: db, now: now, uuid: uuid)
+    return variation
+  }
+
+  public static func setActiveVariation(
+    _ variationID: RecipeVariation.ID?,
+    recipeID: Recipe.ID,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws {
+    if let variationID {
+      guard let variation = try RecipeVariation.find(variationID).fetchOne(db),
+            variation.recipeID == recipeID
+      else {
+        throw RecipeAdjustmentError.missingVariation(variationID)
+      }
+    }
+
+    try #sql("DELETE FROM \"recipeActiveVariations\" WHERE \"recipeID\" = \(bind: recipeID)")
+      .execute(db)
+
+    if let variationID {
+      try RecipeActiveVariation.insert {
+        RecipeActiveVariation(
+          id: uuid(),
+          recipeID: recipeID,
+          variationID: variationID,
+          dateModified: now
+        )
+      }
+      .execute(db)
+    }
   }
 
   public static func restoreRecipeAdjustment(
@@ -457,6 +566,47 @@ extension RecipeRepository {
     )
   }
 
+  static func activeVariationID(
+    recipeID: Recipe.ID,
+    variations: [RecipeVariation],
+    in db: Database
+  ) throws -> RecipeVariation.ID? {
+    let validVariationIDs = Set(variations.map(\.id))
+    return try RecipeActiveVariation
+      .where { $0.recipeID.eq(recipeID) }
+      .fetchAll(db)
+      .filter { validVariationIDs.contains($0.variationID) }
+      .sorted(by: areActiveVariationsInDecreasingOrder)
+      .first?
+      .variationID
+  }
+
+  private static func validateVariationsCanRebase(
+    _ variations: [RecipeVariation],
+    onto proposedDetail: RecipeDetailData
+  ) throws {
+    for variation in variations {
+      do {
+        _ = try proposedDetail.resolved(applying: variation)
+      } catch {
+        throw RecipeAdjustmentError.variationNeedsReview(
+          variation.name,
+          (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+        )
+      }
+    }
+  }
+
+  private static func nextVariationSortIndex(recipeID: Recipe.ID, in db: Database) throws -> Int {
+    try RecipeVariation
+      .where { $0.recipeID.eq(recipeID) }
+      .fetchAll(db)
+      .map(\.sortIndex)
+      .max()
+      .map { $0 + 1 }
+      ?? 0
+  }
+
   private static func replaceEditableChildren(
     recipeID: Recipe.ID,
     ingredientSections: [IngredientSection],
@@ -492,6 +642,53 @@ extension RecipeRepository {
     for note in generalNotes {
       try RecipeNote.insert { note }.execute(db)
     }
+  }
+}
+
+public extension RecipeDetailData {
+  var activeVariation: RecipeVariation? {
+    guard let activeVariationID else { return nil }
+    return variations.first { $0.id == activeVariationID }
+  }
+
+  func resolved(applying variation: RecipeVariation) throws -> RecipeDetailData {
+    let payload = try RecipeVariationPayload.decode(variation.deltas, variationID: variation.id)
+    var uuids = VariationUUIDSequence(variationID: variation.id)
+    var detail = try RecipeAdjustmentProposal(
+      summary: variation.name,
+      ingredientOps: payload.ingredientOps,
+      methodStepReplacements: payload.methodStepReplacements
+    )
+    .proposedDetail(applyingTo: self, now: recipe.dateModified, uuid: { uuids.next() })
+    detail.variations = variations
+    detail.activeVariationID = variation.id
+    return detail
+  }
+
+  func variationIngredientHighlights(
+    for variation: RecipeVariation
+  ) throws -> [IngredientLine.ID: RecipeVariationIngredientHighlight] {
+    let payload = try RecipeVariationPayload.decode(variation.deltas, variationID: variation.id)
+    var highlights: [IngredientLine.ID: RecipeVariationIngredientHighlight] = [:]
+    var uuids = VariationUUIDSequence(variationID: variation.id)
+
+    for op in payload.ingredientOps {
+      switch op {
+      case let .add(line, _):
+        if !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+          highlights[uuids.next()] = .added
+        }
+      case let .remove(reference):
+        if let index = reference.index(in: ingredientLines) {
+          highlights[ingredientLines[index].id] = .removed
+        }
+      case let .substitute(reference, _), let .scale(reference, _):
+        if let index = reference.index(in: ingredientLines) {
+          highlights[ingredientLines[index].id] = .changed
+        }
+      }
+    }
+    return highlights
   }
 }
 
@@ -625,6 +822,59 @@ private func notesWithMethodNote(
   return existing + [
     RecipeNote(id: uuid(), recipeID: recipeID, text: methodNote, noteType: .general, dateCreated: now, dateModified: now)
   ]
+}
+
+private struct VariationUUIDSequence {
+  private let variationID: RecipeVariation.ID
+  private var offset = 0
+
+  init(variationID: RecipeVariation.ID) {
+    self.variationID = variationID
+  }
+
+  mutating func next() -> UUID {
+    defer { offset += 1 }
+    return deterministicVariationUUID(variationID: variationID, offset: offset)
+  }
+}
+
+private func deterministicVariationUUID(variationID: RecipeVariation.ID, offset: Int) -> UUID {
+  let uuid = variationID.uuid
+  var bytes = [
+    uuid.0, uuid.1, uuid.2, uuid.3,
+    uuid.4, uuid.5, uuid.6, uuid.7,
+    uuid.8, uuid.9, uuid.10, uuid.11,
+    uuid.12, uuid.13, uuid.14, uuid.15,
+  ]
+  var value = UInt64(offset)
+  for index in stride(from: bytes.indices.upperBound - 1, through: bytes.indices.upperBound - 8, by: -1) {
+    bytes[index] ^= UInt8(value & 0xff)
+    value >>= 8
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x50
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  return UUID(uuid: (
+    bytes[0], bytes[1], bytes[2], bytes[3],
+    bytes[4], bytes[5], bytes[6], bytes[7],
+    bytes[8], bytes[9], bytes[10], bytes[11],
+    bytes[12], bytes[13], bytes[14], bytes[15]
+  ))
+}
+
+private func variationName(_ name: String, fallback: String) -> String {
+  name.nonEmptyAdjustmentText
+    ?? fallback.nonEmptyAdjustmentText
+    ?? "Variation"
+}
+
+private func areActiveVariationsInDecreasingOrder(
+  _ lhs: RecipeActiveVariation,
+  _ rhs: RecipeActiveVariation
+) -> Bool {
+  if lhs.dateModified != rhs.dateModified {
+    return lhs.dateModified > rhs.dateModified
+  }
+  return lhs.id.uuidString < rhs.id.uuidString
 }
 
 private extension IngredientLine {

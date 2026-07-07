@@ -136,7 +136,8 @@ struct RecipeDetailView: View {
     ) { review in
       RecipeAdjustmentReviewView(
         review: review,
-        overwrite: { model.overwriteAdjustmentButtonTapped($0) }
+        overwrite: { model.overwriteAdjustmentButtonTapped($0) },
+        keepAsVariation: { model.keepAdjustmentAsVariationButtonTapped($0, name: $1) }
       )
     }
     .alert("Recipe Update Failed", isPresented: $model.isShowingError) {
@@ -150,7 +151,7 @@ struct RecipeDetailView: View {
   private var detailContent: some View {
     if isSplitEnabled, let detail = model.detail {
       ChatWorkspaceSplit(
-        context: .recipe(RecipeChatRecipeContext(detail: detail)),
+        context: .recipe(RecipeChatRecipeContext(detail: model.displayDetail ?? detail)),
         detentRaw: $chatWorkspaceDetentRaw,
         applyActions: { chatModel in
           model.applyActionCatalog(for: chatModel)
@@ -357,6 +358,9 @@ private struct RecipeReaderView: View {
         }
         .buttonStyle(.bordered)
       }
+      if let detail = model.detail, !detail.variations.isEmpty {
+        variationPicker(detail.variations, activeVariationID: detail.activeVariationID)
+      }
       if model.adjustmentRestorePoint != nil {
         Button {
           model.undoLastAdjustmentButtonTapped()
@@ -366,6 +370,27 @@ private struct RecipeReaderView: View {
         .buttonStyle(.bordered)
       }
     }
+  }
+
+  private func variationPicker(
+    _ variations: [RecipeVariation],
+    activeVariationID: RecipeVariation.ID?
+  ) -> some View {
+    Picker(
+      "Variation",
+      selection: Binding(
+        get: { activeVariationID },
+        set: { model.activeVariationSelectionChanged($0) }
+      )
+    ) {
+      Label("Base Recipe", systemImage: "book.closed")
+        .tag(nil as RecipeVariation.ID?)
+      ForEach(variations) { variation in
+        Text(variation.name)
+          .tag(variation.id as RecipeVariation.ID?)
+      }
+    }
+    .pickerStyle(.menu)
   }
 
   private func recipeStats(_ recipe: Recipe) -> some View {
@@ -427,6 +452,9 @@ private struct RecipeReaderView: View {
       if !model.serveWithItems.isEmpty {
         serveWithSection(model.serveWithItems)
       }
+      if let note = model.activeVariationNote {
+        variationMethodNote(note)
+      }
       if !model.instructionSteps.isEmpty {
         instructions
       }
@@ -451,7 +479,7 @@ private struct RecipeReaderView: View {
       let groups = model.ingredientGroups
       VStack(alignment: .leading, spacing: 12) {
         if groups.isEmpty {
-          ingredientLineList(model.ingredientLines)
+          ingredientLineList(model.ingredientLineDisplays)
         } else {
           ForEach(groups) { group in
             VStack(alignment: .leading, spacing: 8) {
@@ -468,12 +496,12 @@ private struct RecipeReaderView: View {
     }
   }
 
-  private func ingredientLineList(_ lines: [IngredientLine]) -> some View {
+  private func ingredientLineList(_ lines: [IngredientLineDisplay]) -> some View {
     VStack(alignment: .leading, spacing: 8) {
-      ForEach(lines) { line in
+      ForEach(lines) { display in
         IngredientLineRow(
-          line: line,
-          scaledText: IngredientScaler.scaledText(for: line, factor: model.scaleFactor)
+          display: display,
+          scaledText: IngredientScaler.scaledText(for: display.line, factor: model.scaleFactor)
         )
       }
     }
@@ -496,6 +524,17 @@ private struct RecipeReaderView: View {
         }
       }
     }
+  }
+
+  private func variationMethodNote(_ note: String) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Label(model.activeVariation?.name ?? "Variation", systemImage: "square.stack.3d.up")
+        .font(.title3.bold())
+      Text(note)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .padding(12)
+    .background(.tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
   }
 
   private func makeAheadSection(_ makeAhead: String) -> some View {
@@ -582,8 +621,10 @@ private struct RecipeReaderView: View {
 }
 
 private struct IngredientLineRow: View {
-  let line: IngredientLine
+  let display: IngredientLineDisplay
   let scaledText: String
+
+  private var line: IngredientLine { display.line }
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -595,7 +636,25 @@ private struct IngredientLineRow: View {
           .foregroundStyle(.secondary)
         Text(scaledText)
           .font(.body)
+          .strikethrough(display.highlight == .removed)
       }
+    }
+    .foregroundStyle(display.highlight == .removed ? .secondary : .primary)
+    .padding(.horizontal, display.highlight == nil ? 0 : 8)
+    .padding(.vertical, display.highlight == nil ? 0 : 4)
+    .background(highlightColor, in: RoundedRectangle(cornerRadius: 6))
+  }
+
+  private var highlightColor: Color {
+    switch display.highlight {
+    case .added:
+      Color.green.opacity(0.14)
+    case .changed:
+      Color.accentColor.opacity(0.12)
+    case .removed:
+      Color.secondary.opacity(0.10)
+    case nil:
+      Color.clear
     }
   }
 }
