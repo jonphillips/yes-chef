@@ -1,7 +1,10 @@
 # ADR-0022 — LLM-aligned Compare matrix (semantic row alignment + role ordering)
 
-Status: **Proposed** — 2026-07-07 (architect sketch; the decisions below are *recommendations* for a
-design session, not ratified). Builds directly on **ADR-0019** (the Recipe Workbench, whose S4 Compare
+Status: **Accepted** — 2026-07-07; **shipped** S1–S4 (yes-chef PRs [#116](https://github.com/jonphillips/yes-chef/pull/116)
+parse fix / [#117](https://github.com/jonphillips/yes-chef/pull/117) / [#118](https://github.com/jonphillips/yes-chef/pull/118) /
+[#119](https://github.com/jonphillips/yes-chef/pull/119) the LLM aligner) + the Compare→chat affordance
+([#120](https://github.com/jonphillips/yes-chef/pull/120)). See `docs/DONE-LOG.md`. Originally proposed as
+an architect sketch. Builds directly on **ADR-0019** (the Recipe Workbench, whose S4 Compare
 matrix this refines), the deterministic comparison-key slice ([PR #114], now the *fallback* not the
 solution), and the **LLMClientKit structured-output house pattern** (ADR-0011/0012 actionable chat,
 ADR-0017 effort tiers). Governed by [[llm-curation-not-synthesis]]. Draws the **LLM-vs-determinism
@@ -129,8 +132,15 @@ but the Compare surface earns its fix now, cheaply, on its own.
 3. **Does *Full* (the whole-recipe flip-through) get role-ordering too, or only the Ingredients matrix?**
    Recommend matrix-only for v1 — *Full* is a reading view, not an alignment.
 4. **Cache invalidation granularity** — per candidate-**set** hash is clear; do candidate *edits*
-   (not add/remove) invalidate, or is it manual **refresh** only? Recommend manual refresh (ADR-0019 D4
-   passive-artifact posture — no auto-recompute on edits).
+   (not add/remove) invalidate, or is it manual **refresh** only? **DECIDED (Jon, 2026-07-07): detect,
+   don't auto-recompute.** The cache slot is keyed by recipe-**set identity** (add/remove/reorder), stable
+   across text edits; each cached alignment also stores a **content signature** of the ingredient text.
+   When the current text no longer matches, the alignment is shown **flagged stale**
+   ("Ingredients changed — refresh to update") and the cook re-runs it on demand — never an automatic LLM
+   call per edit. Honors the ADR-0019 D4 passive-artifact posture while keeping the surface honest about
+   drift (a silently-stale alignment was the failure mode of pure identity-keying). Shipped as the
+   device-local disk-cache follow-on (`CompareAlignmentKey` = `identity` + `contentSignature`,
+   `CachedCompareAlignment`, `CompareAlignmentCacheStore`).
 5. **Failure UX** — when the call errors, do we silently fall back to the deterministic matrix, or show a
    "couldn't smart-align, showing basic view" affordance with retry? Recommend a quiet fallback + an
    unobtrusive refresh, never a blocking error.

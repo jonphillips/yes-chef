@@ -10,6 +10,51 @@ Newest first.
 
 ---
 
+## LLM-aligned Compare matrix (ADR-0022) — shipped S1–S4 + Compare→chat affordance
+
+**Architect-reviewed + merged 2026-07-07** — yes-chef PRs [#116](https://github.com/jonphillips/yes-chef/pull/116)–[#120](https://github.com/jonphillips/yes-chef/pull/120).
+Implements [ADR-0022](decisions/ADR-0022-llm-aligned-compare-matrix.md) (now **Accepted**), the semantic
+upgrade to the Workbench Compare matrix; `efforts/compare-alignment.md`. **S1** ([#116](https://github.com/jonphillips/yes-chef/pull/116))
+was a no-LLM **parse/key fix** that stands alone and improved the deterministic fallback: fixed the
+singularizer `chilies → chily` bug and a dual-unit quantity leak. **S2–S4** ([#117](https://github.com/jonphillips/yes-chef/pull/117)/[#118](https://github.com/jonphillips/yes-chef/pull/118)/[#119](https://github.com/jonphillips/yes-chef/pull/119))
+built the **LLM aligner**: clusters ingredient rows by culinary role (chicken breast ≡ thigh;
+`chile`/`chiles`/`chilies` collapse to one row; `morita` ≈ `chipotle`) and orders by role ("protein at
+top"), structured-out with verbatim cells, cached per candidate-set, with the deterministic `comparisonKey`
+as the fallback when the LLM is unavailable. The **boundary** held: the LLM drives *presentational*
+alignment on the read-only, self-correcting Compare surface only — grocery consolidation stays deterministic
+([[llm-vs-determinism-surface-boundary]]). [#120](https://github.com/jonphillips/yes-chef/pull/120) added a
+**Compare→chat affordance** (jump from the matrix into workbench chat) and extracted a shared
+`ModelResponse.wasTruncated` (`ModelResponse+Truncation.swift`) used by both the aligner and the draft verb.
+The prior-session review's two open questions (content-hash vs. identity for the cache; keep-or-split the
+chat rework) were both resolved — the chat rework was split into its own PR (#120).
+
+---
+
+## Compare-key granularity — coarser matrix key, grocery key untouched
+
+**Merged 2026-07-07** — yes-chef [PR #114](https://github.com/jonphillips/yes-chef/pull/114);
+`efforts/comparison-key-granularity.md`. A second, coarser `CanonicalIngredient.comparisonKey` that the
+Workbench Compare matrix aligns on so `fresh`/`frozen`/`dried` variants share one base row with the form
+shown in the cells. The grocery canonical key is **untouched** (determinism-at-merge preserved); no schema.
+Core-only. This became the *fallback* that ADR-0022's LLM aligner sits on top of.
+
+---
+
+## Recipe Workbench — S4 (Compare: ingredient-diff matrix + Full flip-through)
+
+**Merged 2026-07-07** — yes-chef [PR #113](https://github.com/jonphillips/yes-chef/pull/113);
+`efforts/recipe-workbench.md`. Completes the Workbench build arc **S1–S4**. App-layer only — no migration,
+no new fetch, no sync touch. A pure `WorkbenchCompare.ingredientComparison` read (`WorkbenchCompareCore.swift`)
+with unit tests, rendered by a responsive `WorkbenchCompareView` (full-screen cover on iPad via the
+`.detailOnly` focus pattern, sheet on iPhone), reached from a **Compare** button in the Candidates header
+(enabled at ≥2 comparable recipes). Two segments behind one entry point: the **Ingredients** aligned matrix
+(canonical-name rows, working recipe pinned as a frozen first column, blank cell = ingredient absent) and the
+**Full** whole-recipe flip-through (ingredients + directions, one recipe at a time — the parked tabbed
+quick-view folded in here). Alignment is exact `canonicalName` match only; anything ambiguous drops to a
+per-column "other" tail rather than force-merging (a wrong alignment is worse than an honest blank).
+
+---
+
 ## Recipe Workbench — S3 (durable workbench log)
 
 **Architect-approved + Jon device-passed 2026-07-06** — yes-chef

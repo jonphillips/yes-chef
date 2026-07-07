@@ -2,8 +2,8 @@ import Foundation
 
 /// One recipe column in the Compare ingredient matrix. The working recipe is pinned first
 /// (`role == .working`); candidates follow in their workbench order.
-public struct IngredientMatrixColumn: Identifiable, Equatable, Sendable {
-  public enum Role: Equatable, Sendable {
+public struct IngredientMatrixColumn: Identifiable, Equatable, Codable, Sendable {
+  public enum Role: Equatable, Codable, Sendable {
     case working
     case candidate
   }
@@ -26,7 +26,7 @@ public struct IngredientMatrixColumn: Identifiable, Equatable, Sendable {
 
 /// One canonical-ingredient row spanning every column. `cells` is parallel to the matrix `columns`;
 /// a `nil` cell means the ingredient is absent from that recipe — an honest blank, not a guess.
-public struct IngredientMatrixRow: Identifiable, Equatable, Sendable {
+public struct IngredientMatrixRow: Identifiable, Equatable, Codable, Sendable {
   /// The canonical alignment key (`CanonicalIngredient.canonicalName`).
   public let id: String
   public var label: String
@@ -41,7 +41,7 @@ public struct IngredientMatrixRow: Identifiable, Equatable, Sendable {
 
 /// An aligned ingredient-diff matrix over a workbench's working recipe + candidates. A pure read
 /// over already-loaded `RecipeDetailData` — no fetch, no schema.
-public struct IngredientComparison: Equatable, Sendable {
+public struct IngredientComparison: Equatable, Codable, Sendable {
   public var columns: [IngredientMatrixColumn]
   public var rows: [IngredientMatrixRow]
 

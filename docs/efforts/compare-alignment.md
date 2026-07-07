@@ -3,9 +3,10 @@
 **Type:** New AI feature (app + core) + a small deterministic parse fix. Dogfood-driven (Jon,
 2026-07-07 — real beef-birria recipes don't align in the S4 matrix).
 **Owner:** Codex (implement, per slice) · Claude (architect/review) · Jon (product/review)
-**Status:** Scoped 2026-07-07. **Rationale + boundary live in
-[ADR-0022](../decisions/ADR-0022-llm-aligned-compare-matrix.md) — read it first.** Not yet dispatched;
-milestone-sized, do **not** bundle the slices.
+**Status:** **Shipped (S1–S3), ADR-0022 Accepted.** S1 parse fix + S2 LLM aligner + S3 view wiring all
+landed; the device-local **disk cache + stale-detection follow-on** completes S3 (see the S3 note below).
+**Rationale + boundary live in [ADR-0022](../decisions/ADR-0022-llm-aligned-compare-matrix.md).** Remaining
+work is parked in "Later" (cook-tunable ordering, *Full* role-ordering, structured-ingest input).
 
 **The one-line why.** The Compare matrix aligns rows on a deterministic canonical key ([PR #114]); real
 recipes need *semantic* alignment (chicken breast ≡ thigh, `chile`/`chiles`/`chilies` are one thing,
@@ -64,12 +65,20 @@ remains the fallback the core falls through to on parse failure / empty.
 breast/thigh merge; chile spellings merge; protein row ordered first); a malformed/empty model response
 falls back to the deterministic matrix; every input line appears in exactly one row or *other*.
 
-## S3 — wire into the view
+## S3 — wire into the view (shipped)
 
-`WorkbenchCompareView`: async load of the aligned matrix, per-candidate-set device-local cache,
-loading + fallback states, and a **refresh** affordance (recompute on demand; ADR-0022 open-Q4 —
-manual refresh, no auto-recompute on candidate edits). Quiet fallback on error, never a blocking alert.
-Device pass on iPad (primary) + iPhone.
+`WorkbenchCompareView`: async load of the aligned matrix, loading + fallback states, and a **refresh**
+affordance. Quiet fallback on error, never a blocking alert.
+
+**Cache + staleness (ADR-0022 open-Q4, resolved — detect, don't auto-recompute).** Device-local,
+LRU-bounded disk cache (`CompareAlignmentCacheStore`, Application Support, SyncEngine-excluded — a
+presentational artifact, ADR-0019 D4). The key (`CompareAlignmentKey`) carries **two** fingerprints: an
+`identity` over the recipe *set* (the cache slot, stable across text edits) and a `contentSignature` over
+the ingredient text. A cached alignment (`CachedCompareAlignment`) stores the signature it was computed
+against; when the current text drifts, the view keeps showing the cached alignment **flagged stale**
+("Ingredients changed — refresh to update") and re-runs only on the cook's Refresh tap — never an
+automatic LLM call per edit. Only `.aligned` outcomes persist to disk; fallbacks stay in-memory. Device
+pass on iPad (primary) + iPhone.
 
 ## Verification
 
