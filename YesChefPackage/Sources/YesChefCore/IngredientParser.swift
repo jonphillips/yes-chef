@@ -78,16 +78,25 @@ public enum IngredientParser {
     remainingTokens: [String],
     preparation: String?
   ) -> (quantity: Double?, quantityText: String?, unit: String?, item: String?, preparation: String?) {
-    guard let firstRemainingToken = remainingTokens.first else {
+    // Drop a leading range clause ("40 to 45 g …") before the unit is read, so the shared unit and
+    // item survive rather than leaking "to 45 …" into the item.
+    let tokens = strippingAlternateMeasurement(remainingTokens, consumingUnit: false)
+    guard let firstRemainingToken = tokens.first else {
       return (quantity, quantityText, nil, nil, preparation)
     }
 
     if isUnit(firstRemainingToken) {
+      // With the primary unit consumed, a dual-unit clause ("4 lb / 1.8 kg …") carries its own unit;
+      // strip connector + number + unit so the item is the ingredient noun, not "/ 1.8 kg …".
+      let itemTokens = strippingAlternateMeasurement(
+        Array(tokens.dropFirst()),
+        consumingUnit: true
+      )
       return (
         quantity,
         quantityText,
         firstRemainingToken,
-        nonEmpty(remainingTokens.dropFirst().joined(separator: " ")),
+        nonEmpty(itemTokens.joined(separator: " ")),
         preparation
       )
     }
@@ -96,10 +105,39 @@ public enum IngredientParser {
       quantity,
       quantityText,
       nil,
-      nonEmpty(remainingTokens.joined(separator: " ")),
+      nonEmpty(tokens.joined(separator: " ")),
       preparation
     )
   }
+
+  /// Strip a leading *alternate measurement* clause from ingredient tokens — a connector
+  /// (`/`, `to`, `or`, a dash) followed by a number, and (when `consumingUnit`) that number's own
+  /// unit. Fixes two known-bad inputs that leak quantity fragments into the parsed item:
+  /// dual-unit lines ("4 lb / 1.8 kg beef chuck roast" → "beef chuck roast") and range / metric-first
+  /// lines ("28 to 32 g kosher salt" → unit "g", item "kosher salt"). Tightly scoped: it only fires
+  /// when the tokens *begin* with a connector, so ordinary lines are untouched.
+  private static func strippingAlternateMeasurement(
+    _ tokens: [String],
+    consumingUnit: Bool
+  ) -> [String] {
+    guard
+      tokens.count >= 2,
+      connectors.contains(tokens[0].lowercased()),
+      isQuantityToken(tokens[1])
+    else { return tokens }
+
+    var dropCount = 2
+    if consumingUnit, tokens.count > dropCount, isUnit(tokens[dropCount]) {
+      dropCount += 1
+    }
+    return Array(tokens.dropFirst(dropCount))
+  }
+
+  private static func isQuantityToken(_ token: String) -> Bool {
+    Double(token) != nil || fractionValue(token) != nil || mixedNumberValue(token) != nil
+  }
+
+  private static let connectors: Set<String> = ["/", "to", "or", "-", "–", "—"]
 
   private static func ingredientParts(_ text: String) -> (ingredient: String, preparation: String?) {
     let separators = [",", ";", "("]
