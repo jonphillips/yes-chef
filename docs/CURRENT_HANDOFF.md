@@ -141,5 +141,9 @@ device pass regardless. So verify with **compiler + tests once**, then hand off:
 - **Do not install/launch on simulators by default** — skip the install loop and hand straight to
   Jon's UI pass. Only boot/install a simulator when a change genuinely can't be confirmed from build
   + tests, and say why in the PR.
+- **Fail fast — one build attempt, then stop.** A simulator that won't boot/install, or any
+  Xcode/toolchain trouble, is **never** a reason to retry with alternate incantations. Make one
+  attempt; if it fails, paste the error and stop — do not try to repair the toolchain or the sim.
+  That is Jon's device pass, not a Codex grind.
 
 Jon performs the primary UI testing pass on `iPad Pro 13-inch (M5) (16GB)` and `iPhone 17 Pro`.

@@ -177,6 +177,13 @@ These are now project rules, not preferences:
    cost and Jon does the device pass on `iPad Pro 13-inch (M5) (16GB)` and `iPhone 17 Pro`
    regardless. Only boot/install a simulator when a change can't be confirmed from build +
    tests, and say why. See the Verification Pattern in `CURRENT_HANDOFF.md`.
+   **Fail fast — one attempt, then stop.** A simulator that won't boot/install, or any Xcode/
+   toolchain trouble, is **never** a reason to retry with alternate incantations (different
+   `-destination`, `simctl erase`/`boot`, flag permutations). Make **one** attempt at the
+   required build; if it fails, paste the error and **stop** — do not try to repair the
+   toolchain or the simulator. Booting/installing sims is Jon's device pass, not a Codex problem
+   to grind on. Endless build/install retries are the specific token-and-time sink this rule exists
+   to prevent.
 
 ## Data Preservation Rules
 

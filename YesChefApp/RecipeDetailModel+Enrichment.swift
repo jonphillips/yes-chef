@@ -7,8 +7,31 @@ extension RecipeDetailModel {
     @Dependency(\.makeAheadPlanClient) var makeAheadPlanClient
     @Dependency(\.chefItUpPlanClient) var chefItUpPlanClient
     @Dependency(\.serveWithPlanClient) var serveWithPlanClient
+    @Dependency(\.recipeAdjustmentClient) var recipeAdjustmentClient
 
     let context = chatModel.context.serialized()
+    let adjustRecipeAction = ChatApplyAction<RecipeAdjustmentProposal>(
+      title: "Adjust this recipe",
+      extractingTitle: "Drafting adjustment...",
+      reviewTitle: "Review recipe adjustment",
+      commitTitle: "Review Side by Side",
+      committingTitle: "Opening review...",
+      committedTitle: "Ready to review",
+      extract: { [weak self] selection, messages in
+        guard let detail = self?.detail else {
+          throw RecipeDetailError.missingRecipeForAdjustment
+        }
+        return try await recipeAdjustmentClient(
+          selection: selection,
+          messages: messages,
+          detail: detail,
+          tier: chatModel.activeTier
+        )
+      },
+      commit: { [weak self] proposal in
+        try self?.presentAdjustmentReview(proposal)
+      }
+    )
     let makeAheadAction = ChatApplyAction<MakeAheadPlan>(
       title: "Summarize make-ahead -> Make-ahead section",
       extractingTitle: "Summarizing make-ahead...",
@@ -52,6 +75,9 @@ extension RecipeDetailModel {
       }
     )
     return [
+      AnyChatApplyAction(adjustRecipeAction, requiresSubject: false) { proposal in
+        proposal.reviewSummary()
+      },
       AnyChatApplyAction(makeAheadAction) { plan in
         plan.rendered().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : plan.rendered()
       },
@@ -136,6 +162,7 @@ private enum RecipeDetailError: Error, CustomStringConvertible, LocalizedError {
   case emptyMakeAheadPlan
   case emptyChefItUpPlan
   case emptyServeWithPlan
+  case missingRecipeForAdjustment
 
   var description: String {
     switch self {
@@ -145,6 +172,8 @@ private enum RecipeDetailError: Error, CustomStringConvertible, LocalizedError {
       "The assistant did not find a Chef It Up plan to save."
     case .emptyServeWithPlan:
       "The assistant did not find any accompaniments to save."
+    case .missingRecipeForAdjustment:
+      "The recipe could not be loaded for adjustment."
     }
   }
 

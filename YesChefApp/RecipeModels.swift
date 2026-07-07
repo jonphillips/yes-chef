@@ -850,17 +850,18 @@ final class RecipeDetailModel {
     case scaling
     case chat(RecipeChatModel)
     case workbench(WorkbenchPresentation)
+    case adjustmentReview(RecipeAdjustmentReviewState)
   }
 
   let recipeID: Recipe.ID
   let scaleContext: ScaleContext
 
   @ObservationIgnored
-  @Dependency(\.date.now) private var now
+  @Dependency(\.date.now) var now
   @ObservationIgnored
-  @Dependency(\.defaultDatabase) private var database
+  @Dependency(\.defaultDatabase) var database
   @ObservationIgnored
-  @Dependency(\.uuid) private var uuid
+  @Dependency(\.uuid) var uuid
   @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
   @ObservationIgnored
@@ -872,6 +873,7 @@ final class RecipeDetailModel {
   var scaleFactor = 1.0
   var scaleWholePart = 1
   var scaleFraction = ScaleFraction.none
+  var adjustmentRestorePoint: RecipeAdjustmentRestorePoint?
   private var lastAppliedPersistedScale: Double?
 
   init(recipeID: Recipe.ID, scaleContext: ScaleContext? = nil) {
@@ -993,6 +995,8 @@ final class RecipeDetailModel {
       isShowingError = true
     }
   }
+
+  
 
   func clearMakeAheadButtonTapped() {
     do {

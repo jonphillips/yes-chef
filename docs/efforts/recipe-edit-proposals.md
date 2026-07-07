@@ -66,6 +66,66 @@ column, no CKAsset. The **variation** destination's durable table is **ADR-0021'
   - **Dogfood before S2.** Watch whether "adjust" mostly wants overwrite or mostly wants "keep both" — that
     tells us how urgent the variation destination is.
 
+### S1 dispatch — section-aware revision (the current build, ADR-0023 S1 option B)
+
+The first S1 pass (branch `codex/adjust-recipe-s1`) builds and passes but only edits the **first** ingredient/
+instruction section, because `proposedDetail` round-trips through a single `ingredientText`
+(`editorDraft` → join → `IngredientParser.lines` back into section 0), which also mints new line IDs. But
+Paprika and web imports create **real multi-section recipes** (`PaprikaHTMLImport.swift` `makeRecipeBundle`;
+`RecipeParseBuilder.sectionedIngredients`), so a "For the chicken / For the sauce" recipe would only get its
+top group edited. This revision makes adjust span all sections. **Still schema-free** — no new tables; only
+*how* existing children are written changes. Sync posture unchanged (in-memory restore point, no synced row).
+
+**The pivot:** stop round-tripping through text. Mutate the detail's `[IngredientLine]` / `[InstructionStep]`
+arrays **in place**, preserving each line's `id`, `sectionID`, `sortOrder`. This gives section-awareness *and*
+ID preservation (which S2 variation anchoring wants) in one move.
+
+1. **Section-aware, ID-preserving delta application** (`RecipeAdjustment.swift`).
+   - `substitute`/`scale`: replace the matched line's `originalText` (re-run `IngredientParser.parse` for the
+     structured fields) **in place** — keep `id`/`sectionID`/`sortOrder`.
+   - `remove`: drop the matched line from whatever section it lives in.
+   - `add`: mint a new line; target section = an optional `sectionName` on the op matched case-insensitively
+     to an existing section name, else the **first** section; append with next `sortOrder`.
+   - Instruction replacements: same in-place mutation, keyed `id` → `stepNumber` → exact text.
+   - Resolver (`RecipeIngredientReference.index` / `RecipeMethodStepReplacement.index`) spans **all** sections
+     (`id` first, then exact text; prefer `id` on duplicate text). Keep the fail-safe throw for a genuinely
+     unmatched reference.
+   - Delete `editorDraft(applyingTo:)`, `existingIngredientLineID`, and the `editable*` single-section helpers
+     once unused — no dead code. Fold in the `methodNote == nil ? notes : notes` dead-ternary cleanup;
+     `methodNote` still lands exactly once as a general note.
+2. **Multi-section overwrite + restore writers** (`RecipeAdjustment.swift` / `RecipeCore.swift`).
+   - Private `replaceEditableChildren(recipeID:ingredientSections:ingredientLines:instructionSections:instructionSteps:generalNotes:in:)`
+     — delete the recipe's existing ingredient sections+lines, instruction sections+steps, and **general** notes,
+     then insert the provided ones (direct SQLiteData `.delete()`/insert primitives, inside the existing write
+     transaction, atomic).
+   - `overwriteRecipeWithAdjustmentProposal`: compute proposed detail, stash the `RecipeBundleCoding` restore
+     point (unchanged), then `replaceEditableChildren` with the proposed multi-section children. Leave
+     **untouched**: recipe-row provenance (`originalSnapshot`, `dateCreated`, `coverPhotoID`,
+     `makeAhead`/`chefItUp`/`serveWith`), source, photos, tags, categories, equipment, non-general notes. Bump
+     `dateModified`.
+   - `restoreRecipeAdjustment`: **latent-bug fix** — rewrite to decode the bundle and `replaceEditableChildren`
+     with the snapshot's **full multi-section** children, **not** via single-section `RecipeEditorDraft` (today
+     undo would itself collapse a multi-section recipe to one section).
+3. **Extractor contract** (`RecipeAdjustment.swift`). Add optional `"sectionName"` to the `add` op (schema +
+   parse). Prompt: may edit ingredients in **any** section; reference existing rows by exact `id`/text; name the
+   target section on adds when relevant. Keep truncation/empty handling.
+4. **Tests** (`RecipeAdjustmentTests.swift`, core-only — no simulator). Apply-to-preview across **two** ingredient
+   sections (substitute in section 2, add to a named section, remove from section 2 → per-section changes correct,
+   other section intact, `id`s preserved on in-place edits); overwrite a two-section recipe (both sections
+   persisted; `originalSnapshot`/photos/tags/categories/source untouched); **undo/restore a two-section recipe**
+   (all sections restored exactly — the case that breaks today); keep the existing parse/single-section/
+   snapshot/truncation tests.
+
+**App layer:** expected to be untouched — `RecipeModels.swift` calls the same repo signatures, and the review
+(`IngredientMatrixView` via `WorkbenchCompare`, which flattens by canonical name) handles multi-section. Confirm
+the review renders a two-section proposed detail sensibly; adjust only if it doesn't.
+
+**Verify — fail fast, no simulator:** `swift build` + `swift test` (the new tests are the signal); `xcodegen
+generate` only if files were added; **one** app build for `iPad Pro 13-inch (M5) (16GB)` with
+`-skipMacroValidation`; `scripts/check-drift.sh`. **Do not boot, install, or `simctl` a simulator, and do not
+try to repair the toolchain** — if the app build fails, paste the compiler error and **stop**; Jon does the
+device pass.
+
 - **S2 — the variation destination (this is ADR-0021's build).**
   - Add **"keep as a variation"** as the second commit path on the *same* proposal: the structured delta
     the S1 extractor already produces *is* the ADR-0021 variation payload. Introduces the `recipeVariations`
