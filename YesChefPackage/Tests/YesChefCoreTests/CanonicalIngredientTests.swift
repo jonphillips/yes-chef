@@ -18,6 +18,22 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func chilePepperSpellingsCollapseToOneKey() {
+      // chile / chiles / chilies all reduce to `chile` — the naive `-ies → y` rule turned
+      // `chilies → chily`, splitting it off from `chiles → chile` onto a separate matrix row.
+      for spelling in ["ancho chile", "ancho chiles", "ancho chilies", "ancho chilis"] {
+        expectNoDifference(CanonicalIngredient.canonicalName(spelling), "ancho chile")
+        expectNoDifference(CanonicalIngredient.comparisonKey(spelling), "ancho chile")
+      }
+
+      // The targeted exception does not disturb the generic `-ies → y` / `-oes → o` plurals.
+      expectNoDifference(CanonicalIngredient.canonicalName("berries"), "berry")
+      expectNoDifference(CanonicalIngredient.canonicalName("cherries"), "cherry")
+      expectNoDifference(CanonicalIngredient.canonicalName("tomatoes"), "tomatoes")
+      expectNoDifference(CanonicalIngredient.canonicalName("potatoes"), "potato")
+    }
+
+    @Test
     func comparisonKeyCoarsensFormWhileGroceryKeyKeepsItSplit() {
       // The compare key drops form/state words so variants share a matrix row…
       expectNoDifference(

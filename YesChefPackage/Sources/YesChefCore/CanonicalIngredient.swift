@@ -189,11 +189,28 @@ public enum CanonicalIngredient {
     return words.joined(separator: " ")
   }
 
+  /// Words the generic `-ies → y` / `-s` rules singularize wrong. Keyed by the plural (as it appears
+  /// after `normalize`), mapped to the canonical singular. Targeted exception, not a rule rewrite:
+  /// only these listed forms divert; `berries → berry`, `tomatoes → tomato`, etc. stay on the generic
+  /// path. Every chile-pepper spelling converges on `chile` so the Compare matrix aligns them on one
+  /// row (the naive rule turned `chilies → chily`, which never matched `chile` from `chiles`).
+  private static let irregularSingulars: [String: String] = [
+    "chile": "chile",
+    "chiles": "chile",
+    "chilies": "chile",
+    "chilis": "chile",
+    "chilli": "chile",
+    "chillies": "chile",
+    "chillis": "chile",
+  ]
+
   private static func lightlySingularized(_ text: String) -> String {
     let words = text.split(separator: " ").map(String.init)
     guard var last = words.last else { return text }
 
-    if last.hasSuffix("ies"), last.count > 3 {
+    if let irregular = irregularSingulars[last] {
+      last = irregular
+    } else if last.hasSuffix("ies"), last.count > 3 {
       last = String(last.dropLast(3)) + "y"
     } else if last.hasSuffix("oes"), last.count > 3 {
       last = String(last.dropLast(2))

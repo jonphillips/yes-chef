@@ -56,6 +56,41 @@ struct RecipeCoreTests {
   }
 
   @Test
+  func ingredientParserDropsAlternateAndRangeMeasurementsFromItem() {
+    let recipeID = SampleUUIDSequence.uuid(21)
+    let sectionID = SampleUUIDSequence.uuid(22)
+    var uuids = SampleUUIDSequence(start: 23)
+
+    let lines = IngredientParser.lines(
+      from: """
+      4 lb / 1.8 kg beef chuck roast
+      28 to 32 g kosher salt
+      1¼ ounces ancho chiles
+      2 to 3 cloves garlic, minced
+      """,
+      recipeID: recipeID,
+      sectionID: sectionID,
+      uuid: { uuids.next() }
+    )
+
+    // Dual-unit (slash) and range/metric-first (to) clauses no longer leak into the item…
+    expectNoDifference(
+      lines.map(\.item),
+      ["beef chuck roast", "kosher salt", "ancho chiles", "garlic"]
+    )
+    // …and the primary quantity + shared unit survive the strip.
+    expectNoDifference(lines.map(\.quantity), [4, 28, 1.25, 2])
+    expectNoDifference(lines.map(\.unit), ["lb", "g", "ounces", "cloves"])
+    expectNoDifference(lines.map(\.preparation), [nil, nil, nil, "minced"])
+
+    // The clean item now canonicalizes without the parse garbage that split rows apart.
+    expectNoDifference(
+      lines.compactMap { CanonicalIngredient.comparisonKey($0.item) },
+      ["beef chuck roast", "kosher salt", "ancho chile", "garlic"]
+    )
+  }
+
+  @Test
   func scalingUsesParsedQuantitiesAndPreservesUnparsedText() {
     let recipeID = SampleUUIDSequence.uuid(1)
     let sectionID = SampleUUIDSequence.uuid(2)
