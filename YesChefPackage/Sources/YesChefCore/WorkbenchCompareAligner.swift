@@ -2,13 +2,13 @@ import Dependencies
 import Foundation
 import LLMClientKit
 
-public struct WorkbenchAlignedComparison: Sendable, Equatable {
-  public enum Source: Sendable, Equatable {
+public struct WorkbenchAlignedComparison: Sendable, Equatable, Codable {
+  public enum Source: Sendable, Equatable, Codable {
     case aligned
     case fallback(FallbackReason)
   }
 
-  public enum FallbackReason: Sendable, Equatable {
+  public enum FallbackReason: Sendable, Equatable, Codable {
     case emptyResponse
     case malformed
     case truncated

@@ -123,9 +123,7 @@ struct WorkbenchDetailView: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   @AppStorage(ChatWorkspaceDetent.storageKey) private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   @State private var model: WorkbenchDetailModel
-  @State private var compactChatModel: RecipeChatModel?
   @State private var compareTier: ModelTier = .onDevice
-  @State private var pendingChatAfterCompare = false
   let isFocusActive: Bool
   let focusButtonTapped: (() -> Void)?
 
@@ -160,10 +158,22 @@ struct WorkbenchDetailView: View {
                 model.applyActionCatalog(for: chatModel)
               }
             ) {
-              WorkbenchReader(model: model, detail: detail)
+              WorkbenchReader(
+                model: model,
+                detail: detail,
+                compareButtonTapped: {
+                  await openCompare(detail: detail)
+                }
+              )
             }
           } else {
-            WorkbenchReader(model: model, detail: detail)
+            WorkbenchReader(
+              model: model,
+              detail: detail,
+              compareButtonTapped: {
+                await openCompare(detail: detail)
+              }
+            )
           }
         }
         .navigationTitle(detail.workbench.title)
@@ -244,14 +254,12 @@ struct WorkbenchDetailView: View {
     // Full-screen focus cover on regular-width iPad (no third pane — the chat split owns the detail);
     // a sheet on compact iPhone. Same responsive Compare view either way.
     .fullScreenCover(
-      isPresented: isRegularWidth ? $model.isShowingCompare : .constant(false),
-      onDismiss: openPendingChat
+      isPresented: isRegularWidth ? $model.isShowingCompare : .constant(false)
     ) {
       compareCover
     }
     .sheet(
-      isPresented: isRegularWidth ? .constant(false) : $model.isShowingCompare,
-      onDismiss: openPendingChat
+      isPresented: isRegularWidth ? .constant(false) : $model.isShowingCompare
     ) {
       compareCover
     }
@@ -259,30 +267,42 @@ struct WorkbenchDetailView: View {
 
   @ViewBuilder private var compareCover: some View {
     if let detail = model.detail {
-      WorkbenchCompareView(
-        detail: detail,
-        alignmentModel: model.compareAlignmentModel,
-        tier: compareTier,
-        onDiscuss: discussComparison
-      )
+      if isRegularWidth {
+        ChatWorkspaceSplit(
+          context: .workbench(WorkbenchChatContext(detail: detail)),
+          detentRaw: $chatWorkspaceDetentRaw,
+          activeTierChanged: { compareTier = $0 },
+          applyActions: { chatModel in
+            model.applyActionCatalog(for: chatModel)
+          }
+        ) {
+          WorkbenchCompareView(
+            detail: detail,
+            alignmentModel: model.compareAlignmentModel,
+            tier: compareTier
+          )
+        }
+      } else {
+        WorkbenchCompareView(
+          detail: detail,
+          alignmentModel: model.compareAlignmentModel,
+          tier: compareTier,
+          compactChatContext: .workbench(WorkbenchChatContext(detail: detail)),
+          compactChatActiveTierChanged: { compareTier = $0 },
+          compactApplyActions: { chatModel in
+            model.applyActionCatalog(for: chatModel)
+          }
+        )
+      }
     }
   }
 
-  /// Compare is modal, so we can't layer the chat on top of it cleanly. Instead we dismiss
-  /// Compare and open the chat once the cover is gone (see `openPendingChat`), avoiding the
-  /// present-while-dismissing race SwiftUI hits with back-to-back modals.
-  private func discussComparison() {
-    pendingChatAfterCompare = true
-    model.isShowingCompare = false
-  }
-
-  private func openPendingChat() {
-    guard pendingChatAfterCompare else { return }
-    pendingChatAfterCompare = false
-    // On iPad the chat split is always mounted — dismissing Compare already reveals it. Only
-    // compact width, where chat lives behind a toolbar button, needs the sheet opened.
-    guard !isSplitEnabled else { return }
-    model.chatButtonTapped()
+  private func openCompare(detail: WorkbenchDetailData) async {
+    await model.compareAlignmentModel.prefetchDiskIfNeeded(
+      working: detail.draftRecipeDetail,
+      candidates: detail.candidateRows.compactMap(\.recipeDetail)
+    )
+    model.compareButtonTapped()
   }
 
   private var isRegularWidth: Bool {
@@ -297,6 +317,7 @@ struct WorkbenchDetailView: View {
 private struct WorkbenchReader: View {
   let model: WorkbenchDetailModel
   let detail: WorkbenchDetailData
+  let compareButtonTapped: () async -> Void
 
   @State private var titleText = ""
   @State private var notesText = ""
@@ -411,7 +432,9 @@ private struct WorkbenchReader: View {
           Text("Candidates")
           Spacer()
           Button {
-            model.compareButtonTapped()
+            Task {
+              await compareButtonTapped()
+            }
           } label: {
             Label("Compare", systemImage: "square.split.2x2")
           }

@@ -16,11 +16,12 @@ struct WorkbenchCompareView: View {
   let detail: WorkbenchDetailData
   let alignmentModel: WorkbenchCompareAlignmentModel
   let tier: ModelTier
-  /// Dismisses Compare and opens the workbench chat (already seeded with every candidate's
-  /// ingredients) so the cook can talk through the differences. Nil hides the affordance.
-  var onDiscuss: (() -> Void)?
+  var compactChatContext: RecipeChatContext?
+  var compactChatActiveTierChanged: (ModelTier) -> Void = { _ in }
+  var compactApplyActions: (RecipeChatModel) -> [AnyChatApplyAction] = { _ in [] }
   @Environment(\.dismiss) private var dismiss
   @State private var segment: Segment = .ingredients
+  @State private var compactChatModel: RecipeChatModel?
 
   private var workingDetail: RecipeDetailData? {
     detail.draftRecipeDetail
@@ -54,10 +55,11 @@ struct WorkbenchCompareView: View {
     displayedOutcome?.comparison ?? deterministicComparison
   }
 
+  // `model.isAligning` is true only while a model call is genuinely in flight (a cold miss or a
+  // Refresh) — a cache hit never sets it — so it drives the spinner directly, including over a
+  // still-displayed stale/previous result during a refresh.
   private var isAligning: Bool {
-    cachedOutcome == nil
-      && alignmentModel.currentKey == alignmentKey
-      && alignmentModel.isAligning
+    alignmentModel.currentKey == alignmentKey && alignmentModel.isAligning
   }
 
   private var showsBasicViewAffordance: Bool {
@@ -65,6 +67,14 @@ struct WorkbenchCompareView: View {
       return displayedOutcome.source.isFallback
     }
     return alignmentModel.currentKey == alignmentKey && alignmentModel.showsBasicViewAffordance
+  }
+
+  /// The displayed alignment was computed against older ingredient text. We surface this and let the
+  /// cook refresh on demand rather than re-running the model automatically on every edit.
+  private var isStale: Bool {
+    alignmentModel.currentKey?.identity == alignmentKey.identity
+      && alignmentModel.isStale
+      && !isAligning
   }
 
   private var fullRecipes: [WorkbenchCompareRecipe] {
@@ -84,7 +94,7 @@ struct WorkbenchCompareView: View {
         switch segment {
         case .ingredients:
           IngredientMatrixView(comparison: comparison)
-            .task(id: alignmentKey) {
+            .task(id: alignmentLoadID) {
               await ingredientsSegmentAppeared()
             }
         case .full:
@@ -108,10 +118,10 @@ struct WorkbenchCompareView: View {
             dismiss()
           }
         }
-        if let onDiscuss {
+        if let compactChatContext {
           ToolbarItem(placement: .topBarLeading) {
             Button {
-              onDiscuss()
+              compactChatModel = RecipeChatModel(context: compactChatContext)
             } label: {
               Label("Chat", systemImage: "sparkles")
             }
@@ -131,6 +141,13 @@ struct WorkbenchCompareView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(Capsule().fill(Color.secondary.opacity(0.12)))
+            } else if isStale {
+              Text("Ingredients changed — refresh to update")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(Color.secondary.opacity(0.12)))
             }
             Button {
               Task {
@@ -143,6 +160,13 @@ struct WorkbenchCompareView: View {
           }
         }
       }
+    }
+    .sheet(item: $compactChatModel) { chatModel in
+      WorkbenchCompareChatSheet(
+        chatModel: chatModel,
+        applyActions: compactApplyActions(chatModel),
+        activeTierChanged: compactChatActiveTierChanged
+      )
     }
   }
 
@@ -160,6 +184,31 @@ struct WorkbenchCompareView: View {
       candidates: candidateDetails,
       tier: tier
     )
+  }
+
+  /// Re-fires the alignment load whenever the recipe *set* or its ingredient text changes — so
+  /// staleness is re-evaluated — but not on tier changes: the tier only matters when an alignment is
+  /// actually run (a cold miss or an explicit refresh), never for re-displaying a cached result.
+  private var alignmentLoadID: String {
+    alignmentKey.contentSignature
+  }
+}
+
+private struct WorkbenchCompareChatSheet: View {
+  let chatModel: RecipeChatModel
+  let applyActions: [AnyChatApplyAction]
+  let activeTierChanged: (ModelTier) -> Void
+
+  var body: some View {
+    NavigationStack {
+      RecipeChatPanel(chatModel: chatModel, applyActions: applyActions)
+    }
+    .onAppear {
+      activeTierChanged(chatModel.activeTier)
+    }
+    .onChange(of: chatModel.activeTier) { _, tier in
+      activeTierChanged(tier)
+    }
   }
 }
 

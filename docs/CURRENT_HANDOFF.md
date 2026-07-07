@@ -1,18 +1,17 @@
 # Current Handoff
 
-Last updated: July 6, 2026 (**Next Up = the synthesis-shaped apply-action** — the draft verb's own action
-shape). Recently completed: **Compare-key granularity** (a second, coarser `CanonicalIngredient.comparisonKey`
-the Workbench Compare matrix aligns on — `fresh`/`frozen`/`dried` variants now share one base row with the form
-in the cells; grocery key untouched, no schema; core-only, in review; `efforts/comparison-key-granularity.md`)
-and **Workbench S4 — Compare** (the ingredient-diff matrix + *Full* flip-through, app-layer only —
-completes the Workbench build arc S1–S4). Earlier, moved to
-[`docs/DONE-LOG.md`](DONE-LOG.md):
-Workbench S3 durable log ([#110](https://github.com/jonphillips/yes-chef/pull/110), Jon device-passed),
-Workbench S2 + dogfood-hardening ([#107](https://github.com/jonphillips/yes-chef/pull/107)), chat controls
-([#105](https://github.com/jonphillips/yes-chef/pull/105), Jon device-passed), Workbench S1 + grounding
-fix/polish ([#101](https://github.com/jonphillips/yes-chef/pull/101) /
-[#103](https://github.com/jonphillips/yes-chef/pull/103)), and the menu-planning overhaul
-([#98](https://github.com/jonphillips/yes-chef/pull/98)).
+Last updated: July 7, 2026 (**Next Up = Recipe edit proposals — Slice 1**, the "Adjust this recipe" verb,
+ADR-0023). Recently completed and moved to [`docs/DONE-LOG.md`](DONE-LOG.md): the **LLM-aligned Compare
+matrix** (ADR-0022, now Accepted — shipped S1–S4 + the Compare→chat affordance,
+[#116](https://github.com/jonphillips/yes-chef/pull/116)–[#120](https://github.com/jonphillips/yes-chef/pull/120)),
+**Compare-key granularity** ([#114](https://github.com/jonphillips/yes-chef/pull/114)), and **Workbench S4 —
+Compare** ([#113](https://github.com/jonphillips/yes-chef/pull/113), completing the Workbench build arc
+S1–S4). Earlier, also in DONE-LOG: Workbench S3 durable log
+([#110](https://github.com/jonphillips/yes-chef/pull/110)), Workbench S2 + dogfood-hardening
+([#107](https://github.com/jonphillips/yes-chef/pull/107)), chat controls
+([#105](https://github.com/jonphillips/yes-chef/pull/105)), Workbench S1 + grounding fix/polish
+([#101](https://github.com/jonphillips/yes-chef/pull/101) / [#103](https://github.com/jonphillips/yes-chef/pull/103)),
+and the menu-planning overhaul ([#98](https://github.com/jonphillips/yes-chef/pull/98)).
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -28,20 +27,53 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Synthesis-shaped apply-action — the draft verb's own action shape.** App-layer only, small slice. Full spec
-in `efforts/recipe-workbench.md` (Out of scope / parked follow-ons → "Synthesis-shaped apply-action"); read it
-before starting. The problem: the shared apply-action "subject" mechanism (`RecipeChatWorkspace`) is built
-around *acting on one assistant reply* — the Apply menu is gated on a last reply existing, auto-fills the
-subject with `.latestReply`, and frames it with an "Acting on latest reply" chip. That fits per-reply verbs
-(Chef-It-Up, Serve-With) but fits the *synthesis* draft verb poorly: the working-recipe draft should be enabled
-whenever the workbench has candidates and synthesize from the **full conversation + all candidates**, with any
-user selection as an optional focus only. An interim fix already landed (the draft prompt ignores greeting/
-acknowledgement subjects so a heartbeat reply can't hijack it); this slice is the **proper** fix — a distinct
-action shape enabled by workbench state, with **no last-reply gate and no misleading chip**. The draft action is
-built in `WorkbenchDetailModel.applyActionCatalog` (`WorkbenchModels.swift`) via `AnyChatApplyAction(...,
-requiresSubject: false)`; the gating/chip live in `RecipeChatWorkspace.swift`. Keep the existing S2 draft
-behavior (create `.reference` working recipe, link `draftRecipeID`, capture `originalSnapshot`, open in reader)
-intact — this is a UX/action-shape refinement, not a data change.
+**Recipe edit proposals — Slice 1: the "Adjust this recipe" verb (preview + side-by-side review + overwrite;
+schema-free).** Implements [ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) S1. **Read before
+starting:** ADR-0023 in full (vocabulary banner + D1–D6 are load-bearing) and
+[`efforts/recipe-edit-proposals.md`](efforts/recipe-edit-proposals.md) (the S1 reuse map + out-of-scope);
+skim [ADR-0021](decisions/ADR-0021-recipe-variations.md) D2 for the delta op vocabulary this reuses.
+
+*Why:* no chat verb anywhere edits a recipe's **canonical** ingredients/method — Make-ahead, Chef-It-Up, and
+Serve-With each write an additive **sidecar section** (`RecipeDetailModel+Enrichment.swift`), and the
+workbench draft only ever *creates* a recipe. This is the first canonical-edit verb, made safe by
+construction: the model writes only to a transient preview, never to a stored recipe, until a human tap.
+
+*Build (S1 is schema-free — no migration, no synced column):*
+- **`.adjustRecipe` apply-action** on `RecipeDetailModel.applyActionCatalog`
+  (`RecipeDetailModel+Enrichment.swift`, sibling of the make-ahead/chef-it-up/serve-with actions). Because it
+  lives on the recipe reader it lands on **every recipe and the workbench working recipe** at once
+  (ADR-0023 D1) — not workbench-gated.
+- **Delta extractor** — a new LLM client mirroring `WorkbenchDraftRecipeClient` (`WorkbenchDraftRecipe.swift`:
+  system prompt + strict-JSON parse). It emits a **structured delta** in ADR-0021 D2's closed op vocabulary
+  (`add`/`remove`/`substitute`/`scale` for ingredients; a prose method note / whole-step text replacement for
+  method) — **not** a whole-recipe blob (ADR-0023 D4). `high` effort (ADR-0017); generous `maxTokens` that
+  budgets reasoning **and** output, throwing on truncation, not returning an empty delta
+  ([[reasoning-budget-starves-output]] — the draft verb's `ModelResponse.wasTruncated` in
+  `ModelResponse+Truncation.swift` is the pattern). Hold [[llm-curation-not-synthesis]]: distinct ops, never a
+  re-blended recipe.
+- **Ephemeral proposal store** — transient, **device-local, SyncEngine-excluded** (ADR-0015 precedent, same
+  live-schema audit test that excludes chat). Discarded on dismiss; nothing persists until a commit tap
+  (ADR-0023 D2).
+- **Side-by-side review view** — reuse `WorkbenchCompareCore` canonical-name alignment + the two-column
+  `WorkbenchCompareView`, pointed at *(current recipe, proposed recipe)* instead of *(working recipe,
+  candidates)*. Ingredients diff **structurally** (added/removed/substituted read as aligned rows + blanks);
+  method shows as a **prose before/after** (no structural per-step merge — ADR-0023 D3/OQ1, holds the ADR-0016
+  line). Full-screen cover on iPad via the `.detailOnly` focus pattern; sheet on iPhone.
+- **Commit = overwrite-in-place** through the existing structured-editor update (ADR-0004), **after** stashing
+  a **pre-edit restore point** for a one-level undo (ADR-0023 D5). Reuse the `RecipeBundleCoding` snapshot
+  codec + the existing snapshot-viewer UI (`RecipeModels.swift` `originalSnapshotButtonTapped`), but store it
+  as a **distinct, device-local, sync-excluded** restore point — **do not** write the pristine
+  `originalSnapshot` column (set-once "as captured/imported" provenance in `RecipeCore.swift`; clobbering it
+  loses the import baseline).
+
+*Invariant:* the model proposes → writes only to the preview → the tap writes (extends ADR-0011/0012). The
+side-by-side review is the guard against roughshod edits.
+
+*Out of S1 (do NOT build here):* the **"keep as a variation"** commit destination (that's S2 = ADR-0021's
+`recipeVariations` table + reader/grocery fold), the **iterative refine loop + workbench-log deposit** (S3),
+a multi-level undo stack, and any structural per-step method merge. Watch **OQ4**: the plain-recipe and
+working-recipe paths must be the *same* code (a `Recipe` + a proposed delta) — confirm the reader/compare
+wiring is identical, no fork.
 
 **Standing release follow-up (not a dispatch — a pre-cut ops step Jon runs).** We stay in the CloudKit
 **Development** environment (dev stance) so the schema keeps evolving freely; promoting to **Production** is
@@ -56,21 +88,18 @@ app target (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's d
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
-**Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — S1, chat controls, S2, S3, and S4 all shipped
-(S1–S3 → DONE-LOG; S4 Compare in review); the store + curate + compare arc is complete, and the tabbed
-candidate/working-recipe quick-view shipped as S4's *Full* segment. The **synthesis-shaped apply-action**
-follow-on is the current Next Up; the rest stay parked in the effort doc (AI effort/tier as a user-facing
-setting, AI-generated log entries, the S3 review notes).
+**Recipe edit proposals** ([ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) +
+`efforts/recipe-edit-proposals.md`) — the "Adjust this recipe" verb; **S1 is the current Next Up**. **S2** =
+the *"keep as a variation"* commit destination (this is ADR-0021's build: `recipeVariations` table + reader
+fold + grocery fold). **S3** = the iterative refine loop + workbench-log deposit. Extends ADR-0021 (the
+variation destination) — do not duplicate it.
 
-**LLM-aligned Compare matrix** ([ADR-0022](decisions/ADR-0022-llm-aligned-compare-matrix.md) +
-`efforts/compare-alignment.md`) — **milestone-sized, proposed (needs a design session)**. The deterministic
-`comparisonKey` ([#114](https://github.com/jonphillips/yes-chef/pull/114)) hits its ceiling on real recipes;
-an LLM aligner clusters ingredient rows by culinary role (chicken breast ≡ thigh, `chile`/`chiles`/`chilies`
-one row, `morita` ≈ `chipotle`) and orders by role ("protein at top"). The interesting decision is the
-**boundary**: LLM drives *presentational* alignment on the read-only, self-correcting Compare surface;
-grocery consolidation stays deterministic (determinism-at-merge). Structured-out/verbatim-cells, cached
-per candidate-set, deterministic fallback. **S1 is a no-LLM parse fix** (singularizer `chilies→chily` bug +
-dual-unit quantity leak) that stands alone and improves the fallback now.
+**Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — the store + curate + compare arc is
+complete (S1–S4 all shipped → DONE-LOG). Remaining parked follow-ons in the effort doc: the
+**synthesis-shaped apply-action** (the draft verb's own action shape — a distinct action enabled by workbench
+state, no last-reply gate/chip; app-layer only, small, spec in the effort doc's "Out of scope" section — this
+was the prior Next Up, demoted here, not yet built), plus AI effort/tier as a user-facing setting,
+AI-generated log entries, and the S3 review notes.
 
 **Meal-Planner chat verbs** (ADR-0013 follow-on + `efforts/cooking-workspace.md`) — the one remaining named
 actionable-chat verb instance. Classify each new verb's commit shape first ([[chat-verb-commit-shapes]]) —
@@ -85,12 +114,11 @@ parked in [`docs/open-questions.md`](open-questions.md) until scoped. Interacts 
 model), so sequence them.
 
 **Open design ADRs (discussion, not yet Accepted)** — [ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md)
-recipe text editing (header toggles vs. rich text / bold-italic), opened from the 2026-07-04 dogfood pass;
-and [ADR-0021](decisions/ADR-0021-recipe-variations.md) recipe variations (named deltas on a base recipe,
-selected in the reader → folds into method display + grocery; ingredients structured, method as prose,
-selection persisted-not-synced; closes ADR-0019 D1(c)'s promote-target gap), opened from Workbench S1
-dogfooding 2026-07-06 — **milestone-sized; dogfood more before slicing.**
-Decide with Jon before any implementation.
+recipe text editing (header toggles vs. rich text / bold-italic), opened from the 2026-07-04 dogfood pass.
+Decide with Jon before any implementation. *(Note: [ADR-0021](decisions/ADR-0021-recipe-variations.md) recipe
+variations is no longer a standalone queue item — it is now the **S2 destination** of the Recipe edit
+proposals effort above, reached via the same proposal/review surface; ADR-0023 D1/S2 supersedes its
+standalone framing.)*
 
 **Parked (not dispatched):**
 - **Dogfood the core loop on two devices** — capture ~15–20 real recipes via the extension, cook from
