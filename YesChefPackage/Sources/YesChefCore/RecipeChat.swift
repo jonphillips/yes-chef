@@ -610,15 +610,17 @@ public struct AnyChatApplyAction: Identifiable {
   public var id: String { title }
   public var title: String
   public var extractingTitle: String
+  public var requiresSubject: Bool
   public var run: @MainActor (_ selection: String, _ context: [RecipeChatMessage]) async throws
     -> [ChatApplyReviewItem]
 
   @MainActor
   public init<Payload>(
     _ action: ChatApplyAction<Payload>,
+    requiresSubject: Bool = true,
     renderedSummary: @escaping @MainActor (Payload) -> String?
   ) {
-    self.init(action) { payload in
+    self.init(action, requiresSubject: requiresSubject) { payload in
       guard
         let summary = renderedSummary(payload)?.trimmingCharacters(in: .whitespacesAndNewlines),
         !summary.isEmpty
@@ -641,10 +643,12 @@ public struct AnyChatApplyAction: Identifiable {
   @MainActor
   public init<Payload>(
     _ action: ChatApplyAction<Payload>,
+    requiresSubject: Bool = true,
     reviewItems: @escaping @MainActor (Payload) -> [ChatApplyReviewItem]
   ) {
     self.title = action.title
     self.extractingTitle = action.extractingTitle
+    self.requiresSubject = requiresSubject
     self.run = { selection, context in
       let payload = try await action.extract(selection, context)
       return reviewItems(payload)
@@ -657,6 +661,8 @@ public enum RecipeChatErrorText {
     switch error {
     case ModelClientError.onDeviceUnavailable:
       "On-device intelligence is not available on this device yet."
+    case ModelClientError.onDeviceContextTooLarge:
+      "This is too large for on-device intelligence. Switch to a frontier model and try again."
     case ModelClientError.frontierUnavailable:
       "No frontier model key is configured."
     case let ModelClientError.http(status, message):

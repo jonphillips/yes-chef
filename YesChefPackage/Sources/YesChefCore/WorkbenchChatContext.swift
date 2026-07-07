@@ -3,7 +3,12 @@ import LLMClientKit
 
 public struct WorkbenchChatContext: Equatable, Sendable {
   public static let softCandidateCap = 5
-  public static let onDeviceSerializedCharacterBudget = 24_000
+  // Apple reports an on-device context near 4k tokens. At the shared 4 chars/token estimate,
+  // 9k context chars leaves room for base instructions, chat history, prompt preferences, and reply.
+  public static let onDeviceSerializedCharacterBudget = 9_000
+  // 2.4k chars is roughly 600 estimated tokens: enough for several recent log entries while
+  // preventing the append-only log from crowding every candidate out of the on-device window.
+  public static let onDeviceLogCharacterBudget = 2_400
   public static let frontierSerializedCharacterBudget = 160_000
   public static let serializedCharacterBudget = onDeviceSerializedCharacterBudget
 
@@ -72,18 +77,24 @@ public struct WorkbenchChatContext: Equatable, Sendable {
     for includedCount in stride(from: cappedCandidates.count, through: 0, by: -1) {
       let candidate = renderedContext(
         candidates: Array(cappedCandidates.prefix(includedCount)),
-        omittedCandidateCount: sortedCandidates.count - includedCount
+        omittedCandidateCount: sortedCandidates.count - includedCount,
+        characterBudget: characterBudget
       )
       if candidate.text.count <= characterBudget || includedCount == 0 {
         return candidate
       }
     }
-    return renderedContext(candidates: [], omittedCandidateCount: sortedCandidates.count)
+    return renderedContext(
+      candidates: [],
+      omittedCandidateCount: sortedCandidates.count,
+      characterBudget: characterBudget
+    )
   }
 
   private func renderedContext(
     candidates: [WorkbenchCandidateChatContext],
-    omittedCandidateCount: Int
+    omittedCandidateCount: Int,
+    characterBudget: Int
   ) -> WorkbenchChatSerializedContext {
     var budgetNotes: [String] = []
     if omittedCandidateCount > 0 {
@@ -101,7 +112,7 @@ public struct WorkbenchChatContext: Equatable, Sendable {
       lines.append("Current working recipe:")
       lines.append(draftRecipe.serialized())
     }
-    appendLogEntries(to: &lines)
+    appendLogEntries(to: &lines, characterBudget: Self.logCharacterBudget(for: characterBudget), notes: &budgetNotes)
     if !budgetNotes.isEmpty {
       lines.append("Context budget notes:")
       for note in budgetNotes {
@@ -165,19 +176,51 @@ public struct WorkbenchChatContext: Equatable, Sendable {
     }
   }
 
-  private func appendLogEntries(to lines: inout [String]) {
-    guard !logEntries.isEmpty else { return }
-    lines.append("Workbench log:")
-    for entry in logEntries.sorted(by: areWorkbenchLogEntriesInIncreasingOrder) {
-      lines.append("- \(entry.kind.title) (\(entry.dateCreated.formatted(date: .abbreviated, time: .shortened))):")
-      lines.append("  - \(entry.body.replacingOccurrences(of: "\n", with: " "))")
-      if let outcome = entry.outcome {
-        lines.append("  - Outcome: \(outcome.replacingOccurrences(of: "\n", with: " "))")
-      }
-      if let relatedRecipeID = entry.relatedRecipeID {
-        lines.append("  - Related recipe ID: \(relatedRecipeID.uuidString)")
-      }
+  private static func logCharacterBudget(for characterBudget: Int) -> Int {
+    guard characterBudget > onDeviceSerializedCharacterBudget else {
+      return min(onDeviceLogCharacterBudget, characterBudget)
     }
+    return characterBudget * onDeviceLogCharacterBudget / onDeviceSerializedCharacterBudget
+  }
+
+  private func appendLogEntries(to lines: inout [String], characterBudget: Int, notes: inout [String]) {
+    guard !logEntries.isEmpty else { return }
+    let rendered = renderedLogEntries().joined(separator: "\n")
+    if rendered.count <= characterBudget {
+      lines.append(rendered)
+      return
+    }
+
+    notes.append("Workbench log was trimmed to recent text so it stays within its context slice.")
+    lines.append("Workbench log (trimmed to fit context budget):")
+    let clipped = rendered.suffix(characterBudget)
+    if let firstNewline = clipped.firstIndex(of: "\n") {
+      lines.append(String(clipped[clipped.index(after: firstNewline)...]))
+    } else {
+      lines.append(String(clipped))
+    }
+  }
+
+  private func renderedLogEntries() -> [String] {
+    var lines = ["Workbench log:"]
+    for entry in logEntries.sorted(by: areWorkbenchLogEntriesInIncreasingOrder) {
+      lines.append(contentsOf: renderedLogEntry(entry))
+    }
+    return lines
+  }
+
+  private func renderedLogEntry(_ entry: WorkbenchLogEntryChatContext) -> [String] {
+    var lines = [
+      "- \(entry.kind.title) (\(entry.dateCreated.formatted(date: .abbreviated, time: .shortened))):",
+      "  - \(entry.body.replacingOccurrences(of: "\n", with: " "))",
+    ]
+    if let outcome = entry.outcome {
+      lines.append("  - Outcome: \(outcome.replacingOccurrences(of: "\n", with: " "))")
+    }
+    if let relatedRecipeID = entry.relatedRecipeID {
+      lines.append("  - Related recipe ID: \(relatedRecipeID.uuidString)")
+    }
+    return lines
   }
 }
 

@@ -214,7 +214,7 @@ final class WorkbenchDetailModel {
       }
     ]
 
-    if detail?.workbench.draftRecipeID == nil {
+    if detail?.workbench.draftRecipeID == nil, detail?.candidateRows.isEmpty == false {
       let context = chatModel.context.serialized(for: chatModel.activeTier)
       let draftAction = ChatApplyAction<WorkbenchDraftRecipe>(
         title: "Draft working recipe -> Working recipe",
@@ -237,7 +237,7 @@ final class WorkbenchDetailModel {
       )
 
       actions.append(
-        AnyChatApplyAction(draftAction) { draftRecipe in
+        AnyChatApplyAction(draftAction, requiresSubject: false) { draftRecipe in
           draftRecipe.isEmpty ? nil : draftRecipe.renderedReview()
         }
       )
