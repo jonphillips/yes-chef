@@ -45,7 +45,7 @@ extension RecipeDetailModel {
       destination = nil
       return true
     } catch {
-      errorMessage = String(describing: error)
+      errorMessage = error.localizedDescription
       isShowingError = true
       return false
     }
@@ -69,7 +69,7 @@ extension RecipeDetailModel {
       destination = nil
       return true
     } catch {
-      errorMessage = String(describing: error)
+      errorMessage = error.localizedDescription
       isShowingError = true
       return false
     }

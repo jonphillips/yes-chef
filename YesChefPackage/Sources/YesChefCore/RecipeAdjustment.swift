@@ -669,15 +669,18 @@ public extension RecipeDetailData {
     for variation: RecipeVariation
   ) throws -> [IngredientLine.ID: RecipeVariationIngredientHighlight] {
     let payload = try RecipeVariationPayload.decode(variation.deltas, variationID: variation.id)
-    var highlights: [IngredientLine.ID: RecipeVariationIngredientHighlight] = [:]
-    var uuids = VariationUUIDSequence(variationID: variation.id)
+    let resolvedDetail = try resolved(applying: variation)
+    let baseLineIDs = Set(ingredientLines.map(\.id))
+    var highlights = Dictionary(
+      uniqueKeysWithValues: resolvedDetail.ingredientLines
+        .filter { !baseLineIDs.contains($0.id) }
+        .map { ($0.id, RecipeVariationIngredientHighlight.added) }
+    )
 
     for op in payload.ingredientOps {
       switch op {
-      case let .add(line, _):
-        if !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-          highlights[uuids.next()] = .added
-        }
+      case .add:
+        break
       case let .remove(reference):
         if let index = reference.index(in: ingredientLines) {
           highlights[ingredientLines[index].id] = .removed

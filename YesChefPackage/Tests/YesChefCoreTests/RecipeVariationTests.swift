@@ -74,6 +74,86 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func variationNeedsReviewErrorUsesUserFacingDescription() {
+      let error = RecipeAdjustmentError.variationNeedsReview(
+        "Smoky",
+        "The adjustment references an ingredient that could not be matched: 1 teaspoon paprika"
+      )
+
+      expectNoDifference(
+        error.localizedDescription,
+        "\"Smoky\" needs review before this recipe can be overwritten: The adjustment references an ingredient that could not be matched: 1 teaspoon paprika"
+      )
+      #expect(String(describing: error) != error.localizedDescription)
+    }
+
+    @Test
+    func addedIngredientHighlightUsesResolvedLineIDWhenRecipeHasNoIngredientSections() throws {
+      let now = Date(timeIntervalSinceReferenceDate: 819_255_000)
+      let recipeID = SampleUUIDSequence.uuid(32_601)
+      let variationID = SampleUUIDSequence.uuid(32_602)
+      let detail = RecipeDetailData(
+        recipe: Recipe(id: recipeID, title: "Lime Rice", dateCreated: now, dateModified: now)
+      )
+      let variation = RecipeVariation(
+        id: variationID,
+        recipeID: recipeID,
+        name: "Zesty",
+        sortIndex: 0,
+        deltas: try RecipeVariationPayload(
+          ingredientOps: [
+            .add(line: "1 teaspoon lime zest", sectionName: nil)
+          ],
+          methodStepReplacements: []
+        )
+        .encodedData(),
+        dateCreated: now,
+        dateModified: now
+      )
+
+      let resolved = try detail.resolved(applying: variation)
+      let addedLine = try #require(resolved.ingredientLines.first)
+      let highlights = try detail.variationIngredientHighlights(for: variation)
+
+      expectNoDifference(resolved.ingredientSections.count, 1)
+      expectNoDifference(addedLine.originalText, "1 teaspoon lime zest")
+      expectNoDifference(highlights[addedLine.id], RecipeVariationIngredientHighlight?.some(.added))
+    }
+
+    @Test
+    func addedIngredientHighlightUsesResolvedLineIDWhenAddTextContainsNewline() throws {
+      let now = Date(timeIntervalSinceReferenceDate: 819_256_000)
+      let recipeID = SampleUUIDSequence.uuid(32_611)
+      let variationID = SampleUUIDSequence.uuid(32_612)
+      let detail = RecipeDetailData(
+        recipe: Recipe(id: recipeID, title: "Lime Rice", dateCreated: now, dateModified: now)
+      )
+      let variation = RecipeVariation(
+        id: variationID,
+        recipeID: recipeID,
+        name: "Extra Lime",
+        sortIndex: 0,
+        deltas: try RecipeVariationPayload(
+          ingredientOps: [
+            .add(line: "1 teaspoon lime zest\n1 tablespoon lime juice", sectionName: nil)
+          ],
+          methodStepReplacements: []
+        )
+        .encodedData(),
+        dateCreated: now,
+        dateModified: now
+      )
+
+      let resolved = try detail.resolved(applying: variation)
+      let addedLine = try #require(resolved.ingredientLines.first)
+      let highlights = try detail.variationIngredientHighlights(for: variation)
+
+      expectNoDifference(resolved.ingredientSections.count, 1)
+      expectNoDifference(addedLine.originalText, "1 teaspoon lime zest")
+      expectNoDifference(highlights[addedLine.id], RecipeVariationIngredientHighlight?.some(.added))
+    }
+
+    @Test
     func overwriteBlocksWhenExistingVariationNoLongerResolvesAgainstProposedBase() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 819_260_000)
