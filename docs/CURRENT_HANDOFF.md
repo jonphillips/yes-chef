@@ -1,7 +1,10 @@
 # Current Handoff
 
-Last updated: July 7, 2026 (**Next Up = Recipe edit proposals — Slice 2**, the "keep as a variation" commit
-destination, ADR-0021/ADR-0023). Recently completed and moved to [`docs/DONE-LOG.md`](DONE-LOG.md):
+Last updated: July 7, 2026 (**Next Up = Recipe edit proposals — Slice 3**, the iterative refine loop +
+workbench-log deposit, ADR-0023 S3). Recently completed and moved to [`docs/DONE-LOG.md`](DONE-LOG.md):
+**Recipe edit proposals — Slice 2** (the "keep as a variation" commit destination — ADR-0021's build:
+synced `recipeVariations` table + migration, reader fold with add/change/remove highlighting, deterministic
+grocery fold, and ADR-0023 OQ3's conservative overwrite-block, [#123](https://github.com/jonphillips/yes-chef/pull/123));
 **Recipe edit proposals — Slice 1** (the "Adjust this recipe" verb + section-aware multi-section
 overwrite/undo, ADR-0023, schema-free); the **LLM-aligned Compare
 matrix** (ADR-0022, now Accepted — shipped S1–S4 + the Compare→chat affordance,
@@ -29,43 +32,27 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Recipe edit proposals — Slice 2: the "keep as a variation" commit destination (this is ADR-0021's build —
-first schema change in this effort).** Implements [ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) S2
-by adding a second commit path on the *same* S1 proposal. **Read before starting:**
-[ADR-0021](decisions/ADR-0021-recipe-variations.md) in full (the `recipeVariations` table shape, D2 delta
-vocabulary, the reader fold + grocery fold, OQ1/OQ2), ADR-0023 **D6 + OQ3**, and
-[`efforts/recipe-edit-proposals.md`](efforts/recipe-edit-proposals.md) S2. The S1 code this extends:
-`RecipeAdjustment.swift` (the structured delta the extractor already produces **is** the ADR-0021 variation
-payload — do **not** re-extract) and `RecipeAdjustmentReviewView.swift` (the side-by-side is the staging
-surface — add the second commit button beside Overwrite).
+**Recipe edit proposals — Slice 3: the iterative refine loop + workbench-log deposit.** Implements
+[ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) S3 — the conversational editing loop Jon originally
+asked for. **Read before starting:** ADR-0023 (full), `efforts/recipe-edit-proposals.md` S3, and ADR-0019 for
+the workbench-log shape. The S1/S2 code this extends: `RecipeAdjustment.swift` (the extractor + delta) and
+`RecipeAdjustmentReviewView.swift` (the side-by-side staging surface + the two commit buttons S2 added).
 
-*Why:* S1 shipped overwrite-in-place with a one-level undo; dogfooding tells us how often "adjust" wants
-"keep both" instead. S2 gives the non-destructive destination: the same reviewed delta persists as a **named
-variation overlay** on the base recipe (ADR-0021, [[recipe-variations-overlay]]), leaving canonical
-ingredients/method intact.
+*Why:* S1/S2 shipped the two commit destinations (overwrite, keep-as-variation) but each is one-shot — the
+proposal is take-it-or-leave-it. S3 lets the user **keep chatting to revise a live proposal before
+committing**, closing the loop from a single extraction to an actual conversation.
 
-*Build (S2 introduces schema — the first migration + synced column in this effort):*
-- **`recipeVariations` table + BLOB** (the ADR-0021 D2 delta payload) + migration. This is a **real durable,
-  synced** row — schema-evolves freely in the CloudKit **Development** environment; **add it to the Standing
-  release follow-up list** so it deploys at the eventual prod cut.
-- **"Keep as a variation"** as the **second commit button** on `RecipeAdjustmentReviewView`, alongside
-  Overwrite. Reuses the S1 proposal/delta unchanged — **ADR-0021 OQ1 resolved** (no separate extraction),
-  **OQ2 resolved** (the S1 side-by-side is the staging surface).
-- **Reader fold** — the variation renders **highlighted-in-place** on the base recipe (ADR-0021); the active
-  selection is **persisted-not-synced** ([[recipe-variations-overlay]]).
-- **Grocery fold** — the active variation's delta folds into the grocery list **deterministically**
-  ([[llm-vs-determinism-surface-boundary]] — this is a reproducible data-merge, keep it LLM-free).
-- **Resolve ADR-0023 OQ3** — an S1 **overwrite** of a recipe that already carries variations must
-  re-validate/rebase the variation deltas against the new base (or warn): the delta anchors on
-  base-ingredient identity, which S1's `id`/`sectionID`-preserving in-place mutation is what makes tractable.
+*Build:*
+- **Iterative refine** — keep chatting to revise the live proposal before committing; **re-extract with the
+  current proposal as context, not from scratch** (do not throw away the staged delta on each turn).
+- **Workbench-log deposit** — on the workbench, a committed adjustment can drop a `rationale`/`experiment`
+  entry into the ADR-0019 workbench log, closing the "why did I change this" memory loop.
 
-*Invariant (unchanged):* the model proposes → writes only to the preview → the tap writes (ADR-0011/0012).
-The variation tap now writes a **durable overlay** instead of overwriting; the side-by-side review remains
-the guard against roughshod edits.
+*Invariant (unchanged):* the model proposes → writes only to the preview → the tap writes (ADR-0011/0012);
+the side-by-side review remains the guard against roughshod edits.
 
-*Out of S2 (do NOT build here):* the **iterative refine loop + workbench-log deposit** (S3 — re-extract with
-the live proposal as context, then drop a `rationale` entry into the ADR-0019 workbench log), a multi-level
-undo stack, and any structural per-step method merge (declined, ADR-0016/0023 OQ1).
+*Out of S3 (do NOT build here):* a multi-level undo stack (one-level restore point stands unless dogfooding
+asks, ADR-0023 OQ2) and any structural per-step method merge (declined, ADR-0016/0023 OQ1).
 
 **Standing release follow-up (not a dispatch — a pre-cut ops step Jon runs).** We stay in the CloudKit
 **Development** environment (dev stance) so the schema keeps evolving freely; promoting to **Production** is
@@ -82,11 +69,10 @@ Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); no
 target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
 **Recipe edit proposals** ([ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) +
-`efforts/recipe-edit-proposals.md`) — the "Adjust this recipe" verb; **S1 shipped** (overwrite destination,
-section-aware multi-section overwrite/undo). **S2 is the current Next Up** = the *"keep as a variation"*
-commit destination (this is ADR-0021's build: `recipeVariations` table + reader fold + grocery fold). **S3**
-= the iterative refine loop + workbench-log deposit. Extends ADR-0021 (the variation destination) — do not
-duplicate it.
+`efforts/recipe-edit-proposals.md`) — the "Adjust this recipe" verb; **S1 + S2 shipped** (overwrite
+destination with section-aware multi-section overwrite/undo; the "keep as a variation" destination = ADR-0021's
+`recipeVariations` table + reader fold + grocery fold). **S3 is the current Next Up** = the iterative refine
+loop + workbench-log deposit. Extends ADR-0021 (the variation destination) — do not duplicate it.
 
 **Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — the store + curate + compare arc is
 complete (S1–S4 all shipped → DONE-LOG). Remaining parked follow-ons in the effort doc: the
