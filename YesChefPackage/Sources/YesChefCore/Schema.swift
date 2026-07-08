@@ -53,7 +53,15 @@ extension DependencyValues {
     let database = try SQLiteData.defaultDatabase(path: path, configuration: configuration)
     var migrator = DatabaseMigrator()
     #if DEBUG
-      migrator.eraseDatabaseOnSchemaChange = true
+      // Opt-in only. eraseDatabaseOnSchemaChange wipes the entire store whenever GRDB
+      // decides the on-disk schema differs from the migration-defined one — and
+      // SQLiteData's SyncEngine installs triggers on the synced tables at runtime, so
+      // that comparison drifts on an ordinary rebuild and nukes the dogfood library
+      // ("my database is gone"). Gate it behind an explicit launch argument: add
+      // -YesChefEraseDatabaseOnSchemaChange to the scheme only when you actually want a
+      // clean-slate dev DB, instead of firing on every DEBUG launch.
+      migrator.eraseDatabaseOnSchemaChange =
+        ProcessInfo.processInfo.arguments.contains("-YesChefEraseDatabaseOnSchemaChange")
     #endif
 
     migrator.registerMigration("Create MVP recipe library schema") { db in
