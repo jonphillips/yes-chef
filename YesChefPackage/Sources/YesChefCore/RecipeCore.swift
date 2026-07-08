@@ -15,6 +15,8 @@ public struct RecipeDetailData: Equatable, Sendable {
   public var categoryDisplayNames: [String]
   public var equipment: [Equipment]
   public var recipeEquipment: [RecipeEquipment]
+  public var variations: [RecipeVariation]
+  public var activeVariationID: RecipeVariation.ID?
 
   public init(
     recipe: Recipe,
@@ -29,7 +31,9 @@ public struct RecipeDetailData: Equatable, Sendable {
     categories: [Category] = [],
     categoryDisplayNames: [String] = [],
     equipment: [Equipment] = [],
-    recipeEquipment: [RecipeEquipment] = []
+    recipeEquipment: [RecipeEquipment] = [],
+    variations: [RecipeVariation] = [],
+    activeVariationID: RecipeVariation.ID? = nil
   ) {
     self.recipe = recipe
     self.source = source
@@ -44,6 +48,8 @@ public struct RecipeDetailData: Equatable, Sendable {
     self.categoryDisplayNames = categoryDisplayNames
     self.equipment = equipment
     self.recipeEquipment = recipeEquipment
+    self.variations = variations
+    self.activeVariationID = activeVariationID
   }
 }
 
@@ -93,6 +99,10 @@ public enum RecipeRepository {
       .fetchAll(db)
     let recipeEquipment = try (RecipeEquipment.where { $0.recipeID.eq(recipeID) })
       .fetchAll(db)
+    let variations = try (RecipeVariation.where { $0.recipeID.eq(recipeID) })
+      .order { $0.sortIndex }
+      .fetchAll(db)
+    let activeVariationID = try activeVariationID(recipeID: recipeID, variations: variations, in: db)
     let tags = try Tag.fetchAll(db)
       .filter { tag in recipeTags.contains { $0.tagID == tag.id } }
       .sorted { lhs, rhs in
@@ -125,7 +135,9 @@ public enum RecipeRepository {
       categories: categories,
       categoryDisplayNames: categoryDisplayNames,
       equipment: equipment,
-      recipeEquipment: recipeEquipment
+      recipeEquipment: recipeEquipment,
+      variations: variations,
+      activeVariationID: activeVariationID
     )
   }
 

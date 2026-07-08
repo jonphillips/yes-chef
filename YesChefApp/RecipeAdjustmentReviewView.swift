@@ -4,10 +4,24 @@ import YesChefCore
 struct RecipeAdjustmentReviewView: View {
   let review: RecipeAdjustmentReviewState
   let overwrite: (RecipeAdjustmentReviewState) -> Bool
+  let keepAsVariation: (RecipeAdjustmentReviewState, String) -> Bool
 
   @Environment(\.dismiss) private var dismiss
   @State private var segment = Segment.ingredients
+  @State private var variationName: String
   @State private var isOverwriting = false
+  @State private var isKeepingVariation = false
+
+  init(
+    review: RecipeAdjustmentReviewState,
+    overwrite: @escaping (RecipeAdjustmentReviewState) -> Bool,
+    keepAsVariation: @escaping (RecipeAdjustmentReviewState, String) -> Bool
+  ) {
+    self.review = review
+    self.overwrite = overwrite
+    self.keepAsVariation = keepAsVariation
+    _variationName = State(initialValue: review.defaultVariationName)
+  }
 
   private enum Segment: String, CaseIterable, Identifiable {
     case ingredients = "Ingredients"
@@ -28,13 +42,21 @@ struct RecipeAdjustmentReviewView: View {
       Group {
         switch segment {
         case .ingredients:
-          IngredientMatrixView(comparison: comparison)
+          VStack(spacing: 0) {
+            variationNameField
+            Divider()
+            IngredientMatrixView(comparison: comparison)
+          }
         case .method:
-          MethodBeforeAfterView(
-            current: review.currentDetail,
-            proposed: review.proposedDetail,
-            methodNote: review.proposal.methodNote
-          )
+          VStack(spacing: 0) {
+            variationNameField
+            Divider()
+            MethodBeforeAfterView(
+              current: review.currentDetail,
+              proposed: review.proposedDetail,
+              methodNote: review.proposal.methodNote
+            )
+          }
         }
       }
       .navigationTitle("Adjust Recipe")
@@ -53,9 +75,20 @@ struct RecipeAdjustmentReviewView: View {
           Button("Cancel") {
             dismiss()
           }
-          .disabled(isOverwriting)
+          .disabled(isBusy)
         }
-        ToolbarItem(placement: .confirmationAction) {
+        ToolbarItemGroup(placement: .confirmationAction) {
+          Button {
+            keepAsVariationButtonTapped()
+          } label: {
+            if isKeepingVariation {
+              Label("Keeping", systemImage: "hourglass")
+            } else {
+              Label("Keep as Variation", systemImage: "square.stack.3d.up")
+            }
+          }
+          .disabled(isBusy || variationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
           Button {
             overwriteButtonTapped()
           } label: {
@@ -65,9 +98,35 @@ struct RecipeAdjustmentReviewView: View {
               Label("Overwrite", systemImage: "checkmark.circle")
             }
           }
-          .disabled(isOverwriting)
+          .disabled(isBusy)
         }
       }
+    }
+  }
+
+  private var isBusy: Bool {
+    isOverwriting || isKeepingVariation
+  }
+
+  private var variationNameField: some View {
+    LabeledContent {
+      TextField("Variation name", text: $variationName)
+        .textFieldStyle(.roundedBorder)
+        .frame(maxWidth: 360)
+    } label: {
+      Label("Variation", systemImage: "square.stack.3d.up")
+        .font(.subheadline.bold())
+    }
+    .padding()
+    .background(.bar)
+  }
+
+  private func keepAsVariationButtonTapped() {
+    isKeepingVariation = true
+    if keepAsVariation(review, variationName) {
+      dismiss()
+    } else {
+      isKeepingVariation = false
     }
   }
 
@@ -78,6 +137,13 @@ struct RecipeAdjustmentReviewView: View {
     } else {
       isOverwriting = false
     }
+  }
+}
+
+private extension RecipeAdjustmentReviewState {
+  var defaultVariationName: String {
+    let summary = proposal.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+    return summary.isEmpty ? "\(currentDetail.recipe.title) Variation" : summary
   }
 }
 

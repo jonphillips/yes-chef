@@ -835,13 +835,6 @@ struct RecipeBackupSupplementSummary: Identifiable, Equatable, Sendable {
   }
 }
 
-/// A run of ingredient lines under an optional section heading, for grouped detail display.
-struct IngredientLineGroup: Identifiable {
-  let id: IngredientSection.ID
-  var name: String?
-  var lines: [IngredientLine]
-}
-
 @Observable
 @MainActor
 final class RecipeDetailModel {
@@ -885,37 +878,6 @@ final class RecipeDetailModel {
       RecipeScaleRequest(context: self.scaleContext),
       animation: .default
     )
-  }
-
-  var recipe: Recipe? {
-    detail?.recipe
-  }
-
-  var ingredientLines: [IngredientLine] {
-    detail?.ingredientLines.sorted { $0.sortOrder < $1.sortOrder } ?? []
-  }
-
-  /// Ingredient lines grouped under their (optional) section heading, ordered by the
-  /// section sort order, so recovered Paprika sections (e.g. CHICKEN / SAUCE) render as
-  /// headings instead of a flat list.
-  var ingredientGroups: [IngredientLineGroup] {
-    guard let detail else { return [] }
-    let linesBySection = Dictionary(grouping: detail.ingredientLines) { $0.sectionID }
-    return detail.ingredientSections
-      .sorted { $0.sortOrder < $1.sortOrder }
-      .compactMap { section in
-        let lines = (linesBySection[section.id] ?? []).sorted { $0.sortOrder < $1.sortOrder }
-        guard !lines.isEmpty else { return nil }
-        return IngredientLineGroup(id: section.id, name: section.name, lines: lines)
-      }
-  }
-
-  var instructionSteps: [InstructionStep] {
-    detail?.instructionSteps.sorted { $0.sortOrder < $1.sortOrder } ?? []
-  }
-
-  var visibleNotes: [RecipeNote] {
-    detail?.notes.filter { $0.noteType != .retrospective } ?? []
   }
 
   var displayablePhotos: [RecipePhoto] {
