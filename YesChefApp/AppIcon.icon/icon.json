@@ -1,0 +1,77 @@
+{
+  "fill" : {
+    "automatic-gradient" : "display-p3:0.96078,0.93725,0.90196,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "YesChefSpoon.png",
+          "name" : "YesChefSpoon",
+          "position" : {
+            "scale" : 0.15,
+            "translation-in-points" : [
+              39.4609375,
+              -171.1875
+            ]
+          }
+        },
+        {
+          "image-name" : "YesChefTowel.png",
+          "name" : "YesChefTowel",
+          "position" : {
+            "scale" : 0.35,
+            "translation-in-points" : [
+              -109.8671875,
+              145.45781250000005
+            ]
+          }
+        },
+        {
+          "image-name" : "YesChefApronIcon.png",
+          "name" : "YesChefApronIcon"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.6
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.2
+      }
+    },
+    {
+      "layers" : [
+
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.6
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.2
+      }
+    },
+    {
+      "layers" : [
+
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.6
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.2
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}
