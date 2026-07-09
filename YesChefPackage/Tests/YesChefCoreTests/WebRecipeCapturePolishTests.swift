@@ -8,8 +8,10 @@ extension RecipeCoreTests {
   @Suite
   struct WebRecipeCapturePolishTests {
     @Test
-    func incomingSourceURLStripsQueryAndFragmentButCanonicalStaysPreferred() async throws {
-      let incomingURL = try #require(URL(string: "https://example.com/recipes/fallback?utm_source=newsletter#comments"))
+    func incomingSourceURLStripsTrackersAndFragmentButCanonicalStaysPreferred() async throws {
+      let incomingURL = try #require(
+        URL(string: "https://example.com/recipes/fallback?utm_source=newsletter&id=123#comments")
+      )
       let canonicalHTML = """
         <html>
           <head>
@@ -64,22 +66,27 @@ extension RecipeCoreTests {
         capturedAt: Date(timeIntervalSinceReferenceDate: 803_750_100)
       )
 
-      expectNoDifference(fallbackDraft.page.sourceURL?.absoluteString, "https://example.com/recipes/fallback")
+      expectNoDifference(fallbackDraft.page.sourceURL?.absoluteString, "https://example.com/recipes/fallback?id=123")
     }
 
     @Test
-    func importIdentityIgnoresTrackingQueryAndFragment() {
+    func importIdentityIgnoresKnownTrackingParametersAndFragment() {
       let first = RecipeImportIdentityKey(
-        sourceURL: "https://example.com/recipes/tacos?utm_source=newsletter#comments",
+        sourceURL: "https://example.com/recipes/tacos?id=123&utm_source=newsletter&fbclid=abc#comments",
         title: "Tacos"
       )
       let second = RecipeImportIdentityKey(
-        sourceURL: "https://example.com/recipes/tacos",
+        sourceURL: "https://example.com/recipes/tacos?id=123",
+        title: "Tacos"
+      )
+      let distinctRecipe = RecipeImportIdentityKey(
+        sourceURL: "https://example.com/recipes/tacos?id=456",
         title: "Tacos"
       )
 
       expectNoDifference(first, second)
-      expectNoDifference(first.normalizedSourceURL, "https://example.com/recipes/tacos")
+      #expect(first != distinctRecipe)
+      expectNoDifference(first.normalizedSourceURL, "https://example.com/recipes/tacos?id=123")
     }
 
     @Test

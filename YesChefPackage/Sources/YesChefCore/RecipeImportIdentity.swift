@@ -42,7 +42,7 @@ public struct RecipeImportIdentityKey: Equatable, Hashable, Sendable {
     else { return nil }
 
     if let url = URL(string: value),
-       let strippedURL = URLProvenanceNormalization.strippingQueryAndFragment(from: url)
+       let strippedURL = URLProvenanceNormalization.strippingTrackingParametersAndFragment(from: url)
     {
       value = strippedURL.absoluteString
     }
