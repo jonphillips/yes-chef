@@ -396,6 +396,7 @@ final class RecipeCaptureModel {
   var isFetching = false
   var isCommitting = false
   var readerFeedbackProposals: [ReaderFeedbackTip] = []
+  var readerFeedbackComments: [RawComment] = []
 
   var canFetch: Bool {
     normalizedURL != nil && !isFetching && !isCommitting
@@ -452,6 +453,7 @@ final class RecipeCaptureModel {
     isFetching = false
     isCommitting = false
     readerFeedbackProposals = []
+    readerFeedbackComments = []
   }
 
   func cancelButtonTapped() -> Bool {
@@ -495,7 +497,8 @@ final class RecipeCaptureModel {
     return .extracted
   }
 
-  func stageReaderFeedbackTips(_ tips: [ReaderFeedbackTip]) {
+  func stageReaderFeedback(tips: [ReaderFeedbackTip], comments: [RawComment]) {
+    readerFeedbackComments = comments
     guard !tips.isEmpty else { return }
     let acceptedKeys = Set(readerFeedbackBlocks.map { $0.text.lowercased() })
     var seen = Set(readerFeedbackProposals.map { $0.text.lowercased() })
@@ -505,6 +508,23 @@ final class RecipeCaptureModel {
         return !acceptedKeys.contains(key) && seen.insert(key).inserted
       }
     )
+  }
+
+  func promoteReaderFeedbackComment(_ comment: RawComment, commentNumber: Int) -> ReaderFeedbackTip {
+    let tip = ReaderFeedbackTip(
+      text: comment.text,
+      provenanceKind: .singularPreserved,
+      supportCount: 1,
+      backingComments: [
+        ReaderFeedbackBackingComment(
+          commentNumber: commentNumber,
+          text: comment.text,
+          helpfulCount: comment.helpfulCount
+        )
+      ]
+    )
+    stageReaderFeedback(tips: [tip], comments: readerFeedbackComments)
+    return tip
   }
 
   func acceptReaderFeedbackTip(_ tip: ReaderFeedbackTip, approvedText: String) {
@@ -982,7 +1002,9 @@ final class CookingModeModel {
   }
 
   var visibleNotes: [RecipeNote] {
-    detail?.notes.filter { $0.noteType != .retrospective } ?? []
+    detail?.notes.filter { note in
+      note.noteType != .retrospective && note.noteType != .readerFeedback
+    } ?? []
   }
 
   func detailChanged(_ detail: RecipeDetailData?) {

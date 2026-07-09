@@ -585,6 +585,8 @@ public struct ChatApplyReviewItem: Identifiable {
   public var presentation: ChatApplyReviewPresentation
   public var editableTitle: String
   public var editableText: String?
+  public var supportingEvidenceTitle: String?
+  public var supportingEvidenceRows: [String]
   public var commitTitle: String
   public var committingTitle: String
   public var committedTitle: String
@@ -597,6 +599,8 @@ public struct ChatApplyReviewItem: Identifiable {
     presentation: ChatApplyReviewPresentation = .sheet,
     editableTitle: String = "Proposal",
     editableText: String? = nil,
+    supportingEvidenceTitle: String? = nil,
+    supportingEvidenceRows: [String] = [],
     commitTitle: String,
     committingTitle: String,
     committedTitle: String,
@@ -608,6 +612,8 @@ public struct ChatApplyReviewItem: Identifiable {
     self.presentation = presentation
     self.editableTitle = editableTitle
     self.editableText = editableText
+    self.supportingEvidenceTitle = supportingEvidenceTitle
+    self.supportingEvidenceRows = supportingEvidenceRows
     self.commitTitle = commitTitle
     self.committingTitle = committingTitle
     self.committedTitle = committedTitle
@@ -621,6 +627,8 @@ public struct ChatApplyReviewItem: Identifiable {
     presentation: ChatApplyReviewPresentation = .sheet,
     editableTitle: String = "Proposal",
     editableText: String? = nil,
+    supportingEvidenceTitle: String? = nil,
+    supportingEvidenceRows: [String] = [],
     commitTitle: String,
     committingTitle: String,
     committedTitle: String,
@@ -632,6 +640,8 @@ public struct ChatApplyReviewItem: Identifiable {
     self.presentation = presentation
     self.editableTitle = editableTitle
     self.editableText = editableText
+    self.supportingEvidenceTitle = supportingEvidenceTitle
+    self.supportingEvidenceRows = supportingEvidenceRows
     self.commitTitle = commitTitle
     self.committingTitle = committingTitle
     self.committedTitle = committedTitle

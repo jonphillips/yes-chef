@@ -5,10 +5,50 @@ import LLMClientKit
 public struct ReaderFeedbackTip: Equatable, Sendable, Identifiable {
   public var id: String { text }
   public var text: String
+  public var provenanceKind: ReaderFeedbackProvenanceKind
+  public var supportCount: Int
+  public var backingComments: [ReaderFeedbackBackingComment]
 
-  public init(text: String) {
+  public init(
+    text: String,
+    provenanceKind: ReaderFeedbackProvenanceKind = .singularPreserved,
+    supportCount: Int = 1,
+    backingComments: [ReaderFeedbackBackingComment] = []
+  ) {
     self.text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    self.provenanceKind = provenanceKind
+    self.supportCount = max(supportCount, backingComments.count, 1)
+    self.backingComments = backingComments
   }
+}
+
+public enum ReaderFeedbackProvenanceKind: String, Equatable, Sendable {
+  case consensusDistilled
+  case singularPreserved
+
+  public var displayName: String {
+    switch self {
+    case .consensusDistilled: "Consensus"
+    case .singularPreserved: "Single Comment"
+    }
+  }
+}
+
+public struct ReaderFeedbackBackingComment: Equatable, Sendable, Identifiable {
+  public var id: Int { commentNumber }
+  public var commentNumber: Int
+  public var text: String
+  public var helpfulCount: Int
+
+  public init(commentNumber: Int, text: String, helpfulCount: Int) {
+    self.commentNumber = commentNumber
+    self.text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    self.helpfulCount = helpfulCount
+  }
+}
+
+public enum ReaderFeedbackCurationError: Error, Equatable, Sendable {
+  case responseTruncated
 }
 
 public struct ReaderFeedbackCurationClient: Sendable {
@@ -27,6 +67,7 @@ public struct ReaderFeedbackCurationClient: Sendable {
 
 extension ReaderFeedbackCurationClient: DependencyKey {
   public static let liveValue = ReaderFeedbackCurationClient { comments, sourceURL in
+    let comments = comments.compactMap(\.cleanedForReaderFeedbackCuration)
     guard !comments.isEmpty else { return [] }
     @Dependency(\.modelClient) var modelClient
     @Dependency(\.apiKeyStore) var apiKeyStore
@@ -52,13 +93,15 @@ extension ReaderFeedbackCurationClient: DependencyKey {
         reasoningEffort: .high
       )
     )
-    return parse(response.text)
+    if response.wasTruncated {
+      throw ReaderFeedbackCurationError.responseTruncated
+    }
+    return parse(response.text, comments: comments)
   }
 
   public static let testValue = ReaderFeedbackCurationClient { _, _ in [] }
 
-  static let maxComments = 80
-  static let maxTokens = 2048
+  static let maxTokens = 16_384
 
   static let instructions = """
     You curate reader comments for a recipe app. Your primary job is ruthless selectivity.
@@ -66,17 +109,30 @@ extension ReaderFeedbackCurationClient: DependencyKey {
     Keep only distinct, non-obvious, genuinely useful cooking tips: technique corrections, timing or temperature fixes,
     ratio tweaks, failure warnings, or result-changing improvements the recipe did not already make clear.
 
-    Preserve distinct tips. Select and lightly trim individual comments; never merge multiple readers into a summary.
-    Bias toward precision over recall. Returning a few strong tips is correct. Returning an empty list is correct when
-    nothing clears the bar.
+    Return a JSON array of atomic recipe-change points. You may synthesize WITHIN one point when several commenters
+    converge on the same change, and you must keep distinct changes as separate entries. Do not blend separate changes
+    into one paragraph.
+
+    Two provenance kinds are both first-class:
+    - consensusDistilled: many comments support the same atomic point. Return one point with a support count.
+    - singularPreserved: one rich, specific comment is worth preserving largely intact.
+
+    Bias toward precision over recall. Returning a few strong points is correct. Returning an empty array is correct
+    when nothing clears the bar.
 
     Return ONLY strict JSON:
-    {"tips":[{"text":"one selected, lightly trimmed reader tip"}]}
+    [
+      {
+        "text": "one atomic reader-feedback point",
+        "kind": "consensusDistilled or singularPreserved",
+        "supportCount": 2,
+        "commentNumbers": [1, 7]
+      }
+    ]
     """
 
   static func prompt(comments: [RawComment], sourceURL: URL?) -> String {
     let renderedComments = comments
-      .prefix(maxComments)
       .enumerated()
       .map { index, comment in
         """
@@ -85,23 +141,21 @@ extension ReaderFeedbackCurationClient: DependencyKey {
         """
       }
       .joined(separator: "\n\n")
-    let omittedCount = max(0, comments.count - maxComments)
-    let omittedLine = omittedCount == 0
-      ? ""
-      : "\n\n\(omittedCount) lower-priority comment(s) were omitted to keep the request bounded."
     return """
       Source URL: \(sourceURL?.absoluteString ?? "(unknown)")
 
       Reader comments, already sorted by the site/playbook toward Most Helpful:
-      \(renderedComments)\(omittedLine)
+      \(renderedComments)
 
-      Select only the comments that carry durable, specific cooking value. Return JSON only.
+      Select only comments that carry durable, specific cooking value. Keep redundancy intact as the consensus signal:
+      when several comments say the same useful thing, emit one consensusDistilled point with the backing commentNumbers.
+      When one comment has a useful specific contribution, emit one singularPreserved point. Return JSON only.
       """
   }
 
-  public static func parse(_ text: String) -> [ReaderFeedbackTip] {
+  public static func parse(_ text: String, comments: [RawComment] = []) -> [ReaderFeedbackTip] {
     guard
-      let json = jsonObjectSlice(text) ?? jsonArraySlice(text),
+      let json = jsonSlice(text),
       let data = json.data(using: .utf8),
       let raw = try? JSONSerialization.jsonObject(with: data)
     else { return [] }
@@ -118,7 +172,63 @@ extension ReaderFeedbackCurationClient: DependencyKey {
       guard let text = (element["text"] as? String)?.cleanedReaderFeedbackText else { return nil }
       let key = text.lowercased()
       guard seen.insert(key).inserted else { return nil }
-      return ReaderFeedbackTip(text: text)
+      let backingComments = backingComments(from: element, comments: comments)
+      let supportCount = element["supportCount"] as? Int ?? backingComments.count
+      return ReaderFeedbackTip(
+        text: text,
+        provenanceKind: provenanceKind(from: element, supportCount: supportCount),
+        supportCount: supportCount,
+        backingComments: backingComments
+      )
+    }
+  }
+
+  private static func backingComments(
+    from element: [String: Any],
+    comments: [RawComment]
+  ) -> [ReaderFeedbackBackingComment] {
+    let commentNumbers = (element["commentNumbers"] as? [Int])
+      ?? (element["backingCommentNumbers"] as? [Int])
+      ?? (element["sourceCommentNumbers"] as? [Int])
+      ?? []
+    let numberedComments = commentNumbers.compactMap { commentNumber -> ReaderFeedbackBackingComment? in
+      let index = commentNumber - 1
+      guard comments.indices.contains(index) else { return nil }
+      let comment = comments[index]
+      return ReaderFeedbackBackingComment(
+        commentNumber: commentNumber,
+        text: comment.text,
+        helpfulCount: comment.helpfulCount
+      )
+    }
+    if !numberedComments.isEmpty {
+      return numberedComments
+    }
+    let inlineComments = (element["comments"] as? [String]) ?? (element["backingComments"] as? [String]) ?? []
+    return inlineComments.enumerated().compactMap { index, text in
+      guard let cleanedText = text.cleanedReaderFeedbackText else { return nil }
+      return ReaderFeedbackBackingComment(
+        commentNumber: index + 1,
+        text: cleanedText,
+        helpfulCount: 0
+      )
+    }
+  }
+
+  private static func provenanceKind(
+    from element: [String: Any],
+    supportCount: Int
+  ) -> ReaderFeedbackProvenanceKind {
+    guard let kind = element["kind"] as? String else {
+      return supportCount > 1 ? .consensusDistilled : .singularPreserved
+    }
+    switch kind {
+    case ReaderFeedbackProvenanceKind.consensusDistilled.rawValue:
+      return .consensusDistilled
+    case ReaderFeedbackProvenanceKind.singularPreserved.rawValue:
+      return .singularPreserved
+    default:
+      return supportCount > 1 ? .consensusDistilled : .singularPreserved
     }
   }
 
@@ -133,6 +243,16 @@ extension ReaderFeedbackCurationClient: DependencyKey {
     else { return nil }
     return String(text[open...close])
   }
+
+  private static func jsonSlice(_ text: String) -> String? {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    let objectOpen = trimmed.firstIndex(of: "{")
+    let arrayOpen = trimmed.firstIndex(of: "[")
+    if let arrayOpen, objectOpen.map({ arrayOpen < $0 }) ?? true {
+      return jsonArraySlice(trimmed)
+    }
+    return jsonObjectSlice(trimmed) ?? jsonArraySlice(trimmed)
+  }
 }
 
 extension DependencyValues {
@@ -146,5 +266,12 @@ private extension String {
   var cleanedReaderFeedbackText: String? {
     let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
+  }
+}
+
+private extension RawComment {
+  var cleanedForReaderFeedbackCuration: RawComment? {
+    guard let text = text.cleanedReaderFeedbackText else { return nil }
+    return RawComment(text: text, helpfulCount: helpfulCount)
   }
 }
