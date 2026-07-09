@@ -577,6 +577,29 @@ final class RecipeCaptureModel {
     set { draft?.page.editorialBlocks = newValue }
   }
 
+  var reviewTitle: String {
+    get { draft?.page.title ?? "" }
+    set { draft?.page.title = newValue.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty }
+  }
+
+  var reviewSummary: String {
+    get { draft?.page.summary ?? "" }
+    set { draft?.page.summary = newValue.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty }
+  }
+
+  var reviewServingsText: String {
+    get { draft?.page.servingsText ?? "" }
+    set { draft?.page.servingsText = newValue.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty }
+  }
+
+  var reviewTotalTimeText: String {
+    get { draft?.page.totalTimeMinutes.map(String.init) ?? "" }
+    set {
+      let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+      draft?.page.totalTimeMinutes = trimmed.isEmpty ? nil : Int(trimmed)
+    }
+  }
+
   func reset() {
     urlText = ""
     draft = nil
@@ -720,6 +743,13 @@ struct WebRecipeCaptureSummary: Identifiable, Equatable, Sendable {
       lines.append("\(warningCount) identity \(warningCount == 1 ? "warning" : "warnings").")
     }
     return lines.joined(separator: "\n")
+  }
+}
+
+private extension String {
+  var nonEmpty: String? {
+    let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
   }
 }
 

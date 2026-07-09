@@ -122,7 +122,9 @@ struct RecipeParseBuilder {
   }
 
   private func resolvedSourceURL() -> URL? {
-    sourceURL ?? votes.winner(.sourceURL).flatMap { URL(string: $0) }
+    votes.winner(.sourceURL)
+      .flatMap { URL(string: $0, relativeTo: sourceURL)?.absoluteURL }
+      ?? sourceURL
   }
 
   private func resolvedURL(_ rawValue: String?) -> URL? {

@@ -192,6 +192,7 @@ public enum RecipeRepository {
 
     let prepTimeMinutes: Int? = draft.prepTimeMinutes == 0 ? nil : draft.prepTimeMinutes
     let cookTimeMinutes: Int? = draft.cookTimeMinutes == 0 ? nil : draft.cookTimeMinutes
+    let appliesEditableProseFields = draft.id == nil || draft.editsMakeAheadAndChefItUp
     var recipe = Recipe(
       id: recipeID,
       title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -210,8 +211,8 @@ public enum RecipeRepository {
       dateCreated: dateCreated,
       dateModified: now,
       originalSnapshot: draft.originalSnapshot,
-      makeAhead: existingDetail?.recipe.makeAhead,
-      chefItUp: existingDetail?.recipe.chefItUp,
+      makeAhead: appliesEditableProseFields ? draft.makeAhead.nonEmpty : existingDetail?.recipe.makeAhead,
+      chefItUp: appliesEditableProseFields ? draft.chefItUp.nonEmpty : existingDetail?.recipe.chefItUp,
       serveWith: existingDetail?.recipe.serveWith,
       viewScale: existingDetail?.recipe.viewScale ?? 1.0,
       coverPhotoID: existingDetail?.recipe.coverPhotoID

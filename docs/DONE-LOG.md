@@ -10,6 +10,59 @@ Newest first.
 
 ---
 
+## Dogfood fixes — batch 5 (mechanical polish)
+
+**Architect-reviewed 2026-07-09 — yes-chef PR [#126](https://github.com/jonphillips/yes-chef/pull/126);
+merges after Jon's device pass** (the app target never compiled in CI — its `PreferenceKey` concurrency
+error and the whole app layer are verified only in Jon's Xcode build). Four mechanical dogfood fixes from
+the 2026-07-08 pass, one PR; `efforts/dogfood-fixes-batch-5-mechanical-polish.md`. **Schema-free.**
+
+- **Recipe-detail layout/toolbar** — "Chef It Up" now renders below Notes (both idioms); the Focus control
+  became highlighted leading chevrons with the Edit button moved leading; the Chat button *toggles* the
+  iPad split (balanced ↔ reader-only) instead of only opening.
+- **Recipe editor** — multiline fields auto-grow to fit content (fixes the instruction-scroll truncation;
+  also Summary/Notes/Source), via a measured-height `StackedTextEditor`; **Make-Ahead + Chef-It-Up are now
+  editable** with a no-clobber guard (`RecipeEditorDraft.editsMakeAheadAndChefItUp` — a save that doesn't
+  touch them preserves existing values); async save + spinner (`isSaving`), Save/Cancel disabled while
+  saving, no double-save.
+- **Recipe search** — a shared tokenized, case/diacritic-insensitive `RecipeSearchMatcher` (all query
+  tokens must match, across the fields each picker already searched) replaces `localizedCaseInsensitiveContains`
+  in the Menu, Meal-Calendar, Workbench, and string-filter pickers ("Sous Vide pork" → "Sous Vide indoor
+  pulled pork").
+- **Web/share capture review** — title / summary / servings / total-time are editable before import on both
+  hosts (in-app `RecipeCaptureView` + share extension); provenance/dedup URLs strip tracking params and the
+  fragment, preferring the page's canonical `og:url`. The first cut removed the *entire* query (a dedup
+  collision on query-param sites); corrected in follow-up commit `5fd2934` to a tracking-key **denylist**
+  (`URLProvenanceNormalization.strippingTrackingParametersAndFragment`) that keeps meaningful params — the
+  new test asserts `?id=123` ≠ `?id=456` stay distinct. Known accepted asymmetry: the parsed canonical is
+  preferred verbatim, not re-stripped (trusting the site's declared canonical).
+
+New core tests cover the matcher, the Make-Ahead/Chef-It-Up round-trip + clear, the URL strip/dedup, and
+review-edits-persist-on-import. The `PreferenceKey` concurrency fix (computed `defaultValue`) is folded in.
+
+---
+
+## Recipe edit proposals — S2 (the "keep as a variation" commit destination — ADR-0021's build)
+
+**Merged — yes-chef PR [#123](https://github.com/jonphillips/yes-chef/pull/123)** (backfilled into this log
+2026-07-09 from the ratified ADRs; confirm detail against #123). Implements
+[ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) S2, which **is** ADR-0021's build
+([ADR-0021](decisions/ADR-0021-recipe-variations.md)); `efforts/recipe-edit-proposals.md`. Adds **"keep as
+a variation"** as the second commit path on the *same* proposal surface built in S1 — the structured delta
+the S1 extractor already produces *is* the ADR-0021 variation payload (no separate extraction; resolves
+ADR-0021 OQ1/OQ2).
+
+- **Schema (synced):** introduces the `recipeVariations` table + BLOB + migration — a synced-schema change,
+  so it is on the standing production-deploy list in CURRENT_HANDOFF.
+- The **reader fold** — a selected variation renders highlighted-in-place over the base recipe (add / change
+  / remove).
+- The **grocery fold** — deterministic, per [[llm-vs-determinism-surface-boundary]] (the variation delta
+  folds into the grocery list without an LLM).
+- Resolves **ADR-0023 OQ3**: overwriting a recipe that already carries variations must re-validate/rebase or
+  warn, since the delta anchors on base-ingredient identity (the conservative overwrite-block).
+
+---
+
 ## Recipe edit proposals — S1 (the "Adjust this recipe" verb + section-aware overwrite/undo)
 
 **Architect-reviewed + Jon device-passed 2026-07-07** — yes-chef PR #122 (this slice). Implements

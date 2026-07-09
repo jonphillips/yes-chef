@@ -16,6 +16,9 @@ public struct RecipeEditorDraft: Equatable, Sendable {
   public var yieldText: String
   public var prepTimeMinutes: Int
   public var cookTimeMinutes: Int
+  public var makeAhead: String
+  public var chefItUp: String
+  public var editsMakeAheadAndChefItUp: Bool
   public var cuisine: String
   public var course: String
   public var libraryPlacement: RecipeLibraryPlacement
@@ -48,6 +51,9 @@ public struct RecipeEditorDraft: Equatable, Sendable {
     yieldText: String = "",
     prepTimeMinutes: Int = 0,
     cookTimeMinutes: Int = 0,
+    makeAhead: String = "",
+    chefItUp: String = "",
+    editsMakeAheadAndChefItUp: Bool? = nil,
     cuisine: String = "",
     course: String = "",
     libraryPlacement: RecipeLibraryPlacement = .main,
@@ -79,6 +85,9 @@ public struct RecipeEditorDraft: Equatable, Sendable {
     self.yieldText = yieldText
     self.prepTimeMinutes = prepTimeMinutes
     self.cookTimeMinutes = cookTimeMinutes
+    self.makeAhead = makeAhead
+    self.chefItUp = chefItUp
+    self.editsMakeAheadAndChefItUp = editsMakeAheadAndChefItUp ?? (!makeAhead.isEmpty || !chefItUp.isEmpty)
     self.cuisine = cuisine
     self.course = course
     self.libraryPlacement = libraryPlacement
@@ -122,6 +131,9 @@ public struct RecipeEditorDraft: Equatable, Sendable {
       yieldText: detail.recipe.yieldText ?? "",
       prepTimeMinutes: detail.recipe.prepTimeMinutes ?? 0,
       cookTimeMinutes: detail.recipe.cookTimeMinutes ?? 0,
+      makeAhead: detail.recipe.makeAhead ?? "",
+      chefItUp: detail.recipe.chefItUp ?? "",
+      editsMakeAheadAndChefItUp: true,
       cuisine: detail.recipe.cuisine ?? "",
       course: detail.recipe.course ?? "",
       libraryPlacement: detail.recipe.libraryPlacement,

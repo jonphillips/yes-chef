@@ -2,9 +2,13 @@
 
 **Type:** New feature (post-M4, parsing-quality track — sibling to Milk Street parser hardening)
 **Owner:** Codex (implement, per slice) · Jon (architect/review)
-**Status:** Designed, not dispatched. Queued behind Milk Street
-(`docs/efforts/parser-hardening-truncated-structured-data.md`), which ships first as the
-smaller, already-spec'd fix.
+**Status:** Designed, not dispatched. **Now governed by
+[ADR-0025](../decisions/ADR-0025-reader-comment-ingestion.md)** (2026-07-08, ratifies this design).
+**Two slices below are stale — read the ADR's "Relationship to the prior effort":** Slice 4 (build a
+Claude client + key storage) is **done** — reuse `LLMClientKit` + the Keychain `apiKeyStore`, don't
+build a new client; and Slice 5's `AppStorage` curation prompt becomes a **DB-backed
+`AIPromptPreferenceKind.readerFeedback`** (ADR-0018), not `AppStorage`. Slice 1 (review-sheet dismiss
+hardening) is now **shared with ADR-0024** — do it once. Everything else here stands.
 
 ## Motivation
 

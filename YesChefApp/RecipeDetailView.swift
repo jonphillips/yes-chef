@@ -49,17 +49,28 @@ struct RecipeDetailView: View {
       model.persistedScaleChanged(persistedScale)
     }
     .toolbar {
-      ToolbarItemGroup(placement: .primaryAction) {
+      ToolbarItemGroup(placement: .topBarLeading) {
         if isSplitEnabled, let focusButtonTapped {
           Button {
             focusButtonTapped()
           } label: {
             Label(
-              "Focus",
-              systemImage: isFocusActive ? "rectangle.expand" : "arrow.up.left.and.arrow.down.right"
+              isFocusActive ? "Exit Focus" : "Focus",
+              systemImage: isFocusActive
+                ? "arrow.up.left.and.arrow.down.right.circle.fill"
+                : "arrow.up.left.and.arrow.down.right"
             )
           }
+          .tint(isFocusActive ? .accentColor : .primary)
+          .accessibilityValue(Text(isFocusActive ? "Focused" : "Split view"))
         }
+        Button {
+          libraryModel.editButtonTapped(recipeID: model.recipeID)
+        } label: {
+          Label("Edit", systemImage: "square.and.pencil")
+        }
+      }
+      ToolbarItemGroup(placement: .primaryAction) {
         if !model.ingredientLines.isEmpty {
           Button {
             model.scaleButtonTapped()
@@ -90,13 +101,6 @@ struct RecipeDetailView: View {
           groceryModel.addRecipeButtonTapped(recipeID: model.recipeID)
         } label: {
           Label("Groceries", systemImage: "cart.badge.plus")
-        }
-      }
-      ToolbarItemGroup(placement: .primaryAction) {
-        Button {
-          libraryModel.editButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("Edit", systemImage: "square.and.pencil")
         }
         Menu {
           Button {
@@ -178,7 +182,9 @@ struct RecipeDetailView: View {
 
   private func chatButtonTapped() {
     if isSplitEnabled {
-      chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
+      chatWorkspaceDetentRaw = chatWorkspaceDetentRaw == ChatWorkspaceDetent.readerOnly.rawValue
+        ? ChatWorkspaceDetent.balanced.rawValue
+        : ChatWorkspaceDetent.readerOnly.rawValue
     } else {
       model.chatButtonTapped()
     }
@@ -446,9 +452,6 @@ private struct RecipeReaderView: View {
       if let makeAhead = model.makeAhead {
         makeAheadSection(makeAhead)
       }
-      if let chefItUp = model.chefItUp {
-        chefItUpSection(chefItUp)
-      }
       if !model.serveWithItems.isEmpty {
         serveWithSection(model.serveWithItems)
       }
@@ -460,6 +463,9 @@ private struct RecipeReaderView: View {
       }
       if !model.visibleNotes.isEmpty {
         notesView(model.visibleNotes)
+      }
+      if let chefItUp = model.chefItUp {
+        chefItUpSection(chefItUp)
       }
     }
   }

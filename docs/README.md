@@ -36,10 +36,14 @@ change is migration-aware.
 7. [open-questions.md](open-questions.md) — live ambiguities and recently-resolved
    decisions.
 
-## Decisions and reviews
+## Decisions, efforts, and reviews
 
-- [decisions/](decisions/) — settled ADRs. Check before proposing architecture
-  changes; don't re-litigate them.
+- [decisions/](decisions/) — settled ADRs (indexed in [decisions/README.md](decisions/README.md)).
+  Check before proposing architecture changes; don't re-litigate them.
+- [efforts/](efforts/) — worked designs + slice plans that implement the ADRs
+  (indexed in [efforts/README.md](efforts/README.md)). **Search here before writing a
+  new effort or ADR** — per jon-platform `agent-workflow.md` § "Working docs stay
+  discoverable."
 - [reviews/](reviews/) — architect review passes (historical and ongoing).
 
 ## House layer

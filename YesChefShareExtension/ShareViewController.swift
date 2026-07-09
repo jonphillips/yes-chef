@@ -87,6 +87,29 @@ final class ShareCaptureModel {
     set { draft?.page.editorialBlocks = newValue }
   }
 
+  var reviewTitle: String {
+    get { draft?.page.title ?? "" }
+    set { draft?.page.title = newValue.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty }
+  }
+
+  var reviewSummary: String {
+    get { draft?.page.summary ?? "" }
+    set { draft?.page.summary = newValue.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty }
+  }
+
+  var reviewServingsText: String {
+    get { draft?.page.servingsText ?? "" }
+    set { draft?.page.servingsText = newValue.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty }
+  }
+
+  var reviewTotalTimeText: String {
+    get { draft?.page.totalTimeMinutes.map(String.init) ?? "" }
+    set {
+      let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+      draft?.page.totalTimeMinutes = trimmed.isEmpty ? nil : Int(trimmed)
+    }
+  }
+
   func loadSharedPage() async {
     isLoading = true
     defer { isLoading = false }
@@ -244,24 +267,11 @@ private struct ShareCaptureReviewSections: View {
 
   var body: some View {
     Section("Review") {
-      LabeledContent("Title") {
-        Text(page.title ?? "Untitled Recipe")
-      }
-      if let summary = page.summary {
-        LabeledContent("Summary") {
-          Text(summary)
-        }
-      }
-      if let servings = page.servingsText {
-        LabeledContent("Servings") {
-          Text(servings)
-        }
-      }
-      if let totalTime = page.totalTimeMinutes {
-        LabeledContent("Total Time") {
-          Text("\(totalTime) min")
-        }
-      }
+      ShareStackedTextField(title: "Title", text: $model.reviewTitle)
+      ShareStackedTextField(title: "Summary", text: $model.reviewSummary, axis: .vertical)
+      ShareStackedTextField(title: "Servings", text: $model.reviewServingsText)
+      ShareStackedTextField(title: "Total Time", text: $model.reviewTotalTimeText)
+        .keyboardType(.numberPad)
     }
 
     Section("Source") {
@@ -475,6 +485,24 @@ private enum ShareCaptureExtraction {
   }
 }
 
+private struct ShareStackedTextField: View {
+  let title: LocalizedStringKey
+  @Binding var text: String
+  var axis: Axis = .horizontal
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text(title)
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      TextField(title, text: $text, axis: axis)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.vertical, 4)
+  }
+}
+
 private extension WebRecipeCaptureWarning {
   var shareReviewTitle: String {
     switch self {
@@ -489,5 +517,12 @@ private extension WebRecipeCaptureWarning {
     case .noInstructions:
       "No instructions found."
     }
+  }
+}
+
+private extension String {
+  var nonEmpty: String? {
+    let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
   }
 }

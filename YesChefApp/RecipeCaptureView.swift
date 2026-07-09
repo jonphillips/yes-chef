@@ -123,24 +123,11 @@ private struct RecipeCaptureReviewSections: View {
 
   var body: some View {
     Section("Review") {
-      LabeledContent("Title") {
-        Text(page.title ?? "Untitled Recipe")
-      }
-      if let summary = page.summary {
-        LabeledContent("Summary") {
-          Text(summary)
-        }
-      }
-      if let servings = page.servingsText {
-        LabeledContent("Servings") {
-          Text(servings)
-        }
-      }
-      if let totalTime = page.totalTimeMinutes {
-        LabeledContent("Total Time") {
-          Text("\(totalTime) min")
-        }
-      }
+      StackedTextField(title: "Title", text: $model.reviewTitle)
+      StackedTextField(title: "Summary", text: $model.reviewSummary, axis: .vertical)
+      StackedTextField(title: "Servings", text: $model.reviewServingsText)
+      StackedTextField(title: "Total Time", text: $model.reviewTotalTimeText)
+        .keyboardType(.numberPad)
       if draft.usedRenderedFallback {
         LabeledContent("Fetch") {
           Text("Rendered page")

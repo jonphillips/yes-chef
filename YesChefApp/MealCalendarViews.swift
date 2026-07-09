@@ -396,11 +396,11 @@ struct MealPlanItemEditorView: View {
     let query = recipeSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !query.isEmpty else { return model.availableRecipeRows }
     return model.availableRecipeRows.filter { row in
-      row.recipe.title.localizedCaseInsensitiveContains(query)
-        || (row.recipe.subtitle?.localizedCaseInsensitiveContains(query) ?? false)
-        || (row.recipe.summary?.localizedCaseInsensitiveContains(query) ?? false)
-        || row.tagNames.contains { $0.localizedCaseInsensitiveContains(query) }
-        || row.categoryNames.contains { $0.localizedCaseInsensitiveContains(query) }
+      RecipeSearchMatcher.matches(
+        query: query,
+        in: [row.recipe.title, row.recipe.subtitle, row.recipe.summary]
+          .compactMap(\.self) + row.tagNames + row.categoryNames
+      )
     }
   }
 
