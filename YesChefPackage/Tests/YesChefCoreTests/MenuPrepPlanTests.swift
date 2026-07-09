@@ -56,6 +56,47 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func menuPrepPlanRoundTripPreservesSourceDishForUnchangedSteps() {
+      let sourceDishID = SampleUUIDSequence.uuid(15_120)
+      let plan = MenuPrepPlan(
+        steps: [
+          PrepPlanStep(
+            when: "Day before",
+            task: "Marinate the chicken.",
+            sourceDish: sourceDishID
+          ),
+          PrepPlanStep(
+            when: "Morning of",
+            task: "Chop the herbs.",
+            sourceDish: sourceDishID
+          ),
+        ]
+      )
+
+      let edited = plan.applyingEditableReviewText(
+        """
+        Day before: Marinate the chicken.
+        Morning of: Chop herbs and scallions.
+        """
+      )
+
+      expectNoDifference(
+        edited.steps,
+        [
+          PrepPlanStep(
+            when: "Day before",
+            task: "Marinate the chicken.",
+            sourceDish: sourceDishID
+          ),
+          PrepPlanStep(
+            when: "Morning of",
+            task: "Chop herbs and scallions."
+          ),
+        ]
+      )
+    }
+
+    @Test
     func menuPrepPlanClientSendsRequestedModelTierAndMenuContext() async throws {
       let recorder = ModelRequestRecorder()
 

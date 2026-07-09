@@ -31,6 +31,46 @@ public struct MealPlanComplementSuggestion: Equatable, Sendable {
     \(dayTitle) - \(mealSlot.title)
     """
   }
+
+  public func editableReviewText(dayTitle: String) -> String {
+    rendered(dayTitle: dayTitle)
+  }
+
+  public func applyingEditableReviewText(_ text: String) -> MealPlanComplementSuggestion {
+    let lines = text.editableMealPlanComplementLines
+    var suggestion = self
+
+    if let titleLine = lines.first {
+      suggestion.kind = Self.kind(fromEditableReviewTitleLine: titleLine) ?? suggestion.kind
+      suggestion.title = Self.title(fromEditableReviewTitleLine: titleLine) ?? suggestion.title
+    }
+    if let placementLine = lines.dropFirst().first {
+      suggestion.mealSlot = Self.mealSlot(fromEditableReviewPlacementLine: placementLine) ?? suggestion.mealSlot
+    }
+
+    return suggestion
+  }
+
+  private static func kind(fromEditableReviewTitleLine line: String) -> MealPlanItemKind? {
+    guard let label = line.split(separator: ":", maxSplits: 1).first else { return nil }
+    let normalized = String(label).normalizedMealPlanComplementEnumValue
+    return MealPlanItemKind.allCases.first {
+      $0.rawValue == normalized || $0.title.normalizedMealPlanComplementEnumValue == normalized
+    }
+  }
+
+  private static func title(fromEditableReviewTitleLine line: String) -> String? {
+    let pieces = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+    return String(pieces.count > 1 ? pieces[1] : pieces[0]).cleanedMealPlanComplementText
+  }
+
+  private static func mealSlot(fromEditableReviewPlacementLine line: String) -> MealPlanItemSlot? {
+    guard let slotText = line.components(separatedBy: " - ").last?.cleanedMealPlanComplementText else { return nil }
+    return MealPlanItemSlot.allCases.first {
+      $0.rawValue == slotText.normalizedMealPlanComplementEnumValue
+        || $0.title.normalizedMealPlanComplementEnumValue == slotText.normalizedMealPlanComplementEnumValue
+    }
+  }
 }
 
 public struct MealPlanComplementClient: Sendable {
@@ -176,6 +216,12 @@ private extension RecipeChatMessage.Role {
 }
 
 private extension String {
+  var editableMealPlanComplementLines: [String] {
+    components(separatedBy: .newlines)
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+  }
+
   var cleanedMealPlanComplementText: String? {
     let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed

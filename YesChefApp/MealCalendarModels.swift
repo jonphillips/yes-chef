@@ -403,14 +403,23 @@ final class MealCalendarModel {
     return [
       AnyChatApplyAction(complementAction) { [weak self] plan in
         plan.items.map { suggestion in
+          let originalEditableText = suggestion.editableReviewText(dayTitle: dayTitle)
           ChatApplyReviewItem(
             title: suggestion.title,
             summary: suggestion.rendered(dayTitle: dayTitle),
+            editableTitle: "Complement",
+            editableText: originalEditableText,
             commitTitle: complementAction.commitTitle,
             committingTitle: complementAction.committingTitle,
             committedTitle: complementAction.committedTitle,
-            commit: {
-              try self?.commitComplementSuggestion(suggestion, on: scheduledDate)
+            commit: { editedText in
+              let approved = editedText == originalEditableText
+                ? suggestion
+                : suggestion.applyingEditableReviewText(editedText)
+              try self?.commitComplementSuggestion(
+                approved,
+                on: scheduledDate
+              )
             }
           )
         }
@@ -422,11 +431,19 @@ final class MealCalendarModel {
           ChatApplyReviewItem(
             title: strategy.title,
             summary: summary,
+            editableTitle: "Make-ahead strategy",
+            editableText: summary,
             commitTitle: makeAheadAction.commitTitle,
             committingTitle: makeAheadAction.committingTitle,
             committedTitle: makeAheadAction.committedTitle,
-            commit: {
-              try self?.commitMakeAheadStrategy(strategy, on: scheduledDate)
+            commit: { editedText in
+              let approved = editedText == summary
+                ? strategy
+                : strategy.applyingEditableReviewText(editedText)
+              try self?.commitMakeAheadStrategy(
+                approved,
+                on: scheduledDate
+              )
             }
           )
         ]

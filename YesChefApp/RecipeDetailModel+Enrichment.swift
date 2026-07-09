@@ -88,9 +88,13 @@ extension RecipeDetailModel {
       }, commitEditedSummary: { [weak self] _, editedText in
         try self?.commitChefItUpText(editedText)
       }),
-      AnyChatApplyAction(serveWithAction) { plan in
-        plan.rendered().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : plan.rendered()
-      }
+      AnyChatApplyAction(serveWithAction, editableSummary: { plan in
+        plan.editableReviewText().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+          ? nil
+          : plan.editableReviewText()
+      }, commitEditedSummary: { [weak self] plan, editedText in
+        try self?.commitServeWithPlan(plan.applyingEditableReviewText(editedText))
+      })
     ]
   }
 

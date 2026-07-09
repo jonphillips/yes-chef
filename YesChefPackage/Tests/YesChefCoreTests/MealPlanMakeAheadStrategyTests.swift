@@ -50,6 +50,53 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func mealPlanMakeAheadStrategyRoundTripPreservesSourceItemForUnchangedSteps() {
+      let strategy = MealPlanMakeAheadStrategy(
+        title: "Saturday prep",
+        mealSlot: .dinner,
+        steps: [
+          MealPlanMakeAheadStep(
+            when: "Morning",
+            task: "Make the sauce.",
+            sourceItem: "meal:abc"
+          ),
+          MealPlanMakeAheadStep(
+            when: "Afternoon",
+            task: "Toast the nuts.",
+            sourceItem: "meal:def"
+          ),
+        ]
+      )
+
+      let edited = strategy.applyingEditableReviewText(
+        """
+        Make-ahead weekend prep - Lunch
+        Morning: Make the sauce.
+        Afternoon: Toast nuts and seeds.
+        """
+      )
+
+      expectNoDifference(
+        edited,
+        MealPlanMakeAheadStrategy(
+          title: "Make-ahead weekend prep",
+          mealSlot: .lunch,
+          steps: [
+            MealPlanMakeAheadStep(
+              when: "Morning",
+              task: "Make the sauce.",
+              sourceItem: "meal:abc"
+            ),
+            MealPlanMakeAheadStep(
+              when: "Afternoon",
+              task: "Toast nuts and seeds."
+            ),
+          ]
+        )
+      )
+    }
+
+    @Test
     func mealPlanMakeAheadStrategyClientSendsRequestedModelTierAndDayContext() async throws {
       let recorder = MealPlanMakeAheadRequestRecorder()
 

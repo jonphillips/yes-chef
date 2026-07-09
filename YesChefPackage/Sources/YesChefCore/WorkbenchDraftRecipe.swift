@@ -102,6 +102,41 @@ public struct WorkbenchDraftRecipe: Equatable, Sendable {
     return lines.joined(separator: "\n")
   }
 
+  public func editableProseReviewText() -> String {
+    var lines = [
+      WorkbenchDraftRecipeEditableField.rationale.render(rationale),
+      WorkbenchDraftRecipeEditableField.title.render(title),
+      WorkbenchDraftRecipeEditableField.subtitle.render(subtitle ?? ""),
+      WorkbenchDraftRecipeEditableField.summary.render(summary ?? ""),
+      WorkbenchDraftRecipeEditableField.servings.render(servingsText ?? ""),
+      WorkbenchDraftRecipeEditableField.yield.render(yieldText ?? ""),
+      WorkbenchDraftRecipeEditableField.cuisine.render(cuisine ?? ""),
+      WorkbenchDraftRecipeEditableField.course.render(course ?? ""),
+      WorkbenchDraftRecipeEditableField.ingredientSection.render(ingredientSectionName ?? ""),
+      WorkbenchDraftRecipeEditableField.notes.render(""),
+    ]
+    if !notes.isEmpty {
+      lines.append(contentsOf: notes.map { "- \($0)" })
+    }
+    return lines.joined(separator: "\n")
+  }
+
+  public func applyingEditableProseReviewText(_ text: String) -> WorkbenchDraftRecipe {
+    let fields = WorkbenchDraftRecipeEditableField.parse(text)
+    var draft = self
+    draft.rationale = fields.text(for: .rationale) ?? rationale
+    draft.title = fields.text(for: .title) ?? title
+    draft.subtitle = fields.optionalText(for: .subtitle, default: subtitle)
+    draft.summary = fields.optionalText(for: .summary, default: summary)
+    draft.servingsText = fields.optionalText(for: .servings, default: servingsText)
+    draft.yieldText = fields.optionalText(for: .yield, default: yieldText)
+    draft.cuisine = fields.optionalText(for: .cuisine, default: cuisine)
+    draft.course = fields.optionalText(for: .course, default: course)
+    draft.ingredientSectionName = fields.optionalText(for: .ingredientSection, default: ingredientSectionName)
+    draft.notes = fields.notes ?? notes
+    return draft
+  }
+
   public func editorDraft(libraryPlacement: RecipeLibraryPlacement) -> RecipeEditorDraft {
     let noteParagraphs = (["Draft rationale: \(rationale)"] + notes)
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -123,6 +158,106 @@ public struct WorkbenchDraftRecipe: Equatable, Sendable {
       instructionText: instructionLines.joined(separator: "\n\n"),
       noteText: noteParagraphs.joined(separator: "\n\n")
     )
+  }
+}
+
+private enum WorkbenchDraftRecipeEditableField: CaseIterable, Hashable {
+  case rationale
+  case title
+  case subtitle
+  case summary
+  case servings
+  case yield
+  case cuisine
+  case course
+  case ingredientSection
+  case notes
+
+  var label: String {
+    switch self {
+    case .rationale: "Rationale"
+    case .title: "Title"
+    case .subtitle: "Subtitle"
+    case .summary: "Summary"
+    case .servings: "Servings"
+    case .yield: "Yield"
+    case .cuisine: "Cuisine"
+    case .course: "Course"
+    case .ingredientSection: "Ingredient section"
+    case .notes: "Notes"
+    }
+  }
+
+  func render(_ value: String) -> String {
+    "\(label): \(value)"
+  }
+
+  static func parse(_ text: String) -> WorkbenchDraftRecipeEditableFields {
+    var values: [WorkbenchDraftRecipeEditableField: [String]] = [:]
+    var currentField: WorkbenchDraftRecipeEditableField?
+
+    for rawLine in text.components(separatedBy: .newlines) {
+      let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !line.isEmpty else { continue }
+      if let fieldValue = fieldValue(from: line) {
+        currentField = fieldValue.field
+        values[fieldValue.field] = fieldValue.value.isEmpty ? [] : [fieldValue.value]
+      } else if let currentField {
+        values[currentField, default: []].append(line)
+      }
+    }
+
+    return WorkbenchDraftRecipeEditableFields(values: values)
+  }
+
+  private static func fieldValue(from line: String) -> (field: WorkbenchDraftRecipeEditableField, value: String)? {
+    let normalized = line.lowercased()
+    for field in allCases {
+      let prefix = "\(field.label.lowercased()):"
+      guard normalized.hasPrefix(prefix) else { continue }
+      let valueStart = line.index(line.startIndex, offsetBy: prefix.count)
+      return (
+        field,
+        String(line[valueStart...]).trimmingCharacters(in: .whitespacesAndNewlines)
+      )
+    }
+    return nil
+  }
+}
+
+private struct WorkbenchDraftRecipeEditableFields {
+  var values: [WorkbenchDraftRecipeEditableField: [String]]
+
+  var notes: [String]? {
+    guard let lines = values[.notes] else { return nil }
+    return lines
+      .map(\.cleanedWorkbenchDraftEditableListLine)
+      .filter { !$0.isEmpty }
+  }
+
+  func text(for field: WorkbenchDraftRecipeEditableField) -> String? {
+    guard let lines = values[field] else { return nil }
+    return lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  func optionalText(
+    for field: WorkbenchDraftRecipeEditableField,
+    default defaultValue: String?
+  ) -> String? {
+    guard let text = text(for: field) else { return defaultValue }
+    return text.isEmpty ? nil : text
+  }
+}
+
+private extension String {
+  var cleanedWorkbenchDraftEditableListLine: String {
+    var line = trimmingCharacters(in: .whitespacesAndNewlines)
+    if line.hasPrefix("- ") || line.hasPrefix("* ") {
+      line.removeFirst(2)
+    } else if line.hasPrefix("• ") {
+      line.removeFirst(2)
+    }
+    return line.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 }
 

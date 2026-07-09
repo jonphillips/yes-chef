@@ -500,23 +500,31 @@ final class MenuDetailModel {
     return [
       AnyChatApplyAction(complementAction) { [weak self] plan in
         plan.items.map { suggestion in
+          let originalEditableText = suggestion.editableReviewText()
           ChatApplyReviewItem(
             title: suggestion.title,
             summary: suggestion.rendered(),
+            editableTitle: "Complement",
+            editableText: originalEditableText,
             commitTitle: complementAction.commitTitle,
             committingTitle: complementAction.committingTitle,
             committedTitle: complementAction.committedTitle,
-            commit: {
-              try self?.commitComplementSuggestion(suggestion)
+            commit: { editedText in
+              let approved = editedText == originalEditableText
+                ? suggestion
+                : suggestion.applyingEditableReviewText(editedText)
+              try self?.commitComplementSuggestion(approved)
             }
           )
         }
       },
-      AnyChatApplyAction(prepPlanAction) { plan in
-        plan.rendered().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      AnyChatApplyAction(prepPlanAction, editableSummary: { plan in
+        plan.editableReviewText().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
           ? nil
-          : plan.rendered()
-      }
+          : plan.editableReviewText()
+      }, commitEditedSummary: { [weak self] plan, editedText in
+        try self?.commitPrepPlan(plan.applyingEditableReviewText(editedText))
+      })
     ]
   }
 

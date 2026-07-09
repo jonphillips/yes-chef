@@ -258,19 +258,21 @@ final class WorkbenchDetailModel {
       actions.append(
         AnyChatApplyAction(draftAction, requiresSubject: false) { [weak self] draftRecipe in
           guard !draftRecipe.isEmpty else { return [] }
+          let originalEditableText = draftRecipe.editableProseReviewText()
           return [
             ChatApplyReviewItem(
               title: draftAction.reviewTitle,
               summary: draftRecipe.renderedReview(),
-              editableTitle: "Rationale",
-              editableText: draftRecipe.rationale,
+              editableTitle: "Draft prose fields",
+              editableText: originalEditableText,
               commitTitle: draftAction.commitTitle,
               committingTitle: draftAction.committingTitle,
               committedTitle: draftAction.committedTitle,
-              commit: { editedRationale in
-                var approvedDraftRecipe = draftRecipe
-                approvedDraftRecipe.rationale = editedRationale
-                try self?.commitDraftRecipe(approvedDraftRecipe)
+              commit: { editedText in
+                let approved = editedText == originalEditableText
+                  ? draftRecipe
+                  : draftRecipe.applyingEditableProseReviewText(editedText)
+                try self?.commitDraftRecipe(approved)
               }
             )
           ]
