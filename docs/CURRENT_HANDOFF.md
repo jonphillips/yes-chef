@@ -1,22 +1,16 @@
 # Current Handoff
 
-Last updated: July 7, 2026 (**Next Up = Recipe edit proposals — Slice 3**, the iterative refine loop +
-workbench-log deposit, ADR-0023 S3). Recently completed and moved to [`docs/DONE-LOG.md`](DONE-LOG.md):
-**Recipe edit proposals — Slice 2** (the "keep as a variation" commit destination — ADR-0021's build:
-synced `recipeVariations` table + migration, reader fold with add/change/remove highlighting, deterministic
-grocery fold, and ADR-0023 OQ3's conservative overwrite-block, [#123](https://github.com/jonphillips/yes-chef/pull/123));
-**Recipe edit proposals — Slice 1** (the "Adjust this recipe" verb + section-aware multi-section
-overwrite/undo, ADR-0023, schema-free); the **LLM-aligned Compare
-matrix** (ADR-0022, now Accepted — shipped S1–S4 + the Compare→chat affordance,
-[#116](https://github.com/jonphillips/yes-chef/pull/116)–[#120](https://github.com/jonphillips/yes-chef/pull/120)),
-**Compare-key granularity** ([#114](https://github.com/jonphillips/yes-chef/pull/114)), and **Workbench S4 —
-Compare** ([#113](https://github.com/jonphillips/yes-chef/pull/113), completing the Workbench build arc
-S1–S4). Earlier, also in DONE-LOG: Workbench S3 durable log
-([#110](https://github.com/jonphillips/yes-chef/pull/110)), Workbench S2 + dogfood-hardening
-([#107](https://github.com/jonphillips/yes-chef/pull/107)), chat controls
-([#105](https://github.com/jonphillips/yes-chef/pull/105)), Workbench S1 + grounding fix/polish
-([#101](https://github.com/jonphillips/yes-chef/pull/101) / [#103](https://github.com/jonphillips/yes-chef/pull/103)),
-and the menu-planning overhaul ([#98](https://github.com/jonphillips/yes-chef/pull/98)).
+Last updated: July 9, 2026. **Next Up = ADR-0024 Slice 1** (editable proposal preview — the roomy,
+scrollable, *editable* review sheet for the single-string verbs, dismiss-hardening first; ADR-0024 +
+ADR-0025 both Accepted 2026-07-09). **Riding to merge: Dogfood fixes — batch 5 (mechanical polish),
+[#126](https://github.com/jonphillips/yes-chef/pull/126)** — gated on Jon's device pass (the app target
+never compiled in CI; one `PreferenceKey` concurrency error already fixed on-branch); full contents logged in
+[`docs/DONE-LOG.md`](DONE-LOG.md), alongside **Recipe edit proposals — Slice 2**
+([#123](https://github.com/jonphillips/yes-chef/pull/123)) and **Slice 1**
+([#122](https://github.com/jonphillips/yes-chef/pull/122)); the **LLM-aligned Compare matrix** (ADR-0022,
+Accepted, [#116](https://github.com/jonphillips/yes-chef/pull/116)–[#120](https://github.com/jonphillips/yes-chef/pull/120)),
+**Compare-key granularity** ([#114](https://github.com/jonphillips/yes-chef/pull/114)), and the **Workbench
+build arc S1–S4** ([#101](https://github.com/jonphillips/yes-chef/pull/101)–[#113](https://github.com/jonphillips/yes-chef/pull/113)).
 
 The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
 **Next Up** (the dispatch target), the **Ready Efforts** queue, and the **Verification Pattern** —
@@ -32,27 +26,25 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Recipe edit proposals — Slice 3: the iterative refine loop + workbench-log deposit.** Implements
-[ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) S3 — the conversational editing loop Jon originally
-asked for. **Read before starting:** ADR-0023 (full), `efforts/recipe-edit-proposals.md` S3, and ADR-0019 for
-the workbench-log shape. The S1/S2 code this extends: `RecipeAdjustment.swift` (the extractor + delta) and
-`RecipeAdjustmentReviewView.swift` (the side-by-side staging surface + the two commit buttons S2 added).
+**ADR-0024 Slice 1 — editable proposal preview (single-string verbs), dismiss-hardening first.**
+Implements S1 of [ADR-0024](decisions/ADR-0024-editable-proposal-preview.md) (Accepted). Two steps:
+(1) **shared review-sheet dismiss hardening** — the fragility ADR-0024 OQ1 and ADR-0025 S1 both raise:
+`interactiveDismissDisabled`/`isModalInPresentation` while edits are unsaved + Cancel-with-confirm, applied
+once to the capture review sheets (`RecipeCaptureView` / `ShareViewController`) and built into the new
+sheet. (2) **the editable sheet for single-string verbs** — replace the cramped inline
+`ChatApplyReviewCard` (`RecipeChatWorkspace.swift` ~745) with a roomy, scrollable, presented sheet; make
+Chef-It-Up / Make-ahead / workbench rationale **editable**; thread the edited string through commit (the
+ADR-0024 **D3** contract change — `commit` takes the sheet's current text, not a frozen payload). List /
+structured verbs get the roomy sheet now; their editing lands in S2. **Schema-free, app-wide.** Read first:
+ADR-0024 (esp. D3 + the OQ1/OQ3/OQ4 leans), `ChatApplyReviewItem`/`ChatApplyReviewCard`/`AnyChatApplyAction`
+in `RecipeChatWorkspace.swift`, and `RecipeCaptureView`/`ShareViewController` for the dismiss pattern.
 
-*Why:* S1/S2 shipped the two commit destinations (overwrite, keep-as-variation) but each is one-shot — the
-proposal is take-it-or-leave-it. S3 lets the user **keep chatting to revise a live proposal before
-committing**, closing the loop from a single extraction to an actual conversation.
-
-*Build:*
-- **Iterative refine** — keep chatting to revise the live proposal before committing; **re-extract with the
-  current proposal as context, not from scratch** (do not throw away the staged delta on each turn).
-- **Workbench-log deposit** — on the workbench, a committed adjustment can drop a `rationale`/`experiment`
-  entry into the ADR-0019 workbench log, closing the "why did I change this" memory loop.
-
-*Invariant (unchanged):* the model proposes → writes only to the preview → the tap writes (ADR-0011/0012);
-the side-by-side review remains the guard against roughshod edits.
-
-*Out of S3 (do NOT build here):* a multi-level undo stack (one-level restore point stands unless dogfooding
-asks, ADR-0023 OQ2) and any structural per-step method merge (declined, ADR-0016/0023 OQ1).
+**Riding to merge (not a dispatch): Dogfood fixes — batch 5 (mechanical polish),
+[#126](https://github.com/jonphillips/yes-chef/pull/126).** Built and logged in DONE-LOG; gated on Jon's
+device pass (app target never compiled in CI; the `PreferenceKey` concurrency error already fixed on-branch);
+this handoff bump rides in #126. (The other 2026-07-08 dogfood items were always ADR-gated, separate from
+batch 5: editable AI preview + comment ingestion are now ADR-0024/0025 Accepted — see Ready Efforts;
+workbench provenance + browser autofill remain ADR-pending.)
 
 **Standing release follow-up (not a dispatch — a pre-cut ops step Jon runs).** We stay in the CloudKit
 **Development** environment (dev stance) so the schema keeps evolving freely; promoting to **Production** is
@@ -68,11 +60,24 @@ synced `recipeVariations` table (Recipe edit proposals S2); and note the app tar
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
+**Dogfood 2026-07-08 — ADR-gated design efforts (both Accepted 2026-07-09).**
+- **ADR-0024 editable proposal preview** ([ADR-0024](decisions/ADR-0024-editable-proposal-preview.md)) —
+  the roomy/scrollable/editable review sheet + edited-text-through-commit contract. **S1 is Next Up**
+  (above). **S2** (list / structured verbs — Serve-With, complements, workbench draft prose fields; keep
+  each commit shape, never flatten) remains queued behind it.
+- **ADR-0025 reader-comment ingestion** ([ADR-0025](decisions/ADR-0025-reader-comment-ingestion.md) +
+  `efforts/reader-feedback-comment-ingestion.md`) — NYT "Most Helpful" harvest → LLM-curate distinct tips →
+  reviewable `RecipeNote(readerFeedback)` + chat feed; additive enum, no schema. **Not a straight Codex
+  dispatch:** it starts with a fixture step (S2 — harvest a real authenticated-NYT comment DOM via the
+  browser MCP; selectors/OQ2 are unknowable until then), which Jon or the architect drives before S3–S5 can
+  be specced. Its S1 (dismiss hardening) is shared with ADR-0024 S1 above — done once.
+
 **Recipe edit proposals** ([ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) +
 `efforts/recipe-edit-proposals.md`) — the "Adjust this recipe" verb; **S1 + S2 shipped** (overwrite
 destination with section-aware multi-section overwrite/undo; the "keep as a variation" destination = ADR-0021's
-`recipeVariations` table + reader fold + grocery fold). **S3 is the current Next Up** = the iterative refine
-loop + workbench-log deposit. Extends ADR-0021 (the variation destination) — do not duplicate it.
+`recipeVariations` table + reader fold + grocery fold). **S3 queued** = the iterative refine loop +
+workbench-log deposit (behind the dogfood ADRs above). Extends ADR-0021 (the variation destination) — do
+not duplicate it.
 
 **Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — the store + curate + compare arc is
 complete (S1–S4 all shipped → DONE-LOG). Remaining parked follow-ons in the effort doc: the
