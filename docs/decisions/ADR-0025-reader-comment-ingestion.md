@@ -24,6 +24,59 @@ change**, sync-safe ([ADR-0002](ADR-0002-cloudkit-sync-no-server.md)). Shares th
 dismiss-fragility hardening with **[ADR-0024](ADR-0024-editable-proposal-preview.md)** (OQ1 there = Slice 1
 here).
 
+## Amendment — 2026-07-09 (dogfood revision of D3–D5, post-[#129](https://github.com/jonphillips/yes-chef/pull/129))
+
+Reviewing the first curation build ([#129](https://github.com/jonphillips/yes-chef/pull/129)), Jon flagged
+the auto-curate-then-review flow as **too magical/opaque** and pinned down what the output should actually
+look like: a human editor's numbered list of atomic recipe changes — *"use less honey (some said none, but
+that's a different recipe IMO); 2 garlic cloves instead of 1; salt and drain the cukes if not serving
+right away; don't add the splash of water — dressing goes watery; …"* — where **some lines distill what
+many commenters converged on** and **some preserve one commenter's specific detailed contribution.** This
+amendment revises **D3–D5** to hit that target. #129's scaffolding stands (the `readerFeedback` enum case,
+the `RecipeReaderCommentExtractor` bridge, the Reader Feedback display section, the ADR-0024 review-sheet
+reuse, and per-accepted-tip `RecipeNote` storage); what changes is the **curation prompt, the review UI,
+and the token budget.**
+
+- **A1 — the rule refines to "synthesize *within* a point, never *across* points" (revises D3).** The
+  original D3 read as "never synthesize." That was too blunt: the hazard was never *"collapse the six
+  people who all said less honey into one line"* — it was *"blend seven distinct changes into one soupy
+  paragraph."* So the LLM **may** collapse a change many commenters mention into **one atomic point**, and
+  **must** keep distinct changes as **separate entries** ("less honey" and "more garlic" are always two).
+  The output shape stays the [[llm-curation-not-synthesis]] guardrail — a **JSON array of atomic points,
+  never a prose blob** — which is exactly what keeps within-point consensus from becoming across-point
+  mush. Two provenance kinds are both first-class: **consensus-distilled** (many comments → one point, with
+  a support count) and **singular-preserved** (one rich, specific comment kept largely intact). D3's
+  quality bar is otherwise unchanged: precision over recall, cut the blabber, **empty list is a valid
+  answer.**
+
+- **A2 — provenance-in-review is the answer to "too magical" (revises D4/D5).** Each proposed point
+  carries its **provenance** — a support count and the **backing anonymized comments**, expandable at
+  review time (*"Use less honey ← 6 comments"* / *"Salt and drain the cukes ← 1 detailed comment"*). The
+  model **shows its evidence**; it is not a black box. Jon reviews the list in the ADR-0024 editable sheet
+  — accept / **edit** / reject **each point** — injecting his own editorial cut (the *"…but that's a
+  different recipe IMO"* voice is his, added at review, not the model's). A **"promote a comment the model
+  missed"** escape hatch keeps the manual-triage instinct alive as a fallback without making him wade
+  through the raw thread as the primary flow. **Storage is unchanged from #129:** each accepted point is
+  one `RecipeNote(readerFeedback)`. Provenance is **transient/advisory** — shown at review; *optionally*
+  persist a light *"(from 6 comments)"* tag in the note text (OQ6, Jon's call), no schema impact either way.
+
+- **A3 — no deterministic near-duplicate pre-filter; redundancy IS the signal.** An earlier review idea —
+  a cheap deterministic dedup/consensus-collapse pass before the frontier — is **rejected here.** Consensus
+  detection *needs* the redundancy intact to count "6 people said less honey"; collapsing near-duplicates
+  first would destroy the exact signal A1 depends on. Strip only **truly empty/garbage** comments before
+  the call. (The on-device first-pass-model idea is likewise deferred — same risk of dropping the signal,
+  and no cost case at today's volumes.)
+
+- **A4 — raise the token budget and check truncation.** Because A1 requires the **whole thread** to reach
+  the frontier for the tally, `maxTokens: 2048` at `.high` reasoning over ~80 comments is too tight
+  ([[reasoning-budget-starves-output]]). Raise the ceiling (billing is per token *used*, not the cap, so a
+  generous ceiling only removes truncation) **and** check `ModelResponse.wasTruncated` — a cut-off tally
+  silently **under-counts** consensus, which is a wrong answer, not just a short one. Surface a distinct
+  "couldn't finish — try again" state rather than swallowing it as an empty curation.
+
+**New open question — OQ6:** persist a lightweight support-count tag in the accepted note text, or keep the
+count review-only? *Lean:* review-only unless Jon wants the provenance durable on the recipe.
+
 ## Context
 
 Dogfooding NYT capture 2026-07-08, Jon asked whether the app captures the comment thread the in-app
@@ -73,6 +126,11 @@ host-keyed, fixture-tested function over the loaded `Document` (same shape as
 
 ### D3 — Curate ruthlessly: cut the noise, keep only distinct, non-obvious, genuinely useful tips (ratified)
 
+> **Amended 2026-07-09 (A1 above):** "never synthesize" refines to **synthesize *within* a point, never
+> *across* points** — consensus-distilling many comments into one atomic line is now explicitly allowed;
+> only across-point merging into a prose blob is forbidden. The JSON-array-of-atomic-points output shape is
+> unchanged.
+
 Two jobs — and the **first is the whole point of the feature**, so it must be the loudest instruction in
 the prompt, not a trailing clause:
 
@@ -93,6 +151,11 @@ the prompt, not a trailing clause:
    [[llm-curation-not-synthesis]]).
 
 ### D4 — Each accepted tip is its own reviewable `RecipeNote(readerFeedback)` (ratified)
+
+> **Amended 2026-07-09 (A2 above):** each proposed point now carries **visible provenance** (support count
+> + expandable backing comments) at review time, plus a "promote a comment the model missed" escape hatch —
+> the answer to the "too magical" worry. Per-point storage as a `RecipeNote(readerFeedback)` is unchanged.
+
 
 Add an additive `RecipeNoteType.readerFeedback` enum case (no table/schema change; same sync-safe pattern
 as the existing note types). Each selected snippet becomes its **own draft `RecipeNote` row**, so in the

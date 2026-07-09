@@ -1,8 +1,10 @@
 # Current Handoff
 
-Last updated: July 9, 2026. **Next Up = ADR-0025 curation slice (D3–D5) — wire the already-built NYT comment
-harvest into an LLM-curation review that writes `readerFeedback` notes** (straight Codex dispatch; the
-harvest/extractor + fixture are already done — see below). **Just shipped: ADR-0024 fully
+Last updated: July 9, 2026. **Next Up = ADR-0025 curation — revise per the Amendment 2026-07-09:
+[#129](https://github.com/jonphillips/yes-chef/pull/129) shipped the scaffolding (enum, extractor bridge,
+display, review-sheet, per-tip note storage — all stands); reprompt to two-provenance curation
+(synthesize *within* a point, never across), show comment provenance in review, raise the token budget**
+(Codex dispatch — see below). **Just shipped: ADR-0024 fully
 done — S1 editable proposal preview ([#127](https://github.com/jonphillips/yes-chef/pull/127)) + S2
 list / structured editable verbs (this PR, architect-approved 2026-07-09, including the unchanged-payload
 fidelity guard so an un-edited commit re-writes the original, never a lossy re-parse)** and **Dogfood fixes —
@@ -29,33 +31,44 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**ADR-0025 curation slice (D3–D5) — wire the existing NYT harvest into an LLM-curation review that writes
-`readerFeedback` notes.** The harvest half of [ADR-0025](decisions/ADR-0025-reader-comment-ingestion.md)
-(Accepted) is **already built** from the 2026-07-01 pre-ADR effort and is currently **orphaned** — nothing
-consumes it: the interactive **Load Comments** playbook (D1 — `BrowserCommentLoadingPlaybook.nytCooking` in
-`RecipeModels.swift`: Most-Helpful sort + bounded 4× Load-More, host-gated, wired to a browser button in
-`BrowserViews.swift`), the anonymizing **extractor** (D2 — `RecipeReaderCommentExtractor.extract(html:sourceURL:)`
-→ `[RawComment]{text, helpfulCount}` in `WebRecipeCapture/`, fixture-tested in `WebRecipeReaderCommentTests`
-against the real 76-comment `nyt-comments.html`), and the **fixture** itself (the effort's S2 deliverable).
-So OQ1/OQ2 (cap + NYT selectors) are **resolved and grounded in a passing test**. This dispatch does the
-**consumption** half:
+**ADR-0025 curation — revise per the [Amendment 2026-07-09](decisions/ADR-0025-reader-comment-ingestion.md#amendment--2026-07-09-dogfood-revision-of-d3d5-post-129).**
+[#129](https://github.com/jonphillips/yes-chef/pull/129) shipped the working **scaffolding** — the
+`readerFeedback` enum case, the `RecipeReaderCommentExtractor` bridge (Load Comments → `[RawComment]`), the
+Reader Feedback display section, the ADR-0024 review-sheet reuse, and per-accepted-tip
+`RecipeNote(readerFeedback)` storage — but Jon flagged its auto-curate flow as **too magical** and the tip
+shape as wrong. **All of that scaffolding stands.** This dispatch revises the **curation prompt, the review
+UI, and the token budget** to hit the amendment's target (a human editor's numbered list of atomic recipe
+changes — some consensus-distilled, some singular-preserved). Do all four, in order:
 
-1. **Bridge** — after Load Comments succeeds, extract the loaded DOM to `[RawComment]` via the existing
-   `RecipeReaderCommentExtractor` (today the button only loads + counts; it never calls the extractor).
-2. **D3 curation** — LLM curates the `[RawComment]` down to distinct, non-obvious, genuinely-useful tips
-   (cut the noise). Reuse `LLMClientKit` + Keychain `apiKeyStore` — **do not** build a new client (the effort
-   doc's Slice 4 is moot). Respect [[llm-curation-not-synthesis]]: select/trim distinct tips, never merge into
-   one summary.
-3. **D4/D5** — add an **additive** `readerFeedback` note kind (absent today), review each curated tip through
-   the **just-shipped ADR-0024 editable sheet**, commit accepted tips as `RecipeNote(readerFeedback)`, and
-   display them in a "Reader Feedback" section.
+1. **A1 — two-provenance curation (revises D3).** Reprompt the existing `ReaderFeedbackCurationClient` so
+   the output is a **JSON array of atomic points** where the model **may collapse a change many commenters
+   converge on into one point** (with a support count) **and must keep distinct changes as separate
+   entries** — *synthesize within a point, never across points*. Two kinds are both first-class:
+   **consensus-distilled** (many → one) and **singular-preserved** (one rich comment kept intact). Keep D3's
+   bar: precision over recall, cut blabber, **empty list is valid.** Reuse `LLMClientKit` + `apiKeyStore` —
+   do **not** build a new client. Still [[llm-curation-not-synthesis]] — the array shape *is* the guard.
+2. **A2 — provenance-in-review (revises D4/D5).** Each proposed point shows its **provenance** at review:
+   a support count + the **backing anonymized comments**, expandable in the ADR-0024 sheet. Accept / edit /
+   reject **each point** (Jon's editorial voice is added here, at review). Add a **"promote a comment the
+   model missed"** escape hatch. Storage unchanged: each accepted point → one `RecipeNote(readerFeedback)`.
+   Provenance is **transient/advisory** (review-only unless OQ6 says otherwise).
+3. **A3 — no dedup pre-filter.** Do **not** collapse near-duplicate comments before the frontier —
+   redundancy *is* the consensus signal A1 counts. Strip only truly empty/garbage. (On-device first pass
+   stays deferred.)
+4. **A4 — budget + truncation.** The whole thread must reach the frontier for the tally, so raise
+   `maxTokens` above 2048 (billing is per token *used*, so a generous ceiling is free) **and** check
+   `ModelResponse.wasTruncated` — a cut-off tally under-counts consensus; surface a distinct "couldn't
+   finish — try again," never a silent empty. Ties [[reasoning-budget-starves-output]].
+
+Also fold in the **cooking-mode fix**: `readerFeedback` notes currently fall into cooking mode's flat
+"Notes" list unlabeled ([CookingModeView.swift:66](../YesChefApp/CookingModeView.swift)); give them their
+own section or drop them from the at-the-stove step view (Jon's call — likely out).
 
 **Fast follow (next slice, not this one):** **D6** the DB-backed `AIPromptPreferenceKind.readerFeedback`
 curation-prompt setting (ADR-0018, *not* `AppStorage`), **D7** feed curated notes into
 `RecipeChatRecipeContext`, then **S6** Jon's end-to-end device test on a real NYT recipe. Read first: ADR-0025
-(esp. **D3–D5**) + `efforts/reader-feedback-comment-ingestion.md` (note its "two slices are stale" header).
-**Schema note:** `readerFeedback` is an additive enum case, sync-safe; the new note rows ride the existing
-`RecipeNote` table — no new table/column.
+**Amendment 2026-07-09** + **D3–D5** (as amended). **Schema note:** `readerFeedback` is an additive enum
+case, sync-safe; the new note rows ride the existing `RecipeNote` table — no new table/column.
 
 **Standing release follow-up (not a dispatch — a pre-cut ops step Jon runs).** We stay in the CloudKit
 **Development** environment (dev stance) so the schema keeps evolving freely; promoting to **Production** is
