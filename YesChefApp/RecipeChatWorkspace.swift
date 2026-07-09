@@ -814,7 +814,7 @@ private struct ChatApplyReviewRow: View {
   }
 }
 
-private struct ChatApplyReviewSheet: View {
+struct ChatApplyReviewSheet: View {
   @Environment(\.dismiss) private var dismiss
 
   let item: ChatApplyReviewItem

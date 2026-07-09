@@ -461,8 +461,14 @@ private struct RecipeReaderView: View {
       if !model.instructionSteps.isEmpty {
         instructions
       }
-      if !model.visibleNotes.isEmpty {
-        notesView(model.visibleNotes)
+      let visibleNotes = model.visibleNotes
+      let readerFeedbackNotes = visibleNotes.filter { $0.noteType == .readerFeedback }
+      let otherNotes = visibleNotes.filter { $0.noteType != .readerFeedback }
+      if !readerFeedbackNotes.isEmpty {
+        readerFeedbackView(readerFeedbackNotes)
+      }
+      if !otherNotes.isEmpty {
+        notesView(otherNotes)
       }
       if let chefItUp = model.chefItUp {
         chefItUpSection(chefItUp)
@@ -615,12 +621,24 @@ private struct RecipeReaderView: View {
         .font(.title2.bold())
       ForEach(notes) { note in
         VStack(alignment: .leading, spacing: 4) {
-          Text(note.noteType.rawValue.capitalized)
+          Text(note.noteType.displayTitle)
             .font(.caption.bold())
             .foregroundStyle(.secondary)
           Text(note.text)
         }
         .padding(.vertical, 4)
+      }
+    }
+  }
+
+  private func readerFeedbackView(_ notes: [RecipeNote]) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Reader Feedback")
+        .font(.title2.bold())
+      ForEach(notes) { note in
+        Text(note.text)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.vertical, 4)
       }
     }
   }

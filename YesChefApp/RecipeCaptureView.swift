@@ -116,112 +116,189 @@ struct RecipeCaptureView: View {
 private struct RecipeCaptureReviewSections: View {
   @Bindable var model: RecipeCaptureModel
   let draft: WebRecipeCaptureDraft
+  @State private var presentedReaderFeedbackTip: ReaderFeedbackTip?
 
   private var page: ParsedRecipePage {
     draft.page
   }
 
   var body: some View {
-    Section("Review") {
-      StackedTextField(title: "Title", text: $model.reviewTitle)
-      StackedTextField(title: "Summary", text: $model.reviewSummary, axis: .vertical)
-      StackedTextField(title: "Servings", text: $model.reviewServingsText)
-      StackedTextField(title: "Total Time", text: $model.reviewTotalTimeText)
-        .keyboardType(.numberPad)
-      if draft.usedRenderedFallback {
-        LabeledContent("Fetch") {
-          Text("Rendered page")
+    Group {
+      Section("Review") {
+        StackedTextField(title: "Title", text: $model.reviewTitle)
+        StackedTextField(title: "Summary", text: $model.reviewSummary, axis: .vertical)
+        StackedTextField(title: "Servings", text: $model.reviewServingsText)
+        StackedTextField(title: "Total Time", text: $model.reviewTotalTimeText)
+          .keyboardType(.numberPad)
+        if draft.usedRenderedFallback {
+          LabeledContent("Fetch") {
+            Text("Rendered page")
+          }
+        }
+        if draft.capturedInBrowser {
+          LabeledContent("Fetch") {
+            Text("Captured in browser")
+          }
         }
       }
-      if draft.capturedInBrowser {
-        LabeledContent("Fetch") {
-          Text("Captured in browser")
-        }
-      }
-    }
 
-    Section("Source") {
-      if let sourceURL = page.sourceURL {
-        LabeledContent("URL") {
-          Text(sourceURL.absoluteString)
+      Section("Source") {
+        if let sourceURL = page.sourceURL {
+          LabeledContent("URL") {
+            Text(sourceURL.absoluteString)
+              .textSelection(.enabled)
+          }
+        }
+        if let publisherName = page.publisherName {
+          LabeledContent("Source") {
+            Text(publisherName)
+          }
+        }
+        if let author = page.author {
+          LabeledContent("Author") {
+            Text(author)
+          }
+        }
+      }
+
+      if let heroImage {
+        Section("Photo") {
+          Image(uiImage: heroImage)
+            .resizable()
+            .scaledToFit()
+            .frame(maxHeight: 220)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+      }
+
+      if !page.warnings.isEmpty {
+        Section("Warnings") {
+          Text(page.warnings.map(\.reviewTitle).joined(separator: "\n"))
+            .foregroundStyle(.secondary)
+        }
+      }
+
+      if !model.editorialBlocks.isEmpty {
+        Section("Notes") {
+          ForEach(model.editorialBlocks.indices, id: \.self) { index in
+            VStack(alignment: .leading, spacing: 8) {
+              Text(model.editorialBlocks[index].label)
+                .font(.headline)
+                .foregroundStyle(.secondary)
+              TextField("Note", text: editorialBlockTextBinding(at: index), axis: .vertical)
+                .lineLimit(3...8)
+            }
+            .padding(.vertical, 4)
+          }
+          .onDelete { offsets in
+            model.removeEditorialBlocks(atOffsets: offsets)
+          }
+        }
+      }
+
+      if !model.readerFeedbackProposals.isEmpty || !model.readerFeedbackBlocks.isEmpty {
+        Section("Reader Feedback") {
+          ForEach(model.readerFeedbackProposals) { tip in
+            VStack(alignment: .leading, spacing: 8) {
+              Text(tip.text)
+                .font(.callout)
+                .lineLimit(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+              HStack {
+                Button(role: .cancel) {
+                  model.discardReaderFeedbackTip(tip)
+                } label: {
+                  Label("Discard", systemImage: "trash")
+                }
+                .buttonStyle(.bordered)
+
+                Spacer(minLength: 8)
+
+                Button {
+                  presentedReaderFeedbackTip = tip
+                } label: {
+                  Label("Review", systemImage: "doc.text.magnifyingglass")
+                }
+                .buttonStyle(.borderedProminent)
+              }
+            }
+            .padding(.vertical, 4)
+          }
+
+          ForEach(model.readerFeedbackBlocks.indices, id: \.self) { index in
+            TextField("Reader feedback", text: readerFeedbackBlockTextBinding(at: index), axis: .vertical)
+              .lineLimit(2...8)
+          }
+          .onDelete { offsets in
+            model.removeReaderFeedbackBlocks(atOffsets: offsets)
+          }
+        }
+      }
+
+      Section("Ingredients") {
+        if ingredientText.isEmpty {
+          Text("No ingredients found")
+            .foregroundStyle(.secondary)
+        } else {
+          Text(ingredientText)
             .textSelection(.enabled)
         }
       }
-      if let publisherName = page.publisherName {
-        LabeledContent("Source") {
-          Text(publisherName)
+
+      Section("Instructions") {
+        if instructionText.isEmpty {
+          Text("No instructions found")
+            .foregroundStyle(.secondary)
+        } else {
+          Text(instructionText)
+            .textSelection(.enabled)
         }
       }
-      if let author = page.author {
-        LabeledContent("Author") {
-          Text(author)
+
+      if let bodyText = page.bodyText, page.ingredientSections.isEmpty || page.instructionSections.isEmpty {
+        Section("Page Text") {
+          Text(bodyText)
+            .lineLimit(8)
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
         }
       }
     }
-
-    if let heroImage {
-      Section("Photo") {
-        Image(uiImage: heroImage)
-          .resizable()
-          .scaledToFit()
-          .frame(maxHeight: 220)
-          .clipShape(RoundedRectangle(cornerRadius: 8))
-      }
-    }
-
-    if !page.warnings.isEmpty {
-      Section("Warnings") {
-        Text(page.warnings.map(\.reviewTitle).joined(separator: "\n"))
-          .foregroundStyle(.secondary)
-      }
-    }
-
-    if !model.editorialBlocks.isEmpty {
-      Section("Notes") {
-        ForEach(model.editorialBlocks.indices, id: \.self) { index in
-          VStack(alignment: .leading, spacing: 8) {
-            Text(model.editorialBlocks[index].label)
-              .font(.headline)
-              .foregroundStyle(.secondary)
-            TextField("Note", text: editorialBlockTextBinding(at: index), axis: .vertical)
-              .lineLimit(3...8)
+    .sheet(item: $presentedReaderFeedbackTip) { tip in
+      let item = readerFeedbackReviewItem(for: tip)
+      ChatApplyReviewSheet(
+        item: item,
+        isCommitting: false,
+        commit: { approvedText in
+          do {
+            try await item.commit(approvedText)
+            presentedReaderFeedbackTip = nil
+          } catch {
+            model.errorMessage = RecipeChatErrorText.describe(error)
+            model.isShowingError = true
           }
-          .padding(.vertical, 4)
+        },
+        discard: {
+          model.discardReaderFeedbackTip(tip)
+          presentedReaderFeedbackTip = nil
         }
-        .onDelete { offsets in
-          model.removeEditorialBlocks(atOffsets: offsets)
-        }
-      }
+      )
     }
+  }
 
-    Section("Ingredients") {
-      if ingredientText.isEmpty {
-        Text("No ingredients found")
-          .foregroundStyle(.secondary)
-      } else {
-        Text(ingredientText)
-          .textSelection(.enabled)
+  private func readerFeedbackReviewItem(for tip: ReaderFeedbackTip) -> ChatApplyReviewItem {
+    ChatApplyReviewItem(
+      title: "Review Reader Feedback",
+      summary: tip.text,
+      editableTitle: "Reader Feedback",
+      editableText: tip.text,
+      commitTitle: "Accept",
+      committingTitle: "Saving...",
+      committedTitle: "Saved Reader Feedback",
+      commit: { approvedText in
+        model.acceptReaderFeedbackTip(tip, approvedText: approvedText)
       }
-    }
-
-    Section("Instructions") {
-      if instructionText.isEmpty {
-        Text("No instructions found")
-          .foregroundStyle(.secondary)
-      } else {
-        Text(instructionText)
-          .textSelection(.enabled)
-      }
-    }
-
-    if let bodyText = page.bodyText, page.ingredientSections.isEmpty || page.instructionSections.isEmpty {
-      Section("Page Text") {
-        Text(bodyText)
-          .lineLimit(8)
-          .foregroundStyle(.secondary)
-          .textSelection(.enabled)
-      }
-    }
+    )
   }
 
   private var ingredientText: String {
@@ -248,6 +325,15 @@ private struct RecipeCaptureReviewSections: View {
       return model.editorialBlocks[index].text
     } set: { text in
       model.updateEditorialBlockText(text, at: index)
+    }
+  }
+
+  private func readerFeedbackBlockTextBinding(at index: Int) -> Binding<String> {
+    Binding {
+      guard model.readerFeedbackBlocks.indices.contains(index) else { return "" }
+      return model.readerFeedbackBlocks[index].text
+    } set: { text in
+      model.updateReaderFeedbackBlockText(text, at: index)
     }
   }
 
