@@ -10,6 +10,34 @@ Newest first.
 
 ---
 
+## ADR-0024 Slice 2 — list / structured verbs get editable review
+
+**Architect-reviewed & approved 2026-07-09 — yes-chef branch `codex/adr-0024-s2-editable-list-verbs`
+(built on device by Jon; core round-trip + fidelity carry unit tests).** S2 of
+[ADR-0024](decisions/ADR-0024-editable-proposal-preview.md) (Accepted 2026-07-09). **Schema-free, app-wide.**
+Completes the ADR: every list / structured verb the S1 sheet showed read-only is now **editable while keeping
+its commit shape intact** (D4) — no list flattened into an opaque string ([[chat-verb-commit-shapes]],
+[[llm-curation-not-synthesis]]).
+
+- **Per-shape parse round-trip (D4/OQ2 lean).** Each verb gained an `editableReviewText()` /
+  `applyingEditableReviewText()` pair in `YesChefCore`: `ServeWithPlan`, `MenuComplementSuggestion`,
+  `MealPlanComplementSuggestion`, `MealPlanMakeAheadStrategy`, `MenuPrepPlan`, and `WorkbenchDraftRecipe`
+  (its **prose fields** — rationale/title/subtitle/summary/servings/yield/cuisine/course/ingredient-section/
+  notes — beyond S1's rationale-only edit; ingredient/instruction lines stay structured, untouched). The edited
+  text re-parses to the typed payload on commit; latent provenance (`sourceItem`/`sourceDish`) is preserved for
+  lines the user left unchanged via a group-and-drain pop.
+- **Unchanged-payload fidelity guard (the review fix, commit `Preserve unchanged editable review payloads`).**
+  The commit path always re-parsed, even with zero edits — and the flat `"title: note"` format can't losslessly
+  round-trip a colon-in-title Serve-With item (`"2:1 rice"` → `title "2" / note "1 rice"`), a regression from
+  S1's faithful original-payload commit. Fixed by short-circuiting: when the committed text is byte-identical to
+  the presented `editableText`, commit the **original payload** untouched (`action.commit(payload)` at the
+  `AnyChatApplyAction` layer; `edited == original ? original : applying(edited)` at the four inline
+  `ChatApplyReviewItem` sites). Invariant is now uniform: **un-edited commit → faithful original; edited commit
+  → re-parse.** Two regression tests document the parser ambiguity and prove the guard commits the original.
+- **D5 scope.** The ADR-0023 "Adjust this recipe" compare verb stays `.inline`, untouched.
+
+---
+
 ## ADR-0024 Slice 1 — editable proposal preview (single-string verbs)
 
 **Architect-reviewed & approved 2026-07-09 — yes-chef PR [#127](https://github.com/jonphillips/yes-chef/pull/127)

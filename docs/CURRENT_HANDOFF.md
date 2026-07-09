@@ -1,12 +1,13 @@
 # Current Handoff
 
-Last updated: July 9, 2026. **Next Up = ADR-0024 Slice 2** (list / structured verbs get *editable* review —
-Serve-With, complements, prep-plan; keep each commit shape, never flatten; plus the workbench draft's prose
-fields; ADR-0024 + ADR-0025 both Accepted 2026-07-09). **Riding to merge: ADR-0024 Slice 1 — editable
-proposal preview (single-string verbs), architect-approved 2026-07-09** (its handoff bump rides in the S1
-PR), **and Dogfood fixes — batch 5 (mechanical polish),
-[#126](https://github.com/jonphillips/yes-chef/pull/126)** — both gated on Jon's device pass (the app target
-never compiled in CI; one `PreferenceKey` concurrency error already fixed on-branch); full contents logged in
+Last updated: July 9, 2026. **Next Up = ADR-0025 curation slice (D3–D5) — wire the already-built NYT comment
+harvest into an LLM-curation review that writes `readerFeedback` notes** (straight Codex dispatch; the
+harvest/extractor + fixture are already done — see below). **Just shipped: ADR-0024 fully
+done — S1 editable proposal preview ([#127](https://github.com/jonphillips/yes-chef/pull/127)) + S2
+list / structured editable verbs (this PR, architect-approved 2026-07-09, including the unchanged-payload
+fidelity guard so an un-edited commit re-writes the original, never a lossy re-parse)** and **Dogfood fixes —
+batch 5 (mechanical polish), [#126](https://github.com/jonphillips/yes-chef/pull/126)** — all
+merged/device-passed; full contents logged in
 [`docs/DONE-LOG.md`](DONE-LOG.md), alongside **Recipe edit proposals — Slice 2**
 ([#123](https://github.com/jonphillips/yes-chef/pull/123)) and **Slice 1**
 ([#122](https://github.com/jonphillips/yes-chef/pull/122)); the **LLM-aligned Compare matrix** (ADR-0022,
@@ -28,27 +29,33 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**ADR-0024 Slice 2 — list / structured verbs get editable review.**
-Implements S2 of [ADR-0024](decisions/ADR-0024-editable-proposal-preview.md) (Accepted), building directly on
-S1's editable sheet (now riding to merge; the **D3** `commit(approvedText:)` contract +
-`ChatApplyReviewItem.editableText`/`presentation` + `ChatApplyReviewSheet` already exist). S1 gave the **list
-verbs** (Serve-With, complements, meal-plan/menu prep-plan) the roomy read-only sheet; S2 makes them
-**editable while keeping each commit shape intact** — respect [[chat-verb-commit-shapes]] and
-[[llm-curation-not-synthesis]]: **never flatten a list into one opaque string.** Do list-aware editing, or as
-the minimum viable step a prose round-trip that re-parses on commit. The **workbench draft** gets at least
-prose-field editing beyond S1's rationale-only edit (structured-field editing may stay deferred — OQ2).
-**Schema-free, app-wide.** Read first: ADR-0024 (esp. **D4** + the OQ2 lean), the S1 machinery —
-`ChatApplyReviewItem` / the `AnyChatApplyAction(editableSummary:commitEditedSummary:)` init in
-`RecipeChat.swift` and `ChatApplyReviewSheet` in `RecipeChatWorkspace.swift` — and the list-verb call sites:
-`serveWithAction` in `RecipeDetailModel+Enrichment.swift`, `complementAction`/`prepPlanAction` in
-`MenuModels.swift` + `MealCalendarModels.swift`, and the draft action in `WorkbenchModels.swift`.
+**ADR-0025 curation slice (D3–D5) — wire the existing NYT harvest into an LLM-curation review that writes
+`readerFeedback` notes.** The harvest half of [ADR-0025](decisions/ADR-0025-reader-comment-ingestion.md)
+(Accepted) is **already built** from the 2026-07-01 pre-ADR effort and is currently **orphaned** — nothing
+consumes it: the interactive **Load Comments** playbook (D1 — `BrowserCommentLoadingPlaybook.nytCooking` in
+`RecipeModels.swift`: Most-Helpful sort + bounded 4× Load-More, host-gated, wired to a browser button in
+`BrowserViews.swift`), the anonymizing **extractor** (D2 — `RecipeReaderCommentExtractor.extract(html:sourceURL:)`
+→ `[RawComment]{text, helpfulCount}` in `WebRecipeCapture/`, fixture-tested in `WebRecipeReaderCommentTests`
+against the real 76-comment `nyt-comments.html`), and the **fixture** itself (the effort's S2 deliverable).
+So OQ1/OQ2 (cap + NYT selectors) are **resolved and grounded in a passing test**. This dispatch does the
+**consumption** half:
 
-**Riding to merge (not a dispatch): Dogfood fixes — batch 5 (mechanical polish),
-[#126](https://github.com/jonphillips/yes-chef/pull/126).** Built and logged in DONE-LOG; gated on Jon's
-device pass (app target never compiled in CI; the `PreferenceKey` concurrency error already fixed on-branch);
-this handoff bump rides in #126. (The other 2026-07-08 dogfood items were always ADR-gated, separate from
-batch 5: editable AI preview + comment ingestion are now ADR-0024/0025 Accepted — see Ready Efforts;
-workbench provenance + browser autofill remain ADR-pending.)
+1. **Bridge** — after Load Comments succeeds, extract the loaded DOM to `[RawComment]` via the existing
+   `RecipeReaderCommentExtractor` (today the button only loads + counts; it never calls the extractor).
+2. **D3 curation** — LLM curates the `[RawComment]` down to distinct, non-obvious, genuinely-useful tips
+   (cut the noise). Reuse `LLMClientKit` + Keychain `apiKeyStore` — **do not** build a new client (the effort
+   doc's Slice 4 is moot). Respect [[llm-curation-not-synthesis]]: select/trim distinct tips, never merge into
+   one summary.
+3. **D4/D5** — add an **additive** `readerFeedback` note kind (absent today), review each curated tip through
+   the **just-shipped ADR-0024 editable sheet**, commit accepted tips as `RecipeNote(readerFeedback)`, and
+   display them in a "Reader Feedback" section.
+
+**Fast follow (next slice, not this one):** **D6** the DB-backed `AIPromptPreferenceKind.readerFeedback`
+curation-prompt setting (ADR-0018, *not* `AppStorage`), **D7** feed curated notes into
+`RecipeChatRecipeContext`, then **S6** Jon's end-to-end device test on a real NYT recipe. Read first: ADR-0025
+(esp. **D3–D5**) + `efforts/reader-feedback-comment-ingestion.md` (note its "two slices are stale" header).
+**Schema note:** `readerFeedback` is an additive enum case, sync-safe; the new note rows ride the existing
+`RecipeNote` table — no new table/column.
 
 **Standing release follow-up (not a dispatch — a pre-cut ops step Jon runs).** We stay in the CloudKit
 **Development** environment (dev stance) so the schema keeps evolving freely; promoting to **Production** is
@@ -66,16 +73,19 @@ target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](
 
 **Dogfood 2026-07-08 — ADR-gated design efforts (both Accepted 2026-07-09).**
 - **ADR-0024 editable proposal preview** ([ADR-0024](decisions/ADR-0024-editable-proposal-preview.md)) —
-  the roomy/scrollable/editable review sheet + edited-text-through-commit contract. **S1 shipped**
-  (the editable sheet + the D3 `commit(approvedText:)` contract for the single-string verbs → DONE-LOG;
-  riding to merge). **S2 is Next Up** (above) — list / structured verbs (Serve-With, complements,
-  prep-plan) get editable review + the workbench draft's prose fields; keep each commit shape, never flatten.
+  **DONE** (S1 + S2 both shipped → DONE-LOG). S1 = the roomy/scrollable/editable sheet + the D3
+  `commit(approvedText:)` contract for the single-string verbs ([#127](https://github.com/jonphillips/yes-chef/pull/127));
+  S2 = list / structured verbs (Serve-With, complements, prep-plan) + the workbench draft's prose fields get
+  editable review, each commit shape intact (per-shape parse round-trip), plus the unchanged-payload fidelity
+  guard (un-edited commit re-writes the original, never a lossy re-parse). Nothing left here.
 - **ADR-0025 reader-comment ingestion** ([ADR-0025](decisions/ADR-0025-reader-comment-ingestion.md) +
   `efforts/reader-feedback-comment-ingestion.md`) — NYT "Most Helpful" harvest → LLM-curate distinct tips →
-  reviewable `RecipeNote(readerFeedback)` + chat feed; additive enum, no schema. **Not a straight Codex
-  dispatch:** it starts with a fixture step (S2 — harvest a real authenticated-NYT comment DOM via the
-  browser MCP; selectors/OQ2 are unknowable until then), which Jon or the architect drives before S3–S5 can
-  be specced. Its S1 (dismiss hardening) is shared with ADR-0024 S1 above — done once.
+  reviewable `RecipeNote(readerFeedback)` + chat feed; additive enum, no schema. **The harvest half is already
+  built** (2026-07-01 pre-ADR effort, currently orphaned): S1 dismiss hardening (shared with ADR-0024 S1), the
+  D1 Load-Comments playbook + D2 anonymizing `RecipeReaderCommentExtractor` + the real 76-comment
+  `nyt-comments.html` fixture with passing tests — so OQ1/OQ2 are resolved. **The curation slice (D3–D5) is
+  Next Up** (above): bridge the extractor in → LLM-curate → `readerFeedback` notes reviewed via the ADR-0024
+  sheet. **Fast follow:** D6 prompt preference (ADR-0018 DB-backed) + D7 chat feed + S6 device test.
 
 **Recipe edit proposals** ([ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) +
 `efforts/recipe-edit-proposals.md`) — the "Adjust this recipe" verb; **S1 + S2 shipped** (overwrite
