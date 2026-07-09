@@ -572,7 +572,7 @@ extension RecipeCoreTests {
         expectNoDifference(recipe.makeAhead, nil)
       }
 
-      try await items[0].commit()
+      try await items[0].commit(items[0].summary)
 
       try await database.read { db in
         let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))

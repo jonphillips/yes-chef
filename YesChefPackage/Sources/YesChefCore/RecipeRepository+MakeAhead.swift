@@ -11,11 +11,7 @@ extension RecipeRepository {
     try updateMakeAhead(plan.rendered().nonEmptyMakeAheadText, recipeID: recipeID, in: db, now: now)
   }
 
-  public static func clearMakeAhead(recipeID: Recipe.ID, in db: Database, now: Date) throws {
-    try updateMakeAhead(nil, recipeID: recipeID, in: db, now: now)
-  }
-
-  private static func updateMakeAhead(
+  public static func updateMakeAhead(
     _ makeAhead: String?,
     recipeID: Recipe.ID,
     in db: Database,
@@ -26,6 +22,10 @@ extension RecipeRepository {
       $0.dateModified = now
     }
     .execute(db)
+  }
+
+  public static func clearMakeAhead(recipeID: Recipe.ID, in db: Database, now: Date) throws {
+    try updateMakeAhead(nil, recipeID: recipeID, in: db, now: now)
   }
 }
 

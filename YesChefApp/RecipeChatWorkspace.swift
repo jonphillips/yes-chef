@@ -232,6 +232,7 @@ struct RecipeChatPanel: View {
   @State private var applyingActionID: AnyChatApplyAction.ID?
   @State private var committingReviewItemID: ChatApplyReviewItem.ID?
   @State private var stagedReviewItems: [ChatApplyReviewItem] = []
+  @State private var presentedReviewItem: ChatApplyReviewItem?
   @State private var actionSummary: ChatCommittedActionSummary?
   @State private var actionError: String?
   @State private var confirmingClearChat = false
@@ -287,8 +288,11 @@ struct RecipeChatPanel: View {
           ChatApplyReviewList(
             items: stagedReviewItems,
             committingItemID: committingReviewItemID,
+            present: { item in
+              presentedReviewItem = item
+            },
             commit: { item in
-              Task { await commit(item) }
+              Task { await commit(item, approvedText: item.summary) }
             },
             discard: { item in
               discard(item)
@@ -368,6 +372,18 @@ struct RecipeChatPanel: View {
     } message: {
       Text("This removes the scratch transcript for this \(chatModel.context.subject).")
     }
+    .sheet(item: $presentedReviewItem) { item in
+      ChatApplyReviewSheet(
+        item: item,
+        isCommitting: committingReviewItemID == item.id,
+        commit: { approvedText in
+          await commit(item, approvedText: approvedText)
+        },
+        discard: {
+          discard(item)
+        }
+      )
+    }
   }
 
   private func sendDraft() async {
@@ -377,6 +393,7 @@ struct RecipeChatPanel: View {
     actionSummary = nil
     actionError = nil
     stagedReviewItems = []
+    presentedReviewItem = nil
     await chatModel.send(text)
   }
 
@@ -396,21 +413,25 @@ struct RecipeChatPanel: View {
         return
       }
       stagedReviewItems = items
+      presentedReviewItem = items.first { $0.presentation == .sheet }
     } catch {
       actionError = RecipeChatErrorText.describe(error)
     }
   }
 
   @MainActor
-  private func commit(_ item: ChatApplyReviewItem) async {
+  private func commit(_ item: ChatApplyReviewItem, approvedText: String) async {
     committingReviewItemID = item.id
     actionError = nil
     defer { committingReviewItemID = nil }
 
     do {
-      try await item.commit()
+      try await item.commit(approvedText)
       stagedReviewItems.removeAll { $0.id == item.id }
-      actionSummary = ChatCommittedActionSummary(title: item.committedTitle, text: item.summary)
+      if presentedReviewItem?.id == item.id {
+        presentedReviewItem = nil
+      }
+      actionSummary = ChatCommittedActionSummary(title: item.committedTitle, text: approvedText)
     } catch {
       actionError = RecipeChatErrorText.describe(error)
     }
@@ -419,6 +440,9 @@ struct RecipeChatPanel: View {
   @MainActor
   private func discard(_ item: ChatApplyReviewItem) {
     stagedReviewItems.removeAll { $0.id == item.id }
+    if presentedReviewItem?.id == item.id {
+      presentedReviewItem = nil
+    }
   }
 
   private var visibleActionSubject: ChatActionSubject? {
@@ -478,6 +502,7 @@ struct RecipeChatPanel: View {
   private func clearChat() {
     selectedAssistantText = ""
     stagedReviewItems = []
+    presentedReviewItem = nil
     actionSummary = nil
     actionError = nil
     chatModel.clear()
@@ -725,19 +750,186 @@ private struct ChatCommittedActionSummary: Equatable {
 private struct ChatApplyReviewList: View {
   let items: [ChatApplyReviewItem]
   let committingItemID: ChatApplyReviewItem.ID?
+  let present: (ChatApplyReviewItem) -> Void
   let commit: (ChatApplyReviewItem) -> Void
   let discard: (ChatApplyReviewItem) -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       ForEach(items) { item in
-        ChatApplyReviewCard(
-          item: item,
-          isCommitting: committingItemID == item.id,
-          commit: { commit(item) },
-          discard: { discard(item) }
-        )
+        switch item.presentation {
+        case .inline:
+          ChatApplyReviewCard(
+            item: item,
+            isCommitting: committingItemID == item.id,
+            commit: { commit(item) },
+            discard: { discard(item) }
+          )
+        case .sheet:
+          ChatApplyReviewRow(
+            item: item,
+            isCommitting: committingItemID == item.id,
+            review: { present(item) },
+            discard: { discard(item) }
+          )
+        }
       }
+    }
+  }
+}
+
+private struct ChatApplyReviewRow: View {
+  let item: ChatApplyReviewItem
+  let isCommitting: Bool
+  let review: () -> Void
+  let discard: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Label(item.title, systemImage: "checklist")
+        .font(.caption.bold())
+      Text(item.summary)
+        .font(.callout)
+        .lineLimit(2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      HStack {
+        Button(role: .cancel, action: discard) {
+          Label("Discard", systemImage: "trash")
+        }
+        .buttonStyle(.bordered)
+        .disabled(isCommitting)
+
+        Spacer(minLength: 8)
+
+        Button(action: review) {
+          Label("Review", systemImage: "doc.text.magnifyingglass")
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(isCommitting)
+      }
+    }
+    .padding(10)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(.tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+  }
+}
+
+private struct ChatApplyReviewSheet: View {
+  @Environment(\.dismiss) private var dismiss
+
+  let item: ChatApplyReviewItem
+  let isCommitting: Bool
+  let commit: (String) async -> Void
+  let discard: () -> Void
+
+  @State private var draftText: String
+  @State private var isShowingDiscardConfirmation = false
+
+  init(
+    item: ChatApplyReviewItem,
+    isCommitting: Bool,
+    commit: @escaping (String) async -> Void,
+    discard: @escaping () -> Void
+  ) {
+    self.item = item
+    self.isCommitting = isCommitting
+    self.commit = commit
+    self.discard = discard
+    _draftText = State(initialValue: item.editableText ?? item.summary)
+  }
+
+  var body: some View {
+    NavigationStack {
+      VStack(alignment: .leading, spacing: 12) {
+        if item.editableText == nil {
+          ScrollView {
+            Text(item.summary)
+              .font(.body)
+              .textSelection(.enabled)
+              .frame(maxWidth: .infinity, alignment: .leading)
+          }
+        } else {
+          VStack(alignment: .leading, spacing: 6) {
+            Text(item.editableTitle)
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(.secondary)
+            TextEditor(text: $draftText)
+              .textInputAutocapitalization(.sentences)
+              .autocorrectionDisabled(false)
+              .frame(maxWidth: .infinity, maxHeight: .infinity)
+          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+          if item.editableText != item.summary {
+            DisclosureGroup("Full proposal") {
+              ScrollView {
+                Text(item.summary)
+                  .font(.callout)
+                  .textSelection(.enabled)
+                  .frame(maxWidth: .infinity, alignment: .leading)
+              }
+            }
+          }
+        }
+      }
+      .padding()
+      .navigationTitle(item.title)
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Discard", role: .destructive) {
+            discardButtonTapped()
+          }
+          .disabled(isCommitting)
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button {
+            Task {
+              await commit(draftText)
+            }
+          } label: {
+            if isCommitting {
+              ProgressView()
+            } else {
+              Text(item.commitTitle)
+            }
+          }
+          .disabled(isCommitting || approvedTextIsEmpty)
+        }
+      }
+    }
+    .interactiveDismissDisabled(hasUnsavedEdits)
+    .confirmationDialog(
+      "Discard this proposal?",
+      isPresented: $isShowingDiscardConfirmation,
+      titleVisibility: .visible
+    ) {
+      Button("Discard Proposal", role: .destructive) {
+        discard()
+        dismiss()
+      }
+      Button("Keep Reviewing", role: .cancel) {}
+    } message: {
+      Text("Your review edits have not been saved.")
+    }
+    .presentationDetents([.medium, .large])
+  }
+
+  private var hasUnsavedEdits: Bool {
+    guard let editableText = item.editableText else { return false }
+    return draftText != editableText
+  }
+
+  private var approvedTextIsEmpty: Bool {
+    draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  private func discardButtonTapped() {
+    if hasUnsavedEdits {
+      isShowingDiscardConfirmation = true
+    } else {
+      discard()
+      dismiss()
     }
   }
 }

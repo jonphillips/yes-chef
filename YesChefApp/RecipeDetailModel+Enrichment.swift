@@ -75,15 +75,19 @@ extension RecipeDetailModel {
       }
     )
     return [
-      AnyChatApplyAction(adjustRecipeAction, requiresSubject: false) { proposal in
+      AnyChatApplyAction(adjustRecipeAction, requiresSubject: false, reviewPresentation: .inline) { proposal in
         proposal.reviewSummary()
       },
-      AnyChatApplyAction(makeAheadAction) { plan in
+      AnyChatApplyAction(makeAheadAction, editableSummary: { plan in
         plan.rendered().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : plan.rendered()
-      },
-      AnyChatApplyAction(chefItUpAction) { plan in
+      }, commitEditedSummary: { [weak self] _, editedText in
+        try self?.commitMakeAheadText(editedText)
+      }),
+      AnyChatApplyAction(chefItUpAction, editableSummary: { plan in
         plan.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : plan.text
-      },
+      }, commitEditedSummary: { [weak self] _, editedText in
+        try self?.commitChefItUpText(editedText)
+      }),
       AnyChatApplyAction(serveWithAction) { plan in
         plan.rendered().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : plan.rendered()
       }
@@ -130,6 +134,19 @@ extension RecipeDetailModel {
     }
   }
 
+  private func commitMakeAheadText(_ text: String) throws {
+    @Dependency(\.date.now) var now
+    @Dependency(\.defaultDatabase) var database
+
+    let approvedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !approvedText.isEmpty else {
+      throw RecipeDetailError.emptyMakeAheadPlan
+    }
+    try database.write { db in
+      try RecipeRepository.updateMakeAhead(approvedText, recipeID: recipeID, in: db, now: now)
+    }
+  }
+
   private func commitChefItUpPlan(_ plan: ChefItUpPlan) throws {
     @Dependency(\.date.now) var now
     @Dependency(\.defaultDatabase) var database
@@ -139,6 +156,19 @@ extension RecipeDetailModel {
     }
     try database.write { db in
       try RecipeRepository.applyChefItUpPlan(plan, to: recipeID, in: db, now: now)
+    }
+  }
+
+  private func commitChefItUpText(_ text: String) throws {
+    @Dependency(\.date.now) var now
+    @Dependency(\.defaultDatabase) var database
+
+    let approvedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !approvedText.isEmpty else {
+      throw RecipeDetailError.emptyChefItUpPlan
+    }
+    try database.write { db in
+      try RecipeRepository.updateChefItUp(approvedText, recipeID: recipeID, in: db, now: now)
     }
   }
 
