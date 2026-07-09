@@ -870,6 +870,19 @@ struct ChatApplyReviewSheet: View {
               }
             }
           }
+
+          if !item.supportingEvidenceRows.isEmpty {
+            DisclosureGroup(item.supportingEvidenceTitle ?? "Supporting Evidence") {
+              VStack(alignment: .leading, spacing: 10) {
+                ForEach(Array(item.supportingEvidenceRows.enumerated()), id: \.offset) { _, row in
+                  Text(row)
+                    .font(.callout)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+              }
+            }
+          }
         }
       }
       .padding()

@@ -16,10 +16,12 @@ final class BrowserModel {
   var isCapturing = false
   var isLoadingComments = false
   private var readerFeedbackTips: [ReaderFeedbackTip] = []
+  private var readerFeedbackComments: [RawComment] = []
 
   func recordRecent(_ url: URL) {
     if recents.first?.absoluteString != url.absoluteString {
       readerFeedbackTips = []
+      readerFeedbackComments = []
     }
     recents.removeAll { $0.absoluteString == url.absoluteString }
     recents.insert(url, at: 0)
@@ -76,15 +78,18 @@ final class BrowserModel {
           return
         }
         let tips = try await readerFeedbackCurationClient(comments: comments, sourceURL: page.url)
+        readerFeedbackComments = comments
         readerFeedbackTips = tips
         if tips.isEmpty {
-          notice = "Loaded \(comments.count) comments. No useful reader tips found."
+          notice = "Loaded \(comments.count) comments. No useful reader tips found. Capture to promote one manually."
         } else {
           notice = "Loaded \(comments.count) comments and found \(tips.count) reader tips. Capture to review them."
         }
       case .notFound:
         notice = "Couldn't find NYT comments on this page."
       }
+    } catch ReaderFeedbackCurationError.responseTruncated {
+      notice = "Loaded comments, but couldn't finish curating them. Try again."
     } catch {
       notice = "Couldn't load comments - try again once the page settles."
     }
@@ -94,9 +99,12 @@ final class BrowserModel {
     notice = nil
   }
 
-  func takeReaderFeedbackTips() -> [ReaderFeedbackTip] {
-    defer { readerFeedbackTips = [] }
-    return readerFeedbackTips
+  func takeReaderFeedbackDraft() -> (tips: [ReaderFeedbackTip], comments: [RawComment]) {
+    defer {
+      readerFeedbackTips = []
+      readerFeedbackComments = []
+    }
+    return (readerFeedbackTips, readerFeedbackComments)
   }
 
   func reloadAfterExternalChange() async {

@@ -10,25 +10,60 @@ extension RecipeCoreTests {
   @Suite
   struct ReaderFeedbackCurationTests {
     @Test
-    func parseKeepsDistinctTipsAndDropsMalformedItems() {
+    func parseKeepsAtomicPointsWithProvenanceAndDropsMalformedItems() {
       let tips = ReaderFeedbackCurationClient.parse(
         """
-        {
-          "tips": [
-            {"text": "Bake it on the lower rack so the bottom browns before the topping burns."},
-            {"text": "  "},
-            {"text": "Bake it on the lower rack so the bottom browns before the topping burns."},
-            {"text": "Rest the dough overnight; same-day dough spread too much."}
-          ]
-        }
-        """
+        [
+          {
+            "text": "Bake it on the lower rack so the bottom browns before the topping burns.",
+            "kind": "consensusDistilled",
+            "supportCount": 2,
+            "commentNumbers": [1, 3]
+          },
+          {"text": "  "},
+          {
+            "text": "Bake it on the lower rack so the bottom browns before the topping burns.",
+            "supportCount": 1,
+            "commentNumbers": [1]
+          },
+          {
+            "text": "Rest the dough overnight; same-day dough spread too much.",
+            "kind": "singularPreserved",
+            "commentNumbers": [2]
+          }
+        ]
+        """,
+        comments: [
+          RawComment(text: "Lower rack gave me a browned bottom.", helpfulCount: 12),
+          RawComment(text: "Same-day dough spread; overnight rest fixed it.", helpfulCount: 7),
+          RawComment(text: "Another vote for the lower rack.", helpfulCount: 3),
+        ]
       )
 
       expectNoDifference(
         tips,
         [
-          ReaderFeedbackTip(text: "Bake it on the lower rack so the bottom browns before the topping burns."),
-          ReaderFeedbackTip(text: "Rest the dough overnight; same-day dough spread too much."),
+          ReaderFeedbackTip(
+            text: "Bake it on the lower rack so the bottom browns before the topping burns.",
+            provenanceKind: .consensusDistilled,
+            supportCount: 2,
+            backingComments: [
+              ReaderFeedbackBackingComment(commentNumber: 1, text: "Lower rack gave me a browned bottom.", helpfulCount: 12),
+              ReaderFeedbackBackingComment(commentNumber: 3, text: "Another vote for the lower rack.", helpfulCount: 3),
+            ]
+          ),
+          ReaderFeedbackTip(
+            text: "Rest the dough overnight; same-day dough spread too much.",
+            provenanceKind: .singularPreserved,
+            supportCount: 1,
+            backingComments: [
+              ReaderFeedbackBackingComment(
+                commentNumber: 2,
+                text: "Same-day dough spread; overnight rest fixed it.",
+                helpfulCount: 7
+              )
+            ]
+          ),
         ]
       )
     }
@@ -46,30 +81,77 @@ extension RecipeCoreTests {
         $0.modelClient = StubModelClient { request in
           await recorder.append(request)
           return ModelResponse(
-            text: #"{"tips":[{"text":"Toast the spices briefly before adding the tomatoes."}]}"#
+            text: """
+              [
+                {
+                  "text": "Toast the spices briefly before adding the tomatoes.",
+                  "kind": "consensusDistilled",
+                  "supportCount": 2,
+                  "commentNumbers": [1, 2]
+                }
+              ]
+              """
           )
         }
       } operation: {
         let tips = try await ReaderFeedbackCurationClient.liveValue(
           comments: [
-            RawComment(text: "My sauce was flat until I toasted the spices first.", helpfulCount: 18)
+            RawComment(text: "My sauce was flat until I toasted the spices first.", helpfulCount: 18),
+            RawComment(text: "Toasting the spice mix made it bloom.", helpfulCount: 9),
+            RawComment(text: "   ", helpfulCount: 99),
           ],
           sourceURL: URL(string: "https://cooking.nytimes.com/recipes/example")
         )
 
         expectNoDifference(
           tips,
-          [ReaderFeedbackTip(text: "Toast the spices briefly before adding the tomatoes.")]
+          [
+            ReaderFeedbackTip(
+              text: "Toast the spices briefly before adding the tomatoes.",
+              provenanceKind: .consensusDistilled,
+              supportCount: 2,
+              backingComments: [
+                ReaderFeedbackBackingComment(
+                  commentNumber: 1,
+                  text: "My sauce was flat until I toasted the spices first.",
+                  helpfulCount: 18
+                ),
+                ReaderFeedbackBackingComment(
+                  commentNumber: 2,
+                  text: "Toasting the spice mix made it bloom.",
+                  helpfulCount: 9
+                ),
+              ]
+            )
+          ]
         )
       }
 
       let request = try #require(await recorder.first())
       expectNoDifference(request.tier, .frontier(.openai))
       expectNoDifference(request.reasoningEffort, .high)
-      expectNoDifference(request.maxTokens, 2048)
+      expectNoDifference(request.maxTokens, 16_384)
       expectNoDifference(request.promptPreferenceKey, nil)
       #expect(request.messages.first?.text.contains("helpful count: 18") == true)
-      #expect(request.system?.contains("never merge multiple readers into a summary") == true)
+      #expect(request.messages.first?.text.contains("helpful count: 9") == true)
+      #expect(request.messages.first?.text.contains("99") == false)
+      #expect(request.system?.contains("synthesize WITHIN one point") == true)
+    }
+
+    @Test
+    func liveClientSurfacesTruncatedResponses() async throws {
+      await withDependencies {
+        $0.modelClient = StubModelClient { _ in
+          ModelResponse(text: #"[]"#, stopReason: "length")
+        }
+      } operation: {
+        await #expect(throws: ReaderFeedbackCurationError.responseTruncated) {
+          _ = try await ReaderFeedbackCurationClient.liveValue(
+            comments: [RawComment(text: "Use less honey.", helpfulCount: 4)],
+            sourceURL: nil
+          )
+        }
+      }
     }
 
     @Test

@@ -116,7 +116,19 @@ struct RecipeCaptureView: View {
 private struct RecipeCaptureReviewSections: View {
   @Bindable var model: RecipeCaptureModel
   let draft: WebRecipeCaptureDraft
-  @State private var presentedReaderFeedbackTip: ReaderFeedbackTip?
+  @State private var readerFeedbackSheet: ReaderFeedbackSheet?
+
+  private enum ReaderFeedbackSheet: Identifiable {
+    case review(ReaderFeedbackTip)
+    case promoteComments
+
+    var id: String {
+      switch self {
+      case .review(let tip): "review-\(tip.id)"
+      case .promoteComments: "promote-comments"
+      }
+    }
+  }
 
   private var page: ParsedRecipePage {
     draft.page
@@ -196,10 +208,16 @@ private struct RecipeCaptureReviewSections: View {
         }
       }
 
-      if !model.readerFeedbackProposals.isEmpty || !model.readerFeedbackBlocks.isEmpty {
+      if !model.readerFeedbackProposals.isEmpty
+        || !model.readerFeedbackBlocks.isEmpty
+        || !model.readerFeedbackComments.isEmpty
+      {
         Section("Reader Feedback") {
           ForEach(model.readerFeedbackProposals) { tip in
             VStack(alignment: .leading, spacing: 8) {
+              Label(tip.provenanceSummary, systemImage: tip.provenanceSystemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
               Text(tip.text)
                 .font(.callout)
                 .lineLimit(3)
@@ -215,7 +233,7 @@ private struct RecipeCaptureReviewSections: View {
                 Spacer(minLength: 8)
 
                 Button {
-                  presentedReaderFeedbackTip = tip
+                  readerFeedbackSheet = .review(tip)
                 } label: {
                   Label("Review", systemImage: "doc.text.magnifyingglass")
                 }
@@ -231,6 +249,14 @@ private struct RecipeCaptureReviewSections: View {
           }
           .onDelete { offsets in
             model.removeReaderFeedbackBlocks(atOffsets: offsets)
+          }
+
+          if !model.readerFeedbackComments.isEmpty {
+            Button {
+              readerFeedbackSheet = .promoteComments
+            } label: {
+              Label("Promote Comment", systemImage: "plus.bubble")
+            }
           }
         }
       }
@@ -264,26 +290,41 @@ private struct RecipeCaptureReviewSections: View {
         }
       }
     }
-    .sheet(item: $presentedReaderFeedbackTip) { tip in
-      let item = readerFeedbackReviewItem(for: tip)
-      ChatApplyReviewSheet(
-        item: item,
-        isCommitting: false,
-        commit: { approvedText in
-          do {
-            try await item.commit(approvedText)
-            presentedReaderFeedbackTip = nil
-          } catch {
-            model.errorMessage = RecipeChatErrorText.describe(error)
-            model.isShowingError = true
+    .sheet(item: $readerFeedbackSheet) { sheet in
+      switch sheet {
+      case .review(let tip):
+        readerFeedbackReviewSheet(tip: tip)
+      case .promoteComments:
+        ReaderFeedbackPromotionSheet(
+          comments: model.readerFeedbackComments,
+          promote: { comment, commentNumber in
+            let tip = model.promoteReaderFeedbackComment(comment, commentNumber: commentNumber)
+            readerFeedbackSheet = .review(tip)
           }
-        },
-        discard: {
-          model.discardReaderFeedbackTip(tip)
-          presentedReaderFeedbackTip = nil
-        }
-      )
+        )
+      }
     }
+  }
+
+  private func readerFeedbackReviewSheet(tip: ReaderFeedbackTip) -> some View {
+    let item = readerFeedbackReviewItem(for: tip)
+    return ChatApplyReviewSheet(
+      item: item,
+      isCommitting: false,
+      commit: { approvedText in
+        do {
+          try await item.commit(approvedText)
+          readerFeedbackSheet = nil
+        } catch {
+          model.errorMessage = RecipeChatErrorText.describe(error)
+          model.isShowingError = true
+        }
+      },
+      discard: {
+        model.discardReaderFeedbackTip(tip)
+        readerFeedbackSheet = nil
+      }
+    )
   }
 
   private func readerFeedbackReviewItem(for tip: ReaderFeedbackTip) -> ChatApplyReviewItem {
@@ -292,6 +333,8 @@ private struct RecipeCaptureReviewSections: View {
       summary: tip.text,
       editableTitle: "Reader Feedback",
       editableText: tip.text,
+      supportingEvidenceTitle: tip.provenanceSummary,
+      supportingEvidenceRows: tip.supportingEvidenceRows,
       commitTitle: "Accept",
       committingTitle: "Saving...",
       committedTitle: "Saved Reader Feedback",
@@ -346,6 +389,80 @@ private struct RecipeCaptureReviewSections: View {
         return section.steps
       }
       .joined(separator: "\n")
+  }
+}
+
+private struct ReaderFeedbackPromotionSheet: View {
+  @Environment(\.dismiss) private var dismiss
+  let comments: [RawComment]
+  let promote: (RawComment, Int) -> Void
+
+  var body: some View {
+    NavigationStack {
+      List {
+        ForEach(commentRows) { row in
+          VStack(alignment: .leading, spacing: 8) {
+            Label(row.subtitle, systemImage: "text.bubble")
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(.secondary)
+            Text(row.comment.text)
+              .font(.callout)
+              .textSelection(.enabled)
+            Button {
+              promote(row.comment, row.commentNumber)
+            } label: {
+              Label("Review This Comment", systemImage: "doc.text.magnifyingglass")
+            }
+            .buttonStyle(.bordered)
+          }
+          .padding(.vertical, 4)
+        }
+      }
+      .navigationTitle("Promote Comment")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancel") {
+            dismiss()
+          }
+        }
+      }
+    }
+  }
+
+  private var commentRows: [ReaderFeedbackCommentRow] {
+    comments.enumerated().map { index, comment in
+      ReaderFeedbackCommentRow(commentNumber: index + 1, comment: comment)
+    }
+  }
+}
+
+private struct ReaderFeedbackCommentRow: Identifiable {
+  var id: Int { commentNumber }
+  var commentNumber: Int
+  var comment: RawComment
+
+  var subtitle: String {
+    "Comment \(commentNumber) - \(comment.helpfulCount) helpful"
+  }
+}
+
+private extension ReaderFeedbackTip {
+  var provenanceSummary: String {
+    "\(supportCount) \(supportCount == 1 ? "comment" : "comments") - \(provenanceKind.displayName)"
+  }
+
+  var provenanceSystemImage: String {
+    switch provenanceKind {
+    case .consensusDistilled: "person.2"
+    case .singularPreserved: "person"
+    }
+  }
+
+  var supportingEvidenceRows: [String] {
+    backingComments.map { comment in
+      "Comment \(comment.commentNumber) (\(comment.helpfulCount) helpful):\n\(comment.text)"
+    }
   }
 }
 
