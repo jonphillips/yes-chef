@@ -218,6 +218,19 @@ extension RecipeRepository {
     try updateChefItUp(plan.text.nonEmptyEnrichmentText, recipeID: recipeID, in: db, now: now)
   }
 
+  public static func updateChefItUp(
+    _ chefItUp: String?,
+    recipeID: Recipe.ID,
+    in db: Database,
+    now: Date
+  ) throws {
+    try Recipe.find(recipeID).update {
+      $0.chefItUp = chefItUp
+      $0.dateModified = now
+    }
+    .execute(db)
+  }
+
   public static func clearChefItUp(recipeID: Recipe.ID, in db: Database, now: Date) throws {
     try updateChefItUp(nil, recipeID: recipeID, in: db, now: now)
   }
@@ -248,19 +261,6 @@ extension RecipeRepository {
     let recipe = try Recipe.find(recipeID).fetchOne(db)
     let items = ServeWithCoding.decode(recipe?.serveWith).filter { $0.id != itemID }
     try updateServeWith(items, recipeID: recipeID, in: db, now: now)
-  }
-
-  private static func updateChefItUp(
-    _ chefItUp: String?,
-    recipeID: Recipe.ID,
-    in db: Database,
-    now: Date
-  ) throws {
-    try Recipe.find(recipeID).update {
-      $0.chefItUp = chefItUp
-      $0.dateModified = now
-    }
-    .execute(db)
   }
 
   private static func updateServeWith(

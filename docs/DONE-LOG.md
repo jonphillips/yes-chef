@@ -10,6 +10,44 @@ Newest first.
 
 ---
 
+## ADR-0024 Slice 1 — editable proposal preview (single-string verbs)
+
+**Architect-reviewed & approved 2026-07-09 — yes-chef PR [#127](https://github.com/jonphillips/yes-chef/pull/127)
+(confirm the number when cutting); merges after Jon's device pass** (the app layer — the presented sheet and its
+iPad split-chat host — is verified only in Jon's Xcode build; the core D3 contract change carries a unit test).
+S1 of [ADR-0024](decisions/ADR-0024-editable-proposal-preview.md) (Accepted 2026-07-09). **Schema-free,
+app-wide.** The two-step S1 plan collapsed to one: the planned shared capture-sheet dismiss hardening (step 1)
+was already landed by batch 5's "Harden capture review dismissal" commit — `RecipeCaptureView` and
+`ShareViewController` both already carry `interactiveDismissDisabled` + `isModalInPresentation` + discard-confirm
+— so S1 delivered the remaining editable-chat-sheet step.
+
+- **D3 contract change (the risk) — additive.** `ChatApplyReviewItem` gains `presentation`
+  (`.inline`/`.sheet`), `editableTitle`, `editableText`, and `commit` now takes an `approvedText` argument.
+  Backward compatible: the legacy zero-arg `commit` init is preserved (wrapped `{ _ in }`), and a new
+  `AnyChatApplyAction(editableSummary:commitEditedSummary:)` init sits beside the existing
+  `renderedSummary`/`reviewItems` inits. Every prior call site keeps working; only the default presentation
+  flips to `.sheet`.
+- **D2 authorship.** Commit persists the edited string verbatim — Make-ahead / Chef-It-Up route through the
+  newly-public `RecipeRepository.updateMakeAhead` / `updateChefItUp` (these sections are prose blobs stored as
+  `String`, so editing the rendered text and writing it back is lossless); the committed-action summary reflects
+  the approved text.
+- **D4 per-shape.** Make-ahead / Chef-It-Up / workbench-rationale edit as prose (the workbench sheet edits only
+  `rationale`, keeps the structured draft intact, and shows the full review in a "Full proposal" disclosure).
+  List verbs (Serve-With, complements, prep-plan) inherit the roomy **read-only** scrollable sheet now; their
+  editing is S2 — no list is flattened into an editable string.
+- **D5 scope + OQ1.** `.sheet` is the app-wide default; the ADR-0023 "Adjust this recipe" compare verb stays
+  `.inline` (verified the only compare verb). OQ1 dismiss-hardening built into the sheet:
+  `interactiveDismissDisabled(hasUnsavedEdits)` + Discard-with-confirm-when-edited + commit disabled on empty.
+- **Tests** — new `ChatApplyReviewItemTests.editableReviewItemCommitsApprovedText` proves the edited string
+  reaches commit; the existing apply-action tests updated to the new `commit(_:)` signature. Core package builds
+  and tests pass.
+
+**Device-pass follow-ups (non-blocking, from the review):** OQ3 — confirm the sheet presents over the detail
+view (not cramped inside the chat column) and doesn't fight the `ChatWorkspaceDetent` drag on iPad split-chat;
+eyeball that the auto-presented sheet + its staged "Review" row behind it don't read as a duplicate.
+
+---
+
 ## Dogfood fixes — batch 5 (mechanical polish)
 
 **Architect-reviewed 2026-07-09 — yes-chef PR [#126](https://github.com/jonphillips/yes-chef/pull/126);

@@ -582,15 +582,21 @@ public struct ChatApplyReviewItem: Identifiable {
   public let id: UUID
   public var title: String
   public var summary: String
+  public var presentation: ChatApplyReviewPresentation
+  public var editableTitle: String
+  public var editableText: String?
   public var commitTitle: String
   public var committingTitle: String
   public var committedTitle: String
-  public var commit: @MainActor () async throws -> Void
+  public var commit: @MainActor (_ approvedText: String) async throws -> Void
 
   public init(
     id: UUID = UUID(),
     title: String,
     summary: String,
+    presentation: ChatApplyReviewPresentation = .sheet,
+    editableTitle: String = "Proposal",
+    editableText: String? = nil,
     commitTitle: String,
     committingTitle: String,
     committedTitle: String,
@@ -599,11 +605,43 @@ public struct ChatApplyReviewItem: Identifiable {
     self.id = id
     self.title = title
     self.summary = summary
+    self.presentation = presentation
+    self.editableTitle = editableTitle
+    self.editableText = editableText
+    self.commitTitle = commitTitle
+    self.committingTitle = committingTitle
+    self.committedTitle = committedTitle
+    self.commit = { _ in try await commit() }
+  }
+
+  public init(
+    id: UUID = UUID(),
+    title: String,
+    summary: String,
+    presentation: ChatApplyReviewPresentation = .sheet,
+    editableTitle: String = "Proposal",
+    editableText: String? = nil,
+    commitTitle: String,
+    committingTitle: String,
+    committedTitle: String,
+    commit: @escaping @MainActor (_ approvedText: String) async throws -> Void
+  ) {
+    self.id = id
+    self.title = title
+    self.summary = summary
+    self.presentation = presentation
+    self.editableTitle = editableTitle
+    self.editableText = editableText
     self.commitTitle = commitTitle
     self.committingTitle = committingTitle
     self.committedTitle = committedTitle
     self.commit = commit
   }
+}
+
+public enum ChatApplyReviewPresentation: Sendable, Equatable {
+  case inline
+  case sheet
 }
 
 public struct AnyChatApplyAction: Identifiable {
@@ -618,6 +656,7 @@ public struct AnyChatApplyAction: Identifiable {
   public init<Payload>(
     _ action: ChatApplyAction<Payload>,
     requiresSubject: Bool = true,
+    reviewPresentation: ChatApplyReviewPresentation = .sheet,
     renderedSummary: @escaping @MainActor (Payload) -> String?
   ) {
     self.init(action, requiresSubject: requiresSubject) { payload in
@@ -629,11 +668,40 @@ public struct AnyChatApplyAction: Identifiable {
         ChatApplyReviewItem(
           title: action.reviewTitle,
           summary: summary,
+          presentation: reviewPresentation,
           commitTitle: action.commitTitle,
           committingTitle: action.committingTitle,
           committedTitle: action.committedTitle,
           commit: {
             try await action.commit(payload)
+          }
+        )
+      ]
+    }
+  }
+
+  @MainActor
+  public init<Payload>(
+    _ action: ChatApplyAction<Payload>,
+    requiresSubject: Bool = true,
+    editableSummary: @escaping @MainActor (Payload) -> String?,
+    commitEditedSummary: @escaping @MainActor (_ payload: Payload, _ editedSummary: String) async throws -> Void
+  ) {
+    self.init(action, requiresSubject: requiresSubject) { payload in
+      guard
+        let summary = editableSummary(payload)?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !summary.isEmpty
+      else { return [] }
+      return [
+        ChatApplyReviewItem(
+          title: action.reviewTitle,
+          summary: summary,
+          editableText: summary,
+          commitTitle: action.commitTitle,
+          committingTitle: action.committingTitle,
+          committedTitle: action.committedTitle,
+          commit: { editedSummary in
+            try await commitEditedSummary(payload, editedSummary)
           }
         )
       ]

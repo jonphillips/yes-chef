@@ -150,7 +150,7 @@ extension RecipeCoreTests {
         expectNoDifference(try MealPlanItem.fetchAll(db), [])
       }
 
-      try await items[0].commit()
+      try await items[0].commit(items[0].summary)
 
       try await database.read { db in
         let mealPlanItems = try MealPlanItem.fetchAll(db)

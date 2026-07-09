@@ -1,9 +1,11 @@
 # Current Handoff
 
-Last updated: July 9, 2026. **Next Up = ADR-0024 Slice 1** (editable proposal preview — the roomy,
-scrollable, *editable* review sheet for the single-string verbs, dismiss-hardening first; ADR-0024 +
-ADR-0025 both Accepted 2026-07-09). **Riding to merge: Dogfood fixes — batch 5 (mechanical polish),
-[#126](https://github.com/jonphillips/yes-chef/pull/126)** — gated on Jon's device pass (the app target
+Last updated: July 9, 2026. **Next Up = ADR-0024 Slice 2** (list / structured verbs get *editable* review —
+Serve-With, complements, prep-plan; keep each commit shape, never flatten; plus the workbench draft's prose
+fields; ADR-0024 + ADR-0025 both Accepted 2026-07-09). **Riding to merge: ADR-0024 Slice 1 — editable
+proposal preview (single-string verbs), architect-approved 2026-07-09** (its handoff bump rides in the S1
+PR), **and Dogfood fixes — batch 5 (mechanical polish),
+[#126](https://github.com/jonphillips/yes-chef/pull/126)** — both gated on Jon's device pass (the app target
 never compiled in CI; one `PreferenceKey` concurrency error already fixed on-branch); full contents logged in
 [`docs/DONE-LOG.md`](DONE-LOG.md), alongside **Recipe edit proposals — Slice 2**
 ([#123](https://github.com/jonphillips/yes-chef/pull/123)) and **Slice 1**
@@ -26,18 +28,20 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**ADR-0024 Slice 1 — editable proposal preview (single-string verbs), dismiss-hardening first.**
-Implements S1 of [ADR-0024](decisions/ADR-0024-editable-proposal-preview.md) (Accepted). Two steps:
-(1) **shared review-sheet dismiss hardening** — the fragility ADR-0024 OQ1 and ADR-0025 S1 both raise:
-`interactiveDismissDisabled`/`isModalInPresentation` while edits are unsaved + Cancel-with-confirm, applied
-once to the capture review sheets (`RecipeCaptureView` / `ShareViewController`) and built into the new
-sheet. (2) **the editable sheet for single-string verbs** — replace the cramped inline
-`ChatApplyReviewCard` (`RecipeChatWorkspace.swift` ~745) with a roomy, scrollable, presented sheet; make
-Chef-It-Up / Make-ahead / workbench rationale **editable**; thread the edited string through commit (the
-ADR-0024 **D3** contract change — `commit` takes the sheet's current text, not a frozen payload). List /
-structured verbs get the roomy sheet now; their editing lands in S2. **Schema-free, app-wide.** Read first:
-ADR-0024 (esp. D3 + the OQ1/OQ3/OQ4 leans), `ChatApplyReviewItem`/`ChatApplyReviewCard`/`AnyChatApplyAction`
-in `RecipeChatWorkspace.swift`, and `RecipeCaptureView`/`ShareViewController` for the dismiss pattern.
+**ADR-0024 Slice 2 — list / structured verbs get editable review.**
+Implements S2 of [ADR-0024](decisions/ADR-0024-editable-proposal-preview.md) (Accepted), building directly on
+S1's editable sheet (now riding to merge; the **D3** `commit(approvedText:)` contract +
+`ChatApplyReviewItem.editableText`/`presentation` + `ChatApplyReviewSheet` already exist). S1 gave the **list
+verbs** (Serve-With, complements, meal-plan/menu prep-plan) the roomy read-only sheet; S2 makes them
+**editable while keeping each commit shape intact** — respect [[chat-verb-commit-shapes]] and
+[[llm-curation-not-synthesis]]: **never flatten a list into one opaque string.** Do list-aware editing, or as
+the minimum viable step a prose round-trip that re-parses on commit. The **workbench draft** gets at least
+prose-field editing beyond S1's rationale-only edit (structured-field editing may stay deferred — OQ2).
+**Schema-free, app-wide.** Read first: ADR-0024 (esp. **D4** + the OQ2 lean), the S1 machinery —
+`ChatApplyReviewItem` / the `AnyChatApplyAction(editableSummary:commitEditedSummary:)` init in
+`RecipeChat.swift` and `ChatApplyReviewSheet` in `RecipeChatWorkspace.swift` — and the list-verb call sites:
+`serveWithAction` in `RecipeDetailModel+Enrichment.swift`, `complementAction`/`prepPlanAction` in
+`MenuModels.swift` + `MealCalendarModels.swift`, and the draft action in `WorkbenchModels.swift`.
 
 **Riding to merge (not a dispatch): Dogfood fixes — batch 5 (mechanical polish),
 [#126](https://github.com/jonphillips/yes-chef/pull/126).** Built and logged in DONE-LOG; gated on Jon's
@@ -62,9 +66,10 @@ target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](
 
 **Dogfood 2026-07-08 — ADR-gated design efforts (both Accepted 2026-07-09).**
 - **ADR-0024 editable proposal preview** ([ADR-0024](decisions/ADR-0024-editable-proposal-preview.md)) —
-  the roomy/scrollable/editable review sheet + edited-text-through-commit contract. **S1 is Next Up**
-  (above). **S2** (list / structured verbs — Serve-With, complements, workbench draft prose fields; keep
-  each commit shape, never flatten) remains queued behind it.
+  the roomy/scrollable/editable review sheet + edited-text-through-commit contract. **S1 shipped**
+  (the editable sheet + the D3 `commit(approvedText:)` contract for the single-string verbs → DONE-LOG;
+  riding to merge). **S2 is Next Up** (above) — list / structured verbs (Serve-With, complements,
+  prep-plan) get editable review + the workbench draft's prose fields; keep each commit shape, never flatten.
 - **ADR-0025 reader-comment ingestion** ([ADR-0025](decisions/ADR-0025-reader-comment-ingestion.md) +
   `efforts/reader-feedback-comment-ingestion.md`) — NYT "Most Helpful" harvest → LLM-curate distinct tips →
   reviewable `RecipeNote(readerFeedback)` + chat feed; additive enum, no schema. **Not a straight Codex

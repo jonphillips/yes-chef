@@ -147,7 +147,7 @@ extension RecipeCoreTests {
         expectNoDifference(MenuPrepPlanCoding.decode(menu.prepPlan), [])
       }
 
-      try await items[0].commit()
+      try await items[0].commit(items[0].summary)
 
       try await database.read { db in
         let menu = try #require(try Menu.find(menuID).fetchOne(db))

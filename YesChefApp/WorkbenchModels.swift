@@ -256,8 +256,24 @@ final class WorkbenchDetailModel {
       )
 
       actions.append(
-        AnyChatApplyAction(draftAction, requiresSubject: false) { draftRecipe in
-          draftRecipe.isEmpty ? nil : draftRecipe.renderedReview()
+        AnyChatApplyAction(draftAction, requiresSubject: false) { [weak self] draftRecipe in
+          guard !draftRecipe.isEmpty else { return [] }
+          return [
+            ChatApplyReviewItem(
+              title: draftAction.reviewTitle,
+              summary: draftRecipe.renderedReview(),
+              editableTitle: "Rationale",
+              editableText: draftRecipe.rationale,
+              commitTitle: draftAction.commitTitle,
+              committingTitle: draftAction.committingTitle,
+              committedTitle: draftAction.committedTitle,
+              commit: { editedRationale in
+                var approvedDraftRecipe = draftRecipe
+                approvedDraftRecipe.rationale = editedRationale
+                try self?.commitDraftRecipe(approvedDraftRecipe)
+              }
+            )
+          ]
         }
       )
     }

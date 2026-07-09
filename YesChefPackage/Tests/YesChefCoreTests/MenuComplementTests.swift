@@ -168,7 +168,7 @@ extension RecipeCoreTests {
         expectNoDifference(try MenuItem.where { $0.menuID.eq(menuID) }.fetchAll(db), [])
       }
 
-      try await items[0].commit()
+      try await items[0].commit(items[0].summary)
 
       try await database.read { db in
         let menuItems = try MenuItem.where { $0.menuID.eq(menuID) }.fetchAll(db)
