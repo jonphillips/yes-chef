@@ -404,7 +404,7 @@ final class MealCalendarModel {
       AnyChatApplyAction(complementAction) { [weak self] plan in
         plan.items.map { suggestion in
           let originalEditableText = suggestion.editableReviewText(dayTitle: dayTitle)
-          ChatApplyReviewItem(
+          return ChatApplyReviewItem(
             title: suggestion.title,
             summary: suggestion.rendered(dayTitle: dayTitle),
             editableTitle: "Complement",

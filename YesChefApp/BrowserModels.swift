@@ -1,4 +1,5 @@
 import Dependencies
+import WebKit
 import Foundation
 import Observation
 import WebExtractorKit
