@@ -501,7 +501,7 @@ final class MenuDetailModel {
       AnyChatApplyAction(complementAction) { [weak self] plan in
         plan.items.map { suggestion in
           let originalEditableText = suggestion.editableReviewText()
-          ChatApplyReviewItem(
+          return ChatApplyReviewItem(
             title: suggestion.title,
             summary: suggestion.rendered(),
             editableTitle: "Complement",

@@ -13,6 +13,7 @@ final class AISettingsModel {
   var serveWithPreference = ""
   var makeAheadPrepPlanPreference = ""
   var complementsPreference = ""
+  var readerFeedbackPreference = ""
   var errorMessage: String?
   var isShowingError = false
 
@@ -39,6 +40,7 @@ final class AISettingsModel {
       || serveWithPreference != savedPreferences.serveWithPreference
       || makeAheadPrepPlanPreference != savedPreferences.makeAheadPrepPlanPreference
       || complementsPreference != savedPreferences.complementsPreference
+      || readerFeedbackPreference != savedPreferences.readerFeedbackPreference
   }
 
   func hasStoredKey(_ provider: FrontierProvider) -> Bool {
@@ -81,6 +83,7 @@ final class AISettingsModel {
       serveWithPreference: serveWithPreference,
       makeAheadPrepPlanPreference: makeAheadPrepPlanPreference,
       complementsPreference: complementsPreference,
+      readerFeedbackPreference: readerFeedbackPreference,
       dateModified: now
     )
     do {
@@ -121,5 +124,6 @@ final class AISettingsModel {
     serveWithPreference = settings.serveWithPreference
     makeAheadPrepPlanPreference = settings.makeAheadPrepPlanPreference
     complementsPreference = settings.complementsPreference
+    readerFeedbackPreference = settings.readerFeedbackPreference
   }
 }

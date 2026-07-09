@@ -206,6 +206,7 @@ public struct AISettingsRecord: Codable, Identifiable, Equatable, Sendable {
   public var serveWithPreference: String
   public var makeAheadPrepPlanPreference: String
   public var complementsPreference: String
+  public var readerFeedbackPreference: String
   public var dateModified: Date
 
   public init(
@@ -215,6 +216,7 @@ public struct AISettingsRecord: Codable, Identifiable, Equatable, Sendable {
     serveWithPreference: String = "",
     makeAheadPrepPlanPreference: String = "",
     complementsPreference: String = "",
+    readerFeedbackPreference: String = "",
     dateModified: Date
   ) {
     self.id = id
@@ -223,6 +225,7 @@ public struct AISettingsRecord: Codable, Identifiable, Equatable, Sendable {
     self.serveWithPreference = serveWithPreference
     self.makeAheadPrepPlanPreference = makeAheadPrepPlanPreference
     self.complementsPreference = complementsPreference
+    self.readerFeedbackPreference = readerFeedbackPreference
     self.dateModified = dateModified
   }
 }

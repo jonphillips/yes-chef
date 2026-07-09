@@ -382,6 +382,7 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
   public var ingredientSections: [RecipeChatSection]
   public var instructionSections: [RecipeChatSection]
   public var notes: [String]
+  public var readerFeedback: [String]
   public var makeAhead: String?
   public var chefItUp: String?
   public var serveWith: [ServeWithItem]
@@ -399,6 +400,7 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
     ingredientSections: [RecipeChatSection] = [],
     instructionSections: [RecipeChatSection] = [],
     notes: [String] = [],
+    readerFeedback: [String] = [],
     makeAhead: String? = nil,
     chefItUp: String? = nil,
     serveWith: [ServeWithItem] = []
@@ -415,6 +417,7 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
     self.ingredientSections = ingredientSections
     self.instructionSections = instructionSections
     self.notes = notes
+    self.readerFeedback = readerFeedback
     self.makeAhead = makeAhead
     self.chefItUp = chefItUp
     self.serveWith = serveWith
@@ -459,6 +462,10 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
         .filter { $0.noteType == .general }
         .sorted { $0.dateCreated < $1.dateCreated }
         .map(\.text),
+      readerFeedback: detail.notes
+        .filter { $0.noteType == .readerFeedback }
+        .sorted { $0.dateCreated < $1.dateCreated }
+        .map(\.text),
       makeAhead: detail.recipe.makeAhead,
       chefItUp: detail.recipe.chefItUp,
       serveWith: ServeWithCoding.decode(detail.recipe.serveWith)
@@ -481,6 +488,12 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
       lines.append("Notes:")
       for note in notes {
         lines.append("- \(note.replacingOccurrences(of: "\n", with: " "))")
+      }
+    }
+    if !readerFeedback.isEmpty {
+      lines.append("Reader Feedback (curated tips from reader comments, not the recipe author):")
+      for tip in readerFeedback {
+        lines.append("- \(tip.replacingOccurrences(of: "\n", with: " "))")
       }
     }
     if let makeAhead {

@@ -131,7 +131,7 @@ extension RecipeCoreTests {
       expectNoDifference(request.tier, .frontier(.openai))
       expectNoDifference(request.reasoningEffort, .high)
       expectNoDifference(request.maxTokens, 16_384)
-      expectNoDifference(request.promptPreferenceKey, nil)
+      expectNoDifference(request.promptPreferenceKey, AIPromptPreferenceKind.readerFeedback.rawValue)
       #expect(request.messages.first?.text.contains("helpful count: 18") == true)
       #expect(request.messages.first?.text.contains("helpful count: 9") == true)
       #expect(request.messages.first?.text.contains("99") == false)

@@ -367,7 +367,15 @@ extension RecipeCoreTests {
             noteType: .general,
             dateCreated: now,
             dateModified: now
-          )
+          ),
+          RecipeNote(
+            id: SampleUUIDSequence.uuid(606),
+            recipeID: recipeID,
+            text: "Blind-bake the crust or it goes soggy.",
+            noteType: .readerFeedback,
+            dateCreated: now,
+            dateModified: now
+          ),
         ]
       )
 
@@ -390,6 +398,8 @@ extension RecipeCoreTests {
         - Bake until browned.
         Notes:
         - Use ripe tomatoes.
+        Reader Feedback (curated tips from reader comments, not the recipe author):
+        - Blind-bake the crust or it goes soggy.
         Current make-ahead section:
         Day before: Make the pastry.
         """

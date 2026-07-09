@@ -214,6 +214,8 @@ private struct RecipeReaderView: View {
 
   @State private var compactSection: CompactSection = .ingredients
   @State private var isPhotoGalleryPresented = false
+  @State private var isEditingReaderFeedback = false
+  @State private var readerFeedbackDrafts: [RecipeNote.ID: String] = [:]
 
   var body: some View {
     GeometryReader { proxy in
@@ -633,14 +635,60 @@ private struct RecipeReaderView: View {
 
   private func readerFeedbackView(_ notes: [RecipeNote]) -> some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("Reader Feedback")
-        .font(.title2.bold())
+      HStack {
+        Text("Reader Feedback")
+          .font(.title2.bold())
+        Spacer()
+        Button(isEditingReaderFeedback ? "Done" : "Edit") {
+          if isEditingReaderFeedback {
+            commitReaderFeedbackEdits(notes)
+          } else {
+            readerFeedbackDrafts = Dictionary(
+              uniqueKeysWithValues: notes.map { ($0.id, $0.text) }
+            )
+          }
+          isEditingReaderFeedback.toggle()
+        }
+        .font(.callout)
+      }
       ForEach(notes) { note in
-        Text(note.text)
-          .frame(maxWidth: .infinity, alignment: .leading)
+        if isEditingReaderFeedback {
+          VStack(alignment: .leading, spacing: 6) {
+            TextEditor(text: readerFeedbackDraftBinding(for: note))
+              .frame(minHeight: 72)
+              .padding(6)
+              .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+            Button(role: .destructive) {
+              readerFeedbackDrafts[note.id] = nil
+              model.deleteReaderFeedbackNote(note)
+            } label: {
+              Label("Delete", systemImage: "trash")
+            }
+            .font(.callout)
+          }
           .padding(.vertical, 4)
+        } else {
+          Text(note.text)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 4)
+        }
       }
     }
+  }
+
+  private func readerFeedbackDraftBinding(for note: RecipeNote) -> Binding<String> {
+    Binding(
+      get: { readerFeedbackDrafts[note.id] ?? note.text },
+      set: { readerFeedbackDrafts[note.id] = $0 }
+    )
+  }
+
+  private func commitReaderFeedbackEdits(_ notes: [RecipeNote]) {
+    for note in notes {
+      guard let draft = readerFeedbackDrafts[note.id] else { continue }
+      model.updateReaderFeedbackNote(note, text: draft)
+    }
+    readerFeedbackDrafts = [:]
   }
 }
 

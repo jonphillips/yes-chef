@@ -905,6 +905,34 @@ final class RecipeDetailModel {
     }
   }
 
+  func updateReaderFeedbackNote(_ note: RecipeNote, text: String) {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed != note.text else { return }
+    guard !trimmed.isEmpty else {
+      deleteReaderFeedbackNote(note)
+      return
+    }
+    do {
+      try database.write { db in
+        try RecipeRepository.updateReaderFeedbackNote(id: note.id, text: trimmed, in: db, now: now)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func deleteReaderFeedbackNote(_ note: RecipeNote) {
+    do {
+      try database.write { db in
+        try RecipeRepository.deleteReaderFeedbackNote(id: note.id, in: db)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
   func coverPhotoButtonTapped(_ coverPhotoID: RecipePhoto.ID?) {
     do {
       try database.write { db in
