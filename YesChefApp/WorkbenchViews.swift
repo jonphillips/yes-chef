@@ -693,7 +693,7 @@ private struct WorkbenchCandidatePickerView: View {
     let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !query.isEmpty else { return model.availableRecipeRows }
     return model.availableRecipeRows.filter { row in
-      row.recipe.title.localizedStandardContains(query)
+      RecipeSearchMatcher.matches(query: query, in: row.recipe.title, row.recipe.subtitle)
     }
   }
 }

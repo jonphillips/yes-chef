@@ -1,4 +1,5 @@
 import SwiftUI
+import YesChefCore
 
 struct RecipeCategoryFilterAvailability: Equatable {
   let categoryName: String
@@ -86,7 +87,7 @@ struct RecipeStringFilterPickerView: View {
   private var filteredOptions: [String] {
     let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !query.isEmpty else { return options }
-    return options.filter { $0.localizedCaseInsensitiveContains(query) }
+    return options.filter { RecipeSearchMatcher.matches(query: query, in: $0) }
   }
 
   var body: some View {

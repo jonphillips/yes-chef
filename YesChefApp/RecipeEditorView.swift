@@ -53,6 +53,22 @@ struct RecipeEditorView: View {
         }
       }
 
+      Section("Make-Ahead") {
+        StackedTextEditor(
+          title: "Make-Ahead",
+          text: $model.draft.makeAhead,
+          minHeight: 120
+        )
+      }
+
+      Section("Chef It Up") {
+        StackedTextEditor(
+          title: "Chef It Up",
+          text: $model.draft.chefItUp,
+          minHeight: 120
+        )
+      }
+
       Section("Organization") {
         Picker("Library", selection: $model.draft.libraryPlacement) {
           ForEach(RecipeLibraryPlacement.allCases, id: \.self) { placement in
@@ -103,11 +119,20 @@ struct RecipeEditorView: View {
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {
         Button("Cancel") { dismiss() }
+          .disabled(model.isSaving)
       }
       ToolbarItem(placement: .confirmationAction) {
-        Button("Save") {
-          if model.saveButtonTapped() {
-            dismiss()
+        Button {
+          Task {
+            if await model.saveButtonTapped() {
+              dismiss()
+            }
+          }
+        } label: {
+          if model.isSaving {
+            ProgressView()
+          } else {
+            Text("Save")
           }
         }
         .disabled(model.isSavingDisabled)

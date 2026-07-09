@@ -75,5 +75,58 @@ extension RecipeCoreTests {
         expectNoDifference(extraLine.originalText, "2 cups powdered sugar")
       }
     }
+
+    @Test
+    func editorDraftLoadsAndPreservesMakeAheadAndChefItUp() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 824_100_000)
+      let savedAt = now.addingTimeInterval(60)
+      let recipeID = SampleUUIDSequence.uuid(36_201)
+
+      try database.write { db in
+        try Recipe.insert {
+          Recipe(
+            id: recipeID,
+            title: "Dinner Rolls",
+            dateCreated: now,
+            dateModified: now,
+            makeAhead: "Shape the rolls and refrigerate overnight.",
+            chefItUp: "Brush with browned butter before serving."
+          )
+        }
+        .execute(db)
+
+        let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+        let draft = RecipeEditorDraft(detail: detail)
+
+        expectNoDifference(draft.makeAhead, "Shape the rolls and refrigerate overnight.")
+        expectNoDifference(draft.chefItUp, "Brush with browned butter before serving.")
+
+        try RecipeRepository.save(
+          draft: draft,
+          in: db,
+          now: savedAt,
+          uuid: { SampleUUIDSequence.uuid(36_300) }
+        )
+
+        let updated = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+        expectNoDifference(updated.recipe.makeAhead, "Shape the rolls and refrigerate overnight.")
+        expectNoDifference(updated.recipe.chefItUp, "Brush with browned butter before serving.")
+
+        var clearingDraft = RecipeEditorDraft(detail: updated)
+        clearingDraft.makeAhead = ""
+        clearingDraft.chefItUp = ""
+        try RecipeRepository.save(
+          draft: clearingDraft,
+          in: db,
+          now: savedAt.addingTimeInterval(60),
+          uuid: { SampleUUIDSequence.uuid(36_301) }
+        )
+
+        let cleared = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+        expectNoDifference(cleared.recipe.makeAhead, nil)
+        expectNoDifference(cleared.recipe.chefItUp, nil)
+      }
+    }
   }
 }

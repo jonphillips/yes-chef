@@ -36,13 +36,41 @@ struct StackedTextEditor: View {
   @Binding var text: String
   var minHeight: CGFloat
   var font: Font = .body
+  @State private var measuredTextHeight: CGFloat = 0
 
   var body: some View {
     StackedFormField(title: title) {
-      TextEditor(text: $text)
-        .frame(minHeight: minHeight)
-        .font(font)
+      ZStack(alignment: .topLeading) {
+        TextEditor(text: $text)
+          .frame(minHeight: max(minHeight, measuredTextHeight))
+          .font(font)
+
+        Text(text.isEmpty ? " " : text + "\n")
+          .font(font)
+          .padding(.horizontal, 5)
+          .padding(.vertical, 8)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .opacity(0)
+          .accessibilityHidden(true)
+          .background {
+            GeometryReader { proxy in
+              Color.clear
+                .preference(key: StackedTextEditorHeightKey.self, value: proxy.size.height)
+            }
+          }
+      }
+      .onPreferenceChange(StackedTextEditorHeightKey.self) { height in
+        measuredTextHeight = height
+      }
     }
+  }
+}
+
+private struct StackedTextEditorHeightKey: PreferenceKey {
+  static var defaultValue: CGFloat = 0
+
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = max(value, nextValue())
   }
 }
 

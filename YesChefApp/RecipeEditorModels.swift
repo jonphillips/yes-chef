@@ -22,6 +22,7 @@ final class RecipeEditorModel {
   var draft = RecipeEditorDraft()
   var errorMessage: String?
   var isShowingError = false
+  var isSaving = false
   private var hasLoadedDraft = false
 
   init(recipeID: Recipe.ID?) {
@@ -34,7 +35,7 @@ final class RecipeEditorModel {
   }
 
   var isSavingDisabled: Bool {
-    draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    isSaving || draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
   var categoryRows: [CategoryHierarchy.DisplayRow] {
@@ -146,14 +147,22 @@ final class RecipeEditorModel {
     isShowingError = true
   }
 
-  func saveButtonTapped() -> Bool {
+  func saveButtonTapped() async -> Bool {
+    guard !isSavingDisabled else { return false }
+    isSaving = true
+    defer { isSaving = false }
+
+    let draft = draft
+    let saveDate = now
+    let makeUUID = uuid
+
     do {
-      _ = try database.write { db in
+      _ = try await database.write { db in
         try RecipeRepository.save(
           draft: draft,
           in: db,
-          now: now,
-          uuid: { uuid() }
+          now: saveDate,
+          uuid: { makeUUID() }
         )
       }
       return true

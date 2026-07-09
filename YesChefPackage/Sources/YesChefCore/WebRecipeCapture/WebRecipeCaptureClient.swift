@@ -73,11 +73,12 @@ public struct WebRecipeCaptureClient: Sendable {
     capturedAt: Date
   ) async throws -> WebRecipeCaptureDraft {
     let fetchedHTML = try await fetchHTML(url)
-    var page = WebRecipePageParser.parse(html: fetchedHTML, sourceURL: url, capturedAt: capturedAt)
+    let provenanceURL = URLProvenanceNormalization.strippingQueryAndFragment(from: url)
+    var page = WebRecipePageParser.parse(html: fetchedHTML, sourceURL: provenanceURL, capturedAt: capturedAt)
     var usedRenderedFallback = false
 
     if page.isEmpty, let renderedHTML = try await renderHTML(url), !renderedHTML.isEmpty {
-      page = WebRecipePageParser.parse(html: renderedHTML, sourceURL: url, capturedAt: capturedAt)
+      page = WebRecipePageParser.parse(html: renderedHTML, sourceURL: provenanceURL, capturedAt: capturedAt)
       usedRenderedFallback = true
     }
 
@@ -92,7 +93,7 @@ public struct WebRecipeCaptureClient: Sendable {
     WebRecipeCaptureDraft(
       page: WebRecipePageParser.parse(
         html: html,
-        sourceURL: sourceURL,
+        sourceURL: URLProvenanceNormalization.strippingQueryAndFragment(from: sourceURL),
         capturedAt: capturedAt
       ),
       capturedInBrowser: true
@@ -131,7 +132,7 @@ public struct WebRecipeCaptureClient: Sendable {
       return WebRecipeCaptureDraft(
         page: WebRecipePageParser.parse(
           html: renderedHTML,
-          sourceURL: payload.sourceURL,
+          sourceURL: URLProvenanceNormalization.strippingQueryAndFragment(from: payload.sourceURL),
           capturedAt: capturedAt
         )
       )
