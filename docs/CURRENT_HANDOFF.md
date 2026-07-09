@@ -67,7 +67,8 @@ existing `RecipeNote` table (no new table/column); D6's preference row rides the
 additive-only and permanently locks those record types, so it is deliberately **held** until an actual
 prod/TestFlight cut. At that cut, deploy to the production schema the Phase E Slice 3 pantry-policy +
 `canonicalName` fields, the ADR-0012 S2 `Menu.prepPlan` BLOB (PR #82), the reader-photo-affordances
-`Recipe.coverPhotoID` column (PR #87), the ADR-0018 synced `aiSettings` table (PR #96), **and** the ADR-0021
+`Recipe.coverPhotoID` column (PR #87), the ADR-0018 synced `aiSettings` table (PR #96) **including its additive
+`readerFeedbackPreference` column** (ADR-0025 D6), **and** the ADR-0021
 synced `recipeVariations` table (Recipe edit proposals S2); and note the app target
 (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 

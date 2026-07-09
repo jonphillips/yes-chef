@@ -90,7 +90,8 @@ extension ReaderFeedbackCurationClient: DependencyKey {
         system: instructions,
         prompt: prompt(comments: comments, sourceURL: sourceURL),
         maxTokens: maxTokens,
-        reasoningEffort: .high
+        reasoningEffort: .high,
+        promptPreferenceKey: AIPromptPreferenceKind.readerFeedback.rawValue
       )
     )
     if response.wasTruncated {

@@ -12,6 +12,7 @@ public enum AIPromptPreferenceKind: String, CaseIterable, Identifiable, Sendable
   case serveWith
   case makeAheadPrepPlan
   case complements
+  case readerFeedback
 
   public var id: String { rawValue }
 
@@ -21,6 +22,7 @@ public enum AIPromptPreferenceKind: String, CaseIterable, Identifiable, Sendable
     case .serveWith: "Serve With"
     case .makeAheadPrepPlan: "Make-ahead & Prep Plans"
     case .complements: "Complements"
+    case .readerFeedback: "Reader Feedback"
     }
   }
 }
@@ -69,6 +71,7 @@ public enum AISettingsRepository {
       serveWithPreference: settings.serveWithPreference,
       makeAheadPrepPlanPreference: settings.makeAheadPrepPlanPreference,
       complementsPreference: settings.complementsPreference,
+      readerFeedbackPreference: settings.readerFeedbackPreference,
       dateModified: now
     )
     try save(settings, in: db)
@@ -83,6 +86,7 @@ public enum AISettingsRepository {
     case .serveWith: settings.serveWithPreference
     case .makeAheadPrepPlan: settings.makeAheadPrepPlanPreference
     case .complements: settings.complementsPreference
+    case .readerFeedback: settings.readerFeedbackPreference
     }
   }
 
@@ -96,6 +100,7 @@ public enum AISettingsRepository {
     case .serveWith: settings.serveWithPreference = value
     case .makeAheadPrepPlan: settings.makeAheadPrepPlanPreference = value
     case .complements: settings.complementsPreference = value
+    case .readerFeedback: settings.readerFeedbackPreference = value
     }
   }
 

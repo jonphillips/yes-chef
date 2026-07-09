@@ -771,6 +771,14 @@ extension DependencyValues {
       }
     }
 
+    migrator.registerMigration("Add reader feedback curation preference") { db in
+      try #sql("""
+        ALTER TABLE "aiSettings"
+        ADD COLUMN "readerFeedbackPreference" TEXT NOT NULL DEFAULT ''
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

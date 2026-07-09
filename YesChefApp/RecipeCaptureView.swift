@@ -3,10 +3,23 @@ import UIKit
 import WebExtractorKit
 import YesChefCore
 
+private enum ReaderFeedbackSheet: Identifiable {
+  case review(ReaderFeedbackTip)
+  case promoteComments
+
+  var id: String {
+    switch self {
+    case .review(let tip): "review-\(tip.id)"
+    case .promoteComments: "promote-comments"
+    }
+  }
+}
+
 struct RecipeCaptureView: View {
   @Environment(\.dismiss) private var dismiss
   let libraryModel: RecipeLibraryModel
   let model: RecipeCaptureModel
+  @State private var readerFeedbackSheet: ReaderFeedbackSheet?
 
   var body: some View {
     @Bindable var model = model
@@ -50,7 +63,25 @@ struct RecipeCaptureView: View {
       }
 
       if let draft = model.draft {
-        RecipeCaptureReviewSections(model: model, draft: draft)
+        RecipeCaptureReviewSections(
+          model: model,
+          draft: draft,
+          readerFeedbackSheet: $readerFeedbackSheet
+        )
+      }
+    }
+    .sheet(item: $readerFeedbackSheet) { sheet in
+      switch sheet {
+      case .review(let tip):
+        readerFeedbackReviewSheet(tip: tip)
+      case .promoteComments:
+        ReaderFeedbackPromotionSheet(
+          comments: model.readerFeedbackComments,
+          promote: { comment, commentNumber in
+            let tip = model.promoteReaderFeedbackComment(comment, commentNumber: commentNumber)
+            readerFeedbackSheet = .review(tip)
+          }
+        )
       }
     }
     .navigationTitle("Capture Recipe")
@@ -111,24 +142,50 @@ struct RecipeCaptureView: View {
       )
     }
   }
+
+  private func readerFeedbackReviewSheet(tip: ReaderFeedbackTip) -> some View {
+    let item = readerFeedbackReviewItem(for: tip)
+    return ChatApplyReviewSheet(
+      item: item,
+      isCommitting: false,
+      commit: { approvedText in
+        do {
+          try await item.commit(approvedText)
+          readerFeedbackSheet = nil
+        } catch {
+          model.errorMessage = RecipeChatErrorText.describe(error)
+          model.isShowingError = true
+        }
+      },
+      discard: {
+        model.discardReaderFeedbackTip(tip)
+        readerFeedbackSheet = nil
+      }
+    )
+  }
+
+  private func readerFeedbackReviewItem(for tip: ReaderFeedbackTip) -> ChatApplyReviewItem {
+    ChatApplyReviewItem(
+      title: "Review Reader Feedback",
+      summary: tip.text,
+      editableTitle: "Reader Feedback",
+      editableText: tip.text,
+      supportingEvidenceTitle: tip.provenanceSummary,
+      supportingEvidenceRows: tip.supportingEvidenceRows,
+      commitTitle: "Accept",
+      committingTitle: "Saving...",
+      committedTitle: "Saved Reader Feedback",
+      commit: { approvedText in
+        model.acceptReaderFeedbackTip(tip, approvedText: approvedText)
+      }
+    )
+  }
 }
 
 private struct RecipeCaptureReviewSections: View {
   @Bindable var model: RecipeCaptureModel
   let draft: WebRecipeCaptureDraft
-  @State private var readerFeedbackSheet: ReaderFeedbackSheet?
-
-  private enum ReaderFeedbackSheet: Identifiable {
-    case review(ReaderFeedbackTip)
-    case promoteComments
-
-    var id: String {
-      switch self {
-      case .review(let tip): "review-\(tip.id)"
-      case .promoteComments: "promote-comments"
-      }
-    }
-  }
+  @Binding var readerFeedbackSheet: ReaderFeedbackSheet?
 
   private var page: ParsedRecipePage {
     draft.page
@@ -290,58 +347,6 @@ private struct RecipeCaptureReviewSections: View {
         }
       }
     }
-    .sheet(item: $readerFeedbackSheet) { sheet in
-      switch sheet {
-      case .review(let tip):
-        readerFeedbackReviewSheet(tip: tip)
-      case .promoteComments:
-        ReaderFeedbackPromotionSheet(
-          comments: model.readerFeedbackComments,
-          promote: { comment, commentNumber in
-            let tip = model.promoteReaderFeedbackComment(comment, commentNumber: commentNumber)
-            readerFeedbackSheet = .review(tip)
-          }
-        )
-      }
-    }
-  }
-
-  private func readerFeedbackReviewSheet(tip: ReaderFeedbackTip) -> some View {
-    let item = readerFeedbackReviewItem(for: tip)
-    return ChatApplyReviewSheet(
-      item: item,
-      isCommitting: false,
-      commit: { approvedText in
-        do {
-          try await item.commit(approvedText)
-          readerFeedbackSheet = nil
-        } catch {
-          model.errorMessage = RecipeChatErrorText.describe(error)
-          model.isShowingError = true
-        }
-      },
-      discard: {
-        model.discardReaderFeedbackTip(tip)
-        readerFeedbackSheet = nil
-      }
-    )
-  }
-
-  private func readerFeedbackReviewItem(for tip: ReaderFeedbackTip) -> ChatApplyReviewItem {
-    ChatApplyReviewItem(
-      title: "Review Reader Feedback",
-      summary: tip.text,
-      editableTitle: "Reader Feedback",
-      editableText: tip.text,
-      supportingEvidenceTitle: tip.provenanceSummary,
-      supportingEvidenceRows: tip.supportingEvidenceRows,
-      commitTitle: "Accept",
-      committingTitle: "Saving...",
-      committedTitle: "Saved Reader Feedback",
-      commit: { approvedText in
-        model.acceptReaderFeedbackTip(tip, approvedText: approvedText)
-      }
-    )
   }
 
   private var ingredientText: String {

@@ -49,6 +49,11 @@ struct AISettingsView: View {
             text: $model.complementsPreference,
             minHeight: 90
           )
+          StackedTextEditor(
+            title: "Reader Feedback",
+            text: $model.readerFeedbackPreference,
+            minHeight: 90
+          )
         } label: {
           Label("Per-task Preferences", systemImage: "slider.horizontal.3")
         }

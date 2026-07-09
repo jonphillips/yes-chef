@@ -59,5 +59,34 @@ extension RecipeCoreTests {
         )
       }
     }
+
+    @Test
+    func readerFeedbackPreferenceRoundTripsAndMaps() {
+      let preference = "Prize technique and temperature fixes; ignore taste-only raves."
+
+      var mutated = AISettingsRepository.defaultSettings(
+        now: Date(timeIntervalSinceReferenceDate: 820_200_000)
+      )
+      AISettingsRepository.setPreference(preference, for: .readerFeedback, in: &mutated)
+      expectNoDifference(
+        AISettingsRepository.preference(in: mutated, for: .readerFeedback),
+        preference
+      )
+
+      let settings = mutated
+      let request = ModelRequest(
+        prompt: "x",
+        promptPreferenceKey: AIPromptPreferenceKind.readerFeedback.rawValue
+      )
+
+      withDependencies {
+        $0.aiPromptPreferences = AIPromptPreferencesClient { settings }
+      } operation: {
+        expectNoDifference(
+          YesChefAIPromptPreferences.modelPromptPreferences(for: request),
+          ModelPromptPreferences(tasteProfile: "", taskPreference: preference)
+        )
+      }
+    }
   }
 }
