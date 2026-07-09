@@ -701,7 +701,11 @@ public struct AnyChatApplyAction: Identifiable {
           committingTitle: action.committingTitle,
           committedTitle: action.committedTitle,
           commit: { editedSummary in
-            try await commitEditedSummary(payload, editedSummary)
+            if editedSummary == summary {
+              try await action.commit(payload)
+            } else {
+              try await commitEditedSummary(payload, editedSummary)
+            }
           }
         )
       ]

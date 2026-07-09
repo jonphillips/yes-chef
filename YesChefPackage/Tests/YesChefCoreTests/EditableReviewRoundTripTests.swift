@@ -33,6 +33,62 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func serveWithParserIsAmbiguousForColonTitles() {
+      let plan = ServeWithPlan(
+        items: [
+          ServeWithSuggestion(title: "2:1 rice")
+        ]
+      )
+
+      let reparsed = plan.applyingEditableReviewText(plan.editableReviewText())
+
+      #expect(reparsed != plan)
+      expectNoDifference(
+        reparsed,
+        ServeWithPlan(
+          items: [
+            ServeWithSuggestion(title: "2", note: "1 rice")
+          ]
+        )
+      )
+    }
+
+    @Test
+    @MainActor
+    func unchangedEditableSummaryCommitsOriginalPayloadWithoutReparsing() async throws {
+      let plan = ServeWithPlan(
+        items: [
+          ServeWithSuggestion(title: "2:1 rice")
+        ]
+      )
+      var committedPlan: ServeWithPlan?
+      var reparsedPlan: ServeWithPlan?
+      let action = ChatApplyAction<ServeWithPlan>(
+        title: "Serve With -> Serve With section",
+        extractingTitle: "Finding accompaniments...",
+        reviewTitle: "Review Serve With",
+        commitTitle: "Add to Serve With",
+        committingTitle: "Saving Serve With...",
+        committedTitle: "Saved to Serve With",
+        extract: { _, _ in plan },
+        commit: { payload in
+          committedPlan = payload
+        }
+      )
+      let erased = AnyChatApplyAction(action, editableSummary: { payload in
+        payload.editableReviewText()
+      }, commitEditedSummary: { payload, editedText in
+        reparsedPlan = payload.applyingEditableReviewText(editedText)
+      })
+
+      let item = try #require(try await erased.run("", []).first)
+      try await item.commit(item.editableText ?? item.summary)
+
+      expectNoDifference(committedPlan, plan)
+      expectNoDifference(reparsedPlan, nil)
+    }
+
+    @Test
     func workbenchDraftRecipeRoundTripsEditableProseFieldsOnly() {
       let draft = WorkbenchDraftRecipe(
         title: "Weeknight Birria",
