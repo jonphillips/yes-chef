@@ -50,6 +50,33 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func menuComplementSuggestionRoundTripsEditableReviewText() {
+      let suggestion = MenuComplementSuggestion(
+        kind: .note,
+        title: "Cucumber herb salad",
+        dayOffset: 0,
+        mealSlot: .dinner
+      )
+
+      let edited = suggestion.applyingEditableReviewText(
+        """
+        Note: Charred cucumber salad
+        Day 2 - Lunch
+        """
+      )
+
+      expectNoDifference(
+        edited,
+        MenuComplementSuggestion(
+          kind: .note,
+          title: "Charred cucumber salad",
+          dayOffset: 1,
+          mealSlot: .lunch
+        )
+      )
+    }
+
+    @Test
     func menuComplementClientSendsRequestedModelTierAndMenuContext() async throws {
       let recorder = MenuComplementRequestRecorder()
 

@@ -503,20 +503,24 @@ final class MenuDetailModel {
           ChatApplyReviewItem(
             title: suggestion.title,
             summary: suggestion.rendered(),
+            editableTitle: "Complement",
+            editableText: suggestion.editableReviewText(),
             commitTitle: complementAction.commitTitle,
             committingTitle: complementAction.committingTitle,
             committedTitle: complementAction.committedTitle,
-            commit: {
-              try self?.commitComplementSuggestion(suggestion)
+            commit: { editedText in
+              try self?.commitComplementSuggestion(suggestion.applyingEditableReviewText(editedText))
             }
           )
         }
       },
-      AnyChatApplyAction(prepPlanAction) { plan in
-        plan.rendered().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      AnyChatApplyAction(prepPlanAction, editableSummary: { plan in
+        plan.editableReviewText().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
           ? nil
-          : plan.rendered()
-      }
+          : plan.editableReviewText()
+      }, commitEditedSummary: { [weak self] plan, editedText in
+        try self?.commitPrepPlan(plan.applyingEditableReviewText(editedText))
+      })
     ]
   }
 

@@ -28,6 +28,51 @@ public struct MealPlanMakeAheadStrategy: Equatable, Sendable {
   public func renderedNotes() -> String {
     steps.map(\.rendered).joined(separator: "\n")
   }
+
+  public func editableReviewText() -> String {
+    rendered()
+  }
+
+  public func applyingEditableReviewText(_ text: String) -> MealPlanMakeAheadStrategy {
+    let lines = text.editableMealPlanMakeAheadLines
+    guard let titleLine = lines.first else { return MealPlanMakeAheadStrategy() }
+    var sourceItemsByLine = Dictionary(grouping: steps) { $0.rendered }
+      .mapValues { steps in steps.map(\.sourceItem) }
+    return MealPlanMakeAheadStrategy(
+      title: Self.title(fromEditableReviewTitleLine: titleLine) ?? title,
+      mealSlot: Self.mealSlot(fromEditableReviewTitleLine: titleLine) ?? mealSlot,
+      steps: lines.dropFirst().compactMap { line in
+        guard let parsedLine = MealPlanMakeAheadStep.editableReviewLine(line) else { return nil }
+        return MealPlanMakeAheadStep(
+          when: parsedLine.when,
+          task: parsedLine.task,
+          sourceItem: Self.popSourceItem(for: line, from: &sourceItemsByLine)
+        )
+      }
+    )
+  }
+
+  private static func title(fromEditableReviewTitleLine line: String) -> String? {
+    line.components(separatedBy: " - ").first?.cleanedMealPlanMakeAheadText
+  }
+
+  private static func mealSlot(fromEditableReviewTitleLine line: String) -> MealPlanItemSlot? {
+    guard let slotText = line.components(separatedBy: " - ").last?.cleanedMealPlanMakeAheadText else { return nil }
+    return MealPlanItemSlot.allCases.first {
+      $0.rawValue == slotText.normalizedMealPlanMakeAheadEnumValue
+        || $0.title.normalizedMealPlanMakeAheadEnumValue == slotText.normalizedMealPlanMakeAheadEnumValue
+    }
+  }
+
+  private static func popSourceItem(
+    for line: String,
+    from sourceItemsByLine: inout [String: [String?]]
+  ) -> String? {
+    guard var sourceItems = sourceItemsByLine[line], !sourceItems.isEmpty else { return nil }
+    let sourceItem = sourceItems.removeFirst()
+    sourceItemsByLine[line] = sourceItems
+    return sourceItem
+  }
 }
 
 public struct MealPlanMakeAheadStep: Equatable, Sendable {
@@ -45,6 +90,16 @@ public struct MealPlanMakeAheadStep: Equatable, Sendable {
 
   public var rendered: String {
     "\(when): \(task)"
+  }
+
+  fileprivate static func editableReviewLine(_ line: String) -> (when: String, task: String)? {
+    let pieces = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+    guard
+      pieces.count == 2,
+      let when = String(pieces[0]).cleanedMealPlanMakeAheadText,
+      let task = String(pieces[1]).cleanedMealPlanMakeAheadText
+    else { return nil }
+    return (when, task)
   }
 }
 
@@ -223,6 +278,22 @@ private extension RecipeChatMessage.Role {
 }
 
 private extension String {
+  var editableMealPlanMakeAheadLines: [String] {
+    components(separatedBy: .newlines)
+      .map(\.cleanedEditableMealPlanMakeAheadLine)
+      .filter { !$0.isEmpty }
+  }
+
+  var cleanedEditableMealPlanMakeAheadLine: String {
+    var line = trimmingCharacters(in: .whitespacesAndNewlines)
+    if line.hasPrefix("- ") || line.hasPrefix("* ") {
+      line.removeFirst(2)
+    } else if line.hasPrefix("• ") {
+      line.removeFirst(2)
+    }
+    return line.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
   var cleanedMealPlanMakeAheadText: String? {
     let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed

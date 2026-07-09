@@ -34,6 +34,56 @@ public struct MenuComplementSuggestion: Equatable, Sendable {
     Day \(dayOffset + 1) - \(mealSlot.title)
     """
   }
+
+  public func editableReviewText() -> String {
+    rendered()
+  }
+
+  public func applyingEditableReviewText(_ text: String) -> MenuComplementSuggestion {
+    let lines = text.editableMenuComplementLines
+    var suggestion = self
+
+    if let titleLine = lines.first {
+      suggestion.kind = Self.kind(fromEditableReviewTitleLine: titleLine) ?? suggestion.kind
+      suggestion.title = Self.title(fromEditableReviewTitleLine: titleLine) ?? suggestion.title
+    }
+    if let placementLine = lines.dropFirst().first {
+      suggestion.dayOffset = Self.dayOffset(fromEditableReviewPlacementLine: placementLine) ?? suggestion.dayOffset
+      suggestion.mealSlot = Self.mealSlot(fromEditableReviewPlacementLine: placementLine) ?? suggestion.mealSlot
+    }
+
+    return suggestion
+  }
+
+  private static func kind(fromEditableReviewTitleLine line: String) -> MealPlanItemKind? {
+    guard let label = line.split(separator: ":", maxSplits: 1).first else { return nil }
+    let normalized = String(label).normalizedMenuComplementEnumValue
+    return MealPlanItemKind.allCases.first {
+      $0.rawValue == normalized || $0.title.normalizedMenuComplementEnumValue == normalized
+    }
+  }
+
+  private static func title(fromEditableReviewTitleLine line: String) -> String? {
+    let pieces = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+    return String(pieces.count > 1 ? pieces[1] : pieces[0]).cleanedMenuComplementText
+  }
+
+  private static func dayOffset(fromEditableReviewPlacementLine line: String) -> Int? {
+    guard let dayText = line.components(separatedBy: " - ").first?.cleanedMenuComplementText else { return nil }
+    let normalized = dayText.normalizedMenuComplementEnumValue
+    guard normalized.hasPrefix("day ") else { return nil }
+    let numberText = normalized.dropFirst("day ".count).trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let dayNumber = Int(numberText), dayNumber > 0 else { return nil }
+    return dayNumber - 1
+  }
+
+  private static func mealSlot(fromEditableReviewPlacementLine line: String) -> MealPlanItemSlot? {
+    guard let slotText = line.components(separatedBy: " - ").last?.cleanedMenuComplementText else { return nil }
+    return MealPlanItemSlot.allCases.first {
+      $0.rawValue == slotText.normalizedMenuComplementEnumValue
+        || $0.title.normalizedMenuComplementEnumValue == slotText.normalizedMenuComplementEnumValue
+    }
+  }
 }
 
 public struct MenuComplementClient: Sendable {
@@ -180,6 +230,12 @@ private extension RecipeChatMessage.Role {
 }
 
 private extension String {
+  var editableMenuComplementLines: [String] {
+    components(separatedBy: .newlines)
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+  }
+
   var cleanedMenuComplementText: String? {
     let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed

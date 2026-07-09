@@ -38,6 +38,27 @@ public struct ServeWithPlan: Equatable, Sendable {
       }
       .joined(separator: "\n")
   }
+
+  public func editableReviewText() -> String {
+    rendered()
+  }
+
+  public func applyingEditableReviewText(_ text: String) -> ServeWithPlan {
+    ServeWithPlan(
+      items: text
+        .editableReviewLines
+        .compactMap(Self.suggestion(fromEditableReviewLine:))
+    )
+  }
+
+  private static func suggestion(fromEditableReviewLine line: String) -> ServeWithSuggestion? {
+    let pieces = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+    guard let title = String(pieces[0]).cleanedEnrichmentText else { return nil }
+    return ServeWithSuggestion(
+      title: title,
+      note: pieces.count > 1 ? String(pieces[1]).cleanedEnrichmentText : nil
+    )
+  }
 }
 
 public struct ServeWithSuggestion: Equatable, Sendable {
@@ -321,6 +342,27 @@ private extension RecipeChatMessage.Role {
 }
 
 private extension String {
+  var editableReviewLines: [String] {
+    components(separatedBy: .newlines)
+      .map(\.cleanedEditableReviewLine)
+      .filter { !$0.isEmpty }
+  }
+
+  var cleanedEditableReviewLine: String {
+    var line = trimmingCharacters(in: .whitespacesAndNewlines)
+    if line.hasPrefix("- ") || line.hasPrefix("* ") {
+      line.removeFirst(2)
+    } else if line.hasPrefix("• ") {
+      line.removeFirst(2)
+    } else if let periodIndex = line.firstIndex(of: ".") {
+      let prefix = line[..<periodIndex]
+      if !prefix.isEmpty, prefix.allSatisfy(\.isNumber) {
+        line = String(line[line.index(after: periodIndex)...])
+      }
+    }
+    return line.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
   var cleanedEnrichmentText: String? {
     trimmingCharacters(in: .whitespacesAndNewlines).nonEmptyEnrichmentText
   }

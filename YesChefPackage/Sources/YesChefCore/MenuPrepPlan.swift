@@ -27,6 +27,51 @@ public struct MenuPrepPlan: Equatable, Sendable {
       .map { "\($0.when): \($0.task)" }
       .joined(separator: "\n")
   }
+
+  public func editableReviewText() -> String {
+    rendered()
+  }
+
+  public func applyingEditableReviewText(_ text: String) -> MenuPrepPlan {
+    var sourceDishesByLine = Dictionary(grouping: steps) { $0.renderedEditableReviewLine }
+      .mapValues { steps in steps.map(\.sourceDish) }
+    return MenuPrepPlan(
+      steps: text.editablePrepPlanLines.compactMap { line in
+        guard let parsedLine = PrepPlanStep.editableReviewLine(line) else { return nil }
+        return PrepPlanStep(
+          when: parsedLine.when,
+          task: parsedLine.task,
+          sourceDish: Self.popSourceDish(for: line, from: &sourceDishesByLine)
+        )
+      }
+    )
+  }
+
+  private static func popSourceDish(
+    for line: String,
+    from sourceDishesByLine: inout [String: [MenuItem.ID?]]
+  ) -> MenuItem.ID? {
+    guard var sourceDishes = sourceDishesByLine[line], !sourceDishes.isEmpty else { return nil }
+    let sourceDish = sourceDishes.removeFirst()
+    sourceDishesByLine[line] = sourceDishes
+    return sourceDish
+  }
+}
+
+private extension PrepPlanStep {
+  var renderedEditableReviewLine: String {
+    "\(when): \(task)"
+  }
+
+  static func editableReviewLine(_ line: String) -> (when: String, task: String)? {
+    let pieces = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+    guard
+      pieces.count == 2,
+      let when = String(pieces[0]).cleanedPrepPlanText,
+      let task = String(pieces[1]).cleanedPrepPlanText
+    else { return nil }
+    return (when, task)
+  }
 }
 
 public enum MenuPrepPlanCoding {
@@ -207,6 +252,22 @@ private extension RecipeChatMessage.Role {
 }
 
 private extension String {
+  var editablePrepPlanLines: [String] {
+    components(separatedBy: .newlines)
+      .map(\.cleanedEditablePrepPlanLine)
+      .filter { !$0.isEmpty }
+  }
+
+  var cleanedEditablePrepPlanLine: String {
+    var line = trimmingCharacters(in: .whitespacesAndNewlines)
+    if line.hasPrefix("- ") || line.hasPrefix("* ") {
+      line.removeFirst(2)
+    } else if line.hasPrefix("• ") {
+      line.removeFirst(2)
+    }
+    return line.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
   var cleanedPrepPlanText: String? {
     let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed

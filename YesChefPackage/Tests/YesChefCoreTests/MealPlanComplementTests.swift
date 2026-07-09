@@ -47,6 +47,31 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func mealPlanComplementSuggestionRoundTripsEditableReviewText() {
+      let suggestion = MealPlanComplementSuggestion(
+        kind: .note,
+        title: "Cucumber herb salad",
+        mealSlot: .dinner
+      )
+
+      let edited = suggestion.applyingEditableReviewText(
+        """
+        Note: Charred cucumber salad
+        Tuesday, July 8 - Lunch
+        """
+      )
+
+      expectNoDifference(
+        edited,
+        MealPlanComplementSuggestion(
+          kind: .note,
+          title: "Charred cucumber salad",
+          mealSlot: .lunch
+        )
+      )
+    }
+
+    @Test
     func mealPlanComplementClientSendsRequestedModelTierAndDayContext() async throws {
       let recorder = MealPlanComplementRequestRecorder()
 

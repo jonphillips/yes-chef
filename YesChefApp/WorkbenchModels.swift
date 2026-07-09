@@ -262,15 +262,13 @@ final class WorkbenchDetailModel {
             ChatApplyReviewItem(
               title: draftAction.reviewTitle,
               summary: draftRecipe.renderedReview(),
-              editableTitle: "Rationale",
-              editableText: draftRecipe.rationale,
+              editableTitle: "Draft prose fields",
+              editableText: draftRecipe.editableProseReviewText(),
               commitTitle: draftAction.commitTitle,
               committingTitle: draftAction.committingTitle,
               committedTitle: draftAction.committedTitle,
-              commit: { editedRationale in
-                var approvedDraftRecipe = draftRecipe
-                approvedDraftRecipe.rationale = editedRationale
-                try self?.commitDraftRecipe(approvedDraftRecipe)
+              commit: { editedText in
+                try self?.commitDraftRecipe(draftRecipe.applyingEditableProseReviewText(editedText))
               }
             )
           ]

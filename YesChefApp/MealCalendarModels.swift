@@ -406,11 +406,16 @@ final class MealCalendarModel {
           ChatApplyReviewItem(
             title: suggestion.title,
             summary: suggestion.rendered(dayTitle: dayTitle),
+            editableTitle: "Complement",
+            editableText: suggestion.editableReviewText(dayTitle: dayTitle),
             commitTitle: complementAction.commitTitle,
             committingTitle: complementAction.committingTitle,
             committedTitle: complementAction.committedTitle,
-            commit: {
-              try self?.commitComplementSuggestion(suggestion, on: scheduledDate)
+            commit: { editedText in
+              try self?.commitComplementSuggestion(
+                suggestion.applyingEditableReviewText(editedText),
+                on: scheduledDate
+              )
             }
           )
         }
@@ -422,11 +427,16 @@ final class MealCalendarModel {
           ChatApplyReviewItem(
             title: strategy.title,
             summary: summary,
+            editableTitle: "Make-ahead strategy",
+            editableText: strategy.editableReviewText(),
             commitTitle: makeAheadAction.commitTitle,
             committingTitle: makeAheadAction.committingTitle,
             committedTitle: makeAheadAction.committedTitle,
-            commit: {
-              try self?.commitMakeAheadStrategy(strategy, on: scheduledDate)
+            commit: { editedText in
+              try self?.commitMakeAheadStrategy(
+                strategy.applyingEditableReviewText(editedText),
+                on: scheduledDate
+              )
             }
           )
         ]
