@@ -1,16 +1,21 @@
 # Current Handoff
 
-Last updated: July 9, 2026. **Next Up = ADR-0025 curation — revise per the Amendment 2026-07-09:
-[#129](https://github.com/jonphillips/yes-chef/pull/129) shipped the scaffolding (enum, extractor bridge,
-display, review-sheet, per-tip note storage — all stands); reprompt to two-provenance curation
-(synthesize *within* a point, never across), show comment provenance in review, raise the token budget**
-(Codex dispatch — see below). **Just shipped: ADR-0024 fully
-done — S1 editable proposal preview ([#127](https://github.com/jonphillips/yes-chef/pull/127)) + S2
-list / structured editable verbs (this PR, architect-approved 2026-07-09, including the unchanged-payload
+Last updated: July 9, 2026. **Next Up = ADR-0025 fast-follow — D6 DB-backed reader-feedback
+curation-prompt preference (ADR-0018, *not* `AppStorage`) + D7 feed curated notes into
+`RecipeChatRecipeContext` + S6 Jon's end-to-end device test on a real NYT recipe** (Codex dispatch —
+see below). **Just shipped: ADR-0025 curation revision — two-provenance atomic-point curation
+(synthesize *within* a point, never across), provenance-in-review + a Promote-Comment escape hatch,
+16K token budget with truncation surfaced as "couldn't finish," and the cooking-mode `readerFeedback`
+drop ([#131](https://github.com/jonphillips/yes-chef/pull/131), architect-approved 2026-07-09)**, plus a
+**latent meal-planner build fix** (ADR-0024 S2's fidelity guard turned a `.map` closure multi-statement
+without a `return`; app target isn't CI-built so it slipped) **([#132](https://github.com/jonphillips/yes-chef/pull/132))**.
+Earlier: **ADR-0024 fully done — S1 editable proposal preview ([#127](https://github.com/jonphillips/yes-chef/pull/127)) + S2
+list / structured editable verbs ([#128](https://github.com/jonphillips/yes-chef/pull/128), including the unchanged-payload
 fidelity guard so an un-edited commit re-writes the original, never a lossy re-parse)** and **Dogfood fixes —
 batch 5 (mechanical polish), [#126](https://github.com/jonphillips/yes-chef/pull/126)** — all
 merged/device-passed; full contents logged in
-[`docs/DONE-LOG.md`](DONE-LOG.md), alongside **Recipe edit proposals — Slice 2**
+[`docs/DONE-LOG.md`](DONE-LOG.md), alongside **ADR-0025 curation scaffolding**
+([#129](https://github.com/jonphillips/yes-chef/pull/129)) and **Recipe edit proposals — Slice 2**
 ([#123](https://github.com/jonphillips/yes-chef/pull/123)) and **Slice 1**
 ([#122](https://github.com/jonphillips/yes-chef/pull/122)); the **LLM-aligned Compare matrix** (ADR-0022,
 Accepted, [#116](https://github.com/jonphillips/yes-chef/pull/116)–[#120](https://github.com/jonphillips/yes-chef/pull/120)),
@@ -31,44 +36,31 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**ADR-0025 curation — revise per the [Amendment 2026-07-09](decisions/ADR-0025-reader-comment-ingestion.md#amendment--2026-07-09-dogfood-revision-of-d3d5-post-129).**
-[#129](https://github.com/jonphillips/yes-chef/pull/129) shipped the working **scaffolding** — the
-`readerFeedback` enum case, the `RecipeReaderCommentExtractor` bridge (Load Comments → `[RawComment]`), the
-Reader Feedback display section, the ADR-0024 review-sheet reuse, and per-accepted-tip
-`RecipeNote(readerFeedback)` storage — but Jon flagged its auto-curate flow as **too magical** and the tip
-shape as wrong. **All of that scaffolding stands.** This dispatch revises the **curation prompt, the review
-UI, and the token budget** to hit the amendment's target (a human editor's numbered list of atomic recipe
-changes — some consensus-distilled, some singular-preserved). Do all four, in order:
+**ADR-0025 fast-follow — D6 + D7, then S6.** The curation revision
+([#131](https://github.com/jonphillips/yes-chef/pull/131), architect-approved 2026-07-09) shipped
+two-provenance atomic-point curation, provenance-in-review with a Promote-Comment escape hatch, the 16K
+token budget + truncation surfacing, and the cooking-mode `readerFeedback` drop — so A1–A4 and the
+scaffolding ([#129](https://github.com/jonphillips/yes-chef/pull/129)) are all done. This dispatch closes
+out the effort. Do both slices, in order, then hand to Jon for S6:
 
-1. **A1 — two-provenance curation (revises D3).** Reprompt the existing `ReaderFeedbackCurationClient` so
-   the output is a **JSON array of atomic points** where the model **may collapse a change many commenters
-   converge on into one point** (with a support count) **and must keep distinct changes as separate
-   entries** — *synthesize within a point, never across points*. Two kinds are both first-class:
-   **consensus-distilled** (many → one) and **singular-preserved** (one rich comment kept intact). Keep D3's
-   bar: precision over recall, cut blabber, **empty list is valid.** Reuse `LLMClientKit` + `apiKeyStore` —
-   do **not** build a new client. Still [[llm-curation-not-synthesis]] — the array shape *is* the guard.
-2. **A2 — provenance-in-review (revises D4/D5).** Each proposed point shows its **provenance** at review:
-   a support count + the **backing anonymized comments**, expandable in the ADR-0024 sheet. Accept / edit /
-   reject **each point** (Jon's editorial voice is added here, at review). Add a **"promote a comment the
-   model missed"** escape hatch. Storage unchanged: each accepted point → one `RecipeNote(readerFeedback)`.
-   Provenance is **transient/advisory** (review-only unless OQ6 says otherwise).
-3. **A3 — no dedup pre-filter.** Do **not** collapse near-duplicate comments before the frontier —
-   redundancy *is* the consensus signal A1 counts. Strip only truly empty/garbage. (On-device first pass
-   stays deferred.)
-4. **A4 — budget + truncation.** The whole thread must reach the frontier for the tally, so raise
-   `maxTokens` above 2048 (billing is per token *used*, so a generous ceiling is free) **and** check
-   `ModelResponse.wasTruncated` — a cut-off tally under-counts consensus; surface a distinct "couldn't
-   finish — try again," never a silent empty. Ties [[reasoning-budget-starves-output]].
+1. **D6 — reader-feedback curation-prompt preference.** Add `AIPromptPreferenceKind.readerFeedback` as a
+   **DB-backed** setting per **ADR-0018** (the synced `aiSettings` table — *not* `AppStorage`), so Jon can
+   tune the curation system prompt like the other AI prompts. Wire it through
+   `ReaderFeedbackCurationClient` via the existing `promptPreferenceKey` plumbing the request already
+   carries (it currently passes `nil`). Follow the established prompt-preference pattern; do not invent new
+   storage.
+2. **D7 — feed curated notes into chat context.** Surface accepted `RecipeNote(readerFeedback)` rows in
+   `RecipeChatRecipeContext` so the recipe chat can read the reviewed reader tips (the original "feed the
+   AI" ask). Read-only context assembly — no new writes, no synthesis; respect
+   [[llm-curation-not-synthesis]]. Classify the shape before slicing ([[chat-verb-commit-shapes]]) — this
+   is context injection, not an actionable verb.
 
-Also fold in the **cooking-mode fix**: `readerFeedback` notes currently fall into cooking mode's flat
-"Notes" list unlabeled ([CookingModeView.swift:66](../YesChefApp/CookingModeView.swift)); give them their
-own section or drop them from the at-the-stove step view (Jon's call — likely out).
-
-**Fast follow (next slice, not this one):** **D6** the DB-backed `AIPromptPreferenceKind.readerFeedback`
-curation-prompt setting (ADR-0018, *not* `AppStorage`), **D7** feed curated notes into
-`RecipeChatRecipeContext`, then **S6** Jon's end-to-end device test on a real NYT recipe. Read first: ADR-0025
-**Amendment 2026-07-09** + **D3–D5** (as amended). **Schema note:** `readerFeedback` is an additive enum
-case, sync-safe; the new note rows ride the existing `RecipeNote` table — no new table/column.
+Then **S6 (Jon, not the agent):** end-to-end device test on a real NYT recipe — Load Comments → curate →
+review/promote → accept → confirm the notes appear in Reader Feedback, drop out of cooking mode, and reach
+the chat context. Read first: ADR-0025 **Amendment 2026-07-09** + **D6/D7** and **ADR-0018** (prompt
+preferences). **Schema note:** `readerFeedback` is an additive enum case, sync-safe; curated notes ride the
+existing `RecipeNote` table (no new table/column); D6's preference row rides the existing ADR-0018
+`aiSettings` table — no schema change either.
 
 **Standing release follow-up (not a dispatch — a pre-cut ops step Jon runs).** We stay in the CloudKit
 **Development** environment (dev stance) so the schema keeps evolving freely; promoting to **Production** is
@@ -93,12 +85,11 @@ target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](
   guard (un-edited commit re-writes the original, never a lossy re-parse). Nothing left here.
 - **ADR-0025 reader-comment ingestion** ([ADR-0025](decisions/ADR-0025-reader-comment-ingestion.md) +
   `efforts/reader-feedback-comment-ingestion.md`) — NYT "Most Helpful" harvest → LLM-curate distinct tips →
-  reviewable `RecipeNote(readerFeedback)` + chat feed; additive enum, no schema. **The harvest half is already
-  built** (2026-07-01 pre-ADR effort, currently orphaned): S1 dismiss hardening (shared with ADR-0024 S1), the
-  D1 Load-Comments playbook + D2 anonymizing `RecipeReaderCommentExtractor` + the real 76-comment
-  `nyt-comments.html` fixture with passing tests — so OQ1/OQ2 are resolved. **The curation slice (D3–D5) is
-  Next Up** (above): bridge the extractor in → LLM-curate → `readerFeedback` notes reviewed via the ADR-0024
-  sheet. **Fast follow:** D6 prompt preference (ADR-0018 DB-backed) + D7 chat feed + S6 device test.
+  reviewable `RecipeNote(readerFeedback)` + chat feed; additive enum, no schema. **Harvest (D1/D2), the
+  curation scaffolding (#129), and the two-provenance curation revision (#131, per the Amendment
+  2026-07-09) are all done** → DONE-LOG. What remains is the **fast-follow, now Next Up (above): D6 the
+  ADR-0018 DB-backed curation-prompt preference + D7 the chat-context feed, then S6 Jon's device test.**
+  After S6 this effort closes.
 
 **Recipe edit proposals** ([ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) +
 `efforts/recipe-edit-proposals.md`) — the "Adjust this recipe" verb; **S1 + S2 shipped** (overwrite
