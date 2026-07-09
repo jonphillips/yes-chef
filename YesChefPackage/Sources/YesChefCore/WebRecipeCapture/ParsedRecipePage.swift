@@ -34,6 +34,14 @@ public struct ParsedRecipeEditorialBlock: Equatable, Sendable {
   }
 }
 
+public struct ParsedRecipeReaderFeedbackBlock: Equatable, Sendable {
+  public var text: String
+
+  public init(text: String) {
+    self.text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+}
+
 public enum WebRecipeCaptureWarning: String, Equatable, Sendable {
   case noStructuredRecipeData
   case truncatedStructuredData
@@ -58,6 +66,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
   public var ingredientSections: [ParsedRecipeIngredientSection]
   public var instructionSections: [ParsedRecipeInstructionSection]
   public var editorialBlocks: [ParsedRecipeEditorialBlock]
+  public var readerFeedbackBlocks: [ParsedRecipeReaderFeedbackBlock]
   public var imageURLs: [URL]
   public var processedImages: [URL: ProcessedRecipePhoto]
   public var schemaTypes: [String]
@@ -83,6 +92,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
     ingredientSections: [ParsedRecipeIngredientSection] = [],
     instructionSections: [ParsedRecipeInstructionSection] = [],
     editorialBlocks: [ParsedRecipeEditorialBlock] = [],
+    readerFeedbackBlocks: [ParsedRecipeReaderFeedbackBlock] = [],
     imageURLs: [URL] = [],
     processedImages: [URL: ProcessedRecipePhoto] = [:],
     schemaTypes: [String] = [],
@@ -107,6 +117,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
     self.ingredientSections = ingredientSections
     self.instructionSections = instructionSections
     self.editorialBlocks = editorialBlocks
+    self.readerFeedbackBlocks = readerFeedbackBlocks
     self.imageURLs = imageURLs
     self.processedImages = processedImages
     self.schemaTypes = schemaTypes
@@ -293,7 +304,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
     now: Date,
     uuid: () -> UUID
   ) -> [RecipeNote] {
-    editorialBlocks
+    let editorialNotes = editorialBlocks
       .map { ParsedRecipeEditorialBlock(label: $0.label, text: $0.text) }
       .filter { !$0.text.isEmpty }
       .enumerated()
@@ -307,6 +318,22 @@ public struct ParsedRecipePage: Equatable, Sendable {
           dateModified: createdAt
         )
       }
+    let readerFeedbackNotes = readerFeedbackBlocks
+      .map { ParsedRecipeReaderFeedbackBlock(text: $0.text) }
+      .filter { !$0.text.isEmpty }
+      .enumerated()
+      .map { index, block in
+        let createdAt = now.addingTimeInterval(TimeInterval(editorialNotes.count + index))
+        return RecipeNote(
+          id: uuid(),
+          recipeID: recipeID,
+          text: block.text,
+          noteType: .readerFeedback,
+          dateCreated: createdAt,
+          dateModified: createdAt
+        )
+      }
+    return editorialNotes + readerFeedbackNotes
   }
 
   private func makeSource(

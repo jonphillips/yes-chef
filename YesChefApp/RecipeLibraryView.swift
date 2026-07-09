@@ -286,6 +286,7 @@ struct AppContainer: View {
       await recipeModel.captureModel.ingestBrowserCapture(html: html, sourceURL: url)
     }
     if outcome == .extracted {
+      recipeModel.captureModel.stageReaderFeedbackTips(browserModel.takeReaderFeedbackTips())
       recipeModel.destination = .captureRecipe
     }
   }

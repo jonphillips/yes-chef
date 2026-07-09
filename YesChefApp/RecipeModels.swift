@@ -377,170 +377,6 @@ struct RecipeImportCommitResult {
 
 @Observable
 @MainActor
-final class BrowserModel {
-  let page = WebPage.browser()
-  var recents: [URL] = []
-  var notice: String?
-  var isCapturing = false
-  var isLoadingComments = false
-
-  func recordRecent(_ url: URL) {
-    recents.removeAll { $0.absoluteString == url.absoluteString }
-    recents.insert(url, at: 0)
-    if recents.count > 12 {
-      recents.removeSubrange(12...)
-    }
-  }
-
-  func captureButtonTapped(
-    page: WebPage,
-    ingest: (String, URL?) async -> WebExtractionOutcome
-  ) async -> WebExtractionOutcome {
-    isCapturing = true
-    notice = nil
-    defer { isCapturing = false }
-
-    guard let html = await page.currentDOM(), !html.isEmpty else {
-      let message = "Couldn't read this page - try again once it's loaded."
-      notice = message
-      return .notFound(message: message)
-    }
-
-    let outcome = await ingest(html, page.url)
-    switch outcome {
-    case .extracted:
-      notice = nil
-    case .notFound(let message):
-      notice = message
-    }
-    return outcome
-  }
-
-  func loadCommentsButtonTapped(page: WebPage) async {
-    guard let playbook = BrowserCommentLoadingPlaybook.playbook(for: page.url) else {
-      notice = "Comment loading is only available for NYT Cooking."
-      return
-    }
-
-    isLoadingComments = true
-    notice = nil
-    defer { isLoadingComments = false }
-
-    do {
-      let result = try await playbook.load(on: page)
-      switch result.status {
-      case .loaded:
-        notice = "Loaded \(result.commentCount) comments."
-      case .notFound:
-        notice = "Couldn't find NYT comments on this page."
-      }
-    } catch {
-      notice = "Couldn't load comments - try again once the page settles."
-    }
-  }
-
-  func noticeDismissButtonTapped() {
-    notice = nil
-  }
-
-  func reloadAfterExternalChange() async {
-  }
-}
-
-enum BrowserCommentLoadingPlaybook: Equatable {
-  case nytCooking
-
-  static func playbook(for url: URL?) -> Self? {
-    guard let host = url?.host()?.lowercased() else { return nil }
-    if host == "cooking.nytimes.com" {
-      return .nytCooking
-    }
-    return nil
-  }
-
-  func load(on page: WebPage) async throws -> BrowserCommentLoadingResult {
-    switch self {
-    case .nytCooking:
-      return try await loadNYTCookingComments(on: page)
-    }
-  }
-
-  private func loadNYTCookingComments(on page: WebPage) async throws -> BrowserCommentLoadingResult {
-    let value = try await page.callJavaScript(Self.nytCookingScript)
-    guard let json = value as? String else {
-      throw BrowserCommentLoadingError.invalidResult
-    }
-    return try JSONDecoder().decode(BrowserCommentLoadingResult.self, from: Data(json.utf8))
-  }
-
-  private static let nytCookingScript = #"""
-  const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
-  const classStartsWith = (element, prefix) =>
-    Array.from(element.classList || []).some((className) => className.startsWith(prefix));
-  const section = document.querySelector("#notes_section");
-
-  if (!section) {
-    return JSON.stringify({ status: "notFound", commentCount: 0, loadMoreClicks: 0 });
-  }
-
-  const noteCount = () =>
-    Array.from(section.querySelectorAll("[class]"))
-      .filter((element) => classStartsWith(element, "note_note__"))
-      .length;
-  const visibleButton = (button) =>
-    !button.disabled && button.offsetParent !== null && getComputedStyle(button).visibility !== "hidden";
-  const buttonText = (button) => (button.innerText || button.textContent || "").replace(/\s+/g, " ").trim();
-  const buttons = () => Array.from(section.querySelectorAll("button, [role='tab']"));
-
-  const helpfulTab = buttons().find((button) => buttonText(button).includes("Most Helpful"));
-  if (helpfulTab && helpfulTab.getAttribute("aria-selected") !== "true") {
-    helpfulTab.click();
-    await sleep(1200);
-  }
-
-  let loadMoreClicks = 0;
-  for (let index = 0; index < 4; index += 1) {
-    const loadMore = buttons().find((button) =>
-      visibleButton(button) &&
-      (buttonText(button).includes("Show more comments") ||
-        classStartsWith(button, "showmorebutton_showMoreButton__"))
-    );
-    if (!loadMore) { break; }
-
-    const before = noteCount();
-    loadMore.click();
-    loadMoreClicks += 1;
-    await sleep(1400);
-    if (noteCount() <= before) {
-      await sleep(900);
-    }
-  }
-
-  return JSON.stringify({
-    status: "loaded",
-    commentCount: noteCount(),
-    loadMoreClicks
-  });
-  """#
-}
-
-struct BrowserCommentLoadingResult: Decodable, Equatable {
-  enum Status: String, Decodable {
-    case loaded
-    case notFound
-  }
-
-  var status: Status
-  var commentCount: Int
-  var loadMoreClicks: Int
-}
-
-enum BrowserCommentLoadingError: Error {
-  case invalidResult
-}
-
-@Observable
-@MainActor
 final class RecipeCaptureModel {
   @ObservationIgnored
   @Dependency(\.date.now) private var now
@@ -559,6 +395,7 @@ final class RecipeCaptureModel {
   var isPresentingBrowser = false
   var isFetching = false
   var isCommitting = false
+  var readerFeedbackProposals: [ReaderFeedbackTip] = []
 
   var canFetch: Bool {
     normalizedURL != nil && !isFetching && !isCommitting
@@ -575,6 +412,11 @@ final class RecipeCaptureModel {
   var editorialBlocks: [ParsedRecipeEditorialBlock] {
     get { draft?.page.editorialBlocks ?? [] }
     set { draft?.page.editorialBlocks = newValue }
+  }
+
+  var readerFeedbackBlocks: [ParsedRecipeReaderFeedbackBlock] {
+    get { draft?.page.readerFeedbackBlocks ?? [] }
+    set { draft?.page.readerFeedbackBlocks = newValue }
   }
 
   var reviewTitle: String {
@@ -609,6 +451,7 @@ final class RecipeCaptureModel {
     isPresentingBrowser = false
     isFetching = false
     isCommitting = false
+    readerFeedbackProposals = []
   }
 
   func cancelButtonTapped() -> Bool {
@@ -652,6 +495,31 @@ final class RecipeCaptureModel {
     return .extracted
   }
 
+  func stageReaderFeedbackTips(_ tips: [ReaderFeedbackTip]) {
+    guard !tips.isEmpty else { return }
+    let acceptedKeys = Set(readerFeedbackBlocks.map { $0.text.lowercased() })
+    var seen = Set(readerFeedbackProposals.map { $0.text.lowercased() })
+    readerFeedbackProposals.append(
+      contentsOf: tips.filter { tip in
+        let key = tip.text.lowercased()
+        return !acceptedKeys.contains(key) && seen.insert(key).inserted
+      }
+    )
+  }
+
+  func acceptReaderFeedbackTip(_ tip: ReaderFeedbackTip, approvedText: String) {
+    let trimmed = approvedText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    var blocks = readerFeedbackBlocks
+    blocks.append(ParsedRecipeReaderFeedbackBlock(text: trimmed))
+    readerFeedbackBlocks = blocks
+    discardReaderFeedbackTip(tip)
+  }
+
+  func discardReaderFeedbackTip(_ tip: ReaderFeedbackTip) {
+    readerFeedbackProposals.removeAll { $0.id == tip.id }
+  }
+
   func commitButtonTapped() async -> RecipeImportBundleResult? {
     guard let draft = curatedDraftForCommit() else { return nil }
     isCommitting = true
@@ -689,6 +557,19 @@ final class RecipeCaptureModel {
     editorialBlocks = blocks
   }
 
+  func updateReaderFeedbackBlockText(_ text: String, at index: Int) {
+    guard readerFeedbackBlocks.indices.contains(index) else { return }
+    var blocks = readerFeedbackBlocks
+    blocks[index].text = text
+    readerFeedbackBlocks = blocks
+  }
+
+  func removeReaderFeedbackBlocks(atOffsets offsets: IndexSet) {
+    var blocks = readerFeedbackBlocks
+    blocks.remove(atOffsets: offsets)
+    readerFeedbackBlocks = blocks
+  }
+
   var browserStartURL: URL {
     if let normalizedURL {
       return normalizedURL
@@ -700,6 +581,9 @@ final class RecipeCaptureModel {
     guard var draft else { return nil }
     draft.page.editorialBlocks = draft.page.editorialBlocks
       .map { ParsedRecipeEditorialBlock(label: $0.label, text: $0.text) }
+      .filter { !$0.text.isEmpty }
+    draft.page.readerFeedbackBlocks = draft.page.readerFeedbackBlocks
+      .map { ParsedRecipeReaderFeedbackBlock(text: $0.text) }
       .filter { !$0.text.isEmpty }
     self.draft = draft
     return draft

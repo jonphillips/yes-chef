@@ -878,6 +878,7 @@ public struct RecipeNote: Codable, Identifiable, Equatable, Sendable {
 public enum RecipeNoteType: String, Codable, QueryBindable, QueryDecodable, Sendable {
   case general
   case adaptation
+  case readerFeedback
   case makeAhead
   case freezing
   case thawing
