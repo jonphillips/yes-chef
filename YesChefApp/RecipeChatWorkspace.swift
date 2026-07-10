@@ -230,6 +230,8 @@ struct RecipeChatPanel: View {
   @State private var draft = ""
   @State private var assistantSelection = ChatAssistantSelection()
   @State private var applyingActionID: AnyChatApplyAction.ID?
+  @State private var stagedReviewActionID: String?
+  @State private var stagedReviewActionTitle: String?
   @State private var committingReviewItemID: ChatApplyReviewItem.ID?
   @State private var stagedReviewItems: [ChatApplyReviewItem] = []
   @State private var isReviewSheetPresented = false
@@ -357,6 +359,8 @@ struct RecipeChatPanel: View {
     }
     .sheet(isPresented: $isReviewSheetPresented, onDismiss: {
       stagedReviewItems = []
+      stagedReviewActionID = nil
+      stagedReviewActionTitle = nil
     }) {
       RecipeCollectionReviewSheet(
         items: stagedReviewItems,
@@ -390,6 +394,10 @@ struct RecipeChatPanel: View {
   @MainActor
   private func run(_ action: AnyChatApplyAction) async {
     let subject = actionSubject(for: action)
+    let subjectSource = subject?.source.logDescription ?? "none"
+    AppLog.applyAction.info(
+      "invoke id=\(action.id, privacy: .public) title=\(action.title, privacy: .public) subjectSource=\(subjectSource, privacy: .public) subjectPresent=\(subject != nil, privacy: .public)"
+    )
     guard !action.requiresSubject || subject != nil else { return }
     applyingActionID = action.id
     actionError = nil
@@ -398,18 +406,36 @@ struct RecipeChatPanel: View {
     do {
       let items = try await action.run(subject?.text ?? "", chatModel.messages)
       guard !items.isEmpty else {
-        actionError = action.emptyResultMessage ?? "The assistant did not return anything to review."
+        let emptyResultMessage = action.emptyResultMessage ?? "The assistant did not return anything to review."
+        AppLog.applyAction.info(
+          "extract id=\(action.id, privacy: .public) title=\(action.title, privacy: .public) outcome=empty itemCount=0 emptyResultMessage=\(emptyResultMessage, privacy: .public)"
+        )
+        actionError = emptyResultMessage
         return
       }
+      AppLog.applyAction.info(
+        "extract id=\(action.id, privacy: .public) title=\(action.title, privacy: .public) outcome=items itemCount=\(items.count, privacy: .public)"
+      )
+      stagedReviewActionID = action.id
+      stagedReviewActionTitle = action.title
       stagedReviewItems = items
       isReviewSheetPresented = true
     } catch {
+      let errorDescription = String(describing: error)
+      AppLog.applyAction.error(
+        "extract id=\(action.id, privacy: .public) title=\(action.title, privacy: .public) outcome=error error=\(errorDescription, privacy: .public)"
+      )
       actionError = RecipeChatErrorText.describe(error)
     }
   }
 
   @MainActor
   private func commit(_ item: ChatApplyReviewItem, approvedText: String) async -> Bool {
+    let actionID = stagedReviewActionID ?? "unknown"
+    let actionTitle = stagedReviewActionTitle ?? "unknown"
+    AppLog.applyAction.info(
+      "commit-start id=\(actionID, privacy: .public) title=\(actionTitle, privacy: .public) reviewItem=\(item.title, privacy: .public)"
+    )
     committingReviewItemID = item.id
     actionError = nil
     defer { committingReviewItemID = nil }
@@ -419,9 +445,18 @@ struct RecipeChatPanel: View {
       stagedReviewItems.removeAll { $0.id == item.id }
       if stagedReviewItems.isEmpty {
         isReviewSheetPresented = false
+        stagedReviewActionID = nil
+        stagedReviewActionTitle = nil
       }
+      AppLog.applyAction.info(
+        "commit-success id=\(actionID, privacy: .public) title=\(actionTitle, privacy: .public) reviewItem=\(item.title, privacy: .public)"
+      )
       return true
     } catch {
+      let errorDescription = String(describing: error)
+      AppLog.applyAction.error(
+        "commit-error id=\(actionID, privacy: .public) title=\(actionTitle, privacy: .public) reviewItem=\(item.title, privacy: .public) error=\(errorDescription, privacy: .public)"
+      )
       actionError = RecipeChatErrorText.describe(error)
       return false
     }
@@ -432,6 +467,8 @@ struct RecipeChatPanel: View {
     stagedReviewItems.removeAll { $0.id == item.id }
     if stagedReviewItems.isEmpty {
       isReviewSheetPresented = false
+      stagedReviewActionID = nil
+      stagedReviewActionTitle = nil
     }
   }
 
@@ -439,6 +476,8 @@ struct RecipeChatPanel: View {
   private func discardAll() {
     stagedReviewItems = []
     isReviewSheetPresented = false
+    stagedReviewActionID = nil
+    stagedReviewActionTitle = nil
   }
 
   private var visibleActionSubject: ChatActionSubject? {
@@ -583,6 +622,13 @@ private struct ChatActionSubject: Equatable {
     switch source {
     case .selection: "Acting on your selection"
     case .latestReply: "Acting on latest reply"
+    }
+  }
+
+  var logDescription: String {
+    switch source {
+    case .selection: "explicit-selection-subject-chip"
+    case .latestReply: "latestReplySubject-fallback"
     }
   }
 

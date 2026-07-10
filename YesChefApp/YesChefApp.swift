@@ -21,8 +21,10 @@ struct YesChefApp: App {
         },
         fetchImageData: WebRecipeCaptureClient.liveValue.fetchImageData
       )
-      $0.modelClient = TieredModelClient.live(
-        promptPreferences: YesChefAIPromptPreferences.modelPromptPreferences(for:)
+      $0.modelClient = LoggingModelClient(
+        wrapping: TieredModelClient.live(
+          promptPreferences: YesChefAIPromptPreferences.modelPromptPreferences(for:)
+        )
       )
     }
     YesChefCloudSync.persistManualEnablementFromLaunchEnvironment()
