@@ -228,7 +228,7 @@ struct RecipeChatPanel: View {
   var showsEmbeddedHeader = false
 
   @State private var draft = ""
-  @State private var selectedAssistantText = ""
+  @State private var assistantSelection = ChatAssistantSelection()
   @State private var applyingActionID: AnyChatApplyAction.ID?
   @State private var committingReviewItemID: ChatApplyReviewItem.ID?
   @State private var stagedReviewItems: [ChatApplyReviewItem] = []
@@ -260,7 +260,7 @@ struct RecipeChatPanel: View {
           LazyVStack(alignment: .leading, spacing: 12) {
             ChatContextHeader(chatModel: chatModel)
             ForEach(chatModel.messages) { message in
-              ChatMessageBubble(message: message, selectedAssistantText: $selectedAssistantText)
+              ChatMessageBubble(message: message, selection: assistantSelection)
                 .id(message.id)
             }
             if let actionSummary {
@@ -301,7 +301,10 @@ struct RecipeChatPanel: View {
         }
 
         if let visibleActionSubject {
-          ChatActionSubjectView(subject: visibleActionSubject)
+          ChatActionSubjectView(
+            subject: visibleActionSubject,
+            onClear: visibleActionSubject.source == .selection ? { assistantSelection.clear() } : nil
+          )
         }
 
         Menu {
@@ -409,7 +412,7 @@ struct RecipeChatPanel: View {
     do {
       let items = try await action.run(subject?.text ?? "", chatModel.messages)
       guard !items.isEmpty else {
-        actionError = "The assistant did not return anything to review."
+        actionError = action.emptyResultMessage ?? "The assistant did not return anything to review."
         return
       }
       stagedReviewItems = items
@@ -466,7 +469,7 @@ struct RecipeChatPanel: View {
   }
 
   private var selectionSubject: ChatActionSubject? {
-    let selected = selectedAssistantText.trimmingCharacters(in: .whitespacesAndNewlines)
+    let selected = assistantSelection.text.trimmingCharacters(in: .whitespacesAndNewlines)
     if !selected.isEmpty {
       return ChatActionSubject(source: .selection, text: selected)
     }
@@ -500,7 +503,7 @@ struct RecipeChatPanel: View {
   }
 
   private func clearChat() {
-    selectedAssistantText = ""
+    assistantSelection.clear()
     stagedReviewItems = []
     presentedReviewItem = nil
     actionSummary = nil
@@ -602,16 +605,31 @@ private struct ChatActionSubject: Equatable {
 
 private struct ChatActionSubjectView: View {
   let subject: ChatActionSubject
+  var onClear: (() -> Void)?
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text(subject.label)
-        .font(.caption.bold())
-        .foregroundStyle(.secondary)
-      Text(subject.snippet)
-        .font(.caption)
-        .lineLimit(2)
-        .foregroundStyle(.secondary)
+    HStack(alignment: .top, spacing: 8) {
+      VStack(alignment: .leading, spacing: 4) {
+        Text(subject.label)
+          .font(.caption.bold())
+          .foregroundStyle(.secondary)
+        Text(subject.snippet)
+          .font(.caption)
+          .lineLimit(2)
+          .foregroundStyle(.secondary)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+      if let onClear {
+        Button(action: onClear) {
+          Label("Clear selection", systemImage: "xmark.circle.fill")
+            .labelStyle(.iconOnly)
+            .font(.body)
+            .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Clear selection"))
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -619,7 +637,7 @@ private struct ChatActionSubjectView: View {
 
 private struct ChatMessageBubble: View {
   let message: RecipeChatMessage
-  @Binding var selectedAssistantText: String
+  let selection: ChatAssistantSelection
 
   var body: some View {
     HStack {
@@ -644,7 +662,7 @@ private struct ChatMessageBubble: View {
     case .user:
       Text(LocalizedStringKey(message.text))
     case .assistant:
-      SelectableAssistantText(text: message.text, selectedText: $selectedAssistantText)
+      SelectableAssistantText(text: message.text, selection: selection)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
@@ -652,7 +670,7 @@ private struct ChatMessageBubble: View {
 
 private struct SelectableAssistantText: UIViewRepresentable {
   let text: String
-  @Binding var selectedText: String
+  let selection: ChatAssistantSelection
 
   func makeUIView(context: Context) -> UITextView {
     let textView = IntrinsicTextView()
@@ -665,11 +683,19 @@ private struct SelectableAssistantText: UIViewRepresentable {
     textView.textContainer.lineFragmentPadding = 0
     textView.adjustsFontForContentSizeCategory = true
     textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    // Tapping away / into another bubble resigns first responder without firing a
+    // selection-change delegate callback, so clear the shared selection here — but only
+    // if this bubble still owns it (a newly-selected bubble may already have claimed it).
+    let coordinator = context.coordinator
+    textView.onResignFirstResponder = { [weak textView] in
+      guard let textView else { return }
+      coordinator.selection.relinquish(owner: textView)
+    }
     return textView
   }
 
   func updateUIView(_ textView: UITextView, context: Context) {
-    context.coordinator.selectedText = $selectedText
+    context.coordinator.selection = selection
     let rendered = Self.attributedText(for: text)
     if textView.attributedText?.string != rendered.string {
       textView.attributedText = rendered
@@ -684,7 +710,7 @@ private struct SelectableAssistantText: UIViewRepresentable {
   }
 
   func makeCoordinator() -> Coordinator {
-    Coordinator(selectedText: $selectedText)
+    Coordinator(selection: selection)
   }
 
   private static func attributedText(for text: String) -> NSAttributedString {
@@ -712,26 +738,65 @@ private struct SelectableAssistantText: UIViewRepresentable {
   }
 
   final class Coordinator: NSObject, UITextViewDelegate {
-    var selectedText: Binding<String>
+    var selection: ChatAssistantSelection
 
-    init(selectedText: Binding<String>) {
-      self.selectedText = selectedText
+    init(selection: ChatAssistantSelection) {
+      self.selection = selection
     }
 
     func textViewDidChangeSelection(_ textView: UITextView) {
       guard
         let selectedRange = textView.selectedTextRange,
-        let selected = textView.text(in: selectedRange)
+        let selected = textView.text(in: selectedRange),
+        !selected.isEmpty
       else {
-        selectedText.wrappedValue = ""
+        selection.update("", owner: textView)
         return
       }
-      selectedText.wrappedValue = selected
+      selection.update(selected, owner: textView)
     }
   }
 }
 
+/// Shared selection state across the assistant bubbles. Each bubble is a separate `UITextView`
+/// writing into one selection, so ownership is tracked to keep a resigning bubble from wiping a
+/// selection another bubble just claimed. Selection still cannot span bubbles (per-`UITextView`);
+/// that is a parked ADR question, not this store's job.
+@MainActor
+@Observable
+final class ChatAssistantSelection {
+  private(set) var text: String = ""
+  private var ownerID: ObjectIdentifier?
+
+  func update(_ newText: String, owner: AnyObject) {
+    let trimmed = newText.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty {
+      // Only the current owner (or an unowned selection) may collapse the shared selection.
+      if ownerID == nil || ownerID == ObjectIdentifier(owner) {
+        text = ""
+        ownerID = nil
+      }
+    } else {
+      text = newText
+      ownerID = ObjectIdentifier(owner)
+    }
+  }
+
+  func relinquish(owner: AnyObject) {
+    guard ownerID == ObjectIdentifier(owner) else { return }
+    text = ""
+    ownerID = nil
+  }
+
+  func clear() {
+    text = ""
+    ownerID = nil
+  }
+}
+
 private final class IntrinsicTextView: UITextView {
+  var onResignFirstResponder: (() -> Void)?
+
   override var intrinsicContentSize: CGSize {
     CGSize(width: UIView.noIntrinsicMetric, height: contentSize.height)
   }
@@ -739,6 +804,15 @@ private final class IntrinsicTextView: UITextView {
   override func layoutSubviews() {
     super.layoutSubviews()
     invalidateIntrinsicContentSize()
+  }
+
+  @discardableResult
+  override func resignFirstResponder() -> Bool {
+    let didResign = super.resignFirstResponder()
+    if didResign {
+      onResignFirstResponder?()
+    }
+    return didResign
   }
 }
 

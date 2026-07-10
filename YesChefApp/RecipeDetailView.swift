@@ -216,6 +216,8 @@ private struct RecipeReaderView: View {
   @State private var isPhotoGalleryPresented = false
   @State private var isEditingReaderFeedback = false
   @State private var readerFeedbackDrafts: [RecipeNote.ID: String] = [:]
+  @State private var renamingVariation: RecipeVariation?
+  @State private var variationNameDraft = ""
 
   var body: some View {
     GeometryReader { proxy in
@@ -384,21 +386,56 @@ private struct RecipeReaderView: View {
     _ variations: [RecipeVariation],
     activeVariationID: RecipeVariation.ID?
   ) -> some View {
-    Picker(
-      "Variation",
-      selection: Binding(
-        get: { activeVariationID },
-        set: { model.activeVariationSelectionChanged($0) }
-      )
-    ) {
-      Label("Base Recipe", systemImage: "book.closed")
-        .tag(nil as RecipeVariation.ID?)
-      ForEach(variations) { variation in
-        Text(variation.name)
-          .tag(variation.id as RecipeVariation.ID?)
+    let activeVariation = activeVariationID.flatMap { id in variations.first { $0.id == id } }
+    return HStack(spacing: 8) {
+      Picker(
+        "Variation",
+        selection: Binding(
+          get: { activeVariationID },
+          set: { model.activeVariationSelectionChanged($0) }
+        )
+      ) {
+        Label("Base Recipe", systemImage: "book.closed")
+          .tag(nil as RecipeVariation.ID?)
+        ForEach(variations) { variation in
+          Text(variation.name)
+            .tag(variation.id as RecipeVariation.ID?)
+        }
+      }
+      .pickerStyle(.menu)
+
+      if let activeVariation {
+        Button {
+          variationNameDraft = activeVariation.name
+          renamingVariation = activeVariation
+        } label: {
+          Label("Rename Variation", systemImage: "pencil")
+            .labelStyle(.iconOnly)
+        }
+        .buttonStyle(.bordered)
+        .accessibilityLabel(Text("Rename Variation"))
       }
     }
-    .pickerStyle(.menu)
+    .alert(
+      "Rename Variation",
+      isPresented: Binding(
+        get: { renamingVariation != nil },
+        set: { if !$0 { renamingVariation = nil } }
+      )
+    ) {
+      TextField("Name", text: $variationNameDraft)
+      Button("Save") {
+        if let variation = renamingVariation {
+          model.renameVariation(variation.id, to: variationNameDraft)
+        }
+        renamingVariation = nil
+      }
+      Button("Cancel", role: .cancel) {
+        renamingVariation = nil
+      }
+    } message: {
+      Text("Give this variation a new name.")
+    }
   }
 
   private func recipeStats(_ recipe: Recipe) -> some View {

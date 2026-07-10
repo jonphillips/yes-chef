@@ -77,6 +77,126 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func menuComplementParsesIngredientBodyIntoSuggestion() {
+      let plan = MenuComplementClient.parse(
+        """
+        {"items":[
+          {"kind":"note","title":"Chile-lime cauliflower",
+           "body":"  1 head cauliflower\\n2 tbsp olive oil  ","dayOffset":0,"mealSlot":"dinner"},
+          {"kind":"note","title":"Plain side","body":"   ","dayOffset":0,"mealSlot":"lunch"}
+        ]}
+        """
+      )
+
+      expectNoDifference(
+        plan,
+        MenuComplementPlan(
+          items: [
+            MenuComplementSuggestion(
+              kind: .note,
+              title: "Chile-lime cauliflower",
+              body: "1 head cauliflower\n2 tbsp olive oil",
+              dayOffset: 0,
+              mealSlot: .dinner
+            ),
+            MenuComplementSuggestion(
+              kind: .note,
+              title: "Plain side",
+              body: nil,
+              dayOffset: 0,
+              mealSlot: .lunch
+            ),
+          ]
+        )
+      )
+    }
+
+    @Test
+    func menuComplementSuggestionRoundTripsAndEditsBody() {
+      let suggestion = MenuComplementSuggestion(
+        kind: .note,
+        title: "Chile-lime cauliflower",
+        body: "1 head cauliflower\n2 tbsp olive oil",
+        dayOffset: 0,
+        mealSlot: .dinner
+      )
+
+      // Un-edited round-trip preserves the body verbatim.
+      expectNoDifference(
+        suggestion.applyingEditableReviewText(suggestion.editableReviewText()),
+        suggestion
+      )
+
+      // Editing the ingredient body in the review sheet persists the edit.
+      let edited = suggestion.applyingEditableReviewText(
+        """
+        Note: Chile-lime cauliflower
+        Day 1 - Dinner
+        1 head cauliflower, cut into florets
+        2 tbsp olive oil
+        1 tsp chile powder
+        """
+      )
+      expectNoDifference(
+        edited,
+        MenuComplementSuggestion(
+          kind: .note,
+          title: "Chile-lime cauliflower",
+          body: "1 head cauliflower, cut into florets\n2 tbsp olive oil\n1 tsp chile powder",
+          dayOffset: 0,
+          mealSlot: .dinner
+        )
+      )
+    }
+
+    @Test
+    func addComplementItemStoresSuggestionBodyInNotes() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 805_700_000)
+      let menuID = SampleUUIDSequence.uuid(15_500)
+      var uuids = SampleUUIDSequence(start: 15_510)
+
+      try database.write { db in
+        try Menu.insert {
+          Menu(id: menuID, title: "Body Menu", dayCount: 2, dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+
+        let withBodyID = try MenuRepository.addComplementItem(
+          MenuComplementSuggestion(
+            kind: .note,
+            title: "Chile-lime cauliflower",
+            body: "1 head cauliflower\n2 tbsp olive oil",
+            dayOffset: 0,
+            mealSlot: .dinner
+          ),
+          to: menuID,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let withBody = try #require(try MenuItem.find(withBodyID).fetchOne(db))
+        expectNoDifference(withBody.notes, "1 head cauliflower\n2 tbsp olive oil")
+
+        let noBodyID = try MenuRepository.addComplementItem(
+          MenuComplementSuggestion(
+            kind: .note,
+            title: "Plain side",
+            body: nil,
+            dayOffset: 0,
+            mealSlot: .lunch
+          ),
+          to: menuID,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let noBody = try #require(try MenuItem.find(noBodyID).fetchOne(db))
+        expectNoDifference(noBody.notes, nil)
+      }
+    }
+
+    @Test
     func menuComplementClientSendsRequestedModelTierAndMenuContext() async throws {
       let recorder = MenuComplementRequestRecorder()
 

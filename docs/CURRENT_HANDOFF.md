@@ -1,14 +1,17 @@
 # Current Handoff
 
-Last updated: July 9, 2026. **Next Up = Menu-planner dogfood quick-fixes bundle**
-([`docs/efforts/dogfood-fixes-menu-planner-2026-07-09.md`](efforts/dogfood-fixes-menu-planner-2026-07-09.md),
-4 slices, one PR), **then ADR-0026 review-collection sheet as a separate dispatch** — both from Jon's
-2026-07-09 menu-planner dogfood pass (see Next Up below). **Just shipped: ADR-0025 D6 + D7
-([#134](https://github.com/jonphillips/yes-chef/pull/134)) — the DB-backed reader-feedback
+Last updated: July 10, 2026. **Next Up = ADR-0026 review-collection sheet** (Dispatch 2 of the 2026-07-09
+menu-planner pass; see Next Up below). **Just shipped: the menu-planner dogfood quick-fixes bundle
+([#136](https://github.com/jonphillips/yes-chef/pull/136)) — 4 slices, one PR: chat selection reliably
+clears on deselect + explicit clear affordance; complement suggestions carry a `body` into `MenuItem.notes`
+(ADR-0012 Amendment 2); prep-plan empty result explains itself via a per-action `emptyResultMessage`
+(contract unchanged); rename an existing variation (`RecipeRepository.renameVariation` + detail affordance);
+no schema change** (full contents in [`docs/DONE-LOG.md`](DONE-LOG.md)). Earlier and also logged there:
+**ADR-0025 D6 + D7 ([#134](https://github.com/jonphillips/yes-chef/pull/134)) — the DB-backed reader-feedback
 curation-prompt preference (ADR-0018 `aiSettings`, additive `readerFeedbackPreference` column) + curated
 `RecipeNote(.readerFeedback)` rows feeding a distinct bucket in `RecipeChatRecipeContext`, bundled with the
 capture review-sheet host fix + inline reader-feedback editing; the ADR-0025 comment-ingestion effort is
-now closed** (full contents in [`docs/DONE-LOG.md`](DONE-LOG.md)). Earlier and also logged there: the
+now closed**. Earlier and also logged there: the
 **ADR-0025 curation revision** ([#131](https://github.com/jonphillips/yes-chef/pull/131)) + a latent
 meal-planner build fix ([#132](https://github.com/jonphillips/yes-chef/pull/132)); **ADR-0024 fully done**
 ([#127](https://github.com/jonphillips/yes-chef/pull/127)/[#128](https://github.com/jonphillips/yes-chef/pull/128));
@@ -33,24 +36,18 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Menu-planner dogfood quick-fixes bundle — then ADR-0026, separately.** From Jon's 2026-07-09
-menu-planner dogfood pass. Two dispatches, deliberately **not** merged (a low-risk fix bundle vs. a shared
-apply-action refactor with ripple risk):
+**ADR-0026 review-collection sheet (Dispatch 2 of the 2026-07-09 menu-planner pass).** Dispatch 1 (the
+quick-fixes bundle) shipped in [#136](https://github.com/jonphillips/yes-chef/pull/136); this is the
+deliberately-separate second dispatch (a shared apply-action refactor with ripple risk, held apart from the
+low-risk fix bundle).
 
-1. **Dispatch 1 — the quick-fixes bundle.** Do the effort in
-   [`docs/efforts/dogfood-fixes-menu-planner-2026-07-09.md`](efforts/dogfood-fixes-menu-planner-2026-07-09.md)
-   — **4 slices, one PR**, in order: (A) chat selection never clears on deselect (real bug + explicit
-   clear affordance); (B) complement suggestions carry a `body` so ingredients land in `MenuItem.notes`
-   (**ADR-0012 Amendment 2**, schema-safe); (C) prep-plan empty result explains itself (**keep the
-   contract strict** — compose from stored Make-Ahead fields, never chat prose — just name the source in a
-   per-action empty message); (D) rename an existing variation (missing repository call + detail-view
-   affordance). Read the effort's "Read first" list and per-slice acceptance. No schema change.
-2. **Dispatch 2 — the review-collection sheet.** Build [ADR-0026](decisions/ADR-0026-review-collection-sheet.md)
-   (Proposed 2026-07-09): hoist the whole multi-item LLM-review **collection** into the slide-up sheet (the
-   universal "evaluate content from the LLM" surface), removing the cramped inline `ChatApplyReviewList`
-   band. **Separate dispatch on purpose** — it re-touches the shared `RecipeChatWorkspace` apply-action
-   presentation state (the ADR-0024 D3 generics), so it must not ride with Dispatch 1. Prove S1 on the
-   complements verb; S2 points ADR-0025 curation at the same surface. No schema change.
+Build [ADR-0026](decisions/ADR-0026-review-collection-sheet.md) (Proposed 2026-07-09): hoist the whole
+multi-item LLM-review **collection** into the slide-up sheet (the universal "evaluate content from the LLM"
+surface), removing the cramped inline `ChatApplyReviewList` band. **Separate dispatch on purpose** — it
+re-touches the shared `RecipeChatWorkspace` apply-action presentation state (`stagedReviewItems` /
+`presentedReviewItem`, the ADR-0024 D3 generics), which Dispatch 1 also lightly touched (Slice C's
+`emptyResultMessage`), so review it against `main` after #136 merges. Prove S1 on the complements verb; S2
+points ADR-0025 curation at the same surface. No schema change.
 
 **Parked to `docs/open-questions.md` (design forks, decide with Jon before build):** multi-bubble /
 whole-transcript chat selection (per-bubble `UITextView` caps the payload); hand-editing a variation /
@@ -84,13 +81,14 @@ target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](
   Helpful" harvest → LLM-curate distinct tips → reviewable `RecipeNote(.readerFeedback)` + curation-prompt
   preference + chat-context feed; additive enum + `aiSettings` column, no new table. Nothing left here.
 
-**Menu-planner dogfood 2026-07-09 (now Next Up, above).**
+**Menu-planner dogfood 2026-07-09.**
 - **Quick-fixes bundle** ([`efforts/dogfood-fixes-menu-planner-2026-07-09.md`](efforts/dogfood-fixes-menu-planner-2026-07-09.md))
-  — selection-clear bug, complement note-body (ADR-0012 Amd 2), prep-plan explain-better, variation rename.
-  One dispatch, one PR; no schema.
+  — **DONE** ([#136](https://github.com/jonphillips/yes-chef/pull/136) → DONE-LOG): selection-clear bug +
+  clear affordance, complement note-body (ADR-0012 Amd 2), prep-plan explain-better, variation rename. One
+  PR, no schema. Nothing left here.
 - **ADR-0026 review-collection sheet** ([ADR-0026](decisions/ADR-0026-review-collection-sheet.md), Proposed)
-  — the universal LLM-evaluation slide-up sheet; **separate dispatch** (shared apply-action generics). Extends
-  ADR-0024; serves ADR-0025 curation.
+  — **now Next Up, above.** The universal LLM-evaluation slide-up sheet; **separate dispatch** (shared
+  apply-action generics). Extends ADR-0024; serves ADR-0025 curation.
 
 **Recipe edit proposals** ([ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) +
 `efforts/recipe-edit-proposals.md`) — the "Adjust this recipe" verb; **S1 + S2 shipped** (overwrite
