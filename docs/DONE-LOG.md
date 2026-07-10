@@ -9,6 +9,53 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0027 — "Capture to menu" harvest verb (S1)
+
+**Architect-reviewed & approved 2026-07-10 — yes-chef PR [#141](https://github.com/jonphillips/yes-chef/pull/141)
+(branch `codex/adr-0027-capture-to-menu`).** Implements
+[ADR-0027](decisions/ADR-0027-harvest-chat-into-notes.md) (Accepted 2026-07-10), S1. A new **extraction**
+menu chat verb — the inverse of the generative complement family — that takes content **already in the chat**
+and captures it as one or more `.note`-kind `MenuItem`s. The model **segments and reshapes** rambling chat
+prose into clean recipe-looking notes (title + body) and **never invents**; output is a JSON array of
+`{title, body}`, one per distinct note ([[llm-curation-not-synthesis]]). Rode the already-merged ADR-0026
+collection sheet ([#138](https://github.com/jonphillips/yes-chef/pull/138)). **Additive `aiSettings`
+`captureToNotePreference` column only** (non-null, nonempty default), otherwise sync-safe by construction —
+captured rows are always `.note` with no `recipeID` ([[menu-item-recipe-id-invariant]] sidestepped for free).
+
+- **Payload + client (`YesChefCore/MenuNoteHarvest.swift`).** `MenuNoteHarvestPlan { notes: [HarvestedNote] }`
+  / `HarvestedNote { title, body }` (Equatable/Sendable) with the ADR-0024 `editableReviewText()` /
+  `applyingEditableReviewText(_:)` round-trip, mirroring `MenuComplement.swift`. The `@Dependency`-injected
+  `MenuNoteHarvestClient` deliberately takes **no `context:` argument** — the menu is **not** sent (D2, the fix
+  for Jon's "it sent the whole menu" surprise). Two prompt modes, one client: non-empty selection → the
+  selection alone; empty → the assistant transcript. **LLM always runs** even for an exact selection (OQ2).
+  Static `parse(_:)` tolerates ```json fences and drops empty-title elements. `maxTokens: 1536`,
+  `reasoningEffort: .medium` (matches complement).
+- **Wiring (`MenuModels.applyActionCatalog`).** A `ChatApplyAction<MenuNoteHarvestPlan>` titled "Capture to
+  menu", mapping `plan.notes` → one `ChatApplyReviewItem` per note, each committing its own `.note` `MenuItem`
+  via `commitCapturedNote` → `MenuRepository.addNoteItem`. **Placement (OQ1): deterministic Day 1 / Dinner** —
+  menu detail renders all days in one scroll with no selected-day state, so captured notes land in a fixed slot
+  the user moves afterward (flagged in the PR).
+- **Selection plumbing fix.** The apply-menu tap resigns the assistant bubble's first responder before its
+  action runs, which previously wiped the shared selection — so selection-scoping never survived to *any* verb.
+  `ChatAssistantSelection.relinquish` now **retains** the text on resign (releasing only bubble ownership) and
+  the action clears it via `clear(ifMatching:)` after consuming it. Latent bug the ADR assumed absent; fixes
+  every selection-scoped verb, not just harvest.
+- **Task preference.** New `AIPromptPreferenceKind.captureToNote` + a "Capture to Note" Settings editor with a
+  recipe-formatting default prompt, shared through the existing model-boundary preference injection (ADR-0018).
+- **Architect fix during review ([#141](https://github.com/jonphillips/yes-chef/pull/141), commit `05c481b`).**
+  The harvest `AnyChatApplyAction` inherited the default `requiresSubject: true`, so the no-selection case fell
+  back to the latest-reply subject and `run()` fed that reply in as `selection` — keeping the client in
+  explicit-selection mode and making the ADR-0027 D2 **transcript-scan branch unreachable in production** (the
+  existing unit test called the client directly, bypassing the wiring). Set `requiresSubject: false` so an
+  empty selection reaches the client and the transcript branch runs; added a wiring-level guard test that
+  builds the real catalog and asserts the flag.
+- **Verification.** `swift test` (package) green — 278 tests; app + test targets compile clean
+  (`build-for-testing`, generic iOS Simulator destination) so the wiring change and new tests build;
+  `scripts/check-drift.sh` green. A device-bound build (iPad Pro 13-inch M5) could not run in this environment
+  — no iOS 27 simulator present — consistent with the lean-verification stance. **Device pass owed (Jon):**
+  selection path (highlight survives the apply-menu tap), transcript path (N notes), and Day 1/Dinner
+  placement, on `iPad Pro 13-inch (M5)` (both orientations) + `iPhone 17 Pro`.
+
 ## Logging for Frontier LLM Interaction
 
 **Architect-reviewed & approved 2026-07-10 — yes-chef PR [#139](https://github.com/jonphillips/yes-chef/pull/139)

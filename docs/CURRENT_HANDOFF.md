@@ -1,12 +1,16 @@
 # Current Handoff
 
-Last updated: July 10, 2026. **Next Up = ADR-0027 "Capture to menu"** — a new menu chat harvest verb
-(design ADR Accepted 2026-07-10; see Next Up below). Its prerequisite (the ADR-0026 collection sheet)
-already merged in #138. **Just shipped: Instrumentation — apply-action + LLM logging
+Last updated: July 10, 2026. **Next Up = Jon picks the next effort** — ADR-0027 S1 just shipped; the
+"Ready after this" candidates below are Jon's call (do not infer). **Just shipped: ADR-0027 "Capture to
+menu" S1 ([#141](https://github.com/jonphillips/yes-chef/pull/141))** — the menu chat **harvest** verb
+(inverse of the generative complement family): captures a chat text selection (or, absent one, the assistant
+transcript) into `.note`-kind `MenuItem`s, the model segmenting + reshaping prose into recipe-looking notes
+and never inventing; menu context is **not** sent (D2 — the fix for the "it sent the whole menu" surprise).
+Additive `aiSettings.captureToNotePreference` column, otherwise sync-safe; device pass owed (Jon). Earlier
+and also logged in [`docs/DONE-LOG.md`](DONE-LOG.md): **Instrumentation — apply-action + LLM logging
 ([#139](https://github.com/jonphillips/yes-chef/pull/139))** — diagnostic `os.Logger` at the `\.modelClient`
 seam + apply-action lifecycle logging, so a misbehaving verb's raw LLM response and empty-`extract` reason
-are legible; no `LLMClientKit` edits, no schema, no behavior change. This closes the last un-built item from
-the 2026-07-09 menu-planner dogfood. Earlier and also logged in [`docs/DONE-LOG.md`](DONE-LOG.md):
+are legible; no `LLMClientKit` edits, no schema, no behavior change. Earlier and also logged there:
 **ADR-0026 review-collection sheet ([#138](https://github.com/jonphillips/yes-chef/pull/138))
 — S1+S2, one PR: the whole multi-item LLM-review collection now lives in the universal slide-up sheet
 (`RecipeCollectionReviewSheet`, built host-agnostic), the cramped inline `ChatApplyReviewList` band is gone,
@@ -44,26 +48,23 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**ADR-0027 "Capture to menu" — a menu chat harvest verb.** Build **S1** per the brief
-[`efforts/adr-0027-capture-to-menu.md`](efforts/adr-0027-capture-to-menu.md): a new **extraction** verb
-(the inverse of the generative complement family) that takes content **already in the chat** — a user's
-text selection in an assistant bubble, or, absent one, the transcript — and captures it as one or more
-`MenuItem` notes. The model **segments and reshapes** rambling chat prose into clean recipe-looking notes
-(title + body) and **never invents**; output is a JSON array of `{title, body}`, one per distinct note
-([[llm-curation-not-synthesis]]). New in-memory payload (`MenuNoteHarvestPlan`/`HarvestedNote`, mirror
-`MenuComplement.swift`), a new `@Dependency` client that **does not send the menu context** (D2 — the menu
-is the write target, not source material; this is the fix for the "it sent the whole menu" surprise), and a
-new `ChatApplyAction` in `MenuModels.applyActionCatalog` whose commit writes `.note`-kind `MenuItem`s (no
-`recipeID`, [[menu-item-recipe-id-invariant]] sidestepped). Rides the already-merged ADR-0026 collection
-sheet. **Prove the selection path first** (highlight a dish → one note), then the no-selection
-transcript-scan path. LLM always runs even on a selection (OQ2); placement drops into the currently-viewed
-day / unslotted spot (OQ1). No schema, sync-safe. Design:
-[ADR-0027](decisions/ADR-0027-harvest-chat-into-notes.md).
+**Jon picks the next effort — do not infer.** ADR-0027 S1 shipped in
+[#141](https://github.com/jonphillips/yes-chef/pull/141) (see Just Shipped, above). The candidates below are
+Jon's call; a fresh dispatch must **STOP and ask Jon** which one:
+- **ADR-0027 S2** — the recipe sibling (capture chat into a `RecipeNote` on a recipe). S1's shape ported
+  cleanly (`MenuNoteHarvestPlan`/`HarvestedNote` + the two-mode client), so this is a straight port if Jon
+  wants it. Design: [ADR-0027](decisions/ADR-0027-harvest-chat-into-notes.md) D6.
+- **Recipe edit proposals S3** — the iterative refine loop + workbench-log deposit.
+- **Workbench synthesis-shaped apply-action** — the draft verb's own action shape (no last-reply gate/chip).
+- **Open a design ADR** — ADR-0013 meal-planner verbs (needs scope confirmation) or ADR-0014 text editing.
 
-**Ready after this (Jon picks — do not infer):** **ADR-0027 S2** (the recipe sibling — capture chat into a
-`RecipeNote`; only if Jon asks and S1's shape ports cleanly); **Recipe edit proposals S3** (iterative refine
-loop + workbench-log deposit); the **Workbench synthesis-shaped apply-action**; or opening a **design ADR**
-(ADR-0013 meal-planner verbs — needs scope confirmation; ADR-0014 text editing).
+**ADR-0027 device pass owed (Jon):** confirm on device (primary `iPad Pro 13-inch (M5)`, both orientations;
+`iPhone 17 Pro` for the compact sheet) — (1) the **selection path**: highlight a dish paragraph in an
+assistant bubble → "Capture to menu" → one clean note in the collection sheet → commit lands a `.note`
+`MenuItem` (the resign-retains-selection plumbing change means the highlight must survive the apply-menu tap);
+(2) the **no-selection path**: no highlight → the verb scans the assistant transcript → N candidate notes;
+(3) captured notes land on Day 1 / Dinner (deterministic placement, OQ1 — menu detail has no selected-day
+state) and can be moved afterward.
 
 **ADR-0026 device pass still owed (Jon):** the architect review flagged two interaction risks to confirm on
 device — (1) the adjust launch row presents Compare-diff from `RecipeDetailView` while the collection sheet
@@ -81,7 +82,8 @@ additive-only and permanently locks those record types, so it is deliberately **
 prod/TestFlight cut. At that cut, deploy to the production schema the Phase E Slice 3 pantry-policy +
 `canonicalName` fields, the ADR-0012 S2 `Menu.prepPlan` BLOB (PR #82), the reader-photo-affordances
 `Recipe.coverPhotoID` column (PR #87), the ADR-0018 synced `aiSettings` table (PR #96) **including its additive
-`readerFeedbackPreference` column** (ADR-0025 D6), **and** the ADR-0021
+`readerFeedbackPreference` column** (ADR-0025 D6) **and `captureToNotePreference` column** (ADR-0027 S1,
+PR #141), **and** the ADR-0021
 synced `recipeVariations` table (Recipe edit proposals S2); and note the app target
 (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 
@@ -104,11 +106,13 @@ target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](
   preference + chat-context feed; additive enum + `aiSettings` column, no new table. Nothing left here.
 
 **ADR-0027 "Capture to menu" harvest verb** ([ADR-0027](decisions/ADR-0027-harvest-chat-into-notes.md);
-brief [`efforts/adr-0027-capture-to-menu.md`](efforts/adr-0027-capture-to-menu.md)) — **now Next Up, above.**
-A new **extraction** menu verb (inverse of the generative complement family): captures a chat text selection
-(or, absent one, the transcript) into `.note`-kind `MenuItem`s, the model segmenting + reshaping prose into
-recipe-looking notes, never inventing. Selection scopes the source; menu context is **not** sent (D2). Rides
-the merged ADR-0026 sheet. S1 = menu; S2 (recipe `RecipeNote` sibling) deferred. No schema.
+brief [`efforts/adr-0027-capture-to-menu.md`](efforts/adr-0027-capture-to-menu.md)) — **S1 DONE**
+([#141](https://github.com/jonphillips/yes-chef/pull/141) → DONE-LOG; device pass owed, see Next Up). A new
+**extraction** menu verb (inverse of the generative complement family): captures a chat text selection (or,
+absent one, the transcript) into `.note`-kind `MenuItem`s, the model segmenting + reshaping prose into
+recipe-looking notes, never inventing. Selection scopes the source; menu context is **not** sent (D2). Rode
+the merged ADR-0026 sheet. **S2** (recipe `RecipeNote` sibling) deferred — Jon's pick (see Next Up). Additive
+`aiSettings.captureToNotePreference` column, otherwise sync-safe.
 
 **Instrumentation — apply-action + LLM logging**
 ([`efforts/instrumentation-apply-action-logging.md`](efforts/instrumentation-apply-action-logging.md))
