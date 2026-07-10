@@ -536,7 +536,7 @@ final class MenuDetailModel {
           )
         }
       },
-      AnyChatApplyAction(harvestAction) { [weak self] plan in
+      AnyChatApplyAction(harvestAction, requiresSubject: false) { [weak self] plan in
         plan.notes.map { note in
           let originalEditableText = note.editableReviewText()
           return ChatApplyReviewItem(
