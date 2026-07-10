@@ -392,6 +392,17 @@ struct RecipeChatPanel: View {
   @MainActor
   private func run(_ action: AnyChatApplyAction) async {
     let subject = actionSubject(for: action)
+    let selectedText: String?
+    if let subject {
+      switch subject.source {
+      case .selection:
+        selectedText = subject.text
+      case .latestReply:
+        selectedText = nil
+      }
+    } else {
+      selectedText = nil
+    }
     let subjectSource = subject?.source.logDescription ?? "none"
     AppLog.applyAction.info(
       "invoke id=\(action.id, privacy: .public) title=\(action.title, privacy: .public) subjectSource=\(subjectSource, privacy: .public) subjectPresent=\(subject != nil, privacy: .public)"
@@ -399,7 +410,12 @@ struct RecipeChatPanel: View {
     guard !action.requiresSubject || subject != nil else { return }
     applyingActionID = action.id
     actionError = nil
-    defer { applyingActionID = nil }
+    defer {
+      if let selectedText {
+        assistantSelection.clear(ifMatching: selectedText)
+      }
+      applyingActionID = nil
+    }
 
     do {
       let items = try await action.run(subject?.text ?? "", chatModel.messages)
@@ -715,9 +731,9 @@ private struct SelectableAssistantText: UIViewRepresentable {
     textView.textContainer.lineFragmentPadding = 0
     textView.adjustsFontForContentSizeCategory = true
     textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-    // Tapping away / into another bubble resigns first responder without firing a
-    // selection-change delegate callback, so clear the shared selection here — but only
-    // if this bubble still owns it (a newly-selected bubble may already have claimed it).
+    // Tapping the apply menu resigns first responder without firing a selection-change
+    // delegate callback. Release bubble ownership, but retain the explicit selection so
+    // the action can consume it after the menu takes focus.
     let coordinator = context.coordinator
     textView.onResignFirstResponder = { [weak textView] in
       guard let textView else { return }
@@ -816,13 +832,20 @@ final class ChatAssistantSelection {
 
   func relinquish(owner: AnyObject) {
     guard ownerID == ObjectIdentifier(owner) else { return }
-    text = ""
+    // The selection is an explicit action subject, not focus state. A menu tap resigns
+    // the text view before its action runs, so keep the text while allowing another
+    // bubble's empty-selection callback to clear it.
     ownerID = nil
   }
 
   func clear() {
     text = ""
     ownerID = nil
+  }
+
+  func clear(ifMatching expectedText: String) {
+    guard text == expectedText else { return }
+    clear()
   }
 }
 
