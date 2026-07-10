@@ -9,6 +9,11 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## Logging for Frontier LLM Interaction
+
+**Architect-reviewed & approved 2026-07-10 — yes-chef PR [#139](https://github.com/jonphillips/yes-chef/pull/139)
+
+- Jon just put this here. Claude may want more details -- feel free to rewrite. We can now view logs in the Xcode console.
 
 ## ADR-0026 — the LLM-review collection becomes the universal slide-up sheet (S1 + S2)
 
