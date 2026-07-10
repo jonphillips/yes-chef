@@ -1,16 +1,18 @@
 # Current Handoff
 
-Last updated: July 10, 2026. **Next Up = ADR-0028 Phase 1 (sync-correctness bug on the gate) — but
-gated on Jon's Phase 0 confirmation + iPad backup; see Next Up.** A two-device dogfood exposed that
-recipe **content** (ingredients/directions/menu items) never reaches a second device: SQLiteData's
-CloudKit sync only models a parent for tables with **exactly one** foreign key, and Yes Chef's content
-tables carry two — [ADR-0028](decisions/ADR-0028-multi-foreign-key-sync-loss.md), holds
-[[sqlitedata-single-fk-sync-limit]]. **Phase 0 shipped in the working tree (non-destructive, builds
-clean):** demo-seeding gated out of the live/synced store (was polluting the zone with deterministic
-`00000000-…` keys) + a debug "Local record counts" section in the Sync detail sheet to confirm on
-device. **Phase 1 (the ≤1-FK schema rebuild + CloudKit zone rebuild) is written up but NOT wired** —
-it needs the iPad backup + Phase 0 device confirmation first. Prior context: ADR-0027 S1 just shipped; the
-"Ready after this" feature candidates below are Jon's call (do not infer). **Just shipped: ADR-0027 "Capture to
+Last updated: July 10, 2026. **Next Up = ADR-0028 sync status-indicator accuracy fix (spec'd; CloudSyncKit)
+— Jon's call vs. the feature efforts below.** A two-device dogfood first looked like recipe **content**
+was missing on the iPhone; investigation ([ADR-0028](decisions/ADR-0028-multi-foreign-key-sync-loss.md),
+holds [[sqlitedata-single-fk-sync-limit]]) showed it was a **throttled bulk initial sync** — CloudKit
+rate-limited (`CKError 7/2062`) a ~44k-row + 2.5k-asset first pull; the debug count row proved the child
+tables were **climbing, not zero**, so a tempting multi-FK "content loss" theory was **disproven and the
+proposed schema/zone rebuild withdrawn** (no schema change, no data at risk). **Two real bugs remain:**
+(1) the **"Up to date" indicator lies** — it ignores incomplete/throttled *download* and flips green
+mid-fetch; fix = feed `SyncEngine.isFetchingChanges` + backoff state into `SyncHealth.displayStatus` (in
+CloudSyncKit, shared w/ galavant; pure reducer, testable). **Shipped in the working tree (non-destructive,
+builds clean, 278 tests pass):** the demo-seed gate (bug 2 — deterministic `00000000-…` keys were
+polluting the zone) + the debug "Local record counts" sheet (keep it — it caught the misdiagnosis). Prior
+context: ADR-0027 S1 just shipped; the "Ready after this" feature candidates below are Jon's call (do not infer). **Just shipped: ADR-0027 "Capture to
 menu" S1 ([#141](https://github.com/jonphillips/yes-chef/pull/141))** — the menu chat **harvest** verb
 (inverse of the generative complement family): captures a chat text selection (or, absent one, the assistant
 transcript) into `.note`-kind `MenuItem`s, the model segmenting + reshaping prose into recipe-looking notes
@@ -57,21 +59,20 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**PRIORITY — ADR-0028 Phase 1: multi-FK sync loss** ([ADR-0028](decisions/ADR-0028-multi-foreign-key-sync-loss.md)).
-A sync-**correctness** bug on the one-way gate: two-FK content tables (`ingredientLines`,
-`instructionSteps`, `menuItems`) never apply on a consuming device (iPhone got 2158 recipe shells, zero
-ingredients/directions, empty menus; data confirmed present in CloudKit). **Phase 0 is already in the
-working tree** (demo-seed gate + debug count row, non-destructive, builds clean). **Before Phase 1, Jon
-owes two gating steps** (neither is a dispatch): (1) **back up the iPad** (Xcode → Devices → iPad →
-YesChef → ⚙︎ Download Container → save the `.xcappdata`), and (2) install the Phase 0 build on both
-devices, open Settings → Sync → **Local record counts**, and confirm iPhone `ingredientLines`/
-`instructionSteps`/`menuItems` ≈ 0 while iPad ≫ 0 (and capture the iPhone device console during a resync —
-expect `FOREIGN KEY constraint failed`). **Phase 1 dispatch** (only after those): wire the ≤1-FK rebuild
-migration (loose-pointer `recipeID` on the three tables; exact column lists in the ADR), **test it against
-the restored iPad backup in a simulator** (trigger-rebuild risk — [[debug-erase-vs-sync-triggers]]), then
-rebuild the CloudKit zone iPad-first and reset the iPhone's local store. Fallback if the in-place migration
-is dicey: export→wipe→reimport (ADR OQ3). Resolve OQ1 (are `recipePhotos`/`menus`/`mealPlanItems` the same
-root cause?) from the Phase 0 counts.
+**CANDIDATE — ADR-0028 sync status-indicator accuracy** ([ADR-0028](decisions/ADR-0028-multi-foreign-key-sync-loss.md)).
+The dogfood "missing content on iPhone" turned out to be a **throttled bulk initial sync** (CloudKit
+`CKError 7/2062` rate-limiting a ~44k-row + 2.5k-asset first pull), **not** data loss — the debug count row
+showed the child tables climbing, so the multi-FK "content loss" theory and its schema/zone rebuild were
+**disproven and withdrawn** (no schema change, nothing at device risk; the iPhone just needs to finish
+downloading). **Already in the working tree** (non-destructive, builds clean, 278 tests pass): the
+demo-seed gate + the debug "Local record counts" sheet — keep both. **The one real fix left:** the
+**"Up to date" indicator lies** during an in-progress/throttled download (it reads upload-pending +
+engine-running + account only). Fix = feed `SyncEngine.isFetchingChanges` (SyncEngine.swift:411) + the
+rate-limit backoff condition into `SyncHealth.displayStatus` so the row stays "Syncing…" until the first
+full pull completes and never claims "Up to date" mid-fetch. **This lives in `CloudSyncKit` (shared with
+galavant)** — read its house rules first ([[architect-role-and-handoffs]]); pure reducer logic, testable in
+the value type; no % progress possible (CloudKit exposes none — this is *don't-lie*, not a progress bar).
+Jon's call whether to take this now or after a feature effort below.
 
 **Feature efforts — Jon picks; do not infer.** ADR-0027 S1 shipped in
 [#141](https://github.com/jonphillips/yes-chef/pull/141) (see Just Shipped, above). The candidates below are
