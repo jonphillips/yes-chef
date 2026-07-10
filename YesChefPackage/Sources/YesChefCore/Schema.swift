@@ -779,6 +779,14 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Add capture to note preference") { db in
+      try #sql("""
+        ALTER TABLE "aiSettings"
+        ADD COLUMN "captureToNotePreference" TEXT NOT NULL DEFAULT 'Format each captured note like a compact recipe: use a clear dish title, an Ingredients section when ingredients are stated, and numbered Method steps when method details are present. Preserve the source''s quantities and wording where possible; do not add unstated ingredients or steps.'
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

@@ -12,6 +12,7 @@ public enum AIPromptPreferenceKind: String, CaseIterable, Identifiable, Sendable
   case serveWith
   case makeAheadPrepPlan
   case complements
+  case captureToNote
   case readerFeedback
 
   public var id: String { rawValue }
@@ -22,6 +23,7 @@ public enum AIPromptPreferenceKind: String, CaseIterable, Identifiable, Sendable
     case .serveWith: "Serve With"
     case .makeAheadPrepPlan: "Make-ahead & Prep Plans"
     case .complements: "Complements"
+    case .captureToNote: "Capture to Note"
     case .readerFeedback: "Reader Feedback"
     }
   }
@@ -38,6 +40,9 @@ public struct AISettingsRequest: FetchKeyRequest {
 
 public enum AISettingsRepository {
   public static let singletonID = UUID(uuidString: "00000000-0000-0000-0000-000000000095")!
+  public static let defaultCaptureToNotePreference = """
+    Format each captured note like a compact recipe: use a clear dish title, an Ingredients section when ingredients are stated, and numbered Method steps when method details are present. Preserve the source's quantities and wording where possible; do not add unstated ingredients or steps.
+    """
 
   public static func defaultSettings(now: Date) -> AISettingsRecord {
     AISettingsRecord(id: singletonID, dateModified: now)
@@ -71,6 +76,7 @@ public enum AISettingsRepository {
       serveWithPreference: settings.serveWithPreference,
       makeAheadPrepPlanPreference: settings.makeAheadPrepPlanPreference,
       complementsPreference: settings.complementsPreference,
+      captureToNotePreference: settings.captureToNotePreference,
       readerFeedbackPreference: settings.readerFeedbackPreference,
       dateModified: now
     )
@@ -86,6 +92,7 @@ public enum AISettingsRepository {
     case .serveWith: settings.serveWithPreference
     case .makeAheadPrepPlan: settings.makeAheadPrepPlanPreference
     case .complements: settings.complementsPreference
+    case .captureToNote: settings.captureToNotePreference
     case .readerFeedback: settings.readerFeedbackPreference
     }
   }
@@ -100,6 +107,7 @@ public enum AISettingsRepository {
     case .serveWith: settings.serveWithPreference = value
     case .makeAheadPrepPlan: settings.makeAheadPrepPlanPreference = value
     case .complements: settings.complementsPreference = value
+    case .captureToNote: settings.captureToNotePreference = value
     case .readerFeedback: settings.readerFeedbackPreference = value
     }
   }

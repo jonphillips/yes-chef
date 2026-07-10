@@ -13,6 +13,7 @@ final class AISettingsModel {
   var serveWithPreference = ""
   var makeAheadPrepPlanPreference = ""
   var complementsPreference = ""
+  var captureToNotePreference = AISettingsRepository.defaultCaptureToNotePreference
   var readerFeedbackPreference = ""
   var errorMessage: String?
   var isShowingError = false
@@ -40,6 +41,7 @@ final class AISettingsModel {
       || serveWithPreference != savedPreferences.serveWithPreference
       || makeAheadPrepPlanPreference != savedPreferences.makeAheadPrepPlanPreference
       || complementsPreference != savedPreferences.complementsPreference
+      || captureToNotePreference != savedPreferences.captureToNotePreference
       || readerFeedbackPreference != savedPreferences.readerFeedbackPreference
   }
 
@@ -83,6 +85,7 @@ final class AISettingsModel {
       serveWithPreference: serveWithPreference,
       makeAheadPrepPlanPreference: makeAheadPrepPlanPreference,
       complementsPreference: complementsPreference,
+      captureToNotePreference: captureToNotePreference,
       readerFeedbackPreference: readerFeedbackPreference,
       dateModified: now
     )
@@ -124,6 +127,7 @@ final class AISettingsModel {
     serveWithPreference = settings.serveWithPreference
     makeAheadPrepPlanPreference = settings.makeAheadPrepPlanPreference
     complementsPreference = settings.complementsPreference
+    captureToNotePreference = settings.captureToNotePreference
     readerFeedbackPreference = settings.readerFeedbackPreference
   }
 }

@@ -50,6 +50,11 @@ struct AISettingsView: View {
             minHeight: 90
           )
           StackedTextEditor(
+            title: "Capture to Note",
+            text: $model.captureToNotePreference,
+            minHeight: 110
+          )
+          StackedTextEditor(
             title: "Reader Feedback",
             text: $model.readerFeedbackPreference,
             minHeight: 90

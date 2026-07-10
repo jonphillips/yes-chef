@@ -456,6 +456,7 @@ final class MenuDetailModel {
 
   func applyActionCatalog(for chatModel: RecipeChatModel) -> [AnyChatApplyAction] {
     @Dependency(\.menuComplementClient) var menuComplementClient
+    @Dependency(\.menuNoteHarvestClient) var menuNoteHarvestClient
     @Dependency(\.menuPrepPlanClient) var menuPrepPlanClient
 
     let context = chatModel.context.serialized(for: chatModel.activeTier)
@@ -471,6 +472,23 @@ final class MenuDetailModel {
           selection: selection,
           messages: messages,
           context: context,
+          tier: chatModel.activeTier
+        )
+      },
+      commit: { _ in
+      }
+    )
+    let harvestAction = ChatApplyAction<MenuNoteHarvestPlan>(
+      title: "Capture to menu",
+      extractingTitle: "Capturing…",
+      reviewTitle: "Review captured note",
+      commitTitle: "Add to Menu",
+      committingTitle: "Adding to menu…",
+      committedTitle: "Added to Menu",
+      extract: { selection, messages in
+        try await menuNoteHarvestClient(
+          selection: selection,
+          messages: messages,
           tier: chatModel.activeTier
         )
       },
@@ -518,6 +536,26 @@ final class MenuDetailModel {
           )
         }
       },
+      AnyChatApplyAction(harvestAction, requiresSubject: false) { [weak self] plan in
+        plan.notes.map { note in
+          let originalEditableText = note.editableReviewText()
+          return ChatApplyReviewItem(
+            title: note.title,
+            summary: note.rendered(),
+            editableTitle: "Note",
+            editableText: originalEditableText,
+            commitTitle: harvestAction.commitTitle,
+            committingTitle: harvestAction.committingTitle,
+            committedTitle: harvestAction.committedTitle,
+            commit: { editedText in
+              let approved = editedText == originalEditableText
+                ? note
+                : note.applyingEditableReviewText(editedText)
+              try self?.commitCapturedNote(approved)
+            }
+          )
+        }
+      },
       AnyChatApplyAction(
         prepPlanAction,
         emptyResultMessage: """
@@ -550,6 +588,23 @@ final class MenuDetailModel {
       try MenuRepository.addComplementItem(
         suggestion,
         to: menuID,
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
+    }
+  }
+
+  private func commitCapturedNote(_ note: HarvestedNote) throws {
+    _ = try database.write { db in
+      // Menu detail currently shows every day in one scroll and has no selected-day state.
+      // Keep the capture placement deterministic; users can move the note after review.
+      try MenuRepository.addNoteItem(
+        menuID: menuID,
+        title: note.title,
+        notes: note.body,
+        dayOffset: 0,
+        mealSlot: .dinner,
         in: db,
         now: now,
         uuid: { uuid() }
