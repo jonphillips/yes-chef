@@ -1,12 +1,17 @@
 # Current Handoff
 
-Last updated: July 10, 2026. **Next Up = Instrumentation — apply-action + LLM logging** (the un-built item
-from the 2026-07-09 menu-planner dogfood; see Next Up below). The rest of that pass shipped in #136/#138.
-**Just shipped: ADR-0026 review-collection sheet ([#138](https://github.com/jonphillips/yes-chef/pull/138))
+Last updated: July 10, 2026. **Next Up = ADR-0027 "Capture to menu"** — a new menu chat harvest verb
+(design ADR Accepted 2026-07-10; see Next Up below). Its prerequisite (the ADR-0026 collection sheet)
+already merged in #138. **Just shipped: Instrumentation — apply-action + LLM logging
+([#139](https://github.com/jonphillips/yes-chef/pull/139))** — diagnostic `os.Logger` at the `\.modelClient`
+seam + apply-action lifecycle logging, so a misbehaving verb's raw LLM response and empty-`extract` reason
+are legible; no `LLMClientKit` edits, no schema, no behavior change. This closes the last un-built item from
+the 2026-07-09 menu-planner dogfood. Earlier and also logged in [`docs/DONE-LOG.md`](DONE-LOG.md):
+**ADR-0026 review-collection sheet ([#138](https://github.com/jonphillips/yes-chef/pull/138))
 — S1+S2, one PR: the whole multi-item LLM-review collection now lives in the universal slide-up sheet
 (`RecipeCollectionReviewSheet`, built host-agnostic), the cramped inline `ChatApplyReviewList` band is gone,
 the adjust verb is a launch-only row that still opens the Compare-diff surface, and reader-feedback curation
-in capture shares the same sheet; no schema change** (full contents in [`docs/DONE-LOG.md`](DONE-LOG.md)).
+in capture shares the same sheet; no schema change**.
 Earlier and also logged there: **the menu-planner dogfood quick-fixes bundle
 ([#136](https://github.com/jonphillips/yes-chef/pull/136))** — selection-clear + clear affordance, complement
 note-body (ADR-0012 Amd 2), prep-plan explain-better, variation rename; no schema. Earlier and also logged there:
@@ -39,22 +44,26 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Instrumentation — logging for the apply-action + LLM pipeline.** Build per the brief
-[`efforts/instrumentation-apply-action-logging.md`](efforts/instrumentation-apply-action-logging.md): add
-"for now" diagnostic logging so a misbehaving chat/menu verb is legible — when a verb shows *"The assistant
-did not return anything to review,"* the log must reveal **what the model actually returned and why `extract`
-produced nothing** (non-JSON prose vs. `{"steps":[]}` vs. truncated/empty output). Design is decided in the
-brief: an `os.Logger` `AppLog` namespace (Core, `.public` payloads — single-user app), a `LoggingModelClient`
-decorator wrapping `\.modelClient` at the composition root (`YesChefApp.swift` ~24 — one seam covers every
-verb), plus apply-action lifecycle logging in `RecipeChatWorkspace.run/commit`. **Do NOT modify `LLMClientKit`**
-(shared jon-platform package); no in-app viewer; no schema; no behavior change. Serves the parked two-device
-dogfood — the next pass shouldn't guess why a verb misbehaved. The one un-built item from the 2026-07-09
-menu-planner dogfood list (the other five shipped in #136/#138).
+**ADR-0027 "Capture to menu" — a menu chat harvest verb.** Build **S1** per the brief
+[`efforts/adr-0027-capture-to-menu.md`](efforts/adr-0027-capture-to-menu.md): a new **extraction** verb
+(the inverse of the generative complement family) that takes content **already in the chat** — a user's
+text selection in an assistant bubble, or, absent one, the transcript — and captures it as one or more
+`MenuItem` notes. The model **segments and reshapes** rambling chat prose into clean recipe-looking notes
+(title + body) and **never invents**; output is a JSON array of `{title, body}`, one per distinct note
+([[llm-curation-not-synthesis]]). New in-memory payload (`MenuNoteHarvestPlan`/`HarvestedNote`, mirror
+`MenuComplement.swift`), a new `@Dependency` client that **does not send the menu context** (D2 — the menu
+is the write target, not source material; this is the fix for the "it sent the whole menu" surprise), and a
+new `ChatApplyAction` in `MenuModels.applyActionCatalog` whose commit writes `.note`-kind `MenuItem`s (no
+`recipeID`, [[menu-item-recipe-id-invariant]] sidestepped). Rides the already-merged ADR-0026 collection
+sheet. **Prove the selection path first** (highlight a dish → one note), then the no-selection
+transcript-scan path. LLM always runs even on a selection (OQ2); placement drops into the currently-viewed
+day / unslotted spot (OQ1). No schema, sync-safe. Design:
+[ADR-0027](decisions/ADR-0027-harvest-chat-into-notes.md).
 
-**Ready after this (Jon picks — do not infer):** **Recipe edit proposals S3** (iterative refine loop +
-workbench-log deposit — unblocked now the dogfood ADRs are done); the **Workbench synthesis-shaped
-apply-action** (prior Next Up, demoted); or opening a **design ADR** (ADR-0013 meal-planner verbs — needs
-scope confirmation; ADR-0014 text editing).
+**Ready after this (Jon picks — do not infer):** **ADR-0027 S2** (the recipe sibling — capture chat into a
+`RecipeNote`; only if Jon asks and S1's shape ports cleanly); **Recipe edit proposals S3** (iterative refine
+loop + workbench-log deposit); the **Workbench synthesis-shaped apply-action**; or opening a **design ADR**
+(ADR-0013 meal-planner verbs — needs scope confirmation; ADR-0014 text editing).
 
 **ADR-0026 device pass still owed (Jon):** the architect review flagged two interaction risks to confirm on
 device — (1) the adjust launch row presents Compare-diff from `RecipeDetailView` while the collection sheet
@@ -94,12 +103,20 @@ target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](
   Helpful" harvest → LLM-curate distinct tips → reviewable `RecipeNote(.readerFeedback)` + curation-prompt
   preference + chat-context feed; additive enum + `aiSettings` column, no new table. Nothing left here.
 
+**ADR-0027 "Capture to menu" harvest verb** ([ADR-0027](decisions/ADR-0027-harvest-chat-into-notes.md);
+brief [`efforts/adr-0027-capture-to-menu.md`](efforts/adr-0027-capture-to-menu.md)) — **now Next Up, above.**
+A new **extraction** menu verb (inverse of the generative complement family): captures a chat text selection
+(or, absent one, the transcript) into `.note`-kind `MenuItem`s, the model segmenting + reshaping prose into
+recipe-looking notes, never inventing. Selection scopes the source; menu context is **not** sent (D2). Rides
+the merged ADR-0026 sheet. S1 = menu; S2 (recipe `RecipeNote` sibling) deferred. No schema.
+
 **Instrumentation — apply-action + LLM logging**
 ([`efforts/instrumentation-apply-action-logging.md`](efforts/instrumentation-apply-action-logging.md))
-— **now Next Up, above.** Diagnostic `os.Logger` logging at the `\.modelClient` seam (one `LoggingModelClient`
-decorator at the composition root) + apply-action lifecycle in `RecipeChatWorkspace`, so a verb's raw LLM
-response and empty-`extract` reason are legible. The un-built item from the 2026-07-09 menu-planner dogfood.
-No `LLMClientKit` edits, no schema, no behavior change.
+— **DONE** ([#139](https://github.com/jonphillips/yes-chef/pull/139) → DONE-LOG): diagnostic `os.Logger` at
+the `\.modelClient` seam (one `LoggingModelClient` decorator at the composition root) + apply-action
+lifecycle in `RecipeChatWorkspace`, so a verb's raw LLM response and empty-`extract` reason are legible.
+The last un-built item from the 2026-07-09 menu-planner dogfood; no `LLMClientKit` edits, no schema, no
+behavior change. Nothing left here.
 
 **Menu-planner dogfood 2026-07-09.**
 - **Quick-fixes bundle** ([`efforts/dogfood-fixes-menu-planner-2026-07-09.md`](efforts/dogfood-fixes-menu-planner-2026-07-09.md))
