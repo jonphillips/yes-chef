@@ -19,6 +19,11 @@ final class SyncHealthModel {
   /// button's progress affordance.
   private(set) var isStarting = false
 
+  /// Local row counts per synced table — the dogfood diagnostic that answers
+  /// "did this table's rows actually reach this device?" at a glance. Populated on
+  /// demand from the Sync detail sheet; compare the two devices side by side.
+  private(set) var recordCounts: [RecordCount] = []
+
   /// The last error from a *start attempt* (launch is discarded; Try again / Enable
   /// capture theirs). Held separately so a routine `refresh()` — which only reads
   /// live account/pending signals — never clobbers it, and so it survives until the
@@ -91,6 +96,26 @@ final class SyncHealthModel {
     await refresh()
   }
 
+  /// Read per-table row counts from the local store. Cheap `COUNT(*)`s; failures
+  /// collapse to an empty list rather than disturbing the sync detail sheet.
+  func loadRecordCounts() async {
+    recordCounts = (try? await database.read { db in
+      [
+        RecordCount(name: "recipes", count: try Recipe.fetchCount(db)),
+        RecordCount(name: "recipeSources", count: try RecipeSource.fetchCount(db)),
+        RecordCount(name: "ingredientSections", count: try IngredientSection.fetchCount(db)),
+        RecordCount(name: "ingredientLines", count: try IngredientLine.fetchCount(db)),
+        RecordCount(name: "instructionSections", count: try InstructionSection.fetchCount(db)),
+        RecordCount(name: "instructionSteps", count: try InstructionStep.fetchCount(db)),
+        RecordCount(name: "recipePhotos", count: try RecipePhoto.fetchCount(db)),
+        RecordCount(name: "recipeNotes", count: try RecipeNote.fetchCount(db)),
+        RecordCount(name: "menus", count: try Menu.fetchCount(db)),
+        RecordCount(name: "menuItems", count: try MenuItem.fetchCount(db)),
+        RecordCount(name: "mealPlanItems", count: try MealPlanItem.fetchCount(db)),
+      ]
+    }) ?? []
+  }
+
   private func currentAccountStatus() async -> SyncAccountStatus {
     do {
       let status = try await CKContainer(identifier: YesChefCloudSync.containerIdentifier)
@@ -106,4 +131,11 @@ final class SyncHealthModel {
   private func currentPendingCount() async -> Int {
     (try? await YesChefCloudSync.pendingRecordZoneChangeCount(in: database)) ?? 0
   }
+}
+
+/// One synced table's local row count, for the Sync detail diagnostics list.
+struct RecordCount: Identifiable, Sendable {
+  let name: String
+  let count: Int
+  var id: String { name }
 }

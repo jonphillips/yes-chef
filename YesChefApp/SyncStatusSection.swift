@@ -89,7 +89,23 @@ struct SyncStatusDetailView: View {
           }
           .disabled(model.isStarting)
         }
+
+        Section {
+          if model.recordCounts.isEmpty {
+            ProgressView()
+          } else {
+            ForEach(model.recordCounts) { row in
+              LabeledContent(row.name, value: row.count.formatted())
+                .monospacedDigit()
+            }
+          }
+        } header: {
+          Text("Local record counts")
+        } footer: {
+          Text("Rows in this device's database, per synced table. Compare across devices to see which records actually arrived.")
+        }
       }
+      .task { await model.loadRecordCounts() }
       .navigationTitle("Sync")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
