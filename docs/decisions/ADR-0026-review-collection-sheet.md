@@ -10,9 +10,11 @@
 > at a time. This ADR moves the **whole review collection** into the slide-up surface, making it the
 > single, universal "evaluate content from the LLM" interface across every consumer.
 
-Status: **Proposed** — 2026-07-09 (dogfood pass 2026-07-09, menu-planner; Jon flagged "the review area is
-too small" and asked that the NYT-comment-style slide-up sheet become the *universal* LLM-evaluation
-surface). **Extends [ADR-0024](ADR-0024-editable-proposal-preview.md)** (which made the per-item review a
+Status: **Accepted** — 2026-07-10 (Proposed 2026-07-09). Dogfood pass 2026-07-09, menu-planner; Jon flagged
+"the review area is too small" and asked that the NYT-comment-style slide-up sheet become the *universal*
+LLM-evaluation surface. Accepted after the 2026-07-10 architect pass reconciled the D1/D4 adjust-verb
+collision (→ launch-only row) and resolved OQ1/OQ3/OQ4 against current code; build brief:
+[`efforts/adr-0026-review-collection-sheet.md`](../efforts/adr-0026-review-collection-sheet.md). **Extends [ADR-0024](ADR-0024-editable-proposal-preview.md)** (which made the per-item review a
 sheet) and **[ADR-0011](ADR-0011-actionable-chat-make-ahead.md)/[ADR-0012](ADR-0012-menu-actionable-chat.md)**
 (the `(extract → review → commit)` apply-action). **Serves [ADR-0025](ADR-0025-reader-comment-ingestion.md)**
 — reader-feedback curation is the other multi-item review and inherits this surface. A consumer of the
@@ -73,8 +75,23 @@ Discarding the whole set is one gesture.
 Recipe chat, menu, meal-planner, workbench, **and** the ADR-0025 reader-feedback curation review all
 surface `ChatApplyReviewItem`s through the shared `RecipeChatPanel`/apply-action machinery, so they all
 inherit the collection sheet. There is **one** universal "evaluate content from the LLM before it's
-written" surface. (The ADR-0023 "Adjust this recipe" verbs remain **out** — they own the structured
-Compare-diff review, per ADR-0024 D5, and must not be rerouted here.)
+written" surface.
+
+The **"Adjust this recipe"** verb (ADR-0023) is the sole `.inline`-presentation consumer, and its
+per-item review still belongs to the structured **Compare-diff** surface (`RecipeAdjustmentReviewView`),
+**not** to this sheet's editable-text review — per ADR-0024 D5. But that verb currently renders as a
+*launch card* wedged into the very `ChatApplyReviewList` band D1 removes (its commit doesn't write; it
+calls `presentAdjustmentReview()` to open the Compare-diff view). Removing the band without a home for it
+would strand it.
+
+**Resolution (decided 2026-07-10):** the adjust verb appears in the collection sheet as a **launch-only
+row** — no editable-text review; its primary action ("Review Side by Side") opens the Compare-diff
+`RecipeAdjustmentReviewView` exactly as today. So the collection sheet lists *everything the LLM proposed*
+(honoring the "one place to see it all" goal), while the Compare-diff still **owns** the adjust review
+(honoring D4's intent). The sheet therefore supports two per-item modes: **editable review** (default,
+`.sheet` items) and **launch-only** (`.inline` items — a row whose action delegates to the item's commit,
+which itself presents another surface). No apply-action's commit contract changes; the router just picks
+the row's per-item affordance from `presentation`.
 
 ## Storage sketch
 
@@ -90,27 +107,38 @@ is **one focused dispatch**, not bundled with the low-risk dogfood fixes.
 
 - **S1 — collection sheet.** Present staged items in the slide-up sheet: a list-of-items mode plus the
   ADR-0024 per-item editable review, with per-item commit/discard that keeps the sheet open on the
-  remainder and a discard-all. Remove the inline `ChatApplyReviewList` band. Prove it on the
-  **complements** verb (the multi-item case Jon hit).
+  remainder and a discard-all. Remove the inline `ChatApplyReviewList` band (both its `.sheet`
+  **and** `.inline` cases — the `.inline` case becomes the D4 launch-only row inside the sheet). Prove it
+  on the **complements** verb (the multi-item case Jon hit).
+  **Build it as a reusable component** (`RecipeCollectionReviewSheet` or similar) parameterized by
+  `[ChatApplyReviewItem]` + commit/discard/discard-all closures — **not** baked into `RecipeChatPanel`'s
+  private `@State` — because S2's consumer does not host a chat panel (see next).
 - **S2 — reader-feedback curation adopts it.** Point the ADR-0025 curation review at the same collection
-  sheet so the two multi-item reviews share one surface (only if S1's shape doesn't already subsume it —
-  confirm during S1).
+  sheet. **Note:** that curation lives in `RecipeCaptureView`'s `Form` (a hand-rolled twin: a
+  `Section("Reader Feedback")` of proposal rows, each opening a `ChatApplyReviewSheet` via the
+  `readerFeedbackSheet` enum), **not** in `RecipeChatPanel`. So S2 hosts the S1 component directly in the
+  capture view — which is only cheap if S1 delivered a genuinely host-agnostic component (hence the S1
+  requirement above). Do S2 only if S1's shape doesn't already subsume it — confirm during S1.
 
-## Open questions (surface when the slice is drawn — not decided)
+## Open questions
 
-- **OQ1 — list vs. auto-drill for N=1.** A single-item result should skip the list and open its editable
-  review directly (today's `items.first { … }` behavior). Confirm the transition reads cleanly for the
-  N→1 case as items are committed/discarded down to the last one.
+Resolved against current `main` (`aaabc17`) during the 2026-07-10 architect pass — kept here as
+confirm-don't-re-litigate notes for the build, except OQ2 which stays a lean-but-open call:
+
+- **OQ1 — list vs. auto-drill for N=1. → Resolved (preserve current behavior).** Today `run(_:)` sets
+  `presentedReviewItem = items.first { $0.presentation == .sheet }`, so a single `.sheet` result already
+  auto-opens its editable review with no list. Keep that: N=1 skips the list; the list appears only for
+  N>1. Confirm the N→1 transition (committing/discarding down to the last item) reads cleanly.
 - **OQ2 — iPad split-chat host.** ADR-0024 OQ3 already asked whether the sheet presents over the whole
   detail view or within the chat column; the collection sheet inherits that answer. *Lean:* a real sheet
-  over the detail view in both compact and split; must not fight the `ChatWorkspaceDetent` drag.
-- **OQ3 — provenance rows.** Reader-feedback curation items carry supporting-evidence / provenance
-  (ADR-0025); the collection sheet must preserve the per-item `supportingEvidenceRows` disclosure the
-  ADR-0024 sheet already renders. Confirm it survives the hoist.
-- **OQ4 — committed-summary feedback.** Today the panel shows a green `ChatActionSummary` after a commit.
-  Decide whether that confirmation lives in the sheet (per item) or still in the panel after the set
-  resolves. *Lean:* keep a lightweight per-item confirmation in the sheet; the panel summary is
-  redundant once the collection sheet owns the loop.
+  over the detail view in both compact and split; must not fight the `ChatWorkspaceDetent` drag. (Still
+  the one genuinely open call.)
+- **OQ3 — provenance rows. → Resolved (already rendered).** `ChatApplyReviewSheet` already renders the
+  per-item `supportingEvidenceRows` disclosure (`RecipeChatWorkspace.swift`). Reuse that per-item review
+  view unchanged and the disclosure survives the hoist for free.
+- **OQ4 — committed-summary feedback. → Resolved (per-item in the sheet).** Today the panel shows a green
+  `ChatActionSummary` after a commit. Keep a lightweight per-item confirmation in the sheet; the panel
+  summary is redundant once the collection sheet owns the loop.
 
 ## Related
 

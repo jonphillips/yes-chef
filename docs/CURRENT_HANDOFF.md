@@ -41,13 +41,24 @@ quick-fixes bundle) shipped in [#136](https://github.com/jonphillips/yes-chef/pu
 deliberately-separate second dispatch (a shared apply-action refactor with ripple risk, held apart from the
 low-risk fix bundle).
 
-Build [ADR-0026](decisions/ADR-0026-review-collection-sheet.md) (Proposed 2026-07-09): hoist the whole
-multi-item LLM-review **collection** into the slide-up sheet (the universal "evaluate content from the LLM"
-surface), removing the cramped inline `ChatApplyReviewList` band. **Separate dispatch on purpose** — it
+Build per the brief [`efforts/adr-0026-review-collection-sheet.md`](efforts/adr-0026-review-collection-sheet.md)
+(implements [ADR-0026](decisions/ADR-0026-review-collection-sheet.md), **Accepted 2026-07-10**): hoist the
+whole multi-item LLM-review **collection** into the slide-up sheet (the universal "evaluate content from the
+LLM" surface), removing the cramped inline `ChatApplyReviewList` band. **Separate dispatch on purpose** — it
 re-touches the shared `RecipeChatWorkspace` apply-action presentation state (`stagedReviewItems` /
 `presentedReviewItem`, the ADR-0024 D3 generics), which Dispatch 1 also lightly touched (Slice C's
-`emptyResultMessage`), so review it against `main` after #136 merges. Prove S1 on the complements verb; S2
-points ADR-0025 curation at the same surface. No schema change.
+`emptyResultMessage`); the ADR's code citations were verified against `main` (`aaabc17`) in the 2026-07-10
+architect pass. Prove S1 on the complements verb; S2 points ADR-0025 curation at the same surface. No schema
+change.
+
+**Two decisions resolved in that architect pass and baked into the ADR/brief (don't re-open):** (1) the
+adjust verb — the sole `.inline` review item, currently a launch card inside the band being removed —
+becomes a **launch-only row inside the collection sheet** whose action opens the Compare-diff
+`RecipeAdjustmentReviewView` (D4 keeps the Compare-diff as adjust's review surface); (2) S1 must build the
+collection sheet as a **host-agnostic component** (`[ChatApplyReviewItem]` + closures), because S2's
+consumer (reader-feedback curation) lives in `RecipeCaptureView`'s Form, **not** a chat panel. OQ1/OQ3/OQ4
+are resolved against current code in the ADR; OQ2 (iPad split-chat host) stays the one open device-feel
+call.
 
 **Parked to `docs/open-questions.md` (design forks, decide with Jon before build):** multi-bubble /
 whole-transcript chat selection (per-bubble `UITextView` caps the payload); hand-editing a variation /
@@ -86,7 +97,8 @@ target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](
   — **DONE** ([#136](https://github.com/jonphillips/yes-chef/pull/136) → DONE-LOG): selection-clear bug +
   clear affordance, complement note-body (ADR-0012 Amd 2), prep-plan explain-better, variation rename. One
   PR, no schema. Nothing left here.
-- **ADR-0026 review-collection sheet** ([ADR-0026](decisions/ADR-0026-review-collection-sheet.md), Proposed)
+- **ADR-0026 review-collection sheet** ([ADR-0026](decisions/ADR-0026-review-collection-sheet.md), Accepted;
+  brief [`efforts/adr-0026-review-collection-sheet.md`](efforts/adr-0026-review-collection-sheet.md))
   — **now Next Up, above.** The universal LLM-evaluation slide-up sheet; **separate dispatch** (shared
   apply-action generics). Extends ADR-0024; serves ADR-0025 curation.
 
