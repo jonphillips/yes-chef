@@ -75,6 +75,22 @@ extension RecipeDetailModel {
     }
   }
 
+  func renameVariation(_ variationID: RecipeVariation.ID, to name: String) {
+    do {
+      try database.write { db in
+        try RecipeRepository.renameVariation(
+          variationID,
+          to: name,
+          in: db,
+          now: now
+        )
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
   func activeVariationSelectionChanged(_ variationID: RecipeVariation.ID?) {
     do {
       try database.write { db in

@@ -74,6 +74,79 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func renameVariationUpdatesNameAndModificationDateWithBlankFallback() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 819_260_000)
+      let renamedAt = now.addingTimeInterval(120)
+      let recipeID = SampleUUIDSequence.uuid(32_701)
+      let sectionID = SampleUUIDSequence.uuid(32_702)
+      let lemonID = SampleUUIDSequence.uuid(32_703)
+      var uuids = SampleUUIDSequence(start: 32_800)
+
+      try database.write { db in
+        try Recipe.insert {
+          Recipe(id: recipeID, title: "Lemon Pasta", dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+        try IngredientSection.insert {
+          IngredientSection(id: sectionID, recipeID: recipeID, name: "Sauce", sortOrder: 0)
+        }
+        .execute(db)
+        try IngredientLine.insert {
+          IngredientLine(
+            id: lemonID,
+            recipeID: recipeID,
+            sectionID: sectionID,
+            originalText: "1 tablespoon lemon juice",
+            sortOrder: 0
+          )
+        }
+        .execute(db)
+      }
+
+      let variation = try database.write { db in
+        try RecipeRepository.keepAdjustmentProposalAsVariation(
+          RecipeAdjustmentProposal(
+            summary: "Lime version",
+            ingredientOps: [
+              .substitute(RecipeIngredientReference(id: lemonID), line: "2 tablespoons lime juice")
+            ],
+            methodNote: nil
+          ),
+          recipeID: recipeID,
+          name: "Lime",
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+      }
+
+      // A real rename updates the name and bumps dateModified.
+      try database.write { db in
+        try RecipeRepository.renameVariation(variation.id, to: "  Zesty Lime  ", in: db, now: renamedAt)
+      }
+      try database.read { db in
+        let stored = try #require(try RecipeVariation.find(variation.id).fetchOne(db))
+        expectNoDifference(stored.name, "Zesty Lime")
+        expectNoDifference(stored.dateModified, renamedAt)
+      }
+
+      // A blank rename keeps the existing name.
+      try database.write { db in
+        try RecipeRepository.renameVariation(
+          variation.id,
+          to: "   ",
+          in: db,
+          now: renamedAt.addingTimeInterval(60)
+        )
+      }
+      try database.read { db in
+        let stored = try #require(try RecipeVariation.find(variation.id).fetchOne(db))
+        expectNoDifference(stored.name, "Zesty Lime")
+      }
+    }
+
+    @Test
     func variationNeedsReviewErrorUsesUserFacingDescription() {
       let error = RecipeAdjustmentError.variationNeedsReview(
         "Smoky",

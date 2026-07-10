@@ -518,13 +518,21 @@ final class MenuDetailModel {
           )
         }
       },
-      AnyChatApplyAction(prepPlanAction, editableSummary: { plan in
-        plan.editableReviewText().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-          ? nil
-          : plan.editableReviewText()
-      }, commitEditedSummary: { [weak self] plan, editedText in
-        try self?.commitPrepPlan(plan.applyingEditableReviewText(editedText))
-      })
+      AnyChatApplyAction(
+        prepPlanAction,
+        emptyResultMessage: """
+          No prep steps to build. The prep plan is assembled from each recipe's Make-Ahead notes — add \
+          Make-Ahead detail to the dishes, or ask in chat for a specific step to add.
+          """,
+        editableSummary: { plan in
+          plan.editableReviewText().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? nil
+            : plan.editableReviewText()
+        },
+        commitEditedSummary: { [weak self] plan, editedText in
+          try self?.commitPrepPlan(plan.applyingEditableReviewText(editedText))
+        }
+      )
     ]
   }
 

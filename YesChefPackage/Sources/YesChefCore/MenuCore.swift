@@ -256,7 +256,7 @@ public enum MenuRepository {
       title: title,
       dayOffset: suggestion.dayOffset,
       mealSlot: suggestion.mealSlot,
-      notes: nil,
+      notes: suggestion.body?.nonEmptyMenuText,
       sortOrder: try nextSortOrder(
         menuID: menuID,
         dayOffset: suggestion.dayOffset,

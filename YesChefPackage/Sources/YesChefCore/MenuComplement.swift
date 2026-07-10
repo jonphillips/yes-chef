@@ -13,26 +13,35 @@ public struct MenuComplementPlan: Equatable, Sendable {
 public struct MenuComplementSuggestion: Equatable, Sendable {
   public var kind: MealPlanItemKind
   public var title: String
+  /// The ingredient/spice/method detail for this one dish, stored into `MenuItem.notes` on commit
+  /// (ADR-0012 Amendment 2). `nil` when the model returned only a dish name.
+  public var body: String?
   public var dayOffset: Int
   public var mealSlot: MealPlanItemSlot
 
   public init(
     kind: MealPlanItemKind = .note,
     title: String,
+    body: String? = nil,
     dayOffset: Int,
     mealSlot: MealPlanItemSlot
   ) {
     self.kind = kind
     self.title = title
+    self.body = body
     self.dayOffset = dayOffset
     self.mealSlot = mealSlot
   }
 
   public func rendered() -> String {
-    """
-    \(kind.title): \(title)
-    Day \(dayOffset + 1) - \(mealSlot.title)
-    """
+    var text = """
+      \(kind.title): \(title)
+      Day \(dayOffset + 1) - \(mealSlot.title)
+      """
+    if let body = body?.cleanedMenuComplementText {
+      text += "\n\(body)"
+    }
+    return text
   }
 
   public func editableReviewText() -> String {
@@ -51,6 +60,8 @@ public struct MenuComplementSuggestion: Equatable, Sendable {
       suggestion.dayOffset = Self.dayOffset(fromEditableReviewPlacementLine: placementLine) ?? suggestion.dayOffset
       suggestion.mealSlot = Self.mealSlot(fromEditableReviewPlacementLine: placementLine) ?? suggestion.mealSlot
     }
+    // Everything after the title + placement lines is the editable ingredient/detail body.
+    suggestion.body = lines.dropFirst(2).joined(separator: "\n").cleanedMenuComplementText
 
     return suggestion
   }
@@ -137,10 +148,11 @@ extension MenuComplementClient: DependencyKey {
   static let instructions = """
     You distill a cooking conversation into concrete dish suggestions that complement one menu.
     Return ONLY strict JSON:
-    {"items":[{"kind":"note","title":"short dish name","dayOffset":0,"mealSlot":"dinner"}]}.
+    {"items":[{"kind":"note","title":"short dish name","body":"ingredients and method detail","dayOffset":0,"mealSlot":"dinner"}]}.
     Allowed kind values are "note" and "recipe"; use "note" for freeform suggested dishes that are not already
-    represented by an existing recipe row. dayOffset is zero-based and must be valid for the menu context.
-    Allowed mealSlot values are "breakfast", "lunch", "dinner", and "snack".
+    represented by an existing recipe row. "body" holds the ingredient/spice/method detail for that one dish
+    (omit it or use "" when there is no detail beyond the name). dayOffset is zero-based and must be valid for
+    the menu context. Allowed mealSlot values are "breakfast", "lunch", "dinner", and "snack".
     Return {"items":[]} when there is no concrete dish to add.
     """
 
@@ -187,6 +199,7 @@ extension MenuComplementClient: DependencyKey {
         return MenuComplementSuggestion(
           kind: .note,
           title: title,
+          body: (element["body"] as? String)?.cleanedMenuComplementText,
           dayOffset: dayOffset,
           mealSlot: mealSlot
         )

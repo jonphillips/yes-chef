@@ -526,6 +526,22 @@ extension RecipeRepository {
     }
   }
 
+  public static func renameVariation(
+    _ variationID: RecipeVariation.ID,
+    to name: String,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard let variation = try RecipeVariation.find(variationID).fetchOne(db) else {
+      throw RecipeAdjustmentError.missingVariation(variationID)
+    }
+    try RecipeVariation.find(variationID).update {
+      $0.name = variationName(name, fallback: variation.name)
+      $0.dateModified = now
+    }
+    .execute(db)
+  }
+
   public static func restoreRecipeAdjustment(
     _ restorePoint: Data,
     recipeID: Recipe.ID,

@@ -672,6 +672,10 @@ public struct AnyChatApplyAction: Identifiable {
   public var title: String
   public var extractingTitle: String
   public var requiresSubject: Bool
+  /// Shown instead of the generic "did not return anything to review" text when `run` yields no items.
+  /// `nil` keeps the generic message. Lets a verb explain *why* its extract came back empty
+  /// (e.g. the prep-plan verb composes only from stored Make-Ahead notes).
+  public var emptyResultMessage: String?
   public var run: @MainActor (_ selection: String, _ context: [RecipeChatMessage]) async throws
     -> [ChatApplyReviewItem]
 
@@ -680,9 +684,10 @@ public struct AnyChatApplyAction: Identifiable {
     _ action: ChatApplyAction<Payload>,
     requiresSubject: Bool = true,
     reviewPresentation: ChatApplyReviewPresentation = .sheet,
+    emptyResultMessage: String? = nil,
     renderedSummary: @escaping @MainActor (Payload) -> String?
   ) {
-    self.init(action, requiresSubject: requiresSubject) { payload in
+    self.init(action, requiresSubject: requiresSubject, emptyResultMessage: emptyResultMessage) { payload in
       guard
         let summary = renderedSummary(payload)?.trimmingCharacters(in: .whitespacesAndNewlines),
         !summary.isEmpty
@@ -707,10 +712,11 @@ public struct AnyChatApplyAction: Identifiable {
   public init<Payload>(
     _ action: ChatApplyAction<Payload>,
     requiresSubject: Bool = true,
+    emptyResultMessage: String? = nil,
     editableSummary: @escaping @MainActor (Payload) -> String?,
     commitEditedSummary: @escaping @MainActor (_ payload: Payload, _ editedSummary: String) async throws -> Void
   ) {
-    self.init(action, requiresSubject: requiresSubject) { payload in
+    self.init(action, requiresSubject: requiresSubject, emptyResultMessage: emptyResultMessage) { payload in
       guard
         let summary = editableSummary(payload)?.trimmingCharacters(in: .whitespacesAndNewlines),
         !summary.isEmpty
@@ -739,11 +745,13 @@ public struct AnyChatApplyAction: Identifiable {
   public init<Payload>(
     _ action: ChatApplyAction<Payload>,
     requiresSubject: Bool = true,
+    emptyResultMessage: String? = nil,
     reviewItems: @escaping @MainActor (Payload) -> [ChatApplyReviewItem]
   ) {
     self.title = action.title
     self.extractingTitle = action.extractingTitle
     self.requiresSubject = requiresSubject
+    self.emptyResultMessage = emptyResultMessage
     self.run = { selection, context in
       let payload = try await action.extract(selection, context)
       return reviewItems(payload)
