@@ -148,6 +148,38 @@ grounded, all in `MenuChatContext` (`RecipeChat.swift`) + the prep-plan flow:
 
 Invariant unchanged: the model proposes and structures; the human's tap is the only write.
 
+## Amendment 2 — Complement suggestions carry a body (ingredients live in the note)
+
+Accepted 2026-07-09 (dogfood pass 2026-07-09, menu-planner). Ships in
+`docs/efforts/dogfood-fixes-menu-planner-2026-07-09.md`. One fix to what the "What complements this?" verb
+captures.
+
+**The defect.** A complement suggestion is **title-only**: `MenuComplementSuggestion`
+(`MenuComplement.swift`) carries `kind / title / dayOffset / mealSlot` and nothing else, and the LLM
+instructions ask for `"title":"short dish name"` — no field for the ingredients, spice blend, or method
+detail the conversation produced. Dogfooding a Mexican-night menu, the chat proposed "Roasted Chile-Lime
+Cauliflower with Pepitas" *with a full spice/ingredient/roast spec in prose*, but the committed note kept
+only the dish name — **every ingredient suggestion was discarded** before it reached the DB.
+
+**Why this is the right shape.** There is no intermediate object between "a note" and "a promoted recipe";
+an un-promoted dish is a `.note`-kind `MenuItem`, and that row **already has a `notes: String?` column**
+(`MenuItem`, `Models.swift`; rendered by `MenuItemRowData.displayNotes`). So the ingredients belong **in
+the note body** — exactly where the model's detail should land — and capturing it needs **no schema
+change**.
+
+- **B1 — The suggestion carries a body.** Add an optional `body` (the ingredient/detail prose) to
+  `MenuComplementSuggestion`. Ask for it in the instructions/JSON schema and capture it in `parse`; render
+  it in `rendered()` / `editableReviewText()` and round-trip it through `applyingEditableReviewText`
+  (so the human can edit ingredients in the review sheet before commit). Store it into `MenuItem.notes`
+  via `addComplementItem`. Holds [[llm-curation-not-synthesis]] — the body is the model's **selected**
+  detail for one dish, not a merged summary across suggestions.
+- **B2 — The `.note` coercion stays.** Complement suggestions remain `.note`-kind and carry **no**
+  `recipeID` (per [[menu-item-recipe-id-invariant]]); this amendment only fills the note **body**, it does
+  not promote anything to a recipe.
+
+Invariant unchanged: the model proposes and structures; the human's tap (now over an editable body) is the
+only write.
+
 ## Related
 
 - ADR-0011 (the recipe-scope parent), ADR-0010 (sync/BLOB playbook), ADR-0006 (vocabulary hygiene).

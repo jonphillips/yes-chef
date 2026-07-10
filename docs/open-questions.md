@@ -285,6 +285,29 @@ chat are **one unified "cooking workspace" effort**, not separate slices — the
   invariant — Yes Chef is the proving ground that feeds jon-platform, so it's an ADR amendment, not a
   silent code change.
 
+## Dogfooding — menu-planner pass (2026-07-09)
+
+Source: `~/code/cooking/menu_planning_llm_questions_and_responses-1.md`. The mechanical fixes from this
+pass are scoped in `docs/efforts/dogfood-fixes-menu-planner-2026-07-09.md`; the review-area fix is
+[ADR-0026](decisions/ADR-0026-review-collection-sheet.md). These two are the **design** residue — decide
+with Jon before any build:
+
+- **[Design — per-bubble selection constraint] Multi-bubble / whole-transcript selection.** Chat
+  selection can't cross bubbles because each assistant message renders as an independent `UITextView`
+  (`SelectableAssistantText`), so a verb's payload is capped at one bubble's worth of highlighted text.
+  Jon confirmed the limit while dogfooding. Lifting it needs either the transcript rendered as a **single
+  text view** or an explicit **"select messages" mode** (per-message checkboxes feeding a combined
+  payload). A rework, not a tweak; interacts with the drafted ADR-0011 Amendment 1 (selection-scoped
+  apply-actions) above.
+- **[Design — feeds ADR-0014 × ADR-0021] Hand-editing a variation (define a header / edit content).**
+  Variations are LLM-created (`keepAdjustmentProposalAsVariation`) then shown **read-only**; there is no
+  manual editing of variation content, so "add a section header to a variation" has no home. A section
+  header can only appear implicitly today, when an add-ingredient delta names a new section. Lands on the
+  open [ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md) (header/text-editing model) crossed
+  with [ADR-0021](decisions/ADR-0021-recipe-variations.md) (variations as named deltas): does a variation
+  become hand-editable, and does that reuse the recipe header-editing affordance? (Variation **rename** is
+  *not* here — it is a scoped quick fix in the effort above.)
+
 ## Menus / planning model
 
 - Does the Menus subsystem need its own ADR, and what is the canonical provenance

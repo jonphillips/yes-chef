@@ -10,6 +10,33 @@ Newest first.
 
 ---
 
+## ADR-0025 D6 + D7 — curation-prompt preference + curated notes into chat (effort closed)
+
+**Merged to main 2026-07-09 — yes-chef PR [#134](https://github.com/jonphillips/yes-chef/pull/134)
+(branch `adr-0025-d6-d7-and-reader-feedback-editing`, commit `50b3965`; core carries unit tests, app layer
+device-passed by Jon).** Closes the [ADR-0025](decisions/ADR-0025-reader-comment-ingestion.md) reader-comment
+ingestion effort (Amendment 2026-07-09). Additive schema only — sync-safe.
+
+- **D6 — DB-backed curation-prompt preference (ADR-0018).** Added `AIPromptPreferenceKind.readerFeedback`, an
+  additive `aiSettings.readerFeedbackPreference` column, wired the curation request's `promptPreferenceKey`
+  (previously `nil`) through `ReaderFeedbackCurationClient`, and exposed the editor in AI settings — the
+  established prompt-preference pattern, no new storage.
+- **D7 — curated notes feed the chat (read-only).** `RecipeChatRecipeContext` gained a **distinct
+  `readerFeedback` bucket** fed from accepted `RecipeNote(.readerFeedback)` rows — context injection, not an
+  actionable verb; no writes, no synthesis ([[llm-curation-not-synthesis]]).
+- **Bundled with the effort (same PR).** A **capture review-sheet fix** (lifted the reader-feedback `.sheet`
+  off the Form-embedded subview onto the parent `RecipeCaptureView` Form so tapping Review no longer collapses
+  the presentation), **inline reader-feedback editing** (per-tip Edit/Done + Delete in the recipe's Reader
+  Feedback section, backed by scoped/tested `RecipeRepository.updateReaderFeedbackNote` /
+  `deleteReaderFeedbackNote` that only touch `.readerFeedback` notes), and a latent `MenuModels` build fix
+  (explicit `return` in a multi-statement complement `.map` closure).
+- **S6** — Jon's end-to-end device test on a real NYT recipe (Load Comments → curate → review/promote → accept
+  → notes appear in Reader Feedback, drop out of cooking mode, reach the chat context). **Production-deploy
+  note:** the additive `aiSettings.readerFeedbackPreference` column joins the held prod-schema checklist in
+  `CURRENT_HANDOFF.md`.
+
+---
+
 ## ADR-0024 Slice 2 — list / structured verbs get editable review
 
 **Architect-reviewed & approved 2026-07-09 — yes-chef branch `codex/adr-0024-s2-editable-list-verbs`
