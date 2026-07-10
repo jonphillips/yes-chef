@@ -4,12 +4,12 @@ import WebExtractorKit
 import YesChefCore
 
 private enum ReaderFeedbackSheet: Identifiable {
-  case review(ReaderFeedbackTip)
+  case review
   case promoteComments
 
   var id: String {
     switch self {
-    case .review(let tip): "review-\(tip.id)"
+    case .review: "review-reader-feedback"
     case .promoteComments: "promote-comments"
     }
   }
@@ -72,14 +72,14 @@ struct RecipeCaptureView: View {
     }
     .sheet(item: $readerFeedbackSheet) { sheet in
       switch sheet {
-      case .review(let tip):
-        readerFeedbackReviewSheet(tip: tip)
+      case .review:
+        readerFeedbackCollectionSheet
       case .promoteComments:
         ReaderFeedbackPromotionSheet(
           comments: model.readerFeedbackComments,
           promote: { comment, commentNumber in
-            let tip = model.promoteReaderFeedbackComment(comment, commentNumber: commentNumber)
-            readerFeedbackSheet = .review(tip)
+            _ = model.promoteReaderFeedbackComment(comment, commentNumber: commentNumber)
+            readerFeedbackSheet = .review
           }
         )
       }
@@ -143,22 +143,30 @@ struct RecipeCaptureView: View {
     }
   }
 
-  private func readerFeedbackReviewSheet(tip: ReaderFeedbackTip) -> some View {
-    let item = readerFeedbackReviewItem(for: tip)
-    return ChatApplyReviewSheet(
-      item: item,
-      isCommitting: false,
-      commit: { approvedText in
+  private var readerFeedbackCollectionSheet: some View {
+    RecipeCollectionReviewSheet(
+      items: model.readerFeedbackProposals.map { readerFeedbackReviewItem(for: $0) },
+      committingItemID: nil,
+      commit: { item, approvedText in
         do {
           try await item.commit(approvedText)
-          readerFeedbackSheet = nil
+          return true
         } catch {
           model.errorMessage = RecipeChatErrorText.describe(error)
           model.isShowingError = true
+          return false
         }
       },
-      discard: {
+      discard: { item in
+        guard let tip = model.readerFeedbackProposals.first(where: { $0.text == item.summary }) else { return }
         model.discardReaderFeedbackTip(tip)
+      },
+      discardAll: {
+        for tip in model.readerFeedbackProposals {
+          model.discardReaderFeedbackTip(tip)
+        }
+      },
+      onEmpty: {
         readerFeedbackSheet = nil
       }
     )
@@ -270,34 +278,15 @@ private struct RecipeCaptureReviewSections: View {
         || !model.readerFeedbackComments.isEmpty
       {
         Section("Reader Feedback") {
-          ForEach(model.readerFeedbackProposals) { tip in
-            VStack(alignment: .leading, spacing: 8) {
-              Label(tip.provenanceSummary, systemImage: tip.provenanceSystemImage)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-              Text(tip.text)
-                .font(.callout)
-                .lineLimit(3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-              HStack {
-                Button(role: .cancel) {
-                  model.discardReaderFeedbackTip(tip)
-                } label: {
-                  Label("Discard", systemImage: "trash")
-                }
-                .buttonStyle(.bordered)
-
-                Spacer(minLength: 8)
-
-                Button {
-                  readerFeedbackSheet = .review(tip)
-                } label: {
-                  Label("Review", systemImage: "doc.text.magnifyingglass")
-                }
-                .buttonStyle(.borderedProminent)
-              }
+          if !model.readerFeedbackProposals.isEmpty {
+            Button {
+              readerFeedbackSheet = .review
+            } label: {
+              Label(
+                "Review \(model.readerFeedbackProposals.count) proposal\(model.readerFeedbackProposals.count == 1 ? "" : "s")",
+                systemImage: "doc.text.magnifyingglass"
+              )
             }
-            .padding(.vertical, 4)
           }
 
           ForEach(model.readerFeedbackBlocks.indices, id: \.self) { index in

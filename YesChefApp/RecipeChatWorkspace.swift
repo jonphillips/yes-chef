@@ -232,8 +232,7 @@ struct RecipeChatPanel: View {
   @State private var applyingActionID: AnyChatApplyAction.ID?
   @State private var committingReviewItemID: ChatApplyReviewItem.ID?
   @State private var stagedReviewItems: [ChatApplyReviewItem] = []
-  @State private var presentedReviewItem: ChatApplyReviewItem?
-  @State private var actionSummary: ChatCommittedActionSummary?
+  @State private var isReviewSheetPresented = false
   @State private var actionError: String?
   @State private var confirmingClearChat = false
 
@@ -263,9 +262,6 @@ struct RecipeChatPanel: View {
               ChatMessageBubble(message: message, selection: assistantSelection)
                 .id(message.id)
             }
-            if let actionSummary {
-              ChatActionSummary(summary: actionSummary)
-            }
           }
           .padding()
         }
@@ -282,22 +278,6 @@ struct RecipeChatPanel: View {
       VStack(alignment: .leading, spacing: 12) {
         if let error = chatModel.errorText ?? actionError {
           ChatErrorBanner(message: error)
-        }
-
-        if !stagedReviewItems.isEmpty {
-          ChatApplyReviewList(
-            items: stagedReviewItems,
-            committingItemID: committingReviewItemID,
-            present: { item in
-              presentedReviewItem = item
-            },
-            commit: { item in
-              Task { await commit(item, approvedText: item.summary) }
-            },
-            discard: { item in
-              discard(item)
-            }
-          )
         }
 
         if let visibleActionSubject {
@@ -375,15 +355,23 @@ struct RecipeChatPanel: View {
     } message: {
       Text("This removes the scratch transcript for this \(chatModel.context.subject).")
     }
-    .sheet(item: $presentedReviewItem) { item in
-      ChatApplyReviewSheet(
-        item: item,
-        isCommitting: committingReviewItemID == item.id,
-        commit: { approvedText in
+    .sheet(isPresented: $isReviewSheetPresented, onDismiss: {
+      stagedReviewItems = []
+    }) {
+      RecipeCollectionReviewSheet(
+        items: stagedReviewItems,
+        committingItemID: committingReviewItemID,
+        commit: { item, approvedText in
           await commit(item, approvedText: approvedText)
         },
-        discard: {
+        discard: { item in
           discard(item)
+        },
+        discardAll: {
+          discardAll()
+        },
+        onEmpty: {
+          isReviewSheetPresented = false
         }
       )
     }
@@ -393,10 +381,9 @@ struct RecipeChatPanel: View {
     let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { return }
     draft = ""
-    actionSummary = nil
     actionError = nil
     stagedReviewItems = []
-    presentedReviewItem = nil
+    isReviewSheetPresented = false
     await chatModel.send(text)
   }
 
@@ -405,7 +392,6 @@ struct RecipeChatPanel: View {
     let subject = actionSubject(for: action)
     guard !action.requiresSubject || subject != nil else { return }
     applyingActionID = action.id
-    actionSummary = nil
     actionError = nil
     defer { applyingActionID = nil }
 
@@ -416,14 +402,14 @@ struct RecipeChatPanel: View {
         return
       }
       stagedReviewItems = items
-      presentedReviewItem = items.first { $0.presentation == .sheet }
+      isReviewSheetPresented = true
     } catch {
       actionError = RecipeChatErrorText.describe(error)
     }
   }
 
   @MainActor
-  private func commit(_ item: ChatApplyReviewItem, approvedText: String) async {
+  private func commit(_ item: ChatApplyReviewItem, approvedText: String) async -> Bool {
     committingReviewItemID = item.id
     actionError = nil
     defer { committingReviewItemID = nil }
@@ -431,21 +417,28 @@ struct RecipeChatPanel: View {
     do {
       try await item.commit(approvedText)
       stagedReviewItems.removeAll { $0.id == item.id }
-      if presentedReviewItem?.id == item.id {
-        presentedReviewItem = nil
+      if stagedReviewItems.isEmpty {
+        isReviewSheetPresented = false
       }
-      actionSummary = ChatCommittedActionSummary(title: item.committedTitle, text: approvedText)
+      return true
     } catch {
       actionError = RecipeChatErrorText.describe(error)
+      return false
     }
   }
 
   @MainActor
   private func discard(_ item: ChatApplyReviewItem) {
     stagedReviewItems.removeAll { $0.id == item.id }
-    if presentedReviewItem?.id == item.id {
-      presentedReviewItem = nil
+    if stagedReviewItems.isEmpty {
+      isReviewSheetPresented = false
     }
+  }
+
+  @MainActor
+  private func discardAll() {
+    stagedReviewItems = []
+    isReviewSheetPresented = false
   }
 
   private var visibleActionSubject: ChatActionSubject? {
@@ -505,8 +498,7 @@ struct RecipeChatPanel: View {
   private func clearChat() {
     assistantSelection.clear()
     stagedReviewItems = []
-    presentedReviewItem = nil
-    actionSummary = nil
+    isReviewSheetPresented = false
     actionError = nil
     chatModel.clear()
   }
@@ -816,43 +808,7 @@ private final class IntrinsicTextView: UITextView {
   }
 }
 
-private struct ChatCommittedActionSummary: Equatable {
-  var title: String
-  var text: String
-}
-
-private struct ChatApplyReviewList: View {
-  let items: [ChatApplyReviewItem]
-  let committingItemID: ChatApplyReviewItem.ID?
-  let present: (ChatApplyReviewItem) -> Void
-  let commit: (ChatApplyReviewItem) -> Void
-  let discard: (ChatApplyReviewItem) -> Void
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      ForEach(items) { item in
-        switch item.presentation {
-        case .inline:
-          ChatApplyReviewCard(
-            item: item,
-            isCommitting: committingItemID == item.id,
-            commit: { commit(item) },
-            discard: { discard(item) }
-          )
-        case .sheet:
-          ChatApplyReviewRow(
-            item: item,
-            isCommitting: committingItemID == item.id,
-            review: { present(item) },
-            discard: { discard(item) }
-          )
-        }
-      }
-    }
-  }
-}
-
-private struct ChatApplyReviewRow: View {
+struct ChatApplyReviewRow: View {
   let item: ChatApplyReviewItem
   let isCommitting: Bool
   let review: () -> Void
@@ -1018,61 +974,6 @@ struct ChatApplyReviewSheet: View {
       discard()
       dismiss()
     }
-  }
-}
-
-private struct ChatApplyReviewCard: View {
-  let item: ChatApplyReviewItem
-  let isCommitting: Bool
-  let commit: () -> Void
-  let discard: () -> Void
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Label(item.title, systemImage: "checklist")
-        .font(.caption.bold())
-      Text(item.summary)
-        .font(.callout)
-        .frame(maxWidth: .infinity, alignment: .leading)
-      HStack {
-        Button(role: .cancel, action: discard) {
-          Label("Discard", systemImage: "trash")
-        }
-        .buttonStyle(.bordered)
-        .disabled(isCommitting)
-
-        Spacer(minLength: 8)
-
-        Button(action: commit) {
-          Label(
-            isCommitting ? item.committingTitle : item.commitTitle,
-            systemImage: isCommitting ? "hourglass" : "checkmark.circle"
-          )
-        }
-        .buttonStyle(.borderedProminent)
-        .disabled(isCommitting)
-      }
-    }
-    .padding(10)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(.tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
-  }
-}
-
-private struct ChatActionSummary: View {
-  let summary: ChatCommittedActionSummary
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Label(summary.title, systemImage: "checkmark.circle")
-        .font(.caption.bold())
-        .foregroundStyle(.green)
-      Text(summary.text)
-        .font(.callout)
-    }
-    .padding(10)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
   }
 }
 
