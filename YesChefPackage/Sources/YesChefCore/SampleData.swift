@@ -20,6 +20,15 @@ extension DependencyValues {
   }
 
   public func seedSampleDataIfNeeded() throws {
+    // Demo recipes use DETERMINISTIC primary keys (`SampleUUIDSequence`,
+    // `00000000-0000-0000-0000-…`). Seeding them into a live, CloudKit-synced store makes
+    // every device manufacture the *same* keys, which then collide across devices under the
+    // tables' `ON CONFLICT REPLACE` primary keys and push demo rows into the shared iCloud
+    // zone. So never seed in the live app unless a screenshot/demo build explicitly opts in;
+    // previews and tests (non-`.live` contexts) still get their sample library.
+    @Dependency(\.context) var context
+    let optedIn = ProcessInfo.processInfo.arguments.contains("-YesChefSeedSampleData")
+    guard context != .live || optedIn else { return }
     try defaultDatabase.write { db in
       guard try Recipe.fetchCount(db) == 0 else { return }
 

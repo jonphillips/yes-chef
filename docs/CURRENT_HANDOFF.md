@@ -1,7 +1,16 @@
 # Current Handoff
 
-Last updated: July 10, 2026. **Next Up = Jon picks the next effort** — ADR-0027 S1 just shipped; the
-"Ready after this" candidates below are Jon's call (do not infer). **Just shipped: ADR-0027 "Capture to
+Last updated: July 10, 2026. **Next Up = ADR-0028 Phase 1 (sync-correctness bug on the gate) — but
+gated on Jon's Phase 0 confirmation + iPad backup; see Next Up.** A two-device dogfood exposed that
+recipe **content** (ingredients/directions/menu items) never reaches a second device: SQLiteData's
+CloudKit sync only models a parent for tables with **exactly one** foreign key, and Yes Chef's content
+tables carry two — [ADR-0028](decisions/ADR-0028-multi-foreign-key-sync-loss.md), holds
+[[sqlitedata-single-fk-sync-limit]]. **Phase 0 shipped in the working tree (non-destructive, builds
+clean):** demo-seeding gated out of the live/synced store (was polluting the zone with deterministic
+`00000000-…` keys) + a debug "Local record counts" section in the Sync detail sheet to confirm on
+device. **Phase 1 (the ≤1-FK schema rebuild + CloudKit zone rebuild) is written up but NOT wired** —
+it needs the iPad backup + Phase 0 device confirmation first. Prior context: ADR-0027 S1 just shipped; the
+"Ready after this" feature candidates below are Jon's call (do not infer). **Just shipped: ADR-0027 "Capture to
 menu" S1 ([#141](https://github.com/jonphillips/yes-chef/pull/141))** — the menu chat **harvest** verb
 (inverse of the generative complement family): captures a chat text selection (or, absent one, the assistant
 transcript) into `.note`-kind `MenuItem`s, the model segmenting + reshaping prose into recipe-looking notes
@@ -48,12 +57,34 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Jon picks the next effort — do not infer.** ADR-0027 S1 shipped in
+**PRIORITY — ADR-0028 Phase 1: multi-FK sync loss** ([ADR-0028](decisions/ADR-0028-multi-foreign-key-sync-loss.md)).
+A sync-**correctness** bug on the one-way gate: two-FK content tables (`ingredientLines`,
+`instructionSteps`, `menuItems`) never apply on a consuming device (iPhone got 2158 recipe shells, zero
+ingredients/directions, empty menus; data confirmed present in CloudKit). **Phase 0 is already in the
+working tree** (demo-seed gate + debug count row, non-destructive, builds clean). **Before Phase 1, Jon
+owes two gating steps** (neither is a dispatch): (1) **back up the iPad** (Xcode → Devices → iPad →
+YesChef → ⚙︎ Download Container → save the `.xcappdata`), and (2) install the Phase 0 build on both
+devices, open Settings → Sync → **Local record counts**, and confirm iPhone `ingredientLines`/
+`instructionSteps`/`menuItems` ≈ 0 while iPad ≫ 0 (and capture the iPhone device console during a resync —
+expect `FOREIGN KEY constraint failed`). **Phase 1 dispatch** (only after those): wire the ≤1-FK rebuild
+migration (loose-pointer `recipeID` on the three tables; exact column lists in the ADR), **test it against
+the restored iPad backup in a simulator** (trigger-rebuild risk — [[debug-erase-vs-sync-triggers]]), then
+rebuild the CloudKit zone iPad-first and reset the iPhone's local store. Fallback if the in-place migration
+is dicey: export→wipe→reimport (ADR OQ3). Resolve OQ1 (are `recipePhotos`/`menus`/`mealPlanItems` the same
+root cause?) from the Phase 0 counts.
+
+**Feature efforts — Jon picks; do not infer.** ADR-0027 S1 shipped in
 [#141](https://github.com/jonphillips/yes-chef/pull/141) (see Just Shipped, above). The candidates below are
 Jon's call; a fresh dispatch must **STOP and ask Jon** which one:
 - **ADR-0027 S2** — the recipe sibling (capture chat into a `RecipeNote` on a recipe). S1's shape ported
   cleanly (`MenuNoteHarvestPlan`/`HarvestedNote` + the two-mode client), so this is a straight port if Jon
   wants it. Design: [ADR-0027](decisions/ADR-0027-harvest-chat-into-notes.md) D6.
+- **ADR-0027 Amendment 1 — deposit chat intelligence onto an item** (dispatch drafted:
+  [`docs/efforts/adr-0027-amd1-deposit-to-item.md`](efforts/adr-0027-amd1-deposit-to-item.md)). Two slices:
+  S1 = target-designation plumbing + recipe-append (`RecipeNote`); S2 = note-revise compose surface
+  (original + LLM-woven draft → overwrite `menuItems.notes`). Schema-free. **One pre-S1 confirm owed from
+  Jon:** target-designation gesture (tap-to-target vs. in-verb picker). NB: shares the "write a `RecipeNote`
+  from a chat commit" primitive with **ADR-0027 S2** above — whichever ships first, the other reuses it.
 - **Recipe edit proposals S3** — the iterative refine loop + workbench-log deposit.
 - **Workbench synthesis-shaped apply-action** — the draft verb's own action shape (no last-reply gate/chip).
 - **Open a design ADR** — ADR-0013 meal-planner verbs (needs scope confirmation) or ADR-0014 text editing.
