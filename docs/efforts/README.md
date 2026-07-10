@@ -24,6 +24,12 @@ it's touched.
 
 ## Active / recent
 
+- [adr-0026-review-collection-sheet.md](adr-0026-review-collection-sheet.md) —
+  **Ready to dispatch** (Next Up) · Governed by
+  [ADR-0026](../decisions/ADR-0026-review-collection-sheet.md) (Accepted) · Hoist the multi-item
+  LLM-review collection into the slide-up sheet (the universal LLM-evaluation surface); remove the inline
+  `ChatApplyReviewList` band; adjust verb becomes a launch-only row; S2 = reader-feedback curation adopts
+  the same host-agnostic sheet. No schema.
 - [dogfood-fixes-batch-5-mechanical-polish.md](dogfood-fixes-batch-5-mechanical-polish.md)
   — **Dispatched** (2026-07-08) · Mechanical dogfood polish in one PR: recipe detail
   toolbar/layout, editor (auto-growing text + editable Make-Ahead/Chef-It-Up + async
