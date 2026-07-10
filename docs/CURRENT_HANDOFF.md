@@ -79,12 +79,12 @@ Jon's call; a fresh dispatch must **STOP and ask Jon** which one:
 - **ADR-0027 S2** — the recipe sibling (capture chat into a `RecipeNote` on a recipe). S1's shape ported
   cleanly (`MenuNoteHarvestPlan`/`HarvestedNote` + the two-mode client), so this is a straight port if Jon
   wants it. Design: [ADR-0027](decisions/ADR-0027-harvest-chat-into-notes.md) D6.
-- **ADR-0027 Amendment 1 — deposit chat intelligence onto an item** (dispatch drafted:
+- **ADR-0027 Amendment 1 — deposit chat intelligence onto an item** (dispatch ready:
   [`docs/efforts/adr-0027-amd1-deposit-to-item.md`](efforts/adr-0027-amd1-deposit-to-item.md)). Two slices:
-  S1 = target-designation plumbing + recipe-append (`RecipeNote`); S2 = note-revise compose surface
-  (original + LLM-woven draft → overwrite `menuItems.notes`). Schema-free. **One pre-S1 confirm owed from
-  Jon:** target-designation gesture (tap-to-target vs. in-verb picker). NB: shares the "write a `RecipeNote`
-  from a chat commit" primitive with **ADR-0027 S2** above — whichever ships first, the other reuses it.
+  S1 = tap-to-target plumbing + recipe-append (`RecipeNote`); S2 = note-revise compose surface
+  (original + LLM-woven draft → overwrite `menuItems.notes`). Schema-free; target gesture confirmed
+  (tap-to-target). NB: shares the "write a `RecipeNote` from a chat commit" primitive with **ADR-0027 S2**
+  above — whichever ships first, the other reuses it.
 - **Recipe edit proposals S3** — the iterative refine loop + workbench-log deposit.
 - **Workbench synthesis-shaped apply-action** — the draft verb's own action shape (no last-reply gate/chip).
 - **Open a design ADR** — ADR-0013 meal-planner verbs (needs scope confirmation) or ADR-0014 text editing.

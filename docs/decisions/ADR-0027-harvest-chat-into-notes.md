@@ -10,7 +10,11 @@
 
 Status: **Accepted** — 2026-07-10 (Jon ratified same day; proposed 2026-07-10, dogfood pass 2026-07-10,
 menu-planner). Verb name is **"Capture to menu"** (OQ5). All open questions resolved below except OQ4
-(taste preference), deliberately deferred. **Extends
+(taste preference), deliberately deferred. **Amendment 1 (2026-07-10, ratified): a
+[deposit sibling](#amendment-1--deposit-chat-intelligence-onto-the-item-you-point-at-recipe-append--note-revise)**
+— write chat *intelligence* onto the **existing item you point at** (recipe → append to note body; note →
+LLM revises in place). **No queue, no auto-Workbench** — durability is opt-in via a separate promote step.
+Schema-free. **Extends
 [ADR-0012](ADR-0012-menu-actionable-chat.md)** (menu actionable chat — same `MenuItem`-`.note` commit
 target, ADR-0012 Amendment 2) and **[ADR-0011](ADR-0011-actionable-chat-make-ahead.md)** (the
 `(extract → review → commit)` apply-action contract). **Rides [ADR-0026](ADR-0026-review-collection-sheet.md)**
@@ -171,3 +175,155 @@ record).
 - Memory: [[chat-verb-commit-shapes]], [[llm-curation-not-synthesis]], [[llm-vs-determinism-surface-boundary]],
   [[menu-item-recipe-id-invariant]], [[reference-placement-and-original-provenance]],
   [[menu-planner-dogfood-2026-07-09]].
+
+---
+
+# Amendment 1 — Deposit chat intelligence onto the item you point at (recipe: append · note: revise)
+
+> **Vocabulary:** a **deposit** takes intelligence **the model already produced in the chat** — usually
+> advisory *reasoning* (a Compare verdict, a "here's how I'd change this" riff) — and writes it onto **the
+> existing item you point at**, in the mode that item's canonical-ness demands:
+> - **recipe → append.** The recipe is canonical/precious, so never rewrite it; add the intelligence to its
+>   **note body** (a `recipeNote`). Record, don't transform.
+> - **note → revise.** A menu note is disposable/non-canonical, so the LLM may **synthesize the intelligence
+>   into the note's content**, rewriting it in place. This *is* a transform — and that is fine *only* because
+>   a note is not precious. (Same reason Jon refuses to transform the recipe.)
+>
+> There is **no queue, no reminder inbox, no auto-Workbench, no graduation-to-candidate** — those were
+> considered and cut (see A4). A note stays an **ephemeral menu note**; durability is **opt-in**, reached
+> only by the separate, user-triggered **promote-to-recipe** step (out of scope, A6). Deposit is a sibling
+> of the base capture verb (both write chat content onto a menu-surface item); the difference is base writes
+> a **new** note, Amd-1 writes onto an **existing** one.
+
+Status: **Accepted** — 2026-07-10 (Jon ratified same day, same menu-planner dogfood lineage as the base
+ADR; converged across the same-day design thread from an auto-queue model to this explicit, queue-free one —
+see A4 for the reversal). **Extends ADR-0027 base** (same harvest nature, same ADR-0011 apply-action
+contract, same review-before-commit guardrails). **Schema-free** (like the base verb): the recipe path
+writes an existing `recipeNote`; the note path rewrites the existing `menuItems.notes` column; nothing
+touches `workbenchCandidates`. Nothing new for `SyncEngine` ([ADR-0002](ADR-0002-cloudkit-sync-no-server.md)).
+The note-revise path borrows the **editable-preview** pattern ([ADR-0024](ADR-0024-editable-proposal-preview.md))
+so a rewrite is reviewed before it overwrites.
+
+## Context
+
+Same session, a **later** intent than the base verb. Jon had a menu, captured a "Roasted Chile-Lime
+Cauliflower" **note** on it (via the base Capture verb), then added a "Charred Cauliflower Tacos" **recipe**
+and ran **Compare** ("compare the recipe to the note"). The model returned a strong advisory verdict — use
+the note as the base, skip the redundant romesco, steal the taco intent, push it toward the menu's Mexican
+lane. **Good intelligence, produced in the moment, with nowhere to land.** Jon's instinct: *"Adjust the
+note"* from that feedback — but there was no such verb and no way to point at the note.
+
+The design thread that followed first reached for a durable **Workbench queue** — every deposit auto-copied
+into a candidate so an idea could never be lost. Jon then cut it: *"If I want to make a note a real recipe, I
+will trigger that wherever the note is. No weird workbench queue."* That collapses the model — the
+"never lose the idea" guarantee is better served by an **explicit promotion**, not an auto-accumulating
+inbox. What remains is a small, target-adaptive write. (The reversal is recorded in A4 so it is not
+re-litigated.)
+
+### The finding that still holds: the menu already makes items addressable
+
+The menu tags **every** item (note and recipe) with its `MenuItem` UUID inside the serialized LLM context
+(`MenuChatContext.swift:180`) and reads each item's notes **back** verbatim (`MenuChatContext.swift:200`).
+So the model already reasons over an **addressable** item — the missing half is the *reverse channel*: Jon
+pointing at that item and a result landing on it (A5).
+
+The menu note's ephemerality (`menuItems` is inline + `ON DELETE CASCADE`, `Schema.swift:380`) is **no
+longer a problem to engineer around** — it is the *intended* default. A note is a menu-scoped, disposable
+thing; if it earns durability, promotion (A6) makes it real. We stopped trying to preserve every note
+automatically.
+
+## Decisions
+
+### A1 — A **deposit** verb, target-adaptive by canonical-ness
+
+One apply-action whose commit **branches on what you pointed at**: append onto a recipe (A2), revise a note
+(A3). It does not generate new dishes (that is complement) and it does not touch the Workbench (A4). The
+selection *source* is the chat intelligence (a Compare verdict, a riff); the selection *target* is the item
+(A5).
+
+### A2 — Recipe target → **append** to the recipe's note body
+
+Write the intelligence as a `recipeNote` on that recipe (lightly tidied, but the recipe body is **never**
+rewritten — protect the canonical recipe, per Jon's "I never want to adjust a recipe from the menu"). Durable
+already; surfaces on the recipe. No Workbench entry, no reminder — you will see it on the recipe.
+
+### A3 — Note target → **revise** the note through a **compose surface** (original + woven draft)
+
+The LLM **synthesizes** the intelligence into the note, and the result overwrites `menuItems.notes` for that
+note-kind row. This is a *transform*, permissible **because a note is non-canonical** — the exact inverse of
+A2's rule. The note **stays on the menu, ephemeral and menu-scoped**; nothing is copied elsewhere.
+
+But the LLM's woven version is **not assumed to be a drop-in replacement** (Jon: "I can't promise the thing I
+want to save is a drop-in replacement"). So the edit sheet is a **compose surface**, not a blind approve:
+
+- **The original note stays visible and copyable** — preserved source, so nothing the model dropped is lost;
+  Jon can lift any of it back.
+- **An LLM-woven combination** (original ⊕ the deposited intelligence) is the **editable draft**.
+- **Jon assembles the final text** — edit the draft, paste from the original — and *that composed text* is
+  what commits.
+
+This is [ADR-0023](ADR-0023-recipe-edit-proposals.md)'s **side-by-side original-vs-proposed** pattern at note
+scale, with [ADR-0024](ADR-0024-editable-proposal-preview.md) editability — cheaper, because a note has a
+**single** commit destination (overwrite itself), not the recipe's overwrite-or-variation fork.
+
+### A4 — **No queue. No auto-Workbench. No graduation.** (Recorded reversal)
+
+An earlier turn of this design auto-copied every deposit into a `workbenchCandidate` to build a single
+"reminder inbox." **Cut, deliberately.** Reasons: (1) it dragged in real machinery — an inbox-workbench
+identity, a provenance column, dedup rules, distinct-origin styling — to solve "don't lose the idea," which
+(2) **explicit promotion solves better and more honestly**: durability should be a *deliberate act*, not a
+side effect of thinking out loud. A deposit therefore touches **only** the item you pointed at. "Add to
+Workbench" remains a **separate, manual staging affordance** (a workbench candidate is already exactly that),
+never auto-populated by this verb. Do not resurrect the queue without a new reason.
+
+### A5 — Item selection as a **target** binding (the one genuinely new UI piece)
+
+The base verb needed *selection-as-source* (built). This needs *selection-as-target*: tapping a menu item
+(note or recipe) to make it the deposit destination. Model side is half-done (item UUIDs are already
+in-prompt); the missing half is the menu-side binding that makes an item the commit target. The subject/verb
+infra (`AnyChatApplyAction`, `requiresSubject`, `RecipeChat.swift:670`) is the hook, not greenfield.
+
+### A6 — Out of scope (named, not folded in)
+
+- **Promote a note → a real recipe.** User-**triggered wherever the note lives** (Jon's explicit shape), not
+  a queue, not automatic. Under-specified on purpose — it drags in recipe placement + original-provenance
+  ([[reference-placement-and-original-provenance]]) and is ADR-0023/0021-adjacent. Base ADR-0027 **D5**
+  already deferred it; this amendment keeps it deferred. Spec it as its own effort when Jon wants it.
+- **The seed-bubble verb model** (pre-populate an editable prompt instead of firing a verb blind). Related,
+  but a **separate interaction concern Jon owns** ("not sure I need your help there").
+
+## Storage sketch (schema-free)
+
+- **Recipe path** → a new `recipeNote` row (existing table, `Schema.swift:273`).
+- **Note path** → overwrites `menuItems.notes` on the existing note-kind row (existing column,
+  `Schema.swift:388`).
+- Nothing touches `workbenchCandidates`; no new table, column, enum case, or `SyncEngine` surface. Both
+  writes are additive/in-place on already-synced tables — sync-safe by construction.
+
+## Open questions
+
+- **OQ-Amd-1 — verb name(s).** Is it **one** verb whose label adapts to the target, or **two** ("Add to
+  recipe notes" on a recipe, "Revise this note" on a note)? The commit branches either way; this is purely
+  how it reads. *Lean:* two labels, because "append" and "rewrite in place" are honestly different promises
+  and a single label would hide which one you are about to get. Resolve at dogfood.
+- **OQ-Amd-2 — note revise: replace or merge? → Resolved: neither — a compose surface.** The LLM does not
+  decide; the edit sheet shows the **original note (copyable source)** beside an **LLM-woven combination
+  (editable draft)**, and Jon assembles the committed text (A3). Chosen because the woven version can't be
+  assumed to be a drop-in replacement, so the original must stay salvageable on screen. One remaining sub-
+  choice for dogfood: whether the **raw deposited intelligence** also gets its own copyable pane, or stays
+  folded into the woven draft only (*lean:* folded-only — the transcript already holds the raw text; two
+  panes is enough).
+- **OQ-Amd-3 — promotion (deferred).** Note→recipe is A6, its own effort; listed here only so it is not
+  mistaken for part of this slice.
+
+## Related
+
+- Base ADR-0027 (parent — new-note capture vs. this existing-item deposit).
+  [ADR-0024](ADR-0024-editable-proposal-preview.md) (the review-before-overwrite pattern the note path
+  borrows). [ADR-0023](ADR-0023-recipe-edit-proposals.md) / [ADR-0021](ADR-0021-recipe-variations.md) (the
+  *out-of-scope* transform / variations, and the eventual promote-to-recipe home).
+  [ADR-0011](ADR-0011-actionable-chat-make-ahead.md) (apply-action contract).
+  [ADR-0002](ADR-0002-cloudkit-sync-no-server.md) (sync-safety).
+- Memory: [[recipe-edit-proposals]], [[llm-curation-not-synthesis]], [[llm-vs-determinism-surface-boundary]],
+  [[menu-item-recipe-id-invariant]], [[reference-placement-and-original-provenance]],
+  [[menu-planner-dogfood-2026-07-09]], [[chat-verb-commit-shapes]].
