@@ -10,6 +10,53 @@ Newest first.
 
 ---
 
+## ADR-0026 — the LLM-review collection becomes the universal slide-up sheet (S1 + S2)
+
+**Architect-reviewed & approved 2026-07-10 — yes-chef PR [#138](https://github.com/jonphillips/yes-chef/pull/138)
+(branch `codex/adr-0026-review-collection-sheet`, commit `f135d25`; core check-drift green — 270 tests, 0 lint;
+app layer device-passed by Jon).** Implements [ADR-0026](decisions/ADR-0026-review-collection-sheet.md)
+(Accepted 2026-07-10), S1 + S2 in one PR. **Schema-free, sync-safe by construction** — an in-memory
+review-surface refactor over the existing `ChatApplyReviewItem` collection, no table/column. Dispatch 2 (and
+last) of the 2026-07-09 menu-planner pass; held apart from Dispatch 1's low-risk quick-fixes because it
+re-touches the shared `RecipeChatWorkspace` apply-action presentation state. Extends
+[ADR-0024](decisions/ADR-0024-editable-proposal-preview.md) (the per-item editable sheet — the layer below);
+serves [ADR-0025](decisions/ADR-0025-reader-comment-ingestion.md) curation. [[chat-verb-commit-shapes]],
+[[llm-curation-not-synthesis]].
+
+- **S1 — collection sheet (D1–D3).** New host-agnostic `RecipeCollectionReviewSheet` (`YesChefApp`),
+  parameterized by `[ChatApplyReviewItem]` + `commit`/`discard`/`discardAll`/`onEmpty` closures — **not** baked
+  into `RecipeChatPanel`'s `@State`, which is what let S2 reuse it. It lists the staged set (title + summary +
+  per-item Discard) and drills into the ADR-0024 editable review; per-item commit/discard removes the item and
+  keeps the sheet open on the remainder; discard-all is one confirmed gesture. The cramped inline
+  `ChatApplyReviewList` band is **removed** from `RecipeChatPanel`, along with its now-dead `ChatApplyReviewCard`,
+  `ChatActionSummary`, and `ChatCommittedActionSummary`; the panel's `presentedReviewItem`/`actionSummary`
+  `@State` collapses to a single `isReviewSheetPresented` bool. `ChatApplyReviewRow` was promoted from `private`
+  so the new sheet can host it.
+- **OQ behaviors preserved.** N=1 skips the list and auto-drills into its editable review (`reconcilePresentedItem`
+  on appear/count-change); the N→1 transition (committing/discarding to the last item) re-drills cleanly; a
+  lightweight per-item green commit confirmation lives in the sheet (OQ4 — replacing the removed panel-level
+  `ChatActionSummary`); the per-item `supportingEvidenceRows` disclosure survives the hoist unchanged (OQ3).
+- **D4 adjust verb — launch-only row.** The sole `.inline`-presentation consumer ("Adjust this recipe",
+  ADR-0023) renders as a launch row inside the collection sheet whose primary action delegates to the item's
+  commit, which opens the Compare-diff `RecipeAdjustmentReviewView` exactly as before — the sheet lists
+  *everything the LLM proposed* while Compare-diff still **owns** the adjust review. No apply-action's commit
+  contract changed; the router picks the row affordance from `presentation`.
+- **S2 — reader-feedback curation adopts it.** `RecipeCaptureView`'s hand-rolled `Section("Reader Feedback")`
+  proposal rows (each opening a one-off `ChatApplyReviewSheet`) are replaced by a single "Review N proposals"
+  button that presents the same `RecipeCollectionReviewSheet`, hosted directly in the capture Form (no chat
+  panel). The `ReaderFeedbackSheet.review` enum case dropped its per-tip associated value. Commit removes the
+  tip from `readerFeedbackProposals` via the existing `acceptReaderFeedbackTip` → `discardReaderFeedbackTip`
+  path; discard matches the tip by text (safe because proposals are deduped by lowercased text at stage time).
+- **Verification.** `xcodegen generate` + `scripts/check-drift.sh` green; one app build attempt was blocked
+  before compilation by an unavailable Xcode-beta simulator service (`simdiskimaged`) and not retried per repo
+  rules. **Device pass owed (Jon):** the architect review flagged two interaction risks — (1) the adjust launch
+  row presents Compare-diff from `RecipeDetailView` while the collection sheet dismisses from `RecipeChatPanel`
+  in the same runloop (present-while-dismiss across two anchors — confirm Compare-diff isn't swallowed); (2) N=1
+  auto-drill stacks the child review sheet over the collection sheet (functionally fine; confirm it reads
+  cleanly, incl. iPad split-chat, OQ2).
+
+---
+
 ## ADR-0025 D6 + D7 — curation-prompt preference + curated notes into chat (effort closed)
 
 **Merged to main 2026-07-09 — yes-chef PR [#134](https://github.com/jonphillips/yes-chef/pull/134)

@@ -1,12 +1,15 @@
 # Current Handoff
 
-Last updated: July 10, 2026. **Next Up = ADR-0026 review-collection sheet** (Dispatch 2 of the 2026-07-09
-menu-planner pass; see Next Up below). **Just shipped: the menu-planner dogfood quick-fixes bundle
-([#136](https://github.com/jonphillips/yes-chef/pull/136)) — 4 slices, one PR: chat selection reliably
-clears on deselect + explicit clear affordance; complement suggestions carry a `body` into `MenuItem.notes`
-(ADR-0012 Amendment 2); prep-plan empty result explains itself via a per-action `emptyResultMessage`
-(contract unchanged); rename an existing variation (`RecipeRepository.renameVariation` + detail affordance);
-no schema change** (full contents in [`docs/DONE-LOG.md`](DONE-LOG.md)). Earlier and also logged there:
+Last updated: July 10, 2026. **Next Up = awaiting Jon's call** — the 2026-07-09 menu-planner pass is now
+complete (both dispatches shipped), so the next dispatch is a fresh strategic pick; see Next Up below.
+**Just shipped: ADR-0026 review-collection sheet ([#138](https://github.com/jonphillips/yes-chef/pull/138))
+— S1+S2, one PR: the whole multi-item LLM-review collection now lives in the universal slide-up sheet
+(`RecipeCollectionReviewSheet`, built host-agnostic), the cramped inline `ChatApplyReviewList` band is gone,
+the adjust verb is a launch-only row that still opens the Compare-diff surface, and reader-feedback curation
+in capture shares the same sheet; no schema change** (full contents in [`docs/DONE-LOG.md`](DONE-LOG.md)).
+Earlier and also logged there: **the menu-planner dogfood quick-fixes bundle
+([#136](https://github.com/jonphillips/yes-chef/pull/136))** — selection-clear + clear affordance, complement
+note-body (ADR-0012 Amd 2), prep-plan explain-better, variation rename; no schema. Earlier and also logged there:
 **ADR-0025 D6 + D7 ([#134](https://github.com/jonphillips/yes-chef/pull/134)) — the DB-backed reader-feedback
 curation-prompt preference (ADR-0018 `aiSettings`, additive `readerFeedbackPreference` column) + curated
 `RecipeNote(.readerFeedback)` rows feeding a distinct bucket in `RecipeChatRecipeContext`, bundled with the
@@ -36,29 +39,21 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**ADR-0026 review-collection sheet (Dispatch 2 of the 2026-07-09 menu-planner pass).** Dispatch 1 (the
-quick-fixes bundle) shipped in [#136](https://github.com/jonphillips/yes-chef/pull/136); this is the
-deliberately-separate second dispatch (a shared apply-action refactor with ripple risk, held apart from the
-low-risk fix bundle).
+**Empty — awaiting Jon's call.** The 2026-07-09 menu-planner pass is complete: Dispatch 1 (quick-fixes,
+[#136](https://github.com/jonphillips/yes-chef/pull/136)) and Dispatch 2 (ADR-0026 review-collection sheet,
+[#138](https://github.com/jonphillips/yes-chef/pull/138)) both shipped. Nothing is pre-sequenced as the next
+dispatch, so per the rule above **do not infer it — Jon picks.**
 
-Build per the brief [`efforts/adr-0026-review-collection-sheet.md`](efforts/adr-0026-review-collection-sheet.md)
-(implements [ADR-0026](decisions/ADR-0026-review-collection-sheet.md), **Accepted 2026-07-10**): hoist the
-whole multi-item LLM-review **collection** into the slide-up sheet (the universal "evaluate content from the
-LLM" surface), removing the cramped inline `ChatApplyReviewList` band. **Separate dispatch on purpose** — it
-re-touches the shared `RecipeChatWorkspace` apply-action presentation state (`stagedReviewItems` /
-`presentedReviewItem`, the ADR-0024 D3 generics), which Dispatch 1 also lightly touched (Slice C's
-`emptyResultMessage`); the ADR's code citations were verified against `main` (`aaabc17`) in the 2026-07-10
-architect pass. Prove S1 on the complements verb; S2 points ADR-0025 curation at the same surface. No schema
-change.
+The strongest ready candidates (details in the queue below): **Recipe edit proposals S3** (the iterative
+refine loop + workbench-log deposit — explicitly gated "behind the dogfood ADRs," which are now all done, so
+it's unblocked); the **Workbench synthesis-shaped apply-action** (the prior Next Up, demoted); or opening
+one of the **design ADRs** (ADR-0013 meal-planner verbs — needs scope confirmation; ADR-0014 text editing).
 
-**Two decisions resolved in that architect pass and baked into the ADR/brief (don't re-open):** (1) the
-adjust verb — the sole `.inline` review item, currently a launch card inside the band being removed —
-becomes a **launch-only row inside the collection sheet** whose action opens the Compare-diff
-`RecipeAdjustmentReviewView` (D4 keeps the Compare-diff as adjust's review surface); (2) S1 must build the
-collection sheet as a **host-agnostic component** (`[ChatApplyReviewItem]` + closures), because S2's
-consumer (reader-feedback curation) lives in `RecipeCaptureView`'s Form, **not** a chat panel. OQ1/OQ3/OQ4
-are resolved against current code in the ADR; OQ2 (iPad split-chat host) stays the one open device-feel
-call.
+**ADR-0026 device pass still owed (Jon):** the architect review flagged two interaction risks to confirm on
+device — (1) the adjust launch row presents Compare-diff from `RecipeDetailView` while the collection sheet
+dismisses from `RecipeChatPanel` in the same runloop (present-while-dismiss across two anchors — verify
+Compare-diff isn't swallowed); (2) N=1 auto-drill stacks the child review sheet over the collection sheet
+(functionally fine; confirm it reads cleanly, incl. iPad split-chat, OQ2).
 
 **Parked to `docs/open-questions.md` (design forks, decide with Jon before build):** multi-bubble /
 whole-transcript chat selection (per-bubble `UITextView` caps the payload); hand-editing a variation /
@@ -97,10 +92,13 @@ target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](
   — **DONE** ([#136](https://github.com/jonphillips/yes-chef/pull/136) → DONE-LOG): selection-clear bug +
   clear affordance, complement note-body (ADR-0012 Amd 2), prep-plan explain-better, variation rename. One
   PR, no schema. Nothing left here.
-- **ADR-0026 review-collection sheet** ([ADR-0026](decisions/ADR-0026-review-collection-sheet.md), Accepted;
+- **ADR-0026 review-collection sheet** ([ADR-0026](decisions/ADR-0026-review-collection-sheet.md);
   brief [`efforts/adr-0026-review-collection-sheet.md`](efforts/adr-0026-review-collection-sheet.md))
-  — **now Next Up, above.** The universal LLM-evaluation slide-up sheet; **separate dispatch** (shared
-  apply-action generics). Extends ADR-0024; serves ADR-0025 curation.
+  — **DONE** ([#138](https://github.com/jonphillips/yes-chef/pull/138) → DONE-LOG): S1+S2 in one PR — the
+  host-agnostic `RecipeCollectionReviewSheet` hoists the whole multi-item review collection into the slide-up
+  sheet, removes the inline `ChatApplyReviewList` band, makes the adjust verb a launch-only row into
+  Compare-diff, and reuses the sheet for reader-feedback curation in capture; no schema. Device pass owed
+  (see Next Up). Nothing left here.
 
 **Recipe edit proposals** ([ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) +
 `efforts/recipe-edit-proposals.md`) — the "Adjust this recipe" verb; **S1 + S2 shipped** (overwrite
