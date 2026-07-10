@@ -230,8 +230,7 @@ struct RecipeChatPanel: View {
   @State private var draft = ""
   @State private var assistantSelection = ChatAssistantSelection()
   @State private var applyingActionID: AnyChatApplyAction.ID?
-  @State private var stagedReviewActionID: String?
-  @State private var stagedReviewActionTitle: String?
+  @State private var stagedReviewAction: AnyChatApplyAction?
   @State private var committingReviewItemID: ChatApplyReviewItem.ID?
   @State private var stagedReviewItems: [ChatApplyReviewItem] = []
   @State private var isReviewSheetPresented = false
@@ -359,8 +358,7 @@ struct RecipeChatPanel: View {
     }
     .sheet(isPresented: $isReviewSheetPresented, onDismiss: {
       stagedReviewItems = []
-      stagedReviewActionID = nil
-      stagedReviewActionTitle = nil
+      stagedReviewAction = nil
     }) {
       RecipeCollectionReviewSheet(
         items: stagedReviewItems,
@@ -416,8 +414,7 @@ struct RecipeChatPanel: View {
       AppLog.applyAction.info(
         "extract id=\(action.id, privacy: .public) title=\(action.title, privacy: .public) outcome=items itemCount=\(items.count, privacy: .public)"
       )
-      stagedReviewActionID = action.id
-      stagedReviewActionTitle = action.title
+      stagedReviewAction = action
       stagedReviewItems = items
       isReviewSheetPresented = true
     } catch {
@@ -431,8 +428,8 @@ struct RecipeChatPanel: View {
 
   @MainActor
   private func commit(_ item: ChatApplyReviewItem, approvedText: String) async -> Bool {
-    let actionID = stagedReviewActionID ?? "unknown"
-    let actionTitle = stagedReviewActionTitle ?? "unknown"
+    let actionID = stagedReviewAction?.id ?? "unknown"
+    let actionTitle = stagedReviewAction?.title ?? "unknown"
     AppLog.applyAction.info(
       "commit-start id=\(actionID, privacy: .public) title=\(actionTitle, privacy: .public) reviewItem=\(item.title, privacy: .public)"
     )
@@ -445,8 +442,7 @@ struct RecipeChatPanel: View {
       stagedReviewItems.removeAll { $0.id == item.id }
       if stagedReviewItems.isEmpty {
         isReviewSheetPresented = false
-        stagedReviewActionID = nil
-        stagedReviewActionTitle = nil
+        stagedReviewAction = nil
       }
       AppLog.applyAction.info(
         "commit-success id=\(actionID, privacy: .public) title=\(actionTitle, privacy: .public) reviewItem=\(item.title, privacy: .public)"
@@ -467,8 +463,7 @@ struct RecipeChatPanel: View {
     stagedReviewItems.removeAll { $0.id == item.id }
     if stagedReviewItems.isEmpty {
       isReviewSheetPresented = false
-      stagedReviewActionID = nil
-      stagedReviewActionTitle = nil
+      stagedReviewAction = nil
     }
   }
 
@@ -476,8 +471,7 @@ struct RecipeChatPanel: View {
   private func discardAll() {
     stagedReviewItems = []
     isReviewSheetPresented = false
-    stagedReviewActionID = nil
-    stagedReviewActionTitle = nil
+    stagedReviewAction = nil
   }
 
   private var visibleActionSubject: ChatActionSubject? {
@@ -613,6 +607,13 @@ private struct ChatActionSubject: Equatable {
   enum Source {
     case selection
     case latestReply
+
+    var logDescription: String {
+      switch self {
+      case .selection: "explicit-selection-subject-chip"
+      case .latestReply: "latestReplySubject-fallback"
+      }
+    }
   }
 
   var source: Source
@@ -622,13 +623,6 @@ private struct ChatActionSubject: Equatable {
     switch source {
     case .selection: "Acting on your selection"
     case .latestReply: "Acting on latest reply"
-    }
-  }
-
-  var logDescription: String {
-    switch source {
-    case .selection: "explicit-selection-subject-chip"
-    case .latestReply: "latestReplySubject-fallback"
     }
   }
 

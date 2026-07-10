@@ -1,7 +1,7 @@
 # Current Handoff
 
-Last updated: July 10, 2026. **Next Up = awaiting Jon's call** — the 2026-07-09 menu-planner pass is now
-complete (both dispatches shipped), so the next dispatch is a fresh strategic pick; see Next Up below.
+Last updated: July 10, 2026. **Next Up = Instrumentation — apply-action + LLM logging** (the un-built item
+from the 2026-07-09 menu-planner dogfood; see Next Up below). The rest of that pass shipped in #136/#138.
 **Just shipped: ADR-0026 review-collection sheet ([#138](https://github.com/jonphillips/yes-chef/pull/138))
 — S1+S2, one PR: the whole multi-item LLM-review collection now lives in the universal slide-up sheet
 (`RecipeCollectionReviewSheet`, built host-agnostic), the cramped inline `ChatApplyReviewList` band is gone,
@@ -39,15 +39,22 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Empty — awaiting Jon's call.** The 2026-07-09 menu-planner pass is complete: Dispatch 1 (quick-fixes,
-[#136](https://github.com/jonphillips/yes-chef/pull/136)) and Dispatch 2 (ADR-0026 review-collection sheet,
-[#138](https://github.com/jonphillips/yes-chef/pull/138)) both shipped. Nothing is pre-sequenced as the next
-dispatch, so per the rule above **do not infer it — Jon picks.**
+**Instrumentation — logging for the apply-action + LLM pipeline.** Build per the brief
+[`efforts/instrumentation-apply-action-logging.md`](efforts/instrumentation-apply-action-logging.md): add
+"for now" diagnostic logging so a misbehaving chat/menu verb is legible — when a verb shows *"The assistant
+did not return anything to review,"* the log must reveal **what the model actually returned and why `extract`
+produced nothing** (non-JSON prose vs. `{"steps":[]}` vs. truncated/empty output). Design is decided in the
+brief: an `os.Logger` `AppLog` namespace (Core, `.public` payloads — single-user app), a `LoggingModelClient`
+decorator wrapping `\.modelClient` at the composition root (`YesChefApp.swift` ~24 — one seam covers every
+verb), plus apply-action lifecycle logging in `RecipeChatWorkspace.run/commit`. **Do NOT modify `LLMClientKit`**
+(shared jon-platform package); no in-app viewer; no schema; no behavior change. Serves the parked two-device
+dogfood — the next pass shouldn't guess why a verb misbehaved. The one un-built item from the 2026-07-09
+menu-planner dogfood list (the other five shipped in #136/#138).
 
-The strongest ready candidates (details in the queue below): **Recipe edit proposals S3** (the iterative
-refine loop + workbench-log deposit — explicitly gated "behind the dogfood ADRs," which are now all done, so
-it's unblocked); the **Workbench synthesis-shaped apply-action** (the prior Next Up, demoted); or opening
-one of the **design ADRs** (ADR-0013 meal-planner verbs — needs scope confirmation; ADR-0014 text editing).
+**Ready after this (Jon picks — do not infer):** **Recipe edit proposals S3** (iterative refine loop +
+workbench-log deposit — unblocked now the dogfood ADRs are done); the **Workbench synthesis-shaped
+apply-action** (prior Next Up, demoted); or opening a **design ADR** (ADR-0013 meal-planner verbs — needs
+scope confirmation; ADR-0014 text editing).
 
 **ADR-0026 device pass still owed (Jon):** the architect review flagged two interaction risks to confirm on
 device — (1) the adjust launch row presents Compare-diff from `RecipeDetailView` while the collection sheet
@@ -86,6 +93,13 @@ target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](
   scaffolding #129, curation revision #131, and **D6/D7 + S6 (#134)** all shipped → DONE-LOG). NYT "Most
   Helpful" harvest → LLM-curate distinct tips → reviewable `RecipeNote(.readerFeedback)` + curation-prompt
   preference + chat-context feed; additive enum + `aiSettings` column, no new table. Nothing left here.
+
+**Instrumentation — apply-action + LLM logging**
+([`efforts/instrumentation-apply-action-logging.md`](efforts/instrumentation-apply-action-logging.md))
+— **now Next Up, above.** Diagnostic `os.Logger` logging at the `\.modelClient` seam (one `LoggingModelClient`
+decorator at the composition root) + apply-action lifecycle in `RecipeChatWorkspace`, so a verb's raw LLM
+response and empty-`extract` reason are legible. The un-built item from the 2026-07-09 menu-planner dogfood.
+No `LLMClientKit` edits, no schema, no behavior change.
 
 **Menu-planner dogfood 2026-07-09.**
 - **Quick-fixes bundle** ([`efforts/dogfood-fixes-menu-planner-2026-07-09.md`](efforts/dogfood-fixes-menu-planner-2026-07-09.md))
