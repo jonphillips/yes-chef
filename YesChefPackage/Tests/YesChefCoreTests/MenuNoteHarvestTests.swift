@@ -81,6 +81,7 @@ extension RecipeCoreTests {
       let request = await recorder.first()
       expectNoDifference(request?.tier, .frontier(.anthropic))
       expectNoDifference(request?.reasoningEffort, .medium)
+      expectNoDifference(request?.promptPreferenceKey, AIPromptPreferenceKind.captureToNote.rawValue)
       #expect(request?.messages.first?.text.contains("The cauliflower paragraph.") == true)
       #expect(request?.messages.first?.text.contains("The full assistant reply.") == false)
       #expect(request?.messages.first?.text.contains("Please suggest a menu.") == false)

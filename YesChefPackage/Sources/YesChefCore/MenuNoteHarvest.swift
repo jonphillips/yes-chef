@@ -78,7 +78,8 @@ extension MenuNoteHarvestClient: DependencyKey {
       system: instructions,
       prompt: prompt(selection: selection, messages: messages),
       maxTokens: 1536,
-      reasoningEffort: .medium
+      reasoningEffort: .medium,
+      promptPreferenceKey: AIPromptPreferenceKind.captureToNote.rawValue
     )
     let response = try await modelClient.complete(request)
     return parse(response.text)

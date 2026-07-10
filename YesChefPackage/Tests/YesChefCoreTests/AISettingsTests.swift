@@ -88,5 +88,34 @@ extension RecipeCoreTests {
         )
       }
     }
+
+    @Test
+    func captureToNotePreferenceRoundTripsAndMaps() {
+      let preference = "Use an Ingredients section and numbered Method steps when the source supports them."
+
+      var mutated = AISettingsRepository.defaultSettings(
+        now: Date(timeIntervalSinceReferenceDate: 820_300_000)
+      )
+      AISettingsRepository.setPreference(preference, for: .captureToNote, in: &mutated)
+      expectNoDifference(
+        AISettingsRepository.preference(in: mutated, for: .captureToNote),
+        preference
+      )
+
+      let request = ModelRequest(
+        prompt: "x",
+        promptPreferenceKey: AIPromptPreferenceKind.captureToNote.rawValue
+      )
+
+      let settings = mutated
+      withDependencies {
+        $0.aiPromptPreferences = AIPromptPreferencesClient { settings }
+      } operation: {
+        expectNoDifference(
+          YesChefAIPromptPreferences.modelPromptPreferences(for: request),
+          ModelPromptPreferences(tasteProfile: "", taskPreference: preference)
+        )
+      }
+    }
   }
 }
