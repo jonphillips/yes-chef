@@ -150,7 +150,7 @@ extension RecipeDetailModel {
         }
         let syncOverall = syncBefore.isActive || syncAfter.isActive ? "active" : "idle"
         AppLog.performance.log(
-          "variation-switch writer-wait=\(writerWait, format: .fixed(precision: 1))ms sql=\(sqlDuration, format: .fixed(precision: 1))ms commit=\(commitDuration, format: .fixed(precision: 1))ms wal-before=\(walBefore?.description ?? \"unavailable\", privacy: .public) wal-after=\(walAfter?.description ?? \"unavailable\", privacy: .public) sync=\(syncOverall, privacy: .public) sync-before=\(syncBefore.description, privacy: .public) sync-after=\(syncAfter.description, privacy: .public)"
+          "variation-switch writer-wait=\(writerWait, format: .fixed(precision: 1))ms sql=\(sqlDuration, format: .fixed(precision: 1))ms commit=\(commitDuration, format: .fixed(precision: 1))ms wal-before=\(walBefore?.description ?? "unavailable", privacy: .public) wal-after=\(walAfter?.description ?? "unavailable", privacy: .public) sync=\(syncOverall, privacy: .public) sync-before=\(syncBefore.description, privacy: .public) sync-after=\(syncAfter.description, privacy: .public)"
         )
 
         await awaitActiveVariationDelivery(variationID)
