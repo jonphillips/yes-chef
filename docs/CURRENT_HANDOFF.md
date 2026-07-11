@@ -59,20 +59,23 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**CANDIDATE — ADR-0028 sync status-indicator accuracy** ([ADR-0028](decisions/ADR-0028-multi-foreign-key-sync-loss.md)).
+**DONE (working tree) — ADR-0028 sync status-indicator accuracy** ([ADR-0028](decisions/ADR-0028-multi-foreign-key-sync-loss.md)).
 The dogfood "missing content on iPhone" turned out to be a **throttled bulk initial sync** (CloudKit
 `CKError 7/2062` rate-limiting a ~44k-row + 2.5k-asset first pull), **not** data loss — the debug count row
 showed the child tables climbing, so the multi-FK "content loss" theory and its schema/zone rebuild were
 **disproven and withdrawn** (no schema change, nothing at device risk; the iPhone just needs to finish
-downloading). **Already in the working tree** (non-destructive, builds clean, 278 tests pass): the
-demo-seed gate + the debug "Local record counts" sheet — keep both. **The one real fix left:** the
-**"Up to date" indicator lies** during an in-progress/throttled download (it reads upload-pending +
-engine-running + account only). Fix = feed `SyncEngine.isFetchingChanges` (SyncEngine.swift:411) + the
-rate-limit backoff condition into `SyncHealth.displayStatus` so the row stays "Syncing…" until the first
-full pull completes and never claims "Up to date" mid-fetch. **This lives in `CloudSyncKit` (shared with
-galavant)** — read its house rules first ([[architect-role-and-handoffs]]); pure reducer logic, testable in
-the value type; no % progress possible (CloudKit exposes none — this is *don't-lie*, not a progress bar).
-Jon's call whether to take this now or after a feature effort below.
+downloading). Already in the working tree: the demo-seed gate + the debug "Local record counts" sheet.
+**The indicator fix is now built (architect executed it directly, 2026-07-10):** `SyncHealth` gained a
+boolean `isFetchingChanges` input + a new `SyncDisplayStatus.downloading` case (gated after upload-pending);
+`SyncHealthModel.refresh()` feeds `syncEngine.isFetchingChanges`; the row now stays "Syncing…" mid-pull and
+never lies "Up to date". Lives in **`CloudSyncKit`** (shared w/ galavant) + the two app files; 15 reducer
+tests pass, package builds+tests clean, `check-drift.sh` green (280 tests). **Scope note:** no public
+rate-limit/backoff signal exists (SQLiteData swallows the throttle `CKError` internally), so the row can't
+say "paused by iCloud" and may briefly flash "Up to date" *between* throttled batches — accepted limitation,
+recorded in the ADR. **NOT committed** — the working tree also holds the parallel ADR-0027 session's
+in-flight edits (`RecipeDetailModel+Enrichment.swift` + `RecipeCapturedNote*`), which currently **don't
+build** (`appendRecipeNote` missing); the ADR-0028 files are independent of them. Jon does the git
+separation/commit.
 
 **Feature efforts — Jon picks; do not infer.** ADR-0027 S1 shipped in
 [#141](https://github.com/jonphillips/yes-chef/pull/141) (see Just Shipped, above). The candidates below are

@@ -60,11 +60,29 @@ incomplete**, and it will converge. Incremental syncs afterward won't hit this.
 
 1. **Fix the status indicator (the real bug).** `SyncHealth.displayStatus` (in **CloudSyncKit**, shared
    with galavant) computes "Up to date" from **upload**-pending count + engine-running + account only. It
-   must also reflect **download** state: feed `SyncEngine.isFetchingChanges` (SyncEngine.swift:411) and the
-   rate-limit/backoff condition into the reducer so the row stays **"Syncing…"** (ideally "Syncing —
-   paused by iCloud, will resume") until the first full pull completes, and never claims "Up to date"
-   while a fetch is in flight or deferred by a retry-after. CloudKit exposes **no** total/percentage, so
-   this is *don't-lie*, not a progress bar. Pure reducer logic — testable in the CloudSyncKit value type.
+   must also reflect **download** state: feed `SyncEngine.isFetchingChanges` (SyncEngine.swift:411) into the
+   reducer so the row stays **"Syncing…"** while a fetch is in flight and never claims "Up to date"
+   mid-pull. CloudKit exposes **no** total/percentage, so this is *don't-lie*, not a progress bar. Pure
+   reducer logic — testable in the CloudSyncKit value type.
+
+   **Shipped (2026-07-10).** Added a boolean `isFetchingChanges` input to `SyncHealth` and a new
+   `SyncDisplayStatus.downloading` case, gated *after* the upload-pending check (an outbound upload with a
+   count is the more useful thing to surface; both are honest "in progress" states). The app's
+   `SyncHealthModel.refresh()` now feeds `syncEngine.isFetchingChanges`; the existing
+   `onChange(of: isSynchronizing)` hook (which already covers `isFetchingChanges`) drives the re-fold, so no
+   new view wiring was needed. Summary reads "Syncing…" for both upload and download; the detail sheet
+   distinguishes them ("Downloading changes from iCloud", plus a first-large-sync-takes-a-while footnote).
+   15 CloudSyncKit reducer tests pass.
+
+   **Scope limit found in-flight (worth recording).** There is **no** public **rate-limit/backoff** signal
+   to feed the reducer: SQLiteData's `SyncEngine` *swallows* the throttle `CKError`s internally
+   (`.requestRateLimited`/`.serviceUnavailable` fall into `continue`/`break` arms at SyncEngine.swift
+   ~1794/1830) and exposes nothing observable for "paused by iCloud, will resume". So the row cannot say
+   *why* it paused, and in the brief gap **between** throttled fetch batches (`isFetchingChanges` momentarily
+   false, nothing pending) it can still flash "Up to date" before the next batch flips it back. That
+   micro-flicker is an **accepted limitation**, not a regression — the steady-state lie (green for hours
+   mid-pull) is fixed; a truthful "paused, will resume" would need SQLiteData to surface backoff state (a
+   possible upstream ask, parked).
 2. **Keep the demo-seed gate** (already shipped, Phase 0) — an independent, minor real bug: seeding demo
    recipes with deterministic `00000000-…` keys into the live synced store collides across devices. Now
    gated to non-`.live` contexts / `-YesChefSeedSampleData`.
