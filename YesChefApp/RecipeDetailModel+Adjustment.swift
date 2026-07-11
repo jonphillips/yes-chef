@@ -96,16 +96,18 @@ extension RecipeDetailModel {
   }
 
   /// Switches the active variation, instrumented per ADR-0029 Amendment 2 S5a to
-  /// split the tap→publish latency into its three phases:
+  /// split the tap→publish latency into its four phases:
   ///
   /// 1. **writer-wait** — handler entry → write-closure entry (the Finding-5 convoy,
   ///    if the theory holds: our write queued behind the sync engine's observation
   ///    re-fetches on the shared writer);
-  /// 2. **write-txn** — the two-statement write itself;
-  /// 3. **publish-gap** — commit → the `@Fetch` delivering the new `activeVariationID`.
+  /// 2. **SQL** — write-closure entry → the last statement in the two-statement write;
+  /// 3. **COMMIT** — the last statement → `database.write` returning;
+  /// 4. **publish-gap** — commit → the `@Fetch` delivering the new `activeVariationID`.
   ///
-  /// Signposted for Instruments and mirrored to `AppLog.performance` so a plain
-  /// console capture is enough. Cheap; left in permanently, no DEBUG gating.
+  /// The SQL and COMMIT boundaries are signposted for Instruments and mirrored,
+  /// with WAL and sync state, to `AppLog.performance` so a plain console capture is
+  /// enough. Cheap; left in permanently, no DEBUG gating.
   func activeVariationSelectionChanged(_ variationID: RecipeVariation.ID?) {
     let clock = ContinuousClock()
     let handlerEntry = clock.now
@@ -115,10 +117,16 @@ extension RecipeDetailModel {
     Task {
       let now = now
       let makeUUID = uuid
+      let walBefore = try? await database.read { db in
+        try WALCheckpointState.read(from: db)
+      }
+      let syncBefore = syncActivity
       let writeStart = InstantBox()
+      let sqlDone = InstantBox()
       do {
         try await database.write { db in
           writeStart.instant = clock.now
+          signposter.emitEvent("writer-wait", id: signpostID)
           try RecipeRepository.setActiveVariation(
             variationID,
             recipeID: recipeID,
@@ -126,14 +134,23 @@ extension RecipeDetailModel {
             now: now,
             uuid: { makeUUID() }
           )
+          sqlDone.instant = clock.now
+          signposter.emitEvent("variationSQLDone", id: signpostID)
         }
         let writeExit = clock.now
         let entryToWrite = writeStart.instant ?? writeExit
+        let lastStatementDone = sqlDone.instant ?? writeExit
         let writerWait = handlerEntry.duration(to: entryToWrite).milliseconds
-        let writeTxn = entryToWrite.duration(to: writeExit).milliseconds
-        signposter.emitEvent("writer-wait", id: signpostID)
+        let sqlDuration = entryToWrite.duration(to: lastStatementDone).milliseconds
+        let commitDuration = lastStatementDone.duration(to: writeExit).milliseconds
+        signposter.emitEvent("variationCommitDone", id: signpostID)
+        let syncAfter = syncActivity
+        let walAfter = try? await database.read { db in
+          try WALCheckpointState.read(from: db)
+        }
+        let syncOverall = syncBefore.isActive || syncAfter.isActive ? "active" : "idle"
         AppLog.performance.log(
-          "variation-switch writer-wait=\(writerWait, format: .fixed(precision: 1))ms write-txn=\(writeTxn, format: .fixed(precision: 1))ms"
+          "variation-switch writer-wait=\(writerWait, format: .fixed(precision: 1))ms sql=\(sqlDuration, format: .fixed(precision: 1))ms commit=\(commitDuration, format: .fixed(precision: 1))ms wal-before=\(walBefore?.description ?? \"unavailable\", privacy: .public) wal-after=\(walAfter?.description ?? \"unavailable\", privacy: .public) sync=\(syncOverall, privacy: .public) sync-before=\(syncBefore.description, privacy: .public) sync-after=\(syncAfter.description, privacy: .public)"
         )
 
         await awaitActiveVariationDelivery(variationID)
@@ -184,6 +201,47 @@ extension RecipeDetailModel {
     }
   }
 
+}
+
+private extension RecipeDetailModel {
+  var syncActivity: SyncActivitySnapshot {
+    SyncActivitySnapshot(
+      isRunning: syncEngine.isRunning,
+      isSending: syncEngine.isSendingChanges,
+      isFetching: syncEngine.isFetchingChanges
+    )
+  }
+}
+
+private struct SyncActivitySnapshot: Sendable, CustomStringConvertible {
+  let isRunning: Bool
+  let isSending: Bool
+  let isFetching: Bool
+
+  var isActive: Bool { isSending || isFetching }
+
+  var description: String {
+    let phase = isActive ? "active" : "idle"
+    return "\(phase)(running=\(isRunning),sending=\(isSending),fetching=\(isFetching))"
+  }
+}
+
+private struct WALCheckpointState: Sendable {
+  let busy: Int
+  let logPages: Int
+  let checkpointedPages: Int
+
+  var description: String {
+    "busy=\(busy),log=\(logPages),checkpointed=\(checkpointedPages)"
+  }
+
+  static func read(from db: Database) throws -> Self {
+    let row = try Row.fetchOne(db, sql: "PRAGMA wal_checkpoint(NOOP)")
+    let busy: Int = row?[0] ?? -1
+    let logPages: Int = row?[1] ?? -1
+    let checkpointedPages: Int = row?[2] ?? -1
+    return Self(busy: busy, logPages: logPages, checkpointedPages: checkpointedPages)
+  }
 }
 
 /// One-shot carrier for the write-closure entry timestamp captured off the main

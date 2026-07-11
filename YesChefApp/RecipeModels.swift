@@ -796,6 +796,8 @@ final class RecipeDetailModel {
   @ObservationIgnored
   @Dependency(\.defaultDatabase) var database
   @ObservationIgnored
+  @Dependency(\.defaultSyncEngine) var syncEngine
+  @ObservationIgnored
   @Dependency(\.uuid) var uuid
   @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
