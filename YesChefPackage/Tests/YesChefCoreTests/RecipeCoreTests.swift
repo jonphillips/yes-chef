@@ -335,11 +335,16 @@ struct RecipeCoreTests {
       expectNoDifference(photo.kind, .hero)
       expectNoDifference(photo.source, .user)
       expectNoDifference(photo.imageDataReference, "recipePhotos/\(photoID.uuidString)")
-      expectNoDifference(photo.displayData, processedPhoto.displayData)
+      expectNoDifference(photo.hasDisplayData, processedPhoto.displayData != nil)
       expectNoDifference(photo.thumbnailData, processedPhoto.thumbnailData)
       expectNoDifference(photo.mediaType, processedPhoto.mediaType)
       expectNoDifference(photo.checksum, processedPhoto.checksum)
-      expectNoDifference(photo.originalSourcePath, "Photo Library.jpg")
+
+      // The slim detail projection omits full-res bytes and originalSourcePath
+      // (ADR-0029 Amd2 S5b); verify those persisted via the stored row.
+      let storedPhoto = try #require(try RecipePhoto.find(photoID).fetchOne(db))
+      expectNoDifference(storedPhoto.displayData, processedPhoto.displayData)
+      expectNoDifference(storedPhoto.originalSourcePath, "Photo Library.jpg")
     }
   }
 
@@ -404,12 +409,11 @@ struct RecipeCoreTests {
 
       let updatedDetail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
       expectNoDifference(updatedDetail.photos.map(\.id), [replacementPhotoID])
-      expectNoDifference(updatedDetail.photos.map(\.originalSourcePath), ["Replacement.jpg"])
 
-      let storedPhotoIDs = try RecipePhoto.fetchAll(db)
+      let storedPhotos = try RecipePhoto.fetchAll(db)
         .filter { $0.recipeID == recipeID }
-        .map(\.id)
-      expectNoDifference(storedPhotoIDs, [replacementPhotoID])
+      expectNoDifference(storedPhotos.map(\.id), [replacementPhotoID])
+      expectNoDifference(storedPhotos.map(\.originalSourcePath), ["Replacement.jpg"])
     }
   }
 

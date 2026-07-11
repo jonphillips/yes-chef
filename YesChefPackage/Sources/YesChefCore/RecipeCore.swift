@@ -1,6 +1,94 @@
 import Foundation
 import SQLiteData
 
+/// A slim projection of `RecipePhoto` for the detail screen: metadata plus the
+/// small `thumbnailData` and a `hasDisplayData` presence flag, but **never** the
+/// full-resolution `displayData` bytes. Carrying those in the observed
+/// `RecipeDetailData` is what made every `SyncEngine` commit re-run a multi-MB
+/// fetch synchronously on the writer connection (ADR-0029 Amendment 2, Finding 5),
+/// and bloated the `Equatable` payload the animated re-publish diffs. Hero and
+/// full-screen bytes are read on demand from the concurrent reader pool instead.
+///
+/// Deliberately not a `@Table` and not directly persistable — a slim row must
+/// never round-trip back to the database (that would null out image bytes). See
+/// `leanRecipePhoto` for the one allowed, byte-free conversion used by passive
+/// snapshots.
+public struct RecipeDetailPhoto: Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var recipeID: Recipe.ID
+  public var imageDataReference: String
+  public var thumbnailData: Data?
+  public var hasDisplayData: Bool
+  public var mediaType: String?
+  public var pixelWidth: Int?
+  public var pixelHeight: Int?
+  public var checksum: String?
+  public var kind: RecipePhotoKind
+  public var caption: String?
+  public var source: PhotoSource
+  public var sortOrder: Int
+  public var dateCreated: Date
+
+  public init(
+    id: UUID,
+    recipeID: Recipe.ID,
+    imageDataReference: String,
+    thumbnailData: Data? = nil,
+    hasDisplayData: Bool = false,
+    mediaType: String? = nil,
+    pixelWidth: Int? = nil,
+    pixelHeight: Int? = nil,
+    checksum: String? = nil,
+    kind: RecipePhotoKind = .gallery,
+    caption: String? = nil,
+    source: PhotoSource = .user,
+    sortOrder: Int,
+    dateCreated: Date
+  ) {
+    self.id = id
+    self.recipeID = recipeID
+    self.imageDataReference = imageDataReference
+    self.thumbnailData = thumbnailData
+    self.hasDisplayData = hasDisplayData
+    self.mediaType = mediaType
+    self.pixelWidth = pixelWidth
+    self.pixelHeight = pixelHeight
+    self.checksum = checksum
+    self.kind = kind
+    self.caption = caption
+    self.source = source
+    self.sortOrder = sortOrder
+    self.dateCreated = dateCreated
+  }
+
+  /// Any image bytes are worth displaying — an on-demand hero read hydrates
+  /// `displayData` even when the fetch carried only a thumbnail (or neither).
+  public var isDisplayable: Bool {
+    hasDisplayData || thumbnailData != nil
+  }
+
+  /// A metadata-only `RecipePhoto` (no image bytes) for passive snapshotting only.
+  /// Never persist this — it deliberately carries no `displayData`/`thumbnailData`.
+  public var leanRecipePhoto: RecipePhoto {
+    RecipePhoto(
+      id: id,
+      recipeID: recipeID,
+      imageDataReference: imageDataReference,
+      displayData: nil,
+      thumbnailData: nil,
+      mediaType: mediaType,
+      pixelWidth: pixelWidth,
+      pixelHeight: pixelHeight,
+      checksum: checksum,
+      kind: kind,
+      caption: caption,
+      source: source,
+      sortOrder: sortOrder,
+      dateCreated: dateCreated
+    )
+  }
+}
+
 public struct RecipeDetailData: Equatable, Sendable {
   public var recipe: Recipe
   public var source: RecipeSource?
@@ -9,7 +97,7 @@ public struct RecipeDetailData: Equatable, Sendable {
   public var instructionSections: [InstructionSection]
   public var instructionSteps: [InstructionStep]
   public var notes: [RecipeNote]
-  public var photos: [RecipePhoto]
+  public var photos: [RecipeDetailPhoto]
   public var tags: [Tag]
   public var categories: [Category]
   public var categoryDisplayNames: [String]
@@ -26,7 +114,7 @@ public struct RecipeDetailData: Equatable, Sendable {
     instructionSections: [InstructionSection] = [],
     instructionSteps: [InstructionStep] = [],
     notes: [RecipeNote] = [],
-    photos: [RecipePhoto] = [],
+    photos: [RecipeDetailPhoto] = [],
     tags: [Tag] = [],
     categories: [Category] = [],
     categoryDisplayNames: [String] = [],
@@ -65,6 +153,46 @@ public struct RecipeDetailRequest: FetchKeyRequest {
   }
 }
 
+/// Column projection backing `RecipeDetailData.photos`. Selects `thumbnailData`
+/// and a `displayData IS NOT NULL` presence flag, but never the `displayData`
+/// bytes themselves — the point of ADR-0029 Amendment 2 S5b.
+@Selection
+struct RecipeDetailPhotoRow: Equatable, Sendable {
+  let id: UUID
+  let recipeID: Recipe.ID
+  let imageDataReference: String
+  let thumbnailData: Data?
+  let hasDisplayData: Bool
+  let mediaType: String?
+  let pixelWidth: Int?
+  let pixelHeight: Int?
+  let checksum: String?
+  let kind: RecipePhotoKind
+  let caption: String?
+  let source: PhotoSource
+  let sortOrder: Int
+  let dateCreated: Date
+
+  var detailPhoto: RecipeDetailPhoto {
+    RecipeDetailPhoto(
+      id: id,
+      recipeID: recipeID,
+      imageDataReference: imageDataReference,
+      thumbnailData: thumbnailData,
+      hasDisplayData: hasDisplayData,
+      mediaType: mediaType,
+      pixelWidth: pixelWidth,
+      pixelHeight: pixelHeight,
+      checksum: checksum,
+      kind: kind,
+      caption: caption,
+      source: source,
+      sortOrder: sortOrder,
+      dateCreated: dateCreated
+    )
+  }
+}
+
 public enum RecipeRepository {
   public static func fetchDetail(recipeID: Recipe.ID, in db: Database) throws -> RecipeDetailData? {
     guard let recipe = try (Recipe.where { $0.id.eq(recipeID) })
@@ -89,7 +217,26 @@ public enum RecipeRepository {
       .fetchAll(db)
     let photos = try (RecipePhoto.where { $0.recipeID.eq(recipeID) })
       .order { $0.sortOrder }
+      .select {
+        RecipeDetailPhotoRow.Columns(
+          id: $0.id,
+          recipeID: $0.recipeID,
+          imageDataReference: $0.imageDataReference,
+          thumbnailData: $0.thumbnailData,
+          hasDisplayData: $0.displayData.isNot(nil),
+          mediaType: $0.mediaType,
+          pixelWidth: $0.pixelWidth,
+          pixelHeight: $0.pixelHeight,
+          checksum: $0.checksum,
+          kind: $0.kind,
+          caption: $0.caption,
+          source: $0.source,
+          sortOrder: $0.sortOrder,
+          dateCreated: $0.dateCreated
+        )
+      }
       .fetchAll(db)
+      .map(\.detailPhoto)
     let source = try (RecipeSource.where { $0.recipeID.eq(recipeID) })
       .fetchOne(db)
     let recipeTags = try (RecipeTag.where { $0.recipeID.eq(recipeID) })
@@ -151,6 +298,13 @@ public enum RecipeRepository {
     let recipeID = draft.id ?? uuid()
     let dateCreated = draft.dateCreated ?? now
     let existingDetail = try draft.id.flatMap { try fetchDetail(recipeID: $0, in: db) }
+    // `existingDetail.photos` is now a slim projection with no `displayData` bytes
+    // (ADR-0029 Amd2 S5b). The photo reconcile below must merge and re-write full
+    // rows, so fetch the writable `RecipePhoto`s directly rather than reusing the
+    // slim ones (which would null the image bytes on any retained row).
+    let existingPhotos = try draft.id.flatMap { existingRecipeID in
+      try RecipePhoto.where { $0.recipeID.eq(existingRecipeID) }.order { $0.sortOrder }.fetchAll(db)
+    } ?? []
     let existingIngredientSection = existingDetail?.ingredientSections.sorted { $0.sortOrder < $1.sortOrder }.first
     let existingInstructionSection = existingDetail?.instructionSections.sorted { $0.sortOrder < $1.sortOrder }.first
     let ingredientSection = existingIngredientSection
@@ -243,7 +397,7 @@ public enum RecipeRepository {
     )
     let snapshotNotes = (existingDetail?.notes.filter { $0.noteType != .general } ?? []) + generalNotes
     let photos = mergedPhotos(
-      existingDetail?.photos ?? [],
+      existingPhotos,
       pendingPhotos: draft.pendingPhotos,
       recipeID: recipeID,
       now: now
@@ -283,7 +437,7 @@ public enum RecipeRepository {
     )
     try reconcileTags(draft.tagNames.listNames, recipeID: recipeID, in: db, now: now, uuid: uuid)
     try reconcileCategories(from: draft, recipeID: recipeID, in: db, now: now, uuid: uuid)
-    try reconcilePhotos(photos, existingPhotos: existingDetail?.photos ?? [], in: db)
+    try reconcilePhotos(photos, existingPhotos: existingPhotos, in: db)
 
     return recipeID
   }

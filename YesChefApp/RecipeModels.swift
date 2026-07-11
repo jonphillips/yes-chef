@@ -822,14 +822,11 @@ final class RecipeDetailModel {
     )
   }
 
-  var displayablePhotos: [RecipePhoto] {
-    detail?.photos
-      .filter { photo in
-        photo.displayData != nil || photo.thumbnailData != nil
-      } ?? []
+  var displayablePhotos: [RecipeDetailPhoto] {
+    detail?.photos.filter(\.isDisplayable) ?? []
   }
 
-  var primaryDisplayPhoto: RecipePhoto? {
+  var primaryDisplayPhoto: RecipeDetailPhoto? {
     RecipePhotoCover.coverPhoto(
       coverPhotoID: recipe?.coverPhotoID,
       from: displayablePhotos

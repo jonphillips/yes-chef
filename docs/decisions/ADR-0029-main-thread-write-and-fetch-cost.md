@@ -365,3 +365,74 @@ with the new evidence instead.
   2026-07-11) and rerun the S5a repro once with sync verifiably idle to bound the engine's contribution.
 - **OQ-A2-2 — does any editor commit path need fetched full-res bytes?** Audit during S5b; if yes, the
   editor does its own on-demand read at commit time — the fetch still never carries bytes.
+
+---
+
+# Amendment 3 — S5a measured: the cost is the COMMIT, not the convoy (Finding 5 disproven)
+
+> **One-line:** The S5a signposts landed on a real device switch and read **writer-wait = 20 ms,
+> write-txn = 5096 ms, publish-gap = 0 ms**. This **overturns Finding 5**: the writer was free when the
+> tap landed (20 ms to enter it — no convoy), and post-commit delivery is instant (0 ms — S5b made the
+> re-fetch cheap). **All ~5.1 s is inside `database.write` itself** — a DELETE + INSERT of one tiny
+> `recipeActiveVariations` row plus SQLite's COMMIT. Trivial SQL taking 5 s ⇒ the cost is the **commit**
+> (fsync / WAL checkpoint) and/or the **per-write CloudKit sync-trigger bookkeeping**, amplified by a
+> 44k-row DB with full-resolution image BLOBs stored inline. **Kill S5c** (observations-off-writer moves
+> nothing). New direction: split and attack the commit cost. **No schema change yet.**
+
+Status: **Measured** — 2026-07-11, S5a instrument (built with S5b). S5a did exactly its job: it was cheap
+insurance against building S5c on a wrong theory, and it caught the wrong theory. Nothing here invalidates
+S1/S2/S4/S5b — S5b in particular is *confirmed* by publish-gap = 0. It retires the Finding-5/S5c hypothesis
+and redirects at [ADR-0002](ADR-0002-cloudkit-sync-no-server.md)'s shared writer from a different angle: not
+*contention* on the writer, but the *per-commit I/O* the writer pays.
+
+## Finding 6 — a two-statement write commits in ~5 s because the commit itself is expensive
+
+The three phases, measured:
+
+| Phase | Definition | Measured |
+|---|---|---|
+| writer-wait | handler entry → write-closure entry | **20 ms** |
+| write-txn | write-closure entry → `database.write` returns (SQL + COMMIT) | **5096 ms** |
+| publish-gap | commit → `@Fetch` delivers new `activeVariationID` | **0 ms** |
+
+- **writer-wait 20 ms disproves the convoy.** If sync-engine observation re-fetches were occupying the
+  writer (Finding 5), our write would have waited behind them. It didn't. The writer was free.
+- **publish-gap 0 ms confirms S5b and clears the render/observation path.** The post-commit re-fetch and
+  publish happen within the 5 ms poll resolution. Whatever ate the seconds finished at COMMIT.
+- **write-txn 5096 ms is the whole hang, and the SQL is trivial** (`setActiveVariation`:
+  [RecipeAdjustment.swift:498](../../YesChefPackage/Sources/YesChefCore/RecipeAdjustment.swift) — one
+  SELECT guard, one DELETE, one INSERT on a tiny table). So the seconds are in **COMMIT**, not the
+  statements. The leading mechanisms, in order of suspicion:
+  1. **WAL checkpoint fsync of a huge main DB.** Full-res image `displayData` is stored inline in the main
+     SQLite file, so the DB is multi-GB. In WAL mode a normal commit fsyncs only the WAL (fast), but when a
+     commit trips the auto-checkpoint threshold it copies WAL pages into — and fsyncs — the multi-GB main
+     file. Under active sync the engine writes fast, the WAL grows fast, and *whichever* commit trips the
+     checkpoint eats it. This also explains the base ADR's **variability** (archive ≈ 1 s vs switch ≈ 5–6 s):
+     it depends on whether your write is the one that checkpoints.
+  2. **Per-write sync-trigger bookkeeping** SQLiteData installs (pending-record-zone rows on every synced
+     write) doing more work than expected on a 44k-row library.
+
+## Decision — retire S5c, add S6 (measure the commit, then move BLOBs out of the hot file)
+
+- **S5c is dropped.** S5a's numbers say the writer is not contended; moving observations off it is dead
+  weight. (Constant-region tracking may still be a *nice* upstream ask, but it is no longer *this* bug's fix.)
+- **S6a — split the commit.** Add one more signpost inside `setActiveVariation`: closure-entry → last-
+  statement-done (the SQL) vs last-statement-done → `database.write` returns (the COMMIT). Also log
+  `PRAGMA wal_checkpoint` / WAL page count around the write, and rerun once with **sync verifiably idle**
+  (settles OQ-A2-1). Acceptance: one repro that says "SQL = X ms, COMMIT = Y ms, WAL = Z pages, sync
+  idle/active." Expect X ≈ 0, Y ≈ 5000.
+- **S6b (gated on S6a) — get full-res image bytes out of the commit's fsync path.** If S6a confirms the
+  checkpoint/fsync-of-a-huge-file hypothesis, the durable fix is that `displayData` should not live inline
+  in the main synced SQLite file: move image blobs to on-disk files (or a separate, un-checkpointed store)
+  so a metadata commit never fsyncs gigabytes. This **touches sync** (the one-way gate — see
+  [[post-browser-sync-vs-features-tension]]) and [[sqlitedata-blob-cloudkit-asset]], so it is a real
+  architectural decision, not a quick slice — spec it separately, do not build it speculatively.
+
+## Consequences
+
+- **The interactive-latency bug is an I/O-per-commit problem, not a concurrency-on-the-writer problem.**
+  Every mutation — archive, switch, rename, undo — pays it; S1's off-main hop stopped it freezing the UI
+  thread but the *latency* is the commit, and only S6 addresses that.
+- **S5b stands and helped** (publish-gap = 0). S1/S2/S4 stand. Only S5c is retired.
+- **S6b, if pursued, is the first S-slice that changes where image bytes live** — hold it to the sync gate's
+  bar, with a device round-trip, not a dogfood slice.

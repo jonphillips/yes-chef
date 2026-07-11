@@ -1,7 +1,22 @@
+import Dependencies
 import ImageIO
+import SQLiteData
 import SwiftUI
 import UIKit
 import YesChefCore
+
+/// Reads a photo's full-resolution `displayData` on demand from the concurrent
+/// reader pool. The detail fetch no longer carries these bytes (ADR-0029 Amd2
+/// S5b), so hero/full-screen rendering hydrates them here — on a pool reader,
+/// which never touches the serialized writer the `SyncEngine` contends for.
+enum RecipePhotoDisplayDataLoader {
+  static func load(photoID: RecipePhoto.ID) async -> Data? {
+    @Dependency(\.defaultDatabase) var database
+    return try? await database.read { db in
+      try RecipePhoto.find(photoID).fetchOne(db)?.displayData
+    }
+  }
+}
 
 /// The rendering contexts a recipe photo appears in. Each maps to a downsample
 /// budget so we decode only as many pixels as the slot can show.
@@ -78,11 +93,17 @@ func downsampledRecipeImage(from data: Data, maxPixelSize: CGFloat) -> UIImage? 
 /// Renders a recipe photo, decoding off the main thread and serving cached
 /// bitmaps on re-render. A cache hit renders synchronously (no placeholder
 /// flash); a miss shows the placeholder until the background decode lands.
+///
+/// The thumbnail variant decodes the carried `thumbnailData`; hero/full-screen
+/// variants read the full-resolution bytes on demand (ADR-0029 Amd2 S5b), so the
+/// detail fetch never has to haul `displayData` through the observed model.
 struct RecipePhotoImage: View {
-  let data: Data
   let photoID: UUID
   let checksum: String?
   let variant: RecipePhotoImageVariant
+  /// The small thumbnail bytes carried by the fetch. Used directly for the
+  /// thumbnail variant, and as a fallback when a photo has no `displayData`.
+  let thumbnailData: Data?
 
   @State private var decoded: (key: String, image: UIImage)?
 
@@ -117,13 +138,30 @@ struct RecipePhotoImage: View {
     let key = cacheKey
     if RecipeImageCache.shared.image(forKey: key) != nil { return }
 
-    let data = data
+    let data: Data?
+    switch variant {
+    case .thumbnail:
+      // Prefer the carried thumbnail (no DB read); fall back to a full-res read
+      // only when a photo never got a generated thumbnail.
+      if let thumbnailData {
+        data = thumbnailData
+      } else {
+        data = await RecipePhotoDisplayDataLoader.load(photoID: photoID)
+      }
+    case .hero, .fullScreen:
+      data = await RecipePhotoDisplayDataLoader.load(photoID: photoID) ?? thumbnailData
+    }
+    guard let data else { return }
+
     let maxPixelSize = variant.maxPixelSize
     let image = await Task.detached(priority: .userInitiated) {
       downsampledRecipeImage(from: data, maxPixelSize: maxPixelSize)
     }.value
 
     guard let image else { return }
+    // The cache key can change while the async decode is in flight (the row
+    // re-published with a new checksum); only publish if we still want this key.
+    guard key == cacheKey else { return }
     RecipeImageCache.shared.insert(image, forKey: key)
     decoded = (key, image)
   }

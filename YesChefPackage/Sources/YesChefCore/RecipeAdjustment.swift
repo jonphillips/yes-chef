@@ -576,7 +576,9 @@ extension RecipeRepository {
       notes: detail.notes,
       tagNames: detail.tags.map(\.name),
       categoryNames: detail.categoryDisplayNames,
-      photos: detail.photos,
+      // Snapshots strip image bytes anyway (leanSnapshotPhotos); the restore path
+      // never re-writes photo rows, so a metadata-only conversion is faithful.
+      photos: detail.photos.map(\.leanRecipePhoto),
       equipment: detail.equipment,
       recipeEquipment: detail.recipeEquipment
     )
