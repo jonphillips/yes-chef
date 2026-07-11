@@ -119,7 +119,7 @@
 /* Begin PBXFileReference section */
 		03DFCF817329BEE674E95B72 /* YesChefApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YesChefApp.swift; sourceTree = "<group>"; };
 		07C439846D3B6561F2CFE399 /* RecipeChatWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeChatWorkspace.swift; sourceTree = "<group>"; };
-		07FEC345E664B62E662EA479 /* YesChefPackage */ = {isa = PBXFileReference; lastKnownFileType = folder; name = YesChefPackage; path = YesChefPackage; sourceTree = SOURCE_ROOT; };
+		07FEC345E664B62E662EA479 /* YesChefPackage */ = {isa = PBXFileReference; lastKnownFileType = folder; path = YesChefPackage; sourceTree = SOURCE_ROOT; };
 		0BA4CA05A4077E714D63D297 /* CategoryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryModels.swift; sourceTree = "<group>"; };
 		0D2AA2B9A5B2A2F4EFDE5A0C /* AppExternalDatabaseChangeReload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppExternalDatabaseChangeReload.swift; sourceTree = "<group>"; };
 		10717DBD3251B160509FD4E9 /* AppDestinationPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDestinationPresentation.swift; sourceTree = "<group>"; };
@@ -130,7 +130,7 @@
 		26A031F93AA06D9ADCD5C36D /* MenuViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuViews.swift; sourceTree = "<group>"; };
 		27FA69A8957E5DC8A49A9E3F /* GroceryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryViews.swift; sourceTree = "<group>"; };
 		2CBD5500A3AAE5279A9F007F /* YesChef.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = YesChef.entitlements; sourceTree = "<group>"; };
-		396029D84F6F6E49A17C47D2 /* YesChefShareExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = YesChefShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		396029D84F6F6E49A17C47D2 /* YesChefShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = YesChefShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		3CCF32B5108C44892607FF3B /* RecipeDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeDetailView.swift; sourceTree = "<group>"; };
 		3EA663A481CAE11E140B6830 /* SyncHealthModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncHealthModel.swift; sourceTree = "<group>"; };
 		46B48DD3E004C108C6CC348A /* WorkbenchCompareAlignmentModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchCompareAlignmentModel.swift; sourceTree = "<group>"; };
@@ -190,7 +190,7 @@
 		ED3C57E4D25E07B0D4161163 /* CategoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryViews.swift; sourceTree = "<group>"; };
 		F24A24C21F9F96CE16EB2F8A /* RecipeCollectionReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeCollectionReviewSheet.swift; sourceTree = "<group>"; };
 		F9FE33039715323689ED24FD /* RecipeCategoryFilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeCategoryFilterView.swift; sourceTree = "<group>"; };
-		FC48B146F8E70CD1E9903EBC /* YesChef.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = YesChef.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FC48B146F8E70CD1E9903EBC /* YesChef.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = YesChef.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FE43F12069919277037EDE55 /* RecipeDetailModel+Enrichment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecipeDetailModel+Enrichment.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 

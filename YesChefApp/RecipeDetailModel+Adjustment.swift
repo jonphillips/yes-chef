@@ -76,54 +76,65 @@ extension RecipeDetailModel {
   }
 
   func renameVariation(_ variationID: RecipeVariation.ID, to name: String) {
-    do {
-      try database.write { db in
-        try RecipeRepository.renameVariation(
-          variationID,
-          to: name,
-          in: db,
-          now: now
-        )
+    Task {
+      let now = now
+      do {
+        try await database.write { db in
+          try RecipeRepository.renameVariation(
+            variationID,
+            to: name,
+            in: db,
+            now: now
+          )
+        }
+      } catch {
+        errorMessage = String(describing: error)
+        isShowingError = true
       }
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
     }
   }
 
   func activeVariationSelectionChanged(_ variationID: RecipeVariation.ID?) {
-    do {
-      try database.write { db in
-        try RecipeRepository.setActiveVariation(
-          variationID,
-          recipeID: recipeID,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
+    Task {
+      let now = now
+      let makeUUID = uuid
+      do {
+        try await database.write { db in
+          try RecipeRepository.setActiveVariation(
+            variationID,
+            recipeID: recipeID,
+            in: db,
+            now: now,
+            uuid: { makeUUID() }
+          )
+        }
+      } catch {
+        errorMessage = String(describing: error)
+        isShowingError = true
       }
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
     }
   }
 
   func undoLastAdjustmentButtonTapped() {
     guard let restorePoint = adjustmentRestorePoint else { return }
-    do {
-      try database.write { db in
-        try RecipeRepository.restoreRecipeAdjustment(
-          restorePoint.data,
-          recipeID: recipeID,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
+    Task {
+      let now = now
+      let makeUUID = uuid
+      do {
+        try await database.write { db in
+          try RecipeRepository.restoreRecipeAdjustment(
+            restorePoint.data,
+            recipeID: recipeID,
+            in: db,
+            now: now,
+            uuid: { makeUUID() }
+          )
+        }
+        adjustmentRestorePoint = nil
+      } catch {
+        errorMessage = String(describing: error)
+        isShowingError = true
       }
-      adjustmentRestorePoint = nil
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
     }
   }
 

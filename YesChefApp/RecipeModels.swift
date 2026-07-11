@@ -208,13 +208,16 @@ final class RecipeLibraryModel {
       selectedRecipeID = nil
     }
 
-    do {
-      try database.write { db in
-        try RecipeRepository.archive(recipeID: recipeID, in: db, now: now)
+    Task {
+      let now = now
+      do {
+        try await database.write { db in
+          try RecipeRepository.archive(recipeID: recipeID, in: db, now: now)
+        }
+      } catch {
+        errorMessage = String(describing: error)
+        isShowingError = true
       }
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
     }
   }
 
@@ -230,13 +233,16 @@ final class RecipeLibraryModel {
   }
 
   func restoreArchivedRecipeButtonTapped(recipeID: Recipe.ID) {
-    do {
-      try database.write { db in
-        try RecipeRepository.restore(recipeID: recipeID, in: db, now: now)
+    Task {
+      let now = now
+      do {
+        try await database.write { db in
+          try RecipeRepository.restore(recipeID: recipeID, in: db, now: now)
+        }
+      } catch {
+        errorMessage = String(describing: error)
+        isShowingError = true
       }
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
     }
   }
 
@@ -250,13 +256,15 @@ final class RecipeLibraryModel {
       selectedRecipeID = nil
     }
 
-    do {
-      try database.write { db in
-        try RecipeRepository.permanentlyDelete(recipeID: recipeID, in: db)
+    Task {
+      do {
+        try await database.write { db in
+          try RecipeRepository.permanentlyDelete(recipeID: recipeID, in: db)
+        }
+      } catch {
+        errorMessage = String(describing: error)
+        isShowingError = true
       }
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
     }
   }
 
