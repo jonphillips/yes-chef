@@ -236,10 +236,11 @@ private struct WALCheckpointState: Sendable {
   }
 
   static func read(from db: Database) throws -> Self {
-    let row = try Row.fetchOne(db, sql: "PRAGMA wal_checkpoint(NOOP)")
-    let busy: Int = row?[0] ?? -1
-    let logPages: Int = row?[1] ?? -1
-    let checkpointedPages: Int = row?[2] ?? -1
+    let result = try #sql("PRAGMA wal_checkpoint(NOOP)", as: (Int, Int, Int).self)
+      .fetchOne(db)
+    let busy = result?.0 ?? -1
+    let logPages = result?.1 ?? -1
+    let checkpointedPages = result?.2 ?? -1
     return Self(busy: busy, logPages: logPages, checkpointedPages: checkpointedPages)
   }
 }
