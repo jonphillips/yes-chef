@@ -48,6 +48,17 @@ extension DependencyValues {
     var configuration = Configuration()
     configuration.prepareDatabase { db in
       try db.attachMetadatabase(containerIdentifier: YesChefCloudSync.containerIdentifier)
+      #if DEBUG
+        db.trace(options: .profile) { event in
+          guard case let .profile(statement, duration) = event,
+            statement.sql == "COMMIT TRANSACTION"
+          else { return }
+
+          AppLog.performance.log(
+            "sqlite-commit duration=\(duration, privacy: .public)s synchronizing=\(SyncEngine.isSynchronizing, privacy: .public)"
+          )
+        }
+      #endif
     }
 
     let database = try SQLiteData.defaultDatabase(path: path, configuration: configuration)

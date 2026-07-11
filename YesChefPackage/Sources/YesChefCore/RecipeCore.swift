@@ -149,7 +149,13 @@ public struct RecipeDetailRequest: FetchKeyRequest {
   }
 
   public func fetch(_ db: Database) throws -> RecipeDetailData? {
-    try RecipeRepository.fetchDetail(recipeID: recipeID, in: db)
+    let clock = ContinuousClock()
+    let start = clock.now
+    defer {
+      let duration = String(describing: start.duration(to: clock.now))
+      AppLog.performance.log("recipe-detail-request-fetch duration=\(duration, privacy: .public)")
+    }
+    return try RecipeRepository.fetchDetail(recipeID: recipeID, in: db)
   }
 }
 

@@ -102,17 +102,19 @@ extension RecipeDetailModel {
   ///    if the theory holds: our write queued behind the sync engine's observation
   ///    re-fetches on the shared writer);
   /// 2. **SQL** — write-closure entry → the last statement in the two-statement write;
-  /// 3. **COMMIT** — the last statement → `database.write` returning;
-  /// 4. **publish-gap** — commit → the `@Fetch` delivering the new `activeVariationID`.
+  /// 3. **write-return envelope** — the last statement → `database.write` returning;
+  /// 4. **publish-gap** — write return → the `@Fetch` delivering the new
+  ///    `activeVariationID`.
   ///
-  /// The SQL and COMMIT boundaries are signposted for Instruments and mirrored,
-  /// with WAL and sync state, to `AppLog.performance` so a plain console capture is
-  /// enough. Cheap; left in permanently, no DEBUG gating.
+  /// The SQL and write-return-envelope boundaries are signposted for Instruments
+  /// and mirrored, with WAL and sync state, to `AppLog.performance` so a plain
+  /// console capture is enough. Cheap; left in permanently, no DEBUG gating.
   func activeVariationSelectionChanged(_ variationID: RecipeVariation.ID?) {
     let clock = ContinuousClock()
     let handlerEntry = clock.now
     let signposter = AppLog.performanceSignposter
     let signpostID = signposter.makeSignpostID()
+    let correlationToken = String(describing: signpostID)
     let interval = signposter.beginInterval("variationSwitch", id: signpostID)
     Task {
       let now = now
@@ -140,13 +142,13 @@ extension RecipeDetailModel {
         let lastStatementDone = sqlDone.instant ?? writeExit
         let writerWait = handlerEntry.duration(to: entryToWrite).milliseconds
         let sqlDuration = entryToWrite.duration(to: lastStatementDone).milliseconds
-        let commitDuration = lastStatementDone.duration(to: writeExit).milliseconds
-        signposter.emitEvent("variationCommitDone", id: signpostID)
+        let writeReturnEnvelope = lastStatementDone.duration(to: writeExit).milliseconds
+        signposter.emitEvent("variationWriteReturnEnvelopeDone", id: signpostID)
         let syncAfter = syncActivity
         let walAfter = await readWALCheckpoint()
         let syncOverall = syncBefore.isActive || syncAfter.isActive ? "active" : "idle"
         AppLog.performance.log(
-          "variation-switch writer-wait=\(writerWait, format: .fixed(precision: 1))ms sql=\(sqlDuration, format: .fixed(precision: 1))ms commit=\(commitDuration, format: .fixed(precision: 1))ms wal-before=\(walBefore.description, privacy: .public) wal-after=\(walAfter.description, privacy: .public) sync=\(syncOverall, privacy: .public) sync-before=\(syncBefore.description, privacy: .public) sync-after=\(syncAfter.description, privacy: .public)"
+          "variation-switch correlation=\(correlationToken, privacy: .public) writer-wait=\(writerWait, format: .fixed(precision: 1))ms sql=\(sqlDuration, format: .fixed(precision: 1))ms write-return-envelope=\(writeReturnEnvelope, format: .fixed(precision: 1))ms wal-before=\(walBefore.description, privacy: .public) wal-after=\(walAfter.description, privacy: .public) sync=\(syncOverall, privacy: .public) sync-before=\(syncBefore.description, privacy: .public) sync-after=\(syncAfter.description, privacy: .public)"
         )
 
         await awaitActiveVariationDelivery(variationID)
