@@ -50,7 +50,7 @@ private struct SyncStatusDot: View {
     switch status {
     case .disabled: .secondary
     case .localOnly: .orange
-    case .syncing: .blue
+    case .syncing, .downloading: .blue
     case .upToDate: .green
     case .error: .red
     }
@@ -121,6 +121,7 @@ struct SyncStatusDetailView: View {
     switch model.displayStatus {
     case let .localOnly(reason): reason
     case let .syncing(pending): "\(pending) change\(pending == 1 ? "" : "s") uploading"
+    case .downloading: "Downloading changes from iCloud"
     case let .error(message): message
     case .disabled, .upToDate: nil
     }
@@ -134,6 +135,8 @@ struct SyncStatusDetailView: View {
       "Changes stay on this device until iCloud can sync. Your other devices won’t see each other’s updates yet."
     case .syncing:
       "Uploading recent changes to iCloud."
+    case .downloading:
+      "Downloading changes from iCloud. A first sync of a large library can take a while — iCloud drip-feeds it and it will finish on its own; keep this device on Wi-Fi and power."
     case .upToDate:
       "Your recipes are synced across your devices over iCloud."
     case .error:
