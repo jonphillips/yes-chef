@@ -8,6 +8,7 @@ extension RecipeDetailModel {
     @Dependency(\.chefItUpPlanClient) var chefItUpPlanClient
     @Dependency(\.serveWithPlanClient) var serveWithPlanClient
     @Dependency(\.recipeAdjustmentClient) var recipeAdjustmentClient
+    @Dependency(\.menuNoteHarvestClient) var noteHarvestClient
 
     let context = chatModel.context.serialized()
     let adjustRecipeAction = ChatApplyAction<RecipeAdjustmentProposal>(
@@ -74,6 +75,27 @@ extension RecipeDetailModel {
         try self?.commitServeWithPlan(plan)
       }
     )
+    // ADR-0027 S2 — the recipe sibling of the menu "Capture to menu" harvest verb. Extraction,
+    // not generation: captures a chat selection (or, absent one, the assistant transcript) into
+    // one or more `.general` recipe notes. Per D2 the recipe is the write target, not source
+    // material — so, exactly like the menu sibling, NO `context:` is sent to the client.
+    let captureNoteAction = ChatApplyAction<MenuNoteHarvestPlan>(
+      title: "Capture to notes",
+      extractingTitle: "Capturing…",
+      reviewTitle: "Review captured note",
+      commitTitle: "Add to Notes",
+      committingTitle: "Adding to notes…",
+      committedTitle: "Added to Notes",
+      extract: { selection, messages in
+        try await noteHarvestClient(
+          selection: selection,
+          messages: messages,
+          tier: chatModel.activeTier
+        )
+      },
+      commit: { _ in
+      }
+    )
     return [
       AnyChatApplyAction(adjustRecipeAction, requiresSubject: false, reviewPresentation: .inline) { proposal in
         proposal.reviewSummary()
@@ -94,7 +116,30 @@ extension RecipeDetailModel {
           : plan.editableReviewText()
       }, commitEditedSummary: { [weak self] plan, editedText in
         try self?.commitServeWithPlan(plan.applyingEditableReviewText(editedText))
-      })
+      }),
+      // `requiresSubject: false` so the no-selection transcript-scan branch stays live in
+      // production ([[harvest-verb-requires-subject-false]]); a list commit shape, one review
+      // item per captured note through the ADR-0026 collection sheet.
+      AnyChatApplyAction(captureNoteAction, requiresSubject: false) { [weak self] plan in
+        plan.notes.map { note in
+          let originalEditableText = note.editableReviewText()
+          return ChatApplyReviewItem(
+            title: note.title,
+            summary: note.rendered(),
+            editableTitle: "Note",
+            editableText: originalEditableText,
+            commitTitle: captureNoteAction.commitTitle,
+            committingTitle: captureNoteAction.committingTitle,
+            committedTitle: captureNoteAction.committedTitle,
+            commit: { editedText in
+              let approved = editedText == originalEditableText
+                ? note
+                : note.applyingEditableReviewText(editedText)
+              try self?.commitCapturedNote(approved)
+            }
+          )
+        }
+      }
     ]
   }
 
@@ -176,6 +221,27 @@ extension RecipeDetailModel {
     }
   }
 
+  private func commitCapturedNote(_ note: HarvestedNote) throws {
+    @Dependency(\.date.now) var now
+    @Dependency(\.defaultDatabase) var database
+    @Dependency(\.uuid) var uuid
+
+    let text = note.rendered().trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else {
+      throw RecipeDetailError.emptyCapturedNote
+    }
+    try database.write { db in
+      _ = try RecipeRepository.appendRecipeNote(
+        recipeID: recipeID,
+        text: text,
+        noteType: .general,
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
+    }
+  }
+
   private func commitServeWithPlan(_ plan: ServeWithPlan) throws {
     @Dependency(\.date.now) var now
     @Dependency(\.defaultDatabase) var database
@@ -196,6 +262,7 @@ private enum RecipeDetailError: Error, CustomStringConvertible, LocalizedError {
   case emptyMakeAheadPlan
   case emptyChefItUpPlan
   case emptyServeWithPlan
+  case emptyCapturedNote
   case missingRecipeForAdjustment
 
   var description: String {
@@ -206,6 +273,8 @@ private enum RecipeDetailError: Error, CustomStringConvertible, LocalizedError {
       "The assistant did not find a Chef It Up plan to save."
     case .emptyServeWithPlan:
       "The assistant did not find any accompaniments to save."
+    case .emptyCapturedNote:
+      "The assistant did not find a note to capture."
     case .missingRecipeForAdjustment:
       "The recipe could not be loaded for adjustment."
     }

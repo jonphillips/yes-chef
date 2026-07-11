@@ -4,6 +4,7 @@ import YesChefCore
 
 struct MenuDishList: View {
   let model: MenuLibraryModel
+  let detailModel: MenuDetailModel
   let menu: CoreMenu
   let detail: MenuDetailData
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
@@ -23,6 +24,7 @@ struct MenuDishList: View {
       ForEach(0..<detail.menu.dayCount, id: \.self) { dayOffset in
         MenuDaySection(
           model: model,
+          detailModel: detailModel,
           menu: menu,
           dayNumber: dayOffset + 1,
           dayOffset: dayOffset,
@@ -75,6 +77,7 @@ struct MenuDishList: View {
 
 private struct MenuDaySection: View {
   let model: MenuLibraryModel
+  let detailModel: MenuDetailModel
   let menu: CoreMenu
   let dayNumber: Int
   let dayOffset: Int
@@ -115,6 +118,7 @@ private struct MenuDaySection: View {
           ForEach(rows) { row in
             MenuDishRowView(
               model: model,
+              detailModel: detailModel,
               menu: menu,
               row: row,
               onRecipeSelected: onRecipeSelected
@@ -165,12 +169,18 @@ private struct MenuDaySection: View {
 
 private struct MenuDishRowView: View {
   let model: MenuLibraryModel
+  let detailModel: MenuDetailModel
   let menu: CoreMenu
   let row: MenuItemRowData
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
+  private var isDepositTarget: Bool {
+    detailModel.selectedTargetItemID == row.id
+  }
+
   var body: some View {
     rowContent
+      .background(isDepositTarget ? Color.accentColor.opacity(0.12) : Color.clear)
       .contentShape(Rectangle())
       .onTapGesture {
         model.editItemButtonTapped(menu: menu, row: row)
@@ -240,6 +250,20 @@ private struct MenuDishRowView: View {
       }
 
       Spacer()
+
+      Button {
+        detailModel.targetItemTapped(row.id)
+      } label: {
+        Label("Deposit target", systemImage: "target")
+          .labelStyle(.iconOnly)
+      }
+      .buttonStyle(.borderless)
+      .tint(isDepositTarget ? .accentColor : .secondary)
+      .accessibilityLabel(
+        isDepositTarget
+          ? "Clear deposit target"
+          : "Set \(row.displayTitle) as chat deposit target"
+      )
 
       if let recipeID = row.recipe?.id, let onRecipeSelected {
         Button {

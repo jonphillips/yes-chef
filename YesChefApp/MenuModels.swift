@@ -449,15 +449,32 @@ final class MenuDetailModel {
   @ObservationIgnored
   @Fetch var detail: MenuDetailData?
 
+  /// The menu item the next chat "deposit" writes onto (ADR-0027 Amendment 1 tap-to-target). `nil`
+  /// when nothing is targeted, in which case the deposit verbs don't appear. Device-local, unsynced.
+  var selectedTargetItemID: MenuItem.ID?
+
   init(menuID: CoreMenu.ID) {
     self.menuID = menuID
     _detail = Fetch(wrappedValue: nil, MenuDetailRequest(menuID: menuID), animation: .default)
+  }
+
+  /// The row currently marked as the deposit target, resolved against the live item set (so a stale
+  /// id — e.g. the item was deleted — reads as no target).
+  var selectedTargetItem: MenuItemRowData? {
+    guard let selectedTargetItemID else { return nil }
+    return detail?.itemRows.first { $0.id == selectedTargetItemID }
+  }
+
+  /// Toggles a menu item as the active deposit target. Tapping the current target clears it.
+  func targetItemTapped(_ itemID: MenuItem.ID) {
+    selectedTargetItemID = selectedTargetItemID == itemID ? nil : itemID
   }
 
   func applyActionCatalog(for chatModel: RecipeChatModel) -> [AnyChatApplyAction] {
     @Dependency(\.menuComplementClient) var menuComplementClient
     @Dependency(\.menuNoteHarvestClient) var menuNoteHarvestClient
     @Dependency(\.menuPrepPlanClient) var menuPrepPlanClient
+    @Dependency(\.menuDepositClient) var menuDepositClient
 
     let context = chatModel.context.serialized(for: chatModel.activeTier)
     let complementAction = ChatApplyAction<MenuComplementPlan>(
@@ -515,7 +532,7 @@ final class MenuDetailModel {
       }
     )
 
-    return [
+    var actions: [AnyChatApplyAction] = [
       AnyChatApplyAction(complementAction) { [weak self] plan in
         plan.items.map { suggestion in
           let originalEditableText = suggestion.editableReviewText()
@@ -572,6 +589,68 @@ final class MenuDetailModel {
         }
       )
     ]
+
+    // ADR-0027 Amendment 1 S1 — the "deposit" verb, shown only when a recipe-kind menu item is the
+    // tap-to-target. Reshapes chat intelligence into an appended `RecipeNote` on that recipe; the
+    // canonical recipe body is never touched (A2). The note-kind "Revise this note" sibling is S2.
+    if let target = selectedTargetItem,
+      target.item.kind == .recipe,
+      let targetRecipeID = target.item.recipeID
+    {
+      let depositAction = ChatApplyAction<DepositNotePlan>(
+        title: "Add to recipe notes",
+        extractingTitle: "Drafting note…",
+        reviewTitle: "Review recipe note",
+        commitTitle: "Add to Recipe Notes",
+        committingTitle: "Adding to notes…",
+        committedTitle: "Added to Recipe Notes",
+        extract: { selection, messages in
+          try await menuDepositClient(
+            intelligence: selection,
+            messages: messages,
+            tier: chatModel.activeTier
+          )
+        },
+        // The unchanged-payload commit path (editable review, committed unedited) routes through here,
+        // so it must write, not no-op.
+        commit: { [weak self] plan in
+          try self?.commitDepositToRecipe(plan.note.text, targetRecipeID: targetRecipeID)
+        }
+      )
+      actions.append(
+        AnyChatApplyAction(
+          depositAction,
+          editableSummary: { plan in
+            let text = plan.note.editableReviewText()
+            return text.isEmpty ? nil : text
+          },
+          commitEditedSummary: { [weak self] _, editedText in
+            try self?.commitDepositToRecipe(editedText, targetRecipeID: targetRecipeID)
+          }
+        )
+      )
+    }
+
+    return actions
+  }
+
+  private func commitDepositToRecipe(_ text: String, targetRecipeID: Recipe.ID) throws {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+      throw MenuDetailError.emptyDepositNote
+    }
+    try database.write { db in
+      // Deposited adaptation intelligence: `.adaptation` note type (OQ-Amd-1 lean); the recipe body
+      // is never rewritten (A2 — protect the canonical recipe).
+      _ = try RecipeRepository.appendRecipeNote(
+        recipeID: targetRecipeID,
+        text: trimmed,
+        noteType: .adaptation,
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
+    }
   }
 
   private func commitPrepPlan(_ plan: MenuPrepPlan) throws {
@@ -615,11 +694,14 @@ final class MenuDetailModel {
 
 private enum MenuDetailError: Error, CustomStringConvertible, LocalizedError {
   case emptyPrepPlan
+  case emptyDepositNote
 
   var description: String {
     switch self {
     case .emptyPrepPlan:
       "The assistant did not find a prep plan to save."
+    case .emptyDepositNote:
+      "The assistant did not find a note to add."
     }
   }
 
