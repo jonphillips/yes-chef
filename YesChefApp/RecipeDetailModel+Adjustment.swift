@@ -117,9 +117,7 @@ extension RecipeDetailModel {
     Task {
       let now = now
       let makeUUID = uuid
-      let walBefore = try? await database.read { db in
-        try WALCheckpointState.read(from: db)
-      }
+      let walBefore = await readWALCheckpoint()
       let syncBefore = syncActivity
       let writeStart = InstantBox()
       let sqlDone = InstantBox()
@@ -145,12 +143,10 @@ extension RecipeDetailModel {
         let commitDuration = lastStatementDone.duration(to: writeExit).milliseconds
         signposter.emitEvent("variationCommitDone", id: signpostID)
         let syncAfter = syncActivity
-        let walAfter = try? await database.read { db in
-          try WALCheckpointState.read(from: db)
-        }
+        let walAfter = await readWALCheckpoint()
         let syncOverall = syncBefore.isActive || syncAfter.isActive ? "active" : "idle"
         AppLog.performance.log(
-          "variation-switch writer-wait=\(writerWait, format: .fixed(precision: 1))ms sql=\(sqlDuration, format: .fixed(precision: 1))ms commit=\(commitDuration, format: .fixed(precision: 1))ms wal-before=\(walBefore?.description ?? "unavailable", privacy: .public) wal-after=\(walAfter?.description ?? "unavailable", privacy: .public) sync=\(syncOverall, privacy: .public) sync-before=\(syncBefore.description, privacy: .public) sync-after=\(syncAfter.description, privacy: .public)"
+          "variation-switch writer-wait=\(writerWait, format: .fixed(precision: 1))ms sql=\(sqlDuration, format: .fixed(precision: 1))ms commit=\(commitDuration, format: .fixed(precision: 1))ms wal-before=\(walBefore.description, privacy: .public) wal-after=\(walAfter.description, privacy: .public) sync=\(syncOverall, privacy: .public) sync-before=\(syncBefore.description, privacy: .public) sync-after=\(syncAfter.description, privacy: .public)"
         )
 
         await awaitActiveVariationDelivery(variationID)
@@ -211,6 +207,17 @@ private extension RecipeDetailModel {
       isFetching: syncEngine.isFetchingChanges
     )
   }
+
+  func readWALCheckpoint() async -> WALCheckpointObservation {
+    do {
+      let state = try await database.read { db in
+        try WALCheckpointState.read(from: db)
+      }
+      return WALCheckpointObservation(state: state)
+    } catch {
+      return WALCheckpointObservation(error: String(describing: error))
+    }
+  }
 }
 
 private struct SyncActivitySnapshot: Sendable, CustomStringConvertible {
@@ -236,13 +243,39 @@ private struct WALCheckpointState: Sendable {
   }
 
   static func read(from db: Database) throws -> Self {
-    let result = try #sql("PRAGMA wal_checkpoint(NOOP)", as: (Int, Int, Int).self)
+    guard let result = try #sql("PRAGMA wal_checkpoint(NOOP)", as: (Int, Int, Int).self)
       .fetchOne(db)
-    let busy = result?.0 ?? -1
-    let logPages = result?.1 ?? -1
-    let checkpointedPages = result?.2 ?? -1
+    else {
+      throw WALCheckpointProbeError.noResult
+    }
+    let busy = result.0
+    let logPages = result.1
+    let checkpointedPages = result.2
     return Self(busy: busy, logPages: logPages, checkpointedPages: checkpointedPages)
   }
+}
+
+private struct WALCheckpointObservation: Sendable {
+  let state: WALCheckpointState?
+  let error: String?
+
+  init(state: WALCheckpointState) {
+    self.state = state
+    self.error = nil
+  }
+
+  init(error: String) {
+    self.state = nil
+    self.error = error
+  }
+
+  var description: String {
+    state?.description ?? "unavailable(error=\(error ?? "unknown"))"
+  }
+}
+
+private enum WALCheckpointProbeError: Error {
+  case noResult
 }
 
 /// One-shot carrier for the write-closure entry timestamp captured off the main
