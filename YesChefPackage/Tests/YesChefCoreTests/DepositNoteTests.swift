@@ -93,6 +93,84 @@ extension RecipeCoreTests {
       #expect(request?.messages.first?.text.contains("An earlier reply.") == false)
       #expect(request?.messages.first?.text.contains("Adjust the note.") == false)
     }
+
+    @Test
+    func reviseSendsOriginalNoteBodyAndExplicitSelection() async throws {
+      let recorder = DepositRequestRecorder()
+
+      try await withDependencies {
+        $0.modelClient = StubModelClient { request in
+          await recorder.append(request)
+          return ModelResponse(text: #"{"text":""}"#)
+        }
+      } operation: {
+        _ = try await MenuDepositClient.liveValue(
+          intelligence: "Push it toward the Mexican lane.",
+          currentNoteBody: "Use the Milk Street romesco as written.",
+          messages: [
+            RecipeChatMessage(role: .user, text: "Compare the recipe to the note."),
+            RecipeChatMessage(role: .assistant, text: "The full compare verdict."),
+          ],
+          tier: .frontier(.anthropic)
+        )
+      }
+
+      let request = await recorder.first()
+      expectNoDifference(request?.promptPreferenceKey, AIPromptPreferenceKind.captureToNote.rawValue)
+      #expect(request?.messages.first?.text.contains("Use the Milk Street romesco as written.") == true)
+      #expect(request?.messages.first?.text.contains("Push it toward the Mexican lane.") == true)
+      #expect(request?.messages.first?.text.contains("The full compare verdict.") == false)
+    }
+
+    @Test
+    func reviseFallsBackToLatestAssistantTurnWhenSelectionAbsent() async throws {
+      let recorder = DepositRequestRecorder()
+
+      try await withDependencies {
+        $0.modelClient = StubModelClient { request in
+          await recorder.append(request)
+          return ModelResponse(text: #"{"text":""}"#)
+        }
+      } operation: {
+        _ = try await MenuDepositClient.liveValue(
+          intelligence: "",
+          currentNoteBody: "Use the Milk Street romesco as written.",
+          messages: [
+            RecipeChatMessage(role: .assistant, text: "An earlier reply."),
+            RecipeChatMessage(role: .user, text: "Adjust the note."),
+            RecipeChatMessage(role: .assistant, text: "Push it toward the Mexican lane."),
+          ],
+          tier: .onDevice
+        )
+      }
+
+      let request = await recorder.first()
+      #expect(request?.messages.first?.text.contains("Push it toward the Mexican lane.") == true)
+      #expect(request?.messages.first?.text.contains("An earlier reply.") == false)
+      #expect(request?.messages.first?.text.contains("Use the Milk Street romesco as written.") == true)
+    }
+
+    @Test
+    func reviseHandlesEmptyOriginalNote() async throws {
+      let recorder = DepositRequestRecorder()
+
+      try await withDependencies {
+        $0.modelClient = StubModelClient { request in
+          await recorder.append(request)
+          return ModelResponse(text: #"{"text":""}"#)
+        }
+      } operation: {
+        _ = try await MenuDepositClient.liveValue(
+          intelligence: "Push it toward the Mexican lane.",
+          currentNoteBody: "",
+          messages: [],
+          tier: .onDevice
+        )
+      }
+
+      let request = await recorder.first()
+      #expect(request?.messages.first?.text.contains("The note is currently empty.") == true)
+    }
   }
 }
 

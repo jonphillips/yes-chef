@@ -590,48 +590,110 @@ final class MenuDetailModel {
       )
     ]
 
-    // ADR-0027 Amendment 1 S1 — the "deposit" verb, shown only when a recipe-kind menu item is the
-    // tap-to-target. Reshapes chat intelligence into an appended `RecipeNote` on that recipe; the
-    // canonical recipe body is never touched (A2). The note-kind "Revise this note" sibling is S2.
-    if let target = selectedTargetItem,
-      target.item.kind == .recipe,
-      let targetRecipeID = target.item.recipeID
-    {
-      let depositAction = ChatApplyAction<DepositNotePlan>(
-        title: "Add to recipe notes",
-        extractingTitle: "Drafting note…",
-        reviewTitle: "Review recipe note",
-        commitTitle: "Add to Recipe Notes",
-        committingTitle: "Adding to notes…",
-        committedTitle: "Added to Recipe Notes",
-        extract: { selection, messages in
-          try await menuDepositClient(
-            intelligence: selection,
-            messages: messages,
-            tier: chatModel.activeTier
-          )
-        },
-        // The unchanged-payload commit path (editable review, committed unedited) routes through here,
-        // so it must write, not no-op.
-        commit: { [weak self] plan in
-          try self?.commitDepositToRecipe(plan.note.text, targetRecipeID: targetRecipeID)
-        }
-      )
-      actions.append(
-        AnyChatApplyAction(
-          depositAction,
-          editableSummary: { plan in
-            let text = plan.note.editableReviewText()
-            return text.isEmpty ? nil : text
-          },
-          commitEditedSummary: { [weak self] _, editedText in
-            try self?.commitDepositToRecipe(editedText, targetRecipeID: targetRecipeID)
-          }
-        )
-      )
-    }
+    // ADR-0027 Amendment 1 — the tap-to-target "deposit" verbs (S1 recipe-append, S2 note-revise),
+    // shown only when a menu item is the active tap-to-target and matches the verb's kind.
+    actions.append(contentsOf: depositToRecipeActions(chatModel: chatModel, menuDepositClient: menuDepositClient))
+    actions.append(contentsOf: reviseNoteActions(chatModel: chatModel, menuDepositClient: menuDepositClient))
 
     return actions
+  }
+
+  /// ADR-0027 Amendment 1 S1 — reshapes chat intelligence into an appended `RecipeNote` on the
+  /// recipe-kind tap-to-target; the canonical recipe body is never touched (A2).
+  private func depositToRecipeActions(
+    chatModel: RecipeChatModel,
+    menuDepositClient: MenuDepositClient
+  ) -> [AnyChatApplyAction] {
+    guard
+      let target = selectedTargetItem,
+      target.item.kind == .recipe,
+      let targetRecipeID = target.item.recipeID
+    else { return [] }
+
+    let depositAction = ChatApplyAction<DepositNotePlan>(
+      title: "Add to recipe notes",
+      extractingTitle: "Drafting note…",
+      reviewTitle: "Review recipe note",
+      commitTitle: "Add to Recipe Notes",
+      committingTitle: "Adding to notes…",
+      committedTitle: "Added to Recipe Notes",
+      extract: { selection, messages in
+        try await menuDepositClient(
+          intelligence: selection,
+          messages: messages,
+          tier: chatModel.activeTier
+        )
+      },
+      // The unchanged-payload commit path (editable review, committed unedited) routes through here,
+      // so it must write, not no-op.
+      commit: { [weak self] plan in
+        try self?.commitDepositToRecipe(plan.note.text, targetRecipeID: targetRecipeID)
+      }
+    )
+    return [
+      AnyChatApplyAction(
+        depositAction,
+        editableSummary: { plan in
+          let text = plan.note.editableReviewText()
+          return text.isEmpty ? nil : text
+        },
+        commitEditedSummary: { [weak self] _, editedText in
+          try self?.commitDepositToRecipe(editedText, targetRecipeID: targetRecipeID)
+        }
+      )
+    ]
+  }
+
+  /// ADR-0027 Amendment 1 S2 — weaves chat intelligence into the note-kind tap-to-target's existing
+  /// body; the compose surface shows the untouched original (supporting evidence) beside the
+  /// LLM-woven editable draft (A3).
+  private func reviseNoteActions(
+    chatModel: RecipeChatModel,
+    menuDepositClient: MenuDepositClient
+  ) -> [AnyChatApplyAction] {
+    guard let target = selectedTargetItem, target.item.kind == .note else { return [] }
+
+    let targetItemID = target.item.id
+    let currentNoteBody = target.item.notes ?? ""
+    let reviseAction = ChatApplyAction<DepositNotePlan>(
+      title: "Revise this note",
+      extractingTitle: "Weaving note…",
+      reviewTitle: "Review revised note",
+      commitTitle: "Save Note",
+      committingTitle: "Saving note…",
+      committedTitle: "Note Updated",
+      extract: { selection, messages in
+        try await menuDepositClient(
+          intelligence: selection,
+          currentNoteBody: currentNoteBody,
+          messages: messages,
+          tier: chatModel.activeTier
+        )
+      },
+      commit: { _ in }
+    )
+    return [
+      AnyChatApplyAction(reviseAction, requiresSubject: false) { [weak self] plan in
+        let draftText = plan.note.editableReviewText()
+        guard !draftText.isEmpty else { return [] }
+        return [
+          ChatApplyReviewItem(
+            title: reviseAction.reviewTitle,
+            summary: draftText,
+            editableTitle: "Revised note",
+            editableText: draftText,
+            supportingEvidenceTitle: "Original note",
+            supportingEvidenceRows: currentNoteBody.isEmpty ? [] : [currentNoteBody],
+            commitTitle: reviseAction.commitTitle,
+            committingTitle: reviseAction.committingTitle,
+            committedTitle: reviseAction.committedTitle,
+            commit: { [weak self] editedText in
+              try self?.commitDepositToNote(editedText, targetItemID: targetItemID)
+            }
+          )
+        ]
+      }
+    ]
   }
 
   private func commitDepositToRecipe(_ text: String, targetRecipeID: Recipe.ID) throws {
@@ -649,6 +711,29 @@ final class MenuDetailModel {
         in: db,
         now: now,
         uuid: { uuid() }
+      )
+    }
+  }
+
+  private func commitDepositToNote(_ text: String, targetItemID: MenuItem.ID) throws {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+      throw MenuDetailError.emptyDepositNote
+    }
+    // Resolve fresh against the live item set (not the captured row) — the item's day/slot/title may
+    // have changed between extract and commit.
+    guard let row = detail?.itemRows.first(where: { $0.id == targetItemID }) else {
+      throw MenuDetailError.depositTargetMissing
+    }
+    try database.write { db in
+      try MenuRepository.updateNoteItem(
+        itemID: targetItemID,
+        title: row.item.title,
+        notes: trimmed,
+        dayOffset: row.item.dayOffset,
+        mealSlot: row.item.mealSlot,
+        in: db,
+        now: now
       )
     }
   }
@@ -695,6 +780,7 @@ final class MenuDetailModel {
 private enum MenuDetailError: Error, CustomStringConvertible, LocalizedError {
   case emptyPrepPlan
   case emptyDepositNote
+  case depositTargetMissing
 
   var description: String {
     switch self {
@@ -702,6 +788,8 @@ private enum MenuDetailError: Error, CustomStringConvertible, LocalizedError {
       "The assistant did not find a prep plan to save."
     case .emptyDepositNote:
       "The assistant did not find a note to add."
+    case .depositTargetMissing:
+      "The deposit target is no longer on this menu."
     }
   }
 
