@@ -313,6 +313,7 @@ private struct MenuDetailReader: View {
         )
         MenuDishList(
           model: model,
+          detailModel: detailModel,
           menu: detail.menu,
           detail: detail,
           onRecipeSelected: onRecipeSelected
