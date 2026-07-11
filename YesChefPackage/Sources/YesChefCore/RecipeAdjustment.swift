@@ -670,6 +670,16 @@ public extension RecipeDetailData {
   }
 
   func resolved(applying variation: RecipeVariation) throws -> RecipeDetailData {
+    #if DEBUG
+      let clock = ContinuousClock()
+      let start = clock.now
+      defer {
+        let duration = String(describing: start.duration(to: clock.now))
+        AppLog.performance.log(
+          "recipe-variation-resolve duration=\(duration, privacy: .public)"
+        )
+      }
+    #endif
     let payload = try RecipeVariationPayload.decode(variation.deltas, variationID: variation.id)
     var uuids = VariationUUIDSequence(variationID: variation.id)
     var detail = try RecipeAdjustmentProposal(
@@ -686,6 +696,16 @@ public extension RecipeDetailData {
   func variationIngredientHighlights(
     for variation: RecipeVariation
   ) throws -> [IngredientLine.ID: RecipeVariationIngredientHighlight] {
+    #if DEBUG
+      let clock = ContinuousClock()
+      let start = clock.now
+      defer {
+        let duration = String(describing: start.duration(to: clock.now))
+        AppLog.performance.log(
+          "recipe-variation-highlights duration=\(duration, privacy: .public)"
+        )
+      }
+    #endif
     let payload = try RecipeVariationPayload.decode(variation.deltas, variationID: variation.id)
     let resolvedDetail = try resolved(applying: variation)
     let baseLineIDs = Set(ingredientLines.map(\.id))

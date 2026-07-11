@@ -290,6 +290,14 @@ private struct RecipeReaderView: View {
       }
     }
     .keepsScreenAwakeWhilePresented()
+    .onChange(of: model.detail?.activeVariationID) {
+      #if DEBUG
+        let selection = model.detail?.activeVariationID?.uuidString ?? "base"
+        AppLog.performance.log(
+          "recipe-detail-view active-variation-delivered selection=\(selection, privacy: .public)"
+        )
+      #endif
+    }
   }
 
   private func header(_ recipe: Recipe) -> some View {

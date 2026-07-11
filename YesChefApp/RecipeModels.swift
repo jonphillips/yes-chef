@@ -811,12 +811,24 @@ final class RecipeDetailModel {
   var scaleWholePart = 1
   var scaleFraction = ScaleFraction.none
   var adjustmentRestorePoint: RecipeAdjustmentRestorePoint?
+  @ObservationIgnored private let detailFetchAnimationDescription: String
   private var lastAppliedPersistedScale: Double?
 
   init(recipeID: Recipe.ID, scaleContext: ScaleContext? = nil) {
     self.recipeID = recipeID
     self.scaleContext = scaleContext ?? .recipe(recipeID)
-    _detail = Fetch(wrappedValue: nil, RecipeDetailRequest(recipeID: recipeID), animation: .default)
+    #if DEBUG
+      let detailFetchAnimation: Animation? = ProcessInfo.processInfo.arguments
+        .contains("-YesChefDisableDetailFetchAnimation") ? nil : .default
+    #else
+      let detailFetchAnimation: Animation? = .default
+    #endif
+    detailFetchAnimationDescription = detailFetchAnimation == nil ? "nil" : "default"
+    _detail = Fetch(
+      wrappedValue: nil,
+      RecipeDetailRequest(recipeID: recipeID),
+      animation: detailFetchAnimation
+    )
     _persistedScale = Fetch(
       wrappedValue: nil,
       RecipeScaleRequest(context: self.scaleContext),
