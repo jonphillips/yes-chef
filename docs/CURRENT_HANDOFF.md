@@ -14,11 +14,12 @@ scoped, and **Jon device-confirmed writer-api-return dropped from ~5000 ms → t
 holds [[sqlitedata-fetch-writer-convoy]]; the S7 test `GroceryIngredientChoiceTests.swift` now rides in the
 Chrome-polish slice commit).
 
-**Next Up is the fresh dogfood batch** (Jon's 2026-07-11 two-device pass). **Three efforts are now DONE —
-Chrome & navigation polish, Workbench dogfood polish, and the Meal-planner (Calendar) affordance swap**
+**The 2026-07-11 dogfood batch is now fully cleared — all four efforts DONE.** Chrome & navigation polish,
+Workbench dogfood polish, and the Meal-planner (Calendar) affordance swap
 ([#154](https://github.com/jonphillips/yes-chef/pull/154), architect-reviewed 2026-07-12; package builds +
-tests pass; app build + device pass are Jon's). **One effort remains** (Fraction input accessory, needs a scope
-confirm) — see **Next Up**. The whole **ADR-0027 harvest + deposit family (base + Amendment 1) is now COMPLETE
+tests pass; app build + device pass are Jon's), plus the **Fraction input accessory** (inline pill row,
+architect-reviewed + **device-passed** 2026-07-12; on this branch, archived to DONE-LOG). **Next Up now has no
+live effort — Jon picks the next target** (see **Next Up**). The whole **ADR-0027 harvest + deposit family (base + Amendment 1) is now COMPLETE
 and device-passed** (2026-07-12) — merged to main, archived to DONE-LOG; only the ADR's own deferred items
 (OQ4 taste preference, A6 promote-note-to-recipe) remain, each a separate future effort.
 
@@ -52,17 +53,15 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Recommended dispatch order (Jon's 2026-07-11 dogfood batch).** One Ready effort remains (the other three —
-Chrome & navigation polish, Workbench dogfood polish, and the Meal-planner affordance swap — are **DONE**,
-archived in [`docs/DONE-LOG.md`](DONE-LOG.md)). Full slice write-ups in `docs/efforts/`:
+**No live dispatch target — the 2026-07-11 dogfood batch is cleared.** All four efforts (Chrome & navigation
+polish, Workbench dogfood polish, Meal-planner affordance swap [#154], and Fraction input accessory) are **DONE**
+and archived in [`docs/DONE-LOG.md`](DONE-LOG.md). The three #154 efforts still owe **Jon's** device pass; the
+Fraction input accessory is device-passed (2026-07-12).
 
-1. **Fraction input accessory** ([`efforts/fraction-input-accessory.md`](efforts/fraction-input-accessory.md))
-   — Paprika-style fraction pills for ingredient authoring; reuses the multiplier-rework glyph set. **Needs a
-   5-minute scope confirm with Jon** (input-accessory vs inline row) before dispatch.
-
-The other three efforts of this dogfood batch — **Chrome & navigation polish**, **Workbench dogfood polish**, and
-the **Meal-planner (Calendar) affordance swap** ([#154](https://github.com/jonphillips/yes-chef/pull/154)) — are
-**DONE** and archived in [`docs/DONE-LOG.md`](DONE-LOG.md). All three still owe Jon's device pass.
+**Next task is Jon's to pick — do not infer one.** The candidates are the **Feature efforts still on the board**
+below (Recipe edit proposals S3, Workbench synthesis apply-action, a new design ADR) or a **new milestone** chosen
+from the 2026-07-11 dogfood gaps. Per [[post-browser-sync-vs-features-tension]], weigh the solvable
+sync/backup-hardening track against fresh feature-building before dispatching. STOP and ask Jon.
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**
@@ -98,13 +97,12 @@ synced `recipeVariations` table (Recipe edit proposals S2); and note the app tar
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
-**Dogfood 2026-07-11 — two-device pass (the current batch, see Next Up for order).**
-- **Fraction input accessory** ([`efforts/fraction-input-accessory.md`](efforts/fraction-input-accessory.md))
-  — needs a scope confirm first. **The one live effort of this batch.**
+**Dogfood 2026-07-11 — two-device pass. BATCH CLEARED — all four efforts DONE → [`docs/DONE-LOG.md`](DONE-LOG.md).**
+- **Fraction input accessory** — inline pill row, full glyph set ¼ ½ ¾ ⅓ ⅔ ⅛ ⅜ ⅝ ⅞; **DONE + device-passed**
+  2026-07-12 (this branch).
 - Chrome & navigation polish, Workbench dogfood polish, and the Meal-planner affordance swap
-  ([#154](https://github.com/jonphillips/yes-chef/pull/154)) are **DONE** → [`docs/DONE-LOG.md`](DONE-LOG.md)
-  (all three owe Jon's device pass). Parked follow-ons (Beta 3 drag-and-drop retest + cell images) stay in the
-  meal-planner effort doc.
+  ([#154](https://github.com/jonphillips/yes-chef/pull/154)) are **DONE** (all three owe Jon's device pass).
+  Parked follow-ons (Beta 3 drag-and-drop retest + cell images) stay in the meal-planner effort doc.
 - Design forks (edit-variation, promote-variation, variation ↔ Workbench overlap) → `docs/open-questions.md`.
 
 **Recently completed → all archived in [`docs/DONE-LOG.md`](DONE-LOG.md).** ADR-0027 harvest + deposit family

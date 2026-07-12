@@ -4,8 +4,10 @@
 ingredient text, so the cook picks pretty glyphs (¼ ½ ¾ ⅓ ⅔ ⅛ …) instead of typing clumsy `1/4`, `1/2`.
 App-layer; no schema. **Standalone slice** (larger than the mechanical chrome bundle — its own dispatch).
 **Owner:** Codex (implement) · Claude (architect/review) · Jon (product/device pass).
-**Status:** **Ready.** Surface decided (inline pill row, Jon 2026-07-11); only the glyph-set scope is still an
-open confirm (see Open).
+**Status:** **DONE — implemented, architect-reviewed, and device-passed (Jon, 2026-07-12).** Shipped as an
+inline pill row above the ingredient editor (`safeAreaInset`/`@FocusState`), the full glyph set
+¼ ½ ¾ ⅓ ⅔ ⅛ ⅜ ⅝ ⅞ (`ScaleFraction.ingredientInputCases`), append-at-end insertion, unit-tested. Archive to
+DONE-LOG on merge. Surface + scope decided with Jon 2026-07-11/12 (see Decided).
 
 **Read before starting:** the structured ingredient editor (`IngredientLine`/`IngredientSection` authoring UI),
 and [`recipe-multiplier-rework.md`](recipe-multiplier-rework.md) Slice A — the vulgar-fraction glyph map
@@ -30,11 +32,11 @@ Only introspect down to UIKit if append-at-end proves too clumsy in the device p
 Slice A), so a `1 ½ tsp` authored via pills scales properly — whereas hand-typed `1 1/2` is a second-class
 citizen. Pills make the well-supported path the easy path.
 
-## Open (confirm with Jon before build)
+## Decided (Jon, 2026-07-12) — all confirms closed
 
-- **Surface: DECIDED — inline pill row** (see Design). Not the keyboard accessory.
-- **Scope of glyphs:** the multiplier-rework set (¼ ½ ¾ ⅓ ⅔ ⅛ ⅜ ⅝ ⅞) — confirm that covers what Jon wants, or
-  whether it's just the common four (¼ ½ ¾ ⅓).
-- **Interaction with the "ingredient authoring — formatting fidelity" open question** (`docs/open-questions.md`,
-  2026-07-02): that fork is about bold/italic/header structure, a different axis; fractions are orthogonal and
-  can ship independently. Confirm no one wants them designed together.
+- **Surface — inline pill row** (see Design). Not the keyboard accessory.
+- **Scope of glyphs — the FULL multiplier-rework set** (¼ ½ ¾ ⅓ ⅔ ⅛ ⅜ ⅝ ⅞), so authoring and scaling stay in
+  lockstep on which fractions are "nice". Not the reduced common-four set.
+- **Independence — ships on its own now.** The "ingredient authoring — formatting fidelity" fork
+  (`docs/open-questions.md`, 2026-07-02: bold/italic/header structure) is a **separate, later** effort;
+  fractions are orthogonal and are **not** designed together with it.
