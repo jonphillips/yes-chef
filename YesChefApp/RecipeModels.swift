@@ -796,6 +796,8 @@ final class RecipeDetailModel {
   @ObservationIgnored
   @Dependency(\.defaultDatabase) var database
   @ObservationIgnored
+  @Dependency(\.defaultSyncEngine) var syncEngine
+  @ObservationIgnored
   @Dependency(\.uuid) var uuid
   @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
@@ -809,12 +811,35 @@ final class RecipeDetailModel {
   var scaleWholePart = 1
   var scaleFraction = ScaleFraction.none
   var adjustmentRestorePoint: RecipeAdjustmentRestorePoint?
+  @ObservationIgnored let detailFetchAnimationDescription: String
   private var lastAppliedPersistedScale: Double?
 
   init(recipeID: Recipe.ID, scaleContext: ScaleContext? = nil) {
     self.recipeID = recipeID
     self.scaleContext = scaleContext ?? .recipe(recipeID)
-    _detail = Fetch(wrappedValue: nil, RecipeDetailRequest(recipeID: recipeID), animation: .default)
+    #if DEBUG
+    if ProcessInfo.processInfo.arguments.contains("-YesChefDisableDetailFetchAnimation") {
+      detailFetchAnimationDescription = "nil"
+      _detail = Fetch(
+        wrappedValue: nil,
+        RecipeDetailRequest(recipeID: recipeID)
+      )
+    } else {
+      detailFetchAnimationDescription = "default"
+      _detail = Fetch(
+        wrappedValue: nil,
+        RecipeDetailRequest(recipeID: recipeID),
+        animation: .default
+      )
+    }
+    #else
+    detailFetchAnimationDescription = "default"
+    _detail = Fetch(
+      wrappedValue: nil,
+      RecipeDetailRequest(recipeID: recipeID),
+      animation: .default
+    )
+    #endif
     _persistedScale = Fetch(
       wrappedValue: nil,
       RecipeScaleRequest(context: self.scaleContext),
@@ -822,14 +847,11 @@ final class RecipeDetailModel {
     )
   }
 
-  var displayablePhotos: [RecipePhoto] {
-    detail?.photos
-      .filter { photo in
-        photo.displayData != nil || photo.thumbnailData != nil
-      } ?? []
+  var displayablePhotos: [RecipeDetailPhoto] {
+    detail?.photos.filter(\.isDisplayable) ?? []
   }
 
-  var primaryDisplayPhoto: RecipePhoto? {
+  var primaryDisplayPhoto: RecipeDetailPhoto? {
     RecipePhotoCover.coverPhoto(
       coverPhotoID: recipe?.coverPhotoID,
       from: displayablePhotos

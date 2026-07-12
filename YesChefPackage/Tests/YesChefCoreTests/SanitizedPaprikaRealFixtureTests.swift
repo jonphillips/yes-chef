@@ -174,7 +174,12 @@ extension RecipeCoreTests {
       }
       let detailsByTitle = Dictionary(uniqueKeysWithValues: importedDetails.map { ($0.recipe.title, $0) })
       let importedReferenceRecipe = try #require(detailsByTitle["Base Curry Sauce"])
-      expectNoDifference(importedReferenceRecipe.photos.map(\.originalSourcePath), ["Images/base-curry/scan-page.jpg"])
+      // The slim detail projection omits originalSourcePath (ADR-0029 Amd2 S5b);
+      // assert it against the stored row.
+      let referencePhotos = try database.read { db in
+        try RecipePhoto.where { $0.recipeID.eq(importedReferenceRecipe.recipe.id) }.fetchAll(db)
+      }
+      expectNoDifference(referencePhotos.map(\.originalSourcePath), ["Images/base-curry/scan-page.jpg"])
       expectNoDifference(importedReferenceRecipe.photos.map(\.kind), [.referenceDocument])
 
       let importedMissingImageRecipe = try #require(detailsByTitle["Missing Image Beans"])

@@ -60,10 +60,12 @@ final class RecipeEditorModel {
     if let pendingHeroPhoto {
       return pendingHeroPhoto.processedPhoto.thumbnailData ?? pendingHeroPhoto.processedPhoto.displayData
     }
+    // The editor preview prefers the carried thumbnail; the detail fetch no longer
+    // holds full-res bytes (ADR-0029 Amd2 S5b), so a thumbnail-less photo falls
+    // through to the placeholder here rather than pulling megabytes.
     return detail?.photos
       .filter { photo in
-        photo.kind != .referenceDocument
-          && (photo.displayData != nil || photo.thumbnailData != nil)
+        photo.kind != .referenceDocument && photo.thumbnailData != nil
       }
       .sorted { lhs, rhs in
         if lhs.kind != rhs.kind {
@@ -72,7 +74,7 @@ final class RecipeEditorModel {
         return lhs.sortOrder < rhs.sortOrder
       }
       .lazy
-      .compactMap { $0.thumbnailData ?? $0.displayData }
+      .compactMap(\.thumbnailData)
       .first
   }
 

@@ -295,16 +295,21 @@ extension RecipeCoreTests {
       expectNoDifference(imported.ingredientLines.map(\.originalText), ["see attached photo"])
       expectNoDifference(imported.instructionSteps.map(\.text), ["See attached photo."])
       expectNoDifference(imported.categories.map(\.name), ["Import Fixture"])
-      expectNoDifference(imported.photos.map(\.originalSourcePath), ["Images/curry/step1.jpg"])
-      expectNoDifference(imported.photos.map(\.sourceURL), [nil])
+      // The slim detail projection omits full-res bytes, originalSourcePath and
+      // sourceURL (ADR-0029 Amd2 S5b); assert those against the stored rows.
+      let storedPhotos = try database.read { db in
+        try RecipePhoto.where { $0.recipeID.eq(imported.recipe.id) }.order { $0.sortOrder }.fetchAll(db)
+      }
+      expectNoDifference(storedPhotos.map(\.originalSourcePath), ["Images/curry/step1.jpg"])
+      expectNoDifference(storedPhotos.map(\.sourceURL), [nil])
       // "see attached photo" body → photo is a reference document (ADR-0005 §4).
       expectNoDifference(imported.photos.map(\.kind), [.referenceDocument])
       expectNoDifference(imported.photos.map(\.source), [.imported])
       expectNoDifference(
-        imported.photos.map { $0.imageDataReference == $0.originalSourcePath },
+        storedPhotos.map { $0.imageDataReference == $0.originalSourcePath },
         [false]
       )
-      expectNoDifference(imported.photos.map { $0.displayData != nil }, [true])
+      expectNoDifference(imported.photos.map(\.hasDisplayData), [true])
       expectNoDifference(imported.photos.map { $0.thumbnailData != nil }, [true])
       expectNoDifference(imported.photos.map(\.mediaType), ["image/jpeg"])
       expectNoDifference(imported.photos.map(\.pixelWidth), [1_200])

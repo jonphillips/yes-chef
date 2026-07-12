@@ -3,13 +3,13 @@ import UIKit
 import YesChefCore
 
 struct RecipeReaderThumbnail: View {
-  let photo: RecipePhoto
+  let photo: RecipeDetailPhoto
   let action: () -> Void
 
   var body: some View {
-    if let data = photo.thumbnailData ?? photo.displayData {
+    if photo.isDisplayable {
       Button(action: action) {
-        RecipePhotoFrame(data: data, aspectRatio: 1)
+        RecipePhotoFrame(photo: photo, aspectRatio: 1, variant: .thumbnail)
           .frame(width: 112, height: 112)
       }
       .buttonStyle(.plain)
@@ -20,14 +20,14 @@ struct RecipeReaderThumbnail: View {
 }
 
 struct RecipePhotoGallery: View {
-  let photos: [RecipePhoto]
+  let photos: [RecipeDetailPhoto]
   let coverPhotoID: RecipePhoto.ID?
   let setCoverPhoto: (RecipePhoto.ID?) -> Void
 
   @State private var selectedPhotoID: RecipePhoto.ID?
-  @State private var enlargedPhoto: RecipePhoto?
+  @State private var enlargedPhoto: RecipeDetailPhoto?
 
-  private var selectedPhoto: RecipePhoto? {
+  private var selectedPhoto: RecipeDetailPhoto? {
     if let selectedPhotoID, let photo = photos.first(where: { $0.id == selectedPhotoID }) {
       return photo
     }
@@ -35,13 +35,17 @@ struct RecipePhotoGallery: View {
   }
 
   var body: some View {
-    if let selectedPhoto, let data = selectedPhoto.displayData ?? selectedPhoto.thumbnailData {
+    if let selectedPhoto {
       VStack(alignment: .leading, spacing: 10) {
         Button {
           enlargedPhoto = selectedPhoto
         } label: {
-          RecipePhotoFrame(data: data, aspectRatio: selectedPhoto.displayAspectRatio)
-            .frame(maxWidth: .infinity, alignment: .leading)
+          RecipePhotoFrame(
+            photo: selectedPhoto,
+            aspectRatio: selectedPhoto.displayAspectRatio,
+            variant: .hero
+          )
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(selectedPhoto.caption ?? "Recipe photo"))
@@ -64,11 +68,11 @@ struct RecipePhotoGallery: View {
           ScrollView(.horizontal) {
             HStack(spacing: 8) {
               ForEach(photos) { photo in
-                if let thumbnailData = photo.thumbnailData ?? photo.displayData {
+                if photo.isDisplayable {
                   Button {
                     selectedPhotoID = photo.id
                   } label: {
-                    RecipePhotoFrame(data: thumbnailData, aspectRatio: 1)
+                    RecipePhotoFrame(photo: photo, aspectRatio: 1, variant: .thumbnail)
                       .frame(width: 76, height: 76)
                       .overlay {
                         RoundedRectangle(cornerRadius: 8)
@@ -139,7 +143,7 @@ private struct RecipePhotoCoverControls: View {
 
 private struct RecipePhotoFullScreenView: View {
   @Environment(\.dismiss) private var dismiss
-  let photo: RecipePhoto
+  let photo: RecipeDetailPhoto
 
   @State private var scale: CGFloat = 1
   @State private var baseScale: CGFloat = 1
@@ -152,9 +156,14 @@ private struct RecipePhotoFullScreenView: View {
         Color.black
           .ignoresSafeArea()
 
-        if let data = photo.displayData ?? photo.thumbnailData {
+        if photo.isDisplayable {
           let imageSize = fittedImageSize(in: proxy.size)
-          RecipePhotoImage(data: data)
+          RecipePhotoImage(
+            photoID: photo.id,
+            checksum: photo.checksum,
+            variant: .fullScreen,
+            thumbnailData: photo.thumbnailData
+          )
             .frame(width: imageSize.width, height: imageSize.height)
             .scaleEffect(scale)
             .offset(offset)
@@ -277,7 +286,7 @@ private struct RecipePhotoFullScreenView: View {
   }
 }
 
-private extension RecipePhoto {
+private extension RecipeDetailPhoto {
   var displayAspectRatio: CGFloat {
     guard kind == .referenceDocument else { return 16.0 / 10.0 }
     guard
@@ -293,35 +302,23 @@ private extension RecipePhoto {
 }
 
 private struct RecipePhotoFrame: View {
-  let data: Data
+  let photo: RecipeDetailPhoto
   let aspectRatio: CGFloat
+  var variant: RecipePhotoImageVariant = .thumbnail
 
   var body: some View {
     Color.clear
       .aspectRatio(aspectRatio, contentMode: .fit)
       .overlay {
-        RecipePhotoImage(data: data)
-          .padding(1)
+        RecipePhotoImage(
+          photoID: photo.id,
+          checksum: photo.checksum,
+          variant: variant,
+          thumbnailData: photo.thumbnailData
+        )
+        .padding(1)
       }
       .clipShape(RoundedRectangle(cornerRadius: 8))
       .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-  }
-}
-
-private struct RecipePhotoImage: View {
-  let data: Data
-
-  var body: some View {
-    if let image = UIImage(data: data) {
-      Image(uiImage: image)
-        .resizable()
-        .scaledToFit()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    } else {
-      Image(systemName: "photo")
-        .font(.title)
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
   }
 }

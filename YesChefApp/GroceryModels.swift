@@ -7,6 +7,13 @@ import YesChefCore
 
 typealias CoreGroceryList = YesChefCore.GroceryList
 
+struct GroceryIngredientSelectionPresentation: Identifiable, Sendable {
+  let context: GroceryIngredientSelectionContext
+  let choices: [GroceryIngredientChoice]
+
+  var id: GroceryIngredientSelectionContext { context }
+}
+
 @Observable
 @MainActor
 final class GroceryLibraryModel {
@@ -21,7 +28,7 @@ final class GroceryLibraryModel {
     case editItem(GroceryItem.ID)
     case editList(CoreGroceryList.ID)
     case editPantryItem(PantryItem.ID)
-    case selectIngredients(GroceryIngredientSelectionContext)
+    case selectIngredients(GroceryIngredientSelectionPresentation)
   }
 
   @ObservationIgnored
@@ -38,10 +45,6 @@ final class GroceryLibraryModel {
   @Fetch(PantryItemListRequest(), animation: .default) var pantryItems: [PantryItem] = []
   @ObservationIgnored
   @Fetch(MenuListRequest(), animation: .default) var menuRows: [MenuRowData] = []
-  @ObservationIgnored
-  @Fetch(GroceryIngredientChoiceRequest(), animation: .default) var ingredientChoices: [GroceryIngredientChoice] = []
-  @ObservationIgnored
-  @Fetch(GroceryMenuRecipeItemRequest(), animation: .default) var menuRecipeItems: [GroceryMenuRecipeItem] = []
 
   var destination: Destination?
   var selectedListID: CoreGroceryList.ID?
@@ -98,8 +101,6 @@ final class GroceryLibraryModel {
     try? await $itemRows.load()
     try? await $pantryItems.load()
     try? await $menuRows.load()
-    try? await $ingredientChoices.load()
-    try? await $menuRecipeItems.load()
   }
 
   func ensureDefaultListIfNeeded() {
@@ -410,43 +411,79 @@ final class GroceryLibraryModel {
     let recipeRows = rows.filter { $0.item.kind == .recipe && $0.item.recipeID != nil }
     guard !recipeRows.isEmpty else { return }
     let date = recipeRows.first?.item.scheduledDate
-    destination = .selectIngredients(
-      GroceryIngredientSelectionContext(
-        source: .mealPlanRows(recipeRows.map(\.item.id)),
-        title: date?.formatted(.dateTime.month(.abbreviated).day()) ?? "Meal Plan",
-        subtitle: "Meal Calendar"
-      )
+    loadIngredientSelection(
+      source: .mealPlanRows(recipeRows.map(\.item.id)),
+      title: date?.formatted(.dateTime.month(.abbreviated).day()) ?? "Meal Plan",
+      subtitle: "Meal Calendar",
+      recipeIDs: Set(recipeRows.compactMap(\.item.recipeID))
     )
   }
 
   func selectMenuButtonTapped(menuID: CoreMenu.ID) {
     guard let menu = menuRows.first(where: { $0.menu.id == menuID })?.menu else { return }
-    destination = .selectIngredients(
-      GroceryIngredientSelectionContext(
-        source: .menu(menu.id),
-        title: menu.title,
-        subtitle: "Menu"
-      )
-    )
+    Task {
+      do {
+        let presentation = try await database.read { db in
+          let recipeIDs = try GroceryMenuRecipeIDsRequest(menuID: menu.id).fetch(db)
+          let choices = try GroceryIngredientChoiceRequest(recipeIDs: recipeIDs).fetch(db)
+          let title = try Menu.find(menu.id).fetchOne(db)?.title ?? menu.title
+          return GroceryIngredientSelectionPresentation(
+            context: GroceryIngredientSelectionContext(
+              source: .menu(menu.id),
+              title: title,
+              subtitle: "Menu"
+            ),
+            choices: choices
+          )
+        }
+        destination = .selectIngredients(presentation)
+      } catch {
+        errorMessage = String(describing: error)
+        isShowingError = true
+      }
+    }
   }
 
   func selectRecipeButtonTapped(recipeID: Recipe.ID) {
-    let title = ingredientChoices.first { $0.recipe.id == recipeID }?.recipe.title ?? "Recipe"
-    destination = .selectIngredients(
-      GroceryIngredientSelectionContext(
-        source: .recipe(recipeID),
-        title: title,
-        subtitle: "Recipe"
-      )
+    loadIngredientSelection(
+      source: .recipe(recipeID),
+      title: "Recipe",
+      subtitle: "Recipe",
+      recipeIDs: [recipeID],
+      recipeTitleID: recipeID
     )
   }
 
-  func ingredientChoices(
-    for context: GroceryIngredientSelectionContext,
-    mealRows: [MealPlanItemRowData]
-  ) -> [GroceryIngredientChoice] {
-    let recipeIDs = recipeIDs(for: context, mealRows: mealRows)
-    return ingredientChoices.filter { recipeIDs.contains($0.recipe.id) }
+  private func loadIngredientSelection(
+    source: GroceryIngredientSelectionContext.Source,
+    title: String,
+    subtitle: String?,
+    recipeIDs: Set<Recipe.ID>,
+    recipeTitleID: Recipe.ID? = nil
+  ) {
+    Task {
+      do {
+        let presentation = try await database.read { db in
+          var resolvedTitle = title
+          if let recipeTitleID,
+             let recipe = try Recipe.find(recipeTitleID).fetchOne(db) {
+            resolvedTitle = recipe.title
+          }
+          return GroceryIngredientSelectionPresentation(
+            context: GroceryIngredientSelectionContext(
+              source: source,
+              title: resolvedTitle,
+              subtitle: subtitle
+            ),
+            choices: try GroceryIngredientChoiceRequest(recipeIDs: recipeIDs).fetch(db)
+          )
+        }
+        destination = .selectIngredients(presentation)
+      } catch {
+        errorMessage = String(describing: error)
+        isShowingError = true
+      }
+    }
   }
 
   func confirmIngredientSelectionButtonTapped(
@@ -588,29 +625,6 @@ final class GroceryLibraryModel {
     pantryItems.first { $0.id == itemID }?.title ?? "Pantry Item"
   }
 
-  private func recipeIDs(
-    for context: GroceryIngredientSelectionContext,
-    mealRows: [MealPlanItemRowData]
-  ) -> Set<Recipe.ID> {
-    switch context.source {
-    case let .recipe(recipeID):
-      return [recipeID]
-
-    case let .mealPlanRows(itemIDs):
-      return Set(
-        mealRows
-          .filter { itemIDs.contains($0.item.id) }
-          .compactMap(\.item.recipeID)
-      )
-
-    case let .menu(menuID):
-      return Set(
-        menuRecipeItems
-          .filter { $0.item.menuID == menuID }
-          .map(\.recipe.id)
-      )
-    }
-  }
 }
 
 extension GroceryLibraryModel {

@@ -23,13 +23,17 @@ public struct GroceryIngredientChoice: Identifiable, Equatable, Sendable {
   }
 }
 
-public struct GroceryIngredientChoiceRequest: FetchKeyRequest {
-  public init() {}
+public struct GroceryIngredientChoiceRequest: Sendable {
+  public let recipeIDs: Set<Recipe.ID>
+
+  public init(recipeIDs: Set<Recipe.ID>) {
+    self.recipeIDs = recipeIDs
+  }
 
   public func fetch(_ db: Database) throws -> [GroceryIngredientChoice] {
     var choices: [GroceryIngredientChoice] = []
-    for recipe in try Recipe.fetchAll(db) {
-      guard let folded = try RecipeRepository.fetchDetailApplyingActiveVariation(recipeID: recipe.id, in: db)
+    for recipeID in recipeIDs {
+      guard let folded = try RecipeRepository.fetchDetailApplyingActiveVariation(recipeID: recipeID, in: db)
       else { continue }
       let sectionsByID = Dictionary(uniqueKeysWithValues: folded.detail.ingredientSections.map { ($0.id, $0) })
       choices += folded.detail.ingredientLines

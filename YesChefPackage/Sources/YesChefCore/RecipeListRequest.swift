@@ -73,7 +73,6 @@ public struct RecipeListRequest: FetchKeyRequest {
       .select {
         RecipeListPhotoRow.Columns(
           recipeID: $0.recipeID,
-          displayData: $0.displayData,
           thumbnailData: $0.thumbnailData,
           pixelWidth: $0.pixelWidth,
           pixelHeight: $0.pixelHeight,
@@ -115,15 +114,16 @@ private struct RecipeListCategorySummary {
 @Selection
 private struct RecipeListPhotoRow: Equatable, Sendable {
   let recipeID: Recipe.ID
-  let displayData: Data?
   let thumbnailData: Data?
   let pixelWidth: Int?
   let pixelHeight: Int?
   let kind: RecipePhotoKind
   let sortOrder: Int
 
+  // List rows carry downscaled thumbnails only — never full-resolution `displayData`
+  // (ADR-0029 S2). A photo with no generated thumbnail shows the placeholder instead.
   var listImageData: Data? {
-    thumbnailData ?? displayData
+    thumbnailData
   }
 
   var listSortKey: PhotoSortKey {
