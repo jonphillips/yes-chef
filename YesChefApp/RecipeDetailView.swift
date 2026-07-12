@@ -94,21 +94,6 @@ struct RecipeDetailView: View {
         }
       }
       ToolbarItemGroup(placement: .secondaryAction) {
-        if !model.ingredientLines.isEmpty {
-          Button {
-            model.scaleButtonTapped()
-          } label: {
-            Label(model.scaleSummary, systemImage: "slider.horizontal.3")
-          }
-          .popover(
-            isPresented: $model.destination.scaling,
-            attachmentAnchor: .rect(.bounds),
-            arrowEdge: .top
-          ) {
-            ScalePanel(model: model)
-              .presentationCompactAdaptation(.popover)
-          }
-        }
         Button(role: .destructive) {
           libraryModel.deleteButtonTapped(recipeID: model.recipeID)
         } label: {
@@ -356,6 +341,7 @@ private struct RecipeReaderView: View {
         Label(recipe.libraryPlacement.title, systemImage: "books.vertical")
           .font(.subheadline)
           .foregroundStyle(.secondary)
+          .recipeChip()
       }
 
       if let source = model.detail?.source {
@@ -448,24 +434,74 @@ private struct RecipeReaderView: View {
   }
 
   private func recipeStats(_ recipe: Recipe) -> some View {
-    HStack(spacing: 12) {
-      if let servingsText = recipe.servingsText {
-        Label(servingsText, systemImage: "person.2")
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 8) {
+        recipeStatChips(recipe)
       }
-      if let totalTime = recipe.totalTimeMinutes {
-        Label("\(totalTime) min", systemImage: "clock")
-      }
-      if let rating = recipe.rating, rating > 0 {
-        Label("\(rating)", systemImage: "star.fill")
-          .accessibilityLabel(Text("Rating \(rating) out of 5"))
-      }
-      if let difficulty = recipe.difficulty {
-        Label(difficulty.rawValue.capitalized, systemImage: "gauge.with.dots.needle.33percent")
-          .accessibilityLabel(Text("Difficulty \(difficulty.rawValue)"))
+      .fixedSize(horizontal: true, vertical: false)
+
+      VStack(alignment: .leading, spacing: 8) {
+        recipeStatChips(recipe)
       }
     }
     .font(.subheadline)
     .foregroundStyle(.secondary)
+  }
+
+  @ViewBuilder
+  private func recipeStatChips(_ recipe: Recipe) -> some View {
+    if let servingsText = recipe.servingsText {
+      if model.ingredientLines.isEmpty {
+        Label(servingsText, systemImage: "person.2")
+          .recipeChip()
+      } else {
+        let scaled = model.scaleFactor != 1
+        scaleButton(
+          scaled ? (model.scaledServingsSummary ?? servingsText) : servingsText,
+          systemImage: scaled ? "slider.horizontal.3" : "person.2"
+        )
+      }
+    } else if !model.ingredientLines.isEmpty {
+      scaleButton("Scale \(model.scaleSummary)")
+    }
+    if let totalTime = recipe.totalTimeMinutes {
+      Label("\(totalTime) min", systemImage: "clock")
+        .recipeChip()
+    }
+    if let rating = recipe.rating, rating > 0 {
+      Label("\(rating)", systemImage: "star.fill")
+        .accessibilityLabel(Text("Rating \(rating) out of 5"))
+        .recipeChip()
+    }
+    if let difficulty = recipe.difficulty {
+      Label(difficulty.rawValue.capitalized, systemImage: "gauge.with.dots.needle.33percent")
+        .accessibilityLabel(Text("Difficulty \(difficulty.rawValue)"))
+        .recipeChip()
+    }
+  }
+
+  private func scaleButton(
+    _ title: String,
+    systemImage: String = "slider.horizontal.3"
+  ) -> some View {
+    @Bindable var model = model
+
+    return Button {
+      model.scaleButtonTapped()
+    } label: {
+      Label(title, systemImage: systemImage)
+        .recipeChip()
+        .frame(minHeight: 44)
+    }
+    .buttonStyle(.plain)
+    .popover(
+      isPresented: $model.destination.scaling,
+      attachmentAnchor: .rect(.bounds),
+      arrowEdge: .top
+    ) {
+      ScalePanel(model: model)
+        .presentationCompactAdaptation(.popover)
+    }
   }
 
   private func startCookingButton(_ recipe: Recipe) -> some View {
@@ -531,14 +567,8 @@ private struct RecipeReaderView: View {
     @Bindable var model = model
 
     return VStack(alignment: .leading, spacing: 12) {
-      HStack {
-        Text("Ingredients")
-          .font(.title2.bold())
-        Spacer()
-        Text(model.scaleSummary)
-          .font(.subheadline)
-          .foregroundStyle(.secondary)
-      }
+      Text("Ingredients")
+        .font(.title2.bold())
       let groups = model.ingredientGroups
       VStack(alignment: .leading, spacing: 12) {
         if groups.isEmpty {
@@ -876,6 +906,10 @@ private extension Optional where Wrapped == String {
 }
 
 private extension View {
+  func recipeChip() -> some View {
+    modifier(RecipeChip())
+  }
+
   @ViewBuilder
   func adjustmentReviewPresentation<Item: Identifiable, Content: View>(
     item: Binding<Item?>,
@@ -887,6 +921,18 @@ private extension View {
     } else {
       sheet(item: item, content: content)
     }
+  }
+}
+
+private struct RecipeChip: ViewModifier {
+  func body(content: Content) -> some View {
+    content
+      .padding(.horizontal, 8)
+      .padding(.vertical, 4)
+      .overlay {
+        Capsule()
+          .stroke(.quaternary, lineWidth: 1)
+      }
   }
 }
 
@@ -967,15 +1013,25 @@ private struct WrappingLabels: View {
   let systemImage: String
 
   var body: some View {
-    HStack(spacing: 8) {
-      Image(systemName: systemImage)
-      ForEach(labels, id: \.self) { label in
-        Text(label)
-          .font(.caption)
-          .padding(.horizontal, 8)
-          .padding(.vertical, 4)
-          .background(.quaternary, in: Capsule())
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 8) {
+        chips
       }
+      .fixedSize(horizontal: true, vertical: false)
+
+      VStack(alignment: .leading, spacing: 8) {
+        chips
+      }
+    }
+    .font(.caption)
+    .foregroundStyle(.secondary)
+  }
+
+  @ViewBuilder
+  private var chips: some View {
+    ForEach(labels, id: \.self) { label in
+      Label(label, systemImage: systemImage)
+        .recipeChip()
     }
   }
 }

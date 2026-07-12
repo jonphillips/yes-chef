@@ -121,4 +121,33 @@ enum ScaleText {
   static func servingUnit(_ value: Double) -> String {
     value == 1 ? "serving" : "servings"
   }
+
+  static func scaledServingsSummary(
+    servingsText: String?,
+    baseServings: Double?,
+    factor: Double
+  ) -> String? {
+    if let range = servingsRange(in: servingsText) {
+      return "\(mixedNumber(range.lowerBound * factor))–\(mixedNumber(range.upperBound * factor)) servings"
+    }
+    guard let baseServings else { return nil }
+    let scaledServings = baseServings * factor
+    return "\(mixedNumber(scaledServings)) \(servingUnit(scaledServings))"
+  }
+
+  private static func servingsRange(in servingsText: String?) -> ClosedRange<Double>? {
+    guard
+      let servingsText,
+      let match = servingsText.range(
+        of: #"(\d+(?:\.\d+)?)\s*(?:to|[-–—])\s*(\d+(?:\.\d+)?)"#,
+        options: .regularExpression
+      )
+    else { return nil }
+
+    let values = servingsText[match]
+      .split(whereSeparator: { !$0.isNumber && $0 != "." })
+      .compactMap { Double($0) }
+    guard values.count == 2, values[0] <= values[1] else { return nil }
+    return values[0]...values[1]
+  }
 }
