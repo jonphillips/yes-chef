@@ -26,6 +26,34 @@ Live ambiguities and recently-resolved decisions. Resolved items stay here brief
   touch the same recipe text, and normalization's interaction with any future user styling must be decided
   together. Likely an LLM enrichment/one-tap action rather than a chat verb; classify before slicing.
 
+## Dogfooding — 2026-07-11 (two-device pass): variation ↔ Workbench overlap
+
+The mechanical fixes from this pass are sliced in `docs/efforts/` (chrome bundle, workbench polish, meal-planner
+affordances, fraction accessory). These three are the **design residue** — decide with Jon before any build.
+The through-line Jon named **twice** in this pass: *individual-recipe workspaces and the Workbench "secretly
+overlap."*
+
+- **[Design fork — the umbrella] Variation workspace vs. Workbench convergence.** Jon keeps hitting the seam
+  between "editing/evolving one recipe in place" (variations, adjust-proposals) and "the Workbench as a durable
+  design workspace over several recipes." Both the two items below are instances. **Open question:** is the
+  per-recipe variation/adjust surface a *lightweight Workbench-of-one*, and should they share machinery — or do
+  they stay distinct (Workbench = multi-candidate synthesis; variations = single-recipe deltas)? Likely a future
+  ADR crossing [ADR-0019](decisions/ADR-0019-recipe-design-studies.md) × [ADR-0021](decisions/ADR-0021-recipe-variations.md)
+  × [ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md). Don't unify prematurely — but stop treating the two
+  reports below as unrelated one-offs; they're evidence for this decision.
+
+- **[Design — feeds ADR-0014 × ADR-0021] Edit a variation, not just the original.** *(Already noted 2026-07-09
+  below; reaffirmed here.)* Looking at a variation, Jon wants to **edit the variation itself**. Variations are
+  LLM-created then shown **read-only** ([ADR-0021](decisions/ADR-0021-recipe-variations.md)), so hand-editing a
+  variation has no home. Jon explicitly flagged the **Workbench collision** — see the umbrella fork above. Needs
+  the header/text-editing model decision ([ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md)) plus a
+  call on whether variation-editing reuses Workbench machinery.
+
+- **[Future — ADR-0021 territory] Promote a variation to a standalone recipe.** Jon (2026-07-11): eventually a
+  way to promote a variation into its own top-level recipe. Again flagged as **Workbench/recipe-workspace
+  overlap** — the Workbench already has a "promote working recipe to `main`" flip (`libraryPlacement`), so
+  variation-promotion and workbench-promotion may want the same primitive. Not scoped; part of the umbrella fork.
+
 ## Resolved — 2026-06-28
 
 - **Web recipe capture is its own milestone (M2), before sync.** A share extension is

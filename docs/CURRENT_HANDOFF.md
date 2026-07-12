@@ -1,42 +1,31 @@
 # Current Handoff
 
-Last updated: July 10, 2026. **Next Up = ADR-0028 sync status-indicator accuracy fix (spec'd; CloudSyncKit)
-— Jon's call vs. the feature efforts below.** A two-device dogfood first looked like recipe **content**
-was missing on the iPhone; investigation ([ADR-0028](decisions/ADR-0028-multi-foreign-key-sync-loss.md),
-holds [[sqlitedata-single-fk-sync-limit]]) showed it was a **throttled bulk initial sync** — CloudKit
-rate-limited (`CKError 7/2062`) a ~44k-row + 2.5k-asset first pull; the debug count row proved the child
-tables were **climbing, not zero**, so a tempting multi-FK "content loss" theory was **disproven and the
-proposed schema/zone rebuild withdrawn** (no schema change, no data at risk). **Two real bugs remain:**
-(1) the **"Up to date" indicator lies** — it ignores incomplete/throttled *download* and flips green
-mid-fetch; fix = feed `SyncEngine.isFetchingChanges` + backoff state into `SyncHealth.displayStatus` (in
-CloudSyncKit, shared w/ galavant; pure reducer, testable). **Shipped in the working tree (non-destructive,
-builds clean, 278 tests pass):** the demo-seed gate (bug 2 — deterministic `00000000-…` keys were
-polluting the zone) + the debug "Local record counts" sheet (keep it — it caught the misdiagnosis). Prior
-context: ADR-0027 S1 just shipped; the "Ready after this" feature candidates below are Jon's call (do not infer). **Just shipped: ADR-0027 "Capture to
-menu" S1 ([#141](https://github.com/jonphillips/yes-chef/pull/141))** — the menu chat **harvest** verb
-(inverse of the generative complement family): captures a chat text selection (or, absent one, the assistant
-transcript) into `.note`-kind `MenuItem`s, the model segmenting + reshaping prose into recipe-looking notes
-and never inventing; menu context is **not** sent (D2 — the fix for the "it sent the whole menu" surprise).
-Additive `aiSettings.captureToNotePreference` column, otherwise sync-safe; device pass owed (Jon). Earlier
-and also logged in [`docs/DONE-LOG.md`](DONE-LOG.md): **Instrumentation — apply-action + LLM logging
-([#139](https://github.com/jonphillips/yes-chef/pull/139))** — diagnostic `os.Logger` at the `\.modelClient`
-seam + apply-action lifecycle logging, so a misbehaving verb's raw LLM response and empty-`extract` reason
-are legible; no `LLMClientKit` edits, no schema, no behavior change. Earlier and also logged there:
-**ADR-0026 review-collection sheet ([#138](https://github.com/jonphillips/yes-chef/pull/138))
-— S1+S2, one PR: the whole multi-item LLM-review collection now lives in the universal slide-up sheet
-(`RecipeCollectionReviewSheet`, built host-agnostic), the cramped inline `ChatApplyReviewList` band is gone,
-the adjust verb is a launch-only row that still opens the Compare-diff surface, and reader-feedback curation
-in capture shares the same sheet; no schema change**.
-Earlier and also logged there: **the menu-planner dogfood quick-fixes bundle
-([#136](https://github.com/jonphillips/yes-chef/pull/136))** — selection-clear + clear affordance, complement
-note-body (ADR-0012 Amd 2), prep-plan explain-better, variation rename; no schema. Earlier and also logged there:
-**ADR-0025 D6 + D7 ([#134](https://github.com/jonphillips/yes-chef/pull/134)) — the DB-backed reader-feedback
-curation-prompt preference (ADR-0018 `aiSettings`, additive `readerFeedbackPreference` column) + curated
-`RecipeNote(.readerFeedback)` rows feeding a distinct bucket in `RecipeChatRecipeContext`, bundled with the
-capture review-sheet host fix + inline reader-feedback editing; the ADR-0025 comment-ingestion effort is
-now closed**. Earlier and also logged there: the
-**ADR-0025 curation revision** ([#131](https://github.com/jonphillips/yes-chef/pull/131)) + a latent
-meal-planner build fix ([#132](https://github.com/jonphillips/yes-chef/pull/132)); **ADR-0024 fully done**
+Last updated: July 11, 2026. **🎉 iCloud sync works end-to-end across two physical devices** (`iPad Pro 13-inch (M5)`
+↔ `iPhone 17 Pro`) — recipes, images, menus all round-trip; the M4 one-way gate everything preceded is
+**crossed and holding** (logged in [`docs/DONE-LOG.md`](DONE-LOG.md); we stay in CloudKit **Development** by
+design — prod-schema promotion is the held ops step below). **Two big things closed with it:**
+**ADR-0028** (sync status-indicator accuracy — the "Up to date" indicator that lied mid-download; now shows
+"Downloading changes from iCloud" via `SyncHealth.isFetchingChanges` + `SyncDisplayStatus.downloading`, on
+main, device-passed) and **ADR-0029** (the UI-stall pass — archive/variation-switch took **5.6–6.8 s**; root
+cause Finding 8 = `GroceryIngredientChoiceRequest`, an always-on whole-library `@Fetch` re-running
+**synchronously on the writer inside every commit**; S7 fix made the grocery selection reads on-demand +
+scoped, and **Jon device-confirmed writer-api-return dropped from ~5000 ms → tens of ms**; PRs
+[#148](https://github.com/jonphillips/yes-chef/pull/148)/[#149](https://github.com/jonphillips/yes-chef/pull/149),
+holds [[sqlitedata-fetch-writer-convoy]]). *(Loose end: the S7 test `GroceryIngredientChoiceTests.swift` is
+authored but still untracked — Jon commits it.)*
+
+**Next Up is now a fresh dogfood batch** (Jon's 2026-07-11 two-device pass) — four Ready efforts sliced below,
+recommended order in **Next Up**. The ADR-0027 feature candidates remain on the board but the dogfood polish
+is the recommended next dispatch.
+
+Earlier and logged in [`docs/DONE-LOG.md`](DONE-LOG.md): **ADR-0027 "Capture to menu" S1**
+([#141](https://github.com/jonphillips/yes-chef/pull/141)); **Instrumentation — apply-action + LLM logging**
+([#139](https://github.com/jonphillips/yes-chef/pull/139)); **ADR-0026 review-collection sheet**
+([#138](https://github.com/jonphillips/yes-chef/pull/138)); **the menu-planner dogfood quick-fixes bundle**
+([#136](https://github.com/jonphillips/yes-chef/pull/136)); **ADR-0025 D6 + D7**
+([#134](https://github.com/jonphillips/yes-chef/pull/134)); the **ADR-0025 curation revision**
+([#131](https://github.com/jonphillips/yes-chef/pull/131)) + meal-planner build fix
+([#132](https://github.com/jonphillips/yes-chef/pull/132)); **ADR-0024 fully done**
 ([#127](https://github.com/jonphillips/yes-chef/pull/127)/[#128](https://github.com/jonphillips/yes-chef/pull/128));
 **Dogfood batch 5** ([#126](https://github.com/jonphillips/yes-chef/pull/126)); **ADR-0025 scaffolding**
 ([#129](https://github.com/jonphillips/yes-chef/pull/129)); **Recipe edit proposals S1/S2**
@@ -59,53 +48,55 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**DONE (working tree) — ADR-0028 sync status-indicator accuracy** ([ADR-0028](decisions/ADR-0028-multi-foreign-key-sync-loss.md)).
-The dogfood "missing content on iPhone" turned out to be a **throttled bulk initial sync** (CloudKit
-`CKError 7/2062` rate-limiting a ~44k-row + 2.5k-asset first pull), **not** data loss — the debug count row
-showed the child tables climbing, so the multi-FK "content loss" theory and its schema/zone rebuild were
-**disproven and withdrawn** (no schema change, nothing at device risk; the iPhone just needs to finish
-downloading). Already in the working tree: the demo-seed gate + the debug "Local record counts" sheet.
-**The indicator fix is now built (architect executed it directly, 2026-07-10):** `SyncHealth` gained a
-boolean `isFetchingChanges` input + a new `SyncDisplayStatus.downloading` case (gated after upload-pending);
-`SyncHealthModel.refresh()` feeds `syncEngine.isFetchingChanges`; the row now stays "Syncing…" mid-pull and
-never lies "Up to date". Lives in **`CloudSyncKit`** (shared w/ galavant) + the two app files; 15 reducer
-tests pass, package builds+tests clean, `check-drift.sh` green (280 tests). **Scope note:** no public
-rate-limit/backoff signal exists (SQLiteData swallows the throttle `CKError` internally), so the row can't
-say "paused by iCloud" and may briefly flash "Up to date" *between* throttled batches — accepted limitation,
-recorded in the ADR. **NOT committed** — the working tree also holds the parallel ADR-0027 session's
-in-flight edits (`RecipeDetailModel+Enrichment.swift` + `RecipeCapturedNote*`), which currently **don't
-build** (`appendRecipeNote` missing); the ADR-0028 files are independent of them. Jon does the git
-separation/commit.
+**Recommended dispatch order (Jon's 2026-07-11 dogfood batch).** Four Ready efforts, sequenced cheap →
+effort. A dispatch may take them one at a time or bundle 1+2. Full slice write-ups in `docs/efforts/`:
 
-**Feature efforts — Jon picks; do not infer.** ADR-0027 S1 shipped in
-[#141](https://github.com/jonphillips/yes-chef/pull/141) (see Just Shipped, above). The candidates below are
-Jon's call; a fresh dispatch must **STOP and ask Jon** which one:
+1. **Chrome & navigation polish** ([`efforts/dogfood-fixes-2026-07-11-chrome.md`](efforts/dogfood-fixes-2026-07-11-chrome.md))
+   — **do this first.** Side-menu order/naming (Recipes · Groceries · Calendar · Menus · Browser · Workbench ·
+   Settings), AI-widget cleanup (drop the on-/off-device disclaimer + the static "talking to X" label — the
+   dropdown reveals it — and make the chat input two lines tall), recipe-detail toolbar reorder
+   (Edit · Grocery · Add Meal · AI toggle · Workbench, Edit back to the trailing set as left-most),
+   delete-a-recipe-image-without-replacing, **and the AI apply-action context-menu relabel + new SF Symbols
+   + width investigation** (Save to Notes / Suggest Dishes / Chef It Up / Create Prep Plan / Revise Recipe;
+   drop the "→ … section" suffixes — which is also the native-Menu width fix). All app-layer, no schema, one PR.
+2. **Workbench dogfood polish** ([`efforts/workbench-dogfood-polish.md`](efforts/workbench-dogfood-polish.md))
+   — candidate rows show photo + source; draft rationale uses **title/source not object ID** (bug); draft
+   preview sheet made **scrollable** (bug); archive-all-candidates; pick a candidate's image for the promoted
+   recipe; links to candidate recipes from the promoted recipe. Reuses existing soft FKs / loaded data — no
+   schema.
+3. **Meal-planner (Calendar) affordance swap** ([`efforts/meal-planner-affordances.md`](efforts/meal-planner-affordances.md))
+   — tap a row → **open the recipe**; two right-hand affordances (existing target icon + a new calendar icon →
+   the Edit-Dish sheet, which moves off row-tap). No schema. *(Drag-and-drop retest on Beta 3 + cell images are
+   the parked follow-on inside that doc — not this dispatch.)*
+4. **Fraction input accessory** ([`efforts/fraction-input-accessory.md`](efforts/fraction-input-accessory.md))
+   — Paprika-style fraction pills for ingredient authoring; reuses the multiplier-rework glyph set. **Needs a
+   5-minute scope confirm with Jon** (input-accessory vs inline row) before dispatch.
+
+**Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
+edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**
+question Jon flagged twice this pass. Future ADR (0014 × 0021 × 0019/0023 territory), not built yet.
+
+**Feature efforts still on the board — Jon picks; do not infer.** Lower priority than the dogfood batch above,
+but unchanged:
 - **ADR-0027 S2** — the recipe sibling (capture chat into a `RecipeNote` on a recipe). S1's shape ported
-  cleanly (`MenuNoteHarvestPlan`/`HarvestedNote` + the two-mode client), so this is a straight port if Jon
-  wants it. Design: [ADR-0027](decisions/ADR-0027-harvest-chat-into-notes.md) D6.
+  cleanly, so a straight port. Design: [ADR-0027](decisions/ADR-0027-harvest-chat-into-notes.md) D6.
 - **ADR-0027 Amendment 1 — deposit chat intelligence onto an item** (dispatch ready:
-  [`docs/efforts/adr-0027-amd1-deposit-to-item.md`](efforts/adr-0027-amd1-deposit-to-item.md)). Two slices:
-  S1 = tap-to-target plumbing + recipe-append (`RecipeNote`); S2 = note-revise compose surface
-  (original + LLM-woven draft → overwrite `menuItems.notes`). Schema-free; target gesture confirmed
-  (tap-to-target). NB: shares the "write a `RecipeNote` from a chat commit" primitive with **ADR-0027 S2**
-  above — whichever ships first, the other reuses it.
+  [`docs/efforts/adr-0027-amd1-deposit-to-item.md`](efforts/adr-0027-amd1-deposit-to-item.md)). Shares the
+  "write a `RecipeNote` from a chat commit" primitive with ADR-0027 S2 — whichever ships first, the other reuses.
 - **Recipe edit proposals S3** — the iterative refine loop + workbench-log deposit.
 - **Workbench synthesis-shaped apply-action** — the draft verb's own action shape (no last-reply gate/chip).
 - **Open a design ADR** — ADR-0013 meal-planner verbs (needs scope confirmation) or ADR-0014 text editing.
 
 **ADR-0027 device pass owed (Jon):** confirm on device (primary `iPad Pro 13-inch (M5)`, both orientations;
-`iPhone 17 Pro` for the compact sheet) — (1) the **selection path**: highlight a dish paragraph in an
-assistant bubble → "Capture to menu" → one clean note in the collection sheet → commit lands a `.note`
-`MenuItem` (the resign-retains-selection plumbing change means the highlight must survive the apply-menu tap);
-(2) the **no-selection path**: no highlight → the verb scans the assistant transcript → N candidate notes;
-(3) captured notes land on Day 1 / Dinner (deterministic placement, OQ1 — menu detail has no selected-day
-state) and can be moved afterward.
+`iPhone 17 Pro` for the compact sheet) — (1) the **selection path**: highlight a dish paragraph → "Capture to
+menu" → one clean note → commit lands a `.note` `MenuItem` (highlight must survive the apply-menu tap);
+(2) the **no-selection path**: no highlight → the verb scans the transcript → N candidate notes;
+(3) captured notes land on Day 1 / Dinner and can be moved afterward.
 
-**ADR-0026 device pass still owed (Jon):** the architect review flagged two interaction risks to confirm on
-device — (1) the adjust launch row presents Compare-diff from `RecipeDetailView` while the collection sheet
-dismisses from `RecipeChatPanel` in the same runloop (present-while-dismiss across two anchors — verify
-Compare-diff isn't swallowed); (2) N=1 auto-drill stacks the child review sheet over the collection sheet
-(functionally fine; confirm it reads cleanly, incl. iPad split-chat, OQ2).
+**ADR-0026 device pass still owed (Jon):** two interaction risks — (1) the adjust launch row presents
+Compare-diff from `RecipeDetailView` while the collection sheet dismisses from `RecipeChatPanel` in the same
+runloop (verify Compare-diff isn't swallowed); (2) N=1 auto-drill stacks the child review sheet over the
+collection sheet (confirm it reads cleanly, incl. iPad split-chat).
 
 **Parked to `docs/open-questions.md` (design forks, decide with Jon before build):** multi-bubble /
 whole-transcript chat selection (per-bubble `UITextView` caps the payload); hand-editing a variation /
@@ -126,6 +117,15 @@ synced `recipeVariations` table (Recipe edit proposals S2); and note the app tar
 
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](DONE-LOG.md).
+
+**Dogfood 2026-07-11 — two-device pass (the current batch, see Next Up for order).**
+- **Chrome & navigation polish** ([`efforts/dogfood-fixes-2026-07-11-chrome.md`](efforts/dogfood-fixes-2026-07-11-chrome.md)).
+- **Workbench dogfood polish** ([`efforts/workbench-dogfood-polish.md`](efforts/workbench-dogfood-polish.md)).
+- **Meal-planner affordance swap** ([`efforts/meal-planner-affordances.md`](efforts/meal-planner-affordances.md))
+  — drag-and-drop retest + cell images parked inside.
+- **Fraction input accessory** ([`efforts/fraction-input-accessory.md`](efforts/fraction-input-accessory.md))
+  — needs a scope confirm first.
+- Design forks (edit-variation, promote-variation, variation ↔ Workbench overlap) → `docs/open-questions.md`.
 
 **Dogfood 2026-07-08 — ADR-gated design efforts (both Accepted 2026-07-09).**
 - **ADR-0024 editable proposal preview** ([ADR-0024](decisions/ADR-0024-editable-proposal-preview.md)) —
@@ -204,10 +204,10 @@ proposals effort above, reached via the same proposal/review surface; ADR-0023 D
 standalone framing.)*
 
 **Parked (not dispatched):**
-- **Dogfood the core loop on two devices** — capture ~15–20 real recipes via the extension, cook from
-  them (phone captures / iPad cooks, exercising the untested multi-device dedup-on-read convergence).
-  Blocked on Apple shipping iOS Beta 3; Jon's simulator-pass feedback still marinating. The most
-  annoying gaps found here still choose the real next milestone after the dogfood batch.
+- **Dogfood the core loop on two devices** — **UNBLOCKED / underway.** Sync now round-trips end-to-end
+  across `iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro` (see top). The 2026-07-11 pass is the first real
+  multi-device dogfood and produced the batch now in **Next Up**; the gaps found there choose the next
+  milestone after the batch clears.
 
 Comment ingestion stays in `docs/open-questions.md` until it is a scoped effort. Full completed-work
 history and the implemented-behavior checkpoint are in [`docs/DONE-LOG.md`](DONE-LOG.md).

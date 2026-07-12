@@ -11,8 +11,17 @@
 > downsampled and cached — the real fix for the ~4 s variation switch, which was synchronous full-res image
 > decoding on the main thread, not the S3 resolves. **No schema change.**
 
-Status: **Proposed** — 2026-07-11. Low-hanging-fruit performance pass, spotted from a dogfood report
-(archive ≈ 1s; variation switching janky). **Amendment 2 (2026-07-11, below): S4 confirmed working on
+Status: **Accepted / Resolved** — 2026-07-11. Shipped: S1 async writes ([#148](https://github.com/jonphillips/yes-chef/pull/148)),
+then S2/S4/S5b hygiene + the S5a→S6c diagnostic arc and the **S7 fix** — scoped, on-demand grocery
+selection fetches — merged in the **performance-fix** PR ([#149](https://github.com/jonphillips/yes-chef/pull/149),
+`ba9d7bd`). **Jon device-confirmed the ~5 s writer-api-return collapsed to tens of milliseconds on every
+quick mutation (archive/restore/variation switch).** Root cause (Finding 8): `GroceryIngredientChoiceRequest`,
+an always-on whole-library `@Fetch` re-running synchronously on the writer inside every affected commit —
+fixed by moving the grocery selection reads on-demand and scoped to the requested recipe IDs. **No schema
+change, no sync change, no image change.** Holds [[sqlitedata-fetch-writer-convoy]]. Follow-up: the S7
+behavioral test (`YesChefPackage/Tests/YesChefCoreTests/GroceryIngredientChoiceTests.swift`) is authored but
+still untracked in the working tree — Jon folds it into a commit. Originally a low-hanging-fruit performance
+pass spotted from a dogfood report (archive ≈ 1s; variation switching janky). **Amendment 2 (2026-07-11, below): S4 confirmed working on
 video, but tap→flip is still 5.6–6.8 s — measured as writer-queue wait, not rendering (Finding 5); S5a–S5c
 are the follow-on slices. Amendment 3's later S5a measurement retired that convoy theory, and
 **Amendment 4 corrects its replacement theory: the measured “COMMIT” interval still includes synchronous
