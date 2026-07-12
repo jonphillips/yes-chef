@@ -11,12 +11,13 @@ cause Finding 8 = `GroceryIngredientChoiceRequest`, an always-on whole-library `
 **synchronously on the writer inside every commit**; S7 fix made the grocery selection reads on-demand +
 scoped, and **Jon device-confirmed writer-api-return dropped from ~5000 ms → tens of ms**; PRs
 [#148](https://github.com/jonphillips/yes-chef/pull/148)/[#149](https://github.com/jonphillips/yes-chef/pull/149),
-holds [[sqlitedata-fetch-writer-convoy]]). *(Loose end: the S7 test `GroceryIngredientChoiceTests.swift` is
-authored but still untracked — Jon commits it.)*
+holds [[sqlitedata-fetch-writer-convoy]]; the S7 test `GroceryIngredientChoiceTests.swift` now rides in the
+Chrome-polish slice commit).
 
-**Next Up is now a fresh dogfood batch** (Jon's 2026-07-11 two-device pass) — four Ready efforts sliced below,
-recommended order in **Next Up**. The ADR-0027 feature candidates remain on the board but the dogfood polish
-is the recommended next dispatch.
+**Next Up is the fresh dogfood batch** (Jon's 2026-07-11 two-device pass). **Effort 1 — Chrome & navigation
+polish — is DONE** (all five slices, package builds + 29 touched tests pass, architect-approved; app build +
+device pass are Jon's). Three efforts remain, recommended order in **Next Up**. The ADR-0027 feature candidates
+remain on the board but the dogfood polish is the recommended next dispatch.
 
 Earlier and logged in [`docs/DONE-LOG.md`](DONE-LOG.md): **ADR-0027 "Capture to menu" S1**
 ([#141](https://github.com/jonphillips/yes-chef/pull/141)); **Instrumentation — apply-action + LLM logging**
@@ -48,29 +49,31 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Recommended dispatch order (Jon's 2026-07-11 dogfood batch).** Four Ready efforts, sequenced cheap →
-effort. A dispatch may take them one at a time or bundle 1+2. Full slice write-ups in `docs/efforts/`:
+**Recommended dispatch order (Jon's 2026-07-11 dogfood batch).** Three Ready efforts remain, sequenced cheap →
+effort (effort 1, Chrome & navigation polish, is **DONE** — see below). A dispatch may take them one at a time
+or bundle 1+2. Full slice write-ups in `docs/efforts/`:
 
-1. **Chrome & navigation polish** ([`efforts/dogfood-fixes-2026-07-11-chrome.md`](efforts/dogfood-fixes-2026-07-11-chrome.md))
-   — **do this first.** Side-menu order/naming (Recipes · Groceries · Calendar · Menus · Browser · Workbench ·
-   Settings), AI-widget cleanup (drop the on-/off-device disclaimer + the static "talking to X" label — the
-   dropdown reveals it — and make the chat input two lines tall), recipe-detail toolbar reorder
-   (Edit · Grocery · Add Meal · AI toggle · Workbench, Edit back to the trailing set as left-most),
-   delete-a-recipe-image-without-replacing, **and the AI apply-action context-menu relabel + new SF Symbols
-   + width investigation** (Save to Notes / Suggest Dishes / Chef It Up / Create Prep Plan / Revise Recipe;
-   drop the "→ … section" suffixes — which is also the native-Menu width fix). All app-layer, no schema, one PR.
-2. **Workbench dogfood polish** ([`efforts/workbench-dogfood-polish.md`](efforts/workbench-dogfood-polish.md))
-   — candidate rows show photo + source; draft rationale uses **title/source not object ID** (bug); draft
-   preview sheet made **scrollable** (bug); archive-all-candidates; pick a candidate's image for the promoted
-   recipe; links to candidate recipes from the promoted recipe. Reuses existing soft FKs / loaded data — no
-   schema.
-3. **Meal-planner (Calendar) affordance swap** ([`efforts/meal-planner-affordances.md`](efforts/meal-planner-affordances.md))
+1. **Workbench dogfood polish** ([`efforts/workbench-dogfood-polish.md`](efforts/workbench-dogfood-polish.md))
+   — **do this first.** Candidate rows show photo + source; draft rationale uses **title/source not object ID**
+   (bug); draft preview sheet made **scrollable** (bug); archive-all-candidates; pick a candidate's image for
+   the promoted recipe; links to candidate recipes from the promoted recipe. Reuses existing soft FKs / loaded
+   data — no schema.
+2. **Meal-planner (Calendar) affordance swap** ([`efforts/meal-planner-affordances.md`](efforts/meal-planner-affordances.md))
    — tap a row → **open the recipe**; two right-hand affordances (existing target icon + a new calendar icon →
    the Edit-Dish sheet, which moves off row-tap). No schema. *(Drag-and-drop retest on Beta 3 + cell images are
    the parked follow-on inside that doc — not this dispatch.)*
-4. **Fraction input accessory** ([`efforts/fraction-input-accessory.md`](efforts/fraction-input-accessory.md))
+3. **Fraction input accessory** ([`efforts/fraction-input-accessory.md`](efforts/fraction-input-accessory.md))
    — Paprika-style fraction pills for ingredient authoring; reuses the multiplier-rework glyph set. **Needs a
    5-minute scope confirm with Jon** (input-accessory vs inline row) before dispatch.
+
+**DONE — Chrome & navigation polish** ([`efforts/dogfood-fixes-2026-07-11-chrome.md`](efforts/dogfood-fixes-2026-07-11-chrome.md)):
+all five slices shipped in the working tree (architect-approved 2026-07-11) — side-menu order/naming
+(Recipes · Groceries · Calendar · Menus · Browser · Workbench · Settings), AI-widget cleanup (dropped the
+on-/off-device disclaimer + static provider label + de-mangled a11y hint, chat input two lines), recipe-detail
+toolbar reorder (Edit · Grocery · Add Meal · AI toggle · Workbench), delete-a-recipe-image-without-replacing
+(new `removesHeroPhoto` draft flag, cover clears, sync-safe), and the AI apply-action relabel + per-verb SF
+Symbols (Save to Notes / Suggest Dishes / Chef It Up / Create Prep Plan / Revise Recipe, suffixes dropped).
+App-layer, no schema. Package builds + 29 touched tests pass; app build + device pass are Jon's.
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**
@@ -119,7 +122,8 @@ Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); no
 target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
 **Dogfood 2026-07-11 — two-device pass (the current batch, see Next Up for order).**
-- **Chrome & navigation polish** ([`efforts/dogfood-fixes-2026-07-11-chrome.md`](efforts/dogfood-fixes-2026-07-11-chrome.md)).
+- **Chrome & navigation polish** ([`efforts/dogfood-fixes-2026-07-11-chrome.md`](efforts/dogfood-fixes-2026-07-11-chrome.md))
+  — **DONE** (architect-approved 2026-07-11; rides in the slice commit, device pass owed).
 - **Workbench dogfood polish** ([`efforts/workbench-dogfood-polish.md`](efforts/workbench-dogfood-polish.md)).
 - **Meal-planner affordance swap** ([`efforts/meal-planner-affordances.md`](efforts/meal-planner-affordances.md))
   — drag-and-drop retest + cell images parked inside.
