@@ -309,17 +309,12 @@ struct MealCalendarDayAgendaView: View {
         )
         .frame(maxWidth: .infinity, minHeight: 220)
       } else {
-        VStack(alignment: .leading, spacing: 18) {
-          ForEach(occupiedMealSlots, id: \.self) { mealSlot in
-            MealPlanSlotSection(
-              model: model,
-              mealSlot: mealSlot,
-              rows: model.rows(on: model.selectedDate, mealSlot: mealSlot),
-              onMenuSelected: onMenuSelected,
-              onRecipeSelected: onRecipeSelected
-            )
-          }
-        }
+        MealPlanDaySections(
+          model: model,
+          mealSlots: occupiedMealSlots,
+          onMenuSelected: onMenuSelected,
+          onRecipeSelected: onRecipeSelected
+        )
       }
     }
   }
@@ -906,77 +901,52 @@ private extension CookSessionItem {
   }
 }
 
-extension ReorderDifference where CollectionID == ReorderableSingleCollectionIdentifier {
-  /// Applies a single-collection reorder to `collection` in one in-place pass.
-  func apply<C>(to collection: inout C)
-  where C: RangeReplaceableCollection, C.Element: Identifiable, C.Element.ID == ItemID {
-    let moving = Set(sources)
-    guard !moving.isEmpty else { return }
-
-    var moved: [C.Element] = []
-    moved.reserveCapacity(moving.count)
-    collection.removeAll { element in
-      guard moving.contains(element.id) else { return false }
-      moved.append(element)
-      return true
-    }
-
-    switch destination.position {
-    case .before(let id):
-      let index = collection.firstIndex { $0.id == id } ?? collection.endIndex
-      collection.insert(contentsOf: moved, at: index)
-    case .end:
-      collection.append(contentsOf: moved)
-    }
-  }
-}
-
-private struct MealPlanSlotSection: View {
+private struct MealPlanDaySections: View {
   let model: MealCalendarModel
-  let mealSlot: MealPlanItemSlot
-  let rows: [MealPlanItemRowData]
+  let mealSlots: [MealPlanItemSlot]
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      Label(mealSlot.title, systemImage: mealSlot.systemImage)
-        .font(.title3.weight(.semibold))
-
-      VStack(spacing: 0) {
-        ForEach(rows) { row in
-          MealPlanItemRowView(
-            row: row,
-            editAction: row.isFromMenu ? nil : {
-              model.editButtonTapped(itemID: row.item.id)
-            },
-            deleteAction: row.isFromMenu ? nil : {
-              model.deleteButtonTapped(itemID: row.item.id)
-            },
-            sourceAction: sourceAction(for: row),
-            primaryAction: recipeAction(for: row)
-          )
-          if row.id != rows.last?.id {
-            Divider()
-              .padding(.leading, 72)
+    LazyVStack(alignment: .leading, spacing: 0) {
+      ForEach(mealSlots, id: \.self) { mealSlot in
+        let rows = model.rows(on: model.selectedDate, mealSlot: mealSlot)
+        Section {
+          ForEach(rows) { row in
+            MealPlanItemRowView(
+              row: row,
+              editAction: row.isFromMenu ? nil : {
+                model.editButtonTapped(itemID: row.item.id)
+              },
+              deleteAction: row.isFromMenu ? nil : {
+                model.deleteButtonTapped(itemID: row.item.id)
+              },
+              sourceAction: sourceAction(for: row),
+              primaryAction: recipeAction(for: row)
+            )
+            .background(.background)
+            .overlay(alignment: .bottom) {
+              if row.id != rows.last?.id {
+                Divider()
+                  .padding(.leading, 72)
+                  .allowsHitTesting(false)
+              }
+            }
           }
+          .reorderable(collectionID: mealSlot)
+        } header: {
+          Label(mealSlot.title, systemImage: mealSlot.systemImage)
+            .font(.title3.weight(.semibold))
+            .padding(.top, mealSlot == mealSlots.first ? 0 : 18)
+            .padding(.bottom, 12)
         }
-        .reorderable()
       }
-      .reorderContainer(for: MealPlanItemRowData.self) { difference in
-        var reordered = rows
-        difference.apply(to: &reordered)
-        model.reorderItems(
-          orderedRowKeys: reordered.map(\.id.rawValue),
-          mealSlot: mealSlot
-        )
-      }
-      .background(.background)
-      .clipShape(.rect(cornerRadius: 8))
-      .overlay {
-        RoundedRectangle(cornerRadius: 8)
-          .stroke(.quaternary)
-      }
+    }
+    .reorderContainer(for: MealPlanItemRowData.self, in: MealPlanItemSlot.self) { difference in
+      model.reorderItems(
+        itemIDs: difference.sources,
+        destination: difference.destination
+      )
     }
   }
 

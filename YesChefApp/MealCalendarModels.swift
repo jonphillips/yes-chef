@@ -339,22 +339,47 @@ final class MealCalendarModel {
     }
   }
 
-  /// Persists a new display order for the selected day's `mealSlot`. `orderedRowKeys` are
-  /// `MealPlanItemRowID.rawValue` strings covering every row in the slot (manual and
-  /// menu-projected). The projection re-fetch reflects the new order; the underlying menu
-  /// is never mutated.
-  func reorderItems(orderedRowKeys: [String], mealSlot: MealPlanItemSlot) {
+  /// Persists a sectioned reorder within the selected day. The day-order overlays can
+  /// reassign projected rows to another meal slot without mutating their underlying menu.
+  func reorderItems(
+    itemIDs: [MealPlanItemRowID],
+    destination: ReorderDifference<MealPlanItemRowID, MealPlanItemSlot>.Destination
+  ) {
+    let movingIDs = Set(itemIDs)
+    guard !movingIDs.isEmpty else { return }
+
+    let dayRows = selectedDayRows
+    let movingRows = dayRows.filter { movingIDs.contains($0.id) }
+    guard !movingRows.isEmpty else { return }
+
+    var rowsBySlot = Dictionary(grouping: dayRows, by: \.item.mealSlot)
+    for mealSlot in MealPlanItemSlot.allCases {
+      rowsBySlot[mealSlot]?.removeAll { movingIDs.contains($0.id) }
+    }
+
+    var destinationRows = rowsBySlot[destination.collectionID, default: []]
+    switch destination.position {
+    case .before(let itemID):
+      let index = destinationRows.firstIndex { $0.id == itemID } ?? destinationRows.endIndex
+      destinationRows.insert(contentsOf: movingRows, at: index)
+    case .end:
+      destinationRows.append(contentsOf: movingRows)
+    }
+    rowsBySlot[destination.collectionID] = destinationRows
+
     let scheduledDate = startOfDay(selectedDate)
     do {
       try database.write { db in
-        try MealCalendarRepository.setDayOrder(
-          orderedRowKeys: orderedRowKeys,
-          on: scheduledDate,
-          mealSlot: mealSlot,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
+        for mealSlot in MealPlanItemSlot.allCases {
+          try MealCalendarRepository.setDayOrder(
+            orderedRowKeys: rowsBySlot[mealSlot, default: []].map(\.id.rawValue),
+            on: scheduledDate,
+            mealSlot: mealSlot,
+            in: db,
+            now: now,
+            uuid: { uuid() }
+          )
+        }
       }
     } catch {
       errorMessage = String(describing: error)

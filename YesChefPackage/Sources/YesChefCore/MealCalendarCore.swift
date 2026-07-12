@@ -246,10 +246,9 @@ public struct MealCalendarRequest: FetchKeyRequest {
 
 /// Applies `MealPlanDayOrder` overlays to a comparator-sorted row list.
 ///
-/// Input rows must already be sorted by the natural comparator, so all rows for a given
-/// (day, meal slot) are contiguous. Within each such run, rows listed in the matching
-/// overlay are ordered by their stored position; rows absent from the overlay keep their
-/// relative comparator order and follow the listed ones.
+/// Input rows must already be sorted by the natural comparator. An overlay both orders
+/// rows within its meal slot and, when a row originated in another slot, projects it into
+/// the destination slot for this placed day without mutating the underlying menu.
 enum MealPlanDayOrderApplier {
   struct Key: Hashable {
     var date: Date
@@ -268,45 +267,48 @@ enum MealPlanDayOrderApplier {
       orders.map { (Key(date: $0.scheduledDate, slot: $0.mealSlot), $0) },
       uniquingKeysWith: { $0.dateModified >= $1.dateModified ? $0 : $1 }
     )
-    let positionsByKey: [Key: [String: Int]] = latestByKey.compactMapValues { order in
-      let indexed = Dictionary(
-        uniqueKeysWithValues: order.rowKeys.enumerated().map { ($0.element, $0.offset) }
-      )
-      return indexed.isEmpty ? nil : indexed
+    let positionsByKey: [Key: [String: Int]] = latestByKey.mapValues { order in
+      Dictionary(uniqueKeysWithValues: order.rowKeys.enumerated().map { ($0.element, $0.offset) })
     }
     guard !positionsByKey.isEmpty else { return rows }
 
-    var result: [MealPlanItemRowData] = []
-    result.reserveCapacity(rows.count)
-    var index = 0
-    while index < rows.count {
-      let start = index
-      let key = Key(date: rows[start].item.scheduledDate, slot: rows[start].item.mealSlot)
-      index += 1
-      while index < rows.count,
-        rows[index].item.scheduledDate == key.date,
-        rows[index].item.mealSlot == key.slot
-      {
-        index += 1
+    var assignedSlotByDayAndRowKey: [Date: [String: MealPlanItemSlot]] = [:]
+    for (key, order) in latestByKey {
+      for rowKey in order.rowKeys {
+        assignedSlotByDayAndRowKey[key.date, default: [:]][rowKey] = key.slot
       }
-      let run = Array(rows[start..<index])
-      guard let positions = positionsByKey[key] else {
-        result.append(contentsOf: run)
-        continue
-      }
-      let ordered = run.enumerated().sorted { lhs, rhs in
-        let lp = positions[lhs.element.id.rawValue]
-        let rp = positions[rhs.element.id.rawValue]
-        switch (lp, rp) {
-        case let (l?, r?): return l < r
-        case (_?, nil): return true
-        case (nil, _?): return false
-        case (nil, nil): return lhs.offset < rhs.offset
-        }
-      }
-      result.append(contentsOf: ordered.map(\.element))
     }
-    return result
+
+    let projected = rows.enumerated().map { offset, originalRow in
+      var row = originalRow
+      if let assignedSlot = assignedSlotByDayAndRowKey[row.item.scheduledDate]?[row.id.rawValue] {
+        row.item.mealSlot = assignedSlot
+      }
+      return (offset: offset, row: row)
+    }
+
+    return projected.sorted { lhs, rhs in
+      if lhs.row.item.scheduledDate != rhs.row.item.scheduledDate {
+        return lhs.row.item.scheduledDate < rhs.row.item.scheduledDate
+      }
+      if lhs.row.item.mealSlot.sortOrder != rhs.row.item.mealSlot.sortOrder {
+        return lhs.row.item.mealSlot.sortOrder < rhs.row.item.mealSlot.sortOrder
+      }
+
+      let key = Key(date: lhs.row.item.scheduledDate, slot: lhs.row.item.mealSlot)
+      let positions = positionsByKey[key] ?? [:]
+      switch (positions[lhs.row.id.rawValue], positions[rhs.row.id.rawValue]) {
+      case let (left?, right?):
+        return left < right
+      case (_?, nil):
+        return true
+      case (nil, _?):
+        return false
+      case (nil, nil):
+        return lhs.offset < rhs.offset
+      }
+    }
+    .map(\.row)
   }
 }
 

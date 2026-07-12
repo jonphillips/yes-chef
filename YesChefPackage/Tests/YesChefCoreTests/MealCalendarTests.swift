@@ -532,6 +532,35 @@ extension RecipeCoreTests {
           [menu1Key, manualBKey, menu2Key, manualAKey]
         )
 
+        // A sectioned reorder can project a row into another slot for this day.
+        try MealCalendarRepository.setDayOrder(
+          orderedRowKeys: [manualBKey],
+          on: scheduledDate,
+          mealSlot: .lunch,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        try MealCalendarRepository.setDayOrder(
+          orderedRowKeys: [menu1Key, menu2Key, manualAKey],
+          on: scheduledDate,
+          mealSlot: .dinner,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        let movedBetweenSlots = try MealCalendarRequest().fetch(db)
+          .filter { $0.item.scheduledDate == scheduledDate }
+        expectNoDifference(
+          movedBetweenSlots.map(\.id.rawValue),
+          [manualBKey, menu1Key, menu2Key, manualAKey]
+        )
+        expectNoDifference(
+          movedBetweenSlots.map(\.item.mealSlot),
+          [.lunch, .dinner, .dinner, .dinner]
+        )
+
         // The underlying menu is untouched.
         let menuItems = try MenuItem.where { $0.menuID.eq(menuID) }
           .order { $0.sortOrder }
@@ -540,6 +569,14 @@ extension RecipeCoreTests {
         expectNoDifference(menuItems.map(\.sortOrder), [0, 1])
 
         // Re-saving keeps a single overlay row for the slot.
+        try MealCalendarRepository.setDayOrder(
+          orderedRowKeys: [],
+          on: scheduledDate,
+          mealSlot: .lunch,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
         try MealCalendarRepository.setDayOrder(
           orderedRowKeys: [manualAKey, manualBKey, menu1Key, menu2Key],
           on: scheduledDate,
