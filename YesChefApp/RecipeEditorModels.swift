@@ -122,6 +122,10 @@ final class RecipeEditorModel {
       }
   }
 
+  func ingredientFractionTapped(_ fraction: ScaleFraction) {
+    draft.ingredientText = ScaleFraction.appending(fraction, to: draft.ingredientText)
+  }
+
   func heroPhotoSelected(sourceData: Data, sourcePath: String) async {
     let photoID = uuid()
     let processedPhoto = await Task.detached {
