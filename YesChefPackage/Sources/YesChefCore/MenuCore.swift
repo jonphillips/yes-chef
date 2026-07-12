@@ -35,15 +35,18 @@ public struct MenuItemRowData: Identifiable, Equatable, Sendable {
   public var item: MenuItem
   public var recipe: Recipe?
   public var recipeIngredientLines: [String]
+  public var thumbnailData: Data?
 
   public init(
     item: MenuItem,
     recipe: Recipe? = nil,
-    recipeIngredientLines: [String] = []
+    recipeIngredientLines: [String] = [],
+    thumbnailData: Data? = nil
   ) {
     self.item = item
     self.recipe = recipe
     self.recipeIngredientLines = recipeIngredientLines
+    self.thumbnailData = thumbnailData
   }
 
   public var id: MenuItem.ID { item.id }
@@ -101,6 +104,26 @@ public struct MenuDetailRequest: FetchKeyRequest {
         .map { ($0.id, $0) }
     )
     let recipeIDs = Set(recipesByID.keys)
+    let photoRows = try RecipePhoto
+      .select {
+        MenuItemPhotoRow.Columns(
+          recipeID: $0.recipeID,
+          thumbnailData: $0.thumbnailData,
+          kind: $0.kind,
+          sortOrder: $0.sortOrder
+        )
+      }
+      .fetchAll(db)
+    var thumbnailsByRecipeID: [Recipe.ID: MenuItemPhotoRow] = [:]
+    for photo in photoRows where photo.kind != .referenceDocument && photo.thumbnailData != nil {
+      guard let existing = thumbnailsByRecipeID[photo.recipeID] else {
+        thumbnailsByRecipeID[photo.recipeID] = photo
+        continue
+      }
+      if photo.isPreferred(over: existing) {
+        thumbnailsByRecipeID[photo.recipeID] = photo
+      }
+    }
     let ingredientLinesByRecipeID = Dictionary(
       grouping: try IngredientLine.fetchAll(db)
         .filter { recipeIDs.contains($0.recipeID) },
@@ -121,7 +144,8 @@ public struct MenuDetailRequest: FetchKeyRequest {
             (ingredientLinesByRecipeID[recipe.id] ?? [])
               .sorted { $0.sortOrder < $1.sortOrder }
               .map(\.originalText)
-          } ?? []
+          } ?? [],
+          thumbnailData: recipe.flatMap { thumbnailsByRecipeID[$0.id]?.thumbnailData }
         )
       }
       .sorted(by: areMenuItemRowsInIncreasingOrder)
@@ -136,6 +160,21 @@ public struct MenuDetailRequest: FetchKeyRequest {
       }
 
     return MenuDetailData(menu: menu, itemRows: itemRows, placements: placements)
+  }
+}
+
+@Selection
+private struct MenuItemPhotoRow: Equatable, Sendable {
+  let recipeID: Recipe.ID
+  let thumbnailData: Data?
+  let kind: RecipePhotoKind
+  let sortOrder: Int
+
+  func isPreferred(over other: Self) -> Bool {
+    if kind != other.kind {
+      return kind == .hero
+    }
+    return sortOrder < other.sortOrder
   }
 }
 

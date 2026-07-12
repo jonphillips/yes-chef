@@ -14,6 +14,7 @@ extension RecipeCoreTests {
       let startDate = Date(timeIntervalSinceReferenceDate: 804_200_000)
       let recipeID = SampleUUIDSequence.uuid(9_001)
       let ingredientSectionID = SampleUUIDSequence.uuid(9_002)
+      let thumbnailData = Data([1])
       var uuids = SampleUUIDSequence(start: 9_100)
 
       try database.write { db in
@@ -23,6 +24,18 @@ extension RecipeCoreTests {
             title: "Menu Chicken",
             dateCreated: now,
             dateModified: now
+          )
+        }
+        .execute(db)
+        try RecipePhoto.insert {
+          RecipePhoto(
+            id: SampleUUIDSequence.uuid(9_004),
+            recipeID: recipeID,
+            imageDataReference: "recipePhotos/menu-chicken",
+            thumbnailData: thumbnailData,
+            kind: .hero,
+            sortOrder: 0,
+            dateCreated: now
           )
         }
         .execute(db)
@@ -91,6 +104,7 @@ extension RecipeCoreTests {
         expectNoDifference(detail.itemRows.map(\.item.notes), ["Grill outside", "Use extra chicken"])
         expectNoDifference(detail.itemRows[0].recipeIngredientLines, ["1 chicken"])
         expectNoDifference(detail.itemRows[1].recipeIngredientLines, [])
+        expectNoDifference(detail.itemRows.map(\.thumbnailData), [thumbnailData, nil])
         expectNoDifference(detail.placements.map(\.id), [placementID])
       }
     }

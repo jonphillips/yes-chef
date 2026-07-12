@@ -181,10 +181,6 @@ private struct MenuDishRowView: View {
   var body: some View {
     rowContent
       .background(isDepositTarget ? Color.accentColor.opacity(0.12) : Color.clear)
-      .contentShape(Rectangle())
-      .onTapGesture {
-        model.editItemButtonTapped(menu: menu, row: row)
-      }
       .draggable(
         MenuDraggedMenuItem(
           menuID: row.item.menuID,
@@ -215,14 +211,16 @@ private struct MenuDishRowView: View {
 
   private var rowContent: some View {
     HStack(alignment: .top, spacing: 12) {
-      Image(systemName: row.item.kind.systemImage)
-        .font(.title3)
-        .foregroundStyle(.secondary)
-        .frame(width: 32, height: 32)
+      dishImage
 
       VStack(alignment: .leading, spacing: 5) {
-        Text(row.displayTitle)
-          .font(.headline)
+        Button {
+          primaryAction()
+        } label: {
+          Text(row.displayTitle)
+            .font(.headline)
+        }
+        .buttonStyle(.plain)
         Menu {
           ForEach(MealPlanItemSlot.allCases, id: \.self) { mealSlot in
             Button {
@@ -265,23 +263,42 @@ private struct MenuDishRowView: View {
           : "Set \(row.displayTitle) as chat deposit target"
       )
 
-      if let recipeID = row.recipe?.id, let onRecipeSelected {
-        Button {
-          onRecipeSelected(
-            RecipeDetailPresentation(
-              recipeID: recipeID,
-              scaleContext: .menuItem(row.item.id)
-            )
-          )
-        } label: {
-          Label("Open Recipe", systemImage: "book.closed")
-            .labelStyle(.iconOnly)
-        }
-        .buttonStyle(.borderless)
-        .accessibilityLabel("Open \(row.displayTitle)")
+      Button {
+        model.editItemButtonTapped(menu: menu, row: row)
+      } label: {
+        Label("Edit Dish", systemImage: "calendar")
+          .labelStyle(.iconOnly)
       }
+      .buttonStyle(.borderless)
+      .accessibilityLabel("Edit \(row.displayTitle)")
     }
     .padding(12)
+  }
+
+  private func primaryAction() {
+    if let recipeID = row.recipe?.id, let onRecipeSelected {
+      onRecipeSelected(
+        RecipeDetailPresentation(
+          recipeID: recipeID,
+          scaleContext: .menuItem(row.item.id)
+        )
+      )
+    } else {
+      model.editItemButtonTapped(menu: menu, row: row)
+    }
+  }
+
+  @ViewBuilder private var dishImage: some View {
+    if row.item.kind == .recipe {
+      RecipeThumbnail(data: row.thumbnailData)
+        .frame(width: 32, height: 32)
+        .accessibilityHidden(true)
+    } else {
+      Image(systemName: row.item.kind.systemImage)
+        .font(.title3)
+        .foregroundStyle(.secondary)
+        .frame(width: 32, height: 32)
+    }
   }
 }
 
