@@ -14,10 +14,10 @@ scoped, and **Jon device-confirmed writer-api-return dropped from ~5000 ms → t
 holds [[sqlitedata-fetch-writer-convoy]]; the S7 test `GroceryIngredientChoiceTests.swift` now rides in the
 Chrome-polish slice commit).
 
-**Next Up is the fresh dogfood batch** (Jon's 2026-07-11 two-device pass). **Effort 1 — Chrome & navigation
-polish — is DONE** (all five slices, package builds + 29 touched tests pass, architect-approved; app build +
-device pass are Jon's). Three efforts remain, recommended order in **Next Up**. The ADR-0027 feature candidates
-remain on the board but the dogfood polish is the recommended next dispatch.
+**Next Up is the fresh dogfood batch** (Jon's 2026-07-11 two-device pass). **Efforts 1 & 2 — Chrome &
+navigation polish and Workbench dogfood polish — are DONE** (architect-approved 2026-07-11; package builds +
+tests pass; app build + device pass are Jon's). Two efforts remain, recommended order in **Next Up**. The
+ADR-0027 feature candidates remain on the board but the dogfood polish is the recommended next dispatch.
 
 Earlier and logged in [`docs/DONE-LOG.md`](DONE-LOG.md): **ADR-0027 "Capture to menu" S1**
 ([#141](https://github.com/jonphillips/yes-chef/pull/141)); **Instrumentation — apply-action + LLM logging**
@@ -49,22 +49,29 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Recommended dispatch order (Jon's 2026-07-11 dogfood batch).** Three Ready efforts remain, sequenced cheap →
-effort (effort 1, Chrome & navigation polish, is **DONE** — see below). A dispatch may take them one at a time
-or bundle 1+2. Full slice write-ups in `docs/efforts/`:
+**Recommended dispatch order (Jon's 2026-07-11 dogfood batch).** Two Ready efforts remain, sequenced cheap →
+effort (efforts 1 & 2, Chrome & navigation polish and Workbench dogfood polish, are **DONE** — see below). Full
+slice write-ups in `docs/efforts/`:
 
-1. **Workbench dogfood polish** ([`efforts/workbench-dogfood-polish.md`](efforts/workbench-dogfood-polish.md))
-   — **do this first.** Candidate rows show photo + source; draft rationale uses **title/source not object ID**
-   (bug); draft preview sheet made **scrollable** (bug); archive-all-candidates; pick a candidate's image for
-   the promoted recipe; links to candidate recipes from the promoted recipe. Reuses existing soft FKs / loaded
-   data — no schema.
-2. **Meal-planner (Calendar) affordance swap** ([`efforts/meal-planner-affordances.md`](efforts/meal-planner-affordances.md))
-   — tap a row → **open the recipe**; two right-hand affordances (existing target icon + a new calendar icon →
-   the Edit-Dish sheet, which moves off row-tap). No schema. *(Drag-and-drop retest on Beta 3 + cell images are
-   the parked follow-on inside that doc — not this dispatch.)*
-3. **Fraction input accessory** ([`efforts/fraction-input-accessory.md`](efforts/fraction-input-accessory.md))
+1. **Meal-planner (Calendar) affordance swap** ([`efforts/meal-planner-affordances.md`](efforts/meal-planner-affordances.md))
+   — **do this first.** Tap a row → **open the recipe**; two right-hand affordances (existing target icon + a
+   new calendar icon → the Edit-Dish sheet, which moves off row-tap). No schema. *(Drag-and-drop retest on
+   Beta 3 + cell images are the parked follow-on inside that doc — not this dispatch.)*
+2. **Fraction input accessory** ([`efforts/fraction-input-accessory.md`](efforts/fraction-input-accessory.md))
    — Paprika-style fraction pills for ingredient authoring; reuses the multiplier-rework glyph set. **Needs a
    5-minute scope confirm with Jon** (input-accessory vs inline row) before dispatch.
+
+**DONE — Workbench dogfood polish** ([`efforts/workbench-dogfood-polish.md`](efforts/workbench-dogfood-polish.md)):
+all six slices shipped in the working tree (architect-approved 2026-07-11) — candidate rows show thumbnail +
+source, draft rationale renders candidates by **title/source not object ID** (chat context + synthesis prompt
+both hardened), the apply/review sheet is **scrollable**, **archive-all-candidates** (archives the candidate
+recipes *out of the library* + clears them from the workbench — Jon-confirmed intent: the workbench distills the
+one true recipe and removes the noise; menu/meal-plan cascade accepted), **pick a candidate photo** for the
+working recipe (copies BLOBs to a new hero + sets cover, validated to a candidate → sync-safe), and **"Drafted
+From" provenance links** on the promoted recipe (degrade to title snapshot on delete/archive). App-layer + two
+core files; package builds + 4 new tests pass; app build + device pass are Jon's. **Device note:** archive-all
+deletes the candidate rows, so the "Drafted From" links clear with them — transient provenance by design (a
+persistent-provenance variant is a separable follow-up if wanted).
 
 **DONE — Chrome & navigation polish** ([`efforts/dogfood-fixes-2026-07-11-chrome.md`](efforts/dogfood-fixes-2026-07-11-chrome.md)):
 all five slices shipped in the working tree (architect-approved 2026-07-11) — side-menu order/naming
@@ -124,7 +131,8 @@ target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](
 **Dogfood 2026-07-11 — two-device pass (the current batch, see Next Up for order).**
 - **Chrome & navigation polish** ([`efforts/dogfood-fixes-2026-07-11-chrome.md`](efforts/dogfood-fixes-2026-07-11-chrome.md))
   — **DONE** (architect-approved 2026-07-11; rides in the slice commit, device pass owed).
-- **Workbench dogfood polish** ([`efforts/workbench-dogfood-polish.md`](efforts/workbench-dogfood-polish.md)).
+- **Workbench dogfood polish** ([`efforts/workbench-dogfood-polish.md`](efforts/workbench-dogfood-polish.md))
+  — **DONE** (all six slices, architect-approved 2026-07-11; rides in the slice commit, device pass owed).
 - **Meal-planner affordance swap** ([`efforts/meal-planner-affordances.md`](efforts/meal-planner-affordances.md))
   — drag-and-drop retest + cell images parked inside.
 - **Fraction input accessory** ([`efforts/fraction-input-accessory.md`](efforts/fraction-input-accessory.md))
