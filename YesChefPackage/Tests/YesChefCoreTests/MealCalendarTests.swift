@@ -426,5 +426,133 @@ extension RecipeCoreTests {
         expectNoDifference(rows.contains { $0.item.id == itemID }, false)
       }
     }
+
+    @Test
+    func dayOrderOverlayInterleavesManualItemsAmongMenuRowsWithoutTouchingMenu() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 804_000_000)
+      let scheduledDate = Date(timeIntervalSinceReferenceDate: 804_100_000)
+      let menuID = SampleUUIDSequence.uuid(8_000)
+      let placementID = SampleUUIDSequence.uuid(8_001)
+      let menuItem1ID = SampleUUIDSequence.uuid(8_010)
+      let menuItem2ID = SampleUUIDSequence.uuid(8_011)
+      var uuids = SampleUUIDSequence(start: 8_100)
+
+      try database.write { db in
+        // Two manual dinner items.
+        let manualAID = try MealCalendarRepository.addNoteItem(
+          title: "Manual A",
+          notes: nil,
+          on: scheduledDate,
+          mealSlot: .dinner,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let manualBID = try MealCalendarRepository.addNoteItem(
+          title: "Manual B",
+          notes: nil,
+          on: scheduledDate,
+          mealSlot: .dinner,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        // A two-item menu placed on the same day + slot.
+        try Menu.insert {
+          Menu(id: menuID, title: "Dinner Menu", dayCount: 1, dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+        try MenuItem.insert {
+          MenuItem(
+            id: menuItem1ID,
+            menuID: menuID,
+            kind: .note,
+            title: "Menu 1",
+            dayOffset: 0,
+            mealSlot: .dinner,
+            sortOrder: 0,
+            dateCreated: now,
+            dateModified: now
+          )
+          MenuItem(
+            id: menuItem2ID,
+            menuID: menuID,
+            kind: .note,
+            title: "Menu 2",
+            dayOffset: 0,
+            mealSlot: .dinner,
+            sortOrder: 1,
+            dateCreated: now,
+            dateModified: now
+          )
+        }
+        .execute(db)
+        try MenuPlacement.insert {
+          MenuPlacement(
+            id: placementID,
+            menuID: menuID,
+            startDate: scheduledDate,
+            dateCreated: now,
+            dateModified: now
+          )
+        }
+        .execute(db)
+
+        let manualAKey = MealPlanItemRowID.manual(manualAID).rawValue
+        let manualBKey = MealPlanItemRowID.manual(manualBID).rawValue
+        let menu1Key = MealPlanItemRowID.menu(placementID: placementID, itemID: menuItem1ID).rawValue
+        let menu2Key = MealPlanItemRowID.menu(placementID: placementID, itemID: menuItem2ID).rawValue
+
+        // Baseline: with no overlay, the comparator interleaves manual and menu rows by
+        // their (independent) sortOrder, breaking ties toward manual rows.
+        let baseline = try MealCalendarRequest().fetch(db)
+          .filter { $0.item.scheduledDate == scheduledDate }
+        expectNoDifference(
+          baseline.map(\.id.rawValue),
+          [manualAKey, menu1Key, manualBKey, menu2Key]
+        )
+
+        // Interleave a manual item between the two menu rows, and drop "Manual A" to the end
+        // by leaving it out of the overlay (unlisted rows follow the listed ones).
+        try MealCalendarRepository.setDayOrder(
+          orderedRowKeys: [menu1Key, manualBKey, menu2Key],
+          on: scheduledDate,
+          mealSlot: .dinner,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        let reordered = try MealCalendarRequest().fetch(db)
+          .filter { $0.item.scheduledDate == scheduledDate }
+        expectNoDifference(
+          reordered.map(\.id.rawValue),
+          [menu1Key, manualBKey, menu2Key, manualAKey]
+        )
+
+        // The underlying menu is untouched.
+        let menuItems = try MenuItem.where { $0.menuID.eq(menuID) }
+          .order { $0.sortOrder }
+          .fetchAll(db)
+        expectNoDifference(menuItems.map(\.id), [menuItem1ID, menuItem2ID])
+        expectNoDifference(menuItems.map(\.sortOrder), [0, 1])
+
+        // Re-saving keeps a single overlay row for the slot.
+        try MealCalendarRepository.setDayOrder(
+          orderedRowKeys: [manualAKey, manualBKey, menu1Key, menu2Key],
+          on: scheduledDate,
+          mealSlot: .dinner,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let overlays = try MealPlanDayOrder
+          .where { $0.scheduledDate.eq(scheduledDate) && $0.mealSlot.eq(MealPlanItemSlot.dinner) }
+          .fetchAll(db)
+        expectNoDifference(overlays.count, 1)
+      }
+    }
   }
 }

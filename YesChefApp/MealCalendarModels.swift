@@ -339,6 +339,29 @@ final class MealCalendarModel {
     }
   }
 
+  /// Persists a new display order for the selected day's `mealSlot`. `orderedRowKeys` are
+  /// `MealPlanItemRowID.rawValue` strings covering every row in the slot (manual and
+  /// menu-projected). The projection re-fetch reflects the new order; the underlying menu
+  /// is never mutated.
+  func reorderItems(orderedRowKeys: [String], mealSlot: MealPlanItemSlot) {
+    let scheduledDate = startOfDay(selectedDate)
+    do {
+      try database.write { db in
+        try MealCalendarRepository.setDayOrder(
+          orderedRowKeys: orderedRowKeys,
+          on: scheduledDate,
+          mealSlot: mealSlot,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
   func title(for itemID: MealPlanItem.ID) -> String {
     itemRows.first { $0.item.id == itemID }?.displayTitle ?? "this item"
   }

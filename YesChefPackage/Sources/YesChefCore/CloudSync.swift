@@ -125,6 +125,7 @@ public enum YesChefCloudSync {
         RecipeEquipment.self,
         RecipeImportRef.self,
         MealPlanItem.self,
+        MealPlanDayOrder.self,
         Menu.self,
         MenuItem.self,
         MenuPlacement.self,

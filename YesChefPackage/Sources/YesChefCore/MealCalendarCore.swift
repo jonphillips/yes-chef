@@ -69,6 +69,49 @@ public struct MealPlanItemRowData: Identifiable, Equatable, Sendable {
   }
 }
 
+/// Per-(day, meal slot) explicit ordering overlay for the day agenda.
+///
+/// Rows in a slot come from two sources — manual `MealPlanItem`s and menu-projected
+/// rows synthesized from `MenuItem`/`MenuPlacement`. Menu rows are fixed anchors whose
+/// order lives on the underlying menu, so we cannot renumber them to interleave a manual
+/// item between them. Instead the day view stores its own order over *all* of a slot's
+/// rows here (identified by `MealPlanItemRowID.rawValue`), overlaying projection without
+/// ever mutating the menu. Rows absent from `orderedKeys` fall back to the natural
+/// comparator order, so newly added or stale rows degrade gracefully.
+@Table("mealPlanDayOrders")
+public struct MealPlanDayOrder: Codable, Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var scheduledDate: Date
+  public var mealSlot: MealPlanItemSlot
+  /// JSON-encoded `[String]` of `MealPlanItemRowID.rawValue`, in display order.
+  public var orderedKeys: Data
+  public var dateModified: Date
+
+  public init(
+    id: UUID,
+    scheduledDate: Date,
+    mealSlot: MealPlanItemSlot,
+    orderedKeys: Data,
+    dateModified: Date
+  ) {
+    self.id = id
+    self.scheduledDate = scheduledDate
+    self.mealSlot = mealSlot
+    self.orderedKeys = orderedKeys
+    self.dateModified = dateModified
+  }
+}
+
+extension MealPlanDayOrder {
+  public var rowKeys: [String] {
+    (try? JSONDecoder().decode([String].self, from: orderedKeys)) ?? []
+  }
+
+  public static func encodeKeys(_ keys: [String]) -> Data {
+    (try? JSONEncoder().encode(keys)) ?? Data("[]".utf8)
+  }
+}
+
 public struct MealCalendarRequest: FetchKeyRequest {
   public init() {}
 
@@ -137,8 +180,10 @@ public struct MealCalendarRequest: FetchKeyRequest {
       thumbnailsByRecipeID: thumbnailsByRecipeID
     )
 
-    return (manualRows + menuRows)
+    let sorted = (manualRows + menuRows)
       .sorted(by: areMealPlanRowsInIncreasingOrder)
+    let dayOrders = try MealPlanDayOrder.fetchAll(db)
+    return MealPlanDayOrderApplier.apply(dayOrders, to: sorted)
   }
 
   private func projectedMenuRows(
@@ -196,6 +241,72 @@ public struct MealCalendarRequest: FetchKeyRequest {
         )
       }
     }
+  }
+}
+
+/// Applies `MealPlanDayOrder` overlays to a comparator-sorted row list.
+///
+/// Input rows must already be sorted by the natural comparator, so all rows for a given
+/// (day, meal slot) are contiguous. Within each such run, rows listed in the matching
+/// overlay are ordered by their stored position; rows absent from the overlay keep their
+/// relative comparator order and follow the listed ones.
+enum MealPlanDayOrderApplier {
+  struct Key: Hashable {
+    var date: Date
+    var slot: MealPlanItemSlot
+  }
+
+  static func apply(
+    _ orders: [MealPlanDayOrder],
+    to rows: [MealPlanItemRowData]
+  ) -> [MealPlanItemRowData] {
+    guard !orders.isEmpty else { return rows }
+
+    // On the rare duplicate overlay for one slot (concurrent devices), the most recently
+    // modified record wins.
+    let latestByKey = Dictionary(
+      orders.map { (Key(date: $0.scheduledDate, slot: $0.mealSlot), $0) },
+      uniquingKeysWith: { $0.dateModified >= $1.dateModified ? $0 : $1 }
+    )
+    let positionsByKey: [Key: [String: Int]] = latestByKey.compactMapValues { order in
+      let indexed = Dictionary(
+        uniqueKeysWithValues: order.rowKeys.enumerated().map { ($0.element, $0.offset) }
+      )
+      return indexed.isEmpty ? nil : indexed
+    }
+    guard !positionsByKey.isEmpty else { return rows }
+
+    var result: [MealPlanItemRowData] = []
+    result.reserveCapacity(rows.count)
+    var index = 0
+    while index < rows.count {
+      let start = index
+      let key = Key(date: rows[start].item.scheduledDate, slot: rows[start].item.mealSlot)
+      index += 1
+      while index < rows.count,
+        rows[index].item.scheduledDate == key.date,
+        rows[index].item.mealSlot == key.slot
+      {
+        index += 1
+      }
+      let run = Array(rows[start..<index])
+      guard let positions = positionsByKey[key] else {
+        result.append(contentsOf: run)
+        continue
+      }
+      let ordered = run.enumerated().sorted { lhs, rhs in
+        let lp = positions[lhs.element.id.rawValue]
+        let rp = positions[rhs.element.id.rawValue]
+        switch (lp, rp) {
+        case let (l?, r?): return l < r
+        case (_?, nil): return true
+        case (nil, _?): return false
+        case (nil, nil): return lhs.offset < rhs.offset
+        }
+      }
+      result.append(contentsOf: ordered.map(\.element))
+    }
+    return result
   }
 }
 
@@ -373,6 +484,37 @@ public enum MealCalendarRepository {
     in db: Database
   ) throws {
     try MealPlanItem.find(itemID).delete().execute(db)
+  }
+
+  /// Persists the explicit display order for one (day, meal slot) as a `MealPlanDayOrder`
+  /// overlay. `orderedRowKeys` are `MealPlanItemRowID.rawValue` strings in display order,
+  /// covering both manual and menu-projected rows. The underlying menu is never touched.
+  public static func setDayOrder(
+    orderedRowKeys: [String],
+    on scheduledDate: Date,
+    mealSlot: MealPlanItemSlot,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws {
+    let existing = try MealPlanDayOrder
+      .where { $0.scheduledDate.eq(scheduledDate) && $0.mealSlot.eq(mealSlot) }
+      .order { $0.dateModified.desc() }
+      .fetchAll(db)
+
+    let record = MealPlanDayOrder(
+      id: existing.first?.id ?? uuid(),
+      scheduledDate: scheduledDate,
+      mealSlot: mealSlot,
+      orderedKeys: MealPlanDayOrder.encodeKeys(orderedRowKeys),
+      dateModified: now
+    )
+    try MealPlanDayOrder.upsert { record }.execute(db)
+
+    // Collapse any duplicate overlays a prior concurrent write may have left behind.
+    for stale in existing.dropFirst() where stale.id != record.id {
+      try MealPlanDayOrder.find(stale.id).delete().execute(db)
+    }
   }
 
   private static func nextSortOrder(

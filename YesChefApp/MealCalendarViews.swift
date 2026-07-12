@@ -906,6 +906,31 @@ private extension CookSessionItem {
   }
 }
 
+extension ReorderDifference where CollectionID == ReorderableSingleCollectionIdentifier {
+  /// Applies a single-collection reorder to `collection` in one in-place pass.
+  func apply<C>(to collection: inout C)
+  where C: RangeReplaceableCollection, C.Element: Identifiable, C.Element.ID == ItemID {
+    let moving = Set(sources)
+    guard !moving.isEmpty else { return }
+
+    var moved: [C.Element] = []
+    moved.reserveCapacity(moving.count)
+    collection.removeAll { element in
+      guard moving.contains(element.id) else { return false }
+      moved.append(element)
+      return true
+    }
+
+    switch destination.position {
+    case .before(let id):
+      let index = collection.firstIndex { $0.id == id } ?? collection.endIndex
+      collection.insert(contentsOf: moved, at: index)
+    case .end:
+      collection.append(contentsOf: moved)
+    }
+  }
+}
+
 private struct MealPlanSlotSection: View {
   let model: MealCalendarModel
   let mealSlot: MealPlanItemSlot
@@ -936,6 +961,15 @@ private struct MealPlanSlotSection: View {
               .padding(.leading, 72)
           }
         }
+        .reorderable()
+      }
+      .reorderContainer(for: MealPlanItemRowData.self) { difference in
+        var reordered = rows
+        difference.apply(to: &reordered)
+        model.reorderItems(
+          orderedRowKeys: reordered.map(\.id.rawValue),
+          mealSlot: mealSlot
+        )
       }
       .background(.background)
       .clipShape(.rect(cornerRadius: 8))

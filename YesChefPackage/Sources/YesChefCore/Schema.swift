@@ -812,6 +812,24 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Create meal plan day order overlay") { db in
+      try #sql("""
+        CREATE TABLE "mealPlanDayOrders" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "scheduledDate" TEXT NOT NULL,
+          "mealSlot" TEXT NOT NULL,
+          "orderedKeys" BLOB NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      try db.execute(
+        sql:
+          #"CREATE INDEX "index_mealPlanDayOrders_on_scheduledDate_mealSlot" ON "mealPlanDayOrders"("scheduledDate", "mealSlot")"#
+      )
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)
