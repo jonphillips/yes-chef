@@ -53,15 +53,27 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**No live dispatch target — the 2026-07-11 dogfood batch is cleared.** All four efforts (Chrome & navigation
-polish, Workbench dogfood polish, Meal-planner affordance swap [#154], and Fraction input accessory) are **DONE**
-and archived in [`docs/DONE-LOG.md`](DONE-LOG.md). The three #154 efforts still owe **Jon's** device pass; the
-Fraction input accessory is device-passed (2026-07-12).
+**Do [ADR-0033](decisions/ADR-0033-recipe-detail-polish.md) (recipe-detail polish) — both slices, one PR, in order.**
+View-layer only, **no schema/model/sync/LLM**. S2 also fixes a hard crash: the toolbar scaler's `.popover` is
+anchored to a `.secondaryAction` item that collapses into an overflow menu → tapping it traps, so scaling is
+currently **unreachable**.
 
-**Next task is Jon's to pick — do not infer one.** The candidates are the **Feature efforts still on the board**
-below (Recipe edit proposals S3, Workbench synthesis apply-action, a new design ADR) or a **new milestone** chosen
-from the 2026-07-11 dogfood gaps. Per [[post-browser-sync-vs-features-tension]], weigh the solvable
-sync/backup-hardening track against fresh feature-building before dispatching. STOP and ask Jon.
+- **S1 — metadata chips (D1).** Add a `recipeChip` modifier / small `Chip` view (hairline-bordered, glyph + text,
+  consistent radius). Apply across `recipeStats` ([RecipeDetailView.swift:450](../YesChefApp/RecipeDetailView.swift))
+  and the reference-placement / tags / category labels below it (`:356`, `:365`–`:370`; `WrappingLabels` gains
+  per-element chips). Pure presentation, no model/string changes. Keep SF + `.secondary` weight; must wrap in the
+  `ViewThatFits` compact branch (`:338`).
+- **S2 — servings-attached scaler + crash fix (D2).** Make the `Serves …` stat a `Button` that shows
+  `scaledServingsSummary` and anchors the existing `ScalePanel` (`:893`) via `.popover` **in the content view**.
+  DELETE the toolbar scaler button + its crashing popover (`:96`–`:111`) and the duplicate scale summary over
+  Ingredients (`:538`). When `recipe.servingsText` is nil but scaling is possible (`!ingredientLines.isEmpty`),
+  render a fallback "Scale" chip (glyph + `scaleSummary`) in the same row. Model API untouched — reuse
+  `scaleButtonTapped()`, `destination.scaling`, `ScalePanel(model:)`.
+
+Verify: package build + tests + `scripts/check-drift.sh`; one app build for `iPad Pro 13-inch (M5)`. **Jon does the
+device pass** (crash gone + scaler opens from the chip on iPad AND iPhone; compact-wrap + scroll-away feel). Fold the
+ADR-0033 files (ADR + `decisions/README.md` index fix — the 0030 number collision) and this CURRENT_HANDOFF bump into
+the slice PR.
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**
