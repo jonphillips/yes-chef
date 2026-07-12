@@ -896,8 +896,11 @@ final class RecipeDetailModel {
   }
 
   var scaledServingsSummary: String? {
-    guard let scaledServings else { return nil }
-    return "\(ScaleText.mixedNumber(scaledServings)) \(ScaleText.servingUnit(scaledServings))"
+    ScaleText.scaledServingsSummary(
+      servingsText: recipe?.servingsText,
+      baseServings: baseServings,
+      factor: scaleFactor
+    )
   }
 
   func scaleButtonTapped() {
