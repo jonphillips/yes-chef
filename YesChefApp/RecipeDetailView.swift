@@ -455,7 +455,11 @@ private struct RecipeReaderView: View {
         Label(servingsText, systemImage: "person.2")
           .recipeChip()
       } else {
-        scaleButton(model.scaledServingsSummary ?? servingsText)
+        let scaled = model.scaleFactor != 1
+        scaleButton(
+          scaled ? (model.scaledServingsSummary ?? servingsText) : servingsText,
+          systemImage: scaled ? "slider.horizontal.3" : "person.2"
+        )
       }
     } else if !model.ingredientLines.isEmpty {
       scaleButton("Scale \(model.scaleSummary)")
@@ -476,13 +480,16 @@ private struct RecipeReaderView: View {
     }
   }
 
-  private func scaleButton(_ title: String) -> some View {
+  private func scaleButton(
+    _ title: String,
+    systemImage: String = "slider.horizontal.3"
+  ) -> some View {
     @Bindable var model = model
 
     return Button {
       model.scaleButtonTapped()
     } label: {
-      Label(title, systemImage: "slider.horizontal.3")
+      Label(title, systemImage: systemImage)
         .recipeChip()
         .frame(minHeight: 44)
     }
@@ -560,11 +567,8 @@ private struct RecipeReaderView: View {
     @Bindable var model = model
 
     return VStack(alignment: .leading, spacing: 12) {
-      HStack {
-        Text("Ingredients")
-          .font(.title2.bold())
-        Spacer()
-      }
+      Text("Ingredients")
+        .font(.title2.bold())
       let groups = model.ingredientGroups
       VStack(alignment: .leading, spacing: 12) {
         if groups.isEmpty {
