@@ -27,18 +27,6 @@ public struct GroceryListRowData: Identifiable, Equatable, Sendable {
   public var id: GroceryList.ID { list.id }
 }
 
-public struct GroceryMenuRecipeItem: Identifiable, Equatable, Sendable {
-  public var item: MenuItem
-  public var recipe: Recipe
-
-  public init(item: MenuItem, recipe: Recipe) {
-    self.item = item
-    self.recipe = recipe
-  }
-
-  public var id: MenuItem.ID { item.id }
-}
-
 public struct GroceryListRequest: FetchKeyRequest {
   public init() {}
 
@@ -85,21 +73,20 @@ public struct PantryItemListRequest: FetchKeyRequest {
   }
 }
 
-public struct GroceryMenuRecipeItemRequest: FetchKeyRequest {
-  public init() {}
+public struct GroceryMenuRecipeIDsRequest: Sendable {
+  public let menuID: Menu.ID
 
-  public func fetch(_ db: Database) throws -> [GroceryMenuRecipeItem] {
-    let recipesByID = Dictionary(uniqueKeysWithValues: try Recipe.fetchAll(db).map { ($0.id, $0) })
+  public init(menuID: Menu.ID) {
+    self.menuID = menuID
+  }
 
-    return try MenuItem.fetchAll(db)
-      .compactMap { item in
-        guard item.kind == .recipe,
-              let recipeID = item.recipeID,
-              let recipe = recipesByID[recipeID]
-        else { return nil }
-        return GroceryMenuRecipeItem(item: item, recipe: recipe)
-      }
-      .sorted(by: areGroceryMenuRecipeItemsInIncreasingOrder)
+  public func fetch(_ db: Database) throws -> Set<Recipe.ID> {
+    Set(
+      try MenuItem.where { $0.menuID.eq(menuID) }
+        .fetchAll(db)
+        .filter { $0.kind == .recipe }
+        .compactMap(\.recipeID)
+    )
   }
 }
 
@@ -938,25 +925,6 @@ private func arePantryItemsInIncreasingOrder(_ lhs: PantryItem, _ rhs: PantryIte
     return lhs.sortOrder < rhs.sortOrder
   }
   return lhs.id.uuidString < rhs.id.uuidString
-}
-
-private func areGroceryMenuRecipeItemsInIncreasingOrder(
-  _ lhs: GroceryMenuRecipeItem,
-  _ rhs: GroceryMenuRecipeItem
-) -> Bool {
-  if lhs.item.menuID != rhs.item.menuID {
-    return lhs.item.menuID.uuidString < rhs.item.menuID.uuidString
-  }
-  if lhs.item.dayOffset != rhs.item.dayOffset {
-    return lhs.item.dayOffset < rhs.item.dayOffset
-  }
-  if lhs.item.mealSlot.sortOrder != rhs.item.mealSlot.sortOrder {
-    return lhs.item.mealSlot.sortOrder < rhs.item.mealSlot.sortOrder
-  }
-  if lhs.item.sortOrder != rhs.item.sortOrder {
-    return lhs.item.sortOrder < rhs.item.sortOrder
-  }
-  return lhs.recipe.title.localizedStandardCompare(rhs.recipe.title) == .orderedAscending
 }
 
 func areMenuItemsInIncreasingOrder(_ lhs: MenuItem, _ rhs: MenuItem) -> Bool {

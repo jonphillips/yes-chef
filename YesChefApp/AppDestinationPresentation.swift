@@ -58,15 +58,12 @@ private struct GroceryDestinationsModifier: ViewModifier {
           PantryItemEditorView(model: groceryModel, itemID: itemID)
         }
       }
-      .sheet(item: gatedBinding($groceryModel.destination.selectIngredients, enabled: isPresentationEnabled), id: \.self) { context in
+      .sheet(item: gatedBinding($groceryModel.destination.selectIngredients, enabled: isPresentationEnabled), id: \.id) { presentation in
         NavigationStack {
           GroceryIngredientSelectionView(
             model: groceryModel,
-            context: context,
-            choices: groceryModel.ingredientChoices(
-              for: context,
-              mealRows: mealCalendarModel.itemRows
-            ),
+            context: presentation.context,
+            choices: presentation.choices,
             mealRows: mealCalendarModel.itemRows,
             pantryStaples: groceryModel.pantryStapleNames
           )
