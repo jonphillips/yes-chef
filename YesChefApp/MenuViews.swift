@@ -313,7 +313,7 @@ private struct MenuDetailReader: View {
         MenuPrepPlanSection(
           menu: detail.menu,
           itemRows: detail.itemRows,
-          dishContext: MenuChatContext(detail: detail).serialized(),
+          copyPrepPrompt: { MenuChatContext(detail: detail).prepPrompt() },
           onRecipeSelected: onRecipeSelected,
           clearPrepPlan: {
             model.clearPrepPlanButtonTapped(menuID: detailModel.menuID)
@@ -346,7 +346,7 @@ private struct MenuDetailReader: View {
 private struct MenuPrepPlanSection: View {
   let menu: CoreMenu
   let itemRows: [MenuItemRowData]
-  let dishContext: String
+  let copyPrepPrompt: () -> String
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var clearPrepPlan: () -> Void
   var regeneratePrepPlan: () -> Void
@@ -370,18 +370,19 @@ private struct MenuPrepPlanSection: View {
         Spacer()
 
         Button {
-          UIPasteboard.general.string = dishContext
+          UIPasteboard.general.string = copyPrepPrompt()
         } label: {
-          Label("Copy Dish Context", systemImage: "doc.on.doc")
+          Label("Copy Prep Prompt", systemImage: "doc.on.doc")
         }
         .buttonStyle(.bordered)
       }
 
       HStack {
-        PasteButton(payloadType: String.self) { strings in
-          pastePrepPlan(strings.first ?? "")
+        Button {
+          pastePrepPlanButtonTapped()
+        } label: {
+          Label("Paste Prep Plan", systemImage: "clipboard")
         }
-        .labelStyle(.titleAndIcon)
         .buttonStyle(.bordered)
 
         Button {
@@ -428,6 +429,11 @@ private struct MenuPrepPlanSection: View {
         .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
+  }
+
+  private func pastePrepPlanButtonTapped() {
+    guard let text = UIPasteboard.general.string else { return }
+    pastePrepPlan(text)
   }
 }
 

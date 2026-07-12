@@ -1,3 +1,4 @@
+import Dependencies
 import Foundation
 import LLMClientKit
 
@@ -53,6 +54,19 @@ public struct MenuChatContext: Equatable, Sendable {
     serialized(characterBudget: Self.serializedCharacterBudget(for: tier))
   }
 
+  public func prepPrompt() -> String {
+    @Dependency(\.aiPromptPreferences) var preferences
+    let settings = preferences.current()
+    return Self.prepPrompt(
+      context: serialized(for: .frontierPreferred),
+      tasteProfile: settings.tasteProfile,
+      makeAheadPreference: AISettingsRepository.preference(
+        in: settings,
+        for: .makeAheadPrepPlan
+      )
+    )
+  }
+
   public func serialized(characterBudget: Int = Self.serializedCharacterBudget) -> String {
     budgetedSerialization(characterBudget: characterBudget).text
   }
@@ -68,11 +82,40 @@ public struct MenuChatContext: Equatable, Sendable {
 
   private func budgetedSerialization(characterBudget: Int) -> MenuChatSerializedContext {
     let sortedItems = items.sorted(by: areMenuChatItemsInIncreasingOrder)
-    for ingredientLimit in stride(from: Self.defaultIngredientLimit, through: 0, by: -1) {
+    let initialIngredientLimit = initialIngredientLimit(
+      for: characterBudget,
+      items: sortedItems
+    )
+    if sortedItems.contains(where: { !$0.method.isEmpty }) {
+      let candidate = renderedContext(
+        items: sortedItems,
+        ingredientLimit: initialIngredientLimit,
+        makeAheadCharacterLimit: nil,
+        includeMethod: true,
+        omittedItemCount: 0
+      )
+      if candidate.text.count <= characterBudget {
+        return candidate
+      }
+
+      let methodTrimmedCandidate = renderedContext(
+        items: sortedItems,
+        ingredientLimit: initialIngredientLimit,
+        makeAheadCharacterLimit: nil,
+        includeMethod: false,
+        omittedItemCount: 0
+      )
+      if methodTrimmedCandidate.text.count <= characterBudget {
+        return methodTrimmedCandidate
+      }
+    }
+
+    for ingredientLimit in stride(from: initialIngredientLimit, through: 0, by: -1) {
       let candidate = renderedContext(
         items: sortedItems,
         ingredientLimit: ingredientLimit,
         makeAheadCharacterLimit: nil,
+        includeMethod: false,
         omittedItemCount: 0
       )
       if candidate.text.count <= characterBudget || ingredientLimit == 0 {
@@ -85,11 +128,12 @@ public struct MenuChatContext: Equatable, Sendable {
 
     let makeAheadLimits = [2_000, 1_000, 600, 300, 160, 80, 0]
     for makeAheadCharacterLimit in makeAheadLimits {
-      for ingredientLimit in stride(from: Self.defaultIngredientLimit, through: 0, by: -1) {
+      for ingredientLimit in stride(from: initialIngredientLimit, through: 0, by: -1) {
         let candidate = renderedContext(
           items: sortedItems,
           ingredientLimit: ingredientLimit,
           makeAheadCharacterLimit: makeAheadCharacterLimit,
+          includeMethod: false,
           omittedItemCount: 0
         )
         if candidate.text.count <= characterBudget {
@@ -105,6 +149,7 @@ public struct MenuChatContext: Equatable, Sendable {
         items: includedItems,
         ingredientLimit: 0,
         makeAheadCharacterLimit: 0,
+        includeMethod: false,
         omittedItemCount: sortedItems.count - includedItems.count
       )
       if candidate.text.count <= characterBudget {
@@ -116,17 +161,58 @@ public struct MenuChatContext: Equatable, Sendable {
       items: [],
       ingredientLimit: 0,
       makeAheadCharacterLimit: 0,
+      includeMethod: false,
       omittedItemCount: sortedItems.count
     )
+  }
+
+  private func initialIngredientLimit(
+    for characterBudget: Int,
+    items: [MenuChatItemContext]
+  ) -> Int {
+    guard characterBudget >= Self.frontierSerializedCharacterBudget else {
+      return Self.defaultIngredientLimit
+    }
+    return items.map { $0.keyIngredients.count }.max() ?? 0
+  }
+
+  private static func prepPrompt(
+    context: String,
+    tasteProfile: String,
+    makeAheadPreference: String
+  ) -> String {
+    """
+    You weave a staged prep plan for one multi-day menu from the menu context below. Compose from stored per-recipe Make-Ahead notes when present, and invent grounded sequencing, work sessions, and new prep steps from the menu's dishes. Prefer the authored Make-Ahead notes when they are available.
+
+    Taste profile:
+    \(tasteProfile)
+
+    Make-ahead & prep-plan preferences:
+    \(makeAheadPreference)
+
+    Return only paste-ready review text, not JSON. Use free-form session headers ending with a colon, followed by one or more bullets, exactly like this:
+    Wednesday evening:
+    - Salt the chicken → Thursday dinner
+
+    Put one task on each `- task → serves` bullet, using the `→ serves` suffix when it clarifies the meal or day the task feeds. This text will be pasted back into the recipe app, so do not include commentary, Markdown fences, menu item IDs, or JSON.
+
+    \(context)
+    """
   }
 
   private func renderedContext(
     items: [MenuChatItemContext],
     ingredientLimit: Int,
     makeAheadCharacterLimit: Int?,
+    includeMethod: Bool,
     omittedItemCount: Int
   ) -> MenuChatSerializedContext {
     var budgetNotes: [String] = []
+    if !includeMethod, items.contains(where: { !$0.method.isEmpty }) {
+      budgetNotes.append(
+        "Recipe methods were omitted before other dish details to stay within the context budget."
+      )
+    }
     let ingredientListsWereTrimmed = items.contains { $0.keyIngredients.count > ingredientLimit }
     if ingredientListsWereTrimmed {
       budgetNotes.append(
@@ -207,6 +293,12 @@ public struct MenuChatContext: Equatable, Sendable {
         lines.append("  - Existing recipe make-ahead note, verbatim:")
         lines.append(makeAhead)
       }
+      if includeMethod, !item.method.isEmpty {
+        lines.append("  - Method:")
+        for line in item.method {
+          lines.append("    - \(line.replacingOccurrences(of: "\n", with: " "))")
+        }
+      }
     }
     return MenuChatSerializedContext(text: lines.joined(separator: "\n"), notes: budgetNotes)
   }
@@ -224,6 +316,7 @@ public struct MenuChatItemContext: Equatable, Sendable {
   public var cookTimeMinutes: Int?
   public var totalTimeMinutes: Int?
   public var makeAhead: String?
+  public var method: [String]
   public var notes: String?
 
   public init(
@@ -238,6 +331,7 @@ public struct MenuChatItemContext: Equatable, Sendable {
     cookTimeMinutes: Int? = nil,
     totalTimeMinutes: Int? = nil,
     makeAhead: String? = nil,
+    method: [String] = [],
     notes: String? = nil
   ) {
     self.id = id
@@ -251,6 +345,7 @@ public struct MenuChatItemContext: Equatable, Sendable {
     self.cookTimeMinutes = cookTimeMinutes
     self.totalTimeMinutes = totalTimeMinutes
     self.makeAhead = makeAhead
+    self.method = method
     self.notes = notes
   }
 
@@ -267,6 +362,7 @@ public struct MenuChatItemContext: Equatable, Sendable {
       cookTimeMinutes: row.recipe?.cookTimeMinutes,
       totalTimeMinutes: row.recipe?.totalTimeMinutes,
       makeAhead: row.recipe?.makeAhead,
+      method: row.recipeMethodLines,
       notes: row.item.notes
     )
   }

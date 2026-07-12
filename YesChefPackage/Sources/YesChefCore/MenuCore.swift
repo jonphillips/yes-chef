@@ -35,17 +35,20 @@ public struct MenuItemRowData: Identifiable, Equatable, Sendable {
   public var item: MenuItem
   public var recipe: Recipe?
   public var recipeIngredientLines: [String]
+  public var recipeMethodLines: [String]
   public var thumbnailData: Data?
 
   public init(
     item: MenuItem,
     recipe: Recipe? = nil,
     recipeIngredientLines: [String] = [],
+    recipeMethodLines: [String] = [],
     thumbnailData: Data? = nil
   ) {
     self.item = item
     self.recipe = recipe
     self.recipeIngredientLines = recipeIngredientLines
+    self.recipeMethodLines = recipeMethodLines
     self.thumbnailData = thumbnailData
   }
 
@@ -129,6 +132,7 @@ public struct MenuDetailRequest: FetchKeyRequest {
         .filter { recipeIDs.contains($0.recipeID) },
       by: \.recipeID
     )
+    let recipeMethodLinesByRecipeID = try recipeMethodLinesByRecipeID(recipeIDs, in: db)
     let itemRows = try MenuItem
       .where { $0.menuID.eq(menuID) }
       .fetchAll(db)
@@ -137,15 +141,28 @@ public struct MenuDetailRequest: FetchKeyRequest {
         if item.kind == .recipe && item.recipeID != nil && recipe == nil {
           return nil
         }
+
+        let recipeIngredientLines: [String]
+        let recipeMethodLines: [String]
+        let thumbnailData: Data?
+        if let recipe {
+          recipeIngredientLines = (ingredientLinesByRecipeID[recipe.id] ?? [])
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .map(\.originalText)
+          recipeMethodLines = recipeMethodLinesByRecipeID[recipe.id] ?? []
+          thumbnailData = thumbnailsByRecipeID[recipe.id]?.thumbnailData
+        } else {
+          recipeIngredientLines = []
+          recipeMethodLines = []
+          thumbnailData = nil
+        }
+
         return MenuItemRowData(
           item: item,
           recipe: recipe,
-          recipeIngredientLines: recipe.map { recipe in
-            (ingredientLinesByRecipeID[recipe.id] ?? [])
-              .sorted { $0.sortOrder < $1.sortOrder }
-              .map(\.originalText)
-          } ?? [],
-          thumbnailData: recipe.flatMap { thumbnailsByRecipeID[$0.id]?.thumbnailData }
+          recipeIngredientLines: recipeIngredientLines,
+          recipeMethodLines: recipeMethodLines,
+          thumbnailData: thumbnailData
         )
       }
       .sorted(by: areMenuItemRowsInIncreasingOrder)
@@ -161,6 +178,75 @@ public struct MenuDetailRequest: FetchKeyRequest {
 
     return MenuDetailData(menu: menu, itemRows: itemRows, placements: placements)
   }
+}
+
+private func recipeMethodLinesByRecipeID(
+  _ recipeIDs: Set<Recipe.ID>,
+  in db: Database
+) throws -> [Recipe.ID: [String]] {
+  var sectionsByRecipeID: [Recipe.ID: [InstructionSection]] = [:]
+  for section in try InstructionSection.fetchAll(db) where recipeIDs.contains(section.recipeID) {
+    sectionsByRecipeID[section.recipeID, default: []].append(section)
+  }
+
+  var stepsByRecipeID: [Recipe.ID: [InstructionStep]] = [:]
+  for step in try InstructionStep.fetchAll(db) where recipeIDs.contains(step.recipeID) {
+    stepsByRecipeID[step.recipeID, default: []].append(step)
+  }
+
+  var linesByRecipeID: [Recipe.ID: [String]] = [:]
+  for recipeID in recipeIDs {
+    linesByRecipeID[recipeID] = recipeMethodLines(
+      sections: sectionsByRecipeID[recipeID] ?? [],
+      steps: stepsByRecipeID[recipeID] ?? []
+    )
+  }
+  return linesByRecipeID
+}
+
+private func recipeMethodLines(
+  sections: [InstructionSection],
+  steps: [InstructionStep]
+) -> [String] {
+  var sortedSections = sections
+  sortedSections.sort(by: isInstructionSectionInIncreasingOrder)
+  let includesSectionSubheaders = sortedSections.count > 1
+
+  var stepsBySectionID: [InstructionSection.ID: [InstructionStep]] = [:]
+  for step in steps {
+    stepsBySectionID[step.sectionID, default: []].append(step)
+  }
+
+  var lines: [String] = []
+  for section in sortedSections {
+    var sectionSteps = stepsBySectionID[section.id] ?? []
+    sectionSteps.sort(by: isInstructionStepInIncreasingOrder)
+    guard !sectionSteps.isEmpty else { continue }
+
+    if includesSectionSubheaders, let name = section.name, !name.isEmpty {
+      lines.append("\(name):")
+    }
+    for (offset, step) in sectionSteps.enumerated() {
+      lines.append("\(offset + 1). \(step.text)")
+    }
+  }
+  return lines
+}
+
+private func isInstructionSectionInIncreasingOrder(
+  _ lhs: InstructionSection,
+  _ rhs: InstructionSection
+) -> Bool {
+  if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
+  return lhs.id.uuidString < rhs.id.uuidString
+}
+
+private func isInstructionStepInIncreasingOrder(
+  _ lhs: InstructionStep,
+  _ rhs: InstructionStep
+) -> Bool {
+  if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
+  return lhs.id.uuidString < rhs.id.uuidString
 }
 
 @Selection

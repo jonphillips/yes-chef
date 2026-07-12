@@ -176,6 +176,27 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func menuPrepPlanAcceptsLiteralSessionHeaders() {
+      let plan = MenuPrepPlan().applyingEditableReviewText(
+        """
+        Session: Wednesday evening
+        - Salt the chicken → Thursday dinner
+        """
+      )
+
+      expectNoDifference(
+        plan.steps,
+        [
+          PrepPlanStep(
+            session: "Wednesday evening",
+            task: "Salt the chicken",
+            serves: "Thursday dinner"
+          )
+        ]
+      )
+    }
+
+    @Test
     func menuPrepPlanClientSendsRequestedModelTierAndMenuContext() async throws {
       let recorder = ModelRequestRecorder()
 

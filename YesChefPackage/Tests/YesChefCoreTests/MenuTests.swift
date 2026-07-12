@@ -14,6 +14,8 @@ extension RecipeCoreTests {
       let startDate = Date(timeIntervalSinceReferenceDate: 804_200_000)
       let recipeID = SampleUUIDSequence.uuid(9_001)
       let ingredientSectionID = SampleUUIDSequence.uuid(9_002)
+      let prepInstructionSectionID = SampleUUIDSequence.uuid(9_005)
+      let cookInstructionSectionID = SampleUUIDSequence.uuid(9_006)
       let thumbnailData = Data([1])
       var uuids = SampleUUIDSequence(start: 9_100)
 
@@ -27,6 +29,47 @@ extension RecipeCoreTests {
           )
         }
         .execute(db)
+        for section in [
+          InstructionSection(
+            id: prepInstructionSectionID,
+            recipeID: recipeID,
+            name: "Prep",
+            sortOrder: 0
+          ),
+          InstructionSection(
+            id: cookInstructionSectionID,
+            recipeID: recipeID,
+            name: "Cook",
+            sortOrder: 1
+          ),
+        ] {
+          try InstructionSection.insert { section }.execute(db)
+        }
+        for step in [
+          InstructionStep(
+            id: SampleUUIDSequence.uuid(9_007),
+            recipeID: recipeID,
+            sectionID: prepInstructionSectionID,
+            text: "Salt the chicken overnight.",
+            sortOrder: 0
+          ),
+          InstructionStep(
+            id: SampleUUIDSequence.uuid(9_009),
+            recipeID: recipeID,
+            sectionID: cookInstructionSectionID,
+            text: "Grill over medium heat.",
+            sortOrder: 1
+          ),
+          InstructionStep(
+            id: SampleUUIDSequence.uuid(9_008),
+            recipeID: recipeID,
+            sectionID: cookInstructionSectionID,
+            text: "Rest before slicing.",
+            sortOrder: 0
+          ),
+        ] {
+          try InstructionStep.insert { step }.execute(db)
+        }
         try RecipePhoto.insert {
           RecipePhoto(
             id: SampleUUIDSequence.uuid(9_004),
@@ -103,12 +146,26 @@ extension RecipeCoreTests {
         expectNoDifference(detail.itemRows.map(\.displayTitle), ["Menu Chicken", "Leftover lunch"])
         expectNoDifference(detail.itemRows.map(\.item.notes), ["Grill outside", "Use extra chicken"])
         expectNoDifference(detail.itemRows[0].recipeIngredientLines, ["1 chicken"])
+        expectNoDifference(
+          detail.itemRows[0].recipeMethodLines,
+          [
+            "Prep:",
+            "1. Salt the chicken overnight.",
+            "Cook:",
+            "1. Rest before slicing.",
+            "2. Grill over medium heat.",
+          ]
+        )
         expectNoDifference(detail.itemRows[1].recipeIngredientLines, [])
         expectNoDifference(detail.itemRows.map(\.thumbnailData), [thumbnailData, nil])
         expectNoDifference(detail.placements.map(\.id), [placementID])
       }
     }
 
+  }
+
+  @Suite
+  struct MenuChatContextTests {
     @Test
     func menuChatContextSerializesDishSummariesAndMakeAhead() throws {
       let menuID = SampleUUIDSequence.uuid(13_000)
@@ -161,12 +218,18 @@ extension RecipeCoreTests {
               "2 pounds chicken thighs",
               "1/2 cup soy sauce",
               "4 cloves garlic"
+            ],
+            recipeMethodLines: [
+              "Marinate:",
+              "1. Whisk the soy marinade.",
+              "Cook:",
+              "1. Grill the chicken until browned.",
             ]
           )
         ]
       )
 
-      let serialized = RecipeChatContext.menu(MenuChatContext(detail: detail)).serialized()
+      let serialized = MenuChatContext(detail: detail).serialized(for: .frontierPreferred)
 
       #expect(serialized.contains("- Title: Birthday Menu"))
       #expect(serialized.contains("Current prep plan:"))
@@ -183,6 +246,15 @@ extension RecipeCoreTests {
           "Existing recipe make-ahead note, verbatim:\n"
             + "Marinate the chicken overnight.\n"
             + "Bring to room temperature before grilling."
+        )
+      )
+      #expect(
+        serialized.contains(
+          "  - Method:\n"
+            + "    - Marinate:\n"
+            + "    - 1. Whisk the soy marinade.\n"
+            + "    - Cook:\n"
+            + "    - 1. Grill the chicken until browned."
         )
       )
     }
