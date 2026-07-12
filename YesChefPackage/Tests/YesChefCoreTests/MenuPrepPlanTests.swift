@@ -80,6 +80,36 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func menuPrepPlanParsesLegacyWhenModelResponse() {
+      let sourceDishID = SampleUUIDSequence.uuid(15_121)
+
+      expectNoDifference(
+        MenuPrepPlanClient.parse(
+          """
+          {"steps":[
+            {
+              "when":"Thursday evening",
+              "task":"Salt the pork.",
+              "serves":"Friday dinner",
+              "sourceDish":"\(sourceDishID.uuidString)"
+            }
+          ]}
+          """
+        ),
+        MenuPrepPlan(
+          steps: [
+            PrepPlanStep(
+              session: "Thursday evening",
+              task: "Salt the pork.",
+              serves: "Friday dinner",
+              sourceDish: sourceDishID
+            )
+          ]
+        )
+      )
+    }
+
+    @Test
     func menuPrepPlanHeaderLineRoundTripPreservesUnchangedSourceDish() {
       let sourceDishID = SampleUUIDSequence.uuid(15_120)
       let plan = MenuPrepPlan(

@@ -452,6 +452,8 @@ final class MenuDetailModel {
   /// The menu item the next chat "deposit" writes onto (ADR-0027 Amendment 1 tap-to-target). `nil`
   /// when nothing is targeted, in which case the deposit verbs don't appear. Device-local, unsynced.
   var selectedTargetItemID: MenuItem.ID?
+  var errorMessage: String?
+  var isShowingError = false
 
   init(menuID: CoreMenu.ID) {
     self.menuID = menuID
@@ -468,6 +470,24 @@ final class MenuDetailModel {
   /// Toggles a menu item as the active deposit target. Tapping the current target clears it.
   func targetItemTapped(_ itemID: MenuItem.ID) {
     selectedTargetItemID = selectedTargetItemID == itemID ? nil : itemID
+  }
+
+  func prepPlanPasted(_ text: String) {
+    let currentPlan = MenuPrepPlan(steps: MenuPrepPlanCoding.decode(detail?.menu.prepPlan))
+    let plan = currentPlan.applyingEditableReviewText(text)
+
+    guard !plan.steps.isEmpty else {
+      errorMessage = "The pasted plan needs a session heading followed by one or more prep steps."
+      isShowingError = true
+      return
+    }
+
+    do {
+      try commitPrepPlan(plan)
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
   }
 
   func applyActionCatalog(for chatModel: RecipeChatModel) -> [AnyChatApplyAction] {
