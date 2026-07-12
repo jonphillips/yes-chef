@@ -167,6 +167,8 @@ struct MenuDetailView: View {
   }
 
   var body: some View {
+    @Bindable var detailModel = detailModel
+
     Group {
       if let detail = detailModel.detail {
         Group {
@@ -253,6 +255,11 @@ struct MenuDetailView: View {
         )
       }
     }
+    .alert("Could Not Save Prep Plan", isPresented: $detailModel.isShowingError) {
+      Button("OK") {}
+    } message: {
+      Text(detailModel.errorMessage ?? "")
+    }
   }
 
   private var isSplitEnabled: Bool {
@@ -306,11 +313,13 @@ private struct MenuDetailReader: View {
         MenuPrepPlanSection(
           menu: detail.menu,
           itemRows: detail.itemRows,
+          dishContext: MenuChatContext(detail: detail).serialized(),
           onRecipeSelected: onRecipeSelected,
           clearPrepPlan: {
             model.clearPrepPlanButtonTapped(menuID: detailModel.menuID)
           },
-          regeneratePrepPlan: regeneratePrepPlan
+          regeneratePrepPlan: regeneratePrepPlan,
+          pastePrepPlan: detailModel.prepPlanPasted
         )
         MenuDishList(
           model: model,
@@ -337,9 +346,11 @@ private struct MenuDetailReader: View {
 private struct MenuPrepPlanSection: View {
   let menu: CoreMenu
   let itemRows: [MenuItemRowData]
+  let dishContext: String
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var clearPrepPlan: () -> Void
   var regeneratePrepPlan: () -> Void
+  var pastePrepPlan: (String) -> Void
   @State private var expandedSessionIDs: Set<MenuPrepPlanSessionBand.ID> = []
 
   private var steps: [PrepPlanStep] {
@@ -351,29 +362,52 @@ private struct MenuPrepPlanSection: View {
   }
 
   var body: some View {
-    if !steps.isEmpty {
-      VStack(alignment: .leading, spacing: 12) {
-        HStack(alignment: .firstTextBaseline) {
-          Text("Prep Plan")
-            .font(.title2.weight(.semibold))
+    VStack(alignment: .leading, spacing: 12) {
+      HStack(alignment: .firstTextBaseline) {
+        Text("Prep Plan")
+          .font(.title2.weight(.semibold))
 
-          Spacer()
+        Spacer()
 
-          Button {
-            regeneratePrepPlan()
-          } label: {
-            Label("Regenerate", systemImage: "sparkles")
-          }
-          .buttonStyle(.bordered)
-
-          Button(role: .destructive) {
-            clearPrepPlan()
-          } label: {
-            Label("Clear", systemImage: "xmark.circle")
-          }
-          .buttonStyle(.bordered)
+        Button {
+          UIPasteboard.general.string = dishContext
+        } label: {
+          Label("Copy Dish Context", systemImage: "doc.on.doc")
         }
+        .buttonStyle(.bordered)
+      }
 
+      HStack {
+        PasteButton(payloadType: String.self) { strings in
+          pastePrepPlan(strings.first ?? "")
+        }
+        .labelStyle(.titleAndIcon)
+        .buttonStyle(.bordered)
+
+        Button {
+          regeneratePrepPlan()
+        } label: {
+          Label("Regenerate", systemImage: "sparkles")
+        }
+        .buttonStyle(.bordered)
+        .disabled(steps.isEmpty)
+
+        Button(role: .destructive) {
+          clearPrepPlan()
+        } label: {
+          Label("Clear", systemImage: "xmark.circle")
+        }
+        .buttonStyle(.bordered)
+        .disabled(steps.isEmpty)
+      }
+
+      if steps.isEmpty {
+        ContentUnavailableView(
+          "No Prep Plan Yet",
+          systemImage: "checklist",
+          description: Text("Paste a plan grouped under session headers, then refine it with chat.")
+        )
+      } else {
         VStack(alignment: .leading, spacing: 8) {
           ForEach(sessionBands) { band in
             MenuPrepPlanSessionBandView(

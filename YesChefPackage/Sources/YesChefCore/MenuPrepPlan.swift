@@ -248,7 +248,8 @@ extension MenuPrepPlanClient: DependencyKey {
     return MenuPrepPlan(
       steps: elements.compactMap { element in
         guard
-          let session = (element["session"] as? String)?.cleanedPrepPlanText,
+          let session = (element["session"] as? String)?.cleanedPrepPlanText
+            ?? (element["when"] as? String)?.cleanedPrepPlanText,
           let task = (element["task"] as? String)?.cleanedPrepPlanText
         else { return nil }
         return PrepPlanStep(
