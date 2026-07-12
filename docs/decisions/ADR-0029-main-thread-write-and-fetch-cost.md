@@ -17,7 +17,10 @@ video, but tap→flip is still 5.6–6.8 s — measured as writer-queue wait, no
 are the follow-on slices. Amendment 3's later S5a measurement retired that convoy theory, and
 **Amendment 4 corrects its replacement theory: the measured “COMMIT” interval still includes synchronous
 observation work, so S6b attributes that envelope before any image-storage change. Amendment 5 records
-the result — SQLite and the fetch are fast — and scopes S6c at the main-actor delivery/render boundary.** Binds
+the result — SQLite and the fetch are fast — and scopes S6c at the main-actor delivery/render boundary.
+Amendment 6 closes the investigation: the timestamped S6c capture roots the ~5 s in
+`GroceryIngredientChoiceRequest`, an always-on whole-library `@Fetch` re-run synchronously on the writer
+inside every affected commit (Finding 8); S7 is the fix.** Binds
 **[ADR-0001](ADR-0001-persistence-sqlitedata.md)**
 (SQLiteData) and **[ADR-0002](ADR-0002-cloudkit-sync-no-server.md)** (the shared `DatabaseWriter` that the
 `SyncEngine` also uses — the contention amplifier). Touches **[ADR-0021](ADR-0021-recipe-variations.md)** /
@@ -641,7 +644,9 @@ bootstrap tracing is app-compile-risk. No simulator launch is required; Jon owns
 Status: **Measured / S6c proposed** — 2026-07-11. Closes Amendment 4's S6b decision gate on a new branch:
 neither the SQLite/WAL branch nor the writer-side observation-fetch branch owns the latency. Supersedes the
 remaining performance conclusion in Amendment 3. S1/S2/S4/S5b remain correct; S3 (memoizing variation
-resolution) returns as a measured candidate, not yet as the chosen fix.
+resolution) returns as a measured candidate, not yet as the chosen fix. **Amendment 6 records the S6c
+result: Finding 7's delivery-boundary theory is disproven in turn — the timestamped capture puts the five
+seconds back on the writer connection, inside our own commit's observer pass, and names the owner.**
 
 ## S6b result
 
@@ -807,3 +812,151 @@ No simulator launch is required; Jon owns the device pass.
   device result selects a fix.
 - The next implementation slice is either a narrow animation-scope fix, S3 memoization, or a trace-driven
   SwiftUI fix — never an image-storage migration for this bug.
+
+---
+
+# Amendment 6 — Root cause found: a whole-library grocery `@Fetch` re-runs on the writer inside every commit (S7)
+
+> **One-line:** The S6c device capture (writer-api-return = 5019.0 ms measured **off** the main actor,
+> main-actor-resume = 51.2 ms) plus the **timestamped** unified-log pull reconstruct the five seconds
+> exactly: they sit **on the writer connection, inside our own commit's `databaseDidCommit` observer pass**,
+> and the owner is **`GroceryIngredientChoiceRequest`** — an always-on `@Fetch` on `GroceryLibraryModel`
+> whose fetch runs `Recipe.fetchAll` and then the full composite detail fetch (via
+> `fetchDetailApplyingActiveVariation`) for **every recipe in the library** (2,159 × ~2.3 ms ≈ 5.0 s).
+> Its observed region spans essentially the whole recipe schema including `recipeActiveVariations`, so every
+> variation switch — and every archive, rename, undo — re-runs the entire five-second fetch synchronously
+> before its own write returns. GRDB, SQLiteData sync, SQLite, and CloudKit are exonerated as bugs; the
+> query is ours. Fix (**S7**): the grocery selection observations become on-demand, scoped reads. **No
+> schema change, no sync change.**
+
+Status: **Root-caused** — 2026-07-11, from the S6c device pass and a `log collect` pull of the same runs
+with full timestamps. Closes Amendment 5's decision gate on a fourth branch none of its three anticipated:
+an app-level O(library) observation. Finding 7's delivery-boundary theory is disproven the same way
+Findings 5 and 6 were — each instrumentation round moved the boundary; this round landed on the owner.
+S1/S2/S4/S5b remain correct and shipped. S3 and the fetch-animation change are **not needed** for this
+symptom. Vindicates Amendment 2's core intuition (heavy observation fetches run on the writer connection)
+while correcting its trigger: not sync-engine commits — **our own commit**, paying for its own observers.
+
+## S6c result and the timestamped reconstruction
+
+Summary line (correlation 18, sync idle, animation `.default`): writer-wait = 18.3 ms, sql = 0.4 ms,
+**writer-api-return = 5019.0 ms**, **main-actor-resume = 51.2 ms**. The off-main `@concurrent` timestamp
+kills Finding 7: `database.write` genuinely does not return for ~5 s on its own executor; the main actor
+was free (51 ms) the whole time.
+
+The unified-log pull (`log collect --device`, category `performance`) adds wall-clock times:
+
+| Time (20:31:…) | Event | Reading |
+|---|---|---|
+| ~34.04 | tap → SQL done | writer was free; write is trivial |
+| 34.056 | `sqlite-commit` 0.000000 s | our COMMIT, instant |
+| 34.056→37.765 | **3.7 s silence** on the same thread | uninstrumented observer fetch chewing through the library |
+| 37.765 / 38.654 / 38.987 | three cheap `recipe-variation-resolve` calls, ~1 s apart | the ~3 recipes that have an active variation, hit mid-loop |
+| 39.075 | `recipe-detail-request-fetch` 2.9 ms | the detail observer, **last** in the observer chain |
+| 39.097 | `active-variation-delivered` | view got the value immediately after |
+| 39.126 | summary line on main | write returned, main resumed, all within ~60 ms |
+
+Everything between the COMMIT and the detail fetch is GRDB's synchronous post-commit observer pass on the
+writer connection. The write API cannot return — and nothing can be delivered — until it completes.
+
+## Finding 8 — `GroceryIngredientChoiceRequest` is the five seconds
+
+[GroceryIngredientChoice.swift](../../YesChefPackage/Sources/YesChefCore/GroceryIngredientChoice.swift)
+(`fetch`, ~line 29):
+
+- `for recipe in try Recipe.fetchAll(db)` — all 2,159 recipes, full rows (including `originalSnapshot`
+  BLOBs) — then `RecipeRepository.fetchDetailApplyingActiveVariation(recipeID:in:)` per recipe: the full
+  composite detail fetch, ~2.3 ms each. 2,159 × ~2.3 ms ≈ **5.0 s**, matching the measured 5019–5098 ms
+  and its eerie repeatability (a deterministic loop, not contention or a timeout).
+- `fetchDetailApplyingActiveVariation` reads `recipeActiveVariations` for every recipe, so the observation's
+  tracked region includes that table (and most of the recipe schema). SQLiteData's `@Fetch` uses
+  non-constant-region tracking, so GRDB re-runs the whole fetch **synchronously on the writer connection
+  inside `databaseDidCommit`** for any commit touching the region (Amendment 2's Finding-5 mechanism —
+  correct mechanism, wrong trigger).
+- The observation is always live: `GroceryLibraryModel` is `@State` on
+  [RecipeLibraryView.swift:27](../../YesChefApp/RecipeLibraryView.swift) — alive during every detail-screen
+  interaction.
+- **Why every prior probe missed it:** it calls `RecipeRepository.fetchDetail` directly, bypassing the
+  instrumented `RecipeDetailRequest.fetch` wrapper (S6b) — so five seconds of detail-fetching produced zero
+  `recipe-detail-request-fetch` lines. And it runs *inside* the tap's own envelope, so S5a's writer-wait
+  (which only sees work queued *ahead* of the tap) read 20 ms.
+- **Why publish-gap read ≈0:** the grocery observer registers at app scaffold time, before any
+  `RecipeDetailModel` exists, so it runs first in the observer chain; the detail re-fetch and delivery land
+  at the very end, right before the write returns.
+- This also owns the base ADR's archive/restore/rename/undo latencies: those write `recipes` (also in the
+  region), so **every quick mutation pays the same five seconds of writer occupancy** — S1 moved it off the
+  main thread, but the latency was this.
+
+**Secondary offender, same shape:** `GroceryMenuRecipeItemRequest`
+([GroceryCore.swift:88](../../YesChefPackage/Sources/YesChefCore/GroceryCore.swift)) does
+`Recipe.fetchAll` + `MenuItem.fetchAll` (full library rows, `originalSnapshot` included). Its region does
+not include `recipeActiveVariations` (variation switches don't re-run it), but every `recipes`/`menuItems`
+write does.
+
+**Library verdict:** GRDB behaves exactly as documented for non-constant regions; SQLiteData's sync engine
+is not involved (the table isn't synced; sync was idle); SQLite and the WAL were never the cost. The one
+structural library observation stands: SQLiteData's `@Fetch` always tracks non-constant regions, which is
+*why* an expensive request becomes a write stall instead of a background cost. A constant-region upstream
+ask (retired S5c's first option) remains a nice-to-have with its motivation now corrected — but the fix is
+not running a five-second query on every commit at all.
+
+## Decision — S7: make the grocery selection fetches on-demand and scoped
+
+Both heavy observations exist to feed one sheet — the ingredient-selection flow
+([AppDestinationPresentation.swift:66](../../YesChefApp/AppDestinationPresentation.swift)) — plus two
+trivial lookups. The sheet already filters to a handful of recipes at consumption time
+([GroceryModels.swift:449](../../YesChefApp/GroceryModels.swift)): we observe the whole library at
+full-detail depth to display 1–10 recipes' ingredients. Invert it:
+
+1. **Remove** `@Fetch var ingredientChoices` and `@Fetch var menuRecipeItems` from `GroceryLibraryModel`
+   ([GroceryModels.swift:42,44](../../YesChefApp/GroceryModels.swift)), and their `reloadAfterExternalChange`
+   loads.
+2. **Add a scoped core fetch** in `YesChefCore`: choices for an explicit `Set<Recipe.ID>` — the same
+   fold-active-variation + `isShoppableForGroceries` + section-join logic and the same
+   `areGroceryIngredientChoicesInIncreasingOrder` ordering, iterating **only the requested recipes**.
+   Reuse the existing body; the change is the iteration source (IDs in, not `Recipe.fetchAll`).
+3. **Fetch at presentation time.** The three `selectIngredients` entry points
+   (`selectRecipeButtonTapped`, `selectMenuButtonTapped`, `selectMealRowsButtonTapped`,
+   [GroceryModels.swift:405–442](../../YesChefApp/GroceryModels.swift)) resolve their recipe-ID set first
+   (menu source: a scoped `MenuItem` query replacing the `menuRecipeItems` scan at
+   [GroceryModels.swift:608](../../YesChefApp/GroceryModels.swift)), then load choices via
+   `try await database.read` (pool readers — never the writer) in a `Task`, S1-style, and present the
+   destination with the loaded choices carried in model state or the destination payload. The title lookup
+   at [GroceryModels.swift:434](../../YesChefApp/GroceryModels.swift) becomes a one-row read in the same
+   access.
+4. **The sheet consumes the passed choices** — `GroceryIngredientSelectionView` and
+   `ingredientChoices(for:mealRows:)` stop reading a live whole-library array. A brief loading beat before
+   the sheet appears is acceptable; a typical selection reads 1–10 recipes (~2–25 ms).
+5. **State the invariant** (S2/S5b's rule, generalized): *no always-on `@Fetch` may perform O(library)
+   work or read full rows of tables with large inline BLOBs.* Quick audit of the remaining
+   `FetchKeyRequest`s against it; the known residual is `RecipeListRequest` ×4 (post-S2
+   thumbnails-only — bounded, watch, don't rebuild here).
+6. **No instrumentation changes.** The S5a/S6b/S6c probes stay for the confirming capture; the
+   `-YesChefDisableDetailFetchAnimation` A/B seam may be removed in a later cleanup once the fix is
+   confirmed, not in this slice.
+
+Verification for the executor: behavioral tests for the scoped fetch (same output as the old request for a
+seeded library filtered to the same IDs, including a recipe with an active variation), package tests via
+`scripts/check-drift.sh`, one app build through `scripts/xcodebuild-summary.sh`. No simulator launch; Jon
+owns the device pass.
+
+### Device pass / acceptance
+
+Same capture as S6c on the real library, sync idle: one base → variation → base switch, plus one archive
+and restore. Acceptance: **writer-api-return drops from ~5000 ms to tens of milliseconds** on every
+mutation; the grocery flows (add from recipe / menu / meal plan, including a recipe with an active
+variation) round-trip correctly; the selection sheet's choices match pre-S7 behavior.
+
+## Consequences
+
+- Every quick mutation stops paying five seconds of self-inflicted writer occupancy — this is the actual
+  fix for the dogfood symptom the base ADR opened with. S1/S2/S4/S5b remain as shipped, correct hygiene.
+- The grocery picker trades an always-hot cache for a per-open scoped read measured in milliseconds — the
+  right trade a hundred times over.
+- **No schema change, no sync change, no image change** — after five diagnostic slices, the fix touches
+  two `@Fetch` declarations, one core request, and three tap handlers.
+- S3 memoization and fetch-animation narrowing are closed as unnecessary for this symptom (the render work
+  measured sub-millisecond throughout).
+- Follow-ups parked, not scoped here: the constant-region upstream ask (correct motivation recorded above);
+  `GroceryMenuRecipeItemRequest`-class `Recipe.fetchAll` cost if it ever shows up in a capture; the
+  `RecipeListRequest` ×4 residual.
