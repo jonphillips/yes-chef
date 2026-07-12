@@ -905,11 +905,13 @@ private extension Optional where Wrapped == String {
   }
 }
 
-private extension View {
+extension View {
   func recipeChip() -> some View {
     modifier(RecipeChip())
   }
+}
 
+private extension View {
   @ViewBuilder
   func adjustmentReviewPresentation<Item: Identifiable, Content: View>(
     item: Binding<Item?>,

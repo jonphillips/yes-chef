@@ -4,14 +4,46 @@ import LLMClientKit
 import SQLiteData
 
 public struct PrepPlanStep: Codable, Equatable, Sendable {
-  public var when: String
+  public var session: String
   public var task: String
+  public var serves: String?
   public var sourceDish: MenuItem.ID?
 
-  public init(when: String, task: String, sourceDish: MenuItem.ID? = nil) {
-    self.when = when
+  public init(
+    session: String,
+    task: String,
+    serves: String? = nil,
+    sourceDish: MenuItem.ID? = nil
+  ) {
+    self.session = session
     self.task = task
+    self.serves = serves
     self.sourceDish = sourceDish
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case session
+    case when
+    case task
+    case serves
+    case sourceDish
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    session = try container.decodeIfPresent(String.self, forKey: .session)
+      ?? container.decode(String.self, forKey: .when)
+    task = try container.decode(String.self, forKey: .task)
+    serves = try container.decodeIfPresent(String.self, forKey: .serves)
+    sourceDish = try container.decodeIfPresent(MenuItem.ID.self, forKey: .sourceDish)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(session, forKey: .session)
+    try container.encode(task, forKey: .task)
+    try container.encodeIfPresent(serves, forKey: .serves)
+    try container.encodeIfPresent(sourceDish, forKey: .sourceDish)
   }
 }
 
@@ -23,27 +55,56 @@ public struct MenuPrepPlan: Equatable, Sendable {
   }
 
   public func rendered() -> String {
-    steps
-      .map { "\($0.when): \($0.task)" }
-      .joined(separator: "\n")
+    editableReviewText()
   }
 
   public func editableReviewText() -> String {
-    rendered()
+    var lines: [String] = []
+    var previousSession: String?
+    for step in steps {
+      if step.session != previousSession {
+        lines.append("\(step.session):")
+        previousSession = step.session
+      }
+      lines.append("- \(step.renderedEditableReviewLine)")
+    }
+    return lines.joined(separator: "\n")
   }
 
   public func applyingEditableReviewText(_ text: String) -> MenuPrepPlan {
-    var sourceDishesByLine = Dictionary(grouping: steps) { $0.renderedEditableReviewLine }
+    var sourceDishesByLine = Dictionary(grouping: steps) { $0.editableReviewKey }
       .mapValues { steps in steps.map(\.sourceDish) }
-    return MenuPrepPlan(
-      steps: text.editablePrepPlanLines.compactMap { line in
-        guard let parsedLine = PrepPlanStep.editableReviewLine(line) else { return nil }
-        return PrepPlanStep(
-          when: parsedLine.when,
-          task: parsedLine.task,
-          sourceDish: Self.popSourceDish(for: line, from: &sourceDishesByLine)
-        )
+    var session: String?
+    var revisedSteps: [PrepPlanStep] = []
+
+    for rawLine in text.components(separatedBy: .newlines) {
+      let line = rawLine.cleanedEditablePrepPlanLine
+      guard !line.isEmpty else { continue }
+
+      if rawLine.isEditablePrepPlanSessionHeader, let parsedSession = line.editablePrepPlanSession {
+        session = parsedSession
+        continue
       }
+
+      guard let session, let parsedLine = PrepPlanStep.editableReviewLine(line) else { continue }
+      let reviewKey = PrepPlanStep(
+        session: session,
+        task: parsedLine.task,
+        serves: parsedLine.serves
+      )
+      .editableReviewKey
+      revisedSteps.append(
+        PrepPlanStep(
+          session: session,
+          task: parsedLine.task,
+          serves: parsedLine.serves,
+          sourceDish: Self.popSourceDish(for: reviewKey, from: &sourceDishesByLine)
+        )
+      )
+    }
+
+    return MenuPrepPlan(
+      steps: revisedSteps
     )
   }
 
@@ -60,17 +121,20 @@ public struct MenuPrepPlan: Equatable, Sendable {
 
 private extension PrepPlanStep {
   var renderedEditableReviewLine: String {
-    "\(when): \(task)"
+    guard let serves else { return task }
+    return "\(task) → \(serves)"
   }
 
-  static func editableReviewLine(_ line: String) -> (when: String, task: String)? {
-    let pieces = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
-    guard
-      pieces.count == 2,
-      let when = String(pieces[0]).cleanedPrepPlanText,
-      let task = String(pieces[1]).cleanedPrepPlanText
-    else { return nil }
-    return (when, task)
+  var editableReviewKey: String {
+    "\(session)\n\(renderedEditableReviewLine)"
+  }
+
+  static func editableReviewLine(_ line: String) -> (task: String, serves: String?)? {
+    let pieces = line.split(separator: "→", maxSplits: 1, omittingEmptySubsequences: false)
+    guard let task = String(pieces[0]).cleanedPrepPlanText else { return nil }
+    guard pieces.count == 2 else { return (task, nil) }
+    guard let serves = String(pieces[1]).cleanedPrepPlanText else { return nil }
+    return (task, serves)
   }
 }
 
@@ -135,14 +199,17 @@ extension MenuPrepPlanClient: DependencyKey {
   }
 
   static let instructions = """
-    You refine a staged prep plan for one multi-day menu from the current menu context and conversation.
+    You weave a staged prep plan for one multi-day menu from the current menu context and conversation.
     Return ONLY strict JSON:
-    {"steps":[{"when":"relative timing label","task":"concrete kitchen task","sourceDish":"menu item UUID or null"}]}.
+    {"steps":[{"session":"work-session label","task":"concrete kitchen task","serves":"human-readable meal or day this feeds, or null","sourceDish":"menu item UUID or null"}]}.
     The menu context may include a Current prep plan. Treat it as the artifact being edited: preserve useful existing
-    steps, apply the user's requested refinements, and return the full proposed replacement plan. Compose and sequence
-    the existing per-recipe make-ahead notes from the menu context. Do not invent or rewrite per-dish make-ahead prose.
+    steps, apply the user's requested refinements, and return the full proposed replacement plan. Compose from stored
+    per-recipe Make-Ahead notes when present, and invent grounded sequencing, work sessions, and new prep steps from
+    the menu's dishes and conversation. Prefer the authored Make-Ahead notes when they are available.
+    Group related work under free-form session labels such as "Anytime, get ahead" or "Wednesday evening". Set serves
+    to the meal or day each step feeds when useful.
     Use sourceDish only when the step clearly comes from one menu item ID in the context; use null when a step spans
-    dishes or the source is unclear. Return {"steps":[]} when there is no prep plan to save.
+    dishes or the source is unclear. Return {"steps":[]} only when there is genuinely no prep plan to save.
     """
 
   static func prompt(selection: String, messages: [RecipeChatMessage], context: String) -> String {
@@ -181,12 +248,13 @@ extension MenuPrepPlanClient: DependencyKey {
     return MenuPrepPlan(
       steps: elements.compactMap { element in
         guard
-          let when = (element["when"] as? String)?.cleanedPrepPlanText,
+          let session = (element["session"] as? String)?.cleanedPrepPlanText,
           let task = (element["task"] as? String)?.cleanedPrepPlanText
         else { return nil }
         return PrepPlanStep(
-          when: when,
+          session: session,
           task: task,
+          serves: (element["serves"] as? String)?.cleanedPrepPlanText,
           sourceDish: (element["sourceDish"] as? String)
             .flatMap { UUID(uuidString: $0.trimmingCharacters(in: .whitespacesAndNewlines)) }
         )
@@ -252,12 +320,6 @@ private extension RecipeChatMessage.Role {
 }
 
 private extension String {
-  var editablePrepPlanLines: [String] {
-    components(separatedBy: .newlines)
-      .map(\.cleanedEditablePrepPlanLine)
-      .filter { !$0.isEmpty }
-  }
-
   var cleanedEditablePrepPlanLine: String {
     var line = trimmingCharacters(in: .whitespacesAndNewlines)
     if line.hasPrefix("- ") || line.hasPrefix("* ") {
@@ -271,5 +333,18 @@ private extension String {
   var cleanedPrepPlanText: String? {
     let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
+  }
+
+  var editablePrepPlanSession: String? {
+    guard hasSuffix(":") else { return nil }
+    return String(dropLast()).cleanedPrepPlanText
+  }
+
+  var isEditablePrepPlanSessionHeader: Bool {
+    let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+    return !trimmed.hasPrefix("- ")
+      && !trimmed.hasPrefix("* ")
+      && !trimmed.hasPrefix("• ")
+      && trimmed.hasSuffix(":")
   }
 }

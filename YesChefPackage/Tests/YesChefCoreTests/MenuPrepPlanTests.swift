@@ -9,24 +9,26 @@ extension RecipeCoreTests {
   @Suite
   struct MenuPrepPlanTests {
     @Test
-    func menuPrepPlanParsesAndCodesNullableSourceDish() throws {
+    func menuPrepPlanParsesAndCodesWorkSessionSteps() throws {
       let sourceDishID = SampleUUIDSequence.uuid(15_000)
 
       let plan = MenuPrepPlanClient.parse(
         """
         {"steps":[
           {
-            "when":"2 days out",
+            "session":"Wednesday evening",
             "task":"Make the barbecue sauce.",
+            "serves":"Thursday dinner",
             "sourceDish":"\(sourceDishID.uuidString)"
           },
           {
-            "when":"morning of day 2",
+            "session":"Anytime, get ahead",
             "task":"Set out serving platters.",
+            "serves":null,
             "sourceDish":null
           },
           {
-            "when":"later",
+            "session":"Later",
             "sourceDish":"not enough"
           }
         ]}
@@ -38,12 +40,13 @@ extension RecipeCoreTests {
         MenuPrepPlan(
           steps: [
             PrepPlanStep(
-              when: "2 days out",
+              session: "Wednesday evening",
               task: "Make the barbecue sauce.",
+              serves: "Thursday dinner",
               sourceDish: sourceDishID
             ),
             PrepPlanStep(
-              when: "morning of day 2",
+              session: "Anytime, get ahead",
               task: "Set out serving platters."
             ),
           ]
@@ -56,27 +59,71 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func menuPrepPlanRoundTripPreservesSourceDishForUnchangedSteps() {
+    func menuPrepPlanDecodesLegacyWhenSteps() {
+      let sourceDishID = SampleUUIDSequence.uuid(15_120)
+      let legacyData = Data(
+        """
+        [{"when":"Day before","task":"Marinate the chicken.","sourceDish":"\(sourceDishID.uuidString)"}]
+        """.utf8
+      )
+
+      expectNoDifference(
+        MenuPrepPlanCoding.decode(legacyData),
+        [
+          PrepPlanStep(
+            session: "Day before",
+            task: "Marinate the chicken.",
+            sourceDish: sourceDishID
+          )
+        ]
+      )
+    }
+
+    @Test
+    func menuPrepPlanHeaderLineRoundTripPreservesUnchangedSourceDish() {
       let sourceDishID = SampleUUIDSequence.uuid(15_120)
       let plan = MenuPrepPlan(
         steps: [
           PrepPlanStep(
-            when: "Day before",
+            session: "Wednesday evening",
             task: "Marinate the chicken.",
+            serves: "Thursday dinner",
             sourceDish: sourceDishID
           ),
           PrepPlanStep(
-            when: "Morning of",
+            session: "Wednesday evening",
             task: "Chop the herbs.",
+            serves: "Thursday dinner",
             sourceDish: sourceDishID
+          ),
+          PrepPlanStep(
+            session: "At service",
+            task: "Warm the tortillas."
           ),
         ]
       )
 
+      expectNoDifference(
+        plan.editableReviewText(),
+        """
+        Wednesday evening:
+        - Marinate the chicken. → Thursday dinner
+        - Chop the herbs. → Thursday dinner
+        At service:
+        - Warm the tortillas.
+        """
+      )
+
+      expectNoDifference(
+        plan.applyingEditableReviewText(plan.editableReviewText()),
+        plan
+      )
+
       let edited = plan.applyingEditableReviewText(
         """
-        Day before: Marinate the chicken.
-        Morning of: Chop herbs and scallions.
+        Wednesday evening:
+        - Marinate the chicken. → Thursday dinner
+        - Chop herbs and scallions. → Thursday dinner
         """
       )
 
@@ -84,13 +131,15 @@ extension RecipeCoreTests {
         edited.steps,
         [
           PrepPlanStep(
-            when: "Day before",
+            session: "Wednesday evening",
             task: "Marinate the chicken.",
+            serves: "Thursday dinner",
             sourceDish: sourceDishID
           ),
           PrepPlanStep(
-            when: "Morning of",
-            task: "Chop herbs and scallions."
+            session: "Wednesday evening",
+            task: "Chop herbs and scallions.",
+            serves: "Thursday dinner"
           ),
         ]
       )
@@ -121,6 +170,8 @@ extension RecipeCoreTests {
       expectNoDifference(request?.promptPreferenceKey, AIPromptPreferenceKind.makeAheadPrepPlan.rawValue)
       #expect(request?.messages.first?.text.contains("Menu context:\nMenu context") == true)
       #expect(request?.messages.first?.text.contains("User-selected subject:\nSequence the prep.") == true)
+      #expect(request?.system?.contains("\"session\"") == true)
+      #expect(request?.system?.contains("invent grounded sequencing") == true)
     }
 
     @Test
@@ -160,7 +211,7 @@ extension RecipeCoreTests {
           return MenuPrepPlan(
             steps: [
               PrepPlanStep(
-                when: "Day before",
+                session: "Day before",
                 task: "Marinate the chicken.",
                 sourceDish: sourceDishID
               )
@@ -182,7 +233,7 @@ extension RecipeCoreTests {
 
       expectNoDifference(extractedSelection, "Use the chicken note.")
       expectNoDifference(extractedContext, messages)
-      expectNoDifference(items.map(\.summary), ["Day before: Marinate the chicken."])
+      expectNoDifference(items.map(\.summary), ["Day before:\n- Marinate the chicken."])
       try await database.read { db in
         let menu = try #require(try Menu.find(menuID).fetchOne(db))
         expectNoDifference(MenuPrepPlanCoding.decode(menu.prepPlan), [])
@@ -196,7 +247,7 @@ extension RecipeCoreTests {
           MenuPrepPlanCoding.decode(menu.prepPlan),
           [
             PrepPlanStep(
-              when: "Day before",
+              session: "Day before",
               task: "Marinate the chicken.",
               sourceDish: sourceDishID
             )
@@ -231,7 +282,7 @@ extension RecipeCoreTests {
           MenuPrepPlan(
             steps: [
               PrepPlanStep(
-                when: "2 days out",
+                session: "2 days out",
                 task: "Make the sauce.",
                 sourceDish: sourceDishID
               )
@@ -249,7 +300,7 @@ extension RecipeCoreTests {
           MenuPrepPlanCoding.decode(menu.prepPlan),
           [
             PrepPlanStep(
-              when: "2 days out",
+              session: "2 days out",
               task: "Make the sauce.",
               sourceDish: sourceDishID
             )

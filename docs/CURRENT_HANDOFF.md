@@ -18,8 +18,9 @@ Chrome-polish slice commit).
 Workbench dogfood polish, and the Meal-planner (Calendar) affordance swap
 ([#154](https://github.com/jonphillips/yes-chef/pull/154), architect-reviewed 2026-07-12; package builds +
 tests pass; app build + device pass are Jon's), plus the **Fraction input accessory** (inline pill row,
-architect-reviewed + **device-passed** 2026-07-12; on this branch, archived to DONE-LOG). **Next Up now has no
-live effort — Jon picks the next target** (see **Next Up**). The whole **ADR-0027 harvest + deposit family (base + Amendment 1) is now COMPLETE
+architect-reviewed + **device-passed** 2026-07-12; on this branch, archived to DONE-LOG). **[ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md)
+prep-plan work-session timeline S1 + S2 landed** ([#163](https://github.com/jonphillips/yes-chef/pull/163),
+architect-reviewed 2026-07-12) — **S3 (parse-robustness + clipboard) is now Next Up.** The whole **ADR-0027 harvest + deposit family (base + Amendment 1) is now COMPLETE
 and device-passed** (2026-07-12) — merged to main, archived to DONE-LOG; only the ADR's own deferred items
 (OQ4 taste preference, A6 promote-note-to-recipe) remain, each a separate future effort.
 
@@ -53,34 +54,27 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Do [ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md) (prep plan → work-session timeline) — S1 + S2, one PR, in order.**
-Menu-scoped: a JSON-blob step reshape + verb loosening (Core) plus a banded display (App). **No schema change** —
-`Menu.prepPlan` stays a BLOB; the reshape is a JSON-key change with **back-compat decode** (old blobs still load).
-Do **not** touch the meal-calendar per-day make-ahead-strategy note verb (ADR defers that realignment).
+**Do [ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md) S3 — parse-robustness + clipboard, one PR.**
+S1 + S2 (step reshape `when`→`session`+`serves`, the D3 weave, banded collapsible UI + tappable `serves`) are
+**DONE** — PR [#163](https://github.com/jonphillips/yes-chef/pull/163), architect-reviewed 2026-07-12 (package
+builds + `MenuPrepPlanTests` 6/6 pass; Jon built the app locally). Do **not** touch the meal-calendar per-day
+make-ahead-strategy note verb (ADR defers that realignment).
 
-- **S1 — model + weave (Core, `MenuPrepPlan.swift`).** Reshape `PrepPlanStep`: `when`→`session`, add
-  `serves: String?`, keep `sourceDish`. `MenuPrepPlanCoding.decode` reads `session` **falling back to legacy
-  `when`**, missing `serves`→nil (no migration). Update `parse` to read `session`/`serves`/`sourceDish` from the
-  model JSON. Loosen `MenuPrepPlanClient.instructions` to the ADR **D3 weave**: compose from stored per-recipe
-  Make-Ahead **when present** *and* invent work sessions / sequencing / new steps grounded in the menu's dishes +
-  conversation; emit `session` + `serves` + `sourceDish`; keep `{"steps":[]}` only when genuinely empty (OQ3:
-  still pass the per-dish Make-Ahead in context so the weave *prefers* authored notes). Rework the editable
-  round-trip (`editableReviewText`/`applyingEditableReviewText`) — **OQ1 lean: a `session:` header line per band**,
-  steps beneath it, re-parsed on commit. Extend `MenuPrepPlanTests.swift`: reshape, legacy-`when` decode,
-  weave-shaped parse, header-line round-trip.
-- **S2 — banded UI + tappable serves (App, `MenuViews.swift` / `MenuModels.swift`).** `MenuPrepPlanSection`
-  renders **collapsible session bands** — grouped by `session` in plan-emitted order, an "anytime/flexible"
-  band sorted first, collapsed by default, per-band step count on the right, tap to expand. Render `serves` as a
-  chip; when the step's `sourceDish` resolves to a row in the section's `itemRows`, make the chip tap open that
-  dish's recipe via the **existing `onRecipeSelected: (RecipeDetailPresentation)` hook** already threaded through
-  the menu views; render plain text when `sourceDish` is null (OQ2). Soften the prep-plan `emptyResultMessage` in
-  `MenuModels.swift` (empty is now the rare case, no longer the "add Make-Ahead notes first" story).
+- **Parse robustness (fold in FIRST — it's blocking the whole feature).** `MenuPrepPlanClient.parse`
+  (`MenuPrepPlan.swift`) hard-requires the new `session` key and **silently drops every step** when the model
+  emits the legacy `when` instead — which it does often, producing the empty "No prep steps to save yet" error
+  Jon hit repeatedly on device (the weave looks broken end-to-end because of this). Mirror the `Codable` decoder:
+  read `session` **falling back to `when`**. Add a `parse` test for a `when`-only model response.
+- **S3a — copy dish context out (ADR-0034 D5).** A button on the Prep Plan pane that copies the already-built
+  `MenuChatContext.serialized` to the clipboard — paste into an external LLM, spend those tokens instead of ours.
+- **S3b — paste free-text plan in (D5).** The Prep Plan pane accepts a pasted free-text plan as its body; seed
+  the document through the existing `applyingEditableReviewText` round-trip so the weave verb can later sort it
+  into sessions / add `serves` tags on a re-run.
 
 Verify: `swift build` the package + `MenuPrepPlanTests` + `scripts/check-drift.sh`; one app build for
-`iPad Pro 13-inch (M5)` (`xcodegen generate` first if files were added). **Jon does the device pass** (the weave
-produces a banded, multi-meal plan; collapse-to-band reads under pressure; the `serves` chip opens the recipe on
-iPad AND iPhone). Fold the ADR-0034 Accepted flip + `decisions/README.md` entry + this CURRENT_HANDOFF bump into
-the slice PR. **S3 (clipboard: dish-context-out / free-text-plan-in) is a follow-up dispatch — not this PR.**
+`iPad Pro 13-inch (M5)` (`xcodegen generate` first if files were added). **Jon does the device pass** (the parse
+fix makes the weave actually populate the section; copy-out lands on the clipboard; paste-in seeds a plan). Fold
+this CURRENT_HANDOFF bump into the S3 PR.
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**

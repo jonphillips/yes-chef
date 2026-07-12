@@ -124,7 +124,7 @@ extension RecipeCoreTests {
           dayCount: 2,
           prepPlan: try MenuPrepPlanCoding.encode([
             PrepPlanStep(
-              when: "Day before",
+              session: "Day before",
               task: "Marinate the chicken.",
               sourceDish: prepSourceID
             )
