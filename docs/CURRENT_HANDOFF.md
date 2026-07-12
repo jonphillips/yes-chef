@@ -53,27 +53,34 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Do [ADR-0033](decisions/ADR-0033-recipe-detail-polish.md) (recipe-detail polish) — both slices, one PR, in order.**
-View-layer only, **no schema/model/sync/LLM**. S2 also fixes a hard crash: the toolbar scaler's `.popover` is
-anchored to a `.secondaryAction` item that collapses into an overflow menu → tapping it traps, so scaling is
-currently **unreachable**.
+**Do [ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md) (prep plan → work-session timeline) — S1 + S2, one PR, in order.**
+Menu-scoped: a JSON-blob step reshape + verb loosening (Core) plus a banded display (App). **No schema change** —
+`Menu.prepPlan` stays a BLOB; the reshape is a JSON-key change with **back-compat decode** (old blobs still load).
+Do **not** touch the meal-calendar per-day make-ahead-strategy note verb (ADR defers that realignment).
 
-- **S1 — metadata chips (D1).** Add a `recipeChip` modifier / small `Chip` view (hairline-bordered, glyph + text,
-  consistent radius). Apply across `recipeStats` ([RecipeDetailView.swift:450](../YesChefApp/RecipeDetailView.swift))
-  and the reference-placement / tags / category labels below it (`:356`, `:365`–`:370`; `WrappingLabels` gains
-  per-element chips). Pure presentation, no model/string changes. Keep SF + `.secondary` weight; must wrap in the
-  `ViewThatFits` compact branch (`:338`).
-- **S2 — servings-attached scaler + crash fix (D2).** Make the `Serves …` stat a `Button` that shows
-  `scaledServingsSummary` and anchors the existing `ScalePanel` (`:893`) via `.popover` **in the content view**.
-  DELETE the toolbar scaler button + its crashing popover (`:96`–`:111`) and the duplicate scale summary over
-  Ingredients (`:538`). When `recipe.servingsText` is nil but scaling is possible (`!ingredientLines.isEmpty`),
-  render a fallback "Scale" chip (glyph + `scaleSummary`) in the same row. Model API untouched — reuse
-  `scaleButtonTapped()`, `destination.scaling`, `ScalePanel(model:)`.
+- **S1 — model + weave (Core, `MenuPrepPlan.swift`).** Reshape `PrepPlanStep`: `when`→`session`, add
+  `serves: String?`, keep `sourceDish`. `MenuPrepPlanCoding.decode` reads `session` **falling back to legacy
+  `when`**, missing `serves`→nil (no migration). Update `parse` to read `session`/`serves`/`sourceDish` from the
+  model JSON. Loosen `MenuPrepPlanClient.instructions` to the ADR **D3 weave**: compose from stored per-recipe
+  Make-Ahead **when present** *and* invent work sessions / sequencing / new steps grounded in the menu's dishes +
+  conversation; emit `session` + `serves` + `sourceDish`; keep `{"steps":[]}` only when genuinely empty (OQ3:
+  still pass the per-dish Make-Ahead in context so the weave *prefers* authored notes). Rework the editable
+  round-trip (`editableReviewText`/`applyingEditableReviewText`) — **OQ1 lean: a `session:` header line per band**,
+  steps beneath it, re-parsed on commit. Extend `MenuPrepPlanTests.swift`: reshape, legacy-`when` decode,
+  weave-shaped parse, header-line round-trip.
+- **S2 — banded UI + tappable serves (App, `MenuViews.swift` / `MenuModels.swift`).** `MenuPrepPlanSection`
+  renders **collapsible session bands** — grouped by `session` in plan-emitted order, an "anytime/flexible"
+  band sorted first, collapsed by default, per-band step count on the right, tap to expand. Render `serves` as a
+  chip; when the step's `sourceDish` resolves to a row in the section's `itemRows`, make the chip tap open that
+  dish's recipe via the **existing `onRecipeSelected: (RecipeDetailPresentation)` hook** already threaded through
+  the menu views; render plain text when `sourceDish` is null (OQ2). Soften the prep-plan `emptyResultMessage` in
+  `MenuModels.swift` (empty is now the rare case, no longer the "add Make-Ahead notes first" story).
 
-Verify: package build + tests + `scripts/check-drift.sh`; one app build for `iPad Pro 13-inch (M5)`. **Jon does the
-device pass** (crash gone + scaler opens from the chip on iPad AND iPhone; compact-wrap + scroll-away feel). Fold the
-ADR-0033 files (ADR + `decisions/README.md` index fix — the 0030 number collision) and this CURRENT_HANDOFF bump into
-the slice PR.
+Verify: `swift build` the package + `MenuPrepPlanTests` + `scripts/check-drift.sh`; one app build for
+`iPad Pro 13-inch (M5)` (`xcodegen generate` first if files were added). **Jon does the device pass** (the weave
+produces a banded, multi-meal plan; collapse-to-band reads under pressure; the `serves` chip opens the recipe on
+iPad AND iPhone). Fold the ADR-0034 Accepted flip + `decisions/README.md` entry + this CURRENT_HANDOFF bump into
+the slice PR. **S3 (clipboard: dish-context-out / free-text-plan-in) is a follow-up dispatch — not this PR.**
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**
@@ -117,7 +124,9 @@ target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](
   Parked follow-ons (Beta 3 drag-and-drop retest + cell images) stay in the meal-planner effort doc.
 - Design forks (edit-variation, promote-variation, variation ↔ Workbench overlap) → `docs/open-questions.md`.
 
-**Recently completed → all archived in [`docs/DONE-LOG.md`](DONE-LOG.md).** ADR-0027 harvest + deposit family
+**Recently completed → all archived in [`docs/DONE-LOG.md`](DONE-LOG.md).** ADR-0033 recipe-detail polish
+(metadata chips + servings-attached scaler + toolbar-scaler crash fix, [#160](https://github.com/jonphillips/yes-chef/pull/160),
+device pass owed to Jon); ADR-0027 harvest + deposit family
 (base + Amendment 1, COMPLETE + device-passed 2026-07-12); ADR-0026 review-collection sheet (#138, device pass
 owed — see Next Up); ADR-0025 reader-comment ingestion (effort closed, #129/#131/#134); ADR-0024 editable
 proposal preview (S1 #127 + S2); the menu-planner-dogfood-2026-07-09 quick-fixes bundle (#136); and the
