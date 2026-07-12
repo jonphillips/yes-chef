@@ -162,6 +162,7 @@ struct RecipeDetailView: View {
         RecipeReaderView(
           model: model,
           libraryModel: libraryModel,
+          onRecipeSelected: onRecipeSelected,
           showsStartCookingButton: showsStartCookingButton
         )
       }
@@ -169,6 +170,7 @@ struct RecipeDetailView: View {
       RecipeReaderView(
         model: model,
         libraryModel: libraryModel,
+        onRecipeSelected: onRecipeSelected,
         showsStartCookingButton: showsStartCookingButton
       )
     }
@@ -208,6 +210,7 @@ private struct RecipeReaderView: View {
 
   let model: RecipeDetailModel
   let libraryModel: RecipeLibraryModel
+  let onRecipeSelected: (RecipeDetailPresentation) -> Void
   let showsStartCookingButton: Bool
 
   @State private var compactSection: CompactSection = .ingredients
@@ -357,6 +360,10 @@ private struct RecipeReaderView: View {
 
       if let source = model.detail?.source {
         SourceMetadataView(source: source)
+      }
+
+      if !model.workbenchCandidateLinks.isEmpty {
+        WorkbenchCandidateLinksView(links: model.workbenchCandidateLinks, onRecipeSelected: onRecipeSelected)
       }
 
       if let tags = model.detail?.tags, !tags.isEmpty {
@@ -796,6 +803,47 @@ private struct SourceMetadataView: View {
       }
     }
     .font(.subheadline)
+  }
+}
+
+private struct WorkbenchCandidateLinksView: View {
+  let links: [WorkbenchCandidateLink]
+  let onRecipeSelected: (RecipeDetailPresentation) -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Label("Drafted From", systemImage: "arrow.triangle.branch")
+        .font(.subheadline.weight(.semibold))
+      ForEach(links) { link in
+        if let recipeID = link.recipeID {
+          Button {
+            onRecipeSelected(RecipeDetailPresentation(recipeID: recipeID))
+          } label: {
+            linkLabel(link)
+          }
+          .buttonStyle(.plain)
+        } else {
+          linkLabel(link)
+            .foregroundStyle(.secondary)
+        }
+      }
+    }
+    .font(.subheadline)
+  }
+
+  private func linkLabel(_ link: WorkbenchCandidateLink) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: 8) {
+      Image(systemName: link.recipeID == nil ? "book.closed" : "arrow.up.right.square")
+        .foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(link.title)
+        if let sourceName = link.sourceName {
+          Text(sourceName)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+    }
   }
 }
 

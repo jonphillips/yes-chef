@@ -96,6 +96,8 @@ final class WorkbenchDetailModel {
   @CasePathable
   enum Destination {
     case addCandidates
+    case archiveCandidates
+    case candidatePhotoPicker
     case chat(RecipeChatModel)
     case logEntryEditor(WorkbenchLogEntryEditorState)
   }
@@ -141,6 +143,23 @@ final class WorkbenchDetailModel {
 
   func addCandidatesButtonTapped() {
     destination = .addCandidates
+  }
+
+  func archiveAllCandidatesButtonTapped() {
+    guard detail?.candidateRows.isEmpty == false else { return }
+    destination = .archiveCandidates
+  }
+
+  func confirmArchiveAllCandidatesButtonTapped() {
+    destination = nil
+    do {
+      try database.write { db in
+        try WorkbenchRepository.archiveAllCandidates(for: workbenchID, in: db, now: now)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
   }
 
   /// Recipes with loaded ingredient data available to compare — the working recipe (if any) plus
@@ -196,6 +215,37 @@ final class WorkbenchDetailModel {
   func removeWorkingRecipeButtonTapped() {
     guard detail?.workbench.draftRecipeID != nil else { return }
     isConfirmingRemoveWorkingRecipe = true
+  }
+
+  var candidatePhotoChoices: [WorkbenchCandidatePhoto] {
+    detail?.candidateRows.flatMap { row in
+      (row.recipeDetail?.photos.filter(\.isDisplayable) ?? []).map {
+        WorkbenchCandidatePhoto(photo: $0, candidateTitle: row.displayTitle)
+      }
+    } ?? []
+  }
+
+  func candidatePhotoPickerButtonTapped() {
+    guard detail?.draftRecipeDetail != nil, !candidatePhotoChoices.isEmpty else { return }
+    destination = .candidatePhotoPicker
+  }
+
+  func selectCandidatePhotoButtonTapped(photoID: RecipePhoto.ID) {
+    do {
+      try database.write { db in
+        try WorkbenchRepository.copyCandidatePhotoToDraft(
+          photoID: photoID,
+          for: workbenchID,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+      destination = nil
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
   }
 
   func confirmRemoveWorkingRecipe() {
@@ -456,6 +506,13 @@ private enum WorkbenchDetailError: Error, CustomStringConvertible, LocalizedErro
   }
 
   var errorDescription: String? { description }
+}
+
+struct WorkbenchCandidatePhoto: Identifiable, Equatable {
+  let photo: RecipeDetailPhoto
+  let candidateTitle: String
+
+  var id: RecipePhoto.ID { photo.id }
 }
 
 struct WorkbenchDeletionContext: Identifiable, Hashable, Sendable {

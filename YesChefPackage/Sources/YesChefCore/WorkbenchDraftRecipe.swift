@@ -335,6 +335,8 @@ extension WorkbenchDraftRecipeClient: DependencyKey {
 
     The draft must be a coherent editorial choice with a rationale referencing candidates. Do not average every
     candidate together. It may include a base recipe plus deliberate variations inside notes or method steps.
+    When the rationale names a candidate, use the candidate's title and source label from the workbench context.
+    Never expose candidate IDs or recipe IDs in the rationale.
     Use only the provided workbench context and conversation. Return an empty title, empty arrays, and empty rationale
     when there is no concrete working recipe to save.
     """

@@ -802,6 +802,8 @@ final class RecipeDetailModel {
   @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
   @ObservationIgnored
+  @Fetch var workbenchCandidateLinks: [WorkbenchCandidateLink] = []
+  @ObservationIgnored
   @Fetch var persistedScale: Double?
 
   var destination: Destination?
@@ -840,6 +842,11 @@ final class RecipeDetailModel {
       animation: .default
     )
     #endif
+    _workbenchCandidateLinks = Fetch(
+      wrappedValue: [],
+      RecipeWorkbenchLinksRequest(recipeID: recipeID),
+      animation: .default
+    )
     _persistedScale = Fetch(
       wrappedValue: nil,
       RecipeScaleRequest(context: self.scaleContext),

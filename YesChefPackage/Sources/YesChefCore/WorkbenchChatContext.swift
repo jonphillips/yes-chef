@@ -127,9 +127,8 @@ public struct WorkbenchChatContext: Equatable, Sendable {
     lines.append("Candidates:")
     for candidate in candidates {
       lines.append("- \(candidate.title.isEmpty ? "(untitled)" : candidate.title)")
-      lines.append("  - Candidate ID: \(candidate.id.uuidString)")
-      if let recipeID = candidate.recipeID {
-        lines.append("  - Recipe ID: \(recipeID.uuidString)")
+      if let sourceName = candidate.sourceName {
+        lines.append("  - Source: \(sourceName)")
       }
       if let annotation = candidate.annotation {
         lines.append("  - Cook annotation: \(annotation.replacingOccurrences(of: "\n", with: " "))")
@@ -268,6 +267,7 @@ public struct WorkbenchCandidateChatContext: Equatable, Sendable {
   public var id: WorkbenchCandidate.ID
   public var recipeID: Recipe.ID?
   public var title: String
+  public var sourceName: String?
   public var annotation: String?
   public var sortOrder: Int
   public var subtitle: String?
@@ -285,6 +285,7 @@ public struct WorkbenchCandidateChatContext: Equatable, Sendable {
     id: WorkbenchCandidate.ID,
     recipeID: Recipe.ID? = nil,
     title: String,
+    sourceName: String? = nil,
     annotation: String? = nil,
     sortOrder: Int,
     subtitle: String? = nil,
@@ -301,6 +302,7 @@ public struct WorkbenchCandidateChatContext: Equatable, Sendable {
     self.id = id
     self.recipeID = recipeID
     self.title = title
+    self.sourceName = sourceName
     self.annotation = annotation
     self.sortOrder = sortOrder
     self.subtitle = subtitle
@@ -321,6 +323,7 @@ public struct WorkbenchCandidateChatContext: Equatable, Sendable {
       id: row.candidate.id,
       recipeID: row.candidate.recipeID,
       title: row.displayTitle,
+      sourceName: row.recipeDetail?.source?.workbenchDisplayName,
       annotation: row.candidate.annotation,
       sortOrder: row.candidate.sortOrder,
       subtitle: recipeContext?.subtitle,
