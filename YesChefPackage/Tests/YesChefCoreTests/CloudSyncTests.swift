@@ -29,7 +29,7 @@ extension RecipeCoreTests {
       let modelTableNames = try mainDatabase.read { db in
         try schemaTableNames(in: db)
       }
-      let localOnlyTableNames = ["chatMessages", "recipeActiveVariations"]
+      let localOnlyTableNames = ["chatMessages", "chatThreads", "recipeActiveVariations"]
 
       expectNoDifference(
         actualTableNames,
