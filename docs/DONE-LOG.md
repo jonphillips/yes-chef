@@ -9,6 +9,57 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## 🎉 iCloud sync working end-to-end across two devices (M4 milestone confirmed)
+
+**Jon device-confirmed 2026-07-11:** recipes, images, menus, and the whole synced library round-trip
+**end-to-end across two physical devices** (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`). This is the M4
+iCloud-sync milestone ([`milestones/M4-icloud-sync.md`](milestones/M4-icloud-sync.md), ADR-0002/ADR-0010)
+**landing in practice** — the one-way gate everything preceded is crossed and holding. The earlier
+"missing content on iPhone" scare was diagnosed (ADR-0028) as a throttled bulk *initial* sync that simply
+needed to finish downloading, **not** data loss; once caught up, convergence is clean. We remain in the
+CloudKit **Development** environment by design (schema still evolving) — the production-schema promotion is
+the deliberately-held ops step in `CURRENT_HANDOFF.md`, not a blocker on dogfooding sync. Prior sync round-trip
+milestone: the extension-sync fix ([[extension-sync-construct-not-run]], PR #49).
+
+---
+## ADR-0028 — Sync status indicator accuracy (throttled-initial-sync honesty)
+
+**Accepted (scope corrected) 2026-07-10; fix on main, Jon device-passed via the two-device sync run above.**
+Implements [ADR-0028](decisions/ADR-0028-multi-foreign-key-sync-loss.md). The dogfood "missing content on
+iPhone" turned out to be **CloudKit rate-limiting a ~44k-row + 2.5k-asset first pull** (`CKError 7/2062`), not
+multi-FK content loss — the debug "Local record counts" sheet showed the child tables **climbing, not zero**,
+so the proposed schema/zone rebuild was **disproven and withdrawn** (holds [[sqlitedata-single-fk-sync-limit]]).
+Two real bugs fixed instead: **(1)** the "Up to date" indicator lied — it flipped green mid-download; `SyncHealth`
+gained an `isFetchingChanges` input + a `SyncDisplayStatus.downloading` case (gated after upload-pending) so the
+row stays "Downloading changes from iCloud" until the pull completes (lives in **CloudSyncKit**, shared with
+galavant; reducer-tested). **(2)** the demo-seed gate — deterministic `00000000-…` keys were polluting the zone.
+The debug count-row sheet stays (it caught the misdiagnosis). Accepted limitation: no public throttle/backoff
+signal exists (SQLiteData swallows the `CKError`), so the row can't say "paused by iCloud" and may briefly flash
+"Up to date" between throttled batches — recorded in the ADR.
+
+---
+## ADR-0029 — Main-thread DB writes + over-heavy list/grocery fetch (the UI-stall pass)
+
+**Accepted / Resolved 2026-07-11 — PRs [#148](https://github.com/jonphillips/yes-chef/pull/148) (S1) +
+[#149](https://github.com/jonphillips/yes-chef/pull/149) (S2/S4/S5b + the S5a→S6c diagnostics + the S7 fix,
+`ba9d7bd`). Jon device-confirmed.** Implements [ADR-0029](decisions/ADR-0029-main-thread-write-and-fetch-cost.md).
+The dogfood symptom — archive ≈ 1 s, variation switch janky, then measured at **5.6–6.8 s** — resisted four
+successive theories (writer convoy, image decode, COMMIT envelope, main-actor delivery), each retired by a
+timestamped capture. **Finding 8 (the real root cause):** `GroceryIngredientChoiceRequest`, an **always-on
+whole-library `@Fetch` re-running synchronously on the writer inside every affected commit** — so every quick
+mutation paid ~5 s of self-inflicted writer occupancy ([[sqlitedata-fetch-writer-convoy]]). **S7 fix:** remove
+the two always-on grocery `@Fetch`es from `GroceryLibraryModel`, add a **scoped** `YesChefCore` fetch (choices
+for an explicit `Set<Recipe.ID>`), and load them **on-demand at presentation time** via `database.read` (pool
+readers, never the writer) when the ingredient-selection sheet opens. Also shipped as correct hygiene: S1 async
+off-main writes for the six tap handlers, S2 thumbnails-only list fetch (no full-res BLOBs), S4 off-main
+downsampled+cached detail-photo decode, S5b. **Result: writer-api-return dropped from ~5000 ms to tens of ms on
+every mutation; no schema change, no sync change, no image change.** New invariant recorded in the ADR: *no
+always-on `@Fetch` may perform O(library) work or read full rows of tables with large inline BLOBs.* S3
+memoization + fetch-animation narrowing closed as unnecessary (render work measured sub-millisecond throughout).
+Residuals parked (not scoped): `RecipeListRequest` ×4 (post-S2 thumbnails-only, bounded — watch, don't rebuild).
+The S7 behavioral test (`GroceryIngredientChoiceTests.swift`) is authored but still untracked — Jon commits it.
+
+---
 ## ADR-0027 — "Capture to menu" harvest verb (S1)
 
 **Architect-reviewed & approved 2026-07-10 — yes-chef PR [#141](https://github.com/jonphillips/yes-chef/pull/141)
