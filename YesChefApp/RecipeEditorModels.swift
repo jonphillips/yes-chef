@@ -142,6 +142,12 @@ final class RecipeEditorModel {
         source: .user
       )
     )
+    draft.removesHeroPhoto = false
+  }
+
+  func heroPhotoRemoved() {
+    draft.pendingPhotos.removeAll { $0.kind == .hero }
+    draft.removesHeroPhoto = true
   }
 
   func heroPhotoSelectionFailed(_ error: any Error) {

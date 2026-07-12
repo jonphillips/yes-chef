@@ -34,6 +34,7 @@ public struct RecipeEditorDraft: Equatable, Sendable {
   public var originalSnapshot: Data?
   public var dateCreated: Date?
   public var pendingPhotos: [RecipeEditorPhotoDraft]
+  public var removesHeroPhoto: Bool
 
   public init(
     id: Recipe.ID? = nil,
@@ -68,7 +69,8 @@ public struct RecipeEditorDraft: Equatable, Sendable {
     selectedCategoryIDs: Set<Category.ID>? = nil,
     originalSnapshot: Data? = nil,
     dateCreated: Date? = nil,
-    pendingPhotos: [RecipeEditorPhotoDraft] = []
+    pendingPhotos: [RecipeEditorPhotoDraft] = [],
+    removesHeroPhoto: Bool = false
   ) {
     self.id = id
     self.title = title
@@ -103,6 +105,7 @@ public struct RecipeEditorDraft: Equatable, Sendable {
     self.originalSnapshot = originalSnapshot
     self.dateCreated = dateCreated
     self.pendingPhotos = pendingPhotos
+    self.removesHeroPhoto = removesHeroPhoto
   }
 
   public init(detail: RecipeDetailData) {
@@ -161,7 +164,8 @@ public struct RecipeEditorDraft: Equatable, Sendable {
       selectedCategoryIDs: Set(detail.categories.map(\.id)),
       originalSnapshot: detail.recipe.originalSnapshot,
       dateCreated: detail.recipe.dateCreated,
-      pendingPhotos: []
+      pendingPhotos: [],
+      removesHeroPhoto: false
     )
   }
 }

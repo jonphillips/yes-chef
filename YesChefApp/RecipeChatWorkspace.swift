@@ -293,7 +293,7 @@ struct RecipeChatPanel: View {
             Button {
               Task { await run(action) }
             } label: {
-              Label(action.title, systemImage: "text.badge.checkmark")
+              Label(action.title, systemImage: action.systemImage)
             }
             .disabled(!canRun(action))
           }
@@ -313,7 +313,7 @@ struct RecipeChatPanel: View {
         HStack(alignment: .bottom, spacing: 8) {
           TextField("Ask about this \(chatModel.context.subject)", text: $draft, axis: .vertical)
             .textFieldStyle(.roundedBorder)
-            .lineLimit(1...4)
+            .lineLimit(2...4)
             .onSubmit {
               Task { await sendDraft() }
             }
@@ -558,17 +558,7 @@ private struct ChatContextHeader: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      Label(
-        chatModel.sendsToProvider ? chatModel.selectedProvider.displayName : "On-device",
-        systemImage: chatModel.sendsToProvider ? "network" : "iphone"
-      )
-        .font(.caption.bold())
-        .foregroundStyle(.secondary)
-      Text(
-        chatModel.sendsToProvider
-          ? chatModel.context.providerContextWarning
-          : chatModel.context.seededContextDescription
-      )
+      Text(chatModel.context.seededContextDescription)
         .font(.footnote)
         .foregroundStyle(.secondary)
     }

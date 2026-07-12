@@ -40,11 +40,11 @@ struct CookSessionPresentation: Hashable, Identifiable {
 
 enum AppSection: String, CaseIterable, Identifiable {
   case recipes
-  case workbenches
-  case browser
-  case mealCalendar
   case groceries
+  case mealCalendar
   case menus
+  case browser
+  case workbenches
   case settings
 
   var id: Self { self }
@@ -56,11 +56,11 @@ enum AppSection: String, CaseIterable, Identifiable {
   var title: String {
     switch self {
     case .recipes: "Recipes"
-    case .workbenches: "Workbenches"
-    case .browser: "Browser"
-    case .mealCalendar: "Meal Calendar"
     case .groceries: "Groceries"
+    case .mealCalendar: "Calendar"
     case .menus: "Menus"
+    case .browser: "Browser"
+    case .workbenches: "Workbench"
     case .settings: "Settings"
     }
   }

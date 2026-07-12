@@ -24,10 +24,11 @@ extension RecipeRepository {
   static func mergedPhotos(
     _ existingPhotos: [RecipePhoto],
     pendingPhotos: [RecipeEditorPhotoDraft],
+    removesHeroPhoto: Bool = false,
     recipeID: Recipe.ID,
     now: Date
   ) -> [RecipePhoto] {
-    let replacesExistingHero = pendingPhotos.contains { $0.kind == .hero }
+    let replacesExistingHero = removesHeroPhoto || pendingPhotos.contains { $0.kind == .hero }
     let retainedPhotos = existingPhotos.filter { photo in
       !(replacesExistingHero && photo.kind == .hero)
     }

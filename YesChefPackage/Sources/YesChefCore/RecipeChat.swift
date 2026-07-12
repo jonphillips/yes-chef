@@ -670,6 +670,7 @@ public enum ChatApplyReviewPresentation: Sendable, Equatable {
 public struct AnyChatApplyAction: Identifiable {
   public var id: String { title }
   public var title: String
+  public var systemImage: String
   public var extractingTitle: String
   public var requiresSubject: Bool
   /// Shown instead of the generic "did not return anything to review" text when `run` yields no items.
@@ -685,9 +686,15 @@ public struct AnyChatApplyAction: Identifiable {
     requiresSubject: Bool = true,
     reviewPresentation: ChatApplyReviewPresentation = .sheet,
     emptyResultMessage: String? = nil,
+    systemImage: String = "checklist",
     renderedSummary: @escaping @MainActor (Payload) -> String?
   ) {
-    self.init(action, requiresSubject: requiresSubject, emptyResultMessage: emptyResultMessage) { payload in
+    self.init(
+      action,
+      requiresSubject: requiresSubject,
+      emptyResultMessage: emptyResultMessage,
+      systemImage: systemImage
+    ) { payload in
       guard
         let summary = renderedSummary(payload)?.trimmingCharacters(in: .whitespacesAndNewlines),
         !summary.isEmpty
@@ -713,10 +720,16 @@ public struct AnyChatApplyAction: Identifiable {
     _ action: ChatApplyAction<Payload>,
     requiresSubject: Bool = true,
     emptyResultMessage: String? = nil,
+    systemImage: String = "checklist",
     editableSummary: @escaping @MainActor (Payload) -> String?,
     commitEditedSummary: @escaping @MainActor (_ payload: Payload, _ editedSummary: String) async throws -> Void
   ) {
-    self.init(action, requiresSubject: requiresSubject, emptyResultMessage: emptyResultMessage) { payload in
+    self.init(
+      action,
+      requiresSubject: requiresSubject,
+      emptyResultMessage: emptyResultMessage,
+      systemImage: systemImage
+    ) { payload in
       guard
         let summary = editableSummary(payload)?.trimmingCharacters(in: .whitespacesAndNewlines),
         !summary.isEmpty
@@ -746,9 +759,11 @@ public struct AnyChatApplyAction: Identifiable {
     _ action: ChatApplyAction<Payload>,
     requiresSubject: Bool = true,
     emptyResultMessage: String? = nil,
+    systemImage: String = "checklist",
     reviewItems: @escaping @MainActor (Payload) -> [ChatApplyReviewItem]
   ) {
     self.title = action.title
+    self.systemImage = systemImage
     self.extractingTitle = action.extractingTitle
     self.requiresSubject = requiresSubject
     self.emptyResultMessage = emptyResultMessage

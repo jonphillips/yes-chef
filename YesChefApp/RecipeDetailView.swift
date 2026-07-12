@@ -64,13 +64,36 @@ struct RecipeDetailView: View {
           .tint(isFocusActive ? .accentColor : .primary)
           .accessibilityValue(Text(isFocusActive ? "Focused" : "Split view"))
         }
+      }
+      ToolbarItemGroup(placement: .primaryAction) {
         Button {
           libraryModel.editButtonTapped(recipeID: model.recipeID)
         } label: {
           Label("Edit", systemImage: "square.and.pencil")
         }
+        Button {
+          groceryModel.addRecipeButtonTapped(recipeID: model.recipeID)
+        } label: {
+          Label("Groceries", systemImage: "cart.badge.plus")
+        }
+        Button {
+          mealCalendarModel.addRecipeToPlanButtonTapped(recipeID: model.recipeID)
+        } label: {
+          Label("Plan", systemImage: "calendar.badge.plus")
+        }
+        Button {
+          chatButtonTapped()
+        } label: {
+          Label("Chat", systemImage: "sparkles")
+        }
+        .disabled(model.detail == nil)
+        Button {
+          model.openWorkbenchButtonTapped()
+        } label: {
+          Label("Workbench", systemImage: "hammer")
+        }
       }
-      ToolbarItemGroup(placement: .primaryAction) {
+      ToolbarItemGroup(placement: .secondaryAction) {
         if !model.ingredientLines.isEmpty {
           Button {
             model.scaleButtonTapped()
@@ -86,35 +109,10 @@ struct RecipeDetailView: View {
               .presentationCompactAdaptation(.popover)
           }
         }
-        Button {
-          chatButtonTapped()
+        Button(role: .destructive) {
+          libraryModel.deleteButtonTapped(recipeID: model.recipeID)
         } label: {
-          Label("Chat", systemImage: "sparkles")
-        }
-        .disabled(model.detail == nil)
-        Button {
-          mealCalendarModel.addRecipeToPlanButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("Plan", systemImage: "calendar.badge.plus")
-        }
-        Button {
-          groceryModel.addRecipeButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("Groceries", systemImage: "cart.badge.plus")
-        }
-        Menu {
-          Button {
-            model.openWorkbenchButtonTapped()
-          } label: {
-            Label("Open a Workbench", systemImage: "hammer")
-          }
-          Button(role: .destructive) {
-            libraryModel.deleteButtonTapped(recipeID: model.recipeID)
-          } label: {
-            Label("Archive", systemImage: "archivebox")
-          }
-        } label: {
-          Label("More", systemImage: "ellipsis.circle")
+          Label("Archive", systemImage: "archivebox")
         }
       }
     }
