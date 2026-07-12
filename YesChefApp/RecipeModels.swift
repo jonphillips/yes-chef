@@ -843,6 +843,7 @@ final class RecipeDetailModel {
     )
     #endif
     _workbenchCandidateLinks = Fetch(
+      wrappedValue: [],
       RecipeWorkbenchLinksRequest(recipeID: recipeID),
       animation: .default
     )
