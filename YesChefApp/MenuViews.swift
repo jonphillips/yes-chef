@@ -306,6 +306,7 @@ private struct MenuDetailReader: View {
         MenuPrepPlanSection(
           menu: detail.menu,
           itemRows: detail.itemRows,
+          onRecipeSelected: onRecipeSelected,
           clearPrepPlan: {
             model.clearPrepPlanButtonTapped(menuID: detailModel.menuID)
           },
@@ -336,15 +337,17 @@ private struct MenuDetailReader: View {
 private struct MenuPrepPlanSection: View {
   let menu: CoreMenu
   let itemRows: [MenuItemRowData]
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var clearPrepPlan: () -> Void
   var regeneratePrepPlan: () -> Void
+  @State private var expandedSessionIDs: Set<MenuPrepPlanSessionBand.ID> = []
 
   private var steps: [PrepPlanStep] {
     MenuPrepPlanCoding.decode(menu.prepPlan)
   }
 
-  private var dishTitlesByID: [MenuItem.ID: String] {
-    Dictionary(uniqueKeysWithValues: itemRows.map { ($0.id, $0.displayTitle) })
+  private var sessionBands: [MenuPrepPlanSessionBand] {
+    MenuPrepPlanSessionBand.grouping(steps)
   }
 
   var body: some View {
@@ -371,37 +374,195 @@ private struct MenuPrepPlanSection: View {
           .buttonStyle(.bordered)
         }
 
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
-            HStack(alignment: .top, spacing: 12) {
-              Image(systemName: "checklist")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-
-              VStack(alignment: .leading, spacing: 4) {
-                Text(step.when)
-                  .font(.headline)
-                Text(step.task)
-                if let sourceDish = step.sourceDish, let title = dishTitlesByID[sourceDish] {
-                  Label(title, systemImage: "fork.knife")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+          ForEach(sessionBands) { band in
+            MenuPrepPlanSessionBandView(
+              band: band,
+              itemRows: itemRows,
+              isExpanded: expandedSessionIDs.contains(band.id),
+              onToggle: {
+                if expandedSessionIDs.contains(band.id) {
+                  expandedSessionIDs.remove(band.id)
+                } else {
+                  expandedSessionIDs.insert(band.id)
                 }
-              }
-
-              Spacer(minLength: 8)
-            }
-            .padding(.vertical, 12)
-
-            if index < steps.count - 1 {
-              Divider()
-                .padding(.leading, 44)
-            }
+              },
+              onRecipeSelected: onRecipeSelected
+            )
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
+  }
+}
+
+private struct MenuPrepPlanSessionBand: Identifiable {
+  struct Step: Identifiable {
+    let id: String
+    let step: PrepPlanStep
+  }
+
+  let id: String
+  let session: String
+  let steps: [Step]
+
+  var stepCountTitle: String {
+    steps.count == 1 ? "1 step" : "\(steps.count) steps"
+  }
+
+  private var isFlexible: Bool {
+    let normalizedSession = session.lowercased()
+    return normalizedSession.contains("anytime")
+      || normalizedSession.contains("flexible")
+      || normalizedSession.contains("get ahead")
+  }
+
+  static func grouping(_ planSteps: [PrepPlanStep]) -> [MenuPrepPlanSessionBand] {
+    var unprioritizedBands: [(session: String, steps: [PrepPlanStep])] = []
+    for step in planSteps {
+      if let lastBandIndex = unprioritizedBands.indices.last,
+        unprioritizedBands[lastBandIndex].session == step.session
+      {
+        unprioritizedBands[lastBandIndex].steps.append(step)
+      } else {
+        unprioritizedBands.append((session: step.session, steps: [step]))
+      }
+    }
+
+    let bands = unprioritizedBands.enumerated().map { index, band in
+      MenuPrepPlanSessionBand(
+        id: "\(index):\(band.session)",
+        session: band.session,
+        steps: Self.displaySteps(for: band.steps, in: band.session)
+      )
+    }
+    return bands.filter(\.isFlexible) + bands.filter { !$0.isFlexible }
+  }
+
+  private static func displaySteps(for steps: [PrepPlanStep], in session: String) -> [Step] {
+    var occurrencesByContents: [String: Int] = [:]
+    return steps.map { step in
+      let contents = [
+        session,
+        step.task,
+        step.serves ?? "",
+        step.sourceDish?.uuidString ?? "",
+      ]
+      .joined(separator: "\u{1F}")
+      let occurrence = occurrencesByContents[contents, default: 0]
+      occurrencesByContents[contents] = occurrence + 1
+      return Step(id: "\(contents)\u{1E}\(occurrence)", step: step)
+    }
+  }
+}
+
+private struct MenuPrepPlanSessionBandView: View {
+  let band: MenuPrepPlanSessionBand
+  let itemRows: [MenuItemRowData]
+  let isExpanded: Bool
+  var onToggle: () -> Void
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Button(action: onToggle) {
+        HStack(spacing: 8) {
+          Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .frame(width: 12)
+
+          Text(band.session)
+            .font(.headline)
+
+          Spacer()
+
+          Text(band.stepCountTitle)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(isExpanded ? "Collapse \(band.session)" : "Expand \(band.session)")
+      .accessibilityValue(band.stepCountTitle)
+
+      if isExpanded {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(band.steps) { presentation in
+            MenuPrepPlanStepView(
+              step: presentation.step,
+              itemRows: itemRows,
+              onRecipeSelected: onRecipeSelected
+            )
+
+            if presentation.id != band.steps.last?.id {
+              Divider()
+                .padding(.leading, 44)
+            }
+          }
+        }
+      }
+    }
+    .padding(.vertical, 8)
+  }
+}
+
+private struct MenuPrepPlanStepView: View {
+  let step: PrepPlanStep
+  let itemRows: [MenuItemRowData]
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 12) {
+      Image(systemName: "checklist")
+        .font(.headline)
+        .foregroundStyle(.secondary)
+
+      VStack(alignment: .leading, spacing: 4) {
+        Text(step.task)
+        if let serves = step.serves {
+          servesLabel(serves)
+        }
+      }
+
+      Spacer(minLength: 8)
+    }
+    .padding(.vertical, 12)
+  }
+
+  @ViewBuilder
+  private func servesLabel(_ serves: String) -> some View {
+    if let recipePresentation {
+      Button {
+        onRecipeSelected?(recipePresentation)
+      } label: {
+        Label(serves, systemImage: "fork.knife")
+          .recipeChip()
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel("Open recipe for \(serves)")
+    } else if step.sourceDish == nil {
+      Text(serves)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    } else {
+      Label(serves, systemImage: "fork.knife")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .recipeChip()
+    }
+  }
+
+  private var recipePresentation: RecipeDetailPresentation? {
+    guard
+      let sourceDish = step.sourceDish,
+      let row = itemRows.first(where: { $0.id == sourceDish }),
+      let recipeID = row.recipe?.id,
+      onRecipeSelected != nil
+    else { return nil }
+    return RecipeDetailPresentation(recipeID: recipeID, scaleContext: .menuItem(row.id))
   }
 }
 

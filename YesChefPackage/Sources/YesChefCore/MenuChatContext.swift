@@ -157,7 +157,10 @@ public struct MenuChatContext: Equatable, Sendable {
     if !prepPlan.isEmpty {
       lines.append("Current prep plan:")
       for step in prepPlan {
-        lines.append("- \(step.when): \(step.task)")
+        lines.append("- \(step.session): \(step.task)")
+        if let serves = step.serves {
+          lines.append("  - Serves: \(serves)")
+        }
         if let sourceDish = step.sourceDish {
           lines.append("  - Source menu item ID: \(sourceDish.uuidString)")
         }

@@ -576,8 +576,7 @@ final class MenuDetailModel {
       AnyChatApplyAction(
         prepPlanAction,
         emptyResultMessage: """
-          No prep steps to build. The prep plan is assembled from each recipe's Make-Ahead notes — add \
-          Make-Ahead detail to the dishes, or ask in chat for a specific step to add.
+          No prep steps to save yet. Try asking for a work-session timeline for the menu's dishes.
           """,
         editableSummary: { plan in
           plan.editableReviewText().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
