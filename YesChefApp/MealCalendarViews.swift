@@ -922,14 +922,13 @@ private struct MealPlanSlotSection: View {
         ForEach(rows) { row in
           MealPlanItemRowView(
             row: row,
-            editAction: row.isFromMenu ? nil : {
-              model.editButtonTapped(itemID: row.item.id)
-            },
+            editAction: editAction(for: row),
             deleteAction: row.isFromMenu ? nil : {
               model.deleteButtonTapped(itemID: row.item.id)
             },
             sourceAction: sourceAction(for: row),
-            primaryAction: recipeAction(for: row)
+            calendarAction: editAction(for: row),
+            primaryAction: recipeAction(for: row) ?? editAction(for: row)
           )
           if row.id != rows.last?.id {
             Divider()
@@ -958,6 +957,13 @@ private struct MealPlanSlotSection: View {
     }
   }
 
+  private func editAction(for row: MealPlanItemRowData) -> (() -> Void)? {
+    guard !row.isFromMenu else { return nil }
+    return {
+      model.editButtonTapped(itemID: row.item.id)
+    }
+  }
+
   private func scaleContext(for row: MealPlanItemRowData) -> ScaleContext {
     if let menuItem = row.menuItem {
       return .menuItem(menuItem.id)
@@ -978,6 +984,7 @@ private struct MealPlanItemRowView: View {
   let editAction: (() -> Void)?
   let deleteAction: (() -> Void)?
   let sourceAction: (() -> Void)?
+  let calendarAction: (() -> Void)?
   let primaryAction: (() -> Void)?
 
   var body: some View {
@@ -1000,6 +1007,13 @@ private struct MealPlanItemRowView: View {
           }
         } label: {
           Label("Meal Actions", systemImage: "ellipsis.circle")
+            .labelStyle(.iconOnly)
+        }
+      }
+
+      if let calendarAction {
+        Button(action: calendarAction) {
+          Label("Edit Meal", systemImage: "calendar")
             .labelStyle(.iconOnly)
         }
       }
