@@ -14,7 +14,11 @@
 Status: **Proposed** — 2026-07-11. Low-hanging-fruit performance pass, spotted from a dogfood report
 (archive ≈ 1s; variation switching janky). **Amendment 2 (2026-07-11, below): S4 confirmed working on
 video, but tap→flip is still 5.6–6.8 s — measured as writer-queue wait, not rendering (Finding 5); S5a–S5c
-are the follow-on slices.** Binds **[ADR-0001](ADR-0001-persistence-sqlitedata.md)**
+are the follow-on slices. Amendment 3's later S5a measurement retired that convoy theory, and
+**Amendment 4 corrects its replacement theory: the measured “COMMIT” interval still includes synchronous
+observation work, so S6b attributes that envelope before any image-storage change. Amendment 5 records
+the result — SQLite and the fetch are fast — and scopes S6c at the main-actor delivery/render boundary.** Binds
+**[ADR-0001](ADR-0001-persistence-sqlitedata.md)**
 (SQLiteData) and **[ADR-0002](ADR-0002-cloudkit-sync-no-server.md)** (the shared `DatabaseWriter` that the
 `SyncEngine` also uses — the contention amplifier). Touches **[ADR-0021](ADR-0021-recipe-variations.md)** /
 **[ADR-0023](ADR-0023-recipe-edit-proposals.md)** (the variation resolve in S3). Holds
@@ -421,7 +425,8 @@ The three phases, measured:
   `PRAGMA wal_checkpoint` / WAL page count around the write, and rerun once with **sync verifiably idle**
   (settles OQ-A2-1). Acceptance: one repro that says "SQL = X ms, COMMIT = Y ms, WAL = Z pages, sync
   idle/active." Expect X ≈ 0, Y ≈ 5000.
-- **S6b (gated on S6a) — get full-res image bytes out of the commit's fsync path.** If S6a confirms the
+- **S6b (gated on S6a; superseded by Amendment 4) — get full-res image bytes out of the commit's fsync
+  path.** If S6a confirms the
   checkpoint/fsync-of-a-huge-file hypothesis, the durable fix is that `displayData` should not live inline
   in the main synced SQLite file: move image blobs to on-disk files (or a separate, un-checkpointed store)
   so a metadata commit never fsyncs gigabytes. This **touches sync** (the one-way gate — see
@@ -436,3 +441,369 @@ The three phases, measured:
 - **S5b stands and helped** (publish-gap = 0). S1/S2/S4 stand. Only S5c is retired.
 - **S6b, if pursued, is the first S-slice that changes where image bytes live** — hold it to the sync gate's
   bar, with a device round-trip, not a dogfood slice.
+
+---
+
+# Amendment 4 — the S6a “COMMIT” bucket still includes observation work; keep SQLiteData assets (S6b)
+
+> **One-line:** S6a split repository SQL from the interval after the write closure returns, but that second
+> interval is **not pure SQLite COMMIT time**: GRDB runs SQLiteData's non-constant `@Fetch` re-fetches
+> synchronously from `databaseDidCommit` before `database.write` returns. Therefore the 5.1 s result does
+> not yet prove checkpoint/fsync cost, and the 0 ms publish gap does not prove the re-fetch was cheap — it
+> is also what we expect when the re-fetch completed inside the measured “COMMIT” bucket. Keep recipe image
+> BLOBs on SQLiteData's supported BLOB→`CKAsset` path. Replace the old image-externalization S6b with a
+> narrow attribution slice that measures SQLite's actual `COMMIT` statement separately from the detail
+> observation it triggers. **No schema change, no sync change, no image-storage change.**
+
+Status: **Measured** — 2026-07-11. Supersedes Amendment 3's S6b and narrows Finding 6 from a conclusion
+(“the commit itself is expensive”) to a candidate mechanism. S1/S2/S4/S5b remain valid. **Amendment 5
+records the result: SQLite COMMIT and the detail request are both fast; the five seconds remain between
+off-main completion and resumption of the `@MainActor` task.**
+
+## Correction to Finding 6 — the timing boundary was named too strongly
+
+The S6a instrumentation records:
+
+1. `writer-wait`: handler entry → entry into the `database.write` closure;
+2. `sql`: closure entry → `setActiveVariation` returns;
+3. `commit`: closure return → `database.write` returns;
+4. `publish-gap`: `database.write` return → observed active variation matches the target.
+
+The first two names are accurate. The third is an **envelope**, not a pure SQLite phase. GRDB invokes
+transaction observers from `databaseDidCommit` before the write API returns. SQLiteData constructs every
+`@Fetch` with non-constant-region `ValueObservation.tracking`; for that tracking mode GRDB re-runs an
+affected request synchronously on the writer connection from the commit callback. That work therefore
+lands after our `sqlDone` timestamp but before `writeExit` — inside the interval S6a labels `commit`.
+
+This changes what the existing measurements establish:
+
+- **20 ms writer-wait** rules out a pre-existing convoy ahead of this tap. It does not rule out work that
+  this tap's own commit triggers.
+- **0 ms publish-gap** proves only that the new value was ready when `database.write` returned. It is
+  consistent with either a cheap re-fetch or a multi-second re-fetch performed synchronously inside the
+  return envelope.
+- **≈0 ms repository SQL** clears `setActiveVariation` and SQLiteData's row triggers, because those triggers
+  execute with the DELETE/INSERT before the closure returns.
+- **≈5.1 s closure-return envelope** currently combines SQLite's `COMMIT TRANSACTION`, GRDB commit-callback
+  work, affected observation re-fetches, and small wrapper overhead. It cannot choose among them.
+
+The four whole-library `RecipeListRequest` observations are not the favored explanation for a variation
+switch: that request does not read `recipeActiveVariations`, so the event should not intersect its observed
+region. `RecipeDetailRequest` does read that table and is affected. S5b removed `displayData` from its photo
+projection, but the request still performs many sequential queries and reads all `Tag`, `Category`, and
+`Equipment` rows before filtering in Swift. That may be cheap; S6b measures it rather than assuming either
+way.
+
+### WAL nuance
+
+The S6a `PRAGMA wal_checkpoint(NOOP)` probe is valid on the iOS 27 SQLite runtime: it reports WAL/log and
+checkpointed-page counts without performing a checkpoint. Keep it.
+
+However, “the database is multi-GB, therefore a small metadata commit fsyncs gigabytes” is too strong.
+A checkpoint copies applicable WAL frames back to their database pages; it does not rewrite every page in
+the main file merely because the file is large. Images can still be an indirect amplifier when recent image
+writes created a large checkpoint backlog — especially if readers prevented earlier checkpoints from
+finishing — but the main-file byte count alone does not establish that mechanism.
+
+## Image/iCloud decision — keep the current SQLiteData asset architecture
+
+SQLiteData 1.6.6 explicitly supports images as SQLite BLOBs: it turns every BLOB field into a `CKAsset` when
+materializing a CloudKit record and decodes a received asset back into the table. Its guidance is to place
+large BLOBs in a separate related table so ordinary queries do not load them. Yes Chef already has that
+shape: `RecipePhoto` owns the bytes separately from `Recipe`, and S2/S5b now select slim projections while
+the hero/full-screen path reads `displayData` on demand.
+
+The CloudKit bookkeeping installed on an unrelated metadata write enqueues record identities; it does not
+hash, copy, or upload every existing photo. BLOB hashing and temporary `CKAsset` file creation happen when
+the sync engine materializes the photo's CloudKit record.
+
+Do **not** move canonical image bytes to ordinary files or a second store in this effort:
+
+- an app-group file path is device-local and will not round-trip through SQLiteData/CloudKit;
+- iCloud Drive would introduce a second independent sync/conflict system with no atomic relationship to
+  the recipe rows;
+- a second SQLite database/`SyncEngine` would lose the real FK/share-tree relationship and cross-store
+  transactionality, and two engines targeting the same zone are not an established SQLiteData pattern;
+- custom CloudKit asset upload/download would violate ADR-0002's no-hand-rolled-sync decision.
+
+Splitting photo metadata and photo BLOBs into two tables **inside the same SQLite file** remains a possible
+query-shaping cleanup, but S2/S5b already avoid selecting the bytes and such a split would not remove image
+pages from the file or its WAL. It is not a fix for the mechanism currently under investigation.
+
+## Decision — S6b: attribute the closure-return envelope — **DONE 2026-07-11**
+
+### Goal
+
+Produce one device log in which the existing closure-return envelope reconciles into:
+
+1. SQLite's actual `COMMIT TRANSACTION` statement duration;
+2. the affected `RecipeDetailRequest.fetch` duration;
+3. any residual GRDB/observation/write-return overhead.
+
+This is the last diagnostic slice before choosing a structural fix. It makes no user-visible behavior,
+schema, migration, image-storage, or sync change.
+
+### Implementation scope
+
+1. **Profile the real SQLite COMMIT.** In the existing database `Configuration.prepareDatabase`, install a
+   DEBUG-only GRDB `.profile` trace. Inspect the unexpanded statement SQL and log only
+   `COMMIT TRANSACTION` events to `AppLog.performance`, including the profile duration and whether
+   `SyncEngine.isSynchronizing` is true. Do not log expanded SQL or bound values. The SQLite profile event
+   occurs for the statement itself; GRDB's `databaseDidCommit` observation callbacks run afterward.
+
+2. **Time the detail observation request.** Wrap `RecipeDetailRequest.fetch` with a `ContinuousClock`
+   interval and emit its total duration to `AppLog.performance`. Keep the repository queries and returned
+   value unchanged. This intentionally measures the entire composite request, not each SELECT — per-query
+   profiling would add noise and risks logging recipe content.
+
+3. **Retain the S6a envelope.** Keep writer-wait, repository-SQL, closure-return envelope, publish-gap,
+   WAL `NOOP`, and sync-state logging. Rename the logged `commit=` field to `write-return-envelope=` (and
+   the signpost event accordingly) so future captures cannot repeat Finding 6's category error. Historical
+   console captures remain interpretable through this amendment.
+
+4. **Make one correlation line.** After `database.write` returns, emit a single summary containing a
+   per-switch correlation token plus writer-wait, SQL, write-return envelope, WAL before/after, and sync
+   state. Give the SQLite-COMMIT and detail-fetch profile lines the same token only if it can be threaded
+   without global mutable state; otherwise their logger timestamps must make the association unambiguous.
+   Do not introduce a singleton or broad tracing service solely for correlation.
+
+5. **No optimization in this slice.** Do not rewrite `RecipeDetailRequest`, enable constant-region
+   observation, change checkpoint settings, null/copy image BLOBs, add a second store, or alter the
+   `SyncEngine` table list. S6b is evidence only.
+
+### Device pass
+
+Jon performs the real-device pass after the executor's build is green:
+
+1. switch base → variation → base once while sync reports idle;
+2. if sync can be observed actively fetching/sending without manufacturing data churn, repeat once active;
+3. capture the `performance` category lines from handler entry through publish.
+
+Do not force a checkpoint, disable sync, rewrite the live library, or create artificial CloudKit churn for
+this pass.
+
+### Acceptance
+
+The capture must unambiguously report, for at least the idle pair of switches:
+
+- writer-wait;
+- repository SQL;
+- write-return envelope;
+- SQLite `COMMIT TRANSACTION` profile duration;
+- `RecipeDetailRequest.fetch` duration;
+- publish-gap;
+- WAL log/checkpointed pages before and after;
+- sync running/sending/fetching state.
+
+The numbers must be sufficient to reconcile the multi-second envelope. Small scheduler/logging residuals
+are acceptable; a material unexplained residual is itself the result and blocks structural work until it is
+identified.
+
+Verification for the executor: focused instrumentation tests where practical, package tests via
+`scripts/check-drift.sh`, and one app build through `scripts/xcodebuild-summary.sh` because database
+bootstrap tracing is app-compile-risk. No simulator launch is required; Jon owns the device pass.
+
+## Decision gate after S6b
+
+- **Observation branch:** SQLite's profiled COMMIT is fast while `RecipeDetailRequest.fetch` or the residual
+  owns the delay. Design S6c around the measured owner — first choices are a constant-region SQLiteData
+  capability/upstream ask or a narrower detail request. Do not touch image storage.
+- **SQLite/WAL branch:** the profiled COMMIT itself owns the seconds, including with sync idle, and WAL
+  state supports a checkpoint hypothesis. Before changing production storage, make the next slice a
+  sync-disabled diagnostic copy of the real database and compare the same write with photo BLOBs present
+  versus nulled in the copy. Only a decisive A/B result earns an image-storage ADR.
+- **Mixed/ambiguous branch:** return to the ADR with the capture. Do not let the executor choose a
+  structural fix from partial evidence.
+
+## Consequences
+
+- The current BLOB→`CKAsset` round-trip remains the canonical image persistence/sync path.
+- Amendment 3's “commit itself is expensive” and image-externalization direction are hypotheses, not
+  settled findings.
+- S6b is intentionally small and reversible: instrumentation only, no migration or CloudKit production
+  schema consequence.
+- The next performance slice is chosen from measured ownership of the latency, not from database size.
+
+---
+
+# Amendment 5 — S6b clears SQLite and fetch; the delay is at the main-actor delivery boundary (S6c)
+
+> **One-line:** S6b's real-device capture reports **writer-wait = 62.1 ms, repository SQL = 0.1 ms,
+> SQLite COMMIT = below the logger's 1 µs display resolution, `RecipeDetailRequest.fetch` = 2.85 ms,
+> write-return envelope = 5097.7 ms, sync idle**. Roughly **5095 ms remains after the database work**.
+> `writeExit` is recorded only after `await database.write` resumes inside the model's `@MainActor` task,
+> so the old envelope includes delivery of the observed value to the main queue, SwiftUI invalidation/render
+> work scheduled ahead of the continuation, and the continuation's wait to reacquire the main actor. The
+> database, WAL/checkpoint, CloudKit triggers, detail query, and image storage are cleared for this symptom.
+> **S6c** measures the actor hop, runs one fetch-animation A/B, and counts variation derivation work before
+> choosing a fix. **No schema, sync, image, query, or production behavior change.**
+
+Status: **Measured / S6c proposed** — 2026-07-11. Closes Amendment 4's S6b decision gate on a new branch:
+neither the SQLite/WAL branch nor the writer-side observation-fetch branch owns the latency. Supersedes the
+remaining performance conclusion in Amendment 3. S1/S2/S4/S5b remain correct; S3 (memoizing variation
+resolution) returns as a measured candidate, not yet as the chosen fix.
+
+## S6b result
+
+Device capture, variation switch with the engine running but idle:
+
+| Phase | Measured | Interpretation |
+|---|---:|---|
+| writer-wait | 62.1 ms | No multi-second work queued ahead of the tap |
+| repository SQL | 0.1 ms | Variation SELECT/DELETE/INSERT and SQLiteData row triggers are cheap |
+| SQLite `COMMIT TRANSACTION` | 0.000000 s | Below log resolution; not the five seconds |
+| `RecipeDetailRequest.fetch` | 0.002845375 s | Composite detail observation fetch is cheap |
+| write-return envelope | 5097.7 ms | Contains the unresolved main-actor delivery/resumption interval |
+| publish-gap | 37.9 ms | Small, but includes the post-write WAL probe and logging; not a pure phase |
+| sync | idle | `isRunning=true`, `isSending=false`, `isFetching=false` |
+
+The screenshot contains several adjacent SQLite COMMIT profile lines and all are below display resolution,
+which reinforces that neither the variation transaction nor nearby SQLiteData bookkeeping commits are
+expensive.
+
+Both WAL `NOOP` probes failed with `SQLITE_LOCKED` (“database table is locked”). They provide no WAL state
+for this run, but that no longer blocks the decision: the profiled SQLite COMMIT itself is fast. Remove the
+WAL probes in S6c rather than spending another slice making them work.
+
+## Finding 7 — the “write-return envelope” crosses back onto the main actor
+
+`activeVariationSelectionChanged` is a method on the `@MainActor` `RecipeDetailModel`. Its unstructured
+`Task` inherits that isolation. `database.write` executes the transaction away from the main actor, but the
+timestamp called `writeExit` is taken only after the `await` continuation resumes on the main actor. The
+5097.7 ms envelope therefore does **not** mean that `database.write` itself took 5.1 seconds to return on its
+executor.
+
+The favored sequence is now:
+
+1. the writer executes SQL and commits immediately;
+2. the affected detail observation fetches in ~2.85 ms;
+3. SQLiteData's animated fetch scheduler dispatches delivery to the main queue inside `withAnimation`;
+4. observation mutation and/or the resulting SwiftUI update/variation derivation occupies or stays ahead
+   of the model task's continuation;
+5. the continuation finally resumes and records `writeExit` about 5.1 seconds later.
+
+Step 3 is confirmed by SQLiteData 1.6.6's implementation: `@Fetch(..., animation: .default)` uses an
+`AnimatedScheduler` whose `schedule` dispatches to the main queue and invokes the delivery action inside
+`withAnimation(animation)`. Steps 4–5 are the favored inference, not yet a measurement. S6c separates them.
+
+### Why S3 returns as a candidate
+
+`RecipeDetailModel.displayDetail` calls `resolved(applying:)`. Several computed display properties call
+`displayDetail` independently during a body pass, and ingredient display additionally calls
+`variationIngredientHighlights`, which decodes the payload and resolves the recipe again. A broad animated
+detail publication can therefore repeat the same pure derivation across view evaluation and animation
+frames. The earlier ADR correctly identified this duplication but deprioritized it without measuring its
+cumulative render-time cost. S6c measures count plus cumulative time before authorizing memoization.
+
+## Decision — S6c: attribute main-actor delivery and render work
+
+### Goal
+
+Split the remaining ~5.1 seconds into:
+
+1. writer/API completion away from the main actor;
+2. wait to resume the model task on the main actor;
+3. variation resolve/highlight work performed while the detail update renders;
+4. the effect of applying `.default` animation to the entire `RecipeDetailRequest` publication.
+
+S6c is an A/B diagnostic slice. It does not ship a speculative performance fix.
+
+### Implementation scope
+
+1. **Timestamp write return off-main.** Extract the variation write into a small explicitly `@concurrent`
+   async helper that accepts only the already-captured Sendable inputs, awaits `database.write`, and records
+   `writerAPIReturn` immediately after it returns. The `@MainActor` model awaits that helper and records
+   `mainActorResume` as its first statement after the await. Log:
+   - last SQL statement → writer API return;
+   - writer API return → main-actor resume.
+
+   Use structured `async`/`await`; do **not** use `Task.detached`, an unchecked-Sendable box, a singleton,
+   GCD, or a semaphore. Swift 6.2 plain `nonisolated async` stays on the caller's actor, so `nonisolated`
+   alone is insufficient — the helper must explicitly opt into concurrent execution.
+
+2. **Add a DEBUG fetch-animation switch.** Keep production behavior as the default. In
+   `RecipeDetailModel.init`, choose the detail fetch animation from a DEBUG-only launch argument such as
+   `-YesChefDisableDetailFetchAnimation`: absent → `.default`; present → `nil`. This preserves SQLiteData
+   observation and main-queue delivery in both runs while isolating the broad `withAnimation` transaction.
+   Do not remove observation or replace `@Fetch` with a manual read.
+
+3. **Measure variation derivation without changing it.** Add DEBUG-only timing to
+   `RecipeDetailData.resolved(applying:)` and `variationIngredientHighlights(for:)`. Log one line per call
+   with operation name and duration; the existing variation-switch signpost window supplies the count and
+   cumulative duration. Do not add a cache, change return values, or introduce shared mutable counters in
+   this slice.
+
+4. **Mark when SwiftUI observes the new selection.** Add a DEBUG-only marker at the narrowest existing
+   recipe-detail view boundary that can observe `detail?.activeVariationID` changing (using the modern
+   `onChange(of:) { }` form). Log the new selection and timestamp only; do not mutate model state or create
+   a second source of truth. This marker distinguishes “value delivered to the view” from “model write task
+   resumed.”
+
+5. **Retain the useful probes, remove the dead ones.** Keep writer-wait, repository SQL, SQLite COMMIT,
+   detail-fetch, and the variation-switch signpost. Remove both WAL `NOOP` reads and their support types;
+   they fail under the live connection topology, contaminate `publish-gap`, and no longer answer the active
+   question. Redefine `publish-gap` from writer API return to the view-delivery marker, or retire the name if
+   that value cannot be correlated honestly.
+
+6. **No optimization or persistence work.** Do not implement S3 memoization, permanently remove fetch
+   animation, restructure the detail view, change `RecipeDetailRequest`, change checkpoint configuration,
+   alter images, or touch CloudKit/`SyncEngine` behavior.
+
+### Device pass
+
+Jon performs two otherwise identical base → variation → base runs on the same recipe with sync idle:
+
+1. normal launch, detail fetch animation `.default`;
+2. launch with `-YesChefDisableDetailFetchAnimation`, detail fetch animation `nil`.
+
+Capture the `performance` log from variation handler entry until the visible flip completes. No sync-active
+run is required: S6b reproduced the full delay while sync was idle.
+
+### Acceptance
+
+For both switches in both runs, the log must unambiguously report:
+
+- writer-wait and repository SQL;
+- SQLite COMMIT and detail-fetch duration;
+- last-statement → writer-API-return;
+- writer-API-return → main-actor-resume;
+- view-delivery marker;
+- count and cumulative duration of `resolved(applying:)`;
+- count and cumulative duration of `variationIngredientHighlights(for:)`;
+- whether detail fetch animation was `.default` or `nil`.
+
+The A/B must be sufficient to explain the five-second interval or select the next diagnostic. A material
+unexplained gap remains a valid result; the executor returns it rather than choosing a fix.
+
+Verification for the executor: focused tests for unchanged resolve/highlight output and for the DEBUG
+animation selection seam where practical; `scripts/check-drift.sh`; one app build through
+`scripts/xcodebuild-summary.sh` because the slice changes concurrency isolation and SwiftUI initialization.
+No simulator launch is required; Jon owns the device pass.
+
+## Decision gate after S6c
+
+- **Broad-animation branch:** the `nil` run removes most of the actor-resume/visible delay. Permanently
+  remove fetch-level animation in the next fix slice and, if desired, add a narrow content transition owned
+  by the specific detail subview. Database observation should publish state; it should not animate the
+  entire composite detail tree by default.
+- **Variation-derivation branch:** resolve/highlight calls own a material share cumulatively. Implement S3
+  as originally conceived: one cached resolved detail and highlight map per `(detail identity,
+  activeVariationID)`, invalidated when either changes, with behavioral tests.
+- **Neither branch:** the main-actor-resume gap remains large, but the A/B and derivations are cheap. Record
+  one real-device SwiftUI Instruments trace over the existing `variationSwitch` signpost and use main-thread
+  running coverage plus SwiftUI cause-graph fan-in to identify the blocking view/update source. Do not add
+  more timestamp probes blindly.
+- **Mixed branch:** if both broad animation and repeated derivation contribute materially, bundle the two
+  small fixes only if the measurements show they share the same render path and neither changes behavior;
+  otherwise fix the dominant owner first and remeasure.
+
+## Consequences
+
+- The current SQLiteData observation, CloudKit sync, and BLOB→`CKAsset` image design remain unchanged and
+  cleared for this symptom.
+- S6c uses `@concurrent` deliberately so its off-main timestamp is meaningful under Swift 6.2 actor
+  semantics; it does not introduce detached work or a new service layer.
+- The fetch-animation A/B is DEBUG-only and reversible. Production behavior remains unchanged until a
+  device result selects a fix.
+- The next implementation slice is either a narrow animation-scope fix, S3 memoization, or a trace-driven
+  SwiftUI fix — never an image-storage migration for this bug.
