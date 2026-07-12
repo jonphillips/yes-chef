@@ -1003,7 +1003,6 @@ private struct MealPlanItemRowView: View {
             .labelStyle(.iconOnly)
         }
       }
-
     }
     .padding(12)
   }
