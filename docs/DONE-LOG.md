@@ -9,6 +9,50 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## Meal-planner (Calendar) row affordance swap
+
+**Architect-reviewed 2026-07-12 — yes-chef PR [#154](https://github.com/jonphillips/yes-chef/pull/154)
+(branch `codex/meal-planner-affordances`).** Closes the effort in
+[`efforts/meal-planner-affordances.md`](efforts/meal-planner-affordances.md) (Jon's 2026-07-11 dogfood batch,
+effort #1). Reworks the meal-calendar row so a **row tap opens the recipe reader** (recipe rows) and the
+**Edit-Meal sheet moves off the row tap** onto a dedicated right-hand affordance; note rows (no reader) tap
+straight to Edit-Meal. App-layer only (`MealCalendarViews.swift`), no schema. Package tests + `git diff --check`
+passed; app build blocked on an unavailable CoreSimulator service (per lean-verification policy, no retry — Jon's
+device pass). **Miscommunication caught and resolved:** the brief named an "existing target/grocery row icon" to
+sit beside the new calendar icon, but no such control exists in the code — Codex's first pass papered over the gap
+and left **Edit-Meal reachable via three redundant controls** (row tap, the Meal-Actions ellipsis "Edit", and the
+new calendar button). The architect review flagged the multiple edit paths; that surfaced the miscommunication,
+Jon and Codex re-aligned on the intended single affordance model, and the effort was confirmed good. Parked
+follow-ons still live in the effort doc: **drag-and-drop retest on Beta 3** and **cell images**.
+
+---
+## Workbench dogfood polish (Jon's 2026-07-11 two-device pass)
+
+**Architect-approved 2026-07-11 — rides in the slice commit; app build + device pass are Jon's.** Effort
+[`efforts/workbench-dogfood-polish.md`](efforts/workbench-dogfood-polish.md), all six slices shipped in the
+working tree: candidate rows show thumbnail + source; draft rationale renders candidates by **title/source not
+object ID** (chat context + synthesis prompt both hardened); the apply/review sheet is **scrollable**;
+**archive-all-candidates** archives the candidate recipes *out of the library* + clears them from the workbench
+(Jon-confirmed intent: the workbench distills the one true recipe and removes the noise; menu/meal-plan cascade
+accepted); **pick a candidate photo** for the working recipe (copies BLOBs to a new hero + sets cover, validated
+to a candidate → sync-safe); and **"Drafted From" provenance links** on the promoted recipe (degrade to title
+snapshot on delete/archive). App-layer + two core files; package builds + 4 new tests pass. **Device note:**
+archive-all deletes the candidate rows, so the "Drafted From" links clear with them — transient provenance by
+design (a persistent-provenance variant is a separable follow-up if wanted).
+
+---
+## Chrome & navigation polish (Jon's 2026-07-11 two-device pass)
+
+**Architect-approved 2026-07-11 — rides in the slice commit; app build + device pass are Jon's.** Effort
+[`efforts/dogfood-fixes-2026-07-11-chrome.md`](efforts/dogfood-fixes-2026-07-11-chrome.md), all five slices
+shipped in the working tree: side-menu order/naming (Recipes · Groceries · Calendar · Menus · Browser · Workbench
+· Settings); AI-widget cleanup (dropped the on-/off-device disclaimer + static provider label + de-mangled a11y
+hint, chat input two lines); recipe-detail toolbar reorder (Edit · Grocery · Add Meal · AI toggle · Workbench);
+delete-a-recipe-image-without-replacing (new `removesHeroPhoto` draft flag, cover clears, sync-safe); and the AI
+apply-action relabel + per-verb SF Symbols (Save to Notes / Suggest Dishes / Chef It Up / Create Prep Plan /
+Revise Recipe, suffixes dropped). App-layer, no schema. Package builds + 29 touched tests pass.
+
+---
 ## 🎉 iCloud sync working end-to-end across two devices (M4 milestone confirmed)
 
 **Jon device-confirmed 2026-07-11:** recipes, images, menus, and the whole synced library round-trip
@@ -103,9 +147,51 @@ captured rows are always `.note` with no `recipeID` ([[menu-item-recipe-id-invar
 - **Verification.** `swift test` (package) green — 278 tests; app + test targets compile clean
   (`build-for-testing`, generic iOS Simulator destination) so the wiring change and new tests build;
   `scripts/check-drift.sh` green. A device-bound build (iPad Pro 13-inch M5) could not run in this environment
-  — no iOS 27 simulator present — consistent with the lean-verification stance. **Device pass owed (Jon):**
-  selection path (highlight survives the apply-menu tap), transcript path (N notes), and Day 1/Dinner
-  placement, on `iPad Pro 13-inch (M5)` (both orientations) + `iPhone 17 Pro`.
+  — no iOS 27 simulator present — consistent with the lean-verification stance. **Device pass complete
+  (Jon, 2026-07-12):** selection path (highlight survives the apply-menu tap), transcript path (N notes), and
+  Day 1/Dinner placement all confirmed on `iPad Pro 13-inch (M5)` + `iPhone 17 Pro`.
+
+## ADR-0027 S2 — "Capture to notes" (the recipe sibling of the menu harvest verb)
+
+**Merged to main — yes-chef PR [#147](https://github.com/jonphillips/yes-chef/pull/147) (branch `adr27s2`);
+architect-confirmed in code + Jon device-passed 2026-07-12.** Implements
+[ADR-0027](decisions/ADR-0027-harvest-chat-into-notes.md) D6/S2 — the recipe instance of the same harvest verb,
+the sibling ADR-0027 S1 deferred until its shape proved out. Adds a **"Capture to notes"** extraction verb to the
+recipe chat catalog (`RecipeDetailModel+Enrichment.swift`): captures a chat selection (or, absent one, the
+assistant transcript) into one or more `RecipeNote`s on the recipe, reusing the same `MenuNoteHarvestPlan` /
+`HarvestedNote` payload and client as the menu verb. Wired `requiresSubject: false` so the no-selection
+transcript-scan branch stays live in production ([[harvest-verb-requires-subject-false]]); list commit shape, one
+review item per note through the ADR-0026 collection sheet. Commits via the shared
+`RecipeRepository.appendRecipeNote` primitive (`YesChefCore/RecipeCapturedNote.swift`) writing a `.general`
+`RecipeNote` — the canonical recipe body is never touched. Schema-free / sync-safe (`.general` is an existing
+`RecipeNoteType`). Package tests green; app build + device pass are Jon's (now done).
+
+## ADR-0027 Amendment 1 — the tap-to-target "deposit" verbs (S1 recipe-append · S2 note-revise)
+
+**Merged to main — yes-chef PR [#146](https://github.com/jonphillips/yes-chef/pull/146) (branch `adr27s1`) +
+the Amd-1 S2 commit `4df9fc2`; architect-confirmed in code + Jon device-passed 2026-07-12.** Implements
+[ADR-0027 Amendment 1](decisions/ADR-0027-harvest-chat-into-notes.md#amendment-1--deposit-chat-intelligence-onto-the-item-you-point-at-recipe-append--note-revise)
+— write chat *intelligence* (a Compare verdict, a "here's how I'd change this" riff) onto the **existing menu
+item you point at**, adaptively by canonical-ness:
+
+- **A5 — tap-to-target binding (the one genuinely new UI piece).** `MenuModels` gains a device-local, unsynced
+  `depositTargetItemID` + a "Deposit target" toggle row in `MenuDetailSections.swift` (target icon, a11y label,
+  tinted highlight); tapping the active target clears it. The deposit verbs only appear when a target is set.
+- **A2 — recipe target → append (S1, "Add to recipe notes").** `depositToRecipeActions` reshapes the
+  intelligence into one note and appends it via `RecipeRepository.appendRecipeNote` with the **`.adaptation`**
+  note type (a new, additive `RecipeNoteType` case — sync-safe, no migration); the recipe body is never
+  rewritten (protect the canonical recipe).
+- **A3 — note target → revise via a compose surface (S2, "Revise this note").** `reviseNoteActions` runs the
+  `MenuDepositClient` revise mode (weaves intelligence into the note's current body) and surfaces the woven draft
+  as the editable review text **beside the "Original note" as supporting evidence** (OQ-Amd-2 resolved: neither
+  pure replace nor merge — a compose surface, the original stays salvageable), committing over `menuItems.notes`.
+  `requiresSubject: false`.
+
+Payload `DepositNotePlan { note: DepositedNote { text } }` + `MenuDepositClient` (extract + revise modes) in
+`YesChefCore/DepositNote.swift`; `DepositNoteTests` cover it. **No queue / no auto-Workbench / no graduation**
+(A4 — the recorded reversal): a deposit touches **only** the item pointed at. Schema-free; both writes are
+additive/in-place on already-synced tables. **Still deferred by the ADR (separate future efforts, not Amd-1
+follow-through):** OQ4 taste preference and A6/D5 promote-a-note → real recipe.
 
 ## Logging for Frontier LLM Interaction
 
@@ -185,12 +271,34 @@ ingestion effort (Amendment 2026-07-09). Additive schema only — sync-safe.
   note:** the additive `aiSettings.readerFeedbackPreference` column joins the held prod-schema checklist in
   `CURRENT_HANDOFF.md`.
 
+**ADR-0025 effort arc (full lineage, all merged to main):** D1/D2 harvest + curation **scaffolding**
+([#129](https://github.com/jonphillips/yes-chef/pull/129)), the **curation revision**
+([#131](https://github.com/jonphillips/yes-chef/pull/131)) with its same-day companion **"Quick fixes"**
+([#132](https://github.com/jonphillips/yes-chef/pull/132) — the bulk was `ReaderFeedbackCuration` +
+`RecipeCaptureView` curation work, not the "meal-planner build fix" the earlier one-liner implied; carries
+`ReaderFeedbackCurationTests`), and **D6/D7 + S6** ([#134], this entry) — NYT "Most Helpful" harvest →
+LLM-curate distinct tips → reviewable `RecipeNote(.readerFeedback)` + curation-prompt preference + read-only
+chat-context feed. Additive enum + `aiSettings` column, no new table; sync-safe. Effort closed.
+
+---
+
+## Menu-planner dogfood 2026-07-09 — quick-fixes bundle
+
+**Merged to main 2026-07-09 — yes-chef PR [#136](https://github.com/jonphillips/yes-chef/pull/136).** The
+one-PR, no-schema quick-fixes bundle from the 2026-07-09 menu-planner dogfood pass (brief
+[`efforts/dogfood-fixes-menu-planner-2026-07-09.md`](efforts/dogfood-fixes-menu-planner-2026-07-09.md)): the
+**chat selection-clear bug + a clear affordance**, the **complement note-body** write (ADR-0012 Amendment 2 —
+complement suggestions land their body onto the `.note` `MenuItem`), the **prep-plan "explain better"** revision
+(compose from the stored Make-Ahead strategy, just describe it more legibly — [[menu-planner-dogfood-2026-07-09]]),
+and **variation rename**. App-layer, no schema; nothing left.
+
 ---
 
 ## ADR-0024 Slice 2 — list / structured verbs get editable review
 
-**Architect-reviewed & approved 2026-07-09 — yes-chef branch `codex/adr-0024-s2-editable-list-verbs`
-(built on device by Jon; core round-trip + fidelity carry unit tests).** S2 of
+**Architect-reviewed & approved 2026-07-09 — yes-chef PR [#128](https://github.com/jonphillips/yes-chef/pull/128)
+(branch `codex/adr-0024-s2-editable-list-verbs`; built on device by Jon; core round-trip + fidelity carry unit
+tests).** S2 of
 [ADR-0024](decisions/ADR-0024-editable-proposal-preview.md) (Accepted 2026-07-09). **Schema-free, app-wide.**
 Completes the ADR: every list / structured verb the S1 sheet showed read-only is now **editable while keeping
 its commit shape intact** (D4) — no list flattened into an opaque string ([[chat-verb-commit-shapes]],

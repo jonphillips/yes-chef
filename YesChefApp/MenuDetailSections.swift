@@ -211,10 +211,7 @@ private struct MenuDishRowView: View {
 
   private var rowContent: some View {
     HStack(alignment: .top, spacing: 12) {
-      Image(systemName: row.item.kind.systemImage)
-        .font(.title3)
-        .foregroundStyle(.secondary)
-        .frame(width: 32, height: 32)
+      dishImage
 
       VStack(alignment: .leading, spacing: 5) {
         Button {
@@ -288,6 +285,19 @@ private struct MenuDishRowView: View {
       )
     } else {
       model.editItemButtonTapped(menu: menu, row: row)
+    }
+  }
+
+  @ViewBuilder private var dishImage: some View {
+    if row.item.kind == .recipe {
+      RecipeThumbnail(data: row.thumbnailData)
+        .frame(width: 32, height: 32)
+        .accessibilityHidden(true)
+    } else {
+      Image(systemName: row.item.kind.systemImage)
+        .font(.title3)
+        .foregroundStyle(.secondary)
+        .frame(width: 32, height: 32)
     }
   }
 }
