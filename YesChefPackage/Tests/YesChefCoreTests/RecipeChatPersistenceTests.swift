@@ -2,6 +2,7 @@ import CustomDump
 import Dependencies
 import Foundation
 import LLMClientKit
+import Synchronization
 import Testing
 import YesChefCore
 
@@ -24,6 +25,145 @@ extension RecipeCoreTests {
 
   @Suite
   struct RecipeChatPersistenceTests {
+    @Test
+    @MainActor
+    func consecutiveOpenAITurnsThreadAndPersistResponseID() async {
+      let recipeID = SampleUUIDSequence.uuid(710)
+      let requests = Mutex<[ModelRequest]>([])
+      let responseCount = Mutex(0)
+      let keyStore = chatAPIKeyStore()
+      keyStore.setKey("sk-openai-test", for: .openai)
+
+      await withDependencies {
+        $0.apiKeyStore = keyStore
+        $0.date.now = Date(timeIntervalSinceReferenceDate: 820_500_000)
+        $0.uuid = .incrementing
+        $0.modelClient = StubModelClient { request in
+          requests.withLock { $0.append(request) }
+          let index = responseCount.withLock { count in
+            count += 1
+            return count
+          }
+          return ModelResponse(
+            text: "Answer \(index)",
+            continuationToken: ModelContinuationToken(
+              provider: .openai,
+              value: "resp_\(index)"
+            )
+          )
+        }
+      } operation: {
+        let model = RecipeChatModel(
+          context: .recipe(RecipeChatRecipeContext(recipeID: recipeID, title: "Tomato Sauce"))
+        )
+        model.selectedProvider = .openai
+        model.useFrontier = true
+
+        await model.send("First question")
+        await model.send("Follow up")
+
+        let captured = requests.withLock { $0 }
+        #expect(captured.count == 2)
+        #expect(captured[0].continuationToken == nil)
+        expectNoDifference(
+          captured[1].continuationToken,
+          ModelContinuationToken(provider: .openai, value: "resp_1")
+        )
+        #expect(captured[1].messages.count == 3)
+
+        let reloaded = RecipeChatModel(
+          context: .recipe(RecipeChatRecipeContext(recipeID: recipeID, title: "Tomato Sauce"))
+        )
+        expectNoDifference(
+          reloaded.continuationToken,
+          ModelContinuationToken(provider: .openai, value: "resp_2")
+        )
+      }
+    }
+
+    @Test
+    @MainActor
+    func providerSwitchInvalidatesOpenAIResponseIDAndSendsFullContext() async {
+      let recipeID = SampleUUIDSequence.uuid(711)
+      let requests = Mutex<[ModelRequest]>([])
+      let responseCount = Mutex(0)
+      let keyStore = chatAPIKeyStore()
+      keyStore.setKey("sk-openai-test", for: .openai)
+      keyStore.setKey("sk-anthropic-test", for: .anthropic)
+
+      await withDependencies {
+        $0.apiKeyStore = keyStore
+        $0.date.now = Date(timeIntervalSinceReferenceDate: 820_600_000)
+        $0.uuid = .incrementing
+        $0.modelClient = StubModelClient { request in
+          requests.withLock { $0.append(request) }
+          let index = responseCount.withLock { count in
+            count += 1
+            return count
+          }
+          return ModelResponse(
+            text: "Answer \(index)",
+            continuationToken: request.tier == .frontier(.openai)
+              ? ModelContinuationToken(provider: .openai, value: "resp_\(index)")
+              : nil
+          )
+        }
+      } operation: {
+        let model = RecipeChatModel(
+          context: .recipe(RecipeChatRecipeContext(recipeID: recipeID, title: "Tomato Sauce"))
+        )
+        model.selectedProvider = .openai
+        model.useFrontier = true
+        await model.send("First question")
+
+        model.selectedProvider = .anthropic
+        await model.send("Different provider")
+
+        let second = requests.withLock { $0[1] }
+        #expect(second.continuationToken == nil)
+        #expect(second.messages.count == 3)
+      }
+    }
+
+    @Test
+    @MainActor
+    func tierDegradationInvalidatesOpenAIResponseIDAndSendsFullContext() async {
+      let recipeID = SampleUUIDSequence.uuid(712)
+      let requests = Mutex<[ModelRequest]>([])
+      let keyStore = chatAPIKeyStore()
+      keyStore.setKey("sk-openai-test", for: .openai)
+
+      await withDependencies {
+        $0.apiKeyStore = keyStore
+        $0.date.now = Date(timeIntervalSinceReferenceDate: 820_700_000)
+        $0.uuid = .incrementing
+        $0.modelClient = StubModelClient { request in
+          requests.withLock { $0.append(request) }
+          return ModelResponse(
+            text: "Answer",
+            continuationToken: request.tier == .frontier(.openai)
+              ? ModelContinuationToken(provider: .openai, value: "resp_1")
+              : nil
+          )
+        }
+      } operation: {
+        let model = RecipeChatModel(
+          context: .recipe(RecipeChatRecipeContext(recipeID: recipeID, title: "Tomato Sauce"))
+        )
+        model.selectedProvider = .openai
+        model.useFrontier = true
+        await model.send("First question")
+
+        keyStore.setKey(nil, for: .openai)
+        await model.send("No key now")
+
+        let second = requests.withLock { $0[1] }
+        #expect(second.tier == .onDevice)
+        #expect(second.continuationToken == nil)
+        #expect(second.messages.count == 3)
+      }
+    }
+
     @Test
     @MainActor
     func recipeChatPersistsAcrossModelsForSameRecipeSubject() async {
@@ -176,4 +316,12 @@ private struct MessageSnapshot: Equatable {
   init(message: RecipeChatMessage) {
     self.init(role: message.role, text: message.text)
   }
+}
+
+private func chatAPIKeyStore() -> APIKeyStore {
+  let storage = Mutex<[FrontierProvider: String]>([:])
+  return APIKeyStore(
+    read: { provider in storage.withLock { $0[provider] } },
+    write: { provider, key in storage.withLock { $0[provider] = key } }
+  )
 }

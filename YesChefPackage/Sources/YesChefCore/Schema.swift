@@ -798,6 +798,20 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Add local chat response continuity") { db in
+      try #sql("""
+        CREATE TABLE "chatThreads" (
+          "subjectKind" TEXT NOT NULL,
+          "subjectID" TEXT NOT NULL,
+          "continuationProvider" TEXT NOT NULL,
+          "responseID" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL,
+          PRIMARY KEY ("subjectKind", "subjectID")
+        ) STRICT
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

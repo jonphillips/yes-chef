@@ -787,6 +787,8 @@ public enum RecipeChatErrorText {
       "The model returned an error (\(status))." + (message.map { " \($0)" } ?? "")
     case ModelClientError.malformedResponse:
       "The model returned a response the app could not read."
+    case let ModelClientError.provider(message):
+      "The model stopped before finishing." + (message.map { " \($0)" } ?? "")
     case let urlError as URLError where urlError.code == .timedOut:
       "The request timed out — the model took too long to respond. Try again in a moment."
     case let urlError as URLError
@@ -813,15 +815,18 @@ public final class RecipeChatModel: Identifiable {
   public var useFrontier = false {
     didSet {
       tierPreference.set(useFrontier)
+      if !useFrontier { continuationToken = nil }
     }
   }
   public var selectedProvider: FrontierProvider = .anthropic {
     didSet {
       providerPreference.set(selectedProvider)
+      if continuationToken?.provider != selectedProvider { continuationToken = nil }
     }
   }
   public private(set) var isResponding = false
   public private(set) var errorText: String?
+  public private(set) var continuationToken: ModelContinuationToken?
 
   @ObservationIgnored @Dependency(\.modelClient) private var modelClient
   @ObservationIgnored @Dependency(\.apiKeyStore) private var apiKeyStore
@@ -892,6 +897,7 @@ public final class RecipeChatModel: Identifiable {
     guard !isResponding else { return }
     messages.removeAll()
     errorText = nil
+    continuationToken = nil
     persistCurrentThread()
   }
 
@@ -906,19 +912,25 @@ public final class RecipeChatModel: Identifiable {
     }
 
     let requestMessages = history()
+    let tier = activeTier
+    if continuationToken?.provider != tier.frontierProvider {
+      continuationToken = nil
+    }
     let assistantID = appendAssistantPlaceholder()
     do {
-      if case .frontier = activeTier {
+      if case .frontier = tier {
         let response = try await modelClient.complete(
           ModelRequest(
-            tier: activeTier,
+            tier: tier,
             system: systemPrompt(),
             messages: requestMessages,
             maxTokens: 2048,
-            reasoningEffort: .medium
+            reasoningEffort: .medium,
+            continuationToken: continuationToken
           )
         )
         try Task.checkCancellation()
+        continuationToken = response.continuationToken
         setAssistantText(
           id: assistantID,
           text: response.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -926,7 +938,7 @@ public final class RecipeChatModel: Identifiable {
         )
       } else {
         let request = ModelRequest(
-          tier: activeTier,
+          tier: tier,
           system: systemPrompt(),
           messages: requestMessages,
           maxTokens: 1024,
@@ -1016,10 +1028,12 @@ public final class RecipeChatModel: Identifiable {
   private func loadPersistedThread() {
     guard let subject = context.persistenceSubject else { return }
     do {
-      messages = try database.write { db in
+      let thread = try database.write { db in
         try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: now), in: db)
-        return try RecipeChatStore.fetchMessages(for: subject, in: db)
+        return try RecipeChatStore.fetchThread(for: subject, in: db)
       }
+      messages = thread.messages
+      continuationToken = thread.continuationToken
     } catch {
       errorText = "Could not load the saved chat for this \(context.subject)."
     }
@@ -1029,7 +1043,12 @@ public final class RecipeChatModel: Identifiable {
     guard let subject = context.persistenceSubject else { return }
     do {
       try database.write { db in
-        try RecipeChatStore.replaceMessages(messages, for: subject, in: db, now: now)
+        try RecipeChatStore.replaceThread(
+          RecipeChatThread(messages: messages, continuationToken: continuationToken),
+          for: subject,
+          in: db,
+          now: now
+        )
       }
     } catch {
       if errorText == nil {
@@ -1048,5 +1067,12 @@ public final class RecipeChatModel: Identifiable {
 
   private func defaultUseFrontier() -> Bool {
     frontierAvailable && tierPreference.current() == true
+  }
+}
+
+private extension ModelTier {
+  var frontierProvider: FrontierProvider? {
+    if case let .frontier(provider) = self { return provider }
+    return nil
   }
 }

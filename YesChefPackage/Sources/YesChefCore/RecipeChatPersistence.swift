@@ -1,5 +1,29 @@
 import Foundation
+import LLMClientKit
 import SQLiteData
+
+@Table("chatThreads")
+public struct ChatThreadRecord: Codable, Equatable, Sendable {
+  public var subjectKind: ChatSubjectKind
+  public var subjectID: String
+  public var continuationProvider: String
+  public var responseID: String
+  public var dateModified: Date
+
+  public init(
+    subjectKind: ChatSubjectKind,
+    subjectID: String,
+    continuationProvider: String,
+    responseID: String,
+    dateModified: Date
+  ) {
+    self.subjectKind = subjectKind
+    self.subjectID = subjectID
+    self.continuationProvider = continuationProvider
+    self.responseID = responseID
+    self.dateModified = dateModified
+  }
+}
 
 public struct RecipeChatSubject: Equatable, Hashable, Sendable {
   public var kind: ChatSubjectKind
@@ -82,8 +106,37 @@ public enum RecipeChatStore {
     }
   }
 
+  public static func fetchThread(
+    for subject: RecipeChatSubject,
+    in db: Database
+  ) throws -> RecipeChatThread {
+    let record = try threadRecord(for: subject, in: db)
+    return RecipeChatThread(
+      messages: try fetchMessages(for: subject, in: db),
+      continuationToken: record.flatMap { record in
+        FrontierProvider(rawValue: record.continuationProvider).map {
+          ModelContinuationToken(provider: $0, value: record.responseID)
+        }
+      }
+    )
+  }
+
   public static func replaceMessages(
     _ messages: [RecipeChatMessage],
+    for subject: RecipeChatSubject,
+    in db: Database,
+    now: Date
+  ) throws {
+    try replaceThread(
+      RecipeChatThread(messages: messages),
+      for: subject,
+      in: db,
+      now: now
+    )
+  }
+
+  public static func replaceThread(
+    _ thread: RecipeChatThread,
     for subject: RecipeChatSubject,
     in db: Database,
     now: Date
@@ -96,7 +149,7 @@ public enum RecipeChatStore {
       try ChatMessageRecord.find(row.id).delete().execute(db)
     }
 
-    for (index, message) in messages.enumerated() {
+    for (index, message) in thread.messages.enumerated() {
       let text = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !text.isEmpty else { continue }
       try ChatMessageRecord.insert {
@@ -112,12 +165,32 @@ public enum RecipeChatStore {
       }
       .execute(db)
     }
+
+    try deleteThreadRecord(for: subject, in: db)
+    if let continuationToken = thread.continuationToken {
+      try ChatThreadRecord.insert {
+        ChatThreadRecord(
+          subjectKind: subject.kind,
+          subjectID: subject.id,
+          continuationProvider: continuationToken.provider.rawValue,
+          responseID: continuationToken.value,
+          dateModified: now
+        )
+      }
+      .execute(db)
+    }
   }
 
   public static func pruneMessages(olderThan cutoff: Date, in db: Database) throws {
     let expiredRows = try ChatMessageRecord.fetchAll(db).filter { $0.createdAt < cutoff }
     for row in expiredRows {
       try ChatMessageRecord.find(row.id).delete().execute(db)
+    }
+    for thread in try ChatThreadRecord.fetchAll(db).filter({ $0.dateModified < cutoff }) {
+      try deleteThreadRecord(
+        for: RecipeChatSubject(kind: thread.subjectKind, id: thread.subjectID),
+        in: db
+      )
     }
   }
 
@@ -127,5 +200,42 @@ public enum RecipeChatStore {
       .where { $0.subjectID.eq(subject.id) }
       .order { $0.sortOrder }
       .fetchAll(db)
+  }
+
+  private static func threadRecord(
+    for subject: RecipeChatSubject,
+    in db: Database
+  ) throws -> ChatThreadRecord? {
+    try ChatThreadRecord
+      .where { $0.subjectKind.eq(subject.kind) }
+      .where { $0.subjectID.eq(subject.id) }
+      .fetchOne(db)
+  }
+
+  private static func deleteThreadRecord(
+    for subject: RecipeChatSubject,
+    in db: Database
+  ) throws {
+    try #sql(
+      """
+      DELETE FROM "chatThreads"
+      WHERE "subjectKind" = \(bind: subject.kind)
+        AND "subjectID" = \(bind: subject.id)
+      """
+    )
+    .execute(db)
+  }
+}
+
+public struct RecipeChatThread: Equatable, Sendable {
+  public var messages: [RecipeChatMessage]
+  public var continuationToken: ModelContinuationToken?
+
+  public init(
+    messages: [RecipeChatMessage] = [],
+    continuationToken: ModelContinuationToken? = nil
+  ) {
+    self.messages = messages
+    self.continuationToken = continuationToken
   }
 }
