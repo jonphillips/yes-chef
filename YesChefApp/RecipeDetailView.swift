@@ -241,7 +241,7 @@ private struct RecipeReaderView: View {
                   .padding()
                   .frame(maxWidth: .infinity, alignment: .topLeading)
               }
-              .frame(maxWidth: .infinity)
+              .frame(width: proxy.size.width / 3)
 
               Divider()
 
@@ -360,10 +360,6 @@ private struct RecipeReaderView: View {
 
       if let source = model.detail?.source {
         SourceMetadataView(source: source)
-      }
-
-      if !model.workbenchCandidateLinks.isEmpty {
-        WorkbenchCandidateLinksView(links: model.workbenchCandidateLinks, onRecipeSelected: onRecipeSelected)
       }
 
       if let tags = model.detail?.tags, !tags.isEmpty {
@@ -524,6 +520,9 @@ private struct RecipeReaderView: View {
       }
       if let chefItUp = model.chefItUp {
         chefItUpSection(chefItUp)
+      }
+      if !model.workbenchCandidateLinks.isEmpty {
+        WorkbenchCandidateLinksView(links: model.workbenchCandidateLinks, onRecipeSelected: onRecipeSelected)
       }
     }
   }
