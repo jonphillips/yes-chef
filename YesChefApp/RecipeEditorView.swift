@@ -96,13 +96,6 @@ struct RecipeEditorView: View {
           model.ingredientTextChanged()
         }
 
-        if isIngredientTextFocused {
-          IngredientFractionPillRow { fraction in
-            model.ingredientFractionTapped(fraction)
-            isIngredientTextFocused = true
-          }
-        }
-
         ForEach($model.draft.ingredientLineDrafts) { $line in
           IngredientLineStructureEditor(line: $line)
         }
@@ -122,6 +115,19 @@ struct RecipeEditorView: View {
           text: $model.draft.noteText,
           minHeight: 120
         )
+      }
+    }
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      if isIngredientTextFocused {
+        IngredientFractionPillRow { fraction in
+          model.ingredientFractionTapped(fraction)
+          isIngredientTextFocused = true
+        }
+        .padding(.horizontal)
+        .background(.bar)
+        .overlay(alignment: .top) {
+          Divider()
+        }
       }
     }
     .navigationTitle(model.recipeID == nil ? "New Recipe" : "Edit Recipe")
