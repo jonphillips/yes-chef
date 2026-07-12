@@ -214,6 +214,11 @@ struct WorkbenchDetailView: View {
         WorkbenchCandidatePickerView(model: model)
       }
     }
+    .sheet(isPresented: $model.destination.candidatePhotoPicker) {
+      NavigationStack {
+        WorkbenchCandidatePhotoPickerView(model: model)
+      }
+    }
     .sheet(item: $model.destination.chat) { chatModel in
       NavigationStack {
         RecipeChatPanel(
@@ -231,6 +236,18 @@ struct WorkbenchDetailView: View {
       Button("OK") {}
     } message: {
       Text(model.errorMessage ?? "")
+    }
+    .confirmationDialog(
+      "Archive all candidates?",
+      isPresented: $model.destination.archiveCandidates,
+      titleVisibility: .visible
+    ) {
+      Button("Archive All", role: .destructive) {
+        model.confirmArchiveAllCandidatesButtonTapped()
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("This archives the candidate recipes and removes them from this workbench.")
     }
     .confirmationDialog(
       model.workingRecipeIsPromoted ? "Remove Working Recipe?" : "Delete Working Recipe?",
@@ -368,7 +385,9 @@ private struct WorkbenchReader: View {
             },
             remove: {
               model.removeWorkingRecipeButtonTapped()
-            }
+            },
+            choosePhoto: model.candidatePhotoPickerButtonTapped,
+            canChoosePhoto: !model.candidatePhotoChoices.isEmpty
           )
         } else {
           ContentUnavailableView("No Working Recipe", systemImage: "doc.badge.plus")
@@ -431,6 +450,13 @@ private struct WorkbenchReader: View {
         HStack {
           Text("Candidates")
           Spacer()
+          if !detail.candidateRows.isEmpty {
+            Button {
+              model.archiveAllCandidatesButtonTapped()
+            } label: {
+              Label("Archive All", systemImage: "archivebox")
+            }
+          }
           Button {
             Task {
               await compareButtonTapped()
@@ -492,6 +518,8 @@ private struct WorkingRecipeRow: View {
   let open: () -> Void
   let promote: () -> Void
   let remove: () -> Void
+  let choosePhoto: () -> Void
+  let canChoosePhoto: Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -509,6 +537,14 @@ private struct WorkingRecipeRow: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
+      }
+      if canChoosePhoto {
+        Button {
+          choosePhoto()
+        } label: {
+          Label("Choose Candidate Photo", systemImage: "photo.badge.checkmark")
+        }
+        .buttonStyle(.bordered)
       }
       HStack {
         Button {
@@ -602,8 +638,28 @@ private struct WorkbenchCandidateRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Text(row.displayTitle)
-        .font(.headline)
+      HStack(alignment: .top, spacing: 12) {
+        if let photo = candidatePhoto {
+          RecipePhotoImage(
+            photoID: photo.id,
+            checksum: photo.checksum,
+            variant: .thumbnail,
+            thumbnailData: photo.thumbnailData
+          )
+          .frame(width: 72, height: 72)
+          .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+          .clipShape(RoundedRectangle(cornerRadius: 8))
+          .accessibilityLabel(Text("Photo for \(row.displayTitle)"))
+        }
+        VStack(alignment: .leading, spacing: 5) {
+          Text(row.displayTitle)
+            .font(.headline)
+          Label(sourceDisplayName, systemImage: "book")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        Spacer(minLength: 0)
+      }
       if let recipe = row.recipeDetail?.recipe {
         HStack(spacing: 10) {
           if let totalTimeMinutes = recipe.totalTimeMinutes {
@@ -641,6 +697,18 @@ private struct WorkbenchCandidateRow: View {
     .onChange(of: row.candidate.annotation) { _, value in
       annotation = value ?? ""
     }
+  }
+
+  private var candidatePhoto: RecipeDetailPhoto? {
+    guard let detail = row.recipeDetail else { return nil }
+    return RecipePhotoCover.coverPhoto(
+      coverPhotoID: detail.recipe.coverPhotoID,
+      from: detail.photos.filter(\.isDisplayable)
+    )
+  }
+
+  private var sourceDisplayName: String {
+    row.recipeDetail?.source?.workbenchDisplayName ?? "No source recorded"
   }
 }
 
@@ -694,6 +762,48 @@ private struct WorkbenchCandidatePickerView: View {
     guard !query.isEmpty else { return model.availableRecipeRows }
     return model.availableRecipeRows.filter { row in
       RecipeSearchMatcher.matches(query: query, in: row.recipe.title, row.recipe.subtitle)
+    }
+  }
+}
+
+private struct WorkbenchCandidatePhotoPickerView: View {
+  @Environment(\.dismiss) private var dismiss
+  let model: WorkbenchDetailModel
+
+  var body: some View {
+    List(model.candidatePhotoChoices) { choice in
+      Button {
+        model.selectCandidatePhotoButtonTapped(photoID: choice.photo.id)
+      } label: {
+        HStack(spacing: 12) {
+          RecipePhotoImage(
+            photoID: choice.photo.id,
+            checksum: choice.photo.checksum,
+            variant: .thumbnail,
+            thumbnailData: choice.photo.thumbnailData
+          )
+          .frame(width: 72, height: 72)
+          .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+          .clipShape(RoundedRectangle(cornerRadius: 8))
+          VStack(alignment: .leading, spacing: 4) {
+            Text(choice.candidateTitle)
+              .font(.headline)
+            Text("Use this candidate photo")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+          Spacer(minLength: 0)
+        }
+      }
+      .buttonStyle(.plain)
+    }
+    .navigationTitle("Choose Candidate Photo")
+    .toolbar {
+      ToolbarItem(placement: .cancellationAction) {
+        Button("Cancel") {
+          dismiss()
+        }
+      }
     }
   }
 }

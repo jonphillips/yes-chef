@@ -923,52 +923,52 @@ struct ChatApplyReviewSheet: View {
 
   var body: some View {
     NavigationStack {
-      VStack(alignment: .leading, spacing: 12) {
-        if item.editableText == nil {
-          ScrollView {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 12) {
+          if item.editableText == nil {
             Text(item.summary)
               .font(.body)
               .textSelection(.enabled)
               .frame(maxWidth: .infinity, alignment: .leading)
-          }
-        } else {
-          VStack(alignment: .leading, spacing: 6) {
-            Text(item.editableTitle)
-              .font(.caption.weight(.semibold))
-              .foregroundStyle(.secondary)
-            TextEditor(text: $draftText)
-              .textInputAutocapitalization(.sentences)
-              .autocorrectionDisabled(false)
-              .frame(maxWidth: .infinity, maxHeight: .infinity)
-          }
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+          } else {
+            VStack(alignment: .leading, spacing: 6) {
+              Text(item.editableTitle)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+              TextEditor(text: $draftText)
+                .textInputAutocapitalization(.sentences)
+                .autocorrectionDisabled(false)
+                .frame(height: ChatApplyReviewLayout.minimumEditableTextHeight)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-          if item.editableText != item.summary {
-            DisclosureGroup("Full proposal") {
-              ScrollView {
+            if item.editableText != item.summary {
+              DisclosureGroup("Full proposal") {
                 Text(item.summary)
                   .font(.callout)
                   .textSelection(.enabled)
                   .frame(maxWidth: .infinity, alignment: .leading)
               }
             }
-          }
 
-          if !item.supportingEvidenceRows.isEmpty {
-            DisclosureGroup(item.supportingEvidenceTitle ?? "Supporting Evidence") {
-              VStack(alignment: .leading, spacing: 10) {
-                ForEach(Array(item.supportingEvidenceRows.enumerated()), id: \.offset) { _, row in
-                  Text(row)
-                    .font(.callout)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            if !item.supportingEvidenceRows.isEmpty {
+              DisclosureGroup(item.supportingEvidenceTitle ?? "Supporting Evidence") {
+                VStack(alignment: .leading, spacing: 10) {
+                  ForEach(Array(item.supportingEvidenceRows.enumerated()), id: \.offset) { _, row in
+                    Text(row)
+                      .font(.callout)
+                      .textSelection(.enabled)
+                      .frame(maxWidth: .infinity, alignment: .leading)
+                  }
                 }
               }
             }
           }
         }
+        .padding()
       }
-      .padding()
+      .safeAreaPadding(.bottom)
+      .scrollDismissesKeyboard(.interactively)
       .navigationTitle(item.title)
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
@@ -1028,6 +1028,12 @@ struct ChatApplyReviewSheet: View {
       dismiss()
     }
   }
+}
+
+private enum ChatApplyReviewLayout {
+  // Gives the editable review a useful starting viewport while the outer ScrollView keeps
+  // long draft proposals reachable on compact sheets.
+  static let minimumEditableTextHeight: CGFloat = 320
 }
 
 private struct ChatErrorBanner: View {

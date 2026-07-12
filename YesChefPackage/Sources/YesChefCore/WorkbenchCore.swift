@@ -180,6 +180,34 @@ public struct WorkbenchCandidateRowData: Identifiable, Equatable, Sendable {
   }
 }
 
+public struct WorkbenchCandidateLink: Identifiable, Equatable, Sendable {
+  public let id: WorkbenchCandidate.ID
+  public let recipeID: Recipe.ID?
+  public let title: String
+  public let sourceName: String?
+
+  public init(
+    id: WorkbenchCandidate.ID,
+    recipeID: Recipe.ID?,
+    title: String,
+    sourceName: String? = nil
+  ) {
+    self.id = id
+    self.recipeID = recipeID
+    self.title = title
+    self.sourceName = sourceName
+  }
+}
+
+public extension RecipeSource {
+  var workbenchDisplayName: String? {
+    name?.nonEmptyWorkbenchText
+      ?? publicationName?.nonEmptyWorkbenchText
+      ?? bookTitle?.nonEmptyWorkbenchText
+      ?? url?.nonEmptyWorkbenchText
+  }
+}
+
 public struct WorkbenchListRequest: FetchKeyRequest {
   public init() {}
 
@@ -224,6 +252,18 @@ public struct WorkbenchDetailRequest: FetchKeyRequest {
 
     return WorkbenchDetailData(workbench: workbench, candidateRows: candidateRows, logEntries: logEntries)
       .withDraftRecipeDetail(try workbench.draftRecipeID.flatMap { try RecipeRepository.fetchDetail(recipeID: $0, in: db) })
+  }
+}
+
+public struct RecipeWorkbenchLinksRequest: FetchKeyRequest {
+  public var recipeID: Recipe.ID
+
+  public init(recipeID: Recipe.ID) {
+    self.recipeID = recipeID
+  }
+
+  public func fetch(_ db: Database) throws -> [WorkbenchCandidateLink] {
+    try WorkbenchRepository.candidateLinks(forRecipeID: recipeID, in: db)
   }
 }
 
@@ -554,6 +594,8 @@ public enum WorkbenchRepositoryError: Error, Equatable, Sendable {
   case draftRecipeAlreadyExists(Recipe.ID)
   case missingDraftRecipe(Workbench.ID)
   case draftRecipeNotFound(Recipe.ID)
+  case photoNotFound(RecipePhoto.ID)
+  case photoNotFromCandidate(RecipePhoto.ID)
 }
 
 private extension WorkbenchDetailData {

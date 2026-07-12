@@ -58,7 +58,8 @@ struct AppContainer: View {
         recipeModel: recipeModel,
         mealCalendarModel: mealCalendarModel,
         groceryModel: groceryModel,
-        toastCenter: toastCenter
+        toastCenter: toastCenter,
+        onRecipeSelected: { presentedRecipe = $0 }
       )
     }
     .fullScreenCover(item: $presentedCookSession) { presentation in
@@ -300,6 +301,7 @@ private struct RecipeFullScreenCover: View {
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
   let toastCenter: AppToastCenter
+  let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   var body: some View {
     NavigationStack {
@@ -308,7 +310,8 @@ private struct RecipeFullScreenCover: View {
         scaleContext: presentation.scaleContext,
         libraryModel: recipeModel,
         mealCalendarModel: mealCalendarModel,
-        groceryModel: groceryModel
+        groceryModel: groceryModel,
+        onRecipeSelected: onRecipeSelected
       )
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
