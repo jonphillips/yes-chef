@@ -151,6 +151,13 @@ the reference-fetch case.
   the response id; the request threads a prior id with `store: true`; **mandatory full-context fallback**
   when the id is absent/mismatched/degraded; ZDR capability gate. Persist the id in the ADR-0015 thread
   record. New tests: id threaded on consecutive OpenAI turns, fallback on degrade/provider-switch.
+  - **Carried from S1a review ([jon-platform#31](https://github.com/jonphillips/jon-platform/pull/31)):** surface
+    streaming `response.failed` as an error instead of a clean finish. S1a maps `response.failed` /
+    `response.incomplete` to `.stop` and `OpenAIModelClient.stream` finishes the continuation, so a
+    mid-stream provider failure ends the stream with partial/empty text and no thrown error (the parsed
+    reason is discarded). Fold this into S1b's error handling — throw a `ModelClientError` on
+    `response.failed` — since S1b already introduces the stream-failure/degrade seam. New test: a
+    `response.failed` SSE terminal event throws rather than yielding a silent finish.
 - **Later (parked) — neutral web-access capability.** Generalize `webSearchMaxUses` → a backend-agnostic
   `webAccess` knob now that OpenAI can host it, if/when a feature wants native provider search (note:
   ADR-0032 deliberately does **not**).
