@@ -119,6 +119,20 @@ count on the right, tap to open one. This is the reconciliation of the two modes
   `applyingEditableReviewText`), an imported plan can seed the document; the weave verb (D3) can then sort
   it into sessions / add `serves` tags on a later pass.
 
+**Amendment 1 (2026-07-12) — the exported context is the _frontier_ view, with full method.** Dogfooding
+D5 surfaced that "Copy dish context" reused `MenuChatContext.serialized()` at the **on-device 12k-char
+budget** (~3k tokens), whose degradation ladder trims key ingredients to zero, truncates make-ahead notes,
+and finally **drops whole dishes** — so on a real menu the pasted plan referenced dishes the external LLM
+never saw. And recipe **method steps were never in the context at all**, starving the LLM of the
+prep-ahead signal that lives in the method ("chill overnight", "salt the day before"). Since the entire
+point of the escape hatch is to spend _their_ tokens, and a full menu with method is only ~2–18k tokens
+(well under the 120k-char frontier budget), the copy-out now serializes at **`serialized(for: .frontier)`**
+and the serialization carries **full recipe method** (fetched via `InstructionStep`, section-then-step
+order, `InstructionSection.name` as a sub-header when a recipe has >1 section). Method is a **new trim rung
+cut _first_** in `budgetedSerialization`, so the _shared_ on-device chat path is essentially unchanged
+(method drops immediately under 12k) while the frontier export keeps everything. Export-only enrichment;
+the on-device weave verb (D3) is untouched. → slice **S3c**.
+
 ## Deferred (on the record, explicitly not built here)
 
 - **Calendar real-date anchoring.** Pin a menu to actual dates → resolve free-form session labels
@@ -158,7 +172,13 @@ prompt loosening, the band grouping, the tappable tag, and the two clipboard aff
   as a chip; tappable → navigate to `sourceDish`'s recipe when present, plain text when null. This is the
   display that makes S1 legible; bundle S1+S2 as one dispatch (the author-and-read pass).
 - **S3 — clipboard (follow-up dispatch).** "Copy dish context" out + free-text paste-in. Small,
-  independent; rides after S1+S2.
+  independent; rides after S1+S2. **Shipped** in [#164](https://github.com/jonphillips/yes-chef/pull/164)
+  (also folded in the parse-robustness `session`←`when` fallback).
+- **S3c — enrich the exported context (Amendment 1, follow-up dispatch).** Copy-out serializes at the
+  frontier budget and the serialization gains a full-method block with a method-first trim rung. Core
+  plumbing (`MenuDetailRequest` fetch of `InstructionStep`/`InstructionSection`, new `recipeMethodLines` on
+  `MenuItemRowData`, `method` on `MenuChatItemContext`, per-dish `Method:` render + trim rung in
+  `budgetedSerialization`) + one app-layer line (`.serialized(for: .frontier)`). Follows S3.
 
 Follow the [[batch-slices-and-lean-handoff]] default: S1+S2 is one Codex dispatch; S3 follows. Build brief
 to live at `efforts/adr-0034-prep-plan-work-session-timeline.md` when dispatched.
