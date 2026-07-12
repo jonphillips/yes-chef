@@ -64,7 +64,7 @@ extension RecipeCoreTests {
       var committedPlan: ServeWithPlan?
       var reparsedPlan: ServeWithPlan?
       let action = ChatApplyAction<ServeWithPlan>(
-        title: "Serve With -> Serve With section",
+        title: "Suggest Dishes",
         extractingTitle: "Finding accompaniments...",
         reviewTitle: "Review Serve With",
         commitTitle: "Add to Serve With",

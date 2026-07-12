@@ -164,25 +164,37 @@ private struct RecipeHeroPhotoPickerRow: View {
         RecipeHeroPhotoPreview(data: data)
       }
 
-      PhotosPicker(selection: $selectedItem, matching: .images) {
-        Label(hasPhoto ? "Change Photo" : "Add Photo", systemImage: "photo.badge.plus")
-      }
-      .onChange(of: selectedItem) { _, item in
-        guard let item else { return }
-        Task {
-          do {
-            guard let data = try await item.loadTransferable(type: Data.self) else {
-              selectedItem = nil
-              return
+      HStack(alignment: .firstTextBaseline, spacing: 12) {
+        PhotosPicker(selection: $selectedItem, matching: .images) {
+          Label(hasPhoto ? "Change Photo" : "Add Photo", systemImage: "photo.badge.plus")
+        }
+        .buttonStyle(.bordered)
+        .onChange(of: selectedItem) { _, item in
+          guard let item else { return }
+          Task {
+            do {
+              guard let data = try await item.loadTransferable(type: Data.self) else {
+                selectedItem = nil
+                return
+              }
+              await model.heroPhotoSelected(
+                sourceData: data,
+                sourcePath: sourcePath(for: item)
+              )
+            } catch {
+              model.heroPhotoSelectionFailed(error)
             }
-            await model.heroPhotoSelected(
-              sourceData: data,
-              sourcePath: sourcePath(for: item)
-            )
-          } catch {
-            model.heroPhotoSelectionFailed(error)
+            selectedItem = nil
           }
-          selectedItem = nil
+        }
+
+        if hasPhoto {
+          Button(role: .destructive) {
+            model.heroPhotoRemoved()
+          } label: {
+            Label("Delete Photo", systemImage: "trash")
+          }
+          .buttonStyle(.bordered)
         }
       }
     }

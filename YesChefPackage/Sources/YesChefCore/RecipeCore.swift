@@ -405,6 +405,7 @@ public enum RecipeRepository {
     let photos = mergedPhotos(
       existingPhotos,
       pendingPhotos: draft.pendingPhotos,
+      removesHeroPhoto: draft.removesHeroPhoto,
       recipeID: recipeID,
       now: now
     )

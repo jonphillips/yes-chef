@@ -12,7 +12,7 @@ extension RecipeDetailModel {
 
     let context = chatModel.context.serialized()
     let adjustRecipeAction = ChatApplyAction<RecipeAdjustmentProposal>(
-      title: "Adjust this recipe",
+      title: "Revise Recipe",
       extractingTitle: "Drafting adjustment...",
       reviewTitle: "Review recipe adjustment",
       commitTitle: "Review Side by Side",
@@ -34,7 +34,7 @@ extension RecipeDetailModel {
       }
     )
     let makeAheadAction = ChatApplyAction<MakeAheadPlan>(
-      title: "Summarize make-ahead -> Make-ahead section",
+      title: "Create Prep Plan",
       extractingTitle: "Summarizing make-ahead...",
       reviewTitle: "Review make-ahead",
       commitTitle: "Commit to Make-ahead",
@@ -48,7 +48,7 @@ extension RecipeDetailModel {
       }
     )
     let chefItUpAction = ChatApplyAction<ChefItUpPlan>(
-      title: "Chef It Up -> Chef It Up section",
+      title: "Chef It Up",
       extractingTitle: "Building Chef It Up...",
       reviewTitle: "Review Chef It Up",
       commitTitle: "Commit to Chef It Up",
@@ -62,7 +62,7 @@ extension RecipeDetailModel {
       }
     )
     let serveWithAction = ChatApplyAction<ServeWithPlan>(
-      title: "Serve With -> Serve With section",
+      title: "Suggest Dishes",
       extractingTitle: "Finding accompaniments...",
       reviewTitle: "Review Serve With",
       commitTitle: "Add to Serve With",
@@ -80,7 +80,7 @@ extension RecipeDetailModel {
     // one or more `.general` recipe notes. Per D2 the recipe is the write target, not source
     // material — so, exactly like the menu sibling, NO `context:` is sent to the client.
     let captureNoteAction = ChatApplyAction<MenuNoteHarvestPlan>(
-      title: "Capture to notes",
+      title: "Save to Notes",
       extractingTitle: "Capturing…",
       reviewTitle: "Review captured note",
       commitTitle: "Add to Notes",
@@ -97,20 +97,25 @@ extension RecipeDetailModel {
       }
     )
     return [
-      AnyChatApplyAction(adjustRecipeAction, requiresSubject: false, reviewPresentation: .inline) { proposal in
+      AnyChatApplyAction(
+        adjustRecipeAction,
+        requiresSubject: false,
+        reviewPresentation: .inline,
+        systemImage: "pencil.and.outline"
+      ) { proposal in
         proposal.reviewSummary()
       },
-      AnyChatApplyAction(makeAheadAction, editableSummary: { plan in
+      AnyChatApplyAction(makeAheadAction, systemImage: "clock.badge.checkmark", editableSummary: { plan in
         plan.rendered().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : plan.rendered()
       }, commitEditedSummary: { [weak self] _, editedText in
         try self?.commitMakeAheadText(editedText)
       }),
-      AnyChatApplyAction(chefItUpAction, editableSummary: { plan in
+      AnyChatApplyAction(chefItUpAction, systemImage: "wand.and.stars", editableSummary: { plan in
         plan.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : plan.text
       }, commitEditedSummary: { [weak self] _, editedText in
         try self?.commitChefItUpText(editedText)
       }),
-      AnyChatApplyAction(serveWithAction, editableSummary: { plan in
+      AnyChatApplyAction(serveWithAction, systemImage: "fork.knife.circle", editableSummary: { plan in
         plan.editableReviewText().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
           ? nil
           : plan.editableReviewText()
@@ -120,7 +125,11 @@ extension RecipeDetailModel {
       // `requiresSubject: false` so the no-selection transcript-scan branch stays live in
       // production ([[harvest-verb-requires-subject-false]]); a list commit shape, one review
       // item per captured note through the ADR-0026 collection sheet.
-      AnyChatApplyAction(captureNoteAction, requiresSubject: false) { [weak self] plan in
+      AnyChatApplyAction(
+        captureNoteAction,
+        requiresSubject: false,
+        systemImage: "note.text.badge.plus"
+      ) { [weak self] plan in
         plan.notes.map { note in
           let originalEditableText = note.editableReviewText()
           return ChatApplyReviewItem(

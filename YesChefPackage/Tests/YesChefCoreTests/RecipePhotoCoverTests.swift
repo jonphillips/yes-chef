@@ -127,6 +127,53 @@ struct RecipePhotoCoverTests {
     }
   }
 
+  @Test
+  func saveRemovingUserHeroPhotoClearsCoverAndDeletesPhoto() throws {
+    @Dependency(\.defaultDatabase) var database
+    let createdAt = Date(timeIntervalSinceReferenceDate: 802_370_000)
+    let modifiedAt = Date(timeIntervalSinceReferenceDate: 802_370_100)
+    let photoID = SampleUUIDSequence.uuid(670)
+    let processedPhoto = RecipePhotoProcessor.process(
+      sourceData: Data([0x01, 0x02, 0x03, 0x04]),
+      sourcePath: "Original.jpg",
+      kind: .hero
+    )
+    var uuids = SampleUUIDSequence(start: 671)
+
+    try database.write { db in
+      let recipeID = try RecipeRepository.save(
+        draft: RecipeEditorDraft(
+          title: "Remove Photo Soup",
+          ingredientText: "1 onion",
+          instructionText: "Cook.",
+          pendingPhotos: [
+            RecipeEditorPhotoDraft(
+              id: photoID,
+              processedPhoto: processedPhoto,
+              originalSourcePath: "Original.jpg",
+              kind: .hero,
+              source: .user
+            )
+          ]
+        ),
+        in: db,
+        now: createdAt,
+        uuid: { uuids.next() }
+      )
+      try RecipeRepository.setCoverPhotoID(photoID, recipeID: recipeID, in: db, now: createdAt)
+
+      var editDraft = RecipeEditorDraft(
+        detail: try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+      )
+      editDraft.removesHeroPhoto = true
+      _ = try RecipeRepository.save(draft: editDraft, in: db, now: modifiedAt, uuid: { uuids.next() })
+
+      let updatedRecipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+      expectNoDifference(updatedRecipe.coverPhotoID, nil)
+      expectNoDifference(try RecipePhoto.where { $0.recipeID.eq(recipeID) }.fetchAll(db), [])
+    }
+  }
+
   private static func photo(
     id: RecipePhoto.ID,
     recipeID: Recipe.ID,
