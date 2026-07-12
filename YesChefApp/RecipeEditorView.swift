@@ -6,6 +6,7 @@ import YesChefCore
 struct RecipeEditorView: View {
   @State private var model: RecipeEditorModel
   @State private var selectedHeroPhotoItem: PhotosPickerItem?
+  @FocusState private var isIngredientTextFocused: Bool
   @Environment(\.dismiss) private var dismiss
 
   init(recipeID: Recipe.ID?) {
@@ -90,8 +91,16 @@ struct RecipeEditorView: View {
           minHeight: 180,
           font: .body.monospacedDigit()
         )
+        .focused($isIngredientTextFocused)
         .onChange(of: model.draft.ingredientText) { _, _ in
           model.ingredientTextChanged()
+        }
+
+        if isIngredientTextFocused {
+          IngredientFractionPillRow { fraction in
+            model.ingredientFractionTapped(fraction)
+            isIngredientTextFocused = true
+          }
         }
 
         ForEach($model.draft.ingredientLineDrafts) { $line in
@@ -149,6 +158,32 @@ struct RecipeEditorView: View {
     } message: {
       Text(model.errorMessage ?? "")
     }
+  }
+}
+
+private struct IngredientFractionPillRow: View {
+  let onSelect: (ScaleFraction) -> Void
+
+  var body: some View {
+    ScrollView(.horizontal, showsIndicators: false) {
+      HStack(spacing: 8) {
+        ForEach(ScaleFraction.ingredientInputCases) { fraction in
+          Button {
+            onSelect(fraction)
+          } label: {
+            Text(verbatim: fraction.label)
+              .font(.title3)
+              .frame(minWidth: 44, minHeight: 36)
+          }
+          .buttonStyle(.bordered)
+          .buttonBorderShape(.capsule)
+          .accessibilityLabel(Text(verbatim: "Insert " + fraction.label))
+          .accessibilityHint(Text("Appends this fraction to the ingredient text."))
+        }
+      }
+      .padding(.horizontal, 2)
+    }
+    .padding(.vertical, 2)
   }
 }
 

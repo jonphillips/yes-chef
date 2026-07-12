@@ -7,6 +7,9 @@ enum ScaleFraction: String, CaseIterable, Identifiable {
   case oneFourth
   case oneFifth
   case oneEighth
+  case threeEighths
+  case fiveEighths
+  case sevenEighths
   case twoThirds
   case threeFourths
 
@@ -20,6 +23,9 @@ enum ScaleFraction: String, CaseIterable, Identifiable {
     case .oneFourth: "¼"
     case .oneFifth: "⅕"
     case .oneEighth: "⅛"
+    case .threeEighths: "⅜"
+    case .fiveEighths: "⅝"
+    case .sevenEighths: "⅞"
     case .twoThirds: "⅔"
     case .threeFourths: "¾"
     }
@@ -33,9 +39,29 @@ enum ScaleFraction: String, CaseIterable, Identifiable {
     case .oneFourth: 1.0 / 4.0
     case .oneFifth: 1.0 / 5.0
     case .oneEighth: 1.0 / 8.0
+    case .threeEighths: 3.0 / 8.0
+    case .fiveEighths: 5.0 / 8.0
+    case .sevenEighths: 7.0 / 8.0
     case .twoThirds: 2.0 / 3.0
     case .threeFourths: 3.0 / 4.0
     }
+  }
+
+  /// The nine glyphs shared by multiplier rendering and ingredient authoring.
+  static let ingredientInputCases: [Self] = [
+    .oneFourth,
+    .oneHalf,
+    .threeFourths,
+    .oneThird,
+    .twoThirds,
+    .oneEighth,
+    .threeEighths,
+    .fiveEighths,
+    .sevenEighths,
+  ]
+
+  static func appending(_ fraction: Self, to ingredientText: String) -> String {
+    ingredientText + fraction.label
   }
 
   static func nearestSelection(to value: Double) -> (whole: Int, fraction: ScaleFraction) {
