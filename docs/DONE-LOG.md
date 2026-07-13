@@ -9,6 +9,76 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0038 — External-LLM handoff, S1 (session-tracked core)
+
+**✅ DONE — merged + Jon device-passed 2026-07-13.** yes-chef PR
+[#179](https://github.com/jonphillips/yes-chef/pull/179).
+[ADR-0038](decisions/ADR-0038-external-llm-handoff.md) S1: the transport-agnostic, **device-local** core
+that generalizes the menu Copy-Prep-Prompt / Paste-Prep-Plan round-trip
+([ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md) D5) into a trackable hand-off, proven
+through the existing menu paste path (no new UI beyond one info alert).
+
+**Core (`AIHandoff.swift`).** New device-local `aiHandoffs` table
+(id/sourceType/sourceID/taskType/createdAt/importedAt/status/schemaVersion/exportedPrompt; STRICT migration)
+**excluded from the CloudKit `SyncEngine`** — the sync-exclusion "unknown" resolved cleanly because
+`makeSyncEngine` is a table **whitelist**, so `AIHandoff` simply isn't listed and joins
+`chatMessages`/`chatThreads`/`recipeActiveVariations` in `localOnlyTableNames` (guarded by `CloudSyncTests`).
+`AIHandoffRepository` = create/find/markImported.
+
+**Token round-trip.** `AIHandoffToken` (prefix `YC-HANDOFF:`, `prompt`/`header`/`stripping`). **Copy Prep
+Prompt** creates a hand-off, prefixes the token, snapshots the exported prompt. **Paste Prep Plan** strips +
+validates the token (matching menu + task), applies the plan and marks the hand-off imported **atomically**
+(one `database.write`), and dedupes a repeat return. Missing/mangled token → self-describing fallback still
+lands the plan (`.applied`). Outbound prompt now demands the Unicode `→` glyph; `editableReviewLine` hardened
+to also accept ASCII `->`.
+
+**Discuss-vs-immediate (device-pass learning).** S1's prompt is the *discuss* variant — the strict format is
+emitted on "finalize" (confirmed on device: an un-finalized paste returns prose). The **immediate-mode**
+prompt variant (format-on-first-response, needed for the automated App Intents chain) is deferred to S2.
+
+**Follow-up (silent-failure fix, `48c5114`).** Device pass caught an asymmetry: a re-paste of an
+already-imported hand-off returned `.duplicate` and `prepPlanPasted` discarded it (silent), while the
+wrong-menu guard *throws* first (proper error). Fix: a separate `MenuDetailModel.Information` channel surfaces
+`.duplicate` as an **informative, non-error** "Already imported…" alert; **non-destructive** (no re-apply → no
+clobber of hand-edits). Core `apply` unchanged; strict block-on-duplicate dedupe reserved for S2's
+`ImportHandoffResult`.
+
+**Tests.** `AIHandoffTests` (token/import/dedupe/fallback), `CloudSyncTests` sync-exclusion guard,
+`MenuPrepPlanTests` ASCII-arrow, `AIHandoffMenuPasteTests` (duplicate informs without replacing the plan).
+
+**Pre-code de-risking (2026-07-13).** The whole loop was validated by hand before implementation: `Ask
+ChatGPT` returns text as a Shortcuts value, and a live beach-menu round-trip came back in the exact
+review-text format the parser accepts ([ADR-0038](decisions/ADR-0038-external-llm-handoff.md) D2/OQ3). **S2**
+(App Intents surface + per-menu project + immediate-mode prompt) and **S3** (generalize the serializer to
+Recipe/MealPlan) remain, out of this scope.
+
+---
+## ADR-0036 — promote a recipe-shaped menu note → a real recipe
+
+**✅ DONE — merged + Jon device-passed 2026-07-13.** yes-chef PR
+[#178](https://github.com/jonphillips/yes-chef/pull/178).
+[ADR-0036](decisions/ADR-0036-promote-note-to-recipe.md) S1 + S2 (one batch) + a provenance-shape follow-up.
+Turns a recipe-shaped **menu note-item** (`MealPlanItemKind.note`, no `recipeID`,
+[[menu-item-recipe-id-invariant]]) into a real structured `Recipe`. **S1** = a **deterministic**
+heading-based note→draft adapter (`MenuNoteRecipePromotion`, `RecipeParseBuilder`-family naming only — no
+LLM: recognizes explicit `Ingredients`/`Instructions|Method|Directions|Preparation` sections, strips
+bullets/step numbers, everything else stays as notes) → `WorkbenchDraftRecipe` → the existing ADR-0024
+editable review sheet → commit to a new `Recipe`. Chose determinism over the ADR's proposed on-device LLM
+parse per [[llm-vs-determinism-surface-boundary]] (reproducible, private, free, no truncation; quantity/unit
+parsing still happens downstream at `RecipeRepository.save`). Entry point = a **Make Recipe** glyph on note
+rows (`MenuDetailSections`). **S2** = an opt-in confirmation to swap the note row for a recipe-kind item
+pointing at the new recipe (`MenuRepository.replaceNoteItemWithRecipe`), preserving day/meal/sort.
+**Provenance (OQ2 resolved, follow-up commit):** original prose rides in as an **editable general
+`RecipeNote`** (`From menu note "<title>":` + blank-line-collapsed prose), **not** a `RecipeSource` — the
+source-card version was a pinned, non-deletable header crowding both the recipe and the menu row (caught on
+device). On replacement the note row's `notes` is cleared (`item.notes = nil`) so the promoted row collapses
+to its title; blank machine FK dropped (live back-link is the item's `recipeID`). No schema change → the
+standing prod-schema follow-up is unaffected. Free-rider: `.lineLimit(3)` on the menu-row note text
+(`MenuDetailSections.swift:276`) **closes the queued "Menu note-item truncation" effort**. New
+`MenuNoteRecipePromotionTests` (parse + provenance-as-note + replacement-clears-row). `RecipeNote`-on-recipe
+promotion remains a future **S3**, out of this scope.
+
+---
 ## ADR-0037 — grocery seed-coverage diagnostic
 
 **⏳ PENDING — architect-reviewed 2026-07-13; awaiting merge + Jon device pass before this entry is final

@@ -816,6 +816,23 @@ extension DependencyValues {
       try GroceryStoreAreaCache.backfill(in: db)
     }
 
+    migrator.registerMigration("Create local AI handoffs") { db in
+      try #sql("""
+        CREATE TABLE "aiHandoffs" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "sourceType" TEXT NOT NULL,
+          "sourceID" TEXT NOT NULL,
+          "taskType" TEXT NOT NULL,
+          "createdAt" TEXT NOT NULL,
+          "importedAt" TEXT,
+          "status" TEXT NOT NULL,
+          "schemaVersion" INTEGER NOT NULL,
+          "exportedPrompt" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

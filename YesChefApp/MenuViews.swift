@@ -287,6 +287,11 @@ struct MenuDetailView: View {
     } message: {
       Text(detailModel.errorMessage ?? "")
     }
+    .alert("Prep Plan", item: $detailModel.information) { _ in
+      Button("OK", role: .cancel) {}
+    } message: { information in
+      Text(information.message)
+    }
   }
 
   private var isSplitEnabled: Bool {
@@ -340,7 +345,7 @@ private struct MenuDetailReader: View {
         MenuPrepPlanSection(
           menu: detail.menu,
           itemRows: detail.itemRows,
-          copyPrepPrompt: { MenuChatContext(detail: detail).prepPrompt() },
+          copyPrepPrompt: { detailModel.copyPrepPrompt(MenuChatContext(detail: detail).prepPrompt()) },
           onRecipeSelected: onRecipeSelected,
           clearPrepPlan: {
             model.clearPrepPlanButtonTapped(menuID: detailModel.menuID)
@@ -373,7 +378,7 @@ private struct MenuDetailReader: View {
 private struct MenuPrepPlanSection: View {
   let menu: CoreMenu
   let itemRows: [MenuItemRowData]
-  let copyPrepPrompt: () -> String
+  let copyPrepPrompt: () -> String?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var clearPrepPlan: () -> Void
   var regeneratePrepPlan: () -> Void
@@ -397,7 +402,8 @@ private struct MenuPrepPlanSection: View {
         Spacer()
 
         Button {
-          UIPasteboard.general.string = copyPrepPrompt()
+          guard let prompt = copyPrepPrompt() else { return }
+          UIPasteboard.general.string = prompt
         } label: {
           Label("Copy Prep Prompt", systemImage: "doc.on.doc")
         }

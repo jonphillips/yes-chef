@@ -459,6 +459,19 @@ final class MenuLibraryModel {
 @Observable
 @MainActor
 final class MenuDetailModel {
+  enum Information: Hashable, Identifiable {
+    case alreadyImported
+
+    var id: Self { self }
+
+    var message: String {
+      switch self {
+      case .alreadyImported:
+        "Already imported from that prompt. Tap Copy Prep Prompt to import a fresh plan."
+      }
+    }
+  }
+
   let menuID: CoreMenu.ID
 
   @ObservationIgnored
@@ -476,6 +489,7 @@ final class MenuDetailModel {
   var noteRecipeReview: MenuNoteRecipePromotionReview?
   var noteReplacementOffer: MenuNoteReplacementOffer?
   var isPromotingNoteRecipe = false
+  var information: Information?
   var errorMessage: String?
   var isShowingError = false
 
@@ -555,18 +569,48 @@ final class MenuDetailModel {
     }
   }
 
-  func prepPlanPasted(_ text: String) {
-    let currentPlan = MenuPrepPlan(steps: MenuPrepPlanCoding.decode(detail?.menu.prepPlan))
-    let plan = currentPlan.applyingEditableReviewText(text)
-
-    guard !plan.steps.isEmpty else {
-      errorMessage = "The pasted plan needs a session heading followed by one or more prep steps."
-      isShowingError = true
-      return
-    }
+  func copyPrepPrompt(_ basePrompt: String) -> String? {
+    let handoffID = uuid()
+    let prompt = AIHandoffToken.prompt(handoffID: handoffID, context: basePrompt)
 
     do {
-      try commitPrepPlan(plan)
+      try database.write { db in
+        try AIHandoffRepository.create(
+          AIHandoff(
+            id: handoffID,
+            sourceType: .menu,
+            sourceID: menuID,
+            taskType: .prepPlan,
+            createdAt: now,
+            exportedPrompt: prompt
+          ),
+          in: db
+        )
+      }
+      return prompt
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return nil
+    }
+  }
+
+  func prepPlanPasted(_ text: String) {
+    let currentPlan = MenuPrepPlan(steps: MenuPrepPlanCoding.decode(detail?.menu.prepPlan))
+
+    do {
+      let result = try database.write { db in
+        try AIHandoffMenuPrepPlanImport.apply(
+          text: text,
+          to: menuID,
+          currentPlan: currentPlan,
+          in: db,
+          now: now
+        )
+      }
+      if result == .duplicate {
+        information = .alreadyImported
+      }
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
