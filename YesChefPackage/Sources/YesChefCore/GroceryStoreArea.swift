@@ -278,6 +278,24 @@ public enum GroceryStoreArea: Hashable, Sendable {
 }
 
 public enum GroceryStoreAreaCache {
+  public static func uncategorizedCanonicalNames(in db: Database) throws -> [String] {
+    let names = try GroceryItem.fetchAll(db).compactMap { item in
+      item.aisle == nil ? item.canonicalName : nil
+    }
+    return Array(Set(names)).sorted()
+  }
+
+  public static func applyClassified(
+    _ classified: [String: GroceryStoreArea],
+    in db: Database
+  ) throws {
+    for var item in try GroceryItem.fetchAll(db) where item.aisle == nil {
+      guard let canonicalName = item.canonicalName, let area = classified[canonicalName] else { continue }
+      item.aisle = area.title
+      try GroceryItem.upsert { item }.execute(db)
+    }
+  }
+
   public static func backfill(in db: Database) throws {
     for var item in try GroceryItem.fetchAll(db) where item.aisle == nil {
       guard let area = GroceryStoreArea.seed(for: item.canonicalIngredientName) else { continue }
