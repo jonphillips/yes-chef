@@ -100,6 +100,38 @@ classifies on `.onDevice`, writing the result to `aisle` and thus caching it. Ba
 with a stub client: uncached names get classified + cached, cached names are skipped, unavailable model
 leaves items ungrouped without error.
 
+### S2 dispatch detail (locked 2026-07-13)
+
+Grounded against the merged S1 and the existing verb-client pattern:
+
+1. **`GroceryCategorizationClient`** — new `YesChefCore/GroceryCategorization.swift`, mirror `MenuDepositClient`
+   ([`DepositNote.swift`](../../YesChefPackage/Sources/YesChefCore/DepositNote.swift)) exactly: `Sendable`
+   struct, `@Sendable classify(_ names: [String], _ tier: ModelTier) async throws -> [String: GroceryStoreArea]`,
+   `DependencyKey` (live/test), `DependencyValues` accessor, tolerant static `parse`. **Batched**, one
+   `ModelRequest(tier:.onDevice, reasoningEffort:.low)` per chunk (~40 names) asking for a strict JSON
+   name→area map; **fold every value through `GroceryStoreArea.normalized(_:)`** so the open vocabulary stays
+   canonical/round-trippable. No `promptPreferenceKey` (no new synced settings — hold the no-schema promise).
+   Chunk to survive `onDeviceContextTooLarge`. `testValue = [:]`.
+2. **Cache read/write** — extend `GroceryStoreAreaCache`: `uncategorizedCanonicalNames(in:)` (distinct
+   `canonicalName` where `aisle == nil`) and `applyClassified(_:in:)` (write `area.title` only where still
+   `aisle == nil`; never overwrite user/seed/prior — the stability contract; idempotent).
+3. **Off-writer sequencing** ([[sqlitedata-fetch-writer-convoy]]): read uncached names → classify (async, **no
+   transaction**) → `applyClassified` (write tx). Never run the model call inside `database.write`.
+4. **App wiring** (`GroceryLibraryModel`): `.onDevice` tier; run the pass **after each generation path**
+   (`addRecipeImmediately`/`addMenuImmediately`/`addMealPlan…`/multi-source `addSelected…`) **and once on
+   grocery-detail appearance** guarded by `uncategorizedCanonicalNames` non-empty (LOCKED 2026-07-13: both
+   triggers, so existing lists fill the long tail without a regen). Reload `itemRows` after the write.
+   **Degrade silently** — `try?`/swallow; `onDeviceUnavailable` or any error leaves items under "Other", no
+   alert.
+5. **Tests** (stub client, `@testable`): uncached→classified+written; existing-aisle item skipped even if the
+   stub returns otherwise; stub throwing `onDeviceUnavailable` leaves `aisle == nil` with no error; model
+   output folded through the normalizer; `parse` tolerates malformed JSON → `[:]`.
+
+Verify: package build + the new tests + `swift test --skip-build`; `check-drift.sh`; one iPad build
+(`xcodegen generate` first — new source file). Device pass (Jon): generate a list with off-seed items
+(harissa, miso, gochujang) → sensible departments, stable across regen; a device without on-device support
+leaves them under "Other" with no error.
+
 ## Consequences
 
 - **No migration, no prod-schema delta.** `aisle` already exists and syncs; categorization is a write to
