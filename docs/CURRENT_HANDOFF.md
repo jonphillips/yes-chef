@@ -66,15 +66,21 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**No live dispatch target — ADR-0035 S1 is architect-reviewed & approved 2026-07-13 in [#172](https://github.com/jonphillips/yes-chef/pull/172) (device pass owed).**
-Jon picks the next effort from the Ready queue; a fresh dispatch must **STOP and ask Jon** — never
-infer the next task. S1 adds the deterministic seed, normalizer, dedicated-migration backfill, and store-ordered “To Buy”
-sections; it has **no model and no schema change**. Its categorization only places items; it never invents or merges list data
-([[llm-vs-determinism-surface-boundary]]).
+**Live dispatch target — [ADR-0035](decisions/ADR-0035-grocery-store-area-grouping.md) S2: on-device
+store-area classifier for the long tail.** Full grounded spec (client shape, cache read/write, off-writer
+sequencing, app triggers, tests) is the **"S2 dispatch detail (locked 2026-07-13)"** subsection of the ADR —
+build to that. In one line: a new `.onDevice` `GroceryCategorizationClient` (mirror `MenuDepositClient`)
+classifies the *new, uncached* canonical names (`aisle == nil`) once, folds output through
+`GroceryStoreArea.normalized`, and writes `aisle` via `GroceryStoreAreaCache.applyClassified` — never
+overwriting user/seed/prior (the stability contract), never on the writer, degrading silently to "Other" on
+`onDeviceUnavailable`. **Locked 2026-07-13: run the pass on BOTH triggers** — after each generation path AND
+once on grocery-detail appearance (guarded by uncached-names non-empty) — so existing lists fill without a
+regen. No schema change; first `.onDevice`-by-design verb. Its categorization only *places* items; it never
+invents or merges list data ([[llm-vs-determinism-surface-boundary]]).
 
-**ADR-0035 device pass owed (Jon):** generate a grocery list from a multi-recipe menu, confirm items land in the
-right departments in store-walk order, and confirm a hand-set aisle survives regeneration. Purchased remains a
-flat crossed-off tail.
+**ADR-0035 S1 device pass still owed (Jon), independent of S2:** generate a grocery list from a multi-recipe
+menu, confirm items land in the right departments in store-walk order, and confirm a hand-set aisle survives
+regeneration. Purchased remains a flat crossed-off tail.
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**
@@ -124,11 +130,11 @@ build + `MenuChatContext`/`MenuPrepPlan` tests + `check-drift.sh`; one iPad app 
 
 **Dogfood 2026-07-12 — trip-prep pass (3 items triaged, written up 2026-07-12; Jon picks order, none dispatched).**
 - **Grocery list by store area** — [ADR-0035](decisions/ADR-0035-grocery-store-area-grouping.md) (**Accepted**;
-  **S1 architect-reviewed & approved 2026-07-13 in [#172](https://github.com/jonphillips/yes-chef/pull/172); device pass owed — see Next Up**).
-  The existing synced `GroceryItem.aisle` column now receives a deterministic seed and the flat “To Buy” list
-  groups by store area; no migration. **S2 = on-device long-tail classifier**, queued after S1 reads well on
-  device. OQ1 resolved 2026-07-12: store-walk order fixed to Jon's 13 areas (perishables last); seed mapping
-  contents remain incrementally editable.
+  **S1 merged [#172](https://github.com/jonphillips/yes-chef/pull/172), device pass owed; S2 is now the live
+  dispatch target — see Next Up**). The existing synced `GroceryItem.aisle` column receives a deterministic
+  seed and the flat “To Buy” list groups by store area; no migration. **S2 = on-device long-tail classifier**
+  (spec locked 2026-07-13 in the ADR). OQ1 resolved 2026-07-12: store-walk order fixed to Jon's 13 areas
+  (perishables last); seed mapping contents remain incrementally editable.
 - **Promote a note → a real recipe** — [ADR-0036](decisions/ADR-0036-promote-note-to-recipe.md). Formalizes
   ADR-0027 D5/A6. Parse recipe-shaped note prose → `WorkbenchDraftRecipe` → ADR-0024 review → real `Recipe`
   (reuses web-capture parse + editable-proposal surface). Real design work is **placement + provenance**.
