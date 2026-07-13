@@ -194,7 +194,7 @@ public struct MenuChatContext: Equatable, Sendable {
     Wednesday evening:
     - Salt the chicken → Thursday dinner
 
-    Put one task on each `- task → serves` bullet, using the `→ serves` suffix when it clarifies the meal or day the task feeds. This text will be pasted back into the recipe app, so do not include commentary, Markdown fences, menu item IDs, or JSON.
+    Put one task on each `- task → serves` bullet, using the Unicode `→` glyph (not ASCII `->`) for the optional serves suffix. This text will be pasted back into the recipe app, so do not include commentary, Markdown fences, menu item IDs, or JSON.
 
     \(context)
     """

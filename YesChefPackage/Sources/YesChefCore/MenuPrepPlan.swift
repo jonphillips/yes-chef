@@ -130,7 +130,12 @@ private extension PrepPlanStep {
   }
 
   static func editableReviewLine(_ line: String) -> (task: String, serves: String?)? {
-    let pieces = line.split(separator: "→", maxSplits: 1, omittingEmptySubsequences: false)
+    let pieces: [Substring]
+    if line.contains("→") {
+      pieces = line.split(separator: "→", maxSplits: 1, omittingEmptySubsequences: false)
+    } else {
+      pieces = line.split(separator: "->", maxSplits: 1, omittingEmptySubsequences: false)
+    }
     guard let task = String(pieces[0]).cleanedPrepPlanText else { return nil }
     guard pieces.count == 2 else { return (task, nil) }
     guard let serves = String(pieces[1]).cleanedPrepPlanText else { return nil }

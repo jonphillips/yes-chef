@@ -555,18 +555,45 @@ final class MenuDetailModel {
     }
   }
 
-  func prepPlanPasted(_ text: String) {
-    let currentPlan = MenuPrepPlan(steps: MenuPrepPlanCoding.decode(detail?.menu.prepPlan))
-    let plan = currentPlan.applyingEditableReviewText(text)
-
-    guard !plan.steps.isEmpty else {
-      errorMessage = "The pasted plan needs a session heading followed by one or more prep steps."
-      isShowingError = true
-      return
-    }
+  func copyPrepPrompt(_ basePrompt: String) -> String? {
+    let handoffID = uuid()
+    let prompt = AIHandoffToken.prompt(handoffID: handoffID, context: basePrompt)
 
     do {
-      try commitPrepPlan(plan)
+      try database.write { db in
+        try AIHandoffRepository.create(
+          AIHandoff(
+            id: handoffID,
+            sourceType: .menu,
+            sourceID: menuID,
+            taskType: .prepPlan,
+            createdAt: now,
+            exportedPrompt: prompt
+          ),
+          in: db
+        )
+      }
+      return prompt
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return nil
+    }
+  }
+
+  func prepPlanPasted(_ text: String) {
+    let currentPlan = MenuPrepPlan(steps: MenuPrepPlanCoding.decode(detail?.menu.prepPlan))
+
+    do {
+      _ = try database.write { db in
+        try AIHandoffMenuPrepPlanImport.apply(
+          text: text,
+          to: menuID,
+          currentPlan: currentPlan,
+          in: db,
+          now: now
+        )
+      }
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
