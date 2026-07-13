@@ -55,6 +55,9 @@ extension RecipeCoreTests {
           now: now,
           uuid: { uuids.next() }
         )
+        var mealPlanItem = try #require(try MealPlanItem.find(mealPlanItemID).fetchOne(db))
+        mealPlanItem.scale = 2
+        try MealPlanItem.upsert { mealPlanItem }.execute(db)
         let menuID = try MenuRepository.addMenu(
           title: "Soup Week",
           notes: nil,
@@ -73,6 +76,9 @@ extension RecipeCoreTests {
           now: now,
           uuid: { uuids.next() }
         )
+        var menuItem = try #require(try MenuItem.find(menuItemID).fetchOne(db))
+        menuItem.scale = 3
+        try MenuItem.upsert { menuItem }.execute(db)
         let placementID = try MenuRepository.placeMenu(
           menuID: menuID,
           startDate: scheduledDate,
@@ -97,8 +103,8 @@ extension RecipeCoreTests {
           .filter { itemIDs.contains($0.id) }
 
         expectNoDifference(rows.count, 1)
-        expectNoDifference(rows.first?.item.quantity, 6)
-        expectNoDifference(rows.first?.item.quantityText, "6")
+        expectNoDifference(rows.first?.item.quantity, 15)
+        expectNoDifference(rows.first?.item.quantityText, "15")
         expectNoDifference(sources.map(\.origin), [.menuPlacement, .calendarItem])
         expectNoDifference(sources.map(\.recipeID), [recipeID, recipeID].map(Optional.some))
         expectNoDifference(sources.map(\.ingredientLineID), [ingredientLineID, ingredientLineID].map(Optional.some))
@@ -169,6 +175,9 @@ extension RecipeCoreTests {
           now: now,
           uuid: { uuids.next() }
         )
+        var menuItem = try #require(try MenuItem.find(menuItemID).fetchOne(db))
+        menuItem.scale = 2
+        try MenuItem.upsert { menuItem }.execute(db)
         let placementID = try MenuRepository.placeMenu(
           menuID: menuID,
           startDate: startDate,
@@ -198,8 +207,8 @@ extension RecipeCoreTests {
           .filter { (menuItemIDs + placedItemIDs).contains($0.id) }
 
         expectNoDifference(rows.count, 1)
-        expectNoDifference(rows.first?.item.quantity, 4)
-        expectNoDifference(rows.first?.item.quantityText, "4")
+        expectNoDifference(rows.first?.item.quantity, 8)
+        expectNoDifference(rows.first?.item.quantityText, "8")
         expectNoDifference(sources.map(\.origin), [.menu, .menuPlacement])
         expectNoDifference(sources.map(\.menuID), [menuID, menuID].map(Optional.some))
         expectNoDifference(sources.map(\.menuItemID), [menuItemID, menuItemID].map(Optional.some))
