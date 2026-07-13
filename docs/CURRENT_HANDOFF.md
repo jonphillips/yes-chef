@@ -22,7 +22,9 @@ architect-reviewed + **device-passed** 2026-07-12; on this branch, archived to D
 prep-plan work-session timeline S1 + S2 landed** ([#163](https://github.com/jonphillips/yes-chef/pull/163),
 architect-reviewed 2026-07-12); **S3 (parse-robustness + clipboard) shipped**
 ([#164](https://github.com/jonphillips/yes-chef/pull/164), architect-reviewed 2026-07-12) — **S3c (enrich the
-exported dish context: frontier budget + full method, ADR-0034 Amendment 1) is now Next Up.** The whole **ADR-0027 harvest + deposit family (base + Amendment 1) is now COMPLETE
+exported dish context: frontier budget + full method, ADR-0034 Amendment 1) remains in the Ready queue.**
+**ADR-0035 grocery store-area grouping S1 is built in [#172](https://github.com/jonphillips/yes-chef/pull/172)
+(draft; device pass owed), so Jon picks the next dispatch — do not infer.** The whole **ADR-0027 harvest + deposit family (base + Amendment 1) is now COMPLETE
 and device-passed** (2026-07-12) — merged to main, archived to DONE-LOG; only the ADR's own deferred items
 (OQ4 taste preference, A6 promote-note-to-recipe) remain, each a separate future effort.
 
@@ -64,33 +66,15 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Do [ADR-0035](decisions/ADR-0035-grocery-store-area-grouping.md) S1 — deterministic store-area grouping
-(no model), one PR.** Populate the dormant `GroceryItem.aisle` from a deterministic seed and split the flat
-"To Buy" list into store-ordered sections. **No model in S1** (that's S2). **No migration** — `aisle` is an
-existing synced column (`Schema.swift`). Full spec: ADR-0035 §Build slices S1 + §Decision. Deterministic-surface
-line: the categorization only *places* items; it never invents/merges list data ([[llm-vs-determinism-surface-boundary]]).
+**No live dispatch target — ADR-0035 S1 is built in [#172](https://github.com/jonphillips/yes-chef/pull/172)
+(draft).** Jon picks the next effort from the Ready queue; a fresh dispatch must **STOP and ask Jon** — never
+infer the next task. S1 adds the deterministic seed, normalizer, backfill, and store-ordered “To Buy” sections;
+it has **no model and no migration**. Its categorization only places items; it never invents or merges list data
+([[llm-vs-determinism-surface-boundary]]).
 
-- **Store-area type + normalizer (`YesChefCore`, pure).** Canonical set = Jon's fixed 13 areas with the fixed
-  store-walk sort order: **Produce → Bakery → Deli → Canned & Dry → Condiments & Oils → Spices → Baking →
-  Beverages → Meat & Seafood → Household → Dairy → Frozen → Other** (perishables deliberately last). A
-  synonym-fold normalizer maps free strings onto the set (veg/vegetables/produce → Produce; butcher/meat/seafood
-  → Meat & Seafood; …); an unknown string passes through title-cased and sorts **just before Other**.
-- **Seed override table.** In-code map `canonicalName → area` over common ingredients (starter set;
-  incrementally editable — the seed *contents* are the non-blocking open part of OQ1).
-- **Populate on generate/insert.** When an item has **no user-set aisle and no cached area**, set `aisle` from
-  the seed. A user-set aisle (the existing editor "Aisle" field) **always wins** — never overwrite it.
-- **Backfill.** Mirror `GroceryCanonicalNameCache.backfill` so existing lists group immediately on first run.
-- **Group the list (`GroceryViews`).** Split the flat "To Buy" `ForEach` over `displaySections.toBuyRows` into
-  one `Section` per store area in sort order; empty areas don't render. Needs-Review / Assumed-Pantry /
-  Purchased sections unchanged (Purchased stays a flat crossed-off tail — OQ2 default no sub-grouping).
-- **Tests (`GroceryTests` / new).** normalizer synonym folding + unknown title-case passthrough; the 13-area
-  sort order; seed hits; "user aisle wins, never overwritten"; backfill idempotence.
-
-Verify: `swift build` the package + `Grocery*` tests + `scripts/check-drift.sh`; one app build for
-`iPad Pro 13-inch (M5)` (new file is in the `YesChefCore` package → SPM picks it up, **no `xcodegen`**; only
-new *app-target* files need it). **Jon does the device pass:** generate a grocery list from a multi-recipe
-menu, confirm items land in the right departments in store-walk order and a hand-set aisle survives a regen.
-(Handoff bump rides this slice PR per [[handoff-bump-rides-in-slice-pr]].)
+**ADR-0035 device pass owed (Jon):** generate a grocery list from a multi-recipe menu, confirm items land in the
+right departments in store-walk order, and confirm a hand-set aisle survives regeneration. Purchased remains a
+flat crossed-off tail.
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**
@@ -140,12 +124,11 @@ build + `MenuChatContext`/`MenuPrepPlan` tests + `check-drift.sh`; one iPad app 
 
 **Dogfood 2026-07-12 — trip-prep pass (3 items triaged, written up 2026-07-12; Jon picks order, none dispatched).**
 - **Grocery list by store area** — [ADR-0035](decisions/ADR-0035-grocery-store-area-grouping.md) (**Accepted**;
-  **S1 is now the Next Up dispatch target — see above**). Populate the dormant `GroceryItem.aisle` (existing
-  synced column, no migration) and group the flat "To Buy" list by store area; **on-device**
-  classify-once-then-cache keyed on `canonicalName` (deterministic-surface line held). Open vocabulary — "6
-  buckets is just the start" (Jon). S1 = deterministic seed + grouping (no model, in Next Up); **S2 = on-device
-  long-tail classifier — follow-on, queue after S1 reads well on device.** OQ1 resolved 2026-07-12: store-walk
-  order fixed to Jon's 13 areas (perishables last); seed *mapping* contents non-blocking.
+  **S1 built in [#172](https://github.com/jonphillips/yes-chef/pull/172), draft; device pass owed — see Next Up**).
+  The existing synced `GroceryItem.aisle` column now receives a deterministic seed and the flat “To Buy” list
+  groups by store area; no migration. **S2 = on-device long-tail classifier**, queued after S1 reads well on
+  device. OQ1 resolved 2026-07-12: store-walk order fixed to Jon's 13 areas (perishables last); seed mapping
+  contents remain incrementally editable.
 - **Promote a note → a real recipe** — [ADR-0036](decisions/ADR-0036-promote-note-to-recipe.md). Formalizes
   ADR-0027 D5/A6. Parse recipe-shaped note prose → `WorkbenchDraftRecipe` → ADR-0024 review → real `Recipe`
   (reuses web-capture parse + editable-proposal surface). Real design work is **placement + provenance**.
