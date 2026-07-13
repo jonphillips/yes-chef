@@ -7,7 +7,7 @@
 > This ADR builds **visibility** into which canonical names miss the seed table, so Jon has a de-duped,
 > prioritized **review queue** to curate `seedAreas` in code.
 
-Status: **Proposed** — 2026-07-13. Origin: post-ADR-0035 session note ("build the visibility for items that
+Status: **Accepted** — 2026-07-13 (Proposed 2026-07-13). Origin: post-ADR-0035 session note ("build the visibility for items that
 did not match deterministically — a diagnostic that surfaces which canonical names miss `seed(for:)` — so
 Jon has a review queue to review and add to code"). This is ADR-0035 **OQ1's** open half — the seed mapping
 *contents* are curated incrementally, and this is the instrument that tells Jon what to curate. Read-only,
