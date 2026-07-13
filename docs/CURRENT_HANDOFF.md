@@ -23,7 +23,7 @@ prep-plan work-session timeline S1 + S2 landed** ([#163](https://github.com/jonp
 architect-reviewed 2026-07-12); **S3 (parse-robustness + clipboard) shipped**
 ([#164](https://github.com/jonphillips/yes-chef/pull/164), architect-reviewed 2026-07-12) — **S3c (enrich the
 exported dish context: frontier budget + full method, ADR-0034 Amendment 1) remains in the Ready queue.**
-**ADR-0035 grocery store-area grouping S1 is ready for review in [#172](https://github.com/jonphillips/yes-chef/pull/172)
+**ADR-0035 grocery store-area grouping S1 is architect-reviewed & approved 2026-07-13 in [#172](https://github.com/jonphillips/yes-chef/pull/172)
 (device pass owed), so Jon picks the next dispatch — do not infer.** The whole **ADR-0027 harvest + deposit family (base + Amendment 1) is now COMPLETE
 and device-passed** (2026-07-12) — merged to main, archived to DONE-LOG; only the ADR's own deferred items
 (OQ4 taste preference, A6 promote-note-to-recipe) remain, each a separate future effort.
@@ -66,7 +66,7 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**No live dispatch target — ADR-0035 S1 is ready for review in [#172](https://github.com/jonphillips/yes-chef/pull/172).**
+**No live dispatch target — ADR-0035 S1 is architect-reviewed & approved 2026-07-13 in [#172](https://github.com/jonphillips/yes-chef/pull/172) (device pass owed).**
 Jon picks the next effort from the Ready queue; a fresh dispatch must **STOP and ask Jon** — never
 infer the next task. S1 adds the deterministic seed, normalizer, dedicated-migration backfill, and store-ordered “To Buy”
 sections; it has **no model and no schema change**. Its categorization only places items; it never invents or merges list data
@@ -124,7 +124,7 @@ build + `MenuChatContext`/`MenuPrepPlan` tests + `check-drift.sh`; one iPad app 
 
 **Dogfood 2026-07-12 — trip-prep pass (3 items triaged, written up 2026-07-12; Jon picks order, none dispatched).**
 - **Grocery list by store area** — [ADR-0035](decisions/ADR-0035-grocery-store-area-grouping.md) (**Accepted**;
-  **S1 ready for review in [#172](https://github.com/jonphillips/yes-chef/pull/172); device pass owed — see Next Up**).
+  **S1 architect-reviewed & approved 2026-07-13 in [#172](https://github.com/jonphillips/yes-chef/pull/172); device pass owed — see Next Up**).
   The existing synced `GroceryItem.aisle` column now receives a deterministic seed and the flat “To Buy” list
   groups by store area; no migration. **S2 = on-device long-tail classifier**, queued after S1 reads well on
   device. OQ1 resolved 2026-07-12: store-walk order fixed to Jon's 13 areas (perishables last); seed mapping
