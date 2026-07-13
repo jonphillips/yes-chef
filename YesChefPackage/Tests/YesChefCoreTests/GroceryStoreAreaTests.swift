@@ -13,7 +13,16 @@ extension RecipeCoreTests {
       expectNoDifference(GroceryStoreArea.normalized(" vegetables "), .produce)
       expectNoDifference(GroceryStoreArea.normalized("Butcher"), .meatAndSeafood)
       expectNoDifference(GroceryStoreArea.normalized("seafood"), .meatAndSeafood)
+      expectNoDifference(GroceryStoreArea.normalized("Meat & Seafood"), .meatAndSeafood)
+      expectNoDifference(GroceryStoreArea.normalized("Condiments & Oils"), .condimentsAndOils)
       expectNoDifference(GroceryStoreArea.normalized("bulk bins"), .custom("Bulk Bins"))
+    }
+
+    @Test
+    func canonicalTitlesAlwaysRoundTripToTheirAreas() {
+      for area in GroceryStoreArea.canonicalAreas {
+        expectNoDifference(GroceryStoreArea.normalized(area.title), area)
+      }
     }
 
     @Test
@@ -78,6 +87,43 @@ extension RecipeCoreTests {
       ]
 
       expectNoDifference(GroceryStoreArea.sections(for: rows).map(\.title), ["Produce", "Bulk Bins", "Other"])
+    }
+
+    @Test
+    func seededAreasRoundTripIntoStoreWalkSections() throws {
+      let listID = SampleUUIDSequence.uuid(87_101)
+      let now = Date(timeIntervalSinceReferenceDate: 879_100_000)
+      let condiments = try #require(GroceryStoreArea.seed(for: "olive oil"))
+      let meat = try #require(GroceryStoreArea.seed(for: "salmon"))
+      let rows = [
+        GroceryItemRowData(
+          item: GroceryItem(
+            id: SampleUUIDSequence.uuid(87_102),
+            groceryListID: listID,
+            title: "Salmon",
+            aisle: meat.title,
+            sortOrder: 0,
+            dateCreated: now,
+            dateModified: now
+          )
+        ),
+        GroceryItemRowData(
+          item: GroceryItem(
+            id: SampleUUIDSequence.uuid(87_103),
+            groceryListID: listID,
+            title: "Olive oil",
+            aisle: condiments.title,
+            sortOrder: 1,
+            dateCreated: now,
+            dateModified: now
+          )
+        ),
+      ]
+
+      expectNoDifference(
+        GroceryStoreArea.sections(for: rows).map(\.title),
+        ["Condiments & Oils", "Meat & Seafood"]
+      )
     }
 
     @Test

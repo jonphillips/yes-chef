@@ -616,6 +616,7 @@ extension DependencyValues {
         .execute(db)
 
       try GroceryCanonicalNameCache.backfill(in: db)
+      try GroceryStoreAreaCache.backfill(in: db)
     }
 
     migrator.registerMigration("Add menu prep plan") { db in

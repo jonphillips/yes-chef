@@ -99,7 +99,6 @@ public enum GroceryRepository {
     now: Date,
     uuid: () -> UUID
   ) throws -> GroceryList.ID {
-    try GroceryStoreAreaCache.backfill(in: db)
     let lists = try GroceryList.fetchAll(db).sorted(by: areGroceryListsInIncreasingOrder)
     if let defaultList = try reconciledDefaultList(in: db, lists: lists, now: now) {
       return defaultList.id

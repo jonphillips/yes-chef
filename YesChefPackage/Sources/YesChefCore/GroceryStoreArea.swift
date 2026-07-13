@@ -68,6 +68,9 @@ public enum GroceryStoreArea: Hashable, Sendable {
 
   public static func normalized(_ value: String?) -> Self? {
     guard let normalizedValue = normalizedText(value) else { return nil }
+    if let area = canonicalAreas.first(where: { normalizedText($0.title) == normalizedValue }) {
+      return area
+    }
     if let area = synonyms[normalizedValue] {
       return area
     }
