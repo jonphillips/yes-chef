@@ -895,7 +895,8 @@ struct GroceryIngredientSelectionView: View {
             title: "Ingredients",
             choices: regularChoices,
             selectedIngredientLineIDs: $selectedIngredientLineIDs,
-            showsRecipeTitle: showsRecipeTitle
+            showsRecipeTitle: showsRecipeTitle,
+            scale: context.displayScale
           )
         }
 
@@ -904,7 +905,8 @@ struct GroceryIngredientSelectionView: View {
             title: "Skipped Pantry Staples",
             choices: pantryStapleChoices,
             selectedIngredientLineIDs: $selectedIngredientLineIDs,
-            showsRecipeTitle: showsRecipeTitle
+            showsRecipeTitle: showsRecipeTitle,
+            scale: context.displayScale
           )
         }
       }
@@ -969,6 +971,7 @@ private struct GroceryIngredientChoiceSection: View {
   let choices: [GroceryIngredientChoice]
   @Binding var selectedIngredientLineIDs: Set<IngredientLine.ID>
   var showsRecipeTitle: Bool
+  var scale: Double
 
   var body: some View {
     Section(title) {
@@ -979,7 +982,8 @@ private struct GroceryIngredientChoiceSection: View {
           GroceryIngredientChoiceRow(
             choice: choice,
             isSelected: selectedIngredientLineIDs.contains(choice.line.id),
-            showsRecipeTitle: showsRecipeTitle
+            showsRecipeTitle: showsRecipeTitle,
+            scale: scale
           )
         }
         .buttonStyle(.plain)
@@ -1000,6 +1004,7 @@ private struct GroceryIngredientChoiceRow: View {
   let choice: GroceryIngredientChoice
   var isSelected: Bool
   var showsRecipeTitle: Bool
+  var scale: Double
 
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
@@ -1009,7 +1014,7 @@ private struct GroceryIngredientChoiceRow: View {
         .frame(width: 28, height: 28)
 
       VStack(alignment: .leading, spacing: 4) {
-        Text(choice.line.originalText)
+        Text(IngredientScaler.scaledText(for: choice.line, factor: scale))
           .foregroundStyle(.primary)
 
         if let detailText {

@@ -444,13 +444,18 @@ final class GroceryLibraryModel {
     }
   }
 
-  func selectRecipeButtonTapped(recipeID: Recipe.ID) {
+  func selectRecipeButtonTapped(
+    recipeID: Recipe.ID,
+    scaleContext: ScaleContext? = nil
+  ) {
+    let scaleContext = scaleContext ?? .recipe(recipeID)
     loadIngredientSelection(
-      source: .recipe(recipeID),
+      source: .recipe(recipeID, scaleContext),
       title: "Recipe",
       subtitle: "Recipe",
       recipeIDs: [recipeID],
-      recipeTitleID: recipeID
+      recipeTitleID: recipeID,
+      scaleContext: scaleContext
     )
   }
 
@@ -459,7 +464,8 @@ final class GroceryLibraryModel {
     title: String,
     subtitle: String?,
     recipeIDs: Set<Recipe.ID>,
-    recipeTitleID: Recipe.ID? = nil
+    recipeTitleID: Recipe.ID? = nil,
+    scaleContext: ScaleContext? = nil
   ) {
     Task {
       do {
@@ -469,11 +475,18 @@ final class GroceryLibraryModel {
              let recipe = try Recipe.find(recipeTitleID).fetchOne(db) {
             resolvedTitle = recipe.title
           }
+          let displayScale: Double
+          if let scaleContext {
+            displayScale = try RecipeScaleRepository.scale(for: scaleContext, in: db) ?? 1
+          } else {
+            displayScale = 1
+          }
           return GroceryIngredientSelectionPresentation(
             context: GroceryIngredientSelectionContext(
               source: source,
               title: resolvedTitle,
-              subtitle: subtitle
+              subtitle: subtitle,
+              displayScale: displayScale
             ),
             choices: try GroceryIngredientChoiceRequest(recipeIDs: recipeIDs).fetch(db)
           )
@@ -507,15 +520,38 @@ final class GroceryLibraryModel {
           uuid: { uuid() }
         )
         switch context.source {
-        case let .recipe(recipeID):
-          try GroceryRepository.addRecipe(
-            recipeID: recipeID,
-            groceryListID: listID,
-            in: db,
-            now: now,
-            uuid: { uuid() },
-            includedIngredientLineIDs: selectedIngredientLineIDs
-          )
+        case let .recipe(recipeID, scaleContext):
+          switch scaleContext {
+          case .recipe:
+            try GroceryRepository.addRecipe(
+              recipeID: recipeID,
+              groceryListID: listID,
+              in: db,
+              now: now,
+              uuid: { uuid() },
+              includedIngredientLineIDs: selectedIngredientLineIDs
+            )
+
+          case let .mealPlanItem(itemID):
+            try GroceryRepository.addMealPlanItem(
+              itemID: itemID,
+              groceryListID: listID,
+              in: db,
+              now: now,
+              uuid: { uuid() },
+              includedIngredientLineIDs: selectedIngredientLineIDs
+            )
+
+          case let .menuItem(itemID):
+            try GroceryRepository.addMenuItem(
+              itemID: itemID,
+              groceryListID: listID,
+              in: db,
+              now: now,
+              uuid: { uuid() },
+              includedIngredientLineIDs: selectedIngredientLineIDs
+            )
+          }
 
         case let .mealPlanRows(itemIDs):
           let rows = mealRows.filter { itemIDs.contains($0.item.id) }
@@ -587,8 +623,11 @@ final class GroceryLibraryModel {
     }
   }
 
-  func addRecipeButtonTapped(recipeID: Recipe.ID) {
-    selectRecipeButtonTapped(recipeID: recipeID)
+  func addRecipeButtonTapped(
+    recipeID: Recipe.ID,
+    scaleContext: ScaleContext? = nil
+  ) {
+    selectRecipeButtonTapped(recipeID: recipeID, scaleContext: scaleContext)
   }
 
   func addRecipeImmediately(recipeID: Recipe.ID) {
@@ -744,7 +783,7 @@ struct GroceryDisplaySections: Equatable {
 
 struct GroceryIngredientSelectionContext: Hashable, Sendable {
   enum Source: Hashable, Sendable {
-    case recipe(Recipe.ID)
+    case recipe(Recipe.ID, ScaleContext)
     case mealPlanRows([MealPlanItem.ID])
     case menu(CoreMenu.ID)
   }
@@ -752,6 +791,7 @@ struct GroceryIngredientSelectionContext: Hashable, Sendable {
   var source: Source
   var title: String
   var subtitle: String?
+  var displayScale: Double = 1
 }
 
 struct GroceryAddConfirmation: Identifiable, Hashable, Sendable {
