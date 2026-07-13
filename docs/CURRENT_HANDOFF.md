@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 13, 2026 (ADR-0038 External-LLM handoff set as Next Up — S1 first; ADR-0036 shipped PR #178).
+Last updated: July 13, 2026 (ADR-0038 S1 shipped PR #179 → DONE-LOG; Next Up = ADR-0038 S2, the App Intents surface).
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,18 +21,22 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0038](decisions/ADR-0038-external-llm-handoff.md) External-LLM handoff, S1
-only** ([`efforts/adr-0038-external-llm-handoff.md`](efforts/adr-0038-external-llm-handoff.md)). Generalizes
-the menu Copy/Paste-to-ChatGPT round-trip into a **session-tracked, App-Intents-routed** handoff from any
-source. **S1 = the transport-agnostic core, proven through the existing menu paste path** (no new UI): a
-**device-local** `AIHandoff` record + a `YC-HANDOFF:` token (emit on Copy Prep Prompt, strip/route/dedupe on
-Paste Prep Plan) + the `→`-glyph hardening (ADR-0038 D2). **Keep the `AIHandoff` table out of the CloudKit
-SyncEngine set** (confirm the per-table opt-out; else a device-local store) — this sync-exclusion is why S1
-leads. **Do S1 only this dispatch;** S2 (App Intents surface + per-menu project + the additive
-`Menu.externalProjectName` column → add to the standing prod-schema follow-up when it lands) and S3
-(generalize the serializer to Recipe/MealPlan) follow. Pre-code de-risked 2026-07-13: `Ask ChatGPT` returns
-text as a value and a live beach-menu round-trip parsed cleanly ([ADR-0038](decisions/ADR-0038-external-llm-handoff.md)
-D2/OQ3).
+**Live dispatch target — [ADR-0038](decisions/ADR-0038-external-llm-handoff.md) External-LLM handoff, S2**
+([`efforts/adr-0038-external-llm-handoff.md`](efforts/adr-0038-external-llm-handoff.md)). The **App Intents
+surface** over the S1 core (shipped PR #179 → DONE-LOG). Build: three `AppEntity`s (Recipe/Menu/MealPlan,
+`SyncableEntity`); **`ExportHandoffContext(source:)`** (`@UnionValue` source, creates the handoff, returns
+the prompt **and** `Menu.externalProjectName`); **`ImportHandoffResult(handoffID:result:)`** routing by id →
+**`OpensIntent`** into `RecipeCollectionReviewSheet`; the additive **`Menu.externalProjectName`** column
+(per-menu ChatGPT project, OQ6 — **add to the standing prod-schema follow-up** below when it lands) + a
+menu-detail field to set it. **Two device-pass learnings now baked into scope** (see the effort brief S2):
+**(1)** an **immediate-mode prompt variant** (`AIHandoffToken.prompt(mode:)`, format-on-first-response, exact
+`session:`/`- task → serves` format restated **last**) is **required** — the automated
+`Export → Ask ChatGPT → Import` chain has no human to say "finalize" (S1's prompt is discuss-only, confirmed
+on device). **(2)** **strict block-on-duplicate dedupe** lives in `ImportHandoffResult` (guard a double-fire);
+the manual paste only informs. Resolve **OQ5** (no-`source` Action-Button invocation) and **OQ6** (does
+`Start chat in project` accept a *variable* project) on device. New `AppIntents/` group in the app target.
+**S3** (generalize the serializer to Recipe/MealPlan) follows S2. S2 is greenfield with real unknowns
+(OQ5/OQ6) — its own dispatch, not batched.
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**
