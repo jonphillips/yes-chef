@@ -9,6 +9,57 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## Grocery quantity scaling fix
+
+**Architect-reviewed 2026-07-12, Jon device-passed 2026-07-13 — yes-chef PRs
+[#167](https://github.com/jonphillips/yes-chef/pull/167)–[#170](https://github.com/jonphillips/yes-chef/pull/170).**
+Scaling a recipe / menu item / meal-plan item never scaled the quantities added to the grocery list —
+generation and the source-removal recompute both read raw `line.quantity`. Fixed in `GroceryCore.swift` with one
+source-provenance-keyed `groceryScale` helper (priority `menuItem.scale → mealPlanItem.scale → recipe.viewScale`),
+applied in both `GroceryGeneratedItemDraft` (scale 1 preserves fraction text byte-for-byte) and `generatedMeasure`;
+free-text quantities left unscaled. New + updated tests in `GroceryTests`/`GroceryPlanningTests` (293 pass).
+
+---
+## ADR-0035 S2 — on-device grocery store-area classifier
+
+**Architect-reviewed 2026-07-13, Jon device-passed 2026-07-13 — yes-chef PR
+[#174](https://github.com/jonphillips/yes-chef/pull/174).**
+[ADR-0035](decisions/ADR-0035-grocery-store-area-grouping.md) S2 — the first `.onDevice`-by-design verb. A new
+`GroceryCategorizationClient` (mirrors `MenuDepositClient`) classifies the *new, uncached* canonical names
+(`aisle == nil`) once, folds output through `GroceryStoreArea.normalized`, and writes `aisle` via
+`GroceryStoreAreaCache.applyClassified` — **never** overwriting user/seed/prior (the stability contract),
+**never** on the writer, degrading silently to "Other" on `onDeviceUnavailable`. Runs on **both** triggers
+(after each generation path AND once on grocery-detail appearance, guarded by uncached-names non-empty) so
+existing lists fill without a regen. No schema change; categorization only *places* items, never invents or
+merges list data ([[llm-vs-determinism-surface-boundary]]). Touches `GroceryModels.swift` / `GroceryViews.swift`
++ new `GroceryCategorization.swift` / `GroceryStoreArea.swift`; new `GroceryCategorizationTests.swift`. **Closes
+ADR-0035.**
+
+---
+## ADR-0035 S1 — grocery store-area grouping
+
+**Architect-reviewed & approved 2026-07-13, Jon device-passed 2026-07-13 — yes-chef PR
+[#172](https://github.com/jonphillips/yes-chef/pull/172).**
+[ADR-0035](decisions/ADR-0035-grocery-store-area-grouping.md), Accepted. The existing synced
+`GroceryItem.aisle` column receives a deterministic seed and the flat "To Buy" list groups by store area (no
+migration; a fresh migration runs the backfill). Store-walk order fixed to Jon's 13 areas (perishables last,
+OQ1 resolved 2026-07-12); a hand-set aisle survives regeneration; Purchased stays a flat crossed-off tail. S2
+(on-device long-tail classifier) landed in #174 above.
+
+---
+## ADR-0034 S3c — enrich the exported dish context (Amendment 1)
+
+**Architect-reviewed 2026-07-12 — yes-chef PR
+[#166](https://github.com/jonphillips/yes-chef/pull/166).**
+[ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md) Amendment 1. The menu "Copy Dish Context"
+button became a self-contained **frontier** prompt (renamed **"Copy Prep Prompt"**): serializes at `.frontier`
+budget, threads full recipe **method** into `MenuChatItemContext` (with `InstructionSection` sub-headers, a
+method-first trim rung on the on-device path), **uncaps ingredients** on the frontier path (8 stays the on-device
+starting ceiling only), and **prepends a real intro prompt** (adapted `MenuPrepPlanClient.instructions` +
+`tasteProfile`/`makeAheadPrepPlanPreference` via `aiPromptPreferences`) asking for **review-text** output so
+ChatGPT's answer pastes back cleanly. The meal-calendar per-day make-ahead-strategy verb was left untouched.
+
+---
 ## Meal-planner (Calendar) row affordance swap
 
 **Architect-reviewed 2026-07-12 — yes-chef PR [#154](https://github.com/jonphillips/yes-chef/pull/154)
