@@ -52,6 +52,8 @@ final class GroceryLibraryModel {
   var isShowingError = false
   var toastCenter: AppToastCenter?
   var pantryAddBackItemIDsByListID: [CoreGroceryList.ID: Set<GroceryItem.ID>] = [:]
+  @ObservationIgnored
+  var groceryCategorizationAttemptCache = GroceryCategorizationAttemptCache()
 
   init(toastCenter: AppToastCenter? = nil) {
     self.toastCenter = toastCenter
@@ -93,87 +95,6 @@ final class GroceryLibraryModel {
   var availableMenuRows: [MenuRowData] {
     menuRows.sorted {
       $0.menu.title.localizedStandardCompare($1.menu.title) == .orderedAscending
-    }
-  }
-
-  func reloadAfterExternalChange() async {
-    try? await $listRows.load()
-    try? await $itemRows.load()
-    try? await $pantryItems.load()
-    try? await $menuRows.load()
-  }
-
-  func ensureDefaultListIfNeeded() {
-    do {
-      let listID = try database.write { db in
-        try GroceryRepository.ensureDefaultList(
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
-      }
-      if selectedListID == nil {
-        selectedListID = listID
-      }
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
-    }
-  }
-
-  func addListButtonTapped() {
-    destination = .addList
-  }
-
-  func addPantryItemButtonTapped() {
-    destination = .addPantryItem
-  }
-
-  func addCustomItemButtonTapped() {
-    destination = .addCustomItem
-  }
-
-  func editItemButtonTapped(itemID: GroceryItem.ID) {
-    destination = .editItem(itemID)
-  }
-
-  func editListButtonTapped(listID: CoreGroceryList.ID) {
-    destination = .editList(listID)
-  }
-
-  func saveListButtonTapped(
-    listID: CoreGroceryList.ID? = nil,
-    title: String,
-    remindersListName: String
-  ) -> Bool {
-    do {
-      let listID = try database.write { db in
-        if let listID {
-          try GroceryRepository.updateList(
-            listID: listID,
-            title: title,
-            remindersListName: remindersListName,
-            in: db,
-            now: now
-          )
-          return listID
-        } else {
-          return try GroceryRepository.addList(
-            title: title,
-            remindersListName: remindersListName,
-            in: db,
-            now: now,
-            uuid: { uuid() }
-          )
-        }
-      }
-      selectedListID = listID
-      destination = nil
-      return true
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
-      return false
     }
   }
 
@@ -585,6 +506,7 @@ final class GroceryLibraryModel {
           ingredientCount: selectedIngredientLineIDs.count
         ).message
       )
+      Task { await categorizeUncachedItems() }
       return true
     } catch {
       errorMessage = String(describing: error)
@@ -617,6 +539,7 @@ final class GroceryLibraryModel {
         return listID
       }
       self.selectedListID = listID
+      Task { await categorizeUncachedItems() }
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
@@ -650,6 +573,7 @@ final class GroceryLibraryModel {
         return listID
       }
       self.selectedListID = listID
+      Task { await categorizeUncachedItems() }
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
@@ -667,6 +591,87 @@ final class GroceryLibraryModel {
 }
 
 extension GroceryLibraryModel {
+  func reloadAfterExternalChange() async {
+    try? await $listRows.load()
+    try? await $itemRows.load()
+    try? await $pantryItems.load()
+    try? await $menuRows.load()
+  }
+
+  func ensureDefaultListIfNeeded() {
+    do {
+      let listID = try database.write { db in
+        try GroceryRepository.ensureDefaultList(
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+      if selectedListID == nil {
+        selectedListID = listID
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func addListButtonTapped() {
+    destination = .addList
+  }
+
+  func addPantryItemButtonTapped() {
+    destination = .addPantryItem
+  }
+
+  func addCustomItemButtonTapped() {
+    destination = .addCustomItem
+  }
+
+  func editItemButtonTapped(itemID: GroceryItem.ID) {
+    destination = .editItem(itemID)
+  }
+
+  func editListButtonTapped(listID: CoreGroceryList.ID) {
+    destination = .editList(listID)
+  }
+
+  func saveListButtonTapped(
+    listID: CoreGroceryList.ID? = nil,
+    title: String,
+    remindersListName: String
+  ) -> Bool {
+    do {
+      let listID = try database.write { db in
+        if let listID {
+          try GroceryRepository.updateList(
+            listID: listID,
+            title: title,
+            remindersListName: remindersListName,
+            in: db,
+            now: now
+          )
+          return listID
+        } else {
+          return try GroceryRepository.addList(
+            title: title,
+            remindersListName: remindersListName,
+            in: db,
+            now: now,
+            uuid: { uuid() }
+          )
+        }
+      }
+      selectedListID = listID
+      destination = nil
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
   func saveCustomItemButtonTapped(
     title: String,
     quantityText: String,
@@ -698,6 +703,7 @@ extension GroceryLibraryModel {
       }
       self.selectedListID = listID
       destination = nil
+      Task { await categorizeUncachedItems() }
       return true
     } catch {
       errorMessage = String(describing: error)
@@ -742,6 +748,33 @@ extension GroceryLibraryModel {
       list: selectedListRow.list,
       rows: selectedDisplaySections.shoppingRows
     )
+  }
+
+  func categorizeUncachedItems() async {
+    @Dependency(\.groceryCategorizationClient) var groceryCategorizationClient
+
+    do {
+      try await database.write { db in
+        try GroceryStoreAreaCache.backfill(in: db)
+      }
+      try? await $itemRows.load()
+
+      let uncategorizedNames = try await database.read { db in
+        try GroceryStoreAreaCache.uncategorizedCanonicalNames(in: db)
+      }
+      let names = groceryCategorizationAttemptCache.namesToClassify(from: uncategorizedNames)
+      guard !names.isEmpty else { return }
+
+      let classified = try await groceryCategorizationClient(names: names, tier: .onDevice)
+      guard !classified.isEmpty else { return }
+
+      try await database.write { db in
+        try GroceryStoreAreaCache.applyClassified(classified, in: db)
+      }
+      try? await $itemRows.load()
+    } catch {
+      return
+    }
   }
 
   private func removePantryAddBack(itemID: GroceryItem.ID) {

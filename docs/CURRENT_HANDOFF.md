@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 12, 2026. **🎉 iCloud sync works end-to-end across two physical devices** (`iPad Pro 13-inch (M5)`
+Last updated: July 13, 2026. **🎉 iCloud sync works end-to-end across two physical devices** (`iPad Pro 13-inch (M5)`
 ↔ `iPhone 17 Pro`) — recipes, images, menus all round-trip; the M4 one-way gate everything preceded is
 **crossed and holding** (logged in [`docs/DONE-LOG.md`](DONE-LOG.md); we stay in CloudKit **Development** by
 design — prod-schema promotion is the held ops step below). **Two big things closed with it:**
@@ -77,6 +77,12 @@ overwriting user/seed/prior (the stability contract), never on the writer, degra
 once on grocery-detail appearance (guarded by uncached-names non-empty) — so existing lists fill without a
 regen. No schema change; first `.onDevice`-by-design verb. Its categorization only *places* items; it never
 invents or merges list data ([[llm-vs-determinism-surface-boundary]]).
+
+**S2 review amendment (PR [#174](https://github.com/jonphillips/yes-chef/pull/174), 2026-07-13):** deterministic
+seeds now resolve exact names, comparison keys, then conservative produce head nouns before any model request;
+the on-device request uses eight names per batch and retries only omitted names once. Failed/omitted names are
+remembered only for the current app session — no schema or sync state. **Next after S2 (not dispatched):** a
+cloud-tier fallback for still-uncategorized names remains deliberately deferred; Jon must choose and scope it.
 
 **ADR-0035 S1 device pass still owed (Jon), independent of S2:** generate a grocery list from a multi-recipe
 menu, confirm items land in the right departments in store-walk order, and confirm a hand-set aisle survives
