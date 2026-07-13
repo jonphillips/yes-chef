@@ -21,10 +21,19 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**No live dispatch target.** The ADR-0035 grocery store-area effort (S1 + S2) is complete and device-passed
-→ [`docs/DONE-LOG.md`](DONE-LOG.md). **Jon picks the next dispatch from the Ready Efforts queue below — do
-not infer.** Per `docs/AGENTS.md` § Work Intake & Dispatch, when this section names no target the agent must
-**STOP and ask Jon.**
+**Live dispatch target — [ADR-0036](decisions/ADR-0036-promote-note-to-recipe.md): promote a recipe-shaped
+note → a real recipe.** Formalizes ADR-0027 D5/A6. **OQ1 resolved 2026-07-12:** first scope is a **menu
+note-item** (`MealPlanItemKind.note`, no `recipeID`, per [[menu-item-recipe-id-invariant]]) whose body is recipe
+prose. Build the **S1 + S2 batch** (cohesive — one PR) to the ADR: **S1** = wire the note text through the
+`RecipeParseBuilder`-style extraction into a `WorkbenchDraftRecipe`, surface it in the ADR-0024 review preview,
+commit to a new `Recipe` with a provenance link — reuses the existing parse + review + commit machinery; the
+net-new is the entry point (a note action) + the note→draft adapter. **Schema-free if provenance rides an
+existing column/snapshot; otherwise one additive nullable column — call it out and add it to the standing
+prod-schema follow-up.** **S2** = when the source is a menu note-item, offer to swap it for a recipe-kind item
+referencing the new recipe (satisfies [[menu-item-recipe-id-invariant]]) — app-layer, small, gated on S1.
+Reuses web-capture extraction, no new parser; the genuinely new design work is **placement + provenance**
+([[reference-placement-and-original-provenance]]). **Confirm the S1+S2 batch scope with Jon before dispatch**
+(the ADR flags it). `RecipeNote` promotion is a later S3, out of this scope.
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**
@@ -61,12 +70,6 @@ Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); no
 target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
 **Dogfood 2026-07-12 — trip-prep pass (Jon picks order, none dispatched).**
-- **Promote a note → a real recipe** — [ADR-0036](decisions/ADR-0036-promote-note-to-recipe.md). Formalizes
-  ADR-0027 D5/A6. Parse recipe-shaped note prose → `WorkbenchDraftRecipe` → ADR-0024 review → real `Recipe`
-  (reuses web-capture parse + editable-proposal surface). Real design work is **placement + provenance**.
-  **OQ1 resolved 2026-07-12:** scope is a **menu note-item** in recipe shape → S1 library commit, S2 swaps
-  the note-item for a recipe-kind menu item. The "just add notes to grocery" alternative was rejected as a
-  trap (secretly the same parse, none of the reuse).
 - **Menu note-item truncation** — [`efforts/menu-note-truncation.md`](efforts/menu-note-truncation.md).
   One-line `.lineLimit(5)` at `MenuDetailSections.swift` ~272. Trivial free rider — bundle into any adjacent
   menu/list dispatch.

@@ -9,6 +9,25 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0037 — grocery seed-coverage diagnostic
+
+**⏳ PENDING — architect-reviewed 2026-07-13; awaiting merge + Jon device pass before this entry is final
+(fill the PR # and device-pass date on merge).** yes-chef PR
+[#177](https://github.com/jonphillips/yes-chef/pull/177).
+[ADR-0037](decisions/ADR-0037-grocery-seed-coverage-diagnostic.md) S1 + S2 (one batch). Closes ADR-0035 OQ1's
+curation loop — a read-only, dev-facing review queue for canonical grocery names that miss
+`GroceryStoreArea.seed(for:)`. **S1** = pure `SeedCoverageReport` + `make(from:)` in `YesChefCore` (seed hits
+excluded via `seed(for:)` not raw `seedAreas`; uncovered vs covered-elsewhere split on any stored aisle;
+most-common aisle → `suggestedArea`; count-desc/name-asc sort; deterministic tie-break) + a
+`GroceryStoreAreaCache.seedCoverage(in:)` DB adapter over `IngredientLine ∪ GroceryItem` + a tested
+Swift-literal export (`.other` placeholder for uncovered). **S2** = `SeedCoverageView` + an always-on
+**Developer** section in `SettingsView` (two grouped lists, counts in headers, copy-per-row + copy-per-group via
+`UIPasteboard`, reload on appear + `DatabaseChangeBeacon.didChange`). No schema change, no sync surface — purely
+derived from existing durable columns ([[grocery-area-no-learned-cache]], [[llm-vs-determinism-surface-boundary]]).
+Review fold: adapter switched to the `canonicalIngredientName` accessor (not the raw `canonicalName` column) so
+rows with an unpopulated column aren't silently dropped from the queue. New `SeedCoverageReportTests`.
+
+---
 ## Grocery quantity scaling fix
 
 **Architect-reviewed 2026-07-12, Jon device-passed 2026-07-13 — yes-chef PRs
