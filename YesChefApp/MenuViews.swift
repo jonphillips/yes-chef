@@ -287,6 +287,11 @@ struct MenuDetailView: View {
     } message: {
       Text(detailModel.errorMessage ?? "")
     }
+    .alert("Prep Plan", item: $detailModel.information) { _ in
+      Button("OK", role: .cancel) {}
+    } message: { information in
+      Text(information.message)
+    }
   }
 
   private var isSplitEnabled: Bool {

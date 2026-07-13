@@ -459,6 +459,19 @@ final class MenuLibraryModel {
 @Observable
 @MainActor
 final class MenuDetailModel {
+  enum Information: Hashable, Identifiable {
+    case alreadyImported
+
+    var id: Self { self }
+
+    var message: String {
+      switch self {
+      case .alreadyImported:
+        "Already imported from that prompt. Tap Copy Prep Prompt to import a fresh plan."
+      }
+    }
+  }
+
   let menuID: CoreMenu.ID
 
   @ObservationIgnored
@@ -476,6 +489,7 @@ final class MenuDetailModel {
   var noteRecipeReview: MenuNoteRecipePromotionReview?
   var noteReplacementOffer: MenuNoteReplacementOffer?
   var isPromotingNoteRecipe = false
+  var information: Information?
   var errorMessage: String?
   var isShowingError = false
 
@@ -585,7 +599,7 @@ final class MenuDetailModel {
     let currentPlan = MenuPrepPlan(steps: MenuPrepPlanCoding.decode(detail?.menu.prepPlan))
 
     do {
-      _ = try database.write { db in
+      let result = try database.write { db in
         try AIHandoffMenuPrepPlanImport.apply(
           text: text,
           to: menuID,
@@ -593,6 +607,9 @@ final class MenuDetailModel {
           in: db,
           now: now
         )
+      }
+      if result == .duplicate {
+        information = .alreadyImported
       }
     } catch {
       errorMessage = String(describing: error)
