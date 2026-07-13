@@ -54,10 +54,9 @@ correction, and on commit creates a real `Recipe` with structured ingredients + 
 **advisory input to a review**, not an autonomous write — consistent with the whole apply-action family
 and the "preserve original text" priority.
 
-**Provenance.** The source note is preserved, not consumed. The new recipe carries a passive provenance
-link back to the originating note (mirroring [[reference-placement-and-original-provenance]]'s
-snapshot-as-provenance stance); the note itself is left intact (optionally annotated "promoted →
-<recipe>"). No destructive delete of user prose.
+**Provenance.** The source note is preserved, not consumed. The original prose rides into the new recipe
+as an editable general note (see OQ2 — resolved to a `RecipeNote`, not a `RecipeSource` snapshot or FK);
+the note itself is left intact until the user opts into S2 replacement. No destructive delete of user prose.
 
 **Placement.** The new recipe lands in the main library by default. If the source was a *menu* note-item,
 the promotion additionally offers to **replace the note-item in place with a recipe-kind menu item**
@@ -93,8 +92,15 @@ referencing the new recipe (satisfies [[menu-item-recipe-id-invariant]]). App-la
   recipe prose. So **S1 targets the menu note-item**, and S2's menu re-placement (swap the note-item for a
   recipe-kind item pointing at the new recipe) is the natural completion of that exact flow. `RecipeNote`
   promotion is a later, separate slice (S3), not part of this scope.
-- **OQ2 — provenance storage.** Passive snapshot vs. a real FK back-link. Prefer the lightest thing that
-  survives sync; decide during S1 design (affects whether a schema column is needed).
+- **OQ2 — provenance storage. — RESOLVED 2026-07-13 (S1 build).** Neither a snapshot nor an FK. The
+  original note prose is written into the new recipe as an **editable general `RecipeNote`** (`From menu
+  note "<title>":` + the prose), not a `RecipeSource`. Rationale from device testing: a `RecipeSource`
+  renders as a pinned, non-editable "source" card at the top of the recipe (and can't be deleted), which
+  crowds the recipe and the menu row for no payoff. A general note is user-trimmable/deletable, survives
+  sync as plain text (the lightest thing that survives), and needs no schema column. No machine FK is
+  stored: after S2 replacement the live back-link is the menu item's own `recipeID`; for a kept note the
+  human-readable attribution line is the provenance. The S2 replacement also clears the note row's
+  `notes` so the promoted row collapses to its title.
 - **OQ3 — parse quality bar for hand-typed prose.** Web capture parses fairly structured page markup;
   free-hand note prose is messier. The editable review (ADR-0024) is the safety net, but watch whether
   on-device extraction is strong enough or this should default frontier-preferred.

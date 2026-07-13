@@ -273,10 +273,22 @@ private struct MenuDishRowView: View {
           Text(notes)
             .font(.subheadline)
             .foregroundStyle(.secondary)
+            .lineLimit(3)
         }
       }
 
       Spacer()
+
+      if row.item.kind == .note {
+        Button {
+          detailModel.makeRecipeFromNoteButtonTapped(row.item)
+        } label: {
+          Label("Make Recipe", systemImage: "book.badge.plus")
+            .labelStyle(.iconOnly)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel("Make a recipe from \(row.displayTitle)")
+      }
 
       Button {
         detailModel.targetItemTapped(row.id)

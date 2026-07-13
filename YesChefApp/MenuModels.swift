@@ -473,6 +473,9 @@ final class MenuDetailModel {
   /// The menu item the next chat "deposit" writes onto (ADR-0027 Amendment 1 tap-to-target). `nil`
   /// when nothing is targeted, in which case the deposit verbs don't appear. Device-local, unsynced.
   var selectedTargetItemID: MenuItem.ID?
+  var noteRecipeReview: MenuNoteRecipePromotionReview?
+  var noteReplacementOffer: MenuNoteReplacementOffer?
+  var isPromotingNoteRecipe = false
   var errorMessage: String?
   var isShowingError = false
 
@@ -491,6 +494,65 @@ final class MenuDetailModel {
   /// Toggles a menu item as the active deposit target. Tapping the current target clears it.
   func targetItemTapped(_ itemID: MenuItem.ID) {
     selectedTargetItemID = selectedTargetItemID == itemID ? nil : itemID
+  }
+
+  /// ADR-0036 S1: make a reviewed, editable recipe proposal from a recipe-shaped menu note.
+  func makeRecipeFromNoteButtonTapped(_ item: MenuItem) {
+    guard let promotion = MenuNoteRecipePromotion(menuItem: item) else {
+      errorMessage = "This note needs recipe prose before it can become a recipe."
+      isShowingError = true
+      return
+    }
+    guard !promotion.draftRecipe.isEmpty else {
+      errorMessage = "This note needs both ingredients and instructions before it can become a recipe."
+      isShowingError = true
+      return
+    }
+    noteRecipeReview = MenuNoteRecipePromotionReview(promotion: promotion)
+  }
+
+  func reviewItem(for review: MenuNoteRecipePromotionReview) -> ChatApplyReviewItem {
+    let draftRecipe = review.promotion.draftRecipe
+    let originalEditableText = draftRecipe.editableProseReviewText()
+    return ChatApplyReviewItem(
+      title: "Review recipe from note",
+      summary: draftRecipe.renderedReview(),
+      editableTitle: "Draft prose fields",
+      editableText: originalEditableText,
+      supportingEvidenceTitle: "Original menu note",
+      supportingEvidenceRows: [review.promotion.originalProse],
+      commitTitle: "Create Recipe",
+      committingTitle: "Creating recipe…",
+      committedTitle: "Created Recipe",
+      commit: { [weak self] editedText in
+        try self?.commitPromotedRecipe(
+          editedText: editedText,
+          review: review,
+          originalEditableText: originalEditableText
+        )
+      }
+    )
+  }
+
+  func discardNoteRecipeReview() {
+    noteRecipeReview = nil
+  }
+
+  func replacePromotedNote(_ offer: MenuNoteReplacementOffer) {
+    do {
+      try database.write { db in
+        try MenuRepository.replaceNoteItemWithRecipe(
+          itemID: offer.sourceItemID,
+          recipeID: offer.recipeID,
+          in: db,
+          now: now
+        )
+      }
+      noteReplacementOffer = nil
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
   }
 
   func prepPlanPasted(_ text: String) {
@@ -815,12 +877,44 @@ final class MenuDetailModel {
       )
     }
   }
+
+  private func commitPromotedRecipe(
+    editedText: String,
+    review: MenuNoteRecipePromotionReview,
+    originalEditableText: String
+  ) throws {
+    isPromotingNoteRecipe = true
+    defer { isPromotingNoteRecipe = false }
+
+    let approvedRecipe = editedText == originalEditableText
+      ? review.promotion.draftRecipe
+      : review.promotion.draftRecipe.applyingEditableProseReviewText(editedText)
+    guard !approvedRecipe.isEmpty else {
+      throw MenuDetailError.emptyPromotedRecipe
+    }
+
+    let recipeID = try database.write { db in
+      try RecipeRepository.save(
+        draft: review.promotion.editorDraft(for: approvedRecipe),
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
+    }
+    noteRecipeReview = nil
+    noteReplacementOffer = MenuNoteReplacementOffer(
+      sourceItemID: review.promotion.sourceItemID,
+      recipeID: recipeID,
+      recipeTitle: approvedRecipe.title
+    )
+  }
 }
 
 private enum MenuDetailError: Error, CustomStringConvertible, LocalizedError {
   case emptyPrepPlan
   case emptyDepositNote
   case depositTargetMissing
+  case emptyPromotedRecipe
 
   var description: String {
     switch self {
@@ -830,10 +924,26 @@ private enum MenuDetailError: Error, CustomStringConvertible, LocalizedError {
       "The assistant did not find a note to add."
     case .depositTargetMissing:
       "The deposit target is no longer on this menu."
+    case .emptyPromotedRecipe:
+      "The recipe proposal needs a title plus ingredients or instructions."
     }
   }
 
   var errorDescription: String? { description }
+}
+
+struct MenuNoteRecipePromotionReview: Identifiable {
+  let promotion: MenuNoteRecipePromotion
+
+  var id: MenuItem.ID { promotion.sourceItemID }
+}
+
+struct MenuNoteReplacementOffer: Identifiable {
+  let sourceItemID: MenuItem.ID
+  let recipeID: Recipe.ID
+  let recipeTitle: String
+
+  var id: Recipe.ID { recipeID }
 }
 
 enum MenuListStyle {
