@@ -70,7 +70,15 @@ The menu round-trip already works; S1 adds the *session* around it, no new UI su
   `importedAt`). Missing/absent token → today's behavior unchanged (self-describing fallback).
 - **Harden the `→` glyph** per D2.
 - **Prove it:** Copy Prep Prompt (record created, token in clipboard) → `Ask ChatGPT` shortcut → Paste Prep
-  Plan (token matched, plan parses into bands, handoff flips to `.imported`, re-paste no-ops).
+  Plan (token matched, plan parses into bands, handoff flips to `.imported`).
+
+**S1 follow-up — device-pass finding (2026-07-13, folds into #179).** `prepPlanPasted` currently *discards*
+the `AIHandoffMenuPrepPlanImport` result, so a re-paste of an already-imported hand-off returns `.duplicate`
+and **fails silently** — the wrong-menu guard *throws* first, so a wrong-menu paste errors correctly while a
+correct-menu re-paste is silent (the exact asymmetry Jon caught on device). Fix: stop discarding the result;
+on `.duplicate` show an **informative, non-error** message ("Already imported from that prompt — tap Copy
+Prep Prompt to import again"). Keep it **non-destructive**: do *not* silently re-apply, because a re-paste of
+an old clipboard would clobber any hand-edits made to the plan since the first import. Never fail silently.
 
 ### S2 — the App Intents surface + review-sheet import + per-menu project (follows S1)
 
@@ -84,6 +92,14 @@ The menu round-trip already works; S1 adds the *session* around it, no new UI su
   **`OpensIntent`** into `RecipeCollectionReviewSheet` (D6 — discuss path always previews).
 - **`Menu.externalProjectName: String?`** — additive column; a menu-detail field to set it. Verify on-device
   whether `Start chat in project` takes the project as a variable (OQ6); flag the finding in the PR.
+- **Immediate-mode prompt variant** (`AIHandoffToken.prompt(mode:)`) — **required for S2, not optional.** The
+  S1 prompt is the *discuss* variant: it defers the strict format until the user types "finalize" (validated
+  on device 2026-07-13 — an un-finalized paste came back as prose). The automated
+  `Export → Ask ChatGPT → Import` chain has **no human to say "finalize,"** so it needs an *immediate* variant
+  that demands the formatted plan on the **first** response, with the exact `session:` + `- task → serves`
+  format (and "no preamble / no code fence") restated **last**, after the context (recency = compliance).
+- **Strict dedupe lives here.** *Blocking* a re-applied duplicate belongs to the automated
+  `ImportHandoffResult` (guard a genuine double-fire); the manual S1 paste only **informs** (S1 follow-up above).
 - **Prove it:** a Shortcut `ExportHandoffContext(menu) → Ask ChatGPT → ImportHandoffResult` (immediate) and
   `ExportHandoffContext(menu) → Start chat in project → …return… → ImportHandoffResult` (discuss → sheet).
 
