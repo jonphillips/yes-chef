@@ -135,6 +135,41 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func seedsQualifiedHomeCookStaplesWithoutFalseProduceMatches() throws {
+      let expectedAreas: [(String, GroceryStoreArea)] = [
+        ("large white onion", .produce),
+        ("garlic cloves", .produce),
+        ("medium ripe tomato", .produce),
+        ("dried guajillo chiles", .produce),
+        ("dried ancho chiles", .produce),
+        ("smoked paprika", .spices),
+        ("cayenne pepper", .spices),
+        ("dried thyme", .spices),
+        ("Mexican oregano", .spices),
+        ("garlic powder", .spices),
+        ("yellow mustard", .condimentsAndOils),
+        ("cider vinegar", .condimentsAndOils),
+        ("liquid smoke", .condimentsAndOils),
+        ("5-pound boneless pork butt roast", .meatAndSeafood),
+      ]
+
+      for (title, expectedArea) in expectedAreas {
+        let canonicalName = try #require(CanonicalIngredient.canonicalName(title))
+        expectNoDifference(GroceryStoreArea.seed(for: canonicalName), expectedArea)
+      }
+    }
+
+    @Test
+    func produceFallbackExcludesCompoundDepartmentWords() {
+      expectNoDifference(GroceryStoreArea.seed(for: "garlic powder"), .spices)
+      expectNoDifference(GroceryStoreArea.seed(for: "onion powder"), .spices)
+      expectNoDifference(GroceryStoreArea.seed(for: "smoked paprika"), .spices)
+      expectNoDifference(GroceryStoreArea.seed(for: "chili powder"), .spices)
+      expectNoDifference(GroceryStoreArea.seed(for: "tomato paste"), .cannedAndDry)
+      expectNoDifference(GroceryStoreArea.seed(for: "tomato sauce"), .cannedAndDry)
+    }
+
+    @Test
     func everySeedKeyIsCanonical() {
       for key in GroceryStoreArea.seedAreas.keys {
         expectNoDifference(CanonicalIngredient.canonicalName(key), key)

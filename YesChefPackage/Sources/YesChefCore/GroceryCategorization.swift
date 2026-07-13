@@ -24,18 +24,18 @@ extension GroceryCategorizationClient: DependencyKey {
     @Dependency(\.modelClient) var modelClient
     var classified: [String: GroceryStoreArea] = [:]
 
-    for chunk in names.chunked(into: 40) {
+    for chunk in names.chunked(into: maximumNamesPerRequest) {
       try Task.checkCancellation()
-      let response = try await modelClient.complete(
-        ModelRequest(
-          tier: tier,
-          system: instructions,
-          prompt: prompt(names: chunk),
-          maxTokens: 1_024,
-          reasoningEffort: .low
-        )
-      )
-      classified.merge(parse(response.text), uniquingKeysWith: { _, latest in latest })
+      let firstResponse = try await modelClient.complete(request(names: chunk, tier: tier))
+      let firstPass = parse(firstResponse.text)
+      classified.merge(firstPass, uniquingKeysWith: { _, latest in latest })
+
+      let omittedNames = chunk.filter { firstPass[$0] == nil }
+      guard !omittedNames.isEmpty else { continue }
+
+      try Task.checkCancellation()
+      let retryResponse = try await modelClient.complete(request(names: omittedNames, tier: tier))
+      classified.merge(parse(retryResponse.text), uniquingKeysWith: { _, latest in latest })
     }
 
     return classified
@@ -43,17 +43,31 @@ extension GroceryCategorizationClient: DependencyKey {
 
   public static let testValue = GroceryCategorizationClient { _, _ in [:] }
 
+  /// Eight entries leave ample room for the complete name-to-area JSON map within the 1,024-token
+  /// response budget on constrained on-device models, including one retry for omitted names.
+  static let maximumNamesPerRequest = 8
+  static let maximumResponseTokens = 1_024
+
   static let instructions = """
     You categorize grocery ingredient names by the store area where a shopper would buy them.
     Return ONLY a strict JSON object mapping every supplied name to one concise store-area string.
-    Use a practical grocery-store department such as Produce, Bakery, Deli, Canned & Dry,
-    Condiments & Oils, Spices, Baking, Beverages, Meat & Seafood, Household, Dairy, Frozen, or
-    a more specific real department when appropriate. Do not omit names, add names, quantities, or
-    explanations.
+    Choose exactly one of these store areas for each name: Produce, Bakery, Deli, Canned & Dry,
+    Condiments & Oils, Spices, Baking, Beverages, Meat & Seafood, Household, Dairy, Frozen, or Other.
+    Do not omit names, add names, quantities, or explanations.
     """
 
   static func prompt(names: [String]) -> String {
     "Classify these exact canonical ingredient names:\n\n" + names.joined(separator: "\n")
+  }
+
+  static func request(names: [String], tier: ModelTier) -> ModelRequest {
+    ModelRequest(
+      tier: tier,
+      system: instructions,
+      prompt: prompt(names: names),
+      maxTokens: maximumResponseTokens,
+      reasoningEffort: .low
+    )
   }
 
   public static func parse(_ text: String) -> [String: GroceryStoreArea] {
@@ -83,6 +97,16 @@ extension DependencyValues {
   public var groceryCategorizationClient: GroceryCategorizationClient {
     get { self[GroceryCategorizationClient.self] }
     set { self[GroceryCategorizationClient.self] = newValue }
+  }
+}
+
+public struct GroceryCategorizationAttemptCache: Sendable {
+  private var attemptedNames: Set<String> = []
+
+  public init() {}
+
+  public mutating func namesToClassify(from uncategorizedNames: [String]) -> [String] {
+    uncategorizedNames.filter { attemptedNames.insert($0).inserted }
   }
 }
 

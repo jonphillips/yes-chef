@@ -40,12 +40,15 @@ extension RecipeCoreTests {
     @Test
     func clientBatchesLargeNameSets() async throws {
       let recorder = GroceryCategorizationRequestRecorder()
-      let names = (0..<41).map { "ingredient \($0)" }
+      let names = (0..<9).map { "ingredient \($0)" }
+      let completeResponse = ModelResponse(
+        text: "{" + names.map { "\"\($0)\":\"Other\"" }.joined(separator: ",") + "}"
+      )
 
       try await withDependencies {
         $0.modelClient = StubModelClient { request in
           await recorder.append(request)
-          return ModelResponse(text: "{}")
+          return completeResponse
         }
       } operation: {
         _ = try await GroceryCategorizationClient.liveValue(names: names, tier: .onDevice)
@@ -53,9 +56,38 @@ extension RecipeCoreTests {
 
       let requests = await recorder.allRequests()
       expectNoDifference(requests.map { $0.messages.first?.text }, [
-        "Classify these exact canonical ingredient names:\n\n" + names.prefix(40).joined(separator: "\n"),
-        "Classify these exact canonical ingredient names:\n\ningredient 40",
+        "Classify these exact canonical ingredient names:\n\n" + names.prefix(8).joined(separator: "\n"),
+        "Classify these exact canonical ingredient names:\n\ningredient 8",
       ])
+    }
+
+    @Test
+    func clientRetriesOnlyNamesOmittedFromTheFirstResponse() async throws {
+      let recorder = GroceryCategorizationRequestRecorder()
+
+      try await withDependencies {
+        $0.modelClient = StubModelClient { request in
+          await recorder.append(request)
+          return ModelResponse(
+            text: request.messages.first?.text.contains("harissa\nmiso") == true
+              ? #"{"harissa":"Condiments & Oils"}"#
+              : #"{"miso":"Canned & Dry"}"#
+          )
+        }
+      } operation: {
+        let classified = try await GroceryCategorizationClient.liveValue(
+          names: ["harissa", "miso"],
+          tier: .onDevice
+        )
+        expectNoDifference(
+          classified,
+          ["harissa": .condimentsAndOils, "miso": .cannedAndDry]
+        )
+      }
+
+      let requests = await recorder.allRequests()
+      expectNoDifference(requests.count, 2)
+      expectNoDifference(requests.last?.messages.first?.text, "Classify these exact canonical ingredient names:\n\nmiso")
     }
 
     @Test
@@ -176,6 +208,28 @@ extension RecipeCoreTests {
         expectNoDifference(item.aisle, nil)
       }
     }
+
+    @Test
+    func attemptCacheSkipsPriorMissesButSendsNewNames() async throws {
+      let recorder = GroceryCategorizationNamesRecorder()
+      let client = GroceryCategorizationClient { names, _ in
+        await recorder.append(names)
+        return [:]
+      }
+      var attemptCache = GroceryCategorizationAttemptCache()
+
+      let firstNames = attemptCache.namesToClassify(from: ["harissa"])
+      _ = try await client(names: firstNames, tier: .onDevice)
+
+      let repeatedNames = attemptCache.namesToClassify(from: ["harissa"])
+      #expect(repeatedNames.isEmpty)
+
+      let newNames = attemptCache.namesToClassify(from: ["harissa", "miso"])
+      _ = try await client(names: newNames, tier: .onDevice)
+
+      let requests = await recorder.allNames()
+      expectNoDifference(requests, [["harissa"], ["miso"]])
+    }
   }
 }
 
@@ -192,5 +246,17 @@ private actor GroceryCategorizationRequestRecorder {
 
   func allRequests() -> [ModelRequest] {
     requests
+  }
+}
+
+private actor GroceryCategorizationNamesRecorder {
+  private var names: [[String]] = []
+
+  func append(_ names: [String]) {
+    self.names.append(names)
+  }
+
+  func allNames() -> [[String]] {
+    names
   }
 }

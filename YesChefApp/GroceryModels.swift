@@ -52,6 +52,8 @@ final class GroceryLibraryModel {
   var isShowingError = false
   var toastCenter: AppToastCenter?
   var pantryAddBackItemIDsByListID: [CoreGroceryList.ID: Set<GroceryItem.ID>] = [:]
+  @ObservationIgnored
+  var groceryCategorizationAttemptCache = GroceryCategorizationAttemptCache()
 
   init(toastCenter: AppToastCenter? = nil) {
     self.toastCenter = toastCenter
@@ -752,9 +754,15 @@ extension GroceryLibraryModel {
     @Dependency(\.groceryCategorizationClient) var groceryCategorizationClient
 
     do {
-      let names = try await database.read { db in
+      try await database.write { db in
+        try GroceryStoreAreaCache.backfill(in: db)
+      }
+      try? await $itemRows.load()
+
+      let uncategorizedNames = try await database.read { db in
         try GroceryStoreAreaCache.uncategorizedCanonicalNames(in: db)
       }
+      let names = groceryCategorizationAttemptCache.namesToClassify(from: uncategorizedNames)
       guard !names.isEmpty else { return }
 
       let classified = try await groceryCategorizationClient(names: names, tier: .onDevice)
