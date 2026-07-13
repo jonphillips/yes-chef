@@ -64,49 +64,33 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Do [ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md) S3c — enrich the exported dish context,
-one PR.** S1 + S2 (step reshape `when`→`session`+`serves`, the D3 weave, banded collapsible UI + tappable
-`serves`) shipped in [#163](https://github.com/jonphillips/yes-chef/pull/163); **S3 (parse-robustness
-`session`←`when` fallback + both-way clipboard) shipped** in
-[#164](https://github.com/jonphillips/yes-chef/pull/164), architect-reviewed 2026-07-12. S3c is the
-**Amendment 1** follow-on: the "Copy dish context" button serializes at the on-device 12k-char budget, whose
-ladder trims ingredients/make-ahead and **drops whole dishes** on a real menu; also never includes recipe
-**method**, hard-caps ingredients at an arbitrary **8** even when budget is plentiful, and ships as bare
-context with **no instruction prompt**. Make the copy-out a self-contained *frontier* prompt (a full menu is
-only ~2–18k tokens, well under the 120k-char frontier budget). Do **not** touch the meal-calendar per-day
-make-ahead-strategy note verb (ADR defers that realignment). Full spec: ADR-0034 Amendment 1.
+**Do [ADR-0035](decisions/ADR-0035-grocery-store-area-grouping.md) S1 — deterministic store-area grouping
+(no model), one PR.** Populate the dormant `GroceryItem.aisle` from a deterministic seed and split the flat
+"To Buy" list into store-ordered sections. **No model in S1** (that's S2). **No migration** — `aisle` is an
+existing synced column (`Schema.swift`). Full spec: ADR-0035 §Build slices S1 + §Decision. Deterministic-surface
+line: the categorization only *places* items; it never invents/merges list data ([[llm-vs-determinism-surface-boundary]]).
 
-- **Frontier budget (one line).** `MenuViews.swift` copy button →
-  `MenuChatContext(detail: detail).serialized(for: .frontier)` (was the defaulted on-device budget).
-- **Full method into the context (core plumbing).** `MenuDetailRequest.fetch` (`MenuCore.swift`) fetches
-  `InstructionStep` — with `InstructionSection` for `name` sub-headers when a recipe has >1 section — in
-  section-then-step order (mirror the existing `IngredientLine` grouping). Add `recipeMethodLines: [String] = []`
-  to `MenuItemRowData` (defaulted so the `MealCalendarCore.swift` construction sites still compile; only
-  `MenuDetailRequest` populates it). Add `method: [String] = []` to `MenuChatItemContext`, populated in
-  `init(row:)`. Render a per-dish `Method:` block in `renderedContext`, and add a **method-first trim rung** to
-  `budgetedSerialization` (cut before make-ahead / ingredients / dish-dropping) so the shared on-device path
-  stays lean while frontier keeps everything. Add the matching budget-note string.
-- **Uncap ingredients on the frontier path.** The ingredient-limit ladder starts at the full list length under
-  the frontier budget (keep 8 as the on-device starting ceiling only). `keyIngredients` already holds the full
-  list — this is a tier-aware starting bound in `budgetedSerialization`, not new data. (`defaultIngredientLimit
-  = 8` is currently just the ladder's start, which only walks down — an arbitrary heuristic, never a real cap.)
-- **Prepend a real intro prompt from AI settings.** Build the copied blob as intro + context: an adapted form
-  of `MenuPrepPlanClient.instructions` (the weave's system prompt) plus the user's `tasteProfile` and
-  `makeAheadPrepPlanPreference` pulled via `aiPromptPreferences` / `AISettingsRepository`. **The exported prompt
-  must ask for the review-text output format** (`Session:` headers + `- task → serves` bullets that
-  `applyingEditableReviewText` re-imports), **not** the internal strict-JSON/UUID contract — else ChatGPT's
-  answer won't paste back cleanly. Compose in Core (needs the `aiPromptPreferences` dependency), not the view.
-  **Rename the button "Copy Dish Context" → "Copy Prep Prompt"** (it's a runnable prompt now, not raw context).
-- **Tests.** `MenuChatContext`: at the frontier budget a dish emits its full numbered `Method:` block (section
-  sub-headers) and its **full** ingredient list; at the on-device 12k budget with several dishes, method is the
-  **first** thing dropped and the budget note appears. Prompt-composition test: intro + taste/make-ahead prefs
-  present, output-format instruction is review-text (no JSON).
+- **Store-area type + normalizer (`YesChefCore`, pure).** Canonical set = Jon's fixed 13 areas with the fixed
+  store-walk sort order: **Produce → Bakery → Deli → Canned & Dry → Condiments & Oils → Spices → Baking →
+  Beverages → Meat & Seafood → Household → Dairy → Frozen → Other** (perishables deliberately last). A
+  synonym-fold normalizer maps free strings onto the set (veg/vegetables/produce → Produce; butcher/meat/seafood
+  → Meat & Seafood; …); an unknown string passes through title-cased and sorts **just before Other**.
+- **Seed override table.** In-code map `canonicalName → area` over common ingredients (starter set;
+  incrementally editable — the seed *contents* are the non-blocking open part of OQ1).
+- **Populate on generate/insert.** When an item has **no user-set aisle and no cached area**, set `aisle` from
+  the seed. A user-set aisle (the existing editor "Aisle" field) **always wins** — never overwrite it.
+- **Backfill.** Mirror `GroceryCanonicalNameCache.backfill` so existing lists group immediately on first run.
+- **Group the list (`GroceryViews`).** Split the flat "To Buy" `ForEach` over `displaySections.toBuyRows` into
+  one `Section` per store area in sort order; empty areas don't render. Needs-Review / Assumed-Pantry /
+  Purchased sections unchanged (Purchased stays a flat crossed-off tail — OQ2 default no sub-grouping).
+- **Tests (`GroceryTests` / new).** normalizer synonym folding + unknown title-case passthrough; the 13-area
+  sort order; seed hits; "user aisle wins, never overwritten"; backfill idempotence.
 
-Verify: `swift build` the package + `MenuChatContext`/`MenuPrepPlan` tests + `scripts/check-drift.sh`; one app
-build for `iPad Pro 13-inch (M5)` (no new source files → no `xcodegen`). **Jon does the device pass:** copy a
-real multi-dish menu, confirm every dish now carries full ingredients + make-ahead + method behind a runnable
-intro prompt, paste into ChatGPT, and paste its plan back to seed the pane. (This CURRENT_HANDOFF bump + the
-ADR Amendment ride in their own doc PR this time, per Jon.)
+Verify: `swift build` the package + `Grocery*` tests + `scripts/check-drift.sh`; one app build for
+`iPad Pro 13-inch (M5)` (new file is in the `YesChefCore` package → SPM picks it up, **no `xcodegen`**; only
+new *app-target* files need it). **Jon does the device pass:** generate a grocery list from a multi-recipe
+menu, confirm items land in the right departments in store-walk order and a hand-set aisle survives a regen.
+(Handoff bump rides this slice PR per [[handoff-bump-rides-in-slice-pr]].)
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**
@@ -141,6 +125,36 @@ synced `recipeVariations` table (Recipe edit proposals S2); and note the app tar
 
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](DONE-LOG.md).
+
+**[ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md) S3c — enrich the exported dish context
+(Amendment 1).** *Was Next Up; displaced 2026-07-12 by the dogfood grocery pick, not dropped — promote back
+when Jon chooses.* Make the menu "Copy Dish Context" button a self-contained **frontier** prompt: serialize at
+`.frontier` budget, thread full recipe **method** into `MenuChatItemContext` (with `InstructionSection`
+sub-headers, a method-first trim rung on the on-device path), **uncap ingredients** on the frontier path (8 stays
+the on-device starting ceiling only), and **prepend a real intro prompt** (adapted `MenuPrepPlanClient.instructions`
++ `tasteProfile`/`makeAheadPrepPlanPreference` via `aiPromptPreferences`) that asks for the **review-text** output
+format (not strict JSON) so ChatGPT's answer pastes back cleanly; rename button → **"Copy Prep Prompt"**. Do
+**not** touch the meal-calendar per-day make-ahead-strategy verb. Full spec: ADR-0034 Amendment 1. Verify: package
+build + `MenuChatContext`/`MenuPrepPlan` tests + `check-drift.sh`; one iPad app build (no new source files → no
+`xcodegen`). (Per Jon, this one's handoff bump + the ADR Amendment ride in their own doc PR.)
+
+**Dogfood 2026-07-12 — trip-prep pass (3 items triaged, written up 2026-07-12; Jon picks order, none dispatched).**
+- **Grocery list by store area** — [ADR-0035](decisions/ADR-0035-grocery-store-area-grouping.md) (**Accepted**;
+  **S1 is now the Next Up dispatch target — see above**). Populate the dormant `GroceryItem.aisle` (existing
+  synced column, no migration) and group the flat "To Buy" list by store area; **on-device**
+  classify-once-then-cache keyed on `canonicalName` (deterministic-surface line held). Open vocabulary — "6
+  buckets is just the start" (Jon). S1 = deterministic seed + grouping (no model, in Next Up); **S2 = on-device
+  long-tail classifier — follow-on, queue after S1 reads well on device.** OQ1 resolved 2026-07-12: store-walk
+  order fixed to Jon's 13 areas (perishables last); seed *mapping* contents non-blocking.
+- **Promote a note → a real recipe** — [ADR-0036](decisions/ADR-0036-promote-note-to-recipe.md). Formalizes
+  ADR-0027 D5/A6. Parse recipe-shaped note prose → `WorkbenchDraftRecipe` → ADR-0024 review → real `Recipe`
+  (reuses web-capture parse + editable-proposal surface). Real design work is **placement + provenance**.
+  **OQ1 resolved 2026-07-12:** scope is a **menu note-item** in recipe shape → S1 library commit, S2 swaps
+  the note-item for a recipe-kind menu item. The "just add notes to grocery" alternative was rejected as a
+  trap (secretly the same parse, none of the reuse).
+- **Menu note-item truncation** — [`efforts/menu-note-truncation.md`](efforts/menu-note-truncation.md).
+  One-line `.lineLimit(5)` at `MenuDetailSections.swift` ~272. Trivial free rider — bundle into any adjacent
+  menu/list dispatch.
 
 **Dogfood 2026-07-11 — two-device pass. BATCH CLEARED — all four efforts DONE → [`docs/DONE-LOG.md`](DONE-LOG.md).**
 - **Fraction input accessory** — inline pill row, full glyph set ¼ ½ ¾ ⅓ ⅔ ⅛ ⅜ ⅝ ⅞; **DONE + device-passed**
