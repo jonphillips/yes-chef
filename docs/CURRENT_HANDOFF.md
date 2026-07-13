@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 13, 2026.
+Last updated: July 13, 2026 (ADR-0038 External-LLM handoff set as Next Up — S1 first; ADR-0036 shipped PR #178).
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,19 +21,18 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0036](decisions/ADR-0036-promote-note-to-recipe.md): promote a recipe-shaped
-note → a real recipe.** Formalizes ADR-0027 D5/A6. **OQ1 resolved 2026-07-12:** first scope is a **menu
-note-item** (`MealPlanItemKind.note`, no `recipeID`, per [[menu-item-recipe-id-invariant]]) whose body is recipe
-prose. Build the **S1 + S2 batch** (cohesive — one PR) to the ADR: **S1** = wire the note text through the
-`RecipeParseBuilder`-style extraction into a `WorkbenchDraftRecipe`, surface it in the ADR-0024 review preview,
-commit to a new `Recipe` with a provenance link — reuses the existing parse + review + commit machinery; the
-net-new is the entry point (a note action) + the note→draft adapter. **Schema-free if provenance rides an
-existing column/snapshot; otherwise one additive nullable column — call it out and add it to the standing
-prod-schema follow-up.** **S2** = when the source is a menu note-item, offer to swap it for a recipe-kind item
-referencing the new recipe (satisfies [[menu-item-recipe-id-invariant]]) — app-layer, small, gated on S1.
-Reuses web-capture extraction, no new parser; the genuinely new design work is **placement + provenance**
-([[reference-placement-and-original-provenance]]). **Confirm the S1+S2 batch scope with Jon before dispatch**
-(the ADR flags it). `RecipeNote` promotion is a later S3, out of this scope.
+**Live dispatch target — [ADR-0038](decisions/ADR-0038-external-llm-handoff.md) External-LLM handoff, S1
+only** ([`efforts/adr-0038-external-llm-handoff.md`](efforts/adr-0038-external-llm-handoff.md)). Generalizes
+the menu Copy/Paste-to-ChatGPT round-trip into a **session-tracked, App-Intents-routed** handoff from any
+source. **S1 = the transport-agnostic core, proven through the existing menu paste path** (no new UI): a
+**device-local** `AIHandoff` record + a `YC-HANDOFF:` token (emit on Copy Prep Prompt, strip/route/dedupe on
+Paste Prep Plan) + the `→`-glyph hardening (ADR-0038 D2). **Keep the `AIHandoff` table out of the CloudKit
+SyncEngine set** (confirm the per-table opt-out; else a device-local store) — this sync-exclusion is why S1
+leads. **Do S1 only this dispatch;** S2 (App Intents surface + per-menu project + the additive
+`Menu.externalProjectName` column → add to the standing prod-schema follow-up when it lands) and S3
+(generalize the serializer to Recipe/MealPlan) follow. Pre-code de-risked 2026-07-13: `Ask ChatGPT` returns
+text as a value and a live beach-menu round-trip parsed cleanly ([ADR-0038](decisions/ADR-0038-external-llm-handoff.md)
+D2/OQ3).
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**
@@ -69,11 +68,6 @@ synced `recipeVariations` table (Recipe edit proposals S2); and note the app tar
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
-**Dogfood 2026-07-12 — trip-prep pass (Jon picks order, none dispatched).**
-- **Menu note-item truncation** — [`efforts/menu-note-truncation.md`](efforts/menu-note-truncation.md).
-  One-line `.lineLimit(5)` at `MenuDetailSections.swift` ~272. Trivial free rider — bundle into any adjacent
-  menu/list dispatch.
-
 **Recipe edit proposals** ([ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) +
 `efforts/recipe-edit-proposals.md`) — the "Adjust this recipe" verb; **S1 + S2 shipped** (overwrite
 destination with section-aware multi-section overwrite/undo; the "keep as a variation" destination = ADR-0021's
@@ -108,9 +102,10 @@ proposals effort above, reached via the same proposal/review surface; ADR-0023 D
 standalone framing.)*
 
 **Still-deferred, separate future efforts** (not follow-through on any shipped effort): ADR-0027 **OQ4**
-(a note-worthiness taste preference) and **A6/D5** (promote-a-note → a real recipe — now scoped as ADR-0036
-above). Comment ingestion stays in `docs/open-questions.md` until it is a scoped effort. Full completed-work
-history and the implemented-behavior checkpoint are in [`docs/DONE-LOG.md`](DONE-LOG.md).
+(a note-worthiness taste preference); **ADR-0036 S3** — promote a `RecipeNote` deposited *on a recipe* (the
+menu note-item S1+S2 shipped in PR #178 → DONE-LOG; S3 is the remaining, separate slice). Comment ingestion
+stays in `docs/open-questions.md` until it is a scoped effort. Full completed-work history and the
+implemented-behavior checkpoint are in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
 ## Verification Pattern
 

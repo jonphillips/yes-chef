@@ -9,6 +9,32 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0036 — promote a recipe-shaped menu note → a real recipe
+
+**✅ DONE — merged + Jon device-passed 2026-07-13.** yes-chef PR
+[#178](https://github.com/jonphillips/yes-chef/pull/178).
+[ADR-0036](decisions/ADR-0036-promote-note-to-recipe.md) S1 + S2 (one batch) + a provenance-shape follow-up.
+Turns a recipe-shaped **menu note-item** (`MealPlanItemKind.note`, no `recipeID`,
+[[menu-item-recipe-id-invariant]]) into a real structured `Recipe`. **S1** = a **deterministic**
+heading-based note→draft adapter (`MenuNoteRecipePromotion`, `RecipeParseBuilder`-family naming only — no
+LLM: recognizes explicit `Ingredients`/`Instructions|Method|Directions|Preparation` sections, strips
+bullets/step numbers, everything else stays as notes) → `WorkbenchDraftRecipe` → the existing ADR-0024
+editable review sheet → commit to a new `Recipe`. Chose determinism over the ADR's proposed on-device LLM
+parse per [[llm-vs-determinism-surface-boundary]] (reproducible, private, free, no truncation; quantity/unit
+parsing still happens downstream at `RecipeRepository.save`). Entry point = a **Make Recipe** glyph on note
+rows (`MenuDetailSections`). **S2** = an opt-in confirmation to swap the note row for a recipe-kind item
+pointing at the new recipe (`MenuRepository.replaceNoteItemWithRecipe`), preserving day/meal/sort.
+**Provenance (OQ2 resolved, follow-up commit):** original prose rides in as an **editable general
+`RecipeNote`** (`From menu note "<title>":` + blank-line-collapsed prose), **not** a `RecipeSource` — the
+source-card version was a pinned, non-deletable header crowding both the recipe and the menu row (caught on
+device). On replacement the note row's `notes` is cleared (`item.notes = nil`) so the promoted row collapses
+to its title; blank machine FK dropped (live back-link is the item's `recipeID`). No schema change → the
+standing prod-schema follow-up is unaffected. Free-rider: `.lineLimit(3)` on the menu-row note text
+(`MenuDetailSections.swift:276`) **closes the queued "Menu note-item truncation" effort**. New
+`MenuNoteRecipePromotionTests` (parse + provenance-as-note + replacement-clears-row). `RecipeNote`-on-recipe
+promotion remains a future **S3**, out of this scope.
+
+---
 ## ADR-0037 — grocery seed-coverage diagnostic
 
 **⏳ PENDING — architect-reviewed 2026-07-13; awaiting merge + Jon device pass before this entry is final
