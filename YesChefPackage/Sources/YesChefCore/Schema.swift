@@ -808,7 +808,7 @@ extension DependencyValues {
           "dateModified" TEXT NOT NULL,
           PRIMARY KEY ("subjectKind", "subjectID")
         ) STRICT
-      """)
+        """)
         .execute(db)
     }
 
