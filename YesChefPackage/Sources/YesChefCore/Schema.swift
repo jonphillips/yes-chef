@@ -833,6 +833,14 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Add external ChatGPT project to menus") { db in
+      try #sql("""
+        ALTER TABLE "menus"
+        ADD COLUMN "externalProjectName" TEXT
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

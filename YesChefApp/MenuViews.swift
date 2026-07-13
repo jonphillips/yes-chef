@@ -342,6 +342,10 @@ private struct MenuDetailReader: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
         MenuDetailHeader(detail: detail)
+        MenuExternalProjectField(
+          externalProjectName: detail.menu.externalProjectName,
+          save: detailModel.updateExternalProjectName
+        )
         MenuPrepPlanSection(
           menu: detail.menu,
           itemRows: detail.itemRows,
@@ -664,6 +668,48 @@ private struct MenuDetailHeader: View {
 
   private var itemCountTitle: String {
     detail.itemRows.count == 1 ? "1 dish" : "\(detail.itemRows.count) dishes"
+  }
+}
+
+private struct MenuExternalProjectField: View {
+  let externalProjectName: String?
+  let save: (String) -> Void
+
+  @State private var draft: String
+
+  init(externalProjectName: String?, save: @escaping (String) -> Void) {
+    self.externalProjectName = externalProjectName
+    self.save = save
+    _draft = State(wrappedValue: externalProjectName ?? "")
+  }
+
+  private var normalizedDraft: String {
+    draft.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private var normalizedStoredValue: String {
+    (externalProjectName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      StackedTextField(
+        title: "ChatGPT Project",
+        text: $draft,
+        prompt: "Emerald Isle Beach"
+      )
+      HStack {
+        Text("Used by the Start Chat in Project shortcut.")
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+        Spacer()
+        Button("Save Project") {
+          save(draft)
+        }
+        .buttonStyle(.bordered)
+        .disabled(normalizedDraft == normalizedStoredValue)
+      }
+    }
   }
 }
 

@@ -617,6 +617,22 @@ final class MenuDetailModel {
     }
   }
 
+  func updateExternalProjectName(_ externalProjectName: String) {
+    do {
+      try database.write { db in
+        try MenuRepository.updateExternalProjectName(
+          menuID: menuID,
+          externalProjectName: externalProjectName,
+          in: db,
+          now: now
+        )
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
   func applyActionCatalog(for chatModel: RecipeChatModel) -> [AnyChatApplyAction] {
     @Dependency(\.menuComplementClient) var menuComplementClient
     @Dependency(\.menuNoteHarvestClient) var menuNoteHarvestClient

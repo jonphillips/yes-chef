@@ -1,3 +1,4 @@
+import Dependencies
 import SwiftUI
 import SwiftUINavigation
 import UIKit
@@ -8,6 +9,7 @@ import YesChefCore
 
 struct AppContainer: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+  @Dependency(\.handoffReviewCoordinator) private var handoffReviewCoordinator
   @State private var toastCenter: AppToastCenter
   @State private var recipeModel = RecipeLibraryModel()
   @State private var workbenchModel = WorkbenchLibraryModel()
@@ -33,6 +35,7 @@ struct AppContainer: View {
     @Bindable var mealCalendarModel = mealCalendarModel
     @Bindable var menuModel = menuModel
     @Bindable var groceryModel = groceryModel
+    @Bindable var handoffReviewCoordinator = handoffReviewCoordinator
 
     AppMainLayout(
       horizontalSizeClass: horizontalSizeClass,
@@ -133,6 +136,9 @@ struct AppContainer: View {
       NavigationStack {
         WorkbenchEditorView(model: workbenchModel)
       }
+    }
+    .sheet(item: $handoffReviewCoordinator.review, id: \.handoffID) { review in
+      HandoffReviewSheet(coordinator: handoffReviewCoordinator, review: review)
     }
     .confirmationDialog(
       "Remove Meal Plan Item?",

@@ -370,6 +370,7 @@ public struct Menu: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID
   public var title: String
   public var notes: String?
+  public var externalProjectName: String?
   public var dayCount: Int
   public var prepPlan: Data?
   public var dateCreated: Date
@@ -379,6 +380,7 @@ public struct Menu: Codable, Identifiable, Equatable, Sendable {
     id: UUID,
     title: String,
     notes: String? = nil,
+    externalProjectName: String? = nil,
     dayCount: Int,
     prepPlan: Data? = nil,
     dateCreated: Date,
@@ -387,6 +389,7 @@ public struct Menu: Codable, Identifiable, Equatable, Sendable {
     self.id = id
     self.title = title
     self.notes = notes
+    self.externalProjectName = externalProjectName
     self.dayCount = dayCount
     self.prepPlan = prepPlan
     self.dateCreated = dateCreated
