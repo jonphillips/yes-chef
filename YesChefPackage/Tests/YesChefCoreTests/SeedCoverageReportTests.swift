@@ -97,7 +97,7 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func gathersIngredientLinesAndGroceryItemsWithoutWriting() throws {
+    func fallsBackToRawTextWhenCanonicalNamesAreNotBackfilled() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 900_000_000)
       let recipeID = SampleUUIDSequence.uuid(90_001)
@@ -115,7 +115,6 @@ extension RecipeCoreTests {
               recipeID: recipeID,
               sectionID: sectionID,
               originalText: "harissa",
-              canonicalName: "harissa",
               shoppingCategory: "Condiments & Oils",
               sortOrder: 0
             ),
@@ -139,7 +138,6 @@ extension RecipeCoreTests {
             id: SampleUUIDSequence.uuid(90_005),
             groceryListID: listID,
             title: "sumac",
-            canonicalName: "sumac",
             sortOrder: 0,
             dateCreated: now,
             dateModified: now

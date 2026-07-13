@@ -110,10 +110,10 @@ public struct SeedCoverageReport: Equatable, Sendable {
 public extension GroceryStoreAreaCache {
   static func seedCoverage(in db: Database) throws -> SeedCoverageReport {
     let ingredientObservations = try IngredientLine.fetchAll(db).map {
-      (canonicalName: $0.canonicalName, aisle: $0.shoppingCategory)
+      (canonicalName: $0.canonicalIngredientName, aisle: $0.shoppingCategory)
     }
     let groceryObservations = try GroceryItem.fetchAll(db).map {
-      (canonicalName: $0.canonicalName, aisle: $0.aisle)
+      (canonicalName: $0.canonicalIngredientName, aisle: $0.aisle)
     }
     return SeedCoverageReport.make(from: ingredientObservations + groceryObservations)
   }
