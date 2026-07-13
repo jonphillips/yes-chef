@@ -119,19 +119,36 @@ count on the right, tap to open one. This is the reconciliation of the two modes
   `applyingEditableReviewText`), an imported plan can seed the document; the weave verb (D3) can then sort
   it into sessions / add `serves` tags on a later pass.
 
-**Amendment 1 (2026-07-12) — the exported context is the _frontier_ view, with full method.** Dogfooding
-D5 surfaced that "Copy dish context" reused `MenuChatContext.serialized()` at the **on-device 12k-char
-budget** (~3k tokens), whose degradation ladder trims key ingredients to zero, truncates make-ahead notes,
-and finally **drops whole dishes** — so on a real menu the pasted plan referenced dishes the external LLM
-never saw. And recipe **method steps were never in the context at all**, starving the LLM of the
-prep-ahead signal that lives in the method ("chill overnight", "salt the day before"). Since the entire
-point of the escape hatch is to spend _their_ tokens, and a full menu with method is only ~2–18k tokens
-(well under the 120k-char frontier budget), the copy-out now serializes at **`serialized(for: .frontier)`**
-and the serialization carries **full recipe method** (fetched via `InstructionStep`, section-then-step
-order, `InstructionSection.name` as a sub-header when a recipe has >1 section). Method is a **new trim rung
-cut _first_** in `budgetedSerialization`, so the _shared_ on-device chat path is essentially unchanged
-(method drops immediately under 12k) while the frontier export keeps everything. Export-only enrichment;
-the on-device weave verb (D3) is untouched. → slice **S3c**.
+**Amendment 1 (2026-07-12) — the copy-out is a complete, _frontier_-budget prompt.** Dogfooding D5
+surfaced that "Copy dish context" reused `MenuChatContext.serialized()` at the **on-device 12k-char budget**
+(~3k tokens), whose degradation ladder trims ingredients to zero, truncates make-ahead notes, and finally
+**drops whole dishes** — so on a real menu the pasted plan referenced dishes the external LLM never saw.
+Three further gaps: recipe **method was never in the context**; the ingredient list is capped at a hard
+**8** even when budget is plentiful (`defaultIngredientLimit` is the _start_ of the trim ladder, which only
+walks down — an arbitrary "key ingredients" heuristic from the tiny-budget era, not a real limit); and the
+copied blob is bare context with **no instruction prompt**, so it doesn't read as something you can paste
+and run. Since the entire point of the escape hatch is to spend _their_ tokens (a full menu with method is
+only ~2–18k tokens, well under the 120k-char frontier budget), S3c makes the copy-out a self-contained
+prompt. Four moves, **export-path only — the on-device weave verb (D3) is untouched:**
+
+1. **Frontier budget.** Copy-out serializes at `serialized(for: .frontier)` (was the defaulted on-device
+   budget), so ingredients/make-ahead stop trimming and no dishes drop.
+2. **Full method.** Serialization carries recipe method (fetched via `InstructionStep`, section-then-step
+   order, `InstructionSection.name` as a sub-header when a recipe has >1 section), as a per-dish `Method:`
+   block behind a **new trim rung cut _first_** in `budgetedSerialization` — so the _shared_ on-device path
+   is essentially unchanged (method drops immediately under 12k) while frontier keeps everything.
+3. **Uncap ingredients on the frontier path.** The ingredient-limit ladder starts from the full list length
+   at the frontier budget (keeping 8 only as the on-device starting ceiling); `keyIngredients` already holds
+   the complete list, so this is a tier-aware starting bound, not new data.
+4. **A real intro prompt, tuned from AI settings.** Prepend an adapted form of `MenuPrepPlanClient.instructions`
+   (the weave's own system prompt) plus the user's `tasteProfile` and `makeAheadPrepPlanPreference` (via
+   `aiPromptPreferences` / `AISettingsRepository`). Critically, the exported prompt asks for the
+   **review-text output format** (`Session:` headers + `- task → serves` bullets that
+   `applyingEditableReviewText` re-imports), **not** the internal strict-JSON/UUID contract — otherwise the
+   paste-in round-trip breaks on ChatGPT's answer.
+
+Because the clipboard now carries a runnable prompt rather than raw context, the button is renamed
+**"Copy Dish Context" → "Copy Prep Prompt."**
 
 ## Deferred (on the record, explicitly not built here)
 
@@ -174,11 +191,14 @@ prompt loosening, the band grouping, the tappable tag, and the two clipboard aff
 - **S3 — clipboard (follow-up dispatch).** "Copy dish context" out + free-text paste-in. Small,
   independent; rides after S1+S2. **Shipped** in [#164](https://github.com/jonphillips/yes-chef/pull/164)
   (also folded in the parse-robustness `session`←`when` fallback).
-- **S3c — enrich the exported context (Amendment 1, follow-up dispatch).** Copy-out serializes at the
-  frontier budget and the serialization gains a full-method block with a method-first trim rung. Core
-  plumbing (`MenuDetailRequest` fetch of `InstructionStep`/`InstructionSection`, new `recipeMethodLines` on
-  `MenuItemRowData`, `method` on `MenuChatItemContext`, per-dish `Method:` render + trim rung in
-  `budgetedSerialization`) + one app-layer line (`.serialized(for: .frontier)`). Follows S3.
+- **S3c — the copy-out becomes a complete frontier prompt (Amendment 1, follow-up dispatch).** Four moves:
+  (1) frontier budget (`.serialized(for: .frontier)`); (2) full method — `MenuDetailRequest` fetch of
+  `InstructionStep`/`InstructionSection`, new `recipeMethodLines` on `MenuItemRowData`, `method` on
+  `MenuChatItemContext`, per-dish `Method:` render + method-first trim rung in `budgetedSerialization`;
+  (3) uncap ingredients on the frontier path (tier-aware start of the ingredient ladder, keeping 8 on-device);
+  (4) prepend an adapted intro prompt from `MenuPrepPlanClient.instructions` + the user's `tasteProfile` /
+  `makeAheadPrepPlanPreference` (`aiPromptPreferences`), asking for the **review-text** output format the
+  paste-in path re-imports. Follows S3.
 
 Follow the [[batch-slices-and-lean-handoff]] default: S1+S2 is one Codex dispatch; S3 follows. Build brief
 to live at `efforts/adr-0034-prep-plan-work-session-timeline.md` when dispatched.
