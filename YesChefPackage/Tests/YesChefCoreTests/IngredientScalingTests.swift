@@ -47,4 +47,23 @@ struct IngredientScalingTests {
     expectNoDifference(IngredientScaler.scaledText(for: lines[1], factor: 2), "2 ½ teaspoons pepper")
     expectNoDifference(IngredientScaler.scaledText(for: lines[2], factor: 3), "1 cup sugar")
   }
+
+  @Test
+  func scalingPreservesAlternateMeasurementsAndPurchaseDetail() {
+    let recipeID = SampleUUIDSequence.uuid(41)
+    let sectionID = SampleUUIDSequence.uuid(42)
+    var uuids = SampleUUIDSequence(start: 43)
+    let originalText = "4 lb / 1.8 kg beef, preferably 3 lb chuck roast plus 1 lb boneless short ribs, cut into 2- to 3-inch pieces; trim only hard exterior fat"
+    let line = IngredientParser.lines(
+      from: originalText,
+      recipeID: recipeID,
+      sectionID: sectionID,
+      uuid: { uuids.next() }
+    )[0]
+
+    expectNoDifference(
+      IngredientScaler.scaledText(for: line, factor: 3),
+      "12 lbs / 1.8 kg beef, preferably 3 lb chuck roast plus 1 lb boneless short ribs, cut into 2- to 3-inch pieces; trim only hard exterior fat"
+    )
+  }
 }
