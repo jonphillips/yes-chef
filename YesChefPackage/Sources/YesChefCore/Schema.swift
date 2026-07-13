@@ -812,6 +812,10 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Backfill grocery store areas") { db in
+      try GroceryStoreAreaCache.backfill(in: db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

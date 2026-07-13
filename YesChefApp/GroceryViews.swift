@@ -112,8 +112,7 @@ struct GroceryDetailView: View {
               model: model
             )
 
-            GroceryItemsSection(
-              title: "To Buy",
+            GroceryStoreAreaSections(
               rows: displaySections.toBuyRows,
               model: model
             )
@@ -327,6 +326,21 @@ private struct GroceryItemsSection: View {
           }
         }
       }
+    }
+  }
+}
+
+private struct GroceryStoreAreaSections: View {
+  let rows: [GroceryItemRowData]
+  let model: GroceryLibraryModel
+
+  var body: some View {
+    ForEach(GroceryStoreArea.sections(for: rows)) { section in
+      GroceryItemsSection(
+        title: section.title,
+        rows: section.rows,
+        model: model
+      )
     }
   }
 }
