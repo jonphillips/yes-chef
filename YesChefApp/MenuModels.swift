@@ -241,6 +241,27 @@ final class MenuLibraryModel {
     }
   }
 
+  @discardableResult
+  func reorderMenuItemWithinDay(
+    itemID: MenuItem.ID,
+    direction: MenuItemMoveDirection
+  ) -> Bool {
+    do {
+      return try database.write { db in
+        try MenuRepository.reorderItemWithinDay(
+          itemID: itemID,
+          direction: direction,
+          in: db,
+          now: now
+        )
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
   func deleteMenuButtonTapped(_ row: MenuRowData) {
     destination = .deleteMenu(
       MenuDeletionContext(

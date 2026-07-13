@@ -60,4 +60,14 @@ Nothing here mutates the menu without an explicit tap (delete gets a confirm).
 - **Drag-and-drop reorder of dishes across days** — the eventual replacement for S2's "Move to day…".
   Deferred by Jon (2026-07-05) to keep this batch lower-risk; a named follow-on using the iOS 27 reorder
   API (`swiftui-whats-new-27`). S2's swipe-move is the interim.
+  - **Beta retest — 2026-07-12: still blocked, still parked.** Scoped down to just reordering items
+    *within a day* (the simplest case). Three agents (Claude, Codex 5.6 Sol, Fable) all came up empty
+    on the current SwiftUI 27 beta — the `reorderable()` / `reorderContainer` API doesn't behave in a
+    `VStack`-in-`ScrollView` dish list. Attempts preserved on the **`drag-and-drop`** branch
+    (`a216e42` Claude, `bcae852` Codex 5.6 Sol). **Wait for the next beta** before retrying.
+    Interim within-a-day affordance tracked below.
+- **Within-a-day manual reorder (interim, non-drag)** — up/down affordance to reorder dishes inside a
+  single day while drag-and-drop stays blocked. Swaps `sortOrder` with the adjacent same-day/same-slot
+  item; `MenuItem.sortOrder` already exists (`MenuCore.swift`), so this is a small add
+  (core `reorderItemWithinDay` + swipe/menu buttons). Requested by Jon 2026-07-12.
 - **Anthropic extended-thinking budget** and any auto-router — not here (ADR-0017 "Why not").

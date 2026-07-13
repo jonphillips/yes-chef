@@ -538,6 +538,45 @@ public enum MenuRepository {
     try MenuItem.upsert { item }.execute(db)
   }
 
+  /// Interim within-a-day reorder (parked drag-and-drop stand-in). Swaps an item's position with its
+  /// adjacent same-day, same-meal-slot sibling by renumbering the slot's `sortOrder` sequentially, so
+  /// the move is stable even if stored `sortOrder`s had gaps or ties. No-op (returns `false`) when the
+  /// item is already at the slot's edge in the requested direction.
+  @discardableResult
+  public static func reorderItemWithinDay(
+    itemID: MenuItem.ID,
+    direction: MenuItemMoveDirection,
+    in db: Database,
+    now: Date
+  ) throws -> Bool {
+    guard let item = try MenuItem.find(itemID).fetchOne(db) else {
+      throw MenuRepositoryError.menuItemNotFound(itemID)
+    }
+
+    var siblings = try MenuItem
+      .where {
+        $0.menuID.eq(item.menuID)
+          && $0.dayOffset.eq(item.dayOffset)
+          && $0.mealSlot.eq(item.mealSlot)
+      }
+      .fetchAll(db)
+      .sorted { $0.sortOrder < $1.sortOrder }
+
+    guard let index = siblings.firstIndex(where: { $0.id == itemID }) else { return false }
+    let neighborIndex = direction == .earlier ? index - 1 : index + 1
+    guard siblings.indices.contains(neighborIndex) else { return false }
+
+    siblings.swapAt(index, neighborIndex)
+
+    for (position, sibling) in siblings.enumerated() where sibling.sortOrder != position {
+      var updated = sibling
+      updated.sortOrder = position
+      updated.dateModified = now
+      try MenuItem.upsert { updated }.execute(db)
+    }
+    return true
+  }
+
   public static func deleteItem(
     itemID: MenuItem.ID,
     in db: Database
@@ -607,6 +646,13 @@ public enum MenuRepository {
       .fetchAll(db)
     return (items.map(\.sortOrder).max() ?? -1) + 1
   }
+}
+
+/// Direction for `MenuRepository.reorderItemWithinDay` — `.earlier` moves a dish up (toward the top of
+/// its meal-slot group), `.later` moves it down.
+public enum MenuItemMoveDirection: Sendable {
+  case earlier
+  case later
 }
 
 public enum MenuRepositoryError: Error, Equatable, Sendable {
