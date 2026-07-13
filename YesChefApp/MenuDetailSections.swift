@@ -278,6 +278,17 @@ private struct MenuDishRowView: View {
 
       Spacer()
 
+      if row.item.kind == .note {
+        Button {
+          detailModel.makeRecipeFromNoteButtonTapped(row.item)
+        } label: {
+          Label("Make Recipe", systemImage: "book.closed.badge.plus")
+            .labelStyle(.iconOnly)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel("Make a recipe from \(row.displayTitle)")
+      }
+
       Button {
         detailModel.targetItemTapped(row.id)
       } label: {

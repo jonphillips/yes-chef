@@ -255,6 +255,33 @@ struct MenuDetailView: View {
         )
       }
     }
+    .sheet(item: $detailModel.noteRecipeReview) { review in
+      ChatApplyReviewSheet(
+        item: detailModel.reviewItem(for: review),
+        isCommitting: detailModel.isPromotingNoteRecipe,
+        commit: { approvedText in
+          do {
+            try await detailModel.reviewItem(for: review).commit(approvedText)
+          } catch {
+            detailModel.errorMessage = RecipeChatErrorText.describe(error)
+            detailModel.isShowingError = true
+          }
+        },
+        discard: detailModel.discardNoteRecipeReview
+      )
+    }
+    .confirmationDialog(
+      "Replace the menu note with this recipe?",
+      item: $detailModel.noteReplacementOffer,
+      titleVisibility: .visible
+    ) { offer in
+      Button("Replace Note") {
+        detailModel.replacePromotedNote(offer)
+      }
+      Button("Keep Note", role: .cancel) {}
+    } message: { offer in
+      Text("\(offer.recipeTitle) is now in your library. Replacing keeps this menu item's day, meal, and original note prose.")
+    }
     .alert("Could Not Save Prep Plan", isPresented: $detailModel.isShowingError) {
       Button("OK") {}
     } message: {

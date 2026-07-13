@@ -459,6 +459,32 @@ public enum MenuRepository {
     try MenuItem.upsert { item }.execute(db)
   }
 
+  /// Turns an existing note-kind menu item into a recipe-kind item without moving it or dropping its
+  /// original note prose. Promotion is an explicit second step after the new recipe has been reviewed
+  /// and saved, so declining this operation leaves the note untouched.
+  public static func replaceNoteItemWithRecipe(
+    itemID: MenuItem.ID,
+    recipeID: Recipe.ID,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard var item = try MenuItem.find(itemID).fetchOne(db) else {
+      throw MenuRepositoryError.menuItemNotFound(itemID)
+    }
+    guard item.kind == .note else {
+      throw MenuRepositoryError.menuItemIsNotNote(itemID)
+    }
+    guard let recipe = try Recipe.find(recipeID).fetchOne(db), !recipe.archived else {
+      throw MenuRepositoryError.recipeNotFound(recipeID)
+    }
+
+    item.kind = .recipe
+    item.recipeID = recipeID
+    item.title = recipe.title
+    item.dateModified = now
+    try MenuItem.upsert { item }.execute(db)
+  }
+
   @discardableResult
   public static func placeMenu(
     menuID: Menu.ID,
@@ -661,6 +687,7 @@ public enum MenuRepositoryError: Error, Equatable, Sendable {
   case invalidDayOffset(Int)
   case menuNotFound(Menu.ID)
   case menuItemNotFound(MenuItem.ID)
+  case menuItemIsNotNote(MenuItem.ID)
   case placementNotFound(MenuPlacement.ID)
   case recipeNotFound(Recipe.ID)
 }
