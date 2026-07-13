@@ -180,7 +180,7 @@ public enum GroceryStoreArea: Hashable, Sendable {
   ]
 
   /// A small, editable quality floor before S2 classifies the long tail on-device.
-  private static let seedAreas: [String: Self] = [
+  static let seedAreas: [String: Self] = [
     "apple": .produce,
     "avocado": .produce,
     "banana": .produce,
@@ -245,7 +245,7 @@ public enum GroceryStoreArea: Hashable, Sendable {
     "tea": .beverages,
     "chicken breast": .meatAndSeafood,
     "chicken thigh": .meatAndSeafood,
-    "ground beef": .meatAndSeafood,
+    "beef": .meatAndSeafood,
     "salmon": .meatAndSeafood,
     "shrimp": .meatAndSeafood,
     "toilet paper": .household,

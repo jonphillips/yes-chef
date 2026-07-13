@@ -616,7 +616,6 @@ extension DependencyValues {
         .execute(db)
 
       try GroceryCanonicalNameCache.backfill(in: db)
-      try GroceryStoreAreaCache.backfill(in: db)
     }
 
     migrator.registerMigration("Add menu prep plan") { db in
@@ -809,8 +808,12 @@ extension DependencyValues {
           "dateModified" TEXT NOT NULL,
           PRIMARY KEY ("subjectKind", "subjectID")
         ) STRICT
-        """)
+      """)
         .execute(db)
+    }
+
+    migrator.registerMigration("Backfill grocery store areas") { db in
+      try GroceryStoreAreaCache.backfill(in: db)
     }
 
     try migrator.migrate(database)

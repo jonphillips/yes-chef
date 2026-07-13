@@ -68,7 +68,7 @@ PR); do all listed, in order.
 
 **No live dispatch target — ADR-0035 S1 is ready for review in [#172](https://github.com/jonphillips/yes-chef/pull/172).**
 Jon picks the next effort from the Ready queue; a fresh dispatch must **STOP and ask Jon** — never
-infer the next task. S1 adds the deterministic seed, normalizer, migration-time backfill, and store-ordered “To Buy”
+infer the next task. S1 adds the deterministic seed, normalizer, dedicated-migration backfill, and store-ordered “To Buy”
 sections; it has **no model and no schema change**. Its categorization only places items; it never invents or merges list data
 ([[llm-vs-determinism-surface-boundary]]).
 

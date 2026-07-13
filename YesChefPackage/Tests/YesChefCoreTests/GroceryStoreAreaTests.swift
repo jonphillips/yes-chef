@@ -3,7 +3,7 @@ import Dependencies
 import Foundation
 import SQLiteData
 import Testing
-import YesChefCore
+@testable import YesChefCore
 
 extension RecipeCoreTests {
   @Suite
@@ -132,6 +132,13 @@ extension RecipeCoreTests {
       expectNoDifference(GroceryStoreArea.seed(for: "milk"), .dairy)
       expectNoDifference(GroceryStoreArea.seed(for: "chicken thighs"), .meatAndSeafood)
       expectNoDifference(GroceryStoreArea.seed(for: "all-purpose flour"), .baking)
+    }
+
+    @Test
+    func everySeedKeyIsCanonical() {
+      for key in GroceryStoreArea.seedAreas.keys {
+        expectNoDifference(CanonicalIngredient.canonicalName(key), key)
+      }
     }
 
     @Test
