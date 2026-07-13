@@ -60,6 +60,10 @@ struct SettingsView: View {
         }
         .disabled(model.isImporting)
       }
+
+      Section("Developer") {
+        seedCoverageRow
+      }
     }
     .navigationTitle("Settings")
     // Refresh the sync signals on appear, on scene activation (the same hook that
@@ -148,6 +152,23 @@ struct SettingsView: View {
       }
     }
   }
+
+  @ViewBuilder private var seedCoverageRow: some View {
+    if let selectedPane {
+      Button {
+        selectedPane.wrappedValue = .seedCoverage
+      } label: {
+        SettingsPane.seedCoverage.label
+      }
+      .foregroundStyle(.primary)
+    } else {
+      NavigationLink {
+        SeedCoverageView()
+      } label: {
+        SettingsPane.seedCoverage.label
+      }
+    }
+  }
 }
 
 struct SettingsDetailPane: View {
@@ -173,6 +194,8 @@ struct SettingsDetailPane: View {
       NavigationStack {
         ArchivedRecipesView(model: model)
       }
+    case .seedCoverage:
+      SeedCoverageView()
     case nil:
       ContentUnavailableView("Settings", systemImage: AppSection.settings.systemImage)
     }

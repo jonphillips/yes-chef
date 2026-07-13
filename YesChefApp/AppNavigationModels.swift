@@ -83,6 +83,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
   case categories
   case pantry
   case archivedRecipes
+  case seedCoverage
 
   var id: Self { self }
 
@@ -92,6 +93,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case .categories: "Categories"
     case .pantry: "Pantry"
     case .archivedRecipes: "Archived Recipes"
+    case .seedCoverage: "Seed Coverage"
     }
   }
 
@@ -101,6 +103,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case .categories: "folder"
     case .pantry: "list.bullet"
     case .archivedRecipes: "archivebox"
+    case .seedCoverage: "checklist"
     }
   }
 
