@@ -337,6 +337,9 @@ private extension String {
   }
 
   var editablePrepPlanSession: String? {
+    if lowercased().hasPrefix("session:") {
+      return String(dropFirst("session:".count)).cleanedPrepPlanText
+    }
     guard hasSuffix(":") else { return nil }
     return String(dropLast()).cleanedPrepPlanText
   }
@@ -346,6 +349,6 @@ private extension String {
     return !trimmed.hasPrefix("- ")
       && !trimmed.hasPrefix("* ")
       && !trimmed.hasPrefix("• ")
-      && trimmed.hasSuffix(":")
+      && editablePrepPlanSession != nil
   }
 }

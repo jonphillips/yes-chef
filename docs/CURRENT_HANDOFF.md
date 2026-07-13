@@ -62,11 +62,11 @@ one PR.** S1 + S2 (step reshape `when`→`session`+`serves`, the D3 weave, bande
 `session`←`when` fallback + both-way clipboard) shipped** in
 [#164](https://github.com/jonphillips/yes-chef/pull/164), architect-reviewed 2026-07-12. S3c is the
 **Amendment 1** follow-on: the "Copy dish context" button serializes at the on-device 12k-char budget, whose
-ladder trims ingredients/make-ahead and **drops whole dishes** on a real menu, and never includes recipe
-**method** — starving the very external LLM we offboard to. Make the copy-out the *frontier* view with full
-method (a full menu is only ~2–18k tokens, well under the 120k-char frontier budget). Do **not** touch the
-meal-calendar per-day make-ahead-strategy note verb (ADR defers that realignment). Full spec: ADR-0034
-Amendment 1.
+ladder trims ingredients/make-ahead and **drops whole dishes** on a real menu; also never includes recipe
+**method**, hard-caps ingredients at an arbitrary **8** even when budget is plentiful, and ships as bare
+context with **no instruction prompt**. Make the copy-out a self-contained *frontier* prompt (a full menu is
+only ~2–18k tokens, well under the 120k-char frontier budget). Do **not** touch the meal-calendar per-day
+make-ahead-strategy note verb (ADR defers that realignment). Full spec: ADR-0034 Amendment 1.
 
 - **Frontier budget (one line).** `MenuViews.swift` copy button →
   `MenuChatContext(detail: detail).serialized(for: .frontier)` (was the defaulted on-device budget).
@@ -78,15 +78,27 @@ Amendment 1.
   `init(row:)`. Render a per-dish `Method:` block in `renderedContext`, and add a **method-first trim rung** to
   `budgetedSerialization` (cut before make-ahead / ingredients / dish-dropping) so the shared on-device path
   stays lean while frontier keeps everything. Add the matching budget-note string.
-- **Tests.** `MenuChatContext`: at the frontier budget a dish emits its full numbered `Method:` block (with
-  section sub-headers); at the on-device 12k budget with several dishes, method is the **first** thing dropped
-  and the budget note appears.
+- **Uncap ingredients on the frontier path.** The ingredient-limit ladder starts at the full list length under
+  the frontier budget (keep 8 as the on-device starting ceiling only). `keyIngredients` already holds the full
+  list — this is a tier-aware starting bound in `budgetedSerialization`, not new data. (`defaultIngredientLimit
+  = 8` is currently just the ladder's start, which only walks down — an arbitrary heuristic, never a real cap.)
+- **Prepend a real intro prompt from AI settings.** Build the copied blob as intro + context: an adapted form
+  of `MenuPrepPlanClient.instructions` (the weave's system prompt) plus the user's `tasteProfile` and
+  `makeAheadPrepPlanPreference` pulled via `aiPromptPreferences` / `AISettingsRepository`. **The exported prompt
+  must ask for the review-text output format** (`Session:` headers + `- task → serves` bullets that
+  `applyingEditableReviewText` re-imports), **not** the internal strict-JSON/UUID contract — else ChatGPT's
+  answer won't paste back cleanly. Compose in Core (needs the `aiPromptPreferences` dependency), not the view.
+  **Rename the button "Copy Dish Context" → "Copy Prep Prompt"** (it's a runnable prompt now, not raw context).
+- **Tests.** `MenuChatContext`: at the frontier budget a dish emits its full numbered `Method:` block (section
+  sub-headers) and its **full** ingredient list; at the on-device 12k budget with several dishes, method is the
+  **first** thing dropped and the budget note appears. Prompt-composition test: intro + taste/make-ahead prefs
+  present, output-format instruction is review-text (no JSON).
 
 Verify: `swift build` the package + `MenuChatContext`/`MenuPrepPlan` tests + `scripts/check-drift.sh`; one app
 build for `iPad Pro 13-inch (M5)` (no new source files → no `xcodegen`). **Jon does the device pass:** copy a
-real multi-dish menu, confirm every dish now carries full ingredients + make-ahead + method, and paste into
-ChatGPT reads coherently. (This CURRENT_HANDOFF bump + the ADR Amendment ride in their own doc PR this time,
-per Jon.)
+real multi-dish menu, confirm every dish now carries full ingredients + make-ahead + method behind a runnable
+intro prompt, paste into ChatGPT, and paste its plan back to seed the pane. (This CURRENT_HANDOFF bump + the
+ADR Amendment ride in their own doc PR this time, per Jon.)
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**

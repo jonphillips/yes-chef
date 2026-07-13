@@ -61,6 +61,109 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func menuChatContextDropsMethodsBeforeOtherDishDetailsAtOnDeviceBudget() {
+      let menuID = SampleUUIDSequence.uuid(14_800)
+      let now = Date(timeIntervalSinceReferenceDate: 805_260_000)
+      let rows = (0..<4).map { index in
+        let recipeID = SampleUUIDSequence.uuid(14_900 + index)
+        return MenuItemRowData(
+          item: MenuItem(
+            id: SampleUUIDSequence.uuid(15_000 + index),
+            menuID: menuID,
+            kind: .recipe,
+            recipeID: recipeID,
+            title: "Dish \(index)",
+            dayOffset: index,
+            mealSlot: .dinner,
+            sortOrder: index,
+            dateCreated: now,
+            dateModified: now
+          ),
+          recipe: Recipe(
+            id: recipeID,
+            title: "Dish \(index)",
+            dateCreated: now,
+            dateModified: now,
+            makeAhead: "Make-ahead note \(index)."
+          ),
+          recipeIngredientLines: ["ingredient \(index)"],
+          recipeMethodLines: [
+            "1. \(String(repeating: "Method step \(index). ", count: 250))"
+          ]
+        )
+      }
+      let context = MenuChatContext(
+        detail: MenuDetailData(
+          menu: Menu(
+            id: menuID,
+            title: "Large Method Menu",
+            dayCount: 4,
+            dateCreated: now,
+            dateModified: now
+          ),
+          itemRows: rows
+        )
+      )
+
+      let serialized = context.serialized()
+
+      #expect(serialized.count <= MenuChatContext.onDeviceSerializedCharacterBudget)
+      #expect(
+        serialized.contains(
+          "Recipe methods were omitted before other dish details to stay within the context budget."
+        )
+      )
+      #expect(!serialized.contains("Method step 0."))
+      for index in 0..<4 {
+        #expect(serialized.contains("- Dish \(index)"))
+        #expect(serialized.contains("    - ingredient \(index)"))
+        #expect(serialized.contains("Make-ahead note \(index)."))
+      }
+    }
+
+    @Test
+    func menuChatContextFrontierPromptUsesFullIngredientsAndPrepPreferences() {
+      let itemID = SampleUUIDSequence.uuid(15_100)
+      let context = MenuChatContext(
+        title: "Saturday Dinner",
+        dayCount: 1,
+        items: [
+          MenuChatItemContext(
+            id: itemID,
+            title: "Fennel Chicken",
+            kind: .recipe,
+            dayOffset: 0,
+            mealSlot: .dinner,
+            sortOrder: 0,
+            keyIngredients: (0..<10).map { "ingredient \($0)" },
+            method: ["Prep:", "1. Salt the chicken overnight."]
+          )
+        ]
+      )
+      let settings = AISettingsRecord(
+        id: AISettingsRepository.singletonID,
+        tasteProfile: "Favor bright, spicy flavors.",
+        makeAheadPrepPlanPreference: "Protect the resting time.",
+        dateModified: .distantPast
+      )
+
+      let prompt = withDependencies {
+        $0.aiPromptPreferences = AIPromptPreferencesClient { settings }
+      } operation: {
+        context.prepPrompt()
+      }
+
+      #expect(prompt.contains("ingredient 9"))
+      #expect(prompt.contains("1. Salt the chicken overnight."))
+      #expect(prompt.contains("Favor bright, spicy flavors."))
+      #expect(prompt.contains("Protect the resting time."))
+      #expect(prompt.contains("Wednesday evening:"))
+      #expect(prompt.contains("`- task → serves` bullet"))
+      #expect(!prompt.contains("strict JSON"))
+      #expect(!prompt.contains("menu item UUID"))
+    }
+
+    @Test
     func menuChatContextUsesLargerFrontierBudget() {
       expectNoDifference(MenuChatContext.serializedCharacterBudget(for: .onDevice), 12_000)
       expectNoDifference(
