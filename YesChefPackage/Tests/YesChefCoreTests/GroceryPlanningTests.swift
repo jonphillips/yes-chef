@@ -219,5 +219,97 @@ extension RecipeCoreTests {
         expectNoDifference(sources.map(\.sourceSubtitle), ["Menu Beans", "Menu Beans"])
       }
     }
+
+    @Test
+    func individualMealPlanAndMenuItemsUseTheirOwnScales() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 805_700_000)
+      let scheduledDate = Date(timeIntervalSinceReferenceDate: 805_710_000)
+      let recipeID = SampleUUIDSequence.uuid(16_101)
+      let sectionID = SampleUUIDSequence.uuid(16_102)
+      let ingredientLineID = SampleUUIDSequence.uuid(16_103)
+      var uuids = SampleUUIDSequence(start: 16_200)
+
+      try database.write { db in
+        let listID = try GroceryRepository.ensureDefaultList(
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        try insertRecipeFixture(
+          recipeID: recipeID,
+          sectionID: sectionID,
+          title: "Scaled Soup",
+          lines: [
+            IngredientLine(
+              id: ingredientLineID,
+              recipeID: recipeID,
+              sectionID: sectionID,
+              originalText: "1 cup stock",
+              quantity: 1,
+              quantityText: "1",
+              unit: "cup",
+              item: "stock",
+              sortOrder: 0,
+              confidence: .medium
+            )
+          ],
+          now: now,
+          in: db
+        )
+        let mealPlanItemID = try MealCalendarRepository.addRecipeItem(
+          recipeID: recipeID,
+          on: scheduledDate,
+          mealSlot: .dinner,
+          notes: nil,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let menuID = try MenuRepository.addMenu(
+          title: "Soup Week",
+          notes: nil,
+          dayCount: 1,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let menuItemID = try MenuRepository.addRecipeItem(
+          menuID: menuID,
+          recipeID: recipeID,
+          dayOffset: 0,
+          mealSlot: .lunch,
+          notes: nil,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        try RecipeScaleRepository.setScale(2, for: .mealPlanItem(mealPlanItemID), in: db)
+        try RecipeScaleRepository.setScale(3, for: .menuItem(menuItemID), in: db)
+
+        _ = try GroceryRepository.addMealPlanItem(
+          itemID: mealPlanItemID,
+          groceryListID: listID,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        _ = try GroceryRepository.addMenuItem(
+          itemID: menuItemID,
+          groceryListID: listID,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        let row = try #require(
+          try GroceryItemListRequest().fetch(db).first { $0.item.title == "stock" }
+        )
+        expectNoDifference(row.item.quantity, 5)
+        expectNoDifference(row.item.quantityText, "5")
+        expectNoDifference(row.sources.map(\.mealPlanItemID), [mealPlanItemID, nil])
+        expectNoDifference(row.sources.map(\.menuItemID), [nil, menuItemID])
+      }
+    }
   }
 }

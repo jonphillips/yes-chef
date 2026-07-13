@@ -66,6 +66,43 @@ extension GroceryRepository {
   }
 
   @discardableResult
+  public static func addMenuItem(
+    itemID: MenuItem.ID,
+    groceryListID: GroceryList.ID,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID,
+    includedIngredientLineIDs: Set<IngredientLine.ID>? = nil
+  ) throws -> [GroceryItem.ID] {
+    _ = try requireList(groceryListID, in: db)
+    guard let item = try MenuItem.find(itemID).fetchOne(db) else {
+      throw GroceryRepositoryError.menuItemNotFound(itemID)
+    }
+    guard item.kind == .recipe, let recipeID = item.recipeID else {
+      throw GroceryRepositoryError.menuItemHasNoRecipe(itemID)
+    }
+    let menu = try requireMenu(item.menuID, in: db)
+    let recipe = try requireRecipe(recipeID, in: db)
+
+    return try addRecipeIngredients(
+      recipe: recipe,
+      groceryListID: groceryListID,
+      source: GroceryItemSourceDraft(
+        origin: .menu,
+        menuID: menu.id,
+        menuItemID: item.id,
+        mealSlot: item.mealSlot,
+        sourceTitle: menu.title,
+        sourceSubtitle: recipe.title
+      ),
+      in: db,
+      now: now,
+      uuid: uuid,
+      includedIngredientLineIDs: includedIngredientLineIDs
+    )
+  }
+
+  @discardableResult
   public static func addMealPlanRows(
     _ rows: [MealPlanItemRowData],
     groceryListID: GroceryList.ID,

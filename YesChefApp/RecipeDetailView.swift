@@ -72,7 +72,10 @@ struct RecipeDetailView: View {
           Label("Edit", systemImage: "square.and.pencil")
         }
         Button {
-          groceryModel.addRecipeButtonTapped(recipeID: model.recipeID)
+          groceryModel.addRecipeButtonTapped(
+            recipeID: model.recipeID,
+            scaleContext: model.scaleContext
+          )
         } label: {
           Label("Groceries", systemImage: "cart.badge.plus")
         }

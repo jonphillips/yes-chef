@@ -782,6 +782,8 @@ public enum GroceryRepositoryError: Error, Equatable, Sendable {
   case listNotFound(GroceryList.ID)
   case mealPlanItemHasNoRecipe(MealPlanItem.ID)
   case mealPlanItemNotFound(MealPlanItem.ID)
+  case menuItemHasNoRecipe(MenuItem.ID)
+  case menuItemNotFound(MenuItem.ID)
   case menuNotFound(Menu.ID)
   case menuPlacementNotFound(MenuPlacement.ID)
   case noShoppableIngredients
