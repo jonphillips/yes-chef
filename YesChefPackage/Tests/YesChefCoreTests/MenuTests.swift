@@ -529,6 +529,92 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func reordersItemsWithinADay() throws {
+      @Dependency(\.defaultDatabase) var database
+      let createdAt = Date(timeIntervalSinceReferenceDate: 804_900_000)
+      let modifiedAt = Date(timeIntervalSinceReferenceDate: 805_000_000)
+
+      try database.write { db in
+        let menuID = try MenuRepository.addMenu(
+          title: "Reorder Menu",
+          notes: nil,
+          dayCount: 1,
+          in: db,
+          now: createdAt,
+          uuid: { SampleUUIDSequence.uuid(12_300) }
+        )
+        let firstID = try MenuRepository.addNoteItem(
+          menuID: menuID,
+          title: "First",
+          notes: nil,
+          dayOffset: 0,
+          mealSlot: .dinner,
+          in: db,
+          now: createdAt,
+          uuid: { SampleUUIDSequence.uuid(12_301) }
+        )
+        let secondID = try MenuRepository.addNoteItem(
+          menuID: menuID,
+          title: "Second",
+          notes: nil,
+          dayOffset: 0,
+          mealSlot: .dinner,
+          in: db,
+          now: createdAt,
+          uuid: { SampleUUIDSequence.uuid(12_302) }
+        )
+        // A different meal slot must not be a reorder neighbor.
+        let lunchID = try MenuRepository.addNoteItem(
+          menuID: menuID,
+          title: "Lunch",
+          notes: nil,
+          dayOffset: 0,
+          mealSlot: .lunch,
+          in: db,
+          now: createdAt,
+          uuid: { SampleUUIDSequence.uuid(12_303) }
+        )
+
+        func titlesInOrder() throws -> [String] {
+          try #require(try MenuDetailRequest(menuID: menuID).fetch(db))
+            .itemRows
+            .filter { $0.item.dayOffset == 0 && $0.item.mealSlot == .dinner }
+            .map(\.item.title)
+        }
+
+        // Move the second dinner item up past the first.
+        let moved = try MenuRepository.reorderItemWithinDay(
+          itemID: secondID,
+          direction: .earlier,
+          in: db,
+          now: modifiedAt
+        )
+        #expect(moved)
+        expectNoDifference(try titlesInOrder(), ["Second", "First"])
+
+        // Already at the top: no-op.
+        let noOp = try MenuRepository.reorderItemWithinDay(
+          itemID: secondID,
+          direction: .earlier,
+          in: db,
+          now: modifiedAt
+        )
+        #expect(!noOp)
+        expectNoDifference(try titlesInOrder(), ["Second", "First"])
+
+        // The lone lunch item has no same-slot neighbor in either direction.
+        let lunchUp = try MenuRepository.reorderItemWithinDay(
+          itemID: lunchID,
+          direction: .earlier,
+          in: db,
+          now: modifiedAt
+        )
+        #expect(!lunchUp)
+        _ = firstID
+      }
+    }
+
+    @Test
     func rejectsInvalidMenus() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 804_500_000)

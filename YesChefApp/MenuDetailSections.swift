@@ -115,12 +115,21 @@ private struct MenuDaySection: View {
           .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
       } else {
         VStack(spacing: 0) {
-          ForEach(rows) { row in
+          ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+            // Interim within-day reorder: a dish can move up/down only past an adjacent sibling in the
+            // same meal slot (rows are sorted day → meal slot → sortOrder, so same-slot items are
+            // contiguous). Moving across meal slots stays the meal-slot pill's job.
+            let canMoveUp = index > 0
+              && rows[index - 1].item.mealSlot == row.item.mealSlot
+            let canMoveDown = index < rows.count - 1
+              && rows[index + 1].item.mealSlot == row.item.mealSlot
             MenuDishRowView(
               model: model,
               detailModel: detailModel,
               menu: menu,
               row: row,
+              canMoveUp: canMoveUp,
+              canMoveDown: canMoveDown,
               onRecipeSelected: onRecipeSelected
             )
             if row.id != rows.last?.id {
@@ -172,6 +181,8 @@ private struct MenuDishRowView: View {
   let detailModel: MenuDetailModel
   let menu: CoreMenu
   let row: MenuItemRowData
+  var canMoveUp: Bool = false
+  var canMoveDown: Bool = false
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   private var isDepositTarget: Bool {
@@ -192,6 +203,24 @@ private struct MenuDishRowView: View {
           model.deleteMenuItemButtonTapped(row)
         } label: {
           Label("Delete", systemImage: "trash")
+        }
+
+        if canMoveUp {
+          Button {
+            _ = model.reorderMenuItemWithinDay(itemID: row.id, direction: .earlier)
+          } label: {
+            Label("Move Up", systemImage: "arrow.up")
+          }
+          .tint(.indigo)
+        }
+
+        if canMoveDown {
+          Button {
+            _ = model.reorderMenuItemWithinDay(itemID: row.id, direction: .later)
+          } label: {
+            Label("Move Down", systemImage: "arrow.down")
+          }
+          .tint(.teal)
         }
 
         Menu {
