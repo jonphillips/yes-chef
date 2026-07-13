@@ -273,6 +273,7 @@ private struct MenuDishRowView: View {
           Text(notes)
             .font(.subheadline)
             .foregroundStyle(.secondary)
+            .lineLimit(3)
         }
       }
 
@@ -282,7 +283,7 @@ private struct MenuDishRowView: View {
         Button {
           detailModel.makeRecipeFromNoteButtonTapped(row.item)
         } label: {
-          Label("Make Recipe", systemImage: "book.closed.badge.plus")
+          Label("Make Recipe", systemImage: "book.badge.plus")
             .labelStyle(.iconOnly)
         }
         .buttonStyle(.borderless)

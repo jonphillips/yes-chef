@@ -46,26 +46,11 @@ extension RecipeCoreTests {
           rationale: "Promoted from a menu note."
         )
       )
-      expectNoDifference(
-        promotion.editorDraft(for: promotion.draftRecipe).sourceNotes,
-        """
-        Promoted from menu item \(menuItem.id.uuidString) on menu \(menuItem.menuID.uuidString).
-
-        Original menu note title: Chile-Lime Cauliflower
-
-        Original menu note prose:
-        A bright side dish for taco night.
-
-        Ingredients:
-        - 1 head cauliflower
-        - 2 tablespoons olive oil
-        - 1 lime
-
-        Method:
-        1. Roast the cauliflower until browned.
-        2. Finish with lime.
-        """
-      )
+      let editorDraft = promotion.editorDraft(for: promotion.draftRecipe)
+      expectNoDifference(editorDraft.sourceName, "")
+      expectNoDifference(editorDraft.sourceNotes, "")
+      #expect(editorDraft.noteText.contains("From menu note \"Chile-Lime Cauliflower\":"))
+      #expect(editorDraft.noteText.contains("1 head cauliflower"))
     }
 
     @Test
@@ -116,16 +101,15 @@ extension RecipeCoreTests {
         )
 
         let replacedItem = try #require(try MenuItem.find(noteItemID).fetchOne(db))
-        let source = try #require(try RecipeSource.where { $0.recipeID.eq(recipeID) }.fetchOne(db))
+        let recipeNotes = try RecipeNote.where { $0.recipeID.eq(recipeID) }.fetchAll(db)
 
         expectNoDifference(replacedItem.kind, .recipe)
         expectNoDifference(replacedItem.recipeID, recipeID)
         expectNoDifference(replacedItem.dayOffset, 2)
         expectNoDifference(replacedItem.mealSlot, .lunch)
-        expectNoDifference(replacedItem.notes, noteItem.notes)
+        expectNoDifference(replacedItem.notes, nil)
         expectNoDifference(replacedItem.sortOrder, noteItem.sortOrder)
-        #expect(source.sourceNotes?.contains(noteItem.id.uuidString) == true)
-        #expect(source.sourceNotes?.contains("Roast until browned.") == true)
+        #expect(recipeNotes.contains { $0.text.contains("Roast until browned.") })
       }
     }
   }

@@ -24,8 +24,6 @@ public struct MenuNoteRecipePromotion: Equatable, Sendable {
 
   public func editorDraft(for approvedRecipe: WorkbenchDraftRecipe) -> RecipeEditorDraft {
     approvedRecipe.editorDraft(libraryPlacement: .main).withMenuNoteProvenance(
-      menuID: menuID,
-      menuItemID: sourceItemID,
       originalTitle: originalTitle,
       originalProse: originalProse
     )
@@ -111,21 +109,19 @@ private extension String {
 
 private extension RecipeEditorDraft {
   func withMenuNoteProvenance(
-    menuID: Menu.ID,
-    menuItemID: MenuItem.ID,
     originalTitle: String,
     originalProse: String
   ) -> RecipeEditorDraft {
     var draft = self
-    draft.sourceName = "Menu note"
-    draft.sourceNotes = """
-      Promoted from menu item \(menuItemID.uuidString) on menu \(menuID.uuidString).
-
-      Original menu note title: \(originalTitle)
-
-      Original menu note prose:
-      \(originalProse)
-      """
+    let condensedProse = originalProse
+      .components(separatedBy: .newlines)
+      .map { $0.trimmingCharacters(in: .whitespaces) }
+      .filter { !$0.isEmpty }
+      .joined(separator: "\n")
+    let provenanceNote = "From menu note \"\(originalTitle)\":\n\(condensedProse)"
+    draft.noteText = draft.noteText.isEmpty
+      ? provenanceNote
+      : draft.noteText + "\n\n" + provenanceNote
     return draft
   }
 }

@@ -459,9 +459,9 @@ public enum MenuRepository {
     try MenuItem.upsert { item }.execute(db)
   }
 
-  /// Turns an existing note-kind menu item into a recipe-kind item without moving it or dropping its
-  /// original note prose. Promotion is an explicit second step after the new recipe has been reviewed
-  /// and saved, so declining this operation leaves the note untouched.
+  /// Turns an existing note-kind menu item into a recipe-kind item without moving it. Promotion is an
+  /// explicit second step after the new recipe has been reviewed and saved, so declining this operation
+  /// leaves the note untouched.
   public static func replaceNoteItemWithRecipe(
     itemID: MenuItem.ID,
     recipeID: Recipe.ID,
@@ -481,6 +481,7 @@ public enum MenuRepository {
     item.kind = .recipe
     item.recipeID = recipeID
     item.title = recipe.title
+    item.notes = nil
     item.dateModified = now
     try MenuItem.upsert { item }.execute(db)
   }

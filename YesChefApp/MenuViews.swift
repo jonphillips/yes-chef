@@ -280,7 +280,7 @@ struct MenuDetailView: View {
       }
       Button("Keep Note", role: .cancel) {}
     } message: { offer in
-      Text("\(offer.recipeTitle) is now in your library. Replacing keeps this menu item's day, meal, and original note prose.")
+      Text("\(offer.recipeTitle) is now in your library. Replacing keeps this menu item's day and meal; the original note text is saved in the recipe's notes.")
     }
     .alert("Could Not Save Prep Plan", isPresented: $detailModel.isShowingError) {
       Button("OK") {}
