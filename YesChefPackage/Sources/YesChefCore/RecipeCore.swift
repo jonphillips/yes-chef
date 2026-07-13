@@ -861,15 +861,47 @@ public enum IngredientScaler {
   public static func scaledText(for line: IngredientLine, factor: Double) -> String {
     guard
       let quantity = line.quantity,
-      let item = line.item,
       factor != 1
     else { return line.originalText }
 
     let scaledQuantity = format(quantity * factor)
-    guard let unit = line.unit else {
-      return "\(scaledQuantity) \(item)"
+    return replacingLeadingMeasure(
+      in: line.originalText,
+      quantityText: line.quantityText,
+      unit: line.unit,
+      scaledQuantity: scaledQuantity,
+      scaledValue: quantity * factor
+    ) ?? line.originalText
+  }
+
+  private static func replacingLeadingMeasure(
+    in originalText: String,
+    quantityText: String?,
+    unit: String?,
+    scaledQuantity: String,
+    scaledValue: Double
+  ) -> String? {
+    guard let quantityText else { return nil }
+
+    let leadingWhitespace = originalText.prefix(while: \.isWhitespace)
+    let remainingText = originalText.dropFirst(leadingWhitespace.count)
+    guard remainingText.hasPrefix(quantityText) else { return nil }
+
+    var suffix = remainingText.dropFirst(quantityText.count)
+    guard let unit else {
+      return "\(leadingWhitespace)\(scaledQuantity)\(suffix)"
     }
-    return "\(scaledQuantity) \(pluralized(unit, quantity: quantity * factor)) \(item)"
+
+    let whitespace = suffix.prefix(while: \.isWhitespace)
+    guard !whitespace.isEmpty else { return nil }
+    suffix = suffix.dropFirst(whitespace.count)
+    guard String(suffix.prefix(unit.count)).caseInsensitiveCompare(unit) == .orderedSame else {
+      return nil
+    }
+    suffix = suffix.dropFirst(unit.count)
+    guard suffix.first?.isLetter != true else { return nil }
+
+    return "\(leadingWhitespace)\(scaledQuantity) \(pluralized(unit, quantity: scaledValue))\(suffix)"
   }
 
   private static func format(_ value: Double) -> String {

@@ -130,7 +130,7 @@ struct RecipeCoreTests {
       sortOrder: 2,
       confidence: .medium
     )
-    expectNoDifference(IngredientScaler.scaledText(for: unitless, factor: 2), "1 red onion")
+    expectNoDifference(IngredientScaler.scaledText(for: unitless, factor: 2), "1 red onion, thinly sliced")
   }
 
   @Test
