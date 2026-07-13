@@ -62,6 +62,16 @@ Rules:
    queue, and the Verification Pattern. Completed-slice history, the implemented-behavior checkpoint,
    and strategic background live in `docs/DONE-LOG.md` (append-on-approval, read-rarely). No dispatch
    instruction points at `DONE-LOG.md` — it is a human archive, kept out of working context on purpose.
+7. **On approval, MOVE — don't mark.** "Mark done" is the leak that bloats the handoff into a
+   changelog. When a slice/effort is approved, the completed write goes to `DONE-LOG.md` (newest
+   first) **and the corresponding block is deleted from `CURRENT_HANDOFF.md`** — both riding the same
+   approved PR branch. The handoff only ever gains a **forward** edit (advance Next Up, draw the next
+   effort from Ready); it never gains a backward one. **Litmus test:** *if the sentence you're adding
+   to `CURRENT_HANDOFF.md` describes finished work, it belongs in `DONE-LOG.md` instead.* A "✅ DONE"
+   line, a celebratory header, or an "earlier and logged" PR recitation left in the handoff is a
+   process bug, not a record. The one exception: an **owed-but-non-blocking** verification (a device
+   or CloudKit gate) stays as a single-line debt under Next Up until Jon clears it — not as a
+   done-narrative.
 
 ## Development Priorities
 
