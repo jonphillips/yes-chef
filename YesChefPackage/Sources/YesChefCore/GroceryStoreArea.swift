@@ -79,7 +79,14 @@ public enum GroceryStoreArea: Hashable, Sendable {
 
   public static func seed(for canonicalName: String?) -> Self? {
     guard let canonicalName = CanonicalIngredient.canonicalName(canonicalName) else { return nil }
-    return seedAreas[canonicalName]
+    if let area = seedAreas[canonicalName] {
+      return area
+    }
+    if let comparisonName = CanonicalIngredient.comparisonKey(canonicalName),
+       let area = seedAreas[comparisonName] {
+      return area
+    }
+    return headNounSeed(for: canonicalName)
   }
 
   public static func sections(for rows: [GroceryItemRowData]) -> [Section] {
@@ -226,13 +233,33 @@ public enum GroceryStoreArea: Hashable, Sendable {
     "ketchup": .condimentsAndOils,
     "mayonnaise": .condimentsAndOils,
     "mustard": .condimentsAndOils,
+    "yellow mustard": .condimentsAndOils,
+    "dijon mustard": .condimentsAndOils,
     "olive oil": .condimentsAndOils,
     "soy sauce": .condimentsAndOils,
     "vinegar": .condimentsAndOils,
+    "cider vinegar": .condimentsAndOils,
+    "white vinegar": .condimentsAndOils,
+    "rice vinegar": .condimentsAndOils,
+    "worcestershire": .condimentsAndOils,
+    "liquid smoke": .condimentsAndOils,
+    "hot sauce": .condimentsAndOils,
     "black pepper": .spices,
+    "paprika": .spices,
+    "smoked paprika": .spices,
     "cinnamon": .spices,
     "cumin": .spices,
-    "paprika": .spices,
+    "coriander": .spices,
+    "oregano": .spices,
+    "mexican oregano": .spices,
+    "thyme": .spices,
+    "dried thyme": .spices,
+    "cayenne": .spices,
+    "cayenne pepper": .spices,
+    "chili powder": .spices,
+    "garlic powder": .spices,
+    "onion powder": .spices,
+    "bay leaf": .spices,
     "salt": .spices,
     "all purpose flour": .baking,
     "baking powder": .baking,
@@ -246,8 +273,20 @@ public enum GroceryStoreArea: Hashable, Sendable {
     "chicken breast": .meatAndSeafood,
     "chicken thigh": .meatAndSeafood,
     "beef": .meatAndSeafood,
+    "bacon": .meatAndSeafood,
+    "pork butt": .meatAndSeafood,
+    "pork shoulder": .meatAndSeafood,
+    "pork butt roast": .meatAndSeafood,
+    "boneless pork butt roast": .meatAndSeafood,
+    "5 pound pork butt roast": .meatAndSeafood,
     "salmon": .meatAndSeafood,
     "shrimp": .meatAndSeafood,
+    "guajillo chile": .produce,
+    "ancho chile": .produce,
+    "chile de arbol": .produce,
+    "morita chile": .produce,
+    "chipotle chile": .produce,
+    "pasilla chile": .produce,
     "toilet paper": .household,
     "butter": .dairy,
     "cheddar cheese": .dairy,
@@ -275,9 +314,49 @@ public enum GroceryStoreArea: Hashable, Sendable {
   private static func titleCased(_ value: String) -> String {
     value.capitalized(with: Locale(identifier: "en_US_POSIX"))
   }
+
+  private static func headNounSeed(for canonicalName: String) -> Self? {
+    var words = canonicalName.split(separator: " ").map(String.init)
+    guard let lastWord = words.last, !departmentTailWords.contains(lastWord) else { return nil }
+
+    while let firstWord = words.first, headNounQualifiers.contains(firstWord) {
+      words.removeFirst()
+    }
+    if words.last == "clove" {
+      words.removeLast()
+    }
+    guard let headNoun = words.joined(separator: " ").nonEmptyGroceryText else { return nil }
+    return seedAreas[headNoun]
+  }
+
+  private static let headNounQualifiers: Set<String> = [
+    "black", "green", "red", "sweet", "white", "yellow",
+  ]
+
+  private static let departmentTailWords: Set<String> = [
+    "extract", "flakes", "oil", "paste", "powder", "sauce",
+  ]
 }
 
 public enum GroceryStoreAreaCache {
+  public static func uncategorizedCanonicalNames(in db: Database) throws -> [String] {
+    let names = try GroceryItem.fetchAll(db).compactMap { item in
+      item.aisle == nil ? item.canonicalName : nil
+    }
+    return Array(Set(names)).sorted()
+  }
+
+  public static func applyClassified(
+    _ classified: [String: GroceryStoreArea],
+    in db: Database
+  ) throws {
+    for var item in try GroceryItem.fetchAll(db) where item.aisle == nil {
+      guard let canonicalName = item.canonicalName, let area = classified[canonicalName] else { continue }
+      item.aisle = area.title
+      try GroceryItem.upsert { item }.execute(db)
+    }
+  }
+
   public static func backfill(in db: Database) throws {
     for var item in try GroceryItem.fetchAll(db) where item.aisle == nil {
       guard let area = GroceryStoreArea.seed(for: item.canonicalIngredientName) else { continue }

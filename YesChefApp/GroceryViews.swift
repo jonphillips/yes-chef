@@ -178,6 +178,7 @@ struct GroceryDetailView: View {
     }
     .task {
       model.ensureDefaultListIfNeeded()
+      await model.categorizeUncachedItems()
     }
   }
 }
