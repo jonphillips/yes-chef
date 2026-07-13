@@ -704,7 +704,8 @@ extension RecipeCoreTests {
             )
           ],
           now: now,
-          in: db
+          in: db,
+          viewScale: 2
         )
         try insertRecipeFixture(
           recipeID: secondRecipeID,
@@ -726,7 +727,8 @@ extension RecipeCoreTests {
             )
           ],
           now: now,
-          in: db
+          in: db,
+          viewScale: 3
         )
 
         _ = try GroceryRepository.addRecipe(
@@ -747,14 +749,16 @@ extension RecipeCoreTests {
         let consolidatedRow = try #require(
           try GroceryItemListRequest().fetch(db).first { $0.item.title == "milk" }
         )
+        expectNoDifference(consolidatedRow.item.quantity, 8.5)
+        expectNoDifference(consolidatedRow.item.quantityText, "8.5")
         let wafflesSource = try #require(consolidatedRow.sources.first { $0.recipeID == secondRecipeID })
         try GroceryRepository.deleteSource(sourceID: wafflesSource.id, in: db, now: modifiedAt)
 
         let updatedRow = try #require(
           try GroceryItemListRequest().fetch(db).first { $0.id == consolidatedRow.id }
         )
-        expectNoDifference(updatedRow.item.quantity, 2)
-        expectNoDifference(updatedRow.item.quantityText, "2")
+        expectNoDifference(updatedRow.item.quantity, 4)
+        expectNoDifference(updatedRow.item.quantityText, "4")
         expectNoDifference(updatedRow.item.dateModified, modifiedAt)
         expectNoDifference(updatedRow.sources.map(\.recipeID), [firstRecipeID].map(Optional.some))
         expectNoDifference(updatedRow.sources.map(\.ingredientLineID), [firstMilkLineID].map(Optional.some))
@@ -1000,6 +1004,123 @@ extension RecipeCoreTests {
         expectNoDifference(try GroceryListRequest().fetch(db).first { $0.id == listID }?.itemCount, 0)
       }
     }
+
+    @Test
+    func recipeScaleScalesParsedGroceryQuantitiesAndPreservesFreeText() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 805_280_000)
+      let recipeID = SampleUUIDSequence.uuid(18_001)
+      let sectionID = SampleUUIDSequence.uuid(18_002)
+      var uuids = SampleUUIDSequence(start: 18_100)
+
+      try database.write { db in
+        let listID = try GroceryRepository.ensureDefaultList(
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        try insertRecipeFixture(
+          recipeID: recipeID,
+          sectionID: sectionID,
+          title: "Scaled Soup",
+          lines: [
+            IngredientLine(
+              id: SampleUUIDSequence.uuid(18_003),
+              recipeID: recipeID,
+              sectionID: sectionID,
+              originalText: "1½ cups stock",
+              quantity: 1.5,
+              quantityText: "1½",
+              unit: "cups",
+              item: "stock",
+              sortOrder: 0,
+              confidence: .medium
+            ),
+            IngredientLine(
+              id: SampleUUIDSequence.uuid(18_004),
+              recipeID: recipeID,
+              sectionID: sectionID,
+              originalText: "salt to taste",
+              quantityText: "to taste",
+              item: "salt",
+              sortOrder: 1,
+              confidence: .low
+            ),
+          ],
+          now: now,
+          in: db,
+          viewScale: 2
+        )
+
+        _ = try GroceryRepository.addRecipe(
+          recipeID: recipeID,
+          groceryListID: listID,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        let rows = try GroceryItemListRequest().fetch(db)
+        let stock = try #require(rows.first { $0.item.title == "stock" })
+        let salt = try #require(rows.first { $0.item.title == "salt" })
+        expectNoDifference(stock.item.quantity, 3)
+        expectNoDifference(stock.item.quantityText, "3")
+        expectNoDifference(salt.item.quantity, nil)
+        expectNoDifference(salt.item.quantityText, "to taste")
+      }
+    }
+
+    @Test
+    func unscaledRecipePreservesFractionalQuantityText() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 805_290_000)
+      let recipeID = SampleUUIDSequence.uuid(18_101)
+      let sectionID = SampleUUIDSequence.uuid(18_102)
+      var uuids = SampleUUIDSequence(start: 18_200)
+
+      try database.write { db in
+        let listID = try GroceryRepository.ensureDefaultList(
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        try insertRecipeFixture(
+          recipeID: recipeID,
+          sectionID: sectionID,
+          title: "Half Batch",
+          lines: [
+            IngredientLine(
+              id: SampleUUIDSequence.uuid(18_103),
+              recipeID: recipeID,
+              sectionID: sectionID,
+              originalText: "½ cup cream",
+              quantity: 0.5,
+              quantityText: "½",
+              unit: "cup",
+              item: "cream",
+              sortOrder: 0,
+              confidence: .medium
+            )
+          ],
+          now: now,
+          in: db
+        )
+
+        _ = try GroceryRepository.addRecipe(
+          recipeID: recipeID,
+          groceryListID: listID,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        let cream = try #require(
+          try GroceryItemListRequest().fetch(db).first { $0.item.title == "cream" }
+        )
+        expectNoDifference(cream.item.quantity, 0.5)
+        expectNoDifference(cream.item.quantityText, "½")
+      }
+    }
   }
 }
 
@@ -1009,14 +1130,16 @@ func insertRecipeFixture(
   title: String,
   lines: [IngredientLine],
   now: Date,
-  in db: Database
+  in db: Database,
+  viewScale: Double = 1
 ) throws {
   try Recipe.insert {
     Recipe(
       id: recipeID,
       title: title,
       dateCreated: now,
-      dateModified: now
+      dateModified: now,
+      viewScale: viewScale
     )
   }
   .execute(db)

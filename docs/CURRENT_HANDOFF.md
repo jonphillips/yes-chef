@@ -26,6 +26,14 @@ exported dish context: frontier budget + full method, ADR-0034 Amendment 1) is n
 and device-passed** (2026-07-12) — merged to main, archived to DONE-LOG; only the ADR's own deferred items
 (OQ4 taste preference, A6 promote-note-to-recipe) remain, each a separate future effort.
 
+**Grocery scaling bug — FIXED (architect-reviewed 2026-07-12, device pass owed to Jon).** Scaling a recipe /
+menu item / meal-plan item never scaled the quantities added to the grocery list — generation and the
+source-removal recompute both read raw `line.quantity`. Fixed in `GroceryCore.swift` with one
+source-provenance-keyed `groceryScale` helper (priority `menuItem.scale → mealPlanItem.scale → recipe.viewScale`),
+applied in both `GroceryGeneratedItemDraft` (scale 1 preserves fraction text byte-for-byte) and `generatedMeasure`;
+free-text quantities left unscaled. New + updated tests in `GroceryTests`/`GroceryPlanningTests` (293 pass).
+On branch `menu-within-day-reorder`, not yet PR'd.
+
 Earlier and logged in [`docs/DONE-LOG.md`](DONE-LOG.md): **ADR-0027 "Capture to menu" S1**
 ([#141](https://github.com/jonphillips/yes-chef/pull/141)); **Instrumentation — apply-action + LLM logging**
 ([#139](https://github.com/jonphillips/yes-chef/pull/139)); **ADR-0026 review-collection sheet**

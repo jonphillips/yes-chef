@@ -403,11 +403,17 @@ public enum GroceryRepository {
 
     let sourceSubtitle = source.sourceSubtitle
       ?? folded?.variation.map { "Variation: \($0.name)" }
+    let scale = try groceryScale(
+      recipeID: recipe.id,
+      menuItemID: source.menuItemID,
+      mealPlanItemID: source.mealPlanItemID,
+      in: db
+    )
     var itemIDs: [GroceryItem.ID] = []
     var sortOrder = try nextItemSortOrder(groceryListID: groceryListID, in: db)
     for line in lines {
       let itemID = try addOrConsolidateGeneratedItem(
-        GroceryGeneratedItemDraft(line: line),
+        GroceryGeneratedItemDraft(line: line, scale: scale),
         groceryListID: groceryListID,
         source: PendingGroceryItemSource(
           id: uuid(),
@@ -840,11 +846,17 @@ private struct GroceryGeneratedItemDraft {
   var aisle: String?
   var notes: String?
 
-  init(line: IngredientLine) {
+  init(line: IngredientLine, scale: Double = 1.0) {
     self.title = line.groceryItemTitle
     self.canonicalName = line.canonicalIngredientName ?? CanonicalIngredient.canonicalName(line.groceryItemTitle)
-    self.quantity = line.quantity
-    self.quantityText = line.groceryQuantityText
+    if let quantity = line.quantity {
+      let scaledQuantity = quantity * scale
+      self.quantity = scaledQuantity
+      self.quantityText = scale == 1 ? line.groceryQuantityText : formatGroceryQuantity(scaledQuantity)
+    } else {
+      self.quantity = nil
+      self.quantityText = line.groceryQuantityText
+    }
     self.unit = line.unit?.nonEmptyGroceryText
     self.aisle = line.shoppingCategory?.nonEmptyGroceryText
     self.notes = line.groceryNotes
@@ -1001,7 +1013,13 @@ private func generatedMeasure(
     else {
       return nil
     }
-    let lineMeasure = Measure(quantity: lineQuantity, unit: line.unit)
+    let scale = try groceryScale(
+      recipeID: source.recipeID,
+      menuItemID: source.menuItemID,
+      mealPlanItemID: source.mealPlanItemID,
+      in: db
+    )
+    let lineMeasure = Measure(quantity: lineQuantity * scale, unit: line.unit)
     if let existingMeasure = measure {
       guard let mergedMeasure = existingMeasure.merged(with: lineMeasure) else { return nil }
       measure = mergedMeasure
@@ -1010,6 +1028,27 @@ private func generatedMeasure(
     }
   }
   return measure
+}
+
+private func groceryScale(
+  recipeID: Recipe.ID?,
+  menuItemID: MenuItem.ID?,
+  mealPlanItemID: MealPlanItem.ID?,
+  in db: Database
+) throws -> Double {
+  if let menuItemID,
+     let scale = try MenuItem.find(menuItemID).fetchOne(db)?.scale {
+    return scale
+  }
+  if let mealPlanItemID,
+     let scale = try MealPlanItem.find(mealPlanItemID).fetchOne(db)?.scale {
+    return scale
+  }
+  if let recipeID,
+     let scale = try Recipe.find(recipeID).fetchOne(db)?.viewScale {
+    return scale
+  }
+  return 1.0
 }
 
 private func formatGroceryQuantity(_ quantity: Double) -> String {
