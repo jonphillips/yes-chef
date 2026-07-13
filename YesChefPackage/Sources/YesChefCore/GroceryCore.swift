@@ -99,6 +99,7 @@ public enum GroceryRepository {
     now: Date,
     uuid: () -> UUID
   ) throws -> GroceryList.ID {
+    try GroceryStoreAreaCache.backfill(in: db)
     let lists = try GroceryList.fetchAll(db).sorted(by: areGroceryListsInIncreasingOrder)
     if let defaultList = try reconciledDefaultList(in: db, lists: lists, now: now) {
       return defaultList.id
@@ -230,14 +231,15 @@ public enum GroceryRepository {
       throw GroceryRepositoryError.emptyItemTitle
     }
 
+    let canonicalName = CanonicalIngredient.canonicalName(title)
     let item = GroceryItem(
       id: uuid(),
       groceryListID: groceryListID,
       title: title,
-      canonicalName: CanonicalIngredient.canonicalName(title),
+      canonicalName: canonicalName,
       quantityText: quantityText?.nonEmptyGroceryText,
       unit: unit?.nonEmptyGroceryText,
-      aisle: aisle?.nonEmptyGroceryText,
+      aisle: aisle?.nonEmptyGroceryText ?? GroceryStoreArea.seed(for: canonicalName)?.title,
       notes: notes?.nonEmptyGroceryText,
       sortOrder: try nextItemSortOrder(groceryListID: groceryListID, in: db),
       dateCreated: now,
@@ -861,6 +863,7 @@ private struct GroceryGeneratedItemDraft {
     }
     self.unit = line.unit?.nonEmptyGroceryText
     self.aisle = line.shoppingCategory?.nonEmptyGroceryText
+      ?? GroceryStoreArea.seed(for: canonicalName)?.title
     self.notes = line.groceryNotes
   }
 
