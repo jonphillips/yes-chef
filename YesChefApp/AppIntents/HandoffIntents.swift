@@ -30,12 +30,15 @@ struct ExportHandoffContext: AppIntent {
   @Parameter(title: "Source", requestValueDialog: "What should Yes Chef hand off?")
   var source: HandoffSource
 
-  @Parameter(title: "Mode", default: .discuss)
+  // Defaults to `.immediate` because the Shortcuts surface exists for the headless
+  // `Ask ChatGPT` chain; a discuss prompt sent headlessly comes back as prose the parser
+  // cannot use. The in-app Copy Prep Prompt button remains the discuss path.
+  @Parameter(title: "Mode", default: .immediate)
   var mode: HandoffPromptMode
 
   init() {}
 
-  init(source: HandoffSource, mode: HandoffPromptMode = .discuss) {
+  init(source: HandoffSource, mode: HandoffPromptMode = .immediate) {
     self.source = source
     self.mode = mode
   }

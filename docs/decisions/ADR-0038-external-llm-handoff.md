@@ -158,6 +158,64 @@ the discuss path (the immediate path may commit directly by design, but still su
 `recipeVariations` for recipes and the [ADR-0034](ADR-0034-prep-plan-work-session-timeline.md) full-replace
 for menu prep plans. Route through the existing commit shapes; do not reinvent versioning.
 
+## Amendment 1 — the return artifact is two-part: **Deliverable + Learnings** (2026-07-14)
+
+**Status: Accepted.** Origin: Jon, after the S2 device pass. Amends D2/D3/D6/D7 and re-splits S3.
+
+### The gap
+
+The handoff as shipped reduces a multi-turn session to a **context-free deliverable**. The prep plan
+lands; the *reasoning that produced it* dies in ChatGPT. But a session produces two distinct things:
+
+- **Deliverable** — structured, routes to a field. Prep plan, make-ahead, variation. Built.
+- **Learnings** — durable knowledge established *in discussion*. *"Dried bay leaves beat fresh, and you
+  can dry your own."* *"Birria benefits from a day or two of sitting, so it's a good travel dish."*
+  **Currently discarded.**
+
+Sometimes a session yields **only** Learnings and no deliverable — today that is a dead end, which is
+wrong: it is one of the most valuable session shapes.
+
+We cannot preserve the conversation (ChatGPT owns it, and it expires). We should not want to — nobody
+rereads transcripts. **Don't preserve the conversation; harvest it** — the vocabulary this codebase
+already speaks ([ADR-0027](ADR-0027-note-harvest.md) harvest, [ADR-0025](ADR-0025-reader-feedback.md)
+curate-to-notes).
+
+### Decision
+
+**The return contract becomes `(Deliverable?, Learnings?)` — either may be empty.** A learning-only
+return is a **first-class outcome**, not a degenerate one.
+
+- **Format.** The finalize instruction (already the discuss prompt's hook) asks for both: the deliverable
+  section, then a Learnings section. Learnings come back as a **structured list of distinct items** —
+  never a merged blob summary, per [[llm-curation-not-synthesis]]. The model curates its own
+  conversation, which beats a raw transcript.
+- **Landing zone — the resource's own synced notes.** Learnings commit to `RecipeNote` rows / menu notes.
+  **Not** to `AIHandoff`: that record is device-local, non-synced, transient scaffolding (OQ1). Learnings
+  are durable artifacts and must travel with the resource across devices. This is what actually puts the
+  context back *next to the Yes Chef object*.
+- **Review.** `RecipeCollectionReviewSheet` already takes `items: [ChatApplyReviewItem]`; the handoff sheet
+  currently passes exactly one. It passes **two** — Deliverable and Learnings — each independently
+  editable and independently discardable. The human remains final author of both
+  ([ADR-0024](ADR-0024-editable-proposal-preview.md)/[ADR-0026](ADR-0026-review-collection-sheet.md)).
+- **New `taskType`** for a learning-only handoff, valid against *any* source.
+
+### Consequence — Learnings are the **universal** commit shape, and S3 re-splits
+
+Every resource has notes. So "harvest to notes" works identically for recipe, menu, and meal-plan with
+**zero per-source commit logic**, while the deliverable shapes are all bespoke. S3 therefore splits:
+
+- **S3a — Learnings harvest (universal).** Lands on all three sources at once. Small, uniform, and it
+  makes the handoff useful on resources that have no structured deliverable field at all.
+- **S3b — per-source deliverables.** Recipe → `Recipe.makeAhead` + adjust/variation
+  ([ADR-0021](ADR-0021-recipe-variations.md)/[ADR-0023](ADR-0023-recipe-edit-proposals.md)); meal-plan →
+  make-ahead strategy ([ADR-0013](ADR-0013-meal-planner-actionable-chat.md), classify per
+  [[chat-verb-commit-shapes]]).
+
+**Presentation is deliberately not decided here.** *Where* Learnings and deliverables are displayed (the
+in-app chat panel's future, a possible "Intelligence" third column) is a separate information-architecture
+question with its own ADR. This amendment is the **data contract only** — which is why S3 is not blocked
+by that redesign.
+
 ## Deferred (on the record, explicitly not built here)
 
 - **Widened share-extension "Import into Yes Chef."** A polished entry point for when you're already
@@ -230,7 +288,10 @@ ChatGPT-action question (D5).
   Prompt → paste into the project by hand → Paste Prep Plan; (3) optional hybrid — Export → Copy to Clipboard
   → Start chat in project (fixed project, one shortcut per active project). Menu.externalProjectName is
   demoted from a routing key to an advisory reminder, and ExportHandoffContext gains a mode parameter
-  (default discuss) so a Shortcut can start a discussable session.
+  (default **immediate**) so a Shortcut can also start a discussable session. The default is immediate
+  because the Shortcuts surface exists for the headless `Ask ChatGPT` chain — a discuss prompt sent
+  headlessly returns prose the parser cannot use, while the reverse mispairing is harmless. The
+  **in-app Copy Prep Prompt button stays the discuss path** and takes no mode.
 - **OQ4 — token in the intent parameter vs. the text body.** `ImportHandoffResult(handoffID:)` gets the ID
   typed for the automated chain; the "Return to Yes Chef" / paste path recovers it from the stripped token
   line. Support both; the parameter wins when present.
