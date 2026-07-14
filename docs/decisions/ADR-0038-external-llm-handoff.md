@@ -186,13 +186,42 @@ curate-to-notes).
 return is a **first-class outcome**, not a degenerate one.
 
 - **Format.** The finalize instruction (already the discuss prompt's hook) asks for both: the deliverable
-  section, then a Learnings section. Learnings come back as a **structured list of distinct items** —
-  never a merged blob summary, per [[llm-curation-not-synthesis]]. The model curates its own
-  conversation, which beats a raw transcript.
-- **Landing zone — the resource's own synced notes.** Learnings commit to `RecipeNote` rows / menu notes.
-  **Not** to `AIHandoff`: that record is device-local, non-synced, transient scaffolding (OQ1). Learnings
-  are durable artifacts and must travel with the resource across devices. This is what actually puts the
-  context back *next to the Yes Chef object*.
+  section, then a Learnings section introduced by a **`YC-LEARNINGS:` marker line** (mirroring the
+  `YC-HANDOFF:` convention). Learnings come back as a **structured list of distinct bullet items** — never a
+  merged blob summary, per [[llm-curation-not-synthesis]]. The model curates its own conversation, which
+  beats a raw transcript.
+
+  **⚠️ The parser must split *before* it parses.** `isEditablePrepPlanSessionHeader`
+  (`MenuPrepPlan.swift:352`) treats **any non-bullet, colon-terminated line** as a prep-plan session header.
+  So a `YC-LEARNINGS:` line handed to `applyingEditableReviewText` would be **swallowed as a prep band** and
+  every learning under it would become a prep step. Therefore: **strip the token → split the body on the
+  `YC-LEARNINGS:` marker → feed *only* the deliverable half to `applyingEditableReviewText`**, and parse the
+  learnings half as bullets. No marker → the whole body is the deliverable (today's behavior, unchanged).
+  Marker present with nothing above it → a **learning-only** return.
+- **Landing zone — a new synced `Learning` table.** *(Decided with Jon 2026-07-14, after rejecting both
+  alternatives.)* **Not** `Menu.notes` / `MealPlanItem.notes` — those are string blobs, and merging distinct
+  learnings into one violates [[llm-curation-not-synthesis]] and this amendment's own rule. **Not**
+  `MenuItem` note-rows either — those carry **day/placement** semantics, and a menu-wide learning has no day,
+  so the row would *mean* something false. And **not** `AIHandoff`, which is device-local, non-synced,
+  transient scaffolding (OQ1) — Learnings are durable and must travel with the resource.
+
+  The deciding argument is the project's actual trajectory: **notes are being decomposed, not consolidated.**
+  Make-ahead got its own typed home; Chef It Up got its own. "Notes" is the residue being drained, not a
+  destination. A `Learning` is another **typed content kind** and gets its own home — which also makes it
+  *addressable* by future AI interaction in a way prose buried in a note blob never is.
+
+  **Shape (start minimal — plain text; let the corpus tell us if it wants structure):** `id: UUID`,
+  `sourceType` (reuse `AIHandoffSourceType`), `sourceID: UUID`, `text: String`, `provenance`
+  (`.externalHandoff` / `.inApp`), `dateCreated`, `dateModified`. **Additive + synced** (add to
+  `makeSyncEngine`'s table list *and* the standing prod-schema promotion list).
+
+  **Two consequences that are not free:**
+  - **Polymorphic `(sourceType, sourceID)` cannot be a real FK**, so there is **no cascade delete** — deleting
+    a menu would orphan its Learnings as synced ghosts. Each source's delete path must **hand-cascade**.
+    (`AIHandoff` has the same polymorphic shape but is transient, so orphans there are harmless. Here they are
+    not.)
+  - **No FK back to `AIHandoff`** — it is device-local, so a synced `Learning` referencing a handoff id would
+    dangle on the other device. Provenance is a **marker**, never a link.
 - **Review.** `RecipeCollectionReviewSheet` already takes `items: [ChatApplyReviewItem]`; the handoff sheet
   currently passes exactly one. It passes **two** — Deliverable and Learnings — each independently
   editable and independently discardable. The human remains final author of both

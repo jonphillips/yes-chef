@@ -119,8 +119,15 @@ instruct the model to emit **tasks, never choreography**. Don't generate what wi
 - **OQ3 — what triggers the menu's temporal mode shift (D4)?** Automatic (service date proximity), manual
   toggle, or simply "collapsible days, collapsed by default when the menu is in the past/present"? Prefer the
   dumbest thing that works; avoid a mode the user can't predict.
-- **OQ4 — does the Playbook subsume the existing notes surfaces**, or sit alongside `RecipeNote` /
-  ADR-0025 curated reader notes? Likely subsumes-by-display, not by schema.
+- **OQ4 — RESOLVED (2026-07-14, with Jon): the Playbook subsumes by *display*; the content underneath stays
+  *typed*.** The original lean here ("subsumes-by-display, not by schema") was read as *reuse the existing
+  generic notes surfaces* — and that is **backwards**. The project's actual trajectory is to **decompose**
+  notes into typed, granular homes (make-ahead got its own; Chef It Up got its own); "notes" is the residue
+  being drained, not a destination. So a new content kind gets a **new typed home**, and the Playbook is the
+  *column that renders them together* — not a schema that merges them. First application:
+  [ADR-0038 Amendment 1](ADR-0038-external-llm-handoff.md)'s Learnings get their own synced `Learning` table
+  rather than being dumped into `Menu.notes` or day-scoped `MenuItem` note-rows. **Granularity is also an AI
+  affordance** — a typed record is addressable; a paragraph buried in a note blob is not.
 
 ## Related
 

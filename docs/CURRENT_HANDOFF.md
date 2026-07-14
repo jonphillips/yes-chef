@@ -28,14 +28,27 @@ exposed the gap: a rich multi-turn session collapses to a **context-free deliver
 in ChatGPT. Amendment 1 makes the return **`(Deliverable?, Learnings?)`, either may be empty**. Build, on
 **Menu only** (its serializer already exists — **no new outbound work**; Recipe/MealPlan serializers are S3b):
 
-- **Prompt (both modes).** After the deliverable, ask for a **Learnings** section: durable knowledge
-  established in discussion (*"dried bay leaves beat fresh, and you can dry your own"*). Learnings come back
-  as a **structured list of distinct items — never a merged blob summary** ([[llm-curation-not-synthesis]]).
-  The model curates its own conversation; we are not trying to preserve a transcript.
-- **Parse** both sections (token stripping unchanged).
-- **Commit.** Deliverable → `Menu.prepPlan` (existing path). **Learnings → the menu's own *synced* notes** —
-  **not** `AIHandoff`, which is device-local transient scaffolding (OQ1). Learnings are durable artifacts and
-  must travel with the resource.
+- **Prompt (both modes).** After the deliverable, ask for a **Learnings** section introduced by a
+  **`YC-LEARNINGS:`** marker line (mirrors the `YC-HANDOFF:` convention): durable knowledge established in
+  discussion (*"dried bay leaves beat fresh, and you can dry your own"*). Learnings come back as a
+  **structured list of distinct bullets — never a merged blob summary** ([[llm-curation-not-synthesis]]).
+  The model curates its own conversation; we are not preserving a transcript.
+- **⚠️ Parse: split BEFORE you parse.** `isEditablePrepPlanSessionHeader` (`MenuPrepPlan.swift:352`) treats
+  **any non-bullet, colon-terminated line** as a prep-plan session header — so handing `YC-LEARNINGS:` to
+  `applyingEditableReviewText` would **swallow it as a prep band** and turn every learning into a prep step.
+  Therefore: strip the token → **split the body on the `YC-LEARNINGS:` marker** → feed *only* the deliverable
+  half to `applyingEditableReviewText`; parse the learnings half as bullets. No marker → whole body is the
+  deliverable (today's behavior, unchanged). Marker with nothing above it → a **learning-only** return.
+- **Commit — new synced `Learning` table** (decided with Jon 2026-07-14; see Amendment 1 for why *not*
+  `Menu.notes` (blob), *not* day-scoped `MenuItem` note-rows, *not* `AIHandoff` (device-local)). Deliverable →
+  `Menu.prepPlan` (existing path). Shape, **plain text to start**: `id: UUID`, `sourceType` (reuse
+  `AIHandoffSourceType`), `sourceID: UUID`, `text: String`, `provenance` (`.externalHandoff`/`.inApp`),
+  `dateCreated`, `dateModified`. **Additive + synced** → add `Learning.self` to `makeSyncEngine`'s table list
+  (and the `CloudSyncTests` guard), and **add `learnings` to the standing prod-schema promotion list below**.
+  **Two non-obvious consequences:** (1) `(sourceType, sourceID)` is **polymorphic → no FK → no cascade
+  delete**; deleting a menu would orphan its Learnings as *synced* ghosts, so **hand-cascade in
+  `MenuRepository`'s delete path**. (2) **No FK back to `AIHandoff`** (device-local — it would dangle on the
+  other device); provenance is a **marker, never a link**.
 - **Review.** `RecipeCollectionReviewSheet` already takes `items: [ChatApplyReviewItem]`; `HandoffReviewSheet`
   currently passes **one**. Pass **two** — Deliverable and Learnings — each independently editable and
   discardable (ADR-0024/0026: human is final author of both).
@@ -82,8 +95,8 @@ prod/TestFlight cut. At that cut, deploy to the production schema the Phase E Sl
 `Recipe.coverPhotoID` column (PR #87), the ADR-0018 synced `aiSettings` table (PR #96) **including its additive
 `readerFeedbackPreference` column** (ADR-0025 D6) **and `captureToNotePreference` column** (ADR-0027 S1,
 PR #141), **and** the ADR-0021
-synced `recipeVariations` table (Recipe edit proposals S2), **and `Menu.externalProjectName`** (ADR-0038 S2);
-and note the app target
+synced `recipeVariations` table (Recipe edit proposals S2), **and `Menu.externalProjectName`** (ADR-0038 S2),
+**and the synced `learnings` table** (ADR-0038 Amd 1 / S3a); and note the app target
 (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 
 ## Ready Efforts (queue)
