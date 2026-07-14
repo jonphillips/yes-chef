@@ -699,7 +699,7 @@ private struct MenuExternalProjectField: View {
         prompt: "Emerald Isle Beach"
       )
       HStack {
-        Text("Used by the Start Chat in Project shortcut.")
+        Text("Reminder of which ChatGPT project to open for this menu — Shortcuts can't pick it for you.")
           .font(.footnote)
           .foregroundStyle(.secondary)
         Spacer()

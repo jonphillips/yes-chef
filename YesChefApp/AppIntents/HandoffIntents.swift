@@ -4,6 +4,24 @@ import Foundation
 import SQLiteData
 import YesChefCore
 
+enum HandoffPromptMode: String, AppEnum {
+  case discuss
+  case immediate
+
+  static let typeDisplayRepresentation: TypeDisplayRepresentation = "Handoff Mode"
+  static let caseDisplayRepresentations: [HandoffPromptMode: DisplayRepresentation] = [
+    .discuss: "Discuss",
+    .immediate: "Immediate",
+  ]
+
+  var promptMode: AIHandoffToken.PromptMode {
+    switch self {
+    case .discuss: .discuss
+    case .immediate: .immediate
+    }
+  }
+}
+
 struct ExportHandoffContext: AppIntent {
   static let title: LocalizedStringResource = "Export Handoff Context"
   static let description = IntentDescription("Export a menu context for an external assistant.")
@@ -12,14 +30,18 @@ struct ExportHandoffContext: AppIntent {
   @Parameter(title: "Source", requestValueDialog: "What should Yes Chef hand off?")
   var source: HandoffSource
 
+  @Parameter(title: "Mode", default: .discuss)
+  var mode: HandoffPromptMode
+
   init() {}
 
-  init(source: HandoffSource) {
+  init(source: HandoffSource, mode: HandoffPromptMode = .discuss) {
     self.source = source
+    self.mode = mode
   }
 
   static var parameterSummary: some ParameterSummary {
-    Summary("Export handoff context for \(\.$source)")
+    Summary("Export \(\.$mode) handoff context for \(\.$source)")
   }
 
   func perform() async throws -> some ReturnsValue<HandoffExport> & ProvidesDialog {
@@ -40,7 +62,7 @@ struct ExportHandoffContext: AppIntent {
     let prompt = AIHandoffToken.prompt(
       handoffID: handoffID,
       context: MenuChatContext(detail: detail).prepPrompt(),
-      mode: .immediate
+      mode: mode.promptMode
     )
     try await database.write { db in
       try AIHandoffRepository.create(

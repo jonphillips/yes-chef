@@ -221,9 +221,16 @@ ChatGPT-action question (D5).
   Requires a **Menu↔project mapping**: an optional `Menu.externalProjectName` the user sets once, matching a
   project they created in ChatGPT (projects **cannot** be created via Shortcuts — so Yes Chef selects into an
   existing one, never creates). `ExportHandoffContext` returns that name as an output the shortcut feeds to
-  `Start chat in project`. **New sub-question, verify on-device at S2:** does `Start chat in project` accept
-  the project as a *variable* input, or only a fixed configure-time pick? If fixed-only, per-menu routing
-  needs a per-menu shortcut or a run-time project prompt — confirm before wiring.
+  `Start chat in project`. Sub-question RESOLVED (2026-07-14, device): fixed-only. Start chat in project
+  resolves the project at configure time and does not accept a variable input (no variable bar even with the
+  picker's search field focused); it also appears to take no prompt/message input. Per-menu project
+  auto-seeding from one generic shortcut is therefore not achievable. This does not break the handoff —
+  return→resource routing rides the YC-HANDOFF: token and is project-independent. Fallbacks, in order: (1)
+  immediate mode (Ask ChatGPT, headless) as the automated loop; (2) discuss mode via the in-app Copy Prep
+  Prompt → paste into the project by hand → Paste Prep Plan; (3) optional hybrid — Export → Copy to Clipboard
+  → Start chat in project (fixed project, one shortcut per active project). Menu.externalProjectName is
+  demoted from a routing key to an advisory reminder, and ExportHandoffContext gains a mode parameter
+  (default discuss) so a Shortcut can start a discussable session.
 - **OQ4 — token in the intent parameter vs. the text body.** `ImportHandoffResult(handoffID:)` gets the ID
   typed for the automated chain; the "Return to Yes Chef" / paste path recovers it from the stripped token
   line. Support both; the parameter wins when present.
