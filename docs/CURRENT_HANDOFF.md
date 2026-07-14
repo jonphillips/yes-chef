@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 14, 2026 (ADR-0038 **S3a** approved PR #183 → DONE-LOG; Next Up = **ADR-0040 S1 + S2** — make LLM-populated content editable at row grain: the Learnings surface, then prep-plan BLOB → step rows, *before* the prod-schema cut locks the blob and *before* S3b scales the writers).
+Last updated: July 14, 2026 (ADR-0040 **S1 + S2** approved + device-passed PR #184 → DONE-LOG; Next Up = **ADR-0038 S3b** — generalize the two-part return contract to Recipe + MealPlan, inheriting editable-at-grain).
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,75 +21,36 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0040](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md), S1 + S2
-(one PR, in order).** **Make LLM-populated content editable by the human who has to live with it.** The prep
-plan today is **all-or-nothing**: `Menu.prepPlan` is a BLOB, so there is no *step 3* to delete, no step to add,
-no typo to fix — the only way to change it is to make the LLM regenerate the whole thing. That is a **schema
-defect wearing a missing-button costume**, and ADR-0038 S3a just shipped a second table (`learnings`) that
-nobody can read. Both get fixed here, and **both get fixed before [ADR-0038 S3b](decisions/ADR-0038-external-llm-handoff.md)**
-adds two more sources writing LLM content into more fields.
+**Live dispatch target — [ADR-0038](decisions/ADR-0038-external-llm-handoff.md) External-LLM handoff, S3b**
+([`efforts/adr-0038-external-llm-handoff.md`](efforts/adr-0038-external-llm-handoff.md)).
+**Generalize the two-part return contract to Recipe + MealPlan.** S3a shipped the `(Deliverable?, Learnings?)`
+contract and the synced `Learning` table; ADR-0040 S1+S2 (PR #184 → DONE-LOG) made that content **editable at
+row grain** and gave learnings a reader. Both were proven on **Menu only** — because Menu's context serializer
+already existed. S3b gives the other two sources theirs, and it **inherits** editable-at-grain rather than
+adding new BLOBs:
 
-**Read [ADR-0040](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md) first — its two rules govern every
-line below:** (1) store LLM output at **the grain the human will manipulate** (a row with an id, never an
-element inside a blob); (2) **the human never authors the serialization format**, and any text we do parse is
-**lossless or loud** — never silently dropped.
-
-**S1 — the Learnings surface** (the ADR-0038 S3a follow-on; see
-[`efforts/adr-0038-external-llm-handoff.md`](efforts/adr-0038-external-llm-handoff.md)).
-
-- **Read.** A **Learnings** section on the menu detail (`YesChefApp/MenuViews.swift`, alongside
-  `MenuPrepPlanSection`), this menu's learnings newest-first. Fetch **scoped to the menu** — extend
-  `MenuDetailQuery`/`MenuDetailData` (`MenuCore.swift:18`/`:101`), already a per-menu `@Fetch`. **Never a
-  whole-library `@Fetch`** — [[sqlitedata-fetch-writer-convoy]] (ADR-0029 Finding 8) cost us a week.
-- **Delete one.** Swipe-to-delete a single learning; `LearningRepository` has `create`/`deleteAll` only, so add
-  `delete(id:)`. This is the slice's reason to exist — today a bad learning is **synced and unremovable**
-  except by deleting the whole menu.
-- **Edit one.** Inline text edit → write `dateModified`; **leave `provenance` alone** (it records origin; a
-  human touch-up does not make an externally-returned learning in-app-authored).
-- **No new AI, prompt, or commit path** — the S3a review sheet stays the only writer.
-- **Expose the handoff id to Shortcuts** (found 2026-07-14 while building the S3a device pass).
-  `ImportHandoffResult` has a **Handoff ID** parameter that **nothing can fill**: `HandoffExport`
-  (`YesChefApp/AppIntents/HandoffEntities.swift:157`) exposes `prompt` and `externalProjectName` as
-  `@Property`, but the id is only the entity identifier, which Shortcuts will not hand back as a variable. So
-  **every** return today must route on the token echoed as the *first line* of the model's reply
-  (`AIHandoffToken.stripping`) — i.e. **routing depends on ChatGPT faithfully reproducing a UUID**, while the
-  id sits in the Shortcut unusable. Add `@Property(title: "Handoff ID") var handoffID: String` to
-  `HandoffExport` so a Shortcut can wire Export → Import directly. Token routing stays as the fallback.
-
-**S2 — prep plan → step rows** (ADR-0040 D1/D4; reshapes [ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md)'s
-storage, **not** its model).
-
-- **Migrate** the `Menu.prepPlan` BLOB → a synced **`prepPlanSteps`** table (`id`, `menuID`, `sortOrder`,
-  `session`, `task`, `serves`, `sourceDish`), decoding existing blobs per menu (the ADR-0034 `when`→`session`
-  back-compat decode already exists). Unlike `learnings`, this **is** a real child of `Menu` → give it a
-  proper **FK + cascade delete** (multi-FK does not block sync — [[sqlitedata-single-fk-sync-limit]]).
-  **Add `prepPlanSteps` to the standing prod-schema promotion list below.**
-- **Edit at row grain:** add / edit / delete / **reorder** a step, via a `PrepPlanStepRepository`.
-- **The human edits fields, not the wire format** (D2): task + serves fields and a **session picker** drawn
-  from an explicit band vocabulary — no typing colons, no typing the `→` (a character Jon cannot reliably
-  type), no guessing which heading words land a step in the Flexible band (today that is sniffed from prose:
-  `MenuViews.swift:491`). `applyingEditableReviewText` survives **only as an inbound parser**; it stops being
-  the storage round-trip.
-- **⚠️ Kill the silent-loss paths** (D3): today an unparseable line is `continue`d away, a bullet before any
-  session header is dropped, and `sourceDish` is re-attached by **matching task text** — so editing a task's
-  wording silently severs its recipe link. Rows carry `sourceDish` by identity; leftover text is surfaced,
-  never swallowed.
-- **Why now:** `Menu.prepPlan` is on the prod-promotion list but **not promoted**, and promotion is
-  additive-only and **permanently locks the record type**. This restructuring is **free today, expensive
-  forever** after the first prod/TestFlight cut (ADR-0040 D4).
-
-**Then [ADR-0038 S3b](efforts/adr-0038-external-llm-handoff.md)** (generalize the serializer to Recipe +
-MealPlan; recipe → `Recipe.makeAhead`, meal-plan → make-ahead strategy — classify each commit shape first per
-[[chat-verb-commit-shapes]]; Learnings ride free on the S3a machinery). Sequenced **after** the above on
-purpose: it should inherit editable-at-grain, not add three more places that need retrofitting.
+- **Context builders** for Recipe + MealPlan on the `MenuChatContext` pattern (frontier budget, method,
+  uncapped ingredients, an intro prompt tuned from `tasteProfile`/AI settings, asking for review-text output).
+- **Commit shape per source — classify it first** ([[chat-verb-commit-shapes]]): recipe → `Recipe.makeAhead`
+  (and adjust/variation, ADR-0021/0023); meal-plan → make-ahead strategy
+  ([ADR-0013](decisions/ADR-0013-meal-planner-actionable-chat.md)). **Do not invent a new BLOB the human can
+  only regenerate** — if a deliverable is a list the human will edit one of, it is rows (ADR-0040 D1).
+- **Learnings ride along free** on the S3a machinery — which is what makes the handoff worth doing on a source
+  with **no structured deliverable field at all**. Reuse the S1 learnings surface; it is already source-typed.
+- **Read [ADR-0040](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md) before writing any parser** — the
+  lossless-or-loud rule (D3) and the "human edits fields, not the wire format" rule (D2) are now precedent, not
+  aspiration.
 
 **Then [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md)** (the Playbook column) —
-milestone-sized, Jon-gated, a **design conversation, not a Codex dispatch**. S1 is its evidence-gatherer: design
-the Playbook once a real corpus of learnings exists to hold, in a shape the human can already fix.
+milestone-sized, Jon-gated, a **design conversation, not a Codex dispatch**. The learnings corpus is now real
+and editable; design the Playbook once it has content to hold.
 
-**ADR-0038 S3a device pass owed (Jon):** the two-item review sheet (prep plan + learnings, each independently
-savable/discardable), and a learning-only return through **both** paths — the Shortcuts `Import Handoff Result`
-intent *and* the in-app paste box.
+**Deferred — [ADR-0040 S3](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md), the lossless-or-**loud**
+pass** (not yet queued; fold in when a handoff/paste slice is already open). Two known **silent** paths remain:
+(1) a learning/step edit saves with **no confirmation** — it just appears or doesn't; (2) "Paste Prep Plan"
+**silently no-ops** on an empty clipboard or a missed iOS *Allow Paste* prompt (`MenuViews.swift`
+`pastePrepPlanButtonTapped`, `guard let text … else { return }`). Every import path should end in a visible
+outcome.
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**

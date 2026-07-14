@@ -9,6 +9,55 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0040 — LLM-populated content is editable at the grain it is stored, S1 + S2 (on Menu)
+
+**✅ DONE — architect-approved + Jon device-passed 2026-07-14.** yes-chef PR
+[#184](https://github.com/jonphillips/yes-chef/pull/184).
+[ADR-0040](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md): the prep plan stopped being an
+**all-or-nothing BLOB** the human could only regenerate through the LLM, and the `learnings` table (ADR-0038
+S3a) got a reader. Two rules proven on Menu: **store LLM output at the grain the human manipulates** (a row
+with an id) and **the human never authors the wire format** (structured fields, lossless-or-loud parsing).
+
+**S1 — the Learnings surface.** A **Learnings** section on the menu detail (`MenuLearningsSection`), this
+menu's learnings newest-first, read through the existing **per-menu** `MenuDetailRequest` (no whole-library
+`@Fetch` — [[sqlitedata-fetch-writer-convoy]]). Inline edit (writes `dateModified`, leaves `provenance`),
+swipe-to-delete a single row via `LearningRepository.delete(id:)` — `swipeActionsContainer()` on the
+`ScrollView`, the iOS 27 way to swipe outside a `List`. Also exposed the **Handoff ID** as an `@Property` on
+`HandoffExport` so a Shortcut can wire Export → Import directly instead of trusting ChatGPT to echo the token
+UUID.
+
+**S2 — prep plan → step rows.** `Menu.prepPlan` BLOB migrated into a synced **`prepPlanSteps`** table
+(`id`, `menuID`, `sortOrder`, `session`, `task`, `serves`, `sourceDish`) — a real child of `Menu` with a
+**FK + `ON DELETE CASCADE`** (no hand-cascade; multi-FK does not block sync). `PrepPlanStepRepository` does
+add / edit / delete / **reorder**; the detail section edits **fields + a session picker** (six-band vocabulary
+with an `.other` free-text escape), not the `session:` / `→` wire DSL. The BLOB is retained one release as a
+**frozen snapshot, not a rollback mirror** (nothing writes it). Both `learnings` and `prepPlanSteps` joined the
+prod-schema promotion list; the restructure landed **before the prod cut locks the record type**.
+
+**Silent-loss paths killed (ADR-0040 D3).** `sourceDish` is no longer re-derived by matching task prose — it
+rides on row identity, so a text import with no link intentionally drops the recipe chip rather than guessing
+(pinned by test + documented). The parser now routes unparseable lines to `unparsedLines` instead of
+`continue`-ing them away.
+
+**Review findings, fixed in-PR** (PR #184 review + `076eb11`). (1) App target **did not compile** and the
+suite was **red** as first pushed — an if-let-shorthand typo and a stale BLOB-seeded chat-context fixture
+(architect-fixed, `0bf0e81`). (2) **The Flexible band went unreachable** — `isFlexible` demanded exact picker
+titles, but LLM/legacy plans carry prose; fixed with a **display-only** `PrepPlanSessionBand(matching:)`
+normalizer that never rewrites the stored label. (3) **"Loud" had overshot into "refuse everything"** — one
+unparsed line rejected the whole return incl. learnings, even on the reviewed path; now the review sheet
+**surfaces** the bad lines ("Couldn't parse — fix or remove…") for the human to fix, while the unreviewed
+direct paste still hard-throws.
+
+**Process fix that shipped with it.** The "CoreSimulator has no runtimes" excuse that let **two** uncompiled
+PRs (#183, #184) through is dead: `xcodebuild -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO`
+compiles the app target with no simulator and no signing, and the Verification Pattern in `CURRENT_HANDOFF.md`
+now mandates it.
+
+**Deferred to the [ADR-0040 S3](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md) lossless-or-loud
+pass:** no save confirmation on a learning/step edit (it just appears), and "Paste Prep Plan" silently no-ops
+on an empty clipboard or a missed *Allow Paste* prompt.
+
+---
 ## ADR-0038 Amendment 1 — External-LLM handoff, S3a (the two-part return contract, on Menu)
 
 **✅ DONE — architect-approved 2026-07-14. Jon device pass still owed.** yes-chef PR

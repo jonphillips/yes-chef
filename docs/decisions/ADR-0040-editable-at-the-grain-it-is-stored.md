@@ -5,7 +5,8 @@
 > text we do parse is *lossless or loud*, never silently lossy.** Yes Chef keeps generating content the human
 > can only regenerate, never fix. That is a schema defect masquerading as a missing button.
 
-Status: **Proposed** — 2026-07-14. Origin: Jon, during the [ADR-0038](ADR-0038-external-llm-handoff.md) S3a
+Status: **Accepted** — 2026-07-14 (S1 + S2 shipped + device-passed, PR #184; S3 lossless-or-loud pass
+deferred). Origin: Jon, during the [ADR-0038](ADR-0038-external-llm-handoff.md) S3a
 review — *"what is annoying about the prep plan is that it's an all-or-nothing proposition. I can't edit it,
 I can't add a step, I can't delete a step. I almost have to manage it through an LLM."* Governs
 [ADR-0034](ADR-0034-prep-plan-work-session-timeline.md) (the prep plan), ADR-0038 Amd 1 (Learnings),
