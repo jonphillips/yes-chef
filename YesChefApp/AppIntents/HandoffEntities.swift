@@ -159,8 +159,8 @@ struct HandoffExport: AppEntity {
   static let defaultQuery = HandoffExportQuery()
 
   let id: AIHandoff.ID
-  @ComputedProperty(title: "Prompt") var prompt: String
-  @ComputedProperty(title: "ChatGPT Project") var externalProjectName: String?
+  @Property(title: "Prompt") var prompt: String
+  @Property(title: "ChatGPT Project") var externalProjectName: String?
 
   var displayRepresentation: DisplayRepresentation {
     DisplayRepresentation(title: "Yes Chef Handoff")

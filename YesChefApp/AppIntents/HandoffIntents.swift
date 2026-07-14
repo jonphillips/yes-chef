@@ -72,14 +72,14 @@ struct ImportHandoffResult: AppIntent {
   static var allowedExecutionTargets: IntentExecutionTargets { .main }
 
   @Parameter(title: "Handoff ID")
-  var handoffID: UUID?
+  var handoffID: String?
 
   @Parameter(title: "Result")
   var result: String
 
   init() {}
 
-  init(handoffID: UUID? = nil, result: String) {
+  init(handoffID: String? = nil, result: String) {
     self.handoffID = handoffID
     self.result = result
   }
@@ -93,9 +93,19 @@ struct ImportHandoffResult: AppIntent {
     @Dependency(\.defaultDatabase) var database
     @Dependency(\.handoffReviewCoordinator) var handoffReviewCoordinator
 
+    let parsedHandoffID: UUID?
+    if let handoffID {
+      guard let value = UUID(uuidString: handoffID) else {
+        throw HandoffIntentSurfaceError.invalidHandoffID
+      }
+      parsedHandoffID = value
+    } else {
+      parsedHandoffID = nil
+    }
+
     let review = try await database.write { db in
       try AIHandoffIntentImport.stageMenuPrepPlanReview(
-        handoffID: handoffID,
+        handoffID: parsedHandoffID,
         result: result,
         in: db,
         now: now
@@ -121,6 +131,7 @@ struct OpenHandoffReviewIntent: AppIntent {
 private enum HandoffIntentSurfaceError: Error, LocalizedError {
   case sourceNotAvailableYet
   case sourceNotFound
+  case invalidHandoffID
 
   var errorDescription: String? {
     switch self {
@@ -128,6 +139,8 @@ private enum HandoffIntentSurfaceError: Error, LocalizedError {
       "Recipe and meal-plan handoffs are not available until their serializers ship."
     case .sourceNotFound:
       "Yes Chef could not find that source."
+    case .invalidHandoffID:
+      "The handoff ID must be a UUID."
     }
   }
 }
