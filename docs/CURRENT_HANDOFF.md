@@ -47,6 +47,14 @@ element inside a blob); (2) **the human never authors the serialization format**
 - **Edit one.** Inline text edit → write `dateModified`; **leave `provenance` alone** (it records origin; a
   human touch-up does not make an externally-returned learning in-app-authored).
 - **No new AI, prompt, or commit path** — the S3a review sheet stays the only writer.
+- **Expose the handoff id to Shortcuts** (found 2026-07-14 while building the S3a device pass).
+  `ImportHandoffResult` has a **Handoff ID** parameter that **nothing can fill**: `HandoffExport`
+  (`YesChefApp/AppIntents/HandoffEntities.swift:157`) exposes `prompt` and `externalProjectName` as
+  `@Property`, but the id is only the entity identifier, which Shortcuts will not hand back as a variable. So
+  **every** return today must route on the token echoed as the *first line* of the model's reply
+  (`AIHandoffToken.stripping`) — i.e. **routing depends on ChatGPT faithfully reproducing a UUID**, while the
+  id sits in the Shortcut unusable. Add `@Property(title: "Handoff ID") var handoffID: String` to
+  `HandoffExport` so a Shortcut can wire Export → Import directly. Token routing stays as the fallback.
 
 **S2 — prep plan → step rows** (ADR-0040 D1/D4; reshapes [ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md)'s
 storage, **not** its model).
