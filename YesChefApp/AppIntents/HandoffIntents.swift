@@ -137,7 +137,7 @@ struct ImportHandoffResult: AppIntent {
       )
     }
     await handoffReviewCoordinator.present(review)
-    return .result(opensIntent: OpenHandoffReviewIntent(), dialog: "Review the returned prep plan in Yes Chef.")
+    return .result(opensIntent: OpenHandoffReviewIntent(), dialog: "Review the returned handoff in Yes Chef.")
   }
 }
 

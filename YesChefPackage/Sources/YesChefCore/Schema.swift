@@ -841,6 +841,27 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Create synced learnings") { db in
+      try #sql("""
+        CREATE TABLE "learnings" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "sourceType" TEXT NOT NULL,
+          "sourceID" TEXT NOT NULL,
+          "text" TEXT NOT NULL,
+          "provenance" TEXT NOT NULL,
+          "dateCreated" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      try #sql("""
+        CREATE INDEX "index_learnings_on_sourceType_sourceID"
+        ON "learnings"("sourceType", "sourceID")
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

@@ -18,7 +18,10 @@ struct AIHandoffTests {
     let prompt = AIHandoffToken.prompt(handoffID: handoffID, context: "Menu context")
 
     #expect(prompt.hasPrefix("YC-HANDOFF: \(handoffID.uuidString)\n"))
-    #expect(prompt.contains("Preserve that token exactly"))
+    #expect(prompt.contains("Preserve that token and marker exactly"))
+    #expect(prompt.contains("YC-LEARNINGS:"))
+    #expect(prompt.contains("never merge learnings into a prose summary"))
+    #expect(prompt.contains("Never write choreography"))
 
     let routedText = try #require(
       AIHandoffToken.stripping(
@@ -48,9 +51,35 @@ struct AIHandoffTests {
       mode: .immediate
     )
 
-    #expect(prompt.contains("Return the completed prep plan in your first response."))
-    #expect(prompt.contains("Return only the token and formatted prep plan: no preamble and no Markdown code fence."))
-    #expect(prompt.hasSuffix("session:\n- task → serves"))
+    #expect(prompt.contains("Return the completed prep plan in your first response when the menu needs one."))
+    #expect(prompt.contains("YC-LEARNINGS: section of distinct durable-learning bullets"))
+    #expect(prompt.contains("A learning-only return is valid"))
+    #expect(prompt.contains("never choreography or a merged mega-recipe"))
+    #expect(prompt.hasSuffix("YC-LEARNINGS:\n- durable learning"))
+  }
+
+  @Test
+  func twoPartReturnSplitsBeforePrepPlanParsingAndKeepsDistinctLearningBullets() {
+    let returned = AIHandoffReturn.menuPrepPlan(
+      from: """
+      Wednesday evening:
+      - Salt the chicken → Thursday dinner
+      ## **yc-learnings:**
+      - Dried bay leaves beat fresh.
+      - Salt the chicken a day ahead.
+      - Dried bay leaves beat fresh.
+      """,
+      currentPlan: MenuPrepPlan()
+    )
+
+    expectNoDifference(
+      returned.plan.steps,
+      [PrepPlanStep(session: "Wednesday evening", task: "Salt the chicken", serves: "Thursday dinner")]
+    )
+    expectNoDifference(
+      returned.learnings,
+      ["Dried bay leaves beat fresh.", "Salt the chicken a day ahead."]
+    )
   }
 
   @Test
@@ -94,7 +123,8 @@ struct AIHandoffTests {
         to: menuID,
         currentPlan: MenuPrepPlan(),
         in: db,
-        now: importedAt
+        now: importedAt,
+        uuid: { SampleUUIDSequence.uuid(38_013) }
       )
       expectNoDifference(imported, .imported)
       expectNoDifference(
@@ -112,7 +142,8 @@ struct AIHandoffTests {
         to: menuID,
         currentPlan: MenuPrepPlan(steps: MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan)),
         in: db,
-        now: importedAt.addingTimeInterval(60)
+        now: importedAt.addingTimeInterval(60),
+        uuid: { SampleUUIDSequence.uuid(38_014) }
       )
       expectNoDifference(duplicate, .duplicate)
 
@@ -125,12 +156,111 @@ struct AIHandoffTests {
         to: menuID,
         currentPlan: MenuPrepPlan(),
         in: db,
-        now: importedAt.addingTimeInterval(120)
+        now: importedAt.addingTimeInterval(120),
+        uuid: { SampleUUIDSequence.uuid(38_015) }
       )
       expectNoDifference(fallback, .applied)
       expectNoDifference(
         MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan),
         [PrepPlanStep(session: "Thursday morning", task: "Chop the herbs")]
+      )
+    }
+  }
+
+  @Test
+  func manualPastePersistsTwoPartAndLearningOnlyReturns() throws {
+    @Dependency(\.defaultDatabase) var database
+    let menuID = SampleUUIDSequence.uuid(38_016)
+    let handoffID = SampleUUIDSequence.uuid(38_017)
+    let learningOnlyHandoffID = SampleUUIDSequence.uuid(38_018)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+    var uuids = SampleUUIDSequence(start: 38_100)
+
+    try database.write { db in
+      try Menu.insert {
+        Menu(
+          id: menuID,
+          title: "Beach Menu",
+          dayCount: 2,
+          dateCreated: now,
+          dateModified: now
+        )
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .menu,
+          sourceID: menuID,
+          taskType: .prepPlan,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      let twoPart = try AIHandoffMenuPrepPlanImport.apply(
+        text: """
+        YC-HANDOFF: \(handoffID.uuidString)
+        Wednesday evening:
+        - Salt the chicken → Thursday dinner
+        **YC-LEARNINGS:**
+        - Dried bay leaves beat fresh.
+        - Birria benefits from sitting overnight.
+        """,
+        to: menuID,
+        currentPlan: MenuPrepPlan(),
+        in: db,
+        now: now,
+        uuid: { uuids.next() }
+      )
+      expectNoDifference(twoPart, .imported)
+      expectNoDifference(
+        MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan),
+        [PrepPlanStep(session: "Wednesday evening", task: "Salt the chicken", serves: "Thursday dinner")]
+      )
+
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: learningOnlyHandoffID,
+          sourceType: .menu,
+          sourceID: menuID,
+          taskType: .learning,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(learningOnlyHandoffID.uuidString)"
+        ),
+        in: db
+      )
+      let learningOnly = try AIHandoffMenuPrepPlanImport.apply(
+        text: """
+        YC-HANDOFF: \(learningOnlyHandoffID.uuidString)
+        ## YC-LEARNINGS:
+        - Salt the chicken a day ahead.
+        """,
+        to: menuID,
+        currentPlan: MenuPrepPlan(
+          steps: MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan)
+        ),
+        in: db,
+        now: now,
+        uuid: { uuids.next() }
+      )
+      expectNoDifference(learningOnly, .imported)
+      expectNoDifference(
+        MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan),
+        [PrepPlanStep(session: "Wednesday evening", task: "Salt the chicken", serves: "Thursday dinner")]
+      )
+      expectNoDifference(
+        try Learning
+          .where { $0.sourceType.eq(AIHandoffSourceType.menu) && $0.sourceID.eq(menuID) }
+          .fetchAll(db)
+          .map(\.text)
+          .sorted(),
+        [
+          "Birria benefits from sitting overnight.",
+          "Dried bay leaves beat fresh.",
+          "Salt the chicken a day ahead.",
+        ]
       )
     }
   }
@@ -180,6 +310,7 @@ struct AIHandoffTests {
         review.plan.steps,
         [PrepPlanStep(session: "Wednesday evening", task: "Salt the chicken", serves: "Thursday dinner")]
       )
+      expectNoDifference(review.learnings, [])
       #expect(try Menu.find(menuID).fetchOne(db)?.prepPlan == nil)
       #expect(try AIHandoffRepository.handoff(id: handoffID, in: db)?.status == .imported)
 
@@ -194,6 +325,92 @@ struct AIHandoffTests {
           )
         }
       )
+    }
+  }
+
+  @Test
+  func learningOnlyIntentImportStagesWithoutWritingTheMenuPlan() throws {
+    @Dependency(\.defaultDatabase) var database
+    let menuID = SampleUUIDSequence.uuid(38_022)
+    let handoffID = SampleUUIDSequence.uuid(38_023)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Menu.insert {
+        Menu(
+          id: menuID,
+          title: "Beach Menu",
+          dayCount: 2,
+          dateCreated: now,
+          dateModified: now
+        )
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .menu,
+          sourceID: menuID,
+          taskType: .learning,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      let review = try AIHandoffIntentImport.stageMenuPrepPlanReview(
+        handoffID: handoffID,
+        result: """
+        YC-HANDOFF: \(handoffID.uuidString)
+        YC-LEARNINGS:
+        - Dried bay leaves beat fresh.
+        - Birria benefits from sitting overnight.
+        """,
+        in: db,
+        now: now
+      )
+      expectNoDifference(review.plan.steps, [])
+      expectNoDifference(
+        review.learnings,
+        ["Dried bay leaves beat fresh.", "Birria benefits from sitting overnight."]
+      )
+      #expect(try Menu.find(menuID).fetchOne(db)?.prepPlan == nil)
+    }
+  }
+
+  @Test
+  func menuDeletionHandCascadesItsLearnings() throws {
+    @Dependency(\.defaultDatabase) var database
+    let menuID = SampleUUIDSequence.uuid(38_024)
+    let learningID = SampleUUIDSequence.uuid(38_025)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Menu.insert {
+        Menu(
+          id: menuID,
+          title: "Beach Menu",
+          dayCount: 2,
+          dateCreated: now,
+          dateModified: now
+        )
+      }
+      .execute(db)
+      try LearningRepository.create(
+        Learning(
+          id: learningID,
+          sourceType: .menu,
+          sourceID: menuID,
+          text: "Dried bay leaves beat fresh.",
+          provenance: .externalHandoff,
+          dateCreated: now,
+          dateModified: now
+        ),
+        in: db
+      )
+
+      try MenuRepository.deleteMenu(menuID: menuID, in: db)
+      #expect(try Learning.find(learningID).fetchOne(db) == nil)
     }
   }
 

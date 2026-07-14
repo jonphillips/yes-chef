@@ -47,6 +47,7 @@ public enum AIHandoffSourceType: String, Codable, QueryBindable, QueryDecodable,
 
 public enum AIHandoffTaskType: String, Codable, QueryBindable, QueryDecodable, Sendable {
   case prepPlan
+  case learning
   case adjustRecipe
   case mealPlanMakeAheadStrategy
 }
@@ -55,6 +56,58 @@ public enum AIHandoffStatus: String, Codable, QueryBindable, QueryDecodable, Sen
   case awaitingReturn
   case imported
   case discarded
+}
+
+@Table("learnings")
+public struct Learning: Codable, Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var sourceType: AIHandoffSourceType
+  public var sourceID: UUID
+  public var text: String
+  public var provenance: LearningProvenance
+  public var dateCreated: Date
+  public var dateModified: Date
+
+  public init(
+    id: UUID,
+    sourceType: AIHandoffSourceType,
+    sourceID: UUID,
+    text: String,
+    provenance: LearningProvenance,
+    dateCreated: Date,
+    dateModified: Date
+  ) {
+    self.id = id
+    self.sourceType = sourceType
+    self.sourceID = sourceID
+    self.text = text
+    self.provenance = provenance
+    self.dateCreated = dateCreated
+    self.dateModified = dateModified
+  }
+}
+
+public enum LearningProvenance: String, Codable, QueryBindable, QueryDecodable, Sendable {
+  case externalHandoff
+  case inApp
+}
+
+public enum LearningRepository {
+  public static func create(_ learning: Learning, in db: Database) throws {
+    try Learning.insert { learning }.execute(db)
+  }
+
+  public static func deleteAll(
+    sourceType: AIHandoffSourceType,
+    sourceID: UUID,
+    in db: Database
+  ) throws {
+    try Learning
+      .where { $0.sourceType.eq(sourceType) }
+      .where { $0.sourceID.eq(sourceID) }
+      .delete()
+      .execute(db)
+  }
 }
 
 public enum AIHandoffRepository {
@@ -106,7 +159,9 @@ public enum AIHandoffToken {
 
       \(context)
 
-      You may discuss this freely. When the user asks you to finalize, return only the token line above as the first line followed by paste-ready review text. Preserve that token exactly and do not use a Markdown code fence.
+      You may discuss this freely. When the user asks you to finalize, return only the token line above as the first line, followed by the paste-ready prep plan, then a YC-LEARNINGS: line and a distinct bullet list of durable knowledge established during the discussion. A learning-only return is valid: leave the prep-plan portion empty and include the marker plus bullets. Preserve that token and marker exactly; never merge learnings into a prose summary; do not use a Markdown code fence.
+
+      Prep-plan bullets must be separable, atomic, context-free tasks such as "Salt the chicken Wednesday". Never write choreography or a merged mega-recipe: recipe cooking instructions stay with their recipes.
       """
     case .immediate:
       return """
@@ -114,9 +169,11 @@ public enum AIHandoffToken {
 
       \(context)
 
-      Return the completed prep plan in your first response. Preserve the token above as the first line. Return only the token and formatted prep plan: no preamble and no Markdown code fence. Use this exact format:
+      Return the completed prep plan in your first response when the menu needs one. Preserve the token above as the first line. Return only the token, formatted prep plan, and a YC-LEARNINGS: section of distinct durable-learning bullets: no preamble and no Markdown code fence. A learning-only return is valid: leave the prep-plan portion empty and include the marker plus bullets. Prep-plan bullets must be separable, atomic, context-free tasks, never choreography or a merged mega-recipe; recipe cooking instructions stay with their recipes. Use this exact format:
       session:
       - task → serves
+      YC-LEARNINGS:
+      - durable learning
       """
     }
   }
@@ -143,11 +200,65 @@ public struct AIHandoffMenuPrepPlanReview: Equatable, Sendable {
   public let handoffID: AIHandoff.ID
   public let menuID: Menu.ID
   public let plan: MenuPrepPlan
+  public let learnings: [String]
 
-  public init(handoffID: AIHandoff.ID, menuID: Menu.ID, plan: MenuPrepPlan) {
+  public init(
+    handoffID: AIHandoff.ID,
+    menuID: Menu.ID,
+    plan: MenuPrepPlan,
+    learnings: [String]
+  ) {
     self.handoffID = handoffID
     self.menuID = menuID
     self.plan = plan
+    self.learnings = learnings
+  }
+}
+
+public enum AIHandoffReturn {
+  public static let learningsMarker = "YC-LEARNINGS:"
+
+  public static func menuPrepPlan(
+    from text: String,
+    currentPlan: MenuPrepPlan
+  ) -> (plan: MenuPrepPlan, learnings: [String]) {
+    let split = splitting(text)
+    return (
+      currentPlan.applyingEditableReviewText(split.deliverable),
+      learningBullets(from: split.learnings)
+    )
+  }
+
+  public static func learningBullets(from text: String) -> [String] {
+    var seen = Set<String>()
+    return text.components(separatedBy: .newlines).compactMap { rawLine in
+      let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+      let bullet: String?
+      if line.hasPrefix("- ") || line.hasPrefix("* ") || line.hasPrefix("• ") {
+        bullet = String(line.dropFirst(2)).trimmingCharacters(in: .whitespacesAndNewlines)
+      } else {
+        bullet = nil
+      }
+      guard let bullet, !bullet.isEmpty, seen.insert(bullet).inserted else { return nil }
+      return bullet
+    }
+  }
+
+  private static func splitting(_ text: String) -> (deliverable: String, learnings: String) {
+    let lines = text.components(separatedBy: .newlines)
+    guard let markerIndex = lines.firstIndex(where: isLearningsMarker) else {
+      return (text, "")
+    }
+    return (
+      lines[..<markerIndex].joined(separator: "\n"),
+      lines[lines.index(after: markerIndex)...].joined(separator: "\n")
+    )
+  }
+
+  private static func isLearningsMarker(_ line: String) -> Bool {
+    line
+      .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "#*")))
+      .caseInsensitiveCompare(learningsMarker) == .orderedSame
   }
 }
 
@@ -169,7 +280,7 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
     case .duplicate:
       "This handoff result was already imported for review."
     case .emptyPlan:
-      "The returned plan needs a session heading followed by one or more prep steps."
+      "The returned handoff needs a prep plan or at least one learning bullet."
     }
   }
 
@@ -193,7 +304,9 @@ public enum AIHandoffIntentImport {
     guard let handoff = try AIHandoffRepository.handoff(id: resolvedHandoffID, in: db) else {
       throw AIHandoffIntentImportError.handoffNotFound(resolvedHandoffID)
     }
-    guard handoff.sourceType == .menu, handoff.taskType == .prepPlan else {
+    guard handoff.sourceType == .menu,
+      handoff.taskType == .prepPlan || handoff.taskType == .learning
+    else {
       throw AIHandoffIntentImportError.wrongTask
     }
     guard handoff.status == .awaitingReturn, handoff.importedAt == nil else {
@@ -204,11 +317,21 @@ public enum AIHandoffIntentImport {
     }
 
     let currentPlan = MenuPrepPlan(steps: MenuPrepPlanCoding.decode(menu.prepPlan))
-    let plan = currentPlan.applyingEditableReviewText(routedText?.payload ?? result)
-    guard !plan.steps.isEmpty else { throw AIHandoffIntentImportError.emptyPlan }
+    let returned = AIHandoffReturn.menuPrepPlan(
+      from: routedText?.payload ?? result,
+      currentPlan: currentPlan
+    )
+    guard !returned.plan.steps.isEmpty || !returned.learnings.isEmpty else {
+      throw AIHandoffIntentImportError.emptyPlan
+    }
 
     try AIHandoffRepository.markImported(id: handoff.id, at: now, in: db)
-    return AIHandoffMenuPrepPlanReview(handoffID: handoff.id, menuID: menu.id, plan: plan)
+    return AIHandoffMenuPrepPlanReview(
+      handoffID: handoff.id,
+      menuID: menu.id,
+      plan: returned.plan,
+      learnings: returned.learnings
+    )
   }
 }
 
@@ -226,11 +349,11 @@ public enum AIHandoffMenuPrepPlanImportError: Error, Equatable, LocalizedError, 
   public var errorDescription: String? {
     switch self {
     case .emptyPlan:
-      "The pasted plan needs a session heading followed by one or more prep steps."
+      "The pasted handoff needs prep steps or at least one learning bullet."
     case .wrongMenu:
       "This handoff belongs to a different menu."
     case .wrongTask:
-      "This handoff does not contain a prep plan."
+      "This handoff does not contain a supported result."
     }
   }
 
@@ -243,7 +366,8 @@ public enum AIHandoffMenuPrepPlanImport {
     to menuID: Menu.ID,
     currentPlan: MenuPrepPlan,
     in db: Database,
-    now: Date
+    now: Date,
+    uuid: () -> UUID
   ) throws -> AIHandoffMenuPrepPlanImportResult {
     let routedText = AIHandoffToken.stripping(from: text)
 
@@ -251,23 +375,56 @@ public enum AIHandoffMenuPrepPlanImport {
       guard handoff.sourceType == .menu, handoff.sourceID == menuID else {
         throw AIHandoffMenuPrepPlanImportError.wrongMenu
       }
-      guard handoff.taskType == .prepPlan else {
+      guard handoff.taskType == .prepPlan || handoff.taskType == .learning else {
         throw AIHandoffMenuPrepPlanImportError.wrongTask
       }
       guard handoff.status == .awaitingReturn, handoff.importedAt == nil else {
         return .duplicate
       }
 
-      let plan = currentPlan.applyingEditableReviewText(routedText.payload)
-      guard !plan.steps.isEmpty else { throw AIHandoffMenuPrepPlanImportError.emptyPlan }
-      try MenuRepository.applyPrepPlan(plan, to: menuID, in: db, now: now)
+      let returned = AIHandoffReturn.menuPrepPlan(
+        from: routedText.payload,
+        currentPlan: currentPlan
+      )
+      try apply(returned, to: menuID, in: db, now: now, uuid: uuid)
       try AIHandoffRepository.markImported(id: handoff.id, at: now, in: db)
       return .imported
     }
 
-    let plan = currentPlan.applyingEditableReviewText(routedText?.payload ?? text)
-    guard !plan.steps.isEmpty else { throw AIHandoffMenuPrepPlanImportError.emptyPlan }
-    try MenuRepository.applyPrepPlan(plan, to: menuID, in: db, now: now)
+    let returned = AIHandoffReturn.menuPrepPlan(
+      from: routedText?.payload ?? text,
+      currentPlan: currentPlan
+    )
+    try apply(returned, to: menuID, in: db, now: now, uuid: uuid)
     return .applied
+  }
+
+  private static func apply(
+    _ returned: (plan: MenuPrepPlan, learnings: [String]),
+    to menuID: Menu.ID,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws {
+    guard !returned.plan.steps.isEmpty || !returned.learnings.isEmpty else {
+      throw AIHandoffMenuPrepPlanImportError.emptyPlan
+    }
+    if !returned.plan.steps.isEmpty {
+      try MenuRepository.applyPrepPlan(returned.plan, to: menuID, in: db, now: now)
+    }
+    for text in returned.learnings {
+      try LearningRepository.create(
+        Learning(
+          id: uuid(),
+          sourceType: .menu,
+          sourceID: menuID,
+          text: text,
+          provenance: .externalHandoff,
+          dateCreated: now,
+          dateModified: now
+        ),
+        in: db
+      )
+    }
   }
 }
