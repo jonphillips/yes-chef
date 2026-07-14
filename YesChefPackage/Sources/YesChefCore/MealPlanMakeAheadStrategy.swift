@@ -34,21 +34,50 @@ public struct MealPlanMakeAheadStrategy: Equatable, Sendable {
   }
 
   public func applyingEditableReviewText(_ text: String) -> MealPlanMakeAheadStrategy {
+    Self.parsingEditableReviewText(text, preservingSourceItemsFrom: self).strategy
+  }
+
+  public struct EditableReviewParseResult: Equatable, Sendable {
+    public var strategy: MealPlanMakeAheadStrategy
+    public var unparsedLines: [String]
+
+    public init(strategy: MealPlanMakeAheadStrategy, unparsedLines: [String]) {
+      self.strategy = strategy
+      self.unparsedLines = unparsedLines
+    }
+  }
+
+  /// Preserves every non-empty review line by reporting lines that cannot be represented as a strategy step.
+  /// The caller must surface or reject those lines rather than silently dropping human edits.
+  public static func parsingEditableReviewText(
+    _ text: String,
+    preservingSourceItemsFrom existing: MealPlanMakeAheadStrategy = MealPlanMakeAheadStrategy()
+  ) -> EditableReviewParseResult {
     let lines = text.editableMealPlanMakeAheadLines
-    guard let titleLine = lines.first else { return MealPlanMakeAheadStrategy() }
-    var sourceItemsByLine = Dictionary(grouping: steps) { $0.rendered }
+    guard let titleLine = lines.first else {
+      return EditableReviewParseResult(strategy: MealPlanMakeAheadStrategy(), unparsedLines: [])
+    }
+    var sourceItemsByLine = Dictionary(grouping: existing.steps) { $0.rendered }
       .mapValues { steps in steps.map(\.sourceItem) }
-    return MealPlanMakeAheadStrategy(
-      title: Self.title(fromEditableReviewTitleLine: titleLine) ?? title,
-      mealSlot: Self.mealSlot(fromEditableReviewTitleLine: titleLine) ?? mealSlot,
-      steps: lines.dropFirst().compactMap { line in
-        guard let parsedLine = MealPlanMakeAheadStep.editableReviewLine(line) else { return nil }
-        return MealPlanMakeAheadStep(
-          when: parsedLine.when,
-          task: parsedLine.task,
-          sourceItem: Self.popSourceItem(for: line, from: &sourceItemsByLine)
-        )
+    var unparsedLines: [String] = []
+    let steps = lines.dropFirst().compactMap { line -> MealPlanMakeAheadStep? in
+      guard let parsedLine = MealPlanMakeAheadStep.editableReviewLine(line) else {
+        unparsedLines.append(line)
+        return nil
       }
+      return MealPlanMakeAheadStep(
+        when: parsedLine.when,
+        task: parsedLine.task,
+        sourceItem: Self.popSourceItem(for: line, from: &sourceItemsByLine)
+      )
+    }
+    return EditableReviewParseResult(
+      strategy: MealPlanMakeAheadStrategy(
+        title: Self.title(fromEditableReviewTitleLine: titleLine) ?? existing.title,
+        mealSlot: Self.mealSlot(fromEditableReviewTitleLine: titleLine) ?? existing.mealSlot,
+        steps: steps
+      ),
+      unparsedLines: unparsedLines
     )
   }
 
