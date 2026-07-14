@@ -162,6 +162,17 @@ struct HandoffExport: AppEntity {
   @Property(title: "Prompt") var prompt: String
   @Property(title: "ChatGPT Project") var externalProjectName: String?
 
+  init(id: AIHandoff.ID, prompt: String, externalProjectName: String?) {
+    self.id = id
+    self._prompt = EntityProperty(identifier: "prompt", title: "Prompt")
+    self._prompt.wrappedValue = prompt
+    self._externalProjectName = EntityProperty(
+      identifier: "externalProjectName",
+      title: "ChatGPT Project"
+    )
+    self._externalProjectName.wrappedValue = externalProjectName
+  }
+
   var displayRepresentation: DisplayRepresentation {
     DisplayRepresentation(title: "Yes Chef Handoff")
   }
