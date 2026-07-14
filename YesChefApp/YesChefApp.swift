@@ -5,7 +5,11 @@ import YesChefCore
 
 @main
 struct YesChefApp: App {
+  private let handoffReviewCoordinator: HandoffReviewCoordinator
+
   init() {
+    let handoffReviewCoordinator = HandoffReviewCoordinator()
+    self.handoffReviewCoordinator = handoffReviewCoordinator
     let legacyPantryText = UserDefaults.standard.string(forKey: GroceryPantryStorage.storageKey)
     let legacyPantryItems = legacyPantryText.map(GroceryPantryStorage.items(from:))
     let legacyTasteProfile = UserDefaults.standard.string(forKey: legacyRecipeChatCustomInstructionsKey)
@@ -14,6 +18,7 @@ struct YesChefApp: App {
       try! $0.migrateLegacyAISettingsIfNeeded(tasteProfile: legacyTasteProfile)
       try! $0.seedPantryItemsIfNeeded(titles: legacyPantryItems)
       try! $0.seedSampleDataIfNeeded()
+      $0.handoffReviewCoordinator = handoffReviewCoordinator
       $0.webRecipeCaptureClient = WebRecipeCaptureClient(
         fetchHTML: WebRecipeCaptureClient.liveValue.fetchHTML,
         renderHTML: { url in

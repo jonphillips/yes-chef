@@ -628,6 +628,20 @@ public enum MenuRepository {
     try MenuPlacement.find(placementID).delete().execute(db)
   }
 
+  public static func updateExternalProjectName(
+    menuID: Menu.ID,
+    externalProjectName: String?,
+    in db: Database,
+    now: Date
+  ) throws {
+    _ = try requireMenu(menuID, in: db)
+    try Menu.find(menuID).update {
+      $0.externalProjectName = #bind(externalProjectName?.nonEmptyMenuText)
+      $0.dateModified = #bind(now)
+    }
+    .execute(db)
+  }
+
   private static func requireMenu(_ menuID: Menu.ID, in db: Database) throws -> Menu {
     guard let menu = try Menu.find(menuID).fetchOne(db) else {
       throw MenuRepositoryError.menuNotFound(menuID)

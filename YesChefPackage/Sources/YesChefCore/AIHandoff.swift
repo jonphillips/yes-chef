@@ -76,6 +76,11 @@ public enum AIHandoffRepository {
 }
 
 public enum AIHandoffToken {
+  public enum PromptMode: Sendable {
+    case discuss
+    case immediate
+  }
+
   public struct RoutedText: Equatable, Sendable {
     public let handoffID: AIHandoff.ID
     public let payload: String
@@ -88,15 +93,32 @@ public enum AIHandoffToken {
 
   public static let prefix = "YC-HANDOFF:"
 
-  public static func prompt(handoffID: AIHandoff.ID, context: String) -> String {
+  public static func prompt(
+    handoffID: AIHandoff.ID,
+    context: String,
+    mode: PromptMode = .discuss
+  ) -> String {
     let token = header(handoffID: handoffID)
-    return """
-    \(token)
+    switch mode {
+    case .discuss:
+      return """
+      \(token)
 
-    \(context)
+      \(context)
 
-    You may discuss this freely. When the user asks you to finalize, return only the token line above as the first line followed by paste-ready review text. Preserve that token exactly and do not use a Markdown code fence.
-    """
+      You may discuss this freely. When the user asks you to finalize, return only the token line above as the first line followed by paste-ready review text. Preserve that token exactly and do not use a Markdown code fence.
+      """
+    case .immediate:
+      return """
+      \(token)
+
+      \(context)
+
+      Return the completed prep plan in your first response. Preserve the token above as the first line. Return only the token and formatted prep plan: no preamble and no Markdown code fence. Use this exact format:
+      session:
+      - task → serves
+      """
+    }
   }
 
   public static func header(handoffID: AIHandoff.ID) -> String {
@@ -114,6 +136,79 @@ public enum AIHandoffToken {
 
     lines.removeFirst()
     return RoutedText(handoffID: handoffID, payload: lines.joined(separator: "\n"))
+  }
+}
+
+public struct AIHandoffMenuPrepPlanReview: Equatable, Sendable {
+  public let handoffID: AIHandoff.ID
+  public let menuID: Menu.ID
+  public let plan: MenuPrepPlan
+
+  public init(handoffID: AIHandoff.ID, menuID: Menu.ID, plan: MenuPrepPlan) {
+    self.handoffID = handoffID
+    self.menuID = menuID
+    self.plan = plan
+  }
+}
+
+public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, CustomStringConvertible, Sendable {
+  case missingHandoffID
+  case handoffNotFound(AIHandoff.ID)
+  case wrongTask
+  case duplicate
+  case emptyPlan
+
+  public var errorDescription: String? {
+    switch self {
+    case .missingHandoffID:
+      "This result does not include a Yes Chef handoff ID."
+    case .handoffNotFound:
+      "This handoff is not available on this device."
+    case .wrongTask:
+      "This handoff does not contain a prep plan."
+    case .duplicate:
+      "This handoff result was already imported for review."
+    case .emptyPlan:
+      "The returned plan needs a session heading followed by one or more prep steps."
+    }
+  }
+
+  public var description: String { errorDescription ?? "The handoff result could not be imported." }
+}
+
+public enum AIHandoffIntentImport {
+  /// Stages a returned menu prep plan exactly once. Marking the local session imported before opening the
+  /// review sheet is deliberate: a shortcut can deliver the same result twice, while the sheet remains the
+  /// only place that writes the durable menu artifact.
+  public static func stageMenuPrepPlanReview(
+    handoffID: AIHandoff.ID?,
+    result: String,
+    in db: Database,
+    now: Date
+  ) throws -> AIHandoffMenuPrepPlanReview {
+    let routedText = AIHandoffToken.stripping(from: result)
+    guard let resolvedHandoffID = handoffID ?? routedText?.handoffID else {
+      throw AIHandoffIntentImportError.missingHandoffID
+    }
+    guard let handoff = try AIHandoffRepository.handoff(id: resolvedHandoffID, in: db) else {
+      throw AIHandoffIntentImportError.handoffNotFound(resolvedHandoffID)
+    }
+    guard handoff.sourceType == .menu, handoff.taskType == .prepPlan else {
+      throw AIHandoffIntentImportError.wrongTask
+    }
+    guard handoff.status == .awaitingReturn, handoff.importedAt == nil else {
+      throw AIHandoffIntentImportError.duplicate
+    }
+    guard let menu = try Menu.find(handoff.sourceID).fetchOne(db) else {
+      throw AIHandoffIntentImportError.handoffNotFound(resolvedHandoffID)
+    }
+
+    let currentPlan = MenuPrepPlan(steps: MenuPrepPlanCoding.decode(menu.prepPlan))
+    let plan = currentPlan.applyingEditableReviewText(routedText?.payload ?? result)
+    guard !plan.steps.isEmpty else { throw AIHandoffIntentImportError.emptyPlan }
+
+    try AIHandoffRepository.markImported(id: handoff.id, at: now, in: db)
+    return AIHandoffMenuPrepPlanReview(handoffID: handoff.id, menuID: menu.id, plan: plan)
   }
 }
 

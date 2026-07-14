@@ -64,7 +64,8 @@ prod/TestFlight cut. At that cut, deploy to the production schema the Phase E Sl
 `Recipe.coverPhotoID` column (PR #87), the ADR-0018 synced `aiSettings` table (PR #96) **including its additive
 `readerFeedbackPreference` column** (ADR-0025 D6) **and `captureToNotePreference` column** (ADR-0027 S1,
 PR #141), **and** the ADR-0021
-synced `recipeVariations` table (Recipe edit proposals S2); and note the app target
+synced `recipeVariations` table (Recipe edit proposals S2), **and `Menu.externalProjectName`** (ADR-0038 S2);
+and note the app target
 (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 
 ## Ready Efforts (queue)

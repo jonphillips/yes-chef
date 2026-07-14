@@ -40,6 +40,20 @@ struct AIHandoffTests {
   }
 
   @Test
+  func immediatePromptRequiresTheReviewFormatInItsFirstResponse() {
+    let handoffID = SampleUUIDSequence.uuid(38_002)
+    let prompt = AIHandoffToken.prompt(
+      handoffID: handoffID,
+      context: "Menu context",
+      mode: .immediate
+    )
+
+    #expect(prompt.contains("Return the completed prep plan in your first response."))
+    #expect(prompt.contains("Return only the token and formatted prep plan: no preamble and no Markdown code fence."))
+    #expect(prompt.hasSuffix("session:\n- task → serves"))
+  }
+
+  @Test
   func matchedMenuHandoffImportsOnceAndMissingHandoffPreservesManualPaste() throws {
     @Dependency(\.defaultDatabase) var database
     let menuID = SampleUUIDSequence.uuid(38_010)
@@ -118,6 +132,104 @@ struct AIHandoffTests {
         MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan),
         [PrepPlanStep(session: "Thursday morning", task: "Chop the herbs")]
       )
+    }
+  }
+
+  @Test
+  func intentImportStagesAReviewOnceWithoutWritingTheMenuPlan() throws {
+    @Dependency(\.defaultDatabase) var database
+    let menuID = SampleUUIDSequence.uuid(38_020)
+    let handoffID = SampleUUIDSequence.uuid(38_021)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Menu.insert {
+        Menu(
+          id: menuID,
+          title: "Beach Menu",
+          dayCount: 2,
+          dateCreated: now,
+          dateModified: now
+        )
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .menu,
+          sourceID: menuID,
+          taskType: .prepPlan,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      let review = try AIHandoffIntentImport.stageMenuPrepPlanReview(
+        handoffID: handoffID,
+        result: """
+        YC-HANDOFF: \(handoffID.uuidString)
+        Wednesday evening:
+        - Salt the chicken → Thursday dinner
+        """,
+        in: db,
+        now: now
+      )
+      expectNoDifference(review.menuID, menuID)
+      expectNoDifference(
+        review.plan.steps,
+        [PrepPlanStep(session: "Wednesday evening", task: "Salt the chicken", serves: "Thursday dinner")]
+      )
+      #expect(try Menu.find(menuID).fetchOne(db)?.prepPlan == nil)
+      #expect(try AIHandoffRepository.handoff(id: handoffID, in: db)?.status == .imported)
+
+      #expect(
+        throws: AIHandoffIntentImportError.duplicate,
+        performing: {
+          _ = try AIHandoffIntentImport.stageMenuPrepPlanReview(
+            handoffID: handoffID,
+            result: "Wednesday evening:\n- Duplicate import",
+            in: db,
+            now: now
+          )
+        }
+      )
+    }
+  }
+
+  @Test
+  func menuExternalProjectNameIsTrimmedAndCanBeCleared() throws {
+    @Dependency(\.defaultDatabase) var database
+    let menuID = SampleUUIDSequence.uuid(38_030)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Menu.insert {
+        Menu(
+          id: menuID,
+          title: "Beach Menu",
+          dayCount: 2,
+          dateCreated: now,
+          dateModified: now
+        )
+      }
+      .execute(db)
+
+      try MenuRepository.updateExternalProjectName(
+        menuID: menuID,
+        externalProjectName: "  Emerald Isle Beach  ",
+        in: db,
+        now: now
+      )
+      #expect(try Menu.find(menuID).fetchOne(db)?.externalProjectName == "Emerald Isle Beach")
+
+      try MenuRepository.updateExternalProjectName(
+        menuID: menuID,
+        externalProjectName: "   ",
+        in: db,
+        now: now
+      )
+      #expect(try Menu.find(menuID).fetchOne(db)?.externalProjectName == nil)
     }
   }
 }
