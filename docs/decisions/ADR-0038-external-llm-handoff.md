@@ -186,30 +186,66 @@ curate-to-notes).
 return is a **first-class outcome**, not a degenerate one.
 
 - **Format.** The finalize instruction (already the discuss prompt's hook) asks for both: the deliverable
-  section, then a Learnings section. Learnings come back as a **structured list of distinct items** —
-  never a merged blob summary, per [[llm-curation-not-synthesis]]. The model curates its own
-  conversation, which beats a raw transcript.
-- **Landing zone — the resource's own synced notes.** Learnings commit to `RecipeNote` rows / menu notes.
-  **Not** to `AIHandoff`: that record is device-local, non-synced, transient scaffolding (OQ1). Learnings
-  are durable artifacts and must travel with the resource across devices. This is what actually puts the
-  context back *next to the Yes Chef object*.
+  section, then a Learnings section introduced by a **`YC-LEARNINGS:` marker line** (mirroring the
+  `YC-HANDOFF:` convention). Learnings come back as a **structured list of distinct bullet items** — never a
+  merged blob summary, per [[llm-curation-not-synthesis]]. The model curates its own conversation, which
+  beats a raw transcript.
+
+  **⚠️ The parser must split *before* it parses.** `isEditablePrepPlanSessionHeader`
+  (`MenuPrepPlan.swift:352`) treats **any non-bullet, colon-terminated line** as a prep-plan session header.
+  So a `YC-LEARNINGS:` line handed to `applyingEditableReviewText` would be **swallowed as a prep band** and
+  every learning under it would become a prep step. Therefore: **strip the token → split the body on the
+  `YC-LEARNINGS:` marker → feed *only* the deliverable half to `applyingEditableReviewText`**, and parse the
+  learnings half as bullets. No marker → the whole body is the deliverable (today's behavior, unchanged).
+  Marker present with nothing above it → a **learning-only** return.
+- **Landing zone — a new synced `Learning` table.** *(Decided with Jon 2026-07-14, after rejecting both
+  alternatives.)* **Not** `Menu.notes` / `MealPlanItem.notes` — those are string blobs, and merging distinct
+  learnings into one violates [[llm-curation-not-synthesis]] and this amendment's own rule. **Not**
+  `MenuItem` note-rows either — those carry **day/placement** semantics, and a menu-wide learning has no day,
+  so the row would *mean* something false. And **not** `AIHandoff`, which is device-local, non-synced,
+  transient scaffolding (OQ1) — Learnings are durable and must travel with the resource.
+
+  The deciding argument is the project's actual trajectory: **notes are being decomposed, not consolidated.**
+  Make-ahead got its own typed home; Chef It Up got its own. "Notes" is the residue being drained, not a
+  destination. A `Learning` is another **typed content kind** and gets its own home — which also makes it
+  *addressable* by future AI interaction in a way prose buried in a note blob never is.
+
+  **Shape (start minimal — plain text; let the corpus tell us if it wants structure):** `id: UUID`,
+  `sourceType` (reuse `AIHandoffSourceType`), `sourceID: UUID`, `text: String`, `provenance`
+  (`.externalHandoff` / `.inApp`), `dateCreated`, `dateModified`. **Additive + synced** (add to
+  `makeSyncEngine`'s table list *and* the standing prod-schema promotion list).
+
+  **Two consequences that are not free:**
+  - **Polymorphic `(sourceType, sourceID)` cannot be a real FK**, so there is **no cascade delete** — deleting
+    a menu would orphan its Learnings as synced ghosts. Each source's delete path must **hand-cascade**.
+    (`AIHandoff` has the same polymorphic shape but is transient, so orphans there are harmless. Here they are
+    not.)
+  - **No FK back to `AIHandoff`** — it is device-local, so a synced `Learning` referencing a handoff id would
+    dangle on the other device. Provenance is a **marker**, never a link.
 - **Review.** `RecipeCollectionReviewSheet` already takes `items: [ChatApplyReviewItem]`; the handoff sheet
   currently passes exactly one. It passes **two** — Deliverable and Learnings — each independently
   editable and independently discardable. The human remains final author of both
   ([ADR-0024](ADR-0024-editable-proposal-preview.md)/[ADR-0026](ADR-0026-review-collection-sheet.md)).
 - **New `taskType`** for a learning-only handoff, valid against *any* source.
 
-### Consequence — Learnings are the **universal** commit shape, and S3 re-splits
+### Consequence — Learnings are the **universal commit shape**, and S3 re-splits
 
-Every resource has notes. So "harvest to notes" works identically for recipe, menu, and meal-plan with
-**zero per-source commit logic**, while the deliverable shapes are all bespoke. S3 therefore splits:
+Every resource has notes, so "harvest to notes" needs **zero per-source commit logic** — while every
+deliverable shape is bespoke. **But the *outbound serializer* is still per-source**, and Recipe/MealPlan
+serializers do not exist yet (they were the whole of old-S3). You cannot harvest learnings from a recipe
+until you can *export* a recipe. So S3 splits along the **de-risking** line S1 already proved — build the
+new contract on the surface that already round-trips:
 
-- **S3a — Learnings harvest (universal).** Lands on all three sources at once. Small, uniform, and it
-  makes the handoff useful on resources that have no structured deliverable field at all.
-- **S3b — per-source deliverables.** Recipe → `Recipe.makeAhead` + adjust/variation
+- **S3a — the two-part contract, proven on Menu.** The menu serializer already exists, so there is **no new
+  outbound work**. Extend the finalize instruction to ask for both sections; parse both; stage **two**
+  review items; commit Learnings to menu notes. This is where the *universal* commit machinery gets built,
+  cheaply, on known ground.
+- **S3b — generalize the serializer to Recipe + MealPlan.** Each source gains its deliverable shape —
+  recipe → `Recipe.makeAhead` + adjust/variation
   ([ADR-0021](ADR-0021-recipe-variations.md)/[ADR-0023](ADR-0023-recipe-edit-proposals.md)); meal-plan →
   make-ahead strategy ([ADR-0013](ADR-0013-meal-planner-actionable-chat.md), classify per
-  [[chat-verb-commit-shapes]]).
+  [[chat-verb-commit-shapes]]) — and **Learnings ride along for free** on the S3a machinery. This is also
+  where a learning-only handoff becomes useful on sources with no structured deliverable field.
 
 **Presentation is deliberately not decided here.** *Where* Learnings and deliverables are displayed (the
 in-app chat panel's future, a possible "Intelligence" third column) is a separate information-architecture

@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 13, 2026 (ADR-0038 S1 shipped PR #179 → DONE-LOG; Next Up = ADR-0038 S2, the App Intents surface).
+Last updated: July 14, 2026 (ADR-0038 S2 shipped PR #180 → DONE-LOG; Next Up = ADR-0038 **S3a**, the Amendment 1 two-part return contract, proven on Menu).
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,22 +21,53 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0038](decisions/ADR-0038-external-llm-handoff.md) External-LLM handoff, S2**
-([`efforts/adr-0038-external-llm-handoff.md`](efforts/adr-0038-external-llm-handoff.md)). The **App Intents
-surface** over the S1 core (shipped PR #179 → DONE-LOG). Build: three `AppEntity`s (Recipe/Menu/MealPlan,
-`SyncableEntity`); **`ExportHandoffContext(source:)`** (`@UnionValue` source, creates the handoff, returns
-the prompt **and** `Menu.externalProjectName`); **`ImportHandoffResult(handoffID:result:)`** routing by id →
-**`OpensIntent`** into `RecipeCollectionReviewSheet`; the additive **`Menu.externalProjectName`** column
-(per-menu ChatGPT project, OQ6 — **add to the standing prod-schema follow-up** below when it lands) + a
-menu-detail field to set it. **Two device-pass learnings now baked into scope** (see the effort brief S2):
-**(1)** an **immediate-mode prompt variant** (`AIHandoffToken.prompt(mode:)`, format-on-first-response, exact
-`session:`/`- task → serves` format restated **last**) is **required** — the automated
-`Export → Ask ChatGPT → Import` chain has no human to say "finalize" (S1's prompt is discuss-only, confirmed
-on device). **(2)** **strict block-on-duplicate dedupe** lives in `ImportHandoffResult` (guard a double-fire);
-the manual paste only informs. Resolve **OQ5** (no-`source` Action-Button invocation) and **OQ6** (does
-`Start chat in project` accept a *variable* project) on device. New `AppIntents/` group in the app target.
-**S3** (generalize the serializer to Recipe/MealPlan) follows S2. S2 is greenfield with real unknowns
-(OQ5/OQ6) — its own dispatch, not batched.
+**Live dispatch target — [ADR-0038 Amendment 1](decisions/ADR-0038-external-llm-handoff.md) External-LLM
+handoff, S3a** ([`efforts/adr-0038-external-llm-handoff.md`](efforts/adr-0038-external-llm-handoff.md)).
+**The two-part return contract, proven on Menu.** S2 (PR #180 → DONE-LOG) shipped the loop and immediately
+exposed the gap: a rich multi-turn session collapses to a **context-free deliverable** — the *reasoning* dies
+in ChatGPT. Amendment 1 makes the return **`(Deliverable?, Learnings?)`, either may be empty**. Build, on
+**Menu only** (its serializer already exists — **no new outbound work**; Recipe/MealPlan serializers are S3b):
+
+- **Prompt (both modes).** After the deliverable, ask for a **Learnings** section introduced by a
+  **`YC-LEARNINGS:`** marker line (mirrors the `YC-HANDOFF:` convention): durable knowledge established in
+  discussion (*"dried bay leaves beat fresh, and you can dry your own"*). Learnings come back as a
+  **structured list of distinct bullets — never a merged blob summary** ([[llm-curation-not-synthesis]]).
+  The model curates its own conversation; we are not preserving a transcript.
+- **⚠️ Parse: split BEFORE you parse.** `isEditablePrepPlanSessionHeader` (`MenuPrepPlan.swift:352`) treats
+  **any non-bullet, colon-terminated line** as a prep-plan session header — so handing `YC-LEARNINGS:` to
+  `applyingEditableReviewText` would **swallow it as a prep band** and turn every learning into a prep step.
+  Therefore: strip the token → **split the body on the `YC-LEARNINGS:` marker** → feed *only* the deliverable
+  half to `applyingEditableReviewText`; parse the learnings half as bullets. No marker → whole body is the
+  deliverable (today's behavior, unchanged). Marker with nothing above it → a **learning-only** return.
+- **Commit — new synced `Learning` table** (decided with Jon 2026-07-14; see Amendment 1 for why *not*
+  `Menu.notes` (blob), *not* day-scoped `MenuItem` note-rows, *not* `AIHandoff` (device-local)). Deliverable →
+  `Menu.prepPlan` (existing path). Shape, **plain text to start**: `id: UUID`, `sourceType` (reuse
+  `AIHandoffSourceType`), `sourceID: UUID`, `text: String`, `provenance` (`.externalHandoff`/`.inApp`),
+  `dateCreated`, `dateModified`. **Additive + synced** → add `Learning.self` to `makeSyncEngine`'s table list
+  (and the `CloudSyncTests` guard), and **add `learnings` to the standing prod-schema promotion list below**.
+  **Two non-obvious consequences:** (1) `(sourceType, sourceID)` is **polymorphic → no FK → no cascade
+  delete**; deleting a menu would orphan its Learnings as *synced* ghosts, so **hand-cascade in
+  `MenuRepository`'s delete path**. (2) **No FK back to `AIHandoff`** (device-local — it would dangle on the
+  other device); provenance is a **marker, never a link**.
+- **Review.** `RecipeCollectionReviewSheet` already takes `items: [ChatApplyReviewItem]`; `HandoffReviewSheet`
+  currently passes **one**. Pass **two** — Deliverable and Learnings — each independently editable and
+  discardable (ADR-0024/0026: human is final author of both).
+- **Learning-only is first-class.** A return with **no** deliverable is valid, not an error. Concretely:
+  `AIHandoffIntentImport.stageMenuPrepPlanReview` currently throws `.emptyPlan` when `plan.steps.isEmpty` —
+  that guard must relax to "empty deliverable **and** empty Learnings = error." Add the learning-only
+  `taskType`.
+
+**Bundle the [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md) D5 prompt fix** — cohesive
+(same prompt): instruct the model to emit **tasks, never choreography**. A task is separable/atomic/
+context-free ("salt the chicken Wednesday"); **choreography** is cooking instructions interleaved across
+several recipes ("sear the beef while the salad rests"), which strips the recipe context Jon reasons with and
+will never be trusted. **The prep plan must never become a merged mega-recipe** — the recipes hold the cooking.
+Don't generate what won't be trusted; this makes the plan smaller and sharper. See
+[[automation-decays-near-the-stove]].
+
+**S3b** (generalize the serializer to Recipe + MealPlan; each gains its deliverable shape, Learnings ride free
+on the S3a machinery) follows. **ADR-0039** (the Playbook column) is milestone-sized, Jon-gated, and
+deliberately *not* queued here — design it once S3a gives it real content to hold.
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**
@@ -64,8 +95,8 @@ prod/TestFlight cut. At that cut, deploy to the production schema the Phase E Sl
 `Recipe.coverPhotoID` column (PR #87), the ADR-0018 synced `aiSettings` table (PR #96) **including its additive
 `readerFeedbackPreference` column** (ADR-0025 D6) **and `captureToNotePreference` column** (ADR-0027 S1,
 PR #141), **and** the ADR-0021
-synced `recipeVariations` table (Recipe edit proposals S2), **and `Menu.externalProjectName`** (ADR-0038 S2);
-and note the app target
+synced `recipeVariations` table (Recipe edit proposals S2), **and `Menu.externalProjectName`** (ADR-0038 S2),
+**and the synced `learnings` table** (ADR-0038 Amd 1 / S3a); and note the app target
 (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 
 ## Ready Efforts (queue)

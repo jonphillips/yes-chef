@@ -103,13 +103,58 @@ an old clipboard would clobber any hand-edits made to the plan since the first i
 - **Prove it:** a Shortcut `ExportHandoffContext(menu) → Ask ChatGPT → ImportHandoffResult` (immediate) and
   `ExportHandoffContext(menu) → Start chat in project → …return… → ImportHandoffResult` (discuss → sheet).
 
-### S3 — generalize the serializer to Recipe + MealPlan (follows S2)
+### S3a — the two-part return contract (Amendment 1), proven on Menu (follows S2) ← **live**
+
+S2 shipped the loop and exposed the gap: a multi-turn session collapses to a **context-free deliverable**.
+[Amendment 1](../decisions/ADR-0038-external-llm-handoff.md) makes the return **`(Deliverable?, Learnings?)`,
+either may be empty**. Prove it on **Menu only** — its serializer already exists, so there is **no new
+outbound work** (Recipe/MealPlan serializers are S3b).
+
+- **Prompt (both modes).** After the deliverable, request a **Learnings** section introduced by a
+  **`YC-LEARNINGS:`** marker line (mirrors `YC-HANDOFF:`) — durable knowledge established in discussion. A
+  **structured list of distinct bullets, never a merged blob summary** ([[llm-curation-not-synthesis]]). The
+  model curates its own conversation; we are *not* preserving a transcript.
+- **⚠️ Parse: split before you parse.** `isEditablePrepPlanSessionHeader` (`MenuPrepPlan.swift:352`) treats any
+  non-bullet, colon-terminated line as a prep-plan **session header** — so `YC-LEARNINGS:` handed to
+  `applyingEditableReviewText` gets **swallowed as a prep band** and every learning becomes a prep step. Strip
+  the token → **split the body on the marker** → feed *only* the deliverable half to
+  `applyingEditableReviewText`; parse the learnings half as bullets. No marker → whole body is the deliverable
+  (unchanged). Marker with nothing above it → **learning-only**.
+- **Commit — a new synced `Learning` table** (decided with Jon 2026-07-14). Deliverable → `Menu.prepPlan`
+  (existing). **Not** `Menu.notes` (a blob → would merge distinct learnings, violating
+  [[llm-curation-not-synthesis]]); **not** `MenuItem` note-rows (they carry **day/placement** semantics and a
+  menu-wide learning has no day); **not** `AIHandoff` (device-local, transient, OQ1). Rationale: notes are being
+  **decomposed into typed homes** (make-ahead, Chef It Up), not consolidated — see ADR-0039 OQ4.
+  **Shape, plain text to start** (let the corpus tell us if it wants structure): `id: UUID`, `sourceType`
+  (reuse `AIHandoffSourceType`), `sourceID: UUID`, `text: String`, `provenance` (`.externalHandoff`/`.inApp`),
+  `dateCreated`, `dateModified`. **Additive + synced** — add `Learning.self` to `makeSyncEngine`'s table list
+  and the `CloudSyncTests` membership guard, and add `learnings` to the prod-schema promotion list in
+  `CURRENT_HANDOFF.md`.
+  **Two non-obvious consequences:** (1) `(sourceType, sourceID)` is **polymorphic → no FK → no cascade
+  delete**. Deleting a menu would orphan its Learnings as *synced* ghosts — **hand-cascade in
+  `MenuRepository`'s delete path**. (`AIHandoff` shares the shape but is transient, so its orphans are
+  harmless; these are not.) (2) **No FK back to `AIHandoff`** — device-local, so a synced `Learning` holding a
+  handoff id would dangle on the other device. Provenance is a **marker, never a link**.
+- **Review.** `RecipeCollectionReviewSheet` already takes `items: [ChatApplyReviewItem]`;
+  `YesChefApp/HandoffReviewCoordinator.swift`'s `HandoffReviewSheet` passes **one**. Pass **two** —
+  Deliverable and Learnings — each independently editable/discardable (ADR-0024/0026).
+- **Learning-only is first-class.** `AIHandoffIntentImport.stageMenuPrepPlanReview` currently throws
+  `.emptyPlan` on `plan.steps.isEmpty`; relax to "empty deliverable **and** empty Learnings = error." Add the
+  learning-only `taskType`.
+- **Bundle the [ADR-0039](../decisions/ADR-0039-playbook-column-thinking-vs-doing.md) D5 prompt fix** (same
+  prompt, cohesive): emit **tasks, never choreography**. Tasks are separable/atomic/context-free; choreography
+  is cooking instructions interleaved across recipes, which strips recipe context and will never be trusted.
+  **The prep plan must never become a merged mega-recipe.** See [[automation-decays-near-the-stove]].
+
+### S3b — generalize the serializer to Recipe + MealPlan (follows S3a)
 
 - Recipe + MealPlan context builders on the `MenuChatContext` pattern (frontier budget, method, uncapped
   ingredients, an intro prompt tuned from `tasteProfile`/AI settings, asking for review-text output).
 - Commit shapes per source: recipe → `Recipe.makeAhead` (and adjust/variation, ADR-0021/0023); meal-plan →
   make-ahead-strategy ([ADR-0013](../decisions/ADR-0013-meal-planner-actionable-chat.md), classify commit
   shape first per [[chat-verb-commit-shapes]]).
+- **Learnings ride along free** on the S3a machinery — and make the hand-off useful on sources with no
+  structured deliverable field at all.
 
 **Batching ([[batch-slices-and-lean-handoff]]):** S1 first (it de-risks the record + sync-exclusion + token
 before greenfield App Intents). S2 follows with S1's learnings; S3 last. S1+S2 may bundle if S1's
