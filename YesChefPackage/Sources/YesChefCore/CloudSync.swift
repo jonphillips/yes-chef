@@ -128,6 +128,7 @@ public enum YesChefCloudSync {
         Menu.self,
         MenuItem.self,
         MenuPlacement.self,
+        PrepPlanStepRecord.self,
         Workbench.self,
         WorkbenchCandidate.self,
         WorkbenchLogEntry.self,

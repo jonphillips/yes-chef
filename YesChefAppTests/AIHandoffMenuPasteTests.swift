@@ -60,8 +60,7 @@ struct AIHandoffMenuPasteTests {
       #expect(model.information == .alreadyImported)
       #expect(model.isShowingError == false)
       let storedSteps = try database.read { db in
-        let menu = try #require(try Menu.find(menuID).fetchOne(db))
-        return MenuPrepPlanCoding.decode(menu.prepPlan)
+        try PrepPlanStepRepository.steps(for: menuID, in: db).map(PrepPlanStep.init)
       }
       #expect(
         storedSteps == [

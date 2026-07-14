@@ -179,13 +179,6 @@ extension RecipeCoreTests {
           title: "Birthday Menu",
           notes: "Mostly grill outside.",
           dayCount: 2,
-          prepPlan: try MenuPrepPlanCoding.encode([
-            PrepPlanStep(
-              session: "Day before",
-              task: "Marinate the chicken.",
-              sourceDish: prepSourceID
-            )
-          ]),
           dateCreated: now,
           dateModified: now
         ),
@@ -225,6 +218,16 @@ extension RecipeCoreTests {
               "Cook:",
               "1. Grill the chicken until browned.",
             ]
+          )
+        ],
+        prepPlanSteps: [
+          PrepPlanStepRecord(
+            id: SampleUUIDSequence.uuid(13_004),
+            menuID: menuID,
+            sortOrder: 0,
+            session: "Day before",
+            task: "Marinate the chicken.",
+            sourceDish: prepSourceID
           )
         ]
       )

@@ -19,15 +19,21 @@ public struct MenuDetailData: Equatable, Sendable {
   public var menu: Menu
   public var itemRows: [MenuItemRowData]
   public var placements: [MenuPlacement]
+  public var prepPlanSteps: [PrepPlanStepRecord]
+  public var learnings: [Learning]
 
   public init(
     menu: Menu,
     itemRows: [MenuItemRowData] = [],
-    placements: [MenuPlacement] = []
+    placements: [MenuPlacement] = [],
+    prepPlanSteps: [PrepPlanStepRecord] = [],
+    learnings: [Learning] = []
   ) {
     self.menu = menu
     self.itemRows = itemRows
     self.placements = placements
+    self.prepPlanSteps = prepPlanSteps
+    self.learnings = learnings
   }
 }
 
@@ -176,7 +182,19 @@ public struct MenuDetailRequest: FetchKeyRequest {
         return $0.dateCreated < $1.dateCreated
       }
 
-    return MenuDetailData(menu: menu, itemRows: itemRows, placements: placements)
+    let learningStatement = Learning
+      .where { learnings in learnings.sourceType.eq(AIHandoffSourceType.menu) }
+      .where { learnings in learnings.sourceID.eq(menuID) }
+    var learnings = try learningStatement.fetchAll(db)
+    learnings.sort(by: areLearningsInDescendingOrder)
+
+    return MenuDetailData(
+      menu: menu,
+      itemRows: itemRows,
+      placements: placements,
+      prepPlanSteps: try PrepPlanStepRepository.steps(for: menuID, in: db),
+      learnings: learnings
+    )
   }
 }
 
@@ -247,6 +265,11 @@ private func isInstructionStepInIncreasingOrder(
 ) -> Bool {
   if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
   return lhs.id.uuidString < rhs.id.uuidString
+}
+
+private func areLearningsInDescendingOrder(_ lhs: Learning, _ rhs: Learning) -> Bool {
+  if lhs.dateCreated != rhs.dateCreated { return lhs.dateCreated > rhs.dateCreated }
+  return lhs.id.uuidString > rhs.id.uuidString
 }
 
 @Selection

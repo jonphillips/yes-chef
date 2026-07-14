@@ -5,7 +5,8 @@
 > text we do parse is *lossless or loud*, never silently lossy.** Yes Chef keeps generating content the human
 > can only regenerate, never fix. That is a schema defect masquerading as a missing button.
 
-Status: **Proposed** — 2026-07-14. Origin: Jon, during the [ADR-0038](ADR-0038-external-llm-handoff.md) S3a
+Status: **Accepted** — 2026-07-14 (S1 + S2 shipped + device-passed, PR #184; S3 lossless-or-loud pass
+deferred). Origin: Jon, during the [ADR-0038](ADR-0038-external-llm-handoff.md) S3a
 review — *"what is annoying about the prep plan is that it's an all-or-nothing proposition. I can't edit it,
 I can't add a step, I can't delete a step. I almost have to manage it through an LLM."* Governs
 [ADR-0034](ADR-0034-prep-plan-work-session-timeline.md) (the prep plan), ADR-0038 Amd 1 (Learnings),
@@ -88,8 +89,9 @@ prod/TestFlight cut. That deadline, not aesthetics, is what makes this urgent.
 
 - **A migration with real data behind it.** `prepPlanSteps` rows are created by decoding the existing BLOB
   per menu (back-compat decode already exists for the ADR-0034 `when`→`session` key change). Keep the BLOB
-  column readable through one release, then drop it. `learnings` and `prepPlanSteps` both join the
-  prod-promotion list.
+  column readable through one release, then drop it. It is a frozen pre-migration snapshot, not a mirror or
+  rollback path: an older build would not see edits made to the step rows. `learnings` and `prepPlanSteps`
+  both join the prod-promotion list.
 - **Sync.** `prepPlanSteps` is a real child of `Menu` — unlike `learnings` it **can** carry a proper FK and
   therefore a real cascade delete (no hand-cascade, cf. [[sqlitedata-single-fk-sync-limit]]: multi-FK is not a
   sync blocker).
@@ -98,7 +100,10 @@ prod/TestFlight cut. That deadline, not aesthetics, is what makes this urgent.
 - **The commit path shrinks.** `AIHandoffReturn` → parsed steps → **rows**. `applyingEditableReviewText`
   survives only as an *inbound* parser, not as the storage round-trip.
 - **The band vocabulary must become explicit** (D2's picker needs a list). ADR-0034's horizon bands stop being
-  sniffed from prose and become a known set with an "other / free text" escape.
+  sniffed from prose and become a known set with an "other / free text" escape. Legacy and model-authored
+  prose is normalized only for display ordering; it never rewrites the stored session label.
+- **Text imports cannot carry hidden row links.** An inbound text plan has no `sourceDish` identity, so replacing
+  a linked row from text intentionally drops its recipe chip rather than guessing from task wording.
 
 ## Rejected
 
