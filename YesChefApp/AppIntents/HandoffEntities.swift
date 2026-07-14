@@ -159,11 +159,14 @@ struct HandoffExport: AppEntity {
   static let defaultQuery = HandoffExportQuery()
 
   let id: AIHandoff.ID
+  @Property(title: "Handoff ID") var handoffID: String
   @Property(title: "Prompt") var prompt: String
   @Property(title: "ChatGPT Project") var externalProjectName: String?
 
   init(id: AIHandoff.ID, prompt: String, externalProjectName: String?) {
     self.id = id
+    self._handoffID = EntityProperty(identifier: "handoffID", title: "Handoff ID")
+    self._handoffID.wrappedValue = id.uuidString
     self._prompt = EntityProperty(identifier: "prompt", title: "Prompt")
     self._prompt.wrappedValue = prompt
     self._externalProjectName = EntityProperty(

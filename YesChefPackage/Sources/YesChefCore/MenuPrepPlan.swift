@@ -3,6 +3,63 @@ import Foundation
 import LLMClientKit
 import SQLiteData
 
+/// The rows a person can address and edit in a menu's prep plan. `sourceDish` is a
+/// loose ID: this synced child already has its one CloudKit-compatible parent FK,
+/// `menuID`.
+@Table("prepPlanSteps")
+public struct PrepPlanStepRecord: Codable, Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var menuID: Menu.ID
+  public var sortOrder: Int
+  public var session: String
+  public var task: String
+  public var serves: String?
+  public var sourceDish: MenuItem.ID?
+
+  public init(
+    id: UUID,
+    menuID: Menu.ID,
+    sortOrder: Int,
+    session: String,
+    task: String,
+    serves: String? = nil,
+    sourceDish: MenuItem.ID? = nil
+  ) {
+    self.id = id
+    self.menuID = menuID
+    self.sortOrder = sortOrder
+    self.session = session
+    self.task = task
+    self.serves = serves
+    self.sourceDish = sourceDish
+  }
+
+}
+
+/// The picker vocabulary for new human-authored prep-plan rows. Existing and
+/// custom labels remain valid through the explicit `.other` escape hatch.
+public enum PrepPlanSessionBand: String, CaseIterable, Identifiable, Sendable {
+  case flexible
+  case earlierInWeek
+  case dayBefore
+  case dayOf
+  case atService
+  case other
+
+  public var id: Self { self }
+
+  public var title: String {
+    switch self {
+    case .flexible: "Flexible / get ahead"
+    case .earlierInWeek: "Earlier in the week"
+    case .dayBefore: "The day before"
+    case .dayOf: "The day of"
+    case .atService: "At service"
+    case .other: "Other session"
+    }
+  }
+}
+
 public struct PrepPlanStep: Codable, Equatable, Sendable {
   public var session: String
   public var task: String
@@ -19,6 +76,15 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
     self.task = task
     self.serves = serves
     self.sourceDish = sourceDish
+  }
+
+  public init(_ record: PrepPlanStepRecord) {
+    self.init(
+      session: record.session,
+      task: record.task,
+      serves: record.serves,
+      sourceDish: record.sourceDish
+    )
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -48,6 +114,16 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
 }
 
 public struct MenuPrepPlan: Equatable, Sendable {
+  public struct EditableReviewParseResult: Equatable, Sendable {
+    public var plan: MenuPrepPlan
+    public var unparsedLines: [String]
+
+    public init(plan: MenuPrepPlan, unparsedLines: [String]) {
+      self.plan = plan
+      self.unparsedLines = unparsedLines
+    }
+  }
+
   public var steps: [PrepPlanStep]
 
   public init(steps: [PrepPlanStep] = []) {
@@ -72,10 +148,13 @@ public struct MenuPrepPlan: Equatable, Sendable {
   }
 
   public func applyingEditableReviewText(_ text: String) -> MenuPrepPlan {
-    var sourceDishesByLine = Dictionary(grouping: steps) { $0.editableReviewKey }
-      .mapValues { steps in steps.map(\.sourceDish) }
+    parsingEditableReviewText(text).plan
+  }
+
+  public func parsingEditableReviewText(_ text: String) -> EditableReviewParseResult {
     var session: String?
     var revisedSteps: [PrepPlanStep] = []
+    var unparsedLines: [String] = []
 
     for rawLine in text.components(separatedBy: .newlines) {
       let line = rawLine.cleanedEditablePrepPlanLine
@@ -86,47 +165,35 @@ public struct MenuPrepPlan: Equatable, Sendable {
         continue
       }
 
-      guard let session, let parsedLine = PrepPlanStep.editableReviewLine(line) else { continue }
-      let reviewKey = PrepPlanStep(
-        session: session,
-        task: parsedLine.task,
-        serves: parsedLine.serves
-      )
-      .editableReviewKey
+      guard let session else {
+        unparsedLines.append(rawLine)
+        continue
+      }
+      guard let parsedLine = PrepPlanStep.editableReviewLine(line) else {
+        unparsedLines.append(rawLine)
+        continue
+      }
       revisedSteps.append(
         PrepPlanStep(
           session: session,
           task: parsedLine.task,
-          serves: parsedLine.serves,
-          sourceDish: Self.popSourceDish(for: reviewKey, from: &sourceDishesByLine)
+          serves: parsedLine.serves
         )
       )
     }
 
-    return MenuPrepPlan(
-      steps: revisedSteps
+    return EditableReviewParseResult(
+      plan: MenuPrepPlan(steps: revisedSteps),
+      unparsedLines: unparsedLines
     )
   }
 
-  private static func popSourceDish(
-    for line: String,
-    from sourceDishesByLine: inout [String: [MenuItem.ID?]]
-  ) -> MenuItem.ID? {
-    guard var sourceDishes = sourceDishesByLine[line], !sourceDishes.isEmpty else { return nil }
-    let sourceDish = sourceDishes.removeFirst()
-    sourceDishesByLine[line] = sourceDishes
-    return sourceDish
-  }
 }
 
 private extension PrepPlanStep {
   var renderedEditableReviewLine: String {
     guard let serves else { return task }
     return "\(task) → \(serves)"
-  }
-
-  var editableReviewKey: String {
-    "\(session)\n\(renderedEditableReviewLine)"
   }
 
   static func editableReviewLine(_ line: String) -> (task: String, serves: String?)? {
@@ -293,26 +360,173 @@ extension MenuRepository {
     _ plan: MenuPrepPlan,
     to menuID: Menu.ID,
     in db: Database,
-    now: Date
+    now: Date,
+    uuid: () -> UUID
   ) throws {
-    try updatePrepPlan(MenuPrepPlanCoding.encode(plan.steps), menuID: menuID, in: db, now: now)
+    try PrepPlanStepRepository.replace(plan.steps, for: menuID, in: db, now: now, uuid: uuid)
   }
 
   public static func clearPrepPlan(menuID: Menu.ID, in db: Database, now: Date) throws {
-    try updatePrepPlan(nil, menuID: menuID, in: db, now: now)
-  }
-
-  private static func updatePrepPlan(
-    _ prepPlan: Data?,
-    menuID: Menu.ID,
-    in db: Database,
-    now: Date
-  ) throws {
     try Menu.find(menuID).update {
-      $0.prepPlan = prepPlan
       $0.dateModified = now
     }
     .execute(db)
+    try PrepPlanStepRecord
+      .where { $0.menuID.eq(menuID) }
+      .delete()
+      .execute(db)
+  }
+}
+
+public enum PrepPlanStepRepository {
+  public static func create(
+    _ draft: PrepPlanStep,
+    for menuID: Menu.ID,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws {
+    let sortOrder = try nextSortOrder(for: menuID, in: db)
+    try PrepPlanStepRecord.insert {
+      PrepPlanStepRecord(
+        id: uuid(),
+        menuID: menuID,
+        sortOrder: sortOrder,
+        session: draft.session,
+        task: draft.task,
+        serves: draft.serves,
+        sourceDish: draft.sourceDish
+      )
+    }
+    .execute(db)
+    try Menu.find(menuID).update { $0.dateModified = #bind(now) }.execute(db)
+  }
+
+  public static func update(
+    id: PrepPlanStepRecord.ID,
+    session: String,
+    task: String,
+    serves: String?,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard let existing = try PrepPlanStepRecord.find(id).fetchOne(db) else { return }
+    try PrepPlanStepRecord.find(id).update {
+      $0.session = #bind(session)
+      $0.task = #bind(task)
+      $0.serves = #bind(serves?.cleanedPrepPlanText)
+    }
+    .execute(db)
+    try Menu.find(existing.menuID).update { $0.dateModified = #bind(now) }.execute(db)
+  }
+
+  public static func delete(id: PrepPlanStepRecord.ID, in db: Database, now: Date) throws {
+    guard let existing = try PrepPlanStepRecord.find(id).fetchOne(db) else { return }
+    try PrepPlanStepRecord.find(id).delete().execute(db)
+    try normalizeSortOrder(for: existing.menuID, in: db)
+    try Menu.find(existing.menuID).update { $0.dateModified = #bind(now) }.execute(db)
+  }
+
+  @discardableResult
+  public static func reorder(
+    id: PrepPlanStepRecord.ID,
+    direction: MenuItemMoveDirection,
+    in db: Database,
+    now: Date
+  ) throws -> Bool {
+    guard let step = try PrepPlanStepRecord.find(id).fetchOne(db) else { return false }
+    var steps = try steps(for: step.menuID, in: db)
+    guard let index = steps.firstIndex(where: { $0.id == id }) else { return false }
+    let neighborIndex = direction == .earlier ? index - 1 : index + 1
+    guard steps.indices.contains(neighborIndex) else { return false }
+    steps.swapAt(index, neighborIndex)
+    try writeSortOrder(steps, in: db)
+    try Menu.find(step.menuID).update { $0.dateModified = #bind(now) }.execute(db)
+    return true
+  }
+
+  public static func replace(
+    _ drafts: [PrepPlanStep],
+    for menuID: Menu.ID,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws {
+    var existingByContents = Dictionary(grouping: try steps(for: menuID, in: db)) { step in
+      Contents(step)
+    }
+    var survivors: [PrepPlanStepRecord] = []
+    for (sortOrder, draft) in drafts.enumerated() {
+      let contents = Contents(draft)
+      var candidates = existingByContents[contents] ?? []
+      let existing = candidates.isEmpty ? nil : candidates.removeFirst()
+      existingByContents[contents] = candidates
+      survivors.append(
+        PrepPlanStepRecord(
+          id: existing?.id ?? uuid(),
+          menuID: menuID,
+          sortOrder: sortOrder,
+          session: draft.session,
+          task: draft.task,
+          serves: draft.serves,
+          sourceDish: draft.sourceDish
+        )
+      )
+    }
+    for step in survivors {
+      try PrepPlanStepRecord.upsert { step }.execute(db)
+    }
+    let survivorIDs = Set(survivors.map(\.id))
+    for remaining in existingByContents.values.flatMap({ $0 }) where !survivorIDs.contains(remaining.id) {
+      try PrepPlanStepRecord.find(remaining.id).delete().execute(db)
+    }
+    try Menu.find(menuID).update { $0.dateModified = #bind(now) }.execute(db)
+  }
+
+  public static func steps(for menuID: Menu.ID, in db: Database) throws -> [PrepPlanStepRecord] {
+    let statement = PrepPlanStepRecord.where { prepPlanSteps in
+      prepPlanSteps.menuID.eq(menuID)
+    }
+    let fetched = try statement.fetchAll(db)
+    return fetched.sorted { lhs, rhs in
+      lhs.sortOrder == rhs.sortOrder ? lhs.id.uuidString < rhs.id.uuidString : lhs.sortOrder < rhs.sortOrder
+    }
+  }
+
+  private struct Contents: Hashable {
+    let session: String
+    let task: String
+    let serves: String?
+    let sourceDish: MenuItem.ID?
+
+    init(session: String, task: String, serves: String?, sourceDish: MenuItem.ID?) {
+      self.session = session
+      self.task = task
+      self.serves = serves
+      self.sourceDish = sourceDish
+    }
+
+    init(_ step: PrepPlanStep) {
+      self.init(session: step.session, task: step.task, serves: step.serves, sourceDish: step.sourceDish)
+    }
+
+    init(_ step: PrepPlanStepRecord) {
+      self.init(session: step.session, task: step.task, serves: step.serves, sourceDish: step.sourceDish)
+    }
+  }
+
+  private static func nextSortOrder(for menuID: Menu.ID, in db: Database) throws -> Int {
+    (try steps(for: menuID, in: db).map(\.sortOrder).max() ?? -1) + 1
+  }
+
+  private static func normalizeSortOrder(for menuID: Menu.ID, in db: Database) throws {
+    try writeSortOrder(steps(for: menuID, in: db), in: db)
+  }
+
+  private static func writeSortOrder(_ steps: [PrepPlanStepRecord], in db: Database) throws {
+    for (sortOrder, step) in steps.enumerated() where step.sortOrder != sortOrder {
+      try PrepPlanStepRecord.find(step.id).update { $0.sortOrder = #bind(sortOrder) }.execute(db)
+    }
   }
 }
 

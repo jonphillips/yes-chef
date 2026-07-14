@@ -97,6 +97,23 @@ public enum LearningRepository {
     try Learning.insert { learning }.execute(db)
   }
 
+  public static func update(
+    id: Learning.ID,
+    text: String,
+    in db: Database,
+    now: Date
+  ) throws {
+    try Learning.find(id).update {
+      $0.text = #bind(text)
+      $0.dateModified = #bind(now)
+    }
+    .execute(db)
+  }
+
+  public static func delete(id: Learning.ID, in db: Database) throws {
+    try Learning.find(id).delete().execute(db)
+  }
+
   public static func deleteAll(
     sourceType: AIHandoffSourceType,
     sourceID: UUID,
@@ -216,16 +233,24 @@ public struct AIHandoffMenuPrepPlanReview: Equatable, Sendable {
 }
 
 public enum AIHandoffReturn {
+  public struct MenuPrepPlanReturn: Equatable, Sendable {
+    public var plan: MenuPrepPlan
+    public var learnings: [String]
+    public var unparsedLines: [String]
+  }
+
   public static let learningsMarker = "YC-LEARNINGS:"
 
   public static func menuPrepPlan(
     from text: String,
     currentPlan: MenuPrepPlan
-  ) -> (plan: MenuPrepPlan, learnings: [String]) {
+  ) -> MenuPrepPlanReturn {
     let split = splitting(text)
-    return (
-      currentPlan.applyingEditableReviewText(split.deliverable),
-      learningBullets(from: split.learnings)
+    let parsed = currentPlan.parsingEditableReviewText(split.deliverable)
+    return MenuPrepPlanReturn(
+      plan: parsed.plan,
+      learnings: learningBullets(from: split.learnings),
+      unparsedLines: parsed.unparsedLines
     )
   }
 
@@ -268,6 +293,7 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
   case wrongTask
   case duplicate
   case emptyPlan
+  case unparsedPlanText([String])
 
   public var errorDescription: String? {
     switch self {
@@ -281,6 +307,8 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
       "This handoff result was already imported for review."
     case .emptyPlan:
       "The returned handoff needs a prep plan or at least one learning bullet."
+    case let .unparsedPlanText(lines):
+      "Could not import these prep-plan lines: \(lines.joined(separator: " | "))"
     }
   }
 
@@ -316,11 +344,15 @@ public enum AIHandoffIntentImport {
       throw AIHandoffIntentImportError.handoffNotFound(resolvedHandoffID)
     }
 
-    let currentPlan = MenuPrepPlan(steps: MenuPrepPlanCoding.decode(menu.prepPlan))
+    let currentSteps = try PrepPlanStepRepository.steps(for: menu.id, in: db)
+    let currentPlan = MenuPrepPlan(steps: currentSteps.map { PrepPlanStep($0) })
     let returned = AIHandoffReturn.menuPrepPlan(
       from: routedText?.payload ?? result,
       currentPlan: currentPlan
     )
+    guard returned.unparsedLines.isEmpty else {
+      throw AIHandoffIntentImportError.unparsedPlanText(returned.unparsedLines)
+    }
     guard !returned.plan.steps.isEmpty || !returned.learnings.isEmpty else {
       throw AIHandoffIntentImportError.emptyPlan
     }
@@ -345,6 +377,7 @@ public enum AIHandoffMenuPrepPlanImportError: Error, Equatable, LocalizedError, 
   case emptyPlan
   case wrongMenu
   case wrongTask
+  case unparsedPlanText([String])
 
   public var errorDescription: String? {
     switch self {
@@ -354,6 +387,8 @@ public enum AIHandoffMenuPrepPlanImportError: Error, Equatable, LocalizedError, 
       "This handoff belongs to a different menu."
     case .wrongTask:
       "This handoff does not contain a supported result."
+    case let .unparsedPlanText(lines):
+      "Could not import these prep-plan lines: \(lines.joined(separator: " | "))"
     }
   }
 
@@ -400,17 +435,20 @@ public enum AIHandoffMenuPrepPlanImport {
   }
 
   private static func apply(
-    _ returned: (plan: MenuPrepPlan, learnings: [String]),
+    _ returned: AIHandoffReturn.MenuPrepPlanReturn,
     to menuID: Menu.ID,
     in db: Database,
     now: Date,
     uuid: () -> UUID
   ) throws {
+    guard returned.unparsedLines.isEmpty else {
+      throw AIHandoffMenuPrepPlanImportError.unparsedPlanText(returned.unparsedLines)
+    }
     guard !returned.plan.steps.isEmpty || !returned.learnings.isEmpty else {
       throw AIHandoffMenuPrepPlanImportError.emptyPlan
     }
     if !returned.plan.steps.isEmpty {
-      try MenuRepository.applyPrepPlan(returned.plan, to: menuID, in: db, now: now)
+      try MenuRepository.applyPrepPlan(returned.plan, to: menuID, in: db, now: now, uuid: uuid)
     }
     for text in returned.learnings {
       try LearningRepository.create(

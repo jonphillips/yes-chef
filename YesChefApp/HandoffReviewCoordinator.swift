@@ -63,10 +63,14 @@ final class HandoffReviewCoordinator {
   }
 
   func commitPrepPlan(_ review: AIHandoffMenuPrepPlanReview, approvedText: String) throws {
-    let plan = review.plan.applyingEditableReviewText(approvedText)
+    let parsed = review.plan.parsingEditableReviewText(approvedText)
+    guard parsed.unparsedLines.isEmpty else {
+      throw AIHandoffMenuPrepPlanImportError.unparsedPlanText(parsed.unparsedLines)
+    }
+    let plan = parsed.plan
     guard !plan.steps.isEmpty else { throw AIHandoffMenuPrepPlanImportError.emptyPlan }
     try database.write { db in
-      try MenuRepository.applyPrepPlan(plan, to: review.menuID, in: db, now: now)
+      try MenuRepository.applyPrepPlan(plan, to: review.menuID, in: db, now: now, uuid: { uuid() })
     }
   }
 

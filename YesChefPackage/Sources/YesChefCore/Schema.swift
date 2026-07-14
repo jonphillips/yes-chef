@@ -859,7 +859,45 @@ extension DependencyValues {
         CREATE INDEX "index_learnings_on_sourceType_sourceID"
         ON "learnings"("sourceType", "sourceID")
         """)
+      .execute(db)
+    }
+
+    migrator.registerMigration("Move menu prep plans into editable step rows") { db in
+      try #sql("""
+        CREATE TABLE "prepPlanSteps" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "menuID" TEXT NOT NULL REFERENCES "menus"("id") ON DELETE CASCADE,
+          "sortOrder" INTEGER NOT NULL,
+          "session" TEXT NOT NULL,
+          "task" TEXT NOT NULL,
+          "serves" TEXT,
+          "sourceDish" TEXT
+        ) STRICT
+        """)
         .execute(db)
+
+      try #sql("""
+        CREATE INDEX "index_prepPlanSteps_on_menuID_sortOrder"
+        ON "prepPlanSteps"("menuID", "sortOrder")
+        """)
+        .execute(db)
+
+      for menu in try Menu.fetchAll(db) {
+        for (sortOrder, step) in MenuPrepPlanCoding.decode(menu.prepPlan).enumerated() {
+          try PrepPlanStepRecord.insert {
+            PrepPlanStepRecord(
+              id: UUID(),
+              menuID: menu.id,
+              sortOrder: sortOrder,
+              session: step.session,
+              task: step.task,
+              serves: step.serves,
+              sourceDish: step.sourceDish
+            )
+          }
+          .execute(db)
+        }
+      }
     }
 
     try migrator.migrate(database)

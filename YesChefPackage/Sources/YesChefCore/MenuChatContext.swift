@@ -12,7 +12,7 @@ public struct MenuChatContext: Equatable, Sendable {
   public var title: String
   public var notes: String?
   public var dayCount: Int
-  public var prepPlan: [PrepPlanStep]
+  public var prepPlan: [PrepPlanStepRecord]
   public var items: [MenuChatItemContext]
 
   public init(
@@ -20,7 +20,7 @@ public struct MenuChatContext: Equatable, Sendable {
     title: String,
     notes: String? = nil,
     dayCount: Int,
-    prepPlan: [PrepPlanStep] = [],
+    prepPlan: [PrepPlanStepRecord] = [],
     items: [MenuChatItemContext] = []
   ) {
     self.menuID = menuID
@@ -37,7 +37,7 @@ public struct MenuChatContext: Equatable, Sendable {
       title: detail.menu.title,
       notes: detail.menu.notes,
       dayCount: detail.menu.dayCount,
-      prepPlan: MenuPrepPlanCoding.decode(detail.menu.prepPlan),
+      prepPlan: detail.prepPlanSteps,
       items: detail.itemRows.map(MenuChatItemContext.init(row:))
     )
   }

@@ -128,7 +128,7 @@ struct AIHandoffTests {
       )
       expectNoDifference(imported, .imported)
       expectNoDifference(
-        MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan),
+        try PrepPlanStepRepository.steps(for: menuID, in: db).map { PrepPlanStep($0) },
         [PrepPlanStep(session: "Wednesday evening", task: "Salt the chicken", serves: "Thursday dinner")]
       )
       let handoff = try #require(try AIHandoffRepository.handoff(id: handoffID, in: db))
@@ -140,7 +140,9 @@ struct AIHandoffTests {
         YC-HANDOFF: \(handoffID.uuidString)
         """,
         to: menuID,
-        currentPlan: MenuPrepPlan(steps: MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan)),
+        currentPlan: MenuPrepPlan(
+          steps: try PrepPlanStepRepository.steps(for: menuID, in: db).map { PrepPlanStep($0) }
+        ),
         in: db,
         now: importedAt.addingTimeInterval(60),
         uuid: { SampleUUIDSequence.uuid(38_014) }
@@ -161,7 +163,7 @@ struct AIHandoffTests {
       )
       expectNoDifference(fallback, .applied)
       expectNoDifference(
-        MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan),
+        try PrepPlanStepRepository.steps(for: menuID, in: db).map { PrepPlanStep($0) },
         [PrepPlanStep(session: "Thursday morning", task: "Chop the herbs")]
       )
     }
@@ -216,7 +218,7 @@ struct AIHandoffTests {
       )
       expectNoDifference(twoPart, .imported)
       expectNoDifference(
-        MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan),
+        try PrepPlanStepRepository.steps(for: menuID, in: db).map { PrepPlanStep($0) },
         [PrepPlanStep(session: "Wednesday evening", task: "Salt the chicken", serves: "Thursday dinner")]
       )
 
@@ -239,7 +241,7 @@ struct AIHandoffTests {
         """,
         to: menuID,
         currentPlan: MenuPrepPlan(
-          steps: MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan)
+          steps: try PrepPlanStepRepository.steps(for: menuID, in: db).map { PrepPlanStep($0) }
         ),
         in: db,
         now: now,
@@ -247,7 +249,7 @@ struct AIHandoffTests {
       )
       expectNoDifference(learningOnly, .imported)
       expectNoDifference(
-        MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan),
+        try PrepPlanStepRepository.steps(for: menuID, in: db).map { PrepPlanStep($0) },
         [PrepPlanStep(session: "Wednesday evening", task: "Salt the chicken", serves: "Thursday dinner")]
       )
       expectNoDifference(
@@ -411,6 +413,54 @@ struct AIHandoffTests {
 
       try MenuRepository.deleteMenu(menuID: menuID, in: db)
       #expect(try Learning.find(learningID).fetchOne(db) == nil)
+    }
+  }
+
+  @Test
+  func learningEditsKeepProvenanceAndSingleDeleteTargetsOnlyThatRow() throws {
+    @Dependency(\.defaultDatabase) var database
+    let menuID = SampleUUIDSequence.uuid(38_026)
+    let firstID = SampleUUIDSequence.uuid(38_027)
+    let secondID = SampleUUIDSequence.uuid(38_028)
+    let createdAt = Date(timeIntervalSinceReferenceDate: 840_000_000)
+    let modifiedAt = createdAt.addingTimeInterval(60)
+
+    try database.write { db in
+      for (id, text) in [(firstID, "Use dried bay leaves."), (secondID, "Toast the cumin.")] {
+        try LearningRepository.create(
+          Learning(
+            id: id,
+            sourceType: .menu,
+            sourceID: menuID,
+            text: text,
+            provenance: .externalHandoff,
+            dateCreated: createdAt,
+            dateModified: createdAt
+          ),
+          in: db
+        )
+      }
+      try LearningRepository.update(
+        id: firstID,
+        text: "Use dried Mexican bay leaves.",
+        in: db,
+        now: modifiedAt
+      )
+      try LearningRepository.delete(id: secondID, in: db)
+
+      expectNoDifference(
+        try Learning.find(firstID).fetchOne(db),
+        Learning(
+          id: firstID,
+          sourceType: .menu,
+          sourceID: menuID,
+          text: "Use dried Mexican bay leaves.",
+          provenance: .externalHandoff,
+          dateCreated: createdAt,
+          dateModified: modifiedAt
+        )
+      )
+      #expect(try Learning.find(secondID).fetchOne(db) == nil)
     }
   }
 

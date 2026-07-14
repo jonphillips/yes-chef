@@ -475,11 +475,11 @@ final class MenuDetailModel {
   let menuID: CoreMenu.ID
 
   @ObservationIgnored
-  @Dependency(\.date.now) private var now
+  @Dependency(\.date.now) var now
   @ObservationIgnored
-  @Dependency(\.uuid) private var uuid
+  @Dependency(\.uuid) var uuid
   @ObservationIgnored
-  @Dependency(\.defaultDatabase) private var database
+  @Dependency(\.defaultDatabase) var database
   @ObservationIgnored
   @Fetch var detail: MenuDetailData?
 
@@ -596,7 +596,7 @@ final class MenuDetailModel {
   }
 
   func prepPlanPasted(_ text: String) {
-    let currentPlan = MenuPrepPlan(steps: MenuPrepPlanCoding.decode(detail?.menu.prepPlan))
+    let currentPlan = MenuPrepPlan(steps: detail?.prepPlanSteps.map(PrepPlanStep.init) ?? [])
 
     do {
       let result = try database.write { db in
@@ -748,7 +748,11 @@ final class MenuDetailModel {
             : plan.editableReviewText()
         },
         commitEditedSummary: { [weak self] plan, editedText in
-          try self?.commitPrepPlan(plan.applyingEditableReviewText(editedText))
+          let parsed = plan.parsingEditableReviewText(editedText)
+          guard parsed.unparsedLines.isEmpty else {
+            throw AIHandoffMenuPrepPlanImportError.unparsedPlanText(parsed.unparsedLines)
+          }
+          try self?.commitPrepPlan(parsed.plan)
         }
       )
     ]
@@ -906,7 +910,7 @@ final class MenuDetailModel {
       throw MenuDetailError.emptyPrepPlan
     }
     try database.write { db in
-      try MenuRepository.applyPrepPlan(plan, to: menuID, in: db, now: now)
+      try MenuRepository.applyPrepPlan(plan, to: menuID, in: db, now: now, uuid: { uuid() })
     }
   }
 

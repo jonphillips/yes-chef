@@ -110,7 +110,7 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func menuPrepPlanHeaderLineRoundTripPreservesUnchangedSourceDish() {
+    func menuPrepPlanHeaderLineRoundTripDoesNotReattachSourceDishByTaskText() {
       let sourceDishID = SampleUUIDSequence.uuid(15_120)
       let plan = MenuPrepPlan(
         steps: [
@@ -146,7 +146,21 @@ extension RecipeCoreTests {
 
       expectNoDifference(
         plan.applyingEditableReviewText(plan.editableReviewText()),
-        plan
+        MenuPrepPlan(
+          steps: [
+            PrepPlanStep(
+              session: "Wednesday evening",
+              task: "Marinate the chicken.",
+              serves: "Thursday dinner"
+            ),
+            PrepPlanStep(
+              session: "Wednesday evening",
+              task: "Chop the herbs.",
+              serves: "Thursday dinner"
+            ),
+            PrepPlanStep(session: "At service", task: "Warm the tortillas."),
+          ]
+        )
       )
 
       let edited = plan.applyingEditableReviewText(
@@ -163,8 +177,7 @@ extension RecipeCoreTests {
           PrepPlanStep(
             session: "Wednesday evening",
             task: "Marinate the chicken.",
-            serves: "Thursday dinner",
-            sourceDish: sourceDishID
+            serves: "Thursday dinner"
           ),
           PrepPlanStep(
             session: "Wednesday evening",
@@ -218,6 +231,27 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func menuPrepPlanReportsEveryUnparsedInboundLine() {
+      let parsed = MenuPrepPlan().parsingEditableReviewText(
+        """
+        - This bullet has no session.
+        Wednesday evening:
+        - → Missing task
+        - Salt the chicken → Thursday dinner
+        """
+      )
+
+      expectNoDifference(
+        parsed.plan.steps,
+        [PrepPlanStep(session: "Wednesday evening", task: "Salt the chicken", serves: "Thursday dinner")]
+      )
+      expectNoDifference(
+        parsed.unparsedLines,
+        ["- This bullet has no session.", "- → Missing task"]
+      )
+    }
+
+    @Test
     func menuPrepPlanClientSendsRequestedModelTierAndMenuContext() async throws {
       let recorder = ModelRequestRecorder()
 
@@ -254,6 +288,7 @@ extension RecipeCoreTests {
       let committedAt = now.addingTimeInterval(60)
       let menuID = SampleUUIDSequence.uuid(15_100)
       let sourceDishID = SampleUUIDSequence.uuid(15_101)
+      let stepID = SampleUUIDSequence.uuid(15_102)
       var extractedSelection: String?
       var extractedContext: [RecipeChatMessage] = []
 
@@ -292,7 +327,13 @@ extension RecipeCoreTests {
         },
         commit: { plan in
           try await database.write { db in
-            try MenuRepository.applyPrepPlan(plan, to: menuID, in: db, now: committedAt)
+            try MenuRepository.applyPrepPlan(
+              plan,
+              to: menuID,
+              in: db,
+              now: committedAt,
+              uuid: { stepID }
+            )
           }
         }
       )
@@ -307,8 +348,7 @@ extension RecipeCoreTests {
       expectNoDifference(extractedContext, messages)
       expectNoDifference(items.map(\.summary), ["Day before:\n- Marinate the chicken."])
       try await database.read { db in
-        let menu = try #require(try Menu.find(menuID).fetchOne(db))
-        expectNoDifference(MenuPrepPlanCoding.decode(menu.prepPlan), [])
+        expectNoDifference(try PrepPlanStepRepository.steps(for: menuID, in: db), [])
       }
 
       try await items[0].commit(items[0].summary)
@@ -316,9 +356,12 @@ extension RecipeCoreTests {
       try await database.read { db in
         let menu = try #require(try Menu.find(menuID).fetchOne(db))
         expectNoDifference(
-          MenuPrepPlanCoding.decode(menu.prepPlan),
+          try PrepPlanStepRepository.steps(for: menuID, in: db),
           [
-            PrepPlanStep(
+            PrepPlanStepRecord(
+              id: stepID,
+              menuID: menuID,
+              sortOrder: 0,
               session: "Day before",
               task: "Marinate the chicken.",
               sourceDish: sourceDishID
@@ -337,6 +380,7 @@ extension RecipeCoreTests {
       let clearedAt = now.addingTimeInterval(120)
       let menuID = SampleUUIDSequence.uuid(15_200)
       let sourceDishID = SampleUUIDSequence.uuid(15_201)
+      let stepID = SampleUUIDSequence.uuid(15_202)
 
       try database.write { db in
         try Menu.insert {
@@ -362,16 +406,20 @@ extension RecipeCoreTests {
           ),
           to: menuID,
           in: db,
-          now: modifiedAt
+          now: modifiedAt,
+          uuid: { stepID }
         )
       }
 
       try database.read { db in
         let menu = try #require(try Menu.find(menuID).fetchOne(db))
         expectNoDifference(
-          MenuPrepPlanCoding.decode(menu.prepPlan),
+          try PrepPlanStepRepository.steps(for: menuID, in: db),
           [
-            PrepPlanStep(
+            PrepPlanStepRecord(
+              id: stepID,
+              menuID: menuID,
+              sortOrder: 0,
               session: "2 days out",
               task: "Make the sauce.",
               sourceDish: sourceDishID
@@ -387,8 +435,71 @@ extension RecipeCoreTests {
 
       try database.read { db in
         let menu = try #require(try Menu.find(menuID).fetchOne(db))
-        expectNoDifference(menu.prepPlan, nil)
+        expectNoDifference(try PrepPlanStepRepository.steps(for: menuID, in: db), [])
         expectNoDifference(menu.dateModified, clearedAt)
+      }
+    }
+
+    @Test
+    func prepPlanRowsKeepStableIDsAndSourceDishWhenReorderedAndEdited() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 805_500_000)
+      let menuID = SampleUUIDSequence.uuid(15_300)
+      let firstID = SampleUUIDSequence.uuid(15_301)
+      let secondID = SampleUUIDSequence.uuid(15_302)
+      let sourceDishID = SampleUUIDSequence.uuid(15_303)
+
+      try database.write { db in
+        try Menu.insert {
+          Menu(id: menuID, title: "Stable IDs", dayCount: 1, dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+        var ids = [firstID, secondID].makeIterator()
+        try MenuRepository.applyPrepPlan(
+          MenuPrepPlan(
+            steps: [
+              PrepPlanStep(session: "The day before", task: "Salt the chicken", sourceDish: sourceDishID),
+              PrepPlanStep(session: "At service", task: "Warm the tortillas"),
+            ]
+          ),
+          to: menuID,
+          in: db,
+          now: now,
+          uuid: { ids.next()! }
+        )
+        _ = try PrepPlanStepRepository.reorder(id: secondID, direction: .earlier, in: db, now: now)
+        try PrepPlanStepRepository.update(
+          id: firstID,
+          session: "The day before",
+          task: "Salt the chicken overnight",
+          serves: "Saturday dinner",
+          in: db,
+          now: now
+        )
+      }
+
+      try database.read { db in
+        expectNoDifference(
+          try PrepPlanStepRepository.steps(for: menuID, in: db),
+          [
+            PrepPlanStepRecord(
+              id: secondID,
+              menuID: menuID,
+              sortOrder: 0,
+              session: "At service",
+              task: "Warm the tortillas"
+            ),
+            PrepPlanStepRecord(
+              id: firstID,
+              menuID: menuID,
+              sortOrder: 1,
+              session: "The day before",
+              task: "Salt the chicken overnight",
+              serves: "Saturday dinner",
+              sourceDish: sourceDishID
+            ),
+          ]
+        )
       }
     }
   }

@@ -347,7 +347,7 @@ private struct MenuDetailReader: View {
           save: detailModel.updateExternalProjectName
         )
         MenuPrepPlanSection(
-          menu: detail.menu,
+          steps: detail.prepPlanSteps,
           itemRows: detail.itemRows,
           copyPrepPrompt: { detailModel.copyPrepPrompt(MenuChatContext(detail: detail).prepPrompt()) },
           onRecipeSelected: onRecipeSelected,
@@ -355,7 +355,16 @@ private struct MenuDetailReader: View {
             model.clearPrepPlanButtonTapped(menuID: detailModel.menuID)
           },
           regeneratePrepPlan: regeneratePrepPlan,
-          pastePrepPlan: detailModel.prepPlanPasted
+          pastePrepPlan: detailModel.prepPlanPasted,
+          createStep: detailModel.createPrepPlanStep,
+          updateStep: detailModel.updatePrepPlanStep,
+          deleteStep: detailModel.deletePrepPlanStep,
+          reorderStep: detailModel.reorderPrepPlanStep
+        )
+        MenuLearningsSection(
+          learnings: detail.learnings,
+          updateLearning: detailModel.updateLearning,
+          deleteLearning: detailModel.deleteLearning
         )
         MenuDishList(
           model: model,
@@ -380,18 +389,19 @@ private struct MenuDetailReader: View {
 }
 
 private struct MenuPrepPlanSection: View {
-  let menu: CoreMenu
+  let steps: [PrepPlanStepRecord]
   let itemRows: [MenuItemRowData]
   let copyPrepPrompt: () -> String?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var clearPrepPlan: () -> Void
   var regeneratePrepPlan: () -> Void
   var pastePrepPlan: (String) -> Void
+  var createStep: (PrepPlanStep) -> Void
+  var updateStep: (PrepPlanStep, PrepPlanStepRecord.ID) -> Void
+  var deleteStep: (PrepPlanStepRecord.ID) -> Void
+  var reorderStep: (PrepPlanStepRecord.ID, MenuItemMoveDirection) -> Void
   @State private var expandedSessionIDs: Set<MenuPrepPlanSessionBand.ID> = []
-
-  private var steps: [PrepPlanStep] {
-    MenuPrepPlanCoding.decode(menu.prepPlan)
-  }
+  @State private var editor: PrepPlanStepEditorDraft?
 
   private var sessionBands: [MenuPrepPlanSessionBand] {
     MenuPrepPlanSessionBand.grouping(steps)
@@ -419,6 +429,13 @@ private struct MenuPrepPlanSection: View {
           pastePrepPlanButtonTapped()
         } label: {
           Label("Paste Prep Plan", systemImage: "clipboard")
+        }
+        .buttonStyle(.bordered)
+
+        Button {
+          editor = PrepPlanStepEditorDraft()
+        } label: {
+          Label("Add Step", systemImage: "plus")
         }
         .buttonStyle(.bordered)
 
@@ -459,11 +476,23 @@ private struct MenuPrepPlanSection: View {
                   expandedSessionIDs.insert(band.id)
                 }
               },
-              onRecipeSelected: onRecipeSelected
+              onRecipeSelected: onRecipeSelected,
+              editStep: { editor = PrepPlanStepEditorDraft(step: $0) },
+              deleteStep: deleteStep,
+              reorderStep: reorderStep
             )
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+      }
+    }
+    .sheet(item: $editor) { draft in
+      PrepPlanStepEditorSheet(draft: draft) { savedDraft in
+        if let id = savedDraft.stepID {
+          updateStep(savedDraft.step, id)
+        } else {
+          createStep(savedDraft.step)
+        }
       }
     }
   }
@@ -476,8 +505,8 @@ private struct MenuPrepPlanSection: View {
 
 private struct MenuPrepPlanSessionBand: Identifiable {
   struct Step: Identifiable {
-    let id: String
-    let step: PrepPlanStep
+    let id: PrepPlanStepRecord.ID
+    let step: PrepPlanStepRecord
   }
 
   let id: String
@@ -489,14 +518,11 @@ private struct MenuPrepPlanSessionBand: Identifiable {
   }
 
   private var isFlexible: Bool {
-    let normalizedSession = session.lowercased()
-    return normalizedSession.contains("anytime")
-      || normalizedSession.contains("flexible")
-      || normalizedSession.contains("get ahead")
+    session == PrepPlanSessionBand.flexible.title
   }
 
-  static func grouping(_ planSteps: [PrepPlanStep]) -> [MenuPrepPlanSessionBand] {
-    var unprioritizedBands: [(session: String, steps: [PrepPlanStep])] = []
+  static func grouping(_ planSteps: [PrepPlanStepRecord]) -> [MenuPrepPlanSessionBand] {
+    var unprioritizedBands: [(session: String, steps: [PrepPlanStepRecord])] = []
     for step in planSteps {
       if let lastBandIndex = unprioritizedBands.indices.last,
         unprioritizedBands[lastBandIndex].session == step.session
@@ -517,20 +543,8 @@ private struct MenuPrepPlanSessionBand: Identifiable {
     return bands.filter(\.isFlexible) + bands.filter { !$0.isFlexible }
   }
 
-  private static func displaySteps(for steps: [PrepPlanStep], in session: String) -> [Step] {
-    var occurrencesByContents: [String: Int] = [:]
-    return steps.map { step in
-      let contents = [
-        session,
-        step.task,
-        step.serves ?? "",
-        step.sourceDish?.uuidString ?? "",
-      ]
-      .joined(separator: "\u{1F}")
-      let occurrence = occurrencesByContents[contents, default: 0]
-      occurrencesByContents[contents] = occurrence + 1
-      return Step(id: "\(contents)\u{1E}\(occurrence)", step: step)
-    }
+  private static func displaySteps(for steps: [PrepPlanStepRecord], in session: String) -> [Step] {
+    steps.map { Step(id: $0.id, step: $0) }
   }
 }
 
@@ -540,6 +554,9 @@ private struct MenuPrepPlanSessionBandView: View {
   let isExpanded: Bool
   var onToggle: () -> Void
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  var editStep: (PrepPlanStepRecord) -> Void
+  var deleteStep: (PrepPlanStepRecord.ID) -> Void
+  var reorderStep: (PrepPlanStepRecord.ID, MenuItemMoveDirection) -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -571,7 +588,10 @@ private struct MenuPrepPlanSessionBandView: View {
             MenuPrepPlanStepView(
               step: presentation.step,
               itemRows: itemRows,
-              onRecipeSelected: onRecipeSelected
+              onRecipeSelected: onRecipeSelected,
+              editStep: editStep,
+              deleteStep: deleteStep,
+              reorderStep: reorderStep
             )
 
             if presentation.id != band.steps.last?.id {
@@ -583,63 +603,6 @@ private struct MenuPrepPlanSessionBandView: View {
       }
     }
     .padding(.vertical, 8)
-  }
-}
-
-private struct MenuPrepPlanStepView: View {
-  let step: PrepPlanStep
-  let itemRows: [MenuItemRowData]
-  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
-
-  var body: some View {
-    HStack(alignment: .top, spacing: 12) {
-      Image(systemName: "checklist")
-        .font(.headline)
-        .foregroundStyle(.secondary)
-
-      VStack(alignment: .leading, spacing: 4) {
-        Text(step.task)
-        if let serves = step.serves {
-          servesLabel(serves)
-        }
-      }
-
-      Spacer(minLength: 8)
-    }
-    .padding(.vertical, 12)
-  }
-
-  @ViewBuilder
-  private func servesLabel(_ serves: String) -> some View {
-    if let recipePresentation {
-      Button {
-        onRecipeSelected?(recipePresentation)
-      } label: {
-        Label(serves, systemImage: "fork.knife")
-          .recipeChip()
-      }
-      .buttonStyle(.plain)
-      .accessibilityLabel("Open recipe for \(serves)")
-    } else if step.sourceDish == nil {
-      Text(serves)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-    } else {
-      Label(serves, systemImage: "fork.knife")
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .recipeChip()
-    }
-  }
-
-  private var recipePresentation: RecipeDetailPresentation? {
-    guard
-      let sourceDish = step.sourceDish,
-      let row = itemRows.first(where: { $0.id == sourceDish }),
-      let recipeID = row.recipe?.id,
-      onRecipeSelected != nil
-    else { return nil }
-    return RecipeDetailPresentation(recipeID: recipeID, scaleContext: .menuItem(row.id))
   }
 }
 
