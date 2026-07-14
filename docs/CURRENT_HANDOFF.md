@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 14, 2026 (ADR-0038 **S3a** approved PR #183 → DONE-LOG; Next Up = ADR-0038 **S3b**, generalize the serializer to Recipe + MealPlan).
+Last updated: July 14, 2026 (ADR-0038 **S3a** approved PR #183 → DONE-LOG; Next Up = the **Learnings surface** — give S3a's write-only table a reader + delete, *before* S3b scales its writers).
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,26 +21,36 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0038](decisions/ADR-0038-external-llm-handoff.md) External-LLM handoff, S3b**
+**Live dispatch target — [ADR-0038](decisions/ADR-0038-external-llm-handoff.md) External-LLM handoff,
+S3a follow-on: the Learnings surface**
 ([`efforts/adr-0038-external-llm-handoff.md`](efforts/adr-0038-external-llm-handoff.md)).
-**Generalize the serializer to Recipe + MealPlan.** S3a (PR #183 → DONE-LOG) built the two-part return contract
-(`(Deliverable?, Learnings?)`) and the synced `Learning` table, but proved it on **Menu only** — because Menu is
-the one source whose context serializer already existed. S3b gives the other two sources theirs:
+**Give the `learnings` table a reader and a delete affordance, on Menu.** S3a (PR #183 → DONE-LOG) shipped the
+two-part return contract and the synced `Learning` table — but **nothing in the app reads it.** A write-only
+synced table is a bet, not a feature: a wrong or duplicated learning is currently **unremovable except by
+deleting the whole menu**, and Amd 1's "plain text to start — let the corpus tell us if it wants structure"
+cannot pay off while the corpus is invisible. This slice is the reader. It is **deliberately small and
+ADR-free** — the full thinking-vs-doing surface is ADR-0039, and this is not that (see below).
 
-- **Context builders** for Recipe + MealPlan on the `MenuChatContext` pattern (frontier budget, method,
-  uncapped ingredients, an intro prompt tuned from `tasteProfile`/AI settings, asking for review-text output).
-- **Commit shape per source — classify it first** ([[chat-verb-commit-shapes]]): recipe → `Recipe.makeAhead`
-  (and adjust/variation, ADR-0021/0023); meal-plan → make-ahead strategy
-  ([ADR-0013](decisions/ADR-0013-meal-planner-actionable-chat.md)).
-- **Learnings ride along free** on the S3a machinery — which is what makes the handoff worth doing on a source
-  with **no structured deliverable field at all**.
+- **Read.** A **Learnings** section on the menu detail (`YesChefApp/MenuViews.swift`, alongside
+  `MenuPrepPlanSection`), listing this menu's learnings newest-first. Fetch **scoped to the menu** — extend
+  `MenuDetailQuery`/`MenuDetailData` (`MenuCore.swift:18`/`:101`), which is already a per-menu `@Fetch`. **Do
+  not add a whole-library `@Fetch`** — that is the [[sqlitedata-fetch-writer-convoy]] trap (ADR-0029 Finding 8)
+  and it cost us a week.
+- **Delete one.** Swipe-to-delete a single learning (`LearningRepository.delete(id:)` — the repository has
+  `create`/`deleteAll` only). This is the whole point of the slice.
+- **Edit one (in place).** Inline text edit, writing `dateModified` and leaving `provenance` alone — provenance
+  records where a learning *came from*, and a human touch-up does not make it in-app-authored.
+- **No new AI, no new prompt, no new commit path.** The review sheet already writes these rows.
 
-**⚠️ Prerequisite — decide with Jon before dispatching S3b.** Nothing in the app **reads** the `learnings`
-table yet (ADR-0038 Amd 1 deliberately did not decide presentation). Until there is a read/delete surface, a
-wrong or duplicated learning is **synced and unremovable** except by deleting the whole menu — and S3b triples
-the rate at which rows arrive. Either land a minimal learnings surface first, or accept the debt knowingly.
-That surface is **ADR-0039** (the Playbook column) territory: milestone-sized, Jon-gated, and now holding real
-content — so it is a live design conversation, not a Codex dispatch.
+**S3b follows** (generalize the serializer to Recipe + MealPlan; each gains its deliverable shape — recipe →
+`Recipe.makeAhead`, meal-plan → make-ahead strategy, classifying commit shape first per
+[[chat-verb-commit-shapes]] — and Learnings ride free on the S3a machinery). It is **sequenced after this
+slice on purpose**: S3b triples the number of writers into `learnings`, and we should not scale writers into a
+table shape we have never once looked at.
+
+**Then ADR-0039** (the Playbook column) — milestone-sized, Jon-gated, a design conversation and *not* a Codex
+dispatch. This slice is its evidence-gatherer, not a substitute for it: design the Playbook once a real corpus
+of learnings exists to hold.
 
 **ADR-0038 S3a device pass owed (Jon):** the two-item review sheet (prep plan + learnings, each independently
 savable/discardable), and a learning-only return through **both** paths — the Shortcuts `Import Handoff Result`

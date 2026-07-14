@@ -146,7 +146,28 @@ outbound work** (Recipe/MealPlan serializers are S3b).
   is cooking instructions interleaved across recipes, which strips recipe context and will never be trusted.
   **The prep plan must never become a merged mega-recipe.** See [[automation-decays-near-the-stove]].
 
-### S3b — generalize the serializer to Recipe + MealPlan (follows S3a) ← **live**
+### S3a follow-on — the Learnings surface (read + delete), on Menu ← **live**
+
+S3a left the `learnings` table **write-only**: the review sheet fills it and nothing ever reads it. Two
+consequences force this slice ahead of S3b. (1) A wrong or duplicated learning is **synced and unremovable**
+except by deleting its whole menu — "delete the menu" is not a corpus-management tool. (2) Amendment 1 chose
+**plain text to start, and said to let the corpus tell us if it wants structure** — which is unhearable while
+the corpus is invisible. Small, ADR-free, app-layer; ADR-0039 is the *full* surface and this is explicitly not
+that.
+
+- **Read.** A **Learnings** section on the menu detail (`YesChefApp/MenuViews.swift`, alongside
+  `MenuPrepPlanSection`), this menu's learnings newest-first. Extend the existing per-menu
+  `MenuDetailQuery`/`MenuDetailData` (`MenuCore.swift`) — **never a whole-library `@Fetch`**
+  ([[sqlitedata-fetch-writer-convoy]], ADR-0029 Finding 8).
+- **Delete one.** Swipe-to-delete a single learning; `LearningRepository` has `create`/`deleteAll` only, so add
+  `delete(id:)`. This is the slice's reason to exist.
+- **Edit one.** Inline text edit → write `dateModified`; **leave `provenance` alone** (it records origin, and a
+  human touch-up does not make an externally-returned learning in-app-authored).
+- **No new AI, prompt, or commit path** — the S3a review sheet is still the only writer.
+- **Prove it:** the S3a device pass returns learnings onto a sample menu; this slice is what lets Jon *see*
+  them, prune the bad ones, and delete the sample menu clean.
+
+### S3b — generalize the serializer to Recipe + MealPlan (follows the S3a Learnings surface)
 
 - Recipe + MealPlan context builders on the `MenuChatContext` pattern (frontier budget, method, uncapped
   ingredients, an intro prompt tuned from `tasteProfile`/AI settings, asking for review-text output).
