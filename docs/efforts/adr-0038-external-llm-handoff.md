@@ -103,7 +103,7 @@ an old clipboard would clobber any hand-edits made to the plan since the first i
 - **Prove it:** a Shortcut `ExportHandoffContext(menu) → Ask ChatGPT → ImportHandoffResult` (immediate) and
   `ExportHandoffContext(menu) → Start chat in project → …return… → ImportHandoffResult` (discuss → sheet).
 
-### S3a — the two-part return contract (Amendment 1), proven on Menu (follows S2) ← **live**
+### S3a — the two-part return contract (Amendment 1), proven on Menu (follows S2) ✅ **DONE** (PR #183)
 
 S2 shipped the loop and exposed the gap: a multi-turn session collapses to a **context-free deliverable**.
 [Amendment 1](../decisions/ADR-0038-external-llm-handoff.md) makes the return **`(Deliverable?, Learnings?)`,
@@ -146,7 +146,7 @@ outbound work** (Recipe/MealPlan serializers are S3b).
   is cooking instructions interleaved across recipes, which strips recipe context and will never be trusted.
   **The prep plan must never become a merged mega-recipe.** See [[automation-decays-near-the-stove]].
 
-### S3b — generalize the serializer to Recipe + MealPlan (follows S3a)
+### S3b — generalize the serializer to Recipe + MealPlan (follows S3a) ← **live**
 
 - Recipe + MealPlan context builders on the `MenuChatContext` pattern (frontier budget, method, uncapped
   ingredients, an intro prompt tuned from `tasteProfile`/AI settings, asking for review-text output).

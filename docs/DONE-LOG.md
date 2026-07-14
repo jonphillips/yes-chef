@@ -9,6 +9,50 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0038 Amendment 1 — External-LLM handoff, S3a (the two-part return contract, on Menu)
+
+**✅ DONE — architect-approved 2026-07-14. Jon device pass still owed.** yes-chef PR
+[#183](https://github.com/jonphillips/yes-chef/pull/183).
+[ADR-0038 Amendment 1](decisions/ADR-0038-external-llm-handoff.md): the handoff return is now
+**`(Deliverable?, Learnings?)`, either may be empty** — the *reasoning* of a multi-turn session no longer dies
+in ChatGPT. Proven on **Menu only** (its serializer already existed; Recipe/MealPlan are S3b).
+
+**Prompt (both modes).** After the deliverable, the model returns a **`YC-LEARNINGS:`** marker line followed by
+a bullet list of durable knowledge — a **structured list of distinct bullets, never a merged blob**
+([[llm-curation-not-synthesis]]). A **learning-only return is first-class**, not an error. Bundles the
+**ADR-0039 D5 prompt fix**: prep-plan bullets are **separable, atomic, context-free tasks, never choreography**
+— the plan must never become a merged mega-recipe ([[automation-decays-near-the-stove]]).
+
+**Parse — split before you parse.** `isEditablePrepPlanSessionHeader` treats any non-bullet, colon-terminated
+line as a **session header**, so an unsplit `YC-LEARNINGS:` would be swallowed as a prep band and every learning
+would become a prep step. `AIHandoffReturn` strips the token → **splits the body on the marker** → feeds *only*
+the deliverable half to `applyingEditableReviewText` and parses the learnings half as bullets. The marker match
+is **tolerant of markdown decoration and case** (`## **yc-learnings:**` splits correctly) — models bold their
+headings no matter what the prompt says.
+
+**Commit — new synced `Learning` table.** `id`, `sourceType` (reuses `AIHandoffSourceType`), `sourceID`, `text`
+(plain text to start), `provenance` (`.externalHandoff`/`.inApp`), `dateCreated`, `dateModified`. Registered in
+`makeSyncEngine` (the `CloudSyncTests` guard derives its expectation from the live schema, so it covered this
+with no test edit). `(sourceType, sourceID)` is **polymorphic → no FK → no cascade delete**, so
+`MenuRepository.deleteMenu` **hand-cascades** its learnings — orphans here would be *synced* ghosts, not
+harmless local ones. **`learnings` is on the standing prod-schema promotion list.**
+
+**Review.** `HandoffReviewSheet` now passes **two** `ChatApplyReviewItem`s — Deliverable and Learnings — each
+independently editable, savable, and discardable (ADR-0024/0026).
+
+**Review findings, fixed in-PR.** The prompt change is global, but the first pass taught only the App Intents
+path to keep learnings — the **in-app paste path silently discarded every learning** and hard-errored on a
+learning-only paste. `AIHandoffMenuPrepPlanImport.apply` now persists both halves and its empty-guard relaxed to
+"empty deliverable **and** empty learnings = error." Also: the exact-match marker was hardened (above), the
+error surface no longer says "Prep Plan" for a learnings failure, and a `UUIDGenerator`-vs-`() -> UUID` compile
+error in the app target was fixed at merge — **the app target does not compile in the Codex sandbox, so
+package-only green is not sufficient evidence for app-layer changes.**
+
+**Not decided here (deliberately):** *where* learnings are displayed. Nothing reads the table yet — that is
+ADR-0039 (the Playbook column) and a hard prerequisite of S3b (a read/delete surface, before the corpus grows
+rows nobody can see or prune).
+
+---
 ## ADR-0038 — External-LLM handoff, S2 (the App Intents surface)
 
 **✅ DONE — merged + Jon device-passed 2026-07-14.** yes-chef PR

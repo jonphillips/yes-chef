@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 14, 2026 (ADR-0038 S2 shipped PR #180 → DONE-LOG; Next Up = ADR-0038 **S3a**, the Amendment 1 two-part return contract, proven on Menu).
+Last updated: July 14, 2026 (ADR-0038 **S3a** approved PR #183 → DONE-LOG; Next Up = ADR-0038 **S3b**, generalize the serializer to Recipe + MealPlan).
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,53 +21,30 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0038 Amendment 1](decisions/ADR-0038-external-llm-handoff.md) External-LLM
-handoff, S3a** ([`efforts/adr-0038-external-llm-handoff.md`](efforts/adr-0038-external-llm-handoff.md)).
-**The two-part return contract, proven on Menu.** S2 (PR #180 → DONE-LOG) shipped the loop and immediately
-exposed the gap: a rich multi-turn session collapses to a **context-free deliverable** — the *reasoning* dies
-in ChatGPT. Amendment 1 makes the return **`(Deliverable?, Learnings?)`, either may be empty**. Build, on
-**Menu only** (its serializer already exists — **no new outbound work**; Recipe/MealPlan serializers are S3b):
+**Live dispatch target — [ADR-0038](decisions/ADR-0038-external-llm-handoff.md) External-LLM handoff, S3b**
+([`efforts/adr-0038-external-llm-handoff.md`](efforts/adr-0038-external-llm-handoff.md)).
+**Generalize the serializer to Recipe + MealPlan.** S3a (PR #183 → DONE-LOG) built the two-part return contract
+(`(Deliverable?, Learnings?)`) and the synced `Learning` table, but proved it on **Menu only** — because Menu is
+the one source whose context serializer already existed. S3b gives the other two sources theirs:
 
-- **Prompt (both modes).** After the deliverable, ask for a **Learnings** section introduced by a
-  **`YC-LEARNINGS:`** marker line (mirrors the `YC-HANDOFF:` convention): durable knowledge established in
-  discussion (*"dried bay leaves beat fresh, and you can dry your own"*). Learnings come back as a
-  **structured list of distinct bullets — never a merged blob summary** ([[llm-curation-not-synthesis]]).
-  The model curates its own conversation; we are not preserving a transcript.
-- **⚠️ Parse: split BEFORE you parse.** `isEditablePrepPlanSessionHeader` (`MenuPrepPlan.swift:352`) treats
-  **any non-bullet, colon-terminated line** as a prep-plan session header — so handing `YC-LEARNINGS:` to
-  `applyingEditableReviewText` would **swallow it as a prep band** and turn every learning into a prep step.
-  Therefore: strip the token → **split the body on the `YC-LEARNINGS:` marker** → feed *only* the deliverable
-  half to `applyingEditableReviewText`; parse the learnings half as bullets. No marker → whole body is the
-  deliverable (today's behavior, unchanged). Marker with nothing above it → a **learning-only** return.
-- **Commit — new synced `Learning` table** (decided with Jon 2026-07-14; see Amendment 1 for why *not*
-  `Menu.notes` (blob), *not* day-scoped `MenuItem` note-rows, *not* `AIHandoff` (device-local)). Deliverable →
-  `Menu.prepPlan` (existing path). Shape, **plain text to start**: `id: UUID`, `sourceType` (reuse
-  `AIHandoffSourceType`), `sourceID: UUID`, `text: String`, `provenance` (`.externalHandoff`/`.inApp`),
-  `dateCreated`, `dateModified`. **Additive + synced** → add `Learning.self` to `makeSyncEngine`'s table list
-  (and the `CloudSyncTests` guard), and **add `learnings` to the standing prod-schema promotion list below**.
-  **Two non-obvious consequences:** (1) `(sourceType, sourceID)` is **polymorphic → no FK → no cascade
-  delete**; deleting a menu would orphan its Learnings as *synced* ghosts, so **hand-cascade in
-  `MenuRepository`'s delete path**. (2) **No FK back to `AIHandoff`** (device-local — it would dangle on the
-  other device); provenance is a **marker, never a link**.
-- **Review.** `RecipeCollectionReviewSheet` already takes `items: [ChatApplyReviewItem]`; `HandoffReviewSheet`
-  currently passes **one**. Pass **two** — Deliverable and Learnings — each independently editable and
-  discardable (ADR-0024/0026: human is final author of both).
-- **Learning-only is first-class.** A return with **no** deliverable is valid, not an error. Concretely:
-  `AIHandoffIntentImport.stageMenuPrepPlanReview` currently throws `.emptyPlan` when `plan.steps.isEmpty` —
-  that guard must relax to "empty deliverable **and** empty Learnings = error." Add the learning-only
-  `taskType`.
+- **Context builders** for Recipe + MealPlan on the `MenuChatContext` pattern (frontier budget, method,
+  uncapped ingredients, an intro prompt tuned from `tasteProfile`/AI settings, asking for review-text output).
+- **Commit shape per source — classify it first** ([[chat-verb-commit-shapes]]): recipe → `Recipe.makeAhead`
+  (and adjust/variation, ADR-0021/0023); meal-plan → make-ahead strategy
+  ([ADR-0013](decisions/ADR-0013-meal-planner-actionable-chat.md)).
+- **Learnings ride along free** on the S3a machinery — which is what makes the handoff worth doing on a source
+  with **no structured deliverable field at all**.
 
-**Bundle the [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md) D5 prompt fix** — cohesive
-(same prompt): instruct the model to emit **tasks, never choreography**. A task is separable/atomic/
-context-free ("salt the chicken Wednesday"); **choreography** is cooking instructions interleaved across
-several recipes ("sear the beef while the salad rests"), which strips the recipe context Jon reasons with and
-will never be trusted. **The prep plan must never become a merged mega-recipe** — the recipes hold the cooking.
-Don't generate what won't be trusted; this makes the plan smaller and sharper. See
-[[automation-decays-near-the-stove]].
+**⚠️ Prerequisite — decide with Jon before dispatching S3b.** Nothing in the app **reads** the `learnings`
+table yet (ADR-0038 Amd 1 deliberately did not decide presentation). Until there is a read/delete surface, a
+wrong or duplicated learning is **synced and unremovable** except by deleting the whole menu — and S3b triples
+the rate at which rows arrive. Either land a minimal learnings surface first, or accept the debt knowingly.
+That surface is **ADR-0039** (the Playbook column) territory: milestone-sized, Jon-gated, and now holding real
+content — so it is a live design conversation, not a Codex dispatch.
 
-**S3b** (generalize the serializer to Recipe + MealPlan; each gains its deliverable shape, Learnings ride free
-on the S3a machinery) follows. **ADR-0039** (the Playbook column) is milestone-sized, Jon-gated, and
-deliberately *not* queued here — design it once S3a gives it real content to hold.
+**ADR-0038 S3a device pass owed (Jon):** the two-item review sheet (prep plan + learnings, each independently
+savable/discardable), and a learning-only return through **both** paths — the Shortcuts `Import Handoff Result`
+intent *and* the in-app paste box.
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**

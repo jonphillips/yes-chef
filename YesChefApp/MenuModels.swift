@@ -606,7 +606,7 @@ final class MenuDetailModel {
           currentPlan: currentPlan,
           in: db,
           now: now,
-          uuid: uuid
+          uuid: { uuid() }
         )
       }
       if result == .duplicate {
