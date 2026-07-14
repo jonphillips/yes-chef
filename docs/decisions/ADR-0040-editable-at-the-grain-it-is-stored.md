@@ -117,7 +117,12 @@ prod/TestFlight cut. That deadline, not aesthetics, is what makes this urgent.
   detail section becomes row-editable with a **session picker**, and the handoff/paste path writes rows.
   **Before the prod cut (D4).**
 - **S3 — lossless-or-loud pass** on the remaining text parsers (review sheet, paste box): surface what didn't
-  parse instead of dropping it.
+  parse instead of dropping it. **Includes the silent no-ops, not just the silent drops** — "Paste Prep Plan"
+  does `guard let text = UIPasteboard.general.string else { return }` (`MenuViews.swift:471`), so an empty
+  clipboard, or a missed iOS *Allow Paste* prompt, is **indistinguishable from success**: no step, no error,
+  no word. Confirmed the hard way during the S3a device pass (2026-07-14), where "it did nothing," "it worked
+  invisibly," and "I'm on the wrong build" all looked identical. Every import path ends in a **visible
+  outcome** — what landed, or what didn't and why.
 
 **Sequenced ahead of [ADR-0038 S3b](../efforts/adr-0038-external-llm-handoff.md)** — S3b adds two more sources
 writing LLM content into more fields, and it should inherit this rule rather than add three more places that
