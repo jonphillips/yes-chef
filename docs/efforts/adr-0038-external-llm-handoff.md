@@ -146,7 +146,7 @@ outbound work** (Recipe/MealPlan serializers are S3b).
   is cooking instructions interleaved across recipes, which strips recipe context and will never be trusted.
   **The prep plan must never become a merged mega-recipe.** See [[automation-decays-near-the-stove]].
 
-### S3a follow-on — the Learnings surface (read + delete), on Menu ← **live**
+### S3a follow-on — the Learnings surface (read + delete), on Menu ← **live** (= [ADR-0040](../decisions/ADR-0040-editable-at-the-grain-it-is-stored.md) S1, dispatched with ADR-0040 S2)
 
 S3a left the `learnings` table **write-only**: the review sheet fills it and nothing ever reads it. Two
 consequences force this slice ahead of S3b. (1) A wrong or duplicated learning is **synced and unremovable**
