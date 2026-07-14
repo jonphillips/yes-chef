@@ -103,13 +103,40 @@ an old clipboard would clobber any hand-edits made to the plan since the first i
 - **Prove it:** a Shortcut `ExportHandoffContext(menu) → Ask ChatGPT → ImportHandoffResult` (immediate) and
   `ExportHandoffContext(menu) → Start chat in project → …return… → ImportHandoffResult` (discuss → sheet).
 
-### S3 — generalize the serializer to Recipe + MealPlan (follows S2)
+### S3a — the two-part return contract (Amendment 1), proven on Menu (follows S2) ← **live**
+
+S2 shipped the loop and exposed the gap: a multi-turn session collapses to a **context-free deliverable**.
+[Amendment 1](../decisions/ADR-0038-external-llm-handoff.md) makes the return **`(Deliverable?, Learnings?)`,
+either may be empty**. Prove it on **Menu only** — its serializer already exists, so there is **no new
+outbound work** (Recipe/MealPlan serializers are S3b).
+
+- **Prompt (both modes).** After the deliverable, request a **Learnings** section — durable knowledge
+  established in discussion. A **structured list of distinct items, never a merged blob summary**
+  ([[llm-curation-not-synthesis]]). The model curates its own conversation; we are *not* preserving a
+  transcript.
+- **Parse** both sections; token stripping unchanged.
+- **Commit.** Deliverable → `Menu.prepPlan` (existing). **Learnings → the menu's own *synced* notes** — **not**
+  `AIHandoff` (device-local, transient, OQ1). Learnings are durable artifacts and must travel with the resource.
+- **Review.** `RecipeCollectionReviewSheet` already takes `items: [ChatApplyReviewItem]`;
+  `YesChefApp/HandoffReviewCoordinator.swift`'s `HandoffReviewSheet` passes **one**. Pass **two** —
+  Deliverable and Learnings — each independently editable/discardable (ADR-0024/0026).
+- **Learning-only is first-class.** `AIHandoffIntentImport.stageMenuPrepPlanReview` currently throws
+  `.emptyPlan` on `plan.steps.isEmpty`; relax to "empty deliverable **and** empty Learnings = error." Add the
+  learning-only `taskType`.
+- **Bundle the [ADR-0039](../decisions/ADR-0039-playbook-column-thinking-vs-doing.md) D5 prompt fix** (same
+  prompt, cohesive): emit **tasks, never choreography**. Tasks are separable/atomic/context-free; choreography
+  is cooking instructions interleaved across recipes, which strips recipe context and will never be trusted.
+  **The prep plan must never become a merged mega-recipe.** See [[automation-decays-near-the-stove]].
+
+### S3b — generalize the serializer to Recipe + MealPlan (follows S3a)
 
 - Recipe + MealPlan context builders on the `MenuChatContext` pattern (frontier budget, method, uncapped
   ingredients, an intro prompt tuned from `tasteProfile`/AI settings, asking for review-text output).
 - Commit shapes per source: recipe → `Recipe.makeAhead` (and adjust/variation, ADR-0021/0023); meal-plan →
   make-ahead-strategy ([ADR-0013](../decisions/ADR-0013-meal-planner-actionable-chat.md), classify commit
   shape first per [[chat-verb-commit-shapes]]).
+- **Learnings ride along free** on the S3a machinery — and make the hand-off useful on sources with no
+  structured deliverable field at all.
 
 **Batching ([[batch-slices-and-lean-handoff]]):** S1 first (it de-risks the record + sync-exclusion + token
 before greenfield App Intents). S2 follows with S1's learnings; S3 last. S1+S2 may bundle if S1's

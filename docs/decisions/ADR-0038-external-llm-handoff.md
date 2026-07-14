@@ -199,17 +199,24 @@ return is a **first-class outcome**, not a degenerate one.
   ([ADR-0024](ADR-0024-editable-proposal-preview.md)/[ADR-0026](ADR-0026-review-collection-sheet.md)).
 - **New `taskType`** for a learning-only handoff, valid against *any* source.
 
-### Consequence — Learnings are the **universal** commit shape, and S3 re-splits
+### Consequence — Learnings are the **universal commit shape**, and S3 re-splits
 
-Every resource has notes. So "harvest to notes" works identically for recipe, menu, and meal-plan with
-**zero per-source commit logic**, while the deliverable shapes are all bespoke. S3 therefore splits:
+Every resource has notes, so "harvest to notes" needs **zero per-source commit logic** — while every
+deliverable shape is bespoke. **But the *outbound serializer* is still per-source**, and Recipe/MealPlan
+serializers do not exist yet (they were the whole of old-S3). You cannot harvest learnings from a recipe
+until you can *export* a recipe. So S3 splits along the **de-risking** line S1 already proved — build the
+new contract on the surface that already round-trips:
 
-- **S3a — Learnings harvest (universal).** Lands on all three sources at once. Small, uniform, and it
-  makes the handoff useful on resources that have no structured deliverable field at all.
-- **S3b — per-source deliverables.** Recipe → `Recipe.makeAhead` + adjust/variation
+- **S3a — the two-part contract, proven on Menu.** The menu serializer already exists, so there is **no new
+  outbound work**. Extend the finalize instruction to ask for both sections; parse both; stage **two**
+  review items; commit Learnings to menu notes. This is where the *universal* commit machinery gets built,
+  cheaply, on known ground.
+- **S3b — generalize the serializer to Recipe + MealPlan.** Each source gains its deliverable shape —
+  recipe → `Recipe.makeAhead` + adjust/variation
   ([ADR-0021](ADR-0021-recipe-variations.md)/[ADR-0023](ADR-0023-recipe-edit-proposals.md)); meal-plan →
   make-ahead strategy ([ADR-0013](ADR-0013-meal-planner-actionable-chat.md), classify per
-  [[chat-verb-commit-shapes]]).
+  [[chat-verb-commit-shapes]]) — and **Learnings ride along for free** on the S3a machinery. This is also
+  where a learning-only handoff becomes useful on sources with no structured deliverable field.
 
 **Presentation is deliberately not decided here.** *Where* Learnings and deliverables are displayed (the
 in-app chat panel's future, a possible "Intelligence" third column) is a separate information-architecture

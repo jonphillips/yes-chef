@@ -9,6 +9,64 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0038 — External-LLM handoff, S2 (the App Intents surface)
+
+**✅ DONE — merged + Jon device-passed 2026-07-14.** yes-chef PR
+[#180](https://github.com/jonphillips/yes-chef/pull/180) (+ [#181](https://github.com/jonphillips/yes-chef/pull/181),
+docs). [ADR-0038](decisions/ADR-0038-external-llm-handoff.md) S2: the external-LLM surface over the S1 core.
+**The immediate loop works end-to-end on device** — `Export Handoff Context (menu) → Ask ChatGPT →
+Import Handoff Result` returns a parsed prep plan into the review sheet with no human in the middle.
+
+**App Intents (new `YesChefApp/AppIntents/` group).** Three `AppEntity`s (Recipe/Menu/MealPlan, all
+`SyncableEntity` on our stable iCloud UUIDs) + `HandoffSource` as an `@UnionValue`.
+`ExportHandoffContext(source:mode:)` creates the hand-off and returns a `HandoffExport` carrying the prompt and
+`Menu.externalProjectName`. `ImportHandoffResult(handoffID:result:)` routes by id (param **or** stripped
+token), stages the review, and `OpensIntent`s into `RecipeCollectionReviewSheet` via
+`HandoffReviewCoordinator`/`HandoffReviewSheet`. `allowedExecutionTargets = .main` (in-process; the intents
+call the repositories directly).
+
+**Prompt modes.** `HandoffPromptMode` (`AppEnum`) exposes discuss/immediate in the Shortcuts action row.
+**Default is `.immediate`** (`de8108e`): the Shortcuts surface exists *for* the headless `Ask ChatGPT` chain,
+and a discuss prompt sent headlessly returns conversational prose the parser cannot use, while the reverse
+mispairing is harmless. **The in-app Copy Prep Prompt button stays discuss and takes no mode** — the two
+surfaces map to the two modes.
+
+**Schema.** Additive synced `Menu.externalProjectName` (+ menu-detail field, repository write, trim-to-nil).
+**Added to the standing prod-schema promotion list.** Strict block-on-duplicate dedupe lives in
+`AIHandoffIntentImport.stageMenuPrepPlanReview` (marks imported when the sheet *opens* — the sheet remains the
+sole writer of the durable artifact; a cancelled review therefore burns the session, and re-export is the
+recovery: **confirmed as intended**).
+
+**Device-pass findings (see the [PR #180 comment](https://github.com/jonphillips/yes-chef/pull/180#issuecomment-4964739760)).**
+Two architect concerns were **retired** by the device pass: the `@ComputedProperty` + empty-query pattern on
+`HandoffExport` resolves fine as a Shortcuts variable, and the `assumeIsolated` / dual-coordinator wiring holds
+on the foreground path. **OQ5 resolved** — `source` is required, so a bare Action-Button invocation gets the
+system picker.
+
+**OQ6 RESOLVED — pessimistic.** ChatGPT's `Start chat in project` is **fixed-pick-only**: it resolves the
+project at configure time and does **not** accept a variable (and appears to take no prompt input either). So
+per-menu project auto-seeding from one generic shortcut is **not achievable**. This does *not* break the
+hand-off — return→resource routing rides the `YC-HANDOFF:` token and is project-independent.
+**`Menu.externalProjectName` is demoted from a routing key to an advisory reminder** (helper copy reworded to
+match). Fallbacks: immediate mode as the automated loop; discuss mode via the in-app Copy/Paste buttons; an
+optional `Export → Copy to Clipboard → Start chat in project` hybrid.
+
+**Deferred:** no `AppShortcutsProvider` — the intents are Shortcuts-composable only (no zero-config
+Siri/Action-Button/Spotlight surface). Note it could not have shipped the multi-step chain anyway, since that
+chain includes ChatGPT's own action.
+
+**Tests.** `AIHandoffTests` — immediate-prompt format contract, review-only import staging (no menu write),
+duplicate blocking, project-name trim/clear.
+
+**What S2 provoked.** Dogfooding the loop exposed that the hand-off reduces a rich multi-turn session to a
+**context-free deliverable** — the *reasoning* dies in ChatGPT. Result:
+**[ADR-0038 Amendment 1](decisions/ADR-0038-external-llm-handoff.md)** (the return artifact is
+`(Deliverable?, Learnings?)`; Learnings commit to the resource's synced notes; S3 re-splits into **S3a**
+contract-on-Menu / **S3b** Recipe+MealPlan serializers) and a new
+**[ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md)** (the Playbook column; thinking-vs-doing;
+**D5 — the prep plan holds tasks, never choreography**).
+
+---
 ## ADR-0038 — External-LLM handoff, S1 (session-tracked core)
 
 **✅ DONE — merged + Jon device-passed 2026-07-13.** yes-chef PR
