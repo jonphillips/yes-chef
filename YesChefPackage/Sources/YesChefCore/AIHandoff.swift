@@ -246,15 +246,19 @@ public enum AIHandoffReturn {
 
   private static func splitting(_ text: String) -> (deliverable: String, learnings: String) {
     let lines = text.components(separatedBy: .newlines)
-    guard let markerIndex = lines.firstIndex(where: {
-      $0.trimmingCharacters(in: .whitespacesAndNewlines) == learningsMarker
-    }) else {
+    guard let markerIndex = lines.firstIndex(where: isLearningsMarker) else {
       return (text, "")
     }
     return (
       lines[..<markerIndex].joined(separator: "\n"),
       lines[lines.index(after: markerIndex)...].joined(separator: "\n")
     )
+  }
+
+  private static func isLearningsMarker(_ line: String) -> Bool {
+    line
+      .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "#*")))
+      .caseInsensitiveCompare(learningsMarker) == .orderedSame
   }
 }
 
@@ -345,11 +349,11 @@ public enum AIHandoffMenuPrepPlanImportError: Error, Equatable, LocalizedError, 
   public var errorDescription: String? {
     switch self {
     case .emptyPlan:
-      "The pasted plan needs a session heading followed by one or more prep steps."
+      "The pasted handoff needs prep steps or at least one learning bullet."
     case .wrongMenu:
       "This handoff belongs to a different menu."
     case .wrongTask:
-      "This handoff does not contain a prep plan."
+      "This handoff does not contain a supported result."
     }
   }
 
@@ -362,7 +366,8 @@ public enum AIHandoffMenuPrepPlanImport {
     to menuID: Menu.ID,
     currentPlan: MenuPrepPlan,
     in db: Database,
-    now: Date
+    now: Date,
+    uuid: () -> UUID
   ) throws -> AIHandoffMenuPrepPlanImportResult {
     let routedText = AIHandoffToken.stripping(from: text)
 
@@ -370,29 +375,56 @@ public enum AIHandoffMenuPrepPlanImport {
       guard handoff.sourceType == .menu, handoff.sourceID == menuID else {
         throw AIHandoffMenuPrepPlanImportError.wrongMenu
       }
-      guard handoff.taskType == .prepPlan else {
+      guard handoff.taskType == .prepPlan || handoff.taskType == .learning else {
         throw AIHandoffMenuPrepPlanImportError.wrongTask
       }
       guard handoff.status == .awaitingReturn, handoff.importedAt == nil else {
         return .duplicate
       }
 
-      let plan = AIHandoffReturn.menuPrepPlan(
+      let returned = AIHandoffReturn.menuPrepPlan(
         from: routedText.payload,
         currentPlan: currentPlan
-      ).plan
-      guard !plan.steps.isEmpty else { throw AIHandoffMenuPrepPlanImportError.emptyPlan }
-      try MenuRepository.applyPrepPlan(plan, to: menuID, in: db, now: now)
+      )
+      try apply(returned, to: menuID, in: db, now: now, uuid: uuid)
       try AIHandoffRepository.markImported(id: handoff.id, at: now, in: db)
       return .imported
     }
 
-    let plan = AIHandoffReturn.menuPrepPlan(
+    let returned = AIHandoffReturn.menuPrepPlan(
       from: routedText?.payload ?? text,
       currentPlan: currentPlan
-    ).plan
-    guard !plan.steps.isEmpty else { throw AIHandoffMenuPrepPlanImportError.emptyPlan }
-    try MenuRepository.applyPrepPlan(plan, to: menuID, in: db, now: now)
+    )
+    try apply(returned, to: menuID, in: db, now: now, uuid: uuid)
     return .applied
+  }
+
+  private static func apply(
+    _ returned: (plan: MenuPrepPlan, learnings: [String]),
+    to menuID: Menu.ID,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws {
+    guard !returned.plan.steps.isEmpty || !returned.learnings.isEmpty else {
+      throw AIHandoffMenuPrepPlanImportError.emptyPlan
+    }
+    if !returned.plan.steps.isEmpty {
+      try MenuRepository.applyPrepPlan(returned.plan, to: menuID, in: db, now: now)
+    }
+    for text in returned.learnings {
+      try LearningRepository.create(
+        Learning(
+          id: uuid(),
+          sourceType: .menu,
+          sourceID: menuID,
+          text: text,
+          provenance: .externalHandoff,
+          dateCreated: now,
+          dateModified: now
+        ),
+        in: db
+      )
+    }
   }
 }

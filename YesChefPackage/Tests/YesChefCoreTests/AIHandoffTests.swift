@@ -64,7 +64,7 @@ struct AIHandoffTests {
       from: """
       Wednesday evening:
       - Salt the chicken → Thursday dinner
-      YC-LEARNINGS:
+      ## **yc-learnings:**
       - Dried bay leaves beat fresh.
       - Salt the chicken a day ahead.
       - Dried bay leaves beat fresh.
@@ -123,7 +123,8 @@ struct AIHandoffTests {
         to: menuID,
         currentPlan: MenuPrepPlan(),
         in: db,
-        now: importedAt
+        now: importedAt,
+        uuid: { SampleUUIDSequence.uuid(38_013) }
       )
       expectNoDifference(imported, .imported)
       expectNoDifference(
@@ -141,7 +142,8 @@ struct AIHandoffTests {
         to: menuID,
         currentPlan: MenuPrepPlan(steps: MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan)),
         in: db,
-        now: importedAt.addingTimeInterval(60)
+        now: importedAt.addingTimeInterval(60),
+        uuid: { SampleUUIDSequence.uuid(38_014) }
       )
       expectNoDifference(duplicate, .duplicate)
 
@@ -154,12 +156,111 @@ struct AIHandoffTests {
         to: menuID,
         currentPlan: MenuPrepPlan(),
         in: db,
-        now: importedAt.addingTimeInterval(120)
+        now: importedAt.addingTimeInterval(120),
+        uuid: { SampleUUIDSequence.uuid(38_015) }
       )
       expectNoDifference(fallback, .applied)
       expectNoDifference(
         MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan),
         [PrepPlanStep(session: "Thursday morning", task: "Chop the herbs")]
+      )
+    }
+  }
+
+  @Test
+  func manualPastePersistsTwoPartAndLearningOnlyReturns() throws {
+    @Dependency(\.defaultDatabase) var database
+    let menuID = SampleUUIDSequence.uuid(38_016)
+    let handoffID = SampleUUIDSequence.uuid(38_017)
+    let learningOnlyHandoffID = SampleUUIDSequence.uuid(38_018)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+    var uuids = SampleUUIDSequence(start: 38_100)
+
+    try database.write { db in
+      try Menu.insert {
+        Menu(
+          id: menuID,
+          title: "Beach Menu",
+          dayCount: 2,
+          dateCreated: now,
+          dateModified: now
+        )
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .menu,
+          sourceID: menuID,
+          taskType: .prepPlan,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      let twoPart = try AIHandoffMenuPrepPlanImport.apply(
+        text: """
+        YC-HANDOFF: \(handoffID.uuidString)
+        Wednesday evening:
+        - Salt the chicken → Thursday dinner
+        **YC-LEARNINGS:**
+        - Dried bay leaves beat fresh.
+        - Birria benefits from sitting overnight.
+        """,
+        to: menuID,
+        currentPlan: MenuPrepPlan(),
+        in: db,
+        now: now,
+        uuid: { uuids.next() }
+      )
+      expectNoDifference(twoPart, .imported)
+      expectNoDifference(
+        MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan),
+        [PrepPlanStep(session: "Wednesday evening", task: "Salt the chicken", serves: "Thursday dinner")]
+      )
+
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: learningOnlyHandoffID,
+          sourceType: .menu,
+          sourceID: menuID,
+          taskType: .learning,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(learningOnlyHandoffID.uuidString)"
+        ),
+        in: db
+      )
+      let learningOnly = try AIHandoffMenuPrepPlanImport.apply(
+        text: """
+        YC-HANDOFF: \(learningOnlyHandoffID.uuidString)
+        ## YC-LEARNINGS:
+        - Salt the chicken a day ahead.
+        """,
+        to: menuID,
+        currentPlan: MenuPrepPlan(
+          steps: MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan)
+        ),
+        in: db,
+        now: now,
+        uuid: { uuids.next() }
+      )
+      expectNoDifference(learningOnly, .imported)
+      expectNoDifference(
+        MenuPrepPlanCoding.decode(try Menu.find(menuID).fetchOne(db)?.prepPlan),
+        [PrepPlanStep(session: "Wednesday evening", task: "Salt the chicken", serves: "Thursday dinner")]
+      )
+      expectNoDifference(
+        try Learning
+          .where { $0.sourceType.eq(AIHandoffSourceType.menu) && $0.sourceID.eq(menuID) }
+          .fetchAll(db)
+          .map(\.text)
+          .sorted(),
+        [
+          "Birria benefits from sitting overnight.",
+          "Dried bay leaves beat fresh.",
+          "Salt the chicken a day ahead.",
+        ]
       )
     }
   }

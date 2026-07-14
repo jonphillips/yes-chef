@@ -14,6 +14,7 @@ final class HandoffReviewCoordinator {
 
   var review: AIHandoffMenuPrepPlanReview?
   var errorMessage: String?
+  var errorTitle = "Could Not Save Handoff"
   var isShowingError = false
 
   func present(_ review: AIHandoffMenuPrepPlanReview) {
@@ -71,7 +72,7 @@ final class HandoffReviewCoordinator {
 
   func commitLearnings(_ review: AIHandoffMenuPrepPlanReview, approvedText: String) throws {
     let learnings = AIHandoffReturn.learningBullets(from: approvedText)
-    guard !learnings.isEmpty else { throw AIHandoffIntentImportError.emptyPlan }
+    guard !learnings.isEmpty else { throw HandoffReviewError.emptyLearnings }
     try database.write { db in
       for text in learnings {
         try LearningRepository.create(
@@ -123,6 +124,7 @@ struct HandoffReviewSheet: View {
           items.removeAll { $0.id == item.id }
           return true
         } catch {
+          coordinator.errorTitle = "Could Not \(item.commitTitle)"
           coordinator.errorMessage = String(describing: error)
           coordinator.isShowingError = true
           return false
@@ -138,12 +140,25 @@ struct HandoffReviewSheet: View {
         coordinator.discard(review)
       }
     )
-    .alert("Could Not Save Prep Plan", isPresented: $coordinator.isShowingError) {
+    .alert(coordinator.errorTitle, isPresented: $coordinator.isShowingError) {
       Button("OK") {}
     } message: {
       Text(coordinator.errorMessage ?? "")
     }
   }
+}
+
+private enum HandoffReviewError: LocalizedError, CustomStringConvertible {
+  case emptyLearnings
+
+  var errorDescription: String? {
+    switch self {
+    case .emptyLearnings:
+      "Add at least one bulleted learning before saving."
+    }
+  }
+
+  var description: String { errorDescription ?? "The Learnings could not be saved." }
 }
 
 extension HandoffReviewCoordinator: DependencyKey {
