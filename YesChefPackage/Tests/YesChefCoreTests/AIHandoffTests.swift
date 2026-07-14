@@ -331,6 +331,54 @@ struct AIHandoffTests {
   }
 
   @Test
+  func intentImportStagesUnparsedPlanLinesAlongsideValidContent() throws {
+    @Dependency(\.defaultDatabase) var database
+    let menuID = SampleUUIDSequence.uuid(38_029)
+    let handoffID = SampleUUIDSequence.uuid(38_030)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Menu.insert {
+        Menu(id: menuID, title: "Beach Menu", dayCount: 2, dateCreated: now, dateModified: now)
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .menu,
+          sourceID: menuID,
+          taskType: .prepPlan,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      let review = try AIHandoffIntentImport.stageMenuPrepPlanReview(
+        handoffID: handoffID,
+        result: """
+        YC-HANDOFF: \(handoffID.uuidString)
+        Wednesday evening:
+        - Salt the chicken → Thursday dinner
+        Let me know if you'd like changes!
+        YC-LEARNINGS:
+        - Salt early for better seasoning.
+        """,
+        in: db,
+        now: now
+      )
+
+      expectNoDifference(
+        review.plan.steps,
+        [PrepPlanStep(session: "Wednesday evening", task: "Salt the chicken", serves: "Thursday dinner")]
+      )
+      expectNoDifference(review.unparsedPlanLines, ["Let me know if you'd like changes!"])
+      expectNoDifference(review.learnings, ["Salt early for better seasoning."])
+      #expect(try Menu.find(menuID).fetchOne(db)?.prepPlan == nil)
+    }
+  }
+
+  @Test
   func learningOnlyIntentImportStagesWithoutWritingTheMenuPlan() throws {
     @Dependency(\.defaultDatabase) var database
     let menuID = SampleUUIDSequence.uuid(38_022)

@@ -174,14 +174,14 @@ device pass regardless. So verify with **compiler + tests once**, then hand off:
 
 - Run `xcodegen generate` after adding Swift source files.
 - For package/logic-only changes, `swift build` the package (cheaper than a full app build).
-- Otherwise build `YesChef` **once** for `iPad Pro 13-inch (M5) (16GB)` (`-skipMacroValidation`).
+- Otherwise build `YesChef` **once** with no simulator or signing identity:
+  `xcodebuild -scheme YesChef -destination 'generic/platform=iOS' -skipMacroValidation CODE_SIGNING_ALLOWED=NO build`.
 - Run `scripts/check-drift.sh`.
 - **Do not install/launch on simulators by default** — skip the install loop and hand straight to
   Jon's UI pass. Only boot/install a simulator when a change genuinely can't be confirmed from build
   + tests, and say why in the PR.
-- **Fail fast — one build attempt, then stop.** A simulator that won't boot/install, or any
-  Xcode/toolchain trouble, is **never** a reason to retry with alternate incantations. Make one
-  attempt; if it fails, paste the error and stop — do not try to repair the toolchain or the sim.
-  That is Jon's device pass, not a Codex grind.
+- **Fail fast — one build attempt, then stop.** Xcode/toolchain trouble is never a reason to retry with
+  alternate incantations. Make the generic build attempt once; if it fails, paste the error and stop — do
+  not try to repair the toolchain. Device install is Jon's pass, not a Codex grind.
 
 Jon performs the primary UI testing pass on `iPad Pro 13-inch (M5) (16GB)` and `iPhone 17 Pro`.

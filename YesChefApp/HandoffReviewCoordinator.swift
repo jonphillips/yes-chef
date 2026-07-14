@@ -23,15 +23,20 @@ final class HandoffReviewCoordinator {
 
   func reviewItems(for review: AIHandoffMenuPrepPlanReview) -> [ChatApplyReviewItem] {
     var items: [ChatApplyReviewItem] = []
-    if !review.plan.steps.isEmpty {
+    if !review.plan.steps.isEmpty || !review.unparsedPlanLines.isEmpty {
+      let editableText = reviewEditablePrepPlanText(review)
       items.append(
         ChatApplyReviewItem(
           id: review.handoffID,
           title: "Review prep plan",
-          summary: review.plan.editableReviewText(),
+          summary: editableText,
           presentation: .sheet,
           editableTitle: "Prep plan",
-          editableText: review.plan.editableReviewText(),
+          editableText: editableText,
+          supportingEvidenceTitle: review.unparsedPlanLines.isEmpty
+            ? nil
+            : "Couldn't parse — fix or remove these lines before saving",
+          supportingEvidenceRows: review.unparsedPlanLines,
           commitTitle: "Save Prep Plan",
           committingTitle: "Saving Prep Plan…",
           committedTitle: "Saved Prep Plan",
@@ -60,6 +65,12 @@ final class HandoffReviewCoordinator {
       )
     }
     return items
+  }
+
+  private func reviewEditablePrepPlanText(_ review: AIHandoffMenuPrepPlanReview) -> String {
+    [review.plan.editableReviewText(), review.unparsedPlanLines.joined(separator: "\n")]
+      .filter { !$0.isEmpty }
+      .joined(separator: "\n")
   }
 
   func commitPrepPlan(_ review: AIHandoffMenuPrepPlanReview, approvedText: String) throws {

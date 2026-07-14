@@ -252,6 +252,17 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func legacyFlexibleSessionProseSortsBeforeOtherSessionBands() {
+      let sessions = ["The day before", "Anytime this week", "At service"]
+      let ordered = sessions.sorted { lhs, rhs in
+        PrepPlanSessionBand(matching: lhs) == .flexible
+          && PrepPlanSessionBand(matching: rhs) != .flexible
+      }
+
+      expectNoDifference(ordered, ["Anytime this week", "The day before", "At service"])
+    }
+
+    @Test
     func menuPrepPlanClientSendsRequestedModelTierAndMenuContext() async throws {
       let recorder = ModelRequestRecorder()
 
@@ -498,6 +509,66 @@ extension RecipeCoreTests {
               serves: "Saturday dinner",
               sourceDish: sourceDishID
             ),
+          ]
+        )
+      }
+    }
+
+    @Test
+    func textImportReplacesSourceDishLinksInsteadOfMatchingThemByTaskText() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 805_600_000)
+      let menuID = SampleUUIDSequence.uuid(15_400)
+      let linkedStepID = SampleUUIDSequence.uuid(15_401)
+      let textImportStepID = SampleUUIDSequence.uuid(15_402)
+      let sourceDishID = SampleUUIDSequence.uuid(15_403)
+
+      try database.write { db in
+        try Menu.insert {
+          Menu(id: menuID, title: "Source Links", dayCount: 1, dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+        try MenuRepository.applyPrepPlan(
+          MenuPrepPlan(
+            steps: [
+              PrepPlanStep(
+                session: "The day before",
+                task: "Salt the chicken",
+                sourceDish: sourceDishID
+              )
+            ]
+          ),
+          to: menuID,
+          in: db,
+          now: now,
+          uuid: { linkedStepID }
+        )
+        let pastedPlan = MenuPrepPlan().applyingEditableReviewText(
+          """
+          The day before:
+          - Salt the chicken
+          """
+        )
+        try MenuRepository.applyPrepPlan(
+          pastedPlan,
+          to: menuID,
+          in: db,
+          now: now,
+          uuid: { textImportStepID }
+        )
+      }
+
+      try database.read { db in
+        expectNoDifference(
+          try PrepPlanStepRepository.steps(for: menuID, in: db),
+          [
+            PrepPlanStepRecord(
+              id: textImportStepID,
+              menuID: menuID,
+              sortOrder: 0,
+              session: "The day before",
+              task: "Salt the chicken"
+            )
           ]
         )
       }

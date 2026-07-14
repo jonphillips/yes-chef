@@ -58,6 +58,22 @@ public enum PrepPlanSessionBand: String, CaseIterable, Identifiable, Sendable {
     case .other: "Other session"
     }
   }
+
+  /// Maps legacy and model-authored session prose onto a display band without
+  /// changing the persisted session label.
+  public init?(matching session: String) {
+    let normalized = session.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    if normalized.contains("anytime")
+      || normalized.contains("flexible")
+      || normalized.contains("get ahead") {
+      self = .flexible
+      return
+    }
+    guard let band = Self.allCases.first(where: { $0.title.lowercased() == normalized }) else {
+      return nil
+    }
+    self = band
+  }
 }
 
 public struct PrepPlanStep: Codable, Equatable, Sendable {
@@ -166,6 +182,10 @@ public struct MenuPrepPlan: Equatable, Sendable {
       }
 
       guard let session else {
+        unparsedLines.append(rawLine)
+        continue
+      }
+      guard rawLine.isEditablePrepPlanBullet else {
         unparsedLines.append(rawLine)
         continue
       }
@@ -540,6 +560,11 @@ private extension RecipeChatMessage.Role {
 }
 
 private extension String {
+  var isEditablePrepPlanBullet: Bool {
+    let line = trimmingCharacters(in: .whitespacesAndNewlines)
+    return line.hasPrefix("- ") || line.hasPrefix("* ") || line.hasPrefix("• ")
+  }
+
   var cleanedEditablePrepPlanLine: String {
     var line = trimmingCharacters(in: .whitespacesAndNewlines)
     if line.hasPrefix("- ") || line.hasPrefix("* ") {

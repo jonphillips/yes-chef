@@ -518,7 +518,7 @@ private struct MenuPrepPlanSessionBand: Identifiable {
   }
 
   private var isFlexible: Bool {
-    session == PrepPlanSessionBand.flexible.title
+    PrepPlanSessionBand(matching: session) == .flexible
   }
 
   static func grouping(_ planSteps: [PrepPlanStepRecord]) -> [MenuPrepPlanSessionBand] {

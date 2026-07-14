@@ -218,17 +218,20 @@ public struct AIHandoffMenuPrepPlanReview: Equatable, Sendable {
   public let menuID: Menu.ID
   public let plan: MenuPrepPlan
   public let learnings: [String]
+  public let unparsedPlanLines: [String]
 
   public init(
     handoffID: AIHandoff.ID,
     menuID: Menu.ID,
     plan: MenuPrepPlan,
-    learnings: [String]
+    learnings: [String],
+    unparsedPlanLines: [String] = []
   ) {
     self.handoffID = handoffID
     self.menuID = menuID
     self.plan = plan
     self.learnings = learnings
+    self.unparsedPlanLines = unparsedPlanLines
   }
 }
 
@@ -350,9 +353,6 @@ public enum AIHandoffIntentImport {
       from: routedText?.payload ?? result,
       currentPlan: currentPlan
     )
-    guard returned.unparsedLines.isEmpty else {
-      throw AIHandoffIntentImportError.unparsedPlanText(returned.unparsedLines)
-    }
     guard !returned.plan.steps.isEmpty || !returned.learnings.isEmpty else {
       throw AIHandoffIntentImportError.emptyPlan
     }
@@ -362,7 +362,8 @@ public enum AIHandoffIntentImport {
       handoffID: handoff.id,
       menuID: menu.id,
       plan: returned.plan,
-      learnings: returned.learnings
+      learnings: returned.learnings,
+      unparsedPlanLines: returned.unparsedLines
     )
   }
 }
