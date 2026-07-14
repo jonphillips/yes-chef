@@ -137,6 +137,7 @@ public enum YesChefCloudSync {
         GroceryItemSource.self,
         PantryItem.self,
         AISettingsRecord.self,
+        Learning.self,
       containerIdentifier: configuration.containerIdentifier,
       startImmediately: startImmediately
     )

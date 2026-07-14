@@ -617,6 +617,7 @@ public enum MenuRepository {
     in db: Database
   ) throws {
     _ = try requireMenu(menuID, in: db)
+    try LearningRepository.deleteAll(sourceType: .menu, sourceID: menuID, in: db)
     try Menu.find(menuID).delete().execute(db)
   }
 

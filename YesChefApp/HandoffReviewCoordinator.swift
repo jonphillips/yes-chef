@@ -10,6 +10,7 @@ import YesChefCore
 final class HandoffReviewCoordinator {
   @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
+  @ObservationIgnored @Dependency(\.uuid) private var uuid
 
   var review: AIHandoffMenuPrepPlanReview?
   var errorMessage: String?
@@ -19,29 +20,74 @@ final class HandoffReviewCoordinator {
     self.review = review
   }
 
-  func reviewItem(for review: AIHandoffMenuPrepPlanReview) -> ChatApplyReviewItem {
-    ChatApplyReviewItem(
-      title: "Review prep plan",
-      summary: review.plan.editableReviewText(),
-      presentation: .sheet,
-      editableTitle: "Prep plan",
-      editableText: review.plan.editableReviewText(),
-      commitTitle: "Save Prep Plan",
-      committingTitle: "Saving Prep Plan…",
-      committedTitle: "Saved Prep Plan",
-      commit: { [weak self] approvedText in
-        try self?.commit(review, approvedText: approvedText)
-      }
-    )
+  func reviewItems(for review: AIHandoffMenuPrepPlanReview) -> [ChatApplyReviewItem] {
+    var items: [ChatApplyReviewItem] = []
+    if !review.plan.steps.isEmpty {
+      items.append(
+        ChatApplyReviewItem(
+          id: review.handoffID,
+          title: "Review prep plan",
+          summary: review.plan.editableReviewText(),
+          presentation: .sheet,
+          editableTitle: "Prep plan",
+          editableText: review.plan.editableReviewText(),
+          commitTitle: "Save Prep Plan",
+          committingTitle: "Saving Prep Plan…",
+          committedTitle: "Saved Prep Plan",
+          commit: { [weak self] approvedText in
+            try self?.commitPrepPlan(review, approvedText: approvedText)
+          }
+        )
+      )
+    }
+    if !review.learnings.isEmpty {
+      let editableText = review.learnings.map { "- \($0)" }.joined(separator: "\n")
+      items.append(
+        ChatApplyReviewItem(
+          title: "Review learnings",
+          summary: editableText,
+          presentation: .sheet,
+          editableTitle: "Learnings",
+          editableText: editableText,
+          commitTitle: "Save Learnings",
+          committingTitle: "Saving Learnings…",
+          committedTitle: "Saved Learnings",
+          commit: { [weak self] approvedText in
+            try self?.commitLearnings(review, approvedText: approvedText)
+          }
+        )
+      )
+    }
+    return items
   }
 
-  func commit(_ review: AIHandoffMenuPrepPlanReview, approvedText: String) throws {
+  func commitPrepPlan(_ review: AIHandoffMenuPrepPlanReview, approvedText: String) throws {
     let plan = review.plan.applyingEditableReviewText(approvedText)
     guard !plan.steps.isEmpty else { throw AIHandoffMenuPrepPlanImportError.emptyPlan }
     try database.write { db in
       try MenuRepository.applyPrepPlan(plan, to: review.menuID, in: db, now: now)
     }
-    self.review = nil
+  }
+
+  func commitLearnings(_ review: AIHandoffMenuPrepPlanReview, approvedText: String) throws {
+    let learnings = AIHandoffReturn.learningBullets(from: approvedText)
+    guard !learnings.isEmpty else { throw AIHandoffIntentImportError.emptyPlan }
+    try database.write { db in
+      for text in learnings {
+        try LearningRepository.create(
+          Learning(
+            id: uuid(),
+            sourceType: .menu,
+            sourceID: review.menuID,
+            text: text,
+            provenance: .externalHandoff,
+            dateCreated: now,
+            dateModified: now
+          ),
+          in: db
+        )
+      }
+    }
   }
 
   func discard(_ review: AIHandoffMenuPrepPlanReview) {
@@ -57,16 +103,24 @@ final class HandoffReviewCoordinator {
 struct HandoffReviewSheet: View {
   let coordinator: HandoffReviewCoordinator
   let review: AIHandoffMenuPrepPlanReview
+  @State private var items: [ChatApplyReviewItem]
+
+  init(coordinator: HandoffReviewCoordinator, review: AIHandoffMenuPrepPlanReview) {
+    self.coordinator = coordinator
+    self.review = review
+    _items = State(initialValue: coordinator.reviewItems(for: review))
+  }
 
   var body: some View {
     @Bindable var coordinator = coordinator
 
     RecipeCollectionReviewSheet(
-      items: [coordinator.reviewItem(for: review)],
+      items: items,
       committingItemID: nil,
-      commit: { _, approvedText in
+      commit: { item, approvedText in
         do {
-          try coordinator.commit(review, approvedText: approvedText)
+          try await item.commit(approvedText)
+          items.removeAll { $0.id == item.id }
           return true
         } catch {
           coordinator.errorMessage = String(describing: error)
@@ -74,11 +128,15 @@ struct HandoffReviewSheet: View {
           return false
         }
       },
-      discard: { _ in
-        coordinator.discard(review)
+      discard: { item in
+        items.removeAll { $0.id == item.id }
       },
-      discardAll: coordinator.discardAll,
-      onEmpty: coordinator.discardAll
+      discardAll: {
+        items = []
+      },
+      onEmpty: {
+        coordinator.discard(review)
+      }
     )
     .alert("Could Not Save Prep Plan", isPresented: $coordinator.isShowingError) {
       Button("OK") {}
