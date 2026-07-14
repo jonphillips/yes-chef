@@ -17,7 +17,7 @@ struct MenuPrepPlanStepView: View {
 
       VStack(alignment: .leading, spacing: 4) {
         Text(step.task)
-        if let serves { servesLabel(serves) }
+        if let serves = step.serves { servesLabel(serves) }
       }
       Spacer(minLength: 8)
     }
