@@ -116,7 +116,7 @@ struct ExportHandoffContext: AppIntent {
         return (
           item,
           MealPlanHandoffContext(
-            title: item.scheduledDate.formatted(date: .full, time: .omitted),
+            title: item.scheduledDate.formatted(date: .complete, time: .omitted),
             rows: rows,
             recipeMethodLinesByID: recipeMethodLinesByID
           )
