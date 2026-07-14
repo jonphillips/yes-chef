@@ -230,7 +230,10 @@ ChatGPT-action question (D5).
   Prompt → paste into the project by hand → Paste Prep Plan; (3) optional hybrid — Export → Copy to Clipboard
   → Start chat in project (fixed project, one shortcut per active project). Menu.externalProjectName is
   demoted from a routing key to an advisory reminder, and ExportHandoffContext gains a mode parameter
-  (default discuss) so a Shortcut can start a discussable session.
+  (default **immediate**) so a Shortcut can also start a discussable session. The default is immediate
+  because the Shortcuts surface exists for the headless `Ask ChatGPT` chain — a discuss prompt sent
+  headlessly returns prose the parser cannot use, while the reverse mispairing is harmless. The
+  **in-app Copy Prep Prompt button stays the discuss path** and takes no mode.
 - **OQ4 — token in the intent parameter vs. the text body.** `ImportHandoffResult(handoffID:)` gets the ID
   typed for the automated chain; the "Return to Yes Chef" / paste path recovers it from the stripped token
   line. Support both; the parameter wins when present.
