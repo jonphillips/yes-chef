@@ -6,7 +6,7 @@ import YesChefCore
 
 struct RecipeHandoffEntity: AppEntity, SyncableEntity {
   static let typeDisplayRepresentation: TypeDisplayRepresentation = "Recipe"
-  static var defaultQuery: RecipeHandoffEntityQuery { .init() }
+  static let defaultQuery = RecipeHandoffEntityQuery()
 
   let id: Recipe.ID
   let title: String
@@ -18,11 +18,11 @@ struct RecipeHandoffEntity: AppEntity, SyncableEntity {
 
 struct RecipeHandoffEntityQuery: EntityQuery {
   static var allowedExecutionTargets: IntentExecutionTargets { .main }
-  @Dependency(\.defaultDatabase) private var database
 
   init() {}
 
   func entities(for identifiers: [RecipeHandoffEntity.ID]) async throws -> [RecipeHandoffEntity] {
+    let database = DependencyValues._current.defaultDatabase
     return try await database.read { db in
       try Recipe
         .where { $0.id.in(identifiers) && !$0.archived }
@@ -32,6 +32,7 @@ struct RecipeHandoffEntityQuery: EntityQuery {
   }
 
   func suggestedEntities() async throws -> [RecipeHandoffEntity] {
+    let database = DependencyValues._current.defaultDatabase
     return try await database.read { db in
       try Recipe
         .where { !$0.archived }
@@ -50,7 +51,7 @@ private extension RecipeHandoffEntity {
 
 struct MenuHandoffEntity: AppEntity, SyncableEntity {
   static let typeDisplayRepresentation: TypeDisplayRepresentation = "Menu"
-  static var defaultQuery: MenuHandoffEntityQuery { .init() }
+  static let defaultQuery = MenuHandoffEntityQuery()
 
   let id: Menu.ID
   let title: String
@@ -62,11 +63,11 @@ struct MenuHandoffEntity: AppEntity, SyncableEntity {
 
 struct MenuHandoffEntityQuery: EntityQuery {
   static var allowedExecutionTargets: IntentExecutionTargets { .main }
-  @Dependency(\.defaultDatabase) private var database
 
   init() {}
 
   func entities(for identifiers: [MenuHandoffEntity.ID]) async throws -> [MenuHandoffEntity] {
+    let database = DependencyValues._current.defaultDatabase
     return try await database.read { db in
       try Menu
         .where { $0.id.in(identifiers) }
@@ -76,6 +77,7 @@ struct MenuHandoffEntityQuery: EntityQuery {
   }
 
   func suggestedEntities() async throws -> [MenuHandoffEntity] {
+    let database = DependencyValues._current.defaultDatabase
     return try await database.read { db in
       try Menu.fetchAll(db)
         .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
@@ -92,7 +94,7 @@ private extension MenuHandoffEntity {
 
 struct MealPlanHandoffEntity: AppEntity, SyncableEntity {
   static let typeDisplayRepresentation: TypeDisplayRepresentation = "Meal Plan"
-  static var defaultQuery: MealPlanHandoffEntityQuery { .init() }
+  static let defaultQuery = MealPlanHandoffEntityQuery()
 
   let id: MealPlanItem.ID
   let title: String
@@ -109,11 +111,11 @@ struct MealPlanHandoffEntity: AppEntity, SyncableEntity {
 
 struct MealPlanHandoffEntityQuery: EntityQuery {
   static var allowedExecutionTargets: IntentExecutionTargets { .main }
-  @Dependency(\.defaultDatabase) private var database
 
   init() {}
 
   func entities(for identifiers: [MealPlanHandoffEntity.ID]) async throws -> [MealPlanHandoffEntity] {
+    let database = DependencyValues._current.defaultDatabase
     return try await database.read { db in
       try MealPlanItem
         .where { $0.id.in(identifiers) }
@@ -123,6 +125,7 @@ struct MealPlanHandoffEntityQuery: EntityQuery {
   }
 
   func suggestedEntities() async throws -> [MealPlanHandoffEntity] {
+    let database = DependencyValues._current.defaultDatabase
     return try await database.read { db in
       try MealPlanItem.fetchAll(db)
         .sorted { $0.scheduledDate < $1.scheduledDate }

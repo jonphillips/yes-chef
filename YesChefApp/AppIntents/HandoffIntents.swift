@@ -8,9 +8,6 @@ struct ExportHandoffContext: AppIntent {
   static let title: LocalizedStringResource = "Export Handoff Context"
   static let description = IntentDescription("Export a menu context for an external assistant.")
   static var allowedExecutionTargets: IntentExecutionTargets { .main }
-  @Dependency(\.date.now) private var now
-  @Dependency(\.defaultDatabase) private var database
-  @Dependency(\.uuid) private var uuid
 
   @Parameter(title: "Source", requestValueDialog: "What should Yes Chef hand off?")
   var source: HandoffSource
@@ -26,6 +23,10 @@ struct ExportHandoffContext: AppIntent {
   }
 
   func perform() async throws -> some ReturnsValue<HandoffExport> & ProvidesDialog {
+    let now = DependencyValues._current.date.now
+    let database = DependencyValues._current.defaultDatabase
+    let uuid = DependencyValues._current.uuid
+
     guard case let .menu(menu) = source else {
       throw HandoffIntentSurfaceError.sourceNotAvailableYet
     }
@@ -69,9 +70,6 @@ struct ImportHandoffResult: AppIntent {
   static let title: LocalizedStringResource = "Import Handoff Result"
   static let description = IntentDescription("Open a returned external-assistant handoff for review.")
   static var allowedExecutionTargets: IntentExecutionTargets { .main }
-  @Dependency(\.date.now) private var now
-  @Dependency(\.defaultDatabase) private var database
-  @Dependency(\.handoffReviewCoordinator) private var handoffReviewCoordinator
 
   @Parameter(title: "Handoff ID")
   var handoffID: String?
@@ -91,6 +89,10 @@ struct ImportHandoffResult: AppIntent {
   }
 
   func perform() async throws -> some OpensIntent & ProvidesDialog {
+    let now = DependencyValues._current.date.now
+    let database = DependencyValues._current.defaultDatabase
+    let handoffReviewCoordinator = DependencyValues._current.handoffReviewCoordinator
+
     let parsedHandoffID: UUID?
     if let handoffID {
       guard let value = UUID(uuidString: handoffID) else {
