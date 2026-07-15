@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 15, 2026 (ADR-0039 **D5** — the prep-plan *tasks-never-choreography* prompt amendment — architect-approved, package tests **green** (18/18), PR #188 (device-pass + merge pending, Jon); Next Up = **ADR-0039 Recipe Playbook region** (D1/D2 + OQ1/OQ2) — the anchor UI slice of the now-building Playbook milestone: the recipe gains a third peer region **Ingredients · Directions · Playbook** and the "thinking" content moves out of the cook body).
+Last updated: July 15, 2026 (ADR-0039 **D1/D2 + OQ1/OQ2** — the Recipe Playbook region — architect-approved, app-build-gate **green** (BUILD SUCCEEDED after the architect fixed 4 App-target compile errors invisible to `check-drift.sh`), Jon device-pass **done**, PR #189 (merge pending, Jon); Next Up = **ADR-0039 D3** — the "Ask" slide-over + chat demotion: retire the `ChatWorkspaceDivider`, make the in-app chat a secondary slide-over from the Playbook header, ChatGPT handoff primary. This is the slice that removes the doubled-up AI column the intermediate D1/D2 state leaves behind).
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,40 +21,29 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md) Recipe Playbook
-region (D1/D2 + OQ1/OQ2, Amendment 1).** The anchor UI slice of the now-building Playbook milestone (D5, the
-prompt amendment, shipped in PR #188). The recipe gains a **third peer region — Ingredients · Directions ·
-Playbook** — into which the "thinking" content moves out of the cook body. **App-layer only — no schema /
-migration:** `Recipe.makeAhead` (`String?`) stays the **canonical** make-ahead store. This requires Codex's
-elevated generic iOS build; package tests and `swiftc -parse` do not compile the App target. If that build
-cannot reach the compiler, the architect runs it locally before approval — see the Verification Pattern.
+**Live dispatch target — [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md) D3 — the "Ask"
+slide-over + chat demotion.** With D1/D2 shipped (PR #189), the recipe now has the three-region model, but the
+wide layout still hosts the **old `ChatWorkspaceSplit` + draggable `ChatWorkspaceDivider`**: the Cook/Plan toggle
+merely flips its detent (Cook → `readerOnly` collapses the chat column; Plan → `balanced` re-expands it). That
+leaves the AI in **two places at once** — the standing chat column *and* the Playbook header's Copy-Prompt
+handoff. D3 collapses that. **App-layer — no schema/migration expected.**
 
-**The three-region model (Amendment 1 — device decides how many are co-visible):**
-- **Compact** (iPhone / iPad-narrow / macOS-narrow): add a **third case** to the `CompactSection` `.segmented`
-  `Picker` (`RecipeDetailView.swift:525`) → `Ingredients · Directions · Playbook`. No iPad-only idiom, so the
-  region scales down cleanly ([[macos-longterm-target]]).
-- **Wide iPad**: pin **Ingredients as a stable ⅓ anchor**; a **Cook / Plan toggle** swaps the other ⅔ between
-  **Directions** (Cook) and **Playbook** (Plan), setting preset `ChatWorkspaceDetent` detents (reuse the
-  metrics). See the D3 coupling flag below before retiring the manual divider.
+**What D3 does ([ADR-0039 §D3 + Amendment 1](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#L59)):**
+- **Retire the manual `ChatWorkspaceDivider`** on wide. Its old reader-vs-chat resize job is gone; a free drag
+  invites an "any blend" state that contradicts the bimodal thinking-vs-doing axis. The Cook/Plan toggle is now
+  the only wide-mode control.
+- **Demote the in-app chat to "the quick one" — a true slide-over "Ask"**, decoupled from any resize bar,
+  invoked from the **Playbook column header**. On-device/metered ([[yeschef-onbard-model-tier]]); for the cheap
+  and instant (*"what can I sub for gochujang?"*).
+- **"Hand off to ChatGPT" (ADR-0038 Copy Prompt) is the primary affordance**, also owned by the Playbook header —
+  flat-rate, deep, multi-turn. The header owns **both** tiers; make the cost ladder legible in the UI
+  ([[personal-app-latency-tolerance]]).
 
-**Full content move (OQ1 — body shows *nothing*, no compact summary).** Cut from `directionsColumn`
-(`RecipeDetailView.swift:542`) into the Playbook: **Make-ahead**, **Notes** (reader feedback + other
-`RecipeNote`), **Chef It Up**, **Serve With**. Stays in Directions: Instructions, the active-variation method
-note, Workbench candidate links. Playbook sections are **collapsible**, each header carrying a **filled/empty
-content indicator** so you can see what's populated without expanding. (A first brick already landed — the
-persistent Make-ahead header, PR #186.)
+**Verification:** App-layer SwiftUI — the architect's local `generic/platform=iOS` build is **required evidence**
+(see Verification Pattern; D1/D2 shipped 4 compile errors past `check-drift.sh` because it compiles only the
+package — [[codex-build-excuse-reproduce]]).
 
-**Sequencing flag — the wide divider retirement leans on D3.** Amendment 1 retires the manual
-`ChatWorkspaceDivider` on wide "now that 'Ask' is a slide-over" — i.e. the chat pane's reader-vs-chat job only
-vacates once **D3 ("Ask" slide-over + chat demotion)** relocates the chat. **Recommended split:** land the
-**compact third segment + full content move** first (self-contained, never touches the chat pane), then the
-**wide Cook/Plan toggle**; keep `ChatWorkspaceDivider` until D3 actually moves the chat out, or fold the divider
-retirement into D3. **Confirm this split with Jon before dispatching the wide half** — do not retire the divider
-in the same slice that still hosts the chat.
-
-**Queued behind it — the remaining ADR-0039 UI slices (each its own Jon-gated dispatch, in likely order):**
-- **"Ask" slide-over + chat demotion** (D3) — the in-app chat becomes the secondary "quick one" slide-over;
-  "Hand off to ChatGPT" is the primary affordance; the draggable divider's old reader-vs-chat job retires.
+**Queued behind it — the remaining ADR-0039 UI slice (its own Jon-gated dispatch):**
 - **Menu launcher mode** (D4/OQ3) — delete the menu's third column, foreground the dish list with collapsible
   days (collapsed by default once the service date is today-or-past), collapse the prep plan near service.
 
