@@ -9,6 +9,30 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0040 — Editable-at-the-grain, S3 (surface menu edit outcomes / lossless-or-**loud**)
+
+**✅ architect-approved + app-build-gate green — 2026-07-15. Jon device-pass + merge pending.** yes-chef PR
+[#187](https://github.com/jonphillips/yes-chef/pull/187).
+[ADR-0040 S3](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md): the **silent-success** half of the
+lossless-or-loud pass — every direct menu edit path now ends in a visible outcome. **App-layer only — no core /
+schema / migration.**
+
+**Direct edits confirm.** Prep-step create/edit/delete/reorder and learning edit/delete now post a transient
+success toast via the shared `AppToastCenter` (threaded into `MenuLibraryModel` + `MenuDetailModel`); failures
+keep the standard error surface (`MenuDetailModel+PrepPlanEditing.swift`).
+
+**No-ops go loud.** A reorder that can't move (`PrepPlanStepRepository.reorder` → `false`) now raises "already at
+the beginning/end of the plan" instead of silently accepting it; a blank learning edit raises an error instead
+of silently returning; empty/whitespace handoff-result and recipe-URL pastes (`HandoffInAppTransport`,
+`RecipeCaptureModel.pastedText`) become visible errors instead of `guard let … else { return }` invisibility —
+the S3a device-pass failure mode where "did nothing," "worked invisibly," and "wrong build" were
+indistinguishable.
+
+**Build note.** Codex's one generic-build attempt caught a real `toastCenter` `private`-protection error, which
+was fixed; the architect re-ran the generic app build locally (`generic/platform=iOS`, `BUILD SUCCEEDED`, 0
+errors) as the approval gate.
+
+---
 ## ADR-0038 — External-LLM handoff, S3c (in-app door) + Amendment 2
 
 **✅ DONE — architect-approved + Jon device-passed 2026-07-15.** yes-chef PR
