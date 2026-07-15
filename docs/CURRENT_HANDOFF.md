@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 15, 2026 (ADR-0039 **D3** — the "Ask" chat demotion — architect-approved, app-build-gate **green** (architect's local `generic/platform=iOS` → BUILD SUCCEEDED), Jon device-pass done, **merged** (PR #190). The wide recipe `ChatWorkspaceSplit` + draggable divider are **retired** and the Playbook header now owns both AI tiers — the doubled-up AI column from the D1/D2 intermediate state is gone. Next Up = **ADR-0039 D3 follow-on** — build the *true* "Ask" slide-over (Amendment 1; D3 shipped it as the reused sheet) with the two PR-#190 review-polish notes folded in).
+Last updated: July 15, 2026 (ADR-0039 **D3 follow-on** — the true "Ask" slide-over (native trailing inspector on wide iPad) + Playbook-header polish — architect-approved, app-build-gate **green** (local `generic/platform=iOS` → BUILD SUCCEEDED), Jon device-pass **done**, PR #191 (merge pending, Jon). Ask is now a non-modal companion (tap-to-toggle, active-state ring), separated from the ChatGPT copy/paste cluster. Next Up = **ADR-0039 D4/OQ3** — Menu launcher mode: delete the menu's standing AI third column, foreground the dish list with collapsible days (collapsed once the service date is today-or-past), collapse the prep plan near service. This is the **last ADR-0039 UI slice** — the recipe side is complete).
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,39 +21,27 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md) D3 follow-on — the
-*true* "Ask" slide-over + Playbook-header polish.** D3 (PR #190) demoted the in-app chat and retired the wide
-`ChatWorkspaceSplit` + draggable divider, but shipped "Ask" by **reusing the existing recipe-scoped `.sheet`**
-(`model.chatButtonTapped` → `.sheet(item: $model.destination.chat)`).
-[ADR-0039 Amendment 1](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#L59) specifies "Ask" as **a true
-slide-over, decoupled from any resize bar** — an edge-anchored companion panel, not a modal bottom sheet. This
-slice builds that presentation and folds in the two PR-#190 review notes. **App-layer — no schema/migration
-expected.**
+**Live dispatch target — [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#L72) D4/OQ3 — Menu
+launcher mode.** The **last ADR-0039 UI slice** — the recipe side (D1/D2/D3 + follow-on) is done. A menu is a
+*thinking* artifact you don't execute (you execute its recipes), so its planning→launcher shift is **temporal,
+not spatial** — keyed off the **service date**, not a manual toggle ([[mode-trigger-date-vs-toggle]]). **App-layer
+— no schema/migration expected.**
 
-**What this slice does:**
-- **Build the true slide-over for "Ask" on wide iPad.** Replace the reused `.sheet` with an edge-anchored
-  slide-over companion so Ask reads as the lightweight, non-blocking "quick one" the ADR calls for (it should not
-  dim/steal the reader the way a modal sheet does). Keep the plain sheet on **compact**, where a side slide-over
-  has no room. The Playbook-header **Ask** button is already wired (`model.chatButtonTapped`); this is a
-  presentation change, not a new entry point. Leave the exact panel mechanics to the device pass — the bar is
-  "companion, not modal."
-- **Fold in — PR #190 review notes (both cosmetic, App-layer):**
-  1. **PasteButton styling** — `pasteResultButton` (`YesChefApp/RecipePlaybookView.swift:106`) has no
-     `buttonStyle` while its header siblings are `.borderedProminent` (handoff) / `.bordered` (Ask); the retired
-     `HandoffCopyPasteControls` group was uniformly `.bordered`. Give the PasteButton a matching style so the
-     header reads as one control cluster.
-  2. **"Playbook" vs "Plan" heading** — the new `.title.bold()` "Playbook" title
-     (`YesChefApp/RecipePlaybookView.swift:65`) sits directly under a segmented control labeled "Playbook"
-     (compact) / "Plan" (wide): mild redundancy in compact, a Plan/Playbook mismatch in wide. Resolve by dropping
-     the in-view title **or** aligning the wide segment label — decide which reads better on device.
+**What this slice does ([ADR-0039 §D4 + OQ3](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#L72)):**
+- **Delete the menu's standing AI third column** — the "seeded with…" chat/handoff panel, the "empty rent" from
+  the ADR's opening observation. The prep plan **keeps its primary middle-column placement** (a menu has no
+  Playbook column — it *is* one). The handoff/chat affordance becomes a **toolbar action or slide-in**, echoing
+  the recipe-side D3 demotion (Menu already carries a compact chat sheet + `chatButtonTapped`; trace its current
+  wide presentation first).
+- **Foreground the dish list as a launcher near service.** The dish list is always present with **collapsible
+  days**; days collapse **by default once the service date is today or in the past** (OQ3 — no unpredictable
+  proximity trigger, no new mode). Day-of, the job is *get me into the right recipe fast*.
+- **Collapse the prep plan near service.** Far from service the prep plan is the point; near service it yields
+  the foreground to the dish list.
 
 **Verification:** App-layer SwiftUI — the architect's local `generic/platform=iOS` build is **required evidence**
-(see Verification Pattern; D1/D2 shipped 4 compile errors past `check-drift.sh` because it compiles only the
-package — [[codex-build-excuse-reproduce]]).
-
-**Queued behind it — the remaining ADR-0039 UI slice (its own Jon-gated dispatch):**
-- **Menu launcher mode** (D4/OQ3) — delete the menu's third column, foreground the dish list with collapsible
-  days (collapsed by default once the service date is today-or-past), collapse the prep plan near service.
+(see Verification Pattern; App-target compile errors slip past `check-drift.sh`, which compiles only the package
+— [[codex-build-excuse-reproduce]]).
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**
