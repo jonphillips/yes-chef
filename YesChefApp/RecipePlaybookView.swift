@@ -62,7 +62,7 @@ struct RecipePlaybookView: View {
     _ title: String,
     isFilled: Bool,
     isExpanded: Binding<Bool>,
-    @ViewBuilder content: () -> Content
+    @ViewBuilder content: @escaping () -> Content
   ) -> some View {
     DisclosureGroup(isExpanded: isExpanded) {
       content()
@@ -73,7 +73,7 @@ struct RecipePlaybookView: View {
           .font(.title2.bold())
         Spacer()
         Image(systemName: isFilled ? "circle.fill" : "circle")
-          .foregroundStyle(isFilled ? .tint : .secondary)
+          .foregroundStyle(isFilled ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
           .accessibilityLabel(Text(isFilled ? "Contains content" : "Empty"))
       }
     }
