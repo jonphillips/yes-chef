@@ -5,7 +5,6 @@ import YesChefCore
 
 struct RecipeDetailView: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-  @AppStorage(ChatWorkspaceDetent.storageKey) private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   @State private var model: RecipeDetailModel
   @State private var handoffTransport = HandoffInAppTransport()
   let libraryModel: RecipeLibraryModel
@@ -86,12 +85,6 @@ struct RecipeDetailView: View {
           Label("Plan", systemImage: "calendar.badge.plus")
         }
         Button {
-          chatButtonTapped()
-        } label: {
-          Label("Chat", systemImage: "sparkles")
-        }
-        .disabled(model.detail == nil)
-        Button {
           model.openWorkbenchButtonTapped()
         } label: {
           Label("Workbench", systemImage: "hammer")
@@ -141,46 +134,17 @@ struct RecipeDetailView: View {
 
   @ViewBuilder
   private var detailContent: some View {
-    if isSplitEnabled, let detail = model.detail {
-      ChatWorkspaceSplit(
-        context: .recipe(RecipeChatRecipeContext(detail: model.displayDetail ?? detail)),
-        detentRaw: $chatWorkspaceDetentRaw,
-        applyActions: { chatModel in
-          model.applyActionCatalog(for: chatModel)
-        }
-      ) {
-        RecipeReaderView(
-          model: model,
-          handoffTransport: handoffTransport,
-          libraryModel: libraryModel,
-          onRecipeSelected: onRecipeSelected,
-          showsStartCookingButton: showsStartCookingButton,
-          chatWorkspaceDetentRaw: $chatWorkspaceDetentRaw
-        )
-      }
-    } else {
-      RecipeReaderView(
-        model: model,
-        handoffTransport: handoffTransport,
-        libraryModel: libraryModel,
-        onRecipeSelected: onRecipeSelected,
-        showsStartCookingButton: showsStartCookingButton
-      )
-    }
+    RecipeReaderView(
+      model: model,
+      handoffTransport: handoffTransport,
+      libraryModel: libraryModel,
+      onRecipeSelected: onRecipeSelected,
+      showsStartCookingButton: showsStartCookingButton
+    )
   }
 
   private var isSplitEnabled: Bool {
     UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass != .compact
-  }
-
-  private func chatButtonTapped() {
-    if isSplitEnabled {
-      chatWorkspaceDetentRaw = chatWorkspaceDetentRaw == ChatWorkspaceDetent.readerOnly.rawValue
-        ? ChatWorkspaceDetent.balanced.rawValue
-        : ChatWorkspaceDetent.readerOnly.rawValue
-    } else {
-      model.chatButtonTapped()
-    }
   }
 }
 
@@ -222,7 +186,6 @@ private struct RecipeReaderView: View {
   let libraryModel: RecipeLibraryModel
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
   let showsStartCookingButton: Bool
-  var chatWorkspaceDetentRaw: Binding<String>? = nil
 
   @State private var compactSection: CompactSection = .ingredients
   @State private var wideSection: WideSection = .cook
@@ -549,7 +512,11 @@ private struct RecipeReaderView: View {
     case .directions:
       directionsColumn
     case .playbook:
-      RecipePlaybookView(model: model, handoffTransport: handoffTransport)
+      RecipePlaybookView(
+        model: model,
+        handoffTransport: handoffTransport,
+        ask: model.chatButtonTapped
+      )
     }
   }
 
@@ -562,9 +529,6 @@ private struct RecipeReaderView: View {
       }
       .pickerStyle(.segmented)
       .padding()
-      .onChange(of: wideSection, initial: true) { _, section in
-        wideSectionChanged(section)
-      }
 
       Divider()
 
@@ -574,7 +538,11 @@ private struct RecipeReaderView: View {
           case .cook:
             directionsColumn
           case .plan:
-            RecipePlaybookView(model: model, handoffTransport: handoffTransport)
+            RecipePlaybookView(
+              model: model,
+              handoffTransport: handoffTransport,
+              ask: model.chatButtonTapped
+            )
           }
         }
         .padding()
@@ -595,16 +563,6 @@ private struct RecipeReaderView: View {
       if !model.workbenchCandidateLinks.isEmpty {
         WorkbenchCandidateLinksView(links: model.workbenchCandidateLinks, onRecipeSelected: onRecipeSelected)
       }
-    }
-  }
-
-  private func wideSectionChanged(_ section: WideSection) {
-    switch section {
-    case .cook:
-      // Cook favors an undistracted reader; planning restores the established thinking workspace.
-      chatWorkspaceDetentRaw?.wrappedValue = ChatWorkspaceDetent.readerOnly.rawValue
-    case .plan:
-      chatWorkspaceDetentRaw?.wrappedValue = ChatWorkspaceDetent.balanced.rawValue
     }
   }
 
