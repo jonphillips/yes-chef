@@ -167,7 +167,7 @@ that.
 - **Prove it:** the S3a device pass returns learnings onto a sample menu; this slice is what lets Jon *see*
   them, prune the bad ones, and delete the sample menu clean.
 
-### S3b — generalize the serializer to Recipe + MealPlan (follows the S3a Learnings surface) — **in review (PR #185)**
+### S3b — generalize the serializer to Recipe + MealPlan (follows the S3a Learnings surface) ✅ **DONE (PR #185 → DONE-LOG)**
 
 - Recipe + MealPlan context builders on the `MenuChatContext` pattern (frontier budget, method, uncapped
   ingredients, an intro prompt tuned from `tasteProfile`/AI settings, asking for review-text output).
@@ -177,7 +177,7 @@ that.
 - **Learnings ride along free** on the S3a machinery — and make the hand-off useful on sources with no
   structured deliverable field at all.
 
-### S3c — the **in-app door** for Recipe + MealPlan (Amendment 2; app-layer only)
+### S3c — the **in-app door** for Recipe + MealPlan (Amendment 2; app-layer only) ← **live**
 
 The dogfood finding S3b exposed: recipe/meal-plan handoffs shipped with **no in-app entry point**, so the only
 door is a hand-built Shortcut — and the Immediate autopilot it runs throws away the discussion that is the

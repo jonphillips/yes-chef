@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 14, 2026 (ADR-0040 **S1 + S2** approved + device-passed PR #184 → DONE-LOG; Next Up = **ADR-0038 S3b** — generalize the two-part return contract to Recipe + MealPlan, inheriting editable-at-grain).
+Last updated: July 14, 2026 (ADR-0038 **S3b** shipped PR #185 → DONE-LOG; Next Up = **ADR-0038 S3c** — the in-app handoff door for Recipe + MealPlan, per Amendment 2).
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,25 +21,25 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0038](decisions/ADR-0038-external-llm-handoff.md) External-LLM handoff, S3b**
-([`efforts/adr-0038-external-llm-handoff.md`](efforts/adr-0038-external-llm-handoff.md)).
-**Generalize the two-part return contract to Recipe + MealPlan.** S3a shipped the `(Deliverable?, Learnings?)`
-contract and the synced `Learning` table; ADR-0040 S1+S2 (PR #184 → DONE-LOG) made that content **editable at
-row grain** and gave learnings a reader. Both were proven on **Menu only** — because Menu's context serializer
-already existed. S3b gives the other two sources theirs, and it **inherits** editable-at-grain rather than
-adding new BLOBs:
+**Live dispatch target — [ADR-0038 Amendment 2](decisions/ADR-0038-external-llm-handoff.md) External-LLM
+handoff, S3c** ([`efforts/adr-0038-external-llm-handoff.md`](efforts/adr-0038-external-llm-handoff.md)).
+**Give Recipe + MealPlan an in-app handoff door.** S3b (PR #185 → DONE-LOG) shipped the two-part contract for
+those two sources, but **intent-only** — the sole entry point is a hand-built Shortcut running the *Immediate*
+autopilot, which discards the discussion that is the point of a make-ahead hand-off (the dogfood finding behind
+Amendment 2). S3c makes an in-app door the **primary** path; the App Intent stays the hands-free bonus (D4,
+amended). **App-layer only — no core / schema / migration:**
 
-- **Context builders** for Recipe + MealPlan on the `MenuChatContext` pattern (frontier budget, method,
-  uncapped ingredients, an intro prompt tuned from `tasteProfile`/AI settings, asking for review-text output).
-- **Commit shape per source — classify it first** ([[chat-verb-commit-shapes]]): recipe → `Recipe.makeAhead`
-  (and adjust/variation, ADR-0021/0023); meal-plan → make-ahead strategy
-  ([ADR-0013](decisions/ADR-0013-meal-planner-actionable-chat.md)). **Do not invent a new BLOB the human can
-  only regenerate** — if a deliverable is a list the human will edit one of, it is rows (ADR-0040 D1).
-- **Learnings ride along free** on the S3a machinery — which is what makes the handoff worth doing on a source
-  with **no structured deliverable field at all**. Reuse the S1 learnings surface; it is already source-typed.
-- **Read [ADR-0040](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md) before writing any parser** — the
-  lossless-or-loud rule (D3) and the "human edits fields, not the wire format" rule (D2) are now precedent, not
-  aspiration.
+- **In-app Copy-Prompt / Paste-Result** on `RecipeDetailView` and the meal-plan day view, mirroring Menu's
+  `Copy Prep Prompt` / `Paste Prep Plan` (`MenuViews.swift`) — **discuss-first**. Copy emits the S3b tokenized
+  prompt (`YC-HANDOFF:` header + the source's `DeliverableFormat`); Paste feeds
+  `AIHandoffIntentImport.stageReview` → the review sheet.
+- **Route the paste through the review sheet** (editable-at-grain, lossless-or-loud, Learnings ride along) —
+  strictly better than Menu's older direct-write manual path; **opportunistically move Menu's buttons onto the
+  same review-routed path** while here.
+- **Secondary:** register an `AppShortcut` so export/import reach Action Button / Spotlight / Siri without a
+  hand-built shortcut.
+- **Defer** per-section prompt checkboxes (add only if the default make-ahead context proves wrong); the
+  `Ask ChatGPT` double-fire is a Shortcuts / ChatGPT-action app-switch artifact, not ours.
 
 **Then [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md)** (the Playbook column) —
 milestone-sized, Jon-gated, a **design conversation, not a Codex dispatch**. The learnings corpus is now real
@@ -88,16 +88,6 @@ promotion locks the record type permanently); and note the app target
 
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](DONE-LOG.md).
-
-**ADR-0038 S3c — in-app handoff door for Recipe + MealPlan**
-([ADR-0038 Amd 2](decisions/ADR-0038-external-llm-handoff.md) +
-[`efforts/adr-0038-external-llm-handoff.md`](efforts/adr-0038-external-llm-handoff.md)) — the everyday entry
-point the intent-only S3b lacks. In-app **Copy-Prompt / Paste-Result** on recipe detail + the meal-plan day,
-**discuss-first**, the paste routed through `stageReview` → the review sheet (editable-at-grain,
-lossless-or-loud, Learnings ride along); opportunistically move Menu's manual buttons onto the same
-review-routed path. **App-layer only — no core / schema / migration.** Secondary: register an `AppShortcut` for
-Action Button / Spotlight / Siri. Defer per-section prompt checkboxes. Small, clean dispatch when Jon picks it.
-(Depends on S3b/PR #185 landing first.)
 
 **Recipe edit proposals** ([ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) +
 `efforts/recipe-edit-proposals.md`) — the "Adjust this recipe" verb; **S1 + S2 shipped** (overwrite
