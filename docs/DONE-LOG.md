@@ -9,6 +9,31 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0039 — D5, prep plans emit tasks, not choreography
+
+**✅ architect-approved + package tests green (18/18) — 2026-07-15. Jon device-pass + merge pending.** yes-chef
+PR [#188](https://github.com/jonphillips/yes-chef/pull/188).
+[ADR-0039 §D5](decisions/ADR-0039-playbook-column-thinking-vs-doing.md): the smallest-first opening slice of
+the Playbook milestone — both prep-plan prompt contracts now emit **separable, atomic, context-free tasks** and
+are explicitly forbidden from **choreography** (interleaving recipe instructions, coordinating concurrent
+cooking, or turning the plan into a merged mega-recipe). "The recipes hold the cooking." **Core-only — no app /
+schema / migration.**
+
+**Both contracts constrained.** `MenuPrepPlan.instructions` (`MenuPrepPlan.swift:293`) and the sibling
+`MealPlanMakeAheadStrategy.instructions` (`MealPlanMakeAheadStrategy.swift:183`) both drop the invitation to
+"invent grounded sequencing" and gain the tasks-never-choreography constraint plus grounded example tasks
+("Salt the chicken Wednesday", "Pull the beef to temp at 4"). Existing JSON shapes
+(`session`/`task`/`serves`/`sourceDish`) and the compose-from-stored-Make-Ahead behavior are preserved; the
+horizon-band session grouping (temporal bucketing, not step interleaving) stays. Realizes
+[[automation-decays-near-the-stove]].
+
+**Tested in Core.** Both package suites assert the positive constraint (`separable, atomic, context-free
+tasks`, `Do not generate choreography`, `The recipes hold the cooking`) and the menu suite pins the negative
+(`invent grounded sequencing` == false). `swift test` MenuPrepPlanTests + MealPlanMakeAheadStrategyTests, 18
+passed. Prompt-only steer — no schema/storage change, so a phrasing that underperforms is a regeneration away
+from reversible.
+
+---
 ## ADR-0040 — Editable-at-the-grain, S3 (surface menu edit outcomes / lossless-or-**loud**)
 
 **✅ architect-approved + app-build-gate green — 2026-07-15. Jon device-pass + merge pending.** yes-chef PR

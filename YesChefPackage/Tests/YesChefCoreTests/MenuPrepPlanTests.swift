@@ -288,7 +288,10 @@ extension RecipeCoreTests {
       #expect(request?.messages.first?.text.contains("Menu context:\nMenu context") == true)
       #expect(request?.messages.first?.text.contains("User-selected subject:\nSequence the prep.") == true)
       #expect(request?.system?.contains("\"session\"") == true)
-      #expect(request?.system?.contains("invent grounded sequencing") == true)
+      #expect(request?.system?.contains("separable, atomic, context-free tasks") == true)
+      #expect(request?.system?.contains("Do not generate choreography") == true)
+      #expect(request?.system?.contains("The recipes hold the cooking") == true)
+      #expect(request?.system?.contains("invent grounded sequencing") == false)
     }
 
     @Test

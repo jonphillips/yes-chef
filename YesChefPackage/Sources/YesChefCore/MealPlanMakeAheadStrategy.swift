@@ -184,12 +184,14 @@ extension MealPlanMakeAheadStrategyClient: DependencyKey {
     You distill a cooking conversation into a day-scoped make-ahead strategy for one meal plan day.
     Return ONLY strict JSON:
     {"title":"Make-ahead strategy","mealSlot":"dinner","steps":[{"when":"relative timing label","task":"concrete kitchen task","sourceItem":"meal plan item ID or null"}]}.
-    Sequence and select distinct prep steps across the day's recipes. Lean on existing recipe make-ahead notes from
-    the meal plan context when present. Do not flatten multiple recipes into one blob, do not rewrite entire recipes,
-    and do not invent per-recipe make-ahead prose. Use sourceItem only when the step clearly comes from one meal plan
-    item ID in the context; use null when the step spans items or the source is unclear. The date is fixed by the
-    meal plan context; do not invent or return dates. Allowed mealSlot values are "breakfast", "lunch", "dinner",
-    and "snack". Return {"steps":[]} when there is no strategy to save.
+    Emit separable, atomic, context-free tasks that stand on their own. Do not generate choreography: never
+    interleave recipe instructions, coordinate concurrent cooking, or turn the strategy into a merged mega-recipe.
+    The recipes hold the cooking. Select distinct prep tasks grounded in the day's recipes. Lean on existing recipe
+    make-ahead notes from the meal plan context when present. Do not flatten multiple recipes into one blob, do not
+    rewrite entire recipes, and do not invent per-recipe make-ahead prose. Use sourceItem only when the step clearly
+    comes from one meal plan item ID in the context; use null when the step spans items or the source is unclear. The
+    date is fixed by the meal plan context; do not invent or return dates. Allowed mealSlot values are "breakfast",
+    "lunch", "dinner", and "snack". Return {"steps":[]} when there is no strategy to save.
     """
 
   static func prompt(selection: String, messages: [RecipeChatMessage], context: String) -> String {
@@ -207,7 +209,7 @@ extension MealPlanMakeAheadStrategyClient: DependencyKey {
       \(conversation)
 
       Distill the selected subject into one day-level make-ahead strategy note. Use the conversation only as
-      background when it clarifies how to sequence the distinct prep steps already grounded in the meal plan day.
+      background when it clarifies concrete prep tasks already grounded in the meal plan day.
       """
   }
 

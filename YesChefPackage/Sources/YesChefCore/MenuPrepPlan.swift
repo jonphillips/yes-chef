@@ -294,10 +294,13 @@ extension MenuPrepPlanClient: DependencyKey {
     You weave a staged prep plan for one multi-day menu from the current menu context and conversation.
     Return ONLY strict JSON:
     {"steps":[{"session":"work-session label","task":"concrete kitchen task","serves":"human-readable meal or day this feeds, or null","sourceDish":"menu item UUID or null"}]}.
+    Emit separable, atomic, context-free tasks that stand on their own, such as "Salt the chicken Wednesday" or
+    "Pull the beef to temp at 4." Do not generate choreography: never interleave recipe instructions, coordinate
+    concurrent cooking, or turn the prep plan into a merged mega-recipe. The recipes hold the cooking.
     The menu context may include a Current prep plan. Treat it as the artifact being edited: preserve useful existing
     steps, apply the user's requested refinements, and return the full proposed replacement plan. Compose from stored
-    per-recipe Make-Ahead notes when present, and invent grounded sequencing, work sessions, and new prep steps from
-    the menu's dishes and conversation. Prefer the authored Make-Ahead notes when they are available.
+    per-recipe Make-Ahead notes when present, and invent grounded prep tasks and work sessions from the menu's dishes
+    and conversation. Prefer the authored Make-Ahead notes when they are available.
     Group related work under free-form session labels such as "Anytime, get ahead" or "Wednesday evening". Set serves
     to the meal or day each step feeds when useful.
     Use sourceDish only when the step clearly comes from one menu item ID in the context; use null when a step spans
@@ -319,7 +322,7 @@ extension MenuPrepPlanClient: DependencyKey {
       \(conversation)
 
       Refine the menu prep plan into a full replacement JSON object. Use any Current prep plan in the menu context as
-      the starting artifact, and use the conversation only when it clarifies the requested edits or sequencing.
+      the starting artifact, and use the conversation only when it clarifies the requested edits or concrete tasks.
       """
   }
 

@@ -121,7 +121,9 @@ extension RecipeCoreTests {
       expectNoDifference(request?.promptPreferenceKey, AIPromptPreferenceKind.makeAheadPrepPlan.rawValue)
       #expect(request?.messages.first?.text.contains("Meal plan day context:\nMeal plan day context") == true)
       #expect(request?.messages.first?.text.contains("User-selected subject:\nSequence the day.") == true)
-      #expect(request?.system?.contains("Sequence and select distinct prep steps") == true)
+      #expect(request?.system?.contains("separable, atomic, context-free tasks") == true)
+      #expect(request?.system?.contains("Do not generate choreography") == true)
+      #expect(request?.system?.contains("The recipes hold the cooking") == true)
       #expect(request?.system?.contains("Do not flatten multiple recipes into one blob") == true)
     }
 
