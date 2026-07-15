@@ -914,6 +914,13 @@ final class RecipeDetailModel {
 
   func chatButtonTapped() {
     guard let detail else { return }
+    // Toggle: Ask is a non-modal companion on wide iPad, so its trigger stays live
+    // beside the open panel. Re-tapping closes it (rather than rebuilding the model and
+    // discarding the scratch transcript). See the Menu recipe-browser toggle for the pattern.
+    if destination.chat != nil {
+      destination = nil
+      return
+    }
     destination = .chat(RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail))))
   }
 

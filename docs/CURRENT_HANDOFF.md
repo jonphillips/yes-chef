@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 15, 2026 (ADR-0039 **D3** — the "Ask" chat demotion — architect-approved, app-build-gate **green** (architect's local `generic/platform=iOS` → BUILD SUCCEEDED), Jon device-pass + merge pending, PR #190. The wide recipe `ChatWorkspaceSplit` + draggable divider are **retired** and the Playbook header now owns both AI tiers — the doubled-up AI column from the D1/D2 intermediate state is gone. Next Up = **ADR-0039 D3 follow-on** — build the *true* "Ask" slide-over (Amendment 1; D3 shipped it as the reused sheet) with the two PR-#190 review-polish notes folded in).
+Last updated: July 15, 2026 (ADR-0039 **D3** — the "Ask" chat demotion — architect-approved, app-build-gate **green** (architect's local `generic/platform=iOS` → BUILD SUCCEEDED), Jon device-pass done, **merged** (PR #190). The wide recipe `ChatWorkspaceSplit` + draggable divider are **retired** and the Playbook header now owns both AI tiers — the doubled-up AI column from the D1/D2 intermediate state is gone. Next Up = **ADR-0039 D3 follow-on** — build the *true* "Ask" slide-over (Amendment 1; D3 shipped it as the reused sheet) with the two PR-#190 review-polish notes folded in).
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and

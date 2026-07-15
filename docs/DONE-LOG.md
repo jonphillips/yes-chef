@@ -12,7 +12,7 @@ Newest first.
 ## ADR-0039 — D3, the "Ask" chat demotion + retiring the wide chat split
 
 **✅ architect-approved + app-build-gate green (local `generic/platform=iOS` → BUILD SUCCEEDED) — 2026-07-15.
-Jon device-pass + merge pending.** yes-chef PR [#190](https://github.com/jonphillips/yes-chef/pull/190).
+Jon device-pass done, merged.** yes-chef PR [#190](https://github.com/jonphillips/yes-chef/pull/190).
 [ADR-0039 §D3 + Amendment 1](decisions/ADR-0039-playbook-column-thinking-vs-doing.md): collapses the
 transitional AI-in-two-places state D1/D2 left behind. The always-on `ChatWorkspaceSplit` + draggable
 `ChatWorkspaceDivider` is **removed from the recipe detail** (still live in Menu/Calendar/Workbench); the
