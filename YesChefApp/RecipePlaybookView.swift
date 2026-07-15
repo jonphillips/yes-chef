@@ -4,6 +4,7 @@ import YesChefCore
 struct RecipePlaybookView: View {
   let model: RecipeDetailModel
   let handoffTransport: HandoffInAppTransport
+  let ask: () -> Void
 
   @State private var isMakeAheadExpanded = true
   @State private var isNotesExpanded = true
@@ -18,6 +19,7 @@ struct RecipePlaybookView: View {
     let otherNotes = visibleNotes.filter { $0.noteType != .readerFeedback }
 
     VStack(alignment: .leading, spacing: 18) {
+      playbookHeader
       playbookSection(
         "Make-ahead",
         isFilled: model.makeAhead != nil,
@@ -58,6 +60,58 @@ struct RecipePlaybookView: View {
     }
   }
 
+  private var playbookHeader: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Playbook")
+        .font(.title.bold())
+
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 8) {
+          handoffButton
+          askButton
+          pasteResultButton
+        }
+
+        VStack(alignment: .leading, spacing: 8) {
+          handoffButton
+          HStack(spacing: 8) {
+            askButton
+            pasteResultButton
+          }
+        }
+      }
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("Playbook actions")
+  }
+
+  private var handoffButton: some View {
+    Button {
+      Task {
+        await handoffTransport.copyPrompt(for: .recipe(model.recipeID))
+      }
+    } label: {
+      Label("Hand off to ChatGPT", systemImage: "sparkles.square.filled.on.square")
+    }
+    .buttonStyle(.borderedProminent)
+  }
+
+  private var askButton: some View {
+    Button(action: ask) {
+      Label("Ask", systemImage: "sparkles")
+    }
+    .buttonStyle(.bordered)
+  }
+
+  private var pasteResultButton: some View {
+    PasteButton(payloadType: String.self) { results in
+      Task {
+        await handoffTransport.pastedResultsReceived(results, source: .recipe(model.recipeID))
+      }
+    }
+    .accessibilityLabel("Paste handoff result")
+  }
+
   private func playbookSection<Content: View>(
     _ title: String,
     isFilled: Bool,
@@ -84,11 +138,6 @@ struct RecipePlaybookView: View {
     VStack(alignment: .leading, spacing: 12) {
       HStack {
         Spacer()
-        HandoffCopyPasteControls(
-          source: .recipe(model.recipeID),
-          transport: handoffTransport
-        )
-        .buttonStyle(.bordered)
         if makeAhead != nil {
           Button(role: .destructive) {
             model.clearMakeAheadButtonTapped()
