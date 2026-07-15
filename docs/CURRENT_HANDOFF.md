@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 14, 2026 (ADR-0038 **S3b** shipped PR #185 → DONE-LOG; Next Up = **ADR-0038 S3c** — the in-app handoff door for Recipe + MealPlan, per Amendment 2).
+Last updated: July 15, 2026 (ADR-0038 **S3c** shipped + Jon device-passed PR #186 → DONE-LOG; Next Up = **ADR-0040 S3** — the lossless-or-**loud** pass, remaining silent-success scope only).
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,36 +21,24 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0038 Amendment 2](decisions/ADR-0038-external-llm-handoff.md) External-LLM
-handoff, S3c** ([`efforts/adr-0038-external-llm-handoff.md`](efforts/adr-0038-external-llm-handoff.md)).
-**Give Recipe + MealPlan an in-app handoff door.** S3b (PR #185 → DONE-LOG) shipped the two-part contract for
-those two sources, but **intent-only** — the sole entry point is a hand-built Shortcut running the *Immediate*
-autopilot, which discards the discussion that is the point of a make-ahead hand-off (the dogfood finding behind
-Amendment 2). S3c makes an in-app door the **primary** path; the App Intent stays the hands-free bonus (D4,
-amended). **App-layer only — no core / schema / migration:**
+**Live dispatch target — [ADR-0040 S3](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md), the
+lossless-or-**loud** pass.** **Every import *and edit* path ends in a visible outcome — what landed, or what
+didn't and why.** The **parser-surfacing half is already done**: the handoff review sheet flags unparsed lines
+and refuses a lossy commit (`HandoffReviewCoordinator`, S3a/S3b "at the boundary not just the UI"), and S3c
+retired Menu's `pastePrepPlanButtonTapped` empty-clipboard no-op and added the unmatched-result alert. What
+remains is the **silent-success** side. **App-layer only — no core / schema / migration:**
 
-- **In-app Copy-Prompt / Paste-Result** on `RecipeDetailView` and the meal-plan day view, mirroring Menu's
-  `Copy Prep Prompt` / `Paste Prep Plan` (`MenuViews.swift`) — **discuss-first**. Copy emits the S3b tokenized
-  prompt (`YC-HANDOFF:` header + the source's `DeliverableFormat`); Paste feeds
-  `AIHandoffIntentImport.stageReview` → the review sheet.
-- **Route the paste through the review sheet** (editable-at-grain, lossless-or-loud, Learnings ride along) —
-  strictly better than Menu's older direct-write manual path; **opportunistically move Menu's buttons onto the
-  same review-routed path** while here.
-- **Secondary:** register an `AppShortcut` so export/import reach Action Button / Spotlight / Siri without a
-  hand-built shortcut.
-- **Defer** per-section prompt checkboxes (add only if the default make-ahead context proves wrong); the
-  `Ask ChatGPT` double-fire is a Shortcuts / ChatGPT-action app-switch artifact, not ours.
+- **Confirm direct edits.** A learning edit/delete (ADR-0040 S1, menu detail) and a prep-step
+  create/edit/delete/reorder (`MenuModels.swift` step CRUD) currently save with **no visible confirmation** —
+  the row just appears or doesn't. End each in a visible outcome (a transient success indicator; the standard
+  error surface on failure).
+- **Sweep remaining silent no-ops.** Audit the paste/edit paths for lingering `guard let … else { return }`
+  invisibility (empty clipboard, missed iOS *Allow Paste*) — the S3a device-pass failure mode where "it did
+  nothing," "it worked invisibly," and "wrong build" all looked identical.
 
 **Then [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md)** (the Playbook column) —
 milestone-sized, Jon-gated, a **design conversation, not a Codex dispatch**. The learnings corpus is now real
 and editable; design the Playbook once it has content to hold.
-
-**Deferred — [ADR-0040 S3](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md), the lossless-or-**loud**
-pass** (not yet queued; fold in when a handoff/paste slice is already open). Two known **silent** paths remain:
-(1) a learning/step edit saves with **no confirmation** — it just appears or doesn't; (2) "Paste Prep Plan"
-**silently no-ops** on an empty clipboard or a missed iOS *Allow Paste* prompt (`MenuViews.swift`
-`pastePrepPlanButtonTapped`, `guard let text … else { return }`). Every import path should end in a visible
-outcome.
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**
