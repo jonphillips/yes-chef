@@ -180,20 +180,28 @@ These are now project rules, not preferences:
 7. Add regression tests when a review identifies a data-preservation bug. At a
    minimum, test stable IDs and preservation of out-of-scope structured data.
 8. Codex owns compiler/package verification and should not spend project time on
-   brittle simulator-driving or screenshot automation unless explicitly asked.
-   Jon will do the primary UI testing pass, even when that makes the loop slower.
-9. Verify lean by default: build once + `scripts/check-drift.sh`, then hand off. Do **not**
-   install/launch on simulators as a routine step — that build/install loop is the main time
-   cost and Jon does the device pass on `iPad Pro 13-inch (M5) (16GB)` and `iPhone 17 Pro`
-   regardless. Only boot/install a simulator when a change can't be confirmed from build +
-   tests, and say why. See the Verification Pattern in `CURRENT_HANDOFF.md`.
-   **Fail fast — one attempt, then stop.** A simulator that won't boot/install, or any Xcode/
-   toolchain trouble, is **never** a reason to retry with alternate incantations (different
-   `-destination`, `simctl erase`/`boot`, flag permutations). Make **one** attempt at the
-   required build; if it fails, paste the error and **stop** — do not try to repair the
-   toolchain or the simulator. Booting/installing sims is Jon's device pass, not a Codex problem
-   to grind on. Endless build/install retries are the specific token-and-time sink this rule exists
-   to prevent.
+   simulator-driving or screenshot automation unless explicitly asked. Jon will do the primary UI
+   testing pass, even when that makes the loop slower.
+9. Verify lean by default: `scripts/check-drift.sh` plus the relevant compiler build, then hand
+   off. `check-drift.sh` runs SwiftLint and `swift test --package-path YesChefPackage`; it does
+   **not** compile `YesChefApp/`. A green package build or `swiftc -parse` is therefore never
+   evidence that an App-layer change compiles.
+
+   - Any PR that touches `YesChefApp/` must run the generic device build through
+     `scripts/xcodebuild-summary.sh` with **elevated/unsandboxed permissions**:
+     `scripts/xcodebuild-summary.sh -scheme YesChef -destination 'generic/platform=iOS' -skipMacroValidation CODE_SIGNING_ALLOWED=NO build`.
+     This is a compile-only iOS build: it neither boots nor installs on a simulator.
+   - The default Codex sandbox can deny Xcode access to user-level caches, logs, and the
+     CoreSimulator service, then SIGTERM `xcodebuild` before the compiler starts. That is an
+     environment failure, not a valid app-build result; do not paste it as expected verification
+     or treat it as permission to skip the build. Run the exact generic command elevated from the
+     start.
+   - No target permutations, simulator resets, or install attempts. If the elevated generic build
+     still cannot reach the compiler, save/paste the full-log path and make the architect's local
+     generic build a required approval gate. If it reaches the compiler and reports source errors,
+     fix those errors and rerun the same command to verify the fix.
+
+   See the Verification Pattern in `CURRENT_HANDOFF.md` for the command sequence.
 
 ## Data Preservation Rules
 
@@ -229,11 +237,11 @@ or broad "hunt for drift" sweeps; code review should stay scoped to the diff.
 
 `check-drift.sh` runs `swift test` and covers the default slice — most work needs no
 `xcodebuild` at all (see guardrails #8/#9). Only run an app build when a change carries
-real app/UI compile risk, and when you do, run it through `scripts/xcodebuild-summary.sh`
-(same args as `xcodebuild`), never raw `xcodebuild` in chat. The wrapper writes the full
-log to a file and surfaces only errors/warnings/verdict, so build noise stays out of
-context. Reach for the raw, unfiltered log only while actively diagnosing a compiler
-failure.
+real app/UI compile risk, and when you do, run the elevated generic device build through
+`scripts/xcodebuild-summary.sh` (same args as `xcodebuild`), never raw `xcodebuild` in chat.
+The wrapper writes the full log to a file and surfaces only errors/warnings/verdict, so build
+noise stays out of context. Reach for the raw, unfiltered log only while actively diagnosing a
+compiler failure or an environment failure that prevented compilation.
 
 When completing a milestone slice as the coding worker, finish the handoff by committing,
 pushing the branch, and opening a pull request for Jon as architect unless explicitly told
