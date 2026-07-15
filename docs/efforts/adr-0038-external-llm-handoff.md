@@ -167,7 +167,7 @@ that.
 - **Prove it:** the S3a device pass returns learnings onto a sample menu; this slice is what lets Jon *see*
   them, prune the bad ones, and delete the sample menu clean.
 
-### S3b — generalize the serializer to Recipe + MealPlan (follows the S3a Learnings surface) ← **live**
+### S3b — generalize the serializer to Recipe + MealPlan (follows the S3a Learnings surface) — **in review (PR #185)**
 
 - Recipe + MealPlan context builders on the `MenuChatContext` pattern (frontier budget, method, uncapped
   ingredients, an intro prompt tuned from `tasteProfile`/AI settings, asking for review-text output).
@@ -176,6 +176,28 @@ that.
   shape first per [[chat-verb-commit-shapes]]).
 - **Learnings ride along free** on the S3a machinery — and make the hand-off useful on sources with no
   structured deliverable field at all.
+
+### S3c — the **in-app door** for Recipe + MealPlan (Amendment 2; app-layer only)
+
+The dogfood finding S3b exposed: recipe/meal-plan handoffs shipped with **no in-app entry point**, so the only
+door is a hand-built Shortcut — and the Immediate autopilot it runs throws away the discussion that is the
+point of a make-ahead hand-off. Fix the door, keep the intent as the bonus.
+
+- **Primary entry point** is an in-app **Copy-Prompt / Paste-Result** affordance on `RecipeDetailView` and the
+  meal-plan day view, mirroring Menu's `Copy Prep Prompt` / `Paste Prep Plan` — **discuss-first**. Copy emits
+  the S3b tokenized prompt (`YC-HANDOFF:` + the source's `DeliverableFormat`); Paste feeds
+  `AIHandoffIntentImport.stageReview` → the review sheet.
+- **Route the paste through the review sheet** (editable-at-grain, lossless-or-loud, Learnings ride along) —
+  strictly better than Menu's older direct-write manual path; **opportunistically move Menu's buttons onto the
+  same review-routed path** while here.
+- **A thin transport shell over the S3b core** (D1) — **app-layer only, no core / schema / migration.** The
+  App Intent stays the hands-free / cross-device path (D4, amended).
+- **Secondary:** register an `AppShortcut` so export/import reach Action Button / Spotlight / Siri without a
+  hand-built shortcut.
+- **Deferred:** per-section prompt scoping (add only if the default make-ahead context proves wrong); the
+  `Ask ChatGPT` double-fire is a Shortcuts / ChatGPT-action app-switch artifact, not ours.
+- **Prove it:** on-device — tap Copy Prompt on a recipe, alt-tab to ChatGPT, discuss, copy the reply, alt-tab
+  back, Paste Result → review sheet lands the make-ahead + any Learnings.
 
 **Batching ([[batch-slices-and-lean-handoff]]):** S1 first (it de-risks the record + sync-exclusion + token
 before greenfield App Intents). S2 follows with S1's learnings; S3 last. S1+S2 may bundle if S1's

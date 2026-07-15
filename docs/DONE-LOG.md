@@ -9,6 +9,74 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0038 — External-LLM handoff, S3b (Recipe + Meal Plan)
+
+**✅ DONE — architect-approved; build fix landed as `3999bf2`. Jon device pass: _pending_ — flip this line to
+`+ Jon device-passed 2026-07-14` on pass.** yes-chef PR
+[#185](https://github.com/jonphillips/yes-chef/pull/185).
+[ADR-0038](decisions/ADR-0038-external-llm-handoff.md): the two-part return contract — proven on **Menu only**
+because Menu's context serializer already existed (S3a + ADR-0040 S1/S2) — now covers **Recipe** and **Meal
+Plan**. It **inherits** editable-at-grain rather than adding new BLOBs ([[editable-at-the-grain-stored]]).
+
+**Context builders (Core, `AIHandoffContext.swift`).** `RecipeHandoffContext` and `MealPlanHandoffContext` on
+the `MenuChatContext` pattern — shared frontier character budget, full recipe methods, uncapped ingredients
+within budget, intro prompts tuned from `tasteProfile` / `makeAheadPrepPlan` AI settings, asking for
+paste-ready **review text, not JSON**. `AIHandoffToken.DeliverableFormat` (`menuPrepPlan` / `recipeMakeAhead` /
+`mealPlanMakeAheadStrategy`) shapes the export prompt per source; the export intent passes the right one
+(default stays `menuPrepPlan`).
+
+**Generalized return routing.** `AIHandoffReview` enum + `AIHandoffIntentImport.stageReview` dispatch by
+`sourceType`; `AIHandoffReturn.plainText(from:)` splits deliverable/learnings for the non-Menu sources.
+`HandoffReviewCoordinator` routes source-specific review items and reusable, **source-typed** `Learning` rows
+off the same S3a machinery — the reason the handoff is worth doing on a source with no structured deliverable
+field at all.
+
+**Commit shape per source ([[chat-verb-commit-shapes]]).** Recipe → `Recipe.makeAhead` (verbatim prose at its
+own grain), via a distinct **local-only** `recipeMakeAhead` handoff task — **no synced table or column, no
+migration**. Meal Plan → a day-scoped make-ahead strategy through the existing
+`MealCalendarRepository.addMakeAheadStrategyNote` (PR #91), no new synced schema either. **No additions to the
+prod-schema promotion list.**
+
+**Lossless-or-loud, at the boundary not just the UI (ADR-0040 D3).** `MealPlanMakeAheadStrategy
+.parsingEditableReviewText` returns `unparsedLines`; the review sheet **surfaces** them ("Couldn't parse — fix
+or remove these lines before saving") and `commitMealPlanMakeAhead` **re-parses and hard-rejects** any unparsed
+line (`unparsedStrategyText`) before writing. Human edits are never silently dropped.
+
+**Meal-plan Learnings hand-cascade** on source-item delete (`LearningRepository.deleteAll` in
+`MealCalendarRepository.delete`) — no orphaned synced ghosts. (Menu already did; recipe learnings live on an
+archive-not-delete source.)
+
+**Tests.** `AIHandoffRecipeMealPlanTests` — prompts, full meal-plan context, Recipe staging, Meal Plan staging,
+visible unparsed lines. Full `AIHandoffTests` suite green (15).
+
+**Review finding, fixed post-push (`3999bf2`).** The app target **did not compile** — `HandoffIntents.swift`
+used `date: .full`, invalid for `Date.FormatStyle.DateStyle` (valid: `.omitted/.numeric/.abbreviated/.long/
+.complete`; `.full` is old `DateFormatter.Style` only). Codex's package `swift build` + tests were green and
+its own generic app build **SIGTERM'd (exit 143, "CoreSimulator unavailable")** — the **third** PR (after #183,
+#184) to slip an uncompiled app target through on that excuse. Architect-caught by running the generic build
+locally (exit 65, real compile error); one-line fix `.full → .complete`.
+
+**Process fix (real this time).** The #184 "just mandate the generic build" fix did not hold — Codex **can't
+execute** that build (no working CoreSimulator subsystem / cold-build timeout → SIGTERM). The Verification
+Pattern in `CURRENT_HANDOFF.md` now makes the app-target build the **architect's gate**, treats a green package
+build as *not* evidence the app compiles, and adds the corollary: keep pure formatting/serialization logic in
+`YesChefPackage`, not the App layer (the `.full` call belonged in `MealPlanHandoffContext` in Core, where the
+package build would have caught it). See [[codex-build-excuse-reproduce]].
+
+**Dogfood finding → [Amendment 2](decisions/ADR-0038-external-llm-handoff.md) + queued S3c.** The recipe/
+meal-plan handoffs shipped **intent-only** — no in-app door — so the sole entry point is a hand-built Shortcut
+running the *Immediate* autopilot, which discards the discussion that is the point of a make-ahead hand-off.
+Amendment 2 makes an **in-app Copy-Prompt / Paste-Result** affordance (discuss-first, paste routed through the
+review sheet) the *primary* door for these two sources; the App Intent stays the hands-free/cross-device bonus.
+Filed as **S3c** (app-layer only) in the Ready Efforts queue.
+
+**Known edges (deferred to the ADR-0040 S3 lossless pass).** In meal-plan strategy parsing the **title (first)
+line is not checked for parseability** — a mangled header silently falls back to the existing title/slot rather
+than surfacing in `unparsedLines`. And an import returning **only unparseable lines with no learnings** throws
+`emptyPlan`, losing those lines before they reach a review sheet. Both mirror the existing Menu path, so
+neither is an S3b regression — fold into the same lossless-or-loud sweep.
+
+---
 ## ADR-0040 — LLM-populated content is editable at the grain it is stored, S1 + S2 (on Menu)
 
 **✅ DONE — architect-approved + Jon device-passed 2026-07-14.** yes-chef PR

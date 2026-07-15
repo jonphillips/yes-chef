@@ -89,6 +89,16 @@ promotion locks the record type permanently); and note the app target
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
+**ADR-0038 S3c — in-app handoff door for Recipe + MealPlan**
+([ADR-0038 Amd 2](decisions/ADR-0038-external-llm-handoff.md) +
+[`efforts/adr-0038-external-llm-handoff.md`](efforts/adr-0038-external-llm-handoff.md)) — the everyday entry
+point the intent-only S3b lacks. In-app **Copy-Prompt / Paste-Result** on recipe detail + the meal-plan day,
+**discuss-first**, the paste routed through `stageReview` → the review sheet (editable-at-grain,
+lossless-or-loud, Learnings ride along); opportunistically move Menu's manual buttons onto the same
+review-routed path. **App-layer only — no core / schema / migration.** Secondary: register an `AppShortcut` for
+Action Button / Spotlight / Siri. Defer per-section prompt checkboxes. Small, clean dispatch when Jon picks it.
+(Depends on S3b/PR #185 landing first.)
+
 **Recipe edit proposals** ([ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) +
 `efforts/recipe-edit-proposals.md`) — the "Adjust this recipe" verb; **S1 + S2 shipped** (overwrite
 destination with section-aware multi-section overwrite/undo; the "keep as a variation" destination = ADR-0021's
@@ -135,9 +145,21 @@ device pass regardless. So verify with **compiler + tests once**, then hand off:
 
 - Run `xcodegen generate` after adding Swift source files.
 - For package/logic-only changes, `swift build` the package (cheaper than a full app build).
-- Otherwise build `YesChef` **once** with no simulator or signing identity:
+- Otherwise attempt the app build **once** with no simulator or signing identity:
   `xcodebuild -scheme YesChef -destination 'generic/platform=iOS' -skipMacroValidation CODE_SIGNING_ALLOWED=NO build`.
 - Run `scripts/check-drift.sh`.
+- **The app-target build is the *architect's* gate, not Codex's — a green package `swift build` is NOT
+  evidence the app compiles.** Codex's environment cannot reliably run the generic build (it SIGTERMs — exit
+  143 — with "CoreSimulator unavailable": no working CoreSimulator subsystem to enumerate destinations against,
+  and/or a cold-build timeout). This slipped **three** uncompiled PRs through (#183, #184, #185); the earlier
+  "just mandate the generic build" fix did not hold because Codex *can't execute it*. So: Codex attempts it
+  once and **pastes the exact error** (incl. the 143/CoreSimulator failure) into the PR — that failure is
+  expected and does **not** block handoff — and **the architect runs the generic build locally before
+  approving any PR touching `YesChefApp/`.** A warm build is ~1 min; cold ~3 min.
+- **Corollary — keep pure logic out of the App layer.** String formatting, serialization, and parsing belong
+  in `YesChefPackage` (which Codex *can* compile and test), not in `YesChefApp/`. #185's build break was
+  `HandoffIntents.swift` calling `date: .full` (invalid `Date.FormatStyle.DateStyle`) — logic that belongs in
+  `MealPlanHandoffContext` in Core, where the package build would have caught it instantly.
 - **Do not install/launch on simulators by default** — skip the install loop and hand straight to
   Jon's UI pass. Only boot/install a simulator when a change genuinely can't be confirmed from build
   + tests, and say why in the PR.
