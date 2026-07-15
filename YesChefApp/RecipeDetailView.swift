@@ -7,6 +7,7 @@ struct RecipeDetailView: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   @AppStorage(ChatWorkspaceDetent.storageKey) private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   @State private var model: RecipeDetailModel
+  @State private var handoffTransport = HandoffInAppTransport()
   let libraryModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
@@ -97,6 +98,10 @@ struct RecipeDetailView: View {
         }
       }
       ToolbarItemGroup(placement: .secondaryAction) {
+        HandoffCopyPasteControls(
+          source: .recipe(model.recipeID),
+          transport: handoffTransport
+        )
         Button(role: .destructive) {
           libraryModel.deleteButtonTapped(recipeID: model.recipeID)
         } label: {
@@ -135,6 +140,7 @@ struct RecipeDetailView: View {
     } message: {
       Text(model.errorMessage ?? "Something went wrong.")
     }
+    .handoffTransportAlert(handoffTransport)
   }
 
   @ViewBuilder

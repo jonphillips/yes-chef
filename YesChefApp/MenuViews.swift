@@ -147,6 +147,7 @@ struct MenuDetailView: View {
   @State private var detailModel: MenuDetailModel
   @State private var isShowingRecipeBrowser = false
   @State private var compactChatModel: RecipeChatModel?
+  @State private var handoffTransport = HandoffInAppTransport()
 
   init(
     model: MenuLibraryModel,
@@ -182,6 +183,7 @@ struct MenuDetailView: View {
                 model: model,
                 detailModel: detailModel,
                 detail: detail,
+                handoffTransport: handoffTransport,
                 onRecipeSelected: onRecipeSelected,
                 regeneratePrepPlan: chatButtonTapped
               )
@@ -191,6 +193,7 @@ struct MenuDetailView: View {
               model: model,
               detailModel: detailModel,
               detail: detail,
+              handoffTransport: handoffTransport,
               onRecipeSelected: onRecipeSelected,
               regeneratePrepPlan: chatButtonTapped
             )
@@ -292,6 +295,7 @@ struct MenuDetailView: View {
     } message: { information in
       Text(information.message)
     }
+    .handoffTransportAlert(handoffTransport)
   }
 
   private var isSplitEnabled: Bool {
@@ -335,6 +339,7 @@ private struct MenuDetailReader: View {
   let model: MenuLibraryModel
   let detailModel: MenuDetailModel
   let detail: MenuDetailData
+  let handoffTransport: HandoffInAppTransport
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var regeneratePrepPlan: () -> Void
 
@@ -349,13 +354,13 @@ private struct MenuDetailReader: View {
         MenuPrepPlanSection(
           steps: detail.prepPlanSteps,
           itemRows: detail.itemRows,
-          copyPrepPrompt: { detailModel.copyPrepPrompt(MenuChatContext(detail: detail).prepPrompt()) },
+          handoffSource: .menu(detailModel.menuID),
+          handoffTransport: handoffTransport,
           onRecipeSelected: onRecipeSelected,
           clearPrepPlan: {
             model.clearPrepPlanButtonTapped(menuID: detailModel.menuID)
           },
           regeneratePrepPlan: regeneratePrepPlan,
-          pastePrepPlan: detailModel.prepPlanPasted,
           createStep: detailModel.createPrepPlanStep,
           updateStep: detailModel.updatePrepPlanStep,
           deleteStep: detailModel.deletePrepPlanStep,
@@ -391,11 +396,11 @@ private struct MenuDetailReader: View {
 private struct MenuPrepPlanSection: View {
   let steps: [PrepPlanStepRecord]
   let itemRows: [MenuItemRowData]
-  let copyPrepPrompt: () -> String?
+  let handoffSource: HandoffExportSource
+  let handoffTransport: HandoffInAppTransport
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var clearPrepPlan: () -> Void
   var regeneratePrepPlan: () -> Void
-  var pastePrepPlan: (String) -> Void
   var createStep: (PrepPlanStep) -> Void
   var updateStep: (PrepPlanStep, PrepPlanStepRecord.ID) -> Void
   var deleteStep: (PrepPlanStepRecord.ID) -> Void
@@ -415,23 +420,11 @@ private struct MenuPrepPlanSection: View {
 
         Spacer()
 
-        Button {
-          guard let prompt = copyPrepPrompt() else { return }
-          UIPasteboard.general.string = prompt
-        } label: {
-          Label("Copy Prep Prompt", systemImage: "doc.on.doc")
-        }
+        HandoffCopyPasteControls(source: handoffSource, transport: handoffTransport)
         .buttonStyle(.bordered)
       }
 
       HStack {
-        Button {
-          pastePrepPlanButtonTapped()
-        } label: {
-          Label("Paste Prep Plan", systemImage: "clipboard")
-        }
-        .buttonStyle(.bordered)
-
         Button {
           editor = PrepPlanStepEditorDraft()
         } label: {
@@ -497,10 +490,6 @@ private struct MenuPrepPlanSection: View {
     }
   }
 
-  private func pastePrepPlanButtonTapped() {
-    guard let text = UIPasteboard.general.string else { return }
-    pastePrepPlan(text)
-  }
 }
 
 private struct MenuPrepPlanSessionBand: Identifiable {
