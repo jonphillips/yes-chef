@@ -9,6 +9,40 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0039 — D1/D2 + OQ1/OQ2, the Recipe Playbook region
+
+**✅ architect-approved + app-build-gate green + Jon device-pass done — 2026-07-15. Merge pending.** yes-chef
+PR [#189](https://github.com/jonphillips/yes-chef/pull/189).
+[ADR-0039 §D1/D2, Amendment 1](decisions/ADR-0039-playbook-column-thinking-vs-doing.md): the anchor UI slice —
+the recipe gains a **third peer region, Ingredients · Directions · Playbook**, and the "thinking" content leaves
+the cook body. **App-layer only — no schema / migration; `Recipe.makeAhead` (`String?`) stays canonical.** New
+file `YesChefApp/RecipePlaybookView.swift`.
+
+**Both device renderings (Amendment 1).** Compact adds a **third `.segmented` case** (`Ingredients · Directions
+· Playbook`). Wide iPad **pins Ingredients as a ⅓ anchor** and a **Cook / Plan toggle** swaps the other ⅔
+between Directions (Cook) and Playbook (Plan), setting preset `ChatWorkspaceDetent` detents (Cook → `readerOnly`,
+Plan → `balanced`).
+
+**Full content move (OQ1 — body shows nothing).** Make-ahead, Notes (reader feedback + other `RecipeNote`),
+Chef It Up, and Serve With cut from `directionsColumn` into the Playbook; each section is **collapsible** with a
+**filled/empty header indicator**. Stays in Directions: Instructions, the active-variation method note, Workbench
+candidate links. All existing edit/clear actions and the canonical make-ahead store preserved.
+
+**Architect app-build gate earned its keep — four App-target compile errors that `check-drift.sh` structurally
+cannot see** (it compiles only `YesChefPackage`; all four were pure SwiftUI in `YesChefApp/`). Round 1: a
+`let … = nil` binding excluded from the memberwise init, and `.padding()/.frame()` chained onto a bare `switch`.
+Round 2 (surfaced only by the local `generic/platform=iOS` build): a `.tint`/`.secondary` ShapeStyle ternary
+needing `AnyShapeStyle`, and a non-`@escaping` `@ViewBuilder` closure captured by `DisclosureGroup`. The last two
+fixed + committed by the architect (a3e5011); build → **BUILD SUCCEEDED**. Reinforces
+[[codex-build-excuse-reproduce]]. Codex's cited `swiftc -parse` cannot catch any of these (parse skips
+type-checking).
+
+**Intentional intermediate state (device-confirmed).** The `ChatWorkspaceDivider` / in-app chat column is **not**
+retired here — deferred to **D3**. So on wide iPad, Plan re-expands the old chat column via the `balanced` detent,
+and the AI appears in two places at once (the standing column + the Playbook's Copy-Prompt handoff). That
+doubling is transitional and collapses in D3.
+
+---
 ## ADR-0039 — D5, prep plans emit tasks, not choreography
 
 **✅ architect-approved + package tests green (18/18) — 2026-07-15. Jon device-pass + merge pending.** yes-chef
