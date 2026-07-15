@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 15, 2026 (ADR-0040 **S3** — lossless-or-**loud** surface-outcomes pass — architect-approved, app-build-gate **green**, PR #187 (device-pass + merge pending, Jon); Next Up = **ADR-0039 D5** — the prep-plan *tasks-never-choreography* prompt amendment, the smallest-first opening slice of the now-designed Playbook milestone).
+Last updated: July 15, 2026 (ADR-0039 **D5** — the prep-plan *tasks-never-choreography* prompt amendment — architect-approved, package tests **green** (18/18), PR #188 (device-pass + merge pending, Jon); Next Up = **ADR-0039 Recipe Playbook region** (D1/D2 + OQ1/OQ2) — the anchor UI slice of the now-building Playbook milestone: the recipe gains a third peer region **Ingredients · Directions · Playbook** and the "thinking" content moves out of the cook body).
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,37 +21,38 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md) D5, the
-prep-plan *tasks-never-choreography* prompt amendment.** ADR-0039's design is **complete** (Amendment 1,
-2026-07-15, resolved OQ1–OQ4 + corrected the recipe framing), so the milestone moves from design conversation
-to build — **smallest-first**. This opening slice is **Core-only — no app / schema / migration** (so Codex can
-actually build *and* test it; keep pure prompt/parse logic in the package per the Verification Pattern below).
+**Live dispatch target — [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md) Recipe Playbook
+region (D1/D2 + OQ1/OQ2, Amendment 1).** The anchor UI slice of the now-building Playbook milestone (D5, the
+prompt amendment, shipped in PR #188). The recipe gains a **third peer region — Ingredients · Directions ·
+Playbook** — into which the "thinking" content moves out of the cook body. **App-layer only — no schema /
+migration:** `Recipe.makeAhead` (`String?`) stays the **canonical** make-ahead store, so this hits the
+**architect build gate**, not Codex's (Codex attempts the generic build once, pastes the 143/CoreSimulator
+error, the architect runs `generic/platform=iOS` locally before approving — see the Verification Pattern).
 
-**D5 — the prep plan holds tasks, never choreography.** Amend the prep-plan generation prompt contract so the
-model emits **separable, atomic, context-free tasks** ("Salt the chicken Wednesday", "Pull the beef to temp at
-4") and **never choreography** — interleaved cross-recipe cooking instructions ("sear the beef while the salad
-rests"). Choreography strips the recipe context the cook actually reasons with, so it will never be trusted;
-generating it is noise that buries the tasks that *are* trustworthy. The recipes hold the cooking; the prep
-plan must never become a merged mega-recipe. See ADR-0039 §D5 +
-[ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md).
+**The three-region model (Amendment 1 — device decides how many are co-visible):**
+- **Compact** (iPhone / iPad-narrow / macOS-narrow): add a **third case** to the `CompactSection` `.segmented`
+  `Picker` (`RecipeDetailView.swift:525`) → `Ingredients · Directions · Playbook`. No iPad-only idiom, so the
+  region scales down cleanly ([[macos-longterm-target]]).
+- **Wide iPad**: pin **Ingredients as a stable ⅓ anchor**; a **Cook / Plan toggle** swaps the other ⅔ between
+  **Directions** (Cook) and **Playbook** (Plan), setting preset `ChatWorkspaceDetent` detents (reuse the
+  metrics). See the D3 coupling flag below before retiring the manual divider.
 
-- **Primary contract:** `MenuPrepPlan.instructions`
-  (`YesChefPackage/Sources/YesChefCore/MenuPrepPlan.swift:293`) — today it instructs the model to "invent
-  grounded **sequencing**, work sessions, and new prep steps." Tighten toward atomic tasks and drop the
-  invitation to weave cross-dish sequencing; preserve the existing JSON shape (`session`/`task`/`serves`/
-  `sourceDish`) and the "compose from stored Make-Ahead notes" behavior.
-- **Sibling contract:** `MealPlanMakeAheadStrategy.instructions`
-  (`YesChefPackage/Sources/YesChefCore/MealPlanMakeAheadStrategy.swift:183`) — apply the same
-  tasks-never-choreography constraint so the meal-plan variant doesn't drift.
-- **Test in Core.** Assert the constraint in the package suite (this is exactly why the logic lives in
-  `YesChefPackage`, not the app layer).
+**Full content move (OQ1 — body shows *nothing*, no compact summary).** Cut from `directionsColumn`
+(`RecipeDetailView.swift:542`) into the Playbook: **Make-ahead**, **Notes** (reader feedback + other
+`RecipeNote`), **Chef It Up**, **Serve With**. Stays in Directions: Instructions, the active-variation method
+note, Workbench candidate links. Playbook sections are **collapsible**, each header carrying a **filled/empty
+content indicator** so you can see what's populated without expanding. (A first brick already landed — the
+persistent Make-ahead header, PR #186.)
 
-**Queued behind it — the ADR-0039 UI slices (each its own Jon-gated dispatch, in likely order):**
-- **Recipe Playbook region** (D1/D2/OQ1/OQ2) — the anchor: Playbook as a **third peer region** (compact = a
-  third `CompactSection` picker segment in `RecipeDetailView.swift`; wide iPad = a Cook/Plan toggle with
-  Ingredients pinned as a ⅓ anchor, retiring the manual `ChatWorkspaceDivider`). **Full-move** make-ahead +
-  notes + Chef It Up + Serve With out of `directionsColumn`; collapsible sections with filled/empty content
-  indicators. A first brick already landed (the persistent Make-ahead header, PR #186).
+**Sequencing flag — the wide divider retirement leans on D3.** Amendment 1 retires the manual
+`ChatWorkspaceDivider` on wide "now that 'Ask' is a slide-over" — i.e. the chat pane's reader-vs-chat job only
+vacates once **D3 ("Ask" slide-over + chat demotion)** relocates the chat. **Recommended split:** land the
+**compact third segment + full content move** first (self-contained, never touches the chat pane), then the
+**wide Cook/Plan toggle**; keep `ChatWorkspaceDivider` until D3 actually moves the chat out, or fold the divider
+retirement into D3. **Confirm this split with Jon before dispatching the wide half** — do not retire the divider
+in the same slice that still hosts the chat.
+
+**Queued behind it — the remaining ADR-0039 UI slices (each its own Jon-gated dispatch, in likely order):**
 - **"Ask" slide-over + chat demotion** (D3) — the in-app chat becomes the secondary "quick one" slide-over;
   "Hand off to ChatGPT" is the primary affordance; the draggable divider's old reader-vs-chat job retires.
 - **Menu launcher mode** (D4/OQ3) — delete the menu's third column, foreground the dish list with collapsible
