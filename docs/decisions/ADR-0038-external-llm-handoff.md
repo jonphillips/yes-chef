@@ -313,6 +313,56 @@ In-app **Copy-Prompt / Paste-Result** on recipe detail + the meal-plan day, rout
 review-routed path. No new core, no schema, no migration; no simulator install ([[lean-verification-default]])
 — Jon device-passes the alt-tab flow.
 
+## Amendment 3 — an optional, user-pasted `conversationURL` to reopen the live chat (2026-07-15)
+
+**Status: Proposed.** Origin: Jon, 2026-07-15. Amends **D1** (adds a field to the `AIHandoff` record)
+and **Amd2/S3c** (adds one field to the in-app paste step). No new transport, no core rework.
+
+### The want
+
+After a discuss-mode session, Jon wants to **return to the existing ChatGPT conversation** — reopen it,
+make adjustments, re-finalize, paste again — rather than start cold each time.
+
+### Why the obvious automation doesn't exist
+
+The handoff is one-directional by construction. ChatGPT returns either a **headless value**
+(`Ask ChatGPT`, D5 immediate — response text, no conversation link) or a **human paste** (Amd2's in-app
+Copy/Paste). Neither carries a live-conversation URL. And the payload-marker trick that carries
+`YC-HANDOFF:`/`YC-LEARNINGS:` **cannot** carry the URL: the model *inside* a conversation has no access to
+its own conversation ID and would hallucinate one. So the URL cannot be automated back — it can only be
+**captured by the human, who is already standing in the chat** in the discuss path.
+
+### Decision
+
+- **`AIHandoff` gains `conversationURL: String?`** — device-local like the rest of the record (storage
+  sketch / OQ1; nothing new for sync). Optional; empty is the normal case.
+- **The in-app paste step (S3c) grows one adjacent field** — "paste the chat link" — next to the result
+  paste already in the review flow. Zero new transport: it rides the same Amd2 door and the same review
+  sheet. Filled only when the human bothers.
+- **The source object shows a "Reopen in ChatGPT" affordance** that deep-links the stored URL, when present.
+
+### Two constraints that are load-bearing, not polish
+
+- **Live `/c/` link only, never the `/share/` snapshot.** `https://chatgpt.com/c/<id>` is the *live,
+  continuable* conversation and deep-links into the native app; `https://chatgpt.com/share/<id>` is a
+  **read-only snapshot** that cannot be continued. The field must capture the live link (web address bar,
+  or the app's copy-link-to-chat) — not the "Share" snapshot flow. **Device check owed (Jon):** confirm the
+  current ChatGPT app exposes the live `/c/` link cleanly and that tapping one opens the app to that
+  conversation. If it only offers the share snapshot, this amendment is a no-op until that changes.
+- **This is not the durable-session anchor — the project is.** OQ6 already chose a per-source ChatGPT
+  **project** (`Menu.externalProjectName`) as the durable home for a discuss session that accumulates across
+  sittings. `conversationURL` is a **per-session convenience on top of that**, not a competitor: the project
+  is per-source and persistent; the URL is per-conversation and disposable. The URL field earns the most on
+  **Recipe / MealPlan**, which have no project story yet; on Menu it is secondary to the project. Do not
+  build them as alternatives.
+
+### Slice — folds into S3c (app-layer + one nullable column)
+
+The field, the paste affordance, and the "Reopen in ChatGPT" deep-link are all app-layer over the existing
+core; the only model change is one nullable `TEXT` column on the device-local `AIHandoff` table (migration
+in `Schema.swift`, no sync-set change). Gated on the device check above. Verify per
+[[lean-verification-default]] — Jon device-passes the reopen deep-link.
+
 ## Deferred (on the record, explicitly not built here)
 
 - **Widened share-extension "Import into Yes Chef."** A polished entry point for when you're already
