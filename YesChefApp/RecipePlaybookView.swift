@@ -61,22 +61,24 @@ struct RecipePlaybookView: View {
   }
 
   private var playbookHeader: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    HStack(alignment: .top, spacing: 12) {
+      // The ChatGPT hand-off round-trip: copy the prompt out, paste the reply back.
       ViewThatFits(in: .horizontal) {
         HStack(spacing: 8) {
           handoffButton
-          askButton
           pasteResultButton
         }
 
         VStack(alignment: .leading, spacing: 8) {
           handoffButton
-          HStack(spacing: 8) {
-            askButton
-            pasteResultButton
-          }
+          pasteResultButton
         }
       }
+
+      Spacer(minLength: 12)
+
+      // Ask (in-app) sits apart on the trailing edge, out of the copy/paste flow.
+      askButton
     }
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Playbook actions")
@@ -93,11 +95,24 @@ struct RecipePlaybookView: View {
     .buttonStyle(.borderedProminent)
   }
 
+  private var isAskActive: Bool {
+    model.destination.chat != nil
+  }
+
   private var askButton: some View {
     Button(action: ask) {
       Label("Ask", systemImage: "sparkles")
     }
     .buttonStyle(.bordered)
+    .buttonBorderShape(.roundedRectangle(radius: 8))
+    .overlay {
+      // Light the trigger up in the activity color while its panel is open.
+      if isAskActive {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+          .strokeBorder(.tint, lineWidth: 3)
+      }
+    }
+    .accessibilityValue(isAskActive ? Text("Panel open") : Text("Panel closed"))
   }
 
   private var pasteResultButton: some View {
