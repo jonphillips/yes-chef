@@ -372,6 +372,7 @@ public enum MealCalendarRepository {
     itemID: MealPlanItem.ID,
     in db: Database
   ) throws {
+    try LearningRepository.deleteAll(sourceType: .mealPlan, sourceID: itemID, in: db)
     try MealPlanItem.find(itemID).delete().execute(db)
   }
 

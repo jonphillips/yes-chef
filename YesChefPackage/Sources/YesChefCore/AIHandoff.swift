@@ -48,6 +48,7 @@ public enum AIHandoffSourceType: String, Codable, QueryBindable, QueryDecodable,
 public enum AIHandoffTaskType: String, Codable, QueryBindable, QueryDecodable, Sendable {
   case prepPlan
   case learning
+  case recipeMakeAhead
   case adjustRecipe
   case mealPlanMakeAheadStrategy
 }
@@ -151,6 +152,51 @@ public enum AIHandoffToken {
     case immediate
   }
 
+  public enum DeliverableFormat: Sendable {
+    case menuPrepPlan
+    case recipeMakeAhead
+    case mealPlanMakeAheadStrategy
+
+    var discussInstruction: String {
+      switch self {
+      case .menuPrepPlan:
+        "return only the token line above as the first line, followed by the paste-ready prep plan"
+      case .recipeMakeAhead:
+        "return only the token line above as the first line, followed by the paste-ready recipe make-ahead notes"
+      case .mealPlanMakeAheadStrategy:
+        "return only the token line above as the first line, followed by the paste-ready meal-plan make-ahead strategy"
+      }
+    }
+
+    var immediateInstruction: String {
+      switch self {
+      case .menuPrepPlan:
+        "Return the completed prep plan in your first response when the menu needs one."
+      case .recipeMakeAhead:
+        "Return the completed recipe make-ahead notes in your first response when the recipe needs them."
+      case .mealPlanMakeAheadStrategy:
+        "Return the completed meal-plan make-ahead strategy in your first response when the day needs one."
+      }
+    }
+
+    var example: String {
+      switch self {
+      case .menuPrepPlan:
+        """
+        session:
+        - task → serves
+        """
+      case .recipeMakeAhead:
+        "- Complete the sauce up to two days ahead and refrigerate."
+      case .mealPlanMakeAheadStrategy:
+        """
+        Make-ahead strategy - Dinner
+        Two days ahead: Make the sauce.
+        """
+      }
+    }
+  }
+
   public struct RoutedText: Equatable, Sendable {
     public let handoffID: AIHandoff.ID
     public let payload: String
@@ -166,7 +212,8 @@ public enum AIHandoffToken {
   public static func prompt(
     handoffID: AIHandoff.ID,
     context: String,
-    mode: PromptMode = .discuss
+    mode: PromptMode = .discuss,
+    deliverableFormat: DeliverableFormat = .menuPrepPlan
   ) -> String {
     let token = header(handoffID: handoffID)
     switch mode {
@@ -176,9 +223,9 @@ public enum AIHandoffToken {
 
       \(context)
 
-      You may discuss this freely. When the user asks you to finalize, return only the token line above as the first line, followed by the paste-ready prep plan, then a YC-LEARNINGS: line and a distinct bullet list of durable knowledge established during the discussion. A learning-only return is valid: leave the prep-plan portion empty and include the marker plus bullets. Preserve that token and marker exactly; never merge learnings into a prose summary; do not use a Markdown code fence.
+      You may discuss this freely. When the user asks you to finalize, \(deliverableFormat.discussInstruction), then a YC-LEARNINGS: line and a distinct bullet list of durable knowledge established during the discussion. A learning-only return is valid: leave the deliverable portion empty and include the marker plus bullets. Preserve that token and marker exactly; never merge learnings into a prose summary; do not use a Markdown code fence.
 
-      Prep-plan bullets must be separable, atomic, context-free tasks such as "Salt the chicken Wednesday". Never write choreography or a merged mega-recipe: recipe cooking instructions stay with their recipes.
+      Keep the deliverable practical, atomic, and grounded in the provided context. Never write choreography or a merged mega-recipe: recipe cooking instructions stay with their recipes.
       """
     case .immediate:
       return """
@@ -186,9 +233,8 @@ public enum AIHandoffToken {
 
       \(context)
 
-      Return the completed prep plan in your first response when the menu needs one. Preserve the token above as the first line. Return only the token, formatted prep plan, and a YC-LEARNINGS: section of distinct durable-learning bullets: no preamble and no Markdown code fence. A learning-only return is valid: leave the prep-plan portion empty and include the marker plus bullets. Prep-plan bullets must be separable, atomic, context-free tasks, never choreography or a merged mega-recipe; recipe cooking instructions stay with their recipes. Use this exact format:
-      session:
-      - task → serves
+      \(deliverableFormat.immediateInstruction) Preserve the token above as the first line. Return only the token, formatted deliverable, and a YC-LEARNINGS: section of distinct durable-learning bullets: no preamble and no Markdown code fence. A learning-only return is valid: leave the deliverable portion empty and include the marker plus bullets. Keep the deliverable practical, atomic, and grounded in the provided context; never choreography or a merged mega-recipe. Use this exact format:
+      \(deliverableFormat.example)
       YC-LEARNINGS:
       - durable learning
       """
@@ -235,6 +281,64 @@ public struct AIHandoffMenuPrepPlanReview: Equatable, Sendable {
   }
 }
 
+public struct AIHandoffRecipeMakeAheadReview: Equatable, Sendable {
+  public let handoffID: AIHandoff.ID
+  public let recipeID: Recipe.ID
+  public let makeAhead: String
+  public let learnings: [String]
+
+  public init(
+    handoffID: AIHandoff.ID,
+    recipeID: Recipe.ID,
+    makeAhead: String,
+    learnings: [String]
+  ) {
+    self.handoffID = handoffID
+    self.recipeID = recipeID
+    self.makeAhead = makeAhead
+    self.learnings = learnings
+  }
+}
+
+public struct AIHandoffMealPlanMakeAheadReview: Equatable, Sendable {
+  public let handoffID: AIHandoff.ID
+  public let mealPlanItemID: MealPlanItem.ID
+  public let scheduledDate: Date
+  public let strategy: MealPlanMakeAheadStrategy
+  public let learnings: [String]
+  public let unparsedStrategyLines: [String]
+
+  public init(
+    handoffID: AIHandoff.ID,
+    mealPlanItemID: MealPlanItem.ID,
+    scheduledDate: Date,
+    strategy: MealPlanMakeAheadStrategy,
+    learnings: [String],
+    unparsedStrategyLines: [String]
+  ) {
+    self.handoffID = handoffID
+    self.mealPlanItemID = mealPlanItemID
+    self.scheduledDate = scheduledDate
+    self.strategy = strategy
+    self.learnings = learnings
+    self.unparsedStrategyLines = unparsedStrategyLines
+  }
+}
+
+public enum AIHandoffReview: Equatable, Sendable {
+  case menuPrepPlan(AIHandoffMenuPrepPlanReview)
+  case recipeMakeAhead(AIHandoffRecipeMakeAheadReview)
+  case mealPlanMakeAhead(AIHandoffMealPlanMakeAheadReview)
+
+  public var handoffID: AIHandoff.ID {
+    switch self {
+    case let .menuPrepPlan(review): review.handoffID
+    case let .recipeMakeAhead(review): review.handoffID
+    case let .mealPlanMakeAhead(review): review.handoffID
+    }
+  }
+}
+
 public enum AIHandoffReturn {
   public struct MenuPrepPlanReturn: Equatable, Sendable {
     public var plan: MenuPrepPlan
@@ -254,6 +358,14 @@ public enum AIHandoffReturn {
       plan: parsed.plan,
       learnings: learningBullets(from: split.learnings),
       unparsedLines: parsed.unparsedLines
+    )
+  }
+
+  public static func plainText(from text: String) -> (deliverable: String, learnings: [String]) {
+    let split = splitting(text)
+    return (
+      split.deliverable.trimmingCharacters(in: .whitespacesAndNewlines),
+      learningBullets(from: split.learnings)
     )
   }
 
@@ -309,7 +421,7 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
     case .duplicate:
       "This handoff result was already imported for review."
     case .emptyPlan:
-      "The returned handoff needs a prep plan or at least one learning bullet."
+      "The returned handoff needs a deliverable or at least one learning bullet."
     case let .unparsedPlanText(lines):
       "Could not import these prep-plan lines: \(lines.joined(separator: " | "))"
     }
@@ -328,6 +440,23 @@ public enum AIHandoffIntentImport {
     in db: Database,
     now: Date
   ) throws -> AIHandoffMenuPrepPlanReview {
+    guard case let .menuPrepPlan(review) = try stageReview(
+      handoffID: handoffID,
+      result: result,
+      in: db,
+      now: now
+    ) else {
+      throw AIHandoffIntentImportError.wrongTask
+    }
+    return review
+  }
+
+  public static func stageReview(
+    handoffID: AIHandoff.ID?,
+    result: String,
+    in db: Database,
+    now: Date
+  ) throws -> AIHandoffReview {
     let routedText = AIHandoffToken.stripping(from: result)
     guard let resolvedHandoffID = handoffID ?? routedText?.handoffID else {
       throw AIHandoffIntentImportError.missingHandoffID
@@ -335,36 +464,80 @@ public enum AIHandoffIntentImport {
     guard let handoff = try AIHandoffRepository.handoff(id: resolvedHandoffID, in: db) else {
       throw AIHandoffIntentImportError.handoffNotFound(resolvedHandoffID)
     }
-    guard handoff.sourceType == .menu,
-      handoff.taskType == .prepPlan || handoff.taskType == .learning
-    else {
-      throw AIHandoffIntentImportError.wrongTask
-    }
     guard handoff.status == .awaitingReturn, handoff.importedAt == nil else {
       throw AIHandoffIntentImportError.duplicate
     }
-    guard let menu = try Menu.find(handoff.sourceID).fetchOne(db) else {
-      throw AIHandoffIntentImportError.handoffNotFound(resolvedHandoffID)
-    }
+    let payload = routedText?.payload ?? result
+    let review: AIHandoffReview
+    switch handoff.sourceType {
+    case .menu:
+      guard handoff.taskType == .prepPlan || handoff.taskType == .learning,
+        let menu = try Menu.find(handoff.sourceID).fetchOne(db)
+      else {
+        throw AIHandoffIntentImportError.wrongTask
+      }
+      let currentSteps = try PrepPlanStepRepository.steps(for: menu.id, in: db)
+      let returned = AIHandoffReturn.menuPrepPlan(
+        from: payload,
+        currentPlan: MenuPrepPlan(steps: currentSteps.map { PrepPlanStep($0) })
+      )
+      guard !returned.plan.steps.isEmpty || !returned.learnings.isEmpty else {
+        throw AIHandoffIntentImportError.emptyPlan
+      }
+      review = .menuPrepPlan(
+        AIHandoffMenuPrepPlanReview(
+          handoffID: handoff.id,
+          menuID: menu.id,
+          plan: returned.plan,
+          learnings: returned.learnings,
+          unparsedPlanLines: returned.unparsedLines
+        )
+      )
 
-    let currentSteps = try PrepPlanStepRepository.steps(for: menu.id, in: db)
-    let currentPlan = MenuPrepPlan(steps: currentSteps.map { PrepPlanStep($0) })
-    let returned = AIHandoffReturn.menuPrepPlan(
-      from: routedText?.payload ?? result,
-      currentPlan: currentPlan
-    )
-    guard !returned.plan.steps.isEmpty || !returned.learnings.isEmpty else {
-      throw AIHandoffIntentImportError.emptyPlan
+    case .recipe:
+      guard handoff.taskType == .recipeMakeAhead || handoff.taskType == .learning,
+        let recipe = try Recipe.find(handoff.sourceID).fetchOne(db), !recipe.archived
+      else {
+        throw AIHandoffIntentImportError.wrongTask
+      }
+      let returned = AIHandoffReturn.plainText(from: payload)
+      guard !returned.deliverable.isEmpty || !returned.learnings.isEmpty else {
+        throw AIHandoffIntentImportError.emptyPlan
+      }
+      review = .recipeMakeAhead(
+        AIHandoffRecipeMakeAheadReview(
+          handoffID: handoff.id,
+          recipeID: recipe.id,
+          makeAhead: returned.deliverable,
+          learnings: returned.learnings
+        )
+      )
+
+    case .mealPlan:
+      guard handoff.taskType == .mealPlanMakeAheadStrategy || handoff.taskType == .learning,
+        let item = try MealPlanItem.find(handoff.sourceID).fetchOne(db)
+      else {
+        throw AIHandoffIntentImportError.wrongTask
+      }
+      let returned = AIHandoffReturn.plainText(from: payload)
+      let parsed = MealPlanMakeAheadStrategy.parsingEditableReviewText(returned.deliverable)
+      guard !parsed.strategy.steps.isEmpty || !returned.learnings.isEmpty else {
+        throw AIHandoffIntentImportError.emptyPlan
+      }
+      review = .mealPlanMakeAhead(
+        AIHandoffMealPlanMakeAheadReview(
+          handoffID: handoff.id,
+          mealPlanItemID: item.id,
+          scheduledDate: item.scheduledDate,
+          strategy: parsed.strategy,
+          learnings: returned.learnings,
+          unparsedStrategyLines: parsed.unparsedLines
+        )
+      )
     }
 
     try AIHandoffRepository.markImported(id: handoff.id, at: now, in: db)
-    return AIHandoffMenuPrepPlanReview(
-      handoffID: handoff.id,
-      menuID: menu.id,
-      plan: returned.plan,
-      learnings: returned.learnings,
-      unparsedPlanLines: returned.unparsedLines
-    )
+    return review
   }
 }
 

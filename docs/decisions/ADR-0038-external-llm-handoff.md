@@ -252,6 +252,67 @@ in-app chat panel's future, a possible "Intelligence" third column) is a separat
 question with its own ADR. This amendment is the **data contract only** — which is why S3 is not blocked
 by that redesign.
 
+## Amendment 2 — the **in-app door** is primary for Recipe + MealPlan; the intent is the hands-free bonus (2026-07-14)
+
+**Status: Accepted.** Origin: Jon, dogfooding the S3b recipe handoff on device. Amends **D4/D5** (which named
+App Intents the *primary* transport) and adds an **S3c**. No core or schema change.
+
+### The gap
+
+S3b shipped the **intent half** for Recipe and MealPlan but not the **in-app entry point** Menu already has
+(`Copy Prep Prompt` / `Paste Prep Plan`, `MenuViews.swift`). So on device, the only way to get make-ahead for
+the recipe you are *looking at* is: leave the recipe → open the Shortcuts app → build (once) and run a
+parameterized `ExportHandoffContext` shortcut → round-trip through the ChatGPT `Ask ChatGPT` action → come
+back. There is **no button on the recipe**, and the intents aren't registered as an `AppShortcut`, so they
+aren't reachable from Action Button / Spotlight / Siri without hand-authoring the shortcut either. The first
+honest dogfood question was, correctly, *"is that ever worth it?"*
+
+### Two reasons this is the wrong *primary* door — not just less convenient
+
+- **Make-ahead is a *discussion*, not a one-shot.** The Immediate/autopilot path (`Ask ChatGPT`, D5) answers
+  in a single turn with **no conversation** — discarding the back-and-forth (*"I won't have two days ahead —
+  what about morning-of?"*, *"I'm doubling it"*) that is the *whole point* of handing off to a frontier model.
+  Manual copy/paste keeps the human *inside* the ChatGPT conversation, then harvests the finalized answer.
+  [[automation-decays-near-the-stove]]: full autopilot is a gift when there is nothing to decide, a liability
+  when the deciding **is** the value.
+- **Copy/paste costs nothing structural.** The pasted return still routes through
+  `AIHandoffIntentImport.stageReview` → the review sheet — editable at the grain, lossless-or-loud, Learnings
+  riding along (Amd 1). You get the discussion **and** the safe structured landing. (Strictly better than
+  Menu's *existing* manual path, which predates ADR-0040 and writes more directly — bring Menu onto the same
+  review-routed path while here.)
+
+### Decision
+
+- **The primary, everyday door for Recipe + MealPlan is an in-app affordance**, mirroring Menu's Copy/Paste, on
+  `RecipeDetailView` and the meal-plan day view. **Copy** emits the same tokenized prompt S3b already builds
+  (`YC-HANDOFF:` header + the source's `DeliverableFormat`); **Paste** feeds `stageReview` → the review sheet.
+  This is a **new thin transport shell over the S3b core** — exactly D1's model (transports are thin shells;
+  the core is reused). **App-layer only: no core, schema, or migration change.**
+- **Discuss-first is the default** of the in-app button (seed the prompt, alt-tab, converse, paste the result).
+  **Immediate stays available via the intent** for the genuinely hands-free case.
+- **D4 is amended, not reverted.** App Intents remain the **hands-free / power / cross-device** transport
+  (Action Button, Siri, Spotlight, hand-off-on-iPad-return-on-iPhone). They are **no longer the primary — and
+  never the only — door** for a human standing at a recipe. Both transports ship; this re-orders which one the
+  everyday case reaches for and fills the in-app gap the new sources shipped without.
+- **Discoverability fix for the intent (secondary):** register an `AppShortcut` so export/import are reachable
+  from Action Button / Spotlight / Siri without hand-building a shortcut. Worth doing, but subordinate to
+  putting a door on the recipe.
+
+### Deferred (explicitly not in this amendment)
+
+- **Per-section prompt scoping** (checkboxes to choose which recipe sections to send). The make-ahead context
+  builder already scopes sensibly; add section selection **only if the default context proves wrong** — do not
+  front-load the UI.
+- The **`Ask ChatGPT` double-fire** Jon hit is a ChatGPT-action / Shortcuts app-switch artifact, **not ours** —
+  noted, not owned here. It is one more reason not to make the autopilot path the primary one.
+
+### Slice — S3c (app-layer only)
+
+In-app **Copy-Prompt / Paste-Result** on recipe detail + the meal-plan day, routed through the existing
+`stageReview` → review sheet, discuss-first; opportunistically move Menu's manual buttons onto the same
+review-routed path. No new core, no schema, no migration; no simulator install ([[lean-verification-default]])
+— Jon device-passes the alt-tab flow.
+
 ## Deferred (on the record, explicitly not built here)
 
 - **Widened share-extension "Import into Yes Chef."** A polished entry point for when you're already
