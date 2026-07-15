@@ -57,6 +57,15 @@ final class HandoffInAppTransport {
     }
   }
 
+  func pastedResultsReceived(_ results: [String], source: HandoffExportSource) async {
+    guard let result = results.first, !result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      errorMessage = "No handoff result was pasted."
+      isShowingError = true
+      return
+    }
+    await stageReview(for: result, source: source)
+  }
+
   func reviewUnmatchedResult() async {
     guard let unmatchedResult, let unmatchedSource else { return }
     dismissUnmatchedConfirmation()
@@ -108,9 +117,8 @@ struct HandoffCopyPasteControls: View {
       }
 
       PasteButton(payloadType: String.self) { results in
-        guard let result = results.first else { return }
         Task {
-          await transport.stageReview(for: result, source: source)
+          await transport.pastedResultsReceived(results, source: source)
         }
       }
       .accessibilityLabel("Paste Result")

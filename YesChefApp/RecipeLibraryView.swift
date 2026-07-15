@@ -15,7 +15,7 @@ struct AppContainer: View {
   @State private var workbenchModel = WorkbenchLibraryModel()
   @State private var browserModel = BrowserModel()
   @State private var mealCalendarModel: MealCalendarModel
-  @State private var menuModel = MenuLibraryModel()
+  @State private var menuModel: MenuLibraryModel
   @State private var groceryModel: GroceryLibraryModel
   @State private var selectedSection: AppSection? = .recipes
   @State private var selectedSettingsPane: SettingsPane? = .categories
@@ -26,6 +26,7 @@ struct AppContainer: View {
     let toastCenter = AppToastCenter()
     _toastCenter = State(wrappedValue: toastCenter)
     _mealCalendarModel = State(wrappedValue: MealCalendarModel(toastCenter: toastCenter))
+    _menuModel = State(wrappedValue: MenuLibraryModel(toastCenter: toastCenter))
     _groceryModel = State(wrappedValue: GroceryLibraryModel(toastCenter: toastCenter))
   }
 

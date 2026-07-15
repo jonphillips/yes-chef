@@ -164,7 +164,7 @@ struct MenuDetailView: View {
     self.onCookSessionRequested = onCookSessionRequested
     self.isFocusActive = isFocusActive
     self.focusButtonTapped = focusButtonTapped
-    _detailModel = State(wrappedValue: MenuDetailModel(menuID: menuID))
+    _detailModel = State(wrappedValue: MenuDetailModel(menuID: menuID, toastCenter: model.toastCenter))
   }
 
   var body: some View {

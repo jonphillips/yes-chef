@@ -36,7 +36,7 @@ struct RecipeCaptureView: View {
 
         HStack {
           PasteButton(payloadType: String.self) { strings in
-            model.pastedText(strings.first ?? "")
+            model.pastedText(strings.first)
           }
           .labelStyle(.titleAndIcon)
 

@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 15, 2026 (ADR-0038 **S3c** shipped + Jon device-passed PR #186 → DONE-LOG; Next Up = **ADR-0040 S3** — the lossless-or-**loud** pass, remaining silent-success scope only).
+Last updated: July 15, 2026 (ADR-0040 **S3** — lossless-or-**loud** surface-outcomes pass — architect-approved, app-build-gate **green**, PR #187 (device-pass + merge pending, Jon); Next Up = **ADR-0039 D5** — the prep-plan *tasks-never-choreography* prompt amendment, the smallest-first opening slice of the now-designed Playbook milestone).
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,24 +21,41 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0040 S3](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md), the
-lossless-or-**loud** pass.** **Every import *and edit* path ends in a visible outcome — what landed, or what
-didn't and why.** The **parser-surfacing half is already done**: the handoff review sheet flags unparsed lines
-and refuses a lossy commit (`HandoffReviewCoordinator`, S3a/S3b "at the boundary not just the UI"), and S3c
-retired Menu's `pastePrepPlanButtonTapped` empty-clipboard no-op and added the unmatched-result alert. What
-remains is the **silent-success** side. **App-layer only — no core / schema / migration:**
+**Live dispatch target — [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md) D5, the
+prep-plan *tasks-never-choreography* prompt amendment.** ADR-0039's design is **complete** (Amendment 1,
+2026-07-15, resolved OQ1–OQ4 + corrected the recipe framing), so the milestone moves from design conversation
+to build — **smallest-first**. This opening slice is **Core-only — no app / schema / migration** (so Codex can
+actually build *and* test it; keep pure prompt/parse logic in the package per the Verification Pattern below).
 
-- **Confirm direct edits.** A learning edit/delete (ADR-0040 S1, menu detail) and a prep-step
-  create/edit/delete/reorder (`MenuModels.swift` step CRUD) currently save with **no visible confirmation** —
-  the row just appears or doesn't. End each in a visible outcome (a transient success indicator; the standard
-  error surface on failure).
-- **Sweep remaining silent no-ops.** Audit the paste/edit paths for lingering `guard let … else { return }`
-  invisibility (empty clipboard, missed iOS *Allow Paste*) — the S3a device-pass failure mode where "it did
-  nothing," "it worked invisibly," and "wrong build" all looked identical.
+**D5 — the prep plan holds tasks, never choreography.** Amend the prep-plan generation prompt contract so the
+model emits **separable, atomic, context-free tasks** ("Salt the chicken Wednesday", "Pull the beef to temp at
+4") and **never choreography** — interleaved cross-recipe cooking instructions ("sear the beef while the salad
+rests"). Choreography strips the recipe context the cook actually reasons with, so it will never be trusted;
+generating it is noise that buries the tasks that *are* trustworthy. The recipes hold the cooking; the prep
+plan must never become a merged mega-recipe. See ADR-0039 §D5 +
+[ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md).
 
-**Then [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md)** (the Playbook column) —
-milestone-sized, Jon-gated, a **design conversation, not a Codex dispatch**. The learnings corpus is now real
-and editable; design the Playbook once it has content to hold.
+- **Primary contract:** `MenuPrepPlan.instructions`
+  (`YesChefPackage/Sources/YesChefCore/MenuPrepPlan.swift:293`) — today it instructs the model to "invent
+  grounded **sequencing**, work sessions, and new prep steps." Tighten toward atomic tasks and drop the
+  invitation to weave cross-dish sequencing; preserve the existing JSON shape (`session`/`task`/`serves`/
+  `sourceDish`) and the "compose from stored Make-Ahead notes" behavior.
+- **Sibling contract:** `MealPlanMakeAheadStrategy.instructions`
+  (`YesChefPackage/Sources/YesChefCore/MealPlanMakeAheadStrategy.swift:183`) — apply the same
+  tasks-never-choreography constraint so the meal-plan variant doesn't drift.
+- **Test in Core.** Assert the constraint in the package suite (this is exactly why the logic lives in
+  `YesChefPackage`, not the app layer).
+
+**Queued behind it — the ADR-0039 UI slices (each its own Jon-gated dispatch, in likely order):**
+- **Recipe Playbook region** (D1/D2/OQ1/OQ2) — the anchor: Playbook as a **third peer region** (compact = a
+  third `CompactSection` picker segment in `RecipeDetailView.swift`; wide iPad = a Cook/Plan toggle with
+  Ingredients pinned as a ⅓ anchor, retiring the manual `ChatWorkspaceDivider`). **Full-move** make-ahead +
+  notes + Chef It Up + Serve With out of `directionsColumn`; collapsible sections with filled/empty content
+  indicators. A first brick already landed (the persistent Make-ahead header, PR #186).
+- **"Ask" slide-over + chat demotion** (D3) — the in-app chat becomes the secondary "quick one" slide-over;
+  "Hand off to ChatGPT" is the primary affordance; the draggable divider's old reader-vs-chat job retires.
+- **Menu launcher mode** (D4/OQ3) — delete the menu's third column, foreground the dish list with collapsible
+  days (collapsed by default once the service date is today-or-past), collapse the prep plan near service.
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**

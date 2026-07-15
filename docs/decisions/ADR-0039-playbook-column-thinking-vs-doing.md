@@ -6,7 +6,9 @@
 > work of *actually running it* (ingredients, instructions, navigation). Today they are tangled. This ADR
 > separates them.
 
-Status: **Proposed** — 2026-07-14. Origin: Jon, immediately after the [ADR-0038](ADR-0038-external-llm-handoff.md)
+Status: **Proposed** — 2026-07-14; **Amendment 1** (2026-07-15) resolves OQ1–OQ3 and corrects the recipe
+framing (see the [Amendment 1](#amendment-1--2026-07-15-oq1oq3-resolved-recipe-framing-corrected) section).
+Origin: Jon, immediately after the [ADR-0038](ADR-0038-external-llm-handoff.md)
 S2 device pass. **Depends on [ADR-0038 Amendment 1](ADR-0038-external-llm-handoff.md)** (the two-part
 Deliverable + Learnings return contract — this ADR is *where those Learnings become visible*). Touches
 [ADR-0021](ADR-0021-recipe-variations.md) (variations), [ADR-0023](ADR-0023-recipe-edit-proposals.md)
@@ -42,14 +44,17 @@ Name: **Playbook**. Explicitly rejected:
   screen"). Overloading it would be actively confusing.
 - **"Prep" / "Planning"** — too narrow; excludes Learnings, which are knowledge, not plans.
 
-**Contents:** make-ahead, notes, Learnings (ADR-0038 Amd 1), variations (ADR-0021), adjustments (ADR-0023),
-and the affordances that produce them (D3). Provenance is metadata, never the organizing principle.
+**Contents:** make-ahead, notes, Chef It Up, Serve With, Learnings (ADR-0038 Amd 1), variations (ADR-0021),
+adjustments (ADR-0023), and the affordances that produce them (D3). Provenance is metadata, never the
+organizing principle. *(Amendment 1 corrects the "third column" framing below and fixes the exact contents
+cut — the recipe has **three peer regions**, not two columns; see [Amendment 1](#amendment-1--2026-07-15-oq1oq3-resolved-recipe-framing-corrected).)*
 
 ### D2 — **Make-ahead relocates out of the recipe body into the Playbook**
 
 Make-ahead is **pre-execution by definition** — you read it two days out, never while searing. Moving it is
 not burying cook-critical content; it *fixes* the cook scroll. This is a net win on both ends: the Playbook
-gains its anchor content, and the body gets shorter and more navigable.
+gains its anchor content, and the body gets shorter and more navigable. *(Amendment 1 resolves OQ1: this is a
+**full move** — the cook body shows no make-ahead at all, not even a compact summary.)*
 
 ### D3 — The in-app chat **demotes from "the AI" to "the quick one"**
 
@@ -57,8 +62,9 @@ Its job shrank; it did not disappear. The tiers become legible in the UI, and th
 both:
 
 - **Hand off to ChatGPT** (flat-rate, deep, multi-turn) — the **primary** affordance. ADR-0038's Copy Prompt.
-- **Ask** (in-app, on-device/metered — [[yeschef-onbard-model-tier]]) — **secondary**, slides in. For the
-  cheap and instant: *"what can I sub for gochujang?"* Offboarding for that is absurd.
+- **Ask** (in-app, on-device/metered — [[yeschef-onbard-model-tier]]) — **secondary**, a **slide-over**. For the
+  cheap and instant: *"what can I sub for gochujang?"* Offboarding for that is absurd. *(Amendment 1: "Ask" is a
+  true slide-over, decoupled from any resize bar — the old draggable divider is retired.)*
 
 This is what justifies de-emphasis without deletion, and it puts [[personal-app-latency-tolerance]] and the
 cost ladder on screen instead of in Jon's head.
@@ -111,14 +117,14 @@ instruct the model to emit **tasks, never choreography**. Don't generate what wi
 
 ## Open questions
 
-- **OQ1 — Playbook on the recipe: home or workshop?** Does make-ahead *move* entirely (body shows nothing),
-  or does the body keep a compact read-only summary with the Playbook as the authoring/review surface? Leaning
-  **home with a compact body summary**; Start Cooking must still surface what it needs.
-- **OQ2 — compact/phone layout.** There is no third column on iPhone (and [[macos-longterm-target]] means this
-  must not become an iPad-only idiom). Is the Playbook a tab, a sheet, or a section?
-- **OQ3 — what triggers the menu's temporal mode shift (D4)?** Automatic (service date proximity), manual
-  toggle, or simply "collapsible days, collapsed by default when the menu is in the past/present"? Prefer the
-  dumbest thing that works; avoid a mode the user can't predict.
+- **OQ1 — RESOLVED (2026-07-15, Amendment 1): full move, body shows nothing.** No compact body summary. Start
+  Cooking does not constrain this (and is not being killed). Playbook sections are collapsible with content
+  indicators.
+- **OQ2 — RESOLVED (2026-07-15, Amendment 1): a third segment on compact; a Cook/Plan toggle on wide.** Not a
+  tab or sheet — the Playbook is a third case of the existing `Ingredients · Directions` segmented picker, and
+  on wide iPad a Cook/Plan toggle swaps Directions ↔ Playbook with Ingredients pinned.
+- **OQ3 — RESOLVED (2026-07-15, Amendment 1): collapsible days, collapsed by default when the service date is
+  today-or-past.** The dumbest predictable option, no new mode.
 - **OQ4 — RESOLVED (2026-07-14, with Jon): the Playbook subsumes by *display*; the content underneath stays
   *typed*.** The original lean here ("subsumes-by-display, not by schema") was read as *reuse the existing
   generic notes surfaces* — and that is **backwards**. The project's actual trajectory is to **decompose**
@@ -128,6 +134,74 @@ instruct the model to emit **tasks, never choreography**. Don't generate what wi
   [ADR-0038 Amendment 1](ADR-0038-external-llm-handoff.md)'s Learnings get their own synced `Learning` table
   rather than being dumped into `Menu.notes` or day-scoped `MenuItem` note-rows. **Granularity is also an AI
   affordance** — a typed record is addressable; a paragraph buried in a note blob is not.
+
+## Amendment 1 — 2026-07-15: OQ1–OQ3 resolved, recipe framing corrected
+
+Design discussion with Jon (2026-07-15), grounded in the current UI. Two things: a factual correction to the
+recipe framing, and the resolution of OQ1–OQ3.
+
+### The recipe has three peer regions, not two columns
+
+The original text calls the Playbook "the third column" and speaks of "reclaiming" an empty column. That is
+wrong about the code. Both the recipe and menu use a hand-rolled `ChatWorkspaceSplit`
+(`YesChefApp/RecipeChatWorkspace.swift`) = **reader pane + a collapsible/resizable chat pane** — the pane
+already zeroes out (`ChatWorkspaceDetent.readerOnly`) and is already a `.sheet` on compact. There was never an
+empty column to reclaim; what changes is the pane's **content**.
+
+The correct model: the recipe has **three peer regions — Ingredients · Directions · Playbook** — and *the
+device decides how many are co-visible*:
+
+- **Compact** (iPhone / iPad-narrow / macOS-narrow): one region at a time, via the existing `.segmented`
+  `Picker` over `CompactSection` (`RecipeDetailView.swift:525`), which simply gains a **third case**:
+  `Ingredients · Directions · Playbook`. This is why the split scales down without an iPad-only idiom
+  ([[macos-longterm-target]]).
+- **Wide iPad**: **Ingredients is pinned as a stable ⅓ anchor** (useful in both modes), and a **Cook / Plan
+  toggle** swaps the other ⅔ between **Directions** (Cook) and **Playbook** (Plan). The toggle **sets preset
+  detents** (reusing the `ChatWorkspaceDetent` metrics); the **manual draggable divider (`ChatWorkspaceDivider`)
+  is retired** — its old reader-vs-chat job is gone now that "Ask" is a slide-over, and a free drag invites an
+  "any blend" state that contradicts the bimodal thinking-vs-doing axis. The toggle is the wide-screen render of
+  the same discrete-mode grammar as the compact picker.
+
+The Playbook is a **first-class peer of Ingredients and Directions**, not a bolt-on pane.
+
+### OQ1 — full move, body shows nothing
+
+Make-ahead and the other migrated sections leave the cook body **entirely**; only the Playbook shows them. No
+compact body summary. Start Cooking explicitly does *not* constrain this (nor is it being killed — it just gets
+no vote here). **New requirement:** Playbook sections are **collapsible**, and each header carries a
+**filled/empty content indicator** so you can see what's populated without expanding.
+
+**Contents cut** (from `directionsColumn`, `RecipeDetailView.swift:542`):
+
+| Section | Destination |
+|---|---|
+| Make-ahead (`Recipe.makeAhead`) | **Playbook** (full move) |
+| Notes — reader feedback + other `RecipeNote` | **Playbook** |
+| Chef It Up | **Playbook** |
+| Serve With | **Playbook** |
+| Instructions | stays in **Directions** |
+| Active variation method note | stays in **Directions** (modifies how you cook now) |
+| Workbench candidate links | stays in **Directions** |
+
+**Make-ahead store:** `Recipe.makeAhead` (the `String?` column) stays **canonical**; `RecipeNote` of kind
+`.makeAhead` is legacy/unused — noted, not migrated now. (This is a local exception to OQ4's decompose-into-typed
+-homes trajectory, kept for low churn; revisit if it bites.)
+
+### OQ2 — resolved by the three-region model above
+
+Third segment on compact; Cook/Plan toggle on wide. Not a tab or a separate sheet.
+
+### OQ3 — collapsible days, collapsed when today-or-past
+
+The menu's launcher mode (D4) needs no unpredictable proximity trigger: the dish list is always present with
+collapsible days; days collapse **by default once the service date is today or in the past**. No new mode.
+
+### Unifying principle (spans D4 + OQ2/OQ3)
+
+> **Key the mode off a date when there is one; off a manual toggle when there isn't.**
+
+A **menu** has a service date → its planning→launcher shift is date-driven (OQ3). A **recipe** has no inherent
+date → a manual Cook/Plan toggle is the honest control. The asymmetry is principled, not accidental.
 
 ## Related
 
