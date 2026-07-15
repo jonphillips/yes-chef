@@ -470,7 +470,11 @@ final class RecipeCaptureModel {
     return false
   }
 
-  func pastedText(_ text: String) {
+  func pastedText(_ text: String?) {
+    guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      showError("No recipe URL was pasted.")
+      return
+    }
     urlText = text.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 

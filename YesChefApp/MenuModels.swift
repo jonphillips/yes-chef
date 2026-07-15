@@ -37,6 +37,11 @@ final class MenuLibraryModel {
   var selectedMenuID: CoreMenu.ID?
   var errorMessage: String?
   var isShowingError = false
+  @ObservationIgnored var toastCenter: AppToastCenter?
+
+  init(toastCenter: AppToastCenter? = nil) {
+    self.toastCenter = toastCenter
+  }
 
   var availableRecipeRows: [RecipeListRowData] {
     recipeRows
@@ -492,9 +497,11 @@ final class MenuDetailModel {
   var information: Information?
   var errorMessage: String?
   var isShowingError = false
+  @ObservationIgnored var toastCenter: AppToastCenter?
 
-  init(menuID: CoreMenu.ID) {
+  init(menuID: CoreMenu.ID, toastCenter: AppToastCenter? = nil) {
     self.menuID = menuID
+    self.toastCenter = toastCenter
     _detail = Fetch(wrappedValue: nil, MenuDetailRequest(menuID: menuID), animation: .default)
   }
 
