@@ -9,6 +9,31 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0039 — D3, the "Ask" chat demotion + retiring the wide chat split
+
+**✅ architect-approved + app-build-gate green (local `generic/platform=iOS` → BUILD SUCCEEDED) — 2026-07-15.
+Jon device-pass + merge pending.** yes-chef PR [#190](https://github.com/jonphillips/yes-chef/pull/190).
+[ADR-0039 §D3 + Amendment 1](decisions/ADR-0039-playbook-column-thinking-vs-doing.md): collapses the
+transitional AI-in-two-places state D1/D2 left behind. The always-on `ChatWorkspaceSplit` + draggable
+`ChatWorkspaceDivider` is **removed from the recipe detail** (still live in Menu/Calendar/Workbench); the
+Playbook header now **owns both tiers** — **Hand off to ChatGPT** (`.borderedProminent`, primary) and **Ask**
+(`.bordered`, secondary), plus the return-paste `PasteButton`. The toolbar "Chat" entry point and the Cook/Plan
+detent-toggle logic (`wideSectionChanged`, `chatWorkspaceDetentRaw`) are deleted. **App-layer only — no schema /
+migration.**
+
+**Ask reuses the existing recipe-scoped `.sheet` for now** (`model.chatButtonTapped` →
+`.sheet(item: $model.destination.chat)`); the **true slide-over presentation** Amendment 1 specifies ("a true
+slide-over, decoupled from any resize bar") is a **deliberate follow-on**, not a miss — see the D3-follow-on
+Next Up. D3 delivers the *demotion + divider retirement*; the slide-over *styling* is the next slice.
+
+**Architect review (PR #190) — verified clean.** No orphaned code: `ChatWorkspaceSplit`/`ChatWorkspaceDetent`
+stay in use across Menu/Calendar/Workbench. The Focus toolbar button is untouched — it drives
+`NavigationSplitView` column visibility (`AppMainLayout.swift`), not the retired chat split. Confining
+Ask/handoff to the Playbook is **per-spec** ("the Playbook column header owns both"), not a reachability
+regression. Two cosmetic notes (PasteButton styling; "Playbook" vs "Plan" heading) were **folded forward** into
+the D3-follow-on slice rather than blocking merge. Architect local build → **BUILD SUCCEEDED**.
+
+---
 ## ADR-0039 — D1/D2 + OQ1/OQ2, the Recipe Playbook region
 
 **✅ architect-approved + app-build-gate green + Jon device-pass done — 2026-07-15. Merge pending.** yes-chef

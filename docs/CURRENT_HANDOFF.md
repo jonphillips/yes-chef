@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 15, 2026 (ADR-0039 **D1/D2 + OQ1/OQ2** — the Recipe Playbook region — architect-approved, app-build-gate **green** (BUILD SUCCEEDED after the architect fixed 4 App-target compile errors invisible to `check-drift.sh`), Jon device-pass **done**, PR #189 (merge pending, Jon); Next Up = **ADR-0039 D3** — the "Ask" slide-over + chat demotion: retire the `ChatWorkspaceDivider`, make the in-app chat a secondary slide-over from the Playbook header, ChatGPT handoff primary. This is the slice that removes the doubled-up AI column the intermediate D1/D2 state leaves behind).
+Last updated: July 15, 2026 (ADR-0039 **D3** — the "Ask" chat demotion — architect-approved, app-build-gate **green** (architect's local `generic/platform=iOS` → BUILD SUCCEEDED), Jon device-pass + merge pending, PR #190. The wide recipe `ChatWorkspaceSplit` + draggable divider are **retired** and the Playbook header now owns both AI tiers — the doubled-up AI column from the D1/D2 intermediate state is gone. Next Up = **ADR-0039 D3 follow-on** — build the *true* "Ask" slide-over (Amendment 1; D3 shipped it as the reused sheet) with the two PR-#190 review-polish notes folded in).
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,23 +21,31 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md) D3 — the "Ask"
-slide-over + chat demotion.** With D1/D2 shipped (PR #189), the recipe now has the three-region model, but the
-wide layout still hosts the **old `ChatWorkspaceSplit` + draggable `ChatWorkspaceDivider`**: the Cook/Plan toggle
-merely flips its detent (Cook → `readerOnly` collapses the chat column; Plan → `balanced` re-expands it). That
-leaves the AI in **two places at once** — the standing chat column *and* the Playbook header's Copy-Prompt
-handoff. D3 collapses that. **App-layer — no schema/migration expected.**
+**Live dispatch target — [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md) D3 follow-on — the
+*true* "Ask" slide-over + Playbook-header polish.** D3 (PR #190) demoted the in-app chat and retired the wide
+`ChatWorkspaceSplit` + draggable divider, but shipped "Ask" by **reusing the existing recipe-scoped `.sheet`**
+(`model.chatButtonTapped` → `.sheet(item: $model.destination.chat)`).
+[ADR-0039 Amendment 1](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#L59) specifies "Ask" as **a true
+slide-over, decoupled from any resize bar** — an edge-anchored companion panel, not a modal bottom sheet. This
+slice builds that presentation and folds in the two PR-#190 review notes. **App-layer — no schema/migration
+expected.**
 
-**What D3 does ([ADR-0039 §D3 + Amendment 1](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#L59)):**
-- **Retire the manual `ChatWorkspaceDivider`** on wide. Its old reader-vs-chat resize job is gone; a free drag
-  invites an "any blend" state that contradicts the bimodal thinking-vs-doing axis. The Cook/Plan toggle is now
-  the only wide-mode control.
-- **Demote the in-app chat to "the quick one" — a true slide-over "Ask"**, decoupled from any resize bar,
-  invoked from the **Playbook column header**. On-device/metered ([[yeschef-onbard-model-tier]]); for the cheap
-  and instant (*"what can I sub for gochujang?"*).
-- **"Hand off to ChatGPT" (ADR-0038 Copy Prompt) is the primary affordance**, also owned by the Playbook header —
-  flat-rate, deep, multi-turn. The header owns **both** tiers; make the cost ladder legible in the UI
-  ([[personal-app-latency-tolerance]]).
+**What this slice does:**
+- **Build the true slide-over for "Ask" on wide iPad.** Replace the reused `.sheet` with an edge-anchored
+  slide-over companion so Ask reads as the lightweight, non-blocking "quick one" the ADR calls for (it should not
+  dim/steal the reader the way a modal sheet does). Keep the plain sheet on **compact**, where a side slide-over
+  has no room. The Playbook-header **Ask** button is already wired (`model.chatButtonTapped`); this is a
+  presentation change, not a new entry point. Leave the exact panel mechanics to the device pass — the bar is
+  "companion, not modal."
+- **Fold in — PR #190 review notes (both cosmetic, App-layer):**
+  1. **PasteButton styling** — `pasteResultButton` (`YesChefApp/RecipePlaybookView.swift:106`) has no
+     `buttonStyle` while its header siblings are `.borderedProminent` (handoff) / `.bordered` (Ask); the retired
+     `HandoffCopyPasteControls` group was uniformly `.bordered`. Give the PasteButton a matching style so the
+     header reads as one control cluster.
+  2. **"Playbook" vs "Plan" heading** — the new `.title.bold()` "Playbook" title
+     (`YesChefApp/RecipePlaybookView.swift:65`) sits directly under a segmented control labeled "Playbook"
+     (compact) / "Plan" (wide): mild redundancy in compact, a Plan/Playbook mismatch in wide. Resolve by dropping
+     the in-view title **or** aligning the wide segment label — decide which reads better on device.
 
 **Verification:** App-layer SwiftUI — the architect's local `generic/platform=iOS` build is **required evidence**
 (see Verification Pattern; D1/D2 shipped 4 compile errors past `check-drift.sh` because it compiles only the

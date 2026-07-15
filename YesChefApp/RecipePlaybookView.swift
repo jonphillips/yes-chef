@@ -62,9 +62,6 @@ struct RecipePlaybookView: View {
 
   private var playbookHeader: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("Playbook")
-        .font(.title.bold())
-
       ViewThatFits(in: .horizontal) {
         HStack(spacing: 8) {
           handoffButton
@@ -110,6 +107,7 @@ struct RecipePlaybookView: View {
       }
     }
     .accessibilityLabel("Paste handoff result")
+    .buttonStyle(.bordered)
   }
 
   private func playbookSection<Content: View>(
