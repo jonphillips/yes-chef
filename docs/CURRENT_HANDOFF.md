@@ -25,9 +25,9 @@ PR); do all listed, in order.
 region (D1/D2 + OQ1/OQ2, Amendment 1).** The anchor UI slice of the now-building Playbook milestone (D5, the
 prompt amendment, shipped in PR #188). The recipe gains a **third peer region — Ingredients · Directions ·
 Playbook** — into which the "thinking" content moves out of the cook body. **App-layer only — no schema /
-migration:** `Recipe.makeAhead` (`String?`) stays the **canonical** make-ahead store, so this hits the
-**architect build gate**, not Codex's (Codex attempts the generic build once, pastes the 143/CoreSimulator
-error, the architect runs `generic/platform=iOS` locally before approving — see the Verification Pattern).
+migration:** `Recipe.makeAhead` (`String?`) stays the **canonical** make-ahead store. This requires Codex's
+elevated generic iOS build; package tests and `swiftc -parse` do not compile the App target. If that build
+cannot reach the compiler, the architect runs it locally before approval — see the Verification Pattern.
 
 **The three-region model (Amendment 1 — device decides how many are co-visible):**
 - **Compact** (iPhone / iPad-narrow / macOS-narrow): add a **third case** to the `CompactSection` `.segmented`
@@ -141,17 +141,17 @@ device pass regardless. So verify with **compiler + tests once**, then hand off:
 
 - Run `xcodegen generate` after adding Swift source files.
 - For package/logic-only changes, `swift build` the package (cheaper than a full app build).
-- Otherwise attempt the app build **once** with no simulator or signing identity:
-  `xcodebuild -scheme YesChef -destination 'generic/platform=iOS' -skipMacroValidation CODE_SIGNING_ALLOWED=NO build`.
+- Otherwise run the app build with **elevated/unsandboxed permissions**, no simulator, and no signing
+  identity:
+  `scripts/xcodebuild-summary.sh -scheme YesChef -destination 'generic/platform=iOS' -skipMacroValidation CODE_SIGNING_ALLOWED=NO build`.
 - Run `scripts/check-drift.sh`.
-- **The app-target build is the *architect's* gate, not Codex's — a green package `swift build` is NOT
-  evidence the app compiles.** Codex's environment cannot reliably run the generic build (it SIGTERMs — exit
-  143 — with "CoreSimulator unavailable": no working CoreSimulator subsystem to enumerate destinations against,
-  and/or a cold-build timeout). This slipped **three** uncompiled PRs through (#183, #184, #185); the earlier
-  "just mandate the generic build" fix did not hold because Codex *can't execute it*. So: Codex attempts it
-  once and **pastes the exact error** (incl. the 143/CoreSimulator failure) into the PR — that failure is
-  expected and does **not** block handoff — and **the architect runs the generic build locally before
-  approving any PR touching `YesChefApp/`.** A warm build is ~1 min; cold ~3 min.
+- **The generic app build is required evidence for `YesChefApp/` changes.** `scripts/check-drift.sh` compiles
+  only `YesChefPackage`; a green package build and `swiftc -parse` are not App-target evidence. The default
+  Codex sandbox can SIGTERM Xcode before compilation by denying Xcode's user-level service/cache access, so
+  start with the elevated command above. A sandbox-shaped `143` is not an expected green result. If the
+  elevated build cannot reach the compiler, record the full-log path and **the architect runs the same generic
+  build locally before approving.** Once a build reaches the compiler, source errors must be fixed and the
+  same command rerun to verify.
 - **Corollary — keep pure logic out of the App layer.** String formatting, serialization, and parsing belong
   in `YesChefPackage` (which Codex *can* compile and test), not in `YesChefApp/`. #185's build break was
   `HandoffIntents.swift` calling `date: .full` (invalid `Date.FormatStyle.DateStyle`) — logic that belongs in
@@ -159,8 +159,8 @@ device pass regardless. So verify with **compiler + tests once**, then hand off:
 - **Do not install/launch on simulators by default** — skip the install loop and hand straight to
   Jon's UI pass. Only boot/install a simulator when a change genuinely can't be confirmed from build
   + tests, and say why in the PR.
-- **Fail fast — one build attempt, then stop.** Xcode/toolchain trouble is never a reason to retry with
-  alternate incantations. Make the generic build attempt once; if it fails, paste the error and stop — do
-  not try to repair the toolchain. Device install is Jon's pass, not a Codex grind.
+- **Fail fast, without false escape hatches.** Do not try alternate destinations, simulator resets, or install
+  loops. The only build command is the elevated generic command above; an environment failure that prevents it
+  reaching the compiler is an architect gate, not a successful Codex verification. Device install is Jon's pass.
 
 Jon performs the primary UI testing pass on `iPad Pro 13-inch (M5) (16GB)` and `iPhone 17 Pro`.
