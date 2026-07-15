@@ -7,6 +7,7 @@ struct RecipeDetailView: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   @AppStorage(ChatWorkspaceDetent.storageKey) private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   @State private var model: RecipeDetailModel
+  @State private var handoffTransport = HandoffInAppTransport()
   let libraryModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
@@ -135,6 +136,7 @@ struct RecipeDetailView: View {
     } message: {
       Text(model.errorMessage ?? "Something went wrong.")
     }
+    .handoffTransportAlert(handoffTransport)
   }
 
   @ViewBuilder
@@ -149,6 +151,7 @@ struct RecipeDetailView: View {
       ) {
         RecipeReaderView(
           model: model,
+          handoffTransport: handoffTransport,
           libraryModel: libraryModel,
           onRecipeSelected: onRecipeSelected,
           showsStartCookingButton: showsStartCookingButton
@@ -157,6 +160,7 @@ struct RecipeDetailView: View {
     } else {
       RecipeReaderView(
         model: model,
+        handoffTransport: handoffTransport,
         libraryModel: libraryModel,
         onRecipeSelected: onRecipeSelected,
         showsStartCookingButton: showsStartCookingButton
@@ -197,6 +201,7 @@ private struct RecipeReaderView: View {
   private let twoColumnThreshold: CGFloat = 640
 
   let model: RecipeDetailModel
+  let handoffTransport: HandoffInAppTransport
   let libraryModel: RecipeLibraryModel
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
   let showsStartCookingButton: Bool
@@ -536,9 +541,7 @@ private struct RecipeReaderView: View {
   @ViewBuilder
   private var directionsColumn: some View {
     VStack(alignment: .leading, spacing: 18) {
-      if let makeAhead = model.makeAhead {
-        makeAheadSection(makeAhead)
-      }
+      makeAheadSection(model.makeAhead)
       if !model.serveWithItems.isEmpty {
         serveWithSection(model.serveWithItems)
       }
@@ -633,21 +636,30 @@ private struct RecipeReaderView: View {
     .background(.tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
   }
 
-  private func makeAheadSection(_ makeAhead: String) -> some View {
+  private func makeAheadSection(_ makeAhead: String?) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       HStack(alignment: .firstTextBaseline) {
         Text("Make-ahead")
           .font(.title2.bold())
         Spacer()
-        Button(role: .destructive) {
-          model.clearMakeAheadButtonTapped()
-        } label: {
-          Label("Clear", systemImage: "xmark.circle")
-        }
+        HandoffCopyPasteControls(
+          source: .recipe(model.recipeID),
+          transport: handoffTransport
+        )
         .buttonStyle(.bordered)
+        if makeAhead != nil {
+          Button(role: .destructive) {
+            model.clearMakeAheadButtonTapped()
+          } label: {
+            Label("Clear", systemImage: "xmark.circle")
+          }
+          .buttonStyle(.bordered)
+        }
       }
-      Text(makeAhead)
-        .frame(maxWidth: .infinity, alignment: .leading)
+      if let makeAhead {
+        Text(makeAhead)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
     }
   }
 

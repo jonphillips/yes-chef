@@ -9,6 +9,34 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0038 — External-LLM handoff, S3c (in-app door) + Amendment 2
+
+**✅ DONE — architect-approved + Jon device-passed 2026-07-15.** yes-chef PR
+[#186](https://github.com/jonphillips/yes-chef/pull/186).
+[ADR-0038 Amendment 2](decisions/ADR-0038-external-llm-handoff.md): Recipe + MealPlan get an in-app
+**Copy-Prompt / Paste-Result** door (discuss-first) as the **primary** path; the App Intent stays the
+hands-free bonus. **App-layer only — no core / schema / migration.**
+
+**In-app transport (`HandoffInAppTransport`).** Copy emits the S3b tokenized prompt (`YC-HANDOFF:` + the
+source's `DeliverableFormat`) via shared `HandoffAppOperations.export`; Paste routes through
+`AIHandoffIntentImport.stageReview` → the review sheet (editable-at-grain, Learnings ride along). Menu's manual
+Copy/Paste moved onto the same review-routed transport, retiring its direct-write paste path. Controls live on
+a **persistent Make-ahead header** in the recipe Playbook column (a first ADR-0039 brick, fixing the
+`PasteButton`-in-overflow-menu bug) and on the meal-plan day header; custom copy icon
+(`sparkles.square.filled.on.square`), `PasteButton` kept for paste (privacy, no per-paste prompt).
+
+**Unmatched-result guard.** The in-app paste checks the pasted result against the surface it was tapped on: a
+missing token, a handoff not found locally (incl. cross-device, since `AIHandoff` is device-local), or a token
+resolving to a **different** source each raise a **Review Anyway / Cancel** alert. Proceed stages against the
+current surface via `stageReviewForKnownSource` (mints a device-local handoff + stages atomically in one
+write). Restores the token-less fallback **safely** — never a direct write, always the review sheet, with an
+explicit "check this" gate; also makes a cross-device return route to the same synced recipe/day.
+
+**App Shortcuts.** Export/Import registered as `AppShortcut`s for Spotlight / Siri / Action Button discovery;
+the intents refactored onto the shared `HandoffAppOperations`. Follow-up commits `a4ea289` (controls fix) +
+`da07b47` (unmatched guard) landed the device-pass findings.
+
+---
 ## ADR-0038 — External-LLM handoff, S3b (Recipe + Meal Plan)
 
 **✅ DONE — architect-approved; build fix landed as `3999bf2`. Jon device pass: _pending_ — flip this line to

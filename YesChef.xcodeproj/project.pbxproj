@@ -61,6 +61,7 @@
 		9B8EFD5B3540051D7122B27D /* PaprikaImportReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E29F682A3093D37071F5A924 /* PaprikaImportReviewView.swift */; };
 		A103667583AD5577C2633211 /* OriginalSnapshotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76C7E4899A1093E58F713C2F /* OriginalSnapshotView.swift */; };
 		A53A9EE95AC871F9F6B627C5 /* RecipeLibraryListState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3B1C7A7E48A8FFE074A05E0 /* RecipeLibraryListState.swift */; };
+		A649C9165C7E76B9D2868241 /* HandoffInAppTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0424EE313AB25F0AD46E963E /* HandoffInAppTransport.swift */; };
 		A7663D81E209037F796813A4 /* CategoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA4CA05A4077E714D63D297 /* CategoryModels.swift */; };
 		A8CFCA1AA97D00A5DEB1BE7D /* WorkbenchViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A809D8DA30A2274B2B0E1982 /* WorkbenchViews.swift */; };
 		A988E3254E3FCB7C8001B787 /* HandoffEntities.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55509395111AAC5A4B7E5AB /* HandoffEntities.swift */; };
@@ -128,6 +129,7 @@
 
 /* Begin PBXFileReference section */
 		03DFCF817329BEE674E95B72 /* YesChefApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YesChefApp.swift; sourceTree = "<group>"; };
+		0424EE313AB25F0AD46E963E /* HandoffInAppTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffInAppTransport.swift; sourceTree = "<group>"; };
 		07C439846D3B6561F2CFE399 /* RecipeChatWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeChatWorkspace.swift; sourceTree = "<group>"; };
 		07FEC345E664B62E662EA479 /* YesChefPackage */ = {isa = PBXFileReference; lastKnownFileType = folder; name = YesChefPackage; path = YesChefPackage; sourceTree = SOURCE_ROOT; };
 		0BA4CA05A4077E714D63D297 /* CategoryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryModels.swift; sourceTree = "<group>"; };
@@ -336,6 +338,7 @@
 				21092B09A19EF04372E6A66D /* GroceryModels.swift */,
 				20C2EE75870C5C9AAD099505 /* GroceryPantryReviewViews.swift */,
 				27FA69A8957E5DC8A49A9E3F /* GroceryViews.swift */,
+				0424EE313AB25F0AD46E963E /* HandoffInAppTransport.swift */,
 				BF6D7AE0E516607E7C801612 /* HandoffReviewCoordinator.swift */,
 				18FECD94C6F2E120A02EE0A6 /* IdleTimerDisabledModifier.swift */,
 				7ED8C4BF9300184ABE4E59A5 /* Info.plist */,
@@ -576,6 +579,7 @@
 				AE11AE8D6A7D9F8E06642477 /* GroceryPantryReviewViews.swift in Sources */,
 				A9FBE5AA277DCBB1A66A417E /* GroceryViews.swift in Sources */,
 				A988E3254E3FCB7C8001B787 /* HandoffEntities.swift in Sources */,
+				A649C9165C7E76B9D2868241 /* HandoffInAppTransport.swift in Sources */,
 				3B43FC000CAA77FE2FCBAD93 /* HandoffIntents.swift in Sources */,
 				2F07342A5ED8AB64EFA742F1 /* HandoffReviewCoordinator.swift in Sources */,
 				26A54D34845DADD8C9E1493D /* IdleTimerDisabledModifier.swift in Sources */,

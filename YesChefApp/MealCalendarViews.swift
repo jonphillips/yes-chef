@@ -260,6 +260,7 @@ struct MealCalendarDayAgendaView: View {
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
   @State private var compactChatModel: RecipeChatModel?
+  @State private var handoffTransport = HandoffInAppTransport()
 
   private var occupiedMealSlots: [MealPlanItemSlot] {
     MealPlanItemSlot.allCases.filter { !model.rows(on: model.selectedDate, mealSlot: $0).isEmpty }
@@ -289,6 +290,7 @@ struct MealCalendarDayAgendaView: View {
         )
       }
     }
+    .handoffTransportAlert(handoffTransport)
   }
 
   private var agendaContent: some View {
@@ -297,7 +299,9 @@ struct MealCalendarDayAgendaView: View {
         MealCalendarDayHeader(
           model: model,
           cookSession: cookSessionAction,
-          chat: chatButtonTapped
+          chat: chatButtonTapped,
+          handoffSource: handoffSource,
+          handoffTransport: handoffTransport
         )
       }
 
@@ -346,6 +350,21 @@ struct MealCalendarDayAgendaView: View {
 
   private var cookSessionPresentation: CookSessionPresentation? {
     CookSessionPresentation(plannerTitle: model.selectedDateTitle, rows: model.selectedDayRows)
+  }
+
+  private var handoffSource: HandoffExportSource? {
+    model.selectedDayRows
+      .sorted { lhs, rhs in
+        if lhs.item.mealSlot.sortOrder != rhs.item.mealSlot.sortOrder {
+          return lhs.item.mealSlot.sortOrder < rhs.item.mealSlot.sortOrder
+        }
+        if lhs.item.sortOrder != rhs.item.sortOrder {
+          return lhs.item.sortOrder < rhs.item.sortOrder
+        }
+        return lhs.item.id.uuidString < rhs.item.id.uuidString
+      }
+      .first
+      .map { .mealPlan($0.item.id) }
   }
 
   private var cookSessionAction: (() -> Void)? {
@@ -804,6 +823,8 @@ private struct MealCalendarDayHeader: View {
   let model: MealCalendarModel
   var cookSession: (() -> Void)?
   var chat: () -> Void
+  var handoffSource: HandoffExportSource?
+  let handoffTransport: HandoffInAppTransport
 
   var body: some View {
     ViewThatFits(in: .horizontal) {
@@ -813,6 +834,7 @@ private struct MealCalendarDayHeader: View {
         Spacer()
         cookButton
         chatButton
+        handoffControls
         addMenu
       }
       // Narrow (agenda rail): title, then "Cook these" on its own line, then Chat + Add.
@@ -824,6 +846,7 @@ private struct MealCalendarDayHeader: View {
         }
         HStack {
           chatButton
+          handoffControls
           addMenu
           Spacer()
         }
@@ -858,6 +881,14 @@ private struct MealCalendarDayHeader: View {
       Label("Chat", systemImage: "sparkles")
     }
     .buttonStyle(.bordered)
+  }
+
+  @ViewBuilder
+  private var handoffControls: some View {
+    if let handoffSource {
+      HandoffCopyPasteControls(source: handoffSource, transport: handoffTransport)
+        .buttonStyle(.bordered)
+    }
   }
 
   private var addMenu: some View {
