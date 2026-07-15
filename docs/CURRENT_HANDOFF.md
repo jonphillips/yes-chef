@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 15, 2026 (ADR-0039 **D1/D2 + OQ1/OQ2** — the Recipe Playbook region — architect-approved, app-build-gate **green** (BUILD SUCCEEDED after the architect fixed 4 App-target compile errors invisible to `check-drift.sh`), Jon device-pass **done**, PR #189 (merge pending, Jon); Next Up = **ADR-0039 D3** — the "Ask" slide-over + chat demotion: retire the `ChatWorkspaceDivider`, make the in-app chat a secondary slide-over from the Playbook header, ChatGPT handoff primary. This is the slice that removes the doubled-up AI column the intermediate D1/D2 state leaves behind).
+Last updated: July 15, 2026 (ADR-0039 **D3 follow-on** — the true "Ask" slide-over (native trailing inspector on wide iPad) + Playbook-header polish — architect-approved, app-build-gate **green** (local `generic/platform=iOS` → BUILD SUCCEEDED), Jon device-pass **done**, PR #191 (merge pending, Jon). Ask is now a non-modal companion (tap-to-toggle, active-state ring), separated from the ChatGPT copy/paste cluster. Next Up = **ADR-0039 D4/OQ3** — Menu launcher mode: delete the menu's standing AI third column, foreground the dish list with collapsible days (collapsed once the service date is today-or-past), collapse the prep plan near service. This is the **last ADR-0039 UI slice** — the recipe side is complete).
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,31 +21,27 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md) D3 — the "Ask"
-slide-over + chat demotion.** With D1/D2 shipped (PR #189), the recipe now has the three-region model, but the
-wide layout still hosts the **old `ChatWorkspaceSplit` + draggable `ChatWorkspaceDivider`**: the Cook/Plan toggle
-merely flips its detent (Cook → `readerOnly` collapses the chat column; Plan → `balanced` re-expands it). That
-leaves the AI in **two places at once** — the standing chat column *and* the Playbook header's Copy-Prompt
-handoff. D3 collapses that. **App-layer — no schema/migration expected.**
+**Live dispatch target — [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#L72) D4/OQ3 — Menu
+launcher mode.** The **last ADR-0039 UI slice** — the recipe side (D1/D2/D3 + follow-on) is done. A menu is a
+*thinking* artifact you don't execute (you execute its recipes), so its planning→launcher shift is **temporal,
+not spatial** — keyed off the **service date**, not a manual toggle ([[mode-trigger-date-vs-toggle]]). **App-layer
+— no schema/migration expected.**
 
-**What D3 does ([ADR-0039 §D3 + Amendment 1](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#L59)):**
-- **Retire the manual `ChatWorkspaceDivider`** on wide. Its old reader-vs-chat resize job is gone; a free drag
-  invites an "any blend" state that contradicts the bimodal thinking-vs-doing axis. The Cook/Plan toggle is now
-  the only wide-mode control.
-- **Demote the in-app chat to "the quick one" — a true slide-over "Ask"**, decoupled from any resize bar,
-  invoked from the **Playbook column header**. On-device/metered ([[yeschef-onbard-model-tier]]); for the cheap
-  and instant (*"what can I sub for gochujang?"*).
-- **"Hand off to ChatGPT" (ADR-0038 Copy Prompt) is the primary affordance**, also owned by the Playbook header —
-  flat-rate, deep, multi-turn. The header owns **both** tiers; make the cost ladder legible in the UI
-  ([[personal-app-latency-tolerance]]).
+**What this slice does ([ADR-0039 §D4 + OQ3](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#L72)):**
+- **Delete the menu's standing AI third column** — the "seeded with…" chat/handoff panel, the "empty rent" from
+  the ADR's opening observation. The prep plan **keeps its primary middle-column placement** (a menu has no
+  Playbook column — it *is* one). The handoff/chat affordance becomes a **toolbar action or slide-in**, echoing
+  the recipe-side D3 demotion (Menu already carries a compact chat sheet + `chatButtonTapped`; trace its current
+  wide presentation first).
+- **Foreground the dish list as a launcher near service.** The dish list is always present with **collapsible
+  days**; days collapse **by default once the service date is today or in the past** (OQ3 — no unpredictable
+  proximity trigger, no new mode). Day-of, the job is *get me into the right recipe fast*.
+- **Collapse the prep plan near service.** Far from service the prep plan is the point; near service it yields
+  the foreground to the dish list.
 
 **Verification:** App-layer SwiftUI — the architect's local `generic/platform=iOS` build is **required evidence**
-(see Verification Pattern; D1/D2 shipped 4 compile errors past `check-drift.sh` because it compiles only the
-package — [[codex-build-excuse-reproduce]]).
-
-**Queued behind it — the remaining ADR-0039 UI slice (its own Jon-gated dispatch):**
-- **Menu launcher mode** (D4/OQ3) — delete the menu's third column, foreground the dish list with collapsible
-  days (collapsed by default once the service date is today-or-past), collapse the prep plan near service.
+(see Verification Pattern; App-target compile errors slip past `check-drift.sh`, which compiles only the package
+— [[codex-build-excuse-reproduce]]).
 
 **Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
 edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**

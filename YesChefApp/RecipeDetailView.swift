@@ -49,63 +49,9 @@ struct RecipeDetailView: View {
       model.persistedScaleChanged(persistedScale)
     }
     .toolbar {
-      ToolbarItemGroup(placement: .topBarLeading) {
-        if isSplitEnabled, let focusButtonTapped {
-          Button {
-            focusButtonTapped()
-          } label: {
-            Label(
-              isFocusActive ? "Exit Focus" : "Focus",
-              systemImage: isFocusActive
-                ? "arrow.up.left.and.arrow.down.right.circle.fill"
-                : "arrow.up.left.and.arrow.down.right"
-            )
-          }
-          .tint(isFocusActive ? .accentColor : .primary)
-          .accessibilityValue(Text(isFocusActive ? "Focused" : "Split view"))
-        }
-      }
-      ToolbarItemGroup(placement: .primaryAction) {
-        Button {
-          libraryModel.editButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("Edit", systemImage: "square.and.pencil")
-        }
-        Button {
-          groceryModel.addRecipeButtonTapped(
-            recipeID: model.recipeID,
-            scaleContext: model.scaleContext
-          )
-        } label: {
-          Label("Groceries", systemImage: "cart.badge.plus")
-        }
-        Button {
-          mealCalendarModel.addRecipeToPlanButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("Plan", systemImage: "calendar.badge.plus")
-        }
-        Button {
-          model.openWorkbenchButtonTapped()
-        } label: {
-          Label("Workbench", systemImage: "hammer")
-        }
-      }
-      ToolbarItemGroup(placement: .secondaryAction) {
-        Button(role: .destructive) {
-          libraryModel.deleteButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("Archive", systemImage: "archivebox")
-        }
-      }
+      recipeToolbar
     }
-    .sheet(item: $model.destination.chat) { chatModel in
-      NavigationStack {
-        RecipeChatPanel(
-          chatModel: chatModel,
-          applyActions: model.applyActionCatalog(for: chatModel)
-        )
-      }
-    }
+    .recipeAskPresentation(model: model, isSplitEnabled: isSplitEnabled)
     .sheet(item: $model.destination.workbench) { presentation in
       NavigationStack {
         WorkbenchDetailView(
@@ -145,6 +91,118 @@ struct RecipeDetailView: View {
 
   private var isSplitEnabled: Bool {
     UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass != .compact
+  }
+
+  @ToolbarContentBuilder
+  private var recipeToolbar: some ToolbarContent {
+    ToolbarItemGroup(placement: .topBarLeading) {
+      if isSplitEnabled, let focusButtonTapped {
+        Button {
+          focusButtonTapped()
+        } label: {
+          Label(
+            isFocusActive ? "Exit Focus" : "Focus",
+            systemImage: isFocusActive
+              ? "arrow.up.left.and.arrow.down.right.circle.fill"
+              : "arrow.up.left.and.arrow.down.right"
+          )
+        }
+        .tint(isFocusActive ? .accentColor : .primary)
+        .accessibilityValue(Text(isFocusActive ? "Focused" : "Split view"))
+      }
+    }
+    ToolbarItemGroup(placement: .primaryAction) {
+      Button {
+        libraryModel.editButtonTapped(recipeID: model.recipeID)
+      } label: {
+        Label("Edit", systemImage: "square.and.pencil")
+      }
+      Button {
+        groceryModel.addRecipeButtonTapped(
+          recipeID: model.recipeID,
+          scaleContext: model.scaleContext
+        )
+      } label: {
+        Label("Groceries", systemImage: "cart.badge.plus")
+      }
+      Button {
+        mealCalendarModel.addRecipeToPlanButtonTapped(recipeID: model.recipeID)
+      } label: {
+        Label("Plan", systemImage: "calendar.badge.plus")
+      }
+      Button {
+        model.openWorkbenchButtonTapped()
+      } label: {
+        Label("Workbench", systemImage: "hammer")
+      }
+    }
+    ToolbarItemGroup(placement: .secondaryAction) {
+      Button(role: .destructive) {
+        libraryModel.deleteButtonTapped(recipeID: model.recipeID)
+      } label: {
+        Label("Archive", systemImage: "archivebox")
+      }
+    }
+  }
+}
+
+private enum RecipeAskSlideOverMetrics {
+  // Matches the established Menu recipe-browser inspector range so companion panels
+  // keep a readable, non-dominating width across regular iPad layouts.
+  static let minimumWidth: CGFloat = 320
+  static let idealWidth: CGFloat = 380
+  static let maximumWidth: CGFloat = 480
+}
+
+private struct RecipeAskPresentationModifier: ViewModifier {
+  let model: RecipeDetailModel
+  let isSplitEnabled: Bool
+
+  func body(content: Content) -> some View {
+    @Bindable var model = model
+
+    content
+      .inspector(isPresented: isSplitEnabled ? askInspectorPresented : .constant(false)) {
+        if let destination = model.destination, case let .chat(chatModel) = destination {
+          askSlideOver(chatModel)
+        }
+      }
+      .sheet(item: isSplitEnabled ? .constant(nil) : $model.destination.chat) { chatModel in
+        NavigationStack {
+          RecipeChatPanel(
+            chatModel: chatModel,
+            applyActions: model.applyActionCatalog(for: chatModel)
+          )
+        }
+      }
+  }
+
+  private var askInspectorPresented: Binding<Bool> {
+    Binding(
+      get: { model.destination.chat != nil },
+      set: { isPresented in
+        guard !isPresented, model.destination.chat != nil else { return }
+        model.destination = nil
+      }
+    )
+  }
+
+  private func askSlideOver(_ chatModel: RecipeChatModel) -> some View {
+    RecipeChatPanel(
+      chatModel: chatModel,
+      applyActions: model.applyActionCatalog(for: chatModel)
+    )
+    .inspectorColumnWidth(
+      min: RecipeAskSlideOverMetrics.minimumWidth,
+      ideal: RecipeAskSlideOverMetrics.idealWidth,
+      max: RecipeAskSlideOverMetrics.maximumWidth
+    )
+  }
+}
+
+private extension View {
+  func recipeAskPresentation(model: RecipeDetailModel, isSplitEnabled: Bool) -> some View {
+    modifier(RecipeAskPresentationModifier(model: model, isSplitEnabled: isSplitEnabled))
   }
 }
 

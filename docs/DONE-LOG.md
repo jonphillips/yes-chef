@@ -9,6 +9,58 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0039 — D3 follow-on, the true "Ask" slide-over + Playbook-header polish
+
+**✅ architect-approved + app-build-gate green (local `generic/platform=iOS` → BUILD SUCCEEDED) + Jon
+device-pass done — 2026-07-15. Merge pending.** yes-chef PR
+[#191](https://github.com/jonphillips/yes-chef/pull/191).
+[ADR-0039 §D3 + Amendment 1](decisions/ADR-0039-playbook-column-thinking-vs-doing.md): delivers the *true*
+slide-over Amendment 1 specified ("a true slide-over, decoupled from any resize bar") to replace D3's reused
+modal sheet. **App-layer only — no schema / migration.**
+
+**Ask is now a native trailing inspector on wide iPad**, a non-modal companion that doesn't dim/steal the
+reader; it reuses the established Menu recipe-browser inspector width range (320 / 380 / 480 pt). **Compact keeps
+the plain sheet** (no room for a side companion). The dual `.inspector`/`.sheet` with mirrored `.constant`
+bindings migrates an open chat inspector↔sheet across size-class changes without losing `destination`.
+
+**Architect review (PR #191) fixes — one real interaction bug + polish.** The non-modal companion left the
+Playbook-header **Ask** trigger live beside the open panel, but `chatButtonTapped` was a pure setter: re-tapping
+rebuilt the `RecipeChatModel` and **silently discarded the scratch transcript**, and there was **no close path**
+(the panel has no dismiss control and `@Environment(\.dismiss)` can't close an inspector). Fixed by making
+`chatButtonTapped` **toggle** (re-tap closes), mirroring the Menu recipe-browser toggle
+(`RecipeModels.swift:915`). Both folded-in cosmetic notes landed (PasteButton `.bordered`; redundant in-view
+"Playbook" title removed). Architect local build → **BUILD SUCCEEDED**.
+
+**Jon UI request, same slice.** The Playbook header now **separates the two AI tiers**: the ChatGPT copy/paste
+round-trip (Hand off + Paste) clusters at the leading edge, **Ask sits apart on the trailing edge**, out of that
+workflow. While its panel is open, Ask carries a **3 pt tint-colored active ring** so the trigger reads as lit.
+
+---
+## ADR-0039 — D3, the "Ask" chat demotion + retiring the wide chat split
+
+**✅ architect-approved + app-build-gate green (local `generic/platform=iOS` → BUILD SUCCEEDED) — 2026-07-15.
+Jon device-pass done, merged.** yes-chef PR [#190](https://github.com/jonphillips/yes-chef/pull/190).
+[ADR-0039 §D3 + Amendment 1](decisions/ADR-0039-playbook-column-thinking-vs-doing.md): collapses the
+transitional AI-in-two-places state D1/D2 left behind. The always-on `ChatWorkspaceSplit` + draggable
+`ChatWorkspaceDivider` is **removed from the recipe detail** (still live in Menu/Calendar/Workbench); the
+Playbook header now **owns both tiers** — **Hand off to ChatGPT** (`.borderedProminent`, primary) and **Ask**
+(`.bordered`, secondary), plus the return-paste `PasteButton`. The toolbar "Chat" entry point and the Cook/Plan
+detent-toggle logic (`wideSectionChanged`, `chatWorkspaceDetentRaw`) are deleted. **App-layer only — no schema /
+migration.**
+
+**Ask reuses the existing recipe-scoped `.sheet` for now** (`model.chatButtonTapped` →
+`.sheet(item: $model.destination.chat)`); the **true slide-over presentation** Amendment 1 specifies ("a true
+slide-over, decoupled from any resize bar") is a **deliberate follow-on**, not a miss — see the D3-follow-on
+Next Up. D3 delivers the *demotion + divider retirement*; the slide-over *styling* is the next slice.
+
+**Architect review (PR #190) — verified clean.** No orphaned code: `ChatWorkspaceSplit`/`ChatWorkspaceDetent`
+stay in use across Menu/Calendar/Workbench. The Focus toolbar button is untouched — it drives
+`NavigationSplitView` column visibility (`AppMainLayout.swift`), not the retired chat split. Confining
+Ask/handoff to the Playbook is **per-spec** ("the Playbook column header owns both"), not a reachability
+regression. Two cosmetic notes (PasteButton styling; "Playbook" vs "Plan" heading) were **folded forward** into
+the D3-follow-on slice rather than blocking merge. Architect local build → **BUILD SUCCEEDED**.
+
+---
 ## ADR-0039 — D1/D2 + OQ1/OQ2, the Recipe Playbook region
 
 **✅ architect-approved + app-build-gate green + Jon device-pass done — 2026-07-15. Merge pending.** yes-chef
