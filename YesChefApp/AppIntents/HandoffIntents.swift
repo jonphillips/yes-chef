@@ -144,6 +144,39 @@ enum HandoffExportSource: Sendable {
   }
 }
 
+extension HandoffExportSource {
+  struct Metadata: Sendable {
+    let sourceType: AIHandoffSourceType
+    let sourceID: UUID
+    let taskType: AIHandoffTaskType
+  }
+
+  var metadata: Metadata {
+    switch self {
+    case let .recipe(recipeID):
+      Metadata(sourceType: .recipe, sourceID: recipeID, taskType: .recipeMakeAhead)
+    case let .menu(menuID):
+      Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan)
+    case let .mealPlan(mealPlanID):
+      Metadata(sourceType: .mealPlan, sourceID: mealPlanID, taskType: .mealPlanMakeAheadStrategy)
+    }
+  }
+
+  var unmatchedSubject: String {
+    switch self {
+    case .recipe: "recipe"
+    case .menu: "menu"
+    case .mealPlan: "meal-plan day"
+    }
+  }
+
+  func matches(_ handoff: AIHandoff) -> Bool {
+    let metadata = self.metadata
+    return handoff.sourceType.rawValue == metadata.sourceType.rawValue
+      && handoff.sourceID == metadata.sourceID
+  }
+}
+
 enum HandoffAppOperations {
   static func export(
     source: HandoffExportSource,
@@ -154,6 +187,7 @@ enum HandoffAppOperations {
   ) async throws -> HandoffExport {
     let handoff: AIHandoff
     let externalProjectName: String?
+    let metadata = source.metadata
 
     switch source {
     case let .menu(menuID):
@@ -169,9 +203,9 @@ enum HandoffAppOperations {
       )
       handoff = AIHandoff(
         id: handoffID,
-        sourceType: .menu,
-        sourceID: detail.menu.id,
-        taskType: .prepPlan,
+        sourceType: metadata.sourceType,
+        sourceID: metadata.sourceID,
+        taskType: metadata.taskType,
         createdAt: now,
         exportedPrompt: prompt
       )
@@ -191,9 +225,9 @@ enum HandoffAppOperations {
       )
       handoff = AIHandoff(
         id: handoffID,
-        sourceType: .recipe,
-        sourceID: detail.recipe.id,
-        taskType: .recipeMakeAhead,
+        sourceType: metadata.sourceType,
+        sourceID: metadata.sourceID,
+        taskType: metadata.taskType,
         createdAt: now,
         exportedPrompt: prompt
       )
@@ -230,9 +264,9 @@ enum HandoffAppOperations {
       )
       handoff = AIHandoff(
         id: handoffID,
-        sourceType: .mealPlan,
-        sourceID: context.0.id,
-        taskType: .mealPlanMakeAheadStrategy,
+        sourceType: metadata.sourceType,
+        sourceID: metadata.sourceID,
+        taskType: metadata.taskType,
         createdAt: now,
         exportedPrompt: prompt
       )
@@ -258,6 +292,33 @@ enum HandoffAppOperations {
     try await database.write { db in
       try AIHandoffIntentImport.stageReview(
         handoffID: handoffID,
+        result: result,
+        in: db,
+        now: now
+      )
+    }
+  }
+
+  static func stageReviewForKnownSource(
+    source: HandoffExportSource,
+    result: String,
+    in database: any DatabaseWriter,
+    now: Date,
+    handoffID: AIHandoff.ID
+  ) async throws -> AIHandoffReview {
+    let metadata = source.metadata
+    let handoff = AIHandoff(
+      id: handoffID,
+      sourceType: metadata.sourceType,
+      sourceID: metadata.sourceID,
+      taskType: metadata.taskType,
+      createdAt: now,
+      exportedPrompt: ""
+    )
+    return try await database.write { db in
+      try AIHandoffRepository.create(handoff, in: db)
+      return try AIHandoffIntentImport.stageReview(
+        handoffID: handoff.id,
         result: result,
         in: db,
         now: now
