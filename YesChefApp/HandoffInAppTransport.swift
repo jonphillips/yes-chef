@@ -104,7 +104,7 @@ struct HandoffCopyPasteControls: View {
           await transport.copyPrompt(for: source)
         }
       } label: {
-        Label("Copy Prompt", systemImage: "doc.on.doc")
+        Label("Copy Prompt", systemImage: "sparkles.square.filled.on.square")
       }
 
       PasteButton(payloadType: String.self) { results in

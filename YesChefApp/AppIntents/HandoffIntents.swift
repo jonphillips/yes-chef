@@ -172,7 +172,7 @@ extension HandoffExportSource {
 
   func matches(_ handoff: AIHandoff) -> Bool {
     let metadata = self.metadata
-    return handoff.sourceType.rawValue == metadata.sourceType.rawValue
+    return handoff.sourceType == metadata.sourceType
       && handoff.sourceID == metadata.sourceID
   }
 }
