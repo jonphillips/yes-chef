@@ -12,11 +12,4 @@ enum MenuDetailInspector: Identifiable {
       "chat"
     }
   }
-
-  var title: String {
-    switch self {
-    case .recipeBrowser: "Browse Recipes"
-    case .chat: "Ask"
-    }
-  }
 }

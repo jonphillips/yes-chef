@@ -184,7 +184,7 @@ struct MenuDetailView: View {
       }
     }
     .overlay(alignment: .trailing) {
-      if let toolOverlay {
+      if usesToolOverlay, let toolOverlay {
         // Keep the menu interactive beneath the panel so recipes can later be
         // dragged from Browse Recipes into a meal. The toolbar toggles dismiss it.
         menuToolContent(
@@ -196,8 +196,17 @@ struct MenuDetailView: View {
         )
         .frame(width: MenuToolOverlayMetrics.idealWidth)
         .frame(maxHeight: .infinity)
-        .background(.regularMaterial)
+        .overlay(alignment: .leading) {
+          Rectangle()
+            .fill(Color(uiColor: .separator))
+            .frame(width: 1)
+        }
         .transition(.move(edge: .trailing).combined(with: .opacity))
+      }
+    }
+    .onChange(of: usesToolOverlay) {
+      if !usesToolOverlay {
+        toolOverlay = nil
       }
     }
     .animation(.snappy(duration: 0.22), value: toolOverlay?.id)
