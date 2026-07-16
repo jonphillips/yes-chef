@@ -9,6 +9,19 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0039 — D4 / OQ3, the Menu launcher mode
+
+**✅ architect-approved + app-build-gate green (local `generic/platform=iOS` → BUILD SUCCEEDED; `MenuServiceDateTests` green) — 2026-07-16. Jon device approved.** yes-chef PR [#192](https://github.com/jonphillips/yes-chef/pull/192).
+[ADR-0039 §D4 + OQ3](decisions/ADR-0039-playbook-column-thinking-vs-doing.md): a menu is a *thinking* artifact you don't execute (you execute its recipes), so its planning→launcher shift is **temporal, not spatial** — keyed off the **service date** ([[mode-trigger-date-vs-toggle]]). **App-layer + one Core helper — no schema / migration.**
+
+**Date-driven mode, one pure Core helper.** New `MenuServiceDate.hasArrived(placements:now:calendar:)` (`YesChefCore`) — the earliest placement `startDate` compared to `now` at **day** granularity — is the single mode switch, unit-tested (`MenuServiceDateTests`: empty / future / later-today / mixed-past). Keeping the date logic in Core (not the App layer) is what let it be tested at all.
+
+**Planning vs. launcher, over time.** *Far from service:* the **prep plan is foregrounded and expanded**, the dish list sits at the bottom. *On/after the service date:* the **dish list jumps to the top with all days collapsed** (`isInitiallyExpanded: false`) and the **prep plan collapses** — day-of, the job is *get me into the right recipe fast*. Both `MenuDishList` day headers and the `MenuPrepPlanSection` header gain **chevron toggles** with accessibility labels; OQ3's collapsible days land here.
+
+**The menu's standing AI third column is deleted.** The always-on `ChatWorkspaceSplit` chat pane is removed from the menu detail; the reader is now a single pane. Ask + Browse Recipes become a **unified `.inspector`** (a private `MenuDetailInspector` enum, `recipeBrowser | chat`, with an `Optional.isPresented` binding) on wide iPad; Ask stays a `.sheet` on compact — echoing the recipe-side D3 demotion.
+
+**Architect review (PR #192) — Ask-toggle finding fixed in Amendment 2 Slice A (PR #193)..** The menu's `chatButtonTapped` (`MenuViews.swift:317`) is a pure setter: on wide iPad, re-tapping the live **Ask** toolbar trigger rebuilds the `RecipeChatModel` and **silently discards the in-progress transcript**, with **no toolbar close path** — the *identical* defect the D3 follow-on (PR #191, entry above) just fixed on the recipe side, where `RecipeModels.swift:915` now toggles and its comment even points here ("See the Menu recipe-browser toggle for the pattern"). Fix: make the menu Ask **toggle closed** on re-tap, mirroring the sibling `recipeBrowserButtonTapped` — but `chatButtonTapped` doubles as `regeneratePrepPlan`, so split the intents (a toggling Ask path + an ensure-open path for Regenerate that doesn't rebuild an existing chat). Two minor notes, non-blocking: the menu Ask trigger lacks the recipe's active-state ring, and `dayAccessibilityTitle` duplicates `dayTitle`'s date formatting. Architect local build (pre-fix) → **BUILD SUCCEEDED**.
+
 ## ADR-0039 — D3 follow-on, the true "Ask" slide-over + Playbook-header polish
 
 **✅ architect-approved + app-build-gate green (local `generic/platform=iOS` → BUILD SUCCEEDED) + Jon

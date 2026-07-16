@@ -21,31 +21,19 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0039](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#L72) D4/OQ3 — Menu
-launcher mode.** The **last ADR-0039 UI slice** — the recipe side (D1/D2/D3 + follow-on) is done. A menu is a
-*thinking* artifact you don't execute (you execute its recipes), so its planning→launcher shift is **temporal,
-not spatial** — keyed off the **service date**, not a manual toggle ([[mode-trigger-date-vs-toggle]]). **App-layer
-— no schema/migration expected.**
+**Live dispatch target — [ADR-0039 Amendment 2](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#amendment-2--2026-07-16-the-playbook-becomes-a-persistent-enrichment-column) Slice A — Recipe header compaction + Start Cooking burial (+ fold in the D4 menu Ask-toggle fix).** First of **three** Amendment 2 slices (A here; B = resizable Playbook column + recipe adoption; C = menu adopts it — **do not start B or C**). **App-layer — no schema / migration. Base this slice on code that includes D4 (PR #192)** — the folded-in fix targets D4's menu `chatButtonTapped`.
 
-**What this slice does ([ADR-0039 §D4 + OQ3](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#L72)):**
-- **Delete the menu's standing AI third column** — the "seeded with…" chat/handoff panel, the "empty rent" from
-  the ADR's opening observation. The prep plan **keeps its primary middle-column placement** (a menu has no
-  Playbook column — it *is* one). The handoff/chat affordance becomes a **toolbar action or slide-in**, echoing
-  the recipe-side D3 demotion (Menu already carries a compact chat sheet + `chatButtonTapped`; trace its current
-  wide presentation first).
-- **Foreground the dish list as a launcher near service.** The dish list is always present with **collapsible
-  days**; days collapse **by default once the service date is today or in the past** (OQ3 — no unpredictable
-  proximity trigger, no new mode). Day-of, the job is *get me into the right recipe fast*.
-- **Collapse the prep plan near service.** Far from service the prep plan is the point; near service it yields
-  the foreground to the dish list.
+**Recipe header / Start Cooking:**
+- **Compact the recipe header toward a Paprika-style band.** `metadata(_:)` (`RecipeDetailView.swift:363`) is the vertical bloat pushing Directions down — tighten stats · source · servings · thumbnail toward a compact band; secondary/reference rows shrink. Exact arrangement is your call; density is judged in Jon's device pass. Goal: Directions climbs up the page.
+- **View Original → toolbar.** Move the `View Original` button (`RecipeDetailView.swift:400`) out of the `metadata(_:)` stack into a `.toolbar` item.
+- **Remove the recipe "Start Cooking" entry point (surgical).** Delete `startCookingButton` (`RecipeDetailView.swift:549`), its `metadata(_:)` call sites + `showsStartCookingButton`, the recipe-library `cookButtonTapped` path (`RecipeModels.swift:193`), and any now-dead recipe-only single-item `CookSessionPresentation` init. **DO NOT touch `CookSessionView` (`CookSessionView.swift:101`, a `TabView` over items) or the Menu/Calendar "Cook these" entry points** — the recipe opened it with one item (the 40pt step-by-step, retired); Menu/Calendar open the *same* view with many (kept).
 
-**Verification:** App-layer SwiftUI — the architect's local `generic/platform=iOS` build is **required evidence**
-(see Verification Pattern; App-target compile errors slip past `check-drift.sh`, which compiles only the package
-— [[codex-build-excuse-reproduce]]).
+**Folded-in D4 fix — menu Ask toggle (`MenuViews.swift:317`):**
+- On wide iPad, `chatButtonTapped` is a pure setter: re-tapping the live **Ask** toolbar trigger rebuilds `RecipeChatModel` and **silently discards the in-progress transcript**, with no close path. Make the menu Ask **toggle closed** on re-tap, mirroring the sibling `recipeBrowserButtonTapped` and the recipe-side fix (`RecipeModels.swift:915`).
+- **`chatButtonTapped` doubles as `regeneratePrepPlan`** — split the intents: a toggling Ask path for the toolbar, and an ensure-open path for Regenerate that does **not** rebuild an already-open chat. (Non-blocking polish: give the menu Ask trigger the recipe's active-state ring.)
 
-**Design forks — decide with Jon, not a Codex dispatch** (parked in `docs/open-questions.md`, 2026-07-11):
-edit-a-variation, promote-variation-to-standalone, and the umbrella **variation-workspace ↔ Workbench overlap**
-question Jon flagged twice this pass. Future ADR (0014 × 0021 × 0019/0023 territory), not built yet.
+**Verify:** app-layer SwiftUI — the architect's local `generic/platform=iOS` build is **required evidence**. Confirm (1) Menu + Calendar "Cook these" still build and present (`CookSessionView` untouched); (2) the menu Ask trigger **toggles closed** on re-tap and **preserves an in-progress transcript**, and Regenerate still opens/keeps the chat.
+
 
 **Feature efforts still on the board — Jon picks; do not infer:**
 - **Recipe edit proposals S3** — the iterative refine loop + workbench-log deposit.

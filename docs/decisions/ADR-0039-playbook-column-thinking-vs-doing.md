@@ -7,7 +7,9 @@
 > separates them.
 
 Status: **Proposed** — 2026-07-14; **Amendment 1** (2026-07-15) resolves OQ1–OQ3 and corrects the recipe
-framing (see the [Amendment 1](#amendment-1--2026-07-15-oq1oq3-resolved-recipe-framing-corrected) section).
+framing; **Amendment 2** (2026-07-16) reframes the Playbook as a **persistent, resizable *Enrichment* column
+shared by recipe and menu** — superseding Amendment 1's Cook/Plan toggle and D4's deleted menu column (see the
+[Amendment 2](#amendment-2--2026-07-16-the-playbook-becomes-a-persistent-enrichment-column) section).
 Origin: Jon, immediately after the [ADR-0038](ADR-0038-external-llm-handoff.md)
 S2 device pass. **Depends on [ADR-0038 Amendment 1](ADR-0038-external-llm-handoff.md)** (the two-part
 Deliverable + Learnings return contract — this ADR is *where those Learnings become visible*). Touches
@@ -202,6 +204,136 @@ collapsible days; days collapse **by default once the service date is today or i
 
 A **menu** has a service date → its planning→launcher shift is date-driven (OQ3). A **recipe** has no inherent
 date → a manual Cook/Plan toggle is the honest control. The asymmetry is principled, not accidental.
+
+## Amendment 2 — 2026-07-16: the Playbook becomes a persistent Enrichment column
+
+Design discussion with Jon (2026-07-16), grounded in a week of dogfooding on a **13" iPad** (the design
+target — the biggest iPad made; compact is treated as post-planning execution only). Two lived frustrations
+pointed the same direction:
+
+1. **The Cook/Plan toggle meant planning with the instructions gone.** Amendment 1 had the wide-iPad toggle
+   *swap* Directions ↔ Playbook. In practice you do a lot of planning while wanting to *see* what you're
+   cooking; swapping the instructions off-screen to plan was not sustainable.
+2. **The menu's deleted third column left dead space on a planning artifact.** Half a 13" screen doing nothing,
+   on the surface whose whole job is thinking.
+
+Both say the same thing: **the Playbook should be co-visible with the body, always, and sized by hand — not a
+mode you switch into.** This amendment supersedes Amendment 1's Cook/Plan toggle (OQ2) and its divider
+retirement, and D4's "third column deleted / prep plan keeps primary middle-column placement," in favor of one
+grammar shared by recipe *and* menu.
+
+### The axis evolves: not a mode you toggle, but context you keep beside you
+
+The original thesis modeled *thinking vs. doing* as two **modes** — separated spatially on the recipe (toggle)
+and temporally on the menu (launcher). Dogfooding says they aren't cleanly separable moments: you glance at a
+note *while* you cook, you scan the dishes *while* you plan. The distinction is still real, but it lives in the
+**content** (what is *body* vs. what is *enrichment*), not in a mode the UI forces you between. And the
+alternative — collapsing everything into Directions to get a clean "doing" view — would be a
+content-management nightmare and fights [[decompose-notes-into-typed-homes]] head-on (the trajectory is typed,
+granular homes, *not* prose merged back into instructions).
+
+So a new **lens** — a principle, not new vocabulary; the name stays **Playbook**: the Playbook is the
+**Enrichment column**. Additive context alongside the body, not a destination you toggle into. Its defining
+property, in Jon's words: **it never becomes invisible unless you ask it to.**
+
+### The unified grammar — Body · Playbook · Ask
+
+Every cooking artifact has the same three region-types; **width** decides how many are co-visible, and the
+Playbook's **width** is yours to set:
+
+| | **Body** (what you execute) | **Playbook / Enrichment** (persistent, resizable) | **Ask** (transient slide-over) |
+|---|---|---|---|
+| **Recipe** | Ingredients + Directions | make-ahead · notes · Chef It Up · Serve With · Learnings · variations/adjustments | in-app quick chat |
+| **Menu** | Dishes + placements | Prep Plan + Learnings + **ChatGPT handoff** (Copy Prompt / Paste) | in-app quick chat |
+
+### Recipe (wide): three co-visible columns, no mode
+
+On wide (13" is the target), **Ingredients + Directions + Playbook are all co-visible.** This **reverses
+Amendment 1**: the **Cook/Plan toggle is gone on wide**, and the retired divider's rationale is moot — there is
+no mode to blend, just three columns you size. Directions never leaves the screen to plan. **Compact is
+unchanged:** the `.segmented` picker (`Ingredients · Directions · Playbook`, `RecipeDetailView.swift:560`),
+one region at a time — the toggle survives *only* here, as a necessity of narrow width. iPhone is execution
+mode; planning is already lost ([[macos-longterm-target]]).
+
+### Playbook width: show/hide toggle + drag + snap detents
+
+Three controls, each for the job it's best at (the pattern from Xcode/VS Code sidebars):
+
+- **Toolbar show/hide toggle** — binary; restores the last width. The *honest* hide (dragging a column to
+  zero is fiddly and easy to do by accident).
+- **Drag-to-resize with snap detents** (e.g. Peek / Comfortable / Wide) — arbitrary width *plus* muscle
+  memory.
+- **A hard minimum on Directions** — the readability floor; snaps must never crush instruction line-length.
+- **Persist the width** so it reopens where you left it.
+
+*Implementation note:* the persistent Playbook likely becomes a real structural column, while **Ask and Browse
+Recipes stay `.inspector` slide-overs on top** (two competing inspectors is the thing to avoid). To prototype
+against a device — do not treat the exact detent widths as decided here.
+
+### Menu: Dishes are the Body, the Playbook is the companion
+
+This **reverses D4**. The prep plan is no longer "the primary middle column," and the third column is no longer
+"deleted." Instead: **Dishes + placements = Body** (main pane), and **Prep Plan + Learnings + ChatGPT handoff =
+the Playbook companion** — the *same* column concept as the recipe. This is what fills the dead space, keeps the
+dishes always in view, and makes recipe and menu share one spatial grammar.
+
+D4's real insight survives, demoted from a forced mode to a **soft default**: on or after the service date, the
+Playbook simply *opens at a narrower detent* so the Dishes get the emphasis — **never forced, always draggable
+back** (honoring "never invisible unless I want it"). OQ3's **collapsible days stay** as-is. The service date
+sets the *default* emphasis; it never takes the choice away. **D4 as shipped stands in the tree until this
+lands — nothing here forces a revert.** ([[prep-plan-horizon-redesign]] density gets its first co-visible test
+here; watch the band list in a companion-width column.)
+
+### Ask stays the slide-over (reaffirmed)
+
+Unchanged from D3 / Amendment 1: **Ask is the chat-of-last-resort** — the quick-one-while-I'm-panicking. It is
+**never promoted to a column** and never competes with the Playbook for structural space. Browse Recipes is
+likewise a slide-over.
+
+### Recipe header: compact to a single band
+
+Dogfooding surfaced dead space at the *top* of the recipe — a tall, spread header pushing Directions down.
+This matters more now that Directions is a co-visible column whose vertical space is precious. Match a tight,
+Paprika-style band (title · source · servings · thumbnail); density is craft, not a concession — the
+differentiation lives in the Playbook, not in the header's air.
+
+- **View Original → toolbar.**
+- **Remove the recipe "Start Cooking" entry point.** It is one entry into a **shared** cook-session engine:
+  `CookSessionView` is a single `TabView` over its items (`CookSessionView.swift:101`) — the recipe opens it
+  with *one* item (the 40pt step-by-step Jon won't use); Menu/Calendar "Cook these" open the *same* view with
+  *many* (the tabbed flow that stays and earns its keep). So the burial is **surgical**: delete
+  `startCookingButton` (`RecipeDetailView.swift:549`) and the recipe library's `cookButtonTapped` path
+  (`RecipeModels.swift:193`), plus any recipe-only single-item `CookSessionPresentation` init left dead.
+  **`CookSessionView` and the Menu/Calendar entry points are untouched.** One clean, greppable removal commit —
+  git is the archive, no live mothball ([[automation-decays-near-the-stove]]).
+
+### Parked — refinement, not this amendment
+
+- **Active scale factor is invisible on a scaled recipe.** Servings shows, but the ×2 does not — it wants a
+  glanceable badge. A later polish sweep, deliberately kept off this 10,000-foot amendment.
+
+### What this supersedes
+
+- **Amendment 1 OQ2** (Cook/Plan toggle on wide) — the toggle is gone on wide; it survives only as the compact
+  picker.
+- **Amendment 1's divider-retirement rationale** — moot; the Playbook is a sized companion, not a same-pane
+  mode blend, so resizability is not the "any blend" that was retired.
+- **D4** ("third column deleted," "prep plan keeps its primary middle-column placement") — the menu gets the
+  Body + Playbook grammar; the launcher insight survives as OQ3's collapsible days + the soft-default detent.
+
+### Unifying principle (updated)
+
+> **Enrichment is always available and never forced away.** The body is what you execute; the Playbook is the
+> context you keep beside it and *size to the moment*. Key the *default* emphasis off a date when there is one
+> (menu) and off the user's own hand when there isn't (recipe) — but never take the choice away.
+
+### Still open (prototype, don't pre-decide)
+
+- Exact detent widths, and whether Ingredients also collapses on an 11" iPad (13" is the target, so this is
+  secondary).
+- Whether the Playbook width persists **per-surface** (recipe vs. menu — their content densities differ) or as
+  one shared preference.
+- Coexistence of the persistent Playbook column with the `.inspector`-based Ask/Browse slide-overs.
 
 ## Related
 
