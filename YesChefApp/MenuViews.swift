@@ -143,8 +143,8 @@ struct MenuDetailView: View {
   var isFocusActive = false
   var focusButtonTapped: (() -> Void)?
   @State private var detailModel: MenuDetailModel
-  @State private var inspector: MenuDetailInspector?
-  @State private var compactChatModel: RecipeChatModel?
+  @State private var toolOverlay: MenuDetailInspector?
+  @State private var compactTool: MenuDetailInspector?
   @State private var handoffTransport = HandoffInAppTransport()
 
   init(
@@ -183,6 +183,33 @@ struct MenuDetailView: View {
         ContentUnavailableView("Menu Not Found", systemImage: "menucard")
       }
     }
+    .overlay(alignment: .trailing) {
+      if let toolOverlay {
+        ZStack(alignment: .trailing) {
+          Button {
+            self.toolOverlay = nil
+          } label: {
+            Rectangle()
+              .fill(.black.opacity(0.18))
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel("Dismiss \(toolOverlay.title)")
+
+          menuToolContent(
+            toolOverlay,
+            onRecipeSelected: { presentation in
+              self.toolOverlay = nil
+              onRecipeSelected?(presentation)
+            }
+          )
+          .frame(width: MenuToolOverlayMetrics.idealWidth)
+          .frame(maxHeight: .infinity)
+          .background(.regularMaterial)
+        }
+        .transition(.move(edge: .trailing).combined(with: .opacity))
+      }
+    }
+    .animation(.snappy(duration: 0.22), value: toolOverlay?.id)
     .toolbar {
       if detailModel.detail != nil {
         ToolbarItemGroup(placement: .primaryAction) {
@@ -224,29 +251,14 @@ struct MenuDetailView: View {
         }
       }
     }
-    .inspector(isPresented: $inspector.isPresented) {
-      if let inspector {
-        switch inspector {
-        case .recipeBrowser:
-          MenuRecipeBrowserPanel(
-            recipeModel: recipeModel,
-            onRecipeSelected: onRecipeSelected
-          )
-          .inspectorColumnWidth(min: 320, ideal: 380, max: 480)
-        case let .chat(chatModel):
-          RecipeChatPanel(
-            chatModel: chatModel,
-            applyActions: detailModel.applyActionCatalog(for: chatModel)
-          )
-          .inspectorColumnWidth(min: 320, ideal: 380, max: 480)
-        }
-      }
-    }
-    .sheet(item: $compactChatModel) { chatModel in
+    .sheet(item: $compactTool) { tool in
       NavigationStack {
-        RecipeChatPanel(
-          chatModel: chatModel,
-          applyActions: detailModel.applyActionCatalog(for: chatModel)
+        menuToolContent(
+          tool,
+          onRecipeSelected: { presentation in
+            compactTool = nil
+            onRecipeSelected?(presentation)
+          }
         )
       }
     }
@@ -290,7 +302,7 @@ struct MenuDetailView: View {
     .handoffTransportAlert(handoffTransport)
   }
 
-  private var isSplitEnabled: Bool {
+  private var usesToolOverlay: Bool {
     UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass != .compact
   }
 
@@ -299,19 +311,15 @@ struct MenuDetailView: View {
   }
 
   private var isAskActive: Bool {
-    if case .chat? = inspector {
+    if case .chat? = toolOverlay ?? compactTool {
       return true
     }
-    return compactChatModel != nil
+    return false
   }
 
   private func askButtonTapped() {
     if isAskActive {
-      if isSplitEnabled {
-        inspector = nil
-      } else {
-        compactChatModel = nil
-      }
+      dismissTool()
     } else {
       ensureChatIsOpen()
     }
@@ -319,23 +327,51 @@ struct MenuDetailView: View {
 
   private func ensureChatIsOpen() {
     guard let detail = detailModel.detail else { return }
-    if isSplitEnabled {
-      guard case .chat? = inspector else {
-        inspector = .chat(RecipeChatModel(context: .menu(MenuChatContext(detail: detail))))
-        return
-      }
-    } else if compactChatModel == nil {
-      compactChatModel = RecipeChatModel(context: .menu(MenuChatContext(detail: detail)))
-    }
+    presentTool(.chat(RecipeChatModel(context: .menu(MenuChatContext(detail: detail)))))
   }
 
   private func recipeBrowserButtonTapped() {
-    if case .recipeBrowser? = inspector {
-      inspector = nil
+    if case .recipeBrowser? = toolOverlay ?? compactTool {
+      dismissTool()
     } else {
-      inspector = .recipeBrowser
+      presentTool(.recipeBrowser)
     }
   }
+
+  private func presentTool(_ tool: MenuDetailInspector) {
+    if usesToolOverlay {
+      toolOverlay = tool
+    } else {
+      compactTool = tool
+    }
+  }
+
+  private func dismissTool() {
+    toolOverlay = nil
+    compactTool = nil
+  }
+
+  @ViewBuilder
+  private func menuToolContent(
+    _ tool: MenuDetailInspector,
+    onRecipeSelected: @escaping (RecipeDetailPresentation) -> Void
+  ) -> some View {
+    switch tool {
+    case .recipeBrowser:
+      MenuRecipeBrowserPanel(recipeModel: recipeModel, onRecipeSelected: onRecipeSelected)
+    case let .chat(chatModel):
+      RecipeChatPanel(
+        chatModel: chatModel,
+        applyActions: detailModel.applyActionCatalog(for: chatModel)
+      )
+    }
+  }
+}
+
+private enum MenuToolOverlayMetrics {
+  // Retains the previous inspector's ideal width while changing only its
+  // presentation from a pushing column to a floating tool.
+  static let idealWidth: CGFloat = 380
 }
 
 private extension CookSessionPresentation {
@@ -646,71 +682,6 @@ struct MenuExternalProjectField: View {
         .disabled(normalizedDraft == normalizedStoredValue)
       }
     }
-  }
-}
-
-private struct MenuRecipeBrowserPanel: View {
-  let recipeModel: RecipeLibraryModel
-  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
-
-  var body: some View {
-    @Bindable var recipeModel = recipeModel
-
-    VStack(spacing: 0) {
-      VStack(alignment: .leading, spacing: 12) {
-        HStack {
-          Text("Recipes")
-            .font(.headline)
-
-          Spacer()
-
-          Button {
-            recipeModel.filterButtonTapped()
-          } label: {
-            Label(
-              "Filter Recipes",
-              systemImage: recipeModel.hasActiveFilters
-                ? "line.3.horizontal.decrease.circle.fill"
-                : "line.3.horizontal.decrease.circle"
-            )
-            .labelStyle(.iconOnly)
-          }
-          .accessibilityLabel("Filter Recipes")
-        }
-
-        TextField("Search recipes", text: $recipeModel.searchText)
-          .textFieldStyle(.roundedBorder)
-          .textInputAutocapitalization(.never)
-      }
-      .padding()
-
-      RecipeListStatusBar(model: recipeModel)
-
-      List {
-        if recipeModel.visibleRecipeRows.isEmpty {
-          ContentUnavailableView.search(text: recipeModel.searchText)
-        } else {
-          ForEach(recipeModel.visibleRecipeRows) { row in
-            Button {
-              onRecipeSelected?(RecipeDetailPresentation(recipeID: row.recipe.id))
-            } label: {
-              RecipeListRow(
-                row: row,
-                options: RecipeListViewOptions(
-                  density: .compact,
-                  showsSourceMetadata: true,
-                  showsCategoryMetadata: true
-                )
-              )
-            }
-            .buttonStyle(.plain)
-            .draggable(MenuDraggedRecipe(recipeID: row.recipe.id))
-          }
-        }
-      }
-      .listStyle(.plain)
-    }
-    .background(.background)
   }
 }
 

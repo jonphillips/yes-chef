@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import Testing
 @testable import YesChef
 
@@ -21,5 +22,19 @@ struct MenuWideColumnLayoutTests {
 
     #expect(layout.playbookWidth(for: .comfortable) == 0)
     #expect(layout.bodyWidth(playbookWidth: 0) == width)
+  }
+
+  @Test
+  func persistedDetentsRemainIndependentPerMenu() {
+    let storedDetents: [String: RecipePlaybookColumnDetent] = [
+      "beach-menu": .comfortable,
+      "holiday-menu": .wide,
+    ]
+
+    let restoredDetents = MenuPlaybookColumnPreferences.detents(
+      from: MenuPlaybookColumnPreferences.encodedDetents(storedDetents)
+    )
+
+    #expect(restoredDetents == storedDetents)
   }
 }

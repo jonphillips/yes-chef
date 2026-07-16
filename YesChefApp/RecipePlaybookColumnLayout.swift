@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 enum RecipePlaybookColumnPreferences {
@@ -6,11 +7,24 @@ enum RecipePlaybookColumnPreferences {
 }
 
 enum MenuPlaybookColumnPreferences {
-  static let visibilityStorageKey = "MenuReader.isPlaybookColumnVisible"
-  static let detentStorageKey = "MenuReader.playbookColumnDetent"
+  static let detentsStorageKey = "MenuReader.playbookColumnDetents"
+
+  static func detents(from data: Data) -> [String: RecipePlaybookColumnDetent] {
+    (try? JSONDecoder().decode([String: RecipePlaybookColumnDetent].self, from: data)) ?? [:]
+  }
+
+  static func encodedDetents(_ detents: [String: RecipePlaybookColumnDetent]) -> Data {
+    (try? JSONEncoder().encode(detents)) ?? Data()
+  }
 }
 
-enum RecipePlaybookColumnDetent: String, CaseIterable {
+enum MenuPlaybookColumnMetrics {
+  // Starts above the observed ~700pt multitasking pane so a permanent
+  // Playbook never forces a cramped two-column reader. Device-pass tune knob.
+  static let twoColumnThreshold: CGFloat = 820
+}
+
+enum RecipePlaybookColumnDetent: String, CaseIterable, Codable, Equatable {
   case comfortable
   case wide
 
@@ -151,9 +165,24 @@ struct RecipeWideColumnSeparator: View {
 
 struct RecipePlaybookResizeHandle: View {
   let detent: RecipePlaybookColumnDetent
+  let splitAccessibilityLabel: String
   let cycle: () -> Void
   let decrement: () -> Void
   let increment: () -> Void
+
+  init(
+    detent: RecipePlaybookColumnDetent,
+    splitAccessibilityLabel: String = "Directions and Playbook split",
+    cycle: @escaping () -> Void,
+    decrement: @escaping () -> Void,
+    increment: @escaping () -> Void
+  ) {
+    self.detent = detent
+    self.splitAccessibilityLabel = splitAccessibilityLabel
+    self.cycle = cycle
+    self.decrement = decrement
+    self.increment = increment
+  }
 
   var body: some View {
     Button(action: cycle) {
@@ -176,7 +205,7 @@ struct RecipePlaybookResizeHandle: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .accessibilityLabel(Text("Directions and Playbook split"))
+    .accessibilityLabel(Text(splitAccessibilityLabel))
     .accessibilityValue(Text(detent.title))
     .accessibilityHint(Text("Cycles between comfortable and wide Playbook widths."))
     .accessibilityAdjustableAction { direction in

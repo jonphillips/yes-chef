@@ -2,6 +2,71 @@ import SwiftUI
 import UniformTypeIdentifiers
 import YesChefCore
 
+struct MenuRecipeBrowserPanel: View {
+  let recipeModel: RecipeLibraryModel
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+
+  var body: some View {
+    @Bindable var recipeModel = recipeModel
+
+    VStack(spacing: 0) {
+      VStack(alignment: .leading, spacing: 12) {
+        HStack {
+          Text("Recipes")
+            .font(.headline)
+
+          Spacer()
+
+          Button {
+            recipeModel.filterButtonTapped()
+          } label: {
+            Label(
+              "Filter Recipes",
+              systemImage: recipeModel.hasActiveFilters
+                ? "line.3.horizontal.decrease.circle.fill"
+                : "line.3.horizontal.decrease.circle"
+            )
+            .labelStyle(.iconOnly)
+          }
+          .accessibilityLabel("Filter Recipes")
+        }
+
+        TextField("Search recipes", text: $recipeModel.searchText)
+          .textFieldStyle(.roundedBorder)
+          .textInputAutocapitalization(.never)
+      }
+      .padding()
+
+      RecipeListStatusBar(model: recipeModel)
+
+      List {
+        if recipeModel.visibleRecipeRows.isEmpty {
+          ContentUnavailableView.search(text: recipeModel.searchText)
+        } else {
+          ForEach(recipeModel.visibleRecipeRows) { row in
+            Button {
+              onRecipeSelected?(RecipeDetailPresentation(recipeID: row.recipe.id))
+            } label: {
+              RecipeListRow(
+                row: row,
+                options: RecipeListViewOptions(
+                  density: .compact,
+                  showsSourceMetadata: true,
+                  showsCategoryMetadata: true
+                )
+              )
+            }
+            .buttonStyle(.plain)
+            .draggable(MenuDraggedRecipe(recipeID: row.recipe.id))
+          }
+        }
+      }
+      .listStyle(.plain)
+    }
+    .background(.background)
+  }
+}
+
 struct MenuDishList: View {
   let model: MenuLibraryModel
   let detailModel: MenuDetailModel

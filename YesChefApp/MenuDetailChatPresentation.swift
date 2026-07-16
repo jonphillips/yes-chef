@@ -12,14 +12,11 @@ enum MenuDetailInspector: Identifiable {
       "chat"
     }
   }
-}
 
-extension Optional where Wrapped == MenuDetailInspector {
-  var isPresented: Bool {
-    get { self != nil }
-    set {
-      guard !newValue else { return }
-      self = nil
+  var title: String {
+    switch self {
+    case .recipeBrowser: "Browse Recipes"
+    case .chat: "Ask"
     }
   }
 }
