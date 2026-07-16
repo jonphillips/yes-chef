@@ -9,7 +9,11 @@
 Status: **Proposed** — 2026-07-14; **Amendment 1** (2026-07-15) resolves OQ1–OQ3 and corrects the recipe
 framing; **Amendment 2** (2026-07-16) reframes the Playbook as a **persistent, resizable *Enrichment* column
 shared by recipe and menu** — superseding Amendment 1's Cook/Plan toggle and D4's deleted menu column (see the
-[Amendment 2](#amendment-2--2026-07-16-the-playbook-becomes-a-persistent-enrichment-column) section).
+[Amendment 2](#amendment-2--2026-07-16-the-playbook-becomes-a-persistent-enrichment-column) section);
+**Amendment 3** (2026-07-16, Slice D device pass) makes the **menu** Playbook *permanent* (no toggle, per-menu
+width) and moves **Browse/Ask off `.inspector` to true trailing overlays** — persistent context is a column,
+transient tools slide *over* (see the
+[Amendment 3](#amendment-3--2026-07-16-the-menu-playbook-is-permanent-and-transient-tools-go-over-it-not-beside-it) section).
 Origin: Jon, immediately after the [ADR-0038](ADR-0038-external-llm-handoff.md)
 S2 device pass. **Depends on [ADR-0038 Amendment 1](ADR-0038-external-llm-handoff.md)** (the two-part
 Deliverable + Learnings return contract — this ADR is *where those Learnings become visible*). Touches
@@ -379,6 +383,96 @@ the fallback is a scale-with-width header, **not** a retreat to the band.
 - Whether the Playbook width persists **per-surface** (recipe vs. menu — their content densities differ) or as
   one shared preference.
 - Coexistence of the persistent Playbook column with the `.inspector`-based Ask/Browse slide-overs.
+
+## Amendment 3 — 2026-07-16: the menu Playbook is permanent, and transient tools go *over* it, not *beside* it
+
+Slice D's device pass (13" iPad, the shipped toggle build). Two things showed up the moment the menu had a
+Playbook column *and* the pre-existing Browse Recipes / Ask panels on the same screen:
+
+1. **Two right-edge affordances that look identical do different things.** Slice D's *Show/Hide Playbook*
+   button (`sidebar.trailing`) sits one glyph away from the menu's *Browse Recipes* button (`sidebar.right`) —
+   two trailing-sidebar icons, one toggling a structural column, the other a panel. The user can't tell them
+   apart, and the on/off cross-product produces states no one designed (Playbook hidden + Browse open, both
+   open, etc.).
+2. **`.inspector` does not "sit on top" — it pushes.** Amendment 2's implementation note assumed Ask/Browse
+   could "stay `.inspector` slide-overs on top" of the persistent column. On regular-width iPad that is false:
+   `.inspector` is a **trailing column that reflows the primary content**. So opening Browse squeezed **Body +
+   Playbook + Browse** into three cramped columns (dish titles wrapping to three lines) — the exact "two
+   competing panels" mess the ADR was trying to avoid, now structural rather than avoidable.
+
+The fix follows from naming the two panel *kinds* the earlier amendments blurred: the Playbook is **persistent
+context** (it *is* the menu's thinking surface); Browse and Ask are **transient tools** (invoke, act, dismiss).
+They are not the same kind of surface and must not share the same grammar.
+
+### D6 — On the menu, the Playbook is permanent: no toggle, per-menu width
+
+The menu Playbook **cannot be hidden and has no toolbar toggle.** On wide it is always co-visible with the
+Dishes body; its width is set by drag + the Comfortable/Wide detents only. This **supersedes Amendment 2's
+show/hide toggle for the menu** and deletes the `isPlaybookColumnVisible` state Slice D shipped.
+
+Why the menu loses the toggle the recipe keeps — a **principled asymmetry**, not drift:
+
+- **The menu Body earns nothing from full width.** The Dishes list at 1400pt is whitespace; there is "no value
+  in a full-screen menu" (Jon). The recipe Body (Ingredients + Directions) genuinely can want maximum width
+  for pure cooking, so the recipe's toolbar hide stays (Amendment 2 stands for the recipe — **this amendment is
+  menu-scoped**).
+- **Removing the toggle removes one of the twin buttons.** With the Playbook permanent, the only right-edge
+  controls left on the menu are Browse and Ask — and those become *over*-panels (D7), not columns, so they no
+  longer read as "another sidebar toggle."
+
+**Width is per-menu, and the service date seeds only the first open.** This resolves the sub-decision Slice D's
+dispatch flagged (global detent vs. per-menu service-date default): the detent **persists per menu**; the
+service date sets the *initial* detent (Comfortable on/after service so Dishes get emphasis, Wide before) **only
+until the user first drags that menu**, after which the stored per-menu width wins and the heuristic never
+overrides it. Draggable back always ("never invisible unless I ask"). No schema — a per-menu entry in local
+`@AppStorage` (one JSON map keyed by menu id, not a key per menu).
+
+### D7 — Transient tools slide *over*, never *in*
+
+Browse Recipes and Ask present as **overlays that float above a stable Body + Playbook layout** — the reader
+underneath never reflows. Pull up Browse, tap a recipe, dismiss; you are back exactly where you were. This
+**supersedes** Amendment 2's "stay `.inspector`" note and closes the last "Still open" coexistence question.
+
+The linkage is the crux: **permanent Playbook + slide-*in* is the worst combination**, because a pushing panel
+would force the three-column squeeze *every* time you browse, on a column that can no longer be hidden to make
+room. The cheaper "keep `.inspector`" path (which Jon was willing to accept in isolation) does not survive the
+permanence decision — accepting a permanent Playbook logically *entails* over. The cost is losing sight of the
+Prep Plan while the recipe list is open, which is free: browsing recipes and reading the prep plan are
+different moments.
+
+*Implementation reality:* this moves Browse/Ask off `.inspector` (structurally a column) onto a trailing
+overlay — an `overlay(alignment: .trailing)` panel with a `.move(edge: .trailing)` transition and a
+tap-to-dismiss scrim. The Playbook detent/resize machinery from Slice D is **untouched**; what's deleted is the
+visibility toggle and its state. **Scope:** the menu implements this now (Slice D amended). **Ask is shared
+infrastructure** — the recipe's Ask still rides `.inspector`; converting it is a noted follow-up, lower-urgency
+because the recipe has no Browse collision and more column room to give up. Recorded so the inconsistency is
+deliberate, not forgotten.
+
+### Also on the menu device pass
+
+- **Raise the two-column threshold above 640pt.** With the Playbook non-optional, a ~700pt multitasking pane
+  would be forced into a permanently cramped two-column. Below the raised threshold the menu falls back to the
+  compact single-scroll (which already stacks Body then Playbook). A device-tune knob, not a decided point.
+- **Fix the resize handle's VoiceOver label for the menu.** `RecipePlaybookResizeHandle` hardcodes "Directions
+  and Playbook split"; on the menu it must read "Dishes and Playbook." Parameterize the label rather than fork
+  the handle.
+- **Compact prep-plan default expansion** (minor): Slice D hardcoded the Playbook's prep-plan section expanded;
+  in compact after service this diverges from the old collapse-near-service behavior ([[automation-decays-near-the-stove]]).
+  Left as a device-pass knob — acceptable if it reads fine, otherwise key it off the service date in compact only.
+
+### What this supersedes
+
+- **Amendment 2's menu show/hide toggle** — gone; the menu Playbook is permanent (D6). The recipe's toggle
+  stands (Amendment 2, recipe-scoped).
+- **Amendment 2's "Ask and Browse stay `.inspector` slide-overs on top" note** and the "Still open" coexistence
+  question — `.inspector` pushes, so Browse/Ask become true trailing overlays (D7).
+
+### Unifying principle (Amendment 3)
+
+> **Persistent context is a column; transient tools are overlays.** A surface you keep beside your work earns
+> structural space and, where its body gains nothing from being alone (the menu), never leaves. A tool you
+> invoke and dismiss floats *over* that layout and never reflows it. `.inspector` is a column, not an overlay —
+> use it only for the former.
 
 ## Related
 

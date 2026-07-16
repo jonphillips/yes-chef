@@ -13,13 +13,3 @@ enum MenuDetailInspector: Identifiable {
     }
   }
 }
-
-extension Optional where Wrapped == MenuDetailInspector {
-  var isPresented: Bool {
-    get { self != nil }
-    set {
-      guard !newValue else { return }
-      self = nil
-    }
-  }
-}
