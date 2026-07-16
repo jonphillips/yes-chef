@@ -820,7 +820,18 @@ struct GroceryItemEditorView: View {
         StackedTextField(title: "Name", text: $title, prompt: "Milk")
         StackedTextField(title: "Quantity", text: $quantityText, prompt: "2")
         StackedTextField(title: "Unit", text: $unit, prompt: "cups")
-        StackedTextField(title: "Aisle", text: $aisle, prompt: "Dairy")
+        StackedFormField(title: "Aisle") {
+          Picker("Aisle", selection: $aisle) {
+            Text("Unassigned").tag("")
+            if let customAisle {
+              Text("Custom: \(customAisle)").tag(customAisle)
+            }
+            ForEach(GroceryStoreArea.canonicalAreas, id: \.self) { area in
+              Text(area.title).tag(area.title)
+            }
+          }
+          .labelsHidden()
+        }
         StackedTextEditor(title: "Notes", text: $notes, minHeight: 90)
       }
     }
@@ -859,6 +870,14 @@ struct GroceryItemEditorView: View {
         .disabled(isSaveDisabled)
       }
     }
+  }
+
+  private var customAisle: String? {
+    guard
+      !aisle.isEmpty,
+      !GroceryStoreArea.canonicalAreas.map(\.title).contains(aisle)
+    else { return nil }
+    return aisle
   }
 }
 

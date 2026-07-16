@@ -499,7 +499,7 @@ private struct RecipeReaderView: View {
 
   @ViewBuilder
   private func recipeStatChips(_ recipe: Recipe) -> some View {
-    if let servingsText = recipe.servingsText {
+    if let servingsText = recipe.servingsText ?? recipe.yieldText {
       if model.ingredientLines.isEmpty {
         Label(servingsText, systemImage: "person.2")
           .recipeChip()
@@ -917,7 +917,7 @@ private struct ScalePanel: View {
 
         HStack(spacing: 0) {
           Picker("Whole multiplier", selection: $model.scaleWholePart) {
-            ForEach(0...10, id: \.self) { whole in
+            ForEach(0...ScaleFraction.maximumWholeMultiplier, id: \.self) { whole in
               Text("\(whole)")
                 .tag(whole)
             }

@@ -895,11 +895,7 @@ final class RecipeDetailModel {
   }
 
   var scaledServingsSummary: String? {
-    ScaleText.scaledServingsSummary(
-      servingsText: recipe?.servingsText,
-      baseServings: baseServings,
-      factor: scaleFactor
-    )
+    RecipeYieldScaler.scaledText(recipe?.servingsText ?? recipe?.yieldText, factor: scaleFactor)
   }
 
   func scaleButtonTapped() {

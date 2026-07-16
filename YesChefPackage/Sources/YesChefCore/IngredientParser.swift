@@ -1,5 +1,127 @@
 import Foundation
 
+public enum QuantityParser {
+  public struct LeadingQuantity {
+    public let value: Double
+    public let upperBound: Double?
+    public let range: Range<String.Index>
+  }
+
+  public static func value(from text: String) -> Double? {
+    Double(text) ?? fractionValue(text) ?? mixedNumberValue(text)
+  }
+
+  public static func fractionValue(_ text: String) -> Double? {
+    if text.count == 1, let character = text.first, let value = vulgarFractions[character] {
+      return value
+    }
+
+    let parts = text.split(separator: "/")
+    guard
+      parts.count == 2,
+      let numerator = Double(parts[0]),
+      let denominator = Double(parts[1]),
+      denominator != 0
+    else { return nil }
+    return numerator / denominator
+  }
+
+  public static func mixedNumberValue(_ text: String) -> Double? {
+    guard
+      let fractionCharacter = text.last,
+      let fraction = vulgarFractions[fractionCharacter]
+    else { return nil }
+
+    let wholeText = text.dropLast()
+    guard !wholeText.isEmpty, let whole = Double(wholeText) else { return nil }
+    return whole + fraction
+  }
+
+  public static func leadingValue(in text: String) -> Double? {
+    leadingQuantity(in: text)?.value
+  }
+
+  public static func leadingQuantity(in text: String) -> LeadingQuantity? {
+    guard let first = quantity(at: text.startIndex, in: text) else { return nil }
+
+    var end = first.range.upperBound
+    let afterFirst = skipWhitespace(in: text, from: end)
+    if let rangeStart = rangeStart(in: text, at: afterFirst),
+       let second = quantity(at: rangeStart, in: text) {
+      end = second.range.upperBound
+      return LeadingQuantity(value: first.value, upperBound: second.value, range: first.range.lowerBound..<end)
+    }
+
+    return LeadingQuantity(value: first.value, upperBound: nil, range: first.range)
+  }
+
+  private static func quantity(at index: String.Index, in text: String) -> (value: Double, range: Range<String.Index>)? {
+    let start = skipWhitespace(in: text, from: index)
+    guard start < text.endIndex else { return nil }
+
+    let tokenEnd = text[start...].firstIndex(where: \.isWhitespace) ?? text.endIndex
+    let token = String(text[start..<tokenEnd])
+    if let connectorIndex = token.firstIndex(where: { "-–—".contains($0) }) {
+      let quantityText = String(token[..<connectorIndex])
+      guard let value = value(from: quantityText) else { return nil }
+      let end = text.index(start, offsetBy: quantityText.count)
+      return (value, start..<end)
+    }
+
+    if let whole = Double(token) {
+      let fractionStart = skipWhitespace(in: text, from: tokenEnd)
+      if let fraction = fraction(at: fractionStart, in: text) {
+        return (whole + fraction.value, start..<fraction.range.upperBound)
+      }
+      return (whole, start..<tokenEnd)
+    }
+
+    guard let value = value(from: token) else { return nil }
+    return (value, start..<tokenEnd)
+  }
+
+  private static func fraction(at index: String.Index, in text: String) -> (value: Double, range: Range<String.Index>)? {
+    guard index < text.endIndex else { return nil }
+    let end = text[index...].firstIndex(where: \.isWhitespace) ?? text.endIndex
+    let token = String(text[index..<end])
+    guard let value = fractionValue(token) else { return nil }
+    return (value, index..<end)
+  }
+
+  private static func rangeStart(in text: String, at index: String.Index) -> String.Index? {
+    guard index < text.endIndex else { return nil }
+    if "-–—".contains(text[index]) {
+      return text.index(after: index)
+    }
+    guard text[index...].hasPrefix("to") else { return nil }
+    let afterConnector = text.index(index, offsetBy: 2)
+    guard afterConnector == text.endIndex || text[afterConnector].isWhitespace else { return nil }
+    return afterConnector
+  }
+
+  private static func skipWhitespace(in text: String, from index: String.Index) -> String.Index {
+    text[index...].firstIndex(where: { !$0.isWhitespace }) ?? text.endIndex
+  }
+
+  private static let vulgarFractions: [Character: Double] = [
+    "¼": 1.0 / 4.0,
+    "½": 1.0 / 2.0,
+    "¾": 3.0 / 4.0,
+    "⅓": 1.0 / 3.0,
+    "⅔": 2.0 / 3.0,
+    "⅛": 1.0 / 8.0,
+    "⅜": 3.0 / 8.0,
+    "⅝": 5.0 / 8.0,
+    "⅞": 7.0 / 8.0,
+    "⅕": 1.0 / 5.0,
+    "⅖": 2.0 / 5.0,
+    "⅗": 3.0 / 5.0,
+    "⅘": 4.0 / 5.0,
+    "⅙": 1.0 / 6.0,
+    "⅚": 5.0 / 6.0,
+  ]
+}
+
 public enum IngredientParser {
   public static func lines(
     from text: String,
@@ -41,7 +163,7 @@ public enum IngredientParser {
     let tokens = parts.ingredient.split(separator: " ").map(String.init)
     guard let first = tokens.first else { return (nil, nil, nil, nil, nil) }
 
-    if tokens.count >= 2, let whole = Double(first), let fraction = fractionValue(tokens[1]) {
+    if tokens.count >= 2, let whole = Double(first), let fraction = QuantityParser.fractionValue(tokens[1]) {
       let quantityText = "\(first) \(tokens[1])"
       return parsedQuantity(
         quantity: whole + fraction,
@@ -51,7 +173,7 @@ public enum IngredientParser {
       )
     }
 
-    if let quantity = mixedNumberValue(first) {
+    if let quantity = QuantityParser.mixedNumberValue(first) {
       return parsedQuantity(
         quantity: quantity,
         quantityText: first,
@@ -60,7 +182,7 @@ public enum IngredientParser {
       )
     }
 
-    if let quantity = Double(first) ?? fractionValue(first) {
+    if let quantity = QuantityParser.value(from: first) {
       return parsedQuantity(
         quantity: quantity,
         quantityText: first,
@@ -134,7 +256,7 @@ public enum IngredientParser {
   }
 
   private static func isQuantityToken(_ token: String) -> Bool {
-    Double(token) != nil || fractionValue(token) != nil || mixedNumberValue(token) != nil
+    QuantityParser.value(from: token) != nil
   }
 
   private static let connectors: Set<String> = ["/", "to", "or", "-", "–", "—"]
@@ -165,54 +287,10 @@ public enum IngredientParser {
       .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
   }
 
-  private static func fractionValue(_ text: String) -> Double? {
-    if text.count == 1, let character = text.first, let value = vulgarFractions[character] {
-      return value
-    }
-
-    let parts = text.split(separator: "/")
-    guard
-      parts.count == 2,
-      let numerator = Double(parts[0]),
-      let denominator = Double(parts[1]),
-      denominator != 0
-    else { return nil }
-    return numerator / denominator
-  }
-
-  private static func mixedNumberValue(_ text: String) -> Double? {
-    guard
-      let fractionCharacter = text.last,
-      let fraction = vulgarFractions[fractionCharacter]
-    else { return nil }
-
-    let wholeText = text.dropLast()
-    guard !wholeText.isEmpty, let whole = Double(wholeText) else { return nil }
-    return whole + fraction
-  }
-
   private static func nonEmpty(_ text: String) -> String? {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
   }
-
-  private static let vulgarFractions: [Character: Double] = [
-    "¼": 1.0 / 4.0,
-    "½": 1.0 / 2.0,
-    "¾": 3.0 / 4.0,
-    "⅓": 1.0 / 3.0,
-    "⅔": 2.0 / 3.0,
-    "⅛": 1.0 / 8.0,
-    "⅜": 3.0 / 8.0,
-    "⅝": 5.0 / 8.0,
-    "⅞": 7.0 / 8.0,
-    "⅕": 1.0 / 5.0,
-    "⅖": 2.0 / 5.0,
-    "⅗": 3.0 / 5.0,
-    "⅘": 4.0 / 5.0,
-    "⅙": 1.0 / 6.0,
-    "⅚": 5.0 / 6.0,
-  ]
 
   private static let units: Set<String> = [
     "bag",

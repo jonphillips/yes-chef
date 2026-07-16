@@ -32,7 +32,7 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func archivingAllCandidatesArchivesRecipesAndClearsCandidateLinks() throws {
+    func movingAllCandidatesToReferencePlacesRecipesAndClearsCandidateLinks() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 806_900_000)
       let firstRecipeID = SampleUUIDSequence.uuid(29_001)
@@ -56,7 +56,7 @@ extension RecipeCoreTests {
           uuid: { uuids.next() }
         )
 
-        try WorkbenchRepository.archiveAllCandidates(
+        try WorkbenchRepository.moveAllCandidatesToReference(
           for: workbenchID,
           in: db,
           now: now.addingTimeInterval(60)
@@ -64,8 +64,10 @@ extension RecipeCoreTests {
 
         let first = try #require(try Recipe.find(firstRecipeID).fetchOne(db))
         let second = try #require(try Recipe.find(secondRecipeID).fetchOne(db))
-        #expect(first.archived)
-        #expect(second.archived)
+        expectNoDifference(first.libraryPlacement, .reference)
+        expectNoDifference(second.libraryPlacement, .reference)
+        #expect(!first.archived)
+        #expect(!second.archived)
         let detail = try #require(try WorkbenchDetailRequest(workbenchID: workbenchID).fetch(db))
         #expect(detail.candidateRows.isEmpty)
         expectNoDifference(detail.workbench.dateModified, now.addingTimeInterval(60))

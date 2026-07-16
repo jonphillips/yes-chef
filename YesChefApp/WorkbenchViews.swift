@@ -238,16 +238,16 @@ struct WorkbenchDetailView: View {
       Text(model.errorMessage ?? "")
     }
     .confirmationDialog(
-      "Archive all candidates?",
-      isPresented: $model.destination.archiveCandidates,
+      "Move all candidates to Reference?",
+      isPresented: $model.destination.moveCandidatesToReference,
       titleVisibility: .visible
     ) {
-      Button("Archive All", role: .destructive) {
-        model.confirmArchiveAllCandidatesButtonTapped()
+      Button("Move to Reference") {
+        model.confirmMoveAllCandidatesToReferenceButtonTapped()
       }
       Button("Cancel", role: .cancel) {}
     } message: {
-      Text("This archives the candidate recipes and removes them from this workbench.")
+      Text("This places the candidate recipes in Reference and removes them from this workbench.")
     }
     .confirmationDialog(
       model.workingRecipeIsPromoted ? "Remove Working Recipe?" : "Delete Working Recipe?",
@@ -452,9 +452,9 @@ private struct WorkbenchReader: View {
           Spacer()
           if !detail.candidateRows.isEmpty {
             Button {
-              model.archiveAllCandidatesButtonTapped()
+              model.moveAllCandidatesToReferenceButtonTapped()
             } label: {
-              Label("Archive All", systemImage: "archivebox")
+              Label("Move to Reference", systemImage: "books.vertical")
             }
           }
           Button {

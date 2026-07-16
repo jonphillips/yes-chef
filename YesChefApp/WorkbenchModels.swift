@@ -96,7 +96,7 @@ final class WorkbenchDetailModel {
   @CasePathable
   enum Destination {
     case addCandidates
-    case archiveCandidates
+    case moveCandidatesToReference
     case candidatePhotoPicker
     case chat(RecipeChatModel)
     case logEntryEditor(WorkbenchLogEntryEditorState)
@@ -145,16 +145,16 @@ final class WorkbenchDetailModel {
     destination = .addCandidates
   }
 
-  func archiveAllCandidatesButtonTapped() {
+  func moveAllCandidatesToReferenceButtonTapped() {
     guard detail?.candidateRows.isEmpty == false else { return }
-    destination = .archiveCandidates
+    destination = .moveCandidatesToReference
   }
 
-  func confirmArchiveAllCandidatesButtonTapped() {
+  func confirmMoveAllCandidatesToReferenceButtonTapped() {
     destination = nil
     do {
       try database.write { db in
-        try WorkbenchRepository.archiveAllCandidates(for: workbenchID, in: db, now: now)
+        try WorkbenchRepository.moveAllCandidatesToReference(for: workbenchID, in: db, now: now)
       }
     } catch {
       errorMessage = String(describing: error)
