@@ -5,6 +5,8 @@ import YesChefCore
 
 struct RecipeDetailView: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+  @AppStorage(RecipePlaybookColumnPreferences.visibilityStorageKey)
+  private var isPlaybookColumnVisible = true
   @State private var model: RecipeDetailModel
   @State private var handoffTransport = HandoffInAppTransport()
   let libraryModel: RecipeLibraryModel
@@ -81,6 +83,7 @@ struct RecipeDetailView: View {
       model: model,
       handoffTransport: handoffTransport,
       libraryModel: libraryModel,
+      isPlaybookColumnVisible: $isPlaybookColumnVisible,
       onRecipeSelected: onRecipeSelected
     )
   }
@@ -130,6 +133,16 @@ struct RecipeDetailView: View {
         model.openWorkbenchButtonTapped()
       } label: {
         Label("Workbench", systemImage: "hammer")
+      }
+      if isSplitEnabled {
+        Button {
+          isPlaybookColumnVisible.toggle()
+        } label: {
+          Label(
+            isPlaybookColumnVisible ? "Hide Playbook" : "Show Playbook",
+            systemImage: "sidebar.trailing"
+          )
+        }
       }
     }
     ToolbarItemGroup(placement: .secondaryAction) {
@@ -226,20 +239,6 @@ private struct RecipeReaderView: View {
     }
   }
 
-  private enum WideSection: String, CaseIterable, Identifiable {
-    case cook
-    case plan
-
-    var id: Self { self }
-
-    var title: String {
-      switch self {
-      case .cook: "Cook"
-      case .plan: "Plan"
-      }
-    }
-  }
-
   private enum HeaderMetrics {
     // This keeps the cover photo within the single metadata band on the narrowest
     // two-column reader layout, instead of making the header as tall as the photo.
@@ -251,10 +250,13 @@ private struct RecipeReaderView: View {
   let model: RecipeDetailModel
   let handoffTransport: HandoffInAppTransport
   let libraryModel: RecipeLibraryModel
+  @Binding var isPlaybookColumnVisible: Bool
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
+  @AppStorage(RecipePlaybookColumnPreferences.detentStorageKey)
+  private var playbookDetentRaw = RecipePlaybookColumnDetent.comfortable.rawValue
   @State private var compactSection: CompactSection = .ingredients
-  @State private var wideSection: WideSection = .cook
+  @GestureState private var playbookDragTranslation: CGFloat = 0
   @State private var isPhotoGalleryPresented = false
   @State private var renamingVariation: RecipeVariation?
   @State private var variationNameDraft = ""
@@ -274,19 +276,7 @@ private struct RecipeReaderView: View {
 
             Divider()
 
-            HStack(alignment: .top, spacing: 0) {
-              ScrollView {
-                ingredients
-                  .padding()
-                  .frame(maxWidth: .infinity, alignment: .topLeading)
-              }
-              .frame(width: proxy.size.width / 3)
-
-              Divider()
-
-              wideRecipeSection
-              .frame(maxWidth: .infinity)
-            }
+            wideRecipeColumns(in: proxy.size)
           }
         } else {
           ScrollView {
@@ -575,34 +565,77 @@ private struct RecipeReaderView: View {
     }
   }
 
-  private var wideRecipeSection: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      Picker("Recipe mode", selection: $wideSection) {
-        ForEach(WideSection.allCases) { section in
-          Text(section.title).tag(section)
-        }
-      }
-      .pickerStyle(.segmented)
-      .padding()
+  private func wideRecipeColumns(in size: CGSize) -> some View {
+    let layout = RecipeWideColumnLayout(width: size.width, isPlaybookVisible: isPlaybookColumnVisible)
+    let detent = currentPlaybookDetent
+    let basePlaybookWidth = layout.playbookWidth(for: detent)
+    let livePlaybookWidth = layout.proposedPlaybookWidth(
+      base: basePlaybookWidth,
+      translation: playbookDragTranslation
+    )
 
-      Divider()
+    return HStack(alignment: .top, spacing: 0) {
+      ScrollView {
+        ingredients
+          .padding()
+          .frame(maxWidth: .infinity, alignment: .topLeading)
+      }
+      .frame(width: layout.ingredientsWidth)
+
+      RecipeWideColumnSeparator()
 
       ScrollView {
-        Group {
-          switch wideSection {
-          case .cook:
-            directionsColumn
-          case .plan:
-            RecipePlaybookView(
-              model: model,
-              handoffTransport: handoffTransport,
-              ask: model.chatButtonTapped
-            )
-          }
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        directionsColumn
+          .padding()
+          .frame(maxWidth: .infinity, alignment: .topLeading)
       }
+      .frame(width: layout.directionsWidth(playbookWidth: livePlaybookWidth))
+
+      if isPlaybookColumnVisible {
+        RecipePlaybookResizeHandle(
+          detent: detent,
+          cycle: { currentPlaybookDetent = detent.next },
+          decrement: { currentPlaybookDetent = detent.previous },
+          increment: { currentPlaybookDetent = detent.next }
+        )
+        .simultaneousGesture(
+          DragGesture(minimumDistance: 2)
+            .updating($playbookDragTranslation) { value, state, _ in
+              state = value.translation.width
+            }
+            .onEnded { value in
+              let proposedWidth = layout.proposedPlaybookWidth(
+                base: basePlaybookWidth,
+                translation: value.translation.width
+              )
+              currentPlaybookDetent = layout.nearestDetent(to: proposedWidth)
+            }
+        )
+
+        ScrollView {
+          RecipePlaybookView(
+            model: model,
+            handoffTransport: handoffTransport,
+            ask: model.chatButtonTapped
+          )
+          .padding()
+          .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .frame(width: livePlaybookWidth, alignment: .topLeading)
+        .transition(.move(edge: .trailing).combined(with: .opacity))
+      }
+    }
+    .animation(.snappy(duration: 0.22), value: isPlaybookColumnVisible)
+    .animation(.snappy(duration: 0.22), value: playbookDetentRaw)
+    .frame(width: size.width, alignment: .leading)
+  }
+
+  private var currentPlaybookDetent: RecipePlaybookColumnDetent {
+    get {
+      RecipePlaybookColumnDetent(rawValue: playbookDetentRaw) ?? .comfortable
+    }
+    nonmutating set {
+      playbookDetentRaw = newValue.rawValue
     }
   }
 
