@@ -11,7 +11,7 @@ Newest first.
 ---
 ## ADR-0039 — Amendment 2, Playbook Peek detent dropped (two detents)
 
-**✅ architect-approved + app-build-gate green (architect local `generic/platform=iOS` → BUILD SUCCEEDED) — 2026-07-16. Jon device-pass pending.** yes-chef PR [#196](https://github.com/jonphillips/yes-chef/pull/196). A small follow-up off Slice C's device pass — **not** its own Amendment slice. **App-layer only — no schema / migration** (view + local `@AppStorage` state; **D = menu adopts the Playbook column, still parked**).
+**✅ architect-approved + app-build-gate green (architect local `generic/platform=iOS` → BUILD SUCCEEDED) + Jon device-confirmed (handle cycles Comfortable ↔ Wide, no sliver, toolbar Hide restores) — 2026-07-16.** yes-chef PR [#196](https://github.com/jonphillips/yes-chef/pull/196). A small follow-up off Slice C's device pass — **not** its own Amendment slice. **App-layer only — no schema / migration** (view + local `@AppStorage` state; **D = menu adopts the Playbook column, still parked**).
 
 **Why Peek went.** Slice C's device pass surfaced a pre-existing Slice B detent-math gap: **Peek** = ⅓ of an already-small remaining width, with no content floor mirroring the Directions floor, so at its minimum it rendered a degenerate sliver (the Playbook header wrapped one char per line, Ask clipped). The resize handle was deliberately built *not* to hide the column (drag-to-zero is "fiddly and easy to do by accident"); the **toolbar Show/Hide button is the honest hide**, so a near-hide detent was both redundant and broken. Two detents + binary toolbar-hide is the Xcode/VS Code grammar without the broken corner.
 
