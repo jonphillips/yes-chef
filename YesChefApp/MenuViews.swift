@@ -134,30 +134,6 @@ struct MenuDetailColumn: View {
   }
 }
 
-private enum MenuDetailInspector: Identifiable {
-  case recipeBrowser
-  case chat(RecipeChatModel)
-
-  var id: String {
-    switch self {
-    case .recipeBrowser:
-      "recipeBrowser"
-    case .chat:
-      "chat"
-    }
-  }
-}
-
-private extension Optional where Wrapped == MenuDetailInspector {
-  var isPresented: Bool {
-    get { self != nil }
-    set {
-      guard !newValue else { return }
-      self = nil
-    }
-  }
-}
-
 struct MenuDetailView: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   let model: MenuLibraryModel
@@ -200,7 +176,7 @@ struct MenuDetailView: View {
           detail: detail,
           handoffTransport: handoffTransport,
           onRecipeSelected: onRecipeSelected,
-          regeneratePrepPlan: chatButtonTapped
+          regeneratePrepPlan: ensureChatIsOpen
         )
         .navigationTitle(detail.menu.title)
       } else {
@@ -233,10 +209,18 @@ struct MenuDetailView: View {
             Label("Browse Recipes", systemImage: "sidebar.right")
           }
           Button {
-            chatButtonTapped()
+            askButtonTapped()
           } label: {
             Label("Ask", systemImage: "sparkles")
           }
+          .tint(isAskActive ? .accentColor : nil)
+          .overlay {
+            if isAskActive {
+              RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(.tint, lineWidth: 3)
+            }
+          }
+          .accessibilityValue(isAskActive ? Text("Panel open") : Text("Panel closed"))
         }
       }
     }
@@ -314,11 +298,33 @@ struct MenuDetailView: View {
     detailModel.detail.flatMap(CookSessionPresentation.init(menuDetail:))
   }
 
-  private func chatButtonTapped() {
+  private var isAskActive: Bool {
+    if case .chat? = inspector {
+      return true
+    }
+    return compactChatModel != nil
+  }
+
+  private func askButtonTapped() {
+    if isAskActive {
+      if isSplitEnabled {
+        inspector = nil
+      } else {
+        compactChatModel = nil
+      }
+    } else {
+      ensureChatIsOpen()
+    }
+  }
+
+  private func ensureChatIsOpen() {
     guard let detail = detailModel.detail else { return }
     if isSplitEnabled {
-      inspector = .chat(RecipeChatModel(context: .menu(MenuChatContext(detail: detail))))
-    } else {
+      guard case .chat? = inspector else {
+        inspector = .chat(RecipeChatModel(context: .menu(MenuChatContext(detail: detail))))
+        return
+      }
+    } else if compactChatModel == nil {
       compactChatModel = RecipeChatModel(context: .menu(MenuChatContext(detail: detail)))
     }
   }
