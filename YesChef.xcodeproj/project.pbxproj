@@ -20,6 +20,7 @@
 		1B3549FAE4F58ED491148794 /* SeedCoverageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EAAE31879D63DD62F7855F8 /* SeedCoverageModel.swift */; };
 		210BE26D7D55A64BB3FCB1D3 /* RecipeCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C39EB2615AF4AAC9AFF1F6C3 /* RecipeCaptureView.swift */; };
 		22E5C9EEE3DB5F09E84941BA /* CategoryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED3C57E4D25E07B0D4161163 /* CategoryViews.swift */; };
+		2332533F5D83A3EF69B7F960 /* MenuWideColumnLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A09330F46A0E8E28834FD02B /* MenuWideColumnLayoutTests.swift */; };
 		26A54D34845DADD8C9E1493D /* IdleTimerDisabledModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18FECD94C6F2E120A02EE0A6 /* IdleTimerDisabledModifier.swift */; };
 		2949418F009AE77017F5D1CF /* RecipeVariationDisplayModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD361DD70060E27578688E09 /* RecipeVariationDisplayModel.swift */; };
 		2F07342A5ED8AB64EFA742F1 /* HandoffReviewCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF6D7AE0E516607E7C801612 /* HandoffReviewCoordinator.swift */; };
@@ -47,6 +48,7 @@
 		626E267DA14C0FFA47BE6412 /* WorkbenchCompareAlignmentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B48DD3E004C108C6CC348A /* WorkbenchCompareAlignmentModel.swift */; };
 		627BE832B346246A69355F57 /* SyncHealthModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EA663A481CAE11E140B6830 /* SyncHealthModel.swift */; };
 		638EB65557B6EADDD89B33DD /* WebExtractorKit in Frameworks */ = {isa = PBXBuildFile; productRef = 161A231BCBA04E0D71C67DF2 /* WebExtractorKit */; };
+		6588EBC345BB11E65929F52F /* MenuPlaybookColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A1F368F34241CAF035C9CA /* MenuPlaybookColumnView.swift */; };
 		69B8E2AD921E41D8B38D14C7 /* YesChefShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 396029D84F6F6E49A17C47D2 /* YesChefShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		6BB951B199059B6F99196B26 /* AISettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64ABAAA0A5F20303F4C50314 /* AISettingsView.swift */; };
 		6E4C21A5E580147F1C8A1B94 /* AppExternalDatabaseChangeReload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D2AA2B9A5B2A2F4EFDE5A0C /* AppExternalDatabaseChangeReload.swift */; };
@@ -187,6 +189,7 @@
 		90AEA6C80CDEFF87884B65A7 /* CookSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookSessionView.swift; sourceTree = "<group>"; };
 		993185593DBEA80FD058C270 /* WorkbenchModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchModels.swift; sourceTree = "<group>"; };
 		9EAAE31879D63DD62F7855F8 /* SeedCoverageModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedCoverageModel.swift; sourceTree = "<group>"; };
+		A09330F46A0E8E28834FD02B /* MenuWideColumnLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuWideColumnLayoutTests.swift; sourceTree = "<group>"; };
 		A809D8DA30A2274B2B0E1982 /* WorkbenchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchViews.swift; sourceTree = "<group>"; };
 		A8FDE8F827374CA795E7D125 /* MenuDetailModel+PrepPlanEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuDetailModel+PrepPlanEditing.swift"; sourceTree = "<group>"; };
 		B49D2E9B66A731DB272F063C /* MealCalendarModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCalendarModels.swift; sourceTree = "<group>"; };
@@ -205,6 +208,7 @@
 		D55509395111AAC5A4B7E5AB /* HandoffEntities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffEntities.swift; sourceTree = "<group>"; };
 		D667D9221C270FF5442B4CC8 /* RecipeAdjustmentReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeAdjustmentReviewView.swift; sourceTree = "<group>"; };
 		D674AFA7977D211C929BE6B0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		D7A1F368F34241CAF035C9CA /* MenuPlaybookColumnView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuPlaybookColumnView.swift; sourceTree = "<group>"; };
 		D9653CACD31CEA3DBF5F722E /* SyncStatusSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncStatusSection.swift; sourceTree = "<group>"; };
 		DC10A57FB9A55D40CD97546E /* MenuDetailChatPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuDetailChatPresentation.swift; sourceTree = "<group>"; };
 		DD0F7538696E770B31AA47A0 /* RecipeActiveFilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeActiveFilterBar.swift; sourceTree = "<group>"; };
@@ -272,6 +276,7 @@
 			children = (
 				792C0EBCFF5BA678E266946D /* AIHandoffMenuPasteTests.swift */,
 				842FC32385274C6E7D875B4D /* ChatAssistantSelectionTests.swift */,
+				A09330F46A0E8E28834FD02B /* MenuWideColumnLayoutTests.swift */,
 				9095EE24ABAA5DC23259EDE9 /* RecipeScaleFormattingTests.swift */,
 				8A40B028294CBF15EA2F4F72 /* WorkbenchCompareAlignmentModelTests.swift */,
 			);
@@ -352,6 +357,7 @@
 				A8FDE8F827374CA795E7D125 /* MenuDetailModel+PrepPlanEditing.swift */,
 				754E1448B0A85B0698EFD056 /* MenuDetailSections.swift */,
 				7090DA55279458851517DD5A /* MenuModels.swift */,
+				D7A1F368F34241CAF035C9CA /* MenuPlaybookColumnView.swift */,
 				C0D3B7B8B0BBC62599125F27 /* MenuPrepPlanEditingViews.swift */,
 				26A031F93AA06D9ADCD5C36D /* MenuViews.swift */,
 				76C7E4899A1093E58F713C2F /* OriginalSnapshotView.swift */,
@@ -549,6 +555,7 @@
 			files = (
 				E04A28BE098B255C0B136810 /* AIHandoffMenuPasteTests.swift in Sources */,
 				0CC37A24661F09BC79B0D2DD /* ChatAssistantSelectionTests.swift in Sources */,
+				2332533F5D83A3EF69B7F960 /* MenuWideColumnLayoutTests.swift in Sources */,
 				CFBABC506840D72E020E663D /* RecipeScaleFormattingTests.swift in Sources */,
 				3E8AE18096153006398A5FD8 /* WorkbenchCompareAlignmentModelTests.swift in Sources */,
 			);
@@ -595,6 +602,7 @@
 				15A3B11099759D157C41626E /* MenuDetailModel+PrepPlanEditing.swift in Sources */,
 				06727A8A1C8BD3973911EE23 /* MenuDetailSections.swift in Sources */,
 				D778483B6523AB97BDE06ED6 /* MenuModels.swift in Sources */,
+				6588EBC345BB11E65929F52F /* MenuPlaybookColumnView.swift in Sources */,
 				5AEE3F3E204FC790030FD55B /* MenuPrepPlanEditingViews.swift in Sources */,
 				76A09E387271E9757E7AA9B8 /* MenuViews.swift in Sources */,
 				A103667583AD5577C2633211 /* OriginalSnapshotView.swift in Sources */,

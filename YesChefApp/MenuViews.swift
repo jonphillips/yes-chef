@@ -357,82 +357,7 @@ private extension CookSessionItem {
   }
 }
 
-private struct MenuDetailReader: View {
-  let model: MenuLibraryModel
-  let detailModel: MenuDetailModel
-  let detail: MenuDetailData
-  let handoffTransport: HandoffInAppTransport
-  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
-  var regeneratePrepPlan: () -> Void
-
-  private var isServiceDateTodayOrPast: Bool {
-    MenuServiceDate.hasArrived(placements: detail.placements, now: detailModel.now)
-  }
-
-  var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 24) {
-        MenuDetailHeader(detail: detail)
-        MenuExternalProjectField(
-          externalProjectName: detail.menu.externalProjectName,
-          save: detailModel.updateExternalProjectName
-        )
-        if isServiceDateTodayOrPast {
-          MenuDishList(
-            model: model,
-            detailModel: detailModel,
-            menu: detail.menu,
-            detail: detail,
-            isInitiallyExpanded: false,
-            onRecipeSelected: onRecipeSelected
-          )
-        }
-        MenuPrepPlanSection(
-          steps: detail.prepPlanSteps,
-          itemRows: detail.itemRows,
-          handoffSource: .menu(detailModel.menuID),
-          handoffTransport: handoffTransport,
-          onRecipeSelected: onRecipeSelected,
-          clearPrepPlan: {
-            model.clearPrepPlanButtonTapped(menuID: detailModel.menuID)
-          },
-          regeneratePrepPlan: regeneratePrepPlan,
-          createStep: detailModel.createPrepPlanStep,
-          updateStep: detailModel.updatePrepPlanStep,
-          deleteStep: detailModel.deletePrepPlanStep,
-          reorderStep: detailModel.reorderPrepPlanStep,
-          isInitiallyExpanded: !isServiceDateTodayOrPast
-        )
-        MenuLearningsSection(
-          learnings: detail.learnings,
-          updateLearning: detailModel.updateLearning,
-          deleteLearning: detailModel.deleteLearning
-        )
-        if !isServiceDateTodayOrPast {
-          MenuDishList(
-            model: model,
-            detailModel: detailModel,
-            menu: detail.menu,
-            detail: detail,
-            onRecipeSelected: onRecipeSelected
-          )
-        }
-        MenuPlacementList(
-          model: model,
-          menu: detail.menu,
-          minimumDayCount: max((detail.itemRows.map(\.item.dayOffset).max() ?? 0) + 1, 1),
-          placements: detail.placements
-        )
-      }
-      .padding()
-      .frame(maxWidth: 900, alignment: .leading)
-      .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    .swipeActionsContainer()
-  }
-}
-
-private struct MenuPrepPlanSection: View {
+struct MenuPrepPlanSection: View {
   let steps: [PrepPlanStepRecord]
   let itemRows: [MenuItemRowData]
   let handoffSource: HandoffExportSource
@@ -654,7 +579,7 @@ private struct MenuPrepPlanSessionBandView: View {
   }
 }
 
-private struct MenuDetailHeader: View {
+struct MenuDetailHeader: View {
   let detail: MenuDetailData
 
   var body: some View {
@@ -682,7 +607,7 @@ private struct MenuDetailHeader: View {
   }
 }
 
-private struct MenuExternalProjectField: View {
+struct MenuExternalProjectField: View {
   let externalProjectName: String?
   let save: (String) -> Void
 

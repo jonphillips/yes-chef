@@ -1,0 +1,200 @@
+import SwiftUI
+import YesChefCore
+
+struct MenuDetailReader: View {
+  private let twoColumnThreshold: CGFloat = 640
+
+  let model: MenuLibraryModel
+  let detailModel: MenuDetailModel
+  let detail: MenuDetailData
+  let handoffTransport: HandoffInAppTransport
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  var regeneratePrepPlan: () -> Void
+
+  @AppStorage(MenuPlaybookColumnPreferences.visibilityStorageKey)
+  private var isPlaybookColumnVisible = true
+  @AppStorage(MenuPlaybookColumnPreferences.detentStorageKey)
+  private var playbookDetentRaw: String?
+  @State private var initialPlaybookDetent: RecipePlaybookColumnDetent
+  @GestureState private var playbookDragTranslation: CGFloat = 0
+
+  init(
+    model: MenuLibraryModel,
+    detailModel: MenuDetailModel,
+    detail: MenuDetailData,
+    handoffTransport: HandoffInAppTransport,
+    onRecipeSelected: ((RecipeDetailPresentation) -> Void)? = nil,
+    regeneratePrepPlan: @escaping () -> Void
+  ) {
+    self.model = model
+    self.detailModel = detailModel
+    self.detail = detail
+    self.handoffTransport = handoffTransport
+    self.onRecipeSelected = onRecipeSelected
+    self.regeneratePrepPlan = regeneratePrepPlan
+    _initialPlaybookDetent = State(
+      initialValue: MenuServiceDate.hasArrived(placements: detail.placements, now: detailModel.now)
+        ? .comfortable
+        : .wide
+    )
+  }
+
+  private var isServiceDateTodayOrPast: Bool {
+    MenuServiceDate.hasArrived(placements: detail.placements, now: detailModel.now)
+  }
+
+  var body: some View {
+    GeometryReader { proxy in
+      Group {
+        if proxy.size.width >= twoColumnThreshold {
+          wideMenuColumns(in: proxy.size)
+        } else {
+          compactMenuReader
+        }
+      }
+      .toolbar {
+        if proxy.size.width >= twoColumnThreshold {
+          ToolbarItem(placement: .primaryAction) {
+            Button {
+              isPlaybookColumnVisible.toggle()
+            } label: {
+              Label(
+                isPlaybookColumnVisible ? "Hide Playbook" : "Show Playbook",
+                systemImage: "sidebar.trailing"
+              )
+            }
+          }
+        }
+      }
+    }
+    .swipeActionsContainer()
+  }
+
+  private var compactMenuReader: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 24) {
+        menuBody
+        menuPlaybook
+      }
+      .padding()
+      .frame(maxWidth: 900, alignment: .leading)
+      .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+
+  private func wideMenuColumns(in size: CGSize) -> some View {
+    let layout = MenuWideColumnLayout(
+      width: size.width,
+      isPlaybookVisible: isPlaybookColumnVisible
+    )
+    let detent = currentPlaybookDetent
+    let basePlaybookWidth = layout.playbookWidth(for: detent)
+    let livePlaybookWidth = layout.proposedPlaybookWidth(
+      base: basePlaybookWidth,
+      translation: playbookDragTranslation
+    )
+
+    return HStack(alignment: .top, spacing: 0) {
+      ScrollView {
+        menuBody
+          .padding()
+          .frame(maxWidth: 900, alignment: .leading)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .frame(width: layout.bodyWidth(playbookWidth: livePlaybookWidth))
+
+      if isPlaybookColumnVisible {
+        RecipePlaybookResizeHandle(
+          detent: detent,
+          cycle: { currentPlaybookDetent = detent.next },
+          decrement: { currentPlaybookDetent = detent.previous },
+          increment: { currentPlaybookDetent = detent.next }
+        )
+        .simultaneousGesture(
+          DragGesture(minimumDistance: 2)
+            .updating($playbookDragTranslation) { value, state, _ in
+              state = value.translation.width
+            }
+            .onEnded { value in
+              let proposedWidth = layout.proposedPlaybookWidth(
+                base: basePlaybookWidth,
+                translation: value.translation.width
+              )
+              currentPlaybookDetent = layout.nearestDetent(to: proposedWidth)
+            }
+        )
+
+        ScrollView {
+          menuPlaybook
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .frame(width: livePlaybookWidth, alignment: .topLeading)
+        .transition(.move(edge: .trailing).combined(with: .opacity))
+      }
+    }
+    .animation(.snappy(duration: 0.22), value: isPlaybookColumnVisible)
+    .animation(.snappy(duration: 0.22), value: playbookDetentRaw)
+    .frame(width: size.width, height: size.height, alignment: .topLeading)
+  }
+
+  private var currentPlaybookDetent: RecipePlaybookColumnDetent {
+    get {
+      playbookDetentRaw.flatMap(RecipePlaybookColumnDetent.init(rawValue:))
+        ?? initialPlaybookDetent
+    }
+    nonmutating set {
+      playbookDetentRaw = newValue.rawValue
+    }
+  }
+
+  private var menuBody: some View {
+    VStack(alignment: .leading, spacing: 24) {
+      MenuDetailHeader(detail: detail)
+      MenuExternalProjectField(
+        externalProjectName: detail.menu.externalProjectName,
+        save: detailModel.updateExternalProjectName
+      )
+      MenuDishList(
+        model: model,
+        detailModel: detailModel,
+        menu: detail.menu,
+        detail: detail,
+        isInitiallyExpanded: !isServiceDateTodayOrPast,
+        onRecipeSelected: onRecipeSelected
+      )
+      MenuPlacementList(
+        model: model,
+        menu: detail.menu,
+        minimumDayCount: max((detail.itemRows.map(\.item.dayOffset).max() ?? 0) + 1, 1),
+        placements: detail.placements
+      )
+    }
+  }
+
+  private var menuPlaybook: some View {
+    VStack(alignment: .leading, spacing: 24) {
+      MenuPrepPlanSection(
+        steps: detail.prepPlanSteps,
+        itemRows: detail.itemRows,
+        handoffSource: .menu(detailModel.menuID),
+        handoffTransport: handoffTransport,
+        onRecipeSelected: onRecipeSelected,
+        clearPrepPlan: {
+          model.clearPrepPlanButtonTapped(menuID: detailModel.menuID)
+        },
+        regeneratePrepPlan: regeneratePrepPlan,
+        createStep: detailModel.createPrepPlanStep,
+        updateStep: detailModel.updatePrepPlanStep,
+        deleteStep: detailModel.deletePrepPlanStep,
+        reorderStep: detailModel.reorderPrepPlanStep,
+        isInitiallyExpanded: true
+      )
+      MenuLearningsSection(
+        learnings: detail.learnings,
+        updateLearning: detailModel.updateLearning,
+        deleteLearning: detailModel.deleteLearning
+      )
+    }
+  }
+}
