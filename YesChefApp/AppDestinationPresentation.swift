@@ -122,11 +122,6 @@ private struct RecipeDetailDestinationsModifier: ViewModifier {
           RecipeEditorView(recipeID: recipeID)
         }
       }
-      .sheet(item: gatedBinding($recipeModel.destination.cookingMode, enabled: isPresentationEnabled), id: \.self) { recipeID in
-        NavigationStack {
-          CookingModeView(model: CookingModeModel(recipeID: recipeID))
-        }
-      }
       .sheet(item: gatedBinding($recipeModel.destination.originalSnapshot, enabled: isPresentationEnabled), id: \.self) { recipeID in
         NavigationStack {
           OriginalSnapshotView(recipe: recipeModel.recipeRows.first { $0.recipe.id == recipeID }?.recipe)
