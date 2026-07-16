@@ -134,16 +134,6 @@ struct RecipeDetailView: View {
       } label: {
         Label("Workbench", systemImage: "hammer")
       }
-      if isSplitEnabled {
-        Button {
-          isPlaybookColumnVisible.toggle()
-        } label: {
-          Label(
-            isPlaybookColumnVisible ? "Hide Playbook" : "Show Playbook",
-            systemImage: "sidebar.trailing"
-          )
-        }
-      }
     }
     ToolbarItemGroup(placement: .secondaryAction) {
       if model.recipe?.originalSnapshot != nil {
@@ -240,9 +230,10 @@ private struct RecipeReaderView: View {
   }
 
   private enum HeaderMetrics {
-    // This keeps the cover photo within the single metadata band on the narrowest
-    // two-column reader layout, instead of making the header as tall as the photo.
-    static let thumbnailSideLength: CGFloat = 72
+    static let compactThumbnailSideLength: CGFloat = 72
+    // The nested wide-column header can use its reclaimed vertical space for a
+    // more legible cover photo without changing the compact reader's density.
+    static let wideColumnPhotoSideLength: CGFloat = 96
   }
 
   private let twoColumnThreshold: CGFloat = 640
@@ -263,35 +254,40 @@ private struct RecipeReaderView: View {
 
   var body: some View {
     GeometryReader { proxy in
-      if let recipe = model.recipe {
-        let isTwoColumn = proxy.size.width >= twoColumnThreshold
-        if isTwoColumn {
-          VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 16) {
-              header(recipe)
-              metadata(recipe)
+      Group {
+        if let recipe = model.recipe {
+          let isTwoColumn = proxy.size.width >= twoColumnThreshold
+          if isTwoColumn {
+            wideRecipeColumns(recipe, in: proxy.size)
+          } else {
+            ScrollView {
+              VStack(alignment: .leading, spacing: 16) {
+                header(recipe)
+                metadata(recipe)
+                compactRecipeBody
+              }
+              .padding()
+              .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Divider()
-
-            wideRecipeColumns(in: proxy.size)
           }
         } else {
-          ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-              header(recipe)
-              metadata(recipe)
-              compactRecipeBody
+          ContentUnavailableView("Recipe Not Found", systemImage: "fork.knife")
+            .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+        }
+      }
+      .toolbar {
+        if model.recipe != nil, proxy.size.width >= twoColumnThreshold {
+          ToolbarItem(placement: .primaryAction) {
+            Button {
+              isPlaybookColumnVisible.toggle()
+            } label: {
+              Label(
+                isPlaybookColumnVisible ? "Hide Playbook" : "Show Playbook",
+                systemImage: "sidebar.trailing"
+              )
             }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
           }
         }
-      } else {
-        ContentUnavailableView("Recipe Not Found", systemImage: "fork.knife")
-          .frame(maxWidth: .infinity, minHeight: proxy.size.height)
       }
     }
     .sheet(isPresented: $isPhotoGalleryPresented) {
@@ -349,7 +345,22 @@ private struct RecipeReaderView: View {
     }
   }
 
-  private func metadata(_ recipe: Recipe) -> some View {
+  private func wideColumnHeader(_ recipe: Recipe) -> some View {
+    HStack(alignment: .top, spacing: 12) {
+      header(recipe)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      if let photo = model.primaryDisplayPhoto {
+        RecipeReaderThumbnail(photo: photo, sideLength: HeaderMetrics.wideColumnPhotoSideLength) {
+          isPhotoGalleryPresented = true
+        }
+      }
+    }
+  }
+
+  private func metadata(
+    _ recipe: Recipe,
+    showsPhoto: Bool = true
+  ) -> some View {
     VStack(alignment: .leading, spacing: 6) {
       ViewThatFits(in: .horizontal) {
         HStack(alignment: .top, spacing: 12) {
@@ -360,16 +371,16 @@ private struct RecipeReaderView: View {
             }
           }
           Spacer(minLength: 12)
-          if let photo = model.primaryDisplayPhoto {
-            RecipeReaderThumbnail(photo: photo, sideLength: HeaderMetrics.thumbnailSideLength) {
+          if showsPhoto, let photo = model.primaryDisplayPhoto {
+            RecipeReaderThumbnail(photo: photo, sideLength: HeaderMetrics.compactThumbnailSideLength) {
               isPhotoGalleryPresented = true
             }
           }
         }
 
         VStack(alignment: .leading, spacing: 6) {
-          if let photo = model.primaryDisplayPhoto {
-            RecipeReaderThumbnail(photo: photo, sideLength: HeaderMetrics.thumbnailSideLength) {
+          if showsPhoto, let photo = model.primaryDisplayPhoto {
+            RecipeReaderThumbnail(photo: photo, sideLength: HeaderMetrics.compactThumbnailSideLength) {
               isPhotoGalleryPresented = true
             }
           }
@@ -565,7 +576,7 @@ private struct RecipeReaderView: View {
     }
   }
 
-  private func wideRecipeColumns(in size: CGSize) -> some View {
+  private func wideRecipeColumns(_ recipe: Recipe, in size: CGSize) -> some View {
     let layout = RecipeWideColumnLayout(width: size.width, isPlaybookVisible: isPlaybookColumnVisible)
     let detent = currentPlaybookDetent
     let basePlaybookWidth = layout.playbookWidth(for: detent)
@@ -585,9 +596,13 @@ private struct RecipeReaderView: View {
       RecipeWideColumnSeparator()
 
       ScrollView {
-        directionsColumn
-          .padding()
-          .frame(maxWidth: .infinity, alignment: .topLeading)
+        VStack(alignment: .leading, spacing: 16) {
+          wideColumnHeader(recipe)
+          metadata(recipe, showsPhoto: false)
+          directionsColumn
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .topLeading)
       }
       .frame(width: layout.directionsWidth(playbookWidth: livePlaybookWidth))
 
@@ -627,7 +642,7 @@ private struct RecipeReaderView: View {
     }
     .animation(.snappy(duration: 0.22), value: isPlaybookColumnVisible)
     .animation(.snappy(duration: 0.22), value: playbookDetentRaw)
-    .frame(width: size.width, alignment: .leading)
+    .frame(width: size.width, height: size.height, alignment: .topLeading)
   }
 
   private var currentPlaybookDetent: RecipePlaybookColumnDetent {

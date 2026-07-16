@@ -9,6 +9,22 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0039 — Amendment 2 / Slice C, recipe header nests beside Ingredients
+
+**✅ architect-approved + app-build-gate green (architect local `generic/platform=iOS` → BUILD SUCCEEDED) + Jon device-confirmed running (3 detents exercised on `iPad Pro 13-inch (M5)`, screenshots) — 2026-07-16.** yes-chef PR [#195](https://github.com/jonphillips/yes-chef/pull/195) (Codex branch/PR title says "A2 S3" — same slice; the doc series calls it **Slice C**).
+[ADR-0039 Amendment 2](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#amendment-2--2026-07-16-the-playbook-becomes-a-persistent-enrichment-column): **third of four** Amendment 2 slices — corrects Slice A's full-width header band to the real Paprika **column-scoped** composition. **App-layer only — no schema / migration** (pure view composition; Slice B's `@AppStorage` keys untouched). **D = menu adopts the column, still parked.**
+
+**The full-width band + divider are gone.** `RecipeReaderView.body`'s two-column branch is now just the three columns filling full height (`.frame(width:height:alignment: .topLeading)`); the outer `VStack`/`header`/`metadata`/`Divider` strip that spent the whole recipe's top edge on identity is deleted. Ingredients and Playbook both rise to the top edge — the vertical reclaim the band only half-delivered.
+
+**Header nests at the top of the Directions column only.** A new `wideColumnHeader(_:)` puts `header` + a 96 pt cover photo side-by-side, stacked above `metadata(_:showsPhoto: false)` + `directionsColumn` inside the Directions `ScrollView` — spanning Directions' width and scrolling with it. Directions-only (not Directions + Playbook) keeps identity + method together and lets the Playbook stay **top-anchored** (Ask · Make-ahead · Notes rise to the ceiling) — Jon's chosen fork. `metadata` gained a `showsPhoto` flag so the compact reader keeps its 72 pt band thumbnail (`compactThumbnailSideLength`) while the wide header owns the photo (`wideColumnPhotoSideLength` = 96, a **deliberate** grow past Paprika's stamp, recorded so it doesn't read as drift).
+
+**Ingredients cheated narrower; the three columns still reconcile.** `RecipeWideColumnLayout` split its single `contentColumnFraction` (⅓) into `ingredientsColumnFraction` = **0.27** and `directionsMinimumFraction` = **0.30**. The narrower Ingredients widens both the Directions floor and the Playbook max; the math reconciles exactly (at Wide, Directions lands back on `0.30w`).
+
+**Slice B review finding closed here (same region).** The Show/Hide Playbook toolbar toggle moved out of the parent's `isSplitEnabled` gate into the reader's own `proxy.size.width >= twoColumnThreshold` gate — so the button now appears **iff** the three-column layout actually renders, killing the dead-control state on a sidebar-narrowed pane. `isSplitEnabled` remains used elsewhere (not dead).
+
+**Architect review (PR #195) — approve, no on-branch changes required.** Composition matches the ADR intent exactly (confirmed against on-device screenshots); layout math reconciles precisely; the toolbar re-gate is a genuine improvement, not just a relocation. One **non-blocking** nit: `metadata(showsPhoto: false)`'s `ViewThatFits` collapses to two near-identical candidates on the wide path (the `VStack` branch is dead there) — cosmetic, deferred. **Device-pass discovery → next slice:** the **Peek** detent renders a degenerate sliver at its minimum width ("Hand off to ChatGPT" wraps one char per line, Ask clipped) — a pre-existing Slice B detent-math gap (Peek = ⅓ of an already-small max, with no content floor mirroring the Directions floor), surfaced now, **not caused by Slice C**. Jon's call: **drop Peek to two detents** (see CURRENT_HANDOFF Next Up).
+
+---
 ## ADR-0039 — Amendment 2 / Slice B, resizable recipe Playbook column
 
 **✅ architect-approved + app-build-gate green (architect local `generic/platform=iOS` → BUILD SUCCEEDED) — 2026-07-16. Jon device-pass pending.** yes-chef PR [#194](https://github.com/jonphillips/yes-chef/pull/194).

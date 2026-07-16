@@ -39,20 +39,21 @@ enum RecipeWideColumnMetrics {
 }
 
 struct RecipeWideColumnLayout {
-  // Keeps the reader's existing one-third ingredient column and gives Directions
-  // the same minimum. The three detents evenly divide only the remaining width,
-  // so no device-specific Playbook width is being decided before the device pass.
-  private static let contentColumnFraction: CGFloat = 1 / 3
+  // The device pass tuned Ingredients to 90% of its prior 30% share while
+  // preserving the Directions floor. The three detents evenly divide only the
+  // remaining width, so no device-specific Playbook width is encoded here.
+  private static let ingredientsColumnFraction: CGFloat = 0.27
+  private static let directionsMinimumFraction: CGFloat = 0.30
 
   let width: CGFloat
   let isPlaybookVisible: Bool
 
   var ingredientsWidth: CGFloat {
-    width * Self.contentColumnFraction
+    width * Self.ingredientsColumnFraction
   }
 
   private var directionsMinimumWidth: CGFloat {
-    width * Self.contentColumnFraction
+    width * Self.directionsMinimumFraction
   }
 
   private var maximumPlaybookWidth: CGFloat {
