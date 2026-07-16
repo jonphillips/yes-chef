@@ -378,11 +378,23 @@ private struct RecipeReaderView: View {
         }
 
         VStack(alignment: .leading, spacing: 6) {
+          if let photo = model.primaryDisplayPhoto {
+            RecipeReaderThumbnail(photo: photo, sideLength: HeaderMetrics.thumbnailSideLength) {
+              isPhotoGalleryPresented = true
+            }
+          }
           recipeStats(recipe)
           if let source = model.detail?.source {
             SourceMetadataView(source: source)
           }
         }
+      }
+
+      if let notes = model.detail?.source?.sourceNotes?.nonEmpty {
+        Text(notes)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(2)
       }
 
       if recipe.libraryPlacement == .reference {
