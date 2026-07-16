@@ -185,27 +185,18 @@ struct MenuDetailView: View {
     }
     .overlay(alignment: .trailing) {
       if let toolOverlay {
-        ZStack(alignment: .trailing) {
-          Button {
+        // Keep the menu interactive beneath the panel so recipes can later be
+        // dragged from Browse Recipes into a meal. The toolbar toggles dismiss it.
+        menuToolContent(
+          toolOverlay,
+          onRecipeSelected: { presentation in
             self.toolOverlay = nil
-          } label: {
-            Rectangle()
-              .fill(.black.opacity(0.18))
+            onRecipeSelected?(presentation)
           }
-          .buttonStyle(.plain)
-          .accessibilityLabel("Dismiss \(toolOverlay.title)")
-
-          menuToolContent(
-            toolOverlay,
-            onRecipeSelected: { presentation in
-              self.toolOverlay = nil
-              onRecipeSelected?(presentation)
-            }
-          )
-          .frame(width: MenuToolOverlayMetrics.idealWidth)
-          .frame(maxHeight: .infinity)
-          .background(.regularMaterial)
-        }
+        )
+        .frame(width: MenuToolOverlayMetrics.idealWidth)
+        .frame(maxHeight: .infinity)
+        .background(.regularMaterial)
         .transition(.move(edge: .trailing).combined(with: .opacity))
       }
     }
