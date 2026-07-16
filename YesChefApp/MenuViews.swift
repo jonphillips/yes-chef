@@ -136,8 +136,6 @@ struct MenuDetailColumn: View {
 
 struct MenuDetailView: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-  @AppStorage(ChatWorkspaceDetent.storageKey)
-  private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   let model: MenuLibraryModel
   let recipeModel: RecipeLibraryModel
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
@@ -145,7 +143,7 @@ struct MenuDetailView: View {
   var isFocusActive = false
   var focusButtonTapped: (() -> Void)?
   @State private var detailModel: MenuDetailModel
-  @State private var isShowingRecipeBrowser = false
+  @State private var inspector: MenuDetailInspector?
   @State private var compactChatModel: RecipeChatModel?
   @State private var handoffTransport = HandoffInAppTransport()
 
@@ -172,33 +170,14 @@ struct MenuDetailView: View {
 
     Group {
       if let detail = detailModel.detail {
-        Group {
-          if isSplitEnabled {
-            ChatWorkspaceSplit(
-              context: .menu(MenuChatContext(detail: detail)),
-              detentRaw: $chatWorkspaceDetentRaw,
-              applyActions: { chatModel in detailModel.applyActionCatalog(for: chatModel) }
-            ) {
-              MenuDetailReader(
-                model: model,
-                detailModel: detailModel,
-                detail: detail,
-                handoffTransport: handoffTransport,
-                onRecipeSelected: onRecipeSelected,
-                regeneratePrepPlan: chatButtonTapped
-              )
-            }
-          } else {
-            MenuDetailReader(
-              model: model,
-              detailModel: detailModel,
-              detail: detail,
-              handoffTransport: handoffTransport,
-              onRecipeSelected: onRecipeSelected,
-              regeneratePrepPlan: chatButtonTapped
-            )
-          }
-        }
+        MenuDetailReader(
+          model: model,
+          detailModel: detailModel,
+          detail: detail,
+          handoffTransport: handoffTransport,
+          onRecipeSelected: onRecipeSelected,
+          regeneratePrepPlan: ensureChatIsOpen
+        )
         .navigationTitle(detail.menu.title)
       } else {
         ContentUnavailableView("Menu Not Found", systemImage: "menucard")
@@ -225,29 +204,42 @@ struct MenuDetailView: View {
             }
           }
           Button {
-            isShowingRecipeBrowser.toggle()
+            recipeBrowserButtonTapped()
           } label: {
             Label("Browse Recipes", systemImage: "sidebar.right")
           }
-          if !isSplitEnabled {
-            Button {
-              chatButtonTapped()
-            } label: {
-              Label("Chat", systemImage: "sparkles")
+          Button {
+            askButtonTapped()
+          } label: {
+            Label("Ask", systemImage: "sparkles")
+          }
+          .tint(isAskActive ? .accentColor : nil)
+          .overlay {
+            if isAskActive {
+              RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(.tint, lineWidth: 3)
             }
           }
+          .accessibilityValue(isAskActive ? Text("Panel open") : Text("Panel closed"))
         }
       }
     }
-    .inspector(isPresented: $isShowingRecipeBrowser) {
-      if detailModel.detail != nil {
-        MenuRecipeBrowserPanel(
-          recipeModel: recipeModel,
-          onRecipeSelected: onRecipeSelected
-        )
-        .inspectorColumnWidth(min: 320, ideal: 380, max: 480)
-      } else {
-        ContentUnavailableView("Recipes", systemImage: "book.closed")
+    .inspector(isPresented: $inspector.isPresented) {
+      if let inspector {
+        switch inspector {
+        case .recipeBrowser:
+          MenuRecipeBrowserPanel(
+            recipeModel: recipeModel,
+            onRecipeSelected: onRecipeSelected
+          )
+          .inspectorColumnWidth(min: 320, ideal: 380, max: 480)
+        case let .chat(chatModel):
+          RecipeChatPanel(
+            chatModel: chatModel,
+            applyActions: detailModel.applyActionCatalog(for: chatModel)
+          )
+          .inspectorColumnWidth(min: 320, ideal: 380, max: 480)
+        }
       }
     }
     .sheet(item: $compactChatModel) { chatModel in
@@ -306,12 +298,42 @@ struct MenuDetailView: View {
     detailModel.detail.flatMap(CookSessionPresentation.init(menuDetail:))
   }
 
-  private func chatButtonTapped() {
+  private var isAskActive: Bool {
+    if case .chat? = inspector {
+      return true
+    }
+    return compactChatModel != nil
+  }
+
+  private func askButtonTapped() {
+    if isAskActive {
+      if isSplitEnabled {
+        inspector = nil
+      } else {
+        compactChatModel = nil
+      }
+    } else {
+      ensureChatIsOpen()
+    }
+  }
+
+  private func ensureChatIsOpen() {
     guard let detail = detailModel.detail else { return }
     if isSplitEnabled {
-      chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
-    } else {
+      guard case .chat? = inspector else {
+        inspector = .chat(RecipeChatModel(context: .menu(MenuChatContext(detail: detail))))
+        return
+      }
+    } else if compactChatModel == nil {
       compactChatModel = RecipeChatModel(context: .menu(MenuChatContext(detail: detail)))
+    }
+  }
+
+  private func recipeBrowserButtonTapped() {
+    if case .recipeBrowser? = inspector {
+      inspector = nil
+    } else {
+      inspector = .recipeBrowser
     }
   }
 }
@@ -343,6 +365,10 @@ private struct MenuDetailReader: View {
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var regeneratePrepPlan: () -> Void
 
+  private var isServiceDateTodayOrPast: Bool {
+    MenuServiceDate.hasArrived(placements: detail.placements, now: detailModel.now)
+  }
+
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
@@ -351,6 +377,16 @@ private struct MenuDetailReader: View {
           externalProjectName: detail.menu.externalProjectName,
           save: detailModel.updateExternalProjectName
         )
+        if isServiceDateTodayOrPast {
+          MenuDishList(
+            model: model,
+            detailModel: detailModel,
+            menu: detail.menu,
+            detail: detail,
+            isInitiallyExpanded: false,
+            onRecipeSelected: onRecipeSelected
+          )
+        }
         MenuPrepPlanSection(
           steps: detail.prepPlanSteps,
           itemRows: detail.itemRows,
@@ -364,20 +400,23 @@ private struct MenuDetailReader: View {
           createStep: detailModel.createPrepPlanStep,
           updateStep: detailModel.updatePrepPlanStep,
           deleteStep: detailModel.deletePrepPlanStep,
-          reorderStep: detailModel.reorderPrepPlanStep
+          reorderStep: detailModel.reorderPrepPlanStep,
+          isInitiallyExpanded: !isServiceDateTodayOrPast
         )
         MenuLearningsSection(
           learnings: detail.learnings,
           updateLearning: detailModel.updateLearning,
           deleteLearning: detailModel.deleteLearning
         )
-        MenuDishList(
-          model: model,
-          detailModel: detailModel,
-          menu: detail.menu,
-          detail: detail,
-          onRecipeSelected: onRecipeSelected
-        )
+        if !isServiceDateTodayOrPast {
+          MenuDishList(
+            model: model,
+            detailModel: detailModel,
+            menu: detail.menu,
+            detail: detail,
+            onRecipeSelected: onRecipeSelected
+          )
+        }
         MenuPlacementList(
           model: model,
           menu: detail.menu,
@@ -405,78 +444,98 @@ private struct MenuPrepPlanSection: View {
   var updateStep: (PrepPlanStep, PrepPlanStepRecord.ID) -> Void
   var deleteStep: (PrepPlanStepRecord.ID) -> Void
   var reorderStep: (PrepPlanStepRecord.ID, MenuItemMoveDirection) -> Void
+  var isInitiallyExpanded: Bool
   @State private var expandedSessionIDs: Set<MenuPrepPlanSessionBand.ID> = []
   @State private var editor: PrepPlanStepEditorDraft?
+  @State private var expansionOverride: Bool?
 
   private var sessionBands: [MenuPrepPlanSessionBand] {
     MenuPrepPlanSessionBand.grouping(steps)
   }
 
+  private var isExpanded: Bool {
+    expansionOverride ?? isInitiallyExpanded
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       HStack(alignment: .firstTextBaseline) {
-        Text("Prep Plan")
-          .font(.title2.weight(.semibold))
-
-        Spacer()
-
-        HandoffCopyPasteControls(source: handoffSource, transport: handoffTransport)
-        .buttonStyle(.bordered)
-      }
-
-      HStack {
         Button {
-          editor = PrepPlanStepEditorDraft()
+          expansionOverride = !isExpanded
         } label: {
-          Label("Add Step", systemImage: "plus")
-        }
-        .buttonStyle(.bordered)
-
-        Button {
-          regeneratePrepPlan()
-        } label: {
-          Label("Regenerate", systemImage: "sparkles")
-        }
-        .buttonStyle(.bordered)
-        .disabled(steps.isEmpty)
-
-        Button(role: .destructive) {
-          clearPrepPlan()
-        } label: {
-          Label("Clear", systemImage: "xmark.circle")
-        }
-        .buttonStyle(.bordered)
-        .disabled(steps.isEmpty)
-      }
-
-      if steps.isEmpty {
-        ContentUnavailableView(
-          "No Prep Plan Yet",
-          systemImage: "checklist",
-          description: Text("Paste a plan grouped under session headers, then refine it with chat.")
-        )
-      } else {
-        VStack(alignment: .leading, spacing: 8) {
-          ForEach(sessionBands) { band in
-            MenuPrepPlanSessionBandView(
-              band: band,
-              itemRows: itemRows,
-              isExpanded: expandedSessionIDs.contains(band.id),
-              onToggle: {
-                if expandedSessionIDs.contains(band.id) {
-                  expandedSessionIDs.remove(band.id)
-                } else {
-                  expandedSessionIDs.insert(band.id)
-                }
-              },
-              onRecipeSelected: onRecipeSelected,
-              editStep: { editor = PrepPlanStepEditorDraft(step: $0) },
-              deleteStep: deleteStep,
-              reorderStep: reorderStep
-            )
+          HStack(spacing: 8) {
+            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(.secondary)
+              .frame(width: 12)
+            Text("Prep Plan")
+              .font(.title2.weight(.semibold))
           }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .buttonStyle(.plain)
+        .accessibilityLabel(isExpanded ? "Collapse Prep Plan" : "Expand Prep Plan")
+
+        Spacer()
+      }
+
+      if isExpanded {
+        HandoffCopyPasteControls(source: handoffSource, transport: handoffTransport)
+          .buttonStyle(.bordered)
+
+        HStack {
+          Button {
+            editor = PrepPlanStepEditorDraft()
+          } label: {
+            Label("Add Step", systemImage: "plus")
+          }
+          .buttonStyle(.bordered)
+
+          Button {
+            regeneratePrepPlan()
+          } label: {
+            Label("Regenerate", systemImage: "sparkles")
+          }
+          .buttonStyle(.bordered)
+          .disabled(steps.isEmpty)
+
+          Button(role: .destructive) {
+            clearPrepPlan()
+          } label: {
+            Label("Clear", systemImage: "xmark.circle")
+          }
+          .buttonStyle(.bordered)
+          .disabled(steps.isEmpty)
+        }
+
+        if steps.isEmpty {
+          ContentUnavailableView(
+            "No Prep Plan Yet",
+            systemImage: "checklist",
+            description: Text("Paste a plan grouped under session headers, then refine it with chat.")
+          )
+        } else {
+          VStack(alignment: .leading, spacing: 8) {
+            ForEach(sessionBands) { band in
+              MenuPrepPlanSessionBandView(
+                band: band,
+                itemRows: itemRows,
+                isExpanded: expandedSessionIDs.contains(band.id),
+                onToggle: {
+                  if expandedSessionIDs.contains(band.id) {
+                    expandedSessionIDs.remove(band.id)
+                  } else {
+                    expandedSessionIDs.insert(band.id)
+                  }
+                },
+                onRecipeSelected: onRecipeSelected,
+                editStep: { editor = PrepPlanStepEditorDraft(step: $0) },
+                deleteStep: deleteStep,
+                reorderStep: reorderStep
+              )
+            }
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+        }
       }
     }
     .sheet(item: $editor) { draft in

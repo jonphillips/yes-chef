@@ -6,6 +6,59 @@ import YesChefCore
 
 extension RecipeCoreTests {
   @Suite
+  struct MenuServiceDateTests {
+    @Test
+    func collapsesAtAndAfterTheEarliestServiceDate() throws {
+      var calendar = Calendar(identifier: .gregorian)
+      calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+      let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 15, hour: 9)))
+      let yesterday = try #require(calendar.date(byAdding: .day, value: -1, to: now))
+      let laterToday = try #require(calendar.date(byAdding: .hour, value: 8, to: now))
+      let tomorrow = try #require(calendar.date(byAdding: .day, value: 1, to: now))
+      let menuID = SampleUUIDSequence.uuid(9_900)
+
+      func placement(_ startDate: Date, id: Int) -> MenuPlacement {
+        MenuPlacement(
+          id: SampleUUIDSequence.uuid(id),
+          menuID: menuID,
+          startDate: startDate,
+          dateCreated: now,
+          dateModified: now
+        )
+      }
+
+      expectNoDifference(
+        MenuServiceDate.hasArrived(placements: [], now: now, calendar: calendar),
+        false
+      )
+      expectNoDifference(
+        MenuServiceDate.hasArrived(
+          placements: [placement(tomorrow, id: 9_901)],
+          now: now,
+          calendar: calendar
+        ),
+        false
+      )
+      expectNoDifference(
+        MenuServiceDate.hasArrived(
+          placements: [placement(laterToday, id: 9_902)],
+          now: now,
+          calendar: calendar
+        ),
+        true
+      )
+      expectNoDifference(
+        MenuServiceDate.hasArrived(
+          placements: [placement(tomorrow, id: 9_903), placement(yesterday, id: 9_904)],
+          now: now,
+          calendar: calendar
+        ),
+        true
+      )
+    }
+  }
+
+  @Suite
   struct MenuTests {
     @Test
     func createsMenuItemsAndPlacements() throws {
