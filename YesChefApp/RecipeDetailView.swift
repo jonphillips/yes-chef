@@ -345,9 +345,21 @@ private struct RecipeReaderView: View {
     }
   }
 
+  private func wideColumnHeader(_ recipe: Recipe) -> some View {
+    HStack(alignment: .top, spacing: 12) {
+      header(recipe)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      if let photo = model.primaryDisplayPhoto {
+        RecipeReaderThumbnail(photo: photo, sideLength: HeaderMetrics.wideColumnPhotoSideLength) {
+          isPhotoGalleryPresented = true
+        }
+      }
+    }
+  }
+
   private func metadata(
     _ recipe: Recipe,
-    photoSideLength: CGFloat = HeaderMetrics.compactThumbnailSideLength
+    showsPhoto: Bool = true
   ) -> some View {
     VStack(alignment: .leading, spacing: 6) {
       ViewThatFits(in: .horizontal) {
@@ -359,16 +371,16 @@ private struct RecipeReaderView: View {
             }
           }
           Spacer(minLength: 12)
-          if let photo = model.primaryDisplayPhoto {
-            RecipeReaderThumbnail(photo: photo, sideLength: photoSideLength) {
+          if showsPhoto, let photo = model.primaryDisplayPhoto {
+            RecipeReaderThumbnail(photo: photo, sideLength: HeaderMetrics.compactThumbnailSideLength) {
               isPhotoGalleryPresented = true
             }
           }
         }
 
         VStack(alignment: .leading, spacing: 6) {
-          if let photo = model.primaryDisplayPhoto {
-            RecipeReaderThumbnail(photo: photo, sideLength: photoSideLength) {
+          if showsPhoto, let photo = model.primaryDisplayPhoto {
+            RecipeReaderThumbnail(photo: photo, sideLength: HeaderMetrics.compactThumbnailSideLength) {
               isPhotoGalleryPresented = true
             }
           }
@@ -585,8 +597,8 @@ private struct RecipeReaderView: View {
 
       ScrollView {
         VStack(alignment: .leading, spacing: 16) {
-          header(recipe)
-          metadata(recipe, photoSideLength: HeaderMetrics.wideColumnPhotoSideLength)
+          wideColumnHeader(recipe)
+          metadata(recipe, showsPhoto: false)
           directionsColumn
         }
         .padding()
