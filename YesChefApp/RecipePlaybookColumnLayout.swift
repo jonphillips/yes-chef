@@ -6,13 +6,11 @@ enum RecipePlaybookColumnPreferences {
 }
 
 enum RecipePlaybookColumnDetent: String, CaseIterable {
-  case peek
   case comfortable
   case wide
 
   var title: String {
     switch self {
-    case .peek: "Peek"
     case .comfortable: "Comfortable"
     case .wide: "Wide"
     }
@@ -40,7 +38,7 @@ enum RecipeWideColumnMetrics {
 
 struct RecipeWideColumnLayout {
   // The device pass tuned Ingredients to 90% of its prior 30% share while
-  // preserving the Directions floor. The three detents evenly divide only the
+  // preserving the Directions floor. The detents evenly divide only the
   // remaining width, so no device-specific Playbook width is encoded here.
   private static let ingredientsColumnFraction: CGFloat = 0.27
   private static let directionsMinimumFraction: CGFloat = 0.30
@@ -130,7 +128,7 @@ struct RecipePlaybookResizeHandle: View {
     .buttonStyle(.plain)
     .accessibilityLabel(Text("Directions and Playbook split"))
     .accessibilityValue(Text(detent.title))
-    .accessibilityHint(Text("Cycles between peek, comfortable, and wide Playbook widths."))
+    .accessibilityHint(Text("Cycles between comfortable and wide Playbook widths."))
     .accessibilityAdjustableAction { direction in
       switch direction {
       case .increment:

@@ -261,8 +261,11 @@ Three controls, each for the job it's best at (the pattern from Xcode/VS Code si
 
 - **Toolbar show/hide toggle** — binary; restores the last width. The *honest* hide (dragging a column to
   zero is fiddly and easy to do by accident).
-- **Drag-to-resize with snap detents** (e.g. Peek / Comfortable / Wide) — arbitrary width *plus* muscle
-  memory.
+- **Drag-to-resize with snap detents** (Comfortable / Wide) — arbitrary width *plus* muscle
+  memory. *(Amendment 2 dropped the original Peek rung: at its minimum width the Playbook collapsed to a
+  degenerate sliver with no content floor mirroring the Directions floor, and the toolbar toggle already owns
+  the honest hide — so a near-hide detent was redundant and broken. Two detents + the binary toolbar-hide is
+  the Xcode/VS Code grammar without the broken corner.)*
 - **A hard minimum on Directions** — the readability floor; snaps must never crush instruction line-length.
 - **Persist the width** so it reopens where you left it.
 

@@ -9,6 +9,19 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0039 — Amendment 2, Playbook Peek detent dropped (two detents)
+
+**✅ architect-approved + app-build-gate green (architect local `generic/platform=iOS` → BUILD SUCCEEDED) — 2026-07-16. Jon device-pass pending.** yes-chef PR [#196](https://github.com/jonphillips/yes-chef/pull/196). A small follow-up off Slice C's device pass — **not** its own Amendment slice. **App-layer only — no schema / migration** (view + local `@AppStorage` state; **D = menu adopts the Playbook column, still parked**).
+
+**Why Peek went.** Slice C's device pass surfaced a pre-existing Slice B detent-math gap: **Peek** = ⅓ of an already-small remaining width, with no content floor mirroring the Directions floor, so at its minimum it rendered a degenerate sliver (the Playbook header wrapped one char per line, Ask clipped). The resize handle was deliberately built *not* to hide the column (drag-to-zero is "fiddly and easy to do by accident"); the **toolbar Show/Hide button is the honest hide**, so a near-hide detent was both redundant and broken. Two detents + binary toolbar-hide is the Xcode/VS Code grammar without the broken corner.
+
+**The change (2 lines, one file).** `case peek` removed from `RecipePlaybookColumnDetent` (`RecipePlaybookColumnLayout.swift`); the enum is now `comfortable · wide`, both `switch` bodies updated, and the resize-handle VoiceOver hint changed to "Cycles between comfortable and wide Playbook widths." No width constants touched: `playbookWidth(for:)` derives its fraction from `(index+1)/count`, so with two cases it auto-rebalances — **Comfortable → ½ max, Wide → full max** — and `next`/`previous`/`nearestDetent` keep working over `allCases`.
+
+**No migration.** `currentPlaybookDetent`'s getter (`RecipeDetailView.swift:650`) reads through `RecipePlaybookColumnDetent(rawValue:) ?? .comfortable`, so any device with `"peek"` persisted from Slice B falls back to Comfortable on next open — confirmed intact. Grep found zero remaining `.peek` / `"peek"` references in Swift.
+
+**Architect review (PR #196) — approve, no on-branch code changes.** Enum-count-driven math self-adjusts correctly; the persisted-`"peek"` fallback holds; VoiceOver hint updated; clean removal. Two notes: (1) **non-blocking doc nit fixed in this PR** — ADR-0039 §D4's detent example still listed "(e.g. Peek / Comfortable / Wide)"; struck to `(Comfortable / Wide)` with an Amendment 2 note. (2) **Pre-existing, not this PR** — the `accessibilityAdjustableAction` wraps around (increment from Wide → Comfortable) rather than clamping at ends; benign with two detents, left for parity with the chat-workspace precedent. **Device-pass watch (Jon):** Comfortable is now ½-max (was ⅓-max under three detents, i.e. it *grows*), so confirm it still clears the Playbook-header content floor on the smallest target; handle cycles only Comfortable ↔ Wide with no sliver reachable; toolbar Hide fully collapses and restores the last detent.
+
+---
 ## ADR-0039 — Amendment 2 / Slice C, recipe header nests beside Ingredients
 
 **✅ architect-approved + app-build-gate green (architect local `generic/platform=iOS` → BUILD SUCCEEDED) + Jon device-confirmed running (3 detents exercised on `iPad Pro 13-inch (M5)`, screenshots) — 2026-07-16.** yes-chef PR [#195](https://github.com/jonphillips/yes-chef/pull/195) (Codex branch/PR title says "A2 S3" — same slice; the doc series calls it **Slice C**).
