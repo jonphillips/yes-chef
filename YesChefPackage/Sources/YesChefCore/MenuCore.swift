@@ -37,6 +37,17 @@ public struct MenuDetailData: Equatable, Sendable {
   }
 }
 
+public enum MenuServiceDate {
+  public static func hasArrived(
+    placements: [MenuPlacement],
+    now: Date,
+    calendar: Calendar = .autoupdatingCurrent
+  ) -> Bool {
+    guard let serviceDate = placements.map(\.startDate).min() else { return false }
+    return calendar.compare(serviceDate, to: now, toGranularity: .day) != .orderedDescending
+  }
+}
+
 public struct MenuItemRowData: Identifiable, Equatable, Sendable {
   public var item: MenuItem
   public var recipe: Recipe?

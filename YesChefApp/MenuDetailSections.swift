@@ -7,7 +7,9 @@ struct MenuDishList: View {
   let detailModel: MenuDetailModel
   let menu: CoreMenu
   let detail: MenuDetailData
+  var isInitiallyExpanded = true
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  @State private var dayExpansionOverrides: [Int: Bool] = [:]
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -22,6 +24,7 @@ struct MenuDishList: View {
       }
 
       ForEach(0..<detail.menu.dayCount, id: \.self) { dayOffset in
+        let isExpanded = dayExpansionOverrides[dayOffset] ?? isInitiallyExpanded
         MenuDaySection(
           model: model,
           detailModel: detailModel,
@@ -30,6 +33,10 @@ struct MenuDishList: View {
           dayOffset: dayOffset,
           scheduledDate: scheduledDate(for: dayOffset),
           rows: detail.itemRows.filter { $0.item.dayOffset == dayOffset },
+          isExpanded: isExpanded,
+          onToggle: {
+            dayExpansionOverrides[dayOffset] = !isExpanded
+          },
           onRecipeSelected: onRecipeSelected
         )
       }
@@ -83,14 +90,30 @@ private struct MenuDaySection: View {
   let dayOffset: Int
   let scheduledDate: Date?
   let rows: [MenuItemRowData]
+  let isExpanded: Bool
+  var onToggle: () -> Void
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack(alignment: .firstTextBaseline) {
-        dayTitle
-          .font(.headline)
-          .foregroundStyle(.secondary)
+        Button(action: onToggle) {
+          HStack(spacing: 8) {
+            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(.secondary)
+              .frame(width: 12)
+            dayTitle
+              .font(.headline)
+              .foregroundStyle(.secondary)
+          }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+          isExpanded
+            ? Text("Collapse \(dayAccessibilityTitle)")
+            : Text("Expand \(dayAccessibilityTitle)")
+        )
 
         Spacer()
 
@@ -108,12 +131,12 @@ private struct MenuDaySection: View {
         .accessibilityLabel("Add recipe to Day \(dayNumber)")
       }
 
-      if rows.isEmpty {
+      if isExpanded, rows.isEmpty {
         Text("No dishes")
           .font(.subheadline)
           .foregroundStyle(.secondary)
           .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-      } else {
+      } else if isExpanded {
         VStack(spacing: 0) {
           ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
             // Interim within-day reorder: a dish can move up/down only past an adjacent sibling in the
@@ -173,6 +196,16 @@ private struct MenuDaySection: View {
     let weekday = scheduledDate.formatted(.dateTime.weekday(.wide))
     let date = scheduledDate.formatted(.dateTime.month(.wide).day().year())
     return Text("\(weekday) - \(date) (Day \(dayNumber))")
+  }
+
+  private var dayAccessibilityTitle: String {
+    guard let scheduledDate else {
+      return String(localized: "Day \(dayNumber)")
+    }
+
+    let weekday = scheduledDate.formatted(.dateTime.weekday(.wide))
+    let date = scheduledDate.formatted(.dateTime.month(.wide).day().year())
+    return String(localized: "\(weekday) - \(date) (Day \(dayNumber))")
   }
 }
 
