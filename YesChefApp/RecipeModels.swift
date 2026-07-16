@@ -14,7 +14,6 @@ final class RecipeLibraryModel {
     case addRecipe
     case captureRecipe
     case editRecipe(Recipe.ID)
-    case cookingMode(Recipe.ID)
     case originalSnapshot(Recipe.ID)
     case deleteRecipe(Recipe.ID)
     case deleteArchivedRecipe(Recipe.ID)
@@ -188,10 +187,6 @@ final class RecipeLibraryModel {
 
   func editButtonTapped(recipeID: Recipe.ID) {
     destination = .editRecipe(recipeID)
-  }
-
-  func cookButtonTapped(recipeID: Recipe.ID) {
-    destination = .cookingMode(recipeID)
   }
 
   func originalSnapshotButtonTapped(recipeID: Recipe.ID) {
@@ -1048,62 +1043,4 @@ final class RecipeDetailModel {
     }
   }
 
-}
-
-@Observable
-@MainActor
-final class CookingModeModel {
-  let recipeID: Recipe.ID
-
-  @ObservationIgnored
-  @Fetch var detail: RecipeDetailData?
-
-  var checkedIngredientIDs: Set<IngredientLine.ID> = []
-  var checkedStepIDs: Set<InstructionStep.ID> = []
-  var focusedStepIndex = 0
-
-  init(recipeID: Recipe.ID) {
-    self.recipeID = recipeID
-    _detail = Fetch(wrappedValue: nil, RecipeDetailRequest(recipeID: recipeID), animation: .default)
-  }
-
-  var ingredientLines: [IngredientLine] {
-    detail?.ingredientLines.sorted { $0.sortOrder < $1.sortOrder } ?? []
-  }
-
-  var instructionSteps: [InstructionStep] {
-    detail?.instructionSteps.sorted { $0.sortOrder < $1.sortOrder } ?? []
-  }
-
-  var currentStep: InstructionStep? {
-    guard instructionSteps.indices.contains(focusedStepIndex) else { return nil }
-    return instructionSteps[focusedStepIndex]
-  }
-
-  var visibleNotes: [RecipeNote] {
-    detail?.notes.filter { note in
-      note.noteType != .retrospective && note.noteType != .readerFeedback
-    } ?? []
-  }
-
-  func detailChanged(_ detail: RecipeDetailData?) {
-    guard detail != nil else { return }
-    focusedStepIndex = min(focusedStepIndex, max(instructionSteps.count - 1, 0))
-  }
-
-  func ingredientToggleButtonTapped(_ id: IngredientLine.ID) {
-    toggle(id, in: &checkedIngredientIDs)
-  }
-
-  func stepToggleButtonTapped(_ id: InstructionStep.ID) {
-    toggle(id, in: &checkedStepIDs)
-  }
-
-  private func toggle<ID>(_ id: ID, in ids: inout Set<ID>) {
-    if ids.contains(id) {
-      ids.remove(id)
-    } else {
-      ids.insert(id)
-    }
-  }
 }

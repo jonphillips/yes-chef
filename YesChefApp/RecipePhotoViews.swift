@@ -4,13 +4,20 @@ import YesChefCore
 
 struct RecipeReaderThumbnail: View {
   let photo: RecipeDetailPhoto
+  let sideLength: CGFloat
   let action: () -> Void
+
+  init(photo: RecipeDetailPhoto, sideLength: CGFloat, action: @escaping () -> Void) {
+    self.photo = photo
+    self.sideLength = sideLength
+    self.action = action
+  }
 
   var body: some View {
     if photo.isDisplayable {
       Button(action: action) {
         RecipePhotoFrame(photo: photo, aspectRatio: 1, variant: .thumbnail)
-          .frame(width: 112, height: 112)
+          .frame(width: sideLength, height: sideLength)
       }
       .buttonStyle(.plain)
       .accessibilityLabel(Text(photo.caption ?? "Recipe photo"))

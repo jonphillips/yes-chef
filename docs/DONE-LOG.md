@@ -9,6 +9,22 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0039 — Amendment 2 / Slice A, compact recipe header + Start Cooking burial
+
+**✅ architect-approved + app-build-gate green (architect local `generic/platform=iOS` → BUILD SUCCEEDED, run against the post-review fix tip) — 2026-07-16. Jon device-pass pending.** yes-chef PR [#193](https://github.com/jonphillips/yes-chef/pull/193).
+[ADR-0039 Amendment 2](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#amendment-2--2026-07-16-the-playbook-becomes-a-persistent-enrichment-column): first of **three** Amendment 2 slices (B = resizable Playbook column + recipe adoption; C = menu adopts it — both still ahead). **App-layer only — no schema / migration.**
+
+**Recipe header compacted to a Paprika-style band.** `header(_:)` is now a tight title/subtitle/summary stack (summary `lineLimit(2)`); `metadata(_:)` is a dense stats · source · thumbnail band. The cover thumbnail dropped 112→72 pt so it no longer dictates header height (`HeaderMetrics.thumbnailSideLength`), and `SourceMetadataView` collapsed from a multi-line block to a single `lineLimit(1)` `.caption` line (displayName + one `compactDetail` field). Directions climbs up the page — the point, now that it's a co-visible column whose vertical space is precious.
+
+**`View Original` → toolbar.** Moved out of the `metadata(_:)` stack into a `.secondaryAction` toolbar item, gated on `originalSnapshot != nil`.
+
+**Recipe "Start Cooking" entry point removed (surgical).** Deleted `startCookingButton`, the `showsStartCookingButton` param threaded through `RecipeDetailView`/`RecipeReaderView` (and its `CookSessionView` call site), the recipe-library `cookButtonTapped` + `.cookingMode` destination, the `CookingModeView` screen, its `.sheet` in `AppDestinationPresentation`, and the `CookingModeModel`. Confirmed **zero** dangling references and the pbxproj no longer lists the deleted file. **`CookSessionView` and the Menu/Calendar "Cook these" flows are untouched** — the recipe opened that shared `TabView` with one item (the 40 pt step-by-step Jon won't use); Menu/Calendar open the *same* view with many (kept). Git is the archive ([[automation-decays-near-the-stove]]).
+
+**Folded-in D4 fix — menu Ask toggle.** The merged D4 menu Ask already uses a toggle action for the toolbar and an ensure-open action for Regenerate, preserving a live transcript — the PR #192 finding is closed here.
+
+**Architect review (PR #193) — two follow-ups, both fixed on-branch.** (1) The new `compactDetail` silently dropped `sourceNotes` from every reader surface (it stayed editable + searchable, so it became write-only). Restored as a capped secondary caption (`.caption`, `lineLimit(2)`) below the metadata band — a **temporary** read surface so Jon can dogfood and decide its fate; the ADR trajectory still points source notes into the Playbook ([[decompose-notes-into-typed-homes]]), not this line. (2) The metadata `ViewThatFits` narrow fallback omitted the thumbnail, which is the **sole** `isPhotoGalleryPresented` entry point — so on narrow width the recipe's photos went unreachable. Fixed by adding the 72 pt thumbnail to the fallback branch too. Architect local build (post-fix) → **BUILD SUCCEEDED**.
+
+---
 ## ADR-0039 — D4 / OQ3, the Menu launcher mode
 
 **✅ architect-approved + app-build-gate green (local `generic/platform=iOS` → BUILD SUCCEEDED; `MenuServiceDateTests` green) — 2026-07-16. Jon device approved.** yes-chef PR [#192](https://github.com/jonphillips/yes-chef/pull/192).

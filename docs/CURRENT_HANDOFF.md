@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 15, 2026 (ADR-0039 **D3 follow-on** — the true "Ask" slide-over (native trailing inspector on wide iPad) + Playbook-header polish — architect-approved, app-build-gate **green** (local `generic/platform=iOS` → BUILD SUCCEEDED), Jon device-pass **done**, PR #191 (merge pending, Jon). Ask is now a non-modal companion (tap-to-toggle, active-state ring), separated from the ChatGPT copy/paste cluster. Next Up = **ADR-0039 D4/OQ3** — Menu launcher mode: delete the menu's standing AI third column, foreground the dish list with collapsible days (collapsed once the service date is today-or-past), collapse the prep plan near service. This is the **last ADR-0039 UI slice** — the recipe side is complete).
+Last updated: July 16, 2026 (ADR-0039 **Amendment 2 Slice A** — compact recipe header (Paprika-style band) + `View Original`→toolbar + surgical removal of the recipe "Start Cooking" entry point + folded-in D4 menu Ask-toggle confirm — architect-approved, app-build-gate **green** (architect local `generic/platform=iOS` → BUILD SUCCEEDED, post-review-fix tip), Jon device-pass **pending**, PR #193. Two review follow-ups fixed on-branch: source-notes read surface restored (capped caption, temporary) and photo-gallery access restored in the narrow header fallback. Next Up = **ADR-0039 Amendment 2 Slice B** — the resizable **Playbook column** on the recipe: wide iPad goes three-co-visible (Ingredients + Directions + Playbook), retiring the wide Cook/Plan toggle; Playbook width is show/hide toggle + drag-snap detents + persist, with a hard Directions minimum. **Slice C (menu adopts it) stays parked.**)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,18 +21,20 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0039 Amendment 2](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#amendment-2--2026-07-16-the-playbook-becomes-a-persistent-enrichment-column) Slice A — Recipe header compaction + Start Cooking burial (+ fold in the D4 menu Ask-toggle fix).** First of **three** Amendment 2 slices (A here; B = resizable Playbook column + recipe adoption; C = menu adopts it — **do not start B or C**). **App-layer — no schema / migration. Base this slice on code that includes D4 (PR #192)** — the folded-in fix targets D4's menu `chatButtonTapped`.
+**Live dispatch target — [ADR-0039 Amendment 2](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#amendment-2--2026-07-16-the-playbook-becomes-a-persistent-enrichment-column) Slice B — the resizable Playbook column on the recipe.** Second of **three** Amendment 2 slices (A shipped → DONE-LOG; **C = menu adopts the same column — do NOT start C**). **App-layer only — no schema / migration** (persist width via a local preference / `@AppStorage`, not synced — it's view state). Read the ADR's *"Recipe (wide): three co-visible columns"* and *"Playbook width"* sections — they are the spec; the below is the surgical map.
 
-**Recipe header / Start Cooking:**
-- **Compact the recipe header toward a Paprika-style band.** `metadata(_:)` (`RecipeDetailView.swift:363`) is the vertical bloat pushing Directions down — tighten stats · source · servings · thumbnail toward a compact band; secondary/reference rows shrink. Exact arrangement is your call; density is judged in Jon's device pass. Goal: Directions climbs up the page.
-- **View Original → toolbar.** Move the `View Original` button (`RecipeDetailView.swift:400`) out of the `metadata(_:)` stack into a `.toolbar` item.
-- **Remove the recipe "Start Cooking" entry point (surgical).** Delete `startCookingButton` (`RecipeDetailView.swift:549`), its `metadata(_:)` call sites + `showsStartCookingButton`, the recipe-library `cookButtonTapped` path (`RecipeModels.swift:193`), and any now-dead recipe-only single-item `CookSessionPresentation` init. **DO NOT touch `CookSessionView` (`CookSessionView.swift:101`, a `TabView` over items) or the Menu/Calendar "Cook these" entry points** — the recipe opened it with one item (the 40pt step-by-step, retired); Menu/Calendar open the *same* view with many (kept).
+**Wide iPad = three co-visible columns, no mode.** Replace `wideRecipeSection`'s **Cook/Plan segmented toggle** (`RecipeDetailView.swift:578` — the `wideSection` picker swapping `directionsColumn` ↔ `RecipePlaybookView`) with **Ingredients + Directions + Playbook all on screen at once**. This **reverses Amendment 1**: the wide toggle is gone, Directions never leaves the screen to plan. Delete `WideSection`/`wideSection` (now dead). Reuse the existing `RecipePlaybookView` as the column content.
 
-**Folded-in D4 fix — menu Ask toggle (`MenuViews.swift:317`):**
-- On wide iPad, `chatButtonTapped` is a pure setter: re-tapping the live **Ask** toolbar trigger rebuilds `RecipeChatModel` and **silently discards the in-progress transcript**, with no close path. Make the menu Ask **toggle closed** on re-tap, mirroring the sibling `recipeBrowserButtonTapped` and the recipe-side fix (`RecipeModels.swift:915`).
-- **`chatButtonTapped` doubles as `regeneratePrepPlan`** — split the intents: a toggling Ask path for the toolbar, and an ensure-open path for Regenerate that does **not** rebuild an already-open chat. (Non-blocking polish: give the menu Ask trigger the recipe's active-state ring.)
+**Playbook width — three controls (Xcode/VS-Code-sidebar pattern):**
+- **Toolbar show/hide toggle** — binary, restores the last width (the *honest* hide; dragging to zero is fiddly/accidental).
+- **Drag-to-resize with snap detents** (e.g. Peek / Comfortable / Wide) — arbitrary width + muscle memory.
+- **Hard minimum on Directions** — the readability floor; a snap must never crush instruction line-length.
+- **Persist the width** so it reopens where you left it.
+- **Exact detent widths are NOT decided in the ADR — prototype them against the device; Jon's pass tunes them.**
 
-**Verify:** app-layer SwiftUI — the architect's local `generic/platform=iOS` build is **required evidence**. Confirm (1) Menu + Calendar "Cook these" still build and present (`CookSessionView` untouched); (2) the menu Ask trigger **toggles closed** on re-tap and **preserves an in-progress transcript**, and Regenerate still opens/keeps the chat.
+**Leave the slide-overs alone.** Ask + Browse Recipes **stay `.inspector` slide-overs on top** — the Playbook is the one *structural* column; do not make Ask a second competing structural column ("never promoted to a column"). **Compact is unchanged:** the `compactRecipeBody` `.segmented` picker (`RecipeDetailView.swift:557`, Ingredients · Directions · Playbook, one region at a time) stays exactly as-is — iPhone is execution mode.
+
+**Verify:** app-layer SwiftUI — the architect's local `generic/platform=iOS` build is **required evidence**. Confirm on wide iPad the three columns co-render with the toggle gone and Directions holding its readability floor at the narrowest Playbook detent; on compact the segmented picker is untouched; Ask/Browse still present as inspectors over the top. Width persists across relaunch. **Detent feel + the hard-minimum threshold are Jon's device-pass calls — flag them, don't hard-decide.**
 
 
 **Feature efforts still on the board — Jon picks; do not infer:**

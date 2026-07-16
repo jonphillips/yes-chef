@@ -12,7 +12,6 @@ struct RecipeDetailView: View {
   let groceryModel: GroceryLibraryModel
   let isFocusActive: Bool
   let focusButtonTapped: (() -> Void)?
-  let showsStartCookingButton: Bool
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   init(
@@ -23,7 +22,6 @@ struct RecipeDetailView: View {
     groceryModel: GroceryLibraryModel,
     isFocusActive: Bool = false,
     focusButtonTapped: (() -> Void)? = nil,
-    showsStartCookingButton: Bool = true,
     onRecipeSelected: @escaping (RecipeDetailPresentation) -> Void = { _ in }
   ) {
     _model = State(wrappedValue: RecipeDetailModel(recipeID: recipeID, scaleContext: scaleContext))
@@ -32,7 +30,6 @@ struct RecipeDetailView: View {
     self.groceryModel = groceryModel
     self.isFocusActive = isFocusActive
     self.focusButtonTapped = focusButtonTapped
-    self.showsStartCookingButton = showsStartCookingButton
     self.onRecipeSelected = onRecipeSelected
   }
 
@@ -84,8 +81,7 @@ struct RecipeDetailView: View {
       model: model,
       handoffTransport: handoffTransport,
       libraryModel: libraryModel,
-      onRecipeSelected: onRecipeSelected,
-      showsStartCookingButton: showsStartCookingButton
+      onRecipeSelected: onRecipeSelected
     )
   }
 
@@ -137,6 +133,13 @@ struct RecipeDetailView: View {
       }
     }
     ToolbarItemGroup(placement: .secondaryAction) {
+      if model.recipe?.originalSnapshot != nil {
+        Button {
+          libraryModel.originalSnapshotButtonTapped(recipeID: model.recipeID)
+        } label: {
+          Label("View Original", systemImage: "doc.text.magnifyingglass")
+        }
+      }
       Button(role: .destructive) {
         libraryModel.deleteButtonTapped(recipeID: model.recipeID)
       } label: {
@@ -237,13 +240,18 @@ private struct RecipeReaderView: View {
     }
   }
 
+  private enum HeaderMetrics {
+    // This keeps the cover photo within the single metadata band on the narrowest
+    // two-column reader layout, instead of making the header as tall as the photo.
+    static let thumbnailSideLength: CGFloat = 72
+  }
+
   private let twoColumnThreshold: CGFloat = 640
 
   let model: RecipeDetailModel
   let handoffTransport: HandoffInAppTransport
   let libraryModel: RecipeLibraryModel
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
-  let showsStartCookingButton: Bool
 
   @State private var compactSection: CompactSection = .ingredients
   @State private var wideSection: WideSection = .cook
@@ -329,65 +337,71 @@ private struct RecipeReaderView: View {
   }
 
   private func header(_ recipe: Recipe) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack(alignment: .top, spacing: 14) {
-        VStack(alignment: .leading, spacing: 8) {
-          HStack(alignment: .firstTextBaseline) {
-            Text(recipe.title)
-              .font(.title.bold())
-            if recipe.favorite {
-              Image(systemName: "star.fill")
-                .foregroundStyle(.yellow)
-            }
-          }
-          if let subtitle = recipe.subtitle {
-            Text(subtitle)
-              .font(.headline)
-              .foregroundStyle(.secondary)
-          }
-          if let summary = recipe.summary {
-            Text(summary)
-              .font(.callout)
-          }
+    VStack(alignment: .leading, spacing: 4) {
+      HStack(alignment: .firstTextBaseline) {
+        Text(recipe.title)
+          .font(.title.bold())
+        if recipe.favorite {
+          Image(systemName: "star.fill")
+            .foregroundStyle(.yellow)
         }
-        Spacer(minLength: 12)
-        if !model.displayablePhotos.isEmpty, let photo = model.primaryDisplayPhoto {
-          RecipeReaderThumbnail(photo: photo) {
-            isPhotoGalleryPresented = true
-          }
-        }
+      }
+      if let subtitle = recipe.subtitle {
+        Text(subtitle)
+          .font(.subheadline.weight(.medium))
+          .foregroundStyle(.secondary)
+      }
+      if let summary = recipe.summary {
+        Text(summary)
+          .font(.callout)
+          .lineLimit(2)
       }
     }
   }
 
   private func metadata(_ recipe: Recipe) -> some View {
-    VStack(alignment: .leading, spacing: 10) {
+    VStack(alignment: .leading, spacing: 6) {
       ViewThatFits(in: .horizontal) {
-        HStack(alignment: .center, spacing: 12) {
-          recipeStats(recipe)
+        HStack(alignment: .top, spacing: 12) {
+          VStack(alignment: .leading, spacing: 4) {
+            recipeStats(recipe)
+            if let source = model.detail?.source {
+              SourceMetadataView(source: source)
+            }
+          }
           Spacer(minLength: 12)
-          if showsStartCookingButton {
-            startCookingButton(recipe)
+          if let photo = model.primaryDisplayPhoto {
+            RecipeReaderThumbnail(photo: photo, sideLength: HeaderMetrics.thumbnailSideLength) {
+              isPhotoGalleryPresented = true
+            }
           }
         }
 
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
+          if let photo = model.primaryDisplayPhoto {
+            RecipeReaderThumbnail(photo: photo, sideLength: HeaderMetrics.thumbnailSideLength) {
+              isPhotoGalleryPresented = true
+            }
+          }
           recipeStats(recipe)
-          if showsStartCookingButton {
-            startCookingButton(recipe)
+          if let source = model.detail?.source {
+            SourceMetadataView(source: source)
           }
         }
+      }
+
+      if let notes = model.detail?.source?.sourceNotes?.nonEmpty {
+        Text(notes)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(2)
       }
 
       if recipe.libraryPlacement == .reference {
         Label(recipe.libraryPlacement.title, systemImage: "books.vertical")
-          .font(.subheadline)
+          .font(.caption)
           .foregroundStyle(.secondary)
           .recipeChip()
-      }
-
-      if let source = model.detail?.source {
-        SourceMetadataView(source: source)
       }
 
       if let tags = model.detail?.tags, !tags.isEmpty {
@@ -397,14 +411,6 @@ private struct RecipeReaderView: View {
         WrappingLabels(labels: categoryDisplayNames, systemImage: "folder")
       }
 
-      if recipe.originalSnapshot != nil {
-        Button {
-          libraryModel.originalSnapshotButtonTapped(recipeID: recipe.id)
-        } label: {
-          Label("View Original", systemImage: "doc.text.magnifyingglass")
-        }
-        .buttonStyle(.bordered)
-      }
       if let detail = model.detail, !detail.variations.isEmpty {
         variationPicker(detail.variations, activeVariationID: detail.activeVariationID)
       }
@@ -544,15 +550,6 @@ private struct RecipeReaderView: View {
       ScalePanel(model: model)
         .presentationCompactAdaptation(.popover)
     }
-  }
-
-  private func startCookingButton(_ recipe: Recipe) -> some View {
-    Button {
-      libraryModel.cookButtonTapped(recipeID: recipe.id)
-    } label: {
-      Label("Start Cooking", systemImage: "flame")
-    }
-    .buttonStyle(.borderedProminent)
   }
 
   @ViewBuilder
@@ -735,24 +732,44 @@ private struct SourceMetadataView: View {
   let source: RecipeSource
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(alignment: .firstTextBaseline, spacing: 8) {
-        Image(systemName: "book")
-          .foregroundStyle(.secondary)
-        if let urlString = source.url, let url = URL(string: urlString) {
-          Link(source.displayName, destination: url)
-        } else {
-          Text(source.displayName)
-        }
+    HStack(alignment: .firstTextBaseline, spacing: 8) {
+      Image(systemName: "book")
+        .foregroundStyle(.secondary)
+      if let urlString = source.url, let url = URL(string: urlString) {
+        Link(source.displayName, destination: url)
+      } else {
+        Text(source.displayName)
       }
-
-      ForEach(source.detailLines, id: \.self) { line in
-        Text(line)
+      if let detail = source.compactDetail {
+        Text(detail)
           .foregroundStyle(.secondary)
-          .padding(.leading, 28)
       }
     }
-    .font(.subheadline)
+    .lineLimit(1)
+    .font(.caption)
+  }
+}
+
+private extension RecipeSource {
+  var displayName: String {
+    name?.nonEmpty ?? publicationName?.nonEmpty ?? bookTitle?.nonEmpty ?? url?.nonEmpty ?? "Source"
+  }
+
+  var compactDetail: String? {
+    author.nonEmpty ?? publicationName.nonEmpty ?? bookTitle.nonEmpty ?? pageNumber.nonEmpty
+  }
+}
+
+private extension String {
+  var nonEmpty: String? {
+    let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+  }
+}
+
+private extension Optional where Wrapped == String {
+  var nonEmpty: String? {
+    flatMap(\.nonEmpty)
   }
 }
 
@@ -797,34 +814,6 @@ private struct WorkbenchCandidateLinksView: View {
   }
 }
 
-private extension RecipeSource {
-  var displayName: String {
-    name?.nonEmpty ?? publicationName?.nonEmpty ?? bookTitle?.nonEmpty ?? url?.nonEmpty ?? "Source"
-  }
-
-  var detailLines: [String] {
-    [
-      author.nonEmpty.map { "Author: \($0)" },
-      publicationName.nonEmpty.map { "Publication: \($0)" },
-      bookTitle.nonEmpty.map { "Book: \($0)" },
-      pageNumber.nonEmpty.map { "Page: \($0)" },
-      sourceNotes.nonEmpty,
-    ].compactMap(\.self)
-  }
-}
-
-private extension String {
-  var nonEmpty: String? {
-    let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmed.isEmpty ? nil : trimmed
-  }
-}
-
-private extension Optional where Wrapped == String {
-  var nonEmpty: String? {
-    flatMap(\.nonEmpty)
-  }
-}
 
 extension View {
   func recipeChip() -> some View {
