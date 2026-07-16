@@ -292,6 +292,11 @@ likewise a slide-over.
 
 ### Recipe header: compact to a single band
 
+> **Corrected by Slice C below (2026-07-16).** Slice A shipped this as a *full-width band above all three
+> columns*. That ratified Paprika's **density** but not its **composition** — actual Paprika nests the header
+> into the top of the right column, letting Ingredients rise to the ceiling. Slice C fixes the geometry; the
+> density lesson here stands.
+
 Dogfooding surfaced dead space at the *top* of the recipe — a tall, spread header pushing Directions down.
 This matters more now that Directions is a co-visible column whose vertical space is precious. Match a tight,
 Paprika-style band (title · source · servings · thumbnail); density is craft, not a concession — the
@@ -307,6 +312,41 @@ differentiation lives in the Playbook, not in the header's air.
   **`CookSessionView` and the Menu/Calendar entry points are untouched.** One clean, greppable removal commit —
   git is the archive, no live mothball ([[automation-decays-near-the-stove]]).
 
+### Recipe header (Slice C): nests beside Ingredients — the real Paprika composition
+
+Living with Slice B's three columns exposed the mis-ratification above: a *full-width band* still spends the
+whole recipe's top edge on identity, and — now that all three columns are co-visible — it pushes **Ingredients,
+Directions, *and* Playbook** down in lockstep. Paprika never does this. In Paprika the header is **column-scoped**,
+nested at the top of the Directions side (thumbnail · title · rating · source · servings/last-prepared), and
+**Ingredients starts at the very top-left.** That is the composition we meant; the band was a misread of it.
+
+**The correction (13" is the target; compact unchanged):**
+
+- **Kill the full-width band and the divider under it.** The two-column branch of the reader is now just the
+  three columns filling full height (`RecipeReaderView.body`, `RecipeDetailView.swift:264`; drop the outer
+  `VStack` + `header`/`metadata` band + `Divider` at lines ~269–279).
+- **The header nests at the top of the *Directions* column only** — spanning Directions' width, scrolling with
+  it. Not Directions + Playbook: keeping it Directions-scoped ties **identity + method** together and lets the
+  **Playbook stay top-anchored** (Ask · Make-ahead · Notes rise to the ceiling instead of below a strip). This
+  was the one fork; Jon chose Directions-only.
+- **Ingredients and Playbook both rise to the top edge.** No strip above them. This is the vertical reclaim the
+  band only half-delivered — and where Directions' precious column height ([[automation-decays-near-the-stove]]:
+  space near the stove) actually comes back.
+- **Cheat Ingredients narrower.** It was a fixed `⅓` (`contentColumnFraction`, `RecipePlaybookColumnLayout.swift`).
+  Drop it below ⅓ (a knob to tune on device, not a decided point width — same discipline as the detents). The
+  Directions-floor math in `RecipeWideColumnLayout` keys off this fraction, so a narrower Ingredients *widens*
+  the Directions floor and the Playbook's max — verify the three still reconcile at the Wide detent.
+- **Photo grows into the taller header box.** Beside a full-height Ingredients column the header can be taller
+  than a top band allowed, so the cover photo grows **past Paprika's stamp size** (`HeaderMetrics` cap,
+  `RecipeDetailView.swift`). This is a *deliberate* departure from Paprika's tiny thumbnail — recorded so it
+  doesn't later read as drift.
+- **No schema or migration.** Pure view-composition; `@AppStorage` keys from Slice B are untouched.
+
+**Watch on the device pass:** the header now lives in the column whose width *varies most* — at the **Wide**
+Playbook detent, Directions shrinks to its floor and the nested header gets tight (title wraps harder, photo
+competes). That's the cost of Directions-only placement. Confirm the header still reads at Wide; if it collapses,
+the fallback is a scale-with-width header, **not** a retreat to the band.
+
 ### Parked — refinement, not this amendment
 
 - **Active scale factor is invisible on a scaled recipe.** Servings shows, but the ×2 does not — it wants a
@@ -320,6 +360,8 @@ differentiation lives in the Playbook, not in the header's air.
   mode blend, so resizability is not the "any blend" that was retired.
 - **D4** ("third column deleted," "prep plan keeps its primary middle-column placement") — the menu gets the
   Body + Playbook grammar; the launcher insight survives as OQ3's collapsible days + the soft-default detent.
+- **Slice A's full-width header band** — corrected by Slice C to the column-nested (Paprika) composition; the
+  band's *density* lesson survives, its *geometry* does not.
 
 ### Unifying principle (updated)
 

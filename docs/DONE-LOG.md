@@ -9,6 +9,20 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0039 — Amendment 2 / Slice B, resizable recipe Playbook column
+
+**✅ architect-approved + app-build-gate green (architect local `generic/platform=iOS` → BUILD SUCCEEDED) — 2026-07-16. Jon device-pass pending.** yes-chef PR [#194](https://github.com/jonphillips/yes-chef/pull/194).
+[ADR-0039 Amendment 2](decisions/ADR-0039-playbook-column-thinking-vs-doing.md#amendment-2--2026-07-16-the-playbook-becomes-a-persistent-enrichment-column): **second of what is now four** Amendment 2 slices — the arc grew from three when the header-nesting correction was inserted. A (header band) shipped; **C = the header nests beside Ingredients (Paprika composition), next**; **D = menu adopts the column, parked** (D is the *old* "Slice C," renumbered). **App-layer only — no schema / migration** (Playbook width persists via local `@AppStorage`, not synced — it's view state).
+
+**Wide iPad is now three co-visible columns, no mode.** `wideRecipeSection`'s Cook/Plan segmented toggle is gone; a new `wideRecipeColumns(in:)` lays out Ingredients + Directions + Playbook simultaneously. `WideSection`/`wideSection` deleted as dead. Directions never leaves the screen to plan — Amendment 1's wide toggle is reversed.
+
+**Playbook width — show/hide + drag-snap + persist.** New `RecipePlaybookColumnLayout.swift`: a `RecipeWideColumnLayout` value type does the width math (Ingredients pinned at ⅓, a matching ⅓ Directions floor, three detents — **Peek / Comfortable / Wide** — evenly dividing only the *remaining* width, so no device-point widths are baked in), a `RecipePlaybookResizeHandle` (draggable + VoiceOver-adjustable, tap-to-cycle), and a `RecipePlaybookColumnDetent` enum. Visibility + detent persist in local `@AppStorage`; a toolbar **Show/Hide Playbook** button preserves the last detent. Structurally a faithful clone of the shipped `RecipeChatWorkspace` resize affordance (same `@GestureState` drag + `.simultaneousGesture`, `proposed…Width`/`nearestDetent`, `.snappy(0.22)`, wrapping detents) — deliberate reuse, the two resize surfaces stay consistent.
+
+**Compact untouched** — the segmented `Ingredients · Directions · Playbook` picker stays, one region at a time. Ask + Browse remain `.inspector` slide-overs over the top.
+
+**Architect review (PR #194) — one coherence finding, carried into Slice C (not fixed on-branch).** The Show/Hide Playbook toolbar button is gated on `isSplitEnabled` (`RecipeDetailView.swift:137` — iPad + non-compact size class) while the three-column layout is gated on `isTwoColumn` (`RecipeDetailView.swift:267` — detail-pane width ≥ 640). On an iPad whose detail pane is < 640 (sidebar showing), the button appears but the Playbook column doesn't render — toggling is a **dead control**, and that's a common everyday state, not an edge case. **Folded into Slice C's task list** (which rebuilds that exact wide-layout + toolbar region): re-gate the toggle on the real two-column width signal. Two non-blocking device-pass notes: the Directions readability floor is a pure `w/3` fraction (watch it at the narrowest Directions width on 13"); the detents wrap (Wide→Peek), consistent with the chat-workspace precedent, left for parity. Architect local build → **BUILD SUCCEEDED**.
+
+---
 ## ADR-0039 — Amendment 2 / Slice A, compact recipe header + Start Cooking burial
 
 **✅ architect-approved + app-build-gate green (architect local `generic/platform=iOS` → BUILD SUCCEEDED, run against the post-review fix tip) — 2026-07-16. Jon device-pass pending.** yes-chef PR [#193](https://github.com/jonphillips/yes-chef/pull/193).
