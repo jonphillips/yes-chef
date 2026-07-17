@@ -1,6 +1,9 @@
 import Foundation
 
 enum ScaleFraction: String, CaseIterable, Identifiable {
+  /// Jon's dogfood maximum for a single-serving cocktail batch.
+  static let maximumWholeMultiplier = 30
+
   case none
   case oneHalf
   case oneThird
@@ -69,7 +72,7 @@ enum ScaleFraction: String, CaseIterable, Identifiable {
     var bestFraction = ScaleFraction.none
     var bestDistance = Double.greatestFiniteMagnitude
 
-    for whole in 0...10 {
+    for whole in 0...maximumWholeMultiplier {
       for fraction in ScaleFraction.allCases {
         let candidate = Double(whole) + fraction.value
         guard candidate >= minimumScale else { continue }
@@ -122,32 +125,4 @@ enum ScaleText {
     value == 1 ? "serving" : "servings"
   }
 
-  static func scaledServingsSummary(
-    servingsText: String?,
-    baseServings: Double?,
-    factor: Double
-  ) -> String? {
-    if let range = servingsRange(in: servingsText) {
-      return "\(mixedNumber(range.lowerBound * factor))–\(mixedNumber(range.upperBound * factor)) servings"
-    }
-    guard let baseServings else { return nil }
-    let scaledServings = baseServings * factor
-    return "\(mixedNumber(scaledServings)) \(servingUnit(scaledServings))"
-  }
-
-  private static func servingsRange(in servingsText: String?) -> ClosedRange<Double>? {
-    guard
-      let servingsText,
-      let match = servingsText.range(
-        of: #"(\d+(?:\.\d+)?)\s*(?:to|[-–—])\s*(\d+(?:\.\d+)?)"#,
-        options: .regularExpression
-      )
-    else { return nil }
-
-    let values = servingsText[match]
-      .split(whereSeparator: { !$0.isNumber && $0 != "." })
-      .compactMap { Double($0) }
-    guard values.count == 2, values[0] <= values[1] else { return nil }
-    return values[0]...values[1]
-  }
 }

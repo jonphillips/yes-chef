@@ -864,7 +864,7 @@ public enum IngredientScaler {
       factor != 1
     else { return line.originalText }
 
-    let scaledQuantity = format(quantity * factor)
+    let scaledQuantity = formattedQuantity(quantity * factor)
     return replacingLeadingMeasure(
       in: line.originalText,
       quantityText: line.quantityText,
@@ -904,7 +904,7 @@ public enum IngredientScaler {
     return "\(leadingWhitespace)\(scaledQuantity) \(pluralized(unit, quantity: scaledValue))\(suffix)"
   }
 
-  private static func format(_ value: Double) -> String {
+  public static func formattedQuantity(_ value: Double) -> String {
     let rounded = value.rounded()
     if abs(value - rounded) < 0.01 {
       return "\(Int(rounded))"
@@ -948,13 +948,34 @@ public enum IngredientScaler {
   ]
 }
 
+public enum RecipeYieldScaler {
+  public static func scaledText(_ text: String?, factor: Double) -> String? {
+    guard let text, factor != 1, let leadingQuantity = QuantityParser.leadingQuantity(in: text) else {
+      return text
+    }
+
+    let scaledLeadingText: String
+    if let upperBound = leadingQuantity.upperBound {
+      scaledLeadingText = "\(IngredientScaler.formattedQuantity(leadingQuantity.value * factor))–\(IngredientScaler.formattedQuantity(upperBound * factor))"
+    } else {
+      scaledLeadingText = IngredientScaler.formattedQuantity(leadingQuantity.value * factor)
+    }
+
+    return String(text[..<leadingQuantity.range.lowerBound])
+      + scaledLeadingText
+      + String(text[leadingQuantity.range.upperBound...])
+  }
+}
+
 public enum ServingParser {
   public static func servings(from text: String) -> Double? {
-    text
-      .split(separator: " ")
-      .lazy
-      .compactMap { Double($0) }
-      .first
+    let tokens = text.split(whereSeparator: \.isWhitespace)
+    for index in tokens.indices {
+      if let servings = QuantityParser.leadingValue(in: tokens[index...].joined(separator: " ")) {
+        return servings
+      }
+    }
+    return nil
   }
 }
 

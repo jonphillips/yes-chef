@@ -196,6 +196,7 @@ struct MenuDetailView: View {
         )
         .frame(width: MenuToolOverlayMetrics.idealWidth)
         .frame(maxHeight: .infinity)
+        .background(.background)
         .overlay(alignment: .leading) {
           Rectangle()
             .fill(Color(uiColor: .separator))

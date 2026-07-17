@@ -44,7 +44,7 @@ extension WorkbenchRepository {
     }
   }
 
-  public static func archiveAllCandidates(
+  public static func moveAllCandidatesToReference(
     for workbenchID: Workbench.ID,
     in db: Database,
     now: Date
@@ -56,13 +56,13 @@ extension WorkbenchRepository {
       .where { $0.workbenchID.eq(workbenchID) }
       .fetchAll(db)
 
-    var archivedRecipeIDs: Set<Recipe.ID> = []
+    var movedRecipeIDs: Set<Recipe.ID> = []
     for candidate in candidates {
-      guard let recipeID = candidate.recipeID, !archivedRecipeIDs.contains(recipeID) else { continue }
+      guard let recipeID = candidate.recipeID, !movedRecipeIDs.contains(recipeID) else { continue }
       if try Recipe.find(recipeID).fetchOne(db) != nil {
-        try RecipeRepository.archive(recipeID: recipeID, in: db, now: now)
+        try RecipeRepository.setLibraryPlacement(.reference, recipeID: recipeID, in: db, now: now)
       }
-      archivedRecipeIDs.insert(recipeID)
+      movedRecipeIDs.insert(recipeID)
     }
 
     try WorkbenchCandidate
