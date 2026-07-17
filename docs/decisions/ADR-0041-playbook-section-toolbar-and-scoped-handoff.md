@@ -7,8 +7,9 @@
 > recipe edit sheet. The organizing move is to stop treating the Playbook column as one blob of sections
 > with a single whole-recipe hand-off, and start treating each section as a small addressable object.
 
-Status: **Proposed** — 2026-07-17. Origin: Jon's 2026-07-17 design discussion (toolbar-efficiency per
-section + the conversation-URL want). **Lives inside [ADR-0039](ADR-0039-playbook-column-thinking-vs-doing.md)**
+Status: **Accepted** — 2026-07-17 (Jon greenlit **S1** for dispatch; **all open questions resolved**
+2026-07-17, incl. OQ3 by a live ChatGPT paste-back taste — S2 un-gated). Origin: Jon's 2026-07-17 design
+discussion (toolbar-efficiency per section + the conversation-URL want). **Lives inside [ADR-0039](ADR-0039-playbook-column-thinking-vs-doing.md)**
 (the persistent Enrichment/Playbook column), **rides [ADR-0038](ADR-0038-external-llm-handoff.md)** (the
 hand-off core and its in-app Copy/Paste door, Amd 2) and **refines [ADR-0038 Amendment 3](ADR-0038-external-llm-handoff.md#amendment-3--an-optional-user-pasted-conversationurl-to-reopen-the-live-chat-2026-07-15)**
 (relocates `conversationURL` from the device-local, non-synced `AIHandoff` onto a synced, section-addressable
@@ -95,8 +96,10 @@ To give Chef It Up and Serve With their own ChatGPT round-trip:
   (`HandoffIntents.swift:173–177`) compares **only** `sourceType + sourceID`. Two sections of the same
   recipe share both — so **without a section key, a pasted Chef-It-Up result would route onto Make-ahead**
   (or whichever handoff for that recipe is `awaitingReturn`). The section kind must be part of the match.
-- **Rescope the existing whole-recipe hand-off to be explicitly `.makeAhead`** rather than the implicit
-  default it is today, so the column-top button and the per-section make-ahead button mean the same thing.
+- **Retire the column-top whole-recipe "Hand off to ChatGPT" button** (OQ5, resolved): the existing
+  whole-recipe export (`.recipe` → `.recipeMakeAhead`) becomes **Make-ahead's section hand-off**, explicitly
+  `.makeAhead`. Whole-recipe-from-Chat is **not** a section action — it routes through the
+  [ADR-0023](ADR-0023-recipe-edit-proposals.md) *"Adjust this recipe"* surface instead.
 
 ### D4 — Per-section Edit is its own sheet, lifted off the monolithic recipe editor
 
@@ -187,8 +190,10 @@ the synced meta table. Sequenced so the IA lands first on existing content and s
   on ground that already round-trips. [[lean-verification-default]].
 - **S2 — the section-scoped external hand-off (core + app).** `HandoffExportSource` section dimension +
   task types + the **`matches(_:)` routing fix (D3)**; wire Chef It Up + Serve With Copy/Paste; rescope the
-  recipe hand-off to `.makeAhead`. Classify Serve-With's list-shaped paste-back per [[chat-verb-commit-shapes]]
-  (OQ3); wire any harvest verb with `requiresSubject:false` ([[harvest-verb-requires-subject-false]]).
+  recipe hand-off to `.makeAhead`. Serve-With's list paste-back is the existing editable-round-trip shape
+  (**OQ3 resolved** — pin the `title: note` format in the outbound prompt, strip `**`/`*` emphasis from the
+  parsed title, else unchanged); wire any harvest verb with `requiresSubject:false`
+  ([[harvest-verb-requires-subject-false]]).
 - **S3 — the synced section meta + the conversation URL (schema + app).** `PlaybookSectionMeta` table +
   migration + sync-set; the `conversationURL` field in the review sheet *and* the edit sheet; the
   **"Reopen in ChatGPT"** deep-link; refine ADR-0038 Amd 3. **Gated on the same live-`/c/`-link device
@@ -200,28 +205,49 @@ per-section round-trip and the reopen deep-link.
 
 ## Open questions
 
-- **OQ1 — inline columns vs sidecar meta (D6).** Recommend the sidecar; confirm at S3. Does `provenance`
-  want more than `{ chatGPTExternal, inApp, handAuthored }` (e.g. which model / date-of-generation)?
-- **OQ2 — Serve With is a list: one `conversationURL` per section, or per item?** Recommend **per section**
-  (the *session* produced the set, not each row). Confirm at S3.
-- **OQ3 — external hand-off for a list section (Serve With).** Does the existing editable-review round-trip
-  carry a list cleanly, or does it need an ADR-0034-style bullet parse? Classify per
-  [[chat-verb-commit-shapes]]; confirm at S2.
-- **OQ4 — the section's existing in-app generate verb** (the `ChatApplyAction`s): keep reachable in overflow,
-  or retire from the section UI in favor of external + Ask? **Lean: keep in overflow — don't delete working
-  verbs.**
-- **OQ5 — the column-top whole-recipe hand-off.** It *looks* redundant with per-section make-ahead, but it
-  is not the same **kind** of thing: a whole-recipe export invites a **whole-recipe deliverable** back — which
-  is the [ADR-0023](ADR-0023-recipe-edit-proposals.md) *"Adjust this recipe"* verb (transient preview →
-  side-by-side → commit as **overwrite-with-undo** *or* **variation** per
-  [ADR-0021](ADR-0021-recipe-variations.md)), **not** a Playbook-section verb. So the real fork is: **retire it
-  from the section grid** and let whole-recipe-from-Chat live on the ADR-0023 adjust surface (which already
-  owns the recipe-vs-variation commit choice), **or** keep a whole-recipe door here that routes into that same
-  side-by-side review. **Either way, section verbs stay scoped:** a make-ahead hand-off that returns a full
-  rewritten recipe must be parsed **lossless-or-loud** ([ADR-0040](ADR-0040-editable-at-the-grain-it-is-stored.md))
-  to its section and **flag the surplus**, never silently absorb a recipe into a `makeAhead` blob. Jon
-  contemplating; the variation UI's fuzzy edges ([ADR-0021](ADR-0021-recipe-variations.md)) are a real but
-  **separable** hardening item, not a blocker here. Decide at S2.
+- **OQ1 — RESOLVED (2026-07-17, Jon): the synced `PlaybookSectionMeta` sidecar (D6b)**, not inline columns.
+  Sub-question left open — does `provenance` want more than `{ chatGPTExternal, inApp, handAuthored }` (which
+  model, date-of-generation)? Decide at S3 once the corpus says whether it's needed.
+- **OQ2 — RESOLVED (2026-07-17, Jon): one `conversationURL` per section**, not per item — the *session*
+  produced the whole set. Falls out of the D6b key `(recipeID, sectionKind)`: Serve With gets **one** meta
+  row, not one per suggestion.
+- **OQ3 — RESOLVED (2026-07-17, Jon's live ChatGPT taste): the Serve With list round-trips cleanly; S2
+  un-gated.** *Method:* a hand-run of the S2-shaped outbound prompt (recipe context → accompaniments → pinned
+  `title: note` per-line, "no bold, no bullets, no intro") through ChatGPT, then the reply through the **real**
+  `cleanedEditableReviewLine` + `suggestion(fromEditableReviewLine:)` — **7/7 items parsed clean, zero junk,
+  zero leakage; no cleaning branch even fired.** Two conclusions: **(1) format-pinning is the load-bearing
+  fix** — when the outbound prompt names the exact shape, ChatGPT complies; it is prompt text, not parser
+  work. **(2) the [ADR-0024](ADR-0024-editable-proposal-preview.md) review sheet is the real junk filter, not
+  the parser** — a stray bold title or prose line (should a future run produce one) lands in the editable
+  review where the human deletes it before commit, and title-only items are *legal* so the parser cannot
+  auto-reject colon-less lines anyway. **S2 hardening is therefore minimal:** strip markdown emphasis
+  (`**` / `*`) from the parsed title; otherwise reuse the existing `editableReviewText()` /
+  `applyingEditableReviewText()` round-trip unchanged. The list uses the editable-round-trip commit shape that
+  already exists ([[chat-verb-commit-shapes]]).
+- **OQ4 — RESOLVED (2026-07-17, Jon): the section overflow's in-app affordance is "Ask" (section-scoped) —
+  no direct per-section generate button, and the distill verbs stay in Ask's catalog.** *Finding:* there is
+  **no** per-section generate button today — make-ahead / chef-it-up / serve-with generation lives **only in
+  the Ask panel** as `AnyChatApplyAction`s that **distill a conversation** (they consume chat `selection` +
+  `messages` and are **not** `requiresSubject:false`, `RecipeDetailModel+Enrichment.swift:108–124`). So the
+  in-app verb is *conversation-distillation*, not standalone one-tap generation — **complementary** to the
+  external hand-off (which exports for a *fresh* chat), not redundant, so it is neither retired from Ask nor
+  duplicated as a section button. A **direct** per-section generate was rejected: firing a
+  conversation-consuming action with no chat open is the [[harvest-verb-requires-subject-false]] dead branch.
+  The section overflow **opens Ask**, optionally pre-scoped to that section.
+- **OQ5 — RESOLVED (2026-07-17, Jon): retire the column-top button; route whole-recipe through ADR-0023.**
+  The whole-recipe hand-off is not a Playbook-section action — a whole-recipe export invites a **whole-recipe
+  deliverable**, which is the [ADR-0023](ADR-0023-recipe-edit-proposals.md) *"Adjust this recipe"* verb
+  (transient preview → side-by-side → commit as **overwrite-with-undo** *or* **variation** per
+  [ADR-0021](ADR-0021-recipe-variations.md)). So the column-top "Hand off to ChatGPT" button is **removed from
+  the Playbook column** (D3); *"hand off the whole recipe"* becomes **"Adjust this recipe → via ChatGPT,"**
+  landing in the existing ADR-0023 side-by-side review with its two commit destinations — **one verb, one
+  review, no new recipe-commit path.** The recipe-vs-variation choice is the human's at review time (already
+  ADR-0023's contract), never a routing decision here. **Section verbs stay scoped regardless:** a make-ahead
+  hand-off that returns a full rewritten recipe is parsed **lossless-or-loud**
+  ([ADR-0040](ADR-0040-editable-at-the-grain-it-is-stored.md)) to its section and **flags the surplus**, never
+  absorbing a recipe into a `makeAhead` blob. **Do not** build a bespoke "recipe back from Chat" landing that
+  bypasses 0023/0021; the variation UI's fuzzy edges ([ADR-0021](ADR-0021-recipe-variations.md)) are a
+  **separable, non-blocking** hardening item on their own track.
 
 ## Related
 

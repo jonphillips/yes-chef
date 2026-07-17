@@ -9,9 +9,17 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
-## ADR-0039 — Amendment 2 / Slice D + Amendment 3, menu adopts the Playbook column (permanent; tools slide over)
+## Dogfood polish batch — yield-fraction scaling · scalar→30 · grocery aisle picker · Workbench→Reference
 
-*(Prepared ahead of Codex's #2/#3/#4 tweak commit — before merging, re-run the `generic/platform=iOS` build on the post-tweak tip and delete this line.)*
+**✅ Merged to main — yes-chef PR [#198](https://github.com/jonphillips/yes-chef/pull/198), 2026-07-17. App-build gate green (`generic/platform=iOS` → BUILD SUCCEEDED) + `check-drift` green (SwiftLint; 358 package tests). Device pass owed (Jon).** App-layer + Core; **no schema / migration** (every field/table/placement pre-existed). From Jon's 2026-07-16 device pass — four unrelated small fixes in one PR.
+
+1. **Vulgar/mixed-fraction yield scaling (Core).** The fraction/mixed-number parse was extracted from `IngredientParser` into a shared Core helper both parsers call, and a pure `YesChefPackage` function scales the leading quantity **in place**, preserving trailing unit words and ranges ("2½ cups" → "5 cups"; "4–6 servings" → "8–12 servings"). Also kept the `ServingParser` Double fix. Fixes existing recipes with **no migration** (stored `Recipe.servings` stays nil).
+2. **Scale multiplier range 10 → 30 (app).** One shared `maximumWholeMultiplier` now drives both the wheel `ForEach` and `ScaleFraction.nearestSelection`, so a >10× scale no longer snaps back on reopen; covers recipe / menu-item / meal-plan via `ScaleContext`.
+3. **Grocery aisle → Picker (app).** The free-text Aisle field became a picker over `GroceryStoreArea.canonicalAreas`, preserving any existing non-canonical value as a selectable custom row.
+4. **Workbench "Archive All candidates" → "Move to Reference" (Core + app).** Curated-out candidates now land as Reference (`setLibraryPlacement(.reference…)`) instead of archived; candidate links still cleared; button / case / confirmation copy renamed. Replaces Archive (Jon's call — not both). Note-only candidates skip, as before.
+
+---
+## ADR-0039 — Amendment 2 / Slice D + Amendment 3, menu adopts the Playbook column (permanent; tools slide over)
 
 **✅ architect-approved + Jon device-confirmed + app-build-gate green (architect local `generic/platform=iOS` → BUILD SUCCEEDED) — 2026-07-16.** yes-chef PR [#197](https://github.com/jonphillips/yes-chef/pull/197). **This closes ADR-0039 Amendment 2 — all four slices (A–D) shipped — under the Amendment 3 correction.** **App-layer only — no schema / migration** (view composition + local `@AppStorage`; prep-plan/learnings/handoff data all pre-existed).
 
