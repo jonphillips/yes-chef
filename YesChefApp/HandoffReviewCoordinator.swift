@@ -89,6 +89,7 @@ final class HandoffReviewCoordinator {
   ) -> [ChatApplyReviewItem] {
     var items: [ChatApplyReviewItem] = []
     if !review.makeAhead.isEmpty {
+      let currentMakeAhead = review.currentMakeAhead?.nonEmpty
       items.append(
         ChatApplyReviewItem(
           id: review.handoffID,
@@ -97,9 +98,19 @@ final class HandoffReviewCoordinator {
           presentation: .sheet,
           editableTitle: "Make-ahead",
           editableText: review.makeAhead,
-          commitTitle: "Save Make-ahead",
+          supportingEvidenceTitle: currentMakeAhead == nil ? nil : "Currently saved",
+          supportingEvidenceRows: currentMakeAhead.map { [$0] } ?? [],
+          commitTitle: currentMakeAhead == nil ? "Save Make-ahead" : "Replace",
           committingTitle: "Saving Make-ahead…",
           committedTitle: "Saved Make-ahead",
+          secondaryCommit: currentMakeAhead.map { currentMakeAhead in
+            ChatApplyReviewSecondaryCommit(title: "Append") { [weak self] approvedText in
+              try self?.commitRecipeMakeAhead(
+                review,
+                approvedText: Self.appending(approvedText, to: currentMakeAhead)
+              )
+            }
+          },
           commit: { [weak self] approvedText in
             try self?.commitRecipeMakeAhead(review, approvedText: approvedText)
           }
@@ -123,6 +134,7 @@ final class HandoffReviewCoordinator {
   ) -> [ChatApplyReviewItem] {
     var items: [ChatApplyReviewItem] = []
     if !review.text.isEmpty {
+      let currentChefItUp = review.currentText?.nonEmpty
       items.append(
         ChatApplyReviewItem(
           id: review.handoffID,
@@ -131,9 +143,19 @@ final class HandoffReviewCoordinator {
           presentation: .sheet,
           editableTitle: "Chef It Up",
           editableText: review.text,
-          commitTitle: "Save Chef It Up",
+          supportingEvidenceTitle: currentChefItUp == nil ? nil : "Currently saved",
+          supportingEvidenceRows: currentChefItUp.map { [$0] } ?? [],
+          commitTitle: currentChefItUp == nil ? "Save Chef It Up" : "Replace",
           committingTitle: "Saving Chef It Up…",
           committedTitle: "Saved Chef It Up",
+          secondaryCommit: currentChefItUp.map { currentChefItUp in
+            ChatApplyReviewSecondaryCommit(title: "Append") { [weak self] approvedText in
+              try self?.commitRecipeChefItUp(
+                review,
+                approvedText: Self.appending(approvedText, to: currentChefItUp)
+              )
+            }
+          },
           commit: { [weak self] approvedText in
             try self?.commitRecipeChefItUp(review, approvedText: approvedText)
           }
@@ -155,6 +177,11 @@ final class HandoffReviewCoordinator {
   ) -> [ChatApplyReviewItem] {
     var items: [ChatApplyReviewItem] = []
     if !review.text.isEmpty {
+      let currentPlan = ServeWithPlan(
+        items: review.currentServeWith.map { ServeWithSuggestion(title: $0.title, note: $0.note) }
+      )
+      let returnedPlan = ServeWithPlan().applyingEditableReviewText(review.text)
+      let editableText = currentPlan.unioning(returnedPlan).editableReviewText()
       items.append(
         ChatApplyReviewItem(
           id: review.handoffID,
@@ -162,7 +189,9 @@ final class HandoffReviewCoordinator {
           summary: review.text,
           presentation: .sheet,
           editableTitle: "Serve With",
-          editableText: review.text,
+          editableText: editableText,
+          supportingEvidenceTitle: currentPlan.items.isEmpty ? nil : "Currently saved",
+          supportingEvidenceRows: currentPlan.items.isEmpty ? [] : [currentPlan.editableReviewText()],
           commitTitle: "Save Serve With",
           committingTitle: "Saving Serve With…",
           committedTitle: "Saved Serve With",
@@ -310,6 +339,10 @@ final class HandoffReviewCoordinator {
     }
   }
 
+  private static func appending(_ returnedText: String, to currentText: String) -> String {
+    [currentText, returnedText].joined(separator: "\n\n")
+  }
+
   private func commitMealPlanMakeAhead(
     _ review: AIHandoffMealPlanMakeAheadReview,
     approvedText: String
@@ -379,9 +412,9 @@ struct HandoffReviewSheet: View {
     RecipeCollectionReviewSheet(
       items: items,
       committingItemID: nil,
-      commit: { item, approvedText in
+      commit: { item, approvedText, usingSecondaryCommit in
         do {
-          try await item.commit(approvedText)
+          try await item.commit(approvedText, usingSecondaryCommit: usingSecondaryCommit)
           items.removeAll { $0.id == item.id }
           return true
         } catch {

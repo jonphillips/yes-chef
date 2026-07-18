@@ -363,8 +363,8 @@ struct RecipeChatPanel: View {
       RecipeCollectionReviewSheet(
         items: stagedReviewItems,
         committingItemID: committingReviewItemID,
-        commit: { item, approvedText in
-          await commit(item, approvedText: approvedText)
+        commit: { item, approvedText, usingSecondaryCommit in
+          await commit(item, approvedText: approvedText, usingSecondaryCommit: usingSecondaryCommit)
         },
         discard: { item in
           discard(item)
@@ -443,7 +443,11 @@ struct RecipeChatPanel: View {
   }
 
   @MainActor
-  private func commit(_ item: ChatApplyReviewItem, approvedText: String) async -> Bool {
+  private func commit(
+    _ item: ChatApplyReviewItem,
+    approvedText: String,
+    usingSecondaryCommit: Bool
+  ) async -> Bool {
     let actionID = stagedReviewAction?.id ?? "unknown"
     let actionTitle = stagedReviewAction?.title ?? "unknown"
     AppLog.applyAction.info(
@@ -454,7 +458,7 @@ struct RecipeChatPanel: View {
     defer { committingReviewItemID = nil }
 
     do {
-      try await item.commit(approvedText)
+      try await item.commit(approvedText, usingSecondaryCommit: usingSecondaryCommit)
       stagedReviewItems.removeAll { $0.id == item.id }
       if stagedReviewItems.isEmpty {
         isReviewSheetPresented = false
@@ -902,7 +906,7 @@ struct ChatApplyReviewSheet: View {
 
   let item: ChatApplyReviewItem
   let isCommitting: Bool
-  let commit: (String) async -> Void
+  let commit: (String, Bool) async -> Void
   let discard: () -> Void
 
   @State private var draftText: String
@@ -911,7 +915,7 @@ struct ChatApplyReviewSheet: View {
   init(
     item: ChatApplyReviewItem,
     isCommitting: Bool,
-    commit: @escaping (String) async -> Void,
+    commit: @escaping (String, Bool) async -> Void,
     discard: @escaping () -> Void
   ) {
     self.item = item
@@ -978,19 +982,11 @@ struct ChatApplyReviewSheet: View {
           }
           .disabled(isCommitting)
         }
-        ToolbarItem(placement: .confirmationAction) {
-          Button {
-            Task {
-              await commit(draftText)
-            }
-          } label: {
-            if isCommitting {
-              ProgressView()
-            } else {
-              Text(item.commitTitle)
-            }
+        ToolbarItemGroup(placement: .confirmationAction) {
+          commitButton(item.commitTitle, usingSecondaryCommit: false)
+          if let secondaryCommit = item.secondaryCommit {
+            commitButton(secondaryCommit.title, usingSecondaryCommit: true)
           }
-          .disabled(isCommitting || approvedTextIsEmpty)
         }
       }
     }
@@ -1027,6 +1023,21 @@ struct ChatApplyReviewSheet: View {
       discard()
       dismiss()
     }
+  }
+
+  private func commitButton(_ title: String, usingSecondaryCommit: Bool) -> some View {
+    Button {
+      Task {
+        await commit(draftText, usingSecondaryCommit)
+      }
+    } label: {
+      if isCommitting {
+        ProgressView()
+      } else {
+        Text(title)
+      }
+    }
+    .disabled(isCommitting || approvedTextIsEmpty)
   }
 }
 

@@ -267,9 +267,12 @@ struct MenuDetailView: View {
       ChatApplyReviewSheet(
         item: detailModel.reviewItem(for: review),
         isCommitting: detailModel.isPromotingNoteRecipe,
-        commit: { approvedText in
+        commit: { approvedText, usingSecondaryCommit in
           do {
-            try await detailModel.reviewItem(for: review).commit(approvedText)
+            try await detailModel.reviewItem(for: review).commit(
+              approvedText,
+              usingSecondaryCommit: usingSecondaryCommit
+            )
           } catch {
             detailModel.errorMessage = RecipeChatErrorText.describe(error)
             detailModel.isShowingError = true

@@ -147,9 +147,9 @@ struct RecipeCaptureView: View {
     RecipeCollectionReviewSheet(
       items: model.readerFeedbackProposals.map { readerFeedbackReviewItem(for: $0) },
       committingItemID: nil,
-      commit: { item, approvedText in
+      commit: { item, approvedText, usingSecondaryCommit in
         do {
-          try await item.commit(approvedText)
+          try await item.commit(approvedText, usingSecondaryCommit: usingSecondaryCommit)
           return true
         } catch {
           model.errorMessage = RecipeChatErrorText.describe(error)

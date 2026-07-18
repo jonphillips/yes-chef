@@ -51,6 +51,15 @@ public struct ServeWithPlan: Equatable, Sendable {
     )
   }
 
+  /// Keeps every existing suggestion at the top of a handoff review while adding only genuinely new returns.
+  /// The exact title-and-note match mirrors `RecipeRepository.reconciledServeWithItems`, which preserves the
+  /// stored UUIDs when this review is committed.
+  public func unioning(_ returnedPlan: ServeWithPlan) -> ServeWithPlan {
+    var seen = Set<ServeWithSuggestion>()
+    let items = (items + returnedPlan.items).filter { seen.insert($0).inserted }
+    return ServeWithPlan(items: items)
+  }
+
   private static func suggestion(fromEditableReviewLine line: String) -> ServeWithSuggestion? {
     let pieces = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
     guard let title = String(pieces[0]).removingMarkdownEmphasis.cleanedEnrichmentText else { return nil }
@@ -67,7 +76,7 @@ private extension String {
   }
 }
 
-public struct ServeWithSuggestion: Equatable, Sendable {
+public struct ServeWithSuggestion: Hashable, Sendable {
   public var title: String
   public var note: String?
 

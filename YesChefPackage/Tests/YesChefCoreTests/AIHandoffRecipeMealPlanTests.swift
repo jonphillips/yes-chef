@@ -116,7 +116,13 @@ extension AIHandoffTests {
 
     try database.write { db in
       try Recipe.insert {
-        Recipe(id: recipeID, title: "Birria", dateCreated: now, dateModified: now)
+        Recipe(
+          id: recipeID,
+          title: "Birria",
+          dateCreated: now,
+          dateModified: now,
+          makeAhead: "Salt the beef the day before."
+        )
       }
       .execute(db)
       try AIHandoffRepository.create(
@@ -152,8 +158,12 @@ extension AIHandoffTests {
         recipeReview.makeAhead,
         "Make the chile sauce up to two days ahead and refrigerate it."
       )
+      expectNoDifference(recipeReview.currentMakeAhead, "Salt the beef the day before.")
       expectNoDifference(recipeReview.learnings, ["Birria improves after resting overnight."])
-      #expect(try Recipe.find(recipeID).fetchOne(db)?.makeAhead == nil)
+      expectNoDifference(
+        try Recipe.find(recipeID).fetchOne(db)?.makeAhead,
+        "Salt the beef the day before."
+      )
     }
   }
 
@@ -166,7 +176,13 @@ extension AIHandoffTests {
 
     try database.write { db in
       try Recipe.insert {
-        Recipe(id: recipeID, title: "Birria", dateCreated: now, dateModified: now)
+        Recipe(
+          id: recipeID,
+          title: "Birria",
+          dateCreated: now,
+          dateModified: now,
+          chefItUp: "Finish with fresh lime."
+        )
       }
       .execute(db)
       let handoff = AIHandoff(
@@ -198,6 +214,7 @@ extension AIHandoffTests {
       }
       expectNoDifference(sectionReview.section, .chefItUp)
       expectNoDifference(sectionReview.text, "Bloom the chiles in oil before blending the sauce.")
+      expectNoDifference(sectionReview.currentText, "Finish with fresh lime.")
     }
   }
 

@@ -8,6 +8,77 @@ extension RecipeCoreTests {
   @Suite
   struct RecipeEnrichmentTests {
     @Test
+    func serveWithUnionPrefillPreservesExistingRowsAndDeduplicatesExactReturn() throws {
+      @Dependency(\.defaultDatabase) var database
+      let createdAt = Date(timeIntervalSinceReferenceDate: 826_000_000)
+      let updatedAt = createdAt.addingTimeInterval(60)
+      let recipeID = SampleUUIDSequence.uuid(36_410)
+      let limeCremaID = SampleUUIDSequence.uuid(36_411)
+      let cornbreadID = SampleUUIDSequence.uuid(36_412)
+      let cabbageSlawID = SampleUUIDSequence.uuid(36_413)
+      let existingItems = [
+        ServeWithItem(id: limeCremaID, title: "Lime crema", note: "Spoon over each bowl."),
+        ServeWithItem(id: cornbreadID, title: "Skillet cornbread"),
+      ]
+      let existingPlan = ServeWithPlan(
+        items: existingItems.map { ServeWithSuggestion(title: $0.title, note: $0.note) }
+      )
+      let existingData = try ServeWithCoding.encode(existingItems)
+      let prefilledPlan = existingPlan.unioning(
+        ServeWithPlan(
+          items: [
+            ServeWithSuggestion(title: "Lime crema", note: "Spoon over each bowl."),
+            ServeWithSuggestion(title: "Cabbage slaw"),
+          ]
+        )
+      )
+
+      expectNoDifference(
+        prefilledPlan,
+        ServeWithPlan(
+          items: [
+            ServeWithSuggestion(title: "Lime crema", note: "Spoon over each bowl."),
+            ServeWithSuggestion(title: "Skillet cornbread"),
+            ServeWithSuggestion(title: "Cabbage slaw"),
+          ]
+        )
+      )
+
+      try database.write { db in
+        try Recipe.insert {
+          Recipe(
+            id: recipeID,
+            title: "Chili",
+            dateCreated: createdAt,
+            dateModified: createdAt,
+            serveWith: existingData
+          )
+        }
+        .execute(db)
+
+        try RecipeRepository.replaceServeWithPlan(
+          prefilledPlan,
+          recipeID: recipeID,
+          in: db,
+          now: updatedAt,
+          uuid: { cabbageSlawID }
+        )
+      }
+
+      try database.read { db in
+        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+        expectNoDifference(
+          ServeWithCoding.decode(recipe.serveWith),
+          [
+            ServeWithItem(id: limeCremaID, title: "Lime crema", note: "Spoon over each bowl."),
+            ServeWithItem(id: cornbreadID, title: "Skillet cornbread"),
+            ServeWithItem(id: cabbageSlawID, title: "Cabbage slaw"),
+          ]
+        )
+      }
+    }
+
+    @Test
     func replacingServeWithPlanPreservesUnchangedItemIDs() throws {
       @Dependency(\.defaultDatabase) var database
       let createdAt = Date(timeIntervalSinceReferenceDate: 826_000_000)
