@@ -363,6 +363,43 @@ core; the only model change is one nullable `TEXT` column on the device-local `A
 in `Schema.swift`, no sync-set change). Gated on the device check above. Verify per
 [[lean-verification-default]] — Jon device-passes the reopen deep-link.
 
+## Amendment 4 — Learning ingest is **append-only**; smart curation deferred (2026-07-18)
+
+**Status: Proposed.** Origin: Jon dogfooding the recipe-Learnings loop (ADR-0041 PRs #199/#200), 2026-07-18.
+Amends **Amd 1** (the `Learning` return artifact and its commit path). No new transport, no schema change.
+
+### The gap
+
+The two-part return's **Learnings** half is committed as a **dumb append** — `commitLearnings`
+(`HandoffReviewCoordinator.swift`) loops `LearningRepository.create` with no dedup, merge, or supersede.
+Compounding it, the outbound hand-off context omits the recipe's **existing** learnings
+(`RecipeChatRecipeContext.serialized()`, `RecipeChat.swift`), so the external model **cannot know what is
+already stored** and re-derives the same durable facts every session. Surfacing recipe learnings for the
+first time (ADR-0041 S1 / #200) made this visible: freshly-returned near-duplicates land next to learnings
+that had been accumulating invisibly. **Nothing refines the corpus as knowledge arrives** — it only grows.
+
+### Decision — a cheap near-term mitigation now; the real curation is future work
+
+**Near-term (greenlit, ships with the #200 follow-on slice):**
+- **Outbound "only new."** Include the recipe's existing learnings in the hand-off context and instruct the
+  YC-LEARNINGS section to **return only durable learnings not already listed**. Cuts dupes at the source,
+  leveraging the model already in the loop — prompt work, not parser work.
+- **Deterministic exact-dedup on ingest.** On commit, skip creating a learning whose **normalized text**
+  already exists for that `(sourceType, sourceID)`. Lives in core (`LearningRepository`), so it is
+  unit-testable. Kills exact repeats; it does **not** catch paraphrases.
+
+**Deferred — the actual shortcoming, on the record:** an **LLM curation pass on ingest** that reconciles
+**incoming vs. existing** learnings (dedup near-duplicates, **merge** overlapping facts, **supersede** a
+stale learning with a corrected one), emitting a structured list the human reviews — [[llm-curation-not-synthesis]]
+applied to the `Learning` corpus: select/trim/merge **distinct** items, never flatten to one summary. This
+requires the review sheet to **surface existing learnings alongside incoming** (today it shows only the
+incoming set, so a human can't dedup against what's stored either). This is a feature, not a patch; it earns
+its own slice — and likely re-touches Amd 1's universal-commit-shape claim, since curation is a **different
+commit shape** than append. Do **not** fold it into the near-term mitigation.
+
+The exact-dedup mitigation is a **floor, not a ceiling**: it must not become the reason the smart pass never
+gets scheduled. Tracked in memory [[handoff-stateless-both-directions]].
+
 ## Deferred (on the record, explicitly not built here)
 
 - **Widened share-extension "Import into Yes Chef."** A polished entry point for when you're already
