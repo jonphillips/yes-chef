@@ -118,16 +118,19 @@ struct RecipePlaybookView: View {
       }
         .padding(.top, 8)
     } label: {
-      HStack {
+      // The fill-dot and the disclosure chevron read as one status pair hugging the trailing edge; the menu
+      // sits well clear of them so its tap target can't be confused for the disclosure's.
+      HStack(spacing: 0) {
         Text(section.title)
           .font(.title2.bold())
-        Spacer()
+        Spacer(minLength: 12)
+        if isExpanded.wrappedValue {
+          sectionMenu(for: section, isFilled: isFilled)
+            .padding(.trailing, 12)
+        }
         Image(systemName: isFilled ? "circle.fill" : "circle")
           .foregroundStyle(isFilled ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
           .accessibilityLabel(Text(isFilled ? "Contains content" : "Empty"))
-        if isExpanded.wrappedValue {
-          sectionMenu(for: section, isFilled: isFilled)
-        }
       }
     }
     .accessibilityValue(Text(isFilled ? "Contains content" : "Empty"))
@@ -253,6 +256,8 @@ struct RecipePlaybookView: View {
       }
     } label: {
       Image(systemName: "ellipsis")
+        .frame(width: 44, height: 44)
+        .contentShape(.rect)
     }
     .accessibilityLabel("\(section.title) actions")
   }

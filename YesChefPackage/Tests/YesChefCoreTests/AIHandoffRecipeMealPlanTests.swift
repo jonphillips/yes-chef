@@ -73,6 +73,20 @@ extension AIHandoffTests {
     #expect(serveWith.contains("Do not use bullets, Markdown emphasis, an introduction"))
   }
 
+  /// The Playbook hands off in `.discuss` mode, which never emits `DeliverableFormat.example` — so each blob
+  /// section's own prompt has to carry the flat-list contract or the return comes back as a headed report.
+  @Test
+  func blobSectionPromptsPinTheirReturnToAFlatLineList() {
+    let context = RecipeHandoffContext(recipe: RecipeChatRecipeContext(title: "Chili"))
+
+    for prompt in [context.prompt(for: .makeAhead), context.prompt(for: .chefItUp)] {
+      #expect(prompt.contains("one make-ahead step per line") || prompt.contains("one upgrade per line"))
+      #expect(prompt.contains("No headings, no section titles, no nested or Markdown bullets"))
+      #expect(prompt.contains("no assessment of what the recipe already does well"))
+      #expect(prompt.contains("Six lines at most"))
+    }
+  }
+
   @Test
   func mealPlanHandoffContextKeepsMethodsAndAllIngredients() {
     let recipeID = SampleUUIDSequence.uuid(38_037)

@@ -56,6 +56,18 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     """
   }
 
+  /// The blob sections are rendered as a flat list, so the return has to *be* a flat list. `.discuss` mode —
+  /// which every Playbook hand-off uses — never emits `AIHandoffToken.DeliverableFormat.example`, so the shape
+  /// contract has to live here in the section prompt, the way Serve With's already does. Without it the model
+  /// returns a report with headings and nested bullets, and the section renders it as bulleted nonsense.
+  private static func lineListFormat(_ itemNoun: String) -> String {
+    """
+    Return format: one \(itemNoun) per line, each a single concrete action the cook can take. No headings, no \
+    section titles, no nested or Markdown bullets, no emphasis, no introduction, and no assessment of what the \
+    recipe already does well. Six lines at most — fewer if there is less worth saying.
+    """
+  }
+
   private static func makeAheadPrompt(
     context: String,
     knownLearnings: String,
@@ -66,6 +78,8 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     You are preparing practical make-ahead notes for one recipe. Preserve the recipe's authored method and
     ingredients as context; suggest only work that can happen before cooking or serving. Do not rewrite the
     recipe or turn the response into a merged mega-recipe.
+
+    \(lineListFormat("make-ahead step"))
 
     Taste profile:
     \(tasteProfile)
@@ -89,6 +103,8 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     """
     You are preparing practical Chef It Up notes for one recipe. Suggest concrete technique and flavor upgrades;
     do not rewrite the recipe or turn the response into a merged mega-recipe.
+
+    \(lineListFormat("upgrade"))
 
     Taste profile:
     \(tasteProfile)
