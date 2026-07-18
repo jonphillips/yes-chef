@@ -49,8 +49,40 @@ public enum AIHandoffTaskType: String, Codable, QueryBindable, QueryDecodable, S
   case prepPlan
   case learning
   case recipeMakeAhead
+  case chefItUp
+  case serveWith
   case adjustRecipe
   case mealPlanMakeAheadStrategy
+}
+
+/// An independently actionable section of a recipe's Playbook. The content remains in the recipe's
+/// existing fields; this identity lets hand-offs and future section metadata stay correctly scoped.
+public enum PlaybookSectionKind: String, CaseIterable, Codable, QueryBindable, QueryDecodable, Sendable, Identifiable {
+  case makeAhead
+  case chefItUp
+  case serveWith
+
+  public var id: Self { self }
+
+  public var handoffTaskType: AIHandoffTaskType {
+    switch self {
+    case .makeAhead: .recipeMakeAhead
+    case .chefItUp: .chefItUp
+    case .serveWith: .serveWith
+    }
+  }
+}
+
+public extension AIHandoff {
+  /// The token identifies a handoff row; its task type is the section key that keeps returns for sibling
+  /// Playbook sections of one recipe from cross-routing.
+  func matches(
+    sourceType: AIHandoffSourceType,
+    sourceID: UUID,
+    taskType: AIHandoffTaskType
+  ) -> Bool {
+    self.sourceType == sourceType && self.sourceID == sourceID && self.taskType == taskType
+  }
 }
 
 public enum AIHandoffStatus: String, Codable, QueryBindable, QueryDecodable, Sendable {
@@ -218,6 +250,8 @@ public enum AIHandoffToken {
   public enum DeliverableFormat: Sendable {
     case menuPrepPlan
     case recipeMakeAhead
+    case recipeChefItUp
+    case recipeServeWith
     case mealPlanMakeAheadStrategy
 
     var discussInstruction: String {
@@ -226,6 +260,10 @@ public enum AIHandoffToken {
         "return only the token line above as the first line, followed by the paste-ready prep plan"
       case .recipeMakeAhead:
         "return only the token line above as the first line, followed by the paste-ready recipe make-ahead notes"
+      case .recipeChefItUp:
+        "return only the token line above as the first line, followed by the paste-ready Chef It Up notes"
+      case .recipeServeWith:
+        "return only the token line above as the first line, followed by paste-ready Serve With suggestions"
       case .mealPlanMakeAheadStrategy:
         "return only the token line above as the first line, followed by the paste-ready meal-plan make-ahead strategy"
       }
@@ -237,6 +275,10 @@ public enum AIHandoffToken {
         "Return the completed prep plan in your first response when the menu needs one."
       case .recipeMakeAhead:
         "Return the completed recipe make-ahead notes in your first response when the recipe needs them."
+      case .recipeChefItUp:
+        "Return the completed Chef It Up notes in your first response when the recipe needs them."
+      case .recipeServeWith:
+        "Return the completed Serve With suggestions in your first response when the recipe needs them."
       case .mealPlanMakeAheadStrategy:
         "Return the completed meal-plan make-ahead strategy in your first response when the day needs one."
       }
@@ -251,6 +293,10 @@ public enum AIHandoffToken {
         """
       case .recipeMakeAhead:
         "- Complete the sauce up to two days ahead and refrigerate."
+      case .recipeChefItUp:
+        "Bloom the spices in oil before adding the tomatoes."
+      case .recipeServeWith:
+        "Cilantro-lime rice: Finish with fresh lime juice."
       case .mealPlanMakeAheadStrategy:
         """
         Make-ahead strategy - Dinner
@@ -363,6 +409,28 @@ public struct AIHandoffRecipeMakeAheadReview: Equatable, Sendable {
   }
 }
 
+public struct AIHandoffRecipeSectionReview: Equatable, Sendable {
+  public let handoffID: AIHandoff.ID
+  public let recipeID: Recipe.ID
+  public let section: PlaybookSectionKind
+  public let text: String
+  public let learnings: [String]
+
+  public init(
+    handoffID: AIHandoff.ID,
+    recipeID: Recipe.ID,
+    section: PlaybookSectionKind,
+    text: String,
+    learnings: [String]
+  ) {
+    self.handoffID = handoffID
+    self.recipeID = recipeID
+    self.section = section
+    self.text = text
+    self.learnings = learnings
+  }
+}
+
 public struct AIHandoffMealPlanMakeAheadReview: Equatable, Sendable {
   public let handoffID: AIHandoff.ID
   public let mealPlanItemID: MealPlanItem.ID
@@ -391,12 +459,16 @@ public struct AIHandoffMealPlanMakeAheadReview: Equatable, Sendable {
 public enum AIHandoffReview: Equatable, Sendable {
   case menuPrepPlan(AIHandoffMenuPrepPlanReview)
   case recipeMakeAhead(AIHandoffRecipeMakeAheadReview)
+  case recipeChefItUp(AIHandoffRecipeSectionReview)
+  case recipeServeWith(AIHandoffRecipeSectionReview)
   case mealPlanMakeAhead(AIHandoffMealPlanMakeAheadReview)
 
   public var handoffID: AIHandoff.ID {
     switch self {
     case let .menuPrepPlan(review): review.handoffID
     case let .recipeMakeAhead(review): review.handoffID
+    case let .recipeChefItUp(review): review.handoffID
+    case let .recipeServeWith(review): review.handoffID
     case let .mealPlanMakeAhead(review): review.handoffID
     }
   }
@@ -558,7 +630,9 @@ public enum AIHandoffIntentImport {
       )
 
     case .recipe:
-      guard handoff.taskType == .recipeMakeAhead || handoff.taskType == .learning,
+      guard
+        handoff.taskType == .recipeMakeAhead || handoff.taskType == .chefItUp
+          || handoff.taskType == .serveWith || handoff.taskType == .learning,
         let recipe = try Recipe.find(handoff.sourceID).fetchOne(db), !recipe.archived
       else {
         throw AIHandoffIntentImportError.wrongTask
@@ -567,14 +641,39 @@ public enum AIHandoffIntentImport {
       guard !returned.deliverable.isEmpty || !returned.learnings.isEmpty else {
         throw AIHandoffIntentImportError.emptyPlan
       }
-      review = .recipeMakeAhead(
-        AIHandoffRecipeMakeAheadReview(
-          handoffID: handoff.id,
-          recipeID: recipe.id,
-          makeAhead: returned.deliverable,
-          learnings: returned.learnings
+      switch handoff.taskType {
+      case .recipeMakeAhead, .learning:
+        review = .recipeMakeAhead(
+          AIHandoffRecipeMakeAheadReview(
+            handoffID: handoff.id,
+            recipeID: recipe.id,
+            makeAhead: returned.deliverable,
+            learnings: returned.learnings
+          )
         )
-      )
+      case .chefItUp:
+        review = .recipeChefItUp(
+          AIHandoffRecipeSectionReview(
+            handoffID: handoff.id,
+            recipeID: recipe.id,
+            section: .chefItUp,
+            text: returned.deliverable,
+            learnings: returned.learnings
+          )
+        )
+      case .serveWith:
+        review = .recipeServeWith(
+          AIHandoffRecipeSectionReview(
+            handoffID: handoff.id,
+            recipeID: recipe.id,
+            section: .serveWith,
+            text: returned.deliverable,
+            learnings: returned.learnings
+          )
+        )
+      case .prepPlan, .adjustRecipe, .mealPlanMakeAheadStrategy:
+        throw AIHandoffIntentImportError.wrongTask
+      }
 
     case .mealPlan:
       guard handoff.taskType == .mealPlanMakeAheadStrategy || handoff.taskType == .learning,

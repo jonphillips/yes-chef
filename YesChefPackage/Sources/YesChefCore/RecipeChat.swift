@@ -478,11 +478,10 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
     )
   }
 
-  /// - Parameter includingCurrentMakeAhead: when `false`, the recipe's existing make-ahead is omitted.
-  ///   The external make-ahead hand-off passes `false` so a re-hand-off regenerates fresh instead of
-  ///   echoing (and biasing on) its own prior output — refinement belongs in the live chat, not here
-  ///   (ADR-0038 Amd 4 / ADR-0041). In-app chat keeps the default `true` so the assistant sees current state.
-  public func serialized(includingCurrentMakeAhead: Bool = true) -> String {
+  /// External section hand-offs omit the section being regenerated. This keeps a fresh hand-off from echoing
+  /// its own prior output while retaining sibling Playbook sections as recipe context; in-app chat keeps the
+  /// default so it can see the recipe's current state.
+  public func serialized(excludingPlaybookSections: Set<PlaybookSectionKind> = []) -> String {
     var lines = ["The user is looking at this recipe:"]
     lines.append("- Title: \(title.isEmpty ? "(untitled)" : title)")
     if let subtitle { lines.append("- Subtitle: \(subtitle)") }
@@ -506,15 +505,15 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
         lines.append("- \(tip.replacingOccurrences(of: "\n", with: " "))")
       }
     }
-    if includingCurrentMakeAhead, let makeAhead {
+    if !excludingPlaybookSections.contains(.makeAhead), let makeAhead {
       lines.append("Current make-ahead section:")
       lines.append(makeAhead)
     }
-    if let chefItUp {
+    if !excludingPlaybookSections.contains(.chefItUp), let chefItUp {
       lines.append("Current Chef It Up section:")
       lines.append(chefItUp)
     }
-    if !serveWith.isEmpty {
+    if !excludingPlaybookSections.contains(.serveWith), !serveWith.isEmpty {
       lines.append("Current Serve With section:")
       for item in serveWith {
         if let note = item.note {

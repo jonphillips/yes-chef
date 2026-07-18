@@ -8,17 +8,39 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     self.recipe = RecipeChatRecipeContext(detail: detail)
   }
 
-  public func makeAheadPrompt() -> String {
+  public init(recipe: RecipeChatRecipeContext) {
+    self.recipe = recipe
+  }
+
+  public func prompt(for section: PlaybookSectionKind) -> String {
     @Dependency(\.aiPromptPreferences) var preferences
     let settings = preferences.current()
-    return Self.makeAheadPrompt(
-      // Omit the current make-ahead: a re-hand-off regenerates fresh rather than refining its own prior
-      // output (ADR-0038 Amd 4 / ADR-0041). Existing learnings are surfaced instead, to steer against dupes.
-      context: bounded(recipe.serialized(includingCurrentMakeAhead: false)),
-      knownLearnings: Self.knownLearningsBlock(recipe.learnings),
-      tasteProfile: settings.tasteProfile,
-      makeAheadPreference: AISettingsRepository.preference(in: settings, for: .makeAheadPrepPlan)
-    )
+    let context = bounded(recipe.serialized(excludingPlaybookSections: [section]))
+    let knownLearnings = Self.knownLearningsBlock(recipe.learnings)
+
+    switch section {
+    case .makeAhead:
+      return Self.makeAheadPrompt(
+        context: context,
+        knownLearnings: knownLearnings,
+        tasteProfile: settings.tasteProfile,
+        makeAheadPreference: AISettingsRepository.preference(in: settings, for: .makeAheadPrepPlan)
+      )
+    case .chefItUp:
+      return Self.chefItUpPrompt(
+        context: context,
+        knownLearnings: knownLearnings,
+        tasteProfile: settings.tasteProfile,
+        chefItUpPreference: AISettingsRepository.preference(in: settings, for: .chefItUp)
+      )
+    case .serveWith:
+      return Self.serveWithPrompt(
+        context: context,
+        knownLearnings: knownLearnings,
+        tasteProfile: settings.tasteProfile,
+        serveWithPreference: AISettingsRepository.preference(in: settings, for: .serveWith)
+      )
+    }
   }
 
   private static func knownLearningsBlock(_ learnings: [String]) -> String {
@@ -53,6 +75,52 @@ public struct RecipeHandoffContext: Equatable, Sendable {
 
     The return must be plain, paste-ready review text — not JSON — because the cook reviews and edits it in
     Yes Chef before it is saved.
+    \(knownLearnings)
+    \(context)
+    """
+  }
+
+  private static func chefItUpPrompt(
+    context: String,
+    knownLearnings: String,
+    tasteProfile: String,
+    chefItUpPreference: String
+  ) -> String {
+    """
+    You are preparing practical Chef It Up notes for one recipe. Suggest concrete technique and flavor upgrades;
+    do not rewrite the recipe or turn the response into a merged mega-recipe.
+
+    Taste profile:
+    \(tasteProfile)
+
+    Chef It Up preferences:
+    \(chefItUpPreference)
+
+    The return must be plain, paste-ready review text — not JSON — because the cook reviews and edits it in
+    Yes Chef before it is saved.
+    \(knownLearnings)
+    \(context)
+    """
+  }
+
+  private static func serveWithPrompt(
+    context: String,
+    knownLearnings: String,
+    tasteProfile: String,
+    serveWithPreference: String
+  ) -> String {
+    """
+    You are suggesting accompaniments for one recipe. Return one suggestion per line, exactly as `title: note`
+    (or `title` when no note is useful). Do not use bullets, Markdown emphasis, an introduction, JSON, or any
+    other text. Do not rewrite the recipe or turn the response into a merged mega-recipe.
+
+    Taste profile:
+    \(tasteProfile)
+
+    Serve With preferences:
+    \(serveWithPreference)
+
+    The cook reviews and edits the returned lines in Yes Chef before saving them.
     \(knownLearnings)
     \(context)
     """

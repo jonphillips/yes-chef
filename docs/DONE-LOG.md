@@ -9,6 +9,21 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0041 Slice 2 — the section-scoped external hand-off
+
+**✅ Merged to main — PR [#205](https://github.com/jonphillips/yes-chef/pull/205), 2026-07-18. Architect-verified locally: `generic/platform=iOS` **TEST BUILD SUCCEEDED** (0 errors) and the touched package tests green (5/5, incl. the section-routing and prompt-scoping tests); `scripts/check-drift.sh` green per Codex. Device pass owed (Jon).** Core + app-layer; **no schema / migration** (content stays in the existing `Recipe` fields; the section meta is S3).
+
+**Chef It Up and Serve With got their own ChatGPT round-trip.** `HandoffExportSource.recipe` became `.recipeSection(Recipe.ID, PlaybookSectionKind)`; `AIHandoffTaskType` gained `chefItUp` + `serveWith`; the private S1 view-local section enum was promoted to a Core `PlaybookSectionKind` (one enum, not two). The whole-recipe export is now explicitly Make-ahead's section hand-off (OQ5) — whole-recipe-from-Chat routes through ADR-0023 instead.
+
+**The load-bearing fix was the router (D3).** `matches(_:)` compared only `sourceType + sourceID`, which two sections of one recipe share — so a pasted Chef-It-Up result would have routed onto Make-ahead. The section's task type is now part of the match, and `AIHandoffIntentImport` switches on it to stage a typed `AIHandoffRecipeSectionReview`. Covered at both layers: a Core test proving a Chef-It-Up token cannot stage a make-ahead review, and an app-layer `HandoffSectionRoutingTests`.
+
+**Prompts are section-scoped and regenerate fresh.** `RecipeChatRecipeContext.serialized(includingCurrentMakeAhead:)` generalized to `serialized(excludingPlaybookSections:)`; each hand-off excludes **only the section being regenerated**, retaining siblings as recipe context ([[handoff-stateless-both-directions]]). Serve With's outbound prompt pins the `title: note` per-line format (OQ3) and the parser strips `**`/`*` emphasis from the title.
+
+**Architect review folded three fixes into the branch.** (1) The first pass excluded *all three* sections from every prompt — a silent shrink of the shipped make-ahead prompt beyond what the ADR asked; corrected to `[section]` with a 3×3 matrix test asserting each prompt keeps its siblings. (2) `YesChefAppTests` did not compile (`RecipeScaleFormattingTests` still called the removed `ScaleText.scaledServingsSummary`), so the new app-layer routing test could never have run — retargeted to `RecipeYieldScaler.scaledText`, the path `model.scaledServingsSummary` actually delegates to. (3) Removed the now-dead `RecipeHandoffContext.makeAheadPrompt()` shim.
+
+**Deferred out of S2 → [ADR-0041 Amendment 1](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-1--a-return-never-stomps-existing-content-and-the-toolbar-collapses-into-the-overflow-2026-07-18) (doc landed in this PR; implementation is S2.5).** Jon's device look surfaced two things S2 got wrong rather than incomplete: a return **replaces wholesale** while the prompt excludes the current section, so "Hand off again" on a filled section discards hand-authored content (worst on Serve With, where whole rows vanish); and D2's prominent per-section buttons shout on every view for a weekly action. Amendment 1 records merge-or-choose returns and the collapse of every section action into one header overflow (superseding D2 on prominence, retiring `PasteButton`).
+
+---
 ## ADR-0041 Slice 1 — per-section Playbook toolbar + edit sheet · recipe Learnings loop · hand-off regenerates fresh + learning dedup
 
 **✅ Merged to main — PRs [#199](https://github.com/jonphillips/yes-chef/pull/199), [#200](https://github.com/jonphillips/yes-chef/pull/200), [#202](https://github.com/jonphillips/yes-chef/pull/202) (+ [#201](https://github.com/jonphillips/yes-chef/pull/201) doc, [#203](https://github.com/jonphillips/yes-chef/pull/203) recovery), 2026-07-18. App-build gate green (architect local `generic/platform=iOS` → BUILD SUCCEEDED); core tests green. Device pass owed (Jon).** App-layer + Core; **no schema / migration** (reuses the existing enrichment content, the ADR-0024 review sheet, and the already-synced ADR-0038 `learnings` table). A dogfood arc off ADR-0041's acceptance — four efforts:

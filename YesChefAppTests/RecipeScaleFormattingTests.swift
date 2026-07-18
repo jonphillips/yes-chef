@@ -1,4 +1,5 @@
 import Testing
+import YesChefCore
 @testable import YesChef
 
 @Suite
@@ -21,29 +22,17 @@ struct RecipeScaleFormattingTests {
   @Test
   func scaledServingsSummaryPreservesSourceRanges() {
     #expect(
-      ScaleText.scaledServingsSummary(
-        servingsText: "Serves 2 to 4",
-        baseServings: 2,
-        factor: 3
-      ) == "6–12 servings"
+      RecipeYieldScaler.scaledText("Serves 2 to 4", factor: 3) == "6–12 servings"
     )
     #expect(
-      ScaleText.scaledServingsSummary(
-        servingsText: "4–6 servings",
-        baseServings: 4,
-        factor: 0.5
-      ) == "2–3 servings"
+      RecipeYieldScaler.scaledText("4–6 servings", factor: 0.5) == "2–3 servings"
     )
   }
 
   @Test
   func scaledServingsSummaryFallsBackToStoredServings() {
     #expect(
-      ScaleText.scaledServingsSummary(
-        servingsText: "Serves 2",
-        baseServings: 2,
-        factor: 3
-      ) == "6 servings"
+      RecipeYieldScaler.scaledText("Serves 2", factor: 3) == "6 servings"
     )
   }
 }

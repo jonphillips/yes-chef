@@ -12,7 +12,7 @@ struct RecipePlaybookView: View {
   @State private var isServeWithExpanded = true
   @State private var isEditingReaderFeedback = false
   @State private var readerFeedbackDrafts: [RecipeNote.ID: String] = [:]
-  @State private var editingSection: RecipePlaybookSection?
+  @State private var editingSection: PlaybookSectionKind?
 
   var body: some View {
     let visibleNotes = model.visibleNotes
@@ -22,7 +22,7 @@ struct RecipePlaybookView: View {
     VStack(alignment: .leading, spacing: 18) {
       playbookHeader
       playbookSection(
-        RecipePlaybookSection.makeAhead,
+        .makeAhead,
         isFilled: model.makeAhead != nil,
         isExpanded: $isMakeAheadExpanded
       ) {
@@ -41,14 +41,14 @@ struct RecipePlaybookView: View {
         }
       }
       playbookSection(
-        RecipePlaybookSection.chefItUp,
+        .chefItUp,
         isFilled: model.chefItUp != nil,
         isExpanded: $isChefItUpExpanded
       ) {
         chefItUpContent(model.chefItUp)
       }
       playbookSection(
-        RecipePlaybookSection.serveWith,
+        .serveWith,
         isFilled: !model.serveWithItems.isEmpty,
         isExpanded: $isServeWithExpanded
       ) {
@@ -85,10 +85,10 @@ struct RecipePlaybookView: View {
     .accessibilityLabel("Playbook actions")
   }
 
-  private var handoffButton: some View {
+  private func handoffButton(for section: PlaybookSectionKind) -> some View {
     Button {
       Task {
-        await handoffTransport.copyPrompt(for: .recipe(model.recipeID))
+        await handoffTransport.copyPrompt(for: .recipeSection(model.recipeID, section))
       }
     } label: {
       Label("Hand off", systemImage: "sparkles.square.filled.on.square")
@@ -96,10 +96,10 @@ struct RecipePlaybookView: View {
     .buttonStyle(.borderedProminent)
   }
 
-  private var redoButton: some View {
+  private func redoButton(for section: PlaybookSectionKind) -> some View {
     Button {
       Task {
-        await handoffTransport.copyPrompt(for: .recipe(model.recipeID))
+        await handoffTransport.copyPrompt(for: .recipeSection(model.recipeID, section))
       }
     } label: {
       Label("Hand off again", systemImage: "sparkles.square.filled.on.square")
@@ -127,18 +127,18 @@ struct RecipePlaybookView: View {
     .accessibilityValue(isAskActive ? Text("Panel open") : Text("Panel closed"))
   }
 
-  private var pasteResultButton: some View {
+  private func pasteResultButton(for section: PlaybookSectionKind) -> some View {
     PasteButton(payloadType: String.self) { results in
       Task {
-        await handoffTransport.pastedResultsReceived(results, source: .recipe(model.recipeID))
+        await handoffTransport.pastedResultsReceived(results, source: .recipeSection(model.recipeID, section))
       }
     }
-    .accessibilityLabel("Paste result into Make-ahead")
+    .accessibilityLabel("Paste result into \(section.title)")
     .buttonStyle(.bordered)
   }
 
   private func playbookSection<Content: View>(
-    _ section: RecipePlaybookSection,
+    _ section: PlaybookSectionKind,
     isFilled: Bool,
     isExpanded: Binding<Bool>,
     @ViewBuilder content: @escaping () -> Content
@@ -242,47 +242,25 @@ struct RecipePlaybookView: View {
   }
 
   @ViewBuilder
-  private func sectionToolbar(for section: RecipePlaybookSection, isFilled: Bool) -> some View {
+  private func sectionToolbar(for section: PlaybookSectionKind, isFilled: Bool) -> some View {
     HStack(spacing: 8) {
-      switch section {
-      case .makeAhead:
-        if isFilled {
-          editButton(for: section)
-          redoButton
-          Menu {
-            pasteResultButton
-            clearButton(for: section)
-          } label: {
-            Image(systemName: "ellipsis.circle")
-          }
-        } else {
-          handoffButton
-          pasteResultButton
-          Menu {
-            writeManuallyButton(for: section)
-            askMenuButton
-          } label: {
-            Image(systemName: "ellipsis.circle")
-          }
+      if isFilled {
+        editButton(for: section)
+        redoButton(for: section)
+        Menu {
+          pasteResultButton(for: section)
+          clearButton(for: section)
+        } label: {
+          Image(systemName: "ellipsis.circle")
         }
-      case .chefItUp, .serveWith:
-        if isFilled {
-          editButton(for: section)
-          Menu {
-            clearButton(for: section)
-          } label: {
-            Image(systemName: "ellipsis.circle")
-          }
-        } else {
-          Button(action: ask) {
-            Label("Ask", systemImage: "sparkles")
-          }
-          .buttonStyle(.borderedProminent)
-          Menu {
-            writeManuallyButton(for: section)
-          } label: {
-            Image(systemName: "ellipsis.circle")
-          }
+      } else {
+        handoffButton(for: section)
+        pasteResultButton(for: section)
+        Menu {
+          writeManuallyButton(for: section)
+          askMenuButton
+        } label: {
+          Image(systemName: "ellipsis.circle")
         }
       }
       Spacer(minLength: 0)
@@ -291,20 +269,20 @@ struct RecipePlaybookView: View {
     .accessibilityLabel(Text("\(section.title) actions"))
   }
 
-  private func editButton(for section: RecipePlaybookSection) -> some View {
+  private func editButton(for section: PlaybookSectionKind) -> some View {
     Button("Edit") {
       editingSection = section
     }
     .buttonStyle(.bordered)
   }
 
-  private func writeManuallyButton(for section: RecipePlaybookSection) -> some View {
+  private func writeManuallyButton(for section: PlaybookSectionKind) -> some View {
     Button("Write manually") {
       editingSection = section
     }
   }
 
-  private func clearButton(for section: RecipePlaybookSection) -> some View {
+  private func clearButton(for section: PlaybookSectionKind) -> some View {
     Button("Clear", role: .destructive) {
       clear(section)
     }
@@ -314,7 +292,7 @@ struct RecipePlaybookView: View {
     Button("Ask", action: ask)
   }
 
-  private func editableText(for section: RecipePlaybookSection) -> String {
+  private func editableText(for section: PlaybookSectionKind) -> String {
     switch section {
     case .makeAhead:
       model.makeAhead ?? ""
@@ -328,7 +306,7 @@ struct RecipePlaybookView: View {
     }
   }
 
-  private func commit(_ text: String, for section: RecipePlaybookSection) throws {
+  private func commit(_ text: String, for section: PlaybookSectionKind) throws {
     switch section {
     case .makeAhead:
       try model.commitMakeAheadText(text)
@@ -339,7 +317,7 @@ struct RecipePlaybookView: View {
     }
   }
 
-  private func clear(_ section: RecipePlaybookSection) {
+  private func clear(_ section: PlaybookSectionKind) {
     switch section {
     case .makeAhead:
       model.clearMakeAheadButtonTapped()
@@ -423,13 +401,7 @@ struct RecipePlaybookView: View {
   }
 }
 
-private enum RecipePlaybookSection: String, Identifiable {
-  case makeAhead
-  case chefItUp
-  case serveWith
-
-  var id: Self { self }
-
+private extension PlaybookSectionKind {
   var title: String {
     switch self {
     case .makeAhead:
@@ -443,7 +415,7 @@ private enum RecipePlaybookSection: String, Identifiable {
 }
 
 private struct RecipePlaybookSectionEditorSheet: View {
-  let section: RecipePlaybookSection
+  let section: PlaybookSectionKind
   let commit: (String) throws -> Void
   let clear: () -> Void
 
@@ -452,7 +424,7 @@ private struct RecipePlaybookSectionEditorSheet: View {
   @State private var errorMessage: String?
 
   init(
-    section: RecipePlaybookSection,
+    section: PlaybookSectionKind,
     initialText: String,
     commit: @escaping (String) throws -> Void,
     clear: @escaping () -> Void
