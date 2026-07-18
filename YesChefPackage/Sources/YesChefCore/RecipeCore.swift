@@ -103,6 +103,7 @@ public struct RecipeDetailData: Equatable, Sendable {
   public var categoryDisplayNames: [String]
   public var equipment: [Equipment]
   public var recipeEquipment: [RecipeEquipment]
+  public var learnings: [Learning]
   public var variations: [RecipeVariation]
   public var activeVariationID: RecipeVariation.ID?
 
@@ -120,6 +121,7 @@ public struct RecipeDetailData: Equatable, Sendable {
     categoryDisplayNames: [String] = [],
     equipment: [Equipment] = [],
     recipeEquipment: [RecipeEquipment] = [],
+    learnings: [Learning] = [],
     variations: [RecipeVariation] = [],
     activeVariationID: RecipeVariation.ID? = nil
   ) {
@@ -136,6 +138,7 @@ public struct RecipeDetailData: Equatable, Sendable {
     self.categoryDisplayNames = categoryDisplayNames
     self.equipment = equipment
     self.recipeEquipment = recipeEquipment
+    self.learnings = learnings
     self.variations = variations
     self.activeVariationID = activeVariationID
   }
@@ -289,6 +292,7 @@ public enum RecipeRepository {
       categoryDisplayNames: categoryDisplayNames,
       equipment: equipment,
       recipeEquipment: recipeEquipment,
+      learnings: try LearningRepository.learnings(sourceType: .recipe, sourceID: recipeID, in: db),
       variations: variations,
       activeVariationID: activeVariationID
     )

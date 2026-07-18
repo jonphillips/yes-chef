@@ -386,6 +386,7 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
   public var makeAhead: String?
   public var chefItUp: String?
   public var serveWith: [ServeWithItem]
+  public var learnings: [String]
 
   public init(
     recipeID: Recipe.ID? = nil,
@@ -403,7 +404,8 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
     readerFeedback: [String] = [],
     makeAhead: String? = nil,
     chefItUp: String? = nil,
-    serveWith: [ServeWithItem] = []
+    serveWith: [ServeWithItem] = [],
+    learnings: [String] = []
   ) {
     self.recipeID = recipeID
     self.title = title
@@ -421,6 +423,7 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
     self.makeAhead = makeAhead
     self.chefItUp = chefItUp
     self.serveWith = serveWith
+    self.learnings = learnings
   }
 
   public init(detail: RecipeDetailData) {
@@ -468,11 +471,18 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
         .map(\.text),
       makeAhead: detail.recipe.makeAhead,
       chefItUp: detail.recipe.chefItUp,
-      serveWith: ServeWithCoding.decode(detail.recipe.serveWith)
+      serveWith: ServeWithCoding.decode(detail.recipe.serveWith),
+      learnings: detail.learnings
+        .sorted { $0.dateCreated < $1.dateCreated }
+        .map(\.text)
     )
   }
 
-  public func serialized() -> String {
+  /// - Parameter includingCurrentMakeAhead: when `false`, the recipe's existing make-ahead is omitted.
+  ///   The external make-ahead hand-off passes `false` so a re-hand-off regenerates fresh instead of
+  ///   echoing (and biasing on) its own prior output — refinement belongs in the live chat, not here
+  ///   (ADR-0038 Amd 4 / ADR-0041). In-app chat keeps the default `true` so the assistant sees current state.
+  public func serialized(includingCurrentMakeAhead: Bool = true) -> String {
     var lines = ["The user is looking at this recipe:"]
     lines.append("- Title: \(title.isEmpty ? "(untitled)" : title)")
     if let subtitle { lines.append("- Subtitle: \(subtitle)") }
@@ -496,7 +506,7 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
         lines.append("- \(tip.replacingOccurrences(of: "\n", with: " "))")
       }
     }
-    if let makeAhead {
+    if includingCurrentMakeAhead, let makeAhead {
       lines.append("Current make-ahead section:")
       lines.append(makeAhead)
     }
