@@ -226,10 +226,12 @@ struct RecipePlaybookView: View {
       }
 
       Button {
-        guard let result = UIPasteboard.general.string else { return }
+        // A declined paste alert (or a non-string clipboard) yields nil. Hand the empty case to the
+        // transport rather than returning silently, so the tap always produces visible feedback.
+        let results = UIPasteboard.general.string.map { [$0] } ?? []
         Task {
           await handoffTransport.pastedResultsReceived(
-            [result],
+            results,
             source: .recipeSection(model.recipeID, section)
           )
         }

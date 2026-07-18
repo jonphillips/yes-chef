@@ -75,6 +75,9 @@ public struct ChatApplyReviewItem: Identifiable {
     self.commit = commit
   }
 
+  /// Main-actor isolated to match the stored commit closures. A nonisolated method here would require
+  /// sending this non-`Sendable` value out of the main actor at every (main-actor) call site.
+  @MainActor
   public func commit(_ approvedText: String, usingSecondaryCommit: Bool) async throws {
     if usingSecondaryCommit, let secondaryCommit {
       try await secondaryCommit.commit(approvedText)

@@ -983,9 +983,13 @@ struct ChatApplyReviewSheet: View {
           .disabled(isCommitting)
         }
         ToolbarItemGroup(placement: .confirmationAction) {
-          commitButton(item.commitTitle, usingSecondaryCommit: false)
+          // With a secondary commit the primary overwrites existing content, so the additive choice
+          // leads and the destructive one carries the role — neither reads as a pre-selected default.
           if let secondaryCommit = item.secondaryCommit {
             commitButton(secondaryCommit.title, usingSecondaryCommit: true)
+            commitButton(item.commitTitle, usingSecondaryCommit: false, role: .destructive)
+          } else {
+            commitButton(item.commitTitle, usingSecondaryCommit: false)
           }
         }
       }
@@ -1025,8 +1029,12 @@ struct ChatApplyReviewSheet: View {
     }
   }
 
-  private func commitButton(_ title: String, usingSecondaryCommit: Bool) -> some View {
-    Button {
+  private func commitButton(
+    _ title: String,
+    usingSecondaryCommit: Bool,
+    role: ButtonRole? = nil
+  ) -> some View {
+    Button(role: role) {
       Task {
         await commit(draftText, usingSecondaryCommit)
       }
