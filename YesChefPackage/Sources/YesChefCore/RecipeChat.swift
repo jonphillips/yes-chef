@@ -478,9 +478,9 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
     )
   }
 
-  /// External section hand-offs omit every current Playbook section. This keeps each fresh hand-off from
-  /// echoing its own prior output or bleeding a sibling section into the requested deliverable; in-app chat
-  /// keeps the default so it can see the recipe's current state.
+  /// External section hand-offs omit the section being regenerated. This keeps a fresh hand-off from echoing
+  /// its own prior output while retaining sibling Playbook sections as recipe context; in-app chat keeps the
+  /// default so it can see the recipe's current state.
   public func serialized(excludingPlaybookSections: Set<PlaybookSectionKind> = []) -> String {
     var lines = ["The user is looking at this recipe:"]
     lines.append("- Title: \(title.isEmpty ? "(untitled)" : title)")

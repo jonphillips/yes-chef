@@ -15,7 +15,7 @@ public struct RecipeHandoffContext: Equatable, Sendable {
   public func prompt(for section: PlaybookSectionKind) -> String {
     @Dependency(\.aiPromptPreferences) var preferences
     let settings = preferences.current()
-    let context = bounded(recipe.serialized(excludingPlaybookSections: Set(PlaybookSectionKind.allCases)))
+    let context = bounded(recipe.serialized(excludingPlaybookSections: [section]))
     let knownLearnings = Self.knownLearningsBlock(recipe.learnings)
 
     switch section {
@@ -41,10 +41,6 @@ public struct RecipeHandoffContext: Equatable, Sendable {
         serveWithPreference: AISettingsRepository.preference(in: settings, for: .serveWith)
       )
     }
-  }
-
-  public func makeAheadPrompt() -> String {
-    prompt(for: .makeAhead)
   }
 
   private static func knownLearningsBlock(_ learnings: [String]) -> String {

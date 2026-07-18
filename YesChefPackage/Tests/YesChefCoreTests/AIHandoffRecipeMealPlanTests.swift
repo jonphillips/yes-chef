@@ -40,14 +40,14 @@ extension AIHandoffTests {
     #expect(refining.contains("Current make-ahead section:"))
     #expect(refining.contains("Make the sauce two days ahead."))
 
-    // A section hand-off regenerates fresh — no existing Playbook section can bias the response.
-    let fresh = context.serialized(excludingPlaybookSections: Set(PlaybookSectionKind.allCases))
+    // A section hand-off regenerates fresh — its existing content must not bias the next return.
+    let fresh = context.serialized(excludingPlaybookSections: [.makeAhead])
     #expect(!fresh.contains("Current make-ahead section:"))
     #expect(!fresh.contains("Make the sauce two days ahead."))
   }
 
   @Test
-  func sectionHandoffPromptsAreScopedAndServeWithPinsItsEditableFormat() {
+  func sectionHandoffPromptsExcludeOnlyTheSectionBeingRegenerated() {
     let context = RecipeHandoffContext(recipe: RecipeChatRecipeContext(
       title: "Chili",
       makeAhead: "Current make-ahead note",
@@ -55,13 +55,20 @@ extension AIHandoffTests {
       serveWith: [ServeWithItem(id: SampleUUIDSequence.uuid(38_041), title: "Current side")]
     ))
 
+    let makeAhead = context.prompt(for: .makeAhead)
     let chefItUp = context.prompt(for: .chefItUp)
     let serveWith = context.prompt(for: .serveWith)
 
+    #expect(!makeAhead.contains("Current make-ahead note"))
+    #expect(makeAhead.contains("Current Chef It Up note"))
+    #expect(makeAhead.contains("Current side"))
     #expect(chefItUp.contains("Chef It Up preferences:"))
-    #expect(!chefItUp.contains("Current make-ahead note"))
+    #expect(chefItUp.contains("Current make-ahead note"))
     #expect(!chefItUp.contains("Current Chef It Up note"))
-    #expect(!chefItUp.contains("Current side"))
+    #expect(chefItUp.contains("Current side"))
+    #expect(serveWith.contains("Current make-ahead note"))
+    #expect(serveWith.contains("Current Chef It Up note"))
+    #expect(!serveWith.contains("Current side"))
     #expect(serveWith.contains("exactly as `title: note`"))
     #expect(serveWith.contains("Do not use bullets, Markdown emphasis, an introduction"))
   }
