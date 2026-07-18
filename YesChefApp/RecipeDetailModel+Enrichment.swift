@@ -1,6 +1,5 @@
 import Dependencies
 import Foundation
-import SQLiteData
 import YesChefCore
 
 extension RecipeDetailModel {
@@ -278,18 +277,13 @@ extension RecipeDetailModel {
     }
 
     try database.write { db in
-      let recipe = try Recipe.find(recipeID).fetchOne(db)
-      let existingItems = ServeWithCoding.decode(recipe?.serveWith)
-      let updatedItems = reconciledServeWithItems(existingItems, with: plan.items) {
-        uuid()
-      }
-      let encodedItems = try ServeWithCoding.encode(updatedItems)
-
-      try Recipe.find(recipeID).update {
-        $0.serveWith = encodedItems
-        $0.dateModified = now
-      }
-      .execute(db)
+      try RecipeRepository.replaceServeWithPlan(
+        plan,
+        recipeID: recipeID,
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
     }
   }
 
@@ -299,11 +293,7 @@ extension RecipeDetailModel {
 
     do {
       try database.write { db in
-        try Recipe.find(recipeID).update {
-          $0.serveWith = #bind(nil as Data?)
-          $0.dateModified = now
-        }
-        .execute(db)
+        try RecipeRepository.clearServeWith(recipeID: recipeID, in: db, now: now)
       }
     } catch {
       errorMessage = String(describing: error)
@@ -311,22 +301,6 @@ extension RecipeDetailModel {
     }
   }
 
-  private func reconciledServeWithItems(
-    _ existingItems: [ServeWithItem],
-    with suggestions: [ServeWithSuggestion],
-    uuid: () -> UUID
-  ) -> [ServeWithItem] {
-    var unmatchedItems = existingItems
-
-    return suggestions.map { suggestion in
-      if let index = unmatchedItems.firstIndex(where: {
-        $0.title == suggestion.title && $0.note == suggestion.note
-      }) {
-        return unmatchedItems.remove(at: index)
-      }
-      return ServeWithItem(id: uuid(), title: suggestion.title, note: suggestion.note)
-    }
-  }
 }
 
 private enum RecipeDetailError: Error, CustomStringConvertible, LocalizedError {

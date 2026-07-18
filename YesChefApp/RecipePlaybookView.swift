@@ -95,7 +95,7 @@ struct RecipePlaybookView: View {
         await handoffTransport.copyPrompt(for: .recipe(model.recipeID))
       }
     } label: {
-      Label("Redo", systemImage: "sparkles.square.filled.on.square")
+      Label("Hand off again", systemImage: "sparkles.square.filled.on.square")
     }
     .buttonStyle(.bordered)
   }
@@ -180,8 +180,7 @@ struct RecipePlaybookView: View {
   private func makeAheadContent(_ makeAhead: String?) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       if let makeAhead {
-        Text(makeAhead)
-          .frame(maxWidth: .infinity, alignment: .leading)
+        enrichmentText(makeAhead)
       }
     }
   }
@@ -189,10 +188,24 @@ struct RecipePlaybookView: View {
   private func chefItUpContent(_ chefItUp: String?) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       if let chefItUp {
-        Text(chefItUp)
-          .frame(maxWidth: .infinity, alignment: .leading)
+        enrichmentText(chefItUp)
       }
     }
+  }
+
+  private func enrichmentText(_ text: String) -> some View {
+    let lines = text
+      .split(whereSeparator: \.isNewline)
+      .map(String.init)
+      .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    return Text(
+      lines.count > 1
+        ? lines.map { "• \($0)" }.joined(separator: "\n")
+        : text
+    )
+    .lineSpacing(lines.count > 1 ? 8 : 0)
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private func serveWithContent(_ items: [ServeWithItem]) -> some View {
