@@ -1,5 +1,6 @@
 import Dependencies
 import Foundation
+import SQLiteData
 import YesChefCore
 
 extension RecipeDetailModel {
@@ -192,7 +193,7 @@ extension RecipeDetailModel {
     }
   }
 
-  private func commitMakeAheadText(_ text: String) throws {
+  func commitMakeAheadText(_ text: String) throws {
     @Dependency(\.date.now) var now
     @Dependency(\.defaultDatabase) var database
 
@@ -217,7 +218,7 @@ extension RecipeDetailModel {
     }
   }
 
-  private func commitChefItUpText(_ text: String) throws {
+  func commitChefItUpText(_ text: String) throws {
     @Dependency(\.date.now) var now
     @Dependency(\.defaultDatabase) var database
 
@@ -263,6 +264,67 @@ extension RecipeDetailModel {
       try RecipeRepository.appendServeWithPlan(plan, to: recipeID, in: db, now: now) {
         uuid()
       }
+    }
+  }
+
+  func commitServeWithText(_ text: String) throws {
+    @Dependency(\.date.now) var now
+    @Dependency(\.defaultDatabase) var database
+    @Dependency(\.uuid) var uuid
+
+    let plan = ServeWithPlan().applyingEditableReviewText(text)
+    guard !plan.items.isEmpty else {
+      throw RecipeDetailError.emptyServeWithPlan
+    }
+
+    try database.write { db in
+      let recipe = try Recipe.find(recipeID).fetchOne(db)
+      let existingItems = ServeWithCoding.decode(recipe?.serveWith)
+      let updatedItems = reconciledServeWithItems(existingItems, with: plan.items) {
+        uuid()
+      }
+      let encodedItems = try ServeWithCoding.encode(updatedItems)
+
+      try Recipe.find(recipeID).update {
+        $0.serveWith = encodedItems
+        $0.dateModified = now
+      }
+      .execute(db)
+    }
+  }
+
+  func clearServeWithButtonTapped() {
+    @Dependency(\.date.now) var now
+    @Dependency(\.defaultDatabase) var database
+
+    do {
+      try database.write { db in
+        try Recipe.find(recipeID).update {
+          $0.serveWith = #bind(nil as Data?)
+          $0.dateModified = now
+        }
+        .execute(db)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  private func reconciledServeWithItems(
+    _ existingItems: [ServeWithItem],
+    with suggestions: [ServeWithSuggestion],
+    uuid: () -> UUID
+  ) -> [ServeWithItem] {
+    var unmatchedItems = existingItems
+
+    return suggestions.map { suggestion in
+      if let index = unmatchedItems.firstIndex(where: {
+        $0.title == suggestion.title && $0.note == suggestion.note
+      }) {
+        return unmatchedItems.remove(at: index)
+      }
+      return ServeWithItem(id: uuid(), title: suggestion.title, note: suggestion.note)
     }
   }
 }

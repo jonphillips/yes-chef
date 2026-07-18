@@ -12,6 +12,7 @@ struct RecipePlaybookView: View {
   @State private var isServeWithExpanded = true
   @State private var isEditingReaderFeedback = false
   @State private var readerFeedbackDrafts: [RecipeNote.ID: String] = [:]
+  @State private var editingSection: RecipePlaybookSection?
 
   var body: some View {
     let visibleNotes = model.visibleNotes
@@ -21,13 +22,13 @@ struct RecipePlaybookView: View {
     VStack(alignment: .leading, spacing: 18) {
       playbookHeader
       playbookSection(
-        "Make-ahead",
+        RecipePlaybookSection.makeAhead,
         isFilled: model.makeAhead != nil,
         isExpanded: $isMakeAheadExpanded
       ) {
         makeAheadContent(model.makeAhead)
       }
-      playbookSection(
+      notesSection(
         "Notes",
         isFilled: !visibleNotes.isEmpty,
         isExpanded: $isNotesExpanded
@@ -40,44 +41,37 @@ struct RecipePlaybookView: View {
         }
       }
       playbookSection(
-        "Chef It Up",
+        RecipePlaybookSection.chefItUp,
         isFilled: model.chefItUp != nil,
         isExpanded: $isChefItUpExpanded
       ) {
-        if let chefItUp = model.chefItUp {
-          chefItUpContent(chefItUp)
-        }
+        chefItUpContent(model.chefItUp)
       }
       playbookSection(
-        "Serve With",
+        RecipePlaybookSection.serveWith,
         isFilled: !model.serveWithItems.isEmpty,
         isExpanded: $isServeWithExpanded
       ) {
-        if !model.serveWithItems.isEmpty {
-          serveWithContent(model.serveWithItems)
-        }
+        serveWithContent(model.serveWithItems)
       }
+    }
+    .sheet(item: $editingSection) { section in
+      RecipePlaybookSectionEditorSheet(
+        section: section,
+        initialText: editableText(for: section),
+        commit: { text in
+          try commit(text, for: section)
+        },
+        clear: {
+          clear(section)
+        }
+      )
     }
   }
 
   private var playbookHeader: some View {
     HStack(alignment: .top, spacing: 12) {
-      // The ChatGPT hand-off round-trip: copy the prompt out, paste the reply back.
-      ViewThatFits(in: .horizontal) {
-        HStack(spacing: 8) {
-          handoffButton
-          pasteResultButton
-        }
-
-        VStack(alignment: .leading, spacing: 8) {
-          handoffButton
-          pasteResultButton
-        }
-      }
-
-      Spacer(minLength: 12)
-
-      // Ask (in-app) sits apart on the trailing edge, out of the copy/paste flow.
+      Spacer()
       askButton
     }
     .accessibilityElement(children: .contain)
@@ -90,9 +84,20 @@ struct RecipePlaybookView: View {
         await handoffTransport.copyPrompt(for: .recipe(model.recipeID))
       }
     } label: {
-      Label("Hand off to ChatGPT", systemImage: "sparkles.square.filled.on.square")
+      Label("Hand off", systemImage: "sparkles.square.filled.on.square")
     }
     .buttonStyle(.borderedProminent)
+  }
+
+  private var redoButton: some View {
+    Button {
+      Task {
+        await handoffTransport.copyPrompt(for: .recipe(model.recipeID))
+      }
+    } label: {
+      Label("Redo", systemImage: "sparkles.square.filled.on.square")
+    }
+    .buttonStyle(.bordered)
   }
 
   private var isAskActive: Bool {
@@ -121,11 +126,36 @@ struct RecipePlaybookView: View {
         await handoffTransport.pastedResultsReceived(results, source: .recipe(model.recipeID))
       }
     }
-    .accessibilityLabel("Paste handoff result")
+    .accessibilityLabel("Paste result into Make-ahead")
     .buttonStyle(.bordered)
   }
 
   private func playbookSection<Content: View>(
+    _ section: RecipePlaybookSection,
+    isFilled: Bool,
+    isExpanded: Binding<Bool>,
+    @ViewBuilder content: @escaping () -> Content
+  ) -> some View {
+    DisclosureGroup(isExpanded: isExpanded) {
+      VStack(alignment: .leading, spacing: 12) {
+        sectionToolbar(for: section, isFilled: isFilled)
+        content()
+      }
+        .padding(.top, 8)
+    } label: {
+      HStack {
+        Text(section.title)
+          .font(.title2.bold())
+        Spacer()
+        Image(systemName: isFilled ? "circle.fill" : "circle")
+          .foregroundStyle(isFilled ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+          .accessibilityLabel(Text(isFilled ? "Contains content" : "Empty"))
+      }
+    }
+    .accessibilityValue(Text(isFilled ? "Contains content" : "Empty"))
+  }
+
+  private func notesSection<Content: View>(
     _ title: String,
     isFilled: Bool,
     isExpanded: Binding<Bool>,
@@ -149,17 +179,6 @@ struct RecipePlaybookView: View {
 
   private func makeAheadContent(_ makeAhead: String?) -> some View {
     VStack(alignment: .leading, spacing: 12) {
-      HStack {
-        Spacer()
-        if makeAhead != nil {
-          Button(role: .destructive) {
-            model.clearMakeAheadButtonTapped()
-          } label: {
-            Label("Clear", systemImage: "xmark.circle")
-          }
-          .buttonStyle(.bordered)
-        }
-      }
       if let makeAhead {
         Text(makeAhead)
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -167,19 +186,12 @@ struct RecipePlaybookView: View {
     }
   }
 
-  private func chefItUpContent(_ chefItUp: String) -> some View {
+  private func chefItUpContent(_ chefItUp: String?) -> some View {
     VStack(alignment: .leading, spacing: 12) {
-      HStack {
-        Spacer()
-        Button(role: .destructive) {
-          model.clearChefItUpButtonTapped()
-        } label: {
-          Label("Clear", systemImage: "xmark.circle")
-        }
-        .buttonStyle(.bordered)
+      if let chefItUp {
+        Text(chefItUp)
+          .frame(maxWidth: .infinity, alignment: .leading)
       }
-      Text(chefItUp)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 
@@ -206,6 +218,115 @@ struct RecipePlaybookView: View {
           .accessibilityLabel(Text("Remove \(item.title)"))
         }
       }
+    }
+  }
+
+  @ViewBuilder
+  private func sectionToolbar(for section: RecipePlaybookSection, isFilled: Bool) -> some View {
+    HStack(spacing: 8) {
+      switch section {
+      case .makeAhead:
+        if isFilled {
+          editButton(for: section)
+          redoButton
+          Menu {
+            pasteResultButton
+            clearButton(for: section)
+          } label: {
+            Image(systemName: "ellipsis.circle")
+          }
+        } else {
+          handoffButton
+          pasteResultButton
+          Menu {
+            writeManuallyButton(for: section)
+            askMenuButton
+          } label: {
+            Image(systemName: "ellipsis.circle")
+          }
+        }
+      case .chefItUp, .serveWith:
+        if isFilled {
+          editButton(for: section)
+          Menu {
+            clearButton(for: section)
+          } label: {
+            Image(systemName: "ellipsis.circle")
+          }
+        } else {
+          Button(action: ask) {
+            Label("Ask", systemImage: "sparkles")
+          }
+          .buttonStyle(.borderedProminent)
+          Menu {
+            writeManuallyButton(for: section)
+          } label: {
+            Image(systemName: "ellipsis.circle")
+          }
+        }
+      }
+      Spacer(minLength: 0)
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel(Text("\(section.title) actions"))
+  }
+
+  private func editButton(for section: RecipePlaybookSection) -> some View {
+    Button("Edit") {
+      editingSection = section
+    }
+    .buttonStyle(.bordered)
+  }
+
+  private func writeManuallyButton(for section: RecipePlaybookSection) -> some View {
+    Button("Write manually") {
+      editingSection = section
+    }
+  }
+
+  private func clearButton(for section: RecipePlaybookSection) -> some View {
+    Button("Clear", role: .destructive) {
+      clear(section)
+    }
+  }
+
+  private var askMenuButton: some View {
+    Button("Ask", action: ask)
+  }
+
+  private func editableText(for section: RecipePlaybookSection) -> String {
+    switch section {
+    case .makeAhead:
+      model.makeAhead ?? ""
+    case .chefItUp:
+      model.chefItUp ?? ""
+    case .serveWith:
+      ServeWithPlan(
+        items: model.serveWithItems.map { ServeWithSuggestion(title: $0.title, note: $0.note) }
+      )
+      .editableReviewText()
+    }
+  }
+
+  private func commit(_ text: String, for section: RecipePlaybookSection) throws {
+    switch section {
+    case .makeAhead:
+      try model.commitMakeAheadText(text)
+    case .chefItUp:
+      try model.commitChefItUpText(text)
+    case .serveWith:
+      try model.commitServeWithText(text)
+    }
+  }
+
+  private func clear(_ section: RecipePlaybookSection) {
+    switch section {
+    case .makeAhead:
+      model.clearMakeAheadButtonTapped()
+    case .chefItUp:
+      model.clearChefItUpButtonTapped()
+    case .serveWith:
+      model.clearServeWithButtonTapped()
     }
   }
 
@@ -279,5 +400,108 @@ struct RecipePlaybookView: View {
       model.updateReaderFeedbackNote(note, text: draft)
     }
     readerFeedbackDrafts = [:]
+  }
+}
+
+private enum RecipePlaybookSection: String, Identifiable {
+  case makeAhead
+  case chefItUp
+  case serveWith
+
+  var id: Self { self }
+
+  var title: String {
+    switch self {
+    case .makeAhead:
+      "Make-ahead"
+    case .chefItUp:
+      "Chef It Up"
+    case .serveWith:
+      "Serve With"
+    }
+  }
+}
+
+private struct RecipePlaybookSectionEditorSheet: View {
+  let section: RecipePlaybookSection
+  let commit: (String) throws -> Void
+  let clear: () -> Void
+
+  @Environment(\.dismiss) private var dismiss
+  @State private var draftText: String
+  @State private var errorMessage: String?
+
+  init(
+    section: RecipePlaybookSection,
+    initialText: String,
+    commit: @escaping (String) throws -> Void,
+    clear: @escaping () -> Void
+  ) {
+    self.section = section
+    self.commit = commit
+    self.clear = clear
+    _draftText = State(initialValue: initialText)
+  }
+
+  var body: some View {
+    NavigationStack {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 12) {
+          Text("Review and edit this \(section.title) section before saving it.")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+
+          VStack(alignment: .leading, spacing: 6) {
+            Text(section.title)
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(.secondary)
+            TextEditor(text: $draftText)
+              .textInputAutocapitalization(.sentences)
+              .autocorrectionDisabled(false)
+              .frame(minHeight: 320)
+          }
+        }
+        .padding()
+      }
+      .safeAreaPadding(.bottom)
+      .scrollDismissesKeyboard(.interactively)
+      .navigationTitle("Edit \(section.title)")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancel") { dismiss() }
+        }
+        ToolbarItem(placement: .topBarLeading) {
+          Button("Clear", role: .destructive) {
+            clear()
+            dismiss()
+          }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Save") {
+            save()
+          }
+          .disabled(draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+      }
+    }
+    .alert("Could Not Save \(section.title)", isPresented: Binding(
+      get: { errorMessage != nil },
+      set: { if !$0 { errorMessage = nil } }
+    )) {
+      Button("OK") {}
+    } message: {
+      Text(errorMessage ?? "Something went wrong.")
+    }
+    .presentationDetents([.medium, .large])
+  }
+
+  private func save() {
+    do {
+      try commit(draftText)
+      dismiss()
+    } catch {
+      errorMessage = String(describing: error)
+    }
   }
 }

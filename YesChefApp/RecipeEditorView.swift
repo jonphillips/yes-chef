@@ -54,22 +54,6 @@ struct RecipeEditorView: View {
         }
       }
 
-      Section("Make-Ahead") {
-        StackedTextEditor(
-          title: "Make-Ahead",
-          text: $model.draft.makeAhead,
-          minHeight: 120
-        )
-      }
-
-      Section("Chef It Up") {
-        StackedTextEditor(
-          title: "Chef It Up",
-          text: $model.draft.chefItUp,
-          minHeight: 120
-        )
-      }
-
       Section("Organization") {
         Picker("Library", selection: $model.draft.libraryPlacement) {
           ForEach(RecipeLibraryPlacement.allCases, id: \.self) { placement in
