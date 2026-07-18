@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 import UniformTypeIdentifiers
 import YesChefCore
 
@@ -307,7 +306,7 @@ struct MenuDetailView: View {
   }
 
   private var usesToolOverlay: Bool {
-    UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass != .compact
+    WideLayout.isEnabled(horizontalSizeClass: horizontalSizeClass)
   }
 
   private var cookSessionPresentation: CookSessionPresentation? {

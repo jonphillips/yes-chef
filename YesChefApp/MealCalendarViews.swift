@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 import YesChefCore
 
 struct MealCalendarStack: View {
@@ -340,8 +339,7 @@ struct MealCalendarDayAgendaView: View {
 
   private var isSplitEnabled: Bool {
     allowsChatWorkspace
-      && UIDevice.current.userInterfaceIdiom == .pad
-      && horizontalSizeClass != .compact
+      && WideLayout.isEnabled(horizontalSizeClass: horizontalSizeClass)
   }
 
   private var chatContextIdentity: String {

@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftUINavigation
-import UIKit
 import YesChefCore
 
 struct RecipeDetailView: View {
@@ -89,7 +88,7 @@ struct RecipeDetailView: View {
   }
 
   private var isSplitEnabled: Bool {
-    UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass != .compact
+    WideLayout.isEnabled(horizontalSizeClass: horizontalSizeClass)
   }
 
   @ToolbarContentBuilder

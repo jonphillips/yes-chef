@@ -1,6 +1,5 @@
 import LLMClientKit
 import SwiftUI
-import UIKit
 import YesChefCore
 
 struct WorkbenchesStack: View {
@@ -327,7 +326,7 @@ struct WorkbenchDetailView: View {
   }
 
   private var isSplitEnabled: Bool {
-    UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass != .compact
+    WideLayout.isEnabled(horizontalSizeClass: horizontalSizeClass)
   }
 }
 
