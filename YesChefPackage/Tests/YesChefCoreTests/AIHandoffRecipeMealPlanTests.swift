@@ -28,6 +28,25 @@ extension AIHandoffTests {
   }
 
   @Test
+  func recipeContextOmitsCurrentMakeAheadWhenRegeneratingFresh() {
+    let context = RecipeChatRecipeContext(
+      title: "Chili",
+      makeAhead: "Make the sauce two days ahead.",
+      learnings: ["Salt the beans early."]
+    )
+
+    // Default (in-app chat) keeps current state so the assistant sees it.
+    let refining = context.serialized()
+    #expect(refining.contains("Current make-ahead section:"))
+    #expect(refining.contains("Make the sauce two days ahead."))
+
+    // The make-ahead hand-off regenerates fresh — the current make-ahead must not bias it.
+    let fresh = context.serialized(includingCurrentMakeAhead: false)
+    #expect(!fresh.contains("Current make-ahead section:"))
+    #expect(!fresh.contains("Make the sauce two days ahead."))
+  }
+
+  @Test
   func mealPlanHandoffContextKeepsMethodsAndAllIngredients() {
     let recipeID = SampleUUIDSequence.uuid(38_037)
     let now = Date(timeIntervalSinceReferenceDate: 840_000_000)

@@ -77,5 +77,59 @@ extension AIHandoffTests {
         )
       }
     }
+
+    @Test
+    func insertNewSkipsExactDuplicatesAgainstStoredAndWithinBatch() throws {
+      @Dependency(\.defaultDatabase) var database
+      let recipeID = SampleUUIDSequence.uuid(38_050)
+      let storedDate = Date(timeIntervalSinceReferenceDate: 840_000_000)
+      let now = storedDate.addingTimeInterval(60)
+      var nextID = 38_060
+      let uuid: () -> UUID = {
+        defer { nextID += 1 }
+        return SampleUUIDSequence.uuid(nextID)
+      }
+
+      try database.write { db in
+        try LearningRepository.create(
+          Learning(
+            id: SampleUUIDSequence.uuid(38_051),
+            sourceType: .recipe,
+            sourceID: recipeID,
+            text: "Salt the beans early.",
+            provenance: .externalHandoff,
+            dateCreated: storedDate,
+            dateModified: storedDate
+          ),
+          in: db
+        )
+      }
+
+      var inserted = 0
+      try database.write { db in
+        inserted = try LearningRepository.insertNew(
+          texts: [
+            "salt the beans early.",      // case-only variant of the stored learning → skipped
+            "Toast  dried  chiles.",      // new; original spacing preserved on insert
+            "Toast dried chiles.",        // whitespace-only variant of the prior line → skipped
+            "Finish with lime.",          // new
+          ],
+          sourceType: .recipe,
+          sourceID: recipeID,
+          provenance: .externalHandoff,
+          in: db,
+          now: now,
+          uuid: uuid
+        )
+      }
+
+      #expect(inserted == 2)
+      try database.read { db in
+        expectNoDifference(
+          Set(try LearningRepository.learnings(sourceType: .recipe, sourceID: recipeID, in: db).map(\.text)),
+          ["Salt the beans early.", "Toast  dried  chiles.", "Finish with lime."]
+        )
+      }
+    }
   }
 }
