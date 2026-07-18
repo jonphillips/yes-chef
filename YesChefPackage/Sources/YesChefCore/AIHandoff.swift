@@ -98,6 +98,51 @@ public enum LearningRepository {
     try Learning.insert { learning }.execute(db)
   }
 
+  /// Inserts only the `texts` whose normalized form is not already stored for `(sourceType, sourceID)`,
+  /// also collapsing exact duplicates within the incoming batch. A deterministic exact-match floor against
+  /// the append-only dupes ADR-0038 Amd 4 describes — it does not catch paraphrases. Returns the count
+  /// actually inserted.
+  @discardableResult
+  public static func insertNew(
+    texts: [String],
+    sourceType: AIHandoffSourceType,
+    sourceID: UUID,
+    provenance: LearningProvenance,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> Int {
+    let existing = try learnings(sourceType: sourceType, sourceID: sourceID, in: db)
+    var seen = Set(existing.map { normalizedLearningText($0.text) })
+    var inserted = 0
+    for text in texts {
+      let key = normalizedLearningText(text)
+      guard !key.isEmpty, seen.insert(key).inserted else { continue }
+      try create(
+        Learning(
+          id: uuid(),
+          sourceType: sourceType,
+          sourceID: sourceID,
+          text: text,
+          provenance: provenance,
+          dateCreated: now,
+          dateModified: now
+        ),
+        in: db
+      )
+      inserted += 1
+    }
+    return inserted
+  }
+
+  static func normalizedLearningText(_ text: String) -> String {
+    text
+      .lowercased()
+      .components(separatedBy: .whitespacesAndNewlines)
+      .filter { !$0.isEmpty }
+      .joined(separator: " ")
+  }
+
   public static func learnings(
     sourceType: AIHandoffSourceType,
     sourceID: UUID,

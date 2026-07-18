@@ -242,20 +242,17 @@ final class HandoffReviewCoordinator {
     let learnings = AIHandoffReturn.learningBullets(from: approvedText)
     guard !learnings.isEmpty else { throw HandoffReviewError.emptyLearnings }
     try database.write { db in
-      for text in learnings {
-        try LearningRepository.create(
-          Learning(
-            id: uuid(),
-            sourceType: sourceType,
-            sourceID: sourceID,
-            text: text,
-            provenance: .externalHandoff,
-            dateCreated: now,
-            dateModified: now
-          ),
-          in: db
-        )
-      }
+      // Exact-dedup on ingest against what's already stored (ADR-0038 Amd 4). All-duplicate commits
+      // insert nothing and succeed — the review item is still consumed.
+      try LearningRepository.insertNew(
+        texts: learnings,
+        sourceType: sourceType,
+        sourceID: sourceID,
+        provenance: .externalHandoff,
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
     }
   }
 
