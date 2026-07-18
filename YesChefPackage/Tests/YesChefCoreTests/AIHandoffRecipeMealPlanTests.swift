@@ -40,10 +40,30 @@ extension AIHandoffTests {
     #expect(refining.contains("Current make-ahead section:"))
     #expect(refining.contains("Make the sauce two days ahead."))
 
-    // The make-ahead hand-off regenerates fresh — the current make-ahead must not bias it.
-    let fresh = context.serialized(includingCurrentMakeAhead: false)
+    // A section hand-off regenerates fresh — no existing Playbook section can bias the response.
+    let fresh = context.serialized(excludingPlaybookSections: Set(PlaybookSectionKind.allCases))
     #expect(!fresh.contains("Current make-ahead section:"))
     #expect(!fresh.contains("Make the sauce two days ahead."))
+  }
+
+  @Test
+  func sectionHandoffPromptsAreScopedAndServeWithPinsItsEditableFormat() {
+    let context = RecipeHandoffContext(recipe: RecipeChatRecipeContext(
+      title: "Chili",
+      makeAhead: "Current make-ahead note",
+      chefItUp: "Current Chef It Up note",
+      serveWith: [ServeWithItem(id: SampleUUIDSequence.uuid(38_041), title: "Current side")]
+    ))
+
+    let chefItUp = context.prompt(for: .chefItUp)
+    let serveWith = context.prompt(for: .serveWith)
+
+    #expect(chefItUp.contains("Chef It Up preferences:"))
+    #expect(!chefItUp.contains("Current make-ahead note"))
+    #expect(!chefItUp.contains("Current Chef It Up note"))
+    #expect(!chefItUp.contains("Current side"))
+    #expect(serveWith.contains("exactly as `title: note`"))
+    #expect(serveWith.contains("Do not use bullets, Markdown emphasis, an introduction"))
   }
 
   @Test
@@ -127,6 +147,50 @@ extension AIHandoffTests {
       )
       expectNoDifference(recipeReview.learnings, ["Birria improves after resting overnight."])
       #expect(try Recipe.find(recipeID).fetchOne(db)?.makeAhead == nil)
+    }
+  }
+
+  @Test
+  func chefItUpTokenCannotMatchOrStageAMakeAheadReview() throws {
+    @Dependency(\.defaultDatabase) var database
+    let recipeID = SampleUUIDSequence.uuid(38_042)
+    let chefItUpHandoffID = SampleUUIDSequence.uuid(38_043)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Recipe.insert {
+        Recipe(id: recipeID, title: "Birria", dateCreated: now, dateModified: now)
+      }
+      .execute(db)
+      let handoff = AIHandoff(
+        id: chefItUpHandoffID,
+        sourceType: .recipe,
+        sourceID: recipeID,
+        taskType: .chefItUp,
+        createdAt: now,
+        exportedPrompt: "YC-HANDOFF: \(chefItUpHandoffID.uuidString)"
+      )
+      try AIHandoffRepository.create(handoff, in: db)
+
+      #expect(!handoff.matches(sourceType: .recipe, sourceID: recipeID, taskType: .recipeMakeAhead))
+      #expect(handoff.matches(sourceType: .recipe, sourceID: recipeID, taskType: .chefItUp))
+
+      let review = try AIHandoffIntentImport.stageReview(
+        handoffID: chefItUpHandoffID,
+        result: """
+        YC-HANDOFF: \(chefItUpHandoffID.uuidString)
+        Bloom the chiles in oil before blending the sauce.
+        """,
+        in: db,
+        now: now
+      )
+
+      guard case let .recipeChefItUp(sectionReview) = review else {
+        Issue.record("A Chef It Up token must not stage a Make-ahead review.")
+        return
+      }
+      expectNoDifference(sectionReview.section, .chefItUp)
+      expectNoDifference(sectionReview.text, "Bloom the chiles in oil before blending the sauce.")
     }
   }
 

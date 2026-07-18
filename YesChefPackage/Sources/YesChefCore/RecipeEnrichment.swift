@@ -53,11 +53,17 @@ public struct ServeWithPlan: Equatable, Sendable {
 
   private static func suggestion(fromEditableReviewLine line: String) -> ServeWithSuggestion? {
     let pieces = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
-    guard let title = String(pieces[0]).cleanedEnrichmentText else { return nil }
+    guard let title = String(pieces[0]).removingMarkdownEmphasis.cleanedEnrichmentText else { return nil }
     return ServeWithSuggestion(
       title: title,
       note: pieces.count > 1 ? String(pieces[1]).cleanedEnrichmentText : nil
     )
+  }
+}
+
+private extension String {
+  var removingMarkdownEmphasis: String {
+    replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "*", with: "")
   }
 }
 

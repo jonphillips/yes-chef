@@ -27,6 +27,10 @@ final class HandoffReviewCoordinator {
       menuPrepPlanReviewItems(for: review)
     case let .recipeMakeAhead(review):
       recipeMakeAheadReviewItems(for: review)
+    case let .recipeChefItUp(review):
+      recipeChefItUpReviewItems(for: review)
+    case let .recipeServeWith(review):
+      recipeServeWithReviewItems(for: review)
     case let .mealPlanMakeAhead(review):
       mealPlanMakeAheadReviewItems(for: review)
     }
@@ -110,6 +114,70 @@ final class HandoffReviewCoordinator {
           learnings: review.learnings
         )
       )
+    }
+    return items
+  }
+
+  private func recipeChefItUpReviewItems(
+    for review: AIHandoffRecipeSectionReview
+  ) -> [ChatApplyReviewItem] {
+    var items: [ChatApplyReviewItem] = []
+    if !review.text.isEmpty {
+      items.append(
+        ChatApplyReviewItem(
+          id: review.handoffID,
+          title: "Review Chef It Up",
+          summary: review.text,
+          presentation: .sheet,
+          editableTitle: "Chef It Up",
+          editableText: review.text,
+          commitTitle: "Save Chef It Up",
+          committingTitle: "Saving Chef It Up…",
+          committedTitle: "Saved Chef It Up",
+          commit: { [weak self] approvedText in
+            try self?.commitRecipeChefItUp(review, approvedText: approvedText)
+          }
+        )
+      )
+    }
+    if !review.learnings.isEmpty {
+      items.append(learningsReviewItem(
+        sourceType: .recipe,
+        sourceID: review.recipeID,
+        learnings: review.learnings
+      ))
+    }
+    return items
+  }
+
+  private func recipeServeWithReviewItems(
+    for review: AIHandoffRecipeSectionReview
+  ) -> [ChatApplyReviewItem] {
+    var items: [ChatApplyReviewItem] = []
+    if !review.text.isEmpty {
+      items.append(
+        ChatApplyReviewItem(
+          id: review.handoffID,
+          title: "Review Serve With",
+          summary: review.text,
+          presentation: .sheet,
+          editableTitle: "Serve With",
+          editableText: review.text,
+          commitTitle: "Save Serve With",
+          committingTitle: "Saving Serve With…",
+          committedTitle: "Saved Serve With",
+          commit: { [weak self] approvedText in
+            try self?.commitRecipeServeWith(review, approvedText: approvedText)
+          }
+        )
+      )
+    }
+    if !review.learnings.isEmpty {
+      items.append(learningsReviewItem(
+        sourceType: .recipe,
+        sourceID: review.recipeID,
+        learnings: review.learnings
+      ))
     }
     return items
   }
@@ -214,6 +282,34 @@ final class HandoffReviewCoordinator {
     }
   }
 
+  private func commitRecipeChefItUp(
+    _ review: AIHandoffRecipeSectionReview,
+    approvedText: String
+  ) throws {
+    let chefItUp = approvedText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !chefItUp.isEmpty else { throw HandoffReviewError.emptyDeliverable }
+    try database.write { db in
+      try RecipeRepository.updateChefItUp(chefItUp, recipeID: review.recipeID, in: db, now: now)
+    }
+  }
+
+  private func commitRecipeServeWith(
+    _ review: AIHandoffRecipeSectionReview,
+    approvedText: String
+  ) throws {
+    let plan = ServeWithPlan().applyingEditableReviewText(approvedText)
+    guard !plan.items.isEmpty else { throw HandoffReviewError.emptyDeliverable }
+    try database.write { db in
+      try RecipeRepository.replaceServeWithPlan(
+        plan,
+        recipeID: review.recipeID,
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
+    }
+  }
+
   private func commitMealPlanMakeAhead(
     _ review: AIHandoffMealPlanMakeAheadReview,
     approvedText: String
@@ -223,7 +319,7 @@ final class HandoffReviewCoordinator {
       throw HandoffReviewError.unparsedStrategyText(parsed.unparsedLines)
     }
     guard !parsed.strategy.steps.isEmpty else { throw HandoffReviewError.emptyDeliverable }
-    try database.write { db in
+    _ = try database.write { db in
       try MealCalendarRepository.addMakeAheadStrategyNote(
         parsed.strategy,
         on: review.scheduledDate,
@@ -241,7 +337,7 @@ final class HandoffReviewCoordinator {
   ) throws {
     let learnings = AIHandoffReturn.learningBullets(from: approvedText)
     guard !learnings.isEmpty else { throw HandoffReviewError.emptyLearnings }
-    try database.write { db in
+    _ = try database.write { db in
       // Exact-dedup on ingest against what's already stored (ADR-0038 Amd 4). All-duplicate commits
       // insert nothing and succeed — the review item is still consumed.
       try LearningRepository.insertNew(

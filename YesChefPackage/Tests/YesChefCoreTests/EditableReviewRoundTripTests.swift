@@ -54,6 +54,18 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func serveWithParserStripsMarkdownEmphasisFromTheTitle() {
+      let parsed = ServeWithPlan().applyingEditableReviewText("**Cilantro-lime rice**: Finish with lime.")
+
+      expectNoDifference(
+        parsed,
+        ServeWithPlan(items: [
+          ServeWithSuggestion(title: "Cilantro-lime rice", note: "Finish with lime.")
+        ])
+      )
+    }
+
+    @Test
     @MainActor
     func unchangedEditableSummaryCommitsOriginalPayloadWithoutReparsing() async throws {
       let plan = ServeWithPlan(

@@ -131,13 +131,13 @@ struct HandoffAppShortcuts: AppShortcutsProvider {
 }
 
 enum HandoffExportSource: Sendable {
-  case recipe(Recipe.ID)
+  case recipeSection(Recipe.ID, PlaybookSectionKind)
   case menu(Menu.ID)
   case mealPlan(MealPlanItem.ID)
 
   init(_ source: HandoffSource) {
     switch source {
-    case let .recipe(recipe): self = .recipe(recipe.id)
+    case let .recipe(recipe): self = .recipeSection(recipe.id, .makeAhead)
     case let .menu(menu): self = .menu(menu.id)
     case let .mealPlan(mealPlan): self = .mealPlan(mealPlan.id)
     }
@@ -153,8 +153,8 @@ extension HandoffExportSource {
 
   var metadata: Metadata {
     switch self {
-    case let .recipe(recipeID):
-      Metadata(sourceType: .recipe, sourceID: recipeID, taskType: .recipeMakeAhead)
+    case let .recipeSection(recipeID, section):
+      Metadata(sourceType: .recipe, sourceID: recipeID, taskType: section.handoffTaskType)
     case let .menu(menuID):
       Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan)
     case let .mealPlan(mealPlanID):
@@ -164,7 +164,7 @@ extension HandoffExportSource {
 
   var unmatchedSubject: String {
     switch self {
-    case .recipe: "recipe"
+    case .recipeSection: "recipe section"
     case .menu: "menu"
     case .mealPlan: "meal-plan day"
     }
@@ -172,8 +172,21 @@ extension HandoffExportSource {
 
   func matches(_ handoff: AIHandoff) -> Bool {
     let metadata = self.metadata
-    return handoff.sourceType == metadata.sourceType
-      && handoff.sourceID == metadata.sourceID
+    return handoff.matches(
+      sourceType: metadata.sourceType,
+      sourceID: metadata.sourceID,
+      taskType: metadata.taskType
+    )
+  }
+}
+
+private extension PlaybookSectionKind {
+  var deliverableFormat: AIHandoffToken.DeliverableFormat {
+    switch self {
+    case .makeAhead: .recipeMakeAhead
+    case .chefItUp: .recipeChefItUp
+    case .serveWith: .recipeServeWith
+    }
   }
 }
 
@@ -211,7 +224,7 @@ enum HandoffAppOperations {
       )
       externalProjectName = detail.menu.externalProjectName
 
-    case let .recipe(recipeID):
+    case let .recipeSection(recipeID, section):
       guard let detail = try await database.read({ db in
         try RecipeDetailRequest(recipeID: recipeID).fetch(db)
       }) else {
@@ -219,9 +232,9 @@ enum HandoffAppOperations {
       }
       let prompt = AIHandoffToken.prompt(
         handoffID: handoffID,
-        context: RecipeHandoffContext(detail: detail).makeAheadPrompt(),
+        context: RecipeHandoffContext(detail: detail).prompt(for: section),
         mode: mode,
-        deliverableFormat: .recipeMakeAhead
+        deliverableFormat: section.deliverableFormat
       )
       handoff = AIHandoff(
         id: handoffID,
