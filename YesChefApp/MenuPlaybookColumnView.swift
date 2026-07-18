@@ -174,7 +174,7 @@ struct MenuDetailReader: View {
         reorderStep: detailModel.reorderPrepPlanStep,
         isInitiallyExpanded: true
       )
-      MenuLearningsSection(
+      LearningsSection(
         learnings: detail.learnings,
         updateLearning: detailModel.updateLearning,
         deleteLearning: detailModel.deleteLearning

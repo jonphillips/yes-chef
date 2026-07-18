@@ -193,18 +193,12 @@ public struct MenuDetailRequest: FetchKeyRequest {
         return $0.dateCreated < $1.dateCreated
       }
 
-    let learningStatement = Learning
-      .where { learnings in learnings.sourceType.eq(AIHandoffSourceType.menu) }
-      .where { learnings in learnings.sourceID.eq(menuID) }
-    var learnings = try learningStatement.fetchAll(db)
-    learnings.sort(by: areLearningsInDescendingOrder)
-
     return MenuDetailData(
       menu: menu,
       itemRows: itemRows,
       placements: placements,
       prepPlanSteps: try PrepPlanStepRepository.steps(for: menuID, in: db),
-      learnings: learnings
+      learnings: try LearningRepository.learnings(sourceType: .menu, sourceID: menuID, in: db)
     )
   }
 }
@@ -276,11 +270,6 @@ private func isInstructionStepInIncreasingOrder(
 ) -> Bool {
   if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
   return lhs.id.uuidString < rhs.id.uuidString
-}
-
-private func areLearningsInDescendingOrder(_ lhs: Learning, _ rhs: Learning) -> Bool {
-  if lhs.dateCreated != rhs.dateCreated { return lhs.dateCreated > rhs.dateCreated }
-  return lhs.id.uuidString > rhs.id.uuidString
 }
 
 @Selection

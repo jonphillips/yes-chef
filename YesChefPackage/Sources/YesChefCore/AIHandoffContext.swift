@@ -12,14 +12,31 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     @Dependency(\.aiPromptPreferences) var preferences
     let settings = preferences.current()
     return Self.makeAheadPrompt(
-      context: bounded(recipe.serialized()),
+      // Omit the current make-ahead: a re-hand-off regenerates fresh rather than refining its own prior
+      // output (ADR-0038 Amd 4 / ADR-0041). Existing learnings are surfaced instead, to steer against dupes.
+      context: bounded(recipe.serialized(includingCurrentMakeAhead: false)),
+      knownLearnings: Self.knownLearningsBlock(recipe.learnings),
       tasteProfile: settings.tasteProfile,
       makeAheadPreference: AISettingsRepository.preference(in: settings, for: .makeAheadPrepPlan)
     )
   }
 
+  private static func knownLearningsBlock(_ learnings: [String]) -> String {
+    let items = learnings
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+    guard !items.isEmpty else { return "" }
+    return """
+
+    Already-captured learnings for this recipe — do NOT repeat these; in the learnings section return only \
+    genuinely new, durable learnings established this session that are not already listed:
+    \(items.map { "- \($0)" }.joined(separator: "\n"))
+    """
+  }
+
   private static func makeAheadPrompt(
     context: String,
+    knownLearnings: String,
     tasteProfile: String,
     makeAheadPreference: String
   ) -> String {
@@ -36,7 +53,7 @@ public struct RecipeHandoffContext: Equatable, Sendable {
 
     The return must be plain, paste-ready review text — not JSON — because the cook reviews and edits it in
     Yes Chef before it is saved.
-
+    \(knownLearnings)
     \(context)
     """
   }

@@ -180,6 +180,34 @@ extension RecipeDetailModel {
     }
   }
 
+  func updateLearning(_ learning: Learning, text: String) {
+    let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else {
+      errorMessage = "A learning can't be blank."
+      isShowingError = true
+      return
+    }
+    do {
+      try database.write { db in
+        try LearningRepository.update(id: learning.id, text: text, in: db, now: now)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func deleteLearning(_ id: Learning.ID) {
+    do {
+      try database.write { db in
+        try LearningRepository.delete(id: id, in: db)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
   private func commitMakeAheadPlan(_ plan: MakeAheadPlan) throws {
     @Dependency(\.date.now) var now
     @Dependency(\.defaultDatabase) var database
