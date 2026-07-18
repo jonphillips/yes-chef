@@ -154,6 +154,67 @@ empty-state hint), and is **never** stamped on per-section buttons. This is also
 mean flipping providers never re-strings the column. The live code string to change is the whole-recipe
 `Hand off to ChatGPT` label (`RecipePlaybookView.swift:93`).
 
+## Amendment 1 — a return never stomps existing content, and the toolbar collapses into the overflow (2026-07-18)
+
+Two findings from the S2 review (PR #205) + Jon's device look at the shipped column. Both are corrections to
+D2/S2 as built, not new scope.
+
+### Amd1-D1 — A section return is **merge-or-choose**, never a silent replace
+
+**The defect.** S2 pairs two decisions that are individually right and jointly lossy. Outbound, a section
+hand-off **excludes the current section** so it regenerates fresh ([[handoff-stateless-both-directions]]) —
+so the model *cannot* echo your existing content back. Inbound, the commit **replaces wholesale**
+(`updateChefItUp` / `commitMakeAheadText` for the blobs; `replaceServeWithPlan` for the list, which drops
+every row absent from the return). Fresh-out + replace-in means a `Hand off again` on a **filled** section
+silently discards hand-authored content. Serve With is the worst case: whole user-curated rows vanish.
+
+**The fix belongs on the return side.** Do *not* solve it by putting the current section back in the prompt —
+that reverses the regenerate-fresh rule for the wrong reason. Refinement belongs in the live chat.
+
+- **List sections (Serve With) — lossless union prefill.** The review sheet's `editableText` is seeded with
+  **existing lines first, then returned lines**, exact-dedup on `title: note`. The human deletes what they
+  don't want; nothing is lost unless they delete it. `reconciledServeWithItems`
+  (`RecipeEnrichment.swift:310`) already matches on `title == && note ==`, so surviving rows **keep their
+  existing UUIDs** — no row churn, no sync thrash. Replace-on-commit stays the only write path; it is simply
+  no longer lossy, because the box now starts out containing everything.
+- **Blob sections (Make-ahead, Chef It Up) — an explicit commit choice, no default.** Two prose blobs cannot
+  be unioned meaningfully, and concatenating two make-ahead plans is a mess to edit. On an **empty** section
+  the commit is just *Save*. On a **filled** section the review item offers **Replace** *and* **Append**,
+  with **no pre-selected default** — the human picks. This is the one place a section commit is destructive,
+  so it is the one place we make the destruction an explicit act.
+- **Both — show what's at risk.** `ChatApplyReviewItem` already carries `supportingEvidenceTitle` /
+  `supportingEvidenceRows` (`RecipeChat.swift:603`), unused on this path. Populate them with the section's
+  current content under *"Currently saved."* Surfacing the stakes in the review sheet is what would have
+  made this visible before it was a defect.
+
+Governed by [ADR-0040](ADR-0040-editable-at-the-grain-it-is-stored.md): the list section merges **at row
+grain** because that is the grain it is stored at; the blob sections cannot merge and therefore must **ask**
+rather than guess.
+
+### Amd1-D2 — The section toolbar collapses into a single `•••`; this **supersedes D2**
+
+**D2 is reversed on prominence.** D2 made *Hand off* a prominent, filled-tint primary in the empty state to
+honor external-first. On device that renders as three sections each showing two filled buttons — the column
+shouts on **every view** for actions taken a few times a week. Jon's rule decides it: *these buttons are
+viewed far more often than they are clicked.* The calm column outranks the nudge; you already know the verb
+exists.
+
+- **Every section action lives in one `•••` menu** — Hand off, Paste, Edit / Write manually, Ask, Clear.
+  The button row is **removed entirely** (reclaiming its vertical space).
+- **The `•••` moves into the section header row**, right of the fill-dot: `Chef It Up ○ ••• ⌄`. It renders
+  **only when the section is expanded** — collapsed sections keep D2's `title + fill-dot + chevron` calm.
+- **`PasteButton` is retired here, and this is a real trade.** `PasteButton` is a system-rendered
+  `UIPasteControl`; its whole bargain is *implicit* pasteboard access with no permission alert, which Apple
+  grants only for a control the user visibly and unambiguously taps. **It therefore cannot render inside a
+  `Menu`** — that is precisely what the API is designed to prevent. Paste becomes a plain `Button` reading
+  `UIPasteboard.general.string`, which raises the system *"Allow Paste?"* alert. **Accepted by Jon
+  (2026-07-18):** the grant is scoped to the current pasteboard contents, so it is roughly **one alert per
+  hand-off round-trip**, not per tap — one extra tap on a weekly action, in exchange for removing a cost paid
+  on every view. Gate the row on `UIPasteboard.general.hasStrings` (which does **not** prompt) so it is
+  disabled when there is nothing to paste.
+
+The [[automation-decays-near-the-stove]] restraint D2 claimed is what Amd1-D2 actually delivers.
+
 ## Deferred (on the record, explicitly not built here)
 
 - **Menu Playbook sections** ([ADR-0039 Amd 2/3](ADR-0039-playbook-column-thinking-vs-doing.md) — the shared
@@ -194,6 +255,10 @@ the synced meta table. Sequenced so the IA lands first on existing content and s
   (**OQ3 resolved** — pin the `title: note` format in the outbound prompt, strip `**`/`*` emphasis from the
   parsed title, else unchanged); wire any harvest verb with `requiresSubject:false`
   ([[harvest-verb-requires-subject-false]]).
+- **S2.5 — non-destructive returns + the collapsed toolbar (app + core, no schema).** Amendment 1: the
+  Serve With union prefill, the blob Replace/Append choice, `supportingEvidenceRows` showing what's at risk,
+  and the D2-superseding collapse of every section action into one header `•••` (retiring `PasteButton`).
+  Follows S2's merge; independent of S3.
 - **S3 — the synced section meta + the conversation URL (schema + app).** `PlaybookSectionMeta` table +
   migration + sync-set; the `conversationURL` field in the review sheet *and* the edit sheet; the
   **"Reopen in ChatGPT"** deep-link; refine ADR-0038 Amd 3. **Gated on the same live-`/c/`-link device
