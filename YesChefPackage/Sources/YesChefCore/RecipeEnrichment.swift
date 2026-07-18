@@ -273,6 +273,19 @@ extension RecipeRepository {
     try updateServeWith(items, recipeID: recipeID, in: db, now: now)
   }
 
+  public static func replaceServeWithPlan(
+    _ plan: ServeWithPlan,
+    recipeID: Recipe.ID,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws {
+    let recipe = try Recipe.find(recipeID).fetchOne(db)
+    let existingItems = ServeWithCoding.decode(recipe?.serveWith)
+    let items = reconciledServeWithItems(existingItems, with: plan.items, uuid: uuid)
+    try updateServeWith(items, recipeID: recipeID, in: db, now: now)
+  }
+
   public static func removeServeWithItem(
     _ itemID: ServeWithItem.ID,
     recipeID: Recipe.ID,
@@ -282,6 +295,27 @@ extension RecipeRepository {
     let recipe = try Recipe.find(recipeID).fetchOne(db)
     let items = ServeWithCoding.decode(recipe?.serveWith).filter { $0.id != itemID }
     try updateServeWith(items, recipeID: recipeID, in: db, now: now)
+  }
+
+  public static func clearServeWith(recipeID: Recipe.ID, in db: Database, now: Date) throws {
+    try updateServeWith([], recipeID: recipeID, in: db, now: now)
+  }
+
+  private static func reconciledServeWithItems(
+    _ existingItems: [ServeWithItem],
+    with suggestions: [ServeWithSuggestion],
+    uuid: () -> UUID
+  ) -> [ServeWithItem] {
+    var unmatchedItems = existingItems
+
+    return suggestions.map { suggestion in
+      if let index = unmatchedItems.firstIndex(where: {
+        $0.title == suggestion.title && $0.note == suggestion.note
+      }) {
+        return unmatchedItems.remove(at: index)
+      }
+      return ServeWithItem(id: uuid(), title: suggestion.title, note: suggestion.note)
+    }
   }
 
   private static func updateServeWith(

@@ -192,7 +192,7 @@ extension RecipeDetailModel {
     }
   }
 
-  private func commitMakeAheadText(_ text: String) throws {
+  func commitMakeAheadText(_ text: String) throws {
     @Dependency(\.date.now) var now
     @Dependency(\.defaultDatabase) var database
 
@@ -217,7 +217,7 @@ extension RecipeDetailModel {
     }
   }
 
-  private func commitChefItUpText(_ text: String) throws {
+  func commitChefItUpText(_ text: String) throws {
     @Dependency(\.date.now) var now
     @Dependency(\.defaultDatabase) var database
 
@@ -265,6 +265,42 @@ extension RecipeDetailModel {
       }
     }
   }
+
+  func commitServeWithText(_ text: String) throws {
+    @Dependency(\.date.now) var now
+    @Dependency(\.defaultDatabase) var database
+    @Dependency(\.uuid) var uuid
+
+    let plan = ServeWithPlan().applyingEditableReviewText(text)
+    guard !plan.items.isEmpty else {
+      throw RecipeDetailError.emptyServeWithPlan
+    }
+
+    try database.write { db in
+      try RecipeRepository.replaceServeWithPlan(
+        plan,
+        recipeID: recipeID,
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
+    }
+  }
+
+  func clearServeWithButtonTapped() {
+    @Dependency(\.date.now) var now
+    @Dependency(\.defaultDatabase) var database
+
+    do {
+      try database.write { db in
+        try RecipeRepository.clearServeWith(recipeID: recipeID, in: db, now: now)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
 }
 
 private enum RecipeDetailError: Error, CustomStringConvertible, LocalizedError {
