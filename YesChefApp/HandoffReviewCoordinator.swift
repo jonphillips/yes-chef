@@ -89,7 +89,7 @@ final class HandoffReviewCoordinator {
   ) -> [ChatApplyReviewItem] {
     var items: [ChatApplyReviewItem] = []
     if !review.makeAhead.isEmpty {
-      let currentMakeAhead = review.currentMakeAhead?.nonEmpty
+      let currentMakeAhead = review.currentMakeAhead.flatMap(Self.nonEmpty)
       items.append(
         ChatApplyReviewItem(
           id: review.handoffID,
@@ -134,7 +134,7 @@ final class HandoffReviewCoordinator {
   ) -> [ChatApplyReviewItem] {
     var items: [ChatApplyReviewItem] = []
     if !review.text.isEmpty {
-      let currentChefItUp = review.currentText?.nonEmpty
+      let currentChefItUp = review.currentText.flatMap(Self.nonEmpty)
       items.append(
         ChatApplyReviewItem(
           id: review.handoffID,
@@ -341,6 +341,11 @@ final class HandoffReviewCoordinator {
 
   private static func appending(_ returnedText: String, to currentText: String) -> String {
     [currentText, returnedText].joined(separator: "\n\n")
+  }
+
+  private static func nonEmpty(_ text: String) -> String? {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
   }
 
   private func commitMealPlanMakeAhead(
