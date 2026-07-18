@@ -54,6 +54,11 @@ struct RecipePlaybookView: View {
       ) {
         serveWithContent(model.serveWithItems)
       }
+      LearningsSection(
+        learnings: model.learnings,
+        updateLearning: model.updateLearning,
+        deleteLearning: model.deleteLearning
+      )
     }
     .sheet(item: $editingSection) { section in
       RecipePlaybookSectionEditorSheet(

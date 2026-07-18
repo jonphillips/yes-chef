@@ -880,6 +880,10 @@ final class RecipeDetailModel {
     ServeWithCoding.decode(recipe?.serveWith)
   }
 
+  var learnings: [Learning] {
+    detail?.learnings ?? []
+  }
+
   var baseServings: Double? {
     recipe?.servings
   }

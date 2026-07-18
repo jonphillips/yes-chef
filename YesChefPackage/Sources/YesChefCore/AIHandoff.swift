@@ -98,6 +98,19 @@ public enum LearningRepository {
     try Learning.insert { learning }.execute(db)
   }
 
+  public static func learnings(
+    sourceType: AIHandoffSourceType,
+    sourceID: UUID,
+    in db: Database
+  ) throws -> [Learning] {
+    var learnings = try Learning
+      .where { $0.sourceType.eq(sourceType) }
+      .where { $0.sourceID.eq(sourceID) }
+      .fetchAll(db)
+    learnings.sort(by: areLearningsInDescendingOrder)
+    return learnings
+  }
+
   public static func update(
     id: Learning.ID,
     text: String,
@@ -126,6 +139,11 @@ public enum LearningRepository {
       .delete()
       .execute(db)
   }
+}
+
+func areLearningsInDescendingOrder(_ lhs: Learning, _ rhs: Learning) -> Bool {
+  if lhs.dateCreated != rhs.dateCreated { return lhs.dateCreated > rhs.dateCreated }
+  return lhs.id.uuidString > rhs.id.uuidString
 }
 
 public enum AIHandoffRepository {

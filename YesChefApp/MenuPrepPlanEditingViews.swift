@@ -101,7 +101,7 @@ struct PrepPlanStepEditorSheet: View {
   private var canSave: Bool { !draft.task.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (draft.sessionBand != .other || !draft.customSession.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
 }
 
-struct MenuLearningsSection: View {
+struct LearningsSection: View {
   let learnings: [Learning]
   var updateLearning: (Learning, String) -> Void
   var deleteLearning: (Learning.ID) -> Void
@@ -112,7 +112,7 @@ struct MenuLearningsSection: View {
         ContentUnavailableView("No Learnings Yet", systemImage: "lightbulb", description: Text("Useful ideas returned from an AI handoff appear here."))
       } else { VStack(alignment: .leading, spacing: 0) {
         ForEach(learnings) { learning in
-          MenuLearningRow(learning: learning, update: updateLearning, delete: deleteLearning)
+          LearningRow(learning: learning, update: updateLearning, delete: deleteLearning)
           if learning.id != learnings.last?.id { Divider() }
         }
       } }
@@ -120,7 +120,7 @@ struct MenuLearningsSection: View {
   }
 }
 
-private struct MenuLearningRow: View {
+struct LearningRow: View {
   let learning: Learning
   var update: (Learning, String) -> Void
   var delete: (Learning.ID) -> Void
