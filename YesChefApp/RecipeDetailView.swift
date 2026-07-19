@@ -268,6 +268,7 @@ private struct RecipeReaderView: View {
               .padding()
               .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .swipeActionsContainer()
           }
         } else {
           ContentUnavailableView("Recipe Not Found", systemImage: "fork.knife")
@@ -635,6 +636,7 @@ private struct RecipeReaderView: View {
           .padding()
           .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .swipeActionsContainer()
         .frame(width: livePlaybookWidth, alignment: .topLeading)
         .transition(.move(edge: .trailing).combined(with: .opacity))
       }
