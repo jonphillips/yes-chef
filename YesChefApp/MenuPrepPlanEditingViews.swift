@@ -105,17 +105,30 @@ struct LearningsSection: View {
   let learnings: [Learning]
   var updateLearning: (Learning, String) -> Void
   var deleteLearning: (Learning.ID) -> Void
+  var reorderLearnings: ([Learning.ID], LearningReorderDestination) -> Void
+
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Learnings").font(.title2.weight(.semibold))
       if learnings.isEmpty {
         ContentUnavailableView("No Learnings Yet", systemImage: "lightbulb", description: Text("Useful ideas returned from an AI handoff appear here."))
-      } else { VStack(alignment: .leading, spacing: 0) {
-        ForEach(learnings) { learning in
-          LearningRow(learning: learning, update: updateLearning, delete: deleteLearning)
-          if learning.id != learnings.last?.id { Divider() }
+      } else {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(learnings) { learning in
+            LearningRow(learning: learning, update: updateLearning, delete: deleteLearning)
+            if learning.id != learnings.last?.id { Divider() }
+          }
+          .reorderable()
         }
-      } }
+        .reorderContainer(for: Learning.self) { difference in
+          switch difference.destination.position {
+          case let .before(id):
+            reorderLearnings(difference.sources, .before(id))
+          case .end:
+            reorderLearnings(difference.sources, .end)
+          }
+        }
+      }
     }
   }
 }

@@ -862,6 +862,22 @@ extension DependencyValues {
       .execute(db)
     }
 
+    migrator.registerMigration("Add sparse learning ordering") { db in
+      try #sql("""
+        ALTER TABLE "learnings"
+        ADD COLUMN "sortOrder" INTEGER NOT NULL ON CONFLICT REPLACE DEFAULT 0
+        """)
+        .execute(db)
+
+      try LearningRepository.backfillSortOrders(in: db)
+
+      try #sql("""
+        CREATE INDEX "index_learnings_on_sourceType_sourceID_sortOrder"
+        ON "learnings"("sourceType", "sourceID", "sortOrder")
+        """)
+        .execute(db)
+    }
+
     migrator.registerMigration("Move menu prep plans into editable step rows") { db in
       try #sql("""
         CREATE TABLE "prepPlanSteps" (

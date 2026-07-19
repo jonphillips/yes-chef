@@ -59,7 +59,8 @@ struct RecipePlaybookView: View {
         LearningsSection(
           learnings: model.learnings,
           updateLearning: model.updateLearning,
-          deleteLearning: model.deleteLearning
+          deleteLearning: model.deleteLearning,
+          reorderLearnings: model.reorderLearnings
         )
       }
     }

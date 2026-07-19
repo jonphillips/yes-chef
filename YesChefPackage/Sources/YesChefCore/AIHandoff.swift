@@ -96,6 +96,10 @@ public struct Learning: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID
   public var sourceType: AIHandoffSourceType
   public var sourceID: UUID
+  /// Sparse ranks are intentional: a human moves one Learning at a time across synced devices, so normal
+  /// reorders update only the moved rows. Other `sortOrder` tables are contiguous because they rewrite a
+  /// whole generated collection; do not normalize these gaps without changing that sync-conflict tradeoff.
+  public var sortOrder: Int
   public var text: String
   public var provenance: LearningProvenance
   public var dateCreated: Date
@@ -105,6 +109,7 @@ public struct Learning: Codable, Identifiable, Equatable, Sendable {
     id: UUID,
     sourceType: AIHandoffSourceType,
     sourceID: UUID,
+    sortOrder: Int = 0,
     text: String,
     provenance: LearningProvenance,
     dateCreated: Date,
@@ -113,6 +118,7 @@ public struct Learning: Codable, Identifiable, Equatable, Sendable {
     self.id = id
     self.sourceType = sourceType
     self.sourceID = sourceID
+    self.sortOrder = sortOrder
     self.text = text
     self.provenance = provenance
     self.dateCreated = dateCreated
@@ -123,6 +129,89 @@ public struct Learning: Codable, Identifiable, Equatable, Sendable {
 public enum LearningProvenance: String, Codable, QueryBindable, QueryDecodable, Sendable {
   case externalHandoff
   case inApp
+}
+
+public enum LearningReorderDestination: Equatable, Sendable {
+  case before(Learning.ID)
+  case end
+}
+
+private enum LearningOrdering {
+  /// Leaves room for ordinary inserts and moves without rewriting every synced row in a Learning group.
+  static let rankStride = 1_024
+
+  static func prependOrders(count: Int, before leadingOrder: Int?) -> [Int] {
+    guard count > 0 else { return [] }
+    // A first insertion receives rank 0. Every later prepend is negative (for example, -1024 before 0),
+    // preserving the pre-ordering newest-first behavior without colliding with the migration backfill.
+    let upperBound = leadingOrder ?? rankStride
+    let first = upperBound - rankStride * count
+    return (0..<count).map { first + rankStride * $0 }
+  }
+
+  static func reordered(
+    _ learnings: [Learning],
+    movingIDs: [Learning.ID],
+    destination: LearningReorderDestination
+  ) -> [Learning] {
+    let movingIDSet = Set(movingIDs)
+    let moving = learnings.filter { movingIDSet.contains($0.id) }
+    guard !moving.isEmpty else { return learnings }
+
+    var remaining = learnings.filter { !movingIDSet.contains($0.id) }
+    switch destination {
+    case let .before(id):
+      let destinationIndex = remaining.firstIndex { $0.id == id } ?? remaining.endIndex
+      remaining.insert(contentsOf: moving, at: destinationIndex)
+    case .end:
+      remaining.append(contentsOf: moving)
+    }
+    return remaining
+  }
+
+  static func changedOrders(
+    for reordered: [Learning],
+    movingIDs: [Learning.ID]
+  ) -> [Learning.ID: Int] {
+    let movingIDSet = Set(movingIDs)
+    let movingIndexes = reordered.indices.filter { movingIDSet.contains(reordered[$0].id) }
+    guard let firstMovingIndex = movingIndexes.first, let lastMovingIndex = movingIndexes.last else { return [:] }
+
+    let precedingOrder = reordered[..<firstMovingIndex]
+      .last(where: { !movingIDSet.contains($0.id) })?
+      .sortOrder
+    let followingOrder = reordered[(lastMovingIndex + 1)...]
+      .first(where: { !movingIDSet.contains($0.id) })?
+      .sortOrder
+    let movingCount = movingIndexes.count
+
+    if let precedingOrder, let followingOrder {
+      let step = (followingOrder - precedingOrder) / (movingCount + 1)
+      if step > 0 {
+        return Dictionary(uniqueKeysWithValues: movingIndexes.enumerated().map { offset, index in
+          (reordered[index].id, precedingOrder + step * (offset + 1))
+        })
+      }
+    } else if let precedingOrder {
+      return Dictionary(uniqueKeysWithValues: movingIndexes.enumerated().map { offset, index in
+        (reordered[index].id, precedingOrder + rankStride * (offset + 1))
+      })
+    } else if let followingOrder {
+      return Dictionary(uniqueKeysWithValues: movingIndexes.enumerated().map { offset, index in
+        (reordered[index].id, followingOrder - rankStride * (movingCount - offset))
+      })
+    } else {
+      return Dictionary(uniqueKeysWithValues: movingIndexes.enumerated().map { offset, index in
+        (reordered[index].id, rankStride * offset)
+      })
+    }
+
+    // No gap remains between neighbors. This rare scoped rebalance is the only time one drag rewrites a
+    // whole Learning group; it restores sparse ranks for future one-row moves.
+    return Dictionary(uniqueKeysWithValues: reordered.enumerated().map { index, learning in
+      (learning.id, rankStride * index)
+    })
+  }
 }
 
 public enum LearningRepository {
@@ -146,15 +235,18 @@ public enum LearningRepository {
   ) throws -> Int {
     let existing = try learnings(sourceType: sourceType, sourceID: sourceID, in: db)
     var seen = Set(existing.map { normalizedLearningText($0.text) })
-    var inserted = 0
-    for text in texts {
+    let newTexts = texts.filter { text in
       let key = normalizedLearningText(text)
-      guard !key.isEmpty, seen.insert(key).inserted else { continue }
+      return !key.isEmpty && seen.insert(key).inserted
+    }
+    let sortOrders = LearningOrdering.prependOrders(count: newTexts.count, before: existing.first?.sortOrder)
+    for (text, sortOrder) in zip(newTexts, sortOrders) {
       try create(
         Learning(
           id: uuid(),
           sourceType: sourceType,
           sourceID: sourceID,
+          sortOrder: sortOrder,
           text: text,
           provenance: provenance,
           dateCreated: now,
@@ -162,9 +254,8 @@ public enum LearningRepository {
         ),
         in: db
       )
-      inserted += 1
     }
-    return inserted
+    return newTexts.count
   }
 
   static func normalizedLearningText(_ text: String) -> String {
@@ -184,8 +275,50 @@ public enum LearningRepository {
       .where { $0.sourceType.eq(sourceType) }
       .where { $0.sourceID.eq(sourceID) }
       .fetchAll(db)
-    learnings.sort(by: areLearningsInDescendingOrder)
+    learnings.sort(by: areLearningsInDisplayOrder)
     return learnings
+  }
+
+  /// Used by the additive `sortOrder` migration to preserve today's newest-first display before anyone
+  /// manually reorders a group.
+  public static func backfillSortOrders(in db: Database) throws {
+    let learnings = try Learning.fetchAll(db)
+    let scopes = Dictionary(grouping: learnings) { learning in
+      "\(learning.sourceType.rawValue):\(learning.sourceID.uuidString)"
+    }
+    for learnings in scopes.values {
+      for (index, learning) in learnings.sorted(by: areLearningsInDescendingOrder).enumerated() {
+        try Learning.find(learning.id).update {
+          $0.sortOrder = #bind(LearningOrdering.rankStride * index)
+        }
+        .execute(db)
+      }
+    }
+  }
+
+  @discardableResult
+  public static func reorder(
+    sourceType: AIHandoffSourceType,
+    sourceID: UUID,
+    movingIDs: [Learning.ID],
+    destination: LearningReorderDestination,
+    in db: Database,
+    now: Date
+  ) throws -> Bool {
+    let learnings = try learnings(sourceType: sourceType, sourceID: sourceID, in: db)
+    let reordered = LearningOrdering.reordered(learnings, movingIDs: movingIDs, destination: destination)
+    guard reordered != learnings else { return false }
+
+    let changedOrders = LearningOrdering.changedOrders(for: reordered, movingIDs: movingIDs)
+    for learning in reordered {
+      guard let sortOrder = changedOrders[learning.id], sortOrder != learning.sortOrder else { continue }
+      try Learning.find(learning.id).update {
+        $0.sortOrder = #bind(sortOrder)
+        $0.dateModified = #bind(now)
+      }
+      .execute(db)
+    }
+    return true
   }
 
   public static func update(
@@ -221,6 +354,11 @@ public enum LearningRepository {
 func areLearningsInDescendingOrder(_ lhs: Learning, _ rhs: Learning) -> Bool {
   if lhs.dateCreated != rhs.dateCreated { return lhs.dateCreated > rhs.dateCreated }
   return lhs.id.uuidString > rhs.id.uuidString
+}
+
+func areLearningsInDisplayOrder(_ lhs: Learning, _ rhs: Learning) -> Bool {
+  if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
+  return areLearningsInDescendingOrder(lhs, rhs)
 }
 
 public enum AIHandoffRepository {
@@ -798,19 +936,14 @@ public enum AIHandoffMenuPrepPlanImport {
     if !returned.plan.steps.isEmpty {
       try MenuRepository.applyPrepPlan(returned.plan, to: menuID, in: db, now: now, uuid: uuid)
     }
-    for text in returned.learnings {
-      try LearningRepository.create(
-        Learning(
-          id: uuid(),
-          sourceType: .menu,
-          sourceID: menuID,
-          text: text,
-          provenance: .externalHandoff,
-          dateCreated: now,
-          dateModified: now
-        ),
-        in: db
-      )
-    }
+    try LearningRepository.insertNew(
+      texts: returned.learnings,
+      sourceType: .menu,
+      sourceID: menuID,
+      provenance: .externalHandoff,
+      in: db,
+      now: now,
+      uuid: uuid
+    )
   }
 }
