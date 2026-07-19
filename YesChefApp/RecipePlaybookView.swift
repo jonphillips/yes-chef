@@ -14,6 +14,7 @@ struct RecipePlaybookView: View {
   @State private var isEditingReaderFeedback = false
   @State private var readerFeedbackDrafts: [RecipeNote.ID: String] = [:]
   @State private var editingSection: PlaybookSectionKind?
+  @State private var clearingSection: PlaybookSectionKind?
 
   var body: some View {
     let visibleNotes = model.visibleNotes
@@ -70,11 +71,15 @@ struct RecipePlaybookView: View {
         initialText: editableText(for: section),
         commit: { text in
           try commit(text, for: section)
-        },
-        clear: {
-          clear(section)
         }
       )
+    }
+    .confirmationDialog("Clear section?", item: $clearingSection) { section in
+      Button("Clear \(section.title)", role: .destructive) {
+        clear(section)
+      }
+    } message: { section in
+      Text("This permanently clears the \(section.title) section. This cannot be undone.")
     }
   }
 
@@ -176,17 +181,10 @@ struct RecipePlaybookView: View {
   }
 
   private func enrichmentText(_ text: String) -> some View {
-    let lines = text
-      .split(whereSeparator: \.isNewline)
-      .map(String.init)
-      .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    let display = PlaybookEnrichmentText.displayText(for: text)
 
-    return Text(
-      lines.count > 1
-        ? lines.map { "• \($0)" }.joined(separator: "\n")
-        : text
-    )
-    .lineSpacing(lines.count > 1 ? 8 : 0)
+    return Text(display.text)
+    .lineSpacing(display.hasBulletedLines ? 8 : 0)
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
@@ -204,12 +202,13 @@ struct RecipePlaybookView: View {
             }
           }
           Spacer(minLength: 8)
+        }
+        .swipeActions {
           Button(role: .destructive) {
             model.removeServeWithButtonTapped(item.id)
           } label: {
-            Image(systemName: "xmark.circle")
+            Label("Remove \(item.title)", systemImage: "trash")
           }
-          .buttonStyle(.borderless)
           .accessibilityLabel(Text("Remove \(item.title)"))
         }
       }
@@ -252,7 +251,7 @@ struct RecipePlaybookView: View {
 
       if isFilled {
         Button("Clear", role: .destructive) {
-          clear(section)
+          clearingSection = section
         }
       }
     } label: {
@@ -388,7 +387,6 @@ private extension PlaybookSectionKind {
 private struct RecipePlaybookSectionEditorSheet: View {
   let section: PlaybookSectionKind
   let commit: (String) throws -> Void
-  let clear: () -> Void
 
   @Environment(\.dismiss) private var dismiss
   @State private var draftText: String
@@ -397,12 +395,10 @@ private struct RecipePlaybookSectionEditorSheet: View {
   init(
     section: PlaybookSectionKind,
     initialText: String,
-    commit: @escaping (String) throws -> Void,
-    clear: @escaping () -> Void
+    commit: @escaping (String) throws -> Void
   ) {
     self.section = section
     self.commit = commit
-    self.clear = clear
     _draftText = State(initialValue: initialText)
   }
 
@@ -433,12 +429,6 @@ private struct RecipePlaybookSectionEditorSheet: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .topBarLeading) {
-          Button("Clear", role: .destructive) {
-            clear()
-            dismiss()
-          }
         }
         ToolbarItem(placement: .confirmationAction) {
           Button("Save") {

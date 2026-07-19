@@ -8,6 +8,67 @@ extension RecipeCoreTests {
   @Suite
   struct RecipeEnrichmentTests {
     @Test
+    func playbookEnrichmentTextNormalizesPastedBullets() {
+      let display = PlaybookEnrichmentText.displayText(for: """
+      - Make the sauce.
+      * Toast the spices.
+      • Cool before storing.
+      – Reheat gently.
+      """)
+
+      expectNoDifference(
+        display,
+        PlaybookEnrichmentDisplayText(
+          text: """
+          • Make the sauce.
+          • Toast the spices.
+          • Cool before storing.
+          • Reheat gently.
+          """,
+          hasBulletedLines: true
+        )
+      )
+    }
+
+    @Test
+    func playbookEnrichmentTextLeavesSingleLineParagraphsAsProse() {
+      let display = PlaybookEnrichmentText.displayText(for: """
+      Make this the day before.
+
+      Chill completely.
+      Reheat gently.
+      """)
+
+      expectNoDifference(
+        display,
+        PlaybookEnrichmentDisplayText(
+          text: """
+          Make this the day before.
+
+          • Chill completely.
+          • Reheat gently.
+          """,
+          hasBulletedLines: true
+        )
+      )
+      expectNoDifference(
+        PlaybookEnrichmentText.displayText(for: "A single line of prose."),
+        PlaybookEnrichmentDisplayText(text: "A single line of prose.", hasBulletedLines: false)
+      )
+    }
+
+    @Test
+    func playbookEnrichmentTextBulletsPlainMultilineText() {
+      expectNoDifference(
+        PlaybookEnrichmentText.displayText(for: "Salt the chicken.\nRoast until browned."),
+        PlaybookEnrichmentDisplayText(
+          text: "• Salt the chicken.\n• Roast until browned.",
+          hasBulletedLines: true
+        )
+      )
+    }
+
+    @Test
     func serveWithUnionPrefillPreservesExistingRowsAndDeduplicatesExactReturn() throws {
       @Dependency(\.defaultDatabase) var database
       let createdAt = Date(timeIntervalSinceReferenceDate: 826_000_000)

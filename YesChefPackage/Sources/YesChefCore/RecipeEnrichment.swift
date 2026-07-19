@@ -23,6 +23,58 @@ public struct ChefItUpPlan: Equatable, Sendable {
   }
 }
 
+/// Presentation-ready text for the prose Playbook sections.
+///
+/// Multi-line paragraphs read as a list in the Playbook, while a single-line paragraph remains prose.
+/// This also normalizes common pasted list markers before applying the app's consistent bullet treatment.
+public struct PlaybookEnrichmentDisplayText: Equatable, Sendable {
+  public var text: String
+  public var hasBulletedLines: Bool
+
+  public init(text: String, hasBulletedLines: Bool) {
+    self.text = text
+    self.hasBulletedLines = hasBulletedLines
+  }
+}
+
+public enum PlaybookEnrichmentText {
+  public static func displayText(for text: String) -> PlaybookEnrichmentDisplayText {
+    let paragraphs = text
+      .split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+      .split(omittingEmptySubsequences: true) { line in
+        line.allSatisfy(\.isWhitespace)
+      }
+
+    var hasBulletedLines = false
+    let renderedParagraphs = paragraphs.map { paragraph in
+      guard paragraph.count > 1 else {
+        return paragraph.map(String.init).joined(separator: "\n")
+      }
+
+      hasBulletedLines = true
+      return paragraph
+        .map { "• \(strippingLeadingBullet(from: String($0)))" }
+        .joined(separator: "\n")
+    }
+
+    return PlaybookEnrichmentDisplayText(
+      text: renderedParagraphs.joined(separator: "\n\n"),
+      hasBulletedLines: hasBulletedLines
+    )
+  }
+
+  private static func strippingLeadingBullet(from line: String) -> String {
+    let trimmed = line.trimmingCharacters(in: .whitespaces)
+    guard let marker = trimmed.first, ["-", "*", "•", "–"].contains(String(marker)) else {
+      return trimmed
+    }
+
+    let remainder = trimmed.dropFirst()
+    guard remainder.first?.isWhitespace == true else { return trimmed }
+    return String(remainder.drop(while: \.isWhitespace))
+  }
+}
+
 public struct ServeWithPlan: Equatable, Sendable {
   public var items: [ServeWithSuggestion]
 
