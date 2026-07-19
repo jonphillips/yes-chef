@@ -73,6 +73,20 @@ extension AIHandoffTests {
     #expect(serveWith.contains("Do not use bullets, Markdown emphasis, an introduction"))
   }
 
+  /// The Playbook hands off in `.discuss` mode, which never emits `DeliverableFormat.example` — so each blob
+  /// section's own prompt has to carry the flat-list contract or the return comes back as a headed report.
+  @Test
+  func blobSectionPromptsPinTheirReturnToAFlatLineList() {
+    let context = RecipeHandoffContext(recipe: RecipeChatRecipeContext(title: "Chili"))
+
+    for prompt in [context.prompt(for: .makeAhead), context.prompt(for: .chefItUp)] {
+      #expect(prompt.contains("one make-ahead step per line") || prompt.contains("one upgrade per line"))
+      #expect(prompt.contains("No headings, no section titles, no nested or Markdown bullets"))
+      #expect(prompt.contains("no assessment of what the recipe already does well"))
+      #expect(prompt.contains("Six lines at most"))
+    }
+  }
+
   @Test
   func mealPlanHandoffContextKeepsMethodsAndAllIngredients() {
     let recipeID = SampleUUIDSequence.uuid(38_037)
@@ -116,7 +130,13 @@ extension AIHandoffTests {
 
     try database.write { db in
       try Recipe.insert {
-        Recipe(id: recipeID, title: "Birria", dateCreated: now, dateModified: now)
+        Recipe(
+          id: recipeID,
+          title: "Birria",
+          dateCreated: now,
+          dateModified: now,
+          makeAhead: "Salt the beef the day before."
+        )
       }
       .execute(db)
       try AIHandoffRepository.create(
@@ -152,8 +172,12 @@ extension AIHandoffTests {
         recipeReview.makeAhead,
         "Make the chile sauce up to two days ahead and refrigerate it."
       )
+      expectNoDifference(recipeReview.currentMakeAhead, "Salt the beef the day before.")
       expectNoDifference(recipeReview.learnings, ["Birria improves after resting overnight."])
-      #expect(try Recipe.find(recipeID).fetchOne(db)?.makeAhead == nil)
+      expectNoDifference(
+        try Recipe.find(recipeID).fetchOne(db)?.makeAhead,
+        "Salt the beef the day before."
+      )
     }
   }
 
@@ -166,7 +190,13 @@ extension AIHandoffTests {
 
     try database.write { db in
       try Recipe.insert {
-        Recipe(id: recipeID, title: "Birria", dateCreated: now, dateModified: now)
+        Recipe(
+          id: recipeID,
+          title: "Birria",
+          dateCreated: now,
+          dateModified: now,
+          chefItUp: "Finish with fresh lime."
+        )
       }
       .execute(db)
       let handoff = AIHandoff(
@@ -198,6 +228,7 @@ extension AIHandoffTests {
       }
       expectNoDifference(sectionReview.section, .chefItUp)
       expectNoDifference(sectionReview.text, "Bloom the chiles in oil before blending the sauce.")
+      expectNoDifference(sectionReview.currentText, "Finish with fresh lime.")
     }
   }
 

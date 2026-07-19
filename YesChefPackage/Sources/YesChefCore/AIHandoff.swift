@@ -394,17 +394,20 @@ public struct AIHandoffRecipeMakeAheadReview: Equatable, Sendable {
   public let handoffID: AIHandoff.ID
   public let recipeID: Recipe.ID
   public let makeAhead: String
+  public let currentMakeAhead: String?
   public let learnings: [String]
 
   public init(
     handoffID: AIHandoff.ID,
     recipeID: Recipe.ID,
     makeAhead: String,
+    currentMakeAhead: String? = nil,
     learnings: [String]
   ) {
     self.handoffID = handoffID
     self.recipeID = recipeID
     self.makeAhead = makeAhead
+    self.currentMakeAhead = currentMakeAhead
     self.learnings = learnings
   }
 }
@@ -414,6 +417,8 @@ public struct AIHandoffRecipeSectionReview: Equatable, Sendable {
   public let recipeID: Recipe.ID
   public let section: PlaybookSectionKind
   public let text: String
+  public let currentText: String?
+  public let currentServeWith: [ServeWithItem]
   public let learnings: [String]
 
   public init(
@@ -421,12 +426,16 @@ public struct AIHandoffRecipeSectionReview: Equatable, Sendable {
     recipeID: Recipe.ID,
     section: PlaybookSectionKind,
     text: String,
+    currentText: String? = nil,
+    currentServeWith: [ServeWithItem] = [],
     learnings: [String]
   ) {
     self.handoffID = handoffID
     self.recipeID = recipeID
     self.section = section
     self.text = text
+    self.currentText = currentText
+    self.currentServeWith = currentServeWith
     self.learnings = learnings
   }
 }
@@ -648,6 +657,7 @@ public enum AIHandoffIntentImport {
             handoffID: handoff.id,
             recipeID: recipe.id,
             makeAhead: returned.deliverable,
+            currentMakeAhead: recipe.makeAhead,
             learnings: returned.learnings
           )
         )
@@ -658,6 +668,7 @@ public enum AIHandoffIntentImport {
             recipeID: recipe.id,
             section: .chefItUp,
             text: returned.deliverable,
+            currentText: recipe.chefItUp,
             learnings: returned.learnings
           )
         )
@@ -668,6 +679,7 @@ public enum AIHandoffIntentImport {
             recipeID: recipe.id,
             section: .serveWith,
             text: returned.deliverable,
+            currentServeWith: ServeWithCoding.decode(recipe.serveWith),
             learnings: returned.learnings
           )
         )

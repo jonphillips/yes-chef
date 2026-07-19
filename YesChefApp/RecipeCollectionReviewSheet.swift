@@ -5,7 +5,7 @@ import YesChefCore
 struct RecipeCollectionReviewSheet: View {
   let items: [ChatApplyReviewItem]
   let committingItemID: ChatApplyReviewItem.ID?
-  let commit: @MainActor (ChatApplyReviewItem, String) async -> Bool
+  let commit: @MainActor (ChatApplyReviewItem, String, Bool) async -> Bool
   let discard: @MainActor (ChatApplyReviewItem) -> Void
   let discardAll: @MainActor () -> Void
   let onEmpty: @MainActor () -> Void
@@ -69,8 +69,12 @@ struct RecipeCollectionReviewSheet: View {
       ChatApplyReviewSheet(
         item: item,
         isCommitting: activeCommittingItemID == item.id,
-        commit: { approvedText in
-          let didCommit = await commitItem(item, approvedText: approvedText)
+        commit: { approvedText, usingSecondaryCommit in
+          let didCommit = await commitItem(
+            item,
+            approvedText: approvedText,
+            usingSecondaryCommit: usingSecondaryCommit
+          )
           if didCommit {
             committedSummary = CollectionReviewCommitSummary(
               title: item.committedTitle,
@@ -134,7 +138,7 @@ struct RecipeCollectionReviewSheet: View {
 
   private func launchReview(for item: ChatApplyReviewItem) {
     Task {
-      let didCommit = await commitItem(item, approvedText: item.summary)
+      let didCommit = await commitItem(item, approvedText: item.summary, usingSecondaryCommit: false)
       if didCommit {
         committedSummary = CollectionReviewCommitSummary(
           title: item.committedTitle,
@@ -148,10 +152,14 @@ struct RecipeCollectionReviewSheet: View {
     localCommittingItemID ?? committingItemID
   }
 
-  private func commitItem(_ item: ChatApplyReviewItem, approvedText: String) async -> Bool {
+  private func commitItem(
+    _ item: ChatApplyReviewItem,
+    approvedText: String,
+    usingSecondaryCommit: Bool
+  ) async -> Bool {
     localCommittingItemID = item.id
     defer { localCommittingItemID = nil }
-    return await commit(item, approvedText)
+    return await commit(item, approvedText, usingSecondaryCommit)
   }
 }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import YesChefCore
 
 struct RecipePlaybookView: View {
@@ -85,28 +86,6 @@ struct RecipePlaybookView: View {
     .accessibilityLabel("Playbook actions")
   }
 
-  private func handoffButton(for section: PlaybookSectionKind) -> some View {
-    Button {
-      Task {
-        await handoffTransport.copyPrompt(for: .recipeSection(model.recipeID, section))
-      }
-    } label: {
-      Label("Hand off", systemImage: "sparkles.square.filled.on.square")
-    }
-    .buttonStyle(.borderedProminent)
-  }
-
-  private func redoButton(for section: PlaybookSectionKind) -> some View {
-    Button {
-      Task {
-        await handoffTransport.copyPrompt(for: .recipeSection(model.recipeID, section))
-      }
-    } label: {
-      Label("Hand off again", systemImage: "sparkles.square.filled.on.square")
-    }
-    .buttonStyle(.bordered)
-  }
-
   private var isAskActive: Bool {
     model.destination.chat != nil
   }
@@ -127,16 +106,6 @@ struct RecipePlaybookView: View {
     .accessibilityValue(isAskActive ? Text("Panel open") : Text("Panel closed"))
   }
 
-  private func pasteResultButton(for section: PlaybookSectionKind) -> some View {
-    PasteButton(payloadType: String.self) { results in
-      Task {
-        await handoffTransport.pastedResultsReceived(results, source: .recipeSection(model.recipeID, section))
-      }
-    }
-    .accessibilityLabel("Paste result into \(section.title)")
-    .buttonStyle(.bordered)
-  }
-
   private func playbookSection<Content: View>(
     _ section: PlaybookSectionKind,
     isFilled: Bool,
@@ -145,15 +114,20 @@ struct RecipePlaybookView: View {
   ) -> some View {
     DisclosureGroup(isExpanded: isExpanded) {
       VStack(alignment: .leading, spacing: 12) {
-        sectionToolbar(for: section, isFilled: isFilled)
         content()
       }
         .padding(.top, 8)
     } label: {
-      HStack {
+      // The fill-dot and the disclosure chevron read as one status pair hugging the trailing edge; the menu
+      // sits well clear of them so its tap target can't be confused for the disclosure's.
+      HStack(spacing: 0) {
         Text(section.title)
           .font(.title2.bold())
-        Spacer()
+        Spacer(minLength: 12)
+        if isExpanded.wrappedValue {
+          sectionMenu(for: section, isFilled: isFilled)
+            .padding(.trailing, 12)
+        }
         Image(systemName: isFilled ? "circle.fill" : "circle")
           .foregroundStyle(isFilled ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
           .accessibilityLabel(Text(isFilled ? "Contains content" : "Empty"))
@@ -241,55 +215,51 @@ struct RecipePlaybookView: View {
     }
   }
 
-  @ViewBuilder
-  private func sectionToolbar(for section: PlaybookSectionKind, isFilled: Bool) -> some View {
-    HStack(spacing: 8) {
-      if isFilled {
-        editButton(for: section)
-        redoButton(for: section)
-        Menu {
-          pasteResultButton(for: section)
-          clearButton(for: section)
-        } label: {
-          Image(systemName: "ellipsis.circle")
+  private func sectionMenu(for section: PlaybookSectionKind, isFilled: Bool) -> some View {
+    Menu {
+      Button {
+        Task {
+          await handoffTransport.copyPrompt(for: .recipeSection(model.recipeID, section))
         }
-      } else {
-        handoffButton(for: section)
-        pasteResultButton(for: section)
-        Menu {
-          writeManuallyButton(for: section)
-          askMenuButton
-        } label: {
-          Image(systemName: "ellipsis.circle")
+      } label: {
+        Label(
+          isFilled ? "Hand off again" : "Hand off",
+          systemImage: "sparkles.square.filled.on.square"
+        )
+      }
+
+      Button {
+        // A declined paste alert (or a non-string clipboard) yields nil. Hand the empty case to the
+        // transport rather than returning silently, so the tap always produces visible feedback.
+        let results = UIPasteboard.general.string.map { [$0] } ?? []
+        Task {
+          await handoffTransport.pastedResultsReceived(
+            results,
+            source: .recipeSection(model.recipeID, section)
+          )
+        }
+      } label: {
+        Label("Paste", systemImage: "doc.on.clipboard")
+      }
+      .disabled(!UIPasteboard.general.hasStrings)
+
+      Button(isFilled ? "Edit" : "Write manually") {
+        editingSection = section
+      }
+
+      Button("Ask", action: ask)
+
+      if isFilled {
+        Button("Clear", role: .destructive) {
+          clear(section)
         }
       }
-      Spacer(minLength: 0)
+    } label: {
+      Image(systemName: "ellipsis")
+        .frame(width: 44, height: 44)
+        .contentShape(.rect)
     }
-    .accessibilityElement(children: .contain)
-    .accessibilityLabel(Text("\(section.title) actions"))
-  }
-
-  private func editButton(for section: PlaybookSectionKind) -> some View {
-    Button("Edit") {
-      editingSection = section
-    }
-    .buttonStyle(.bordered)
-  }
-
-  private func writeManuallyButton(for section: PlaybookSectionKind) -> some View {
-    Button("Write manually") {
-      editingSection = section
-    }
-  }
-
-  private func clearButton(for section: PlaybookSectionKind) -> some View {
-    Button("Clear", role: .destructive) {
-      clear(section)
-    }
-  }
-
-  private var askMenuButton: some View {
-    Button("Ask", action: ask)
+    .accessibilityLabel("\(section.title) actions")
   }
 
   private func editableText(for section: PlaybookSectionKind) -> String {
