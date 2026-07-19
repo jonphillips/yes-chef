@@ -400,6 +400,30 @@ commit shape** than append. Do **not** fold it into the near-term mitigation.
 The exact-dedup mitigation is a **floor, not a ceiling**: it must not become the reason the smart pass never
 gets scheduled. Tracked in memory [[handoff-stateless-both-directions]].
 
+## Amendment 5 — Learnings have sparse, human-controlled order (2026-07-19)
+
+**Status: Accepted.** Amends **Amd 1**'s synced `Learning` table and shared presentation. Learnings are now
+manually reorderable on recipe Playbook, menu Playbook, and menu prep-plan editing surfaces.
+
+### Decision
+
+- `Learning` gains a synced `sortOrder: Int`, backfilled per `(sourceType, sourceID)` group from the current
+  newest-first display as `0, 1024, 2048, …`. The query then sorts ascending by rank, retaining the former
+  date/UUID ordering only as a tie-breaker.
+- **Ranks stay sparse by design.** A normal drag writes only the moved Learning rows, assigning ranks between
+  neighboring rows. If no integer gap remains, the one affected group is rebalanced to the same `1024`
+  stride. This intentionally differs from contiguous `sortOrder` tables such as ingredients, instructions,
+  and prep-plan steps: those are rewritten as a generated collection, while a Learning is a human move on a
+  live two-device synced library. Sparse ranks avoid an N-row sync write and reduce cross-device interleaving.
+- New AI Learnings continue to **prepend** so the pre-existing newest-first behavior holds. After a backfill
+  beginning at `0`, the next insertion gets a negative rank (for example `-1024`); negatives are valid.
+  **Tradeoff, for Jon's device pass:** this still prepends after a person has manually reordered, which can
+  put a newly returned item ahead of a deliberate arrangement. We keep that continuity for now rather than
+  infer a mode switch; revisit if it fights real use.
+- The SDK 27 reorder API belongs on the shared `LearningsSection`: `.reorderable()` attaches to its
+  `ForEach`, and `.reorderContainer(for: Learning.self)` to the enclosing `VStack`. It is already the drag
+  container; no standalone `.draggable` is involved.
+
 ## Deferred (on the record, explicitly not built here)
 
 - **Widened share-extension "Import into Yes Chef."** A polished entry point for when you're already

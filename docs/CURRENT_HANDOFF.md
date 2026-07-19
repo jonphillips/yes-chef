@@ -49,7 +49,7 @@ prod/TestFlight cut. At that cut, deploy to the production schema the Phase E Sl
 `readerFeedbackPreference` column** (ADR-0025 D6) **and `captureToNotePreference` column** (ADR-0027 S1,
 PR #141), **and** the ADR-0021
 synced `recipeVariations` table (Recipe edit proposals S2), **and `Menu.externalProjectName`** (ADR-0038 S2),
-**and the synced `learnings` table** (ADR-0038 Amd 1 / S3a) **and the synced `prepPlanSteps` table**
+**and the synced `learnings` table including its `sortOrder` column** (ADR-0038 Amd 1 / Amd 5) **and the synced `prepPlanSteps` table**
 (ADR-0040 S2 — which also **retires the `Menu.prepPlan` BLOB**: restructure it *before* this cut, because
 promotion locks the record type permanently); and note the app target
 (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.

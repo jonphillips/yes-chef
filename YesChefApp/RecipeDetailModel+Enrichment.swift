@@ -208,6 +208,24 @@ extension RecipeDetailModel {
     }
   }
 
+  func reorderLearnings(_ ids: [Learning.ID], destination: LearningReorderDestination) {
+    do {
+      _ = try database.write { db in
+        try LearningRepository.reorder(
+          sourceType: .recipe,
+          sourceID: recipeID,
+          movingIDs: ids,
+          destination: destination,
+          in: db,
+          now: now
+        )
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
   private func commitMakeAheadPlan(_ plan: MakeAheadPlan) throws {
     @Dependency(\.date.now) var now
     @Dependency(\.defaultDatabase) var database
