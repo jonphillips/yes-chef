@@ -215,6 +215,23 @@ exists.
 
 The [[automation-decays-near-the-stove]] restraint D2 claimed is what Amd1-D2 actually delivers.
 
+## Amendment 2 — destructive section actions are explicit, and Serve With rows use the native gesture (2026-07-19)
+
+Jon's device pass found two destructive affordances too close to routine navigation, plus one list interaction
+that did not match the rest of the app. These are focused refinements to the recipe Playbook column; they add
+no storage and do not change the section hand-off contract.
+
+- **Clear confirms before writing.** Every filled section's `Clear` menu item now presents one section-scoped
+  destructive confirmation dialog. It names the section and states that there is no undo, because clearing is
+  a permanent write reachable from the shared `•••` menu.
+- **Clear leaves the section editor sheet.** This is a deliberate **partial reversal of D4**: D4 put Clear in
+  the editor sheet so every section action had a home, but the proximity to Cancel made it too easy to
+  fat-finger. Clear now lives only in the overflow menu, behind its confirmation; the editor remains a
+  review-and-save surface.
+- **Serve With adopts swipe-to-delete.** The always-visible red `x` is replaced with the platform delete
+  gesture, matching the app's list rows and keeping the content column visually quiet. The action remains
+  accessible by the item's name.
+
 ## Deferred (on the record, explicitly not built here)
 
 - **Menu Playbook sections** ([ADR-0039 Amd 2/3](ADR-0039-playbook-column-thinking-vs-doing.md) — the shared
