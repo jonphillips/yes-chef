@@ -177,7 +177,8 @@ struct MenuDetailReader: View {
       LearningsSection(
         learnings: detail.learnings,
         updateLearning: detailModel.updateLearning,
-        deleteLearning: detailModel.deleteLearning
+        deleteLearning: detailModel.deleteLearning,
+        reorderLearnings: detailModel.reorderLearnings
       )
     }
   }
