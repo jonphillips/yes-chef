@@ -82,4 +82,23 @@ extension MenuDetailModel {
       isShowingError = true
     }
   }
+
+  func reorderLearnings(_ ids: [Learning.ID], destination: LearningReorderDestination) {
+    do {
+      _ = try database.write { db in
+        try LearningRepository.reorder(
+          sourceType: .menu,
+          sourceID: menuID,
+          movingIDs: ids,
+          destination: destination,
+          in: db,
+          now: now
+        )
+      }
+      toastCenter?.postSuccess("Reordered learning.")
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
 }
