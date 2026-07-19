@@ -114,13 +114,15 @@ struct LearningsSection: View {
         ContentUnavailableView("No Learnings Yet", systemImage: "lightbulb", description: Text("Useful ideas returned from an AI handoff appear here."))
       } else {
         VStack(alignment: .leading, spacing: 0) {
-          ForEach(learnings) { learning in
-            LearningRow(learning: learning, update: updateLearning, delete: deleteLearning)
-            if learning.id != learnings.last?.id { Divider() }
+          ForEach(learnings, id: \.id) { learning in
+            VStack(spacing: 0) {
+              LearningRow(learning: learning, update: updateLearning, delete: deleteLearning)
+              if learning.id != learnings.last?.id { Divider() }
+            }
           }
           .reorderable()
         }
-        .reorderContainer(for: Learning.self) { difference in
+        .reorderContainer(for: Learning.self, itemID: \.id) { difference in
           switch difference.destination.position {
           case let .before(id):
             reorderLearnings(difference.sources, .before(id))
