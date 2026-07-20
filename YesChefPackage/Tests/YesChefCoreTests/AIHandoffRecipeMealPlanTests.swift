@@ -73,7 +73,7 @@ extension AIHandoffTests {
     #expect(serveWith.contains("Do not use bullets, Markdown emphasis, an introduction"))
   }
 
-  /// The Playbook hands off in `.discuss` mode, which never emits `DeliverableFormat.example` — so each blob
+  /// The Playbook hands off in `.discuss` mode, and each context owns its format — so each blob
   /// section's own prompt has to carry the flat-list contract or the return comes back as a headed report.
   @Test
   func blobSectionPromptsPinTheirReturnToAFlatLineList() {

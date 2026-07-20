@@ -91,7 +91,7 @@ final class HandoffInAppTransport {
   }
 
   private func present(_ error: Error) {
-    errorMessage = String(describing: error)
+    errorMessage = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
     isShowingError = true
   }
 

@@ -57,7 +57,7 @@ public struct RecipeHandoffContext: Equatable, Sendable {
   }
 
   /// The blob sections are rendered as a flat list, so the return has to *be* a flat list. `.discuss` mode —
-  /// which every Playbook hand-off uses — never emits `AIHandoffToken.DeliverableFormat.example`, so the shape
+  /// which every Playbook hand-off uses — the retired per-verb examples never shaped these prompts, so the shape
   /// contract has to live here in the section prompt, the way Serve With's already does. Without it the model
   /// returns a report with headings and nested bullets, and the section renders it as bulleted nonsense.
   private static func lineListFormat(_ itemNoun: String) -> String {

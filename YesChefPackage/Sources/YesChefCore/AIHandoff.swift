@@ -412,15 +412,15 @@ public enum AIHandoffToken {
     var discussInstruction: String {
       switch self {
       case .menuPrepPlan:
-        "return only the token line above as the first line, followed by the paste-ready prep plan"
+        "the paste-ready prep plan"
       case .recipeMakeAhead:
-        "return only the token line above as the first line, followed by the paste-ready recipe make-ahead notes"
+        "the paste-ready recipe make-ahead notes"
       case .recipeChefItUp:
-        "return only the token line above as the first line, followed by the paste-ready Chef It Up notes"
+        "the paste-ready Chef It Up notes"
       case .recipeServeWith:
-        "return only the token line above as the first line, followed by paste-ready Serve With suggestions"
+        "paste-ready Serve With suggestions"
       case .mealPlanMakeAheadStrategy:
-        "return only the token line above as the first line, followed by the paste-ready meal-plan make-ahead strategy"
+        "the paste-ready meal-plan make-ahead strategy"
       }
     }
 
@@ -439,26 +439,6 @@ public enum AIHandoffToken {
       }
     }
 
-    var example: String {
-      switch self {
-      case .menuPrepPlan:
-        """
-        session:
-        - task → serves
-        """
-      case .recipeMakeAhead:
-        "- Complete the sauce up to two days ahead and refrigerate."
-      case .recipeChefItUp:
-        "Bloom the spices in oil before adding the tomatoes."
-      case .recipeServeWith:
-        "Cilantro-lime rice: Finish with fresh lime juice."
-      case .mealPlanMakeAheadStrategy:
-        """
-        Make-ahead strategy - Dinner
-        Two days ahead: Make the sauce.
-        """
-      }
-    }
   }
 
   public struct RoutedText: Equatable, Sendable {
