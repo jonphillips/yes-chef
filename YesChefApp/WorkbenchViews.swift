@@ -123,6 +123,7 @@ struct WorkbenchDetailView: View {
   @AppStorage(ChatWorkspaceDetent.storageKey) private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   @State private var model: WorkbenchDetailModel
   @State private var compareTier: ModelTier = .onDevice
+  @State private var handoffTransport = HandoffInAppTransport()
   let isFocusActive: Bool
   let focusButtonTapped: (() -> Void)?
 
@@ -135,7 +136,9 @@ struct WorkbenchDetailView: View {
     _model = State(
       wrappedValue: WorkbenchDetailModel(
         workbenchID: workbenchID,
-        openRecipe: { recipeID in onRecipeSelected(RecipeDetailPresentation(recipeID: recipeID)) }
+        openRecipe: { recipeID in
+          onRecipeSelected(RecipeDetailPresentation(recipeID: recipeID, workbenchID: workbenchID))
+        }
       )
     )
     self.isFocusActive = isFocusActive
@@ -160,6 +163,7 @@ struct WorkbenchDetailView: View {
               WorkbenchReader(
                 model: model,
                 detail: detail,
+                handoffTransport: handoffTransport,
                 compareButtonTapped: {
                   await openCompare(detail: detail)
                 }
@@ -169,6 +173,7 @@ struct WorkbenchDetailView: View {
             WorkbenchReader(
               model: model,
               detail: detail,
+              handoffTransport: handoffTransport,
               compareButtonTapped: {
                 await openCompare(detail: detail)
               }
@@ -236,6 +241,7 @@ struct WorkbenchDetailView: View {
     } message: {
       Text(model.errorMessage ?? "")
     }
+    .handoffTransportAlert(handoffTransport)
     .confirmationDialog(
       "Move all candidates to Reference?",
       isPresented: $model.destination.moveCandidatesToReference,
@@ -333,6 +339,7 @@ struct WorkbenchDetailView: View {
 private struct WorkbenchReader: View {
   let model: WorkbenchDetailModel
   let detail: WorkbenchDetailData
+  let handoffTransport: HandoffInAppTransport
   let compareButtonTapped: () async -> Void
 
   @State private var titleText = ""
@@ -464,6 +471,15 @@ private struct WorkbenchReader: View {
             Label("Compare", systemImage: "square.split.2x2")
           }
           .disabled(!model.canCompare)
+        }
+      } footer: {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Discuss a candidate comparison externally, then review what returns before it reaches the workbench log.")
+          HandoffCopyPasteControls(
+            source: .workbench(detail.workbench.id),
+            transport: handoffTransport
+          )
+          .buttonStyle(.bordered)
         }
       }
     }

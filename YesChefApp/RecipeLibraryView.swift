@@ -315,6 +315,7 @@ private struct RecipeFullScreenCover: View {
       RecipeDetailView(
         recipeID: presentation.recipeID,
         scaleContext: presentation.scaleContext,
+        workbenchID: presentation.workbenchID,
         libraryModel: recipeModel,
         mealCalendarModel: mealCalendarModel,
         groceryModel: groceryModel,

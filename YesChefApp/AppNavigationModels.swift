@@ -4,14 +4,20 @@ import YesChefCore
 struct RecipeDetailPresentation: Hashable, Identifiable {
   var recipeID: Recipe.ID
   var scaleContext: ScaleContext
+  var workbenchID: Workbench.ID?
 
-  init(recipeID: Recipe.ID, scaleContext: ScaleContext? = nil) {
+  init(
+    recipeID: Recipe.ID,
+    scaleContext: ScaleContext? = nil,
+    workbenchID: Workbench.ID? = nil
+  ) {
     self.recipeID = recipeID
     self.scaleContext = scaleContext ?? .recipe(recipeID)
+    self.workbenchID = workbenchID
   }
 
   var id: String {
-    "\(recipeID.uuidString):\(scaleContext.id)"
+    "\(recipeID.uuidString):\(scaleContext.id):\(workbenchID?.uuidString ?? "")"
   }
 }
 

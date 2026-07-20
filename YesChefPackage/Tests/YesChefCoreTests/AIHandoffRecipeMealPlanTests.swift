@@ -22,9 +22,9 @@ extension AIHandoffTests {
     )
 
     #expect(recipePrompt.contains("completed recipe make-ahead notes"))
-    #expect(recipePrompt.contains("Complete the sauce up to two days ahead"))
     #expect(mealPlanPrompt.contains("completed meal-plan make-ahead strategy"))
-    #expect(mealPlanPrompt.contains("Two days ahead: Make the sauce."))
+    #expect(!recipePrompt.contains(AIHandoffReturnContract.marker))
+    #expect(!mealPlanPrompt.contains(AIHandoffReturnContract.marker))
   }
 
   @Test
@@ -290,6 +290,62 @@ extension AIHandoffTests {
       )
       expectNoDifference(mealPlanReview.unparsedStrategyLines, ["This sentence has no timing label."])
       expectNoDifference(mealPlanReview.learnings, ["Birria improves after resting overnight."])
+    }
+  }
+
+  @Test
+  func workbenchComparisonStagesProseForHumanReviewWithoutWritingTheLog() throws {
+    @Dependency(\.defaultDatabase) var database
+    let workbenchID = SampleUUIDSequence.uuid(38_004)
+    let handoffID = SampleUUIDSequence.uuid(38_005)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Workbench.insert {
+        Workbench(
+          id: workbenchID,
+          title: "Cookie Study",
+          sortOrder: 0,
+          dateCreated: now,
+          dateModified: now
+        )
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .workbench,
+          sourceID: workbenchID,
+          taskType: .workbenchCompare,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      let review = try AIHandoffIntentImport.stageReview(
+        handoffID: handoffID,
+        result: """
+        YC-HANDOFF: \(handoffID.uuidString)
+        Hydration: Candidate B uses more water, which should leave a more open crumb.
+        YC-LEARNINGS:
+        - Higher hydration needs gentler handling.
+        """,
+        in: db,
+        now: now
+      )
+
+      guard case let .workbenchCompare(compare) = review else {
+        Issue.record("Expected a workbench comparison review.")
+        return
+      }
+      expectNoDifference(compare.workbenchID, workbenchID)
+      expectNoDifference(
+        compare.comparison,
+        "Hydration: Candidate B uses more water, which should leave a more open crumb."
+      )
+      expectNoDifference(compare.learnings, ["Higher hydration needs gentler handling."])
+      #expect(try WorkbenchLogEntry.fetchAll(db).isEmpty)
     }
   }
 }

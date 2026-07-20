@@ -18,6 +18,7 @@ struct RecipeDetailView: View {
   init(
     recipeID: Recipe.ID,
     scaleContext: ScaleContext? = nil,
+    workbenchID: Workbench.ID? = nil,
     libraryModel: RecipeLibraryModel,
     mealCalendarModel: MealCalendarModel,
     groceryModel: GroceryLibraryModel,
@@ -25,7 +26,13 @@ struct RecipeDetailView: View {
     focusButtonTapped: (() -> Void)? = nil,
     onRecipeSelected: @escaping (RecipeDetailPresentation) -> Void = { _ in }
   ) {
-    _model = State(wrappedValue: RecipeDetailModel(recipeID: recipeID, scaleContext: scaleContext))
+    _model = State(
+      wrappedValue: RecipeDetailModel(
+        recipeID: recipeID,
+        scaleContext: scaleContext,
+        workbenchID: workbenchID
+      )
+    )
     self.libraryModel = libraryModel
     self.mealCalendarModel = mealCalendarModel
     self.groceryModel = groceryModel

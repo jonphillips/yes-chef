@@ -43,6 +43,7 @@ public enum AIHandoffSourceType: String, Codable, QueryBindable, QueryDecodable,
   case recipe
   case menu
   case mealPlan
+  case workbench
 }
 
 public enum AIHandoffTaskType: String, Codable, QueryBindable, QueryDecodable, Sendable {
@@ -53,6 +54,22 @@ public enum AIHandoffTaskType: String, Codable, QueryBindable, QueryDecodable, S
   case serveWith
   case adjustRecipe
   case mealPlanMakeAheadStrategy
+  case workbenchCompare
+  case workbenchExperiments
+
+  public var title: String {
+    switch self {
+    case .prepPlan: "Prep Plan"
+    case .learning: "Learnings"
+    case .recipeMakeAhead: "Make-ahead"
+    case .chefItUp: "Chef It Up"
+    case .serveWith: "Serve With"
+    case .adjustRecipe: "Adjust Recipe"
+    case .mealPlanMakeAheadStrategy: "Make-ahead Strategy"
+    case .workbenchCompare: "Compare"
+    case .workbenchExperiments: "Experiments"
+    }
+  }
 }
 
 /// An independently actionable section of a recipe's Playbook. The content remains in the recipe's
@@ -458,32 +475,30 @@ public enum AIHandoffToken {
 
   public static func prompt(
     handoffID: AIHandoff.ID,
+    title: String = "",
     context: String,
     mode: PromptMode = .discuss,
     deliverableFormat: DeliverableFormat = .menuPrepPlan
   ) -> String {
     let token = header(handoffID: handoffID)
+    let titleLine = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    let titlePrefix = titleLine.isEmpty ? "" : "\(titleLine)\n"
     switch mode {
     case .discuss:
       return """
-      \(token)
+      \(titlePrefix)\(token)
 
       \(context)
 
-      You may discuss this freely. When the user asks you to finalize, \(deliverableFormat.discussInstruction), then a YC-LEARNINGS: line and a distinct bullet list of durable knowledge established during the discussion. A learning-only return is valid: leave the deliverable portion empty and include the marker plus bullets. Preserve that token and marker exactly; never merge learnings into a prose summary; do not use a Markdown code fence.
-
-      Keep the deliverable practical, atomic, and grounded in the provided context. Never write choreography or a merged mega-recipe: recipe cooking instructions stay with their recipes.
+      You may discuss this freely. When the user asks you to finalize, return \(deliverableFormat.discussInstruction).
       """
     case .immediate:
       return """
-      \(token)
+      \(titlePrefix)\(token)
 
       \(context)
 
-      \(deliverableFormat.immediateInstruction) Preserve the token above as the first line. Return only the token, formatted deliverable, and a YC-LEARNINGS: section of distinct durable-learning bullets: no preamble and no Markdown code fence. A learning-only return is valid: leave the deliverable portion empty and include the marker plus bullets. Keep the deliverable practical, atomic, and grounded in the provided context; never choreography or a merged mega-recipe. Use this exact format:
-      \(deliverableFormat.example)
-      YC-LEARNINGS:
-      - durable learning
+      \(deliverableFormat.immediateInstruction)
       """
     }
   }
@@ -503,6 +518,38 @@ public enum AIHandoffToken {
 
     lines.removeFirst()
     return RoutedText(handoffID: handoffID, payload: lines.joined(separator: "\n"))
+  }
+}
+
+/// The single, pasteable return contract for the external Yes Chef project. It deliberately lives outside
+/// each hand-off payload: the payload carries only a title, routing token, context, and the verb's ask.
+public enum AIHandoffReturnContract {
+  public static let version = 1
+  public static let marker = "YC-CONTRACT: v\(version)"
+
+  public static let projectInstructions = """
+    You are helping with Yes Chef hand-offs. You may discuss the supplied cooking context freely.
+
+    The opening `<Task>: <Object>` line is the suggested conversation title. Use it if the host supports setting a title, but it is advisory only.
+
+    When the user asks to finalize, or a hand-off asks for an immediate result, stop conversing and return the requested deliverable as a terminal response. Its first line must be the exact `YC-HANDOFF:` token from the prompt. Its second line must be `\(marker)`. Then return the requested deliverable. Include a `YC-LEARNINGS:` section with distinct durable learnings unless the hand-off expressly asks you to omit it.
+
+    Return no preamble, sign-off, headings, or nesting. Do not assess what is already good. Keep distinct requested items distinct rather than merging them into a summary. If a requested field cannot be filled confidently, omit that item rather than inventing it. Do not use a Markdown code fence.
+    """
+
+  /// Removes the echoed version marker before the existing hand-off router sees the return payload.
+  /// A missing or stale marker means the project instructions were not the current copied contract.
+  public static func strippingMarker(from text: String) -> String? {
+    var lines = text.components(separatedBy: .newlines)
+    guard let markerIndex = lines.firstIndex(where: isContractMarker), lines[markerIndex] == marker else {
+      return nil
+    }
+    lines.remove(at: markerIndex)
+    return lines.joined(separator: "\n")
+  }
+
+  private static func isContractMarker(_ line: String) -> Bool {
+    line.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("YC-CONTRACT:")
   }
 }
 
@@ -603,12 +650,32 @@ public struct AIHandoffMealPlanMakeAheadReview: Equatable, Sendable {
   }
 }
 
+public struct AIHandoffWorkbenchCompareReview: Equatable, Sendable {
+  public let handoffID: AIHandoff.ID
+  public let workbenchID: Workbench.ID
+  public let comparison: String
+  public let learnings: [String]
+
+  public init(
+    handoffID: AIHandoff.ID,
+    workbenchID: Workbench.ID,
+    comparison: String,
+    learnings: [String]
+  ) {
+    self.handoffID = handoffID
+    self.workbenchID = workbenchID
+    self.comparison = comparison
+    self.learnings = learnings
+  }
+}
+
 public enum AIHandoffReview: Equatable, Sendable {
   case menuPrepPlan(AIHandoffMenuPrepPlanReview)
   case recipeMakeAhead(AIHandoffRecipeMakeAheadReview)
   case recipeChefItUp(AIHandoffRecipeSectionReview)
   case recipeServeWith(AIHandoffRecipeSectionReview)
   case mealPlanMakeAhead(AIHandoffMealPlanMakeAheadReview)
+  case workbenchCompare(AIHandoffWorkbenchCompareReview)
 
   public var handoffID: AIHandoff.ID {
     switch self {
@@ -617,6 +684,7 @@ public enum AIHandoffReview: Equatable, Sendable {
     case let .recipeChefItUp(review): review.handoffID
     case let .recipeServeWith(review): review.handoffID
     case let .mealPlanMakeAhead(review): review.handoffID
+    case let .workbenchCompare(review): review.handoffID
     }
   }
 }
@@ -821,7 +889,7 @@ public enum AIHandoffIntentImport {
             learnings: returned.learnings
           )
         )
-      case .prepPlan, .adjustRecipe, .mealPlanMakeAheadStrategy:
+      case .prepPlan, .adjustRecipe, .mealPlanMakeAheadStrategy, .workbenchCompare, .workbenchExperiments:
         throw AIHandoffIntentImportError.wrongTask
       }
 
@@ -844,6 +912,25 @@ public enum AIHandoffIntentImport {
           strategy: parsed.strategy,
           learnings: returned.learnings,
           unparsedStrategyLines: parsed.unparsedLines
+        )
+      )
+
+    case .workbench:
+      guard handoff.taskType == .workbenchCompare,
+        try Workbench.find(handoff.sourceID).fetchOne(db) != nil
+      else {
+        throw AIHandoffIntentImportError.wrongTask
+      }
+      let returned = AIHandoffReturn.plainText(from: payload)
+      guard !returned.deliverable.isEmpty || !returned.learnings.isEmpty else {
+        throw AIHandoffIntentImportError.emptyPlan
+      }
+      review = .workbenchCompare(
+        AIHandoffWorkbenchCompareReview(
+          handoffID: handoff.id,
+          workbenchID: handoff.sourceID,
+          comparison: returned.deliverable,
+          learnings: returned.learnings
         )
       )
     }

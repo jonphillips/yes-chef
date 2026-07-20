@@ -134,12 +134,14 @@ enum HandoffExportSource: Sendable {
   case recipeSection(Recipe.ID, PlaybookSectionKind)
   case menu(Menu.ID)
   case mealPlan(MealPlanItem.ID)
+  case workbench(Workbench.ID)
 
   init(_ source: HandoffSource) {
     switch source {
     case let .recipe(recipe): self = .recipeSection(recipe.id, .makeAhead)
     case let .menu(menu): self = .menu(menu.id)
     case let .mealPlan(mealPlan): self = .mealPlan(mealPlan.id)
+    case let .workbench(workbench): self = .workbench(workbench.id)
     }
   }
 }
@@ -159,6 +161,8 @@ extension HandoffExportSource {
       Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan)
     case let .mealPlan(mealPlanID):
       Metadata(sourceType: .mealPlan, sourceID: mealPlanID, taskType: .mealPlanMakeAheadStrategy)
+    case let .workbench(workbenchID):
+      Metadata(sourceType: .workbench, sourceID: workbenchID, taskType: .workbenchCompare)
     }
   }
 
@@ -167,6 +171,7 @@ extension HandoffExportSource {
     case .recipeSection: "recipe section"
     case .menu: "menu"
     case .mealPlan: "meal-plan day"
+    case .workbench: "workbench"
     }
   }
 
@@ -211,6 +216,7 @@ enum HandoffAppOperations {
       }
       let prompt = AIHandoffToken.prompt(
         handoffID: handoffID,
+        title: "\(metadata.taskType.title): \(detail.menu.title)",
         context: MenuChatContext(detail: detail).prepPrompt(),
         mode: mode
       )
@@ -232,6 +238,7 @@ enum HandoffAppOperations {
       }
       let prompt = AIHandoffToken.prompt(
         handoffID: handoffID,
+        title: "\(metadata.taskType.title): \(detail.recipe.title)",
         context: RecipeHandoffContext(detail: detail).prompt(for: section),
         mode: mode,
         deliverableFormat: section.deliverableFormat
@@ -271,9 +278,32 @@ enum HandoffAppOperations {
       }
       let prompt = AIHandoffToken.prompt(
         handoffID: handoffID,
+        title: "\(metadata.taskType.title): \(context.0.title)",
         context: context.1.makeAheadPrompt(),
         mode: mode,
         deliverableFormat: .mealPlanMakeAheadStrategy
+      )
+      handoff = AIHandoff(
+        id: handoffID,
+        sourceType: metadata.sourceType,
+        sourceID: metadata.sourceID,
+        taskType: metadata.taskType,
+        createdAt: now,
+        exportedPrompt: prompt
+      )
+      externalProjectName = nil
+
+    case let .workbench(workbenchID):
+      guard let detail = try await database.read({ db in
+        try WorkbenchDetailRequest(workbenchID: workbenchID).fetch(db)
+      }) else {
+        throw HandoffIntentSurfaceError.sourceNotFound
+      }
+      let prompt = AIHandoffToken.prompt(
+        handoffID: handoffID,
+        title: "\(metadata.taskType.title): \(detail.workbench.title)",
+        context: WorkbenchChatContext(detail: detail).compareHandoffPrompt(),
+        mode: mode
       )
       handoff = AIHandoff(
         id: handoffID,
@@ -302,7 +332,10 @@ enum HandoffAppOperations {
     in database: any DatabaseWriter,
     now: Date
   ) async throws -> AIHandoffReview {
-    try await database.write { db in
+    guard let result = AIHandoffReturnContract.strippingMarker(from: result) else {
+      throw HandoffReturnContractError.instructionsOutOfDate
+    }
+    return try await database.write { db in
       try AIHandoffIntentImport.stageReview(
         handoffID: handoffID,
         result: result,
@@ -319,6 +352,9 @@ enum HandoffAppOperations {
     now: Date,
     handoffID: AIHandoff.ID
   ) async throws -> AIHandoffReview {
+    guard let result = AIHandoffReturnContract.strippingMarker(from: result) else {
+      throw HandoffReturnContractError.instructionsOutOfDate
+    }
     let metadata = source.metadata
     let handoff = AIHandoff(
       id: handoffID,
@@ -363,5 +399,13 @@ private enum HandoffIntentSurfaceError: Error, LocalizedError {
     case .invalidHandoffID:
       "The handoff ID must be a UUID."
     }
+  }
+}
+
+private enum HandoffReturnContractError: Error, LocalizedError {
+  case instructionsOutOfDate
+
+  var errorDescription: String? {
+    "Your Yes Chef project instructions are missing or out of date. Re-copy them from Settings, then try again."
   }
 }

@@ -33,6 +33,8 @@ final class HandoffReviewCoordinator {
       recipeServeWithReviewItems(for: review)
     case let .mealPlanMakeAhead(review):
       mealPlanMakeAheadReviewItems(for: review)
+    case let .workbenchCompare(review):
+      workbenchCompareReviewItems(for: review)
     }
   }
 
@@ -253,6 +255,55 @@ final class HandoffReviewCoordinator {
     return items
   }
 
+  private func workbenchCompareReviewItems(
+    for review: AIHandoffWorkbenchCompareReview
+  ) -> [ChatApplyReviewItem] {
+    var items: [ChatApplyReviewItem] = []
+    if !review.comparison.isEmpty {
+      items.append(
+        ChatApplyReviewItem(
+          id: review.handoffID,
+          title: "Review comparison",
+          summary: review.comparison,
+          presentation: .sheet,
+          editableTitle: "Comparison",
+          editableText: review.comparison,
+          commitTitle: "Save to Workbench Log",
+          committingTitle: "Saving comparison…",
+          committedTitle: "Saved to Workbench Log",
+          commit: { [weak self] approvedText in
+            try self?.commitWorkbenchObservation(
+              workbenchID: review.workbenchID,
+              text: approvedText
+            )
+          }
+        )
+      )
+    }
+    if !review.learnings.isEmpty {
+      let editableText = review.learnings.map { "- \($0)" }.joined(separator: "\n")
+      items.append(
+        ChatApplyReviewItem(
+          title: "Review learnings",
+          summary: editableText,
+          presentation: .sheet,
+          editableTitle: "Learnings",
+          editableText: editableText,
+          commitTitle: "Save to Workbench Log",
+          committingTitle: "Saving learnings…",
+          committedTitle: "Saved to Workbench Log",
+          commit: { [weak self] approvedText in
+            try self?.commitWorkbenchObservation(
+              workbenchID: review.workbenchID,
+              text: "Learnings:\n\(approvedText)"
+            )
+          }
+        )
+      )
+    }
+    return items
+  }
+
   private func reviewEditablePrepPlanText(_ review: AIHandoffMenuPrepPlanReview) -> String {
     [review.plan.editableReviewText(), review.unparsedPlanLines.joined(separator: "\n")]
       .filter { !$0.isEmpty }
@@ -383,6 +434,23 @@ final class HandoffReviewCoordinator {
         sourceType: sourceType,
         sourceID: sourceID,
         provenance: .externalHandoff,
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
+    }
+  }
+
+  private func commitWorkbenchObservation(
+    workbenchID: Workbench.ID,
+    text: String
+  ) throws {
+    let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !body.isEmpty else { throw HandoffReviewError.emptyDeliverable }
+    try database.write { db in
+      try WorkbenchRepository.addLogEntry(
+        WorkbenchLogEntryDraft(kind: .observation, body: body),
+        to: workbenchID,
         in: db,
         now: now,
         uuid: { uuid() }

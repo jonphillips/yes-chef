@@ -13,15 +13,18 @@ import YesChefCore
 )
 struct AIHandoffTests {
   @Test
-  func tokenPrefixesTheExportAndStripsOnlyItsHeaderFromTheReturn() throws {
+  func handoffPromptUsesTheTitleThenTokenAndTheProjectContractOwnsTheReturnShape() throws {
     let handoffID = SampleUUIDSequence.uuid(38_001)
-    let prompt = AIHandoffToken.prompt(handoffID: handoffID, context: "Menu context")
+    let prompt = AIHandoffToken.prompt(
+      handoffID: handoffID,
+      title: "Prep Plan: Beach Menu",
+      context: "Menu context"
+    )
 
-    #expect(prompt.hasPrefix("YC-HANDOFF: \(handoffID.uuidString)\n"))
-    #expect(prompt.contains("Preserve that token and marker exactly"))
-    #expect(prompt.contains("YC-LEARNINGS:"))
-    #expect(prompt.contains("never merge learnings into a prose summary"))
-    #expect(prompt.contains("Never write choreography"))
+    #expect(prompt.hasPrefix("Prep Plan: Beach Menu\nYC-HANDOFF: \(handoffID.uuidString)\n"))
+    #expect(!prompt.contains(AIHandoffReturnContract.marker))
+    #expect(AIHandoffReturnContract.projectInstructions.contains(AIHandoffReturnContract.marker))
+    #expect(AIHandoffReturnContract.projectInstructions.contains("Return no preamble, sign-off, headings, or nesting"))
 
     let routedText = try #require(
       AIHandoffToken.stripping(
@@ -43,7 +46,7 @@ struct AIHandoffTests {
   }
 
   @Test
-  func immediatePromptRequiresTheReviewFormatInItsFirstResponse() {
+  func immediatePromptRequestsTheResultWithoutDuplicatingTheProjectReturnContract() {
     let handoffID = SampleUUIDSequence.uuid(38_002)
     let prompt = AIHandoffToken.prompt(
       handoffID: handoffID,
@@ -52,10 +55,27 @@ struct AIHandoffTests {
     )
 
     #expect(prompt.contains("Return the completed prep plan in your first response when the menu needs one."))
-    #expect(prompt.contains("YC-LEARNINGS: section of distinct durable-learning bullets"))
-    #expect(prompt.contains("A learning-only return is valid"))
-    #expect(prompt.contains("never choreography or a merged mega-recipe"))
-    #expect(prompt.hasSuffix("YC-LEARNINGS:\n- durable learning"))
+    #expect(!prompt.contains(AIHandoffReturnContract.marker))
+    #expect(!prompt.contains("YC-LEARNINGS:"))
+  }
+
+  @Test
+  func currentContractMarkerIsRequiredAndRemovedBeforeRouting() {
+    let result = """
+    YC-HANDOFF: \(SampleUUIDSequence.uuid(38_003).uuidString)
+    \(AIHandoffReturnContract.marker)
+    Comparison text
+    """
+
+    expectNoDifference(
+      AIHandoffReturnContract.strippingMarker(from: result),
+      """
+      YC-HANDOFF: \(SampleUUIDSequence.uuid(38_003).uuidString)
+      Comparison text
+      """
+    )
+    #expect(AIHandoffReturnContract.strippingMarker(from: "YC-CONTRACT: v0") == nil)
+    #expect(AIHandoffReturnContract.strippingMarker(from: "Comparison text") == nil)
   }
 
   @Test

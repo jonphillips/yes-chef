@@ -140,17 +140,59 @@ private extension MealPlanHandoffEntity {
   }
 }
 
+struct WorkbenchHandoffEntity: AppEntity, SyncableEntity {
+  static let typeDisplayRepresentation: TypeDisplayRepresentation = "Workbench"
+  static let defaultQuery = WorkbenchHandoffEntityQuery()
+
+  let id: Workbench.ID
+  let title: String
+
+  var displayRepresentation: DisplayRepresentation {
+    DisplayRepresentation(title: LocalizedStringResource(stringLiteral: title), image: .init(systemName: "hammer"))
+  }
+}
+
+struct WorkbenchHandoffEntityQuery: EntityQuery {
+  static var allowedExecutionTargets: IntentExecutionTargets { .main }
+
+  init() {}
+
+  func entities(for identifiers: [WorkbenchHandoffEntity.ID]) async throws -> [WorkbenchHandoffEntity] {
+    let database = DependencyValues._current.defaultDatabase
+    return try await database.read { db in
+      try Workbench.where { $0.id.in(identifiers) }.fetchAll(db).map(WorkbenchHandoffEntity.init)
+    }
+  }
+
+  func suggestedEntities() async throws -> [WorkbenchHandoffEntity] {
+    let database = DependencyValues._current.defaultDatabase
+    return try await database.read { db in
+      try Workbench.fetchAll(db)
+        .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        .map(WorkbenchHandoffEntity.init)
+    }
+  }
+}
+
+private extension WorkbenchHandoffEntity {
+  init(workbench: Workbench) {
+    self.init(id: workbench.id, title: workbench.title)
+  }
+}
+
 @UnionValue
 enum HandoffSource: Sendable {
   case recipe(RecipeHandoffEntity)
   case menu(MenuHandoffEntity)
   case mealPlan(MealPlanHandoffEntity)
+  case workbench(WorkbenchHandoffEntity)
 
   static let typeDisplayRepresentation: TypeDisplayRepresentation = "Handoff Source"
   static let caseDisplayRepresentations: [Cases: DisplayRepresentation] = [
     .recipe: "Recipe",
     .menu: "Menu",
     .mealPlan: "Meal Plan",
+    .workbench: "Workbench",
   ]
 }
 

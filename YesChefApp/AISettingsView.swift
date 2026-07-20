@@ -1,5 +1,6 @@
 import LLMClientKit
 import SwiftUI
+import UIKit
 import YesChefCore
 
 struct AISettingsView: View {
@@ -73,6 +74,18 @@ struct AISettingsView: View {
           Label("Save Preferences", systemImage: "square.and.arrow.down")
         }
         .disabled(!model.hasUnsavedPreferenceChanges)
+      }
+
+      Section {
+        Button {
+          UIPasteboard.general.string = AIHandoffReturnContract.projectInstructions
+        } label: {
+          Label("Copy Project Instructions", systemImage: "doc.on.doc")
+        }
+      } header: {
+        Text("External Handoff")
+      } footer: {
+        Text("Paste these into the shared Yes Chef project’s custom instructions. Returned handoffs confirm the version automatically.")
       }
     }
     .navigationTitle("AI")
