@@ -195,8 +195,16 @@ except the (already-planned) `libraryPlacement` if D1(b) uses it to hide in-prog
 - **S2 — the draft verb → a Recipe (settles D1).** The flagship synthesis: apply-action + review card
   that writes the draft per the ratified D1 shape, `high` effort (ADR-0017), `draftRecipeID` link +
   provenance capture. Opens the draft in the existing Reader/editor.
-- **S3 — experiments list → `Workbench.experiments`.** Structured `[Experiment]` BLOB, its own
-  section with add/refine/clear; distinct-list commit (D-table row 3).
+- ~~**S3 — experiments list → `Workbench.experiments`.** Structured `[Experiment]` BLOB, its own
+  section with add/refine/clear; distinct-list commit (D-table row 3).~~ **SUPERSEDED by
+  [ADR-0042](ADR-0042-workbench-handoff-and-the-return-block.md) (2026-07-20) — do not build the BLOB.**
+  A `[Experiment]` BLOB is the `Menu.prepPlan` defect exactly: its elements could only ever be
+  *regenerated*, never repaired ([ADR-0040](ADR-0040-editable-at-the-grain-it-is-stored.md),
+  [[editable-at-the-grain-stored]]). Experiments land instead as **`workbenchLog` rows with
+  `kind = .experiment`** — the table already exists, is synced, and carries the kind — which is what this
+  ADR's own **A3** ("a durable, typed, append-only workbench log **replaces the `experiments` BLOB**")
+  had already anticipated. ADR-0042 also adds the **external** path: the experiments verb becomes a
+  hand-off deliverable with a pinned `{hypothesis, change, rationale}` return shape.
 
 Lean verification default ([[lean-verification-default]]): `swift build` for logic-only; otherwise one
 app build for `iPad Pro 13-inch (M5)` + `scripts/check-drift.sh`, no simulator install — Jon does the

@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 19, 2026 (**ADR-0041 S2.5 → Next Up = Slice 2.6.** Jon's device pass found three Playbook-column refinements, recorded in **[ADR-0041 Amendment 2](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-2--destructive-section-actions-are-explicit-and-serve-with-rows-use-the-native-gesture-2026-07-19)**: clear needs an explicit no-undo confirmation, Clear leaves the editor sheet, and Serve With adopts swipe-to-delete. S3 (synced section-meta + conversation URL) stays queued behind it.)
+Last updated: July 20, 2026 (**ADR-0042 ACCEPTED → Next Up = S0 → S1, the workbench hands off to the chat apps.** Ratified 2026-07-20 after the contract, terminal-turn, and no-learnings decisions (D1/D4/D8) were hand-validated end-to-end by a live ChatGPT run (OQ6): the v1 return contract lives in the project's **custom instructions**, not the payload, and survived a long conversation. S0 = the Core contract constant + Settings copy button + `YC-CONTRACT` version marker (also closes the `.discuss`-no-example gap behind the S2.5 blob-report); S1 = `.workbench` as a hand-off source + compare + the log deposit. Both schema-free. S2 (experiments + schema) is un-gated and queued behind them. — Prior close: **ADR-0041 COMPLETE at S2.6** (PRs #206/#209 + ADR-0038 Amd 5 sparse learning ordering #210); **its S3 was WITHDRAWN** — no live `/c/` URL to house, meta-only fallback rejected (see [ADR-0041 Amd 3](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-3--s3-is-withdrawn-the-conversation-url-does-not-exist-2026-07-19) + [ADR-0038 Amd 3](decisions/ADR-0038-external-llm-handoff.md#amendment-3--an-optional-user-pasted-conversationurl-to-reopen-the-live-chat-2026-07-15)). Device passes still owed (Jon) for #206/#209/#210.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,14 +21,24 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — ADR-0041 Slice 2.6: Playbook destructive-action safety + Serve With row consistency (app + core, no schema).** Full spec in [ADR-0041 **Amendment 2**](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-2--destructive-section-actions-are-explicit-and-serve-with-rows-use-the-native-gesture-2026-07-19). Follows S2.5 (PR #206). Confirm before clearing every section; keep Clear out of the editor sheet; replace Serve With's visible destructive button with the SDK 27 scroll-container swipe action; and normalize pasted multi-line enrichment bullets in `YesChefPackage`.
+**Live dispatch target — [ADR-0042](decisions/ADR-0042-workbench-handoff-and-the-return-block.md) S0 → S1 (Accepted 2026-07-20; the workbench hands off to the all-you-can-eat chat apps).** Two cohesive slices, one dispatch, **in order**. Both **schema-free**.
 
-**Verify:** Core → `swift build` + unit coverage for already-bulleted, mixed-style, single-line, and plain multi-line enrichment text. App → elevated generic iOS `build` **and** `build-for-testing`, plus `scripts/check-drift.sh`. No simulator installs. Device pass is Jon's: every Clear asks first, editor sheets have no Clear, Serve With deletes by swipe with no visible `x`, and pasted bullets render singly.
+**S0 — the contract moves into the ChatGPT project (Core + Settings; no schema, no new parse).** One Core constant is the single source of truth for the return contract + the compressed prohibition list (D4) + a `YC-CONTRACT: v1` version marker; a **Settings copy button** emits it verbatim for the project's custom instructions; the return path reads the echoed marker and surfaces a *stale/missing instructions* error when it's absent or an old version. Also add the derived **`<TaskType>: <Object>` title line** (D9) as the first line of every outbound prompt (advisory only — nothing parses it). **The v1 contract text is already hand-validated end-to-end by the OQ6 live run — ship what was tested, do not redesign it.** This slice also closes the long-standing `.discuss`-has-no-example gap ([AIHandoff.swift:473 vs :483](../YesChefPackage/Sources/YesChefCore/AIHandoff.swift)) that caused the ADR-0041 S2.5 blob-report, so it improves make-ahead / Chef It Up / Serve With / prep-plan too.
+
+**S1 — `.workbench` becomes a hand-off source (Core + app; no schema, no parse).** Add `.workbench` to `AIHandoffSourceType` + the router; ship the **compare** deliverable first (its return is prose landing in `workbenchLog` rows a human reads — D3, nothing to mis-parse); and land the committed-adjustment → `.rationale` log deposit promoted from the retired ADR-0023 S3 (D6).
+
+**Verify** per the Verification Pattern below — `swift build` + Core tests, one elevated `generic/platform=iOS` build, `scripts/check-drift.sh`. Device pass is Jon's: the Settings copy button produces pasteable text, a stale/absent marker surfaces the error, and a workbench compare round-trips.
+
+**Then S2 (its own dispatch) — the experiments verb + the schema.** Un-gated (OQ6 passed), but it's the schema slice (three nullable synced `workbenchLog` columns) and carries the label-cycle parser + the D8 no-learnings rule, so it lands separately. Spec below in Ready Efforts / in the ADR.
+
+**Do not** wire `adjustRecipe` as a paste-back (D2 — it's a structured canonical write, stays the in-app verb) or build the ADR-0019 S3 `experiments` BLOB (superseded — rows, not a blob).
+
+**Device passes owed (Jon) on already-merged work** — S2.5 (#206): filled Serve With prefill retains existing rows; filled Make-ahead offers Replace/Append with neither pre-selected; section actions live only in the expanded-header `•••`; paste prompts once per round-trip; Meal Calendar uses compact layout in iPad Slide Over. S2.6 (#209): every Clear asks first, editor sheets have no Clear, Serve With deletes by swipe with no visible `x`, pasted bullets render singly. ADR-0038 Amd 5 (#210): learnings drag-reorder on all three surfaces and hold across a two-device sync — and watch the recorded tradeoff, that a newly returned learning still prepends **ahead of** a deliberate manual arrangement.
 
 
-**Feature efforts still on the board — Jon picks; do not infer:**
-- **Recipe edit proposals S3** — the iterative refine loop + workbench-log deposit.
-- **Workbench synthesis-shaped apply-action** — the draft verb's own action shape (no last-reply gate/chip).
+**Feature efforts still on the board — Jon picks; do not infer** (ADR-0042 is in Next Up above; these are *after* it):
+- **ADR-0042 S2** — the experiments verb + its schema (three synced `workbenchLog` columns, label-cycle parser, D8 no-learnings). Un-gated; the schema slice, so its own dispatch after S0/S1.
+- **Workbench synthesis-shaped apply-action** — the draft verb's own action shape (no last-reply gate/chip). ⚠️ Re-read against [ADR-0042 D2/OQ5](decisions/ADR-0042-workbench-handoff-and-the-return-block.md) before dispatching: it is an *in-app* draft verb, and the draft is a structured write.
 - **Open a design ADR** — ADR-0013 meal-planner verbs (needs scope confirmation) or ADR-0014 text editing.
 
 **ADR-0026 device pass still owed (Jon):** two interaction risks — (1) the adjust launch row presents
@@ -59,7 +69,7 @@ promotion locks the record type permanently); and note the app target
 Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
 target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
-**ADR-0041 Playbook section hand-off — S3** ([ADR-0041](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md); follows S1 + S2 shipped; queued behind **S2.5 in Next Up above**). **S3 (schema + app) — the synced section meta + conversation URL.** New synced `PlaybookSectionMeta` `@Table` keyed `(recipeID, sectionKind)` carrying `{ provenance, conversationURL, dateModified }` (real FK → cascade-delete, no polymorphic-orphan problem); the `conversationURL` field in the review + edit sheets; the **"Open chat"** reopen deep-link. **Refines [ADR-0038 Amd 3](decisions/ADR-0038-external-llm-handoff.md)** (moves the URL off the device-local handoff onto this synced home) and is **gated on the same live-`/c/`-link device check Amd 3 owes**. When S3 ships, add `PlaybookSectionMeta` to the standing prod-schema promotion list below.
+**ADR-0041 deferred follow-ons** (on the record in the ADR, **not** dispatchable without Jon scoping them) — the **menu** Playbook sections getting the same per-section toolbar (ADR-0039 Amd 2/3's shared Enrichment column; ADR-0041 deliberately scoped to the *recipe*), and section-selection checkboxes on the whole-recipe hand-off (the scoped per-section verbs make these *less* necessary, not more). **ADR-0041 itself is complete** (closed at S2.6; S3 withdrawn). **`PlaybookSectionMeta` is not queued anywhere — do not resurrect it**; if section provenance is ever wanted, it designs its own storage against its own consumer ([ADR-0041 Amd 3](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-3--s3-is-withdrawn-the-conversation-url-does-not-exist-2026-07-19)).
 
 **Drag recipes from Browse into a meal (BLOCKED on iPadOS Beta 4)** — surfaced by the Amendment 3 *over*
 presentation (PR #197). The pipeline is **already wired**: `MenuRecipeBrowserPanel` rows are
@@ -72,16 +82,39 @@ it unblocks it's mostly confirm-E2E + polish (drop highlight, autoscroll, multi-
 **Recipe edit proposals** ([ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) +
 `efforts/recipe-edit-proposals.md`) — the "Adjust this recipe" verb; **S1 + S2 shipped** (overwrite
 destination with section-aware multi-section overwrite/undo; the "keep as a variation" destination = ADR-0021's
-`recipeVariations` table + reader fold + grocery fold). **S3 queued** = the iterative refine loop +
-workbench-log deposit (was gated behind the 2026-07-08/09 dogfood ADRs, now all shipped — so S3 is unblocked
-whenever Jon picks it). Extends ADR-0021 (the variation destination) — do not duplicate it.
+`recipeVariations` table + reader fold + grocery fold). **S3 is closed — split by
+[ADR-0042](decisions/ADR-0042-workbench-handoff-and-the-return-block.md) (2026-07-20):** its *iterative
+refine loop* half is **WITHDRAWN** (D7 — refinement happens in the live external thread; an in-app multi-turn
+proposal loop is a worse copy of it, **do not rebuild it**), and its *workbench-log deposit* half is
+**promoted into ADR-0042 S1** (D6). **Nothing remains queued under ADR-0023.** Extends ADR-0021 (the
+variation destination) — do not duplicate it. Per ADR-0042 D2 the in-app verb stays the **only** path that
+writes a structured delta.
 
 **Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — the store + curate + compare arc is
 complete (S1–S4 all shipped → DONE-LOG). Remaining parked follow-ons in the effort doc: the
 **synthesis-shaped apply-action** (the draft verb's own action shape — a distinct action enabled by workbench
 state, no last-reply gate/chip; app-layer only, small, spec in the effort doc's "Out of scope" section — this
 was the prior Next Up, demoted here, not yet built), plus AI effort/tier as a user-facing setting,
-AI-generated log entries, and the S3 review notes.
+AI-generated log entries, and the S3 review notes. **New direction —
+[ADR-0042](decisions/ADR-0042-workbench-handoff-and-the-return-block.md) (Accepted 2026-07-20; S0/S1 is the
+Next Up dispatch above):** the workbench becomes an **external hand-off source**, since its product is deliberation
+and the chat apps do that unmetered in a live thread. Compare + experiments outboard; the **draft verb does
+not** (a structured canonical write, D2); experiments land as `workbenchLog` rows, **not** ADR-0019 S3's
+`experiments` BLOB, which is superseded. **S1 is schema-free; S2 adds three nullable synced `workbenchLog`
+columns** (`hypothesis`/`change`/`rationale` — OQ2 resolved 2026-07-20: an experiment is write-many, so the
+triple is typed fields per ADR-0040, and being pre-prod is the reason to fix the shape *now*). **When S2
+ships, add those columns to the standing prod-schema promotion list above.** **S2 is UN-GATED — OQ6 passed
+on device 2026-07-20:** with the v1 contract living in the ChatGPT project's custom instructions (**not** in
+the prompt), a long real conversation still switched cleanly into the return block on `finalize`, echoed
+`YC-CONTRACT: v1`, held all three field labels across four experiments, and honored D8's learnings
+suppression stated many turns earlier — confirming **D1, D4 and D8** in the shape we'd ship. **One failure
+that binds the parser: the blank lines between blocks did not survive** (model or paste — indeterminable,
+which is the point), so **the parser splits on the label cycle, never on whitespace**, and must be
+unit-covered for the run-together shape the live run actually produced. Also from that run: **D8** (3 of 4
+returned learnings were the verb's own untested hypotheses restated as fact — knowledge belongs in the
+experiment's `outcome`, after it's tried) and **D9** (threads get a derived `<TaskType>: <Object>` title —
+task, not object-kind, because ADR-0041 section-scoping means one recipe can have three live threads; the
+title is **advisory only**, nothing parses it, since the auto-titler paraphrased it in testing).
 
 **Meal-Planner chat verbs** (ADR-0013 follow-on + `efforts/cooking-workspace.md`) — the one remaining named
 actionable-chat verb instance. Classify each new verb's commit shape first ([[chat-verb-commit-shapes]]) —

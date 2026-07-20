@@ -315,8 +315,36 @@ review-routed path. No new core, no schema, no migration; no simulator install (
 
 ## Amendment 3 — an optional, user-pasted `conversationURL` to reopen the live chat (2026-07-15)
 
-**Status: Proposed.** Origin: Jon, 2026-07-15. Amends **D1** (adds a field to the `AIHandoff` record)
-and **Amd2/S3c** (adds one field to the in-app paste step). No new transport, no core rework.
+**Status: WITHDRAWN — 2026-07-19 (Jon). Never built.** The device check this amendment owed came back
+negative and the amendment does not survive it. See *Device-check result* below. Origin: Jon, 2026-07-15.
+Would have amended **D1** (a field on the `AIHandoff` record) and **Amd2/S3c** (one field on the in-app
+paste step). The want is real and stays on the record; **this mechanism is not the answer to it.**
+
+### Device-check result (2026-07-19) — the reason this is withdrawn
+
+The load-bearing constraint below ("live `/c/` link only, never the `/share/` snapshot") is **not
+satisfiable from the mobile flow**, and the reasoning is upstream of any deep-link question:
+
+- **The `/c/` URL can't be obtained where the hand-off happens.** ChatGPT's mobile share affordance
+  produces a `/share/<id>` **read-only snapshot**, not the live continuable conversation. Capturing a real
+  `/c/` link means being on desktop web copying the address bar — which is not the flow this amendment
+  exists to serve.
+- **No custom URL scheme or intent handler exists** to open the app to a conversation. Requested publicly
+  ~a year ago ([OpenAI community
+  thread](https://community.openai.com/t/support-custom-url-schemes-or-intent-handlers-to-trigger-specific-behaviors-in-the-chatgpt-mobile-app/1255168));
+  nothing shipped. A universal link on `chatgpt.com/c/*` would not require a custom scheme and might open
+  the app if OpenAI registers those paths — but that is **moot**, since we cannot get the `/c/` URL to
+  begin with.
+
+**What remains of the want, and where it actually belongs.** The second load-bearing constraint below
+already said it: **the durable session anchor is the project, not the URL** (OQ6 / `Menu.externalProjectName`,
+shipped). That mechanism works and is unaffected. The real remaining gap is that **Recipe has no project
+story** — so if "return to my ongoing conversation" resurfaces for recipes, the answer is very likely a
+per-recipe project name reusing the shipped OQ6 pattern, **not** a URL field. Do not revive the URL as the
+first move.
+
+**Downstream:** [ADR-0041](ADR-0041-playbook-section-toolbar-and-scoped-handoff.md) S3 existed to give this
+URL a synced, section-addressable home; it is **withdrawn** with this amendment (ADR-0041 Amendment 3).
 
 ### The want
 

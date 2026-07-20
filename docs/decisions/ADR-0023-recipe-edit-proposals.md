@@ -136,10 +136,21 @@ slice.**
   proposal — which *is* ADR-0021's build (the `recipeVariations` table + reader fold + grocery fold). Here
   0023 and 0021 converge: one proposal, two taps. Resolves ADR-0021 OQ1 (the delta is already structured,
   so no separate extraction) and OQ2 (the D3 side-by-side is the staging surface).
-- **S3 — iterative refine loop + workbench-log deposit.** Keep chatting to revise a *live* proposal before
-  committing (re-extract with the current proposal as context); on the workbench, a committed adjustment can
-  drop a `rationale`/`experiment` entry into the workbench log (ADR-0019). The conversational editing loop
-  Jon originally asked for.
+- **S3 — SPLIT AND REASSIGNED by [ADR-0042](ADR-0042-workbench-handoff-and-the-return-block.md)
+  (2026-07-20).** The two halves went opposite ways:
+  - ~~**iterative refine loop** — keep chatting to revise a *live* proposal before committing (re-extract
+    with the current proposal as context); the conversational editing loop Jon originally asked for.~~
+    **WITHDRAWN (ADR-0042 D7) — unwanted, not unscheduled.** Refinement now happens in a live external chat
+    thread, which is unmetered and better-reasoned; an in-app multi-turn proposal loop would be a worse copy
+    of it, and never answered what the delta anchors to on turn two ([[handoff-stateless-both-directions]]).
+  - **workbench-log deposit** — a committed adjustment drops a `rationale`/`experiment` entry into the
+    workbench log (ADR-0019). **PROMOTED (ADR-0042 D6) and lands in that ADR's S1.** With no way to
+    deep-link back into an outboarded session ([ADR-0038 Amd 3, withdrawn](ADR-0038-external-llm-handoff.md)),
+    the log is the only thing that survives it.
+
+  **S1 + S2 are shipped and unaffected** — the verb, the transient preview, the side-by-side review, and both
+  commit destinations. Per ADR-0042 D2 the in-app verb remains the **only** path that writes a structured
+  delta; do not build a paste-back that lands one.
 
 ## Open questions (surface when the slice is drawn — not decided)
 

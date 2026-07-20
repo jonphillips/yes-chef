@@ -2,19 +2,21 @@
 
 > **Vocabulary:** a *Playbook section unit* is a single Enrichment-column section (Make-ahead, Chef It Up,
 > Serve With) treated as a **self-contained, independently-actionable unit**: its own state-aware toolbar,
-> its own **section-scoped** external hand-off verb, its own editable content + provenance + optional
-> live-conversation URL, edited in **its own sheet** — pulling per-section editing off the monolithic
+> its own **section-scoped** external hand-off verb, its own editable content, edited in **its own sheet**
+> — pulling per-section editing off the monolithic
 > recipe edit sheet. The organizing move is to stop treating the Playbook column as one blob of sections
 > with a single whole-recipe hand-off, and start treating each section as a small addressable object.
 
-Status: **Accepted** — 2026-07-17 (Jon greenlit **S1** for dispatch; **all open questions resolved**
-2026-07-17, incl. OQ3 by a live ChatGPT paste-back taste — S2 un-gated). Origin: Jon's 2026-07-17 design
+Status: **COMPLETE — closed at S2.6, 2026-07-19.** Shipped S1 → S2 → S2.5 → S2.6 (PRs #199/#200/#202,
+#205, #206, #209). **S3 is withdrawn, not deferred** — see [Amendment 3](#amendment-3--s3-is-withdrawn-the-conversation-url-does-not-exist-2026-07-19).
+**This ADR ships with no schema change of its own.** Previously: **Accepted** — 2026-07-17 (Jon greenlit
+**S1** for dispatch; **all open questions resolved** 2026-07-17, incl. OQ3 by a live ChatGPT paste-back
+taste — S2 un-gated). Origin: Jon's 2026-07-17 design
 discussion (toolbar-efficiency per section + the conversation-URL want). **Lives inside [ADR-0039](ADR-0039-playbook-column-thinking-vs-doing.md)**
 (the persistent Enrichment/Playbook column), **rides [ADR-0038](ADR-0038-external-llm-handoff.md)** (the
-hand-off core and its in-app Copy/Paste door, Amd 2) and **refines [ADR-0038 Amendment 3](ADR-0038-external-llm-handoff.md#amendment-3--an-optional-user-pasted-conversationurl-to-reopen-the-live-chat-2026-07-15)**
-(relocates `conversationURL` from the device-local, non-synced `AIHandoff` onto a synced, section-addressable
-home), **governed by [ADR-0040](ADR-0040-editable-at-the-grain-it-is-stored.md)** (the section's provenance
-and URL become typed fields, never re-parsed from a blob), and **reuses [ADR-0024](ADR-0024-editable-proposal-preview.md)/[ADR-0026](ADR-0026-review-collection-sheet.md)**
+hand-off core and its in-app Copy/Paste door, Amd 2), ~~and **refines [ADR-0038 Amendment 3](ADR-0038-external-llm-handoff.md#amendment-3--an-optional-user-pasted-conversationurl-to-reopen-the-live-chat-2026-07-15)**
+(relocates `conversationURL` onto a synced, section-addressable home)~~ — **struck: ADR-0038 Amd 3 is
+withdrawn (2026-07-19) and so is the S3 that would have housed it** — and **reuses [ADR-0024](ADR-0024-editable-proposal-preview.md)/[ADR-0026](ADR-0026-review-collection-sheet.md)**
 (the editable review sheet becomes the per-section edit sheet). Holds the
 [[llm-vs-determinism-surface-boundary]] line (external help stays advisory; the human edits before it
 matters) and the [[automation-decays-near-the-stove]] restraint (a calm header, a toolbar only on expand).
@@ -232,6 +234,43 @@ no storage and do not change the section hand-off contract.
   gesture, matching the app's list rows and keeping the content column visually quiet. The action remains
   accessible by the item's name.
 
+## Amendment 3 — S3 is withdrawn; the conversation URL does not exist (2026-07-19)
+
+**Status: Accepted.** Withdraws **S3** and the `PlaybookSectionMeta` table from the storage sketch.
+**ADR-0041 is complete at S2.6 and ships with no schema change.** Origin: Jon, 2026-07-19, on the negative
+result of the device check S3 was gated on.
+
+### What killed it
+
+[ADR-0038 Amd 3](ADR-0038-external-llm-handoff.md#amendment-3--an-optional-user-pasted-conversationurl-to-reopen-the-live-chat-2026-07-15)
+is **withdrawn**: ChatGPT's mobile flow yields only a `/share/` read-only snapshot, never the live `/c/`
+conversation URL, and no URL scheme or intent handler exists to reopen a conversation. The URL S3 was
+built to house **cannot be captured in the first place.**
+
+### Why the "meta + provenance still ship" fallback was rejected too
+
+S3's own slice bullet offered this fallback, and it is the interesting call, so it is recorded rather than
+quietly dropped. Three reasons:
+
+1. **The table's shape was derived from the URL.** OQ2 resolved the key to `(recipeID, sectionKind)`
+   because *"the session produced the whole set"* — that is the conversation URL's reasoning, not
+   provenance's. Shipping the table without the URL freezes a **permanent synced record type whose key is
+   justified by a field it no longer carries**: a design orphan.
+2. **There is no provenance consumer** (confirmed, Jon). Nothing in the app reads "this section came from
+   ChatGPT on the 19th." A synced table added on spec is exactly the cost that becomes **irreversible** at
+   the prod-schema cut, where promotion locks a record type permanently.
+3. **"Deferred" would have built it anyway.** A schema slice parked in a queue gets built later on the
+   momentum of the ADR saying so, not on need. Withdrawing is the honest state.
+
+### If provenance is ever actually wanted
+
+It designs its own storage against its own requirements — do **not** revive this table shape. Likely
+consumers, none of which exist today: a "regenerate everything the model wrote" sweep, section staleness
+marking, or [ADR-0038 Amd 4](ADR-0038-external-llm-handoff.md)'s smart-curation pass wanting to know what
+is model-authored. And per Amd 3's own withdrawal note, the durable session anchor is **the project**
+(OQ6 / `Menu.externalProjectName`, shipped); the real gap is that **Recipe has no project story** — the
+first move there is a per-recipe project name, not a URL.
+
 ## Deferred (on the record, explicitly not built here)
 
 - **Menu Playbook sections** ([ADR-0039 Amd 2/3](ADR-0039-playbook-column-thinking-vs-doing.md) — the shared
@@ -245,7 +284,13 @@ no storage and do not change the section hand-off contract.
 
 ## Storage sketch
 
-- **New synced `@Table PlaybookSectionMeta`** in `Models.swift` + migration in `Schema.swift`: `id: UUID`,
+> **⚠️ SUPERSEDED (2026-07-19).** Only the two `HandoffExportSource` / `AIHandoffTaskType` bullets and
+> `PlaybookSectionKind` were built (in S2). **`PlaybookSectionMeta` was never built and will not be** —
+> see [Amendment 3](#amendment-3--s3-is-withdrawn-the-conversation-url-does-not-exist-2026-07-19). ADR-0041
+> shipped with **no schema change**; nothing here goes on the prod-schema promotion list. Kept below as the
+> record of what was designed.
+
+- ~~**New synced `@Table PlaybookSectionMeta`**~~ **(withdrawn)** in `Models.swift` + migration in `Schema.swift`: `id: UUID`,
   `recipeID: UUID` (**real FK**, cascade on recipe delete), `sectionKind: PlaybookSectionKind`,
   `provenance` (`.chatGPTExternal` / `.inApp` / `.handAuthored`), `conversationURL: String?`,
   `dateModified: Date`. **Additive + synced** — add to `makeSyncEngine`'s table list *and* the standing
@@ -276,23 +321,25 @@ the synced meta table. Sequenced so the IA lands first on existing content and s
   Serve With union prefill, the blob Replace/Append choice, `supportingEvidenceRows` showing what's at risk,
   and the D2-superseding collapse of every section action into one header `•••` (retiring `PasteButton`).
   Follows S2's merge; independent of S3.
-- **S3 — the synced section meta + the conversation URL (schema + app).** `PlaybookSectionMeta` table +
-  migration + sync-set; the `conversationURL` field in the review sheet *and* the edit sheet; the
-  **"Reopen in ChatGPT"** deep-link; refine ADR-0038 Amd 3. **Gated on the same live-`/c/`-link device
-  check Amd 3 already owes** — if the ChatGPT app only exposes the `/share/` snapshot, S3's URL half is a
-  no-op until that changes (the meta + provenance still ship).
+- ~~**S3 — the synced section meta + the conversation URL (schema + app).**~~ **WITHDRAWN 2026-07-19 —
+  never built, and not queued.** The gate it carried ("if the ChatGPT app only exposes the `/share/`
+  snapshot, S3's URL half is a no-op") **fired**. The fallback this bullet named — "the meta + provenance
+  still ship" — was **also rejected**, deliberately: see [Amendment 3](#amendment-3--s3-is-withdrawn-the-conversation-url-does-not-exist-2026-07-19).
+  **ADR-0041 is complete at S2.6.**
 
 Verify per [[lean-verification-default]] — build + check-drift for the core; **Jon device-passes** the
-per-section round-trip and the reopen deep-link.
+per-section round-trip. ~~and the reopen deep-link~~ (withdrawn, Amendment 3).
 
 ## Open questions
 
-- **OQ1 — RESOLVED (2026-07-17, Jon): the synced `PlaybookSectionMeta` sidecar (D6b)**, not inline columns.
-  Sub-question left open — does `provenance` want more than `{ chatGPTExternal, inApp, handAuthored }` (which
-  model, date-of-generation)? Decide at S3 once the corpus says whether it's needed.
-- **OQ2 — RESOLVED (2026-07-17, Jon): one `conversationURL` per section**, not per item — the *session*
-  produced the whole set. Falls out of the D6b key `(recipeID, sectionKind)`: Serve With gets **one** meta
-  row, not one per suggestion.
+- **OQ1 — MOOT (2026-07-19, Amendment 3): the table was never built.** *Previously* resolved (2026-07-17,
+  Jon) as the synced `PlaybookSectionMeta` sidecar (D6b) rather than inline columns, with an open
+  sub-question about whether `provenance` wanted more than `{ chatGPTExternal, inApp, handAuthored }`. Both
+  the answer and the sub-question fall with S3.
+- **OQ2 — MOOT (2026-07-19, Amendment 3): there is no `conversationURL`.** *Previously* resolved
+  (2026-07-17, Jon) as one URL per section, not per item — the *session* produced the whole set — falling
+  out of the D6b key `(recipeID, sectionKind)`. **This resolution is precisely what made the meta-only
+  fallback wrong:** the key was justified by the URL, so the table could not outlive it. See Amendment 3.
 - **OQ3 — RESOLVED (2026-07-17, Jon's live ChatGPT taste): the Serve With list round-trips cleanly; S2
   un-gated.** *Method:* a hand-run of the S2-shaped outbound prompt (recipe context → accompaniments → pinned
   `title: note` per-line, "no bold, no bullets, no intro") through ChatGPT, then the reply through the **real**

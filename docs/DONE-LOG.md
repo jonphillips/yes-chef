@@ -9,6 +9,62 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0041 CLOSED at S2.6 — S3 withdrawn, the conversation URL does not exist
+
+**✅ Decision, 2026-07-19 (Jon) — docs only, no code.** [ADR-0041 Amendment 3](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-3--s3-is-withdrawn-the-conversation-url-does-not-exist-2026-07-19) + [ADR-0038 Amd 3 → **Withdrawn**](decisions/ADR-0038-external-llm-handoff.md#amendment-3--an-optional-user-pasted-conversationurl-to-reopen-the-live-chat-2026-07-15). **ADR-0041 shipped S1 → S2 → S2.5 → S2.6 with no schema change of its own; nothing was added to the prod-schema promotion list.**
+
+**The device check S3 was gated on came back negative.** ChatGPT's mobile flow yields only a `/share/` read-only snapshot, never the live `/c/` conversation URL, and no custom URL scheme or intent handler exists to reopen a conversation (requested publicly ~a year ago; nothing shipped). A universal link on `chatgpt.com/c/*` wouldn't need a scheme and might open the app — but it's moot, because **the URL can't be captured in the first place**. S3 existed to give that URL a synced, section-addressable home.
+
+**The "meta + provenance still ship" fallback was rejected too — this is the part worth remembering.** S3's own slice bullet had pre-authorized shipping `PlaybookSectionMeta` without the URL. Three reasons it didn't:
+
+1. **The table's shape was derived from the URL.** OQ2 keyed it `(recipeID, sectionKind)` because *"the session produced the whole set"* — the URL's reasoning, not provenance's. Shipping it URL-less would freeze a **permanent synced record type whose key is justified by a field it no longer carries.**
+2. **No provenance consumer exists** (confirmed). A synced table added on spec is exactly the cost that becomes **irreversible at the prod-schema cut**, where promotion locks a record type permanently.
+3. **"Deferred" would have built it anyway** — a schema slice parked in a queue gets built later on the momentum of the ADR saying so, rather than on need.
+
+**What survives the want.** The durable session anchor was always **the project**, not the URL (ADR-0038 OQ6 / `Menu.externalProjectName`, shipped and unaffected). The real remaining gap is that **Recipe has no project story** — so if "return to my ongoing conversation" resurfaces for recipes, the first move is a per-recipe project name reusing the shipped pattern, **not** a URL field or a revived meta table.
+
+---
+## ADR-0038 Amendment 5 — Learnings have sparse, human-controlled order
+
+**✅ Merged to main — PR [#210](https://github.com/jonphillips/yes-chef/pull/210), 2026-07-19 (recovery of the already-reviewed [#208](https://github.com/jonphillips/yes-chef/pull/208); unchanged cherry-pick). Verification green: `swift build`, Core migration/backfill + rebalance tests, generic iOS `build` **and** `build-for-testing`, `scripts/check-drift.sh`. Device pass owed (Jon).** Core + app; **schema — additive synced column + migration** (`Learning.sortOrder`), recorded in the standing prod-promotion list.
+
+**Learnings became manually reorderable** on the recipe Playbook, the menu Playbook, and menu prep-plan editing — the shared `LearningsSection` gained SDK 27 `.reorderable()` on its `ForEach` with `.reorderContainer(for: Learning.self)` on the enclosing `VStack` (it was already the drag container; no standalone `.draggable`). The query sorts ascending by rank, keeping the old date/UUID order only as a tie-breaker.
+
+**Ranks are sparse by design (the load-bearing call).** The migration backfills per `(sourceType, sourceID)` group at a `1024` stride and adds a matching index; a drag writes **only the moved rows**, taking a rank between neighbors, and rebalances just the one affected group when no integer gap remains. This deliberately differs from the contiguous `sortOrder` tables (ingredients, instructions, prep-plan steps): those are rewritten wholesale as a generated collection, while a Learning is a human move on a **live two-device synced library** — sparse ranks avoid an N-row sync write and reduce cross-device interleaving.
+
+**Known tradeoff, on the record for Jon's device pass.** New AI learnings still **prepend** (a backfill starting at `0` means the next insert takes a negative rank, e.g. `-1024` — negatives are valid), so a returned item can land ahead of a deliberate manual arrangement. Continuity was kept over inferring a mode switch; revisit if it fights real use.
+
+---
+## ADR-0041 Slice 2.6 — Playbook destructive-action safety + Serve With row consistency
+
+**✅ Merged to main — PR [#209](https://github.com/jonphillips/yes-chef/pull/209), 2026-07-19 (recovery of the already-reviewed [#207](https://github.com/jonphillips/yes-chef/pull/207); unchanged cherry-pick of `121ac58`). Verification green: Core build/tests, generic iOS `build` **and** `build-for-testing`, `scripts/check-drift.sh`. Device pass owed (Jon).** App + Core; **no schema / migration**. Spec: [ADR-0041 Amendment 2](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-2--destructive-section-actions-are-explicit-and-serve-with-rows-use-the-native-gesture-2026-07-19), from Jon's S2.5 device pass.
+
+- **Clear confirms before writing.** A section-scoped `confirmationDialog` (driven by a `clearingSection: PlaybookSectionKind?`) names the section and states there is no undo — clearing is a permanent write reachable from the shared `•••`.
+- **Clear left the section editor sheet — a deliberate partial reversal of D4.** D4 had put Clear in the editor so every action had a home, but its proximity to Cancel made it fat-fingerable. The `clear` closure came off `RecipeSectionEditorView` entirely; the editor is now purely review-and-save.
+- **Serve With adopts swipe-to-delete.** The always-visible red `xmark.circle` became a `.swipeActions` `Label("Remove …", systemImage: "trash")` inside a `.swipeActionsContainer()` — matching the app's other list rows, quieting the content column, still reachable by item name for VoiceOver.
+- **Pasted enrichment bullets normalize in Core.** The app-layer line-splitting renderer (which double-bulleted already-bulleted paste) was replaced by `PlaybookEnrichmentText.displayText(for:)` in `YesChefPackage` — paragraph-aware, strips leading `-`/`*`/`•`/`–` markers before applying the app's own `• ` treatment, and keeps single-line text as prose. Unit-covered for already-bulleted, mixed-style, single-line, and plain multi-line text. Pure logic in the package, per the Verification Pattern corollary.
+
+**⚠️ The stacked-merge trap repeated.** #207 and #208 were both based on `codex/adr-0041-s2-5-nondestructive-handoff` rather than main, and merged *after* #206 had already merged — so GitHub marked them "merged" while their commits never reached main. Recovered as clean cherry-picks onto main (#209, #210). Same lesson as PR #203: **base stacked PRs on main, or confirm the merge commit is an ancestor of main before treating it as shipped** ([[verify-local-fix-reached-merge]]).
+
+---
+## ADR-0041 Slice 2.5 — non-destructive section returns + the collapsed section toolbar
+
+**✅ Merged to main — PR [#206](https://github.com/jonphillips/yes-chef/pull/206), 2026-07-19. Verification green: `swift build`, `scripts/check-drift.sh` (SwiftLint + package tests), elevated `generic/platform=iOS` build. Device pass owed (Jon).** App + Core; **no schema / migration**. Spec: [ADR-0041 Amendment 1](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-1--a-return-never-stomps-existing-content-and-the-toolbar-collapses-into-the-overflow-2026-07-18).
+
+**A section return can no longer silently discard hand-authored work.** S2 had paired a *regenerate-fresh* outbound prompt (which excludes the section being regenerated — correct, kept) with an inbound commit that *replaced wholesale*, so "Hand off again" on a filled section destroyed existing content. Fixed on the return side only:
+
+1. **Serve With (list) — lossless union prefill.** The review sheet seeds with existing lines first, then returned lines, exact-deduped on the `title: note` rendering, in `YesChefPackage` with a unit test. Because `reconciledServeWithItems` matches on `title == && note ==`, surviving rows **keep their existing UUIDs** through the eventual replace-on-save; `replaceServeWithPlan` stays the only write path and stops being lossy because the box now starts out containing everything.
+2. **Make-ahead / Chef It Up (blob) — explicit Replace *or* Append, no default.** `ChatApplyReviewItem` took the smallest possible widening (an optional secondary commit: title + closure) rather than a restructure — it backs every apply-action in the app. Current section content shows under *"Currently saved"* via the already-existing, previously-unused `supportingEvidenceTitle` / `supportingEvidenceRows`.
+3. **Section state is captured at return-staging time**, so prompts stay fresh while the return review stays safe.
+4. **The section toolbar collapsed into one header `•••` (supersedes D2 on prominence).** Every action — Hand off / again, Paste, Edit, Ask, Clear — moved into a single overflow menu right of the fill-dot, rendered only when the section is expanded. Three sections × two filled-tint buttons shouted on every view for a weekly action ([[automation-decays-near-the-stove]]).
+5. **`PasteButton` retired.** It's a system-rendered `UIPasteControl` and cannot live inside a `Menu`; replaced with a plain `Button` reading `UIPasteboard.general.string`, gated on `hasStrings` (which does not prompt). The *"Allow Paste?"* alert is accepted — the grant is scoped to the current pasteboard contents, so it's ~one alert per round-trip.
+6. **One wide-layout seam (`01ed188`, independently revertible).** The iPad/non-compact width rule centralized in `WideLayout`; Menu, Recipe Detail, Workbench, and Meal Calendar now share it. Behavior-preserving (the Meal Calendar site already tested `horizontalSizeClass != .compact`); retains the iPad idiom test so a landscape Pro Max doesn't acquire the wide layout, and is the intentional future macOS seam ([[macos-longterm-target]]).
+
+**Architect review folded three fixes into the branch (`59fcaaa`).** (1) **Build break** — `ChatApplyReviewItem.commit(_:usingSecondaryCommit:)` was `nonisolated` while the closures it wraps are `@MainActor`, so every main-actor call site sent a non-Sendable `self` across isolation; both `build` and `build-for-testing` failed under Swift 6 region isolation. Isolated the method to `@MainActor`. (2) **Silent paste** — a declined paste alert left `UIPasteboard.general.string` nil and the action returned with no feedback; the empty case now goes to the transport, which surfaces the error. (3) **Replace was effectively pre-selected** — it led `.confirmationAction`, taking primary prominence and the keyboard default; now Append leads and Replace is marked destructive, so neither reads as the default (Amd1-D1).
+
+**A second review pass pinned the blob return shape (`3cf2880`).** The Playbook hands off in `.discuss` mode, which never emits `DeliverableFormat.example`, so the blob sections' only shape signal was "plain, paste-ready review text" — ChatGPT answered with a *report* (headings, nested Markdown bullets, an assessment of what the recipe already does well), which the flat-list renderer then prefixed `• ` line by line. Serve With was spared only because its contract lives in its own section prompt. The make-ahead and Chef It Up prompts now carry the same contract — one item per line, no headings, no nesting, no preamble, no assessment, six lines max — where it holds regardless of mode, with a test so it can't quietly fall out again. (The *rendering* half of that same defect is S2.6's Core normalizer, above.) Also separated the header controls: fill-dot + chevron hug the trailing edge as one status pair, the menu sits 12pt clear with a full 44×44 target.
+
+---
 ## ADR-0041 Slice 2 — the section-scoped external hand-off
 
 **✅ Merged to main — PR [#205](https://github.com/jonphillips/yes-chef/pull/205), 2026-07-18. Architect-verified locally: `generic/platform=iOS` **TEST BUILD SUCCEEDED** (0 errors) and the touched package tests green (5/5, incl. the section-routing and prompt-scoping tests); `scripts/check-drift.sh` green per Codex. Device pass owed (Jon).** Core + app-layer; **no schema / migration** (content stays in the existing `Recipe` fields; the section meta is S3).
