@@ -578,7 +578,11 @@ final class MenuDetailModel {
 
   func copyPrepPrompt(_ basePrompt: String) -> String? {
     let handoffID = uuid()
-    let prompt = AIHandoffToken.prompt(handoffID: handoffID, context: basePrompt)
+    let prompt = AIHandoffToken.prompt(
+      handoffID: handoffID,
+      title: AIHandoffTaskType.prepPlan.handoffTitle(for: detail?.menu.title ?? "Menu"),
+      context: basePrompt
+    )
 
     do {
       try database.write { db in

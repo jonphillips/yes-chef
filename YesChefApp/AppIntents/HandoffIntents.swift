@@ -134,6 +134,7 @@ enum HandoffExportSource: Sendable {
   case recipeSection(Recipe.ID, PlaybookSectionKind)
   case menu(Menu.ID)
   case mealPlan(MealPlanItem.ID)
+  case workbench(Workbench.ID)
 
   init(_ source: HandoffSource) {
     switch source {
@@ -159,6 +160,8 @@ extension HandoffExportSource {
       Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan)
     case let .mealPlan(mealPlanID):
       Metadata(sourceType: .mealPlan, sourceID: mealPlanID, taskType: .mealPlanMakeAheadStrategy)
+    case let .workbench(workbenchID):
+      Metadata(sourceType: .workbench, sourceID: workbenchID, taskType: .workbenchCompare)
     }
   }
 
@@ -167,6 +170,7 @@ extension HandoffExportSource {
     case .recipeSection: "recipe section"
     case .menu: "menu"
     case .mealPlan: "meal-plan day"
+    case .workbench: "workbench"
     }
   }
 
@@ -211,6 +215,7 @@ enum HandoffAppOperations {
       }
       let prompt = AIHandoffToken.prompt(
         handoffID: handoffID,
+        title: metadata.taskType.handoffTitle(for: detail.menu.title),
         context: MenuChatContext(detail: detail).prepPrompt(),
         mode: mode
       )
@@ -232,6 +237,7 @@ enum HandoffAppOperations {
       }
       let prompt = AIHandoffToken.prompt(
         handoffID: handoffID,
+        title: metadata.taskType.handoffTitle(for: detail.recipe.title),
         context: RecipeHandoffContext(detail: detail).prompt(for: section),
         mode: mode,
         deliverableFormat: section.deliverableFormat
@@ -271,9 +277,32 @@ enum HandoffAppOperations {
       }
       let prompt = AIHandoffToken.prompt(
         handoffID: handoffID,
+        title: metadata.taskType.handoffTitle(for: context.0.title),
         context: context.1.makeAheadPrompt(),
         mode: mode,
         deliverableFormat: .mealPlanMakeAheadStrategy
+      )
+      handoff = AIHandoff(
+        id: handoffID,
+        sourceType: metadata.sourceType,
+        sourceID: metadata.sourceID,
+        taskType: metadata.taskType,
+        createdAt: now,
+        exportedPrompt: prompt
+      )
+      externalProjectName = nil
+
+    case let .workbench(workbenchID):
+      guard let detail = try await database.read({ db in
+        try WorkbenchDetailRequest(workbenchID: workbenchID).fetch(db)
+      }) else {
+        throw HandoffIntentSurfaceError.sourceNotFound
+      }
+      let prompt = AIHandoffToken.prompt(
+        handoffID: handoffID,
+        title: metadata.taskType.handoffTitle(for: detail.workbench.title),
+        context: WorkbenchHandoffContext(detail: detail).comparePrompt(),
+        mode: mode
       )
       handoff = AIHandoff(
         id: handoffID,

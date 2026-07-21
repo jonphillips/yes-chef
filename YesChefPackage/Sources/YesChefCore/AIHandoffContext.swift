@@ -242,6 +242,24 @@ public struct MealPlanHandoffContext: Equatable, Sendable {
   }
 }
 
+public struct WorkbenchHandoffContext: Equatable, Sendable {
+  public let workbench: WorkbenchChatContext
+
+  public init(detail: WorkbenchDetailData) {
+    self.workbench = WorkbenchChatContext(detail: detail)
+  }
+
+  public func comparePrompt() -> String {
+    """
+    Compare the candidate recipes in this workbench. Do not restate the ingredient matrix; identify the named
+    differences that matter and attach a concrete claim about why each difference changes the result. Keep the
+    comparison grounded in the supplied recipes.
+
+    \(workbench.serialized(for: .frontierPreferred))
+    """
+  }
+}
+
 private func bounded(_ context: String) -> String {
   let budget = MenuChatContext.frontierSerializedCharacterBudget
   guard context.count > budget else { return context }

@@ -43,6 +43,7 @@ public enum AIHandoffSourceType: String, Codable, QueryBindable, QueryDecodable,
   case recipe
   case menu
   case mealPlan
+  case workbench
 }
 
 public enum AIHandoffTaskType: String, Codable, QueryBindable, QueryDecodable, Sendable {
@@ -53,6 +54,24 @@ public enum AIHandoffTaskType: String, Codable, QueryBindable, QueryDecodable, S
   case serveWith
   case adjustRecipe
   case mealPlanMakeAheadStrategy
+  case workbenchCompare
+
+  public func handoffTitle(for objectName: String) -> String {
+    "\(handoffTitlePrefix): \(objectName)"
+  }
+
+  private var handoffTitlePrefix: String {
+    switch self {
+    case .prepPlan: "Prep Plan"
+    case .learning: "Learnings"
+    case .recipeMakeAhead: "Make-ahead"
+    case .chefItUp: "Chef It Up"
+    case .serveWith: "Serve With"
+    case .adjustRecipe: "Adjust Recipe"
+    case .mealPlanMakeAheadStrategy: "Make-ahead Strategy"
+    case .workbenchCompare: "Compare"
+    }
+  }
 }
 
 /// An independently actionable section of a recipe's Playbook. The content remains in the recipe's
@@ -395,15 +414,15 @@ public enum AIHandoffToken {
     var discussInstruction: String {
       switch self {
       case .menuPrepPlan:
-        "return only the token line above as the first line, followed by the paste-ready prep plan"
+        "return the paste-ready prep plan"
       case .recipeMakeAhead:
-        "return only the token line above as the first line, followed by the paste-ready recipe make-ahead notes"
+        "return the paste-ready recipe make-ahead notes"
       case .recipeChefItUp:
-        "return only the token line above as the first line, followed by the paste-ready Chef It Up notes"
+        "return the paste-ready Chef It Up notes"
       case .recipeServeWith:
-        "return only the token line above as the first line, followed by paste-ready Serve With suggestions"
+        "return the paste-ready Serve With suggestions"
       case .mealPlanMakeAheadStrategy:
-        "return only the token line above as the first line, followed by the paste-ready meal-plan make-ahead strategy"
+        "return the paste-ready meal-plan make-ahead strategy"
       }
     }
 
@@ -447,10 +466,12 @@ public enum AIHandoffToken {
   public struct RoutedText: Equatable, Sendable {
     public let handoffID: AIHandoff.ID
     public let payload: String
+    public let contractVersion: String?
 
-    public init(handoffID: AIHandoff.ID, payload: String) {
+    public init(handoffID: AIHandoff.ID, payload: String, contractVersion: String?) {
       self.handoffID = handoffID
       self.payload = payload
+      self.contractVersion = contractVersion
     }
   }
 
@@ -458,6 +479,7 @@ public enum AIHandoffToken {
 
   public static func prompt(
     handoffID: AIHandoff.ID,
+    title: String,
     context: String,
     mode: PromptMode = .discuss,
     deliverableFormat: DeliverableFormat = .menuPrepPlan
@@ -466,24 +488,26 @@ public enum AIHandoffToken {
     switch mode {
     case .discuss:
       return """
+      \(title)
+
       \(token)
 
       \(context)
 
-      You may discuss this freely. When the user asks you to finalize, \(deliverableFormat.discussInstruction), then a YC-LEARNINGS: line and a distinct bullet list of durable knowledge established during the discussion. A learning-only return is valid: leave the deliverable portion empty and include the marker plus bullets. Preserve that token and marker exactly; never merge learnings into a prose summary; do not use a Markdown code fence.
+      You may discuss this freely. When the user asks you to finalize, \(deliverableFormat.discussInstruction). Follow the Yes Chef project instructions for the terminal return block.
 
       Keep the deliverable practical, atomic, and grounded in the provided context. Never write choreography or a merged mega-recipe: recipe cooking instructions stay with their recipes.
       """
     case .immediate:
       return """
+      \(title)
+
       \(token)
 
       \(context)
 
-      \(deliverableFormat.immediateInstruction) Preserve the token above as the first line. Return only the token, formatted deliverable, and a YC-LEARNINGS: section of distinct durable-learning bullets: no preamble and no Markdown code fence. A learning-only return is valid: leave the deliverable portion empty and include the marker plus bullets. Keep the deliverable practical, atomic, and grounded in the provided context; never choreography or a merged mega-recipe. Use this exact format:
+      \(deliverableFormat.immediateInstruction) Follow the Yes Chef project instructions for the terminal return block. Keep the deliverable practical, atomic, and grounded in the provided context; never choreography or a merged mega-recipe. Use this exact format:
       \(deliverableFormat.example)
-      YC-LEARNINGS:
-      - durable learning
       """
     }
   }
@@ -502,7 +526,50 @@ public enum AIHandoffToken {
     guard let handoffID = UUID(uuidString: String(rawID)) else { return nil }
 
     lines.removeFirst()
-    return RoutedText(handoffID: handoffID, payload: lines.joined(separator: "\n"))
+    let contractVersion = AIHandoffProjectContract.returnedVersion(in: lines)
+    lines.removeAll(where: AIHandoffProjectContract.isVersionMarker)
+    return RoutedText(
+      handoffID: handoffID,
+      payload: lines.joined(separator: "\n"),
+      contractVersion: contractVersion
+    )
+  }
+}
+
+/// The v1 instructions that the cook pastes into the shared Yes Chef project. Keeping the exact return
+/// contract here lets the app reject a stale paste instead of silently accepting a differently-shaped return.
+public enum AIHandoffProjectContract {
+  public static let version = "v1"
+  public static let versionMarker = "YC-CONTRACT: \(version)"
+
+  public static let instructions = """
+  You are the external deliberation partner for Yes Chef. The first line of each prompt is its suggested thread title; preserve that title when your chat app allows it, but never treat it as data.
+
+  Discuss the request normally. Only when the user says to finalize, emit a terminal return block and nothing else:
+  1. First line: repeat the prompt's `YC-HANDOFF: <UUID>` token exactly.
+  2. Second line: `\(versionMarker)`.
+  3. Then emit the requested deliverable. If the prompt permits learnings, put them after a `YC-LEARNINGS:` line as distinct bullets. A learning-only return may leave the deliverable empty.
+
+  In a terminal return block: no preamble, sign-off, headings, or nesting; do not assess what is already good; do not merge distinct requested items into a summary; and omit an item rather than inventing a partial answer.
+  """
+
+  public static func isCurrent(version: String?) -> Bool {
+    version == Self.version
+  }
+
+  static func returnedVersion(in lines: [String]) -> String? {
+    lines.first(where: isVersionMarker).map { line in
+      line
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .dropFirst("YC-CONTRACT:".count)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+  }
+
+  static func isVersionMarker(_ line: String) -> Bool {
+    line
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .hasPrefix("YC-CONTRACT:")
   }
 }
 
@@ -603,12 +670,25 @@ public struct AIHandoffMealPlanMakeAheadReview: Equatable, Sendable {
   }
 }
 
+public struct AIHandoffWorkbenchCompareReview: Equatable, Sendable {
+  public let handoffID: AIHandoff.ID
+  public let workbenchID: Workbench.ID
+  public let text: String
+
+  public init(handoffID: AIHandoff.ID, workbenchID: Workbench.ID, text: String) {
+    self.handoffID = handoffID
+    self.workbenchID = workbenchID
+    self.text = text
+  }
+}
+
 public enum AIHandoffReview: Equatable, Sendable {
   case menuPrepPlan(AIHandoffMenuPrepPlanReview)
   case recipeMakeAhead(AIHandoffRecipeMakeAheadReview)
   case recipeChefItUp(AIHandoffRecipeSectionReview)
   case recipeServeWith(AIHandoffRecipeSectionReview)
   case mealPlanMakeAhead(AIHandoffMealPlanMakeAheadReview)
+  case workbenchCompare(AIHandoffWorkbenchCompareReview)
 
   public var handoffID: AIHandoff.ID {
     switch self {
@@ -617,6 +697,7 @@ public enum AIHandoffReview: Equatable, Sendable {
     case let .recipeChefItUp(review): review.handoffID
     case let .recipeServeWith(review): review.handoffID
     case let .mealPlanMakeAhead(review): review.handoffID
+    case let .workbenchCompare(review): review.handoffID
     }
   }
 }
@@ -691,6 +772,7 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
   case duplicate
   case emptyPlan
   case unparsedPlanText([String])
+  case outdatedProjectInstructions
 
   public var errorDescription: String? {
     switch self {
@@ -706,6 +788,8 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
       "The returned handoff needs a deliverable or at least one learning bullet."
     case let .unparsedPlanText(lines):
       "Could not import these prep-plan lines: \(lines.joined(separator: " | "))"
+    case .outdatedProjectInstructions:
+      "Your Yes Chef project instructions are out of date. Re-copy them from Settings and try again."
     }
   }
 
@@ -745,6 +829,9 @@ public enum AIHandoffIntentImport {
     }
     guard let handoff = try AIHandoffRepository.handoff(id: resolvedHandoffID, in: db) else {
       throw AIHandoffIntentImportError.handoffNotFound(resolvedHandoffID)
+    }
+    guard AIHandoffProjectContract.isCurrent(version: routedText?.contractVersion) else {
+      throw AIHandoffIntentImportError.outdatedProjectInstructions
     }
     guard handoff.status == .awaitingReturn, handoff.importedAt == nil else {
       throw AIHandoffIntentImportError.duplicate
@@ -821,7 +908,7 @@ public enum AIHandoffIntentImport {
             learnings: returned.learnings
           )
         )
-      case .prepPlan, .adjustRecipe, .mealPlanMakeAheadStrategy:
+      case .prepPlan, .adjustRecipe, .mealPlanMakeAheadStrategy, .workbenchCompare:
         throw AIHandoffIntentImportError.wrongTask
       }
 
@@ -844,6 +931,24 @@ public enum AIHandoffIntentImport {
           strategy: parsed.strategy,
           learnings: returned.learnings,
           unparsedStrategyLines: parsed.unparsedLines
+        )
+      )
+
+    case .workbench:
+      guard handoff.taskType == .workbenchCompare,
+        try Workbench.find(handoff.sourceID).fetchOne(db) != nil
+      else {
+        throw AIHandoffIntentImportError.wrongTask
+      }
+      let text = payload.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !text.isEmpty else {
+        throw AIHandoffIntentImportError.emptyPlan
+      }
+      review = .workbenchCompare(
+        AIHandoffWorkbenchCompareReview(
+          handoffID: handoff.id,
+          workbenchID: handoff.sourceID,
+          text: text
         )
       )
     }

@@ -33,6 +33,8 @@ final class HandoffReviewCoordinator {
       recipeServeWithReviewItems(for: review)
     case let .mealPlanMakeAhead(review):
       mealPlanMakeAheadReviewItems(for: review)
+    case let .workbenchCompare(review):
+      workbenchCompareReviewItems(for: review)
     }
   }
 
@@ -253,6 +255,27 @@ final class HandoffReviewCoordinator {
     return items
   }
 
+  private func workbenchCompareReviewItems(
+    for review: AIHandoffWorkbenchCompareReview
+  ) -> [ChatApplyReviewItem] {
+    [
+      ChatApplyReviewItem(
+        id: review.handoffID,
+        title: "Review comparison",
+        summary: review.text,
+        presentation: .sheet,
+        editableTitle: "Comparison",
+        editableText: review.text,
+        commitTitle: "Save to Workbench Log",
+        committingTitle: "Saving to Workbench Log…",
+        committedTitle: "Saved to Workbench Log",
+        commit: { [weak self] approvedText in
+          try self?.commitWorkbenchCompare(review, approvedText: approvedText)
+        }
+      ),
+    ]
+  }
+
   private func reviewEditablePrepPlanText(_ review: AIHandoffMenuPrepPlanReview) -> String {
     [review.plan.editableReviewText(), review.unparsedPlanLines.joined(separator: "\n")]
       .filter { !$0.isEmpty }
@@ -266,7 +289,7 @@ final class HandoffReviewCoordinator {
     }
     let plan = parsed.plan
     guard !plan.steps.isEmpty else { throw AIHandoffMenuPrepPlanImportError.emptyPlan }
-    try database.write { db in
+    _ = try database.write { db in
       try MenuRepository.applyPrepPlan(plan, to: review.menuID, in: db, now: now, uuid: { uuid() })
     }
   }
@@ -361,6 +384,23 @@ final class HandoffReviewCoordinator {
       try MealCalendarRepository.addMakeAheadStrategyNote(
         parsed.strategy,
         on: review.scheduledDate,
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
+    }
+  }
+
+  private func commitWorkbenchCompare(
+    _ review: AIHandoffWorkbenchCompareReview,
+    approvedText: String
+  ) throws {
+    let text = approvedText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { throw HandoffReviewError.emptyDeliverable }
+    _ = try database.write { db in
+      try WorkbenchRepository.addLogEntry(
+        WorkbenchLogEntryDraft(kind: .observation, body: text),
+        to: review.workbenchID,
         in: db,
         now: now,
         uuid: { uuid() }

@@ -22,6 +22,7 @@ struct WorkbenchCompareView: View {
   @Environment(\.dismiss) private var dismiss
   @State private var segment: Segment = .ingredients
   @State private var compactChatModel: RecipeChatModel?
+  @State private var handoffTransport = HandoffInAppTransport()
 
   private var workingDetail: RecipeDetailData? {
     detail.draftRecipeDetail
@@ -127,6 +128,12 @@ struct WorkbenchCompareView: View {
             }
           }
         }
+        ToolbarItem(placement: .topBarLeading) {
+          HandoffCopyPasteControls(
+            source: .workbench(detail.workbench.id),
+            transport: handoffTransport
+          )
+        }
         if segment == .ingredients {
           ToolbarItemGroup(placement: .topBarTrailing) {
             if isAligning {
@@ -168,6 +175,7 @@ struct WorkbenchCompareView: View {
         activeTierChanged: compactChatActiveTierChanged
       )
     }
+    .handoffTransportAlert(handoffTransport)
   }
 
   private func ingredientsSegmentAppeared() async {

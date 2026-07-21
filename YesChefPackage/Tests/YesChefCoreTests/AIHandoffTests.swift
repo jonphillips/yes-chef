@@ -13,26 +13,33 @@ import YesChefCore
 )
 struct AIHandoffTests {
   @Test
-  func tokenPrefixesTheExportAndStripsOnlyItsHeaderFromTheReturn() throws {
+  func contractPrefixesEveryExportAndStripsItsRoutingMetadataFromTheReturn() throws {
     let handoffID = SampleUUIDSequence.uuid(38_001)
-    let prompt = AIHandoffToken.prompt(handoffID: handoffID, context: "Menu context")
+    let prompt = AIHandoffToken.prompt(
+      handoffID: handoffID,
+      title: "Prep Plan: Beach Menu",
+      context: "Menu context"
+    )
 
-    #expect(prompt.hasPrefix("YC-HANDOFF: \(handoffID.uuidString)\n"))
-    #expect(prompt.contains("Preserve that token and marker exactly"))
-    #expect(prompt.contains("YC-LEARNINGS:"))
-    #expect(prompt.contains("never merge learnings into a prose summary"))
+    #expect(prompt.hasPrefix("Prep Plan: Beach Menu\n\nYC-HANDOFF: \(handoffID.uuidString)\n"))
+    #expect(prompt.contains("Follow the Yes Chef project instructions for the terminal return block."))
+    #expect(!prompt.contains(AIHandoffProjectContract.instructions))
+    #expect(AIHandoffProjectContract.instructions.contains(AIHandoffProjectContract.versionMarker))
+    #expect(AIHandoffProjectContract.instructions.contains("no preamble, sign-off, headings, or nesting"))
     #expect(prompt.contains("Never write choreography"))
 
     let routedText = try #require(
       AIHandoffToken.stripping(
         from: """
         YC-HANDOFF: \(handoffID.uuidString)
+        YC-CONTRACT: v1
         Wednesday evening:
         - Salt the chicken → Thursday dinner
         """
       )
     )
     expectNoDifference(routedText.handoffID, handoffID)
+    expectNoDifference(routedText.contractVersion, AIHandoffProjectContract.version)
     expectNoDifference(
       routedText.payload,
       """
@@ -47,15 +54,54 @@ struct AIHandoffTests {
     let handoffID = SampleUUIDSequence.uuid(38_002)
     let prompt = AIHandoffToken.prompt(
       handoffID: handoffID,
+      title: "Prep Plan: Beach Menu",
       context: "Menu context",
       mode: .immediate
     )
 
     #expect(prompt.contains("Return the completed prep plan in your first response when the menu needs one."))
-    #expect(prompt.contains("YC-LEARNINGS: section of distinct durable-learning bullets"))
-    #expect(prompt.contains("A learning-only return is valid"))
+    #expect(prompt.contains("Follow the Yes Chef project instructions for the terminal return block."))
     #expect(prompt.contains("never choreography or a merged mega-recipe"))
-    #expect(prompt.hasSuffix("YC-LEARNINGS:\n- durable learning"))
+    #expect(prompt.hasSuffix("session:\n- task → serves"))
+  }
+
+  @Test
+  func returnWithMissingOrStaleProjectInstructionsIsRejectedBeforeReview() throws {
+    @Dependency(\.defaultDatabase) var database
+    let menuID = SampleUUIDSequence.uuid(38_003)
+    let handoffID = SampleUUIDSequence.uuid(38_004)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Menu.insert {
+        Menu(id: menuID, title: "Beach Menu", dayCount: 2, dateCreated: now, dateModified: now)
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .menu,
+          sourceID: menuID,
+          taskType: .prepPlan,
+          createdAt: now,
+          exportedPrompt: ""
+        ),
+        in: db
+      )
+
+      #expect(
+        throws: AIHandoffIntentImportError.outdatedProjectInstructions,
+        performing: {
+          _ = try AIHandoffIntentImport.stageReview(
+            handoffID: handoffID,
+            result: "YC-HANDOFF: \(handoffID.uuidString)\nYC-CONTRACT: v0\nComparison",
+            in: db,
+            now: now
+          )
+        }
+      )
+      #expect(try AIHandoffRepository.handoff(id: handoffID, in: db)?.status == .awaitingReturn)
+    }
   }
 
   @Test
@@ -301,6 +347,7 @@ struct AIHandoffTests {
         handoffID: handoffID,
         result: """
         YC-HANDOFF: \(handoffID.uuidString)
+        YC-CONTRACT: v1
         Wednesday evening:
         - Salt the chicken → Thursday dinner
         """,
@@ -321,7 +368,7 @@ struct AIHandoffTests {
         performing: {
           _ = try AIHandoffIntentImport.stageMenuPrepPlanReview(
             handoffID: handoffID,
-            result: "Wednesday evening:\n- Duplicate import",
+            result: "YC-HANDOFF: \(handoffID.uuidString)\nYC-CONTRACT: v1\nWednesday evening:\n- Duplicate import",
             in: db,
             now: now
           )
@@ -358,6 +405,7 @@ struct AIHandoffTests {
         handoffID: handoffID,
         result: """
         YC-HANDOFF: \(handoffID.uuidString)
+        YC-CONTRACT: v1
         Wednesday evening:
         - Salt the chicken → Thursday dinner
         Let me know if you'd like changes!
@@ -412,6 +460,7 @@ struct AIHandoffTests {
         handoffID: handoffID,
         result: """
         YC-HANDOFF: \(handoffID.uuidString)
+        YC-CONTRACT: v1
         YC-LEARNINGS:
         - Dried bay leaves beat fresh.
         - Birria benefits from sitting overnight.

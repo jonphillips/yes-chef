@@ -10,12 +10,14 @@ extension AIHandoffTests {
   func promptsUseTheSourceSpecificReviewFormat() {
     let recipePrompt = AIHandoffToken.prompt(
       handoffID: SampleUUIDSequence.uuid(38_035),
+      title: "Make-ahead: Birria",
       context: "Recipe context",
       mode: .immediate,
       deliverableFormat: .recipeMakeAhead
     )
     let mealPlanPrompt = AIHandoffToken.prompt(
       handoffID: SampleUUIDSequence.uuid(38_036),
+      title: "Make-ahead Strategy: Tuesday",
       context: "Meal-plan context",
       mode: .immediate,
       deliverableFormat: .mealPlanMakeAheadStrategy
@@ -155,6 +157,7 @@ extension AIHandoffTests {
         handoffID: handoffID,
         result: """
         YC-HANDOFF: \(handoffID.uuidString)
+        YC-CONTRACT: v1
         Make the chile sauce up to two days ahead and refrigerate it.
         YC-LEARNINGS:
         - Birria improves after resting overnight.
@@ -216,6 +219,7 @@ extension AIHandoffTests {
         handoffID: chefItUpHandoffID,
         result: """
         YC-HANDOFF: \(chefItUpHandoffID.uuidString)
+        YC-CONTRACT: v1
         Bloom the chiles in oil before blending the sauce.
         """,
         in: db,
@@ -269,6 +273,7 @@ extension AIHandoffTests {
         handoffID: handoffID,
         result: """
         YC-HANDOFF: \(handoffID.uuidString)
+        YC-CONTRACT: v1
         Make-ahead strategy - Dinner
         Two days ahead: Make the chile sauce.
         This sentence has no timing label.
@@ -290,6 +295,66 @@ extension AIHandoffTests {
       )
       expectNoDifference(mealPlanReview.unparsedStrategyLines, ["This sentence has no timing label."])
       expectNoDifference(mealPlanReview.learnings, ["Birria improves after resting overnight."])
+    }
+  }
+
+  @Test
+  func workbenchCompareStagesTheEntireReturnAsEditableObservationProse() throws {
+    @Dependency(\.defaultDatabase) var database
+    let workbenchID = SampleUUIDSequence.uuid(38_050)
+    let handoffID = SampleUUIDSequence.uuid(38_051)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Workbench.insert {
+        Workbench(
+          id: workbenchID,
+          title: "Chocolate Chip Cookies",
+          sortOrder: 0,
+          dateCreated: now,
+          dateModified: now
+        )
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .workbench,
+          sourceID: workbenchID,
+          taskType: .workbenchCompare,
+          createdAt: now,
+          exportedPrompt: ""
+        ),
+        in: db
+      )
+
+      let review = try AIHandoffIntentImport.stageReview(
+        handoffID: handoffID,
+        result: """
+        YC-HANDOFF: \(handoffID.uuidString)
+        YC-CONTRACT: v1
+        hydration: 65% vs 78%, so the second candidate should bake with a more open crumb.
+        YC-LEARNINGS:
+        - Higher hydration can open the crumb.
+        """,
+        in: db,
+        now: now
+      )
+
+      guard case let .workbenchCompare(compareReview) = review else {
+        Issue.record("Expected a workbench comparison review.")
+        return
+      }
+      expectNoDifference(compareReview.workbenchID, workbenchID)
+      expectNoDifference(
+        compareReview.text,
+        """
+        hydration: 65% vs 78%, so the second candidate should bake with a more open crumb.
+        YC-LEARNINGS:
+        - Higher hydration can open the crumb.
+        """
+      )
+      #expect(try AIHandoffRepository.handoff(id: handoffID, in: db)?.status == .imported)
     }
   }
 }

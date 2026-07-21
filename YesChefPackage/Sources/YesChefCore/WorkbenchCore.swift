@@ -434,6 +434,32 @@ public enum WorkbenchRepository {
     return entryID
   }
 
+  /// A workbench's draft recipe is the only recipe that carries that workbench's deliberation history.
+  /// Record an accepted structured adjustment there, in the same transaction as the adjustment itself.
+  @discardableResult
+  public static func addRationaleForCommittedAdjustment(
+    recipeID: Recipe.ID,
+    rationale: String,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> WorkbenchLogEntry.ID? {
+    guard let workbench = try Workbench.fetchAll(db).first(where: { $0.draftRecipeID == recipeID }) else {
+      return nil
+    }
+    return try addLogEntry(
+      WorkbenchLogEntryDraft(
+        kind: .rationale,
+        body: rationale,
+        relatedRecipeID: recipeID
+      ),
+      to: workbench.id,
+      in: db,
+      now: now,
+      uuid: uuid
+    )
+  }
+
   public static func updateLogEntry(
     entryID: WorkbenchLogEntry.ID,
     draft: WorkbenchLogEntryDraft,

@@ -2,6 +2,7 @@ import Dependencies
 import Foundation
 import LLMClientKit
 import Observation
+import UIKit
 import YesChefCore
 
 @MainActor
@@ -98,6 +99,10 @@ final class AISettingsModel {
       errorMessage = String(describing: error)
       isShowingError = true
     }
+  }
+
+  func copyProjectInstructionsButtonTapped() {
+    UIPasteboard.general.string = AIHandoffProjectContract.instructions
   }
 
   private func refresh() {

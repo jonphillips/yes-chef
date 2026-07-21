@@ -74,6 +74,18 @@ struct AISettingsView: View {
         }
         .disabled(!model.hasUnsavedPreferenceChanges)
       }
+
+      Section {
+        Button {
+          model.copyProjectInstructionsButtonTapped()
+        } label: {
+          Label("Copy Yes Chef Instructions", systemImage: "doc.on.doc")
+        }
+      } header: {
+        Text("ChatGPT Project")
+      } footer: {
+        Text("Paste these into the shared Yes Chef project's custom instructions. Yes Chef rejects returned handoffs from stale instructions.")
+      }
     }
     .navigationTitle("AI")
     .task { model.onAppear() }
