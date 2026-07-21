@@ -290,6 +290,8 @@ struct MealCalendarDayAgendaView: View {
       }
     }
     .handoffTransportAlert(handoffTransport)
+    // This view has no custom `init`, so the transport picks up the shared toast center on appear.
+    .onAppear { handoffTransport.toastCenter = model.toastCenter }
   }
 
   private var agendaContent: some View {

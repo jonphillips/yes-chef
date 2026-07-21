@@ -123,7 +123,8 @@ struct WorkbenchDetailView: View {
   @AppStorage(ChatWorkspaceDetent.storageKey) private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   @State private var model: WorkbenchDetailModel
   @State private var compareTier: ModelTier = .onDevice
-  @State private var handoffTransport = HandoffInAppTransport()
+  @State private var handoffTransport: HandoffInAppTransport
+  @State private var toastCenter: AppToastCenter
   let isFocusActive: Bool
   let focusButtonTapped: (() -> Void)?
 
@@ -133,12 +134,16 @@ struct WorkbenchDetailView: View {
     isFocusActive: Bool = false,
     focusButtonTapped: (() -> Void)? = nil
   ) {
+    let toastCenter = AppToastCenter()
+    _toastCenter = State(wrappedValue: toastCenter)
+    _handoffTransport = State(wrappedValue: HandoffInAppTransport(toastCenter: toastCenter))
     _model = State(
       wrappedValue: WorkbenchDetailModel(
         workbenchID: workbenchID,
         openRecipe: { recipeID in
           onRecipeSelected(RecipeDetailPresentation(recipeID: recipeID, workbenchID: workbenchID))
-        }
+        },
+        toastCenter: toastCenter
       )
     )
     self.isFocusActive = isFocusActive
@@ -285,6 +290,13 @@ struct WorkbenchDetailView: View {
     ) {
       compareCover
     }
+    // The workbench is itself presented as a sheet, so it needs its own toast host — an overlay
+    // mounted by a presenting view does not draw over the sheet it presents.
+    .overlay(alignment: .top) {
+      AppToastOverlay(toastCenter: toastCenter)
+        .ignoresSafeArea(.keyboard)
+    }
+    .sensoryFeedback(.success, trigger: toastCenter.feedbackTrigger)
   }
 
   @ViewBuilder private var compareCover: some View {
@@ -730,28 +742,42 @@ private struct WorkbenchCandidateRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      HStack(alignment: .top, spacing: 12) {
-        if let photo = candidatePhoto {
-          RecipePhotoImage(
-            photoID: photo.id,
-            checksum: photo.checksum,
-            variant: .thumbnail,
-            thumbnailData: photo.thumbnailData
-          )
-          .frame(width: 72, height: 72)
-          .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-          .clipShape(RoundedRectangle(cornerRadius: 8))
-          .accessibilityLabel(Text("Photo for \(row.displayTitle)"))
+      Button {
+        guard let recipeID = row.recipeDetail?.recipe.id else { return }
+        model.openCandidateButtonTapped(recipeID: recipeID)
+      } label: {
+        HStack(alignment: .top, spacing: 12) {
+          if let photo = candidatePhoto {
+            RecipePhotoImage(
+              photoID: photo.id,
+              checksum: photo.checksum,
+              variant: .thumbnail,
+              thumbnailData: photo.thumbnailData
+            )
+            .frame(width: 72, height: 72)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .accessibilityLabel(Text("Photo for \(row.displayTitle)"))
+          }
+          VStack(alignment: .leading, spacing: 5) {
+            Text(row.displayTitle)
+              .font(.headline)
+            Label(sourceDisplayName, systemImage: "book")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+          Spacer(minLength: 0)
+          if row.recipeDetail != nil {
+            Image(systemName: "chevron.right")
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(.tertiary)
+          }
         }
-        VStack(alignment: .leading, spacing: 5) {
-          Text(row.displayTitle)
-            .font(.headline)
-          Label(sourceDisplayName, systemImage: "book")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        Spacer(minLength: 0)
+        .contentShape(.rect)
       }
+      .buttonStyle(.plain)
+      .disabled(row.recipeDetail == nil)
+      .accessibilityHint(row.recipeDetail == nil ? "" : "Opens this candidate recipe")
       if let recipe = row.recipeDetail?.recipe {
         HStack(spacing: 10) {
           if let totalTimeMinutes = recipe.totalTimeMinutes {
