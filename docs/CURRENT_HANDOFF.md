@@ -33,6 +33,10 @@ PR); do all listed, in order.
 
 **Do not** wire `adjustRecipe` as a paste-back (D2 — it's a structured canonical write, stays the in-app verb) or build the ADR-0019 S3 `experiments` BLOB (superseded — rows, not a blob). `workbenchDraft` stays deferred (D5/S3).
 
+**Device pass owed (Jon) on ADR-0042 S2 — unmerged, PR [#214](https://github.com/jonphillips/yes-chef/pull/214).** Architect review of `6c71c8a` found the slice faithful to the ADR (label-cycle parser, D8 no-learnings enforced in prompt + contract + import, per-field edit affordance, promotion list updated); package build + 378/378 tests + generic-iOS build all green. Two review fixes landed in `a7b66b9`: the experiments **migration was registered mid-list, ahead of the already-applied ADR-0040 prep-plans migration** — moved to the end so applied migrations stay a stable prefix (additive and independent, so no data risk either way); and the pasted contract now carries a **human-visible `v2` version label**, since the version previously appeared only inside the "second line must be `YC-CONTRACT: v2`" clause and a human could not tell which version their project held. **⚠️ The contract is v2 — re-copy the project instructions from AI Settings before any round-trip, or every verb fails the marker gate.** *Verify on device:* an experiments hand-off round-trips into typed rows; editing one field leaves the other two untouched; a stale-v1 paste surfaces the friendly re-copy error. Non-blocking follow-ups left for Codex: the `canSave`/`normalizedLogEntryDraft` mismatch on body-plus-partial-typed-fields, the dead save spinner, and the pre-existing compare `.menuPrepPlan` mislabel.
+
+**Workbench dogfooding polish (Jon's asks, `aa100d0`, rides in #214).** Candidate rows open their recipe on tap (header only — the row also hosts the annotation field); copy and save now confirm via the existing `AppToastCenter` toast + success haptic, on all four hand-off surfaces plus workbench annotation and log-entry saves. Toast hosting differs by surface because an overlay mounted by a presenting view does not draw over the sheet it presents: workbench and `RecipeDetailView` host their own (the latter is built from four call sites and only `RecipeFullScreenCover` mounted one, so the iPad `AppMainLayout` path was silent), while Menu and Meal Calendar reuse their model's shared center. *Verify on device:* toasts appear over the workbench sheet and on the iPad split recipe path.
+
 **Device passes owed (Jon) on already-merged work** — S2.5 (#206): filled Serve With prefill retains existing rows; filled Make-ahead offers Replace/Append with neither pre-selected; section actions live only in the expanded-header `•••`; paste prompts once per round-trip; Meal Calendar uses compact layout in iPad Slide Over. S2.6 (#209): every Clear asks first, editor sheets have no Clear, Serve With deletes by swipe with no visible `x`, pasted bullets render singly. ADR-0038 Amd 5 (#210): learnings drag-reorder on all three surfaces and hold across a two-device sync — and watch the recorded tradeoff, that a newly returned learning still prepends **ahead of** a deliberate manual arrangement.
 
 
@@ -59,8 +63,8 @@ prod/TestFlight cut. At that cut, deploy to the production schema the Phase E Sl
 PR #141), **and** the ADR-0021
 synced `recipeVariations` table (Recipe edit proposals S2), **and `Menu.externalProjectName`** (ADR-0038 S2),
 **and the synced `learnings` table including its `sortOrder` column** (ADR-0038 Amd 1 / Amd 5) **and the synced `prepPlanSteps` table**
-(ADR-0040 S2 — which also **retires the `Menu.prepPlan` BLOB**: restructure it *before* this cut), **and the synced `workbenchLog` table including its nullable `hypothesis` / `change` / `rationale` columns** (ADR-0042 S2), because
-promotion locks the record type permanently); and note the app target
+(ADR-0040 S2 — which also **retires the `Menu.prepPlan` BLOB**: restructure it *before* this cut, because
+promotion locks the record type permanently), **and the synced `workbenchLog` table including its nullable `hypothesis` / `change` / `rationale` columns** (ADR-0042 S2); and note the app target
 (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 
 ## Ready Efforts (queue)
