@@ -134,14 +134,14 @@ enum HandoffExportSource: Sendable {
   case recipeSection(Recipe.ID, PlaybookSectionKind)
   case menu(Menu.ID)
   case mealPlan(MealPlanItem.ID)
-  case workbench(Workbench.ID)
+  case workbench(Workbench.ID, task: WorkbenchHandoffTask)
 
   init(_ source: HandoffSource) {
     switch source {
     case let .recipe(recipe): self = .recipeSection(recipe.id, .makeAhead)
     case let .menu(menu): self = .menu(menu.id)
     case let .mealPlan(mealPlan): self = .mealPlan(mealPlan.id)
-    case let .workbench(workbench): self = .workbench(workbench.id)
+    case let .workbench(workbench): self = .workbench(workbench.id, task: .compare)
     }
   }
 }
@@ -161,8 +161,8 @@ extension HandoffExportSource {
       Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan)
     case let .mealPlan(mealPlanID):
       Metadata(sourceType: .mealPlan, sourceID: mealPlanID, taskType: .mealPlanMakeAheadStrategy)
-    case let .workbench(workbenchID):
-      Metadata(sourceType: .workbench, sourceID: workbenchID, taskType: .workbenchCompare)
+    case let .workbench(workbenchID, task):
+      Metadata(sourceType: .workbench, sourceID: workbenchID, taskType: task.handoffTaskType)
     }
   }
 
@@ -182,6 +182,18 @@ extension HandoffExportSource {
       sourceID: metadata.sourceID,
       taskType: metadata.taskType
     )
+  }
+}
+
+enum WorkbenchHandoffTask: Sendable {
+  case compare
+  case experiments
+
+  var handoffTaskType: AIHandoffTaskType {
+    switch self {
+    case .compare: .workbenchCompare
+    case .experiments: .workbenchExperiments
+    }
   }
 }
 
@@ -293,17 +305,28 @@ enum HandoffAppOperations {
       )
       externalProjectName = nil
 
-    case let .workbench(workbenchID):
+    case let .workbench(workbenchID, task):
       guard let detail = try await database.read({ db in
         try WorkbenchDetailRequest(workbenchID: workbenchID).fetch(db)
       }) else {
         throw HandoffIntentSurfaceError.sourceNotFound
       }
+      let context: String
+      let deliverableFormat: AIHandoffToken.DeliverableFormat
+      switch task {
+      case .compare:
+        context = WorkbenchChatContext(detail: detail).compareHandoffPrompt()
+        deliverableFormat = .menuPrepPlan
+      case .experiments:
+        context = WorkbenchChatContext(detail: detail).experimentsHandoffPrompt()
+        deliverableFormat = .workbenchExperiments
+      }
       let prompt = AIHandoffToken.prompt(
         handoffID: handoffID,
         title: "\(metadata.taskType.title): \(detail.workbench.title)",
-        context: WorkbenchChatContext(detail: detail).compareHandoffPrompt(),
-        mode: mode
+        context: context,
+        mode: mode,
+        deliverableFormat: deliverableFormat
       )
       handoff = AIHandoff(
         id: handoffID,

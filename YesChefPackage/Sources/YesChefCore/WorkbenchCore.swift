@@ -85,6 +85,9 @@ public struct WorkbenchLogEntry: Codable, Identifiable, Equatable, Sendable {
   public var workbenchID: Workbench.ID
   public var kind: WorkbenchLogEntryKind
   public var body: String
+  public var hypothesis: String?
+  public var change: String?
+  public var rationale: String?
   public var outcome: String?
   public var relatedRecipeID: Recipe.ID?
   public var sortOrder: Int
@@ -95,6 +98,9 @@ public struct WorkbenchLogEntry: Codable, Identifiable, Equatable, Sendable {
     workbenchID: Workbench.ID,
     kind: WorkbenchLogEntryKind,
     body: String,
+    hypothesis: String? = nil,
+    change: String? = nil,
+    rationale: String? = nil,
     outcome: String? = nil,
     relatedRecipeID: Recipe.ID? = nil,
     sortOrder: Int,
@@ -104,6 +110,9 @@ public struct WorkbenchLogEntry: Codable, Identifiable, Equatable, Sendable {
     self.workbenchID = workbenchID
     self.kind = kind
     self.body = body
+    self.hypothesis = hypothesis
+    self.change = change
+    self.rationale = rationale
     self.outcome = outcome
     self.relatedRecipeID = relatedRecipeID
     self.sortOrder = sortOrder
@@ -114,17 +123,26 @@ public struct WorkbenchLogEntry: Codable, Identifiable, Equatable, Sendable {
 public struct WorkbenchLogEntryDraft: Equatable, Sendable {
   public var kind: WorkbenchLogEntryKind
   public var body: String
+  public var hypothesis: String?
+  public var change: String?
+  public var rationale: String?
   public var outcome: String?
   public var relatedRecipeID: Recipe.ID?
 
   public init(
     kind: WorkbenchLogEntryKind = .note,
     body: String,
+    hypothesis: String? = nil,
+    change: String? = nil,
+    rationale: String? = nil,
     outcome: String? = nil,
     relatedRecipeID: Recipe.ID? = nil
   ) {
     self.kind = kind
     self.body = body
+    self.hypothesis = hypothesis
+    self.change = change
+    self.rationale = rationale
     self.outcome = outcome
     self.relatedRecipeID = relatedRecipeID
   }
@@ -410,9 +428,7 @@ public enum WorkbenchRepository {
     now: Date,
     uuid: () -> UUID
   ) throws -> WorkbenchLogEntry.ID {
-    guard let body = draft.body.nonEmptyWorkbenchText else {
-      throw WorkbenchRepositoryError.emptyLogEntry
-    }
+    let draft = try normalizedLogEntryDraft(draft)
     var workbench = try requireWorkbench(workbenchID, in: db)
     let entryID = uuid()
     let sortOrder = try nextLogEntrySortOrder(workbenchID: workbenchID, in: db)
@@ -421,7 +437,10 @@ public enum WorkbenchRepository {
         id: entryID,
         workbenchID: workbenchID,
         kind: draft.kind,
-        body: body,
+        body: draft.body,
+        hypothesis: draft.hypothesis,
+        change: draft.change,
+        rationale: draft.rationale,
         outcome: draft.outcome?.nonEmptyWorkbenchText,
         relatedRecipeID: draft.relatedRecipeID,
         sortOrder: sortOrder,
@@ -440,12 +459,13 @@ public enum WorkbenchRepository {
     in db: Database,
     now: Date
   ) throws {
-    guard let body = draft.body.nonEmptyWorkbenchText else {
-      throw WorkbenchRepositoryError.emptyLogEntry
-    }
+    let draft = try normalizedLogEntryDraft(draft)
     var entry = try requireLogEntry(entryID, in: db)
     entry.kind = draft.kind
-    entry.body = body
+    entry.body = draft.body
+    entry.hypothesis = draft.hypothesis
+    entry.change = draft.change
+    entry.rationale = draft.rationale
     entry.outcome = draft.outcome?.nonEmptyWorkbenchText
     entry.relatedRecipeID = draft.relatedRecipeID
     try WorkbenchLogEntry.upsert { entry }.execute(db)
@@ -546,6 +566,44 @@ public enum WorkbenchRepository {
     return entry
   }
 
+  private static func normalizedLogEntryDraft(
+    _ draft: WorkbenchLogEntryDraft
+  ) throws -> WorkbenchLogEntryDraft {
+    let body = draft.body.nonEmptyWorkbenchText ?? ""
+    let hypothesis = draft.hypothesis?.nonEmptyWorkbenchText
+    let change = draft.change?.nonEmptyWorkbenchText
+    let rationale = draft.rationale?.nonEmptyWorkbenchText
+
+    switch draft.kind {
+    case .experiment:
+      let hasAnyTypedField = hypothesis != nil || change != nil || rationale != nil
+      guard !hasAnyTypedField || (hypothesis != nil && change != nil && rationale != nil) else {
+        throw WorkbenchRepositoryError.incompleteExperiment
+      }
+      guard !body.isEmpty || hypothesis != nil else {
+        throw WorkbenchRepositoryError.emptyLogEntry
+      }
+      return WorkbenchLogEntryDraft(
+        kind: .experiment,
+        body: body,
+        hypothesis: hypothesis,
+        change: change,
+        rationale: rationale,
+        outcome: draft.outcome?.nonEmptyWorkbenchText,
+        relatedRecipeID: draft.relatedRecipeID
+      )
+
+    case .rationale, .fork, .observation, .note:
+      guard !body.isEmpty else { throw WorkbenchRepositoryError.emptyLogEntry }
+      return WorkbenchLogEntryDraft(
+        kind: draft.kind,
+        body: body,
+        outcome: draft.outcome?.nonEmptyWorkbenchText,
+        relatedRecipeID: draft.relatedRecipeID
+      )
+    }
+  }
+
   private static func requireWorkbench(_ workbenchID: Workbench.ID, in db: Database) throws -> Workbench {
     guard let workbench = try Workbench.find(workbenchID).fetchOne(db) else {
       throw WorkbenchRepositoryError.workbenchNotFound(workbenchID)
@@ -587,6 +645,7 @@ public enum WorkbenchRepository {
 public enum WorkbenchRepositoryError: Error, Equatable, Sendable {
   case emptyTitle
   case emptyLogEntry
+  case incompleteExperiment
   case workbenchNotFound(Workbench.ID)
   case candidateNotFound(WorkbenchCandidate.ID)
   case logEntryNotFound(WorkbenchLogEntry.ID)

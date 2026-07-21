@@ -104,6 +104,7 @@ final class WorkbenchDetailModel {
 
   let workbenchID: Workbench.ID
   @ObservationIgnored private let openRecipe: (Recipe.ID) -> Void
+  @ObservationIgnored private let toastCenter: AppToastCenter?
 
   @ObservationIgnored
   @Dependency(\.date.now) private var now
@@ -123,9 +124,14 @@ final class WorkbenchDetailModel {
   var isShowingCompare = false
   let compareAlignmentModel = WorkbenchCompareAlignmentModel()
 
-  init(workbenchID: Workbench.ID, openRecipe: @escaping (Recipe.ID) -> Void = { _ in }) {
+  init(
+    workbenchID: Workbench.ID,
+    openRecipe: @escaping (Recipe.ID) -> Void = { _ in },
+    toastCenter: AppToastCenter? = nil
+  ) {
     self.workbenchID = workbenchID
     self.openRecipe = openRecipe
+    self.toastCenter = toastCenter
     _detail = Fetch(wrappedValue: nil, WorkbenchDetailRequest(workbenchID: workbenchID), animation: .default)
   }
 
@@ -186,6 +192,10 @@ final class WorkbenchDetailModel {
 
   func openWorkingRecipeButtonTapped() {
     guard let recipeID = detail?.workbench.draftRecipeID else { return }
+    openRecipe(recipeID)
+  }
+
+  func openCandidateButtonTapped(recipeID: Recipe.ID) {
     openRecipe(recipeID)
   }
 
@@ -395,6 +405,7 @@ final class WorkbenchDetailModel {
           now: now
         )
       }
+      toastCenter?.postSuccess("Annotation saved.")
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
@@ -424,6 +435,9 @@ final class WorkbenchDetailModel {
     let draft = WorkbenchLogEntryDraft(
       kind: editorState.kind,
       body: editorState.body,
+      hypothesis: editorState.hypothesis,
+      change: editorState.change,
+      rationale: editorState.rationale,
       outcome: editorState.outcome,
       relatedRecipeID: editorState.relatedRecipeID
     )
@@ -447,6 +461,9 @@ final class WorkbenchDetailModel {
         }
       }
       destination = nil
+      toastCenter?.postSuccess(
+        editorState.entryID == nil ? "Log entry added." : "Log entry saved."
+      )
       return true
     } catch {
       errorMessage = String(describing: error)
@@ -527,6 +544,9 @@ struct WorkbenchLogEntryEditorState: Identifiable, Hashable, Sendable {
   var entryID: WorkbenchLogEntry.ID?
   var kind: WorkbenchLogEntryKind = .note
   var body = ""
+  var hypothesis = ""
+  var change = ""
+  var rationale = ""
   var outcome = ""
   var relatedRecipeID: Recipe.ID?
 
@@ -540,6 +560,9 @@ struct WorkbenchLogEntryEditorState: Identifiable, Hashable, Sendable {
     entryID = entry.id
     kind = entry.kind
     body = entry.body
+    hypothesis = entry.hypothesis ?? ""
+    change = entry.change ?? ""
+    rationale = entry.rationale ?? ""
     outcome = entry.outcome ?? ""
     relatedRecipeID = entry.relatedRecipeID
   }

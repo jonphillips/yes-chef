@@ -18,6 +18,15 @@ final class HandoffInAppTransport {
   var unmatchedSource: HandoffExportSource?
   var isShowingUnmatchedConfirmation = false
 
+  /// Optional: surfaces a confirmation toast when a prompt lands on the pasteboard, since a
+  /// silent copy gives the cook no signal that anything happened. Settable so surfaces without a
+  /// custom `init` (which cannot seed one `@State` from another) can assign it on appear.
+  @ObservationIgnored var toastCenter: AppToastCenter?
+
+  init(toastCenter: AppToastCenter? = nil) {
+    self.toastCenter = toastCenter
+  }
+
   func copyPrompt(for source: HandoffExportSource) async {
     do {
       let handoff = try await HandoffAppOperations.export(
@@ -28,6 +37,7 @@ final class HandoffInAppTransport {
         handoffID: uuid()
       )
       UIPasteboard.general.string = handoff.prompt
+      toastCenter?.postSuccess("Prompt copied.")
     } catch {
       present(error)
     }

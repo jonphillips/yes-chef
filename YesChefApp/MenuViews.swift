@@ -144,7 +144,7 @@ struct MenuDetailView: View {
   @State private var detailModel: MenuDetailModel
   @State private var toolOverlay: MenuDetailInspector?
   @State private var compactTool: MenuDetailInspector?
-  @State private var handoffTransport = HandoffInAppTransport()
+  @State private var handoffTransport: HandoffInAppTransport
 
   init(
     model: MenuLibraryModel,
@@ -162,6 +162,7 @@ struct MenuDetailView: View {
     self.isFocusActive = isFocusActive
     self.focusButtonTapped = focusButtonTapped
     _detailModel = State(wrappedValue: MenuDetailModel(menuID: menuID, toastCenter: model.toastCenter))
+    _handoffTransport = State(wrappedValue: HandoffInAppTransport(toastCenter: model.toastCenter))
   }
 
   var body: some View {

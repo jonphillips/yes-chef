@@ -123,7 +123,8 @@ struct WorkbenchDetailView: View {
   @AppStorage(ChatWorkspaceDetent.storageKey) private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   @State private var model: WorkbenchDetailModel
   @State private var compareTier: ModelTier = .onDevice
-  @State private var handoffTransport = HandoffInAppTransport()
+  @State private var handoffTransport: HandoffInAppTransport
+  @State private var toastCenter: AppToastCenter
   let isFocusActive: Bool
   let focusButtonTapped: (() -> Void)?
 
@@ -133,12 +134,16 @@ struct WorkbenchDetailView: View {
     isFocusActive: Bool = false,
     focusButtonTapped: (() -> Void)? = nil
   ) {
+    let toastCenter = AppToastCenter()
+    _toastCenter = State(wrappedValue: toastCenter)
+    _handoffTransport = State(wrappedValue: HandoffInAppTransport(toastCenter: toastCenter))
     _model = State(
       wrappedValue: WorkbenchDetailModel(
         workbenchID: workbenchID,
         openRecipe: { recipeID in
           onRecipeSelected(RecipeDetailPresentation(recipeID: recipeID, workbenchID: workbenchID))
-        }
+        },
+        toastCenter: toastCenter
       )
     )
     self.isFocusActive = isFocusActive
@@ -285,6 +290,13 @@ struct WorkbenchDetailView: View {
     ) {
       compareCover
     }
+    // The workbench is itself presented as a sheet, so it needs its own toast host — an overlay
+    // mounted by a presenting view does not draw over the sheet it presents.
+    .overlay(alignment: .top) {
+      AppToastOverlay(toastCenter: toastCenter)
+        .ignoresSafeArea(.keyboard)
+    }
+    .sensoryFeedback(.success, trigger: toastCenter.feedbackTrigger)
   }
 
   @ViewBuilder private var compareCover: some View {
@@ -435,6 +447,15 @@ private struct WorkbenchReader: View {
           }
           .accessibilityLabel(Text("Add log entry"))
         }
+      } footer: {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Develop experiments externally, then review each proposed hypothesis, change, and rationale before it reaches the workbench log.")
+          HandoffCopyPasteControls(
+            source: .workbench(detail.workbench.id, task: .experiments),
+            transport: handoffTransport
+          )
+          .buttonStyle(.bordered)
+        }
       }
 
       Section {
@@ -476,7 +497,7 @@ private struct WorkbenchReader: View {
         VStack(alignment: .leading, spacing: 8) {
           Text("Discuss a candidate comparison externally, then review what returns before it reaches the workbench log.")
           HandoffCopyPasteControls(
-            source: .workbench(detail.workbench.id),
+            source: .workbench(detail.workbench.id, task: .compare),
             transport: handoffTransport
           )
           .buttonStyle(.bordered)
@@ -510,9 +531,20 @@ private struct WorkbenchLogEntryRow: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
-      Text(entry.body)
-        .font(.body)
-        .foregroundStyle(.primary)
+      if let hypothesis = entry.hypothesis,
+         let change = entry.change,
+         let rationale = entry.rationale
+      {
+        WorkbenchExperimentFields(
+          hypothesis: hypothesis,
+          change: change,
+          rationale: rationale
+        )
+      } else {
+        Text(entry.body)
+          .font(.body)
+          .foregroundStyle(.primary)
+      }
       if let outcome = entry.outcome {
         VStack(alignment: .leading, spacing: 3) {
           Text("Outcome")
@@ -525,6 +557,31 @@ private struct WorkbenchLogEntryRow: View {
       }
     }
     .padding(.vertical, 4)
+  }
+}
+
+private struct WorkbenchExperimentFields: View {
+  let hypothesis: String
+  let change: String
+  let rationale: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      field("Hypothesis", text: hypothesis)
+      field("Change", text: change)
+      field("Rationale", text: rationale)
+    }
+  }
+
+  private func field(_ title: String, text: String) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text(title)
+        .font(.caption.bold())
+        .foregroundStyle(.secondary)
+      Text(text)
+        .font(.body)
+        .foregroundStyle(.primary)
+    }
   }
 }
 
@@ -615,9 +672,30 @@ private struct WorkbenchLogEntryEditorView: View {
         }
         .pickerStyle(.menu)
 
-        StackedFormField(title: "Body") {
-          TextEditor(text: $editorState.body)
-            .frame(minHeight: 140)
+        if editorState.kind == .experiment {
+          StackedFormField(title: "Hypothesis") {
+            TextField("Hypothesis", text: $editorState.hypothesis, axis: .vertical)
+          }
+
+          StackedFormField(title: "Change") {
+            TextField("Change", text: $editorState.change, axis: .vertical)
+          }
+
+          StackedFormField(title: "Rationale") {
+            TextField("Rationale", text: $editorState.rationale, axis: .vertical)
+          }
+
+          if !editorState.body.isEmpty {
+            StackedFormField(title: "Legacy notes") {
+              TextEditor(text: $editorState.body)
+                .frame(minHeight: 140)
+            }
+          }
+        } else {
+          StackedFormField(title: "Body") {
+            TextEditor(text: $editorState.body)
+              .frame(minHeight: 140)
+          }
         }
 
         StackedFormField(title: "Outcome") {
@@ -639,9 +717,20 @@ private struct WorkbenchLogEntryEditorView: View {
             dismiss()
           }
         }
-        .disabled(editorState.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .disabled(!editorState.canSave)
       }
     }
+  }
+}
+
+private extension WorkbenchLogEntryEditorState {
+  var canSave: Bool {
+    if kind == .experiment {
+      return [hypothesis, change, rationale].allSatisfy {
+        !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      } || !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    return !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 }
 
@@ -653,28 +742,42 @@ private struct WorkbenchCandidateRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      HStack(alignment: .top, spacing: 12) {
-        if let photo = candidatePhoto {
-          RecipePhotoImage(
-            photoID: photo.id,
-            checksum: photo.checksum,
-            variant: .thumbnail,
-            thumbnailData: photo.thumbnailData
-          )
-          .frame(width: 72, height: 72)
-          .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-          .clipShape(RoundedRectangle(cornerRadius: 8))
-          .accessibilityLabel(Text("Photo for \(row.displayTitle)"))
+      Button {
+        guard let recipeID = row.recipeDetail?.recipe.id else { return }
+        model.openCandidateButtonTapped(recipeID: recipeID)
+      } label: {
+        HStack(alignment: .top, spacing: 12) {
+          if let photo = candidatePhoto {
+            RecipePhotoImage(
+              photoID: photo.id,
+              checksum: photo.checksum,
+              variant: .thumbnail,
+              thumbnailData: photo.thumbnailData
+            )
+            .frame(width: 72, height: 72)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .accessibilityLabel(Text("Photo for \(row.displayTitle)"))
+          }
+          VStack(alignment: .leading, spacing: 5) {
+            Text(row.displayTitle)
+              .font(.headline)
+            Label(sourceDisplayName, systemImage: "book")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+          Spacer(minLength: 0)
+          if row.recipeDetail != nil {
+            Image(systemName: "chevron.right")
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(.tertiary)
+          }
         }
-        VStack(alignment: .leading, spacing: 5) {
-          Text(row.displayTitle)
-            .font(.headline)
-          Label(sourceDisplayName, systemImage: "book")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        Spacer(minLength: 0)
+        .contentShape(.rect)
       }
+      .buttonStyle(.plain)
+      .disabled(row.recipeDetail == nil)
+      .accessibilityHint(row.recipeDetail == nil ? "" : "Opens this candidate recipe")
       if let recipe = row.recipeDetail?.recipe {
         HStack(spacing: 10) {
           if let totalTimeMinutes = recipe.totalTimeMinutes {

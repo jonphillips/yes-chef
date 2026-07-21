@@ -408,6 +408,7 @@ public enum AIHandoffToken {
     case recipeChefItUp
     case recipeServeWith
     case mealPlanMakeAheadStrategy
+    case workbenchExperiments
 
     var discussInstruction: String {
       switch self {
@@ -421,6 +422,8 @@ public enum AIHandoffToken {
         "paste-ready Serve With suggestions"
       case .mealPlanMakeAheadStrategy:
         "the paste-ready meal-plan make-ahead strategy"
+      case .workbenchExperiments:
+        "the proposed experiments"
       }
     }
 
@@ -436,6 +439,8 @@ public enum AIHandoffToken {
         "Return the completed Serve With suggestions in your first response when the recipe needs them."
       case .mealPlanMakeAheadStrategy:
         "Return the completed meal-plan make-ahead strategy in your first response when the day needs one."
+      case .workbenchExperiments:
+        "Return the proposed experiments in your first response when the workbench needs them."
       }
     }
 
@@ -504,15 +509,19 @@ public enum AIHandoffToken {
 /// The single, pasteable return contract for the external Yes Chef project. It deliberately lives outside
 /// each hand-off payload: the payload carries only a title, routing token, context, and the verb's ask.
 public enum AIHandoffReturnContract {
-  public static let version = 1
+  public static let version = 2
   public static let marker = "YC-CONTRACT: v\(version)"
 
   public static let projectInstructions = """
+    Yes Chef hand-off return contract — v\(version). (If Yes Chef reports these instructions are out of date, re-copy them from AI Settings.)
+
     You are helping with Yes Chef hand-offs. You may discuss the supplied cooking context freely.
 
     The opening `<Task>: <Object>` line is the suggested conversation title. Use it if the host supports setting a title, but it is advisory only.
 
     When the user asks to finalize, or a hand-off asks for an immediate result, stop conversing and return the requested deliverable as a terminal response. Its first line must be the exact `YC-HANDOFF:` token from the prompt. Its second line must be `\(marker)`. Then return the requested deliverable. Include a `YC-LEARNINGS:` section with distinct durable learnings unless the hand-off expressly asks you to omit it.
+
+    For an Experiments hand-off, return each experiment as exactly three lines, in this order: `Hypothesis: <one sentence>`, `Change: <one sentence>`, and `Rationale: <one sentence>`. Repeat that labeled cycle for each distinct experiment. Do not include `YC-LEARNINGS:` for Experiments; an experiment is untested until its outcome is recorded.
 
     Return no preamble, sign-off, headings, or nesting. Do not assess what is already good. Keep distinct requested items distinct rather than merging them into a summary. If a requested field cannot be filled confidently, omit that item rather than inventing it. Do not use a Markdown code fence.
     """
@@ -656,6 +665,7 @@ public enum AIHandoffReview: Equatable, Sendable {
   case recipeServeWith(AIHandoffRecipeSectionReview)
   case mealPlanMakeAhead(AIHandoffMealPlanMakeAheadReview)
   case workbenchCompare(AIHandoffWorkbenchCompareReview)
+  case workbenchExperiments(AIHandoffWorkbenchExperimentsReview)
 
   public var handoffID: AIHandoff.ID {
     switch self {
@@ -665,6 +675,7 @@ public enum AIHandoffReview: Equatable, Sendable {
     case let .recipeServeWith(review): review.handoffID
     case let .mealPlanMakeAhead(review): review.handoffID
     case let .workbenchCompare(review): review.handoffID
+    case let .workbenchExperiments(review): review.handoffID
     }
   }
 }
@@ -714,7 +725,7 @@ public enum AIHandoffReturn {
     }
   }
 
-  private static func splitting(_ text: String) -> (deliverable: String, learnings: String) {
+  static func splitting(_ text: String) -> (deliverable: String, learnings: String) {
     let lines = text.components(separatedBy: .newlines)
     guard let markerIndex = lines.firstIndex(where: isLearningsMarker) else {
       return (text, "")
@@ -730,6 +741,7 @@ public enum AIHandoffReturn {
       .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "#*")))
       .caseInsensitiveCompare(learningsMarker) == .orderedSame
   }
+
 }
 
 public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, CustomStringConvertible, Sendable {
@@ -739,6 +751,7 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
   case duplicate
   case emptyPlan
   case unparsedPlanText([String])
+  case unparsedExperimentBlocks([String])
 
   public var errorDescription: String? {
     switch self {
@@ -754,6 +767,8 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
       "The returned handoff needs a deliverable or at least one learning bullet."
     case let .unparsedPlanText(lines):
       "Could not import these prep-plan lines: \(lines.joined(separator: " | "))"
+    case let .unparsedExperimentBlocks(blocks):
+      "Could not import these experiment blocks: \(blocks.joined(separator: " | "))"
     }
   }
 
@@ -896,23 +911,44 @@ public enum AIHandoffIntentImport {
       )
 
     case .workbench:
-      guard handoff.taskType == .workbenchCompare,
-        try Workbench.find(handoff.sourceID).fetchOne(db) != nil
-      else {
+      guard try Workbench.find(handoff.sourceID).fetchOne(db) != nil else {
         throw AIHandoffIntentImportError.wrongTask
       }
-      let returned = AIHandoffReturn.plainText(from: payload)
-      guard !returned.deliverable.isEmpty || !returned.learnings.isEmpty else {
-        throw AIHandoffIntentImportError.emptyPlan
-      }
-      review = .workbenchCompare(
-        AIHandoffWorkbenchCompareReview(
-          handoffID: handoff.id,
-          workbenchID: handoff.sourceID,
-          comparison: returned.deliverable,
-          learnings: returned.learnings
+      switch handoff.taskType {
+      case .workbenchCompare:
+        let returned = AIHandoffReturn.plainText(from: payload)
+        guard !returned.deliverable.isEmpty || !returned.learnings.isEmpty else {
+          throw AIHandoffIntentImportError.emptyPlan
+        }
+        review = .workbenchCompare(
+          AIHandoffWorkbenchCompareReview(
+            handoffID: handoff.id,
+            workbenchID: handoff.sourceID,
+            comparison: returned.deliverable,
+            learnings: returned.learnings
+          )
         )
-      )
+
+      case .workbenchExperiments:
+        let returned = AIHandoffReturn.workbenchExperiments(from: payload)
+        guard returned.unparsedBlocks.isEmpty else {
+          throw AIHandoffIntentImportError.unparsedExperimentBlocks(returned.unparsedBlocks)
+        }
+        guard !returned.experiments.isEmpty else {
+          throw AIHandoffIntentImportError.emptyPlan
+        }
+        review = .workbenchExperiments(
+          AIHandoffWorkbenchExperimentsReview(
+            handoffID: handoff.id,
+            workbenchID: handoff.sourceID,
+            experiments: returned.experiments
+          )
+        )
+
+      case .prepPlan, .learning, .recipeMakeAhead, .chefItUp, .serveWith, .adjustRecipe,
+           .mealPlanMakeAheadStrategy:
+        throw AIHandoffIntentImportError.wrongTask
+      }
     }
 
     try AIHandoffRepository.markImported(id: handoff.id, at: now, in: db)

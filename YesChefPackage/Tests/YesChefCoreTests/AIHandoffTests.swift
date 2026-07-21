@@ -25,6 +25,8 @@ struct AIHandoffTests {
     #expect(!prompt.contains(AIHandoffReturnContract.marker))
     #expect(AIHandoffReturnContract.projectInstructions.contains(AIHandoffReturnContract.marker))
     #expect(AIHandoffReturnContract.projectInstructions.contains("Return no preamble, sign-off, headings, or nesting"))
+    #expect(AIHandoffReturnContract.projectInstructions.contains("Hypothesis: <one sentence>"))
+    #expect(AIHandoffReturnContract.projectInstructions.contains("Do not include `YC-LEARNINGS:` for Experiments"))
 
     let routedText = try #require(
       AIHandoffToken.stripping(

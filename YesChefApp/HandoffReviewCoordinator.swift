@@ -35,6 +35,8 @@ final class HandoffReviewCoordinator {
       mealPlanMakeAheadReviewItems(for: review)
     case let .workbenchCompare(review):
       workbenchCompareReviewItems(for: review)
+    case .workbenchExperiments:
+      []
     }
   }
 
@@ -447,9 +449,30 @@ final class HandoffReviewCoordinator {
   ) throws {
     let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !body.isEmpty else { throw HandoffReviewError.emptyDeliverable }
-    try database.write { db in
+    _ = try database.write { db in
       try WorkbenchRepository.addLogEntry(
         WorkbenchLogEntryDraft(kind: .observation, body: body),
+        to: workbenchID,
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
+    }
+  }
+
+  func commitWorkbenchExperiment(
+    _ experiment: WorkbenchExperiment,
+    to workbenchID: Workbench.ID
+  ) throws {
+    _ = try database.write { db in
+      try WorkbenchRepository.addLogEntry(
+        WorkbenchLogEntryDraft(
+          kind: .experiment,
+          body: "",
+          hypothesis: experiment.hypothesis,
+          change: experiment.change,
+          rationale: experiment.rationale
+        ),
         to: workbenchID,
         in: db,
         now: now,
@@ -480,9 +503,23 @@ struct HandoffReviewSheet: View {
   }
 
   var body: some View {
+    switch review {
+    case let .workbenchExperiments(experimentsReview):
+      WorkbenchExperimentsReviewSheet(
+        coordinator: coordinator,
+        review: experimentsReview,
+        originalReview: review
+      )
+    case .menuPrepPlan, .recipeMakeAhead, .recipeChefItUp, .recipeServeWith, .mealPlanMakeAhead,
+         .workbenchCompare:
+      standardReviewSheet
+    }
+  }
+
+  private var standardReviewSheet: some View {
     @Bindable var coordinator = coordinator
 
-    RecipeCollectionReviewSheet(
+    return RecipeCollectionReviewSheet(
       items: items,
       committingItemID: nil,
       commit: { item, approvedText, usingSecondaryCommit in
@@ -511,6 +548,121 @@ struct HandoffReviewSheet: View {
       Button("OK") {}
     } message: {
       Text(coordinator.errorMessage ?? "")
+    }
+  }
+}
+
+private struct WorkbenchExperimentsReviewSheet: View {
+  let coordinator: HandoffReviewCoordinator
+  let review: AIHandoffWorkbenchExperimentsReview
+  let originalReview: AIHandoffReview
+
+  @Environment(\.dismiss) private var dismiss
+  @State private var experiments: [WorkbenchExperiment]
+  @State private var savingExperimentID: WorkbenchExperiment.ID?
+  @State private var isShowingDiscardAllConfirmation = false
+
+  init(
+    coordinator: HandoffReviewCoordinator,
+    review: AIHandoffWorkbenchExperimentsReview,
+    originalReview: AIHandoffReview
+  ) {
+    self.coordinator = coordinator
+    self.review = review
+    self.originalReview = originalReview
+    _experiments = State(initialValue: review.experiments)
+  }
+
+  var body: some View {
+    @Bindable var coordinator = coordinator
+
+    NavigationStack {
+      Form {
+        Section {
+          Text("Review each experiment before saving it to the workbench log. The fields stay separate so an outcome can be added after it is tried.")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        }
+
+        ForEach($experiments) { $experiment in
+          Section("Experiment") {
+            TextField("Hypothesis", text: $experiment.hypothesis, axis: .vertical)
+            TextField("Change", text: $experiment.change, axis: .vertical)
+            TextField("Rationale", text: $experiment.rationale, axis: .vertical)
+
+            Button {
+              saveButtonTapped(experiment)
+            } label: {
+              if savingExperimentID == experiment.id {
+                ProgressView()
+              } else {
+                Text("Save Experiment")
+              }
+            }
+            .disabled(savingExperimentID != nil || !experimentIsComplete(experiment))
+
+            Button("Discard", role: .destructive) {
+              experiments.removeAll { $0.id == experiment.id }
+            }
+            .disabled(savingExperimentID != nil)
+          }
+        }
+      }
+      .navigationTitle("Review Experiments")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Done") {
+            dismiss()
+          }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+          Button("Discard All", role: .destructive) {
+            isShowingDiscardAllConfirmation = true
+          }
+          .disabled(experiments.isEmpty || savingExperimentID != nil)
+        }
+      }
+    }
+    .alert(coordinator.errorTitle, isPresented: $coordinator.isShowingError) {
+      Button("OK") {}
+    } message: {
+      Text(coordinator.errorMessage ?? "")
+    }
+    .confirmationDialog(
+      "Discard all experiments?",
+      isPresented: $isShowingDiscardAllConfirmation,
+      titleVisibility: .visible
+    ) {
+      Button("Discard All", role: .destructive) {
+        experiments = []
+      }
+      Button("Keep Reviewing", role: .cancel) {}
+    }
+    .onChange(of: experiments.isEmpty) { _, isEmpty in
+      if isEmpty {
+        coordinator.discard(originalReview)
+      }
+    }
+    .presentationDetents([.medium, .large])
+  }
+
+  private func experimentIsComplete(_ experiment: WorkbenchExperiment) -> Bool {
+    !experiment.hypothesis.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      && !experiment.change.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      && !experiment.rationale.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  private func saveButtonTapped(_ experiment: WorkbenchExperiment) {
+    savingExperimentID = experiment.id
+    defer { savingExperimentID = nil }
+    do {
+      try coordinator.commitWorkbenchExperiment(experiment, to: review.workbenchID)
+      experiments.removeAll { $0.id == experiment.id }
+    } catch {
+      coordinator.errorTitle = "Could Not Save Experiment"
+      coordinator.errorMessage = String(describing: error)
+      coordinator.isShowingError = true
     }
   }
 }

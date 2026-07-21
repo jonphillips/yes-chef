@@ -7,7 +7,10 @@ struct RecipeDetailView: View {
   @AppStorage(RecipePlaybookColumnPreferences.visibilityStorageKey)
   private var isPlaybookColumnVisible = true
   @State private var model: RecipeDetailModel
-  @State private var handoffTransport = HandoffInAppTransport()
+  @State private var handoffTransport: HandoffInAppTransport
+  /// Own toast host: this view is presented from four places (full-screen cover, both iPad split
+  /// layouts, and the cook session) and only one of them mounts an overlay.
+  @State private var toastCenter: AppToastCenter
   let libraryModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
@@ -33,6 +36,9 @@ struct RecipeDetailView: View {
         workbenchID: workbenchID
       )
     )
+    let toastCenter = AppToastCenter()
+    _toastCenter = State(wrappedValue: toastCenter)
+    _handoffTransport = State(wrappedValue: HandoffInAppTransport(toastCenter: toastCenter))
     self.libraryModel = libraryModel
     self.mealCalendarModel = mealCalendarModel
     self.groceryModel = groceryModel
@@ -81,6 +87,11 @@ struct RecipeDetailView: View {
       Text(model.errorMessage ?? "Something went wrong.")
     }
     .handoffTransportAlert(handoffTransport)
+    .overlay(alignment: .top) {
+      AppToastOverlay(toastCenter: toastCenter)
+        .ignoresSafeArea(.keyboard)
+    }
+    .sensoryFeedback(.success, trigger: toastCenter.feedbackTrigger)
   }
 
   @ViewBuilder
