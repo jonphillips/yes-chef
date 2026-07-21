@@ -141,6 +141,13 @@ struct AppContainer: View {
     .sheet(item: $handoffReviewCoordinator.review, id: \.handoffID) { review in
       HandoffReviewSheet(coordinator: handoffReviewCoordinator, review: review)
     }
+    .sheet(item: $handoffReviewCoordinator.adjustmentReview) { review in
+      RecipeAdjustmentReviewView(
+        review: review,
+        overwrite: { handoffReviewCoordinator.overwriteAdjustmentButtonTapped($0) },
+        keepAsVariation: { handoffReviewCoordinator.keepAdjustmentAsVariationButtonTapped($0, name: $1) }
+      )
+    }
     .confirmationDialog(
       "Remove Meal Plan Item?",
       item: $mealCalendarModel.destination.deleteItem,

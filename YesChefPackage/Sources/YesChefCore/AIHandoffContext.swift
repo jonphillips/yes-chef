@@ -43,6 +43,20 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     }
   }
 
+  /// Recipe-body hand-offs have a different return shape from Playbook sections: they outboard
+  /// deliberation, then bring back prose that the in-app extractor resolves against live rows.
+  public func prompt(forTask task: AIHandoffTaskType) -> String {
+    precondition(task == .adjustRecipe, "RecipeHandoffContext only supports recipe-body hand-off tasks.")
+
+    @Dependency(\.aiPromptPreferences) var preferences
+    let settings = preferences.current()
+    return Self.recipeAdjustmentPrompt(
+      context: bounded(recipe.serialized()),
+      knownLearnings: Self.knownLearningsBlock(recipe.learnings),
+      tasteProfile: settings.tasteProfile
+    )
+  }
+
   private static func knownLearningsBlock(_ learnings: [String]) -> String {
     let items = learnings
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -137,6 +151,43 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     \(serveWithPreference)
 
     The cook reviews and edits the returned lines in Yes Chef before saving them.
+    \(knownLearnings)
+    \(context)
+    """
+  }
+
+  private static func recipeAdjustmentPrompt(
+    context: String,
+    knownLearnings: String,
+    tasteProfile: String
+  ) -> String {
+    """
+    You are helping rethink one recipe. Discuss it freely: argue, push back, ask
+    questions, and change your mind. When the cook asks you to finalize, return a
+    revision brief.
+
+    A revision brief is plain prose stating the revision you and the cook settled on:
+    what to change, and why, in a cook's language. One change per line, in the order the
+    change happens. Refer to ingredients and steps by their existing wording so each
+    change can be matched to the recipe as it stands.
+
+    Return only the brief itself: nothing before it, nothing after it, no title, no
+    summary of the discussion. One change per line, like this:
+
+    Take the butter to 120g and brown it before creaming — more nutty depth, less spread.
+    Move the salt into the flour instead of the wet mix so it distributes evenly.
+    Rest the dough 20 minutes before shaping so the flour hydrates.
+
+    Do not return a rewritten recipe, an ingredient list, JSON, IDs, or any structured
+    format. Yes Chef derives the structured edit from your brief itself, and the cook
+    reviews that edit side by side against the current recipe before anything is saved.
+
+    In the learnings section, record only what was considered and rejected, or
+    established as a constraint on this dish — never restate a change that already
+    appears in the brief.
+
+    Taste profile:
+    \(tasteProfile)
     \(knownLearnings)
     \(context)
     """

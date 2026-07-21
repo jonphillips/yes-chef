@@ -24,7 +24,7 @@ enum HandoffPromptMode: String, AppEnum {
 
 struct ExportHandoffContext: AppIntent {
   static let title: LocalizedStringResource = "Export Handoff Context"
-  static let description = IntentDescription("Export a menu context for an external assistant.")
+  static let description = IntentDescription("Export a Yes Chef context for an external assistant.")
   static var allowedExecutionTargets: IntentExecutionTargets { .main }
 
   @Parameter(title: "Source", requestValueDialog: "What should Yes Chef hand off?")
@@ -32,7 +32,7 @@ struct ExportHandoffContext: AppIntent {
 
   // Defaults to `.immediate` because the Shortcuts surface exists for the headless
   // `Ask ChatGPT` chain; a discuss prompt sent headlessly comes back as prose the parser
-  // cannot use. The in-app Copy Prep Prompt button remains the discuss path.
+  // cannot use. The in-app Copy Prompt button remains the discuss path.
   @Parameter(title: "Mode", default: .immediate)
   var mode: HandoffPromptMode
 
@@ -132,13 +132,14 @@ struct HandoffAppShortcuts: AppShortcutsProvider {
 
 enum HandoffExportSource: Sendable {
   case recipeSection(Recipe.ID, PlaybookSectionKind)
+  case recipeAdjustment(Recipe.ID)
   case menu(Menu.ID)
   case mealPlan(MealPlanItem.ID)
   case workbench(Workbench.ID, task: WorkbenchHandoffTask)
 
   init(_ source: HandoffSource) {
     switch source {
-    case let .recipe(recipe): self = .recipeSection(recipe.id, .makeAhead)
+    case let .recipe(recipe): self = .recipeAdjustment(recipe.id)
     case let .menu(menu): self = .menu(menu.id)
     case let .mealPlan(mealPlan): self = .mealPlan(mealPlan.id)
     case let .workbench(workbench): self = .workbench(workbench.id, task: .compare)
@@ -157,6 +158,8 @@ extension HandoffExportSource {
     switch self {
     case let .recipeSection(recipeID, section):
       Metadata(sourceType: .recipe, sourceID: recipeID, taskType: section.handoffTaskType)
+    case let .recipeAdjustment(recipeID):
+      Metadata(sourceType: .recipe, sourceID: recipeID, taskType: .adjustRecipe)
     case let .menu(menuID):
       Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan)
     case let .mealPlan(mealPlanID):
@@ -169,6 +172,7 @@ extension HandoffExportSource {
   var unmatchedSubject: String {
     switch self {
     case .recipeSection: "recipe section"
+    case .recipeAdjustment: "recipe"
     case .menu: "menu"
     case .mealPlan: "meal-plan day"
     case .workbench: "workbench"
@@ -254,6 +258,28 @@ enum HandoffAppOperations {
         context: RecipeHandoffContext(detail: detail).prompt(for: section),
         mode: mode,
         deliverableFormat: section.deliverableFormat
+      )
+      handoff = AIHandoff(
+        id: handoffID,
+        sourceType: metadata.sourceType,
+        sourceID: metadata.sourceID,
+        taskType: metadata.taskType,
+        createdAt: now,
+        exportedPrompt: prompt
+      )
+      externalProjectName = nil
+
+    case let .recipeAdjustment(recipeID):
+      guard let detail = try await database.read({ db in
+        try RecipeDetailRequest(recipeID: recipeID).fetch(db)
+      }) else {
+        throw HandoffIntentSurfaceError.sourceNotFound
+      }
+      let prompt = AIHandoffToken.prompt(
+        handoffID: handoffID,
+        title: "\(metadata.taskType.title): \(detail.recipe.title)",
+        context: RecipeHandoffContext(detail: detail).prompt(forTask: .adjustRecipe),
+        mode: mode
       )
       handoff = AIHandoff(
         id: handoffID,

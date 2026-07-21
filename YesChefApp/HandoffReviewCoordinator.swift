@@ -1,5 +1,6 @@
 import Dependencies
 import Foundation
+import LLMClientKit
 import Observation
 import SQLiteData
 import SwiftUI
@@ -13,6 +14,7 @@ final class HandoffReviewCoordinator {
   @ObservationIgnored @Dependency(\.uuid) private var uuid
 
   var review: AIHandoffReview?
+  var adjustmentReview: RecipeAdjustmentReviewState?
   var errorMessage: String?
   var errorTitle = "Could Not Save Handoff"
   var isShowingError = false
@@ -31,6 +33,8 @@ final class HandoffReviewCoordinator {
       recipeChefItUpReviewItems(for: review)
     case let .recipeServeWith(review):
       recipeServeWithReviewItems(for: review)
+    case .recipeAdjustmentBrief:
+      []
     case let .mealPlanMakeAhead(review):
       mealPlanMakeAheadReviewItems(for: review)
     case let .workbenchCompare(review):
@@ -481,6 +485,104 @@ final class HandoffReviewCoordinator {
     }
   }
 
+  func draftRecipeAdjustment(
+    _ review: AIHandoffRecipeAdjustmentBriefReview,
+    brief: String
+  ) async throws -> RecipeAdjustmentReviewState {
+    @Dependency(\.recipeAdjustmentClient) var recipeAdjustmentClient
+    @Dependency(\.apiKeyStore) var apiKeyStore
+    @Dependency(\.recipeChatProviderPreference) var providerPreference
+
+    let trimmedBrief = brief.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedBrief.isEmpty else { throw HandoffReviewError.emptyDeliverable }
+    guard let detail = try await database.read({ db in
+      try RecipeDetailRequest(recipeID: review.recipeID).fetch(db)
+    }) else {
+      throw RecipeAdjustmentError.missingRecipe(review.recipeID)
+    }
+
+    let availableProviders = FrontierProvider.allCases.filter { apiKeyStore.key($0) != nil }
+    let tier: ModelTier
+    if let preferredProvider = providerPreference.current(), availableProviders.contains(preferredProvider) {
+      tier = .frontier(preferredProvider)
+    } else if let provider = availableProviders.first {
+      tier = .frontier(provider)
+    } else {
+      tier = .onDevice
+    }
+
+    let proposal = try await recipeAdjustmentClient(
+      selection: "",
+      messages: [RecipeChatMessage(role: .user, text: trimmedBrief)],
+      detail: detail,
+      tier: tier
+    )
+    let adjustmentReview = RecipeAdjustmentReviewState(
+      currentDetail: detail,
+      proposedDetail: try proposal.proposedDetail(applyingTo: detail, now: now, uuid: { uuid() }),
+      proposal: proposal
+    )
+    return adjustmentReview
+  }
+
+  func presentAdjustmentReview(_ adjustmentReview: RecipeAdjustmentReviewState) {
+    self.adjustmentReview = adjustmentReview
+  }
+
+  func overwriteAdjustmentButtonTapped(_ review: RecipeAdjustmentReviewState) -> Bool {
+    do {
+      try database.write { db in
+        _ = try RecipeRepository.overwriteRecipeWithAdjustmentProposal(
+          review.proposal,
+          recipeID: review.currentDetail.recipe.id,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+      adjustmentReview = nil
+      return true
+    } catch {
+      errorTitle = "Could Not Overwrite Recipe"
+      errorMessage = error.localizedDescription
+      isShowingError = true
+      return false
+    }
+  }
+
+  func keepAdjustmentAsVariationButtonTapped(
+    _ review: RecipeAdjustmentReviewState,
+    name: String
+  ) -> Bool {
+    do {
+      try database.write { db in
+        _ = try RecipeRepository.keepAdjustmentProposalAsVariation(
+          review.proposal,
+          recipeID: review.currentDetail.recipe.id,
+          name: name,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+      adjustmentReview = nil
+      return true
+    } catch {
+      errorTitle = "Could Not Keep Variation"
+      errorMessage = error.localizedDescription
+      isShowingError = true
+      return false
+    }
+  }
+
+  func commitRecipeAdjustmentLearnings(
+    _ review: AIHandoffRecipeAdjustmentBriefReview,
+    approvedText: String
+  ) throws {
+    guard !approvedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+    try commitLearnings(sourceType: .recipe, sourceID: review.recipeID, approvedText: approvedText)
+  }
+
   func discard(_ review: AIHandoffReview) {
     guard self.review?.handoffID == review.handoffID else { return }
     self.review = nil
@@ -508,6 +610,12 @@ struct HandoffReviewSheet: View {
       WorkbenchExperimentsReviewSheet(
         coordinator: coordinator,
         review: experimentsReview,
+        originalReview: review
+      )
+    case let .recipeAdjustmentBrief(briefReview):
+      RecipeAdjustmentBriefReviewSheet(
+        coordinator: coordinator,
+        review: briefReview,
         originalReview: review
       )
     case .menuPrepPlan, .recipeMakeAhead, .recipeChefItUp, .recipeServeWith, .mealPlanMakeAhead,
@@ -548,6 +656,89 @@ struct HandoffReviewSheet: View {
       Button("OK") {}
     } message: {
       Text(coordinator.errorMessage ?? "")
+    }
+  }
+}
+
+private struct RecipeAdjustmentBriefReviewSheet: View {
+  let coordinator: HandoffReviewCoordinator
+  let review: AIHandoffRecipeAdjustmentBriefReview
+  let originalReview: AIHandoffReview
+
+  @Environment(\.dismiss) private var dismiss
+  @State private var brief: String
+  @State private var learnings: String
+  @State private var isDrafting = false
+
+  init(
+    coordinator: HandoffReviewCoordinator,
+    review: AIHandoffRecipeAdjustmentBriefReview,
+    originalReview: AIHandoffReview
+  ) {
+    self.coordinator = coordinator
+    self.review = review
+    self.originalReview = originalReview
+    _brief = State(initialValue: review.brief)
+    _learnings = State(initialValue: review.learnings.map { "- \($0)" }.joined(separator: "\n"))
+  }
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        Section {
+          Text("This brief is based on the base recipe. It does not revise an active variation.")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        }
+
+        Section("Revision Brief") {
+          TextEditor(text: $brief)
+            .textInputAutocapitalization(.sentences)
+            .frame(minHeight: 180)
+        }
+
+        Section("Learnings") {
+          TextEditor(text: $learnings)
+            .textInputAutocapitalization(.sentences)
+            .frame(minHeight: 120)
+        }
+      }
+      .scrollDismissesKeyboard(.interactively)
+      .navigationTitle("Review Revision Brief")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Discard", role: .destructive) {
+            coordinator.discard(originalReview)
+            dismiss()
+          }
+          .disabled(isDrafting)
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Draft the Revision") {
+            Task { await draftRevision() }
+          }
+          .disabled(isDrafting || brief.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+      }
+    }
+  }
+
+  @MainActor
+  private func draftRevision() async {
+    isDrafting = true
+    defer { isDrafting = false }
+    do {
+      let adjustmentReview = try await coordinator.draftRecipeAdjustment(review, brief: brief)
+      try coordinator.commitRecipeAdjustmentLearnings(review, approvedText: learnings)
+      coordinator.discard(originalReview)
+      dismiss()
+      await Task.yield()
+      coordinator.presentAdjustmentReview(adjustmentReview)
+    } catch {
+      coordinator.errorTitle = "Could Not Draft Revision"
+      coordinator.errorMessage = error.localizedDescription
+      coordinator.isShowingError = true
     }
   }
 }
