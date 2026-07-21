@@ -513,6 +513,8 @@ public enum AIHandoffReturnContract {
   public static let marker = "YC-CONTRACT: v\(version)"
 
   public static let projectInstructions = """
+    Yes Chef hand-off return contract — v\(version). (If Yes Chef reports these instructions are out of date, re-copy them from AI Settings.)
+
     You are helping with Yes Chef hand-offs. You may discuss the supplied cooking context freely.
 
     The opening `<Task>: <Object>` line is the suggested conversation title. Use it if the host supports setting a title, but it is advisory only.
