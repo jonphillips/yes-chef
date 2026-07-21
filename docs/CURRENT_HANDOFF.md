@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 20, 2026 (**ADR-0042 S0 + S1 DONE (verified; Jon: device is fine) → Next Up = S2, the experiments verb + its schema.** S0 moved the return contract into the ChatGPT/Claude project's custom instructions (one Core constant `AIHandoffReturnContract` + a Settings copy button + the `YC-CONTRACT: v1` marker gate on every return path; it also closed the `.discuss`-no-example gap behind the S2.5 blob-report). S1 wired `.workbench` as a hand-off source with the **compare** deliverable (prose into `workbenchLog` rows a human reads) + the promoted committed-adjustment → `.rationale` log deposit (D6). Both schema-free; they ride in the S0/S1 slice PR ([#212](https://github.com/jonphillips/yes-chef/pull/212); `f865250` + review fix `3662aa2`). **⚠️ The feature is inert until the v1 project instructions are pasted from AI Settings** — the marker gate now applies to every verb. S2 is UN-GATED (OQ6 passed): the experiments verb, the label-cycle parser, three nullable synced `workbenchLog` columns, and D8's no-learnings rule. — Prior close: **ADR-0041 COMPLETE at S2.6** (PRs #206/#209 + ADR-0038 Amd 5 sparse learning ordering #210); **its S3 was WITHDRAWN** — no live `/c/` URL to house, meta-only fallback rejected (see [ADR-0041 Amd 3](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-3--s3-is-withdrawn-the-conversation-url-does-not-exist-2026-07-19) + [ADR-0038 Amd 3](decisions/ADR-0038-external-llm-handoff.md#amendment-3--an-optional-user-pasted-conversationurl-to-reopen-the-live-chat-2026-07-15)). Device passes still owed (Jon) for #206/#209/#210.)
+Last updated: July 21, 2026 (**ADR-0042 S2 DONE (device-passed; PR [#214](https://github.com/jonphillips/yes-chef/pull/214)) → Next Up = S4, the recipe-body hand-off + revision brief ([Amendment 1](decisions/ADR-0042-workbench-handoff-and-the-return-block.md#amendment-1--the-ask-outboards-a-revision-brief-returns-and-the-in-app-extractor-still-writes-the-delta-2026-07-21), Accepted 2026-07-21).** S2 shipped the experiments verb, the label-cycle parser, the three typed `workbenchLog` columns and D8's no-learnings rule → DONE-LOG. **⚠️ The contract is now v2 — re-copy the project instructions from AI Settings or every verb fails the marker gate.** **S3 (`workbenchDraft`) stays deferred and is NOT next** — no concrete want; do not build it on ADR momentum. Two new amendment sets landed as architecture-only docs: **ADR-0042 Amd 1** (Accepted — the ask outboards, a prose *revision brief* returns, the in-app extractor still writes the delta; its prompt is hand-validated) and **[ADR-0021 Amds 1 + 2](decisions/ADR-0021-recipe-variations.md)** (Proposed — variations become hand-editable because the ops are *derived*, plus promote-to-base / split-off-as-its-own-recipe; ratify before dispatching). — Prior closes: **ADR-0042 S0 + S1** ([#212](https://github.com/jonphillips/yes-chef/pull/212) — `.workbench` as a hand-off source, the contract moved into the project's custom instructions, compare + the `.rationale` deposit) → DONE-LOG. — Prior close: **ADR-0041 COMPLETE at S2.6** (PRs #206/#209 + ADR-0038 Amd 5 sparse learning ordering #210); **its S3 was WITHDRAWN** — no live `/c/` URL to house, meta-only fallback rejected (see [ADR-0041 Amd 3](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-3--s3-is-withdrawn-the-conversation-url-does-not-exist-2026-07-19) + [ADR-0038 Amd 3](decisions/ADR-0038-external-llm-handoff.md#amendment-3--an-optional-user-pasted-conversationurl-to-reopen-the-live-chat-2026-07-15)). Device passes still owed (Jon) for #206/#209/#210.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,26 +21,26 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**Live dispatch target — [ADR-0042](decisions/ADR-0042-workbench-handoff-and-the-return-block.md) S2 (Accepted 2026-07-20; the experiments verb + its schema). UN-GATED — OQ6 passed on device 2026-07-20.** Its own dispatch because it is the **schema slice** (S0 + S1 shipped — see DONE-LOG).
+**Live dispatch target — [ADR-0042](decisions/ADR-0042-workbench-handoff-and-the-return-block.md) S4 ([Amendment 1](decisions/ADR-0042-workbench-handoff-and-the-return-block.md#amendment-1--the-ask-outboards-a-revision-brief-returns-and-the-in-app-extractor-still-writes-the-delta-2026-07-21), Accepted 2026-07-21): the recipe body gets a hand-off door, and a prose *revision brief* comes back.** One dispatch, two cohesive slices, **one PR. Schema-free** — `AIHandoff` is device-local, so nothing here touches the prod-schema promotion list. **Read Amendment 1 in full before starting; Amd1-D1/D2 and Amd1-D7 are load-bearing.**
 
-**S2 — the experiments verb (`workbenchExperiments`) + three synced `workbenchLog` columns.** Pin the return to labeled three-line blocks — `Hypothesis:` / `Change:` / `Rationale:`, in that order, one sentence each (D5). **The parser splits on the label cycle — a new `Hypothesis:` line opens a block — and NEVER on blank lines**, because OQ6's live run proved the blank-line separators do not survive the paste path; **unit-cover the run-together (no-blank-line) shape explicitly — it is what the live run actually produced, not a hypothetical.** Parse lossless-or-loud (ADR-0040). Add three nullable synced columns to `workbenchLog` — `hypothesis` / `change` / `rationale` (OQ2: an experiment is write-many, its `outcome` is filled in later, so the triple is typed fields, not prose smeared into `body`) + the migration + the per-field edit affordance that justifies typing them. Experiments land as `.experiment` rows. **Emits NO learnings (D8** — an experiment is a conjecture; knowledge belongs in its `outcome` after it is tried, so drop `YC-LEARNINGS:` from the outbound prompt and ignore it if returned).
+**The shape, so it is not mis-built:** the ask goes out, **prose comes back, and the delta is still written in-app by the shipped extractor.** The return is a *revision brief* — a decided revision in a cook's language, one change per line — never ops, never IDs, never a rewritten recipe. **D2 is upheld, not relaxed:** nothing carrying identity crosses the paste door.
 
-**Schema step, same PR:** add the three `workbenchLog` columns to the standing prod-schema promotion list below. We are pre-prod by design — that is the reason to fix the shape *now*, before promotion locks it.
+**S4a — the door out.** A task-keyed entry point on `RecipeHandoffContext` beside `prompt(for: section)` (the recipe body is **not** a `PlaybookSection` — do not force it into one), sending the **whole** recipe (no `excludingPlaybookSections:` filter) plus the taste profile and known-learnings block the section prompts already send. `.discuss` is the default mode. Wire the recipe-body export into `HandoffIntents` metadata and the in-app Copy door (ADR-0038 Amd 2), with the derived D9 title line (`Adjust Recipe: <recipe name>`). **Ship the ask verbatim from the ADR's S4a slice block — it is hand-validated (2026-07-21), including its three illustrative lines and Amd1-D7's learnings sentence.** A `DeliverableFormat` case alone is **not** sufficient: `discussInstruction` is one clause, so the shape must live in the `RecipeHandoffContext` ask, exactly as `lineListFormat` does for the sections.
 
-**Verify** per the Verification Pattern below — `swift build` + Core tests (with the no-blank-line parser test), one elevated `generic/platform=iOS` build, `scripts/check-drift.sh`. Device pass is Jon's: an experiments hand-off round-trips into typed rows and a single field edits without regenerating the others.
+**S4b — the door back.** Replace the `.recipe` × `.adjustRecipe` `throw .wrongTask` with a real import route → a **brief review sheet** (the ADR-0024 editable preview: brief text + learnings) → a *"Draft the revision"* action calling the existing `recipeAdjustmentClient` with the brief as the conversation → the existing side-by-side review → the existing two commit destinations. **No new commit shape and no new storage** — the brief is transient (Amd1-D5).
 
-**S0/S1 groundwork already shipped (context for S2, not a task):** `.workbench` is a hand-off source, the return contract lives in the project's custom instructions behind the `YC-CONTRACT: v1` marker gate, and compare + the `.rationale` deposit are wired. **⚠️ Paste the v1 project instructions from AI Settings** before any round-trip — the marker gate makes every verb inert without them.
+**Do not:** wire a **delta** paste-back (D2 — the structured write stays in-app); restate the return contract in the prompt (D4 — it lives in the project instructions, and this verb needs **no contract stanza and no version bump**, Amd1-D6); extend the ingredient/method **op vocabulary** from inside this slice (it belongs to [ADR-0021 Amd1-D5](decisions/ADR-0021-recipe-variations.md), where step insertion is now the first candidate); or build `workbenchDraft` (D5/S3 — deferred, no want).
 
-**Do not** wire `adjustRecipe` as a paste-back (D2 — it's a structured canonical write, stays the in-app verb) or build the ADR-0019 S3 `experiments` BLOB (superseded — rows, not a blob). `workbenchDraft` stays deferred (D5/S3).
+**Known trap, must be handled (Amd1-OQ3):** adjust applies its proposal to the **base** `detail` while the reader resolves a variation for **display only**, so a brief argued about an active variation would silently anchor to the base. **Export the base recipe and say so in the sheet, or refuse to export while a variation is active** — do not ship it ambiguous.
 
-**Device pass owed (Jon) on ADR-0042 S2 — unmerged, PR [#214](https://github.com/jonphillips/yes-chef/pull/214).** Architect review of `6c71c8a` found the slice faithful to the ADR (label-cycle parser, D8 no-learnings enforced in prompt + contract + import, per-field edit affordance, promotion list updated); package build + 378/378 tests + generic-iOS build all green. Two review fixes landed in `a7b66b9`: the experiments **migration was registered mid-list, ahead of the already-applied ADR-0040 prep-plans migration** — moved to the end so applied migrations stay a stable prefix (additive and independent, so no data risk either way); and the pasted contract now carries a **human-visible `v2` version label**, since the version previously appeared only inside the "second line must be `YC-CONTRACT: v2`" clause and a human could not tell which version their project held. **⚠️ The contract is v2 — re-copy the project instructions from AI Settings before any round-trip, or every verb fails the marker gate.** *Verify on device:* an experiments hand-off round-trips into typed rows; editing one field leaves the other two untouched; a stale-v1 paste surfaces the friendly re-copy error. Non-blocking follow-ups left for Codex: the `canSave`/`normalizedLogEntryDraft` mismatch on body-plus-partial-typed-fields, the dead save spinner, and the pre-existing compare `.menuPrepPlan` mislabel.
-
-**Workbench dogfooding polish (Jon's asks, `aa100d0`, rides in #214).** Candidate rows open their recipe on tap (header only — the row also hosts the annotation field); copy and save now confirm via the existing `AppToastCenter` toast + success haptic, on all four hand-off surfaces plus workbench annotation and log-entry saves. Toast hosting differs by surface because an overlay mounted by a presenting view does not draw over the sheet it presents: workbench and `RecipeDetailView` host their own (the latter is built from four call sites and only `RecipeFullScreenCover` mounted one, so the iPad `AppMainLayout` path was silent), while Menu and Meal Calendar reuse their model's shared center. *Verify on device:* toasts appear over the workbench sheet and on the iPad split recipe path.
+**Verify** per the Verification Pattern below — `swift build` + Core tests (the routing case and a return-payload round-trip: token, `YC-CONTRACT: v2`, prose body, learnings), one elevated `generic/platform=iOS` build, `scripts/check-drift.sh`. Device pass is Jon's: outboard a real revision, argue it, `finalize`, paste, edit the brief, draft, review side by side, commit as a variation.
 
 **Device passes owed (Jon) on already-merged work** — S2.5 (#206): filled Serve With prefill retains existing rows; filled Make-ahead offers Replace/Append with neither pre-selected; section actions live only in the expanded-header `•••`; paste prompts once per round-trip; Meal Calendar uses compact layout in iPad Slide Over. S2.6 (#209): every Clear asks first, editor sheets have no Clear, Serve With deletes by swipe with no visible `x`, pasted bullets render singly. ADR-0038 Amd 5 (#210): learnings drag-reorder on all three surfaces and hold across a two-device sync — and watch the recorded tradeoff, that a newly returned learning still prepends **ahead of** a deliberate manual arrangement.
 
 
-**Feature efforts still on the board — Jon picks; do not infer** (ADR-0042 S2 is in Next Up above; these are *after* it):
+**Feature efforts still on the board — Jon picks; do not infer** (ADR-0042 S4 is in Next Up above; these are *after* it):
+- **[ADR-0021](decisions/ADR-0021-recipe-variations.md) V1 + V2 — variations become hand-editable, and promotion gets its two destinations.** **Amendments 1 + 2 are Proposed — ratify with Jon before dispatching** (Amd1-D7 and Amd2-D4 are already ratified). **V1:** editing a variation edits the **resolved** recipe and the ops are **re-derived** on save — the overlay and highlighting survive because the delta is recomputed, never hand-authored; the derivation returns `(ops, unrepresentable[])` so an inexpressible edit reports at save and offers the split-off, never saving a partial (Amd1-D7). **The editor must be the ID-preserving structured one** — a text round-trip diffs a one-word change as remove+add and destroys the color comparison (Amd1-D4). **V2:** split off as its own recipe (B1) and promote-to-base with the old base auto-derived into a variation (B2); **no probation machinery** — no cook counts, no verdict prompts (Amd2-D4). **Bundle V1+V2** so the save-time report has a split-off to offer. **Schema-free — the `deltas` BLOB stays** (Amd1-D3: ADR-0040 keys on the grain the *human* edits, and no human edits an op). ADR-0023 OQ3 (rebasing existing variations onto a new base) **must be answered in V2**, not deferred again.
+- **Workbench log-editor nits (small, from the S2 review; not urgent)** — the `canSave` / `normalizedLogEntryDraft` mismatch when a body is combined with partially-filled typed fields, the dead save spinner, and the pre-existing compare `.menuPrepPlan` mislabel.
 - **Workbench synthesis-shaped apply-action** — the draft verb's own action shape (no last-reply gate/chip). ⚠️ Re-read against [ADR-0042 D2/OQ5](decisions/ADR-0042-workbench-handoff-and-the-return-block.md) before dispatching: it is an *in-app* draft verb, and the draft is a structured write.
 - **Open a design ADR** — ADR-0013 meal-planner verbs (needs scope confirmation) or ADR-0014 text editing.
 
@@ -50,8 +50,10 @@ runloop (verify Compare-diff isn't swallowed); (2) N=1 auto-drill stacks the chi
 collection sheet (confirm it reads cleanly, incl. iPad split-chat).
 
 **Parked to `docs/open-questions.md` (design forks, decide with Jon before build):** multi-bubble /
-whole-transcript chat selection (per-bubble `UITextView` caps the payload); hand-editing a variation /
-define a header (variations are read-only after LLM creation → feeds ADR-0014 × ADR-0021).
+whole-transcript chat selection (per-bubble `UITextView` caps the payload). *(Hand-editing a variation and
+promote-to-standalone are **no longer parked** — answered 2026-07-21 by ADR-0021 Amds 1 + 2, queued in Ready
+Efforts. ADR-0014 remains a dependency **only** for section headers, the one edit the op vocabulary cannot
+express.)*
 
 **Standing release follow-up (not a dispatch — a pre-cut ops step Jon runs).** We stay in the CloudKit
 **Development** environment (dev stance) so the schema keeps evolving freely; promoting to **Production** is
@@ -91,33 +93,23 @@ refine loop* half is **WITHDRAWN** (D7 — refinement happens in the live extern
 proposal loop is a worse copy of it, **do not rebuild it**), and its *workbench-log deposit* half is
 **promoted into ADR-0042 S1** (D6). **Nothing remains queued under ADR-0023.** Extends ADR-0021 (the
 variation destination) — do not duplicate it. Per ADR-0042 D2 the in-app verb stays the **only** path that
-writes a structured delta.
+writes a structured delta — **unchanged by ADR-0042 Amd 1**, which adds an *export* door and a prose brief
+feeding this same extractor; the in-app verb is complementary, not replaced (OQ5).
 
 **Recipe Workbench** (ADR-0019 + `efforts/recipe-workbench.md`) — the store + curate + compare arc is
 complete (S1–S4 all shipped → DONE-LOG). Remaining parked follow-ons in the effort doc: the
 **synthesis-shaped apply-action** (the draft verb's own action shape — a distinct action enabled by workbench
 state, no last-reply gate/chip; app-layer only, small, spec in the effort doc's "Out of scope" section — this
 was the prior Next Up, demoted here, not yet built), plus AI effort/tier as a user-facing setting,
-AI-generated log entries, and the S3 review notes. **New direction —
-[ADR-0042](decisions/ADR-0042-workbench-handoff-and-the-return-block.md) (Accepted 2026-07-20; S0/S1 shipped —
-DONE-LOG; S2 is the Next Up dispatch above):** the workbench becomes an **external hand-off source**, since its product is deliberation
-and the chat apps do that unmetered in a live thread. Compare + experiments outboard; the **draft verb does
-not** (a structured canonical write, D2); experiments land as `workbenchLog` rows, **not** ADR-0019 S3's
-`experiments` BLOB, which is superseded. **S1 is schema-free; S2 adds three nullable synced `workbenchLog`
-columns** (`hypothesis`/`change`/`rationale` — OQ2 resolved 2026-07-20: an experiment is write-many, so the
-triple is typed fields per ADR-0040, and being pre-prod is the reason to fix the shape *now*). **When S2
-ships, add those columns to the standing prod-schema promotion list above.** **S2 is UN-GATED — OQ6 passed
-on device 2026-07-20:** with the v1 contract living in the ChatGPT project's custom instructions (**not** in
-the prompt), a long real conversation still switched cleanly into the return block on `finalize`, echoed
-`YC-CONTRACT: v1`, held all three field labels across four experiments, and honored D8's learnings
-suppression stated many turns earlier — confirming **D1, D4 and D8** in the shape we'd ship. **One failure
-that binds the parser: the blank lines between blocks did not survive** (model or paste — indeterminable,
-which is the point), so **the parser splits on the label cycle, never on whitespace**, and must be
-unit-covered for the run-together shape the live run actually produced. Also from that run: **D8** (3 of 4
-returned learnings were the verb's own untested hypotheses restated as fact — knowledge belongs in the
-experiment's `outcome`, after it's tried) and **D9** (threads get a derived `<TaskType>: <Object>` title —
-task, not object-kind, because ADR-0041 section-scoping means one recipe can have three live threads; the
-title is **advisory only**, nothing parses it, since the auto-titler paraphrased it in testing).
+AI-generated log entries, and the S3 review notes. **Direction — [ADR-0042](decisions/ADR-0042-workbench-handoff-and-the-return-block.md)
+(Accepted 2026-07-20; **S0/S1/S2 all shipped** → DONE-LOG):** the workbench is an **external hand-off source**,
+since its product is deliberation and the chat apps do that unmetered in a live thread. Compare + experiments
+outboard; the **draft verb does not** (a structured canonical write, D2), and `workbenchDraft` (S3) **stays
+deferred with no want — do not build it on ADR momentum**. Experiments landed as typed `workbenchLog` rows,
+**not** ADR-0019 S3's `experiments` BLOB, which is superseded. **[Amendment 1](decisions/ADR-0042-workbench-handoff-and-the-return-block.md#amendment-1--the-ask-outboards-a-revision-brief-returns-and-the-in-app-extractor-still-writes-the-delta-2026-07-21)
+(Accepted 2026-07-21) is the live dispatch (S4) above** — it extends the same pattern to the recipe body:
+**prose out, prose back, structure derived in-app, a human gate at each end**, with D2's line restated as
+**the paste door never carries identity.**
 
 **Meal-Planner chat verbs** (ADR-0013 follow-on + `efforts/cooking-workspace.md`) — the one remaining named
 actionable-chat verb instance. Classify each new verb's commit shape first ([[chat-verb-commit-shapes]]) —
@@ -133,10 +125,11 @@ model), so sequence them.
 
 **Open design ADRs (discussion, not yet Accepted)** — [ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md)
 recipe text editing (header toggles vs. rich text / bold-italic), opened from the 2026-07-04 dogfood pass.
-Decide with Jon before any implementation. *(Note: [ADR-0021](decisions/ADR-0021-recipe-variations.md) recipe
-variations is no longer a standalone queue item — it is now the **S2 destination** of the Recipe edit
-proposals effort above, reached via the same proposal/review surface; ADR-0023 D1/S2 supersedes its
-standalone framing.)*
+Decide with Jon before any implementation — **and note it narrowed on 2026-07-21**: ADR-0021 Amd1-D5 needs
+ADR-0014 only for **section headers inside a variation**, which is the one edit the op vocabulary cannot
+express. *(Note: [ADR-0021](decisions/ADR-0021-recipe-variations.md)'s original standalone framing was
+superseded by ADR-0023 D1/S2 — variations are created through the adjust proposal/review surface — but it
+**is a queue item again** as V1 + V2 above, on the strength of its 2026-07-21 amendments.)*
 
 **Still-deferred, separate future efforts** (not follow-through on any shipped effort): ADR-0027 **OQ4**
 (a note-worthiness taste preference); **ADR-0036 S3** — promote a `RecipeNote` deposited *on a recipe* (the
