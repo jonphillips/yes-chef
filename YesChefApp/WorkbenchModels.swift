@@ -424,6 +424,9 @@ final class WorkbenchDetailModel {
     let draft = WorkbenchLogEntryDraft(
       kind: editorState.kind,
       body: editorState.body,
+      hypothesis: editorState.hypothesis,
+      change: editorState.change,
+      rationale: editorState.rationale,
       outcome: editorState.outcome,
       relatedRecipeID: editorState.relatedRecipeID
     )
@@ -527,6 +530,9 @@ struct WorkbenchLogEntryEditorState: Identifiable, Hashable, Sendable {
   var entryID: WorkbenchLogEntry.ID?
   var kind: WorkbenchLogEntryKind = .note
   var body = ""
+  var hypothesis = ""
+  var change = ""
+  var rationale = ""
   var outcome = ""
   var relatedRecipeID: Recipe.ID?
 
@@ -540,6 +546,9 @@ struct WorkbenchLogEntryEditorState: Identifiable, Hashable, Sendable {
     entryID = entry.id
     kind = entry.kind
     body = entry.body
+    hypothesis = entry.hypothesis ?? ""
+    change = entry.change ?? ""
+    rationale = entry.rationale ?? ""
     outcome = entry.outcome ?? ""
     relatedRecipeID = entry.relatedRecipeID
   }

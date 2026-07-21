@@ -875,7 +875,13 @@ extension DependencyValues {
         CREATE INDEX "index_learnings_on_sourceType_sourceID_sortOrder"
         ON "learnings"("sourceType", "sourceID", "sortOrder")
         """)
-        .execute(db)
+      .execute(db)
+    }
+
+    migrator.registerMigration("Add typed workbench experiment fields") { db in
+      for column in ["hypothesis", "change", "rationale"] {
+        try db.execute(sql: "ALTER TABLE \"workbenchLog\" ADD COLUMN \"\(column)\" TEXT")
+      }
     }
 
     migrator.registerMigration("Move menu prep plans into editable step rows") { db in

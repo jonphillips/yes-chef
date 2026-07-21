@@ -72,6 +72,14 @@ public struct WorkbenchChatContext: Equatable, Sendable {
     """
   }
 
+  public func experimentsHandoffPrompt() -> String {
+    """
+    Propose a small set of distinct experiments for this workbench. Each experiment should test one concrete change against a specific expected result. Experiments are untested conjectures, so do not return learnings.
+
+    \(serialized(characterBudget: Self.frontierSerializedCharacterBudget))
+    """
+  }
+
   public static func serializedCharacterBudget(for tier: ModelTier) -> Int {
     switch tier {
     case .onDevice:
@@ -219,10 +227,17 @@ public struct WorkbenchChatContext: Equatable, Sendable {
   }
 
   private func renderedLogEntry(_ entry: WorkbenchLogEntryChatContext) -> [String] {
-    var lines = [
-      "- \(entry.kind.title) (\(entry.dateCreated.formatted(date: .abbreviated, time: .shortened))):",
-      "  - \(entry.body.replacingOccurrences(of: "\n", with: " "))",
-    ]
+    var lines = ["- \(entry.kind.title) (\(entry.dateCreated.formatted(date: .abbreviated, time: .shortened))):"]
+    if let hypothesis = entry.hypothesis,
+       let change = entry.change,
+       let rationale = entry.rationale
+    {
+      lines.append("  - Hypothesis: \(hypothesis.replacingOccurrences(of: "\n", with: " "))")
+      lines.append("  - Change: \(change.replacingOccurrences(of: "\n", with: " "))")
+      lines.append("  - Rationale: \(rationale.replacingOccurrences(of: "\n", with: " "))")
+    } else {
+      lines.append("  - \(entry.body.replacingOccurrences(of: "\n", with: " "))")
+    }
     if let outcome = entry.outcome {
       lines.append("  - Outcome: \(outcome.replacingOccurrences(of: "\n", with: " "))")
     }
@@ -237,6 +252,9 @@ public struct WorkbenchLogEntryChatContext: Equatable, Sendable {
   public var id: WorkbenchLogEntry.ID
   public var kind: WorkbenchLogEntryKind
   public var body: String
+  public var hypothesis: String?
+  public var change: String?
+  public var rationale: String?
   public var outcome: String?
   public var relatedRecipeID: Recipe.ID?
   public var sortOrder: Int
@@ -246,6 +264,9 @@ public struct WorkbenchLogEntryChatContext: Equatable, Sendable {
     id: WorkbenchLogEntry.ID,
     kind: WorkbenchLogEntryKind,
     body: String,
+    hypothesis: String? = nil,
+    change: String? = nil,
+    rationale: String? = nil,
     outcome: String? = nil,
     relatedRecipeID: Recipe.ID? = nil,
     sortOrder: Int,
@@ -254,6 +275,9 @@ public struct WorkbenchLogEntryChatContext: Equatable, Sendable {
     self.id = id
     self.kind = kind
     self.body = body
+    self.hypothesis = hypothesis
+    self.change = change
+    self.rationale = rationale
     self.outcome = outcome
     self.relatedRecipeID = relatedRecipeID
     self.sortOrder = sortOrder
@@ -265,6 +289,9 @@ public struct WorkbenchLogEntryChatContext: Equatable, Sendable {
       id: entry.id,
       kind: entry.kind,
       body: entry.body,
+      hypothesis: entry.hypothesis,
+      change: entry.change,
+      rationale: entry.rationale,
       outcome: entry.outcome,
       relatedRecipeID: entry.relatedRecipeID,
       sortOrder: entry.sortOrder,

@@ -348,4 +348,100 @@ extension AIHandoffTests {
       #expect(try WorkbenchLogEntry.fetchAll(db).isEmpty)
     }
   }
+
+  @Test
+  func workbenchExperimentsParseRunTogetherBlocksAndIgnoreLearnings() throws {
+    @Dependency(\.defaultDatabase) var database
+    let workbenchID = SampleUUIDSequence.uuid(38_006)
+    let handoffID = SampleUUIDSequence.uuid(38_007)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Workbench.insert {
+        Workbench(
+          id: workbenchID,
+          title: "Cookie Study",
+          sortOrder: 0,
+          dateCreated: now,
+          dateModified: now
+        )
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .workbench,
+          sourceID: workbenchID,
+          taskType: .workbenchExperiments,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      let review = try AIHandoffIntentImport.stageReview(
+        handoffID: handoffID,
+        result: """
+        YC-HANDOFF: \(handoffID.uuidString)
+        Hypothesis: Resting the dough overnight will deepen caramel flavor.
+        Change: Chill the mixed dough for one night before baking.
+        Rationale: More time lets the flour hydrate and sugars develop.
+        Hypothesis: Brown butter will add nuttiness without thinning the cookie.
+        Change: Replace melted butter with cooled brown butter by weight.
+        Rationale: Browning adds flavor while preserving the fat quantity.
+        YC-LEARNINGS:
+        - Brown butter always improves cookies.
+        """,
+        in: db,
+        now: now
+      )
+
+      guard case let .workbenchExperiments(experimentsReview) = review else {
+        Issue.record("Expected an experiments review.")
+        return
+      }
+      expectNoDifference(experimentsReview.workbenchID, workbenchID)
+      expectNoDifference(
+        experimentsReview.experiments,
+        [
+          WorkbenchExperiment(
+            id: 0,
+            hypothesis: "Resting the dough overnight will deepen caramel flavor.",
+            change: "Chill the mixed dough for one night before baking.",
+            rationale: "More time lets the flour hydrate and sugars develop."
+          ),
+          WorkbenchExperiment(
+            id: 1,
+            hypothesis: "Brown butter will add nuttiness without thinning the cookie.",
+            change: "Replace melted butter with cooled brown butter by weight.",
+            rationale: "Browning adds flavor while preserving the fat quantity."
+          ),
+        ]
+      )
+      #expect(try WorkbenchLogEntry.fetchAll(db).isEmpty)
+    }
+  }
+
+  @Test
+  func workbenchExperimentsKeepMalformedBlocksLoud() {
+    let returned = AIHandoffReturn.workbenchExperiments(
+      from: """
+      Hypothesis: Add a second yolk for chewiness.
+      Change: Add one extra yolk.
+      This explanation has no label.
+      """
+    )
+
+    expectNoDifference(returned.experiments, [])
+    expectNoDifference(
+      returned.unparsedBlocks,
+      [
+        """
+        Hypothesis: Add a second yolk for chewiness.
+        Change: Add one extra yolk.
+        This explanation has no label.
+        """,
+      ]
+    )
+  }
 }

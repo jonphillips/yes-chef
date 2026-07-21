@@ -435,6 +435,15 @@ private struct WorkbenchReader: View {
           }
           .accessibilityLabel(Text("Add log entry"))
         }
+      } footer: {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Develop experiments externally, then review each proposed hypothesis, change, and rationale before it reaches the workbench log.")
+          HandoffCopyPasteControls(
+            source: .workbench(detail.workbench.id, task: .experiments),
+            transport: handoffTransport
+          )
+          .buttonStyle(.bordered)
+        }
       }
 
       Section {
@@ -476,7 +485,7 @@ private struct WorkbenchReader: View {
         VStack(alignment: .leading, spacing: 8) {
           Text("Discuss a candidate comparison externally, then review what returns before it reaches the workbench log.")
           HandoffCopyPasteControls(
-            source: .workbench(detail.workbench.id),
+            source: .workbench(detail.workbench.id, task: .compare),
             transport: handoffTransport
           )
           .buttonStyle(.bordered)
@@ -510,9 +519,20 @@ private struct WorkbenchLogEntryRow: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
-      Text(entry.body)
-        .font(.body)
-        .foregroundStyle(.primary)
+      if let hypothesis = entry.hypothesis,
+         let change = entry.change,
+         let rationale = entry.rationale
+      {
+        WorkbenchExperimentFields(
+          hypothesis: hypothesis,
+          change: change,
+          rationale: rationale
+        )
+      } else {
+        Text(entry.body)
+          .font(.body)
+          .foregroundStyle(.primary)
+      }
       if let outcome = entry.outcome {
         VStack(alignment: .leading, spacing: 3) {
           Text("Outcome")
@@ -525,6 +545,31 @@ private struct WorkbenchLogEntryRow: View {
       }
     }
     .padding(.vertical, 4)
+  }
+}
+
+private struct WorkbenchExperimentFields: View {
+  let hypothesis: String
+  let change: String
+  let rationale: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      field("Hypothesis", text: hypothesis)
+      field("Change", text: change)
+      field("Rationale", text: rationale)
+    }
+  }
+
+  private func field(_ title: String, text: String) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text(title)
+        .font(.caption.bold())
+        .foregroundStyle(.secondary)
+      Text(text)
+        .font(.body)
+        .foregroundStyle(.primary)
+    }
   }
 }
 
@@ -615,9 +660,30 @@ private struct WorkbenchLogEntryEditorView: View {
         }
         .pickerStyle(.menu)
 
-        StackedFormField(title: "Body") {
-          TextEditor(text: $editorState.body)
-            .frame(minHeight: 140)
+        if editorState.kind == .experiment {
+          StackedFormField(title: "Hypothesis") {
+            TextField("Hypothesis", text: $editorState.hypothesis, axis: .vertical)
+          }
+
+          StackedFormField(title: "Change") {
+            TextField("Change", text: $editorState.change, axis: .vertical)
+          }
+
+          StackedFormField(title: "Rationale") {
+            TextField("Rationale", text: $editorState.rationale, axis: .vertical)
+          }
+
+          if !editorState.body.isEmpty {
+            StackedFormField(title: "Legacy notes") {
+              TextEditor(text: $editorState.body)
+                .frame(minHeight: 140)
+            }
+          }
+        } else {
+          StackedFormField(title: "Body") {
+            TextEditor(text: $editorState.body)
+              .frame(minHeight: 140)
+          }
         }
 
         StackedFormField(title: "Outcome") {
@@ -639,9 +705,20 @@ private struct WorkbenchLogEntryEditorView: View {
             dismiss()
           }
         }
-        .disabled(editorState.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .disabled(!editorState.canSave)
       }
     }
+  }
+}
+
+private extension WorkbenchLogEntryEditorState {
+  var canSave: Bool {
+    if kind == .experiment {
+      return [hypothesis, change, rationale].allSatisfy {
+        !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      } || !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    return !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 }
 
