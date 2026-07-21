@@ -41,6 +41,10 @@ overlap."*
   ADR crossing [ADR-0019](decisions/ADR-0019-recipe-design-studies.md) × [ADR-0021](decisions/ADR-0021-recipe-variations.md)
   × [ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md). Don't unify prematurely — but stop treating the two
   reports below as unrelated one-offs; they're evidence for this decision.
+  **NARROWED 2026-07-21:** both instances below are answered by ADR-0021 Amendments 1 + 2 **without sharing
+  Workbench machinery** — hand-editing is a derived diff, promotion is two destinations. **Position: distinct
+  surfaces, shared primitives** (the diff engine and the promote writer), not a "Workbench of one." The
+  umbrella stays open only if a *third* instance appears that neither amendment covers.
 
 - **[Design — feeds ADR-0014 × ADR-0021] Edit a variation, not just the original.** *(Already noted 2026-07-09
   below; reaffirmed here.)* Looking at a variation, Jon wants to **edit the variation itself**. Variations are
@@ -48,11 +52,20 @@ overlap."*
   variation has no home. Jon explicitly flagged the **Workbench collision** — see the umbrella fork above. Needs
   the header/text-editing model decision ([ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md)) plus a
   call on whether variation-editing reuses Workbench machinery.
+  **ANSWERED 2026-07-21 — [ADR-0021 Amendment 1](decisions/ADR-0021-recipe-variations.md#amendment-1--a-variation-is-hand-edited-through-the-resolved-view-the-ops-are-derived-never-authored-2026-07-21)
+  (Proposed):** the human edits the **resolved** recipe and the delta is **re-derived** on save, so editing
+  and the overlay were never in tension. Schema-free, no Workbench machinery. **The ADR-0014 dependency
+  survives** but narrows to section headers only — they are the one edit the op vocabulary cannot express.
 
 - **[Future — ADR-0021 territory] Promote a variation to a standalone recipe.** Jon (2026-07-11): eventually a
   way to promote a variation into its own top-level recipe. Again flagged as **Workbench/recipe-workspace
   overlap** — the Workbench already has a "promote working recipe to `main`" flip (`libraryPlacement`), so
   variation-promotion and workbench-promotion may want the same primitive. Not scoped; part of the umbrella fork.
+  **ANSWERED 2026-07-21 — [ADR-0021 Amendment 2](decisions/ADR-0021-recipe-variations.md#amendment-2--promotion-is-the-release-valve-a-variation-can-become-the-base-or-its-own-recipe-2026-07-21)
+  (Proposed):** two promotions — **split off as its own recipe** (B1) and **promote to base**, with the old
+  base auto-derived into a variation (B2). **No probation machinery** (ratified: Jon — no cook counts, no
+  verdict prompts; you promote when ready). Schema-free, and no `derivedFromRecipeID` column until something
+  actually reads one.
 
 ## Resolved — 2026-06-28
 

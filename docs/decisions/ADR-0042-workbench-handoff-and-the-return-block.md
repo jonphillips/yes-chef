@@ -9,7 +9,14 @@
 
 Status: **Accepted** — 2026-07-20 (Jon ratified; D1/D4/D8 hand-validated end-to-end by the OQ6 live run,
 all OQs resolved except the non-gating Claude-portability check). Opened Proposed the same day (architect +
-Jon, in the "re-empower the workbench for the all-you-can-eat chat apps" conversation). **Extends
+Jon, in the "re-empower the workbench for the all-you-can-eat chat apps" conversation).
+**[Amendment 1](#amendment-1--the-ask-outboards-a-revision-brief-returns-and-the-in-app-extractor-still-writes-the-delta-2026-07-21)
+— Accepted 2026-07-21 (Jon ratified; S4 is the dispatch target).** The recipe body gets an export door; a
+prose *revision brief* returns and feeds the shipped in-app extractor — schema-free, no contract bump, and
+D2 held by keeping identity off the paste door. **Its prompt is hand-validated end-to-end (2026-07-21):
+shape, terminal turn and the `YC-CONTRACT: v2` echo all held, and Amd1-OQ1 resolved to keep learnings with
+a re-aimed ask (Amd1-D7).** S0/S1 shipped in [#212](https://github.com/jonphillips/yes-chef/pull/212), S2
+in [#214](https://github.com/jonphillips/yes-chef/pull/214) (device-passed 2026-07-21). **Extends
 [ADR-0038](ADR-0038-external-llm-handoff.md)** (the hand-off core, its
 in-app Copy/Paste door in Amd 2, and the `Learning` typed home in Amd 1) by adding the **workbench** as a
 hand-off source and by writing down the return-payload contract that ADR-0038 left implicit. **Governed by
@@ -244,6 +251,242 @@ instructions, and take whichever works.
 is the `YC-HANDOFF:` token's job and already works. **Nothing parses the title, and no behavior depends on
 it**, so a failed or paraphrased title costs discoverability, not correctness. Do not add a fallback that
 reads it.
+
+## Amendment 1 — the ask outboards, a *revision brief* returns, and the in-app extractor still writes the delta (2026-07-21)
+
+**D2 is upheld, not weakened — but D7 subtracted a half and nothing was ever built to replace it.** D7
+retired ADR-0023 S3's in-app refine loop on the stated premise that *refinement happens in the live external
+thread*. That premise was never wired: there is no way to get a recipe's **body** out to such a thread, and
+no way to get the result of arguing about it back. This amendment builds the missing half, at the only place
+it can go without touching D2 — **the ask goes out, prose comes back, and the structured write is still
+authored in-app against live rows.**
+
+### The gap (from the code, not from a want)
+
+- **`.adjustRecipe` is unwired in both directions.** Declared in `AIHandoffTaskType`
+  (`AIHandoff.swift:55`), but no exporter builds it — `HandoffIntents.swift:159` mints recipe metadata only
+  from `PlaybookSectionKind.handoffTaskType` — and the import path throws `.wrongTask`
+  (`AIHandoff.swift:887`). D2 named that unwired import and said *stay unwired*. It said nothing about the
+  export, and the export is what is actually missing.
+- **The recipe body has no hand-off door at all.** ADR-0041 scoped recipe hand-offs to the three Playbook
+  sections; `RecipeHandoffContext.prompt(for:)` (`AIHandoffContext.swift:15`) is keyed on
+  `PlaybookSectionKind` and takes no other task. So the most deliberation-heavy content in the app —
+  ingredient lines and method steps — is the one thing that cannot be outboarded, while make-ahead notes
+  can.
+- **What that costs in practice (Jon, 2026-07-21).** Hand-copy the recipe into ChatGPT, argue the revision
+  out well — then come back and re-state the ask in the in-app chat, where a one-shot metered extractor
+  infers a delta from a thin transcript. **The reasoning is discarded at the boundary**, which is precisely
+  the loss D7 assumed would not happen.
+
+### Amd1-D1 — The middle term: outboard the ask, return a **brief**, derive the delta in-app
+
+A three-part pipeline, none of it new machinery:
+
+1. **Out:** the recipe body + the cook's question, as an ordinary `.discuss` hand-off.
+2. **Back:** a **revision brief** — advisory prose stating a *decided* revision in a cook's language
+   (*"take the butter to 120g and brown it; move the salt into the dry mix; rest 20 minutes before
+   shaping"*). **Never ops, never IDs, never a rewritten recipe.**
+3. **In:** the human edits the brief, then taps once to hand it to the **existing** in-app extractor
+   (`RecipeAdjustmentClient`, `RecipeAdjustment.swift:301`), which resolves it into a structured delta
+   against live `id`/`sectionID`/`sortOrder`, and lands in the **existing** side-by-side review with the
+   **existing** two commit destinations.
+
+**Why this is D2-compliant rather than a loophole:** nothing carrying identity crosses the paste door. The
+returned artifact has no anchors to orphan and no line IDs to corrupt; a bad brief costs one edit before
+anything is drafted, and a bad draft costs one dismissed review. **The delta is still authored in-app,
+against rows that exist, by the component built to do exactly that.**
+
+**And the extraction gets *easier*, not harder.** The extractor's prompt already takes
+`selection` + conversation + full recipe context (`RecipeAdjustment.swift:345`). Today it must infer an
+intent from a rambling in-app transcript. Given a brief it *transcribes an already-decided change* — the
+same job, with the hard half already done by the better-reasoned thread.
+
+### Amd1-D2 — The paste door never carries **identity**; that is the durable form of D2
+
+D3 sorted returns into two bins: *terminates in a human-read field* → no format; *feeds typed fields* → pin
+the format. **The brief is a third case** — it lands in a text field a human reads **and edits**, and that
+text is then fed to an in-app LLM step that produces the structured write. So:
+
+- **No format is pinned** (it is prose for a person), and
+- safety comes not from parsing but from **two human gates** — edit the brief, then review the delta
+  side-by-side — plus the structural fact that the write is composed in-app.
+
+**Generalized rule: *prose out, prose back, structure derived in-app, a human gate at each end.*** This is
+the shape for any future "the external thread should change canonical data" want. **`workbenchDraft`
+(D5/S3) should be revisited under this shape** rather than as a paste-back of a recipe — a drafted recipe
+returning as a *brief the in-app draft verb consumes* is a different, safer proposition than a recipe
+returning as data.
+
+The invariant worth carrying forward is therefore **"the paste door never carries identity,"** not
+"adjust-recipe never outboards." The latter was a corollary, and it was too strong: it conflated the
+*write* with the *thinking that decides the write*.
+
+### Amd1-D3 — Learnings stay on, but the D8 test must be re-run against this verb
+
+D8's question is *findings or conjecture?* A brief argued out against a real recipe produces genuine
+findings, so the two-part return holds and `YC-LEARNINGS:` stays. **But the D8 failure mode is plausible
+here and must not be assumed away:** an untested revision is itself a conjecture, and the OQ6 run showed the
+model will happily restate a verb's own proposals as established fact. **Gate on a hand-run** (the OQ3/OQ6
+method) before the import slice: if the learnings come back as the brief restated, suppress them per D8.
+Recorded as Amd1-OQ1 — **and resolved by the 2026-07-21 hand-run, in a third way neither this decision nor
+D8 anticipated: see [Amd1-D7](#amd1-d7--learnings-stay-with-a-re-aimed-ask-resolves-amd1-oq1-hand-run-2026-07-21).**
+
+### Amd1-D4 — Scope: whole recipe body, one task type, and the in-app verb is unchanged
+
+- **`.adjustRecipe` becomes export-capable at the recipe-body scope.** The body is **not** a
+  `PlaybookSection` and must not be forced into one — ADR-0041 D5 already refused that for Notes on the same
+  grounds. `RecipeHandoffContext` gains a task-keyed entry point beside `prompt(for: section)`; the context
+  is the **whole** recipe (no `excludingPlaybookSections:` filter — the Playbook is legitimate context when
+  rethinking the dish), plus the taste profile and the known-learnings block the section prompts already
+  send.
+- **`.discuss` is the default mode.** Arguing is the entire point; `.immediate` remains available for the
+  "just tell me" case.
+- **The in-app "Revise Recipe" verb stays exactly as it is.** OQ5's answer holds — *complementary, not
+  redundant*: the in-app verb distills a live in-app chat, the hand-off exports for a fresh external one,
+  and **both converge on the same side-by-side review and the same two commit destinations.** Nothing is
+  retired by this amendment.
+- **No new `AIPromptPreferenceKind` in v1.** The taste profile carries the standing preference; add a
+  per-verb preference only if dogfooding asks.
+
+### Amd1-D5 — The brief is transient; the commit path is untouched
+
+The return routes to a **brief review sheet** — the ADR-0024 editable preview, holding the brief text and
+its learnings, with a primary action (*"Draft the revision"*) that calls the extractor and then presents
+`presentAdjustmentReview`. From there the flow is the shipped ADR-0023 S1/S2 one: overwrite-with-undo, or
+keep as an ADR-0021 variation.
+
+**The brief itself is not stored** — transient and device-local, like the proposal it produces (ADR-0023
+D2). A recipe has no `workbenchLog`, so there is no durable home standing ready, and **inventing one is the
+wrong reflex**: the durable channel already exists and is `Learning`. On the workbench, where a log *does*
+exist, the brief is the natural body for D6's committed-adjustment `.rationale` deposit. Recorded as
+Amd1-OQ2 in case dogfooding disagrees.
+
+### Amd1-D6 — No contract bump — and that is the evidence this shape is right
+
+`AIHandoffReturnContract` (`AIHandoff.swift:511`) already says: on finalize, emit the token, echo the
+marker, **return the requested deliverable**, include learnings, and obey the prohibitions. **A prose brief
+needs no stanza of its own** — unlike experiments, which needed one because they are parsed. So this
+amendment ships **no contract change and no version bump**, and no re-paste of project instructions.
+
+Treat that as a **test, not a convenience**: *if a new return would require its own stanza in the contract,
+it is structured, and D2 applies to it.* The brief needing nothing but the base contract is the strongest
+available evidence that it sits on the advisory side of the line. What the *prompt* must carry is the ask —
+state the revision as plain prose a cook could follow; **do not** write ops, IDs, or a rewritten recipe.
+
+### Amd1-D7 — Learnings stay, with a **re-aimed ask** (resolves Amd1-OQ1; hand-run 2026-07-21)
+
+*Method:* the OQ3/OQ6 method — the v2 contract in the project instructions, a real multi-turn argument about
+a library recipe (chicken marsala with a rosemary-garlic cream fettuccine), then `finalize`.
+
+**What held, and confirms the amendment's load-bearing claims:** it switched out of interlocutor mode on the
+single word `finalize`; the token came first and `YC-CONTRACT: v2` echoed; the brief came back as six plain
+one-change-per-line entries, each with its reason attached, **no preamble, no headings, no nesting, and no
+assessment of what the recipe already did well.** The shape needs no contract stanza — **Amd1-D6 confirmed
+in the shape we would ship.**
+
+**What recurred — the D8 pattern, but only partially.** Of five learnings, **three were the brief restated
+as fact** (brown the mushrooms; fold the parmesan into the sauce; rosemary at the end) and one was partial.
+That is the pollution D8 named: unverified claims landing in the synced `Learning` table as established
+knowledge.
+
+**What broke the tie, and is why suppression is the wrong answer here.** One learning was the best thing in
+the return, and **the brief structurally cannot carry it** — *the dish's identity is rosemary, marsala,
+mushrooms and garlic cream; spinach, sun-dried tomatoes, bacon, or truffle oil would dilute it rather than
+improve it.* That is **argument residue: what was considered and rejected.** It exists only because there
+was an argument, it is durable, and unlike an experiment's conjecture it has **no other home** — there is no
+`outcome` field waiting to receive it. D8's experiments could suppress precisely because the knowledge had
+somewhere better to go; here it would simply be lost.
+
+**Decision: keep the two-part return, and aim the learnings ask at the residue instead of the deliverable.**
+The verb's prompt adds one sentence:
+
+> In the learnings section, record only what was **considered and rejected**, or established as a
+> **constraint on this dish** — never restate a change that already appears in the brief.
+
+**This is prompt aim, not enforcement, and it must not be mistaken for a guarantee** — nothing parses
+learnings, and a restated learning costs one delete in the review sheet. **Fallback, pinned now so it is not
+re-argued later: if a second hand-run still returns mostly restatements, suppress learnings for this verb per
+D8** and accept the loss of the residue.
+
+*Generalization for the D8 test:* a verb's learnings survive when the discussion produces knowledge the
+deliverable **cannot** carry. Experiments failed that test (the conjecture belongs in `outcome`); the
+revision brief passes it (rejected alternatives appear nowhere in a change list).
+
+### Storage — schema-free, and off the promotion list
+
+`AIHandoff` is device-local (not in `makeSyncEngine`'s table list — verified in the main storage sketch), so
+adding an export path and an import route for an already-declared task type costs **no tables, no columns,
+and nothing on the standing prod-schema promotion list.** The brief is transient; both commit destinations
+are shipped writers.
+
+### Slice — S4, after S2 (app + Core prompt, no schema)
+
+- **S4a — the door out.** Task-keyed `RecipeHandoffContext` entry point + the `.adjustRecipe` prompt;
+  recipe-body export wired into `HandoffIntents` metadata and the in-app Copy door (ADR-0038 Amd 2); the
+  derived D9 title line (`Adjust Recipe: <recipe name>`). **The gate is satisfied — hand-run 2026-07-21,
+  see Amd1-D7.** Ship the ask **as tested**, plus the D7 learnings sentence:
+
+  ```
+  You are helping rethink one recipe. Discuss it freely: argue, push back, ask
+  questions, and change your mind. When the cook asks you to finalize, return a
+  revision brief.
+
+  A revision brief is plain prose stating the revision you and the cook settled on:
+  what to change, and why, in a cook's language. One change per line, in the order the
+  change happens. Refer to ingredients and steps by their existing wording so each
+  change can be matched to the recipe as it stands.
+
+  Return only the brief itself: nothing before it, nothing after it, no title, no
+  summary of the discussion. One change per line, like this:
+
+  Take the butter to 120g and brown it before creaming — more nutty depth, less spread.
+  Move the salt into the flour instead of the wet mix so it distributes evenly.
+  Rest the dough 20 minutes before shaping so the flour hydrates.
+
+  Do not return a rewritten recipe, an ingredient list, JSON, IDs, or any structured
+  format. Yes Chef derives the structured edit from your brief itself, and the cook
+  reviews that edit side by side against the current recipe before anything is saved.
+
+  In the learnings section, record only what was considered and rejected, or
+  established as a constraint on this dish — never restate a change that already
+  appears in the brief.
+  ```
+
+  **The illustrative lines are deliberate.** D4's diagnosis of S2.5 was that `.immediate` mode gets a literal
+  `deliverableFormat.example` while `.discuss` gets a single clause with nothing to imitate — and this verb
+  lives in `.discuss`. The example is per-verb and lives in the *ask*, so it does not collide with the
+  contract (Amd1-D6). **Adding a `DeliverableFormat` case is not sufficient on its own:** its
+  `discussInstruction` is one clause, so the shape must come from the `RecipeHandoffContext` ask, exactly as
+  the shipped section prompts do it.
+- **S4b — the door back.** `.recipe` × `.adjustRecipe` import route (replacing the `.wrongTask` throw) →
+  brief review sheet → *"Draft the revision"* → existing extractor → existing side-by-side → existing
+  commits.
+- **Watch, from the same hand-run: the shared op vocabulary has no step *insertion*.** Two of the six
+  returned changes were finishing steps ("finish with lemon before serving"), and method ops are whole-step
+  **replacement** only — so the extractor will smuggle them into the tail of an existing step and the
+  side-by-side will blame the wrong step. Not a blocker for S4, and **not S4's decision to make**: the op
+  vocabulary belongs to [ADR-0021 Amd1-D5](ADR-0021-recipe-variations.md#amd1-d5--the-op-vocabulary-bounds-the-editable-surface-and-it-extends-on-demand-for-free),
+  where it is now the first extension candidate. Do not extend it from inside this slice.
+- **Verify** per the house pattern: `swift build` + Core tests (the routing case and a return-payload
+  round-trip: token, marker, prose body, learnings), one elevated `generic/platform=iOS` build,
+  `scripts/check-drift.sh`. **Jon's device pass is the real signal** — outboard a real revision, argue it,
+  finalize, paste, edit the brief, draft, review, commit as a variation.
+
+### Amendment 1 open questions
+
+- **Amd1-OQ1 — RESOLVED (2026-07-21, hand-run): learnings stay, with a re-aimed ask — see
+  [Amd1-D7](#amd1-d7--learnings-stay-with-a-re-aimed-ask-resolves-amd1-oq1-hand-run-2026-07-21).** The D8
+  pattern did recur (3 of 5 restated), but one learning carried **argument residue** the brief cannot hold
+  and nothing else would keep. Suppression is the pinned fallback if a second run does not improve.
+- **Amd1-OQ2 — is the brief discarded or durable?** *Lean:* discarded; learnings are the durable channel,
+  and a recipe-scoped deliberation log is a bigger question than this amendment.
+- **Amd1-OQ3 — a brief argued about an *active variation* would silently anchor to the base recipe.** The
+  reader resolves a variation for **display only** (`RecipeVariationDisplayModel.swift:25`), while adjust
+  applies its proposal to the base `detail` (`RecipeDetailModel+Adjustment.swift:21`). Outboarding makes
+  this trap easier to hit, because the exported context would show whichever text the cook is looking at.
+  **v1 must export the base recipe and say so in the sheet, or refuse to export while a variation is
+  active.** The general fix belongs to the variation-grain question (`docs/open-questions.md` — the
+  variation ↔ Workbench umbrella fork), not here.
 
 ## Storage sketch — S1 is schema-free; S2 adds three synced columns
 
