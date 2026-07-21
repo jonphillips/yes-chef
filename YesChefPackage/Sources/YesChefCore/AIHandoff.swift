@@ -614,6 +614,25 @@ public struct AIHandoffRecipeSectionReview: Equatable, Sendable {
   }
 }
 
+public struct AIHandoffRecipeAdjustmentBriefReview: Equatable, Sendable {
+  public let handoffID: AIHandoff.ID
+  public let recipeID: Recipe.ID
+  public let brief: String
+  public let learnings: [String]
+
+  public init(
+    handoffID: AIHandoff.ID,
+    recipeID: Recipe.ID,
+    brief: String,
+    learnings: [String]
+  ) {
+    self.handoffID = handoffID
+    self.recipeID = recipeID
+    self.brief = brief
+    self.learnings = learnings
+  }
+}
+
 public struct AIHandoffMealPlanMakeAheadReview: Equatable, Sendable {
   public let handoffID: AIHandoff.ID
   public let mealPlanItemID: MealPlanItem.ID
@@ -663,6 +682,7 @@ public enum AIHandoffReview: Equatable, Sendable {
   case recipeMakeAhead(AIHandoffRecipeMakeAheadReview)
   case recipeChefItUp(AIHandoffRecipeSectionReview)
   case recipeServeWith(AIHandoffRecipeSectionReview)
+  case recipeAdjustmentBrief(AIHandoffRecipeAdjustmentBriefReview)
   case mealPlanMakeAhead(AIHandoffMealPlanMakeAheadReview)
   case workbenchCompare(AIHandoffWorkbenchCompareReview)
   case workbenchExperiments(AIHandoffWorkbenchExperimentsReview)
@@ -673,6 +693,7 @@ public enum AIHandoffReview: Equatable, Sendable {
     case let .recipeMakeAhead(review): review.handoffID
     case let .recipeChefItUp(review): review.handoffID
     case let .recipeServeWith(review): review.handoffID
+    case let .recipeAdjustmentBrief(review): review.handoffID
     case let .mealPlanMakeAhead(review): review.handoffID
     case let .workbenchCompare(review): review.handoffID
     case let .workbenchExperiments(review): review.handoffID
@@ -842,7 +863,8 @@ public enum AIHandoffIntentImport {
     case .recipe:
       guard
         handoff.taskType == .recipeMakeAhead || handoff.taskType == .chefItUp
-          || handoff.taskType == .serveWith || handoff.taskType == .learning,
+          || handoff.taskType == .serveWith || handoff.taskType == .adjustRecipe
+          || handoff.taskType == .learning,
         let recipe = try Recipe.find(handoff.sourceID).fetchOne(db), !recipe.archived
       else {
         throw AIHandoffIntentImportError.wrongTask
@@ -884,7 +906,19 @@ public enum AIHandoffIntentImport {
             learnings: returned.learnings
           )
         )
-      case .prepPlan, .adjustRecipe, .mealPlanMakeAheadStrategy, .workbenchCompare, .workbenchExperiments:
+      case .adjustRecipe:
+        guard !returned.deliverable.isEmpty else {
+          throw AIHandoffIntentImportError.emptyPlan
+        }
+        review = .recipeAdjustmentBrief(
+          AIHandoffRecipeAdjustmentBriefReview(
+            handoffID: handoff.id,
+            recipeID: recipe.id,
+            brief: returned.deliverable,
+            learnings: returned.learnings
+          )
+        )
+      case .prepPlan, .mealPlanMakeAheadStrategy, .workbenchCompare, .workbenchExperiments:
         throw AIHandoffIntentImportError.wrongTask
       }
 

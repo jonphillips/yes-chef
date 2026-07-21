@@ -153,6 +153,10 @@ struct RecipeDetailView: View {
       }
     }
     ToolbarItemGroup(placement: .secondaryAction) {
+      HandoffCopyPasteControls(
+        source: .recipeAdjustment(model.recipeID),
+        transport: handoffTransport
+      )
       if model.recipe?.originalSnapshot != nil {
         Button {
           libraryModel.originalSnapshotButtonTapped(recipeID: model.recipeID)

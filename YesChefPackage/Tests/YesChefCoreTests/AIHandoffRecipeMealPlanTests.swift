@@ -7,6 +7,80 @@ import YesChefCore
 
 extension AIHandoffTests {
   @Test
+  func recipeAdjustmentPromptUsesTheHandValidatedBriefShapeAndKeepsWholeRecipeContext() {
+    let context = RecipeHandoffContext(recipe: RecipeChatRecipeContext(
+      title: "Brown Butter Cookies",
+      makeAhead: "Chill the dough overnight.",
+      learnings: ["Do not add bacon to this cookie."]
+    ))
+
+    let prompt = context.prompt(forTask: .adjustRecipe)
+
+    #expect(prompt.contains("Discuss it freely: argue, push back, ask"))
+    #expect(prompt.contains("Take the butter to 120g and brown it before creaming"))
+    #expect(prompt.contains("Move the salt into the flour instead of the wet mix"))
+    #expect(prompt.contains("Rest the dough 20 minutes before shaping"))
+    #expect(prompt.contains("Do not return a rewritten recipe, an ingredient list, JSON, IDs"))
+    #expect(prompt.contains("considered and rejected"))
+    #expect(prompt.contains("Current make-ahead section:"))
+    #expect(prompt.contains("Chill the dough overnight."))
+    #expect(prompt.contains("Do not add bacon to this cookie."))
+  }
+
+  @Test
+  func recipeAdjustmentHandoffStagesAProseBriefAndLearningsWithoutWritingTheRecipe() throws {
+    @Dependency(\.defaultDatabase) var database
+    let recipeID = SampleUUIDSequence.uuid(38_030)
+    let handoffID = SampleUUIDSequence.uuid(38_031)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Recipe.insert {
+        Recipe(id: recipeID, title: "Brown Butter Cookies", dateCreated: now, dateModified: now)
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .recipe,
+          sourceID: recipeID,
+          taskType: .adjustRecipe,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      let review = try AIHandoffIntentImport.stageReview(
+        handoffID: handoffID,
+        result: """
+        YC-HANDOFF: \(handoffID.uuidString)
+        Take the butter to 120g and brown it before creaming — more nutty depth, less spread.
+        YC-LEARNINGS:
+        - Bacon was considered and rejected because it would overpower the cookie.
+        """,
+        in: db,
+        now: now
+      )
+
+      guard case let .recipeAdjustmentBrief(briefReview) = review else {
+        Issue.record("Expected a recipe-adjustment brief review.")
+        return
+      }
+      expectNoDifference(briefReview.recipeID, recipeID)
+      expectNoDifference(
+        briefReview.brief,
+        "Take the butter to 120g and brown it before creaming — more nutty depth, less spread."
+      )
+      expectNoDifference(
+        briefReview.learnings,
+        ["Bacon was considered and rejected because it would overpower the cookie."]
+      )
+      expectNoDifference(try Recipe.find(recipeID).fetchOne(db)?.title, "Brown Butter Cookies")
+    }
+  }
+
+  @Test
   func promptsUseTheSourceSpecificReviewFormat() {
     let recipePrompt = AIHandoffToken.prompt(
       handoffID: SampleUUIDSequence.uuid(38_035),
