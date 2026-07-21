@@ -576,32 +576,6 @@ final class MenuDetailModel {
     }
   }
 
-  func copyPrepPrompt(_ basePrompt: String) -> String? {
-    let handoffID = uuid()
-    let prompt = AIHandoffToken.prompt(handoffID: handoffID, context: basePrompt)
-
-    do {
-      try database.write { db in
-        try AIHandoffRepository.create(
-          AIHandoff(
-            id: handoffID,
-            sourceType: .menu,
-            sourceID: menuID,
-            taskType: .prepPlan,
-            createdAt: now,
-            exportedPrompt: prompt
-          ),
-          in: db
-        )
-      }
-      return prompt
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
-      return nil
-    }
-  }
-
   func prepPlanPasted(_ text: String) {
     let currentPlan = MenuPrepPlan(steps: detail?.prepPlanSteps.map(PrepPlanStep.init) ?? [])
 

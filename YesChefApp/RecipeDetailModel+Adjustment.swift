@@ -31,13 +31,15 @@ extension RecipeDetailModel {
   func overwriteAdjustmentButtonTapped(_ review: RecipeAdjustmentReviewState) -> Bool {
     do {
       let restorePoint = try database.write { db in
-        try RecipeRepository.overwriteRecipeWithAdjustmentProposal(
+        let restorePoint = try RecipeRepository.overwriteRecipeWithAdjustmentProposal(
           review.proposal,
           recipeID: recipeID,
           in: db,
           now: now,
           uuid: { uuid() }
         )
+        try addAdjustmentRationaleToWorkbenchIfNeeded(review, in: db)
+        return restorePoint
       }
       adjustmentRestorePoint = RecipeAdjustmentRestorePoint(
         recipeTitle: review.currentDetail.recipe.title,
@@ -66,6 +68,7 @@ extension RecipeDetailModel {
           now: now,
           uuid: { uuid() }
         )
+        try addAdjustmentRationaleToWorkbenchIfNeeded(review, in: db)
       }
       destination = nil
       return true
@@ -74,6 +77,24 @@ extension RecipeDetailModel {
       isShowingError = true
       return false
     }
+  }
+
+  private func addAdjustmentRationaleToWorkbenchIfNeeded(
+    _ review: RecipeAdjustmentReviewState,
+    in db: Database
+  ) throws {
+    guard let workbenchID else { return }
+    try WorkbenchRepository.addLogEntry(
+      WorkbenchLogEntryDraft(
+        kind: .rationale,
+        body: review.proposal.reviewSummary(),
+        relatedRecipeID: recipeID
+      ),
+      to: workbenchID,
+      in: db,
+      now: now,
+      uuid: { uuid() }
+    )
   }
 
   func renameVariation(_ variationID: RecipeVariation.ID, to name: String) {

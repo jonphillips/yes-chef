@@ -789,6 +789,7 @@ final class RecipeDetailModel {
 
   let recipeID: Recipe.ID
   let scaleContext: ScaleContext
+  let workbenchID: Workbench.ID?
 
   @ObservationIgnored
   @Dependency(\.date.now) var now
@@ -815,9 +816,14 @@ final class RecipeDetailModel {
   @ObservationIgnored let detailFetchAnimationDescription: String
   private var lastAppliedPersistedScale: Double?
 
-  init(recipeID: Recipe.ID, scaleContext: ScaleContext? = nil) {
+  init(
+    recipeID: Recipe.ID,
+    scaleContext: ScaleContext? = nil,
+    workbenchID: Workbench.ID? = nil
+  ) {
     self.recipeID = recipeID
     self.scaleContext = scaleContext ?? .recipe(recipeID)
+    self.workbenchID = workbenchID
     #if DEBUG
     if ProcessInfo.processInfo.arguments.contains("-YesChefDisableDetailFetchAnimation") {
       detailFetchAnimationDescription = "nil"

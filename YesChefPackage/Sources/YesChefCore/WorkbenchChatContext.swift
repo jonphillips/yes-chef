@@ -62,6 +62,16 @@ public struct WorkbenchChatContext: Equatable, Sendable {
     budgetedSerialization(characterBudget: characterBudget).text
   }
 
+  /// External compare is deliberately prose-only: the deterministic matrix remains in-app, while the
+  /// hand-off contributes named differences and claims that a cook can read in the workbench log.
+  public func compareHandoffPrompt() -> String {
+    """
+    Compare the candidate recipes in this workbench. Return a handful of named differences with a concrete claim attached, one per line. Do not walk through every recipe or restate an ingredient matrix; Yes Chef already presents that deterministically.
+
+    \(serialized(characterBudget: Self.frontierSerializedCharacterBudget))
+    """
+  }
+
   public static func serializedCharacterBudget(for tier: ModelTier) -> Int {
     switch tier {
     case .onDevice:
