@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftUINavigation
+import UIKit
 import YesChefCore
 
 struct RecipeDetailView: View {
@@ -153,10 +154,32 @@ struct RecipeDetailView: View {
       }
     }
     ToolbarItemGroup(placement: .secondaryAction) {
-      HandoffCopyPasteControls(
-        source: .recipeAdjustment(model.recipeID),
-        transport: handoffTransport
-      )
+      // `.secondaryAction` collapses into the overflow menu, where `PasteButton` does not render —
+      // so these are plain buttons rather than `HandoffCopyPasteControls`, matching the Playbook
+      // section menu (ADR-0041 Amd 1 retired `PasteButton` for exactly this reason).
+      Button {
+        Task {
+          await handoffTransport.copyPrompt(for: .recipeAdjustment(model.recipeID))
+        }
+      } label: {
+        Label("Hand off", systemImage: "sparkles.square.filled.on.square")
+      }
+
+      Button {
+        // A declined paste alert (or a non-string clipboard) yields nil. Hand the empty case to the
+        // transport rather than returning silently, so the tap always produces visible feedback.
+        let results = UIPasteboard.general.string.map { [$0] } ?? []
+        Task {
+          await handoffTransport.pastedResultsReceived(
+            results,
+            source: .recipeAdjustment(model.recipeID)
+          )
+        }
+      } label: {
+        Label("Paste", systemImage: "doc.on.clipboard")
+      }
+      .disabled(!UIPasteboard.general.hasStrings)
+
       if model.recipe?.originalSnapshot != nil {
         Button {
           libraryModel.originalSnapshotButtonTapped(recipeID: model.recipeID)

@@ -112,6 +112,15 @@ final class HandoffInAppTransport {
   }
 }
 
+/// The paired Copy/Paste door for a hand-off surface.
+///
+/// - Important: **Only safe in ordinary view content.** This uses `PasteButton`, which does not
+///   render inside a `Menu` or a `ToolbarItemGroup(placement: .secondaryAction)` (which collapses
+///   into the overflow menu) — the copy button survives and the paste control silently disappears,
+///   leaving the surface unable to take a return. In a menu, use plain buttons that read
+///   `UIPasteboard.general.string` directly, as the Playbook section menu and the recipe-body
+///   toolbar do. ADR-0041 Amd 1 retired `PasteButton` for the sections for this reason; ADR-0042 S4
+///   hit it again on the recipe body.
 struct HandoffCopyPasteControls: View {
   let source: HandoffExportSource
   let transport: HandoffInAppTransport
