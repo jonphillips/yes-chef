@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftUINavigation
+import UIKit
 import YesChefCore
 
 struct RecipeDetailView: View {
@@ -11,6 +12,7 @@ struct RecipeDetailView: View {
   /// Own toast host: this view is presented from four places (full-screen cover, both iPad split
   /// layouts, and the cook session) and only one of them mounts an overlay.
   @State private var toastCenter: AppToastCenter
+  @State private var isConfirmingBaseRecipeHandoff = false
   let libraryModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
@@ -92,6 +94,26 @@ struct RecipeDetailView: View {
         .ignoresSafeArea(.keyboard)
     }
     .sensoryFeedback(.success, trigger: toastCenter.feedbackTrigger)
+    .confirmationDialog(
+      RecipeVariationBaseWriteGuard.handoffConfirmationTitle,
+      isPresented: $isConfirmingBaseRecipeHandoff,
+      titleVisibility: .visible
+    ) {
+      Button("Hand Off Base Recipe") {
+        copyAdjustmentPrompt()
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      if let variationName = model.activeVariation?.name {
+        Text(RecipeVariationBaseWriteGuard.handoffConfirmation(variationName: variationName))
+      }
+    }
+  }
+
+  private func copyAdjustmentPrompt() {
+    Task {
+      await handoffTransport.copyPrompt(for: .recipeAdjustment(model.recipeID))
+    }
   }
 
   @ViewBuilder
@@ -153,10 +175,36 @@ struct RecipeDetailView: View {
       }
     }
     ToolbarItemGroup(placement: .secondaryAction) {
-      HandoffCopyPasteControls(
-        source: .recipeAdjustment(model.recipeID),
-        transport: handoffTransport
-      )
+      // `.secondaryAction` collapses into the overflow menu, where `PasteButton` does not render —
+      // so these are plain buttons rather than `HandoffCopyPasteControls`, matching the Playbook
+      // section menu (ADR-0041 Amd 1 retired `PasteButton` for exactly this reason).
+      Button {
+        // The hand-off exports the base recipe even when a variation is displayed, so confirm rather
+        // than let the cook argue for an hour about text the return cannot apply to (Amd1-OQ3).
+        if model.activeVariation == nil {
+          copyAdjustmentPrompt()
+        } else {
+          isConfirmingBaseRecipeHandoff = true
+        }
+      } label: {
+        Label("Hand off", systemImage: "sparkles.square.filled.on.square")
+      }
+
+      Button {
+        // A declined paste alert (or a non-string clipboard) yields nil. Hand the empty case to the
+        // transport rather than returning silently, so the tap always produces visible feedback.
+        let results = UIPasteboard.general.string.map { [$0] } ?? []
+        Task {
+          await handoffTransport.pastedResultsReceived(
+            results,
+            source: .recipeAdjustment(model.recipeID)
+          )
+        }
+      } label: {
+        Label("Paste", systemImage: "doc.on.clipboard")
+      }
+      .disabled(!UIPasteboard.general.hasStrings)
+
       if model.recipe?.originalSnapshot != nil {
         Button {
           libraryModel.originalSnapshotButtonTapped(recipeID: model.recipeID)
