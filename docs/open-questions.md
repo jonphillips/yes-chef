@@ -3,6 +3,45 @@
 Live ambiguities and recently-resolved decisions. Resolved items stay here briefly
 (dated) so the reasoning is durable, then graduate into the relevant doc or ADR.
 
+## Live — 2026-07-21: no inventory of model calls (what's onboard, what's outboard, what context is layered)
+
+**Jon:** *"It takes a lot of forensics to track what we've got, and it's opaque to the user."* Raised after
+tracing one question — which model the S4 brief extractor uses, and what context it gets — took half a dozen
+greps across Core and the app, by someone with the codebase already open. **Not scoped, not scheduled.**
+Recorded because the evidence is concrete right now and re-deriving it later is the expensive part.
+
+**The asymmetry that narrows the work (measured 2026-07-21).** The **outboard** surface is already
+self-describing: nine verbs, one enum (`AIHandoffTaskType`). The **onboard** surface is **19
+`modelClient.complete` call sites across 14 Core files**, each independently deciding tier resolution,
+prompt assembly, context layers, token budget, and reasoning effort. Nobody has ever had to grep for the
+external verbs. **So this is almost entirely an onboard problem.**
+
+**"Inventory" is two problems with different fixes — do not let them merge:**
+
+- **Architect forensics** — call site → tier resolution → context layers → budget. Fixes the tracking cost.
+- **User opacity** — at runtime the cook cannot tell which model answered, or that it silently degraded.
+  A product feature, and it already has teeth: the S4 extractor's silent `.onDevice` fallback turns a
+  missing API key into a truncation error on a carefully-argued brief (see the Ready Efforts nit).
+
+A doc does not fix opacity; a status chip does not fix forensics.
+
+**The hardest axis is context layering, and it has the least type support.** Tier is one field; context is
+where the hidden variance lives. Proof from the same trace: the outbound hand-off ask sends **taste profile
++ known learnings**, while the extractor sends **neither** — a deliberate and correct split (judgment vs.
+transcription, see the Ready Efforts entry) that was nonetheless **invisible until someone grepped for it.**
+Highest surprise per unit of code.
+
+**Design constraint, learned here already: a hand-maintained inventory would be stale within two slices.**
+That is exactly why `YC-CONTRACT: v<n>` exists — an artifact maintained outside the thing it describes
+drifts silently. A markdown table of 19 call sites would become a *second* thing to do forensics against.
+**If this is built, it must be derived or test-enforced.** *Lean:* the 19 sites all construct a
+`ModelRequest`, so that is the natural chokepoint — route construction through one place that records
+`(surface, tier resolution, context layers, budget)` and the inventory generates itself, while the same
+record feeds the user-facing "which model answered this, and with what." Both halves then fall out of one
+change instead of two features. Related: [[reasoning-budget-starves-output]],
+[[personal-app-latency-tolerance]] (effort/tier belong in user settings, not code constants),
+[[yeschef-onbard-model-tier]].
+
 ## Resolved — 2026-07-04 (dogfood pass)
 
 - **Kill the ingredient-substitution feature entirely, column included.** The AI suggestion path was a
