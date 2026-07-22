@@ -26,6 +26,50 @@ Live ambiguities and recently-resolved decisions. Resolved items stay here brief
   touch the same recipe text, and normalization's interaction with any future user styling must be decided
   together. Likely an LLM enrichment/one-tap action rather than a chat verb; classify before slicing.
 
+## Dogfooding — 2026-07-21 (ADR-0042 S4 pass): the "why" dies at the commit boundary
+
+**Jon, after the first real S4 round-trip:** the model expresses *why* each change is being made
+"pretty succinctly," and none of it survives. Confirmed in code — the why has no home in any of three
+places at once:
+
+1. **The brief is transient by design** (Amd1-D5, "no new storage"). It is the only artifact carrying
+   the reasoning, and it is discarded on commit.
+2. **Learnings are explicitly forbidden from holding it.** The S4 ask says record *"only what was
+   considered and rejected, or established as a constraint — never restate a change that already
+   appears in the brief"* (Amd1-D7). So the why-of-changes-made is deliberately routed *away*.
+3. **The variation payload is ops-only** — `ingredientOps` + `methodStepReplacements`, no rationale.
+
+The one rationale deposit that exists (`RecipeDetailModel+Adjustment.swift`) is `guard let workbenchID
+else { return }` — workbench-only — and writes `proposal.reviewSummary()`, a restatement of the **ops**,
+not the model's prose. **This is [ADR-0042 D6](decisions/ADR-0042-workbench-handoff-and-the-return-block.md)
+with a hole in it:** D6 says an outboarded session that deposits nothing "is a conversation that never
+happened." Lower stakes than the workbench — you still get the changed recipe — but the why is the
+scarce output of an unmetered session and the one thing that cannot be reconstructed from the result.
+
+**The fork to decide (do not build before ADR-0021 Amds 1+2 are ratified — this wants to ride with them):**
+
+- **(a) Variation-level `note`.** Free — `RecipeVariation.note: String?` already exists. But the brief
+  carries **one why per change**, so squashing N rationales into one note makes them regenerate-only,
+  never repairable one at a time — the [[editable-at-the-grain-stored]] failure and the same shape as
+  the `Menu.prepPlan` blob. Also runs at [[decompose-notes-into-typed-homes]] (notes are being drained,
+  not filled).
+- **(b) Retain the brief verbatim as provenance** on the artifact the commit produced. *Architect's
+  lean.* Prose terminating in a text field a human reads → per D3 nothing to parse and nothing to lose,
+  no invented format, no new grain problem, and it preserves the model's phrasing exactly — which is
+  what Jon liked. `RecipeVariation.origin` already exists as a provenance seam. Note this reverses
+  Amd1-OQ2's *lean* ("discarded"), which was recorded before the first real round-trip.
+- **(c) Per-change rationale inside the payload.** Matches the brief's grain but is the heaviest, and
+  the payload is already a BLOB, so it would be regenerate-only anyway until Amd 1 lands.
+
+**The asymmetry that makes this feel fuzzy, and which any answer must address:** the *variation*
+destination has an obvious artifact to hang a why on. **Overwrite does not** — it mutates the recipe and
+leaves nothing behind. Overwrite's only existing home is the workbench `.rationale` log, which does not
+fire outside a workbench. An answer that only covers variations leaves half the flow silent.
+
+**Timing:** pre-prod, so per [ADR-0042 OQ2](decisions/ADR-0042-workbench-handoff-and-the-return-block.md)'s
+lesson this is the moment to fix the shape — and ADR-0021 Amd 2's *promote / split-off* makes it sharper,
+since a variation promoted to its own recipe really ought to carry why it exists.
+
 ## Dogfooding — 2026-07-11 (two-device pass): variation ↔ Workbench overlap
 
 The mechanical fixes from this pass are sliced in `docs/efforts/` (chrome bundle, workbench polish, meal-planner
