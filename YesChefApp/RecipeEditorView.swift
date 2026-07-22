@@ -17,6 +17,12 @@ struct RecipeEditorView: View {
     @Bindable var model = model
 
     Form {
+      if let variationName = model.activeVariationName {
+        Section {
+          RecipeVariationBaseWriteNotice(variationName: variationName)
+        }
+      }
+
       Section("Recipe") {
         StackedTextField(title: "Title", text: $model.draft.title)
         StackedTextField(title: "Subtitle", text: $model.draft.subtitle)

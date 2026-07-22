@@ -38,6 +38,16 @@ final class RecipeEditorModel {
     isSaving || draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
+  /// Non-nil when the reader has a variation selected. The editor writes to the base regardless, so
+  /// the view surfaces this rather than letting the write land silently — see
+  /// `RecipeVariationBaseWriteGuard`.
+  var activeVariationName: String? {
+    guard let name = detail?.activeVariation?.name.trimmingCharacters(in: .whitespacesAndNewlines),
+      !name.isEmpty
+    else { return nil }
+    return name
+  }
+
   var categoryRows: [CategoryHierarchy.DisplayRow] {
     CategoryHierarchy.displayRows(from: categories)
   }

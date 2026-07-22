@@ -12,6 +12,7 @@ struct RecipeDetailView: View {
   /// Own toast host: this view is presented from four places (full-screen cover, both iPad split
   /// layouts, and the cook session) and only one of them mounts an overlay.
   @State private var toastCenter: AppToastCenter
+  @State private var isConfirmingBaseRecipeHandoff = false
   let libraryModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
@@ -93,6 +94,26 @@ struct RecipeDetailView: View {
         .ignoresSafeArea(.keyboard)
     }
     .sensoryFeedback(.success, trigger: toastCenter.feedbackTrigger)
+    .confirmationDialog(
+      RecipeVariationBaseWriteGuard.handoffConfirmationTitle,
+      isPresented: $isConfirmingBaseRecipeHandoff,
+      titleVisibility: .visible
+    ) {
+      Button("Hand Off Base Recipe") {
+        copyAdjustmentPrompt()
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      if let variationName = model.activeVariation?.name {
+        Text(RecipeVariationBaseWriteGuard.handoffConfirmation(variationName: variationName))
+      }
+    }
+  }
+
+  private func copyAdjustmentPrompt() {
+    Task {
+      await handoffTransport.copyPrompt(for: .recipeAdjustment(model.recipeID))
+    }
   }
 
   @ViewBuilder
@@ -158,8 +179,12 @@ struct RecipeDetailView: View {
       // so these are plain buttons rather than `HandoffCopyPasteControls`, matching the Playbook
       // section menu (ADR-0041 Amd 1 retired `PasteButton` for exactly this reason).
       Button {
-        Task {
-          await handoffTransport.copyPrompt(for: .recipeAdjustment(model.recipeID))
+        // The hand-off exports the base recipe even when a variation is displayed, so confirm rather
+        // than let the cook argue for an hour about text the return cannot apply to (Amd1-OQ3).
+        if model.activeVariation == nil {
+          copyAdjustmentPrompt()
+        } else {
+          isConfirmingBaseRecipeHandoff = true
         }
       } label: {
         Label("Hand off", systemImage: "sparkles.square.filled.on.square")
