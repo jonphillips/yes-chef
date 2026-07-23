@@ -77,11 +77,8 @@ private struct ModelCallInventoryRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      HStack(alignment: .firstTextBaseline) {
-        Text("\(entry.record.surface.rawValue) / \(entry.record.task.rawValue)")
-          .font(.headline)
-        Spacer()
-      }
+      Text("\(entry.record.surface.rawValue) / \(entry.record.task.rawValue)")
+        .font(.headline)
 
       LabeledContent("Tier requested", value: entry.tierDescription)
       LabeledContent("Tier resolution", value: entry.record.tierResolution.rawValue)

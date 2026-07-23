@@ -137,7 +137,7 @@ public actor ModelCallRecordCollector {
 
 extension ModelCallRecordCollector: DependencyKey {
   public static let liveValue = ModelCallRecordCollector()
-  public static let testValue = ModelCallRecordCollector()
+  public static var testValue: ModelCallRecordCollector { ModelCallRecordCollector() }
 }
 
 extension ModelCallRecordSink {

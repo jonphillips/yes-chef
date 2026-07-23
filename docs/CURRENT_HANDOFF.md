@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 23, 2026 (**Live dispatch target = [ADR-0043](decisions/ADR-0043-model-call-chokepoint.md) S2 — the dev-only model-call inventory view.** S1 shipped and was approved the same day ([#219](https://github.com/jonphillips/yes-chef/pull/219)) → DONE-LOG: `ModelCall` is the sole `ModelRequest` construction path, all 17 sites route through it, and a **recursive test over `YesChefPackage/Sources` + `YesChefApp`** fails on any bypass — the guard also asserts its own reach, so a directory move can't silently shrink it. **S2 is cheap by construction: `ModelCallRecordSink` already publishes every record from `complete`/`stream`, so the view installs an in-memory collector at the composition root and changes zero construction sites.** Dev-only per D4 — this deliberately does *not* answer what a **cook** should see when a call degrades. **Then the load test, then S3.** The load test is the three stranded advisory verbs (`menuComplement`, `mealPlanComplement`, `readerFeedbackCuration`) — in-app prompts, no hand-off ask; **if the record can't express them trivially, S1 was modeled wrong**, and the specific thing to prove is `contextLayers.omitted`, which has zero production call sites today. **S3 unifies tier policy** (one shared `resolveTier()`, honest error instead of a silent `.onDevice` drop), **absorbs the S4-extractor-drift nit** — deleted from Ready Efforts, not tracked twice — and is where `ModelCallTierResolution` widens past its two cases. **Still gated on Jon: [ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) is Accepted but NOT scoped** (six open questions, slice plan still proposed), so the workbench phase is not dispatchable. **ADR-0042 remains COMPLETE and closed**; **S3 (`workbenchDraft`) stays deferred and un-queued; there is no S5.** **⚠️ The return contract is v2 — re-copy the project instructions from AI Settings or every verb fails the marker gate.** Two things carried forward from the S4 dogfood pass, still not lost: **variations are half-built** — no edit, no promote — which is **[ADR-0021 Amds 1 + 2](decisions/ADR-0021-recipe-variations.md) (Proposed, ratify before dispatching)**, and until then a variation is a display-time overlay that every read folds and **no write understands**, so editing with one active writes to the base (guarded, not fixed); and **the "why" dies at the commit boundary** — the brief's per-change rationale has no home, recorded as a fork in [`open-questions.md`](open-questions.md) to ride with those amendments.)
+Last updated: July 23, 2026 (**Live dispatch target = [ADR-0043](decisions/ADR-0043-model-call-chokepoint.md) load test — three advisory verbs exercise the new record before S3.**) Completed-slice history and strategic background live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
@@ -22,58 +22,26 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**LIVE DISPATCH TARGET — [ADR-0043](decisions/ADR-0043-model-call-chokepoint.md) S2: the dev-only
-model-call inventory view (app; debug-gated; no schema).** One slice, one PR. Read the ADR first — D3/D4 and
-OQ1/OQ2 are the spec; this entry is the dispatch, not a replacement for it. **S1 shipped** ([#219](https://github.com/jonphillips/yes-chef/pull/219)
-→ DONE-LOG) and left the seam S2 needs already in place.
+**LIVE DISPATCH TARGET — [ADR-0043](decisions/ADR-0043-model-call-chokepoint.md) load test: three advisory
+verbs before S3 (Core + app; no schema).** One cohesive dispatch, one PR. Read the ADR first — its decisions
+remain the spec; this entry is the dispatch, not a replacement for it.
 
-**The shape.** `ModelCallRecordSink` is a dependency that `ModelCall.complete` / `.stream` already publish
-every record to; its live value intentionally retains nothing, and `ModelCallRecordCollector` is a shipped
-in-memory actor. **S2 installs the collector at the composition root and builds a debug-gated view over
-`records()`** — surface, task, tier actually used, tier resolution, context layers (included **and**
-omitted), input character count, budget, effort.
+**Build `menuComplement`, `mealPlanComplement`, and `readerFeedbackCuration`.** They have in-app prompts but
+**no hand-off ask**. For each, author a fresh ask, deliverable format, D8 learnings call, and commit shape;
+check against the parked **ADR-0013 meal-planner verbs** entry first because the scopes overlap.
 
-Traps, in the order they will bite:
+**This is a load test of S1's record.** If a verb cannot express its record trivially, S1 was modeled wrong.
+The specific criterion is `contextLayers.omitted`: it shipped with a passing test and **zero production call
+sites**, so these are its first real load. If none needs it, that is useful evidence about whether the field
+earns its place.
 
-- **Change no construction site.** If this slice edits any of the 17 `ModelCall(` sites, it has gone wrong —
-  the sink exists precisely so the view is additive. The only production wiring is the dependency override.
-- **In-memory only, and the record dies with the process (OQ1, resolved).** Do **not** add a table, a column,
-  or a sync posture. *"Which model answered this"* as durable history is a different feature with a retention
-  question nobody has asked; if the view proves it needs history, that is a **new decision**, not an extension
-  of this one.
-- **Dev-only means dev-only (D4).** No shipped chrome, no cook-facing status chip, no degradation banner. The
-  real product question — what a **cook** should see when a call silently degrades — is deliberately deferred
-  until the record exists to answer it from. Answering it here spends the ADR's momentum on the half Jon
-  explicitly deferred.
-- **Derive the view; author no list (D3).** The inventory is whatever the records say. No hardcoded roster of
-  surfaces or tasks to "make the view complete," and **no markdown table of call sites** anywhere — that is
-  the exact artifact this ADR exists to prevent.
-- **`tierResolution` is currently under-modeled and that is deliberate.** Two cases cover at least three real
-  shapes (user-selected via the chat provider picker, preferred-or-arbitrary-first fallback, opaquely passed
-  down). **Do not widen the enum here** — S3 does it when `resolveTier()` unifies and the distinction has a
-  consumer. Display what the record says.
-- **Show `omitted`, not just `included`.** Deliberate absence is the D6 half that makes the
-  judgment-vs-transcription asymmetry legible; a view that renders only what a call *has* discards the point.
-  It will be empty at every site today (see the load test below) — render it anyway.
-
-**Explicitly not in this slice:** tier-policy unification (S3), the three advisory verbs (the load test,
-after S2), persistence of any kind, and the workbench phase (gated — see below).
-
-**Verification:** app-layer, so the elevated `generic/platform=iOS` build is **required evidence**, plus the
-Core test suite and `scripts/check-drift.sh`. Say in the PR how the view is gated and confirm the release
-path is unaffected.
+**Explicitly not in this dispatch:** tier-policy unification or resolved-tier reporting (S3), persistence, and
+the gated workbench phase. **Verification:** app-layer, so the elevated `generic/platform=iOS` build is
+required evidence, plus the Core test suite and `scripts/check-drift.sh`.
 
 **ADR-0042 closed 2026-07-21.** S0/S1/S2/S4 shipped and device-passed (→ [`DONE-LOG`](DONE-LOG.md)); **S3 (`workbenchDraft`) stays deferred and un-queued** — no concrete want, its danger receded rather than grew, **do not build it on ADR momentum**; there is no S5. **⚠️ The return contract is v2 — re-copy the project instructions from AI Settings or every verb fails the marker gate.**
 
-**The rest of the ADR-0043 arc — not this dispatch, listed so the sequence is not re-derived.** **Load test
-between S2 and S3** — the three stranded advisory verbs (`menuComplement`, `mealPlanComplement`,
-`readerFeedbackCuration`) have in-app prompts but **no hand-off ask**; each needs one authored fresh (ask,
-deliverable format, the D8 learnings call, commit shape), and **if S1's record cannot express them trivially,
-S1 was modeled wrong** — which is the point of running them early. **The specific thing to prove is
-`contextLayers.omitted`:** it shipped in S1 with a passing test and **zero production call sites**, so these
-three verbs are its first real load. If none of them needs it, that is real signal about whether the field
-earns its place. Check them against the parked **ADR-0013 meal-planner verbs** entry first; they overlap.
-**S3** unifies tier policy (one shared `resolveTier()` honoring both preferences, with an honest error
+**After this dispatch, S3** unifies tier policy (one shared `resolveTier()` honoring both preferences, with an honest error
 instead of a silent `.onDevice` drop), is the first slice that changes behavior, and is where
 `ModelCallTierResolution` widens past its two cases — the chat path's user-selected tier is a third shape the
 current enum flattens into `.callerProvided`.
@@ -98,7 +66,7 @@ unification (S3) *after* the layer exists rather than before.
 - **Variations are half-built, and it shows in daily use.** No way to **edit** a variation ([ADR-0021 Amd 1](decisions/ADR-0021-recipe-variations.md), Proposed) and no way to **promote** one (Amd 2, Proposed) — **ratify both before dispatching.** Until then a variation is a display-time overlay that every read folds and no write understands; the interim guard (editor notice + hand-off confirmation) only *says so*, it does not fix it. The **"why" fork** in [`open-questions.md`](open-questions.md) wants to ride with these. **⚠️ This lost the slot to ADR-0043 on 2026-07-23 — Jon's explicit call, made with the daily-use cost in view. It stays queued in Ready Efforts and is the natural successor once the chokepoint arc lands; do not re-litigate the ordering, and do not quietly promote it.**
 - **Menu is under-served by hand-off verbs** — **absorbed into ADR-0043's load test** (above), where `menuComplement` and `mealPlanComplement` do double duty as the record's first real load. Still classify each verb's commit shape first ([[chat-verb-commit-shapes]]) and reconcile with parked **ADR-0013**. No longer tracked separately.
 
-**Feature efforts still on the board — Jon picks; do not infer** (the live dispatch target above is ADR-0043 S2 and nothing else; the two candidates named 2026-07-21 are unscoped, and the first of them is the ADR-0021 entry immediately below):
+**Feature efforts still on the board — Jon picks; do not infer** (the live dispatch target above is the ADR-0043 load test and nothing else; the two candidates named 2026-07-21 are unscoped, and the first of them is the ADR-0021 entry immediately below):
 - **[ADR-0021](decisions/ADR-0021-recipe-variations.md) V1 + V2 — variations become hand-editable, and promotion gets its two destinations.** **Amendments 1 + 2 are Proposed — ratify with Jon before dispatching** (Amd1-D7 and Amd2-D4 are already ratified). **V1:** editing a variation edits the **resolved** recipe and the ops are **re-derived** on save — the overlay and highlighting survive because the delta is recomputed, never hand-authored; the derivation returns `(ops, unrepresentable[])` so an inexpressible edit reports at save and offers the split-off, never saving a partial (Amd1-D7). **The editor must be the ID-preserving structured one** — a text round-trip diffs a one-word change as remove+add and destroys the color comparison (Amd1-D4). **V2:** split off as its own recipe (B1) and promote-to-base with the old base auto-derived into a variation (B2); **no probation machinery** — no cook counts, no verdict prompts (Amd2-D4). **Bundle V1+V2** so the save-time report has a split-off to offer. **Schema-free — the `deltas` BLOB stays** (Amd1-D3: ADR-0040 keys on the grain the *human* edits, and no human edits an op). ADR-0023 OQ3 (rebasing existing variations onto a new base) **must be answered in V2**, not deferred again.
 - **Workbench log-editor nits (small, from the S2 review; not urgent)** — the `canSave` / `normalizedLogEntryDraft` mismatch when a body is combined with partially-filled typed fields, the dead save spinner, and the pre-existing compare `.menuPrepPlan` mislabel.
 - **The S4 brief extractor's prompt is framed for a conversation, but S4 hands it a decision (small; found 2026-07-21; silent-failure risk).** `instructions` opens *"You extract a proposed edit … from a cooking **conversation**,"* the prompt says *"**Conversation so far:**"* and closes *"Extract only the concrete recipe edit **the user is asking to review**"* — while `HandoffReviewCoordinator.draftRecipeAdjustment` wraps the finished brief as a single fake `.user` message and passes `selection: ""`. So a **decided** revision is presented as an **in-progress ask**, inviting the extractor to infer or hedge where the whole point of Amd1-D1 is that the human already decided. Under-extraction here is **silent** — a 3-change brief that yields 2 ops just shows a shorter side-by-side. *Fix:* a task-specific framing for the brief path ("this is a decided revision; transcribe every change faithfully and completely"), **not** a second client.
