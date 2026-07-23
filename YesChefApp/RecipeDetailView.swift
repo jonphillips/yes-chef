@@ -327,6 +327,8 @@ private struct RecipeReaderView: View {
   @GestureState private var playbookDragTranslation: CGFloat = 0
   @State private var isPhotoGalleryPresented = false
   @State private var promotingVariation: RecipeVariation?
+  @State private var splittingOffVariation: RecipeVariation?
+  @State private var splitOffTitleDraft = ""
   @State private var unrepresentablePromotionNames: [String] = []
 
   var body: some View {
@@ -500,7 +502,9 @@ private struct RecipeReaderView: View {
           variations: detail.variations,
           activeVariationID: detail.activeVariationID,
           model: model,
-          promotingVariation: $promotingVariation
+          promotingVariation: $promotingVariation,
+          splittingOffVariation: $splittingOffVariation,
+          splitOffTitleDraft: $splitOffTitleDraft
         )
       }
       if model.adjustmentRestorePoint != nil {

@@ -492,7 +492,7 @@ extension RecipeCoreTests {
         let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
         let resolved = try detail.resolved(applying: variation)
         return try RecipeRepository.splitVariationOff(
-          variation.id, resolvedDetail: resolved, name: variation.name,
+          variation.id, resolvedDetail: resolved, name: "Weeknight Lime Pasta",
           in: db, now: now.addingTimeInterval(60), uuid: { uuids.next() }
         )
       }
@@ -502,7 +502,7 @@ extension RecipeCoreTests {
         let standalone = try #require(try RecipeRepository.fetchDetail(recipeID: standaloneID, in: db))
         expectNoDifference(original.ingredientLines.map(\.originalText), ["1 tablespoon lemon juice"])
         expectNoDifference(original.variations, [])
-        expectNoDifference(standalone.recipe.title, "Lime Pasta")
+        expectNoDifference(standalone.recipe.title, "Weeknight Lime Pasta")
         expectNoDifference(standalone.ingredientLines.map(\.originalText), ["2 tablespoons lime juice"])
         #expect(standalone.ingredientLines.allSatisfy { $0.recipeID == standaloneID })
       }

@@ -153,17 +153,16 @@ final class RecipeVariationEditorModel {
     }
   }
 
-  func splitOffButtonTapped() async -> Bool {
+  func splitOffButtonTapped(title: String) async -> Bool {
     guard let resolvedDetail else { return false }
     isSaving = true
     defer { isSaving = false }
     let now = now
-    let name = name
     let makeUUID = uuid
     do {
       _ = try await database.write { db in
         try RecipeRepository.splitVariationOff(
-          variationID, resolvedDetail: resolvedDetail, name: name,
+          variationID, resolvedDetail: resolvedDetail, name: title,
           in: db, now: now, uuid: { makeUUID() }
         )
       }
@@ -180,6 +179,8 @@ struct RecipeVariationEditorView: View {
   @Environment(\.dismiss) private var dismiss
   @State private var model: RecipeVariationEditorModel
   @State private var unrepresentableEdits: [RecipeVariationUnrepresentableEdit] = []
+  @State private var isNamingSplitOff = false
+  @State private var splitOffTitleDraft = ""
 
   init(recipeID: Recipe.ID, variationID: RecipeVariation.ID) {
     _model = State(wrappedValue: RecipeVariationEditorModel(recipeID: recipeID, variationID: variationID))
@@ -239,13 +240,25 @@ struct RecipeVariationEditorView: View {
       titleVisibility: .visible
     ) {
       Button("Split Off as Recipe") {
-        Task {
-          if await model.splitOffButtonTapped() { dismiss() }
-        }
+        splitOffTitleDraft = model.name
+        unrepresentableEdits = []
+        isNamingSplitOff = true
       }
       Button("Keep Editing", role: .cancel) {}
     } message: {
       Text(unrepresentableEdits.map { "\($0.description) can’t be kept in a variation." }.joined(separator: "\n"))
+    }
+    .alert("Split Off as Recipe", isPresented: $isNamingSplitOff) {
+      TextField("Recipe name", text: $splitOffTitleDraft)
+      Button("Save") {
+        let title = splitOffTitleDraft
+        Task {
+          if await model.splitOffButtonTapped(title: title) { dismiss() }
+        }
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("This creates a new standalone recipe and removes the variation.")
     }
   }
 

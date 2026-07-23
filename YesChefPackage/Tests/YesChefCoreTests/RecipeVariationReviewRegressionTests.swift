@@ -65,6 +65,48 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func splitOffWithWhitespaceTitleFallsBackToTheVariationName() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 819_315_000)
+      let recipeID = SampleUUIDSequence.uuid(33_351)
+      let sectionID = SampleUUIDSequence.uuid(33_352)
+      let lineID = SampleUUIDSequence.uuid(33_353)
+      var uuids = SampleUUIDSequence(start: 33_400)
+
+      let variation = try database.write { db in
+        try Recipe.insert { Recipe(id: recipeID, title: "Pasta", dateCreated: now, dateModified: now) }.execute(db)
+        try IngredientSection.insert {
+          IngredientSection(id: sectionID, recipeID: recipeID, name: "Sauce", sortOrder: 0)
+        }
+        .execute(db)
+        try IngredientLine.insert {
+          IngredientLine(id: lineID, recipeID: recipeID, sectionID: sectionID, originalText: "1 tablespoon lemon juice", sortOrder: 0)
+        }
+        .execute(db)
+        return try RecipeRepository.keepAdjustmentProposalAsVariation(
+          RecipeAdjustmentProposal(
+            ingredientOps: [.substitute(RecipeIngredientReference(id: lineID), line: "2 tablespoons lime juice")]
+          ),
+          recipeID: recipeID, name: "Lime Pasta", in: db, now: now, uuid: { uuids.next() }
+        )
+      }
+
+      let standaloneID = try database.write { db in
+        let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+        let resolved = try detail.resolved(applying: variation)
+        return try RecipeRepository.splitVariationOff(
+          variation.id, resolvedDetail: resolved, name: "   ",
+          in: db, now: now.addingTimeInterval(60), uuid: { uuids.next() }
+        )
+      }
+
+      try database.read { db in
+        let standalone = try #require(try RecipeRepository.fetchDetail(recipeID: standaloneID, in: db))
+        expectNoDifference(standalone.recipe.title, "Lime Pasta")
+      }
+    }
+
+    @Test
     func promoteToBaseRequiresConfirmationBeforeRemovingAnUnanchorableSibling() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 819_330_000)

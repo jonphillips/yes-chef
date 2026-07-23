@@ -143,7 +143,10 @@ extension RecipeDetailModel {
     }
   }
 
-  func splitVariationOffButtonTapped(_ variationID: RecipeVariation.ID) async {
+  func splitVariationOffButtonTapped(
+    _ variationID: RecipeVariation.ID,
+    title: String
+  ) async {
     guard let baseDetail = detail,
       let variation = baseDetail.variations.first(where: { $0.id == variationID })
     else { return }
@@ -153,7 +156,7 @@ extension RecipeDetailModel {
       let makeUUID = uuid
       try await database.write { db in
         _ = try RecipeRepository.splitVariationOff(
-          variationID, resolvedDetail: resolvedDetail, name: variation.name,
+          variationID, resolvedDetail: resolvedDetail, name: title,
           in: db, now: now, uuid: { makeUUID() }
         )
       }

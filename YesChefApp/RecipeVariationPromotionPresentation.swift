@@ -5,6 +5,8 @@ struct RecipeVariationActions: View {
   let variation: RecipeVariation
   let model: RecipeDetailModel
   @Binding var promotingVariation: RecipeVariation?
+  @Binding var splittingOffVariation: RecipeVariation?
+  @Binding var splitOffTitleDraft: String
 
   var body: some View {
     Button {
@@ -18,7 +20,8 @@ struct RecipeVariationActions: View {
 
     Menu {
       Button("Split Off as Recipe") {
-        Task { await model.splitVariationOffButtonTapped(variation.id) }
+        splitOffTitleDraft = variation.name
+        splittingOffVariation = variation
       }
       Button("Promote to Base") { promotingVariation = variation }
     } label: {
@@ -34,6 +37,8 @@ struct RecipeVariationPicker: View {
   let activeVariationID: RecipeVariation.ID?
   let model: RecipeDetailModel
   @Binding var promotingVariation: RecipeVariation?
+  @Binding var splittingOffVariation: RecipeVariation?
+  @Binding var splitOffTitleDraft: String
 
   @State private var renamingVariation: RecipeVariation?
   @State private var variationNameDraft = ""
@@ -88,7 +93,9 @@ struct RecipeVariationPicker: View {
         RecipeVariationActions(
           variation: activeVariation,
           model: model,
-          promotingVariation: $promotingVariation
+          promotingVariation: $promotingVariation,
+          splittingOffVariation: $splittingOffVariation,
+          splitOffTitleDraft: $splitOffTitleDraft
         )
       }
     }
@@ -111,6 +118,26 @@ struct RecipeVariationPicker: View {
       }
     } message: {
       Text("Give this variation a new name.")
+    }
+    .alert(
+      "Split Off as Recipe",
+      isPresented: Binding(
+        get: { splittingOffVariation != nil },
+        set: { if !$0 { splittingOffVariation = nil } }
+      )
+    ) {
+      TextField("Recipe name", text: $splitOffTitleDraft)
+      Button("Save") {
+        guard let variation = splittingOffVariation else { return }
+        let title = splitOffTitleDraft
+        splittingOffVariation = nil
+        Task { await model.splitVariationOffButtonTapped(variation.id, title: title) }
+      }
+      Button("Cancel", role: .cancel) {
+        splittingOffVariation = nil
+      }
+    } message: {
+      Text("This creates a new standalone recipe and removes the variation.")
     }
   }
 
