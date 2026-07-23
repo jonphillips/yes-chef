@@ -300,7 +300,11 @@ public struct RecipeAdjustmentClient: Sendable {
 extension RecipeAdjustmentClient: DependencyKey {
   public static let liveValue = RecipeAdjustmentClient { selection, messages, detail, tier in
     @Dependency(\.modelClient) var modelClient
-    let request = ModelRequest(
+    let request = ModelCall(
+      surface: .recipe,
+      task: .recipeAdjustment,
+      tierResolution: .callerProvided,
+      contextLayers: [.systemInstructions, .tasteProfile, .recipe, .selection, .conversation],
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, detail: detail),
@@ -311,7 +315,7 @@ extension RecipeAdjustmentClient: DependencyKey {
       maxTokens: 16_384,
       reasoningEffort: .high
     )
-    let response = try await modelClient.complete(request)
+    let response = try await request.complete(using: modelClient)
     let trimmed = response.text.trimmingCharacters(in: .whitespacesAndNewlines)
     if response.wasTruncated || trimmed.isEmpty {
       throw RecipeAdjustmentError.responseTruncated

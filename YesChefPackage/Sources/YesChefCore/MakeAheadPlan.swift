@@ -68,7 +68,11 @@ public struct MakeAheadPlanClient: Sendable {
 extension MakeAheadPlanClient: DependencyKey {
   public static let liveValue = MakeAheadPlanClient { selection, messages, context, tier in
     @Dependency(\.modelClient) var modelClient
-    let request = ModelRequest(
+    let request = ModelCall(
+      surface: .recipe,
+      task: .makeAhead,
+      tierResolution: .callerProvided,
+      contextLayers: [.systemInstructions, .tasteProfile, .recipe, .selection, .conversation],
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, context: context),
@@ -76,7 +80,7 @@ extension MakeAheadPlanClient: DependencyKey {
       reasoningEffort: .high,
       promptPreferenceKey: AIPromptPreferenceKind.makeAheadPrepPlan.rawValue
     )
-    let response = try await modelClient.complete(request)
+    let response = try await request.complete(using: modelClient)
     return parse(response.text)
   }
 

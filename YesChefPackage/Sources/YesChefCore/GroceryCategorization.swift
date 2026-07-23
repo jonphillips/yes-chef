@@ -26,7 +26,7 @@ extension GroceryCategorizationClient: DependencyKey {
 
     for chunk in names.chunked(into: maximumNamesPerRequest) {
       try Task.checkCancellation()
-      let firstResponse = try await modelClient.complete(request(names: chunk, tier: tier))
+      let firstResponse = try await request(names: chunk, tier: tier).complete(using: modelClient)
       let firstPass = parse(firstResponse.text)
       classified.merge(firstPass, uniquingKeysWith: { _, latest in latest })
 
@@ -34,7 +34,7 @@ extension GroceryCategorizationClient: DependencyKey {
       guard !omittedNames.isEmpty else { continue }
 
       try Task.checkCancellation()
-      let retryResponse = try await modelClient.complete(request(names: omittedNames, tier: tier))
+      let retryResponse = try await request(names: omittedNames, tier: tier).complete(using: modelClient)
       classified.merge(parse(retryResponse.text), uniquingKeysWith: { _, latest in latest })
     }
 
@@ -60,8 +60,12 @@ extension GroceryCategorizationClient: DependencyKey {
     "Classify these exact canonical ingredient names:\n\n" + names.joined(separator: "\n")
   }
 
-  static func request(names: [String], tier: ModelTier) -> ModelRequest {
-    ModelRequest(
+  static func request(names: [String], tier: ModelTier) -> ModelCall {
+    ModelCall(
+      surface: .grocery,
+      task: .categorization,
+      tierResolution: .callerProvided,
+      contextLayers: [.systemInstructions, .tasteProfile, .ingredientNames],
       tier: tier,
       system: instructions,
       prompt: prompt(names: names),

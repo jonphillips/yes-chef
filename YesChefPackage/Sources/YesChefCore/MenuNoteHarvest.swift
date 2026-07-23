@@ -73,7 +73,11 @@ public struct MenuNoteHarvestClient: Sendable {
 extension MenuNoteHarvestClient: DependencyKey {
   public static let liveValue = MenuNoteHarvestClient { selection, messages, tier in
     @Dependency(\.modelClient) var modelClient
-    let request = ModelRequest(
+    let request = ModelCall(
+      surface: .menu,
+      task: .noteHarvest,
+      tierResolution: .callerProvided,
+      contextLayers: [.systemInstructions, .tasteProfile, .selection, .conversation],
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages),
@@ -81,7 +85,7 @@ extension MenuNoteHarvestClient: DependencyKey {
       reasoningEffort: .medium,
       promptPreferenceKey: AIPromptPreferenceKind.captureToNote.rawValue
     )
-    let response = try await modelClient.complete(request)
+    let response = try await request.complete(using: modelClient)
     return parse(response.text)
   }
 

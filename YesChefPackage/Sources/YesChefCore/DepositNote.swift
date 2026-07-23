@@ -86,7 +86,11 @@ extension MenuDepositClient: DependencyKey {
   public static let liveValue = MenuDepositClient(
     extract: { intelligence, messages, tier in
       @Dependency(\.modelClient) var modelClient
-      let request = ModelRequest(
+      let request = ModelCall(
+        surface: .menu,
+        task: .depositAppend,
+        tierResolution: .callerProvided,
+        contextLayers: [.systemInstructions, .tasteProfile, .intelligence, .conversation],
         tier: tier,
         system: appendInstructions,
         prompt: appendPrompt(intelligence: intelligence, messages: messages),
@@ -96,12 +100,16 @@ extension MenuDepositClient: DependencyKey {
         // reuses the capture-to-note prompt preference rather than adding a new synced settings column.
         promptPreferenceKey: AIPromptPreferenceKind.captureToNote.rawValue
       )
-      let response = try await modelClient.complete(request)
+      let response = try await request.complete(using: modelClient)
       return parse(response.text)
     },
     revise: { intelligence, currentNoteBody, messages, tier in
       @Dependency(\.modelClient) var modelClient
-      let request = ModelRequest(
+      let request = ModelCall(
+        surface: .menu,
+        task: .depositRevise,
+        tierResolution: .callerProvided,
+        contextLayers: [.systemInstructions, .tasteProfile, .intelligence, .currentNote, .conversation],
         tier: tier,
         system: reviseInstructions,
         prompt: revisePrompt(intelligence: intelligence, currentNoteBody: currentNoteBody, messages: messages),
@@ -109,7 +117,7 @@ extension MenuDepositClient: DependencyKey {
         reasoningEffort: .medium,
         promptPreferenceKey: AIPromptPreferenceKind.captureToNote.rawValue
       )
-      let response = try await modelClient.complete(request)
+      let response = try await request.complete(using: modelClient)
       return parse(response.text)
     }
   )

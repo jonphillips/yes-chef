@@ -129,7 +129,11 @@ public struct MenuComplementClient: Sendable {
 extension MenuComplementClient: DependencyKey {
   public static let liveValue = MenuComplementClient { selection, messages, context, tier in
     @Dependency(\.modelClient) var modelClient
-    let request = ModelRequest(
+    let request = ModelCall(
+      surface: .menu,
+      task: .complement,
+      tierResolution: .callerProvided,
+      contextLayers: [.systemInstructions, .tasteProfile, .menu, .selection, .conversation],
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, context: context),
@@ -137,7 +141,7 @@ extension MenuComplementClient: DependencyKey {
       reasoningEffort: .medium,
       promptPreferenceKey: AIPromptPreferenceKind.complements.rawValue
     )
-    let response = try await modelClient.complete(request)
+    let response = try await request.complete(using: modelClient)
     return parse(response.text)
   }
 

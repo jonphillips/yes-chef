@@ -26,7 +26,7 @@ public struct WorkbenchAlignedComparison: Sendable, Equatable, Codable {
 public struct WorkbenchCompareAlignerClient: Sendable {
   /// Semantically aligns ingredient lines into the existing compare matrix shape.
   ///
-  /// Transport failures from `modelClient.complete` are rethrown so the view layer can decide how to
+  /// Transport failures from the model call are rethrown so the view layer can decide how to
   /// present a quiet deterministic fallback. Content failures in the model response are not thrown:
   /// malformed JSON, empty rows, or output with no valid assignments falls back to
   /// `WorkbenchCompare.ingredientComparison(working:candidates:)`.
@@ -59,7 +59,11 @@ extension WorkbenchCompareAlignerClient: DependencyKey {
   public static let liveValue = WorkbenchCompareAlignerClient { working, candidates, tier in
     @Dependency(\.modelClient) var modelClient
     let deterministic = WorkbenchCompare.ingredientComparison(working: working, candidates: candidates)
-    let request = ModelRequest(
+    let request = ModelCall(
+      surface: .workbench,
+      task: .workbenchComparison,
+      tierResolution: .callerProvided,
+      contextLayers: [.systemInstructions, .tasteProfile, .workbench, .candidates],
       tier: tier,
       system: instructions,
       prompt: prompt(working: working, candidates: candidates),
@@ -67,7 +71,7 @@ extension WorkbenchCompareAlignerClient: DependencyKey {
       reasoningEffort: .medium,
       promptPreferenceKey: nil
     )
-    let response = try await modelClient.complete(request)
+    let response = try await request.complete(using: modelClient)
     if response.wasTruncated {
       return WorkbenchAlignedComparison(comparison: deterministic, source: .fallback(.truncated))
     }

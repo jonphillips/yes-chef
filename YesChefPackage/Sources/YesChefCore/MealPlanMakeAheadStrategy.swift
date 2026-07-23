@@ -164,7 +164,11 @@ public struct MealPlanMakeAheadStrategyClient: Sendable {
 extension MealPlanMakeAheadStrategyClient: DependencyKey {
   public static let liveValue = MealPlanMakeAheadStrategyClient { selection, messages, context, tier in
     @Dependency(\.modelClient) var modelClient
-    let request = ModelRequest(
+    let request = ModelCall(
+      surface: .mealPlan,
+      task: .makeAheadStrategy,
+      tierResolution: .callerProvided,
+      contextLayers: [.systemInstructions, .tasteProfile, .mealPlan, .selection, .conversation],
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, context: context),
@@ -172,7 +176,7 @@ extension MealPlanMakeAheadStrategyClient: DependencyKey {
       reasoningEffort: .high,
       promptPreferenceKey: AIPromptPreferenceKind.makeAheadPrepPlan.rawValue
     )
-    let response = try await modelClient.complete(request)
+    let response = try await request.complete(using: modelClient)
     return parse(response.text)
   }
 

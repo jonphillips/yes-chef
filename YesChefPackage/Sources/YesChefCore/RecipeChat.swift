@@ -849,19 +849,24 @@ public final class RecipeChatModel: Identifiable {
     if continuationToken?.provider != tier.frontierProvider {
       continuationToken = nil
     }
+    var contextLayers: Set<ModelCallContextLayer> = [.systemInstructions, .tasteProfile, .conversation]
+    contextLayers.insert(context.modelCallContextLayer)
     let assistantID = appendAssistantPlaceholder()
     do {
       if case .frontier = tier {
-        let response = try await modelClient.complete(
-          ModelRequest(
-            tier: tier,
-            system: systemPrompt(),
-            messages: requestMessages,
-            maxTokens: 2048,
-            reasoningEffort: .medium,
-            continuationToken: continuationToken
-          )
+        let call = ModelCall(
+          surface: context.modelCallSurface,
+          task: .chat,
+          tierResolution: .callerProvided,
+          contextLayers: contextLayers,
+          tier: tier,
+          system: systemPrompt(),
+          messages: requestMessages,
+          maxTokens: 2048,
+          reasoningEffort: .medium,
+          continuationToken: continuationToken
         )
+        let response = try await call.complete(using: modelClient)
         try Task.checkCancellation()
         continuationToken = response.continuationToken
         setAssistantText(
@@ -870,14 +875,18 @@ public final class RecipeChatModel: Identifiable {
             ? "(No response.)" : response.text
         )
       } else {
-        let request = ModelRequest(
+        let request = ModelCall(
+          surface: context.modelCallSurface,
+          task: .chat,
+          tierResolution: .callerProvided,
+          contextLayers: contextLayers,
           tier: tier,
           system: systemPrompt(),
           messages: requestMessages,
           maxTokens: 1024,
           reasoningEffort: .medium
         )
-        for try await chunk in modelClient.stream(request) {
+        for try await chunk in request.stream(using: modelClient) {
           try Task.checkCancellation()
           appendAssistantText(id: assistantID, text: chunk.text)
         }
@@ -1000,6 +1009,26 @@ public final class RecipeChatModel: Identifiable {
 
   private func defaultUseFrontier() -> Bool {
     frontierAvailable && tierPreference.current() == true
+  }
+}
+
+private extension RecipeChatContext {
+  var modelCallSurface: ModelCallSurface {
+    switch self {
+    case .mealPlan: .mealPlan
+    case .menu: .menu
+    case .recipe: .recipe
+    case .workbench: .workbench
+    }
+  }
+
+  var modelCallContextLayer: ModelCallContextLayer {
+    switch self {
+    case .mealPlan: .mealPlan
+    case .menu: .menu
+    case .recipe: .recipe
+    case .workbench: .workbench
+    }
   }
 }
 
