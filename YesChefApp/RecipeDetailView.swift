@@ -168,42 +168,45 @@ struct RecipeDetailView: View {
       } label: {
         Label("Plan", systemImage: "calendar.badge.plus")
       }
+      Menu {
+        // `PasteButton` does not render inside a `Menu`, so this stays a plain button that reads the
+        // pasteboard directly, matching the scoped Playbook hand-off menu (ADR-0041 Amd 1).
+        Button {
+          // The hand-off exports the base recipe even when a variation is displayed, so confirm rather
+          // than let the cook argue for an hour about text the return cannot apply to (Amd1-OQ3).
+          if model.activeVariation == nil {
+            copyAdjustmentPrompt()
+          } else {
+            isConfirmingBaseRecipeHandoff = true
+          }
+        } label: {
+          Label("Hand off", systemImage: "sparkles.square.filled.on.square")
+        }
+
+        Button {
+          // A declined paste alert (or a non-string clipboard) yields nil. Hand the empty case to the
+          // transport rather than returning silently, so the tap always produces visible feedback.
+          let results = UIPasteboard.general.string.map { [$0] } ?? []
+          Task {
+            await handoffTransport.pastedResultsReceived(
+              results,
+              source: .recipeAdjustment(model.recipeID)
+            )
+          }
+        } label: {
+          Label("Paste", systemImage: "doc.on.clipboard")
+        }
+        .disabled(!UIPasteboard.general.hasStrings)
+      } label: {
+        Label("Hand off", systemImage: "sparkles.square.filled.on.square")
+      }
+    }
+    ToolbarItemGroup(placement: .secondaryAction) {
       Button {
         model.openWorkbenchButtonTapped()
       } label: {
         Label("Workbench", systemImage: "hammer")
       }
-    }
-    ToolbarItemGroup(placement: .secondaryAction) {
-      // `.secondaryAction` collapses into the overflow menu, where `PasteButton` does not render —
-      // so these are plain buttons rather than `HandoffCopyPasteControls`, matching the Playbook
-      // section menu (ADR-0041 Amd 1 retired `PasteButton` for exactly this reason).
-      Button {
-        // The hand-off exports the base recipe even when a variation is displayed, so confirm rather
-        // than let the cook argue for an hour about text the return cannot apply to (Amd1-OQ3).
-        if model.activeVariation == nil {
-          copyAdjustmentPrompt()
-        } else {
-          isConfirmingBaseRecipeHandoff = true
-        }
-      } label: {
-        Label("Hand off", systemImage: "sparkles.square.filled.on.square")
-      }
-
-      Button {
-        // A declined paste alert (or a non-string clipboard) yields nil. Hand the empty case to the
-        // transport rather than returning silently, so the tap always produces visible feedback.
-        let results = UIPasteboard.general.string.map { [$0] } ?? []
-        Task {
-          await handoffTransport.pastedResultsReceived(
-            results,
-            source: .recipeAdjustment(model.recipeID)
-          )
-        }
-      } label: {
-        Label("Paste", systemImage: "doc.on.clipboard")
-      }
-      .disabled(!UIPasteboard.general.hasStrings)
 
       if model.recipe?.originalSnapshot != nil {
         Button {

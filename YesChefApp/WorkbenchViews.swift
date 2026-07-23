@@ -2,23 +2,6 @@ import LLMClientKit
 import SwiftUI
 import YesChefCore
 
-struct WorkbenchesStack: View {
-  let model: WorkbenchLibraryModel
-  var onRecipeSelected: (RecipeDetailPresentation) -> Void = { _ in }
-
-  var body: some View {
-    @Bindable var model = model
-
-    NavigationStack(path: $model.navigationPath) {
-      WorkbenchListView(model: model, style: .navigation)
-        .navigationDestination(for: Workbench.ID.self) { workbenchID in
-          WorkbenchDetailView(workbenchID: workbenchID, onRecipeSelected: onRecipeSelected)
-            .id(workbenchID)
-        }
-    }
-  }
-}
-
 struct WorkbenchListView: View {
   enum Style {
     case navigation

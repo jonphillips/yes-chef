@@ -189,49 +189,157 @@ private struct AppCompactTabView: View {
   let onCookSessionRequested: (CookSessionPresentation) -> Void
 
   var body: some View {
-    TabView(selection: $selection) {
-      RecipesStack(
-        model: recipeModel,
-        mealCalendarModel: mealCalendarModel,
-        groceryModel: groceryModel,
-        onRecipeSelected: onRecipeSelected
-      )
-        .tabItem { AppSection.recipes.label }
-        .tag(AppSection.recipes as AppSection?)
-      WorkbenchesStack(model: workbenchModel, onRecipeSelected: onRecipeSelected)
-        .tabItem { AppSection.workbenches.label }
-        .tag(AppSection.workbenches as AppSection?)
-      BrowserStack(
-        model: browserModel,
-        onCapture: onBrowserCapture
-      )
-        .tabItem { AppSection.browser.label }
-        .tag(AppSection.browser as AppSection?)
-      MealCalendarStack(
-        model: mealCalendarModel,
-        onMenuSelected: onMenuSelected,
-        onRecipeSelected: onRecipeSelected,
-        onCookSessionRequested: onCookSessionRequested
-      )
-        .tabItem { AppSection.mealCalendar.label }
-        .tag(AppSection.mealCalendar as AppSection?)
-      GroceriesStack(
-        model: groceryModel,
-        mealCalendarModel: mealCalendarModel
-      )
-        .tabItem { AppSection.groceries.label }
-        .tag(AppSection.groceries as AppSection?)
-      MenusStack(
-        model: menuModel,
-        recipeModel: recipeModel,
-        onRecipeSelected: onRecipeSelected,
-        onCookSessionRequested: onCookSessionRequested
-      )
-        .tabItem { AppSection.menus.label }
-        .tag(AppSection.menus as AppSection?)
-      SettingsStack(model: recipeModel, groceryModel: groceryModel)
-        .tabItem { AppSection.settings.label }
-        .tag(AppSection.settings as AppSection?)
+    TabView(selection: compactSelection) {
+      Tab(
+        AppSection.recipes.title,
+        systemImage: AppSection.recipes.systemImage,
+        value: .recipes
+      ) {
+        RecipesStack(
+          model: recipeModel,
+          mealCalendarModel: mealCalendarModel,
+          groceryModel: groceryModel,
+          onRecipeSelected: onRecipeSelected
+        )
+      }
+      Tab(
+        AppSection.menus.title,
+        systemImage: AppSection.menus.systemImage,
+        value: .menus
+      ) {
+        MenusStack(
+          model: menuModel,
+          recipeModel: recipeModel,
+          onRecipeSelected: onRecipeSelected,
+          onCookSessionRequested: onCookSessionRequested
+        )
+      }
+      Tab(
+        AppSection.mealCalendar.title,
+        systemImage: AppSection.mealCalendar.systemImage,
+        value: .mealCalendar
+      ) {
+        MealCalendarStack(
+          model: mealCalendarModel,
+          onMenuSelected: onMenuSelected,
+          onRecipeSelected: onRecipeSelected,
+          onCookSessionRequested: onCookSessionRequested
+        )
+      }
+      Tab(
+        AppSection.groceries.title,
+        systemImage: AppSection.groceries.systemImage,
+        value: .groceries
+      ) {
+        GroceriesStack(
+          model: groceryModel,
+          mealCalendarModel: mealCalendarModel
+        )
+      }
+      Tab("More", systemImage: "ellipsis.circle", value: .more) {
+        AppMoreStack(
+          workbenchModel: workbenchModel,
+          browserModel: browserModel,
+          recipeModel: recipeModel,
+          groceryModel: groceryModel,
+          onBrowserCapture: onBrowserCapture,
+          onRecipeSelected: onRecipeSelected,
+          onSectionSelected: { selection = $0 }
+        )
+      }
+    }
+  }
+
+  private var compactSelection: Binding<AppCompactTab> {
+    Binding {
+      AppCompactTab(section: selection)
+    } set: { tab in
+      guard let section = tab.section else {
+        // `AppSection` has no More case because the regular-width sidebar needs the real destinations.
+        // Browser is the More root's first destination and gives a regular-width transition a useful home.
+        if AppCompactTab(section: selection) != .more {
+          selection = .browser
+        }
+        return
+      }
+      selection = section
+    }
+  }
+}
+
+private enum AppCompactTab: Hashable {
+  case recipes
+  case menus
+  case mealCalendar
+  case groceries
+  case more
+
+  init(section: AppSection?) {
+    switch section {
+    case .recipes, nil:
+      self = .recipes
+    case .menus:
+      self = .menus
+    case .mealCalendar:
+      self = .mealCalendar
+    case .groceries:
+      self = .groceries
+    case .browser, .workbenches, .settings:
+      self = .more
+    }
+  }
+
+  var section: AppSection? {
+    switch self {
+    case .recipes: .recipes
+    case .menus: .menus
+    case .mealCalendar: .mealCalendar
+    case .groceries: .groceries
+    case .more: nil
+    }
+  }
+}
+
+private struct AppMoreStack: View {
+  let workbenchModel: WorkbenchLibraryModel
+  let browserModel: BrowserModel
+  let recipeModel: RecipeLibraryModel
+  let groceryModel: GroceryLibraryModel
+  let onBrowserCapture: (WebPage) async -> Void
+  let onRecipeSelected: (RecipeDetailPresentation) -> Void
+  let onSectionSelected: (AppSection) -> Void
+
+  var body: some View {
+    @Bindable var workbenchModel = workbenchModel
+
+    // This typed path is only written from the Workbench list after that list has been pushed here.
+    // Keep external navigation writers out until More has a route enum that can represent every section.
+    NavigationStack(path: $workbenchModel.navigationPath) {
+      List {
+        NavigationLink {
+          BrowserWorkspaceView(model: browserModel, onCapture: onBrowserCapture)
+            .onAppear { onSectionSelected(.browser) }
+        } label: {
+          AppSection.browser.label
+        }
+        NavigationLink {
+          WorkbenchListView(model: workbenchModel, style: .navigation)
+            .onAppear { onSectionSelected(.workbenches) }
+        } label: {
+          AppSection.workbenches.label
+        }
+        NavigationLink {
+          SettingsView(model: recipeModel, groceryModel: groceryModel)
+            .onAppear { onSectionSelected(.settings) }
+        } label: {
+          AppSection.settings.label
+        }
+      }
+      .navigationTitle("More")
+      .navigationDestination(for: Workbench.ID.self) { workbenchID in
+        WorkbenchDetailView(workbenchID: workbenchID, onRecipeSelected: onRecipeSelected)
+          .id(workbenchID)
+      }
     }
   }
 }
