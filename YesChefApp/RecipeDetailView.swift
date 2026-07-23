@@ -326,8 +326,6 @@ private struct RecipeReaderView: View {
   @State private var compactSection: CompactSection = .ingredients
   @GestureState private var playbookDragTranslation: CGFloat = 0
   @State private var isPhotoGalleryPresented = false
-  @State private var renamingVariation: RecipeVariation?
-  @State private var variationNameDraft = ""
   @State private var promotingVariation: RecipeVariation?
   @State private var unrepresentablePromotionNames: [String] = []
 
@@ -498,7 +496,12 @@ private struct RecipeReaderView: View {
       }
 
       if let detail = model.detail, !detail.variations.isEmpty {
-        variationPicker(detail.variations, activeVariationID: detail.activeVariationID)
+        RecipeVariationPicker(
+          variations: detail.variations,
+          activeVariationID: detail.activeVariationID,
+          model: model,
+          promotingVariation: $promotingVariation
+        )
       }
       if model.adjustmentRestorePoint != nil {
         Button {
@@ -508,68 +511,6 @@ private struct RecipeReaderView: View {
         }
         .buttonStyle(.bordered)
       }
-    }
-  }
-
-  private func variationPicker(
-    _ variations: [RecipeVariation],
-    activeVariationID: RecipeVariation.ID?
-  ) -> some View {
-    let activeVariation = activeVariationID.flatMap { id in variations.first { $0.id == id } }
-    return HStack(spacing: 8) {
-      Picker(
-        "Variation",
-        selection: Binding(
-          get: { activeVariationID },
-          set: { model.activeVariationSelectionChanged($0) }
-        )
-      ) {
-        Label("Base Recipe", systemImage: "book.closed")
-          .tag(nil as RecipeVariation.ID?)
-        ForEach(variations) { variation in
-          Text(variation.name)
-            .tag(variation.id as RecipeVariation.ID?)
-        }
-      }
-      .pickerStyle(.menu)
-
-      if let activeVariation {
-        Button {
-          variationNameDraft = activeVariation.name
-          renamingVariation = activeVariation
-        } label: {
-          Label("Rename Variation", systemImage: "pencil")
-            .labelStyle(.iconOnly)
-        }
-        .buttonStyle(.bordered)
-        .accessibilityLabel(Text("Rename Variation"))
-
-        RecipeVariationActions(
-          variation: activeVariation,
-          model: model,
-          promotingVariation: $promotingVariation
-        )
-      }
-    }
-    .alert(
-      "Rename Variation",
-      isPresented: Binding(
-        get: { renamingVariation != nil },
-        set: { if !$0 { renamingVariation = nil } }
-      )
-    ) {
-      TextField("Name", text: $variationNameDraft)
-      Button("Save") {
-        if let variation = renamingVariation {
-          model.renameVariation(variation.id, to: variationNameDraft)
-        }
-        renamingVariation = nil
-      }
-      Button("Cancel", role: .cancel) {
-        renamingVariation = nil
-      }
-    } message: {
-      Text("Give this variation a new name.")
     }
   }
 
