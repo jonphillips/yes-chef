@@ -406,7 +406,8 @@ extension RecipeCoreTests {
                 dateModified: Date(timeIntervalSinceReferenceDate: 819_200_000)
               )
             ),
-            tier: .onDevice
+            tier: .onDevice,
+            tierResolution: .callerProvided
           )
         }
       }

@@ -84,16 +84,19 @@ extension ReaderFeedbackCurationClient: DependencyKey {
       tier = .onDevice
     }
 
-    let response = try await modelClient.complete(
-      ModelRequest(
-        tier: tier,
-        system: instructions,
-        prompt: prompt(comments: comments, sourceURL: sourceURL),
-        maxTokens: maxTokens,
-        reasoningEffort: .high,
-        promptPreferenceKey: AIPromptPreferenceKind.readerFeedback.rawValue
-      )
+    let call = ModelCall(
+      surface: .reader,
+      task: .feedbackCuration,
+      tierResolution: .preferredProviderOrFirstAvailable,
+      contextLayers: [.readerComments],
+      tier: tier,
+      system: instructions,
+      prompt: prompt(comments: comments, sourceURL: sourceURL),
+      maxTokens: maxTokens,
+      reasoningEffort: .high,
+      promptPreferenceKey: AIPromptPreferenceKind.readerFeedback.rawValue
     )
+    let response = try await call.complete(using: modelClient)
     if response.wasTruncated {
       throw ReaderFeedbackCurationError.responseTruncated
     }

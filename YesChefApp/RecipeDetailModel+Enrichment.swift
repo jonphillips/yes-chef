@@ -26,7 +26,8 @@ extension RecipeDetailModel {
           selection: selection,
           messages: messages,
           detail: detail,
-          tier: chatModel.activeTier
+          tier: chatModel.activeTier,
+          tierResolution: .callerProvided
         )
       },
       commit: { [weak self] proposal in

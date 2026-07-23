@@ -293,7 +293,11 @@ public struct WorkbenchDraftRecipeClient: Sendable {
 extension WorkbenchDraftRecipeClient: DependencyKey {
   public static let liveValue = WorkbenchDraftRecipeClient { selection, messages, context, tier in
     @Dependency(\.modelClient) var modelClient
-    let request = ModelRequest(
+    let call = ModelCall(
+      surface: .workbench,
+      task: .workbenchDraft,
+      tierResolution: .callerProvided,
+      contextLayers: [.workbench, .selection, .conversation, .candidates],
       tier: tier,
       system: instructions,
       // A reasoning model shares `max_completion_tokens` between thinking and output, so the draft
@@ -307,7 +311,7 @@ extension WorkbenchDraftRecipeClient: DependencyKey {
       maxTokens: 16_384,
       reasoningEffort: .high
     )
-    let response = try await modelClient.complete(request)
+    let response = try await call.complete(using: modelClient)
     let trimmed = response.text.trimmingCharacters(in: .whitespacesAndNewlines)
     // Distinguish a real failure from a deliberate "no recipe yet" (which comes back as valid
     // JSON with an empty title). A budget-exhausted or empty response is a retryable failure;
