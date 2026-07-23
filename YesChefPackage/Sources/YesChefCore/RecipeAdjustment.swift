@@ -294,7 +294,7 @@ public struct RecipeAdjustmentClient: Sendable {
     messages: [RecipeChatMessage],
     detail: RecipeDetailData,
     tier: ModelTier,
-    tierResolution: ModelCallTierResolution = .callerProvided
+    tierResolution: ModelCallTierResolution
   ) async throws -> RecipeAdjustmentProposal {
     try await extract(selection, messages, detail, tier, tierResolution)
   }
