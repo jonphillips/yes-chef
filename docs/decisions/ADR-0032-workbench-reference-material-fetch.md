@@ -1,6 +1,15 @@
 # ADR-0032 — Workbench reference material (app-side fetch, provider-agnostic context)
 
-Status: **Proposed** — architect sketch, 2026-07-12. App-side (`YesChefCore` + app), ships **independently**
+Status: **Accepted** — 2026-07-23 (Jon ratified). Opened Proposed as an architect sketch, 2026-07-12.
+**What ratification covers: the Decision and its boundaries** — a per-workbench reference list (URL or
+pasted text), fetched by *our own* engine, reduced to readable text, cached, and injected as **plain grounded
+text**; the rejection of each provider's native server-side web tool as the mechanism; and the
+advisory-read-only boundary (never a data write). **What it does not cover: the six open questions below,
+which remain open for a scoping session** — they carry architect recommendations, but ratifying the ADR did
+**not** adopt them, and **OQ5 (gated-fetch UX) carries no recommendation at all.** The slice plan is still
+marked proposed and is **not dispatchable until that session happens**; see
+[ADR-0043](ADR-0043-model-call-chokepoint.md) D5, which sequences the chokepoint arc *around* this ADR's
+context layer precisely because the layer does not exist yet. App-side (`YesChefCore` + app), ships **independently**
 of ADR-0031 (Responses migration). Refines the Recipe Workbench (ADR-0019) chat surface; reuses the web
 capture engine (ADR-0007) and the authenticated-capture posture (ADR-0009). Governed by the
 LLM-vs-determinism surface boundary ([[llm-vs-determinism-surface-boundary]]) and
