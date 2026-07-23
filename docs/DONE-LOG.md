@@ -9,6 +9,13 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0021 V1 + V2 — editable recipe variations and promotion
+
+**Draft PR [#221](https://github.com/jonphillips/yes-chef/pull/221), 2026-07-23.** Variations are now edited as ID-preserving resolved recipe detail and reduced back into the existing delta vocabulary only when fully representable; a structural edit is identified precisely and offered a split-off, never a partial save. V2 materializes a split-off as a standalone recipe, or promotes a variation to the base while retaining the former base as a variation. Existing siblings are re-derived against the new base; if a later sibling cannot be reanchored, promotion requires explicit confirmation before removing it. **No schema change.**
+
+**Verification.** Focused variation coverage: 12 tests. Full `scripts/check-drift.sh`: **391 tests / 81 suites**, with SwiftLint clean. The elevated Debug `generic/platform=iOS` build succeeded. No device pass was run.
+
+---
 ## ADR-0043 S2 — dev-only model-call inventory
 
 **✅ Verified & approved, 2026-07-23 (architect-verified; no device pass required).** PR [#220](https://github.com/jonphillips/yes-chef/pull/220), branch `codex/adr-0043-s2-model-call-inventory`, commit `8428426`. The required elevated Debug `generic/platform=iOS` build and the Release configuration build both succeeded; `scripts/check-drift.sh` passed **386 tests / 81 suites**, and S1's bypass-enforcement test remains green. App + Core; **no schema**, no persistence, and no cook-facing UI.
