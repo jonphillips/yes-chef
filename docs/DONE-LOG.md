@@ -84,7 +84,7 @@ Newest first.
 ---
 ## ADR-0038 Amendment 5 — Learnings have sparse, human-controlled order
 
-**✅ Merged to main — PR [#210](https://github.com/jonphillips/yes-chef/pull/210), 2026-07-19 (recovery of the already-reviewed [#208](https://github.com/jonphillips/yes-chef/pull/208); unchanged cherry-pick). Verification green: `swift build`, Core migration/backfill + rebalance tests, generic iOS `build` **and** `build-for-testing`, `scripts/check-drift.sh`. Device pass owed (Jon).** Core + app; **schema — additive synced column + migration** (`Learning.sortOrder`), recorded in the standing prod-promotion list.
+**✅ Merged to main — PR [#210](https://github.com/jonphillips/yes-chef/pull/210), 2026-07-19 (recovery of the already-reviewed [#208](https://github.com/jonphillips/yes-chef/pull/208); unchanged cherry-pick). Verification green: `swift build`, Core migration/backfill + rebalance tests, generic iOS `build` **and** `build-for-testing`, `scripts/check-drift.sh`. ✅ Jon device-passed 2026-07-22.** Core + app; **schema — additive synced column + migration** (`Learning.sortOrder`), recorded in the standing prod-promotion list.
 
 **Learnings became manually reorderable** on the recipe Playbook, the menu Playbook, and menu prep-plan editing — the shared `LearningsSection` gained SDK 27 `.reorderable()` on its `ForEach` with `.reorderContainer(for: Learning.self)` on the enclosing `VStack` (it was already the drag container; no standalone `.draggable`). The query sorts ascending by rank, keeping the old date/UUID order only as a tie-breaker.
 
@@ -95,7 +95,7 @@ Newest first.
 ---
 ## ADR-0041 Slice 2.6 — Playbook destructive-action safety + Serve With row consistency
 
-**✅ Merged to main — PR [#209](https://github.com/jonphillips/yes-chef/pull/209), 2026-07-19 (recovery of the already-reviewed [#207](https://github.com/jonphillips/yes-chef/pull/207); unchanged cherry-pick of `121ac58`). Verification green: Core build/tests, generic iOS `build` **and** `build-for-testing`, `scripts/check-drift.sh`. Device pass owed (Jon).** App + Core; **no schema / migration**. Spec: [ADR-0041 Amendment 2](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-2--destructive-section-actions-are-explicit-and-serve-with-rows-use-the-native-gesture-2026-07-19), from Jon's S2.5 device pass.
+**✅ Merged to main — PR [#209](https://github.com/jonphillips/yes-chef/pull/209), 2026-07-19 (recovery of the already-reviewed [#207](https://github.com/jonphillips/yes-chef/pull/207); unchanged cherry-pick of `121ac58`). Verification green: Core build/tests, generic iOS `build` **and** `build-for-testing`, `scripts/check-drift.sh`. ✅ Jon device-passed 2026-07-22.** App + Core; **no schema / migration**. Spec: [ADR-0041 Amendment 2](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-2--destructive-section-actions-are-explicit-and-serve-with-rows-use-the-native-gesture-2026-07-19), from Jon's S2.5 device pass.
 
 - **Clear confirms before writing.** A section-scoped `confirmationDialog` (driven by a `clearingSection: PlaybookSectionKind?`) names the section and states there is no undo — clearing is a permanent write reachable from the shared `•••`.
 - **Clear left the section editor sheet — a deliberate partial reversal of D4.** D4 had put Clear in the editor so every action had a home, but its proximity to Cancel made it fat-fingerable. The `clear` closure came off `RecipeSectionEditorView` entirely; the editor is now purely review-and-save.
@@ -107,7 +107,7 @@ Newest first.
 ---
 ## ADR-0041 Slice 2.5 — non-destructive section returns + the collapsed section toolbar
 
-**✅ Merged to main — PR [#206](https://github.com/jonphillips/yes-chef/pull/206), 2026-07-19. Verification green: `swift build`, `scripts/check-drift.sh` (SwiftLint + package tests), elevated `generic/platform=iOS` build. Device pass owed (Jon).** App + Core; **no schema / migration**. Spec: [ADR-0041 Amendment 1](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-1--a-return-never-stomps-existing-content-and-the-toolbar-collapses-into-the-overflow-2026-07-18).
+**✅ Merged to main — PR [#206](https://github.com/jonphillips/yes-chef/pull/206), 2026-07-19. Verification green: `swift build`, `scripts/check-drift.sh` (SwiftLint + package tests), elevated `generic/platform=iOS` build. ✅ Jon device-passed 2026-07-22.** App + Core; **no schema / migration**. Spec: [ADR-0041 Amendment 1](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-1--a-return-never-stomps-existing-content-and-the-toolbar-collapses-into-the-overflow-2026-07-18).
 
 **A section return can no longer silently discard hand-authored work.** S2 had paired a *regenerate-fresh* outbound prompt (which excludes the section being regenerated — correct, kept) with an inbound commit that *replaced wholesale*, so "Hand off again" on a filled section destroyed existing content. Fixed on the return side only:
 
@@ -968,7 +968,10 @@ follow-through):** OQ4 taste preference and A6/D5 promote-a-note → real recipe
 
 **Architect-reviewed & approved 2026-07-10 — yes-chef PR [#138](https://github.com/jonphillips/yes-chef/pull/138)
 (branch `codex/adr-0026-review-collection-sheet`, commit `f135d25`; core check-drift green — 270 tests, 0 lint;
-app layer device-passed by Jon).** Implements [ADR-0026](decisions/ADR-0026-review-collection-sheet.md)
+app layer device-passed by Jon).** **✅ The two carried interaction risks cleared on device 2026-07-22** — the
+adjust launch row's Compare-diff is not swallowed by the collection sheet dismissing from `RecipeChatPanel` in
+the same runloop, and the N=1 auto-drill's stacked child-over-collection sheet reads cleanly (incl. iPad
+split-chat). Implements [ADR-0026](decisions/ADR-0026-review-collection-sheet.md)
 (Accepted 2026-07-10), S1 + S2 in one PR. **Schema-free, sync-safe by construction** — an in-memory
 review-surface refactor over the existing `ChatApplyReviewItem` collection, no table/column. Dispatch 2 (and
 last) of the 2026-07-09 menu-planner pass; held apart from Dispatch 1's low-risk quick-fixes because it

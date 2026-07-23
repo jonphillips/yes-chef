@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 21, 2026 (**ADR-0042 is COMPLETE and closed — there is no live dispatch target; the next effort is Jon's pick.** S4 (Amd 1) shipped and device-passed: the recipe body now hands off and a prose *revision brief* returns, with the structured write still authored in-app ([#216](https://github.com/jonphillips/yes-chef/pull/216) + follow-ups `2446ed0` restoring the missing paste affordance and `31d2089` adding the base-write guard) → DONE-LOG. **S3 (`workbenchDraft`) stays deferred and un-queued; there is no S5.** **⚠️ The return contract is v2 — re-copy the project instructions from AI Settings or every verb fails the marker gate.** Two things surfaced by the S4 dogfood pass and carried forward, not lost: **variations are half-built** — no edit, no promote — which is **[ADR-0021 Amds 1 + 2](decisions/ADR-0021-recipe-variations.md) (Proposed, ratify before dispatching)**, and until then a variation is a display-time overlay that every read folds and **no write understands**, so editing with one active writes to the base (guarded now, not fixed); and **the "why" dies at the commit boundary** — the brief's per-change rationale has no home, recorded as a fork in [`open-questions.md`](open-questions.md) to ride with those amendments. Jon also named **Menu's thin hand-off verb coverage** as a surface needing love. — Prior closes: **ADR-0042 S2** ([#214](https://github.com/jonphillips/yes-chef/pull/214)) and **S0 + S1** ([#212](https://github.com/jonphillips/yes-chef/pull/212)) → DONE-LOG; **ADR-0041 COMPLETE at S2.6** (PRs #206/#209 + ADR-0038 Amd 5 #210), **its S3 WITHDRAWN**. Device passes still owed (Jon) for #206/#209/#210.)
+Last updated: July 22, 2026 (**Live dispatch target = the iPhone chrome pass** — two compact-width defects from Jon's 2026-07-22 iPhone pass, bundled into one PR: the seven-tab compact `TabView` overflowing into the system **More** tab (which nests a second `UINavigationController` and draws the double back chevron on Menu detail), and the recipe hand-off door being buried in the nav-bar `•••`. Both app-layer, no schema. Two further reports from the same pass — the Playbook's *"Hand off to ChatGPT"* label and its missing per-section `•••` — are **excluded pending a reinstall**, because that string no longer exists in the codebase and both symptoms match a pre-#199 build. **ADR-0042 remains COMPLETE and closed**; after this chrome pass the next feature effort is Jon's pick. S4 (Amd 1) shipped and device-passed: the recipe body now hands off and a prose *revision brief* returns, with the structured write still authored in-app ([#216](https://github.com/jonphillips/yes-chef/pull/216) + follow-ups `2446ed0` restoring the missing paste affordance and `31d2089` adding the base-write guard) → DONE-LOG. **S3 (`workbenchDraft`) stays deferred and un-queued; there is no S5.** **⚠️ The return contract is v2 — re-copy the project instructions from AI Settings or every verb fails the marker gate.** Two things surfaced by the S4 dogfood pass and carried forward, not lost: **variations are half-built** — no edit, no promote — which is **[ADR-0021 Amds 1 + 2](decisions/ADR-0021-recipe-variations.md) (Proposed, ratify before dispatching)**, and until then a variation is a display-time overlay that every read folds and **no write understands**, so editing with one active writes to the base (guarded now, not fixed); and **the "why" dies at the commit boundary** — the brief's per-change rationale has no home, recorded as a fork in [`open-questions.md`](open-questions.md) to ride with those amendments. Jon also named **Menu's thin hand-off verb coverage** as a surface needing love. — Prior closes: **ADR-0042 S2** ([#214](https://github.com/jonphillips/yes-chef/pull/214)) and **S0 + S1** ([#212](https://github.com/jonphillips/yes-chef/pull/212)) → DONE-LOG; **ADR-0041 COMPLETE at S2.6** (PRs #206/#209 + ADR-0038 Amd 5 #210), **its S3 WITHDRAWN**.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -21,7 +21,76 @@ ambiguous, the agent must **STOP and ask Jon — never infer the next task.** Se
 `docs/AGENTS.md` § Work Intake & Dispatch. A dispatch may bundle **several cohesive slices** (one
 PR); do all listed, in order.
 
-**No live dispatch target — ADR-0042 is complete and the next effort is Jon's pick. STOP and ask; do not infer one.**
+**LIVE DISPATCH TARGET — iPhone chrome pass (two cohesive slices, one PR).** Both are compact-width
+defects from Jon's 2026-07-22 iPhone pass; both are **app-layer only, no schema, no Core**. Do them in
+order under one PR.
+
+**Slice 1 — the compact tab bar stops overflowing into the system "More" tab.** `AppSection` has **seven**
+cases and `AppCompactTabView` (`YesChefApp/AppMainLayout.swift`) renders all seven with `.tabItem`. On
+iPhone iOS collapses everything past the fifth into a **system-managed More tab, which is its own
+`UINavigationController`** — so `MenusStack`'s `NavigationStack` nests inside it and every Menu detail
+draws **two stacked back chevrons**. Confirmed on `iPhone 17 Pro` against `main`: the tab bar reads
+Recipes / Workbench / Browser / Calendar / **More**, with Menus, Groceries and Settings all buried.
+
+**Jon's call (2026-07-22): the four primary tabs are Recipes, Menus, Calendar, Groceries** — the cooking
+workflow. Browser, Workbench and Settings move into a **More tab we own**: one `NavigationStack` whose root
+is a `List` of the three overflow sections, pushing them via `navigationDestination`.
+
+Traps, in the order they will bite:
+- **Push the *content* views, never the `*Stack` wrappers.** `BrowserStack`, `WorkbenchesStack` and
+  `SettingsStack` each wrap their content in a `NavigationStack` — pushing those from the More stack
+  recreates the exact nesting this slice removes. Push `BrowserWorkspaceView`, `WorkbenchListView(style:
+  .navigation)` and `SettingsView` instead, and decide explicitly whether the three now-unused wrappers get
+  deleted or kept for the iPad path (they are not used there today — `AppMainLayout`'s split view builds its
+  own columns).
+- **Workbench has its own list→detail push.** `WorkbenchesStack` owns
+  `.navigationDestination(for: Workbench.ID.self)` bound to `model.navigationPath`. Once the list is pushed
+  from the More stack that destination must be registered **on the More stack**, and you must decide whether
+  the More stack's path binds to `WorkbenchLibraryModel.navigationPath` or the model's path becomes
+  iPad-only. Say which in the PR.
+- **`selectedSection` must still round-trip.** The compact `TabView` selection is
+  `Binding<AppSection?>` shared with the iPad sidebar. `.browser` / `.workbenches` / `.settings` are no
+  longer valid tab tags — make sure selecting them cannot silently no-op the tab bar. The only programmatic
+  writer today is `openMenuFromCalendar` (`selectedSection = .menus`), which this layout **promotes to a real
+  tab** — that path gets simpler, not harder.
+- **Do not touch the regular-width path.** `AppMainLayout`'s `NavigationSplitView` + `AppSidebar` use all
+  seven sections and are correct as-is. This slice is `horizontalSizeClass == .compact` only.
+
+**Slice 2 — the recipe hand-off door comes out of the system overflow.** `RecipeDetailView.recipeToolbar`
+puts **Hand off** and **Paste** in `ToolbarItemGroup(placement: .secondaryAction)`, which on iOS collapses
+into the nav-bar `•••`. They are wired correctly (this is *not* the PR #216 `PasteButton` bug — `2446ed0`
+already fixed that), but buried: on iPhone Jon read the recipe toolbar as simply **not having** copy/paste.
+ADR-0042 Amd 1's whole premise is a **round trip**, so the return door must be visible.
+
+**Shape:** replace the two `.secondaryAction` buttons with a single **`.primaryAction` `Menu`** labelled
+`sparkles.square.filled.on.square`, holding *Hand off* and *Paste* — the same idiom as the Playbook section
+`•••` menu. **Keep using plain buttons that read `UIPasteboard.general.string` directly; `PasteButton` does
+not render inside a `Menu`** (the constraint is documented on `HandoffCopyPasteControls` — do not
+re-litigate it). `View Original` and `Archive` stay in `.secondaryAction`. Preserve the existing
+`activeVariation` guard: a variation being active must still route through the
+`isConfirmingBaseRecipeHandoff` confirmation rather than copying straight out (Amd1-OQ3).
+
+**⚠️ Decide with Jon before building Slice 2:** `.primaryAction` already carries four buttons (Edit,
+Groceries, Plan, Workbench) plus a fifth on wide layouts (the Playbook toggle). Adding a hand-off menu makes
+**five or six** on a 393pt iPhone, and iOS will start overflowing them again — which is the same failure in
+a new place. The architect's recommendation is to **demote `Workbench` into `.secondaryAction`** to pay for
+the hand-off menu, on the grounds that hand-off is now a daily round-trip and the workbench is an
+occasional deep-dive. That is a product tradeoff, not an implementation detail — **confirm it, do not
+assume it.**
+
+**Verification:** app-layer only, so the elevated `generic/platform=iOS` build is the required evidence,
+plus `scripts/check-drift.sh`. Jon does the iPhone pass — and this dispatch exists *because* that pass had
+been skipped, so call out in the PR exactly what to look at on a phone.
+
+**Two further 2026-07-22 reports are NOT in this dispatch — they are probably a stale device build.** Jon
+reported the recipe Playbook showing a *"Hand off to ChatGPT"* button and **no per-section `•••` menu**. That
+string **does not exist anywhere in the codebase**: ADR-0041 S1 (`4a3a564`, PR #199, confirmed an ancestor of
+`HEAD`) deleted the column-top button and replaced it with the per-section menu, and the current
+`playbookHeader` holds only *Ask*. Seeing the old label **and** no `•••` is exactly what a pre-#199 build
+looks like. Jon is reinstalling `main` to confirm. **Do not "fix" either one** — if they survive a current
+build they are a genuine and surprising regression and get their own scoped entry. (Note also: the **Notes**
+section has no `•••` *by design* — ADR-0041 scoped the section toolbar to Make Ahead / Chef It Up / Serve
+With.)
 
 **ADR-0042 closed 2026-07-21.** S0/S1/S2/S4 shipped and device-passed (→ [`DONE-LOG`](DONE-LOG.md)); **S3 (`workbenchDraft`) stays deferred and un-queued** — no concrete want, its danger receded rather than grew, **do not build it on ADR momentum**; there is no S5. **⚠️ The return contract is v2 — re-copy the project instructions from AI Settings or every verb fails the marker gate.**
 
@@ -29,10 +98,7 @@ PR); do all listed, in order.
 - **Variations are half-built, and it shows in daily use.** No way to **edit** a variation ([ADR-0021 Amd 1](decisions/ADR-0021-recipe-variations.md), Proposed) and no way to **promote** one (Amd 2, Proposed) — **ratify both before dispatching.** Until then a variation is a display-time overlay that every read folds and no write understands; the interim guard (editor notice + hand-off confirmation) only *says so*, it does not fix it. The **"why" fork** in [`open-questions.md`](open-questions.md) wants to ride with these.
 - **Menu is under-served by hand-off verbs.** Menu has exactly one (`prepPlan`) and the meal-plan day has one (`mealPlanMakeAheadStrategy`); there is no *"let's talk about this day's dishes"* and no *"let's discuss the whole menu."* Deliberation-shaped and advisory, so ADR-0042 D2 puts it on the safe side of the line — but classify each verb's commit shape first ([[chat-verb-commit-shapes]]) and check it against the parked **ADR-0013 meal-planner verbs** entry below, which overlaps.
 
-**Device passes owed (Jon) on already-merged work** — S2.5 (#206): filled Serve With prefill retains existing rows; filled Make-ahead offers Replace/Append with neither pre-selected; section actions live only in the expanded-header `•••`; paste prompts once per round-trip; Meal Calendar uses compact layout in iPad Slide Over. S2.6 (#209): every Clear asks first, editor sheets have no Clear, Serve With deletes by swipe with no visible `x`, pasted bullets render singly. ADR-0038 Amd 5 (#210): learnings drag-reorder on all three surfaces and hold across a two-device sync — and watch the recorded tradeoff, that a newly returned learning still prepends **ahead of** a deliberate manual arrangement.
-
-
-**Feature efforts still on the board — Jon picks; do not infer** (there is no live dispatch target; the two candidates in Next Up above are unscoped, and the first of them is the ADR-0021 entry immediately below):
+**Feature efforts still on the board — Jon picks; do not infer** (the live dispatch target above is the iPhone chrome pass and nothing else; the two candidates named 2026-07-21 are unscoped, and the first of them is the ADR-0021 entry immediately below):
 - **[ADR-0021](decisions/ADR-0021-recipe-variations.md) V1 + V2 — variations become hand-editable, and promotion gets its two destinations.** **Amendments 1 + 2 are Proposed — ratify with Jon before dispatching** (Amd1-D7 and Amd2-D4 are already ratified). **V1:** editing a variation edits the **resolved** recipe and the ops are **re-derived** on save — the overlay and highlighting survive because the delta is recomputed, never hand-authored; the derivation returns `(ops, unrepresentable[])` so an inexpressible edit reports at save and offers the split-off, never saving a partial (Amd1-D7). **The editor must be the ID-preserving structured one** — a text round-trip diffs a one-word change as remove+add and destroys the color comparison (Amd1-D4). **V2:** split off as its own recipe (B1) and promote-to-base with the old base auto-derived into a variation (B2); **no probation machinery** — no cook counts, no verdict prompts (Amd2-D4). **Bundle V1+V2** so the save-time report has a split-off to offer. **Schema-free — the `deltas` BLOB stays** (Amd1-D3: ADR-0040 keys on the grain the *human* edits, and no human edits an op). ADR-0023 OQ3 (rebasing existing variations onto a new base) **must be answered in V2**, not deferred again.
 - **Workbench log-editor nits (small, from the S2 review; not urgent)** — the `canSave` / `normalizedLogEntryDraft` mismatch when a body is combined with partially-filled typed fields, the dead save spinner, and the pre-existing compare `.menuPrepPlan` mislabel.
 - **The S4 brief extractor borrows the in-app Ask machinery without re-aiming it (small; found 2026-07-21, not urgent but the second item is a silent-failure risk).** Two independent drifts in `HandoffReviewCoordinator.draftRecipeAdjustment` → `RecipeAdjustmentClient`:
@@ -41,11 +107,6 @@ PR); do all listed, in order.
   - **Deliberately NOT part of this:** adding the taste profile or known-learnings to the *extractor*. Those belong to the outbound hand-off ask (where `RecipeHandoffContext` already sends both) because that is where judgment happens. The extractor transcribes a settled decision, and feeding it preference context invites exactly the editorializing D1 exists to stop.
 - **Workbench synthesis-shaped apply-action** — the draft verb's own action shape (no last-reply gate/chip). ⚠️ Re-read against [ADR-0042 D2/OQ5](decisions/ADR-0042-workbench-handoff-and-the-return-block.md) before dispatching: it is an *in-app* draft verb, and the draft is a structured write.
 - **Open a design ADR** — ADR-0013 meal-planner verbs (needs scope confirmation) or ADR-0014 text editing.
-
-**ADR-0026 device pass still owed (Jon):** two interaction risks — (1) the adjust launch row presents
-Compare-diff from `RecipeDetailView` while the collection sheet dismisses from `RecipeChatPanel` in the same
-runloop (verify Compare-diff isn't swallowed); (2) N=1 auto-drill stacks the child review sheet over the
-collection sheet (confirm it reads cleanly, incl. iPad split-chat).
 
 **Parked to `docs/open-questions.md` (design forks, decide with Jon before build):** multi-bubble /
 whole-transcript chat selection (per-bubble `UITextView` caps the payload). *(Hand-editing a variation and
