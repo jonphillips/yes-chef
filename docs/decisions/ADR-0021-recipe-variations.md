@@ -184,7 +184,7 @@ card, no review sheet, no "model proposes / tap writes" gate, because no model p
 ### Amd1-D3 — The `deltas` BLOB **stays**, and ADR-0040 is satisfied rather than violated
 
 **On the record, because the architect argued the opposite earlier the same day and was wrong:** the
-`deltas` BLOB (`Schema.swift:758`) looked like the ADR-0040 defect — content that can only be regenerated,
+`deltas` BLOB (the `recipeVariations` migration, `Schema.swift`) looked like the ADR-0040 defect — content that can only be regenerated,
 never repaired, exactly like `Menu.prepPlan`. **It is not, and the reason is the principle's own wording:
 ADR-0040 keys on the grain *the human edits*.** Once the human edits the resolved recipe, **no human ever
 touches an op** — the BLOB is a derived cache of a mechanical diff, which is the one thing a blob is
@@ -209,9 +209,10 @@ fixed for adjust — *stop round-tripping through `ingredientText`; mutate the `
 
 **The enabling fact is already shipped:** `resolved(applying:)` applies the delta through that same
 ID-preserving path with a **deterministic** UUID sequence seeded by the variation's ID
-(`RecipeAdjustment.swift:684`), so every row in the resolved view has a stable identity across resolutions —
+(`resolved(applying:)`, `RecipeAdjustment.swift`), so every row in the resolved view has a stable identity
+across resolutions —
 base rows keep base IDs, added rows get reproducible ones. `variationIngredientHighlights`
-(`RecipeAdjustment.swift:711`) already compares those identities in one direction. **The diff-back is the
+(`RecipeAdjustment.swift`) already compares those identities in one direction. **The diff-back is the
 mirror of code that exists**, not new machinery.
 
 **Diff minimality is the acceptance criterion, not an optimization** — a correct-but-noisy diff destroys the
@@ -388,7 +389,8 @@ produced it — and the reasoning is the scarce output of an unmetered thinking 
 cannot be reconstructed from the result. Three doors were closed on it at once: the brief is transient by
 design (ADR-0042 Amd1-D5), learnings are explicitly forbidden from restating changes that appear in the brief
 (Amd1-D7), and the variation payload is ops-only. The single existing rationale deposit
-(`RecipeDetailModel+Adjustment.swift:82`) fails twice — it is `guard let workbenchID else { return }`, so it
+(`addAdjustmentRationaleToWorkbenchIfNeeded`, `RecipeDetailModel+Adjustment.swift`) fails twice — it is
+`guard let workbenchID else { return }`, so it
 never fires for an ordinary recipe adjust, and it writes `proposal.reviewSummary()`, a restatement of the
 **ops** rather than the model's prose. That is [ADR-0042 D6](ADR-0042-workbench-handoff-and-the-return-block.md)
 with a hole in it.
@@ -413,13 +415,26 @@ failure in the same shape as the `Menu.prepPlan` BLOB, and it fills a `note` tha
 BLOB, would be regenerate-only anyway. **(b)** is subsumed: (d) *is* (b), with a home that overwrite can
 reach too.
 
+**The apparent double standard in (a)'s rejection, reconciled — because (d) puts N rationales in one field
+too.** It does, and that is not the same defect. [[editable-at-the-grain-stored]] asks what a *human would
+repair by hand*. `RecipeVariation.note` is **live, folded, user-facing content**: it renders in the reader,
+it is part of the variation a cook reads while cooking, and someone will eventually want to fix one line of
+it — at which point a squashed blob of N rationales is unrepairable, and the grain was wrong. The
+deliberation body is the opposite: **inert provenance**, written once, never folded into the reader, never
+parsed, never curated, and never edited in place — you read it or you ignore it. Per Amd3-D3 and
+[ADR-0042 D3](ADR-0042-workbench-handoff-and-the-return-block.md), prose terminating in a human-read field
+has nothing to parse and therefore nothing to lose. **The test is not "how many things are in the field"; it
+is "will a human repair this field one piece at a time."** For `note`, yes. For the log body, no.
+
 ### Amd3-D2 — Its **own table**, not a generalized `workbenchLog` (ratified)
 
 `WorkbenchLogEntry` already carries a nullable `relatedRecipeID`, so making its `workbenchID` nullable would
 buy a recipe-scoped log for **zero** new tables. **Rejected deliberately.** The two logs have genuinely
-different delete semantics — workbench rows cascade on workbench delete, recipe rows must cascade on recipe
-delete — so a shared table needs two nullable soft FKs with divergent cascades, which SQLite can express and
-a reader cannot. More importantly it would quietly merge the variation ↔ workbench convergence question that
+different **owning** parents — workbench rows cascade on workbench delete, recipe rows must cascade on recipe
+delete — so a shared table would need *both* `workbenchID` and `recipeID` nullable, each carrying a cascade
+that must fire for one kind of row and not the other. SQLite cannot express "cascade only when this is the
+owning parent"; you would demote both to soft columns and hand-roll the deletes, which is how orphans get
+made. (Amd3-D6 states the two FK styles; this decision is the reason the distinction matters.) More importantly it would quietly merge the variation ↔ workbench convergence question that
 the umbrella fork in `docs/open-questions.md` has deliberately left open. **Table count is not the scarce
 resource; conceptual clarity is** ([[synced-table-cost-calibration]]).
 
@@ -449,21 +464,66 @@ consumer existed before the schema: Jon generated the want from real use.
   (recipe-scoped, optionally referencing the variation), so the two flows are symmetric.
 - The existing workbench `.rationale` deposit is **unchanged and not replaced** — a commit inside a workbench
   keeps writing there. This log is what fires when there is no workbench, which is the ordinary case.
+  **It is exempt from this amendment's diagnosis, and the reason is that it is a different artifact:** the
+  workbench log records *what was tried on a candidate* — an experiment trail, where an ops restatement is
+  the appropriate content and `reviewSummary()` is doing its actual job. The defect diagnosed above is
+  `reviewSummary()` standing in for **the model's prose** in a *provenance* deposit, which is a substitution
+  this new log never makes. Same call, different artifact, different purpose — so it is preserved
+  deliberately, not by oversight.
 - **Amendment 2 interaction, stated so it is not lost:** **split off as its own recipe** (B1) **copies the
   log rows onto the new recipe** — otherwise the provenance evaporates at the exact moment the variation
-  becomes a standalone dish, which is when it matters most. **Promote to base** (B2) moves nothing: the rows
+  becomes a standalone dish, which is when it matters most. **The copied rows must have `variationID`
+  nulled.** After the copy it would otherwise point at a variation belonging to the *old* recipe — a
+  cross-recipe reference this model does not otherwise have ([[reference-placement-and-original-provenance]]:
+  placement is a per-recipe flag, never a link between recipes). The body carries the provenance; the
+  `variationID` was only ever a within-recipe convenience. **Promote to base** (B2) moves nothing: the rows
   are already recipe-scoped and the recipe is the same row.
 - **In-app adjust commits deposit too** when a rationale exists, but nothing is fabricated — no row rather
   than a synthesized one. A deposit with no prose is the `reviewSummary()` mistake repeated.
 
+### Amd3-D6 — Two FK styles, and this table uses both on purpose (ratified)
+
+The repo already has a settled two-style vocabulary, visible in the `workbenchLog` table itself, and this
+ADR must use it precisely because Amd3-D2 rests entirely on delete semantics:
+
+```sql
+"workbenchID"     TEXT NOT NULL REFERENCES "workbenches"("id") ON DELETE CASCADE,  -- owning
+"relatedRecipeID" TEXT,                                                            -- soft, index only
+```
+
+- **`recipeID` is the owning, hard FK** — `NOT NULL REFERENCES "recipes"("id") ON DELETE CASCADE`, matching
+  `recipeVariations.recipeID` and `workbenchLog.workbenchID`. A deliberation row cannot outlive its recipe.
+  **This is the whole of D2's argument** — "recipe rows must cascade on recipe delete" — so writing it as a
+  soft column would defeat the reasoning that justifies the separate table, and an implementer following a
+  soft spec would silently orphan rows on recipe delete.
+- **`variationID` is the soft style** — a bare column with an index, no constraint and no cascade, like
+  `relatedRecipeID`. This is deliberate and asymmetric: **a variation can be deleted, promoted, or split off
+  while the provenance row must survive.** A hard FK here would destroy the why exactly when the variation it
+  described stopped existing, which is the failure this amendment exists to prevent.
+
+*(Stated as its own decision because "soft FK … `ON DELETE CASCADE`" is self-contradictory — a soft FK has no
+cascade — and the first draft of this amendment wrote precisely that. **The same error is present in this
+ADR's original 2026-07-06 schema sketch below** for `recipeVariations.recipeID`, which shipped as a hard FK;
+that line is corrected in place.)*
+
 ### Slice — V3, **one synced table plus its reader** (sequence after V1 + V2)
 
-- **Schema:** one new synced table (a `recipeDeliberationLog`-shaped row: `id`, `recipeID` soft FK
-  `ON DELETE CASCADE`, `body: String`, an optional `variationID`, `dateCreated`). Register it in
-  **`makeSyncEngine` (`CloudSync.swift:110`) *and* `project.yml` deps** — the comment above that list warns
-  that a regenerate silently drops an unregistered table — and **add it to the standing prod-schema promotion
-  list** in `docs/CURRENT_HANDOFF.md`. Additive, UUID PK, no reserved columns, no unique indexes, no BLOB and
-  no CKAsset concern ([[sqlitedata-blob-cloudkit-asset]]).
+- **Schema:** one new synced table, a `recipeDeliberationLog`-shaped row. **The two FK styles are not
+  interchangeable here and the difference is load-bearing** — see Amd3-D6:
+
+  ```sql
+  "id"          TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+  "recipeID"    TEXT NOT NULL REFERENCES "recipes"("id") ON DELETE CASCADE,  -- owning: hard FK
+  "variationID" TEXT,                                                       -- soft: bare column + index
+  "body"        TEXT NOT NULL,
+  "dateCreated" TEXT NOT NULL
+  ```
+
+  Index `recipeID` and `variationID`. Register the table in **`makeSyncEngine` (`CloudSync.swift`) *and*
+  `project.yml` deps** — the comment above that table list warns that a regenerate silently drops an
+  unregistered table — and **add it to the standing prod-schema promotion list** in
+  `docs/CURRENT_HANDOFF.md`. Additive, UUID PK, no reserved columns, no unique indexes, no BLOB and no
+  CKAsset concern ([[sqlitedata-blob-cloudkit-asset]]).
 - **Deposit:** fires on both commit destinations per Amd3-D5, carrying the brief verbatim.
 - **Read surface:** on the recipe, per Amd3-D4. Ships in this slice.
 - **Not in this slice:** any parsing, curation, LLM reconciliation, or per-change decomposition of the body;
@@ -477,8 +537,12 @@ carry to.
 
 Mirrors the `menus`/`menuItems` + Codable-BLOB pattern already in the repo:
 
-- **`recipeVariations`** (synced) — `id` (UUID PK), `recipeID` (**soft FK → `recipes`,
-  `ON DELETE CASCADE`** — a variation cannot outlive its base), `name: String`, `note: String?` (the
+- **`recipeVariations`** (synced) — `id` (UUID PK), `recipeID` (**owning hard FK —
+  `NOT NULL REFERENCES "recipes"("id") ON DELETE CASCADE`**; a variation cannot outlive its base.
+  *Corrected 2026-07-23: this line originally read "soft FK … `ON DELETE CASCADE`", which is
+  self-contradictory — a soft FK is a bare indexed column with no constraint and no cascade. The table
+  shipped with the hard FK; the sketch was wrong, not the code. See Amd3-D6.*), `name: String`,
+  `note: String?` (the
   method annotation), `sortIndex`, `deltas: Data?` (Codable BLOB `[VariationDelta]`, the serveWith/prepPlan
   BLOB pattern). `VariationDelta` = an enum over `add`/`remove`/`substitute`/`scale` carrying the
   ingredient payload. Provenance (`origin: hand | chat | experiment`) optional but cheap.
