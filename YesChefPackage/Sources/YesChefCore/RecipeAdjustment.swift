@@ -273,7 +273,8 @@ public struct RecipeAdjustmentClient: Sendable {
     _ selection: String,
     _ messages: [RecipeChatMessage],
     _ detail: RecipeDetailData,
-    _ tier: ModelTier
+    _ tier: ModelTier,
+    _ tierResolution: ModelCallTierResolution
   ) async throws -> RecipeAdjustmentProposal
 
   public init(
@@ -281,7 +282,8 @@ public struct RecipeAdjustmentClient: Sendable {
       _ selection: String,
       _ messages: [RecipeChatMessage],
       _ detail: RecipeDetailData,
-      _ tier: ModelTier
+      _ tier: ModelTier,
+      _ tierResolution: ModelCallTierResolution
     ) async throws -> RecipeAdjustmentProposal
   ) {
     self.extract = extract
@@ -291,20 +293,21 @@ public struct RecipeAdjustmentClient: Sendable {
     selection: String,
     messages: [RecipeChatMessage],
     detail: RecipeDetailData,
-    tier: ModelTier
+    tier: ModelTier,
+    tierResolution: ModelCallTierResolution = .callerProvided
   ) async throws -> RecipeAdjustmentProposal {
-    try await extract(selection, messages, detail, tier)
+    try await extract(selection, messages, detail, tier, tierResolution)
   }
 }
 
 extension RecipeAdjustmentClient: DependencyKey {
-  public static let liveValue = RecipeAdjustmentClient { selection, messages, detail, tier in
+  public static let liveValue = RecipeAdjustmentClient { selection, messages, detail, tier, tierResolution in
     @Dependency(\.modelClient) var modelClient
-    let request = ModelCall(
+    let call = ModelCall(
       surface: .recipe,
       task: .recipeAdjustment,
-      tierResolution: .callerProvided,
-      contextLayers: [.systemInstructions, .tasteProfile, .recipe, .selection, .conversation],
+      tierResolution: tierResolution,
+      contextLayers: [.recipe, .selection, .conversation],
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, detail: detail),
@@ -315,7 +318,7 @@ extension RecipeAdjustmentClient: DependencyKey {
       maxTokens: 16_384,
       reasoningEffort: .high
     )
-    let response = try await request.complete(using: modelClient)
+    let response = try await call.complete(using: modelClient)
     let trimmed = response.text.trimmingCharacters(in: .whitespacesAndNewlines)
     if response.wasTruncated || trimmed.isEmpty {
       throw RecipeAdjustmentError.responseTruncated
@@ -330,7 +333,7 @@ extension RecipeAdjustmentClient: DependencyKey {
     return proposal
   }
 
-  public static let testValue = RecipeAdjustmentClient { _, _, _, _ in RecipeAdjustmentProposal() }
+  public static let testValue = RecipeAdjustmentClient { _, _, _, _, _ in RecipeAdjustmentProposal() }
 
   static let instructions = """
     You extract a proposed edit to one existing recipe from a cooking conversation.

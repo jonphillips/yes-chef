@@ -105,11 +105,11 @@ public struct MealPlanComplementClient: Sendable {
 extension MealPlanComplementClient: DependencyKey {
   public static let liveValue = MealPlanComplementClient { selection, messages, context, tier in
     @Dependency(\.modelClient) var modelClient
-    let request = ModelCall(
+    let call = ModelCall(
       surface: .mealPlan,
       task: .complement,
       tierResolution: .callerProvided,
-      contextLayers: [.systemInstructions, .tasteProfile, .mealPlan, .selection, .conversation],
+      contextLayers: [.mealPlan, .selection, .conversation],
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, context: context),
@@ -117,7 +117,7 @@ extension MealPlanComplementClient: DependencyKey {
       reasoningEffort: .medium,
       promptPreferenceKey: AIPromptPreferenceKind.complements.rawValue
     )
-    let response = try await request.complete(using: modelClient)
+    let response = try await call.complete(using: modelClient)
     return parse(response.text)
   }
 

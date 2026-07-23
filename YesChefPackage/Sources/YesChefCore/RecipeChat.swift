@@ -849,8 +849,8 @@ public final class RecipeChatModel: Identifiable {
     if continuationToken?.provider != tier.frontierProvider {
       continuationToken = nil
     }
-    var contextLayers: Set<ModelCallContextLayer> = [.systemInstructions, .tasteProfile, .conversation]
-    contextLayers.insert(context.modelCallContextLayer)
+    var contextLayers: ModelCallContextLayers = [.conversation]
+    contextLayers = .init(included: contextLayers.included.union([context.modelCallContextLayer]))
     let assistantID = appendAssistantPlaceholder()
     do {
       if case .frontier = tier {
@@ -875,7 +875,7 @@ public final class RecipeChatModel: Identifiable {
             ? "(No response.)" : response.text
         )
       } else {
-        let request = ModelCall(
+        let call = ModelCall(
           surface: context.modelCallSurface,
           task: .chat,
           tierResolution: .callerProvided,
@@ -886,7 +886,7 @@ public final class RecipeChatModel: Identifiable {
           maxTokens: 1024,
           reasoningEffort: .medium
         )
-        for try await chunk in request.stream(using: modelClient) {
+        for try await chunk in await call.stream(using: modelClient) {
           try Task.checkCancellation()
           appendAssistantText(id: assistantID, text: chunk.text)
         }

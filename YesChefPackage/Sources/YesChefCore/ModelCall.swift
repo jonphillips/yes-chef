@@ -1,3 +1,4 @@
+import Dependencies
 import LLMClientKit
 
 /// The declared provenance for one in-app model call.
@@ -9,7 +10,7 @@ public struct ModelCallRecord: Equatable, Sendable {
   public let task: ModelCallTask
   public let tierResolution: ModelCallTierResolution
   public let tier: ModelTier
-  public let contextLayers: Set<ModelCallContextLayer>
+  public let contextLayers: ModelCallContextLayers
   public let inputCharacterCount: Int
   public let maxTokens: Int
   public let reasoningEffort: ReasoningEffort?
@@ -19,7 +20,7 @@ public struct ModelCallRecord: Equatable, Sendable {
     task: ModelCallTask,
     tierResolution: ModelCallTierResolution,
     tier: ModelTier,
-    contextLayers: Set<ModelCallContextLayer>,
+    contextLayers: ModelCallContextLayers,
     inputCharacterCount: Int,
     maxTokens: Int,
     reasoningEffort: ReasoningEffort?
@@ -81,9 +82,74 @@ public enum ModelCallContextLayer: String, CaseIterable, Hashable, Sendable {
   case readerComments
   case recipe
   case selection
-  case systemInstructions
-  case tasteProfile
   case workbench
+}
+
+/// Context supplied by a call site, including intentional omissions that a later
+/// call shape may need to surface.
+public struct ModelCallContextLayers: Equatable, Sendable, ExpressibleByArrayLiteral {
+  public let included: Set<ModelCallContextLayer>
+  public let omitted: Set<ModelCallContextLayer>
+
+  public init(
+    included: Set<ModelCallContextLayer>,
+    omitted: Set<ModelCallContextLayer> = []
+  ) {
+    precondition(included.isDisjoint(with: omitted), "A context layer cannot be both included and omitted.")
+    self.included = included
+    self.omitted = omitted
+  }
+
+  public init(arrayLiteral elements: ModelCallContextLayer...) {
+    self.init(included: Set(elements))
+  }
+}
+
+/// Receives the provenance record when a model call starts.
+///
+/// S1's live value intentionally retains nothing. S2 can install an in-memory
+/// collector without changing any construction site.
+public struct ModelCallRecordSink: Sendable {
+  public var record: @Sendable (ModelCallRecord) async -> Void
+
+  public init(record: @escaping @Sendable (ModelCallRecord) async -> Void) {
+    self.record = record
+  }
+}
+
+/// An in-memory collector for an inspectable model-call inventory.
+public actor ModelCallRecordCollector {
+  private var values: [ModelCallRecord] = []
+
+  public init() {}
+
+  public func append(_ record: ModelCallRecord) {
+    values.append(record)
+  }
+
+  public func records() -> [ModelCallRecord] {
+    values
+  }
+}
+
+extension ModelCallRecordSink {
+  public static func inMemory(_ collector: ModelCallRecordCollector) -> Self {
+    Self { record in
+      await collector.append(record)
+    }
+  }
+}
+
+extension ModelCallRecordSink: DependencyKey {
+  public static let liveValue = ModelCallRecordSink { _ in }
+  public static let testValue = liveValue
+}
+
+extension DependencyValues {
+  public var modelCallRecordSink: ModelCallRecordSink {
+    get { self[ModelCallRecordSink.self] }
+    set { self[ModelCallRecordSink.self] = newValue }
+  }
 }
 
 /// The sole construction path for `ModelRequest` values owned by Yes Chef.
@@ -99,7 +165,7 @@ public struct ModelCall: Sendable {
     surface: ModelCallSurface,
     task: ModelCallTask,
     tierResolution: ModelCallTierResolution,
-    contextLayers: Set<ModelCallContextLayer>,
+    contextLayers: ModelCallContextLayers,
     tier: ModelTier,
     system: String? = nil,
     messages: [ModelMessage],
@@ -138,7 +204,7 @@ public struct ModelCall: Sendable {
     surface: ModelCallSurface,
     task: ModelCallTask,
     tierResolution: ModelCallTierResolution,
-    contextLayers: Set<ModelCallContextLayer>,
+    contextLayers: ModelCallContextLayers,
     tier: ModelTier,
     system: String? = nil,
     prompt: String,
@@ -167,11 +233,15 @@ public struct ModelCall: Sendable {
   }
 
   public func complete(using modelClient: any ModelClient) async throws -> ModelResponse {
-    try await modelClient.complete(request)
+    @Dependency(\.modelCallRecordSink) var recordSink
+    await recordSink.record(record)
+    return try await modelClient.complete(request)
   }
 
-  public func stream(using modelClient: any ModelClient) -> AsyncThrowingStream<ModelChunk, any Error> {
-    modelClient.stream(request)
+  public func stream(using modelClient: any ModelClient) async -> AsyncThrowingStream<ModelChunk, any Error> {
+    @Dependency(\.modelCallRecordSink) var recordSink
+    await recordSink.record(record)
+    return modelClient.stream(request)
   }
 
   private static func inputCharacterCount(of request: ModelRequest) -> Int {

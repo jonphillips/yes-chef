@@ -274,11 +274,11 @@ public struct MenuPrepPlanClient: Sendable {
 extension MenuPrepPlanClient: DependencyKey {
   public static let liveValue = MenuPrepPlanClient { selection, messages, context, tier in
     @Dependency(\.modelClient) var modelClient
-    let request = ModelCall(
+    let call = ModelCall(
       surface: .menu,
       task: .prepPlan,
       tierResolution: .callerProvided,
-      contextLayers: [.systemInstructions, .tasteProfile, .menu, .selection, .conversation],
+      contextLayers: [.menu, .selection, .conversation],
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, context: context),
@@ -286,7 +286,7 @@ extension MenuPrepPlanClient: DependencyKey {
       reasoningEffort: .high,
       promptPreferenceKey: AIPromptPreferenceKind.makeAheadPrepPlan.rawValue
     )
-    let response = try await request.complete(using: modelClient)
+    let response = try await call.complete(using: modelClient)
     return parse(response.text)
   }
 

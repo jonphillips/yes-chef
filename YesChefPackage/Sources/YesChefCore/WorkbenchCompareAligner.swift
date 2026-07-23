@@ -59,11 +59,11 @@ extension WorkbenchCompareAlignerClient: DependencyKey {
   public static let liveValue = WorkbenchCompareAlignerClient { working, candidates, tier in
     @Dependency(\.modelClient) var modelClient
     let deterministic = WorkbenchCompare.ingredientComparison(working: working, candidates: candidates)
-    let request = ModelCall(
+    let call = ModelCall(
       surface: .workbench,
       task: .workbenchComparison,
       tierResolution: .callerProvided,
-      contextLayers: [.systemInstructions, .tasteProfile, .workbench, .candidates],
+      contextLayers: [.workbench, .candidates],
       tier: tier,
       system: instructions,
       prompt: prompt(working: working, candidates: candidates),
@@ -71,7 +71,7 @@ extension WorkbenchCompareAlignerClient: DependencyKey {
       reasoningEffort: .medium,
       promptPreferenceKey: nil
     )
-    let response = try await request.complete(using: modelClient)
+    let response = try await call.complete(using: modelClient)
     if response.wasTruncated {
       return WorkbenchAlignedComparison(comparison: deterministic, source: .fallback(.truncated))
     }

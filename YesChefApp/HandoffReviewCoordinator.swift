@@ -515,7 +515,8 @@ final class HandoffReviewCoordinator {
       selection: "",
       messages: [RecipeChatMessage(role: .user, text: trimmedBrief)],
       detail: detail,
-      tier: tier
+      tier: tier,
+      tierResolution: .preferredProviderOrFirstAvailable
     )
     let adjustmentReview = RecipeAdjustmentReviewState(
       currentDetail: detail,
