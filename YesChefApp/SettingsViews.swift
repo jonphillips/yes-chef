@@ -52,6 +52,9 @@ struct SettingsView: View {
 
       Section("Developer") {
         seedCoverageRow
+#if DEBUG
+        modelCallInventoryRow
+#endif
       }
     }
     .navigationTitle("Settings")
@@ -158,6 +161,25 @@ struct SettingsView: View {
       }
     }
   }
+
+#if DEBUG
+  @ViewBuilder private var modelCallInventoryRow: some View {
+    if let selectedPane {
+      Button {
+        selectedPane.wrappedValue = .modelCallInventory
+      } label: {
+        SettingsPane.modelCallInventory.label
+      }
+      .foregroundStyle(.primary)
+    } else {
+      NavigationLink {
+        ModelCallInventoryView()
+      } label: {
+        SettingsPane.modelCallInventory.label
+      }
+    }
+  }
+#endif
 }
 
 struct SettingsDetailPane: View {
@@ -185,6 +207,12 @@ struct SettingsDetailPane: View {
       }
     case .seedCoverage:
       SeedCoverageView()
+#if DEBUG
+    case .modelCallInventory:
+      NavigationStack {
+        ModelCallInventoryView()
+      }
+#endif
     case nil:
       ContentUnavailableView("Settings", systemImage: AppSection.settings.systemImage)
     }

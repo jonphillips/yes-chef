@@ -9,6 +9,17 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0043 S2 — dev-only model-call inventory
+
+**✅ Verified & approved, 2026-07-23 (architect-verified; no device pass required).** PR [#220](https://github.com/jonphillips/yes-chef/pull/220), branch `codex/adr-0043-s2-model-call-inventory`, commit `8428426`. The required elevated Debug `generic/platform=iOS` build and the Release configuration build both succeeded; `scripts/check-drift.sh` passed **386 tests / 81 suites**, and S1's bypass-enforcement test remains green. App + Core; **no schema**, no persistence, and no cook-facing UI.
+
+**The shape.** The DEBUG-only Settings pane reads `ModelCallRecordCollector` directly from the dependency container; `ModelCallRecordSink` and collector are installed together at app composition. The inventory is an argument-free, derived view of the append-only records: surface, task, **tier requested**, tier resolution, included and omitted context layers, input character count, budget, and effort. The release app has no inventory UI.
+
+**The S2 review exposed an S1 modeling gap early.** The ADR/dispatch wording promised the tier actually used, but S1 records the tier at construction while `TieredModelClient` can resolve or degrade downstream. Presenting that field as actual would be false, so S2 labels it honestly as **Tier requested**. Resolved-tier reporting belongs to S3, where `resolveTier()` is unified and `ModelCallTierResolution` widens; this is recorded as a scope correction, not silently treated as fulfilled.
+
+**The inventory update logic lives in Core.** `ModelCallInventory.appendNewRecords` computes the append boundary at mutation time, so overlapping `.task` and `.refreshable` refreshes neither duplicate nor misnumber records. Its focused test pins append-only snapshot semantics. The collector remains intentionally uncapped and process-lifetime-only for DEBUG use; cap it before any broader use.
+
+---
 ## ADR-0043 S1 — every model call declares itself, and a test fails when one doesn't
 
 **✅ Verified & approved, 2026-07-23 (architect-verified; behavior-neutral, no device pass required).** Merged as PR [#219](https://github.com/jonphillips/yes-chef/pull/219), branch `codex/adr-0043-s1-model-call-chokepoint` — commits `b85e8a6` (the slice) + `d50b661` (review round 1) + `697b121` (review round 2). Core plus two app call sites; **no schema**, nothing added to the prod-promotion list. Verification green: 385 Core tests, `scripts/check-drift.sh`, and the elevated `generic/platform=iOS` build (required because `YesChefApp/` was touched — the architect ran it locally). Spec: [ADR-0043](decisions/ADR-0043-model-call-chokepoint.md) D1/D2/D3/D6.

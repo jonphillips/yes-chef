@@ -6,10 +6,17 @@ import YesChefCore
 @main
 struct YesChefApp: App {
   private let handoffReviewCoordinator: HandoffReviewCoordinator
+#if DEBUG
+  private let modelCallRecordCollector: ModelCallRecordCollector
+#endif
 
   init() {
     let handoffReviewCoordinator = HandoffReviewCoordinator()
     self.handoffReviewCoordinator = handoffReviewCoordinator
+#if DEBUG
+    let modelCallRecordCollector = ModelCallRecordCollector()
+    self.modelCallRecordCollector = modelCallRecordCollector
+#endif
     let legacyPantryText = UserDefaults.standard.string(forKey: GroceryPantryStorage.storageKey)
     let legacyPantryItems = legacyPantryText.map(GroceryPantryStorage.items(from:))
     let legacyTasteProfile = UserDefaults.standard.string(forKey: legacyRecipeChatCustomInstructionsKey)
@@ -31,6 +38,10 @@ struct YesChefApp: App {
           promptPreferences: YesChefAIPromptPreferences.modelPromptPreferences(for:)
         )
       )
+#if DEBUG
+      $0.modelCallRecordSink = .inMemory(modelCallRecordCollector)
+      $0.modelCallRecordCollector = modelCallRecordCollector
+#endif
     }
     YesChefCloudSync.persistManualEnablementFromLaunchEnvironment()
     Task {

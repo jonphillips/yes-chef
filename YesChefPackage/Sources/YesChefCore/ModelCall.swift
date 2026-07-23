@@ -118,6 +118,9 @@ public struct ModelCallRecordSink: Sendable {
 }
 
 /// An in-memory collector for an inspectable model-call inventory.
+///
+/// Values are append-only and deliberately unbounded for the lifetime of a debug
+/// process. A future cap must add a cursor/reset contract for inventory readers.
 public actor ModelCallRecordCollector {
   private var values: [ModelCallRecord] = []
 
@@ -130,6 +133,11 @@ public actor ModelCallRecordCollector {
   public func records() -> [ModelCallRecord] {
     values
   }
+}
+
+extension ModelCallRecordCollector: DependencyKey {
+  public static let liveValue = ModelCallRecordCollector()
+  public static var testValue: ModelCallRecordCollector { ModelCallRecordCollector() }
 }
 
 extension ModelCallRecordSink {
@@ -149,6 +157,40 @@ extension DependencyValues {
   public var modelCallRecordSink: ModelCallRecordSink {
     get { self[ModelCallRecordSink.self] }
     set { self[ModelCallRecordSink.self] = newValue }
+  }
+
+  public var modelCallRecordCollector: ModelCallRecordCollector {
+    get { self[ModelCallRecordCollector.self] }
+    set { self[ModelCallRecordCollector.self] = newValue }
+  }
+}
+
+/// A stable, append-only snapshot suitable for rendering the debug inventory.
+public struct ModelCallInventory: Equatable, Sendable {
+  public struct Entry: Equatable, Identifiable, Sendable {
+    public let id: Int
+    public let record: ModelCallRecord
+
+    public init(id: Int, record: ModelCallRecord) {
+      self.id = id
+      self.record = record
+    }
+  }
+
+  public private(set) var entries: [Entry] = []
+
+  public init() {}
+
+  /// Incorporates a collector snapshot without replacing entries already rendered.
+  ///
+  /// `ModelCallRecordCollector` is append-only and uncapped, so an entry's index
+  /// remains a stable identity for this process. A capped collector must introduce
+  /// a cursor/reset protocol before using this method.
+  public mutating func appendNewRecords(from records: [ModelCallRecord]) {
+    let firstNewEntryID = entries.count
+    entries.append(contentsOf: records.dropFirst(firstNewEntryID).enumerated().map { offset, record in
+      Entry(id: firstNewEntryID + offset, record: record)
+    })
   }
 }
 
