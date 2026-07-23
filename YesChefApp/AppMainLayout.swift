@@ -177,7 +177,6 @@ private enum AppMainColumnSection {
 
 private struct AppCompactTabView: View {
   @Binding var selection: AppSection?
-  @State private var selectedTab: AppCompactTab
   let recipeModel: RecipeLibraryModel
   let workbenchModel: WorkbenchLibraryModel
   let browserModel: BrowserModel
@@ -189,35 +188,8 @@ private struct AppCompactTabView: View {
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
   let onCookSessionRequested: (CookSessionPresentation) -> Void
 
-  init(
-    selection: Binding<AppSection?>,
-    recipeModel: RecipeLibraryModel,
-    workbenchModel: WorkbenchLibraryModel,
-    browserModel: BrowserModel,
-    mealCalendarModel: MealCalendarModel,
-    menuModel: MenuLibraryModel,
-    groceryModel: GroceryLibraryModel,
-    onBrowserCapture: @escaping (WebPage) async -> Void,
-    onMenuSelected: @escaping (CoreMenu.ID) -> Void,
-    onRecipeSelected: @escaping (RecipeDetailPresentation) -> Void,
-    onCookSessionRequested: @escaping (CookSessionPresentation) -> Void
-  ) {
-    _selection = selection
-    _selectedTab = State(initialValue: AppCompactTab(section: selection.wrappedValue))
-    self.recipeModel = recipeModel
-    self.workbenchModel = workbenchModel
-    self.browserModel = browserModel
-    self.mealCalendarModel = mealCalendarModel
-    self.menuModel = menuModel
-    self.groceryModel = groceryModel
-    self.onBrowserCapture = onBrowserCapture
-    self.onMenuSelected = onMenuSelected
-    self.onRecipeSelected = onRecipeSelected
-    self.onCookSessionRequested = onCookSessionRequested
-  }
-
   var body: some View {
-    TabView(selection: $selectedTab) {
+    TabView(selection: compactSelection) {
       Tab(
         AppSection.recipes.title,
         systemImage: AppSection.recipes.systemImage,
@@ -271,16 +243,26 @@ private struct AppCompactTabView: View {
           recipeModel: recipeModel,
           groceryModel: groceryModel,
           onBrowserCapture: onBrowserCapture,
-          onRecipeSelected: onRecipeSelected
+          onRecipeSelected: onRecipeSelected,
+          onSectionSelected: { selection = $0 }
         )
       }
     }
-    .onChange(of: selectedTab) { _, tab in
-      guard let section = tab.section else { return }
+  }
+
+  private var compactSelection: Binding<AppCompactTab> {
+    Binding {
+      AppCompactTab(section: selection)
+    } set: { tab in
+      guard let section = tab.section else {
+        // `AppSection` has no More case because the regular-width sidebar needs the real destinations.
+        // Browser is the More root's first destination and gives a regular-width transition a useful home.
+        if AppCompactTab(section: selection) != .more {
+          selection = .browser
+        }
+        return
+      }
       selection = section
-    }
-    .onChange(of: selection) { _, section in
-      selectedTab = AppCompactTab(section: section)
     }
   }
 }
@@ -325,24 +307,30 @@ private struct AppMoreStack: View {
   let groceryModel: GroceryLibraryModel
   let onBrowserCapture: (WebPage) async -> Void
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
+  let onSectionSelected: (AppSection) -> Void
 
   var body: some View {
     @Bindable var workbenchModel = workbenchModel
 
+    // This typed path is only written from the Workbench list after that list has been pushed here.
+    // Keep external navigation writers out until More has a route enum that can represent every section.
     NavigationStack(path: $workbenchModel.navigationPath) {
       List {
         NavigationLink {
           BrowserWorkspaceView(model: browserModel, onCapture: onBrowserCapture)
+            .onAppear { onSectionSelected(.browser) }
         } label: {
           AppSection.browser.label
         }
         NavigationLink {
           WorkbenchListView(model: workbenchModel, style: .navigation)
+            .onAppear { onSectionSelected(.workbenches) }
         } label: {
           AppSection.workbenches.label
         }
         NavigationLink {
           SettingsView(model: recipeModel, groceryModel: groceryModel)
+            .onAppear { onSectionSelected(.settings) }
         } label: {
           AppSection.settings.label
         }

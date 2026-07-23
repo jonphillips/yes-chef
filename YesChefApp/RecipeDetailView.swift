@@ -169,6 +169,8 @@ struct RecipeDetailView: View {
         Label("Plan", systemImage: "calendar.badge.plus")
       }
       Menu {
+        // `PasteButton` does not render inside a `Menu`, so this stays a plain button that reads the
+        // pasteboard directly, matching the scoped Playbook hand-off menu (ADR-0041 Amd 1).
         Button {
           // The hand-off exports the base recipe even when a variation is displayed, so confirm rather
           // than let the cook argue for an hour about text the return cannot apply to (Amd1-OQ3).
@@ -196,7 +198,7 @@ struct RecipeDetailView: View {
         }
         .disabled(!UIPasteboard.general.hasStrings)
       } label: {
-        Label("Hand off and Paste", systemImage: "sparkles.square.filled.on.square")
+        Label("Hand off", systemImage: "sparkles.square.filled.on.square")
       }
     }
     ToolbarItemGroup(placement: .secondaryAction) {
