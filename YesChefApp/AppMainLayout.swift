@@ -177,6 +177,7 @@ private enum AppMainColumnSection {
 
 private struct AppCompactTabView: View {
   @Binding var selection: AppSection?
+  @State private var selectedTab: AppCompactTab
   let recipeModel: RecipeLibraryModel
   let workbenchModel: WorkbenchLibraryModel
   let browserModel: BrowserModel
@@ -188,50 +189,169 @@ private struct AppCompactTabView: View {
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
   let onCookSessionRequested: (CookSessionPresentation) -> Void
 
+  init(
+    selection: Binding<AppSection?>,
+    recipeModel: RecipeLibraryModel,
+    workbenchModel: WorkbenchLibraryModel,
+    browserModel: BrowserModel,
+    mealCalendarModel: MealCalendarModel,
+    menuModel: MenuLibraryModel,
+    groceryModel: GroceryLibraryModel,
+    onBrowserCapture: @escaping (WebPage) async -> Void,
+    onMenuSelected: @escaping (CoreMenu.ID) -> Void,
+    onRecipeSelected: @escaping (RecipeDetailPresentation) -> Void,
+    onCookSessionRequested: @escaping (CookSessionPresentation) -> Void
+  ) {
+    _selection = selection
+    _selectedTab = State(initialValue: AppCompactTab(section: selection.wrappedValue))
+    self.recipeModel = recipeModel
+    self.workbenchModel = workbenchModel
+    self.browserModel = browserModel
+    self.mealCalendarModel = mealCalendarModel
+    self.menuModel = menuModel
+    self.groceryModel = groceryModel
+    self.onBrowserCapture = onBrowserCapture
+    self.onMenuSelected = onMenuSelected
+    self.onRecipeSelected = onRecipeSelected
+    self.onCookSessionRequested = onCookSessionRequested
+  }
+
   var body: some View {
-    TabView(selection: $selection) {
-      RecipesStack(
-        model: recipeModel,
-        mealCalendarModel: mealCalendarModel,
-        groceryModel: groceryModel,
-        onRecipeSelected: onRecipeSelected
-      )
-        .tabItem { AppSection.recipes.label }
-        .tag(AppSection.recipes as AppSection?)
-      WorkbenchesStack(model: workbenchModel, onRecipeSelected: onRecipeSelected)
-        .tabItem { AppSection.workbenches.label }
-        .tag(AppSection.workbenches as AppSection?)
-      BrowserStack(
-        model: browserModel,
-        onCapture: onBrowserCapture
-      )
-        .tabItem { AppSection.browser.label }
-        .tag(AppSection.browser as AppSection?)
-      MealCalendarStack(
-        model: mealCalendarModel,
-        onMenuSelected: onMenuSelected,
-        onRecipeSelected: onRecipeSelected,
-        onCookSessionRequested: onCookSessionRequested
-      )
-        .tabItem { AppSection.mealCalendar.label }
-        .tag(AppSection.mealCalendar as AppSection?)
-      GroceriesStack(
-        model: groceryModel,
-        mealCalendarModel: mealCalendarModel
-      )
-        .tabItem { AppSection.groceries.label }
-        .tag(AppSection.groceries as AppSection?)
-      MenusStack(
-        model: menuModel,
-        recipeModel: recipeModel,
-        onRecipeSelected: onRecipeSelected,
-        onCookSessionRequested: onCookSessionRequested
-      )
-        .tabItem { AppSection.menus.label }
-        .tag(AppSection.menus as AppSection?)
-      SettingsStack(model: recipeModel, groceryModel: groceryModel)
-        .tabItem { AppSection.settings.label }
-        .tag(AppSection.settings as AppSection?)
+    TabView(selection: $selectedTab) {
+      Tab(
+        AppSection.recipes.title,
+        systemImage: AppSection.recipes.systemImage,
+        value: .recipes
+      ) {
+        RecipesStack(
+          model: recipeModel,
+          mealCalendarModel: mealCalendarModel,
+          groceryModel: groceryModel,
+          onRecipeSelected: onRecipeSelected
+        )
+      }
+      Tab(
+        AppSection.menus.title,
+        systemImage: AppSection.menus.systemImage,
+        value: .menus
+      ) {
+        MenusStack(
+          model: menuModel,
+          recipeModel: recipeModel,
+          onRecipeSelected: onRecipeSelected,
+          onCookSessionRequested: onCookSessionRequested
+        )
+      }
+      Tab(
+        AppSection.mealCalendar.title,
+        systemImage: AppSection.mealCalendar.systemImage,
+        value: .mealCalendar
+      ) {
+        MealCalendarStack(
+          model: mealCalendarModel,
+          onMenuSelected: onMenuSelected,
+          onRecipeSelected: onRecipeSelected,
+          onCookSessionRequested: onCookSessionRequested
+        )
+      }
+      Tab(
+        AppSection.groceries.title,
+        systemImage: AppSection.groceries.systemImage,
+        value: .groceries
+      ) {
+        GroceriesStack(
+          model: groceryModel,
+          mealCalendarModel: mealCalendarModel
+        )
+      }
+      Tab("More", systemImage: "ellipsis.circle", value: .more) {
+        AppMoreStack(
+          workbenchModel: workbenchModel,
+          browserModel: browserModel,
+          recipeModel: recipeModel,
+          groceryModel: groceryModel,
+          onBrowserCapture: onBrowserCapture,
+          onRecipeSelected: onRecipeSelected
+        )
+      }
+    }
+    .onChange(of: selectedTab) { _, tab in
+      guard let section = tab.section else { return }
+      selection = section
+    }
+    .onChange(of: selection) { _, section in
+      selectedTab = AppCompactTab(section: section)
+    }
+  }
+}
+
+private enum AppCompactTab: Hashable {
+  case recipes
+  case menus
+  case mealCalendar
+  case groceries
+  case more
+
+  init(section: AppSection?) {
+    switch section {
+    case .recipes, nil:
+      self = .recipes
+    case .menus:
+      self = .menus
+    case .mealCalendar:
+      self = .mealCalendar
+    case .groceries:
+      self = .groceries
+    case .browser, .workbenches, .settings:
+      self = .more
+    }
+  }
+
+  var section: AppSection? {
+    switch self {
+    case .recipes: .recipes
+    case .menus: .menus
+    case .mealCalendar: .mealCalendar
+    case .groceries: .groceries
+    case .more: nil
+    }
+  }
+}
+
+private struct AppMoreStack: View {
+  let workbenchModel: WorkbenchLibraryModel
+  let browserModel: BrowserModel
+  let recipeModel: RecipeLibraryModel
+  let groceryModel: GroceryLibraryModel
+  let onBrowserCapture: (WebPage) async -> Void
+  let onRecipeSelected: (RecipeDetailPresentation) -> Void
+
+  var body: some View {
+    @Bindable var workbenchModel = workbenchModel
+
+    NavigationStack(path: $workbenchModel.navigationPath) {
+      List {
+        NavigationLink {
+          BrowserWorkspaceView(model: browserModel, onCapture: onBrowserCapture)
+        } label: {
+          AppSection.browser.label
+        }
+        NavigationLink {
+          WorkbenchListView(model: workbenchModel, style: .navigation)
+        } label: {
+          AppSection.workbenches.label
+        }
+        NavigationLink {
+          SettingsView(model: recipeModel, groceryModel: groceryModel)
+        } label: {
+          AppSection.settings.label
+        }
+      }
+      .navigationTitle("More")
+      .navigationDestination(for: Workbench.ID.self) { workbenchID in
+        WorkbenchDetailView(workbenchID: workbenchID, onRecipeSelected: onRecipeSelected)
+          .id(workbenchID)
+      }
     }
   }
 }

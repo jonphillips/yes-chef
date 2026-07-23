@@ -2,17 +2,6 @@ import SwiftUI
 import WebExtractorKit
 import WebKit
 
-struct BrowserStack: View {
-  let model: BrowserModel
-  let onCapture: (WebPage) async -> Void
-
-  var body: some View {
-    NavigationStack {
-      BrowserWorkspaceView(model: model, onCapture: onCapture)
-    }
-  }
-}
-
 struct BrowserWorkspaceView: View {
   let model: BrowserModel
   let onCapture: (WebPage) async -> Void

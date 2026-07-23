@@ -1,17 +1,6 @@
 import SwiftUI
 import YesChefCore
 
-struct SettingsStack: View {
-  let model: RecipeLibraryModel
-  let groceryModel: GroceryLibraryModel
-
-  var body: some View {
-    NavigationStack {
-      SettingsView(model: model, groceryModel: groceryModel)
-    }
-  }
-}
-
 struct SettingsView: View {
   let model: RecipeLibraryModel
   let groceryModel: GroceryLibraryModel
