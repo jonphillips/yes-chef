@@ -14,9 +14,12 @@ through the adjust proposal/review surface.
 **[Amendment 1](#amendment-1--a-variation-is-hand-edited-through-the-resolved-view-the-ops-are-derived-never-authored-2026-07-21)
 (hand-editing via the resolved view — ops are derived, never authored) and
 [Amendment 2](#amendment-2--promotion-is-the-release-valve-a-variation-can-become-the-base-or-its-own-recipe-2026-07-21)
-(promotion to base / to its own recipe) are Proposed — 2026-07-21, both schema-free**; **Amd1-D7** (an
-inexpressible edit reports at save and offers the split-off) and **Amd2-D4** (no probation machinery) were
-ratified in that conversation, and **Amendment 1 now carries no open questions.** Originally **Proposed** — 2026-07-06 (architect +
+(promotion to base / to its own recipe) are **ACCEPTED — ratified by Jon 2026-07-23**, both schema-free;
+**Amd1-D7** (an inexpressible edit reports at save and offers the split-off) and **Amd2-D4** (no probation
+machinery) were pre-ratified 2026-07-21, and **Amendment 1 carries no open questions.**
+**[Amendment 3](#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23)
+(the why gets a durable home — a recipe-scoped deliberation log) is ACCEPTED in the same conversation and
+is the one part of this ADR that is *not* schema-free: it adds one synced table.** Originally **Proposed** — 2026-07-06 (architect +
 Jon, during Recipe Workbench S1 dogfooding; body decisions D1–D6 ratified in that conversation, schema was
 a recommendation). Extends
 **[ADR-0019](ADR-0019-recipe-design-studies.md)** — closes the promote-target gap its D1(c) left open.
@@ -135,6 +138,9 @@ library. Producers of variations, then:
 - **Promote-from-experiment** in the workbench (the loop-closer above).
 
 ## Amendment 1 — a variation is hand-edited through the **resolved view**; the ops are **derived, never authored** (2026-07-21)
+
+**Status: Accepted — ratified by Jon 2026-07-23** (Amd1-D7 pre-ratified 2026-07-21). Schema-free. Bundles
+with Amendment 2 as one dispatch (V1 + V2).
 
 **The want, parked twice and never answerable as posed:** looking at a variation, Jon wants to edit *the
 variation* — fix a line, define a section header, tune a step. Variations are LLM-created and then
@@ -295,6 +301,9 @@ exist yet. Bundling V1 + V2 in one dispatch avoids that awkward interim, and bot
 
 ## Amendment 2 — promotion is the release valve: a variation can become the **base** or its **own recipe** (2026-07-21)
 
+**Status: Accepted — ratified by Jon 2026-07-23** (Amd2-D4 pre-ratified 2026-07-21). Schema-free. Bundles
+with Amendment 1 as one dispatch (V1 + V2). **ADR-0023 OQ3 must be answered here, not deferred again.**
+
 **The taxonomy this rests on is Jon's, from the 2026-07-21 design conversation, and it is the thing that
 was missing:**
 
@@ -365,6 +374,105 @@ Amendment 1, since promote-to-base wants the derivation engine. Answer ADR-0023 
 variations onto a new base) as part of it — with a warn-and-confirm if a re-anchor cannot be validated,
 never a silent drop.
 
+## Amendment 3 — the **why** survives the commit: a recipe-scoped deliberation log (2026-07-23)
+
+**Status: Accepted (Jon, 2026-07-23).** Resolves the *"the why dies at the commit boundary"* fork parked in
+[`docs/open-questions.md`](../open-questions.md) after the 2026-07-21 ADR-0042 S4 dogfood pass, and **reverses
+[ADR-0042 Amd1-OQ2](ADR-0042-workbench-handoff-and-the-return-block.md)'s lean** (*"the brief is discarded"*),
+which was recorded before the first real round-trip. **This is the one part of ADR-0021 that is not
+schema-free.**
+
+**The observation, in Jon's terms:** the outboarded model explains *why* each change is being made "pretty
+succinctly," and none of it survives the commit. You get the changed recipe; you lose the reasoning that
+produced it — and the reasoning is the scarce output of an unmetered thinking session, the one thing that
+cannot be reconstructed from the result. Three doors were closed on it at once: the brief is transient by
+design (ADR-0042 Amd1-D5), learnings are explicitly forbidden from restating changes that appear in the brief
+(Amd1-D7), and the variation payload is ops-only. The single existing rationale deposit
+(`RecipeDetailModel+Adjustment.swift:82`) fails twice — it is `guard let workbenchID else { return }`, so it
+never fires for an ordinary recipe adjust, and it writes `proposal.reviewSummary()`, a restatement of the
+**ops** rather than the model's prose. That is [ADR-0042 D6](ADR-0042-workbench-handoff-and-the-return-block.md)
+with a hole in it.
+
+### Amd3-D1 — A recipe-scoped deliberation log, because **overwrite has no artifact** (ratified)
+
+Four candidates were on the table: **(a)** squash the rationales into the existing `RecipeVariation.note`,
+**(b)** retain the brief verbatim as provenance on whatever the commit produced, **(c)** per-change rationale
+inside the payload, **(d)** a recipe-scoped deliberation log — the `workbenchLog` analogue for an ordinary
+recipe.
+
+**(d) is chosen, and the deciding factor is the asymmetry the fork named as a requirement.** The *variation*
+destination has an obvious artifact to hang a why on; **overwrite does not** — it mutates the recipe in place
+and leaves nothing behind but an undo, and overwrite is the destination you reach for when the revision is
+simply right. (a), (b) and (c) all answer the variation half and leave overwrite silent. Only (d) covers both
+destinations symmetrically, so only (d) actually satisfies the fork.
+
+The others are rejected on their own terms as well: **(a)** squashes N per-change rationales into one text
+field, making them regenerate-only and never repairable one at a time — the [[editable-at-the-grain-stored]]
+failure in the same shape as the `Menu.prepPlan` BLOB, and it fills a `note` that
+[[decompose-notes-into-typed-homes]] is draining. **(c)** is the heaviest option and, since the payload is a
+BLOB, would be regenerate-only anyway. **(b)** is subsumed: (d) *is* (b), with a home that overwrite can
+reach too.
+
+### Amd3-D2 — Its **own table**, not a generalized `workbenchLog` (ratified)
+
+`WorkbenchLogEntry` already carries a nullable `relatedRecipeID`, so making its `workbenchID` nullable would
+buy a recipe-scoped log for **zero** new tables. **Rejected deliberately.** The two logs have genuinely
+different delete semantics — workbench rows cascade on workbench delete, recipe rows must cascade on recipe
+delete — so a shared table needs two nullable soft FKs with divergent cascades, which SQLite can express and
+a reader cannot. More importantly it would quietly merge the variation ↔ workbench convergence question that
+the umbrella fork in `docs/open-questions.md` has deliberately left open. **Table count is not the scarce
+resource; conceptual clarity is** ([[synced-table-cost-calibration]]).
+
+### Amd3-D3 — Grain: **one row per commit, body = the brief verbatim** (ratified)
+
+Per [ADR-0042 D3](ADR-0042-workbench-handoff-and-the-return-block.md), prose that terminates in a text field
+a human reads needs **no format pinned** — there is nothing to parse and therefore nothing to lose. So the
+row stores the brief's text exactly as the model wrote it, which is precisely what Jon valued about it. **Do
+not decompose it into per-change rationale rows** — that is option (c) wearing a table, it invents a format
+where none is needed, and it re-opens a lossless-or-loud parse obligation (ADR-0040) for no consumer.
+
+This also keeps the deposit honest about what it is: **provenance, not structure.** Nothing reads it
+programmatically, nothing folds it, and no LLM is asked to reconcile it.
+
+### Amd3-D4 — The **consumer ships with the schema** (ratified — this is what keeps it out of the trap)
+
+A log nobody can read is option (b) with extra ceremony, and worse, it is exactly the
+[[withdraw-not-defer-orphaned-schema]] pattern: synced schema built on ADR momentum with no consumer, locked
+forever by CloudKit prod promotion. **So the read surface on the recipe is part of this slice, not a
+follow-on.** The rule this ADR is applying — and it is worth stating because the architect kept mis-applying
+it — is *"does this schema have a consumer that ships with it?"*, **not** *"can we avoid a table?"* Here the
+consumer existed before the schema: Jon generated the want from real use.
+
+### Amd3-D5 — Both destinations deposit; promotion carries the log (ratified)
+
+- **Overwrite** deposits a row on the recipe. **Keep-as-variation** deposits a row on the recipe as well
+  (recipe-scoped, optionally referencing the variation), so the two flows are symmetric.
+- The existing workbench `.rationale` deposit is **unchanged and not replaced** — a commit inside a workbench
+  keeps writing there. This log is what fires when there is no workbench, which is the ordinary case.
+- **Amendment 2 interaction, stated so it is not lost:** **split off as its own recipe** (B1) **copies the
+  log rows onto the new recipe** — otherwise the provenance evaporates at the exact moment the variation
+  becomes a standalone dish, which is when it matters most. **Promote to base** (B2) moves nothing: the rows
+  are already recipe-scoped and the recipe is the same row.
+- **In-app adjust commits deposit too** when a rationale exists, but nothing is fabricated — no row rather
+  than a synthesized one. A deposit with no prose is the `reviewSummary()` mistake repeated.
+
+### Slice — V3, **one synced table plus its reader** (sequence after V1 + V2)
+
+- **Schema:** one new synced table (a `recipeDeliberationLog`-shaped row: `id`, `recipeID` soft FK
+  `ON DELETE CASCADE`, `body: String`, an optional `variationID`, `dateCreated`). Register it in
+  **`makeSyncEngine` (`CloudSync.swift:110`) *and* `project.yml` deps** — the comment above that list warns
+  that a regenerate silently drops an unregistered table — and **add it to the standing prod-schema promotion
+  list** in `docs/CURRENT_HANDOFF.md`. Additive, UUID PK, no reserved columns, no unique indexes, no BLOB and
+  no CKAsset concern ([[sqlitedata-blob-cloudkit-asset]]).
+- **Deposit:** fires on both commit destinations per Amd3-D5, carrying the brief verbatim.
+- **Read surface:** on the recipe, per Amd3-D4. Ships in this slice.
+- **Not in this slice:** any parsing, curation, LLM reconciliation, or per-change decomposition of the body;
+  any change to learnings or to the workbench log.
+
+**Sequencing:** V1 + V2 stay schema-free and are one dispatch; **V3 is a second dispatch** and is
+independently reviewable. V3 wants V2 to exist first so the split-off carry rule (Amd3-D5) has something to
+carry to.
+
 ## Proposed schema (sync-safe by construction, per ADR-0002 — recommendation, not ratified)
 
 Mirrors the `menus`/`menuItems` + Codable-BLOB pattern already in the repo:
@@ -394,6 +502,12 @@ which is the current Next Up.
 Recommended next step is *not* code but **more dogfooding**: when the chat offers a variation, notice what
 you actually reach for it to do — read it, shop it, or cook it — because that tells us whether the first
 slice is grocery-folding or read-only annotation. Ratify slices with Jon before any build.
+
+> **Superseded 2026-07-23 — this section is the 2026-07-06 state, kept for the reasoning, not the status.**
+> The dogfooding it asked for happened (2026-07-09, 07-11, 07-21) and answered its question. The body
+> shipped as ADR-0023 S2, and **Amendments 1, 2 and 3 are Accepted** — V1 + V2 are schema-free and
+> dispatchable as one bundle, V3 adds one synced table plus its reader. The milestone-sized estimate above
+> described the *original* build, which is done; what remains is three slices, not a milestone.
 
 ## Open questions (surface for discussion when the time comes — not decided)
 

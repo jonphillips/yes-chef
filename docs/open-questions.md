@@ -43,6 +43,15 @@ Kept here only as the trail; the live spec is the ADR.
 
 ## Dogfooding — 2026-07-21 (ADR-0042 S4 pass): the "why" dies at the commit boundary
 
+> **ANSWERED 2026-07-23 — [ADR-0021 Amendment 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23)
+> (Accepted).** Option **(d)** — a **recipe-scoped deliberation log**, one synced table, one row per commit
+> holding the brief **verbatim**, with its read surface shipping in the same slice. (a)/(b)/(c) were all
+> rejected on the asymmetry below: they answer the variation half and leave **overwrite** silent. (b) is
+> subsumed — (d) is (b) with a home overwrite can reach. Reverses
+> [ADR-0042 Amd1-OQ2](decisions/ADR-0042-workbench-handoff-and-the-return-block.md)'s "discarded" lean.
+> Split-off (Amd 2 / B1) carries the rows to the new recipe. Ships as **V3**, after V1 + V2. The text below
+> is kept for its reasoning; it is no longer an open fork.
+
 **Jon, after the first real S4 round-trip:** the model expresses *why* each change is being made
 "pretty succinctly," and none of it survives. Confirmed in code — the why has no home in any of three
 places at once:
@@ -61,7 +70,8 @@ with a hole in it:** D6 says an outboarded session that deposits nothing "is a c
 happened." Lower stakes than the workbench — you still get the changed recipe — but the why is the
 scarce output of an unmetered session and the one thing that cannot be reconstructed from the result.
 
-**The fork to decide (do not build before ADR-0021 Amds 1+2 are ratified — this wants to ride with them):**
+**The fork as it stood (decided 2026-07-23 — see the banner above; the options are kept because the
+rejections are the reasoning):**
 
 - **(a) Variation-level `note`.** Free — `RecipeVariation.note: String?` already exists. But the brief
   carries **one why per change**, so squashing N rationales into one note makes them regenerate-only,

@@ -478,7 +478,14 @@ are shipped writers.
   [Amd1-D7](#amd1-d7--learnings-stay-with-a-re-aimed-ask-resolves-amd1-oq1-hand-run-2026-07-21).** The D8
   pattern did recur (3 of 5 restated), but one learning carried **argument residue** the brief cannot hold
   and nothing else would keep. Suppression is the pinned fallback if a second run does not improve.
-- **Amd1-OQ2 — is the brief discarded or durable?** *Lean:* discarded; learnings are the durable channel,
+- **Amd1-OQ2 — RESOLVED 2026-07-23: DURABLE, reversing the lean below.** Dogfooding disagreed, exactly as
+  this question anticipated — the 2026-07-21 S4 pass showed the why is the scarce output of an unmetered
+  session and the one thing unreconstructable from the result. The brief is retained **verbatim** in a
+  **recipe-scoped deliberation log**, per
+  [ADR-0021 Amd 3](ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23)
+  (Accepted), which also answers the "bigger question" the lean deferred: the recipe-scoped log is that
+  log, and it deposits on **overwrite** as well as on keep-as-variation. *Original lean, kept for the
+  record:* discarded; learnings are the durable channel,
   and a recipe-scoped deliberation log is a bigger question than this amendment.
 - **Amd1-OQ3 — a brief argued about an *active variation* would silently anchor to the base recipe.** The
   reader resolves a variation for **display only** (`RecipeVariationDisplayModel.swift:25`), while adjust
