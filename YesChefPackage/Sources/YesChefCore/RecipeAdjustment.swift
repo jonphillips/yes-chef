@@ -201,6 +201,7 @@ public enum RecipeVariationUnrepresentableEdit: Equatable, Sendable {
   case ingredientSectionRemoved(String)
   case ingredientSectionChanged(String)
   case ingredientLineMoved(String)
+  case ingredientLineAnchorUnavailable(String)
   case instructionSectionAdded(String)
   case instructionSectionRemoved(String)
   case instructionSectionChanged(String)
@@ -214,6 +215,7 @@ public enum RecipeVariationUnrepresentableEdit: Equatable, Sendable {
     case let .ingredientSectionRemoved(name): "the ingredient section (\(name))"
     case let .ingredientSectionChanged(name): "the ingredient section (\(name))"
     case let .ingredientLineMoved(text): "the ingredient order for \(text)"
+    case let .ingredientLineAnchorUnavailable(text): "the original ingredient (\(text)), which no longer exists in the new base"
     case let .instructionSectionAdded(name): "a new instruction section (\(name))"
     case let .instructionSectionRemoved(name): "the instruction section (\(name))"
     case let .instructionSectionChanged(name): "the instruction section (\(name))"
@@ -683,7 +685,11 @@ extension RecipeRepository {
     var rederived: [(RecipeVariation, RecipeVariationDerivation)] = []
     for sibling in oldBase.variations where sibling.id != variationID {
       let siblingResolved = try oldBase.resolved(applying: sibling)
-      rederived.append((sibling, newBase.derivingVariation(from: siblingResolved)))
+      var derivation = newBase.derivingVariation(from: siblingResolved)
+      derivation.unrepresentableEdits.append(
+        contentsOf: try unavailableIngredientAnchors(in: sibling, against: newBase)
+      )
+      rederived.append((sibling, derivation))
     }
     let invalidNames = rederived
       .filter { !$0.1.isRepresentable }
@@ -1367,6 +1373,33 @@ private func variationName(_ name: String, fallback: String) -> String {
   name.nonEmptyAdjustmentText
     ?? fallback.nonEmptyAdjustmentText
     ?? "Variation"
+}
+
+/// A sibling can only be re-derived when each of its changed ingredient anchors
+/// still exists in the promoted base. Recasting a lost substitution as an add
+/// would preserve text while silently losing the stable-ID relationship.
+private func unavailableIngredientAnchors(
+  in variation: RecipeVariation,
+  against newBase: RecipeDetailData
+) throws -> [RecipeVariationUnrepresentableEdit] {
+  let payload = try RecipeVariationPayload.decode(variation.deltas, variationID: variation.id)
+  return payload.ingredientOps.compactMap { operation in
+    let reference: RecipeIngredientReference?
+    switch operation {
+    case let .substitute(candidate, _), let .scale(candidate, _):
+      reference = candidate
+    case .add, .remove:
+      reference = nil
+    }
+    guard let reference else { return nil }
+    let anchorIsAvailable: Bool
+    if let id = reference.id {
+      anchorIsAvailable = newBase.ingredientLines.contains { $0.id == id }
+    } else {
+      anchorIsAvailable = reference.index(in: newBase.ingredientLines) != nil
+    }
+    return anchorIsAvailable ? nil : .ingredientLineAnchorUnavailable(reference.displayText)
+  }
 }
 
 private func areActiveVariationsInDecreasingOrder(

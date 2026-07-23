@@ -559,5 +559,6 @@ extension RecipeCoreTests {
         expectNoDifference(try detail.resolved(applying: lime).ingredientLines.map(\.originalText), ["2 tablespoons lime juice"])
       }
     }
+
   }
 }

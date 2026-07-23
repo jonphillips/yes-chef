@@ -105,19 +105,6 @@ final class RecipeVariationEditorModel {
     resolvedDetail = detail
   }
 
-  func ingredientSectionName(_ id: IngredientSection.ID) -> Binding<String> {
-    Binding(
-      get: { self.resolvedDetail?.ingredientSections.first { $0.id == id }?.name ?? "" },
-      set: { text in
-        guard var detail = self.resolvedDetail,
-          let index = detail.ingredientSections.firstIndex(where: { $0.id == id })
-        else { return }
-        detail.ingredientSections[index].name = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
-        self.resolvedDetail = detail
-      }
-    )
-  }
-
   func ingredientLineText(_ id: IngredientLine.ID) -> Binding<String> {
     Binding(
       get: { self.resolvedDetail?.ingredientLines.first { $0.id == id }?.originalText ?? "" },
@@ -126,19 +113,6 @@ final class RecipeVariationEditorModel {
           let index = detail.ingredientLines.firstIndex(where: { $0.id == id })
         else { return }
         detail.ingredientLines[index].originalText = text
-        self.resolvedDetail = detail
-      }
-    )
-  }
-
-  func instructionSectionName(_ id: InstructionSection.ID) -> Binding<String> {
-    Binding(
-      get: { self.resolvedDetail?.instructionSections.first { $0.id == id }?.name ?? "" },
-      set: { text in
-        guard var detail = self.resolvedDetail,
-          let index = detail.instructionSections.firstIndex(where: { $0.id == id })
-        else { return }
-        detail.instructionSections[index].name = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
         self.resolvedDetail = detail
       }
     )
@@ -302,7 +276,11 @@ private struct VariationIngredientSectionEditor: View {
 
   var body: some View {
     if model.resolvedDetail?.ingredientSections.contains(where: { $0.id == section.id }) == true {
-      TextField("Section", text: model.ingredientSectionName(section.id))
+      if let name = section.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+        Text(name)
+          .font(.subheadline.bold())
+          .foregroundStyle(.secondary)
+      }
       ForEach(model.resolvedDetail?.ingredientLines.filter { $0.sectionID == section.id } ?? []) { line in
         TextField("Ingredient", text: model.ingredientLineText(line.id))
           .swipeActions {
@@ -322,7 +300,11 @@ private struct VariationInstructionSectionEditor: View {
 
   var body: some View {
     if model.resolvedDetail?.instructionSections.contains(where: { $0.id == section.id }) == true {
-      TextField("Section", text: model.instructionSectionName(section.id))
+      if let name = section.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+        Text(name)
+          .font(.subheadline.bold())
+          .foregroundStyle(.secondary)
+      }
       ForEach(model.resolvedDetail?.instructionSteps.filter { $0.sectionID == section.id } ?? []) { step in
         TextField("Instruction", text: model.instructionStepText(step.id), axis: .vertical)
           .swipeActions {
