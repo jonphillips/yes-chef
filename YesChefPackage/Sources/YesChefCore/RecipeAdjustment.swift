@@ -3,6 +3,10 @@ import Foundation
 import LLMClientKit
 import SQLiteData
 
+// The variation resolver and its inverse deliberately share this file so their
+// stable-ID semantics remain reviewable as one pair.
+// swiftlint:disable file_length
+
 public enum RecipeAdjustmentError: Error, Equatable, LocalizedError {
   case responseTruncated
   case responseUnreadable
@@ -187,6 +191,57 @@ public struct RecipeVariationPayload: Codable, Equatable, Sendable {
       throw RecipeAdjustmentError.variationPayloadUnreadable(variationID)
     }
   }
+}
+
+/// A lossless description of an edit the current variation vocabulary cannot carry.
+/// The editor may still let a cook make these edits; saving then offers split-off rather
+/// than persisting a partial overlay.
+public enum RecipeVariationUnrepresentableEdit: Equatable, Sendable {
+  case ingredientSectionAdded(String)
+  case ingredientSectionRemoved(String)
+  case ingredientSectionChanged(String)
+  case ingredientLineMoved(String)
+  case instructionSectionAdded(String)
+  case instructionSectionRemoved(String)
+  case instructionSectionChanged(String)
+  case instructionStepAdded(String)
+  case instructionStepRemoved(String)
+  case instructionStepMoved(String)
+
+  public var description: String {
+    switch self {
+    case let .ingredientSectionAdded(name): "a new ingredient section (\(name))"
+    case let .ingredientSectionRemoved(name): "the ingredient section (\(name))"
+    case let .ingredientSectionChanged(name): "the ingredient section (\(name))"
+    case let .ingredientLineMoved(text): "the ingredient order for \(text)"
+    case let .instructionSectionAdded(name): "a new instruction section (\(name))"
+    case let .instructionSectionRemoved(name): "the instruction section (\(name))"
+    case let .instructionSectionChanged(name): "the instruction section (\(name))"
+    case let .instructionStepAdded(text): "a new instruction step (\(text))"
+    case let .instructionStepRemoved(text): "the instruction step (\(text))"
+    case let .instructionStepMoved(text): "the instruction order for \(text)"
+    }
+  }
+}
+
+public struct RecipeVariationDerivation: Equatable, Sendable {
+  public var payload: RecipeVariationPayload
+  public var unrepresentableEdits: [RecipeVariationUnrepresentableEdit]
+
+  public init(
+    payload: RecipeVariationPayload,
+    unrepresentableEdits: [RecipeVariationUnrepresentableEdit]
+  ) {
+    self.payload = payload
+    self.unrepresentableEdits = unrepresentableEdits
+  }
+
+  public var isRepresentable: Bool { unrepresentableEdits.isEmpty }
+}
+
+public enum RecipeVariationPromotionResult: Equatable, Sendable {
+  case promoted
+  case needsConfirmation(removingVariations: [String])
 }
 
 public enum RecipeVariationIngredientHighlight: Equatable, Sendable {
@@ -549,6 +604,138 @@ extension RecipeRepository {
     .execute(db)
   }
 
+  /// Re-derives a variation from its edited resolved detail. A caller must inspect
+  /// `unrepresentableEdits` before writing so no part of a richer edit is lost.
+  @discardableResult
+  public static func saveEditedVariation(
+    _ variationID: RecipeVariation.ID,
+    resolvedDetail: RecipeDetailData,
+    name: String,
+    note: String?,
+    in db: Database,
+    now: Date
+  ) throws -> RecipeVariationDerivation {
+    guard let variation = try RecipeVariation.find(variationID).fetchOne(db) else {
+      throw RecipeAdjustmentError.missingVariation(variationID)
+    }
+    guard let baseDetail = try fetchDetail(recipeID: variation.recipeID, in: db) else {
+      throw RecipeAdjustmentError.missingRecipe(variation.recipeID)
+    }
+
+    let derivation = baseDetail.derivingVariation(from: resolvedDetail)
+    guard derivation.isRepresentable else { return derivation }
+    let deltas = try derivation.payload.encodedData()
+
+    try RecipeVariation.find(variationID).update {
+      $0.name = #bind(variationName(name, fallback: variation.name))
+      $0.note = #bind(note?.nonEmptyAdjustmentText)
+      $0.deltas = #bind(deltas)
+      $0.dateModified = #bind(now)
+    }
+    .execute(db)
+    return derivation
+  }
+
+  /// Materializes the resolved variation into a separate recipe and removes the
+  /// overlay. `resolvedDetail` may contain an edit the overlay vocabulary could
+  /// not express, which is precisely why this path accepts it intact.
+  @discardableResult
+  public static func splitVariationOff(
+    _ variationID: RecipeVariation.ID,
+    resolvedDetail: RecipeDetailData,
+    name: String,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> Recipe.ID {
+    guard let variation = try RecipeVariation.find(variationID).fetchOne(db) else {
+      throw RecipeAdjustmentError.missingVariation(variationID)
+    }
+    let recipeID = try createStandaloneRecipe(
+      from: resolvedDetail,
+      title: variationName(name, fallback: variation.name),
+      in: db,
+      now: now,
+      uuid: uuid
+    )
+    try RecipeVariation.find(variationID).delete().execute(db)
+    try setActiveVariation(nil, recipeID: variation.recipeID, in: db, now: now, uuid: uuid)
+    return recipeID
+  }
+
+  /// Replaces the base with one variation and re-derives every surviving overlay.
+  /// If an overlay cannot be represented against the new base, the caller must
+  /// explicitly confirm its removal; nothing is discarded implicitly.
+  public static func promoteVariationToBase(
+    _ variationID: RecipeVariation.ID,
+    confirmingRemovalOfUnrepresentableVariations: Bool = false,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> RecipeVariationPromotionResult {
+    guard let variation = try RecipeVariation.find(variationID).fetchOne(db) else {
+      throw RecipeAdjustmentError.missingVariation(variationID)
+    }
+    guard let oldBase = try fetchDetail(recipeID: variation.recipeID, in: db) else {
+      throw RecipeAdjustmentError.missingRecipe(variation.recipeID)
+    }
+    let newBase = try oldBase.resolved(applying: variation)
+    var rederived: [(RecipeVariation, RecipeVariationDerivation)] = []
+    for sibling in oldBase.variations where sibling.id != variationID {
+      let siblingResolved = try oldBase.resolved(applying: sibling)
+      rederived.append((sibling, newBase.derivingVariation(from: siblingResolved)))
+    }
+    let invalidNames = rederived
+      .filter { !$0.1.isRepresentable }
+      .map { $0.0.name }
+    guard invalidNames.isEmpty || confirmingRemovalOfUnrepresentableVariations else {
+      return .needsConfirmation(removingVariations: invalidNames)
+    }
+
+    var promotedRecipe = newBase.recipe
+    promotedRecipe.dateModified = now
+    try Recipe.upsert { promotedRecipe }.execute(db)
+    try replaceEditableChildren(
+      recipeID: variation.recipeID,
+      ingredientSections: newBase.ingredientSections,
+      ingredientLines: newBase.ingredientLines,
+      instructionSections: newBase.instructionSections,
+      instructionSteps: newBase.instructionSteps,
+      generalNotes: newBase.notes.filter { $0.noteType == .general },
+      in: db
+    )
+
+    try RecipeVariation.find(variationID).delete().execute(db)
+    for (sibling, derivation) in rederived {
+      guard derivation.isRepresentable else {
+        try RecipeVariation.find(sibling.id).delete().execute(db)
+        continue
+      }
+      let deltas = try derivation.payload.encodedData()
+      try RecipeVariation.find(sibling.id).update {
+        $0.deltas = #bind(deltas)
+        $0.dateModified = #bind(now)
+      }
+      .execute(db)
+    }
+
+    let previousBase = newBase.derivingVariation(from: oldBase)
+    precondition(previousBase.isRepresentable, "A resolved variation must be representable against its base")
+    let restoredBase = RecipeVariation(
+      id: uuid(),
+      recipeID: variation.recipeID,
+      name: variationName(oldBase.recipe.title, fallback: "Base Recipe"),
+      sortIndex: try nextVariationSortIndex(recipeID: variation.recipeID, in: db),
+      deltas: try previousBase.payload.encodedData(),
+      origin: .hand,
+      dateCreated: now,
+      dateModified: now
+    )
+    try RecipeVariation.insert { restoredBase }.execute(db)
+    try setActiveVariation(nil, recipeID: variation.recipeID, in: db, now: now, uuid: uuid)
+    return .promoted
+  }
+
   public static func restoreRecipeAdjustment(
     _ restorePoint: Data,
     recipeID: Recipe.ID,
@@ -622,6 +809,178 @@ extension RecipeRepository {
     }
   }
 
+  private static func createStandaloneRecipe(
+    from detail: RecipeDetailData,
+    title: String,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> Recipe.ID {
+    let recipeID = uuid()
+    let ingredientSectionIDs = Dictionary(
+      uniqueKeysWithValues: detail.ingredientSections.map { ($0.id, uuid()) }
+    )
+    let instructionSectionIDs = Dictionary(
+      uniqueKeysWithValues: detail.instructionSections.map { ($0.id, uuid()) }
+    )
+    let fullPhotos = try RecipePhoto.where { $0.recipeID.eq(detail.recipe.id) }.fetchAll(db)
+    let photoIDs = Dictionary(uniqueKeysWithValues: fullPhotos.map { ($0.id, uuid()) })
+
+    let recipe = Recipe(
+      id: recipeID,
+      title: title,
+      subtitle: detail.recipe.subtitle,
+      summary: detail.recipe.summary,
+      servings: detail.recipe.servings,
+      servingsText: detail.recipe.servingsText,
+      yieldText: detail.recipe.yieldText,
+      prepTimeMinutes: detail.recipe.prepTimeMinutes,
+      cookTimeMinutes: detail.recipe.cookTimeMinutes,
+      totalTimeMinutes: detail.recipe.totalTimeMinutes,
+      activeTimeMinutes: detail.recipe.activeTimeMinutes,
+      restTimeMinutes: detail.recipe.restTimeMinutes,
+      cuisine: detail.recipe.cuisine,
+      course: detail.recipe.course,
+      difficulty: detail.recipe.difficulty,
+      rating: detail.recipe.rating,
+      favorite: detail.recipe.favorite,
+      libraryPlacement: detail.recipe.libraryPlacement,
+      dateCreated: now,
+      dateModified: now,
+      originalImportText: detail.recipe.originalImportText,
+      makeAhead: detail.recipe.makeAhead,
+      chefItUp: detail.recipe.chefItUp,
+      serveWith: detail.recipe.serveWith,
+      viewScale: detail.recipe.viewScale,
+      coverPhotoID: detail.recipe.coverPhotoID.flatMap { photoIDs[$0] }
+    )
+    try Recipe.insert { recipe }.execute(db)
+
+    if let source = detail.source {
+      try RecipeSource.insert {
+        RecipeSource(
+          id: uuid(), recipeID: recipeID, name: source.name, url: source.url,
+          author: source.author, publicationName: source.publicationName, bookTitle: source.bookTitle,
+          pageNumber: source.pageNumber, importedFrom: source.importedFrom, dateImported: source.dateImported,
+          sourceNotes: source.sourceNotes
+        )
+      }
+      .execute(db)
+    }
+
+    for section in detail.ingredientSections {
+      try IngredientSection.insert {
+        IngredientSection(
+          id: ingredientSectionIDs[section.id]!, recipeID: recipeID,
+          name: section.name, sortOrder: section.sortOrder
+        )
+      }
+      .execute(db)
+    }
+    for line in detail.ingredientLines {
+      try IngredientLine.insert {
+        IngredientLine(
+          id: uuid(), recipeID: recipeID, sectionID: ingredientSectionIDs[line.sectionID]!,
+          originalText: line.originalText, quantity: line.quantity, quantityText: line.quantityText,
+          unit: line.unit, item: line.item, canonicalName: line.canonicalName, preparation: line.preparation,
+          comment: line.comment, isOptional: line.isOptional, shoppingCategory: line.shoppingCategory,
+          doNotShop: line.doNotShop, isHeader: line.isHeader, sortOrder: line.sortOrder,
+          confidence: line.confidence
+        )
+      }
+      .execute(db)
+    }
+    for section in detail.instructionSections {
+      try InstructionSection.insert {
+        InstructionSection(
+          id: instructionSectionIDs[section.id]!, recipeID: recipeID,
+          name: section.name, sortOrder: section.sortOrder
+        )
+      }
+      .execute(db)
+    }
+    for step in detail.instructionSteps {
+      try InstructionStep.insert {
+        InstructionStep(
+          id: uuid(), recipeID: recipeID, sectionID: instructionSectionIDs[step.sectionID]!,
+          text: step.text, sortOrder: step.sortOrder, isOptional: step.isOptional
+        )
+      }
+      .execute(db)
+    }
+    for note in detail.notes {
+      try RecipeNote.insert {
+        RecipeNote(
+          id: uuid(), recipeID: recipeID, text: note.text, noteType: note.noteType,
+          dateCreated: now, dateModified: now, cookingSessionID: nil, pinned: note.pinned
+        )
+      }
+      .execute(db)
+    }
+    for photo in fullPhotos {
+      let id = photoIDs[photo.id]!
+      try RecipePhoto.insert {
+        RecipePhoto(
+          id: id, recipeID: recipeID, imageDataReference: "recipePhotos/\(id.uuidString)",
+          displayData: photo.displayData, thumbnailData: photo.thumbnailData, mediaType: photo.mediaType,
+          pixelWidth: photo.pixelWidth, pixelHeight: photo.pixelHeight,
+          originalSourcePath: photo.originalSourcePath, sourceURL: photo.sourceURL, checksum: photo.checksum,
+          kind: photo.kind, caption: photo.caption, source: photo.source, sortOrder: photo.sortOrder,
+          dateCreated: photo.dateCreated
+        )
+      }
+      .execute(db)
+    }
+    for (sortOrder, tag) in detail.tags.enumerated() {
+      try RecipeTag.insert {
+        RecipeTag(id: uuid(), recipeID: recipeID, tagID: tag.id, sortOrder: sortOrder)
+      }
+      .execute(db)
+    }
+    for category in detail.categories {
+      try RecipeCategory.insert {
+        RecipeCategory(id: uuid(), recipeID: recipeID, categoryID: category.id)
+      }
+      .execute(db)
+    }
+    for join in detail.recipeEquipment {
+      try RecipeEquipment.insert {
+        RecipeEquipment(id: uuid(), recipeID: recipeID, equipmentID: join.equipmentID, notes: join.notes)
+      }
+      .execute(db)
+    }
+
+    guard let savedDetail = try fetchDetail(recipeID: recipeID, in: db) else {
+      throw RecipeAdjustmentError.missingRecipe(recipeID)
+    }
+    let snapshot = try RecipeBundleCoding.snapshotData(
+      recipe: recipe,
+      source: savedDetail.source,
+      ingredientSections: savedDetail.ingredientSections,
+      ingredientLines: savedDetail.ingredientLines,
+      instructionSections: savedDetail.instructionSections,
+      instructionSteps: savedDetail.instructionSteps,
+      notes: savedDetail.notes,
+      tagNames: savedDetail.tags.map(\.name),
+      categoryNames: savedDetail.categoryDisplayNames,
+      photos: fullPhotos.map { photo in
+        let id = photoIDs[photo.id]!
+        return RecipePhoto(
+          id: id, recipeID: recipeID, imageDataReference: "recipePhotos/\(id.uuidString)",
+          displayData: photo.displayData, thumbnailData: photo.thumbnailData, mediaType: photo.mediaType,
+          pixelWidth: photo.pixelWidth, pixelHeight: photo.pixelHeight,
+          originalSourcePath: photo.originalSourcePath, sourceURL: photo.sourceURL, checksum: photo.checksum,
+          kind: photo.kind, caption: photo.caption, source: photo.source, sortOrder: photo.sortOrder,
+          dateCreated: photo.dateCreated
+        )
+      },
+      equipment: savedDetail.equipment,
+      recipeEquipment: savedDetail.recipeEquipment
+    )
+    try Recipe.find(recipeID).update { $0.originalSnapshot = #bind(snapshot) }.execute(db)
+    return recipeID
+  }
+
   private static func nextVariationSortIndex(recipeID: Recipe.ID, in db: Database) throws -> Int {
     try RecipeVariation
       .where { $0.recipeID.eq(recipeID) }
@@ -674,6 +1033,101 @@ public extension RecipeDetailData {
   var activeVariation: RecipeVariation? {
     guard let activeVariationID else { return nil }
     return variations.first { $0.id == activeVariationID }
+  }
+
+  /// Mirrors `resolved(applying:)`: turns a resolved, ID-preserving edit back into
+  /// the minimal overlay against this base detail. It deliberately reports edits
+  /// outside the finite delta vocabulary instead of dropping them.
+  func derivingVariation(from edited: RecipeDetailData) -> RecipeVariationDerivation {
+    var ingredientOps: [RecipeIngredientDelta] = []
+    var stepReplacements: [RecipeMethodStepReplacement] = []
+    var unrepresentable: [RecipeVariationUnrepresentableEdit] = []
+
+    let baseIngredientSections = Dictionary(uniqueKeysWithValues: ingredientSections.map { ($0.id, $0) })
+    let editedIngredientSections = Dictionary(uniqueKeysWithValues: edited.ingredientSections.map { ($0.id, $0) })
+    for section in edited.ingredientSections where baseIngredientSections[section.id] == nil {
+      unrepresentable.append(.ingredientSectionAdded(section.name ?? "unnamed"))
+    }
+    for section in ingredientSections where editedIngredientSections[section.id] == nil {
+      unrepresentable.append(.ingredientSectionRemoved(section.name ?? "unnamed"))
+    }
+    for base in ingredientSections {
+      guard let current = editedIngredientSections[base.id] else { continue }
+      if base.name != current.name || base.sortOrder != current.sortOrder {
+        unrepresentable.append(.ingredientSectionChanged(current.name ?? base.name ?? "unnamed"))
+      }
+    }
+
+    let baseLines = Dictionary(uniqueKeysWithValues: ingredientLines.map { ($0.id, $0) })
+    let editedLines = Dictionary(uniqueKeysWithValues: edited.ingredientLines.map { ($0.id, $0) })
+    for base in sortedIngredientLines(ingredientLines, sections: ingredientSections) {
+      guard let current = editedLines[base.id] else {
+        ingredientOps.append(.remove(RecipeIngredientReference(id: base.id, originalText: base.originalText)))
+        continue
+      }
+      if current.sectionID != base.sectionID || current.sortOrder != base.sortOrder {
+        unrepresentable.append(.ingredientLineMoved(current.originalText))
+      }
+      if current.originalText != base.originalText {
+        ingredientOps.append(
+          .substitute(
+            RecipeIngredientReference(id: base.id, originalText: base.originalText),
+            line: current.originalText
+          )
+        )
+      }
+    }
+    for line in sortedIngredientLines(edited.ingredientLines, sections: edited.ingredientSections)
+    where baseLines[line.id] == nil {
+      guard let section = editedIngredientSections[line.sectionID], baseIngredientSections[section.id] != nil else {
+        continue
+      }
+      ingredientOps.append(.add(line: line.originalText, sectionName: section.name))
+    }
+
+    let baseInstructionSections = Dictionary(uniqueKeysWithValues: instructionSections.map { ($0.id, $0) })
+    let editedInstructionSections = Dictionary(uniqueKeysWithValues: edited.instructionSections.map { ($0.id, $0) })
+    for section in edited.instructionSections where baseInstructionSections[section.id] == nil {
+      unrepresentable.append(.instructionSectionAdded(section.name ?? "unnamed"))
+    }
+    for section in instructionSections where editedInstructionSections[section.id] == nil {
+      unrepresentable.append(.instructionSectionRemoved(section.name ?? "unnamed"))
+    }
+    for base in instructionSections {
+      guard let current = editedInstructionSections[base.id] else { continue }
+      if base.name != current.name || base.sortOrder != current.sortOrder {
+        unrepresentable.append(.instructionSectionChanged(current.name ?? base.name ?? "unnamed"))
+      }
+    }
+
+    let baseSteps = Dictionary(uniqueKeysWithValues: instructionSteps.map { ($0.id, $0) })
+    let editedSteps = Dictionary(uniqueKeysWithValues: edited.instructionSteps.map { ($0.id, $0) })
+    for base in sortedInstructionSteps(instructionSteps, sections: instructionSections) {
+      guard let current = editedSteps[base.id] else {
+        unrepresentable.append(.instructionStepRemoved(base.text))
+        continue
+      }
+      if current.sectionID != base.sectionID || current.sortOrder != base.sortOrder {
+        unrepresentable.append(.instructionStepMoved(current.text))
+      }
+      if current.text != base.text {
+        stepReplacements.append(
+          RecipeMethodStepReplacement(id: base.id, originalText: base.text, replacementText: current.text)
+        )
+      }
+    }
+    for step in sortedInstructionSteps(edited.instructionSteps, sections: edited.instructionSections)
+    where baseSteps[step.id] == nil {
+      unrepresentable.append(.instructionStepAdded(step.text))
+    }
+
+    return RecipeVariationDerivation(
+      payload: RecipeVariationPayload(
+        ingredientOps: ingredientOps,
+        methodStepReplacements: stepReplacements
+      ),
+      unrepresentableEdits: unrepresentable
+    )
   }
 
   func resolved(applying variation: RecipeVariation) throws -> RecipeDetailData {

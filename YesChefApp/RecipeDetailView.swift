@@ -83,6 +83,11 @@ struct RecipeDetailView: View {
         keepAsVariation: { model.keepAdjustmentAsVariationButtonTapped($0, name: $1) }
       )
     }
+    .sheet(item: $model.destination.variationEditor, id: \.self) { variationID in
+      NavigationStack {
+        RecipeVariationEditorView(recipeID: model.recipeID, variationID: variationID)
+      }
+    }
     .alert("Recipe Update Failed", isPresented: $model.isShowingError) {
       Button("OK", role: .cancel) {}
     } message: {
@@ -323,6 +328,8 @@ private struct RecipeReaderView: View {
   @State private var isPhotoGalleryPresented = false
   @State private var renamingVariation: RecipeVariation?
   @State private var variationNameDraft = ""
+  @State private var promotingVariation: RecipeVariation?
+  @State private var unrepresentablePromotionNames: [String] = []
 
   var body: some View {
     GeometryReader { proxy in
@@ -393,6 +400,11 @@ private struct RecipeReaderView: View {
         )
       #endif
     }
+    .recipeVariationPromotionPresentation(
+      model: model,
+      promotingVariation: $promotingVariation,
+      unrepresentablePromotionNames: $unrepresentablePromotionNames
+    )
   }
 
   private func header(_ recipe: Recipe) -> some View {
@@ -531,6 +543,12 @@ private struct RecipeReaderView: View {
         }
         .buttonStyle(.bordered)
         .accessibilityLabel(Text("Rename Variation"))
+
+        RecipeVariationActions(
+          variation: activeVariation,
+          model: model,
+          promotingVariation: $promotingVariation
+        )
       }
     }
     .alert(

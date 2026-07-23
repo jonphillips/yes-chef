@@ -116,6 +116,53 @@ extension RecipeDetailModel {
     }
   }
 
+  func editVariationButtonTapped(_ variationID: RecipeVariation.ID) {
+    destination = .variationEditor(variationID)
+  }
+
+  func promoteVariationButtonTapped(
+    _ variationID: RecipeVariation.ID,
+    confirmingRemovalOfUnrepresentableVariations: Bool = false
+  ) async -> RecipeVariationPromotionResult? {
+    let now = now
+    let makeUUID = uuid
+    do {
+      return try await database.write { db in
+        try RecipeRepository.promoteVariationToBase(
+          variationID,
+          confirmingRemovalOfUnrepresentableVariations: confirmingRemovalOfUnrepresentableVariations,
+          in: db,
+          now: now,
+          uuid: { makeUUID() }
+        )
+      }
+    } catch {
+      errorMessage = error.localizedDescription
+      isShowingError = true
+      return nil
+    }
+  }
+
+  func splitVariationOffButtonTapped(_ variationID: RecipeVariation.ID) async {
+    guard let baseDetail = detail,
+      let variation = baseDetail.variations.first(where: { $0.id == variationID })
+    else { return }
+    do {
+      let resolvedDetail = try baseDetail.resolved(applying: variation)
+      let now = now
+      let makeUUID = uuid
+      try await database.write { db in
+        _ = try RecipeRepository.splitVariationOff(
+          variationID, resolvedDetail: resolvedDetail, name: variation.name,
+          in: db, now: now, uuid: { makeUUID() }
+        )
+      }
+    } catch {
+      errorMessage = error.localizedDescription
+      isShowingError = true
+    }
+  }
+
   /// Switches the active variation, instrumented per ADR-0029 Amendment 5 S6c.
   /// The write helper explicitly leaves the main actor, which lets the capture
   /// distinguish writer completion from the waiting time before this model task
