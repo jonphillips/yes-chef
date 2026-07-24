@@ -54,7 +54,7 @@ public struct MenuChatContext: Equatable, Sendable {
     serialized(characterBudget: Self.serializedCharacterBudget(for: tier))
   }
 
-  public func prepPrompt() -> String {
+  public func prepPrompt(destination: AIHandoffPromptDestination = .outboard) -> String {
     @Dependency(\.aiPromptPreferences) var preferences
     let settings = preferences.current()
     return Self.prepPrompt(
@@ -63,7 +63,8 @@ public struct MenuChatContext: Equatable, Sendable {
       makeAheadPreference: AISettingsRepository.preference(
         in: settings,
         for: .makeAheadPrepPlan
-      )
+      ),
+      destination: destination
     )
   }
 
@@ -179,9 +180,20 @@ public struct MenuChatContext: Equatable, Sendable {
   private static func prepPrompt(
     context: String,
     tasteProfile: String,
-    makeAheadPreference: String
+    makeAheadPreference: String,
+    destination: AIHandoffPromptDestination
   ) -> String {
-    """
+    let transportInstruction = switch destination {
+    case .outboard:
+      " This text will be pasted back into the recipe app, so do not include commentary, Markdown fences, menu item IDs, or JSON."
+    case .onboard:
+      ""
+    }
+    let subjectContext = switch destination {
+    case .outboard: "\n\n\(context)"
+    case .onboard: ""
+    }
+    return """
     You weave a staged prep plan for one multi-day menu from the menu context below. Compose from stored per-recipe Make-Ahead notes when present, and invent grounded sequencing, work sessions, and new prep steps from the menu's dishes. Prefer the authored Make-Ahead notes when they are available.
 
     Taste profile:
@@ -194,9 +206,7 @@ public struct MenuChatContext: Equatable, Sendable {
     Wednesday evening:
     - Salt the chicken → Thursday dinner
 
-    Put one task on each `- task → serves` bullet, using the Unicode `→` glyph (not ASCII `->`) for the optional serves suffix. This text will be pasted back into the recipe app, so do not include commentary, Markdown fences, menu item IDs, or JSON.
-
-    \(context)
+    Put one task on each `- task → serves` bullet, using the Unicode `→` glyph (not ASCII `->`) for the optional serves suffix.\(transportInstruction)\(subjectContext)
     """
   }
 

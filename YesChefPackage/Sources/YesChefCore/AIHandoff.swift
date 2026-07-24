@@ -125,6 +125,13 @@ public enum AIHandoffStatus: String, Codable, QueryBindable, QueryDecodable, Sen
   case discarded
 }
 
+/// Whether a prompt is headed to the external hand-off transport or the in-app discussion panel.
+/// Onboard prompts omit subject serialization because the chat system prompt already supplies it.
+public enum AIHandoffPromptDestination: Equatable, Sendable {
+  case outboard
+  case onboard
+}
+
 @Table("learnings")
 public struct Learning: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID
@@ -518,13 +525,25 @@ public enum AIHandoffToken {
   /// Transport-specific title and routing-token lines are intentionally added by `prompt` instead.
   public static func discussAsk(
     context: String,
-    deliverableFormat: DeliverableFormat = .menuPrepPlan
+    deliverableFormat: DeliverableFormat = .menuPrepPlan,
+    destination: AIHandoffPromptDestination = .outboard
   ) -> String {
-    """
-    \(context)
+    switch destination {
+    case .outboard:
+      """
+      \(context)
 
-    You may discuss this freely. When the user asks you to finalize, return \(deliverableFormat.discussInstruction).
-    """
+      You may discuss this freely. When the user asks you to finalize, return \(deliverableFormat.discussInstruction).
+      """
+    case .onboard:
+      """
+      \(context)
+
+      You may discuss this freely. When the user asks you to finalize, return \(deliverableFormat.discussInstruction).
+
+      The format above describes the finalized return, not this conversation — discuss conversationally until the cook asks you to finalize.
+      """
+    }
   }
 
   public static func header(handoffID: AIHandoff.ID) -> String {

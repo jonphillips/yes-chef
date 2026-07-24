@@ -814,7 +814,13 @@ final class RecipeDetailModel {
   @ObservationIgnored
   @Fetch var persistedScale: Double?
 
-  var destination: Destination?
+  var destination: Destination? {
+    didSet {
+      if case .none = destination {
+        seededAskSection = nil
+      }
+    }
+  }
   var errorMessage: String?
   var isShowingError = false
   var scaleFactor = 1.0
@@ -823,6 +829,7 @@ final class RecipeDetailModel {
   var adjustmentRestorePoint: RecipeAdjustmentRestorePoint?
   @ObservationIgnored let detailFetchAnimationDescription: String
   private var lastAppliedPersistedScale: Double?
+  private(set) var seededAskSection: PlaybookSectionKind?
 
   init(
     recipeID: Recipe.ID,
@@ -929,21 +936,37 @@ final class RecipeDetailModel {
     destination = .scaling
   }
 
-  func chatButtonTapped(section: PlaybookSectionKind = .makeAhead) {
+  func chatButtonTapped(section: PlaybookSectionKind) {
     guard let detail else { return }
-    // Toggle: Ask is a non-modal companion on wide iPad, so its trigger stays live
-    // beside the open panel. Re-tapping closes it (rather than rebuilding the model and
-    // discarding the scratch transcript). See the Menu recipe-browser toggle for the pattern.
-    if destination.chat != nil {
-      destination = nil
-      return
-    }
-    let chatModel = RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail)))
-    destination = .chat(chatModel)
     let seed = RecipeHandoffContext(detail: detail).discussAsk(for: section)
-    Task {
-      await chatModel.send(seed)
+    switch chatAskAction(for: section) {
+    case .open:
+      let chatModel = RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail)))
+      destination = .chat(chatModel)
+      seededAskSection = section
+      Task {
+        await chatModel.seedIfCold(seed)
+      }
+    case .close:
+      destination = nil
+    case .reseed:
+      guard let chatModel = destination.chat else { return }
+      seededAskSection = section
+      Task {
+        await chatModel.send(seed)
+      }
     }
+  }
+
+  private func chatAskAction(for section: PlaybookSectionKind) -> ChatAskAction {
+    guard destination.chat != nil else { return .open }
+    return seededAskSection == section ? .close : .reseed
+  }
+
+  private enum ChatAskAction {
+    case open
+    case close
+    case reseed
   }
 
   func openWorkbenchButtonTapped() {

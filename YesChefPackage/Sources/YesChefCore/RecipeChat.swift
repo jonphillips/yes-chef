@@ -822,6 +822,21 @@ public final class RecipeChatModel: Identifiable {
     await task.value
   }
 
+  /// Sends `text` only when the thread is cold. The seeded opener exists to remove a cold start
+  /// (ADR-0045 OQ4); a restored thread already has a reply, so `latestReplySubject` is already non-nil.
+  public func seedIfCold(_ text: String) async {
+    guard messages.isEmpty else { return }
+    await send(text)
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard
+      messages.count == 1,
+      messages[0].role == .user,
+      messages[0].text == trimmed
+    else { return }
+    messages.removeAll()
+    persistCurrentThread()
+  }
+
   public func stop() {
     responseTask?.cancel()
   }
