@@ -8,6 +8,7 @@ struct RecipeAdjustmentReviewState: Identifiable, Equatable {
   var currentDetail: RecipeDetailData
   var proposedDetail: RecipeDetailData
   var proposal: RecipeAdjustmentProposal
+  var deliberationBody: String?
 }
 
 struct RecipeAdjustmentRestorePoint: Equatable {
@@ -23,7 +24,10 @@ extension RecipeDetailModel {
       RecipeAdjustmentReviewState(
         currentDetail: detail,
         proposedDetail: proposedDetail,
-        proposal: proposal
+        proposal: proposal,
+        deliberationBody: proposal.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+          ? nil
+          : proposal.summary
       )
     )
   }
@@ -34,6 +38,7 @@ extension RecipeDetailModel {
         let restorePoint = try RecipeRepository.overwriteRecipeWithAdjustmentProposal(
           review.proposal,
           recipeID: recipeID,
+          deliberationBody: review.deliberationBody,
           in: db,
           now: now,
           uuid: { uuid() }
@@ -64,6 +69,7 @@ extension RecipeDetailModel {
           review.proposal,
           recipeID: recipeID,
           name: name,
+          deliberationBody: review.deliberationBody,
           in: db,
           now: now,
           uuid: { uuid() }

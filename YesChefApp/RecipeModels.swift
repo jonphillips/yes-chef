@@ -891,6 +891,14 @@ final class RecipeDetailModel {
     detail?.learnings ?? []
   }
 
+  var deliberationLogEntries: [RecipeDeliberationLogEntry] {
+    detail?.deliberationLogEntries ?? []
+  }
+
+  var variations: [RecipeVariation] {
+    detail?.variations ?? []
+  }
+
   var baseServings: Double? {
     recipe?.servings
   }

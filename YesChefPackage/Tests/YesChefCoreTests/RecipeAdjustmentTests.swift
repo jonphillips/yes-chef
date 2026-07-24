@@ -165,7 +165,7 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func overwriteStoresRestorePointAndUndoRestoresRecipeWithoutClobberingOriginalSnapshot() throws {
+    func overwriteAndUndoRestoreTheRecipeWhileKeepingTheDeliberationRecord() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 819_100_000)
       let later = now.addingTimeInterval(60)
@@ -204,6 +204,7 @@ extension RecipeCoreTests {
             ]
           ),
           recipeID: recipeID,
+          deliberationBody: "Use lime.",
           in: db,
           now: later,
           uuid: { uuids.next() }
@@ -232,6 +233,7 @@ extension RecipeCoreTests {
         expectNoDifference(restored.ingredientLines.map(\.originalText), ["1 tablespoon lemon juice", "1 teaspoon kosher salt"])
         expectNoDifference(restored.instructionSteps.map(\.text), ["Toss and serve."])
         expectNoDifference(restored.recipe.originalSnapshot, originalSnapshot)
+        expectNoDifference(restored.deliberationLogEntries.map(\.body), ["Use lime."])
       }
     }
 
@@ -333,6 +335,7 @@ extension RecipeCoreTests {
             ]
           ),
           recipeID: recipeID,
+          deliberationBody: nil,
           in: db,
           now: later,
           uuid: { uuids.next() }

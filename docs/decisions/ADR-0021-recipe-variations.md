@@ -480,6 +480,12 @@ consumer existed before the schema: Jon generated the want from real use.
   are already recipe-scoped and the recipe is the same row.
 - **In-app adjust commits deposit too** when a rationale exists, but nothing is fabricated — no row rather
   than a synthesized one. A deposit with no prose is the `reviewSummary()` mistake repeated.
+- **Undo deliberately leaves the deposit behind.** The log records an attempted adjustment and its supplied
+  rationale, including an attempt the cook immediately takes back; undo restores the recipe's cooking state,
+  not its deliberation history.
+- **Split-off copies full ancestry.** The new recipe receives every row from the original recipe's log,
+  including base adjustments and rows associated with other variations; it is an ancestry record, not a
+  filtered description of the split variation.
 
 ### Amd3-D6 — Two FK styles, and this table uses both on purpose (ratified)
 

@@ -49,6 +49,7 @@ extension RecipeCoreTests {
           ),
           recipeID: recipeID,
           name: "Lime",
+          deliberationBody: nil,
           in: db,
           now: now,
           uuid: { uuids.next() }
@@ -115,6 +116,7 @@ extension RecipeCoreTests {
           ),
           recipeID: recipeID,
           name: "Lime",
+          deliberationBody: nil,
           in: db,
           now: now,
           uuid: { uuids.next() }
@@ -262,6 +264,7 @@ extension RecipeCoreTests {
           ),
           recipeID: recipeID,
           name: "Smoky",
+          deliberationBody: nil,
           in: db,
           now: now,
           uuid: { uuids.next() }
@@ -277,6 +280,7 @@ extension RecipeCoreTests {
               ]
             ),
             recipeID: recipeID,
+            deliberationBody: nil,
             in: db,
             now: now.addingTimeInterval(60),
             uuid: { uuids.next() }
@@ -328,6 +332,7 @@ extension RecipeCoreTests {
           ),
           recipeID: recipeID,
           name: "Lime",
+          deliberationBody: nil,
           in: db,
           now: now,
           uuid: { uuids.next() }
@@ -484,7 +489,7 @@ extension RecipeCoreTests {
           RecipeAdjustmentProposal(
             ingredientOps: [.substitute(RecipeIngredientReference(id: lineID), line: "2 tablespoons lime juice")]
           ),
-          recipeID: recipeID, name: "Lime Pasta", in: db, now: now, uuid: { uuids.next() }
+          recipeID: recipeID, name: "Lime Pasta", deliberationBody: nil, in: db, now: now, uuid: { uuids.next() }
         )
       }
 
@@ -531,13 +536,13 @@ extension RecipeCoreTests {
           RecipeAdjustmentProposal(
             ingredientOps: [.substitute(RecipeIngredientReference(id: lineID), line: "1 tablespoon smoked lemon juice")]
           ),
-          recipeID: recipeID, name: "Smoky", in: db, now: now, uuid: { uuids.next() }
+          recipeID: recipeID, name: "Smoky", deliberationBody: nil, in: db, now: now, uuid: { uuids.next() }
         )
         let lime = try RecipeRepository.keepAdjustmentProposalAsVariation(
           RecipeAdjustmentProposal(
             ingredientOps: [.substitute(RecipeIngredientReference(id: lineID), line: "2 tablespoons lime juice")]
           ),
-          recipeID: recipeID, name: "Lime", in: db, now: now, uuid: { uuids.next() }
+          recipeID: recipeID, name: "Lime", deliberationBody: nil, in: db, now: now, uuid: { uuids.next() }
         )
         return (smoky, lime)
       }

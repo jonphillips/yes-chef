@@ -11,6 +11,7 @@ struct RecipePlaybookView: View {
   @State private var isNotesExpanded = true
   @State private var isChefItUpExpanded = true
   @State private var isServeWithExpanded = true
+  @State private var isDeliberationLogExpanded = false
   @State private var isEditingReaderFeedback = false
   @State private var readerFeedbackDrafts: [RecipeNote.ID: String] = [:]
   @State private var editingSection: PlaybookSectionKind?
@@ -55,6 +56,20 @@ struct RecipePlaybookView: View {
         isExpanded: $isServeWithExpanded
       ) {
         serveWithContent(model.serveWithItems)
+      }
+      if !model.deliberationLogEntries.isEmpty {
+        playbookSection(
+          "Deliberation Log",
+          isFilled: true,
+          isExpanded: $isDeliberationLogExpanded,
+          showsActions: false,
+          actions: { EmptyView() }
+        ) {
+          RecipeDeliberationLogEntriesView(
+            entries: model.deliberationLogEntries,
+            variations: model.variations
+          )
+        }
       }
       if !model.learnings.isEmpty {
         LearningsSection(
@@ -118,6 +133,24 @@ struct RecipePlaybookView: View {
     isExpanded: Binding<Bool>,
     @ViewBuilder content: @escaping () -> Content
   ) -> some View {
+    playbookSection(
+      section.title,
+      isFilled: isFilled,
+      isExpanded: isExpanded,
+      showsActions: true,
+      actions: { sectionMenu(for: section, isFilled: isFilled) },
+      content: content
+    )
+  }
+
+  private func playbookSection<Actions: View, Content: View>(
+    _ title: String,
+    isFilled: Bool,
+    isExpanded: Binding<Bool>,
+    showsActions: Bool,
+    @ViewBuilder actions: @escaping () -> Actions,
+    @ViewBuilder content: @escaping () -> Content
+  ) -> some View {
     DisclosureGroup(isExpanded: isExpanded) {
       VStack(alignment: .leading, spacing: 12) {
         content()
@@ -127,11 +160,11 @@ struct RecipePlaybookView: View {
       // The fill-dot and the disclosure chevron read as one status pair hugging the trailing edge; the menu
       // sits well clear of them so its tap target can't be confused for the disclosure's.
       HStack(spacing: 0) {
-        Text(section.title)
+        Text(title)
           .font(.title2.bold())
         Spacer(minLength: 12)
-        if isExpanded.wrappedValue {
-          sectionMenu(for: section, isFilled: isFilled)
+        if showsActions, isExpanded.wrappedValue {
+          actions()
             .padding(.trailing, 12)
         }
         Image(systemName: isFilled ? "circle.fill" : "circle")
