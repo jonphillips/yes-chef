@@ -7,7 +7,9 @@
 
 Status: **Accepted** — ratified by Jon **2026-07-24**, same day it was drafted. D1–D7 stand as written;
 **OQ4 is resolved (auto-send)** and **OQ3 is resolved with a correction that changes V1's scope** — see Open
-questions. OQ1 and OQ2 remain open and are **V2 concerns**, so they do not gate V1. Originally drafted as
+questions. **Amendment 1 (2026-07-24, accepted): the onboard seed reuses the outboard prompt's *framing*, not
+its *payload* — D2's reuse claim holds, but "does not re-author any prompt" narrows to the outboard prompt,
+and OQ4's auto-send means auto-send on a *cold* thread only.** See Amendment 1. OQ1 and OQ2 remain open and are **V2 concerns**, so they do not gate V1. Originally drafted as
 Proposed — 2026-07-24. Jon's call, made explicitly against the "dead code, nuke from orbit"
 alternative he first reached for. Reverses an *implicit* drift (nothing ever decided to retire onboard; it
 decayed because its affordances were never finished). Governed by
@@ -197,6 +199,58 @@ without a seeded discussion). V3 is independent of both and should follow ADR-00
 - **OQ4 — RESOLVED (2026-07-24, Jon): auto-send.** The seed is a *discussion opener*, not a final prompt, and
   the whole point is removing a cold start — a pre-filled composer leaves the buttons grayed until the cook
   types, which is most of the defect still standing. Pre-fill was the alternative and is rejected.
+
+## Amendment 1 — The onboard seed reuses the outboard prompt's **framing**, not its **payload**
+
+Accepted 2026-07-24, from the architect review of PR [#227](https://github.com/jonphillips/yes-chef/pull/227)
+(V1's first implementation). Ships on V1's own branch via
+[`docs/efforts/adr-0045-v1-review-fixes.md`](../efforts/adr-0045-v1-review-fixes.md) — this is a correction
+to V1 before it merges, not a later slice.
+
+**What D2 did not anticipate.** *"Reuse the existing `.discuss` prompt"* is right about the **authored
+thinking** and wrong about the **envelope**. The outboard prompt is **self-contained by construction**: it is
+pasted into a bare external thread with no system prompt, so it must carry the subject, the format contract,
+and the transport instructions itself. Onboard, that same text lands **on top of** the chat's own
+`systemPrompt()`, which already owns the role, the subject, the format rules, and the **tier-budgeted**
+context.
+Reused verbatim, the first turn therefore shipped the recipe or menu **twice** — and the seed's copy was
+tier-blind, bounded at the *frontier* budget (120k chars) while the system prompt's copy was correctly
+budgeted for the active tier (12k on-device). That is [[reasoning-budget-starves-output]] with the rail
+bypassed, on precisely the tier D1 exists to hedge toward.
+
+- **A1 — The reusable unit is framing + preferences + finalize convention; the context payload and the
+  transport sentences are destination-specific.** Prompt builders take an explicit
+  `AIHandoffPromptDestination` (`.outboard` / `.onboard`) that gates **exactly two** things: whether the
+  serialized subject block is appended, and whether transport-only sentences appear (the menu prompt's *"This
+  text will be pasted back into the recipe app…"* — nothing is pasted onboard). Everything else stays
+  byte-identical across destinations, so **D2's one-authored-ask-per-verb claim holds unchanged** and the
+  outboard string is provably untouched. Note the sentence that *does* survive onboard: *"the cook reviews
+  and edits it in Yes Chef before it is saved"* is true on both paths — the review sheet is exactly that.
+- **A2 — D2's "does not re-author any prompt" is narrowed to "does not re-author the outboard prompt."**
+  One onboard-only sentence is authored: *the format contract describes the finalized return, not this
+  conversation.* Without it the opener carries **three formatting contracts at once** (the system prompt's
+  prose rules, the section prompt's flat-list contract, and `discussAsk`'s "discuss freely"), and the
+  likeliest first reply is an immediate deliverable dump — which satisfies **D6's letter** (a reply exists,
+  the verbs light up) while missing its point. Authoring one line beats the alternative of loosening the
+  shared text for both paths.
+- **A3 — OQ4's auto-send means auto-send on a COLD thread only.** Chat threads persist 30 days per
+  recipe/menu, so an unqualified auto-send re-seeds and re-bills on every re-open of a warm panel — and it is
+  redundant, because a restored thread already ends in an assistant reply and `latestReplySubject` is already
+  non-nil. The cold start is the whole defect; a warm thread never had it.
+- **A4 — D3's "section-scoped at every entry point" includes RE-scoping.** A scoped Ask invoked while a
+  differently-scoped panel is open **re-scopes and seeds that section**, keeping the open transcript. It does
+  not dismiss the panel. The dismiss-toggle is correct only when the invoked section matches the open one.
+  On wide iPad the panel is a non-modal companion, so switching sections with it open is the *normal* flow,
+  not an edge case.
+- **A5 — The onboard discussion sees the section it is discussing; the outboard hand-off deliberately does
+  not.** `serialized(excludingPlaybookSections:)` omits the target section so a fresh hand-off cannot echo
+  its own prior output. That is a **blind-regeneration** concern. A discussion about improving what is
+  already written wants to see what is already written, so the asymmetry is **intended** — recorded here so
+  it is not "fixed" into symmetry later.
+
+Invariants unchanged: `requiresSubject` is **not** loosened (D6), and scope stays the **three
+section-scopable entry points** (OQ3) — A1's seam makes the meal-calendar and Workbench openers look cheap,
+which is exactly when [[withdraw-not-defer-orphaned-schema]]'s momentum trap fires.
 
 ## Related
 

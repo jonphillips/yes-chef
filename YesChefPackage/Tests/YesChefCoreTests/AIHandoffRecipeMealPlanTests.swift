@@ -234,14 +234,14 @@ extension AIHandoffTests {
       let cold = RecipeChatModel(
         context: .recipe(RecipeChatRecipeContext(recipeID: recipeID, title: "Tomato Sauce"))
       )
-      await cold.seedIfCold("Open the make-ahead discussion.")
+      #expect(await cold.seedIfCold("Open the make-ahead discussion."))
       #expect(cold.messages.map(\.text) == ["Open the make-ahead discussion.", "Start with the sauce."])
 
       let warm = RecipeChatModel(
         context: .recipe(RecipeChatRecipeContext(recipeID: recipeID, title: "Tomato Sauce"))
       )
       let existingMessages = warm.messages
-      await warm.seedIfCold("Do not send this second opener.")
+      #expect(!(await warm.seedIfCold("Do not send this second opener.")))
       expectNoDifference(warm.messages, existingMessages)
     }
   }
@@ -256,7 +256,7 @@ extension AIHandoffTests {
       let model = RecipeChatModel(
         context: .recipe(RecipeChatRecipeContext(title: "Tomato Sauce"))
       )
-      await model.seedIfCold("Open the make-ahead discussion.")
+      #expect(!(await model.seedIfCold("Open the make-ahead discussion.")))
       expectNoDifference(model.messages, [])
       #expect(model.errorText != nil)
     }

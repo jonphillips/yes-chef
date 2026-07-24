@@ -945,15 +945,20 @@ final class RecipeDetailModel {
       destination = .chat(chatModel)
       seededAskSection = section
       Task {
-        await chatModel.seedIfCold(seed)
+        let didSeed = await chatModel.seedIfCold(seed)
+        guard !didSeed, case let .chat(currentChatModel) = destination, currentChatModel === chatModel else {
+          return
+        }
+        seededAskSection = nil
       }
     case .close:
       destination = nil
     case .reseed:
-      guard let chatModel = destination.chat else { return }
-      seededAskSection = section
+      guard case let .chat(chatModel) = destination else { return }
       Task {
-        await chatModel.send(seed)
+        guard await chatModel.send(seed) else { return }
+        guard case let .chat(currentChatModel) = destination, currentChatModel === chatModel else { return }
+        seededAskSection = section
       }
     }
   }
