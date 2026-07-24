@@ -302,6 +302,7 @@ struct MealCalendarDayAgendaView: View {
           cookSession: cookSessionAction,
           chat: chatButtonTapped,
           handoffSource: handoffSource,
+          complementHandoffSource: complementHandoffSource,
           handoffTransport: handoffTransport
         )
       }
@@ -350,21 +351,6 @@ struct MealCalendarDayAgendaView: View {
 
   private var cookSessionPresentation: CookSessionPresentation? {
     CookSessionPresentation(plannerTitle: model.selectedDateTitle, rows: model.selectedDayRows)
-  }
-
-  private var handoffSource: HandoffExportSource? {
-    model.selectedDayRows
-      .sorted { lhs, rhs in
-        if lhs.item.mealSlot.sortOrder != rhs.item.mealSlot.sortOrder {
-          return lhs.item.mealSlot.sortOrder < rhs.item.mealSlot.sortOrder
-        }
-        if lhs.item.sortOrder != rhs.item.sortOrder {
-          return lhs.item.sortOrder < rhs.item.sortOrder
-        }
-        return lhs.item.id.uuidString < rhs.item.id.uuidString
-      }
-      .first
-      .map { .mealPlan($0.item.id) }
   }
 
   private var cookSessionAction: (() -> Void)? {
@@ -824,6 +810,7 @@ private struct MealCalendarDayHeader: View {
   var cookSession: (() -> Void)?
   var chat: () -> Void
   var handoffSource: HandoffExportSource?
+  var complementHandoffSource: HandoffExportSource?
   let handoffTransport: HandoffInAppTransport
 
   var body: some View {
@@ -886,8 +873,21 @@ private struct MealCalendarDayHeader: View {
   @ViewBuilder
   private var handoffControls: some View {
     if let handoffSource {
-      HandoffCopyPasteControls(source: handoffSource, transport: handoffTransport)
-        .buttonStyle(.bordered)
+      HStack {
+        HandoffCopyPasteControls(
+          source: handoffSource,
+          transport: handoffTransport,
+          copyLabel: "Copy Make-ahead Prompt"
+        )
+        if let complementHandoffSource {
+          HandoffCopyPasteControls(
+            source: complementHandoffSource,
+            transport: handoffTransport,
+            copyLabel: "Copy Complement Prompt"
+          )
+        }
+      }
+      .buttonStyle(.bordered)
     }
   }
 

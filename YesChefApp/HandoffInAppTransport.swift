@@ -76,6 +76,40 @@ final class HandoffInAppTransport {
     await stageReview(for: result, source: source)
   }
 
+  func pastedReaderFeedbackResults(
+    _ results: [String],
+    source: HandoffExportSource,
+    receive: (AIHandoffReaderFeedbackReview) -> Void
+  ) async {
+    guard let result = results.first, !result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      errorMessage = "No handoff result was pasted."
+      isShowingError = true
+      return
+    }
+
+    do {
+      guard let routedText = AIHandoffToken.stripping(from: result),
+        let handoff = try await database.read({ db in
+          try AIHandoffRepository.handoff(id: routedText.handoffID, in: db)
+        }), source.matches(handoff)
+      else {
+        presentUnmatched(result: result, source: source)
+        return
+      }
+      let review = try await database.write { db in
+        try AIHandoffIntentImport.stageReaderFeedbackReview(
+          handoffID: handoff.id,
+          result: result,
+          in: db,
+          now: now
+        )
+      }
+      receive(review)
+    } catch {
+      present(error)
+    }
+  }
+
   func reviewUnmatchedResult() async {
     guard let unmatchedResult, let unmatchedSource else { return }
     dismissUnmatchedConfirmation()
@@ -124,6 +158,7 @@ final class HandoffInAppTransport {
 struct HandoffCopyPasteControls: View {
   let source: HandoffExportSource
   let transport: HandoffInAppTransport
+  var copyLabel = "Copy Prompt"
 
   var body: some View {
     HStack(spacing: 8) {
@@ -132,7 +167,7 @@ struct HandoffCopyPasteControls: View {
           await transport.copyPrompt(for: source)
         }
       } label: {
-        Label("Copy Prompt", systemImage: "sparkles.square.filled.on.square")
+        Label(copyLabel, systemImage: "sparkles.square.filled.on.square")
       }
 
       PasteButton(payloadType: String.self) { results in
@@ -140,7 +175,33 @@ struct HandoffCopyPasteControls: View {
           await transport.pastedResultsReceived(results, source: source)
         }
       }
-      .accessibilityLabel("Paste Result")
+      .accessibilityLabel("Paste \(copyLabel) Result")
+    }
+  }
+}
+
+/// Reader feedback has no recipe row until the capture draft is saved. Its
+/// return therefore goes straight back to that draft's existing per-tip review,
+/// rather than into the global hand-off review coordinator.
+struct ReaderFeedbackHandoffControls: View {
+  let source: HandoffExportSource
+  let transport: HandoffInAppTransport
+  let receive: (AIHandoffReaderFeedbackReview) -> Void
+
+  var body: some View {
+    HStack(spacing: 8) {
+      Button {
+        Task { await transport.copyPrompt(for: source) }
+      } label: {
+        Label("Copy Curation Prompt", systemImage: "sparkles.square.filled.on.square")
+      }
+
+      PasteButton(payloadType: String.self) { results in
+        Task {
+          await transport.pastedReaderFeedbackResults(results, source: source, receive: receive)
+        }
+      }
+      .accessibilityLabel("Paste Reader Feedback Result")
     }
   }
 }

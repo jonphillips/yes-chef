@@ -20,6 +20,7 @@ struct RecipeCaptureView: View {
   let libraryModel: RecipeLibraryModel
   let model: RecipeCaptureModel
   @State private var readerFeedbackSheet: ReaderFeedbackSheet?
+  @State private var readerFeedbackHandoffTransport = HandoffInAppTransport()
 
   var body: some View {
     @Bindable var model = model
@@ -66,7 +67,8 @@ struct RecipeCaptureView: View {
         RecipeCaptureReviewSections(
           model: model,
           draft: draft,
-          readerFeedbackSheet: $readerFeedbackSheet
+          readerFeedbackSheet: $readerFeedbackSheet,
+          readerFeedbackHandoffTransport: readerFeedbackHandoffTransport
         )
       }
     }
@@ -118,6 +120,7 @@ struct RecipeCaptureView: View {
     } message: {
       Text(model.errorMessage ?? "")
     }
+    .handoffTransportAlert(readerFeedbackHandoffTransport)
     .confirmationDialog(
       "Discard this captured recipe?",
       isPresented: $model.isShowingDiscardConfirmation,
@@ -194,6 +197,7 @@ private struct RecipeCaptureReviewSections: View {
   @Bindable var model: RecipeCaptureModel
   let draft: WebRecipeCaptureDraft
   @Binding var readerFeedbackSheet: ReaderFeedbackSheet?
+  let readerFeedbackHandoffTransport: HandoffInAppTransport
 
   private var page: ParsedRecipePage {
     draft.page
@@ -287,6 +291,23 @@ private struct RecipeCaptureReviewSections: View {
                 systemImage: "doc.text.magnifyingglass"
               )
             }
+          }
+
+          if !model.readerFeedbackComments.isEmpty {
+            ReaderFeedbackHandoffControls(
+              source: .readerFeedback(
+                ReaderFeedbackHandoffContext(
+                  comments: model.readerFeedbackComments,
+                  sourceURL: page.sourceURL
+                )
+              ),
+              transport: readerFeedbackHandoffTransport,
+              receive: { review in
+                model.stageReaderFeedback(tips: review.tips, comments: model.readerFeedbackComments)
+                readerFeedbackSheet = .review
+              }
+            )
+            .buttonStyle(.bordered)
           }
 
           ForEach(model.readerFeedbackBlocks.indices, id: \.self) { index in

@@ -10,6 +10,16 @@ public struct MenuComplementPlan: Equatable, Sendable {
   }
 }
 
+public struct MenuComplementHandoffParseResult: Equatable, Sendable {
+  public var plan: MenuComplementPlan
+  public var unparsedBlocks: [String]
+
+  public init(plan: MenuComplementPlan, unparsedBlocks: [String]) {
+    self.plan = plan
+    self.unparsedBlocks = unparsedBlocks
+  }
+}
+
 public struct MenuComplementSuggestion: Equatable, Sendable {
   public var kind: MealPlanItemKind
   public var title: String
@@ -94,6 +104,59 @@ public struct MenuComplementSuggestion: Equatable, Sendable {
       $0.rawValue == slotText.normalizedMenuComplementEnumValue
         || $0.title.normalizedMenuComplementEnumValue == slotText.normalizedMenuComplementEnumValue
     }
+  }
+}
+
+public extension MenuComplementPlan {
+  /// Parses the deliberately human-editable external hand-off shape. Each
+  /// suggestion is a separate blank-line-delimited block so the reviewer can
+  /// accept, edit, or reject it independently before a menu write.
+  static func parsingHandoffText(_ text: String, dayCount: Int) -> MenuComplementHandoffParseResult {
+    let blocks = text
+      .components(separatedBy: "\n\n")
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+
+    var items: [MenuComplementSuggestion] = []
+    var unparsedBlocks: [String] = []
+    for block in blocks {
+      let lines = block.editableMenuComplementLines
+      guard lines.count >= 2,
+        let suggestion = handoffSuggestion(titleLine: lines[0], placementLine: lines[1], bodyLines: lines.dropFirst(2), dayCount: dayCount)
+      else {
+        unparsedBlocks.append(block)
+        continue
+      }
+      items.append(suggestion)
+    }
+    return MenuComplementHandoffParseResult(plan: MenuComplementPlan(items: items), unparsedBlocks: unparsedBlocks)
+  }
+
+  private static func handoffSuggestion(
+    titleLine: String,
+    placementLine: String,
+    bodyLines: ArraySlice<String>,
+    dayCount: Int
+  ) -> MenuComplementSuggestion? {
+    guard let title = titleLine.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).dropFirst().first
+      .map(String.init)?.cleanedMenuComplementText,
+      let dayText = placementLine.components(separatedBy: " - ").first?.cleanedMenuComplementText,
+      dayText.normalizedMenuComplementEnumValue.hasPrefix("day "),
+      let dayNumber = Int(dayText.normalizedMenuComplementEnumValue.dropFirst("day ".count)),
+      (1...dayCount).contains(dayNumber),
+      let slotText = placementLine.components(separatedBy: " - ").last?.cleanedMenuComplementText,
+      let mealSlot = MealPlanItemSlot.allCases.first(where: {
+        $0.rawValue == slotText.normalizedMenuComplementEnumValue
+          || $0.title.normalizedMenuComplementEnumValue == slotText.normalizedMenuComplementEnumValue
+      })
+    else { return nil }
+
+    return MenuComplementSuggestion(
+      title: title,
+      body: bodyLines.joined(separator: "\n").cleanedMenuComplementText,
+      dayOffset: dayNumber - 1,
+      mealSlot: mealSlot
+    )
   }
 }
 

@@ -219,6 +219,32 @@ public struct MealPlanHandoffContext: Equatable, Sendable {
     )
   }
 
+  public func complementPrompt() -> String {
+    @Dependency(\.aiPromptPreferences) var preferences
+    let settings = preferences.current()
+    return """
+    You are suggesting dishes that complement this one meal-plan day. Keep every accepted suggestion on this fixed
+    date; choose only its meal slot. Return a small number of concrete dishes that improve the day as a whole.
+
+    Return format: one blank-line-separated block per suggestion, exactly two lines each:
+    Note: short dish name
+    (title) - Meal slot
+
+    `Meal slot` must be Breakfast, Lunch, Dinner, or Snack. Do not return dates, recipe IDs, JSON, headings,
+    Markdown bullets, or a merged meal plan. Return no blocks when nothing usefully complements the day.
+
+    Do not include `YC-LEARNINGS:`. These are untested suggestions, not durable findings.
+
+    Taste profile:
+    \(settings.tasteProfile)
+
+    Complement preferences:
+    \(AISettingsRepository.preference(in: settings, for: .complements))
+
+    \(bounded(serialized()))
+    """
+  }
+
   public func serialized() -> String {
     var lines = ["The user is looking at this meal-plan day:", "- Date: \(title)"]
     let sortedRows = rows.sorted { lhs, rhs in
@@ -289,6 +315,78 @@ public struct MealPlanHandoffContext: Equatable, Sendable {
     Two days ahead: Make the sauce.
 
     \(context)
+    """
+  }
+}
+
+public struct MenuHandoffContext: Equatable, Sendable {
+  public let menu: MenuChatContext
+
+  public init(detail: MenuDetailData) {
+    self.menu = MenuChatContext(detail: detail)
+  }
+
+  public func complementPrompt() -> String {
+    @Dependency(\.aiPromptPreferences) var preferences
+    let settings = preferences.current()
+    return """
+    You are suggesting dishes that complement this multi-day menu. Return a small number of concrete, freeform
+    dish ideas that fill real gaps without replacing the menu's existing dishes.
+
+    Return format: one blank-line-separated block per suggestion:
+    Note: short dish name
+    Day N - Meal slot
+    optional ingredient and method detail
+
+    `N` must be an existing menu day and `Meal slot` must be Breakfast, Lunch, Dinner, or Snack. Keep any optional
+    detail specific to that one dish. Do not return recipe IDs, JSON, headings, Markdown bullets, or a merged menu.
+    Return no blocks when nothing usefully complements the menu.
+
+    Do not include `YC-LEARNINGS:`. These are untested suggestions, not durable findings.
+
+    Taste profile:
+    \(settings.tasteProfile)
+
+    Complement preferences:
+    \(AISettingsRepository.preference(in: settings, for: .complements))
+
+    \(menu.serialized(for: .frontierPreferred))
+    """
+  }
+}
+
+public struct ReaderFeedbackHandoffContext: Equatable, Sendable {
+  public let comments: [RawComment]
+  public let sourceURL: URL?
+
+  public init(comments: [RawComment], sourceURL: URL?) {
+    self.comments = comments
+    self.sourceURL = sourceURL
+  }
+
+  public func prompt() -> String {
+    @Dependency(\.aiPromptPreferences) var preferences
+    let settings = preferences.current()
+    let renderedComments = comments.enumerated().map { index, comment in
+      "Comment \(index + 1) (helpful count: \(comment.helpfulCount)):\n\(comment.text)"
+    }
+    .joined(separator: "\n\n")
+    return """
+    Curate these reader comments into a small set of distinct, non-obvious, durable cooking tips. Preserve separate
+    changes as separate lines; consensus may be distilled within one line, but never blend unrelated changes.
+
+    Return format: one atomic reader-feedback point per line. No bullets, headings, numbering, JSON, prose preamble,
+    source-comment quotations, or Markdown. Return no lines when nothing clears the bar.
+
+    Do not include `YC-LEARNINGS:`. This is curated source evidence awaiting the cook's review, not a new finding.
+
+    Reader-feedback preferences:
+    \(AISettingsRepository.preference(in: settings, for: .readerFeedback))
+
+    Source URL: \(sourceURL?.absoluteString ?? "(unknown)")
+
+    Reader comments:
+    \(renderedComments)
     """
   }
 }

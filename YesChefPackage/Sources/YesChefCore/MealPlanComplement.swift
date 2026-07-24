@@ -10,6 +10,16 @@ public struct MealPlanComplementPlan: Equatable, Sendable {
   }
 }
 
+public struct MealPlanComplementHandoffParseResult: Equatable, Sendable {
+  public var plan: MealPlanComplementPlan
+  public var unparsedBlocks: [String]
+
+  public init(plan: MealPlanComplementPlan, unparsedBlocks: [String]) {
+    self.plan = plan
+    self.unparsedBlocks = unparsedBlocks
+  }
+}
+
 public struct MealPlanComplementSuggestion: Equatable, Sendable {
   public var kind: MealPlanItemKind
   public var title: String
@@ -70,6 +80,41 @@ public struct MealPlanComplementSuggestion: Equatable, Sendable {
       $0.rawValue == slotText.normalizedMealPlanComplementEnumValue
         || $0.title.normalizedMealPlanComplementEnumValue == slotText.normalizedMealPlanComplementEnumValue
     }
+  }
+}
+
+public extension MealPlanComplementPlan {
+  /// Parses one complement per blank-line-delimited block from an external
+  /// hand-off. The date remains out of the response: the hand-off's source
+  /// day is the only valid destination.
+  static func parsingHandoffText(_ text: String) -> MealPlanComplementHandoffParseResult {
+    let blocks = text
+      .components(separatedBy: "\n\n")
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+
+    var items: [MealPlanComplementSuggestion] = []
+    var unparsedBlocks: [String] = []
+    for block in blocks {
+      let lines = block.editableMealPlanComplementLines
+      guard lines.count == 2,
+        let title = lines[0].split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).dropFirst().first
+          .map(String.init)?.cleanedMealPlanComplementText,
+        let slotText = lines[1].components(separatedBy: " - ").last?.cleanedMealPlanComplementText,
+        let mealSlot = MealPlanItemSlot.allCases.first(where: {
+          $0.rawValue == slotText.normalizedMealPlanComplementEnumValue
+            || $0.title.normalizedMealPlanComplementEnumValue == slotText.normalizedMealPlanComplementEnumValue
+        })
+      else {
+        unparsedBlocks.append(block)
+        continue
+      }
+      items.append(MealPlanComplementSuggestion(title: title, mealSlot: mealSlot))
+    }
+    return MealPlanComplementHandoffParseResult(
+      plan: MealPlanComplementPlan(items: items),
+      unparsedBlocks: unparsedBlocks
+    )
   }
 }
 

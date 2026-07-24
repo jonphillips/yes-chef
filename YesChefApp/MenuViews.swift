@@ -401,6 +401,7 @@ struct MenuPrepPlanSection: View {
   let steps: [PrepPlanStepRecord]
   let itemRows: [MenuItemRowData]
   let handoffSource: HandoffExportSource
+  let complementHandoffSource: HandoffExportSource
   let handoffTransport: HandoffInAppTransport
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var clearPrepPlan: () -> Void
@@ -444,8 +445,19 @@ struct MenuPrepPlanSection: View {
       }
 
       if isExpanded {
-        HandoffCopyPasteControls(source: handoffSource, transport: handoffTransport)
-          .buttonStyle(.bordered)
+        HStack {
+          HandoffCopyPasteControls(
+            source: handoffSource,
+            transport: handoffTransport,
+            copyLabel: "Copy Prep Plan Prompt"
+          )
+          HandoffCopyPasteControls(
+            source: complementHandoffSource,
+            transport: handoffTransport,
+            copyLabel: "Copy Complement Prompt"
+          )
+        }
+        .buttonStyle(.bordered)
 
         HStack {
           Button {
