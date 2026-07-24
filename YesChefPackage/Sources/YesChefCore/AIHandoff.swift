@@ -97,6 +97,14 @@ public enum PlaybookSectionKind: String, CaseIterable, Codable, QueryBindable, Q
     case .serveWith: .serveWith
     }
   }
+
+  public var deliverableFormat: AIHandoffToken.DeliverableFormat {
+    switch self {
+    case .makeAhead: .recipeMakeAhead
+    case .chefItUp: .recipeChefItUp
+    case .serveWith: .recipeServeWith
+    }
+  }
 }
 
 public extension AIHandoff {
@@ -494,13 +502,7 @@ public enum AIHandoffToken {
     let titlePrefix = titleLine.isEmpty ? "" : "\(titleLine)\n"
     switch mode {
     case .discuss:
-      return """
-      \(titlePrefix)\(token)
-
-      \(context)
-
-      You may discuss this freely. When the user asks you to finalize, return \(deliverableFormat.discussInstruction).
-      """
+      return "\(titlePrefix)\(token)\n\n\(discussAsk(context: context, deliverableFormat: deliverableFormat))"
     case .immediate:
       return """
       \(titlePrefix)\(token)
@@ -510,6 +512,19 @@ public enum AIHandoffToken {
       \(deliverableFormat.immediateInstruction)
       """
     }
+  }
+
+  /// The conversational opening shared by external hand-offs and onboard seeded discussions.
+  /// Transport-specific title and routing-token lines are intentionally added by `prompt` instead.
+  public static func discussAsk(
+    context: String,
+    deliverableFormat: DeliverableFormat = .menuPrepPlan
+  ) -> String {
+    """
+    \(context)
+
+    You may discuss this freely. When the user asks you to finalize, return \(deliverableFormat.discussInstruction).
+    """
   }
 
   public static func header(handoffID: AIHandoff.ID) -> String {

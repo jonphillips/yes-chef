@@ -929,7 +929,7 @@ final class RecipeDetailModel {
     destination = .scaling
   }
 
-  func chatButtonTapped() {
+  func chatButtonTapped(section: PlaybookSectionKind = .makeAhead) {
     guard let detail else { return }
     // Toggle: Ask is a non-modal companion on wide iPad, so its trigger stays live
     // beside the open panel. Re-tapping closes it (rather than rebuilding the model and
@@ -938,7 +938,12 @@ final class RecipeDetailModel {
       destination = nil
       return
     }
-    destination = .chat(RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail))))
+    let chatModel = RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail)))
+    destination = .chat(chatModel)
+    let seed = RecipeHandoffContext(detail: detail).discussAsk(for: section)
+    Task {
+      await chatModel.send(seed)
+    }
   }
 
   func openWorkbenchButtonTapped() {
