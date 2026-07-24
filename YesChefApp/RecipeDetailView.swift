@@ -255,6 +255,9 @@ private struct RecipeAskPresentationModifier: ViewModifier {
           RecipeChatPanel(
             chatModel: chatModel,
             applyActions: model.applyActionCatalog(for: chatModel),
+            finalization: model.seededAskSection.map {
+              ChatFinalizeConfiguration.recipe(recipeID: model.recipeID, section: $0)
+            },
             selectSection: model.askSection,
             activeSection: model.seededAskSection,
             onDismiss: { model.destination = nil }
@@ -277,6 +280,9 @@ private struct RecipeAskPresentationModifier: ViewModifier {
     RecipeChatPanel(
       chatModel: chatModel,
       applyActions: model.applyActionCatalog(for: chatModel),
+      finalization: model.seededAskSection.map {
+        ChatFinalizeConfiguration.recipe(recipeID: model.recipeID, section: $0)
+      },
       selectSection: model.askSection,
       activeSection: model.seededAskSection,
       onDismiss: { model.destination = nil }

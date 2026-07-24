@@ -389,7 +389,8 @@ struct MenuDetailView: View {
     case let .chat(chatModel):
       RecipeChatPanel(
         chatModel: chatModel,
-        applyActions: detailModel.applyActionCatalog(for: chatModel)
+        applyActions: detailModel.applyActionCatalog(for: chatModel),
+        finalization: .menu(menuID: detailModel.menuID)
       )
     }
   }

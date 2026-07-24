@@ -189,6 +189,7 @@ extension RecipeCoreTests {
 
       let request = await recorder.first()
       expectNoDifference(request?.tier, .frontier(.openai))
+      expectNoDifference(request?.maxTokens, 4096)
       expectNoDifference(request?.reasoningEffort, .high)
       expectNoDifference(request?.promptPreferenceKey, AIPromptPreferenceKind.makeAheadPrepPlan.rawValue)
       #expect(request?.messages.first?.text.contains("User-selected subject:\nMake the sauce a day ahead.") == true)

@@ -1,3 +1,4 @@
+import Dependencies
 import LLMClientKit
 import SwiftUI
 import UIKit
@@ -225,6 +226,10 @@ private struct ChatWorkspaceDivider: View {
 struct RecipeChatPanel: View {
   let chatModel: RecipeChatModel
   let applyActions: [AnyChatApplyAction]
+  /// The one deliverable control for a seeded discussion. It chooses terminal-return parsing on
+  /// frontier models and the existing structured extractor on-device, rather than exposing two
+  /// competing controls for the same result (ADR-0045 V2 / OQ1).
+  var finalization: ChatFinalizeConfiguration?
   var showsEmbeddedHeader = false
   /// When set, the panel's title becomes a **Discuss ▾** section switcher — the same section-picking
   /// control as the playbook's Ask ▾ launcher, and the only way to re-scope on iPhone where the
@@ -244,6 +249,8 @@ struct RecipeChatPanel: View {
   @State private var isReviewSheetPresented = false
   @State private var actionError: String?
   @State private var confirmingClearChat = false
+  @State private var isFinalizing = false
+  @Dependency(\.handoffReviewCoordinator) private var handoffReviewCoordinator
 
   var body: some View {
     @Bindable var chatModel = chatModel
@@ -300,8 +307,29 @@ struct RecipeChatPanel: View {
           )
         }
 
+        if let finalization, let finalizeAction {
+          Button {
+            Task { await finalize(finalization, using: finalizeAction) }
+          } label: {
+            Label(
+              isFinalizing ? "Finalizing…" : finalization.title,
+              systemImage: isFinalizing ? "hourglass" : "checkmark.seal"
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+          }
+          .buttonStyle(.borderedProminent)
+          .disabled(
+            !canFinalize
+              || chatModel.isResponding
+              || applyingActionID != nil
+              || isFinalizing
+              || committingReviewItemID != nil
+          )
+          .accessibilityHint(Text("Creates the final deliverable from this discussion for review."))
+        }
+
         Menu {
-          ForEach(applyActions) { action in
+          ForEach(visibleApplyActions) { action in
             Button {
               Task { await run(action) }
             } label: {
@@ -315,11 +343,12 @@ struct RecipeChatPanel: View {
         }
         .buttonStyle(.bordered)
         .disabled(
-          applyActions.isEmpty
+          visibleApplyActions.isEmpty
             || chatModel.isResponding
             || applyingActionID != nil
+            || isFinalizing
             || committingReviewItemID != nil
-            || !applyActions.contains(where: canRun)
+            || !visibleApplyActions.contains(where: canRun)
         )
 
         HStack(alignment: .bottom, spacing: 8) {
@@ -409,6 +438,37 @@ struct RecipeChatPanel: View {
     stagedReviewItems = []
     isReviewSheetPresented = false
     await chatModel.send(text)
+  }
+
+  @MainActor
+  private func finalize(
+    _ finalization: ChatFinalizeConfiguration,
+    using action: AnyChatApplyAction
+  ) async {
+    guard canFinalize else { return }
+
+    if case .onDevice = chatModel.activeTier {
+      await run(action)
+      return
+    }
+
+    isFinalizing = true
+    actionError = nil
+    defer { isFinalizing = false }
+
+    // The seed already teaches the shared discussion convention: this is the visible equivalent
+    // of the cook typing “finalize,” not a second authored prompt or return parser.
+    guard await chatModel.send("Finalize.") else { return }
+    guard let result = latestReplySubject?.text else { return }
+
+    do {
+      try await handoffReviewCoordinator.stageOnboardReview(
+        source: finalization.source,
+        result: result
+      )
+    } catch {
+      actionError = RecipeChatErrorText.describe(error)
+    }
   }
 
   @MainActor
@@ -524,6 +584,20 @@ struct RecipeChatPanel: View {
     return latestReplySubject
   }
 
+  private var finalizeAction: AnyChatApplyAction? {
+    guard let finalization else { return nil }
+    return applyActions.first { $0.id == finalization.actionID }
+  }
+
+  private var visibleApplyActions: [AnyChatApplyAction] {
+    guard let finalization else { return applyActions }
+    return applyActions.filter { $0.id != finalization.actionID }
+  }
+
+  private var canFinalize: Bool {
+    latestReplySubject != nil
+  }
+
   private func actionSubject(for action: AnyChatApplyAction) -> ChatActionSubject? {
     if let selectionSubject {
       return selectionSubject
@@ -576,126 +650,6 @@ struct RecipeChatPanel: View {
     isReviewSheetPresented = false
     actionError = nil
     chatModel.clear()
-  }
-}
-
-private struct ChatContextHeader: View {
-  let chatModel: RecipeChatModel
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Text(chatModel.context.seededContextDescription)
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-  }
-}
-
-private struct ChatTierMenu: View {
-  let chatModel: RecipeChatModel
-
-  var body: some View {
-    @Bindable var chatModel = chatModel
-
-    Menu {
-      Button {
-        chatModel.useFrontier = false
-      } label: {
-        Label("On-device (private)", systemImage: "iphone")
-        if !chatModel.sendsToProvider {
-          Image(systemName: "checkmark")
-        }
-      }
-
-      ForEach(FrontierProvider.allCases) { provider in
-        Button {
-          chatModel.selectedProvider = provider
-          chatModel.useFrontier = true
-        } label: {
-          Label("\(provider.displayName) (sends data off device)", systemImage: "network")
-          if chatModel.sendsToProvider, chatModel.selectedProvider == provider {
-            Image(systemName: "checkmark")
-          }
-        }
-        .disabled(!chatModel.availableProviders.contains(provider))
-      }
-    } label: {
-      HStack(spacing: 4) {
-        Image(systemName: chatModel.sendsToProvider ? "network" : "iphone")
-          .foregroundStyle(chatModel.sendsToProvider ? .blue : .green)
-        Text(chatModel.sendsToProvider ? chatModel.selectedProvider.displayName : "On-device")
-          .font(.subheadline)
-        Image(systemName: "chevron.up.chevron.down")
-          .font(.caption2)
-          .foregroundStyle(.secondary)
-      }
-    }
-    .accessibilityHint(Text("Choose whether recipe context stays on device or is sent to a configured provider."))
-  }
-}
-
-private struct ChatActionSubject: Equatable {
-  enum Source {
-    case selection
-    case latestReply
-
-    var logDescription: String {
-      switch self {
-      case .selection: "explicit-selection-subject-chip"
-      case .latestReply: "latestReplySubject-fallback"
-      }
-    }
-  }
-
-  var source: Source
-  var text: String
-
-  var label: String {
-    switch source {
-    case .selection: "Acting on your selection"
-    case .latestReply: "Acting on latest reply"
-    }
-  }
-
-  var snippet: String {
-    let flattened = text
-      .replacingOccurrences(of: "\n", with: " ")
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-    guard flattened.count > 120 else { return flattened }
-    return "\(flattened.prefix(120))..."
-  }
-}
-
-private struct ChatActionSubjectView: View {
-  let subject: ChatActionSubject
-  var onClear: (() -> Void)?
-
-  var body: some View {
-    HStack(alignment: .top, spacing: 8) {
-      VStack(alignment: .leading, spacing: 4) {
-        Text(subject.label)
-          .font(.caption.bold())
-          .foregroundStyle(.secondary)
-        Text(subject.snippet)
-          .font(.caption)
-          .lineLimit(2)
-          .foregroundStyle(.secondary)
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-
-      if let onClear {
-        Button(action: onClear) {
-          Label("Clear selection", systemImage: "xmark.circle.fill")
-            .labelStyle(.iconOnly)
-            .font(.body)
-            .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text("Clear selection"))
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
 
