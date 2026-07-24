@@ -329,7 +329,7 @@ private struct RecipeReaderView: View {
   @State private var promotingVariation: RecipeVariation?
   @State private var splittingOffVariation: RecipeVariation?
   @State private var splitOffTitleDraft = ""
-  @State private var unrepresentablePromotionNames: [String] = []
+  @State private var pendingVariationRemoval: PendingVariationRemoval?
 
   var body: some View {
     GeometryReader { proxy in
@@ -403,7 +403,7 @@ private struct RecipeReaderView: View {
     .recipeVariationPromotionPresentation(
       model: model,
       promotingVariation: $promotingVariation,
-      unrepresentablePromotionNames: $unrepresentablePromotionNames
+      pendingVariationRemoval: $pendingVariationRemoval
     )
   }
 

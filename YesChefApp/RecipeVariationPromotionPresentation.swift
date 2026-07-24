@@ -155,10 +155,18 @@ struct RecipeVariationPicker: View {
   }
 }
 
+/// The variation the cook chose to promote, carried into the second (removal) dialog so it
+/// never has to be guessed from the active selection. Promoting a *non-active* variation that
+/// needs a removal confirmation must act on the promoted variation, not on whatever is active.
+struct PendingVariationRemoval: Equatable {
+  let variation: RecipeVariation
+  let names: [String]
+}
+
 private struct RecipeVariationPromotionPresentation: ViewModifier {
   let model: RecipeDetailModel
   @Binding var promotingVariation: RecipeVariation?
-  @Binding var unrepresentablePromotionNames: [String]
+  @Binding var pendingVariationRemoval: PendingVariationRemoval?
 
   func body(content: Content) -> some View {
     content
@@ -177,8 +185,10 @@ private struct RecipeVariationPromotionPresentation: ViewModifier {
             case .promoted:
               promotingVariation = nil
             case let .needsConfirmation(names):
+              // Capture the promoted variation with its names; the first dialog's
+              // isPresented setter is about to nil `promotingVariation` on dismissal.
+              pendingVariationRemoval = PendingVariationRemoval(variation: variation, names: names)
               promotingVariation = nil
-              unrepresentablePromotionNames = names
             case nil:
               break
             }
@@ -191,25 +201,24 @@ private struct RecipeVariationPromotionPresentation: ViewModifier {
       .confirmationDialog(
         "Remove variations that cannot follow the new base?",
         isPresented: Binding(
-          get: { !unrepresentablePromotionNames.isEmpty },
-          set: { if !$0 { unrepresentablePromotionNames = [] } }
+          get: { pendingVariationRemoval != nil },
+          set: { if !$0 { pendingVariationRemoval = nil } }
         ),
         titleVisibility: .visible
       ) {
         Button("Promote and Remove Variations", role: .destructive) {
-          guard let variation = promotingVariation ?? model.detail?.activeVariation else { return }
+          guard let pending = pendingVariationRemoval else { return }
           Task {
             _ = await model.promoteVariationButtonTapped(
-              variation.id,
+              pending.variation.id,
               confirmingRemovalOfUnrepresentableVariations: true
             )
-            promotingVariation = nil
-            unrepresentablePromotionNames = []
+            pendingVariationRemoval = nil
           }
         }
         Button("Cancel", role: .cancel) {}
       } message: {
-        Text(unrepresentablePromotionNames.joined(separator: ", ") + " cannot be re-anchored to the new base.")
+        Text((pendingVariationRemoval?.names ?? []).joined(separator: ", ") + " cannot be re-anchored to the new base.")
       }
   }
 }
@@ -218,13 +227,13 @@ extension View {
   func recipeVariationPromotionPresentation(
     model: RecipeDetailModel,
     promotingVariation: Binding<RecipeVariation?>,
-    unrepresentablePromotionNames: Binding<[String]>
+    pendingVariationRemoval: Binding<PendingVariationRemoval?>
   ) -> some View {
     modifier(
       RecipeVariationPromotionPresentation(
         model: model,
         promotingVariation: promotingVariation,
-        unrepresentablePromotionNames: unrepresentablePromotionNames
+        pendingVariationRemoval: pendingVariationRemoval
       )
     )
   }
