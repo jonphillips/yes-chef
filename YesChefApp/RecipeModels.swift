@@ -945,31 +945,40 @@ final class RecipeDetailModel {
     guard let detail else { return }
     let seed = RecipeHandoffContext(detail: detail).discussAsk(for: section)
 
-    if case let .chat(chatModel) = destination {
-      // Already open: switch section, keeping the transcript. No-op if it is already this section.
-      // Scope moves only after a real send, so a no-op send never re-labels the panel.
-      guard seededAskSection != section else { return }
-      Task {
-        guard await chatModel.send(seed) else { return }
-        guard case let .chat(currentChatModel) = destination, currentChatModel === chatModel else { return }
-        seededAskSection = section
-      }
-      return
+    // Ensure a panel. The recipe's chat thread persists *per recipe*, so a freshly-opened panel may
+    // restore a warm thread from an earlier section — reopening for a different section must still
+    // deliver this section's opener, not fall silent on the old exchange.
+    let chatModel: RecipeChatModel
+    if case let .chat(existing) = destination {
+      guard seededAskSection != section else { return }  // already showing this section
+      chatModel = existing
+    } else {
+      chatModel = RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail)))
+      destination = .chat(chatModel)
     }
 
-    // Cold open.
-    let chatModel = RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail)))
-    destination = .chat(chatModel)
-    seededAskSection = section
     Task {
-      // Only a failed seed un-scopes the panel. A warm thread keeps the scope: it needed no opener.
-      guard
-        await chatModel.seedIfCold(seed) == .failed,
-        case let .chat(currentChatModel) = destination,
-        currentChatModel === chatModel
-      else { return }
-      seededAskSection = nil
+      // Cold thread: seed it, with clean failure handling on the empty panel. Warm thread (restored
+      // or ongoing): the cook explicitly picked this section, so append its opener to the transcript.
+      switch await chatModel.seedIfCold(seed) {
+      case .seeded:
+        guard isShowing(chatModel) else { return }
+        seededAskSection = section
+      case .failed:
+        guard isShowing(chatModel) else { return }
+        seededAskSection = nil
+      case .alreadyWarm:
+        // A no-op send (e.g. a reply is mid-flight) must not re-label the panel, so scope moves only
+        // after a real send.
+        guard await chatModel.send(seed), isShowing(chatModel) else { return }
+        seededAskSection = section
+      }
     }
+  }
+
+  private func isShowing(_ chatModel: RecipeChatModel) -> Bool {
+    if case let .chat(current) = destination { return current === chatModel }
+    return false
   }
 
   func openWorkbenchButtonTapped() {
