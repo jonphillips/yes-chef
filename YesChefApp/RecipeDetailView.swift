@@ -607,7 +607,7 @@ private struct RecipeReaderView: View {
       RecipePlaybookView(
         model: model,
         handoffTransport: handoffTransport,
-        ask: model.chatButtonTapped
+        ask: model.chatButtonTapped(section:)
       )
     }
   }
@@ -667,7 +667,7 @@ private struct RecipeReaderView: View {
           RecipePlaybookView(
             model: model,
             handoffTransport: handoffTransport,
-            ask: model.chatButtonTapped
+            ask: model.chatButtonTapped(section:)
           )
           .padding()
           .frame(maxWidth: .infinity, alignment: .topLeading)

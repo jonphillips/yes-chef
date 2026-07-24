@@ -331,7 +331,12 @@ struct MenuDetailView: View {
 
   private func ensureChatIsOpen() {
     guard let detail = detailModel.detail else { return }
-    presentTool(.chat(RecipeChatModel(context: .menu(MenuChatContext(detail: detail)))))
+    let context = MenuChatContext(detail: detail)
+    let chatModel = RecipeChatModel(context: .menu(context))
+    presentTool(.chat(chatModel))
+    Task {
+      await chatModel.send(context.discussAsk())
+    }
   }
 
   private func recipeBrowserButtonTapped() {

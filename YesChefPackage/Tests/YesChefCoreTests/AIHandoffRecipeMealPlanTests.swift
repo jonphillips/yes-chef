@@ -147,6 +147,39 @@ extension AIHandoffTests {
     #expect(serveWith.contains("Do not use bullets, Markdown emphasis, an introduction"))
   }
 
+  @Test
+  func sectionDiscussAskSharesTheExternalDiscussionOpeningWithoutItsToken() {
+    let context = RecipeHandoffContext(recipe: RecipeChatRecipeContext(title: "Chili"))
+
+    let ask = context.discussAsk(for: .chefItUp)
+    let exported = AIHandoffToken.prompt(
+      handoffID: SampleUUIDSequence.uuid(38_042),
+      context: context.prompt(for: .chefItUp),
+      deliverableFormat: .recipeChefItUp
+    )
+
+    #expect(ask.contains("You are preparing practical Chef It Up notes for one recipe."))
+    #expect(ask.contains("When the user asks you to finalize, return the paste-ready Chef It Up notes."))
+    #expect(!ask.contains(AIHandoffToken.prefix))
+    #expect(exported.hasSuffix(ask))
+  }
+
+  @Test
+  func menuDiscussAskSharesTheExternalDiscussionOpeningWithoutItsToken() {
+    let context = MenuChatContext(title: "Beach Menu", dayCount: 2)
+
+    let ask = context.discussAsk()
+    let exported = AIHandoffToken.prompt(
+      handoffID: SampleUUIDSequence.uuid(38_043),
+      context: context.prepPrompt()
+    )
+
+    #expect(ask.contains("You weave a staged prep plan for one multi-day menu"))
+    #expect(ask.contains("When the user asks you to finalize, return the paste-ready prep plan."))
+    #expect(!ask.contains(AIHandoffToken.prefix))
+    #expect(exported.hasSuffix(ask))
+  }
+
   /// The Playbook hands off in `.discuss` mode, and each context owns its format — so each blob
   /// section's own prompt has to carry the flat-list contract or the return comes back as a headed report.
   @Test

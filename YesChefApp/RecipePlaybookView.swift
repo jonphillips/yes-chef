@@ -5,7 +5,7 @@ import YesChefCore
 struct RecipePlaybookView: View {
   let model: RecipeDetailModel
   let handoffTransport: HandoffInAppTransport
-  let ask: () -> Void
+  let ask: (PlaybookSectionKind) -> Void
 
   @State private var isMakeAheadExpanded = true
   @State private var isNotesExpanded = true
@@ -112,7 +112,9 @@ struct RecipePlaybookView: View {
   }
 
   private var askButton: some View {
-    Button(action: ask) {
+    Button {
+      ask(.makeAhead)
+    } label: {
       Label("Ask", systemImage: "sparkles")
     }
     .buttonStyle(.bordered)
@@ -280,7 +282,9 @@ struct RecipePlaybookView: View {
         editingSection = section
       }
 
-      Button("Ask", action: ask)
+      Button("Ask") {
+        ask(section)
+      }
 
       if isFilled {
         Button("Clear", role: .destructive) {

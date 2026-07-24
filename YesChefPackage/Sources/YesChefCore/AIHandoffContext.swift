@@ -43,6 +43,15 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     }
   }
 
+  /// The opening user message for an onboard discussion of one Playbook section.
+  /// It deliberately shares the external hand-off's `.discuss` wording, without its routing token.
+  public func discussAsk(for section: PlaybookSectionKind) -> String {
+    AIHandoffToken.discussAsk(
+      context: prompt(for: section),
+      deliverableFormat: section.deliverableFormat
+    )
+  }
+
   /// Recipe-body hand-offs have a different return shape from Playbook sections: they outboard
   /// deliberation, then bring back prose that the in-app extractor resolves against live rows.
   public func prompt(forTask task: AIHandoffTaskType) -> String {
@@ -352,6 +361,14 @@ public struct MenuHandoffContext: Equatable, Sendable {
 
     \(menu.serialized(for: .frontierPreferred))
     """
+  }
+}
+
+public extension MenuChatContext {
+  /// The opening user message for an onboard discussion of this menu's prep plan.
+  /// It deliberately shares the external hand-off's `.discuss` wording, without its routing token.
+  func discussAsk() -> String {
+    AIHandoffToken.discussAsk(context: prepPrompt())
   }
 }
 
