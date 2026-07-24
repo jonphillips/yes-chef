@@ -739,6 +739,16 @@ public enum RecipeChatErrorText {
   }
 }
 
+/// What `seedIfCold` did, for callers that track which section an open panel is scoped to.
+public enum RecipeChatSeedOutcome: Equatable, Sendable {
+  /// The seed was sent and the thread holds its reply.
+  case seeded
+  /// The thread was already warm, so no seed was needed — a restored transcript is not a failure.
+  case alreadyWarm
+  /// The seed could not be delivered; any orphaned user message was removed and the panel is cold again.
+  case failed
+}
+
 @MainActor
 @Observable
 public final class RecipeChatModel: Identifiable {
@@ -826,18 +836,23 @@ public final class RecipeChatModel: Identifiable {
 
   /// Sends `text` only when the thread is cold. The seeded opener exists to remove a cold start
   /// (ADR-0045 OQ4); a restored thread already has a reply, so `latestReplySubject` is already non-nil.
+  ///
+  /// A warm thread and a failed seed are **not** the same answer: the warm panel is scoped and needs
+  /// nothing, while the failed one is back to its cold empty state (ADR-0045 A3/A4). Callers that track
+  /// what the panel is scoped to must be able to tell them apart.
   @discardableResult
-  public func seedIfCold(_ text: String) async -> Bool {
-    guard messages.isEmpty, await send(text) else { return false }
+  public func seedIfCold(_ text: String) async -> RecipeChatSeedOutcome {
+    guard messages.isEmpty else { return .alreadyWarm }
+    guard await send(text) else { return .failed }
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard
       messages.count == 1,
       messages[0].role == .user,
       messages[0].text == trimmed
-    else { return true }
+    else { return .seeded }
     messages.removeAll()
     persistCurrentThread()
-    return false
+    return .failed
   }
 
   public func stop() {

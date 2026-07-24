@@ -945,10 +945,13 @@ final class RecipeDetailModel {
       destination = .chat(chatModel)
       seededAskSection = section
       Task {
-        let didSeed = await chatModel.seedIfCold(seed)
-        guard !didSeed, case let .chat(currentChatModel) = destination, currentChatModel === chatModel else {
-          return
-        }
+        // Only a failed seed un-scopes the panel. A warm thread keeps the scope: it needed no
+        // opener, and clearing it would turn the same-section dismiss tap into a re-seed.
+        guard
+          await chatModel.seedIfCold(seed) == .failed,
+          case let .chat(currentChatModel) = destination,
+          currentChatModel === chatModel
+        else { return }
         seededAskSection = nil
       }
     case .close:

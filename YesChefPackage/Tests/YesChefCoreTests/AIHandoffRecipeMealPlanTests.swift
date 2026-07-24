@@ -234,14 +234,15 @@ extension AIHandoffTests {
       let cold = RecipeChatModel(
         context: .recipe(RecipeChatRecipeContext(recipeID: recipeID, title: "Tomato Sauce"))
       )
-      #expect(await cold.seedIfCold("Open the make-ahead discussion."))
+      #expect(await cold.seedIfCold("Open the make-ahead discussion.") == .seeded)
       #expect(cold.messages.map(\.text) == ["Open the make-ahead discussion.", "Start with the sauce."])
 
       let warm = RecipeChatModel(
         context: .recipe(RecipeChatRecipeContext(recipeID: recipeID, title: "Tomato Sauce"))
       )
       let existingMessages = warm.messages
-      #expect(!(await warm.seedIfCold("Do not send this second opener.")))
+      // A warm thread reports `.alreadyWarm`, never `.failed` — the caller keeps the panel's scope.
+      #expect(await warm.seedIfCold("Do not send this second opener.") == .alreadyWarm)
       expectNoDifference(warm.messages, existingMessages)
     }
   }
@@ -256,7 +257,7 @@ extension AIHandoffTests {
       let model = RecipeChatModel(
         context: .recipe(RecipeChatRecipeContext(title: "Tomato Sauce"))
       )
-      #expect(!(await model.seedIfCold("Open the make-ahead discussion.")))
+      #expect(await model.seedIfCold("Open the make-ahead discussion.") == .failed)
       expectNoDifference(model.messages, [])
       #expect(model.errorText != nil)
     }
