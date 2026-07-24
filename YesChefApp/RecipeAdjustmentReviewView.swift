@@ -142,8 +142,9 @@ struct RecipeAdjustmentReviewView: View {
 
 private extension RecipeAdjustmentReviewState {
   var defaultVariationName: String {
-    let summary = proposal.summary.trimmingCharacters(in: .whitespacesAndNewlines)
-    return summary.isEmpty ? "\(currentDetail.recipe.title) Variation" : summary
+    // A proposal summary can be a sentence. A concise default keeps the active
+    // version readable if the cook chooses to keep it without renaming first.
+    "Variation"
   }
 }
 

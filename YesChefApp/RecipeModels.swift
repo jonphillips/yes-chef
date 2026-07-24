@@ -785,6 +785,7 @@ final class RecipeDetailModel {
     case chat(RecipeChatModel)
     case workbench(WorkbenchPresentation)
     case adjustmentReview(RecipeAdjustmentReviewState)
+    case variationEditor(RecipeVariation.ID)
   }
 
   let recipeID: Recipe.ID
