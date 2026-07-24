@@ -194,7 +194,7 @@ extension HandoffExportSource {
   func matches(_ handoff: AIHandoff) -> Bool {
     switch self {
     case .readerFeedback:
-      handoff.sourceType == .capture
+      return handoff.sourceType == .capture
         && handoff.sourceID == handoff.id
         && handoff.taskType == .readerFeedbackCuration
     default:

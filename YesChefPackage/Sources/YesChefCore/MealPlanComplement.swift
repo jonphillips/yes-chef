@@ -84,37 +84,51 @@ public struct MealPlanComplementSuggestion: Equatable, Sendable {
 }
 
 public extension MealPlanComplementPlan {
-  /// Parses one complement per blank-line-delimited block from an external
+  /// Parses one complement per `Note:`-delimited block from an external
   /// hand-off. The date remains out of the response: the hand-off's source
   /// day is the only valid destination.
   static func parsingHandoffText(_ text: String) -> MealPlanComplementHandoffParseResult {
-    let blocks = text
-      .components(separatedBy: "\n\n")
-      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-      .filter { !$0.isEmpty }
+    let blocks = handoffBlocks(in: text)
 
     var items: [MealPlanComplementSuggestion] = []
     var unparsedBlocks: [String] = []
     for block in blocks {
       let lines = block.editableMealPlanComplementLines
-      guard lines.count == 2,
-        let title = lines[0].split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).dropFirst().first
-          .map(String.init)?.cleanedMealPlanComplementText,
-        let slotText = lines[1].components(separatedBy: " - ").last?.cleanedMealPlanComplementText,
-        let mealSlot = MealPlanItemSlot.allCases.first(where: {
-          $0.rawValue == slotText.normalizedMealPlanComplementEnumValue
-            || $0.title.normalizedMealPlanComplementEnumValue == slotText.normalizedMealPlanComplementEnumValue
-        })
+      guard lines.count >= 2, lines[0].lowercased().hasPrefix("note:"), lines[1].contains(" - ")
       else {
         unparsedBlocks.append(block)
         continue
       }
-      items.append(MealPlanComplementSuggestion(title: title, mealSlot: mealSlot))
+      let suggestion = MealPlanComplementSuggestion(title: "", mealSlot: .dinner)
+        .applyingEditableReviewText(block)
+      guard !suggestion.title.isEmpty else {
+        unparsedBlocks.append(block)
+        continue
+      }
+      items.append(suggestion)
     }
     return MealPlanComplementHandoffParseResult(
       plan: MealPlanComplementPlan(items: items),
       unparsedBlocks: unparsedBlocks
     )
+  }
+
+  private static func handoffBlocks(in text: String) -> [String] {
+    var blocks: [String] = []
+    var current: [String] = []
+
+    for line in text.components(separatedBy: .newlines) {
+      if line.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().hasPrefix("note:"), !current.isEmpty {
+        let block = current.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !block.isEmpty { blocks.append(block) }
+        current = []
+      }
+      current.append(line)
+    }
+
+    let block = current.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    if !block.isEmpty { blocks.append(block) }
+    return blocks
   }
 }
 
@@ -154,7 +168,7 @@ extension MealPlanComplementClient: DependencyKey {
       surface: .mealPlan,
       task: .complement,
       tierResolution: .callerProvided,
-      contextLayers: [.mealPlan, .selection, .conversation],
+      contextLayers: [.mealPlan, .selection, .conversation, .tasteProfile],
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, context: context),

@@ -82,6 +82,7 @@ public enum ModelCallContextLayer: String, CaseIterable, Hashable, Sendable {
   case readerComments
   case recipe
   case selection
+  case tasteProfile
   case workbench
 }
 

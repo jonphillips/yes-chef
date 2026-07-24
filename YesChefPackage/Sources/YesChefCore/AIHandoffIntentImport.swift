@@ -98,14 +98,12 @@ private enum AIHandoffReviewStager {
       ))
     case .menuComplement:
       let returned = AIHandoffReturn.menuComplement(from: payload, dayCount: menu.dayCount)
-      guard returned.unparsedBlocks.isEmpty else {
-        throw AIHandoffIntentImportError.unparsedPlanText(returned.unparsedBlocks)
-      }
       guard !returned.plan.items.isEmpty else { throw AIHandoffIntentImportError.emptyPlan }
       return .menuComplement(AIHandoffMenuComplementReview(
-        handoffID: handoff.id, menuID: menu.id, plan: returned.plan, unparsedBlocks: []
+        handoffID: handoff.id, menuID: menu.id, plan: returned.plan, unparsedBlocks: returned.unparsedBlocks
       ))
-    default:
+    case .recipeMakeAhead, .chefItUp, .serveWith, .adjustRecipe, .mealPlanMakeAheadStrategy,
+      .mealPlanComplement, .readerFeedbackCuration, .workbenchCompare, .workbenchExperiments:
       throw AIHandoffIntentImportError.wrongTask
     }
   }
@@ -140,7 +138,8 @@ private enum AIHandoffReviewStager {
       return .recipeAdjustmentBrief(AIHandoffRecipeAdjustmentBriefReview(
         handoffID: handoff.id, recipeID: recipe.id, brief: returned.deliverable, learnings: returned.learnings
       ))
-    default:
+    case .prepPlan, .mealPlanMakeAheadStrategy, .mealPlanComplement, .menuComplement,
+      .readerFeedbackCuration, .workbenchCompare, .workbenchExperiments:
       throw AIHandoffIntentImportError.wrongTask
     }
   }
@@ -162,15 +161,13 @@ private enum AIHandoffReviewStager {
       ))
     case .mealPlanComplement:
       let returned = AIHandoffReturn.mealPlanComplement(from: payload)
-      guard returned.unparsedBlocks.isEmpty else {
-        throw AIHandoffIntentImportError.unparsedPlanText(returned.unparsedBlocks)
-      }
       guard !returned.plan.items.isEmpty else { throw AIHandoffIntentImportError.emptyPlan }
       return .mealPlanComplement(AIHandoffMealPlanComplementReview(
         handoffID: handoff.id, mealPlanItemID: item.id, scheduledDate: item.scheduledDate,
-        plan: returned.plan, unparsedBlocks: []
+        plan: returned.plan, unparsedBlocks: returned.unparsedBlocks
       ))
-    default:
+    case .prepPlan, .recipeMakeAhead, .chefItUp, .serveWith, .adjustRecipe, .menuComplement,
+      .readerFeedbackCuration, .workbenchCompare, .workbenchExperiments:
       throw AIHandoffIntentImportError.wrongTask
     }
   }
@@ -198,7 +195,8 @@ private enum AIHandoffReviewStager {
       return .workbenchExperiments(AIHandoffWorkbenchExperimentsReview(
         handoffID: handoff.id, workbenchID: handoff.sourceID, experiments: returned.experiments
       ))
-    default:
+    case .prepPlan, .learning, .recipeMakeAhead, .chefItUp, .serveWith, .adjustRecipe,
+      .mealPlanMakeAheadStrategy, .mealPlanComplement, .menuComplement, .readerFeedbackCuration:
       throw AIHandoffIntentImportError.wrongTask
     }
   }

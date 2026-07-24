@@ -13,6 +13,27 @@ import YesChefCore
 )
 struct AIHandoffAdvisoryTests {
   @Test
+  func readerFeedbackReturnAcceptsOnlyLabeledTips() {
+    let tips = AIHandoffReturn.readerFeedback(
+      from: """
+      Here are the useful changes:
+      Tip: Salt and drain the cucumbers before dressing them.
+      ## More ideas
+      Tip: Use two garlic cloves for a more pronounced flavor.
+      Tip: use two garlic cloves for a more pronounced flavor.
+      """
+    )
+
+    expectNoDifference(
+      tips.map(\.text),
+      [
+        "Salt and drain the cucumbers before dressing them.",
+        "Use two garlic cloves for a more pronounced flavor.",
+      ]
+    )
+  }
+
+  @Test
   func menuComplementHandoffStagesDistinctReviewedSuggestionsWithoutWriting() throws {
     @Dependency(\.defaultDatabase) var database
     let menuID = SampleUUIDSequence.uuid(38_050)
@@ -40,10 +61,10 @@ struct AIHandoffAdvisoryTests {
         handoffID: handoffID,
         result: """
         YC-HANDOFF: \(handoffID.uuidString)
+        I found two concrete suggestions:
         Note: Cucumber herb salad
         Day 1 - Dinner
         Cucumber, dill, and lemon.
-
         Note: Charred peaches
         Day 2 - Snack
         """,
@@ -67,6 +88,7 @@ struct AIHandoffAdvisoryTests {
           MenuComplementSuggestion(title: "Charred peaches", dayOffset: 1, mealSlot: .snack),
         ]
       )
+      expectNoDifference(complementReview.unparsedBlocks, ["I found two concrete suggestions:"])
       #expect(try MenuItem.fetchAll(db).isEmpty)
     }
   }
@@ -94,8 +116,8 @@ struct AIHandoffAdvisoryTests {
         result: """
         YC-HANDOFF: \(handoffID.uuidString)
         \(AIHandoffReturnContract.marker)
-        Salt and drain the cucumbers before dressing them.
-        Use two garlic cloves for a more pronounced flavor.
+        Tip: Salt and drain the cucumbers before dressing them.
+        Tip: Use two garlic cloves for a more pronounced flavor.
         """,
         in: db,
         now: now

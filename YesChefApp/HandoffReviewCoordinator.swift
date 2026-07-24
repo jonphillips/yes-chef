@@ -9,9 +9,9 @@ import YesChefCore
 @Observable
 @MainActor
 final class HandoffReviewCoordinator {
-  @ObservationIgnored @Dependency(\.date.now) fileprivate var now
-  @ObservationIgnored @Dependency(\.defaultDatabase) fileprivate var database
-  @ObservationIgnored @Dependency(\.uuid) fileprivate var uuid
+  @ObservationIgnored @Dependency(\.date.now) var now
+  @ObservationIgnored @Dependency(\.defaultDatabase) var database
+  @ObservationIgnored @Dependency(\.uuid) var uuid
 
   var review: AIHandoffReview?
   var adjustmentReview: RecipeAdjustmentReviewState?

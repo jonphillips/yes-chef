@@ -375,8 +375,8 @@ public struct ReaderFeedbackHandoffContext: Equatable, Sendable {
     Curate these reader comments into a small set of distinct, non-obvious, durable cooking tips. Preserve separate
     changes as separate lines; consensus may be distilled within one line, but never blend unrelated changes.
 
-    Return format: one atomic reader-feedback point per line. No bullets, headings, numbering, JSON, prose preamble,
-    source-comment quotations, or Markdown. Return no lines when nothing clears the bar.
+    Return format: one atomic reader-feedback point per line, each beginning `Tip:`. No bullets, headings, numbering,
+    JSON, prose preamble, source-comment quotations, or Markdown. Return no lines when nothing clears the bar.
 
     Do not include `YC-LEARNINGS:`. This is curated source evidence awaiting the cook's review, not a new finding.
 

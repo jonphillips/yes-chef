@@ -96,12 +96,13 @@ final class HandoffInAppTransport {
         presentUnmatched(result: result, source: source)
         return
       }
+      let importDate = now
       let review = try await database.write { db in
         try AIHandoffIntentImport.stageReaderFeedbackReview(
           handoffID: handoff.id,
           result: result,
           in: db,
-          now: now
+          now: importDate
         )
       }
       receive(review)

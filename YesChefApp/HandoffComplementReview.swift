@@ -2,7 +2,7 @@ import Foundation
 import YesChefCore
 
 extension HandoffReviewCoordinator {
-  fileprivate func menuComplementReviewItems(
+  func menuComplementReviewItems(
     for review: AIHandoffMenuComplementReview
   ) -> [ChatApplyReviewItem] {
     review.plan.items.map { suggestion in
@@ -28,7 +28,7 @@ extension HandoffReviewCoordinator {
     }
   }
 
-  fileprivate func mealPlanComplementReviewItems(
+  func mealPlanComplementReviewItems(
     for review: AIHandoffMealPlanComplementReview
   ) -> [ChatApplyReviewItem] {
     review.plan.items.map { suggestion in

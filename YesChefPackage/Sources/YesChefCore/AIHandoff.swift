@@ -811,11 +811,14 @@ public enum AIHandoffReturn {
   }
 
   public static func readerFeedback(from text: String) -> [ReaderFeedbackTip] {
-    splitting(text).deliverable
+    var seen = Set<String>()
+    return splitting(text).deliverable
       .components(separatedBy: .newlines)
       .compactMap { line in
-        let text = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return nil }
+        let line = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard line.lowercased().hasPrefix("tip:") else { return nil }
+        let text = String(line.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, seen.insert(text.lowercased()).inserted else { return nil }
         return ReaderFeedbackTip(text: text)
       }
   }
