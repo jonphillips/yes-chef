@@ -400,6 +400,7 @@ final class RecipeCaptureModel {
   var isCommitting = false
   var readerFeedbackProposals: [ReaderFeedbackTip] = []
   var readerFeedbackComments: [RawComment] = []
+  var readerFeedbackHandoffEvidence: [String] = []
 
   var canFetch: Bool {
     normalizedURL != nil && !isFetching && !isCommitting
@@ -457,6 +458,7 @@ final class RecipeCaptureModel {
     isCommitting = false
     readerFeedbackProposals = []
     readerFeedbackComments = []
+    readerFeedbackHandoffEvidence = []
   }
 
   func cancelButtonTapped() -> Bool {
@@ -504,8 +506,13 @@ final class RecipeCaptureModel {
     return .extracted
   }
 
-  func stageReaderFeedback(tips: [ReaderFeedbackTip], comments: [RawComment]) {
+  func stageReaderFeedback(
+    tips: [ReaderFeedbackTip],
+    comments: [RawComment],
+    unparsedLines: [String] = []
+  ) {
     readerFeedbackComments = comments
+    readerFeedbackHandoffEvidence = unparsedLines
     guard !tips.isEmpty else { return }
     let acceptedKeys = Set(readerFeedbackBlocks.map { $0.text.lowercased() })
     var seen = Set(readerFeedbackProposals.map { $0.text.lowercased() })

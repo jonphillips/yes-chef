@@ -112,13 +112,15 @@ public extension MenuComplementPlan {
   /// `Note:` label starts each suggestion, so empty lines remain optional when
   /// a chat client compacts the returned text.
   static func parsingHandoffText(_ text: String, dayCount: Int) -> MenuComplementHandoffParseResult {
-    let blocks = handoffBlocks(in: text)
+    let blocks = text.labeledHandoffBlocks(startingWith: "note:")
 
     var items: [MenuComplementSuggestion] = []
     var unparsedBlocks: [String] = []
     for block in blocks {
       let lines = block.editableMenuComplementLines
-      guard lines.count >= 2, lines[0].lowercased().hasPrefix("note:")
+      guard lines.count >= 2,
+        lines[0].lowercased().hasPrefix("note:"),
+        MealPlanItemSlot(handoffPlacementLine: lines[1]) != nil
       else {
         unparsedBlocks.append(block)
         continue
@@ -139,23 +141,6 @@ public extension MenuComplementPlan {
     return MenuComplementHandoffParseResult(plan: MenuComplementPlan(items: items), unparsedBlocks: unparsedBlocks)
   }
 
-  private static func handoffBlocks(in text: String) -> [String] {
-    var blocks: [String] = []
-    var current: [String] = []
-
-    for line in text.components(separatedBy: .newlines) {
-      if line.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().hasPrefix("note:"), !current.isEmpty {
-        let block = current.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-        if !block.isEmpty { blocks.append(block) }
-        current = []
-      }
-      current.append(line)
-    }
-
-    let block = current.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-    if !block.isEmpty { blocks.append(block) }
-    return blocks
-  }
 }
 
 public struct MenuComplementClient: Sendable {

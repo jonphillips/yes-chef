@@ -93,6 +93,34 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func handoffParserKeepsUnknownSlotsAndSurplusLinesAsReviewEvidence() {
+      let parsed = MealPlanComplementPlan.parsingHandoffText(
+        """
+        Note: Charred peaches
+        Tuesday, July 8 - Snack
+        Grill them over the coals after dinner.
+        Note: Cucumber herb salad
+        Tuesday, July 8 - Dessert
+        """
+      )
+
+      expectNoDifference(
+        parsed.plan.items,
+        [MealPlanComplementSuggestion(title: "Charred peaches", mealSlot: .snack)]
+      )
+      expectNoDifference(
+        parsed.unparsedBlocks,
+        [
+          "Grill them over the coals after dinner.",
+          """
+          Note: Cucumber herb salad
+          Tuesday, July 8 - Dessert
+          """,
+        ]
+      )
+    }
+
+    @Test
     func mealPlanComplementClientSendsRequestedModelTierAndDayContext() async throws {
       let recorder = MealPlanComplementRequestRecorder()
       let callRecords = ModelCallRecordCollector()

@@ -88,13 +88,15 @@ public extension MealPlanComplementPlan {
   /// hand-off. The date remains out of the response: the hand-off's source
   /// day is the only valid destination.
   static func parsingHandoffText(_ text: String) -> MealPlanComplementHandoffParseResult {
-    let blocks = handoffBlocks(in: text)
+    let blocks = text.labeledHandoffBlocks(startingWith: "note:")
 
     var items: [MealPlanComplementSuggestion] = []
     var unparsedBlocks: [String] = []
     for block in blocks {
       let lines = block.editableMealPlanComplementLines
-      guard lines.count >= 2, lines[0].lowercased().hasPrefix("note:"), lines[1].contains(" - ")
+      guard lines.count >= 2,
+        lines[0].lowercased().hasPrefix("note:"),
+        MealPlanItemSlot(handoffPlacementLine: lines[1]) != nil
       else {
         unparsedBlocks.append(block)
         continue
@@ -106,6 +108,9 @@ public extension MealPlanComplementPlan {
         continue
       }
       items.append(suggestion)
+      if lines.count > 2 {
+        unparsedBlocks.append(lines.dropFirst(2).joined(separator: "\n"))
+      }
     }
     return MealPlanComplementHandoffParseResult(
       plan: MealPlanComplementPlan(items: items),
@@ -113,23 +118,6 @@ public extension MealPlanComplementPlan {
     )
   }
 
-  private static func handoffBlocks(in text: String) -> [String] {
-    var blocks: [String] = []
-    var current: [String] = []
-
-    for line in text.components(separatedBy: .newlines) {
-      if line.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().hasPrefix("note:"), !current.isEmpty {
-        let block = current.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-        if !block.isEmpty { blocks.append(block) }
-        current = []
-      }
-      current.append(line)
-    }
-
-    let block = current.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-    if !block.isEmpty { blocks.append(block) }
-    return blocks
-  }
 }
 
 public struct MealPlanComplementClient: Sendable {

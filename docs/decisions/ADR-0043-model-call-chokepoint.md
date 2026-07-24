@@ -161,6 +161,13 @@ for the price of three small verbs instead of twelve. This also discharges the *
 hand-off verbs"* candidate Jon named 2026-07-21 — check it against the parked **ADR-0013 meal-planner verbs**
 entry first, which overlaps. Classify each verb's commit shape before slicing ([[chat-verb-commit-shapes]]).
 
+**Load-test result (2026-07-24, PR [#226](https://github.com/jonphillips/yes-chef/pull/226)).** The record
+was sufficient, but not uniformly: `tasteProfile` had to become a first-class context layer. The two
+complement calls include it because their prompts inject the taste profile and complement preference;
+`readerFeedbackCuration` explicitly omits it because curation transcribes comment evidence rather than making
+a taste judgment. That is the first production use of `omitted:` and proves the included/omitted distinction
+earns its place. No tier-policy change was needed, so S3 remains independently scoped.
+
 **Free rider:** the workbench compare hand-off passes `deliverableFormat = .menuPrepPlan`
 ([`HandoffIntents.swift:345`](../../YesChefApp/AppIntents/HandoffIntents.swift)), so the copied prompt closes
 with *"return the paste-ready **prep plan**."* One line, user-visible in the pasted text, already noted as a

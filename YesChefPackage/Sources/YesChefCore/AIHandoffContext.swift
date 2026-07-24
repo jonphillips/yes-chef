@@ -228,7 +228,7 @@ public struct MealPlanHandoffContext: Equatable, Sendable {
 
     Return format: one blank-line-separated block per suggestion, exactly two lines each:
     Note: short dish name
-    (title) - Meal slot
+    Date - Meal slot
 
     `Meal slot` must be Breakfast, Lunch, Dinner, or Snack. Do not return dates, recipe IDs, JSON, headings,
     Markdown bullets, or a merged meal plan. Return no blocks when nothing usefully complements the day.

@@ -726,10 +726,16 @@ public struct AIHandoffMealPlanComplementReview: Equatable, Sendable {
 public struct AIHandoffReaderFeedbackReview: Equatable, Sendable {
   public let handoffID: AIHandoff.ID
   public let tips: [ReaderFeedbackTip]
+  public let unparsedLines: [String]
 
-  public init(handoffID: AIHandoff.ID, tips: [ReaderFeedbackTip]) {
+  public init(
+    handoffID: AIHandoff.ID,
+    tips: [ReaderFeedbackTip],
+    unparsedLines: [String] = []
+  ) {
     self.handoffID = handoffID
     self.tips = tips
+    self.unparsedLines = unparsedLines
   }
 }
 
@@ -787,6 +793,11 @@ public enum AIHandoffReturn {
     public var unparsedLines: [String]
   }
 
+  public struct ReaderFeedbackReturn: Equatable, Sendable {
+    public var tips: [ReaderFeedbackTip]
+    public var unparsedLines: [String]
+  }
+
   public static let learningsMarker = "YC-LEARNINGS:"
 
   public static func menuPrepPlan(
@@ -811,16 +822,31 @@ public enum AIHandoffReturn {
   }
 
   public static func readerFeedback(from text: String) -> [ReaderFeedbackTip] {
+    readerFeedbackReturn(from: text).tips
+  }
+
+  public static func readerFeedbackReturn(from text: String) -> ReaderFeedbackReturn {
     var seen = Set<String>()
-    return splitting(text).deliverable
-      .components(separatedBy: .newlines)
-      .compactMap { line in
-        let line = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard line.lowercased().hasPrefix("tip:") else { return nil }
-        let text = String(line.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, seen.insert(text.lowercased()).inserted else { return nil }
-        return ReaderFeedbackTip(text: text)
+    var tips: [ReaderFeedbackTip] = []
+    var unparsedLines: [String] = []
+
+    for rawLine in splitting(text).deliverable.components(separatedBy: .newlines) {
+      let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !line.isEmpty else { continue }
+      guard line.lowercased().hasPrefix("tip:") else {
+        unparsedLines.append(line)
+        continue
       }
+      let tipText = String(line.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !tipText.isEmpty else {
+        unparsedLines.append(line)
+        continue
+      }
+      guard seen.insert(tipText.lowercased()).inserted else { continue }
+      tips.append(ReaderFeedbackTip(text: tipText))
+    }
+
+    return ReaderFeedbackReturn(tips: tips, unparsedLines: unparsedLines)
   }
 
   public static func plainText(from text: String) -> (deliverable: String, learnings: [String]) {
@@ -865,15 +891,23 @@ public enum AIHandoffReturn {
 
 }
 
+public enum AIHandoffReturnContractError: Error, Equatable, LocalizedError, Sendable {
+  case instructionsOutOfDate
+
+  public var errorDescription: String? {
+    "Your Yes Chef project instructions are missing or out of date. Re-copy them from Settings, then try again."
+  }
+}
+
 public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, CustomStringConvertible, Sendable {
   case missingHandoffID
   case handoffNotFound(AIHandoff.ID)
   case wrongTask
   case duplicate
-  case instructionsOutOfDate
   case emptyPlan
   case unparsedPlanText([String])
   case unparsedExperimentBlocks([String])
+  case unparsedReaderFeedbackLines([String])
 
   public var errorDescription: String? {
     switch self {
@@ -885,14 +919,14 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
       "This handoff does not contain a prep plan."
     case .duplicate:
       "This handoff result was already imported for review."
-    case .instructionsOutOfDate:
-      "Your Yes Chef project instructions are missing or out of date. Re-copy them from Settings, then try again."
     case .emptyPlan:
       "The returned handoff needs a deliverable or at least one learning bullet."
     case let .unparsedPlanText(lines):
       "Could not import these prep-plan lines: \(lines.joined(separator: " | "))"
     case let .unparsedExperimentBlocks(blocks):
       "Could not import these experiment blocks: \(blocks.joined(separator: " | "))"
+    case let .unparsedReaderFeedbackLines(lines):
+      "Could not read these reader-feedback lines. Each tip must begin with `Tip:`: \(lines.joined(separator: " | "))"
     }
   }
 

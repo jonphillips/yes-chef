@@ -178,6 +178,28 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func handoffParserKeepsUnknownMealSlotsAsReviewEvidence() {
+      let parsed = MenuComplementPlan.parsingHandoffText(
+        """
+        Note: Charred peaches
+        Day 2 - Dessert
+        """,
+        dayCount: 2
+      )
+
+      expectNoDifference(parsed.plan.items, [])
+      expectNoDifference(
+        parsed.unparsedBlocks,
+        [
+          """
+          Note: Charred peaches
+          Day 2 - Dessert
+          """,
+        ]
+      )
+    }
+
+    @Test
     func addComplementItemStoresSuggestionBodyInNotes() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 805_700_000)

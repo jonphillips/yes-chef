@@ -11,7 +11,7 @@ public extension AIHandoffIntentImport {
     now: Date
   ) throws -> AIHandoffReaderFeedbackReview {
     guard let markedResult = AIHandoffReturnContract.strippingMarker(from: result) else {
-      throw AIHandoffIntentImportError.instructionsOutOfDate
+      throw AIHandoffReturnContractError.instructionsOutOfDate
     }
     let routedText = AIHandoffToken.stripping(from: markedResult)
     guard let routedText, routedText.handoffID == handoffID,
@@ -23,10 +23,19 @@ public extension AIHandoffIntentImport {
       handoff.importedAt == nil
     else { throw AIHandoffIntentImportError.wrongTask }
 
-    let tips = AIHandoffReturn.readerFeedback(from: routedText.payload)
-    guard !tips.isEmpty else { throw AIHandoffIntentImportError.emptyPlan }
+    let returned = AIHandoffReturn.readerFeedbackReturn(from: routedText.payload)
+    guard !returned.tips.isEmpty else {
+      if !returned.unparsedLines.isEmpty {
+        throw AIHandoffIntentImportError.unparsedReaderFeedbackLines(returned.unparsedLines)
+      }
+      throw AIHandoffIntentImportError.emptyPlan
+    }
     try AIHandoffRepository.markImported(id: handoffID, at: now, in: db)
-    return AIHandoffReaderFeedbackReview(handoffID: handoffID, tips: tips)
+    return AIHandoffReaderFeedbackReview(
+      handoffID: handoffID,
+      tips: returned.tips,
+      unparsedLines: returned.unparsedLines
+    )
   }
 
   static func stageMenuPrepPlanReview(

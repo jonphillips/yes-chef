@@ -303,11 +303,27 @@ private struct RecipeCaptureReviewSections: View {
               ),
               transport: readerFeedbackHandoffTransport,
               receive: { review in
-                model.stageReaderFeedback(tips: review.tips, comments: model.readerFeedbackComments)
+                model.stageReaderFeedback(
+                  tips: review.tips,
+                  comments: model.readerFeedbackComments,
+                  unparsedLines: review.unparsedLines
+                )
                 readerFeedbackSheet = .review
               }
             )
             .buttonStyle(.bordered)
+          }
+
+          if !model.readerFeedbackHandoffEvidence.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+              Text("Couldn’t parse these returned lines")
+                .font(.subheadline.weight(.semibold))
+              Text(model.readerFeedbackHandoffEvidence.joined(separator: "\n"))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+            }
+            .accessibilityElement(children: .combine)
           }
 
           ForEach(model.readerFeedbackBlocks.indices, id: \.self) { index in

@@ -14,7 +14,7 @@ import YesChefCore
 struct AIHandoffAdvisoryTests {
   @Test
   func readerFeedbackReturnAcceptsOnlyLabeledTips() {
-    let tips = AIHandoffReturn.readerFeedback(
+    let returned = AIHandoffReturn.readerFeedbackReturn(
       from: """
       Here are the useful changes:
       Tip: Salt and drain the cucumbers before dressing them.
@@ -25,12 +25,13 @@ struct AIHandoffAdvisoryTests {
     )
 
     expectNoDifference(
-      tips.map(\.text),
+      returned.tips.map(\.text),
       [
         "Salt and drain the cucumbers before dressing them.",
         "Use two garlic cloves for a more pronounced flavor.",
       ]
     )
+    expectNoDifference(returned.unparsedLines, ["Here are the useful changes:", "## More ideas"])
   }
 
   @Test
@@ -117,6 +118,7 @@ struct AIHandoffAdvisoryTests {
         YC-HANDOFF: \(handoffID.uuidString)
         \(AIHandoffReturnContract.marker)
         Tip: Salt and drain the cucumbers before dressing them.
+        These were the strongest returns:
         Tip: Use two garlic cloves for a more pronounced flavor.
         """,
         in: db,
@@ -130,8 +132,45 @@ struct AIHandoffAdvisoryTests {
           "Use two garlic cloves for a more pronounced flavor.",
         ]
       )
+      expectNoDifference(review.unparsedLines, ["These were the strongest returns:"])
       #expect(try Learning.fetchAll(db).isEmpty)
       #expect(try AIHandoffRepository.handoff(id: handoffID, in: db)?.status == .imported)
+    }
+  }
+
+  @Test
+  func readerFeedbackCaptureHandoffExplainsUnlabeledReturns() throws {
+    @Dependency(\.defaultDatabase) var database
+    let handoffID = SampleUUIDSequence.uuid(38_053)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .capture,
+          sourceID: handoffID,
+          taskType: .readerFeedbackCuration,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      #expect(throws: AIHandoffIntentImportError.unparsedReaderFeedbackLines([
+        "Salt and drain the cucumbers before dressing them.",
+      ])) {
+        try AIHandoffIntentImport.stageReaderFeedbackReview(
+          handoffID: handoffID,
+          result: """
+          YC-HANDOFF: \(handoffID.uuidString)
+          \(AIHandoffReturnContract.marker)
+          Salt and drain the cucumbers before dressing them.
+          """,
+          in: db,
+          now: now
+        )
+      }
     }
   }
 }

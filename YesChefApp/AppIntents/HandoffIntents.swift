@@ -477,7 +477,7 @@ enum HandoffAppOperations {
     now: Date
   ) async throws -> AIHandoffReview {
     guard let result = AIHandoffReturnContract.strippingMarker(from: result) else {
-      throw HandoffReturnContractError.instructionsOutOfDate
+      throw AIHandoffReturnContractError.instructionsOutOfDate
     }
     return try await database.write { db in
       try AIHandoffIntentImport.stageReview(
@@ -497,7 +497,7 @@ enum HandoffAppOperations {
     handoffID: AIHandoff.ID
   ) async throws -> AIHandoffReview {
     guard let result = AIHandoffReturnContract.strippingMarker(from: result) else {
-      throw HandoffReturnContractError.instructionsOutOfDate
+      throw AIHandoffReturnContractError.instructionsOutOfDate
     }
     let metadata = source.metadata(handoffID: handoffID)
     let handoff = AIHandoff(
@@ -543,13 +543,5 @@ private enum HandoffIntentSurfaceError: Error, LocalizedError {
     case .invalidHandoffID:
       "The handoff ID must be a UUID."
     }
-  }
-}
-
-private enum HandoffReturnContractError: Error, LocalizedError {
-  case instructionsOutOfDate
-
-  var errorDescription: String? {
-    "Your Yes Chef project instructions are missing or out of date. Re-copy them from Settings, then try again."
   }
 }
