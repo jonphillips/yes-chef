@@ -923,6 +923,26 @@ extension DependencyValues {
       }
     }
 
+    migrator.registerMigration("Create recipe deliberation log") { db in
+      try #sql("""
+        CREATE TABLE "recipeDeliberationLog" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "recipeID" TEXT NOT NULL REFERENCES "recipes"("id") ON DELETE CASCADE,
+          "variationID" TEXT,
+          "body" TEXT NOT NULL,
+          "dateCreated" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+
+      for statement in [
+        #"CREATE INDEX "index_recipeDeliberationLog_on_recipeID" ON "recipeDeliberationLog"("recipeID")"#,
+        #"CREATE INDEX "index_recipeDeliberationLog_on_variationID" ON "recipeDeliberationLog"("variationID")"#,
+      ] {
+        try db.execute(sql: statement)
+      }
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

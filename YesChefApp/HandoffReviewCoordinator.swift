@@ -521,7 +521,8 @@ final class HandoffReviewCoordinator {
     let adjustmentReview = RecipeAdjustmentReviewState(
       currentDetail: detail,
       proposedDetail: try proposal.proposedDetail(applyingTo: detail, now: now, uuid: { uuid() }),
-      proposal: proposal
+      proposal: proposal,
+      deliberationBody: brief
     )
     return adjustmentReview
   }
@@ -536,6 +537,7 @@ final class HandoffReviewCoordinator {
         _ = try RecipeRepository.overwriteRecipeWithAdjustmentProposal(
           review.proposal,
           recipeID: review.currentDetail.recipe.id,
+          deliberationBody: review.deliberationBody,
           in: db,
           now: now,
           uuid: { uuid() }
@@ -561,6 +563,7 @@ final class HandoffReviewCoordinator {
           review.proposal,
           recipeID: review.currentDetail.recipe.id,
           name: name,
+          deliberationBody: review.deliberationBody,
           in: db,
           now: now,
           uuid: { uuid() }

@@ -105,6 +105,7 @@ public struct RecipeDetailData: Equatable, Sendable {
   public var recipeEquipment: [RecipeEquipment]
   public var learnings: [Learning]
   public var variations: [RecipeVariation]
+  public var deliberationLogEntries: [RecipeDeliberationLogEntry]
   public var activeVariationID: RecipeVariation.ID?
 
   public init(
@@ -123,6 +124,7 @@ public struct RecipeDetailData: Equatable, Sendable {
     recipeEquipment: [RecipeEquipment] = [],
     learnings: [Learning] = [],
     variations: [RecipeVariation] = [],
+    deliberationLogEntries: [RecipeDeliberationLogEntry] = [],
     activeVariationID: RecipeVariation.ID? = nil
   ) {
     self.recipe = recipe
@@ -140,6 +142,7 @@ public struct RecipeDetailData: Equatable, Sendable {
     self.recipeEquipment = recipeEquipment
     self.learnings = learnings
     self.variations = variations
+    self.deliberationLogEntries = deliberationLogEntries
     self.activeVariationID = activeVariationID
   }
 }
@@ -258,6 +261,9 @@ public enum RecipeRepository {
     let variations = try (RecipeVariation.where { $0.recipeID.eq(recipeID) })
       .order { $0.sortIndex }
       .fetchAll(db)
+    let deliberationLogEntries = try (RecipeDeliberationLogEntry.where { $0.recipeID.eq(recipeID) })
+      .order { $0.dateCreated.desc() }
+      .fetchAll(db)
     let activeVariationID = try activeVariationID(recipeID: recipeID, variations: variations, in: db)
     let tags = try Tag.fetchAll(db)
       .filter { tag in recipeTags.contains { $0.tagID == tag.id } }
@@ -294,6 +300,7 @@ public enum RecipeRepository {
       recipeEquipment: recipeEquipment,
       learnings: try LearningRepository.learnings(sourceType: .recipe, sourceID: recipeID, in: db),
       variations: variations,
+      deliberationLogEntries: deliberationLogEntries,
       activeVariationID: activeVariationID
     )
   }

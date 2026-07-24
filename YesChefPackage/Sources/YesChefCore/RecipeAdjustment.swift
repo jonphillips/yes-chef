@@ -507,6 +507,7 @@ extension RecipeRepository {
   public static func overwriteRecipeWithAdjustmentProposal(
     _ proposal: RecipeAdjustmentProposal,
     recipeID: Recipe.ID,
+    deliberationBody: String?,
     in db: Database,
     now: Date,
     uuid: () -> UUID
@@ -527,6 +528,13 @@ extension RecipeRepository {
       generalNotes: proposedDetail.notes.filter { $0.noteType == .general },
       in: db
     )
+    try addDeliberationLogEntry(
+      body: deliberationBody,
+      recipeID: recipeID,
+      in: db,
+      now: now,
+      uuid: uuid
+    )
     return restorePoint
   }
 
@@ -534,6 +542,7 @@ extension RecipeRepository {
     _ proposal: RecipeAdjustmentProposal,
     recipeID: Recipe.ID,
     name: String,
+    deliberationBody: String?,
     in db: Database,
     now: Date,
     uuid: () -> UUID
@@ -555,6 +564,14 @@ extension RecipeRepository {
     )
     _ = try detail.resolved(applying: variation)
     try RecipeVariation.insert { variation }.execute(db)
+    try addDeliberationLogEntry(
+      body: deliberationBody,
+      recipeID: recipeID,
+      variationID: variation.id,
+      in: db,
+      now: now,
+      uuid: uuid
+    )
     try setActiveVariation(variation.id, recipeID: recipeID, in: db, now: now, uuid: uuid)
     return variation
   }
@@ -660,6 +677,20 @@ extension RecipeRepository {
       now: now,
       uuid: uuid
     )
+    let deliberationLogEntries = try RecipeDeliberationLogEntry
+      .where { $0.recipeID.eq(variation.recipeID) }
+      .fetchAll(db)
+    for entry in deliberationLogEntries {
+      try RecipeDeliberationLogEntry.insert {
+        RecipeDeliberationLogEntry(
+          id: uuid(),
+          recipeID: recipeID,
+          body: entry.body,
+          dateCreated: entry.dateCreated
+        )
+      }
+      .execute(db)
+    }
     try RecipeVariation.find(variationID).delete().execute(db)
     try setActiveVariation(nil, recipeID: variation.recipeID, in: db, now: now, uuid: uuid)
     return recipeID

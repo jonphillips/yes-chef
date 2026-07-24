@@ -99,7 +99,7 @@ PR #141), **and** the ADR-0021
 synced `recipeVariations` table (Recipe edit proposals S2), **and `Menu.externalProjectName`** (ADR-0038 S2),
 **and the synced `learnings` table including its `sortOrder` column** (ADR-0038 Amd 1 / Amd 5) **and the synced `prepPlanSteps` table**
 (ADR-0040 S2 — which also **retires the `Menu.prepPlan` BLOB**: restructure it *before* this cut, because
-promotion locks the record type permanently), **and the synced `workbenchLog` table including its nullable `hypothesis` / `change` / `rationale` columns** (ADR-0042 S2), **and — once ADR-0021 V3 ships — the synced recipe-deliberation-log table** ([ADR-0021 Amd 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23); the *only* schema this variations arc adds — V1+V2 add none); and note the app target
+promotion locks the record type permanently), **and the synced `workbenchLog` table including its nullable `hypothesis` / `change` / `rationale` columns** (ADR-0042 S2), **and — once ADR-0021 V3 ships — the synced `recipeDeliberationLog` table** ([ADR-0021 Amd 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23); the *only* schema this variations arc adds — V1+V2 add none); and note the app target
 (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 
 ## Ready Efforts (queue)

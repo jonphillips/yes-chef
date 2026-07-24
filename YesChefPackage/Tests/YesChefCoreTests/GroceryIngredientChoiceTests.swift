@@ -69,6 +69,7 @@ extension RecipeCoreTests {
           ),
           recipeID: recipeID,
           name: "Lime",
+          deliberationBody: nil,
           in: db,
           now: now,
           uuid: { uuids.next() }
