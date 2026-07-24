@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 24, 2026 (**TWO live dispatch targets, running in PARALLEL — Jon's call, 2026-07-24.** (1) **[ADR-0043](decisions/ADR-0043-model-call-chokepoint.md) load test** — three advisory verbs exercise the new record before S3; (2) **[ADR-0021](decisions/ADR-0021-recipe-variations.md) V3** — the recipe-scoped deliberation log, **the only slice in the variations arc that adds schema** ([Amd 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23), Accepted 2026-07-23; V1 + V2 shipped in PR [#221](https://github.com/jonphillips/yes-chef/pull/221)). **The parallel question is now RESOLVED — both run.** They barely touch: the load test lives in the hand-off/ask layer, V3 adds a table and its reader, and **V3 makes no model calls at all**. Each is still its own dispatch and its own PR — parallel does not mean bundled.) Completed-slice history and strategic background live in [`docs/DONE-LOG.md`](DONE-LOG.md).
+Last updated: July 24, 2026 (**both parallel dispatch targets SHIPPED and the board is clear.** The [ADR-0043](decisions/ADR-0043-model-call-chokepoint.md) load test (PR [#226](https://github.com/jonphillips/yes-chef/pull/226)) and [ADR-0021](decisions/ADR-0021-recipe-variations.md) V3 (PR [#225](https://github.com/jonphillips/yes-chef/pull/225)) were both approved and merged 2026-07-24 → [`DONE-LOG`](DONE-LOG.md). The parallel run worked exactly as scoped — no code contention. **ADR-0021's variations arc is now COMPLETE** (V1+V2+V3, nothing queued under it), and **ADR-0043's record survived its load test** with a real verdict: `omitted:` earned its place. **TWO new live dispatch targets are now up, again in PARALLEL — Jon's call, 2026-07-24:** (1) **[ADR-0045](decisions/ADR-0045-onboard-path-stays-viable.md) V1**, the seeded section-scoped Ask — ADR ratified the same day, and it fixes the grayed-verbs defect from that day's dogfood pass; (2) **[ADR-0043](decisions/ADR-0043-model-call-chokepoint.md) S3**, tier-policy unification, with ADR-0045 V3 riding along. Each is its own dispatch and its own PR — parallel does not mean bundled.) Completed-slice history and strategic background live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
 
 
@@ -17,76 +17,106 @@ live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** re
 
 ## Next Up
 
-**TWO parallel dispatch targets as of 2026-07-24 — so the dispatch must NAME one.** They are
-independent efforts, each its own dispatch and its own **separate PR**; parallel does **not** mean
-bundled, and neither blocks the other. Dispatch with *"Do the **ADR-0043 load test** effort in
-`docs/CURRENT_HANDOFF.md`"* **or** *"Do the **ADR-0021 V3** effort in `docs/CURRENT_HANDOFF.md`."*
-A bare *"do the Next Up effort"* is now **ambiguous by construction**: the agent must **STOP and ask
-Jon — never infer which one.** If this section is empty or missing, likewise STOP. See
-`docs/AGENTS.md` § Work Intake & Dispatch. A single dispatch may bundle **several cohesive slices**
-(one PR); do all listed, in order — but **never bundle across the two targets above.**
+**TWO live dispatch targets as of 2026-07-24, running in PARALLEL — Jon's call — so the dispatch must NAME
+one.** They are independent efforts, each its own dispatch and its own **separate PR**; parallel does **not**
+mean bundled, and neither blocks the other. Dispatch with *"Do the **ADR-0045 V1** effort in
+`docs/CURRENT_HANDOFF.md`"* **or** *"Do the **ADR-0043 S3** effort in `docs/CURRENT_HANDOFF.md`."* A bare
+*"do the Next Up effort"* is **ambiguous by construction**: the agent must **STOP and ask Jon — never infer
+which one.** If this section is empty or missing, likewise STOP. See `docs/AGENTS.md` § Work Intake &
+Dispatch. A single dispatch may bundle **several cohesive slices** (one PR); do all listed, in order — but
+**never bundle across the two targets below.** *(They barely touch: V1 is app-layer threading into the Ask
+entry points, S3 is tier resolution in Core plus AI Settings. This is the same shape as the
+2026-07-24 parallel run, which finished with zero code contention.)*
 
-**LIVE DISPATCH TARGET — [ADR-0043](decisions/ADR-0043-model-call-chokepoint.md) load test: three advisory
-verbs before S3 (Core + app; no schema).** One cohesive dispatch, one PR. Read the ADR first — its decisions
-remain the spec; this entry is the dispatch, not a replacement for it.
+**LIVE DISPATCH TARGET — [ADR-0045](decisions/ADR-0045-onboard-path-stays-viable.md) V1: the seeded,
+section-scoped Ask (app; no schema).** **ADR-0045 was ratified by Jon 2026-07-24** — Accepted, D1–D7 as
+written, with **OQ4 resolved: auto-send** (a pre-filled composer leaves the buttons grayed until the cook
+types, which is most of the defect still standing). OQ1/OQ2 are **V2** concerns and do not gate this. Read the
+ADR first — it is the spec; this entry is the dispatch.
 
-**Build `menuComplement`, `mealPlanComplement`, and `readerFeedbackCuration`.** They have in-app prompts but
-**no hand-off ask**. For each, author a fresh ask, deliverable format, D8 learnings call, and commit shape;
-check against the parked **ADR-0013 meal-planner verbs** entry first because the scopes overlap.
+**The defect it fixes is live and was hit on the 2026-07-24 dogfood pass:** tap Ask → empty panel → every
+apply-verb grayed → the cook concludes the feature was removed. The cause is one unfinished affordance —
+`Ask` is the single per-section menu item that does **not** carry its section, routing to the un-scoped
+`chatButtonTapped`, which seeds no prompt, so `canRun` never sees a subject. **Thread `PlaybookSectionKind`
+through the entry points and seed the opener from the existing outboard `.discuss` ask** (D2 — one authored
+prompt per verb serving both paths), auto-sending it on open. Mostly threading, not thinking.
 
-**This is a load test of S1's record.** If a verb cannot express its record trivially, S1 was modeled wrong.
-The specific criterion is `contextLayers.omitted`: it shipped with a passing test and **zero production call
-sites**, so these are its first real load. If none needs it, that is useful evidence about whether the field
-earns its place.
+**⚠️ Two things are load-bearing and both are ways this slice can go wrong.** First, **do not loosen
+`requiresSubject`** (D6) — seeding is what enables the buttons, because a sent seed produces an assistant
+reply and `latestReplySubject` goes non-nil. Forcing the buttons on instead would let an apply-action fire
+with an **empty subject**, which is the silent-garbage path, not a fix. Second, **scope is exactly the three
+section-scopable entry points** — the recipe column-top Ask, the recipe per-section menu Ask, and the Menu's
+Ask. **[OQ3's pre-dispatch check found FIVE cold-start entry points, not the three D3 claims](decisions/ADR-0045-onboard-path-stays-viable.md#open-questions):**
+the meal-calendar day-header Chat and the Workbench Chat have the same dead end but **no section to carry**,
+so their seeds are a different authoring job. They are a **recorded follow-on, deliberately not folded in** —
+do not expand V1 to cover them on this ADR's momentum.
 
-**Explicitly not in this dispatch:** tier-policy unification or resolved-tier reporting (S3), persistence, and
-the gated workbench phase. **Verification:** app-layer, so the elevated `generic/platform=iOS` build is
-required evidence, plus the Core test suite and `scripts/check-drift.sh`.
+**Verification:** app-layer, so the elevated `generic/platform=iOS` build is required evidence, plus the Core
+suite and `scripts/check-drift.sh`.
 
-**SECOND LIVE DISPATCH TARGET (parallel) — [ADR-0021](decisions/ADR-0021-recipe-variations.md) V3: the recipe-scoped deliberation log (Core + app; **the one slice in this arc that adds schema**).** One slice, one PR. **Promoted 2026-07-24 — Jon resolved the parallel question: this runs alongside the ADR-0043 load test, not after it.** They barely touch: the load test lives in the hand-off/ask layer, V3 adds a table and its reader, and **V3 makes no model calls at all**, so it never touches `ModelCall`. The only shared file is `RecipeAdjustment.swift`, whose variation-derivation half the ADR-0043 arc does not go near. Read [Amd 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23) first — it is the spec; this entry is the dispatch.
+**SECOND LIVE DISPATCH TARGET (parallel) — [ADR-0043](decisions/ADR-0043-model-call-chokepoint.md) S3: policy
+unification (Core + app; the first slice in this arc that changes behavior).** One slice, one PR. **Now
+unblocked:** D5 sequenced S3 *after* the record and the load test, and [the load test landed 2026-07-24](https://github.com/jonphillips/yes-chef/pull/226)
+finding **no tier-policy change needed** — so S3 is independently scoped rather than folded into it. Read the
+ADR first; this entry is the dispatch.
 
-**[ADR-0021](decisions/ADR-0021-recipe-variations.md) V3 — the **why** survives the commit ([Amd 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23), Accepted 2026-07-23; sequence after V1+V2).** Answers the parked *"the why dies at the commit boundary"* fork as option **(d)**: a **recipe-scoped deliberation log** — **one new synced table**, one row per commit holding the returned brief **verbatim** (Amd3-D3; ADR-0042 D3 — prose in a human-read field pins no format), depositing on **both** commit destinations. **The deciding factor was the asymmetry: overwrite leaves no artifact, so (a)/(b)/(c) all leave half the flow silent.** Three things are load-bearing: **the read surface ships in this slice** (Amd3-D4 — a log nobody reads is orphaned schema, and the consumer is what keeps this out of the [[withdraw-not-defer-orphaned-schema]] trap); **it is its own table, not a `workbenchLog` with a nullable `workbenchID`** (Amd3-D2 — divergent cascade semantics, and reusing it would quietly merge the undecided variation↔workbench umbrella fork); and **split-off (V2/B1) copies the rows to the new recipe with `variationID` nulled** (Amd3-D5 — otherwise the copy points at a variation on the *old* recipe, a cross-recipe link this model does not have). **Get the two FK styles right (Amd3-D6): `recipeID` is the owning hard FK (`NOT NULL REFERENCES "recipes"("id") ON DELETE CASCADE`), `variationID` is soft (bare column + index, no cascade — a variation may be deleted or promoted while the provenance must survive).** "Soft FK … `ON DELETE CASCADE`" is self-contradictory and would orphan rows on recipe delete — which would defeat D2's own argument for the separate table. Register it in **`makeSyncEngine` *and* `project.yml`**, and add it to the promotion list below. **No parsing, no curation, no per-change decomposition.** *(V1 + V2 shipped and device-passed in PR [#221](https://github.com/jonphillips/yes-chef/pull/221) → [`DONE-LOG`](DONE-LOG.md); V3 is the remaining slice of this separate ADR-0021 arc.)*
+**One shared `resolveTier()` honoring BOTH `recipeChatProviderPreference` and `recipeChatTierPreference`, with
+an honest error when the only available tier cannot do the job** — replacing the silent `.onDevice` fallback
+that today surfaces to the cook as `responseTruncated` on a 16k strict-JSON call instead of *"add an API
+key."* **This absorbs the extractor tier-selection half** of the S4 nit in Ready Efforts (removed from there,
+not tracked twice — its *prompt-authoring* half stays separate and is not in this dispatch). It is also where
+**`ModelCallTierResolution` widens past its two cases**: the chat path's user-selected tier is a real third
+shape the enum currently flattens into `.callerProvided`, and S1's approval left it under-modeled on purpose
+until a consumer existed. This is that consumer.
+
+**[ADR-0045](decisions/ADR-0045-onboard-path-stays-viable.md) V3 rides with this slice** (its own sequencing
+note asks for exactly that): the frontier **model** becomes a user setting — `FrontierProvider.defaultModel`
+is a hardcoded LLMClientKit constant the S2 inventory now displays read-only, and the override point already
+exists (`AnthropicModelClient(apiKey:model:session:)`); it is only `TieredModelClient.live()` that declines to
+expose it. **This crosses into `jon-platform`**, which is why it belongs here — S3 is the one slice with both
+repos open. **Landing S3 also fires [ADR-0044](decisions/ADR-0044-provenance-engine-to-llmclientkit.md)'s
+trigger** (the provenance-engine lift to `LLMClientKit`, validated by Galavant) — **that is a signal to write
+the design, not licence to build it in this PR.**
+
+**Verification:** touches Core, the App layer, and `jon-platform`, so the elevated `generic/platform=iOS`
+build is required evidence alongside the Core suite and `scripts/check-drift.sh`. ⚠️ A worktree build needs
+the `.claude/jon-platform` symlink ([[worktree-jon-platform-symlink]]).
+
+**Not a dispatch target, but the next thing that wants Jon's time — the [ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md)
+scoping session.** Accepted 2026-07-23, but only its *Decision* was ratified; its six open questions still
+need one scoping pass (OQ5, the gated-fetch UX, carries no architect recommendation at all) and its slice plan
+is still marked proposed. It unblocks the whole gated workbench phase, and its reference material is the
+**first genuinely new context layer** ADR-0043's record must express — a second, harder load test than the
+three advisory verbs. **Ratified ≠ scoped: do not dispatch S1 off the ADR alone.**
 
 **ADR-0042 closed 2026-07-21.** S0/S1/S2/S4 shipped and device-passed (→ [`DONE-LOG`](DONE-LOG.md)); **S3 (`workbenchDraft`) stays deferred and un-queued** — no concrete want, its danger receded rather than grew, **do not build it on ADR momentum**; there is no S5. **⚠️ The return contract is v2 — re-copy the project instructions from AI Settings or every verb fails the marker gate.**
 
-**After the ADR-0043 load test (not after V3 — the two are independent), S3** unifies tier policy (one shared `resolveTier()` honoring both preferences, with an honest error
-instead of a silent `.onDevice` drop), is the first slice that changes behavior, and is where
-`ModelCallTierResolution` widens past its two cases — the chat path's user-selected tier is a third shape the
-current enum flattens into `.callerProvided`.
+**The workbench phase is ratified but NOT yet dispatchable — the distinction matters** (the ADR-0032 half is
+**Candidate C** above; this is the rest of it). The **experiment-outcome verb** has only its *placement*
+ratified — an **ADR-0042 amendment** (D8's corollary: a conjecture suppresses learnings, but a **cooked**
+experiment is findings, so learnings come back on) — and that amendment gets written **when the phase is
+scoped, deliberately not now**, so it is not built on ADR-0043's momentum
+([[withdraw-not-defer-orphaned-schema]]).
 
-**The workbench phase is ratified but NOT yet dispatchable — the distinction matters.** Two unbuilt things
-live there. **[ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) reference material is
-Accepted (Jon ratified 2026-07-23)**, but ratification covered the *Decision* — app-side fetch, reduce,
-cache, inject as grounded text, and the rejection of native provider web tools — **not** its six open
-questions, which still need **one scoping session** (OQ5, the gated-fetch UX, carries no architect
-recommendation at all), and its slice plan is still marked proposed. **Ratified ≠ scoped: do not dispatch
-S1 off the ADR alone.** The **experiment-outcome verb** has only its *placement* ratified — an **ADR-0042
-amendment** (D8's corollary: a conjecture suppresses learnings, but a **cooked** experiment is findings, so
-learnings come back on) — and that amendment gets written **when the phase is scoped, deliberately not now**,
-so it is not built on ADR-0043's momentum ([[withdraw-not-defer-orphaned-schema]]).
+**Both candidates Jon named 2026-07-21 are now DISCHARGED — do not re-queue either.**
+- **Variations — the whole ADR-0021 arc shipped and device-passed.** V1 + V2 in PR [#221](https://github.com/jonphillips/yes-chef/pull/221) (2026-07-23) and **V3, the recipe-scoped deliberation log, in PR [#225](https://github.com/jonphillips/yes-chef/pull/225) (2026-07-24)** → [`DONE-LOG`](DONE-LOG.md). Hand-edit through the resolved view with ops **derived** on save, split-off, promote-to-base, and the deliberation log with its Playbook read surface are all live. **Nothing is queued under ADR-0021.** Its one synced table (`recipeDeliberationLog`) is on the promotion list below.
+- **Menu is under-served by hand-off verbs** — **discharged by ADR-0043's load test** (PR [#226](https://github.com/jonphillips/yes-chef/pull/226)), where `menuComplement` and `mealPlanComplement` shipped their hand-off asks and did double duty as the record's first real load. Parked **ADR-0013** meal-planner verbs remain separate and unscoped; classify each new verb's commit shape first ([[chat-verb-commit-shapes]]).
 
-**Sequencing note now that ADR-0032 is Accepted:** its reference material is the **first genuinely new
-context layer** ADR-0043's record must express, which makes it a second and harder load test after the three
-advisory verbs — and it is exactly why [ADR-0043 D5](decisions/ADR-0043-model-call-chokepoint.md) puts policy
-unification (S3) *after* the layer exists rather than before.
-
-**Candidates Jon named 2026-07-21 (unscoped — none is a dispatch target until scoped with him):**
-- **Variations — V1 + V2 shipped and device-passed (PR [#221](https://github.com/jonphillips/yes-chef/pull/221), 2026-07-23 → [`DONE-LOG`](DONE-LOG.md)); V3 is what remains.** Hand-edit through the resolved view with ops **derived** on save, plus split-off and promote-to-base, are now live. **Amd 3 (V3) is the only ADR-0021 slice still queued** — the recipe-scoped deliberation log answering the "why" fork; it is a live dispatch target as of 2026-07-24 — its full spec is the second dispatch entry above. **✅ V3 was PROMOTED 2026-07-24 — it is now a live dispatch target running in parallel with the ADR-0043 load test (Jon's explicit call, reversing the 2026-07-23 ordering). Its dispatch entry is above.** *(V3, like V1+V2, makes **no model calls at all**, so it never touches `ModelCall`; it can run alongside the ADR-0043 arc without code contention. The only shared file is `RecipeAdjustment.swift`, whose variation-derivation half is untouched by ADR-0043.)*
-- **Menu is under-served by hand-off verbs** — **absorbed into ADR-0043's load test** (above), where `menuComplement` and `mealPlanComplement` do double duty as the record's first real load. Still classify each verb's commit shape first ([[chat-verb-commit-shapes]]) and reconcile with parked **ADR-0013**. No longer tracked separately.
-
-**Feature efforts still on the board — Jon picks; do not infer** (the live dispatch targets above are the ADR-0043 load test and ADR-0021 V3, running in parallel, and nothing else; the two candidates named 2026-07-21 are unscoped, and the first of them is the ADR-0021 entry immediately below):
+**Feature efforts still on the board — Jon picks; do not infer** (the live dispatch targets are ADR-0045 V1 and ADR-0043 S3, running in parallel at the top of this section, and nothing else):
 - **Workbench log-editor nits (small, from the S2 review; not urgent)** — the `canSave` / `normalizedLogEntryDraft` mismatch when a body is combined with partially-filled typed fields, the dead save spinner, and the pre-existing compare `.menuPrepPlan` mislabel.
 - **The S4 brief extractor's prompt is framed for a conversation, but S4 hands it a decision (small; found 2026-07-21; silent-failure risk).** `instructions` opens *"You extract a proposed edit … from a cooking **conversation**,"* the prompt says *"**Conversation so far:**"* and closes *"Extract only the concrete recipe edit **the user is asking to review**"* — while `HandoffReviewCoordinator.draftRecipeAdjustment` wraps the finished brief as a single fake `.user` message and passes `selection: ""`. So a **decided** revision is presented as an **in-progress ask**, inviting the extractor to infer or hedge where the whole point of Amd1-D1 is that the human already decided. Under-extraction here is **silent** — a 3-change brief that yields 2 ops just shows a shorter side-by-side. *Fix:* a task-specific framing for the brief path ("this is a decided revision; transcribe every change faithfully and completely"), **not** a second client.
-  - **Its sibling — the re-implemented tier selection — is no longer tracked here.** That half (ignored `recipeChatTierPreference`, `availableProviders.first` fallback, silent `.onDevice` on a 16k strict-JSON call → `responseTruncated` instead of *"add an API key"*) is **absorbed by [ADR-0043](decisions/ADR-0043-model-call-chokepoint.md) S3**, which removes it structurally rather than patching one call site. **Do not fix it here and do not track it twice.** The two halves are genuinely separate: one is *policy*, the other is *prompt authoring*.
+  - **Its sibling — the re-implemented tier selection — is no longer tracked here.** That half (ignored `recipeChatTierPreference`, `availableProviders.first` fallback, silent `.onDevice` on a 16k strict-JSON call → `responseTruncated` instead of *"add an API key"*) is **absorbed by [ADR-0043](decisions/ADR-0043-model-call-chokepoint.md) S3 — now a live dispatch target above**, which removes it structurally rather than patching one call site. **Do not fix it here and do not track it twice.** The two halves are genuinely separate: one is *policy*, the other is *prompt authoring*.
   - **Deliberately NOT part of this:** adding the taste profile or known-learnings to the *extractor*. Those belong to the outbound hand-off ask (where `RecipeHandoffContext` already sends both) because that is where judgment happens. The extractor transcribes a settled decision, and feeding it preference context invites exactly the editorializing D1 exists to stop — and ADR-0043 D6 makes this asymmetry *visible* rather than flattening it.
 - **Workbench synthesis-shaped apply-action** — the draft verb's own action shape (no last-reply gate/chip). ⚠️ Re-read against [ADR-0042 D2/OQ5](decisions/ADR-0042-workbench-handoff-and-the-return-block.md) before dispatching: it is an *in-app* draft verb, and the draft is a structured write.
+- **The inbound learnings parser has no floor, and it fails silently (small; real defect, not a nit).** `AIHandoff.learningBullets` (`AIHandoff.swift:860`) keeps only lines starting `- ` / `* ` / `• ` and **drops everything else with no trace** — a learning returned as a naked sentence or a paragraph vanishes, which is a straight [[editable-at-the-grain-stored]] *lossless-or-loud* violation and is named as a defect in [ADR-0040](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md). *Fix:* tolerant extraction plus a **loud remainder** (the `unparsedLines` pattern PR #226 just established on the three advisory verbs — reuse it, do not invent a second convention). This is the deterministic **floor** and it goes **ahead of** ADR-0038 Amd 4's LLM curation ceiling ([[handoff-stateless-both-directions]]).
+- **Two small carry-forwards from the PR [#226](https://github.com/jonphillips/yes-chef/pull/226) review (both non-blocking, noted at approval).** `stageReaderFeedback` defaults `unparsedLines` to `[]`, so accepting a single tip through the *in-app* path clears the evidence banner (cosmetic). And a **crowding** observation from the device pass: the Prep Plan disclosure now renders two Copy + two Paste buttons, the meal-plan day header four — routing is correct (a complement result pasted into the prep-plan button hits the unmatched-result confirmation), but it wants a feel on iPhone before anyone adds a fifth.
 - **Open a design ADR** — ADR-0013 meal-planner verbs (needs scope confirmation) or ADR-0014 text editing.
 
 **Parked to `docs/open-questions.md` (design forks, decide with Jon before build):** multi-bubble /
 whole-transcript chat selection (per-bubble `UITextView` caps the payload). *(Hand-editing a variation and
-promote-to-standalone are **no longer parked** — answered 2026-07-21 by ADR-0021 Amds 1 + 2, queued in Ready
-Efforts. ADR-0014 remains a dependency **only** for section headers, the one edit the op vocabulary cannot
-express.)*
+promote-to-standalone are **no longer parked and no longer queued** — answered 2026-07-21 by ADR-0021 Amds
+1 + 2 and **shipped** in PR [#221](https://github.com/jonphillips/yes-chef/pull/221). ADR-0014 remains a
+dependency **only** for section headers, the one edit the op vocabulary cannot express.)*
 
 **Standing release follow-up (not a dispatch — a pre-cut ops step Jon runs).** We stay in the CloudKit
 **Development** environment (dev stance) so the schema keeps evolving freely; promoting to **Production** is
@@ -99,7 +129,7 @@ PR #141), **and** the ADR-0021
 synced `recipeVariations` table (Recipe edit proposals S2), **and `Menu.externalProjectName`** (ADR-0038 S2),
 **and the synced `learnings` table including its `sortOrder` column** (ADR-0038 Amd 1 / Amd 5) **and the synced `prepPlanSteps` table**
 (ADR-0040 S2 — which also **retires the `Menu.prepPlan` BLOB**: restructure it *before* this cut, because
-promotion locks the record type permanently), **and the synced `workbenchLog` table including its nullable `hypothesis` / `change` / `rationale` columns** (ADR-0042 S2), **and — once ADR-0021 V3 ships — the synced `recipeDeliberationLog` table** ([ADR-0021 Amd 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23); the *only* schema this variations arc adds — V1+V2 add none); and note the app target
+promotion locks the record type permanently), **and the synced `workbenchLog` table including its nullable `hypothesis` / `change` / `rationale` columns** (ADR-0042 S2), **and the synced `recipeDeliberationLog` table** (ADR-0021 V3, PR [#225](https://github.com/jonphillips/yes-chef/pull/225) — **shipped 2026-07-24**; [Amd 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23); the *only* schema that variations arc added — V1+V2 added none); and note the app target
 (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 
 ## Ready Efforts (queue)
@@ -140,7 +170,7 @@ since its product is deliberation and the chat apps do that unmetered in a live 
 outboard; the **draft verb does not** (a structured canonical write, D2), and `workbenchDraft` (S3) **stays
 deferred with no want — do not build it on ADR momentum**. Experiments landed as typed `workbenchLog` rows,
 **not** ADR-0019 S3's `experiments` BLOB, which is superseded. **[Amendment 1](decisions/ADR-0042-workbench-handoff-and-the-return-block.md#amendment-1--the-ask-outboards-a-revision-brief-returns-and-the-in-app-extractor-still-writes-the-delta-2026-07-21)
-(Accepted 2026-07-21) is the live dispatch (S4) above** — it extends the same pattern to the recipe body:
+(Accepted 2026-07-21) shipped as S4 in PR [#216](https://github.com/jonphillips/yes-chef/pull/216)** — it extends the same pattern to the recipe body:
 **prose out, prose back, structure derived in-app, a human gate at each end**, with D2's line restated as
 **the paste door never carries identity.**
 
@@ -160,9 +190,22 @@ model), so sequence them.
 recipe text editing (header toggles vs. rich text / bold-italic), opened from the 2026-07-04 dogfood pass.
 Decide with Jon before any implementation — **and note it narrowed on 2026-07-21**: ADR-0021 Amd1-D5 needs
 ADR-0014 only for **section headers inside a variation**, which is the one edit the op vocabulary cannot
-express. *(Note: [ADR-0021](decisions/ADR-0021-recipe-variations.md)'s original standalone framing was
-superseded by ADR-0023 D1/S2 — variations are created through the adjust proposal/review surface — but it
-**is a queue item again** as V1 + V2 above, on the strength of its 2026-07-21 amendments.)*
+express. *(ADR-0021 itself is closed: its original standalone framing was superseded by ADR-0023 D1/S2 —
+variations are created through the adjust proposal/review surface — and its three amendment slices all
+shipped.)*
+
+**[ADR-0045](decisions/ADR-0045-onboard-path-stays-viable.md) — the onboard path stays viable (Accepted
+2026-07-24; V1 is a live dispatch target above, V2 is queued here).** Keeps the onboard/outboard choice
+**reversible**: outboarding was a *pricing* judgment, not an architectural one, and deleting the onboard path
+would convert a commercial bet into an irreversible code fact. **V2 — the Finalize button + the shared return
+parser** (add the control, send the finalize instruction, run the reply through the same `AIHandoffReturn`
+parser the paste path uses, route into the existing review sheet) **wants V1 first** — there is nothing to
+finalize without a seeded discussion — and it is where **OQ1** (how Finalize and the apply-verbs coexist
+without reading as two buttons for one job; recommendation: one control, mechanism chosen by tier) and **OQ2**
+(at what tier the terminal turn is trustworthy — answer it *empirically* with one on-device attempt, do not
+guess) get settled. **V3 rides with ADR-0043 S3**, not here. Also recorded in the ADR and **deliberately not
+folded into V1**: the meal-calendar day-header Chat and the Workbench Chat are the fourth and fifth cold-start
+entry points OQ3's check turned up — same dead end, no section to carry, so each is its own small slice.
 
 **Still-deferred, separate future efforts** (not follow-through on any shipped effort): ADR-0027 **OQ4**
 (a note-worthiness taste preference); **ADR-0036 S3** — promote a `RecipeNote` deposited *on a recipe* (the

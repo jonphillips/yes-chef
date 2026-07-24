@@ -5,7 +5,10 @@
 > subscription does the thinking. The **ask** is the prompt that opens a discussion; the **deliverable** is
 > the structured thing a discussion terminates in.
 
-Status: **Proposed** — 2026-07-24. Jon's call, made explicitly against the "dead code, nuke from orbit"
+Status: **Accepted** — ratified by Jon **2026-07-24**, same day it was drafted. D1–D7 stand as written;
+**OQ4 is resolved (auto-send)** and **OQ3 is resolved with a correction that changes V1's scope** — see Open
+questions. OQ1 and OQ2 remain open and are **V2 concerns**, so they do not gate V1. Originally drafted as
+Proposed — 2026-07-24. Jon's call, made explicitly against the "dead code, nuke from orbit"
 alternative he first reached for. Reverses an *implicit* drift (nothing ever decided to retire onboard; it
 decayed because its affordances were never finished). Governed by
 [ADR-0017](ADR-0017-llm-model-and-reasoning-effort.md) (tier/effort as settings) and
@@ -171,13 +174,29 @@ without a seeded discussion). V3 is independent of both and should follow ADR-00
   settled, and it is the one thing here that could get fiddly.
 - **OQ2 — at what tier do we trust the terminal turn?** D5 names the axis but not the threshold. Needs one
   on-device finalize attempt to answer empirically; do not guess it in advance.
-- **OQ3 — scope beyond the recipe.** Menus have an Ask; meal-plan surfaces have their own verbs. V1 covers
-  the three Ask entry points that exist today — confirm nothing else grew before dispatch, given the drift
-  rate ADR-0043 D2 measured.
-- **OQ4 — does the seeded ask send automatically, or land in the composer for editing?** Auto-send makes D6
-  work immediately; pre-fill gives the cook a chance to aim it first, but leaves the buttons grayed until the
-  first reply. **Recommendation: auto-send**, since the seed is a *discussion opener*, not a final prompt, and
-  the whole point is removing a cold start.
+- **OQ3 — RESOLVED (2026-07-24), and the answer corrects D3: there are FIVE cold-start entry points, not
+  three.** The check was run before dispatch exactly as this OQ asked, and the drift ADR-0043 D2 measured had
+  in fact happened here too. The full map:
+  1. **Recipe column-top Ask** — `RecipePlaybookView.askButton` → `RecipeModel.chatButtonTapped`.
+  2. **Recipe per-section menu Ask** — `RecipePlaybookView`'s `Button("Ask", action: ask)`, the *same*
+     closure with the section dropped. **This is the diagnosed gap in the Context table.**
+  3. **Menu Ask** — `MenuViews.askButtonTapped`.
+  4. **Meal-calendar day-header Chat** — `MealCalendarViews.chatButtonTapped`, its own implementation
+     building a `.mealPlan` chat context. **Not named in D3.**
+  5. **Workbench Chat** — `WorkbenchViews` → `WorkbenchModel.chatButtonTapped`, building a `.workbench`
+     context. **Not named in D3.**
+
+  **All five open a cold panel that seeds nothing, so all five dead-end at D6's grayed verbs** — the defect is
+  broader than the ADR claimed. But the *scoping* answer is unchanged: **V1 stays the three D3 named**, because
+  they are the ones a `PlaybookSectionKind` is meaningful for; 4 and 5 have no section to carry and their
+  seeds would be a different authoring job (a meal-plan opener, a workbench-deliberation opener). **They are
+  recorded here as a known follow-on, not folded into V1** — a seeded-but-not-section-scoped opener for each is
+  its own small slice, and building it on this ADR's momentum is the trap
+  [[withdraw-not-defer-orphaned-schema]] names. D3's *"three entry points exist and no more"* is **factually
+  wrong as written** and should be read as *"three section-scopable entry points."*
+- **OQ4 — RESOLVED (2026-07-24, Jon): auto-send.** The seed is a *discussion opener*, not a final prompt, and
+  the whole point is removing a cold start — a pre-filled composer leaves the buttons grayed until the cook
+  types, which is most of the defect still standing. Pre-fill was the alternative and is rejected.
 
 ## Related
 
