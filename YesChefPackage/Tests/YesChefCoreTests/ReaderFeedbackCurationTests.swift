@@ -139,6 +139,7 @@ extension RecipeCoreTests {
       #expect(request.messages.first?.text.contains("99") == false)
       #expect(request.system?.contains("synthesize WITHIN one point") == true)
       let recordedCalls = await callRecords.records()
+      expectNoDifference(recordedCalls.first?.tierResolution, .configuredPreferences)
       expectNoDifference(
         recordedCalls.first?.contextLayers,
         ModelCallContextLayers(included: [.readerComments], omitted: [.tasteProfile])
@@ -146,8 +147,26 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func liveClientRefusesTheOnDeviceTierForStrictCuration() async throws {
+      await withDependencies {
+        $0.recipeChatTierPreference = RecipeChatTierPreference(
+          current: { false },
+          set: { _ in }
+        )
+      } operation: {
+        await #expect(throws: ModelTierResolutionError.frontierRequired) {
+          _ = try await ReaderFeedbackCurationClient.liveValue(
+            comments: [RawComment(text: "Use a wide skillet.", helpfulCount: 1)],
+            sourceURL: nil
+          )
+        }
+      }
+    }
+
+    @Test
     func liveClientSurfacesTruncatedResponses() async throws {
       await withDependencies {
+        $0.apiKeyStore = readerFeedbackAPIKeyStore([.anthropic: "sk-anthropic"])
         $0.modelClient = StubModelClient { _ in
           ModelResponse(text: #"[]"#, stopReason: "length")
         }

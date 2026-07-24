@@ -811,8 +811,15 @@ public final class RecipeChatModel: Identifiable {
   }
 
   public var activeTier: ModelTier {
-    useFrontier && apiKeyStore.key(selectedProvider) != nil
-      ? .frontier(selectedProvider) : .onDevice
+    resolvedActiveTier.tier
+  }
+
+  private var resolvedActiveTier: ResolvedModelTier {
+    (try? resolveTier(
+      useFrontier: useFrontier,
+      preferredProvider: selectedProvider,
+      availableProviders: availableProviders
+    )) ?? ResolvedModelTier(tier: .onDevice, resolution: .configuredPreferences)
   }
 
   public var sendsToProvider: Bool {
@@ -878,7 +885,8 @@ public final class RecipeChatModel: Identifiable {
     }
 
     let requestMessages = history()
-    let tier = activeTier
+    let resolvedTier = resolvedActiveTier
+    let tier = resolvedTier.tier
     if continuationToken?.provider != tier.frontierProvider {
       continuationToken = nil
     }
@@ -890,7 +898,7 @@ public final class RecipeChatModel: Identifiable {
         let call = ModelCall(
           surface: context.modelCallSurface,
           task: .chat,
-          tierResolution: .callerProvided,
+          tierResolution: resolvedTier.resolution,
           contextLayers: contextLayers,
           tier: tier,
           system: systemPrompt(),
@@ -911,7 +919,7 @@ public final class RecipeChatModel: Identifiable {
         let call = ModelCall(
           surface: context.modelCallSurface,
           task: .chat,
-          tierResolution: .callerProvided,
+          tierResolution: resolvedTier.resolution,
           contextLayers: contextLayers,
           tier: tier,
           system: systemPrompt(),

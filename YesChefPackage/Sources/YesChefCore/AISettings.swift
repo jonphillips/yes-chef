@@ -7,6 +7,53 @@ public let legacyRecipeChatCustomInstructionsKey = "recipeChatCustomInstructions
 public let recipeChatFrontierProviderKey = "recipeChatFrontierProvider"
 public let recipeChatUseFrontierKey = "recipeChatUseFrontier"
 
+public func frontierModelPreferenceKey(for provider: FrontierProvider) -> String {
+  "frontierModel.\(provider.rawValue)"
+}
+
+public struct FrontierModelPreference: Sendable {
+  public var current: @Sendable (FrontierProvider) -> String?
+  public var set: @Sendable (String?, FrontierProvider) -> Void
+
+  public init(
+    current: @escaping @Sendable (FrontierProvider) -> String?,
+    set: @escaping @Sendable (String?, FrontierProvider) -> Void
+  ) {
+    self.current = current
+    self.set = set
+  }
+}
+
+extension FrontierModelPreference: DependencyKey {
+  public static let liveValue = FrontierModelPreference(
+    current: { provider in
+      guard let model = UserDefaults.standard.string(forKey: frontierModelPreferenceKey(for: provider)) else {
+        return nil
+      }
+      return model.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+    },
+    set: { model, provider in
+      let key = frontierModelPreferenceKey(for: provider)
+      let model = model?.trimmingCharacters(in: .whitespacesAndNewlines)
+      if let model, !model.isEmpty {
+        UserDefaults.standard.set(model, forKey: key)
+      } else {
+        UserDefaults.standard.removeObject(forKey: key)
+      }
+    }
+  )
+
+  public static let testValue = FrontierModelPreference(current: { _ in nil }, set: { _, _ in })
+  public static let previewValue = testValue
+}
+
+extension DependencyValues {
+  public var frontierModelPreference: FrontierModelPreference {
+    get { self[FrontierModelPreference.self] }
+    set { self[FrontierModelPreference.self] = newValue }
+  }
+}
+
 public enum AIPromptPreferenceKind: String, CaseIterable, Identifiable, Sendable {
   case chefItUp
   case serveWith
@@ -155,6 +202,11 @@ extension DependencyValues {
 }
 
 public enum YesChefAIPromptPreferences {
+  public static func model(for provider: FrontierProvider) -> String {
+    @Dependency(\.frontierModelPreference) var modelPreference
+    return modelPreference.current(provider) ?? provider.defaultModel
+  }
+
   public static func modelPromptPreferences(for request: ModelRequest) -> ModelPromptPreferences {
     @Dependency(\.aiPromptPreferences) var preferences
     let settings = preferences.current()
@@ -165,4 +217,8 @@ public enum YesChefAIPromptPreferences {
         .map { AISettingsRepository.preference(in: settings, for: $0) }
     )
   }
+}
+
+private extension String {
+  var nonEmpty: String? { isEmpty ? nil : self }
 }

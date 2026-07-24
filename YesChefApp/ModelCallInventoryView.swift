@@ -58,20 +58,14 @@ private extension ModelCallInventory.Entry {
     }
   }
 
-  /// The concrete model a `.frontier` tier *requests*, derived from the
-  /// provider's package default (Yes Chef never overrides it). Like
-  /// `tierDescription`, this is the requested value, not the resolved one — a
-  /// `.frontier` tier degrades to on-device when its key is absent, and
-  /// `.frontierPreferred` picks its provider at the boundary. Resolved-model
-  /// reporting is S3's job, alongside resolved tier.
   var modelDescription: String {
     switch record.tier {
     case .onDevice:
       "on-device (Apple)"
-    case let .frontier(provider):
-      provider.defaultModel
+    case .frontier:
+      record.requestedModel ?? "frontier model"
     case .frontierPreferred:
-      "frontier default (resolved at call)"
+      "frontier-preferred"
     }
   }
 

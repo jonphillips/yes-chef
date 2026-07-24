@@ -91,6 +91,8 @@ final class BrowserModel {
       }
     } catch ReaderFeedbackCurationError.responseTruncated {
       notice = "Loaded comments, but couldn't finish curating them. Try again."
+    } catch let error as ModelTierResolutionError {
+      notice = error.localizedDescription
     } catch {
       notice = "Couldn't load comments - try again once the page settles."
     }
