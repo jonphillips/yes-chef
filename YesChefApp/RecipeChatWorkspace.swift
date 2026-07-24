@@ -226,6 +226,11 @@ struct RecipeChatPanel: View {
   let chatModel: RecipeChatModel
   let applyActions: [AnyChatApplyAction]
   var showsEmbeddedHeader = false
+  /// When set, the panel offers an in-panel section switcher (the only way to re-scope on iPhone,
+  /// where the playbook's per-section Ask menus sit behind the modal sheet). `nil` for panels with
+  /// no sections (menu, workbench).
+  var discussSection: ((PlaybookSectionKind) -> Void)?
+  var activeSection: PlaybookSectionKind?
 
   @State private var draft = ""
   @State private var assistantSelection = ChatAssistantSelection()
@@ -344,6 +349,11 @@ struct RecipeChatPanel: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       if !showsEmbeddedHeader {
+        if let discussSection {
+          ToolbarItem(placement: .topBarLeading) {
+            ChatSectionMenu(activeSection: activeSection, select: discussSection)
+          }
+        }
         ToolbarItem(placement: .topBarTrailing) {
           clearChatButton
         }
@@ -614,6 +624,47 @@ private struct ChatTierMenu: View {
       }
     }
     .accessibilityHint(Text("Choose whether recipe context stays on device or is sent to a configured provider."))
+  }
+}
+
+private struct ChatSectionMenu: View {
+  let activeSection: PlaybookSectionKind?
+  let select: (PlaybookSectionKind) -> Void
+
+  var body: some View {
+    Menu {
+      ForEach(PlaybookSectionKind.allCases) { section in
+        Button {
+          select(section)
+        } label: {
+          Text(section.chatMenuTitle)
+          if section == activeSection {
+            Image(systemName: "checkmark")
+          }
+        }
+      }
+    } label: {
+      HStack(spacing: 4) {
+        Image(systemName: "sparkles")
+        Text(activeSection?.chatMenuTitle ?? "Discuss")
+          .font(.subheadline)
+        Image(systemName: "chevron.up.chevron.down")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .accessibilityLabel(Text("Discuss section"))
+    .accessibilityHint(Text("Move this discussion to another Playbook section."))
+  }
+}
+
+private extension PlaybookSectionKind {
+  var chatMenuTitle: String {
+    switch self {
+    case .makeAhead: "Make-ahead"
+    case .chefItUp: "Chef It Up"
+    case .serveWith: "Serve With"
+    }
   }
 }
 

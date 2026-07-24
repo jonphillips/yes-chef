@@ -254,7 +254,9 @@ private struct RecipeAskPresentationModifier: ViewModifier {
         NavigationStack {
           RecipeChatPanel(
             chatModel: chatModel,
-            applyActions: model.applyActionCatalog(for: chatModel)
+            applyActions: model.applyActionCatalog(for: chatModel),
+            discussSection: model.discussSectionFromChat,
+            activeSection: model.seededAskSection
           )
         }
       }
@@ -273,7 +275,9 @@ private struct RecipeAskPresentationModifier: ViewModifier {
   private func askSlideOver(_ chatModel: RecipeChatModel) -> some View {
     RecipeChatPanel(
       chatModel: chatModel,
-      applyActions: model.applyActionCatalog(for: chatModel)
+      applyActions: model.applyActionCatalog(for: chatModel),
+      discussSection: model.discussSectionFromChat,
+      activeSection: model.seededAskSection
     )
     .inspectorColumnWidth(
       min: RecipeAskSlideOverMetrics.minimumWidth,

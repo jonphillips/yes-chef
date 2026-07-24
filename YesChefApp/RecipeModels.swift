@@ -966,6 +966,15 @@ final class RecipeDetailModel {
     }
   }
 
+  /// Re-scope the *open* chat to another section from inside the panel. On iPhone the chat is a
+  /// full-height modal sheet, so the playbook's per-section Ask menus are unreachable behind it —
+  /// this is the only way to move the discussion to another section there. Reseed only: it never
+  /// toggles the panel closed (that is `chatButtonTapped`'s same-section case, wrong from in-panel).
+  func discussSectionFromChat(_ section: PlaybookSectionKind) {
+    guard destination.chat != nil, seededAskSection != section else { return }
+    chatButtonTapped(section: section)
+  }
+
   private func chatAskAction(for section: PlaybookSectionKind) -> ChatAskAction {
     guard destination.chat != nil else { return .open }
     return seededAskSection == section ? .close : .reseed
