@@ -2,6 +2,7 @@ import CustomDump
 import Dependencies
 import DependenciesTestSupport
 import Foundation
+import LLMClientKit
 import Testing
 import YesChefCore
 
@@ -145,6 +146,121 @@ extension AIHandoffTests {
     #expect(!serveWith.contains("Current side"))
     #expect(serveWith.contains("exactly as `title: note`"))
     #expect(serveWith.contains("Do not use bullets, Markdown emphasis, an introduction"))
+  }
+
+  @Test
+  func sectionDiscussAskSharesTheExternalDiscussionOpeningWithoutItsToken() {
+    let context = RecipeHandoffContext(recipe: RecipeChatRecipeContext(title: "Chili"))
+
+    let ask = context.discussAsk(for: .chefItUp)
+    let outboardAsk = AIHandoffToken.discussAsk(
+      context: context.prompt(for: .chefItUp),
+      deliverableFormat: .recipeChefItUp
+    )
+    let exported = AIHandoffToken.prompt(
+      handoffID: SampleUUIDSequence.uuid(38_042),
+      context: context.prompt(for: .chefItUp),
+      deliverableFormat: .recipeChefItUp
+    )
+
+    #expect(ask.contains("You are preparing practical Chef It Up notes for one recipe."))
+    #expect(ask.contains("When the user asks you to finalize, return the paste-ready Chef It Up notes."))
+    #expect(ask.contains("The format above describes the finalized return"))
+    #expect(!ask.contains(AIHandoffToken.prefix))
+    #expect(!outboardAsk.contains("The format above describes the finalized return"))
+    #expect(exported.hasSuffix(outboardAsk))
+  }
+
+  @Test
+  func menuDiscussAskSharesTheExternalDiscussionOpeningWithoutItsToken() {
+    let context = MenuChatContext(title: "Beach Menu", dayCount: 2)
+
+    let ask = context.discussAsk()
+    let outboardAsk = AIHandoffToken.discussAsk(context: context.prepPrompt())
+    let exported = AIHandoffToken.prompt(
+      handoffID: SampleUUIDSequence.uuid(38_043),
+      context: context.prepPrompt()
+    )
+
+    #expect(ask.contains("You weave a staged prep plan for one multi-day menu"))
+    #expect(ask.contains("When the user asks you to finalize, return the paste-ready prep plan."))
+    #expect(ask.contains("The format above describes the finalized return"))
+    #expect(!ask.contains(AIHandoffToken.prefix))
+    #expect(!outboardAsk.contains("The format above describes the finalized return"))
+    #expect(exported.hasSuffix(outboardAsk))
+  }
+
+  @Test
+  func onboardSectionPromptsLeaveTheRecipeToTheChatSystemPromptAndKeepLearnings() {
+    let context = RecipeHandoffContext(recipe: RecipeChatRecipeContext(
+      title: "Cumin Chili",
+      makeAhead: "Salt the beans overnight.",
+      chefItUp: "Toast the cumin.",
+      serveWith: [ServeWithItem(id: SampleUUIDSequence.uuid(38_044), title: "Cornbread")],
+      learnings: ["Keep the heat modest for the children."]
+    ))
+
+    for section in PlaybookSectionKind.allCases {
+      let outboard = context.prompt(for: section)
+      let onboard = context.prompt(for: section, destination: .onboard)
+
+      #expect(!onboard.contains("Cumin Chili"))
+      #expect(onboard.contains("Keep the heat modest for the children."))
+      #expect(outboard.contains(onboard.trimmingCharacters(in: .whitespacesAndNewlines)))
+    }
+  }
+
+  @Test
+  func onboardMenuPromptLeavesOutTransportAndMenuContext() {
+    let context = MenuChatContext(title: "Beach Menu", dayCount: 2)
+    let outboard = context.prepPrompt()
+    let onboard = context.prepPrompt(destination: .onboard)
+
+    #expect(outboard.contains("This text will be pasted back into the recipe app"))
+    #expect(!onboard.contains("This text will be pasted back into the recipe app"))
+    #expect(!onboard.contains("Beach Menu"))
+    #expect(outboard.contains(onboard.trimmingCharacters(in: .whitespacesAndNewlines)))
+  }
+
+  @Test
+  @MainActor
+  func seedIfColdSeedsOnlyNewThreadsAndLeavesWarmThreadsAlone() async {
+    let recipeID = SampleUUIDSequence.uuid(38_045)
+    await withDependencies {
+      $0.date.now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+      $0.uuid = .incrementing
+      $0.modelClient = StubModelClient.constant("Start with the sauce.")
+    } operation: {
+      let cold = RecipeChatModel(
+        context: .recipe(RecipeChatRecipeContext(recipeID: recipeID, title: "Tomato Sauce"))
+      )
+      #expect(await cold.seedIfCold("Open the make-ahead discussion.") == .seeded)
+      #expect(cold.messages.map(\.text) == ["Open the make-ahead discussion.", "Start with the sauce."])
+
+      let warm = RecipeChatModel(
+        context: .recipe(RecipeChatRecipeContext(recipeID: recipeID, title: "Tomato Sauce"))
+      )
+      let existingMessages = warm.messages
+      // A warm thread reports `.alreadyWarm`, never `.failed` — the caller keeps the panel's scope.
+      #expect(await warm.seedIfCold("Do not send this second opener.") == .alreadyWarm)
+      expectNoDifference(warm.messages, existingMessages)
+    }
+  }
+
+  @Test
+  @MainActor
+  func failedColdSeedDoesNotLeaveAnOrphanedUserMessage() async {
+    await withDependencies {
+      $0.uuid = .incrementing
+      $0.modelClient = StubModelClient { _ in throw SeedFailure.unavailable }
+    } operation: {
+      let model = RecipeChatModel(
+        context: .recipe(RecipeChatRecipeContext(title: "Tomato Sauce"))
+      )
+      #expect(await model.seedIfCold("Open the make-ahead discussion.") == .failed)
+      expectNoDifference(model.messages, [])
+      #expect(model.errorText != nil)
+    }
   }
 
   /// The Playbook hands off in `.discuss` mode, and each context owns its format — so each blob
@@ -518,4 +634,8 @@ extension AIHandoffTests {
       ]
     )
   }
+}
+
+private enum SeedFailure: Error, Sendable {
+  case unavailable
 }

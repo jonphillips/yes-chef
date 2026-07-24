@@ -226,6 +226,14 @@ struct RecipeChatPanel: View {
   let chatModel: RecipeChatModel
   let applyActions: [AnyChatApplyAction]
   var showsEmbeddedHeader = false
+  /// When set, the panel's title becomes a **Discuss ▾** section switcher — the same section-picking
+  /// control as the playbook's Ask ▾ launcher, and the only way to re-scope on iPhone where the
+  /// playbook sits behind the modal sheet. `nil` for panels with no sections (menu, workbench).
+  var selectSection: ((PlaybookSectionKind) -> Void)?
+  var activeSection: PlaybookSectionKind?
+  /// When set, the panel shows an explicit **Done** dismiss (a crowded sheet toolbar is awkward to
+  /// swipe past). `nil` for embedded panels that own their own chrome.
+  var onDismiss: (() -> Void)?
 
   @State private var draft = ""
   @State private var assistantSelection = ChatAssistantSelection()
@@ -266,6 +274,10 @@ struct RecipeChatPanel: View {
           }
           .padding()
         }
+        // A seeded or restored thread arrives with its messages already present, so
+        // `.onChange` never fires for them — without this the panel opens scrolled to the
+        // top of the machine-authored opener instead of on the reply the cook came to read.
+        .defaultScrollAnchor(.bottom)
         .onChange(of: chatModel.messages.count) { _, _ in
           guard let lastID = chatModel.messages.last?.id else { return }
           withAnimation {
@@ -340,6 +352,16 @@ struct RecipeChatPanel: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       if !showsEmbeddedHeader {
+        if let onDismiss {
+          ToolbarItem(placement: .topBarLeading) {
+            Button("Done") { onDismiss() }
+          }
+        }
+        if let selectSection {
+          ToolbarItem(placement: .principal) {
+            ChatSectionMenu(activeSection: activeSection, select: selectSection)
+          }
+        }
         ToolbarItem(placement: .topBarTrailing) {
           clearChatButton
         }

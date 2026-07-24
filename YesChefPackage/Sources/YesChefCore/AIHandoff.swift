@@ -97,6 +97,14 @@ public enum PlaybookSectionKind: String, CaseIterable, Codable, QueryBindable, Q
     case .serveWith: .serveWith
     }
   }
+
+  public var deliverableFormat: AIHandoffToken.DeliverableFormat {
+    switch self {
+    case .makeAhead: .recipeMakeAhead
+    case .chefItUp: .recipeChefItUp
+    case .serveWith: .recipeServeWith
+    }
+  }
 }
 
 public extension AIHandoff {
@@ -115,6 +123,13 @@ public enum AIHandoffStatus: String, Codable, QueryBindable, QueryDecodable, Sen
   case awaitingReturn
   case imported
   case discarded
+}
+
+/// Whether a prompt is headed to the external hand-off transport or the in-app discussion panel.
+/// Onboard prompts omit subject serialization because the chat system prompt already supplies it.
+public enum AIHandoffPromptDestination: Equatable, Sendable {
+  case outboard
+  case onboard
 }
 
 @Table("learnings")
@@ -494,13 +509,7 @@ public enum AIHandoffToken {
     let titlePrefix = titleLine.isEmpty ? "" : "\(titleLine)\n"
     switch mode {
     case .discuss:
-      return """
-      \(titlePrefix)\(token)
-
-      \(context)
-
-      You may discuss this freely. When the user asks you to finalize, return \(deliverableFormat.discussInstruction).
-      """
+      return "\(titlePrefix)\(token)\n\n\(discussAsk(context: context, deliverableFormat: deliverableFormat))"
     case .immediate:
       return """
       \(titlePrefix)\(token)
@@ -508,6 +517,31 @@ public enum AIHandoffToken {
       \(context)
 
       \(deliverableFormat.immediateInstruction)
+      """
+    }
+  }
+
+  /// The conversational opening shared by external hand-offs and onboard seeded discussions.
+  /// Transport-specific title and routing-token lines are intentionally added by `prompt` instead.
+  public static func discussAsk(
+    context: String,
+    deliverableFormat: DeliverableFormat = .menuPrepPlan,
+    destination: AIHandoffPromptDestination = .outboard
+  ) -> String {
+    switch destination {
+    case .outboard:
+      """
+      \(context)
+
+      You may discuss this freely. When the user asks you to finalize, return \(deliverableFormat.discussInstruction).
+      """
+    case .onboard:
+      """
+      \(context)
+
+      You may discuss this freely. When the user asks you to finalize, return \(deliverableFormat.discussInstruction).
+
+      The format above describes the finalized return, not this conversation — discuss conversationally until the cook asks you to finalize.
       """
     }
   }

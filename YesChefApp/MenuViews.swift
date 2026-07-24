@@ -176,7 +176,7 @@ struct MenuDetailView: View {
           detail: detail,
           handoffTransport: handoffTransport,
           onRecipeSelected: onRecipeSelected,
-          regeneratePrepPlan: ensureChatIsOpen
+          regeneratePrepPlan: regeneratePrepPlan
         )
         .navigationTitle(detail.menu.title)
       } else {
@@ -325,13 +325,36 @@ struct MenuDetailView: View {
     if isAskActive {
       dismissTool()
     } else {
-      ensureChatIsOpen()
+      presentAsk()
     }
   }
 
-  private func ensureChatIsOpen() {
+  private func presentAsk() {
     guard let detail = detailModel.detail else { return }
-    presentTool(.chat(RecipeChatModel(context: .menu(MenuChatContext(detail: detail)))))
+    let context = MenuChatContext(detail: detail)
+    let chatModel = chatModel(for: context)
+    Task {
+      await chatModel.seedIfCold(context.discussAsk())
+    }
+  }
+
+  private func regeneratePrepPlan() {
+    guard let detail = detailModel.detail else { return }
+    let context = MenuChatContext(detail: detail)
+    let chatModel = chatModel(for: context)
+    Task {
+      await chatModel.send(context.discussAsk())
+    }
+  }
+
+  private func chatModel(for context: MenuChatContext) -> RecipeChatModel {
+    if case let .chat(chatModel)? = toolOverlay ?? compactTool {
+      chatModel.updateContext(.menu(context))
+      return chatModel
+    }
+    let chatModel = RecipeChatModel(context: .menu(context))
+    presentTool(.chat(chatModel))
+    return chatModel
   }
 
   private func recipeBrowserButtonTapped() {

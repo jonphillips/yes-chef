@@ -220,16 +220,6 @@ enum WorkbenchHandoffTask: Sendable {
   }
 }
 
-private extension PlaybookSectionKind {
-  var deliverableFormat: AIHandoffToken.DeliverableFormat {
-    switch self {
-    case .makeAhead: .recipeMakeAhead
-    case .chefItUp: .recipeChefItUp
-    case .serveWith: .recipeServeWith
-    }
-  }
-}
-
 enum HandoffAppOperations {
   private static func mealPlanHandoffContext(
     mealPlanID: MealPlanItem.ID,

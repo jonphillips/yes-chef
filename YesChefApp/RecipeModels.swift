@@ -814,7 +814,13 @@ final class RecipeDetailModel {
   @ObservationIgnored
   @Fetch var persistedScale: Double?
 
-  var destination: Destination?
+  var destination: Destination? {
+    didSet {
+      if case .none = destination {
+        seededAskSection = nil
+      }
+    }
+  }
   var errorMessage: String?
   var isShowingError = false
   var scaleFactor = 1.0
@@ -823,6 +829,7 @@ final class RecipeDetailModel {
   var adjustmentRestorePoint: RecipeAdjustmentRestorePoint?
   @ObservationIgnored let detailFetchAnimationDescription: String
   private var lastAppliedPersistedScale: Double?
+  private(set) var seededAskSection: PlaybookSectionKind?
 
   init(
     recipeID: Recipe.ID,
@@ -929,16 +936,49 @@ final class RecipeDetailModel {
     destination = .scaling
   }
 
-  func chatButtonTapped() {
+  /// Open the recipe chat scoped to `section`, or move an already-open chat to it, keeping the
+  /// transcript. Both the playbook **Ask ▾** launcher and the in-panel **Discuss ▾** switcher route
+  /// here — one section-picking affordance, not two (ADR-0045 Amd 2). It never *closes* the panel;
+  /// dismissal is the panel's own **Done** button. On iPhone the chat is a full-height modal sheet
+  /// that hides the playbook, so an in-panel switch is the only way to re-scope there.
+  func askSection(_ section: PlaybookSectionKind) {
     guard let detail else { return }
-    // Toggle: Ask is a non-modal companion on wide iPad, so its trigger stays live
-    // beside the open panel. Re-tapping closes it (rather than rebuilding the model and
-    // discarding the scratch transcript). See the Menu recipe-browser toggle for the pattern.
-    if destination.chat != nil {
-      destination = nil
-      return
+    let seed = RecipeHandoffContext(detail: detail).discussAsk(for: section)
+
+    // Ensure a panel. The recipe's chat thread persists *per recipe*, so a freshly-opened panel may
+    // restore a warm thread from an earlier section — reopening for a different section must still
+    // deliver this section's opener, not fall silent on the old exchange.
+    let chatModel: RecipeChatModel
+    if case let .chat(existing) = destination {
+      guard seededAskSection != section else { return }  // already showing this section
+      chatModel = existing
+    } else {
+      chatModel = RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail)))
+      destination = .chat(chatModel)
     }
-    destination = .chat(RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail))))
+
+    Task {
+      // Cold thread: seed it, with clean failure handling on the empty panel. Warm thread (restored
+      // or ongoing): the cook explicitly picked this section, so append its opener to the transcript.
+      switch await chatModel.seedIfCold(seed) {
+      case .seeded:
+        guard isShowing(chatModel) else { return }
+        seededAskSection = section
+      case .failed:
+        guard isShowing(chatModel) else { return }
+        seededAskSection = nil
+      case .alreadyWarm:
+        // A no-op send (e.g. a reply is mid-flight) must not re-label the panel, so scope moves only
+        // after a real send.
+        guard await chatModel.send(seed), isShowing(chatModel) else { return }
+        seededAskSection = section
+      }
+    }
+  }
+
+  private func isShowing(_ chatModel: RecipeChatModel) -> Bool {
+    if case let .chat(current) = destination { return current === chatModel }
+    return false
   }
 
   func openWorkbenchButtonTapped() {

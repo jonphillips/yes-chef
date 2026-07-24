@@ -12,7 +12,10 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     self.recipe = recipe
   }
 
-  public func prompt(for section: PlaybookSectionKind) -> String {
+  public func prompt(
+    for section: PlaybookSectionKind,
+    destination: AIHandoffPromptDestination = .outboard
+  ) -> String {
     @Dependency(\.aiPromptPreferences) var preferences
     let settings = preferences.current()
     let context = bounded(recipe.serialized(excludingPlaybookSections: [section]))
@@ -24,23 +27,36 @@ public struct RecipeHandoffContext: Equatable, Sendable {
         context: context,
         knownLearnings: knownLearnings,
         tasteProfile: settings.tasteProfile,
-        makeAheadPreference: AISettingsRepository.preference(in: settings, for: .makeAheadPrepPlan)
+        makeAheadPreference: AISettingsRepository.preference(in: settings, for: .makeAheadPrepPlan),
+        destination: destination
       )
     case .chefItUp:
       return Self.chefItUpPrompt(
         context: context,
         knownLearnings: knownLearnings,
         tasteProfile: settings.tasteProfile,
-        chefItUpPreference: AISettingsRepository.preference(in: settings, for: .chefItUp)
+        chefItUpPreference: AISettingsRepository.preference(in: settings, for: .chefItUp),
+        destination: destination
       )
     case .serveWith:
       return Self.serveWithPrompt(
         context: context,
         knownLearnings: knownLearnings,
         tasteProfile: settings.tasteProfile,
-        serveWithPreference: AISettingsRepository.preference(in: settings, for: .serveWith)
+        serveWithPreference: AISettingsRepository.preference(in: settings, for: .serveWith),
+        destination: destination
       )
     }
+  }
+
+  /// The opening user message for an onboard discussion of one Playbook section.
+  /// It deliberately shares the external hand-off's `.discuss` wording, without its routing token.
+  public func discussAsk(for section: PlaybookSectionKind) -> String {
+    AIHandoffToken.discussAsk(
+      context: prompt(for: section, destination: .onboard),
+      deliverableFormat: section.deliverableFormat,
+      destination: .onboard
+    )
   }
 
   /// Recipe-body hand-offs have a different return shape from Playbook sections: they outboard
@@ -86,7 +102,8 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     context: String,
     knownLearnings: String,
     tasteProfile: String,
-    makeAheadPreference: String
+    makeAheadPreference: String,
+    destination: AIHandoffPromptDestination
   ) -> String {
     """
     You are preparing practical make-ahead notes for one recipe. Preserve the recipe's authored method and
@@ -103,8 +120,7 @@ public struct RecipeHandoffContext: Equatable, Sendable {
 
     The return must be plain, paste-ready review text — not JSON — because the cook reviews and edits it in
     Yes Chef before it is saved.
-    \(knownLearnings)
-    \(context)
+    \(knownLearnings)\(subjectContext(context, destination: destination))
     """
   }
 
@@ -112,7 +128,8 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     context: String,
     knownLearnings: String,
     tasteProfile: String,
-    chefItUpPreference: String
+    chefItUpPreference: String,
+    destination: AIHandoffPromptDestination
   ) -> String {
     """
     You are preparing practical Chef It Up notes for one recipe. Suggest concrete technique and flavor upgrades;
@@ -128,8 +145,7 @@ public struct RecipeHandoffContext: Equatable, Sendable {
 
     The return must be plain, paste-ready review text — not JSON — because the cook reviews and edits it in
     Yes Chef before it is saved.
-    \(knownLearnings)
-    \(context)
+    \(knownLearnings)\(subjectContext(context, destination: destination))
     """
   }
 
@@ -137,7 +153,8 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     context: String,
     knownLearnings: String,
     tasteProfile: String,
-    serveWithPreference: String
+    serveWithPreference: String,
+    destination: AIHandoffPromptDestination
   ) -> String {
     """
     You are suggesting accompaniments for one recipe. Return one suggestion per line, exactly as `title: note`
@@ -151,9 +168,18 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     \(serveWithPreference)
 
     The cook reviews and edits the returned lines in Yes Chef before saving them.
-    \(knownLearnings)
-    \(context)
+    \(knownLearnings)\(subjectContext(context, destination: destination))
     """
+  }
+
+  private static func subjectContext(
+    _ context: String,
+    destination: AIHandoffPromptDestination
+  ) -> String {
+    switch destination {
+    case .outboard: "\n\(context)"
+    case .onboard: ""
+    }
   }
 
   private static func recipeAdjustmentPrompt(
@@ -352,6 +378,18 @@ public struct MenuHandoffContext: Equatable, Sendable {
 
     \(menu.serialized(for: .frontierPreferred))
     """
+  }
+}
+
+public extension MenuChatContext {
+  /// The opening user message for an onboard discussion of this menu's prep plan.
+  /// It deliberately shares the external hand-off's `.discuss` wording, without its routing token.
+  func discussAsk() -> String {
+    AIHandoffToken.discussAsk(
+      context: prepPrompt(destination: .onboard),
+      deliverableFormat: .menuPrepPlan,
+      destination: .onboard
+    )
   }
 }
 

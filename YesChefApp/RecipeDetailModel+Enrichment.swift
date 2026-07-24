@@ -63,7 +63,7 @@ extension RecipeDetailModel {
       }
     )
     let serveWithAction = ChatApplyAction<ServeWithPlan>(
-      title: "Suggest Dishes",
+      title: "Capture Side Dishes",
       extractingTitle: "Finding accompaniments...",
       reviewTitle: "Review Serve With",
       commitTitle: "Add to Serve With",
