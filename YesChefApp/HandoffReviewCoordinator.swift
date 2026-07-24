@@ -9,9 +9,9 @@ import YesChefCore
 @Observable
 @MainActor
 final class HandoffReviewCoordinator {
-  @ObservationIgnored @Dependency(\.date.now) private var now
-  @ObservationIgnored @Dependency(\.defaultDatabase) private var database
-  @ObservationIgnored @Dependency(\.uuid) private var uuid
+  @ObservationIgnored @Dependency(\.date.now) var now
+  @ObservationIgnored @Dependency(\.defaultDatabase) var database
+  @ObservationIgnored @Dependency(\.uuid) var uuid
 
   var review: AIHandoffReview?
   var adjustmentReview: RecipeAdjustmentReviewState?
@@ -25,6 +25,8 @@ final class HandoffReviewCoordinator {
 
   func reviewItems(for review: AIHandoffReview) -> [ChatApplyReviewItem] {
     switch review {
+    case let .menuComplement(review):
+      menuComplementReviewItems(for: review)
     case let .menuPrepPlan(review):
       menuPrepPlanReviewItems(for: review)
     case let .recipeMakeAhead(review):
@@ -37,6 +39,8 @@ final class HandoffReviewCoordinator {
       []
     case let .mealPlanMakeAhead(review):
       mealPlanMakeAheadReviewItems(for: review)
+    case let .mealPlanComplement(review):
+      mealPlanComplementReviewItems(for: review)
     case let .workbenchCompare(review):
       workbenchCompareReviewItems(for: review)
     case .workbenchExperiments:
@@ -622,8 +626,8 @@ struct HandoffReviewSheet: View {
         review: briefReview,
         originalReview: review
       )
-    case .menuPrepPlan, .recipeMakeAhead, .recipeChefItUp, .recipeServeWith, .mealPlanMakeAhead,
-         .workbenchCompare:
+    case .menuPrepPlan, .menuComplement, .recipeMakeAhead, .recipeChefItUp, .recipeServeWith,
+         .mealPlanMakeAhead, .mealPlanComplement, .workbenchCompare:
       standardReviewSheet
     }
   }

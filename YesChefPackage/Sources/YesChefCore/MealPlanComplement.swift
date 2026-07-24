@@ -10,6 +10,16 @@ public struct MealPlanComplementPlan: Equatable, Sendable {
   }
 }
 
+public struct MealPlanComplementHandoffParseResult: Equatable, Sendable {
+  public var plan: MealPlanComplementPlan
+  public var unparsedBlocks: [String]
+
+  public init(plan: MealPlanComplementPlan, unparsedBlocks: [String]) {
+    self.plan = plan
+    self.unparsedBlocks = unparsedBlocks
+  }
+}
+
 public struct MealPlanComplementSuggestion: Equatable, Sendable {
   public var kind: MealPlanItemKind
   public var title: String
@@ -73,6 +83,43 @@ public struct MealPlanComplementSuggestion: Equatable, Sendable {
   }
 }
 
+public extension MealPlanComplementPlan {
+  /// Parses one complement per `Note:`-delimited block from an external
+  /// hand-off. The date remains out of the response: the hand-off's source
+  /// day is the only valid destination.
+  static func parsingHandoffText(_ text: String) -> MealPlanComplementHandoffParseResult {
+    let blocks = text.labeledHandoffBlocks(startingWith: "note:")
+
+    var items: [MealPlanComplementSuggestion] = []
+    var unparsedBlocks: [String] = []
+    for block in blocks {
+      let lines = block.editableMealPlanComplementLines
+      guard lines.count >= 2,
+        lines[0].lowercased().hasPrefix("note:"),
+        MealPlanItemSlot(handoffPlacementLine: lines[1]) != nil
+      else {
+        unparsedBlocks.append(block)
+        continue
+      }
+      let suggestion = MealPlanComplementSuggestion(title: "", mealSlot: .dinner)
+        .applyingEditableReviewText(block)
+      guard !suggestion.title.isEmpty else {
+        unparsedBlocks.append(block)
+        continue
+      }
+      items.append(suggestion)
+      if lines.count > 2 {
+        unparsedBlocks.append(lines.dropFirst(2).joined(separator: "\n"))
+      }
+    }
+    return MealPlanComplementHandoffParseResult(
+      plan: MealPlanComplementPlan(items: items),
+      unparsedBlocks: unparsedBlocks
+    )
+  }
+
+}
+
 public struct MealPlanComplementClient: Sendable {
   public var extract: @Sendable (
     _ selection: String,
@@ -109,7 +156,7 @@ extension MealPlanComplementClient: DependencyKey {
       surface: .mealPlan,
       task: .complement,
       tierResolution: .callerProvided,
-      contextLayers: [.mealPlan, .selection, .conversation],
+      contextLayers: [.mealPlan, .selection, .conversation, .tasteProfile],
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, context: context),

@@ -71,6 +71,7 @@ extension RecipeCoreTests {
     @Test
     func liveClientUsesConfiguredFrontierProviderAndHighEffort() async throws {
       let recorder = ReaderFeedbackModelRequestRecorder()
+      let callRecords = ModelCallRecordCollector()
 
       try await withDependencies {
         $0.apiKeyStore = readerFeedbackAPIKeyStore([.openai: "sk-openai"])
@@ -93,6 +94,7 @@ extension RecipeCoreTests {
               """
           )
         }
+        $0.modelCallRecordSink = .inMemory(callRecords)
       } operation: {
         let tips = try await ReaderFeedbackCurationClient.liveValue(
           comments: [
@@ -136,6 +138,11 @@ extension RecipeCoreTests {
       #expect(request.messages.first?.text.contains("helpful count: 9") == true)
       #expect(request.messages.first?.text.contains("99") == false)
       #expect(request.system?.contains("synthesize WITHIN one point") == true)
+      let recordedCalls = await callRecords.records()
+      expectNoDifference(
+        recordedCalls.first?.contextLayers,
+        ModelCallContextLayers(included: [.readerComments], omitted: [.tasteProfile])
+      )
     }
 
     @Test

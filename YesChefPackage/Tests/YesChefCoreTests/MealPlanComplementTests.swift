@@ -72,14 +72,65 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func handoffParserUsesNoteLabelsWhenBlankLinesAreCollapsed() {
+      let parsed = MealPlanComplementPlan.parsingHandoffText(
+        """
+        Note: Cucumber herb salad
+        Tuesday, July 8 - Dinner
+        Note: Charred peaches
+        Tuesday, July 8 - Snack
+        """
+      )
+
+      expectNoDifference(
+        parsed.plan.items,
+        [
+          MealPlanComplementSuggestion(title: "Cucumber herb salad", mealSlot: .dinner),
+          MealPlanComplementSuggestion(title: "Charred peaches", mealSlot: .snack),
+        ]
+      )
+      expectNoDifference(parsed.unparsedBlocks, [])
+    }
+
+    @Test
+    func handoffParserKeepsUnknownSlotsAndSurplusLinesAsReviewEvidence() {
+      let parsed = MealPlanComplementPlan.parsingHandoffText(
+        """
+        Note: Charred peaches
+        Tuesday, July 8 - Snack
+        Grill them over the coals after dinner.
+        Note: Cucumber herb salad
+        Tuesday, July 8 - Dessert
+        """
+      )
+
+      expectNoDifference(
+        parsed.plan.items,
+        [MealPlanComplementSuggestion(title: "Charred peaches", mealSlot: .snack)]
+      )
+      expectNoDifference(
+        parsed.unparsedBlocks,
+        [
+          "Grill them over the coals after dinner.",
+          """
+          Note: Cucumber herb salad
+          Tuesday, July 8 - Dessert
+          """,
+        ]
+      )
+    }
+
+    @Test
     func mealPlanComplementClientSendsRequestedModelTierAndDayContext() async throws {
       let recorder = MealPlanComplementRequestRecorder()
+      let callRecords = ModelCallRecordCollector()
 
       try await withDependencies {
         $0.modelClient = StubModelClient { request in
           await recorder.append(request)
           return ModelResponse(text: #"{"items":[]}"#)
         }
+        $0.modelCallRecordSink = .inMemory(callRecords)
       } operation: {
         let client = MealPlanComplementClient.liveValue
         _ = try await client(
@@ -98,6 +149,11 @@ extension RecipeCoreTests {
       #expect(request?.messages.first?.text.contains("User-selected subject:\nWhat goes with Tuesday dinner?") == true)
       #expect(
         request?.messages.first?.text.contains("Choose only the meal slot for each suggestion") == true
+      )
+      let recordedCalls = await callRecords.records()
+      expectNoDifference(
+        recordedCalls.first?.contextLayers,
+        [.mealPlan, .selection, .conversation, .tasteProfile]
       )
     }
 

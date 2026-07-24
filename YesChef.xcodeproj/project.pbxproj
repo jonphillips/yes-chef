@@ -54,9 +54,11 @@
 		627BE832B346246A69355F57 /* SyncHealthModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EA663A481CAE11E140B6830 /* SyncHealthModel.swift */; };
 		638EB65557B6EADDD89B33DD /* WebExtractorKit in Frameworks */ = {isa = PBXBuildFile; productRef = 161A231BCBA04E0D71C67DF2 /* WebExtractorKit */; };
 		6588EBC345BB11E65929F52F /* MenuPlaybookColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A1F368F34241CAF035C9CA /* MenuPlaybookColumnView.swift */; };
+		68A79CAF1B3EDB56758F1CC1 /* MealCalendarHandoffSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EEED601CE748216744F3637 /* MealCalendarHandoffSource.swift */; };
 		69B8E2AD921E41D8B38D14C7 /* YesChefShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 396029D84F6F6E49A17C47D2 /* YesChefShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		6BB951B199059B6F99196B26 /* AISettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64ABAAA0A5F20303F4C50314 /* AISettingsView.swift */; };
 		6E4C21A5E580147F1C8A1B94 /* AppExternalDatabaseChangeReload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D2AA2B9A5B2A2F4EFDE5A0C /* AppExternalDatabaseChangeReload.swift */; };
+		6EA932A0C074C0342AFD01E4 /* HandoffComplementReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB8E39BFB7BEB3E6A0DA515 /* HandoffComplementReview.swift */; };
 		70367DA49A5A79CABD32C9C4 /* RecipePhotoViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71BB04447CDD6B75A1CD330A /* RecipePhotoViews.swift */; };
 		745EB823B218D91E3AA60FC8 /* AppToastCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 851ED481B27014D93BC3E92F /* AppToastCenter.swift */; };
 		747D152238B98A57F6390E26 /* RecipeCollectionReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A24C21F9F96CE16EB2F8A /* RecipeCollectionReviewSheet.swift */; };
@@ -171,6 +173,7 @@
 		64ABAAA0A5F20303F4C50314 /* AISettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISettingsView.swift; sourceTree = "<group>"; };
 		6695544EB0BE23557D34BFA5 /* BrowserViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserViews.swift; sourceTree = "<group>"; };
 		6C250D0CBA2170B99AE070A1 /* RecipeEditorModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeEditorModels.swift; sourceTree = "<group>"; };
+		6EEED601CE748216744F3637 /* MealCalendarHandoffSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCalendarHandoffSource.swift; sourceTree = "<group>"; };
 		6FE4F6BA219B7819AFB1FEAE /* RecipeLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeLibraryView.swift; sourceTree = "<group>"; };
 		7090DA55279458851517DD5A /* MenuModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuModels.swift; sourceTree = "<group>"; };
 		71BB04447CDD6B75A1CD330A /* RecipePhotoViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipePhotoViews.swift; sourceTree = "<group>"; };
@@ -195,6 +198,7 @@
 		8A40B028294CBF15EA2F4F72 /* WorkbenchCompareAlignmentModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchCompareAlignmentModelTests.swift; sourceTree = "<group>"; };
 		8A4FCB37DBBA09D6123D7989 /* SettingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViews.swift; sourceTree = "<group>"; };
 		8C507E80F42B4348BC5E3472 /* ModelCallInventoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCallInventoryView.swift; sourceTree = "<group>"; };
+		8CB8E39BFB7BEB3E6A0DA515 /* HandoffComplementReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffComplementReview.swift; sourceTree = "<group>"; };
 		8DE2CEAA7C5D5836E123F474 /* RecipeImageLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeImageLoader.swift; sourceTree = "<group>"; };
 		9095EE24ABAA5DC23259EDE9 /* RecipeScaleFormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeScaleFormattingTests.swift; sourceTree = "<group>"; };
 		90AEA6C80CDEFF87884B65A7 /* CookSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookSessionView.swift; sourceTree = "<group>"; };
@@ -361,10 +365,12 @@
 				21092B09A19EF04372E6A66D /* GroceryModels.swift */,
 				20C2EE75870C5C9AAD099505 /* GroceryPantryReviewViews.swift */,
 				27FA69A8957E5DC8A49A9E3F /* GroceryViews.swift */,
+				8CB8E39BFB7BEB3E6A0DA515 /* HandoffComplementReview.swift */,
 				0424EE313AB25F0AD46E963E /* HandoffInAppTransport.swift */,
 				BF6D7AE0E516607E7C801612 /* HandoffReviewCoordinator.swift */,
 				18FECD94C6F2E120A02EE0A6 /* IdleTimerDisabledModifier.swift */,
 				7ED8C4BF9300184ABE4E59A5 /* Info.plist */,
+				6EEED601CE748216744F3637 /* MealCalendarHandoffSource.swift */,
 				B49D2E9B66A731DB272F063C /* MealCalendarModels.swift */,
 				EA3742E4519F6D798F171F80 /* MealCalendarRowHelpers.swift */,
 				76A768628F1345FDF66EDC49 /* MealCalendarViews.swift */,
@@ -612,11 +618,13 @@
 				91DE45EFBB52B916289EEB1D /* GroceryModels.swift in Sources */,
 				AE11AE8D6A7D9F8E06642477 /* GroceryPantryReviewViews.swift in Sources */,
 				A9FBE5AA277DCBB1A66A417E /* GroceryViews.swift in Sources */,
+				6EA932A0C074C0342AFD01E4 /* HandoffComplementReview.swift in Sources */,
 				A988E3254E3FCB7C8001B787 /* HandoffEntities.swift in Sources */,
 				A649C9165C7E76B9D2868241 /* HandoffInAppTransport.swift in Sources */,
 				3B43FC000CAA77FE2FCBAD93 /* HandoffIntents.swift in Sources */,
 				2F07342A5ED8AB64EFA742F1 /* HandoffReviewCoordinator.swift in Sources */,
 				26A54D34845DADD8C9E1493D /* IdleTimerDisabledModifier.swift in Sources */,
+				68A79CAF1B3EDB56758F1CC1 /* MealCalendarHandoffSource.swift in Sources */,
 				866C7FBB7E3079ECED997DEB /* MealCalendarModels.swift in Sources */,
 				0577DC99A3BD2368B5CC7EF8 /* MealCalendarRowHelpers.swift in Sources */,
 				F3F3ED67EB4980A43151000F /* MealCalendarViews.swift in Sources */,

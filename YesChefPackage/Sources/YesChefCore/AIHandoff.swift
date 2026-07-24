@@ -40,6 +40,9 @@ public struct AIHandoff: Codable, Identifiable, Equatable, Sendable {
 }
 
 public enum AIHandoffSourceType: String, Codable, QueryBindable, QueryDecodable, Sendable {
+  /// A transient recipe-capture session. Its hand-off can only return to the
+  /// still-open capture editor, so it is intentionally not an App Intent source.
+  case capture
   case recipe
   case menu
   case mealPlan
@@ -54,6 +57,9 @@ public enum AIHandoffTaskType: String, Codable, QueryBindable, QueryDecodable, S
   case serveWith
   case adjustRecipe
   case mealPlanMakeAheadStrategy
+  case mealPlanComplement
+  case menuComplement
+  case readerFeedbackCuration
   case workbenchCompare
   case workbenchExperiments
 
@@ -66,6 +72,9 @@ public enum AIHandoffTaskType: String, Codable, QueryBindable, QueryDecodable, S
     case .serveWith: "Serve With"
     case .adjustRecipe: "Adjust Recipe"
     case .mealPlanMakeAheadStrategy: "Make-ahead Strategy"
+    case .mealPlanComplement: "Meal-plan Complement"
+    case .menuComplement: "Menu Complement"
+    case .readerFeedbackCuration: "Reader Feedback"
     case .workbenchCompare: "Compare"
     case .workbenchExperiments: "Experiments"
     }
@@ -404,16 +413,21 @@ public enum AIHandoffToken {
 
   public enum DeliverableFormat: Sendable {
     case menuPrepPlan
+    case menuComplement
     case recipeMakeAhead
     case recipeChefItUp
     case recipeServeWith
     case mealPlanMakeAheadStrategy
+    case mealPlanComplement
+    case readerFeedbackCuration
     case workbenchExperiments
 
     var discussInstruction: String {
       switch self {
       case .menuPrepPlan:
         "the paste-ready prep plan"
+      case .menuComplement:
+        "the paste-ready menu complements"
       case .recipeMakeAhead:
         "the paste-ready recipe make-ahead notes"
       case .recipeChefItUp:
@@ -422,6 +436,10 @@ public enum AIHandoffToken {
         "paste-ready Serve With suggestions"
       case .mealPlanMakeAheadStrategy:
         "the paste-ready meal-plan make-ahead strategy"
+      case .mealPlanComplement:
+        "the paste-ready meal-plan complements"
+      case .readerFeedbackCuration:
+        "the paste-ready reader-feedback points"
       case .workbenchExperiments:
         "the proposed experiments"
       }
@@ -431,6 +449,8 @@ public enum AIHandoffToken {
       switch self {
       case .menuPrepPlan:
         "Return the completed prep plan in your first response when the menu needs one."
+      case .menuComplement:
+        "Return the completed menu complements in your first response when the menu needs them."
       case .recipeMakeAhead:
         "Return the completed recipe make-ahead notes in your first response when the recipe needs them."
       case .recipeChefItUp:
@@ -439,6 +459,10 @@ public enum AIHandoffToken {
         "Return the completed Serve With suggestions in your first response when the recipe needs them."
       case .mealPlanMakeAheadStrategy:
         "Return the completed meal-plan make-ahead strategy in your first response when the day needs one."
+      case .mealPlanComplement:
+        "Return the completed meal-plan complements in your first response when the day needs them."
+      case .readerFeedbackCuration:
+        "Return the completed reader-feedback curation in your first response when useful tips exist."
       case .workbenchExperiments:
         "Return the proposed experiments in your first response when the workbench needs them."
       }
@@ -521,7 +545,7 @@ public enum AIHandoffReturnContract {
 
     When the user asks to finalize, or a hand-off asks for an immediate result, stop conversing and return the requested deliverable as a terminal response. Its first line must be the exact `YC-HANDOFF:` token from the prompt. Its second line must be `\(marker)`. Then return the requested deliverable. Include a `YC-LEARNINGS:` section with distinct durable learnings unless the hand-off expressly asks you to omit it.
 
-    For an Experiments hand-off, return each experiment as exactly three lines, in this order: `Hypothesis: <one sentence>`, `Change: <one sentence>`, and `Rationale: <one sentence>`. Repeat that labeled cycle for each distinct experiment. Do not include `YC-LEARNINGS:` for Experiments; an experiment is untested until its outcome is recorded.
+    For an Experiments hand-off, return each experiment as exactly three lines, in this order: `Hypothesis: <one sentence>`, `Change: <one sentence>`, and `Rationale: <one sentence>`. Repeat that labeled cycle for each distinct experiment. Do not include `YC-LEARNINGS:` for Experiments; an experiment is untested until its outcome is recorded. Some other hand-offs may also expressly suppress learnings when they return untested suggestions or curated source evidence; follow that task-specific instruction.
 
     Return no preamble, sign-off, headings, or nesting. Do not assess what is already good. Keep distinct requested items distinct rather than merging them into a summary. If a requested field cannot be filled confidently, omit that item rather than inventing it. Do not use a Markdown code fence.
     """
@@ -561,6 +585,25 @@ public struct AIHandoffMenuPrepPlanReview: Equatable, Sendable {
     self.plan = plan
     self.learnings = learnings
     self.unparsedPlanLines = unparsedPlanLines
+  }
+}
+
+public struct AIHandoffMenuComplementReview: Equatable, Sendable {
+  public let handoffID: AIHandoff.ID
+  public let menuID: Menu.ID
+  public let plan: MenuComplementPlan
+  public let unparsedBlocks: [String]
+
+  public init(
+    handoffID: AIHandoff.ID,
+    menuID: Menu.ID,
+    plan: MenuComplementPlan,
+    unparsedBlocks: [String]
+  ) {
+    self.handoffID = handoffID
+    self.menuID = menuID
+    self.plan = plan
+    self.unparsedBlocks = unparsedBlocks
   }
 }
 
@@ -658,6 +701,44 @@ public struct AIHandoffMealPlanMakeAheadReview: Equatable, Sendable {
   }
 }
 
+public struct AIHandoffMealPlanComplementReview: Equatable, Sendable {
+  public let handoffID: AIHandoff.ID
+  public let mealPlanItemID: MealPlanItem.ID
+  public let scheduledDate: Date
+  public let plan: MealPlanComplementPlan
+  public let unparsedBlocks: [String]
+
+  public init(
+    handoffID: AIHandoff.ID,
+    mealPlanItemID: MealPlanItem.ID,
+    scheduledDate: Date,
+    plan: MealPlanComplementPlan,
+    unparsedBlocks: [String]
+  ) {
+    self.handoffID = handoffID
+    self.mealPlanItemID = mealPlanItemID
+    self.scheduledDate = scheduledDate
+    self.plan = plan
+    self.unparsedBlocks = unparsedBlocks
+  }
+}
+
+public struct AIHandoffReaderFeedbackReview: Equatable, Sendable {
+  public let handoffID: AIHandoff.ID
+  public let tips: [ReaderFeedbackTip]
+  public let unparsedLines: [String]
+
+  public init(
+    handoffID: AIHandoff.ID,
+    tips: [ReaderFeedbackTip],
+    unparsedLines: [String] = []
+  ) {
+    self.handoffID = handoffID
+    self.tips = tips
+    self.unparsedLines = unparsedLines
+  }
+}
+
 public struct AIHandoffWorkbenchCompareReview: Equatable, Sendable {
   public let handoffID: AIHandoff.ID
   public let workbenchID: Workbench.ID
@@ -678,23 +759,27 @@ public struct AIHandoffWorkbenchCompareReview: Equatable, Sendable {
 }
 
 public enum AIHandoffReview: Equatable, Sendable {
+  case menuComplement(AIHandoffMenuComplementReview)
   case menuPrepPlan(AIHandoffMenuPrepPlanReview)
   case recipeMakeAhead(AIHandoffRecipeMakeAheadReview)
   case recipeChefItUp(AIHandoffRecipeSectionReview)
   case recipeServeWith(AIHandoffRecipeSectionReview)
   case recipeAdjustmentBrief(AIHandoffRecipeAdjustmentBriefReview)
   case mealPlanMakeAhead(AIHandoffMealPlanMakeAheadReview)
+  case mealPlanComplement(AIHandoffMealPlanComplementReview)
   case workbenchCompare(AIHandoffWorkbenchCompareReview)
   case workbenchExperiments(AIHandoffWorkbenchExperimentsReview)
 
   public var handoffID: AIHandoff.ID {
     switch self {
+    case let .menuComplement(review): review.handoffID
     case let .menuPrepPlan(review): review.handoffID
     case let .recipeMakeAhead(review): review.handoffID
     case let .recipeChefItUp(review): review.handoffID
     case let .recipeServeWith(review): review.handoffID
     case let .recipeAdjustmentBrief(review): review.handoffID
     case let .mealPlanMakeAhead(review): review.handoffID
+    case let .mealPlanComplement(review): review.handoffID
     case let .workbenchCompare(review): review.handoffID
     case let .workbenchExperiments(review): review.handoffID
     }
@@ -705,6 +790,11 @@ public enum AIHandoffReturn {
   public struct MenuPrepPlanReturn: Equatable, Sendable {
     public var plan: MenuPrepPlan
     public var learnings: [String]
+    public var unparsedLines: [String]
+  }
+
+  public struct ReaderFeedbackReturn: Equatable, Sendable {
+    public var tips: [ReaderFeedbackTip]
     public var unparsedLines: [String]
   }
 
@@ -721,6 +811,42 @@ public enum AIHandoffReturn {
       learnings: learningBullets(from: split.learnings),
       unparsedLines: parsed.unparsedLines
     )
+  }
+
+  public static func menuComplement(from text: String, dayCount: Int) -> MenuComplementHandoffParseResult {
+    MenuComplementPlan.parsingHandoffText(splitting(text).deliverable, dayCount: dayCount)
+  }
+
+  public static func mealPlanComplement(from text: String) -> MealPlanComplementHandoffParseResult {
+    MealPlanComplementPlan.parsingHandoffText(splitting(text).deliverable)
+  }
+
+  public static func readerFeedback(from text: String) -> [ReaderFeedbackTip] {
+    readerFeedbackReturn(from: text).tips
+  }
+
+  public static func readerFeedbackReturn(from text: String) -> ReaderFeedbackReturn {
+    var seen = Set<String>()
+    var tips: [ReaderFeedbackTip] = []
+    var unparsedLines: [String] = []
+
+    for rawLine in splitting(text).deliverable.components(separatedBy: .newlines) {
+      let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !line.isEmpty else { continue }
+      guard line.lowercased().hasPrefix("tip:") else {
+        unparsedLines.append(line)
+        continue
+      }
+      let tipText = String(line.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !tipText.isEmpty else {
+        unparsedLines.append(line)
+        continue
+      }
+      guard seen.insert(tipText.lowercased()).inserted else { continue }
+      tips.append(ReaderFeedbackTip(text: tipText))
+    }
+
+    return ReaderFeedbackReturn(tips: tips, unparsedLines: unparsedLines)
   }
 
   public static func plainText(from text: String) -> (deliverable: String, learnings: [String]) {
@@ -765,6 +891,14 @@ public enum AIHandoffReturn {
 
 }
 
+public enum AIHandoffReturnContractError: Error, Equatable, LocalizedError, Sendable {
+  case instructionsOutOfDate
+
+  public var errorDescription: String? {
+    "Your Yes Chef project instructions are missing or out of date. Re-copy them from Settings, then try again."
+  }
+}
+
 public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, CustomStringConvertible, Sendable {
   case missingHandoffID
   case handoffNotFound(AIHandoff.ID)
@@ -773,6 +907,7 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
   case emptyPlan
   case unparsedPlanText([String])
   case unparsedExperimentBlocks([String])
+  case unparsedReaderFeedbackLines([String])
 
   public var errorDescription: String? {
     switch self {
@@ -790,205 +925,15 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
       "Could not import these prep-plan lines: \(lines.joined(separator: " | "))"
     case let .unparsedExperimentBlocks(blocks):
       "Could not import these experiment blocks: \(blocks.joined(separator: " | "))"
+    case let .unparsedReaderFeedbackLines(lines):
+      "Could not read these reader-feedback lines. Each tip must begin with `Tip:`: \(lines.joined(separator: " | "))"
     }
   }
 
   public var description: String { errorDescription ?? "The handoff result could not be imported." }
 }
 
-public enum AIHandoffIntentImport {
-  /// Stages a returned menu prep plan exactly once. Marking the local session imported before opening the
-  /// review sheet is deliberate: a shortcut can deliver the same result twice, while the sheet remains the
-  /// only place that writes the durable menu artifact.
-  public static func stageMenuPrepPlanReview(
-    handoffID: AIHandoff.ID?,
-    result: String,
-    in db: Database,
-    now: Date
-  ) throws -> AIHandoffMenuPrepPlanReview {
-    guard case let .menuPrepPlan(review) = try stageReview(
-      handoffID: handoffID,
-      result: result,
-      in: db,
-      now: now
-    ) else {
-      throw AIHandoffIntentImportError.wrongTask
-    }
-    return review
-  }
-
-  public static func stageReview(
-    handoffID: AIHandoff.ID?,
-    result: String,
-    in db: Database,
-    now: Date
-  ) throws -> AIHandoffReview {
-    let routedText = AIHandoffToken.stripping(from: result)
-    guard let resolvedHandoffID = handoffID ?? routedText?.handoffID else {
-      throw AIHandoffIntentImportError.missingHandoffID
-    }
-    guard let handoff = try AIHandoffRepository.handoff(id: resolvedHandoffID, in: db) else {
-      throw AIHandoffIntentImportError.handoffNotFound(resolvedHandoffID)
-    }
-    guard handoff.status == .awaitingReturn, handoff.importedAt == nil else {
-      throw AIHandoffIntentImportError.duplicate
-    }
-    let payload = routedText?.payload ?? result
-    let review: AIHandoffReview
-    switch handoff.sourceType {
-    case .menu:
-      guard handoff.taskType == .prepPlan || handoff.taskType == .learning,
-        let menu = try Menu.find(handoff.sourceID).fetchOne(db)
-      else {
-        throw AIHandoffIntentImportError.wrongTask
-      }
-      let currentSteps = try PrepPlanStepRepository.steps(for: menu.id, in: db)
-      let returned = AIHandoffReturn.menuPrepPlan(
-        from: payload,
-        currentPlan: MenuPrepPlan(steps: currentSteps.map { PrepPlanStep($0) })
-      )
-      guard !returned.plan.steps.isEmpty || !returned.learnings.isEmpty else {
-        throw AIHandoffIntentImportError.emptyPlan
-      }
-      review = .menuPrepPlan(
-        AIHandoffMenuPrepPlanReview(
-          handoffID: handoff.id,
-          menuID: menu.id,
-          plan: returned.plan,
-          learnings: returned.learnings,
-          unparsedPlanLines: returned.unparsedLines
-        )
-      )
-
-    case .recipe:
-      guard
-        handoff.taskType == .recipeMakeAhead || handoff.taskType == .chefItUp
-          || handoff.taskType == .serveWith || handoff.taskType == .adjustRecipe
-          || handoff.taskType == .learning,
-        let recipe = try Recipe.find(handoff.sourceID).fetchOne(db), !recipe.archived
-      else {
-        throw AIHandoffIntentImportError.wrongTask
-      }
-      let returned = AIHandoffReturn.plainText(from: payload)
-      guard !returned.deliverable.isEmpty || !returned.learnings.isEmpty else {
-        throw AIHandoffIntentImportError.emptyPlan
-      }
-      switch handoff.taskType {
-      case .recipeMakeAhead, .learning:
-        review = .recipeMakeAhead(
-          AIHandoffRecipeMakeAheadReview(
-            handoffID: handoff.id,
-            recipeID: recipe.id,
-            makeAhead: returned.deliverable,
-            currentMakeAhead: recipe.makeAhead,
-            learnings: returned.learnings
-          )
-        )
-      case .chefItUp:
-        review = .recipeChefItUp(
-          AIHandoffRecipeSectionReview(
-            handoffID: handoff.id,
-            recipeID: recipe.id,
-            section: .chefItUp,
-            text: returned.deliverable,
-            currentText: recipe.chefItUp,
-            learnings: returned.learnings
-          )
-        )
-      case .serveWith:
-        review = .recipeServeWith(
-          AIHandoffRecipeSectionReview(
-            handoffID: handoff.id,
-            recipeID: recipe.id,
-            section: .serveWith,
-            text: returned.deliverable,
-            currentServeWith: ServeWithCoding.decode(recipe.serveWith),
-            learnings: returned.learnings
-          )
-        )
-      case .adjustRecipe:
-        guard !returned.deliverable.isEmpty else {
-          throw AIHandoffIntentImportError.emptyPlan
-        }
-        review = .recipeAdjustmentBrief(
-          AIHandoffRecipeAdjustmentBriefReview(
-            handoffID: handoff.id,
-            recipeID: recipe.id,
-            brief: returned.deliverable,
-            learnings: returned.learnings
-          )
-        )
-      case .prepPlan, .mealPlanMakeAheadStrategy, .workbenchCompare, .workbenchExperiments:
-        throw AIHandoffIntentImportError.wrongTask
-      }
-
-    case .mealPlan:
-      guard handoff.taskType == .mealPlanMakeAheadStrategy || handoff.taskType == .learning,
-        let item = try MealPlanItem.find(handoff.sourceID).fetchOne(db)
-      else {
-        throw AIHandoffIntentImportError.wrongTask
-      }
-      let returned = AIHandoffReturn.plainText(from: payload)
-      let parsed = MealPlanMakeAheadStrategy.parsingEditableReviewText(returned.deliverable)
-      guard !parsed.strategy.steps.isEmpty || !returned.learnings.isEmpty else {
-        throw AIHandoffIntentImportError.emptyPlan
-      }
-      review = .mealPlanMakeAhead(
-        AIHandoffMealPlanMakeAheadReview(
-          handoffID: handoff.id,
-          mealPlanItemID: item.id,
-          scheduledDate: item.scheduledDate,
-          strategy: parsed.strategy,
-          learnings: returned.learnings,
-          unparsedStrategyLines: parsed.unparsedLines
-        )
-      )
-
-    case .workbench:
-      guard try Workbench.find(handoff.sourceID).fetchOne(db) != nil else {
-        throw AIHandoffIntentImportError.wrongTask
-      }
-      switch handoff.taskType {
-      case .workbenchCompare:
-        let returned = AIHandoffReturn.plainText(from: payload)
-        guard !returned.deliverable.isEmpty || !returned.learnings.isEmpty else {
-          throw AIHandoffIntentImportError.emptyPlan
-        }
-        review = .workbenchCompare(
-          AIHandoffWorkbenchCompareReview(
-            handoffID: handoff.id,
-            workbenchID: handoff.sourceID,
-            comparison: returned.deliverable,
-            learnings: returned.learnings
-          )
-        )
-
-      case .workbenchExperiments:
-        let returned = AIHandoffReturn.workbenchExperiments(from: payload)
-        guard returned.unparsedBlocks.isEmpty else {
-          throw AIHandoffIntentImportError.unparsedExperimentBlocks(returned.unparsedBlocks)
-        }
-        guard !returned.experiments.isEmpty else {
-          throw AIHandoffIntentImportError.emptyPlan
-        }
-        review = .workbenchExperiments(
-          AIHandoffWorkbenchExperimentsReview(
-            handoffID: handoff.id,
-            workbenchID: handoff.sourceID,
-            experiments: returned.experiments
-          )
-        )
-
-      case .prepPlan, .learning, .recipeMakeAhead, .chefItUp, .serveWith, .adjustRecipe,
-           .mealPlanMakeAheadStrategy:
-        throw AIHandoffIntentImportError.wrongTask
-      }
-    }
-
-    try AIHandoffRepository.markImported(id: handoff.id, at: now, in: db)
-    return review
-  }
-}
+public enum AIHandoffIntentImport {}
 
 public enum AIHandoffMenuPrepPlanImportResult: Equatable, Sendable {
   case applied

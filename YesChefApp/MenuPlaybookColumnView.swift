@@ -162,6 +162,7 @@ struct MenuDetailReader: View {
         steps: detail.prepPlanSteps,
         itemRows: detail.itemRows,
         handoffSource: .menu(detailModel.menuID),
+        complementHandoffSource: .menuComplement(detailModel.menuID),
         handoffTransport: handoffTransport,
         onRecipeSelected: onRecipeSelected,
         clearPrepPlan: {

@@ -88,7 +88,10 @@ extension ReaderFeedbackCurationClient: DependencyKey {
       surface: .reader,
       task: .feedbackCuration,
       tierResolution: .preferredProviderOrFirstAvailable,
-      contextLayers: [.readerComments],
+      contextLayers: ModelCallContextLayers(
+        included: [.readerComments],
+        omitted: [.tasteProfile]
+      ),
       tier: tier,
       system: instructions,
       prompt: prompt(comments: comments, sourceURL: sourceURL),

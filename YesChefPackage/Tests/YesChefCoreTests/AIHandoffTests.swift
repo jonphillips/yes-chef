@@ -569,4 +569,5 @@ struct AIHandoffTests {
       #expect(try Menu.find(menuID).fetchOne(db)?.externalProjectName == nil)
     }
   }
+
 }

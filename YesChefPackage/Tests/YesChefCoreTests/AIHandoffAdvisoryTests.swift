@@ -1,0 +1,176 @@
+import CustomDump
+import Dependencies
+import DependenciesTestSupport
+import Foundation
+import Testing
+import YesChefCore
+
+@Suite(
+  .serialized,
+  .dependencies {
+    try $0.bootstrapDatabase()
+  }
+)
+struct AIHandoffAdvisoryTests {
+  @Test
+  func readerFeedbackReturnAcceptsOnlyLabeledTips() {
+    let returned = AIHandoffReturn.readerFeedbackReturn(
+      from: """
+      Here are the useful changes:
+      Tip: Salt and drain the cucumbers before dressing them.
+      ## More ideas
+      Tip: Use two garlic cloves for a more pronounced flavor.
+      Tip: use two garlic cloves for a more pronounced flavor.
+      """
+    )
+
+    expectNoDifference(
+      returned.tips.map(\.text),
+      [
+        "Salt and drain the cucumbers before dressing them.",
+        "Use two garlic cloves for a more pronounced flavor.",
+      ]
+    )
+    expectNoDifference(returned.unparsedLines, ["Here are the useful changes:", "## More ideas"])
+  }
+
+  @Test
+  func menuComplementHandoffStagesDistinctReviewedSuggestionsWithoutWriting() throws {
+    @Dependency(\.defaultDatabase) var database
+    let menuID = SampleUUIDSequence.uuid(38_050)
+    let handoffID = SampleUUIDSequence.uuid(38_051)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Menu.insert {
+        Menu(id: menuID, title: "Beach Menu", dayCount: 2, dateCreated: now, dateModified: now)
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .menu,
+          sourceID: menuID,
+          taskType: .menuComplement,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      let review = try AIHandoffIntentImport.stageReview(
+        handoffID: handoffID,
+        result: """
+        YC-HANDOFF: \(handoffID.uuidString)
+        I found two concrete suggestions:
+        Note: Cucumber herb salad
+        Day 1 - Dinner
+        Cucumber, dill, and lemon.
+        Note: Charred peaches
+        Day 2 - Snack
+        """,
+        in: db,
+        now: now
+      )
+
+      guard case let .menuComplement(complementReview) = review else {
+        Issue.record("Expected a menu-complement review.")
+        return
+      }
+      expectNoDifference(
+        complementReview.plan.items,
+        [
+          MenuComplementSuggestion(
+            title: "Cucumber herb salad",
+            body: "Cucumber, dill, and lemon.",
+            dayOffset: 0,
+            mealSlot: .dinner
+          ),
+          MenuComplementSuggestion(title: "Charred peaches", dayOffset: 1, mealSlot: .snack),
+        ]
+      )
+      expectNoDifference(complementReview.unparsedBlocks, ["I found two concrete suggestions:"])
+      #expect(try MenuItem.fetchAll(db).isEmpty)
+    }
+  }
+
+  @Test
+  func readerFeedbackCaptureHandoffStagesTipsBackToTheDraftWithoutALearning() throws {
+    @Dependency(\.defaultDatabase) var database
+    let handoffID = SampleUUIDSequence.uuid(38_052)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .capture,
+          sourceID: handoffID,
+          taskType: .readerFeedbackCuration,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+      let review = try AIHandoffIntentImport.stageReaderFeedbackReview(
+        handoffID: handoffID,
+        result: """
+        YC-HANDOFF: \(handoffID.uuidString)
+        \(AIHandoffReturnContract.marker)
+        Tip: Salt and drain the cucumbers before dressing them.
+        These were the strongest returns:
+        Tip: Use two garlic cloves for a more pronounced flavor.
+        """,
+        in: db,
+        now: now
+      )
+
+      expectNoDifference(
+        review.tips.map(\.text),
+        [
+          "Salt and drain the cucumbers before dressing them.",
+          "Use two garlic cloves for a more pronounced flavor.",
+        ]
+      )
+      expectNoDifference(review.unparsedLines, ["These were the strongest returns:"])
+      #expect(try Learning.fetchAll(db).isEmpty)
+      #expect(try AIHandoffRepository.handoff(id: handoffID, in: db)?.status == .imported)
+    }
+  }
+
+  @Test
+  func readerFeedbackCaptureHandoffExplainsUnlabeledReturns() throws {
+    @Dependency(\.defaultDatabase) var database
+    let handoffID = SampleUUIDSequence.uuid(38_053)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .capture,
+          sourceID: handoffID,
+          taskType: .readerFeedbackCuration,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      #expect(throws: AIHandoffIntentImportError.unparsedReaderFeedbackLines([
+        "Salt and drain the cucumbers before dressing them.",
+      ])) {
+        try AIHandoffIntentImport.stageReaderFeedbackReview(
+          handoffID: handoffID,
+          result: """
+          YC-HANDOFF: \(handoffID.uuidString)
+          \(AIHandoffReturnContract.marker)
+          Salt and drain the cucumbers before dressing them.
+          """,
+          in: db,
+          now: now
+        )
+      }
+    }
+  }
+}

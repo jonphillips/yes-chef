@@ -150,6 +150,56 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func handoffParserUsesNoteLabelsWhenBlankLinesAreCollapsed() {
+      let parsed = MenuComplementPlan.parsingHandoffText(
+        """
+        Note: Cucumber herb salad
+        Day 1 - Dinner
+        Cucumber, dill, and lemon.
+        Note: Charred peaches
+        Day 2 - Snack
+        """,
+        dayCount: 2
+      )
+
+      expectNoDifference(
+        parsed.plan.items,
+        [
+          MenuComplementSuggestion(
+            title: "Cucumber herb salad",
+            body: "Cucumber, dill, and lemon.",
+            dayOffset: 0,
+            mealSlot: .dinner
+          ),
+          MenuComplementSuggestion(title: "Charred peaches", dayOffset: 1, mealSlot: .snack),
+        ]
+      )
+      expectNoDifference(parsed.unparsedBlocks, [])
+    }
+
+    @Test
+    func handoffParserKeepsUnknownMealSlotsAsReviewEvidence() {
+      let parsed = MenuComplementPlan.parsingHandoffText(
+        """
+        Note: Charred peaches
+        Day 2 - Dessert
+        """,
+        dayCount: 2
+      )
+
+      expectNoDifference(parsed.plan.items, [])
+      expectNoDifference(
+        parsed.unparsedBlocks,
+        [
+          """
+          Note: Charred peaches
+          Day 2 - Dessert
+          """,
+        ]
+      )
+    }
+
+    @Test
     func addComplementItemStoresSuggestionBodyInNotes() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 805_700_000)
@@ -199,12 +249,14 @@ extension RecipeCoreTests {
     @Test
     func menuComplementClientSendsRequestedModelTierAndMenuContext() async throws {
       let recorder = MenuComplementRequestRecorder()
+      let callRecords = ModelCallRecordCollector()
 
       try await withDependencies {
         $0.modelClient = StubModelClient { request in
           await recorder.append(request)
           return ModelResponse(text: #"{"items":[]}"#)
         }
+        $0.modelCallRecordSink = .inMemory(callRecords)
       } operation: {
         let client = MenuComplementClient.liveValue
         _ = try await client(
@@ -221,6 +273,11 @@ extension RecipeCoreTests {
       expectNoDifference(request?.promptPreferenceKey, AIPromptPreferenceKind.complements.rawValue)
       #expect(request?.messages.first?.text.contains("Menu context:\nMenu context") == true)
       #expect(request?.messages.first?.text.contains("User-selected subject:\nWhat goes with day two dinner?") == true)
+      let recordedCalls = await callRecords.records()
+      expectNoDifference(
+        recordedCalls.first?.contextLayers,
+        [.menu, .selection, .conversation, .tasteProfile]
+      )
     }
 
     @Test

@@ -10,6 +10,16 @@ public struct MenuComplementPlan: Equatable, Sendable {
   }
 }
 
+public struct MenuComplementHandoffParseResult: Equatable, Sendable {
+  public var plan: MenuComplementPlan
+  public var unparsedBlocks: [String]
+
+  public init(plan: MenuComplementPlan, unparsedBlocks: [String]) {
+    self.plan = plan
+    self.unparsedBlocks = unparsedBlocks
+  }
+}
+
 public struct MenuComplementSuggestion: Equatable, Sendable {
   public var kind: MealPlanItemKind
   public var title: String
@@ -97,6 +107,42 @@ public struct MenuComplementSuggestion: Equatable, Sendable {
   }
 }
 
+public extension MenuComplementPlan {
+  /// Parses the deliberately human-editable external hand-off shape. A new
+  /// `Note:` label starts each suggestion, so empty lines remain optional when
+  /// a chat client compacts the returned text.
+  static func parsingHandoffText(_ text: String, dayCount: Int) -> MenuComplementHandoffParseResult {
+    let blocks = text.labeledHandoffBlocks(startingWith: "note:")
+
+    var items: [MenuComplementSuggestion] = []
+    var unparsedBlocks: [String] = []
+    for block in blocks {
+      let lines = block.editableMenuComplementLines
+      guard lines.count >= 2,
+        lines[0].lowercased().hasPrefix("note:"),
+        MealPlanItemSlot(handoffPlacementLine: lines[1]) != nil
+      else {
+        unparsedBlocks.append(block)
+        continue
+      }
+
+      let suggestion = MenuComplementSuggestion(
+        title: "",
+        dayOffset: -1,
+        mealSlot: .dinner
+      )
+      .applyingEditableReviewText(block)
+      guard !suggestion.title.isEmpty, (0..<dayCount).contains(suggestion.dayOffset) else {
+        unparsedBlocks.append(block)
+        continue
+      }
+      items.append(suggestion)
+    }
+    return MenuComplementHandoffParseResult(plan: MenuComplementPlan(items: items), unparsedBlocks: unparsedBlocks)
+  }
+
+}
+
 public struct MenuComplementClient: Sendable {
   public var extract: @Sendable (
     _ selection: String,
@@ -133,7 +179,7 @@ extension MenuComplementClient: DependencyKey {
       surface: .menu,
       task: .complement,
       tierResolution: .callerProvided,
-      contextLayers: [.menu, .selection, .conversation],
+      contextLayers: [.menu, .selection, .conversation, .tasteProfile],
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, context: context),
