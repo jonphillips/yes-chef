@@ -72,27 +72,25 @@ extension ReaderFeedbackCurationClient: DependencyKey {
     @Dependency(\.modelClient) var modelClient
     @Dependency(\.apiKeyStore) var apiKeyStore
     @Dependency(\.recipeChatProviderPreference) var providerPreference
+    @Dependency(\.recipeChatTierPreference) var tierPreference
 
     let availableProviders = FrontierProvider.allCases.filter { apiKeyStore.key($0) != nil }
-    let preferredProvider = providerPreference.current()
-    let tier: ModelTier
-    if let preferredProvider, availableProviders.contains(preferredProvider) {
-      tier = .frontier(preferredProvider)
-    } else if let provider = availableProviders.first {
-      tier = .frontier(provider)
-    } else {
-      tier = .onDevice
-    }
+    let resolvedTier = try resolveTier(
+      useFrontier: tierPreference.current(),
+      preferredProvider: providerPreference.current(),
+      availableProviders: availableProviders,
+      requirement: .frontierRequired
+    )
 
     let call = ModelCall(
       surface: .reader,
       task: .feedbackCuration,
-      tierResolution: .preferredProviderOrFirstAvailable,
+      tierResolution: resolvedTier.resolution,
       contextLayers: ModelCallContextLayers(
         included: [.readerComments],
         omitted: [.tasteProfile]
       ),
-      tier: tier,
+      tier: resolvedTier.tier,
       system: instructions,
       prompt: prompt(comments: comments, sourceURL: sourceURL),
       maxTokens: maxTokens,

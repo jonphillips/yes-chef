@@ -35,7 +35,8 @@ struct YesChefApp: App {
       )
       $0.modelClient = LoggingModelClient(
         wrapping: TieredModelClient.live(
-          promptPreferences: YesChefAIPromptPreferences.modelPromptPreferences(for:)
+          promptPreferences: YesChefAIPromptPreferences.modelPromptPreferences(for:),
+          modelForProvider: YesChefAIPromptPreferences.model(for:)
         )
       )
 #if DEBUG

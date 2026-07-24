@@ -12,7 +12,7 @@ struct AISettingsView: View {
 
     Form {
       modelTierSection
-      activeModelsSection
+      frontierModelsSection
 
       ForEach(model.providers) { provider in
         keySection(for: provider)
@@ -73,7 +73,7 @@ struct AISettingsView: View {
         } label: {
           Label("Save Preferences", systemImage: "square.and.arrow.down")
         }
-        .disabled(!model.hasUnsavedPreferenceChanges)
+        .disabled(!model.hasUnsavedPreferenceChanges || model.hasInvalidCustomModel)
       }
 
       Section {
@@ -145,11 +145,27 @@ struct AISettingsView: View {
     }
   }
 
-  private var activeModelsSection: some View {
-    Section("Active models") {
+  private var frontierModelsSection: some View {
+    Section {
       ForEach(model.providers) { provider in
-        LabeledContent(provider.displayName, value: provider.defaultModel)
+        Picker(provider.displayName, selection: modelSourceBinding(for: provider)) {
+          Text("Default (\(provider.defaultModel))").tag(true)
+          Text("Custom model ID").tag(false)
+        }
+
+        if !model.isUsingDefaultModel(provider) {
+          TextField(
+            "Custom \(provider.displayName) model ID",
+            text: customModelBinding(for: provider)
+          )
+          .textInputAutocapitalization(.never)
+          .autocorrectionDisabled()
+        }
       }
+    } header: {
+      Text("Frontier models")
+    } footer: {
+      Text("Use the provider default unless you have a specific compatible model ID to use with your own API key.")
     }
   }
 
@@ -198,6 +214,20 @@ struct AISettingsView: View {
     Binding(
       get: { model.keyInput(for: provider) },
       set: { model.setKeyInput($0, for: provider) }
+    )
+  }
+
+  private func modelSourceBinding(for provider: FrontierProvider) -> Binding<Bool> {
+    Binding(
+      get: { model.isUsingDefaultModel(provider) },
+      set: { model.setUsesDefaultModel($0, for: provider) }
+    )
+  }
+
+  private func customModelBinding(for provider: FrontierProvider) -> Binding<String> {
+    Binding(
+      get: { model.configuredModel(for: provider) },
+      set: { model.setCustomModel($0, for: provider) }
     )
   }
 

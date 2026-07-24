@@ -496,6 +496,7 @@ final class HandoffReviewCoordinator {
     @Dependency(\.recipeAdjustmentClient) var recipeAdjustmentClient
     @Dependency(\.apiKeyStore) var apiKeyStore
     @Dependency(\.recipeChatProviderPreference) var providerPreference
+    @Dependency(\.recipeChatTierPreference) var tierPreference
 
     let trimmedBrief = brief.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedBrief.isEmpty else { throw HandoffReviewError.emptyDeliverable }
@@ -506,21 +507,19 @@ final class HandoffReviewCoordinator {
     }
 
     let availableProviders = FrontierProvider.allCases.filter { apiKeyStore.key($0) != nil }
-    let tier: ModelTier
-    if let preferredProvider = providerPreference.current(), availableProviders.contains(preferredProvider) {
-      tier = .frontier(preferredProvider)
-    } else if let provider = availableProviders.first {
-      tier = .frontier(provider)
-    } else {
-      tier = .onDevice
-    }
+    let resolvedTier = try resolveTier(
+      useFrontier: tierPreference.current(),
+      preferredProvider: providerPreference.current(),
+      availableProviders: availableProviders,
+      requirement: .frontierRequired
+    )
 
     let proposal = try await recipeAdjustmentClient(
       selection: "",
       messages: [RecipeChatMessage(role: .user, text: trimmedBrief)],
       detail: detail,
-      tier: tier,
-      tierResolution: .preferredProviderOrFirstAvailable
+      tier: resolvedTier.tier,
+      tierResolution: resolvedTier.resolution
     )
     let adjustmentReview = RecipeAdjustmentReviewState(
       currentDetail: detail,

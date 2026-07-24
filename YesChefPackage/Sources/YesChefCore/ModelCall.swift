@@ -10,6 +10,7 @@ public struct ModelCallRecord: Equatable, Sendable {
   public let task: ModelCallTask
   public let tierResolution: ModelCallTierResolution
   public let tier: ModelTier
+  public let requestedModel: String?
   public let contextLayers: ModelCallContextLayers
   public let inputCharacterCount: Int
   public let maxTokens: Int
@@ -20,6 +21,7 @@ public struct ModelCallRecord: Equatable, Sendable {
     task: ModelCallTask,
     tierResolution: ModelCallTierResolution,
     tier: ModelTier,
+    requestedModel: String? = nil,
     contextLayers: ModelCallContextLayers,
     inputCharacterCount: Int,
     maxTokens: Int,
@@ -29,6 +31,7 @@ public struct ModelCallRecord: Equatable, Sendable {
     self.task = task
     self.tierResolution = tierResolution
     self.tier = tier
+    self.requestedModel = requestedModel
     self.contextLayers = contextLayers
     self.inputCharacterCount = inputCharacterCount
     self.maxTokens = maxTokens
@@ -64,10 +67,14 @@ public enum ModelCallTask: String, Equatable, Sendable {
 }
 
 public enum ModelCallTierResolution: String, Equatable, Sendable {
-  /// The surrounding chat surface resolved the requested tier before invoking this task.
+  /// The caller supplied a tier without declaring the policy that chose it.
   case callerProvided
-  /// The task chose the configured provider, then the first available provider, then on-device.
-  case preferredProviderOrFirstAvailable
+  /// The active chat surface reflects the cook's explicit tier selection.
+  case userSelectedTier
+  /// Shared policy honored the persisted tier and provider preferences.
+  case configuredPreferences
+  /// A requested frontier tier was unavailable, so compatible work ran on-device.
+  case degradedToOnDevice
 }
 
 public enum ModelCallContextLayer: String, CaseIterable, Hashable, Sendable {
@@ -236,6 +243,7 @@ public struct ModelCall: Sendable {
       task: task,
       tierResolution: tierResolution,
       tier: tier,
+      requestedModel: Self.requestedModel(for: tier),
       contextLayers: contextLayers,
       inputCharacterCount: Self.inputCharacterCount(of: request),
       maxTokens: maxTokens,
@@ -291,5 +299,10 @@ public struct ModelCall: Sendable {
     (request.system?.count ?? 0) + request.messages.reduce(into: 0) { count, message in
       count += message.text.count
     }
+  }
+
+  private static func requestedModel(for tier: ModelTier) -> String? {
+    guard case let .frontier(provider) = tier else { return nil }
+    return YesChefAIPromptPreferences.model(for: provider)
   }
 }

@@ -8,6 +8,8 @@ import YesChefCore
 @Observable
 final class AISettingsModel {
   var keyInputs: [FrontierProvider: String] = [:]
+  var customModelInputs: [FrontierProvider: String] = [:]
+  var usesDefaultModel: [FrontierProvider: Bool] = [:]
   var tasteProfile = ""
   var chefItUpPreference = ""
   var serveWithPreference = ""
@@ -20,11 +22,13 @@ final class AISettingsModel {
 
   private(set) var storedProviders: Set<FrontierProvider> = []
   private(set) var keyPreviews: [FrontierProvider: String] = [:]
+  private var savedModels: [FrontierProvider: String] = [:]
   private var savedPreferences = AISettingsRepository.defaultSettings(
     now: Date(timeIntervalSinceReferenceDate: 0)
   )
 
   @ObservationIgnored @Dependency(\.apiKeyStore) private var apiKeyStore
+  @ObservationIgnored @Dependency(\.frontierModelPreference) private var modelPreference
   @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
 
@@ -32,6 +36,7 @@ final class AISettingsModel {
 
   func onAppear() {
     refresh()
+    loadModels()
     loadPreferences()
   }
 
@@ -43,6 +48,14 @@ final class AISettingsModel {
       || complementsPreference != savedPreferences.complementsPreference
       || captureToNotePreference != savedPreferences.captureToNotePreference
       || readerFeedbackPreference != savedPreferences.readerFeedbackPreference
+      || providers.contains { configuredModel(for: $0) != savedModels[$0] }
+  }
+
+  var hasInvalidCustomModel: Bool {
+    providers.contains {
+      !isUsingDefaultModel($0)
+        && configuredModel(for: $0).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
   }
 
   func hasStoredKey(_ provider: FrontierProvider) -> Bool {
@@ -59,6 +72,22 @@ final class AISettingsModel {
 
   func setKeyInput(_ value: String, for provider: FrontierProvider) {
     keyInputs[provider] = value
+  }
+
+  func configuredModel(for provider: FrontierProvider) -> String {
+    isUsingDefaultModel(provider) ? provider.defaultModel : (customModelInputs[provider] ?? "")
+  }
+
+  func isUsingDefaultModel(_ provider: FrontierProvider) -> Bool {
+    usesDefaultModel[provider] ?? true
+  }
+
+  func setUsesDefaultModel(_ usesDefault: Bool, for provider: FrontierProvider) {
+    usesDefaultModel[provider] = usesDefault
+  }
+
+  func setCustomModel(_ model: String, for provider: FrontierProvider) {
+    customModelInputs[provider] = model.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
   func canSave(_ provider: FrontierProvider) -> Bool {
@@ -78,6 +107,7 @@ final class AISettingsModel {
   }
 
   func savePreferencesButtonTapped() {
+    guard !hasInvalidCustomModel else { return }
     let settings = AISettingsRecord(
       id: AISettingsRepository.singletonID,
       tasteProfile: tasteProfile,
@@ -93,7 +123,14 @@ final class AISettingsModel {
       try database.write { db in
         try AISettingsRepository.save(settings, in: db)
       }
+      for provider in providers {
+        modelPreference.set(
+          isUsingDefaultModel(provider) ? nil : configuredModel(for: provider),
+          provider
+        )
+      }
       savedPreferences = settings
+      savedModels = Dictionary(uniqueKeysWithValues: providers.map { ($0, configuredModel(for: $0)) })
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
@@ -106,6 +143,18 @@ final class AISettingsModel {
       uniqueKeysWithValues: providers.compactMap { provider in
         apiKeyStore.maskedKey(provider).map { (provider, $0) }
       })
+  }
+
+  private func loadModels() {
+    for provider in providers {
+      if let model = modelPreference.current(provider) {
+        usesDefaultModel[provider] = false
+        customModelInputs[provider] = model
+      } else {
+        usesDefaultModel[provider] = true
+      }
+    }
+    savedModels = Dictionary(uniqueKeysWithValues: providers.map { ($0, configuredModel(for: $0)) })
   }
 
   private func loadPreferences() {

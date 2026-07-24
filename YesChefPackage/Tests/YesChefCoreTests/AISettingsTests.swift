@@ -117,5 +117,21 @@ extension RecipeCoreTests {
         )
       }
     }
+
+    @Test
+    func configuredFrontierModelOverridesTheProviderDefault() {
+      withDependencies {
+        $0.frontierModelPreference = FrontierModelPreference(
+          current: { provider in provider == .openai ? "gpt-custom" : nil },
+          set: { _, _ in }
+        )
+      } operation: {
+        expectNoDifference(YesChefAIPromptPreferences.model(for: .openai), "gpt-custom")
+        expectNoDifference(
+          YesChefAIPromptPreferences.model(for: .anthropic),
+          FrontierProvider.anthropic.defaultModel
+        )
+      }
+    }
   }
 }

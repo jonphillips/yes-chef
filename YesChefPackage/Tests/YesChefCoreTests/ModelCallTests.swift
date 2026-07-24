@@ -29,6 +29,7 @@ struct ModelCallTests {
         task: .makeAhead,
         tierResolution: .callerProvided,
         tier: .frontier(.anthropic),
+        requestedModel: FrontierProvider.anthropic.defaultModel,
         contextLayers: [.recipe, .selection, .conversation],
         inputCharacterCount: "Use the recipe.".count + "Make a plan.".count + "I need timing.".count,
         maxTokens: 2048,
@@ -105,6 +106,27 @@ struct ModelCallTests {
 
     expectNoDifference(layers.included, [.recipe])
     expectNoDifference(layers.omitted, [.learnings])
+  }
+
+  @Test
+  func recordSnapshotsTheConfiguredFrontierModel() {
+    withDependencies {
+      $0.frontierModelPreference = FrontierModelPreference(
+        current: { provider in provider == .openai ? "gpt-custom" : nil },
+        set: { _, _ in }
+      )
+    } operation: {
+      let call = ModelCall(
+        surface: .recipe,
+        task: .chat,
+        tierResolution: .userSelectedTier,
+        contextLayers: [.recipe, .conversation],
+        tier: .frontier(.openai),
+        prompt: "Help me plan dinner."
+      )
+
+      expectNoDifference(call.record.requestedModel, "gpt-custom")
+    }
   }
 
   @Test

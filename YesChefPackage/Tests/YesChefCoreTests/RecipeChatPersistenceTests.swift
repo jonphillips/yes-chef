@@ -131,10 +131,14 @@ extension RecipeCoreTests {
       let recipeID = SampleUUIDSequence.uuid(712)
       let requests = Mutex<[ModelRequest]>([])
       let keyStore = chatAPIKeyStore()
+      let callRecords = ModelCallRecordCollector()
       keyStore.setKey("sk-openai-test", for: .openai)
+      keyStore.setKey("sk-anthropic-test", for: .anthropic)
 
       await withDependencies {
         $0.apiKeyStore = keyStore
+        $0.modelCallRecordCollector = callRecords
+        $0.modelCallRecordSink = .inMemory(callRecords)
         $0.date.now = Date(timeIntervalSinceReferenceDate: 820_700_000)
         $0.uuid = .incrementing
         $0.modelClient = StubModelClient { request in
@@ -161,6 +165,9 @@ extension RecipeCoreTests {
         #expect(second.tier == .onDevice)
         #expect(second.continuationToken == nil)
         #expect(second.messages.count == 3)
+
+        let records = await callRecords.records()
+        #expect(records[1].tierResolution == .degradedToOnDevice)
       }
     }
 
