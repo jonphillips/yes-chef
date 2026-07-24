@@ -252,6 +252,26 @@ Invariants unchanged: `requiresSubject` is **not** loosened (D6), and scope stay
 section-scopable entry points** (OQ3) — A1's seam makes the meal-calendar and Workbench openers look cheap,
 which is exactly when [[withdraw-not-defer-orphaned-schema]]'s momentum trap fires.
 
+## Amendment 2 — One section-picking control, not per-section Ask (2026-07-24)
+
+Accepted 2026-07-24, from the V1 device pass. **D3 said "section-scoped Ask at *every* entry point," and V1
+implemented that as an `Ask` item in each section's overflow menu plus a column-top `Ask` defaulting to
+Make-ahead.** The device pass showed two problems with that literal reading:
+
+1. **On iPhone the chat is a full-height modal sheet**, so once it is open the playbook's per-section Ask
+   menus are behind it and unreachable — the Make-ahead → Serve With re-scope that works on the iPad companion
+   had no path at all. An in-panel switcher is *required* on iPhone, not optional.
+2. **With the switcher added, per-section Ask became a second, unrelated-feeling door to the same thing** —
+   and the one that had caused V1's original defect (the section-menu Ask that dropped its section).
+
+**The mechanism changes; the intent of D3 is preserved.** Section-picking becomes **one control in two
+placements**: a single **Ask ▾** launcher on the playbook (pick a section → open scoped to it), and the open
+panel's **title as a Discuss ▾** switcher (move an already-open discussion, keeping the transcript). Both route
+through one method (`RecipeDetailModel.askSection`) that opens-or-switches and **never closes** — dismissal is
+the panel's own explicit **Done** button, since a crowded sheet toolbar is awkward to swipe past. The
+per-section overflow `Ask` items are **removed**; the overflows keep Hand-off / Paste / Edit / Clear. "Ask at
+every section" is now satisfied by one menu that lists every section, not by duplicated per-section items.
+
 ## Related
 
 - [ADR-0042](ADR-0042-workbench-handoff-and-the-return-block.md) — the `.discuss` ask, the return block, and

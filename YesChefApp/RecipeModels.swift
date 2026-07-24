@@ -936,54 +936,40 @@ final class RecipeDetailModel {
     destination = .scaling
   }
 
-  func chatButtonTapped(section: PlaybookSectionKind) {
+  /// Open the recipe chat scoped to `section`, or move an already-open chat to it, keeping the
+  /// transcript. Both the playbook **Ask ▾** launcher and the in-panel **Discuss ▾** switcher route
+  /// here — one section-picking affordance, not two (ADR-0045 Amd 2). It never *closes* the panel;
+  /// dismissal is the panel's own **Done** button. On iPhone the chat is a full-height modal sheet
+  /// that hides the playbook, so an in-panel switch is the only way to re-scope there.
+  func askSection(_ section: PlaybookSectionKind) {
     guard let detail else { return }
     let seed = RecipeHandoffContext(detail: detail).discussAsk(for: section)
-    switch chatAskAction(for: section) {
-    case .open:
-      let chatModel = RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail)))
-      destination = .chat(chatModel)
-      seededAskSection = section
-      Task {
-        // Only a failed seed un-scopes the panel. A warm thread keeps the scope: it needed no
-        // opener, and clearing it would turn the same-section dismiss tap into a re-seed.
-        guard
-          await chatModel.seedIfCold(seed) == .failed,
-          case let .chat(currentChatModel) = destination,
-          currentChatModel === chatModel
-        else { return }
-        seededAskSection = nil
-      }
-    case .close:
-      destination = nil
-    case .reseed:
-      guard case let .chat(chatModel) = destination else { return }
+
+    if case let .chat(chatModel) = destination {
+      // Already open: switch section, keeping the transcript. No-op if it is already this section.
+      // Scope moves only after a real send, so a no-op send never re-labels the panel.
+      guard seededAskSection != section else { return }
       Task {
         guard await chatModel.send(seed) else { return }
         guard case let .chat(currentChatModel) = destination, currentChatModel === chatModel else { return }
         seededAskSection = section
       }
+      return
     }
-  }
 
-  /// Re-scope the *open* chat to another section from inside the panel. On iPhone the chat is a
-  /// full-height modal sheet, so the playbook's per-section Ask menus are unreachable behind it —
-  /// this is the only way to move the discussion to another section there. Reseed only: it never
-  /// toggles the panel closed (that is `chatButtonTapped`'s same-section case, wrong from in-panel).
-  func discussSectionFromChat(_ section: PlaybookSectionKind) {
-    guard destination.chat != nil, seededAskSection != section else { return }
-    chatButtonTapped(section: section)
-  }
-
-  private func chatAskAction(for section: PlaybookSectionKind) -> ChatAskAction {
-    guard destination.chat != nil else { return .open }
-    return seededAskSection == section ? .close : .reseed
-  }
-
-  private enum ChatAskAction {
-    case open
-    case close
-    case reseed
+    // Cold open.
+    let chatModel = RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail)))
+    destination = .chat(chatModel)
+    seededAskSection = section
+    Task {
+      // Only a failed seed un-scopes the panel. A warm thread keeps the scope: it needed no opener.
+      guard
+        await chatModel.seedIfCold(seed) == .failed,
+        case let .chat(currentChatModel) = destination,
+        currentChatModel === chatModel
+      else { return }
+      seededAskSection = nil
+    }
   }
 
   func openWorkbenchButtonTapped() {

@@ -255,8 +255,9 @@ private struct RecipeAskPresentationModifier: ViewModifier {
           RecipeChatPanel(
             chatModel: chatModel,
             applyActions: model.applyActionCatalog(for: chatModel),
-            discussSection: model.discussSectionFromChat,
-            activeSection: model.seededAskSection
+            selectSection: model.askSection,
+            activeSection: model.seededAskSection,
+            onDismiss: { model.destination = nil }
           )
         }
       }
@@ -276,8 +277,9 @@ private struct RecipeAskPresentationModifier: ViewModifier {
     RecipeChatPanel(
       chatModel: chatModel,
       applyActions: model.applyActionCatalog(for: chatModel),
-      discussSection: model.discussSectionFromChat,
-      activeSection: model.seededAskSection
+      selectSection: model.askSection,
+      activeSection: model.seededAskSection,
+      onDismiss: { model.destination = nil }
     )
     .inspectorColumnWidth(
       min: RecipeAskSlideOverMetrics.minimumWidth,
@@ -611,7 +613,7 @@ private struct RecipeReaderView: View {
       RecipePlaybookView(
         model: model,
         handoffTransport: handoffTransport,
-        ask: model.chatButtonTapped(section:)
+        ask: model.askSection
       )
     }
   }
@@ -671,7 +673,7 @@ private struct RecipeReaderView: View {
           RecipePlaybookView(
             model: model,
             handoffTransport: handoffTransport,
-            ask: model.chatButtonTapped(section:)
+            ask: model.askSection
           )
           .padding()
           .frame(maxWidth: .infinity, alignment: .topLeading)

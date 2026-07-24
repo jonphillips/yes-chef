@@ -226,11 +226,14 @@ struct RecipeChatPanel: View {
   let chatModel: RecipeChatModel
   let applyActions: [AnyChatApplyAction]
   var showsEmbeddedHeader = false
-  /// When set, the panel offers an in-panel section switcher (the only way to re-scope on iPhone,
-  /// where the playbook's per-section Ask menus sit behind the modal sheet). `nil` for panels with
-  /// no sections (menu, workbench).
-  var discussSection: ((PlaybookSectionKind) -> Void)?
+  /// When set, the panel's title becomes a **Discuss ▾** section switcher — the same section-picking
+  /// control as the playbook's Ask ▾ launcher, and the only way to re-scope on iPhone where the
+  /// playbook sits behind the modal sheet. `nil` for panels with no sections (menu, workbench).
+  var selectSection: ((PlaybookSectionKind) -> Void)?
   var activeSection: PlaybookSectionKind?
+  /// When set, the panel shows an explicit **Done** dismiss (a crowded sheet toolbar is awkward to
+  /// swipe past). `nil` for embedded panels that own their own chrome.
+  var onDismiss: (() -> Void)?
 
   @State private var draft = ""
   @State private var assistantSelection = ChatAssistantSelection()
@@ -349,9 +352,14 @@ struct RecipeChatPanel: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       if !showsEmbeddedHeader {
-        if let discussSection {
+        if let onDismiss {
           ToolbarItem(placement: .topBarLeading) {
-            ChatSectionMenu(activeSection: activeSection, select: discussSection)
+            Button("Done") { onDismiss() }
+          }
+        }
+        if let selectSection {
+          ToolbarItem(placement: .principal) {
+            ChatSectionMenu(activeSection: activeSection, select: selectSection)
           }
         }
         ToolbarItem(placement: .topBarTrailing) {
@@ -624,47 +632,6 @@ private struct ChatTierMenu: View {
       }
     }
     .accessibilityHint(Text("Choose whether recipe context stays on device or is sent to a configured provider."))
-  }
-}
-
-private struct ChatSectionMenu: View {
-  let activeSection: PlaybookSectionKind?
-  let select: (PlaybookSectionKind) -> Void
-
-  var body: some View {
-    Menu {
-      ForEach(PlaybookSectionKind.allCases) { section in
-        Button {
-          select(section)
-        } label: {
-          Text(section.chatMenuTitle)
-          if section == activeSection {
-            Image(systemName: "checkmark")
-          }
-        }
-      }
-    } label: {
-      HStack(spacing: 4) {
-        Image(systemName: "sparkles")
-        Text(activeSection?.chatMenuTitle ?? "Discuss")
-          .font(.subheadline)
-        Image(systemName: "chevron.up.chevron.down")
-          .font(.caption2)
-          .foregroundStyle(.secondary)
-      }
-    }
-    .accessibilityLabel(Text("Discuss section"))
-    .accessibilityHint(Text("Move this discussion to another Playbook section."))
-  }
-}
-
-private extension PlaybookSectionKind {
-  var chatMenuTitle: String {
-    switch self {
-    case .makeAhead: "Make-ahead"
-    case .chefItUp: "Chef It Up"
-    case .serveWith: "Serve With"
-    }
   }
 }
 
