@@ -266,6 +266,10 @@ struct RecipeChatPanel: View {
           }
           .padding()
         }
+        // A seeded or restored thread arrives with its messages already present, so
+        // `.onChange` never fires for them — without this the panel opens scrolled to the
+        // top of the machine-authored opener instead of on the reply the cook came to read.
+        .defaultScrollAnchor(.bottom)
         .onChange(of: chatModel.messages.count) { _, _ in
           guard let lastID = chatModel.messages.last?.id else { return }
           withAnimation {
