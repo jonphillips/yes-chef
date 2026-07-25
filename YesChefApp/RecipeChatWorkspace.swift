@@ -458,16 +458,13 @@ struct RecipeChatPanel: View {
 
     // The seed already teaches the shared discussion convention: this is the visible equivalent
     // of the cook typing “finalize,” not a second authored prompt or return parser.
-    guard await chatModel.send("Finalize.") else { return }
-    guard let result = latestReplySubject?.text else { return }
-
-    do {
+    if let error = await OnboardChatFinalizer.finalize(using: chatModel) { result in
       try await handoffReviewCoordinator.stageOnboardReview(
         source: finalization.source,
         result: result
       )
-    } catch {
-      actionError = RecipeChatErrorText.describe(error)
+    } {
+      actionError = error
     }
   }
 

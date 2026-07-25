@@ -30,6 +30,35 @@ struct ChatFinalizeConfiguration {
   }
 }
 
+/// Runs the terminal turn for an onboard discussion. A model failure removes its empty placeholder,
+/// so an existing assistant reply must never be mistaken for the terminal deliverable.
+@MainActor
+enum OnboardChatFinalizer {
+  static func finalize(
+    using chatModel: RecipeChatModel,
+    stage: @escaping @MainActor (String) async throws -> Void
+  ) async -> String? {
+    let priorReplyID = chatModel.messages.last(where: { $0.role == .assistant })?.id
+    guard await chatModel.send("Finalize.") else { return nil }
+    guard
+      chatModel.errorText == nil,
+      let reply = chatModel.messages.last(where: { $0.role == .assistant }),
+      reply.id != priorReplyID,
+      !reply.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+      reply.text != "(No response.)"
+    else {
+      return chatModel.errorText ?? "Finalize didn't return a result. Try again."
+    }
+
+    do {
+      try await stage(reply.text)
+      return nil
+    } catch {
+      return RecipeChatErrorText.describe(error)
+    }
+  }
+}
+
 struct ChatContextHeader: View {
   let chatModel: RecipeChatModel
 
