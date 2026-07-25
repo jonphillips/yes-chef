@@ -105,6 +105,43 @@ struct AIHandoffTests {
   }
 
   @Test
+  func learningBulletsPreserveNakedSentencesAndParagraphsAsRemainder() {
+    let returned = AIHandoffReturn.learningBullets(
+      from: """
+      - Salt the chicken a day ahead.
+      Taste the sauce before adding more salt.
+      This paragraph describes why the sauce needs a final adjustment.
+      It should be kept for the cook to review.
+      """
+    )
+
+    expectNoDifference(returned.learnings, ["Salt the chicken a day ahead."])
+    expectNoDifference(
+      returned.unparsedLines,
+      [
+        "Taste the sauce before adding more salt.",
+        "This paragraph describes why the sauce needs a final adjustment.",
+        "It should be kept for the cook to review.",
+      ]
+    )
+  }
+
+  @Test
+  func menuPrepPlanCarriesUnparsedLearningLinesIntoItsExistingEvidence() {
+    let returned = AIHandoffReturn.menuPrepPlan(
+      from: """
+      Wednesday evening:
+      - Salt the chicken → Thursday dinner
+      YC-LEARNINGS:
+      Taste the sauce before adding more salt.
+      """,
+      currentPlan: MenuPrepPlan()
+    )
+
+    expectNoDifference(returned.unparsedLines, ["Taste the sauce before adding more salt."])
+  }
+
+  @Test
   func matchedMenuHandoffImportsOnceAndMissingHandoffPreservesManualPaste() throws {
     @Dependency(\.defaultDatabase) var database
     let menuID = SampleUUIDSequence.uuid(38_010)

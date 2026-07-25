@@ -832,6 +832,17 @@ public enum AIHandoffReturn {
     public var unparsedLines: [String]
   }
 
+  public struct PlainTextReturn: Equatable, Sendable {
+    public var deliverable: String
+    public var learnings: [String]
+    public var unparsedLines: [String]
+  }
+
+  public struct LearningBulletsReturn: Equatable, Sendable {
+    public var learnings: [String]
+    public var unparsedLines: [String]
+  }
+
   public static let learningsMarker = "YC-LEARNINGS:"
 
   public static func menuPrepPlan(
@@ -840,10 +851,11 @@ public enum AIHandoffReturn {
   ) -> MenuPrepPlanReturn {
     let split = splitting(text)
     let parsed = currentPlan.parsingEditableReviewText(split.deliverable)
+    let learnings = learningBullets(from: split.learnings)
     return MenuPrepPlanReturn(
       plan: parsed.plan,
-      learnings: learningBullets(from: split.learnings),
-      unparsedLines: parsed.unparsedLines
+      learnings: learnings.learnings,
+      unparsedLines: parsed.unparsedLines + learnings.unparsedLines
     )
   }
 
@@ -883,27 +895,40 @@ public enum AIHandoffReturn {
     return ReaderFeedbackReturn(tips: tips, unparsedLines: unparsedLines)
   }
 
-  public static func plainText(from text: String) -> (deliverable: String, learnings: [String]) {
+  public static func plainText(from text: String) -> PlainTextReturn {
     let split = splitting(text)
-    return (
-      split.deliverable.trimmingCharacters(in: .whitespacesAndNewlines),
-      learningBullets(from: split.learnings)
+    let learnings = learningBullets(from: split.learnings)
+    return PlainTextReturn(
+      deliverable: split.deliverable.trimmingCharacters(in: .whitespacesAndNewlines),
+      learnings: learnings.learnings,
+      unparsedLines: learnings.unparsedLines
     )
   }
 
-  public static func learningBullets(from text: String) -> [String] {
+  public static func learningBullets(from text: String) -> LearningBulletsReturn {
     var seen = Set<String>()
-    return text.components(separatedBy: .newlines).compactMap { rawLine in
+    var learnings: [String] = []
+    var unparsedLines: [String] = []
+
+    for rawLine in text.components(separatedBy: .newlines) {
       let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !line.isEmpty else { continue }
       let bullet: String?
       if line.hasPrefix("- ") || line.hasPrefix("* ") || line.hasPrefix("• ") {
         bullet = String(line.dropFirst(2)).trimmingCharacters(in: .whitespacesAndNewlines)
       } else {
         bullet = nil
       }
-      guard let bullet, !bullet.isEmpty, seen.insert(bullet).inserted else { return nil }
-      return bullet
+
+      guard let bullet, !bullet.isEmpty else {
+        unparsedLines.append(line)
+        continue
+      }
+      guard seen.insert(bullet).inserted else { continue }
+      learnings.append(bullet)
     }
+
+    return LearningBulletsReturn(learnings: learnings, unparsedLines: unparsedLines)
   }
 
   static func splitting(_ text: String) -> (deliverable: String, learnings: String) {
@@ -942,6 +967,7 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
   case unparsedPlanText([String])
   case unparsedExperimentBlocks([String])
   case unparsedReaderFeedbackLines([String])
+  case unparsedLearningLines([String])
 
   public var errorDescription: String? {
     switch self {
@@ -961,6 +987,8 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
       "Could not import these experiment blocks: \(blocks.joined(separator: " | "))"
     case let .unparsedReaderFeedbackLines(lines):
       "Could not read these reader-feedback lines. Each tip must begin with `Tip:`: \(lines.joined(separator: " | "))"
+    case let .unparsedLearningLines(lines):
+      "Could not read these learning lines. Each learning must begin with a bullet: \(lines.joined(separator: " | "))"
     }
   }
 
