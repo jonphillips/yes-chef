@@ -469,18 +469,11 @@ struct MenuPrepPlanSection: View {
       }
 
       if isExpanded {
-        HStack {
-          HandoffCopyPasteControls(
-            source: handoffSource,
-            transport: handoffTransport,
-            copyLabel: "Copy Prep Plan Prompt"
-          )
-          HandoffCopyPasteControls(
-            source: complementHandoffSource,
-            transport: handoffTransport,
-            copyLabel: "Copy Complement Prompt"
-          )
-        }
+        PrepPlanHandoffControls(
+          handoffSource: handoffSource,
+          complementHandoffSource: complementHandoffSource,
+          handoffTransport: handoffTransport
+        )
         .buttonStyle(.bordered)
 
         HStack {
@@ -594,6 +587,43 @@ private struct MenuPrepPlanSessionBand: Identifiable {
 
   private static func displaySteps(for steps: [PrepPlanStepRecord], in session: String) -> [Step] {
     steps.map { Step(id: $0.id, step: $0) }
+  }
+}
+
+private struct PrepPlanHandoffControls: View {
+  let handoffSource: HandoffExportSource
+  let complementHandoffSource: HandoffExportSource
+  let handoffTransport: HandoffInAppTransport
+
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+  var body: some View {
+    Group {
+      if horizontalSizeClass == .compact {
+        VStack(alignment: .leading) {
+          controls
+        }
+      } else {
+        HStack {
+          controls
+        }
+      }
+    }
+  }
+
+  private var controls: some View {
+    Group {
+      HandoffCopyPasteControls(
+        source: handoffSource,
+        transport: handoffTransport,
+        copyLabel: "Copy Prep Plan Prompt"
+      )
+      HandoffCopyPasteControls(
+        source: complementHandoffSource,
+        transport: handoffTransport,
+        copyLabel: "Copy Complement Prompt"
+      )
+    }
   }
 }
 

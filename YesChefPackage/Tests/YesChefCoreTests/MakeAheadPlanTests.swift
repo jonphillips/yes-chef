@@ -52,26 +52,6 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func renderedPlanFlattensForRecipeStorage() {
-      let plan = MakeAheadPlan(
-        steps: [
-          MakeAheadStep(when: "Day before", task: "Toast the nuts.", why: "They stay crisp once cooled."),
-          MakeAheadStep(when: "Just before dinner", task: "Dress the salad."),
-        ]
-      )
-
-      expectNoDifference(
-        plan.rendered(),
-        """
-        Day before: Toast the nuts.
-        Why: They stay crisp once cooled.
-
-        Just before dinner: Dress the salad.
-        """
-      )
-    }
-
-    @Test
     func enrichmentClientsParseFocusedJSON() {
       expectNoDifference(
         ChefItUpPlanClient.parse(#"{"text":"Brown the butter before mixing it into the batter."}"#),
@@ -193,6 +173,10 @@ extension RecipeCoreTests {
       expectNoDifference(request?.reasoningEffort, .high)
       expectNoDifference(request?.promptPreferenceKey, AIPromptPreferenceKind.makeAheadPrepPlan.rawValue)
       #expect(request?.messages.first?.text.contains("User-selected subject:\nMake the sauce a day ahead.") == true)
+      let system = try #require(request?.system)
+      for label in makeAheadTimingLabels {
+        #expect(system.contains(label))
+      }
     }
 
     @Test
@@ -430,7 +414,9 @@ extension RecipeCoreTests {
         try RecipeRepository.applyMakeAheadPlan(
           MakeAheadPlan(
             steps: [
-              MakeAheadStep(when: "Day before", task: "Cook the beans.", why: "They reheat well.")
+              MakeAheadStep(when: "Just before serving", task: "Warm the beans."),
+              MakeAheadStep(when: "Up to 2 days ahead", task: "Cook the beans.", why: "They reheat well."),
+              MakeAheadStep(when: "Unscheduled", task: "Taste for salt."),
             ]
           ),
           to: recipeID,
@@ -444,8 +430,12 @@ extension RecipeCoreTests {
         expectNoDifference(
           recipe.makeAhead,
           """
-          Day before: Cook the beans.
+          Up to 2 days ahead: Cook the beans.
           Why: They reheat well.
+
+          Just before serving: Warm the beans.
+
+          Unscheduled: Taste for salt.
           """
         )
         expectNoDifference(recipe.dateModified, modifiedAt)
@@ -632,6 +622,17 @@ extension RecipeCoreTests {
     }
   }
 }
+
+private let makeAheadTimingLabels = [
+  "Up to N days ahead",
+  "Day before",
+  "Night before",
+  "Morning of",
+  "Day of",
+  "N hours ahead",
+  "N minutes ahead",
+  "Before serving",
+]
 
 private func apiKeyStore(_ keys: [FrontierProvider: String]) -> APIKeyStore {
   let storage = Mutex(keys)

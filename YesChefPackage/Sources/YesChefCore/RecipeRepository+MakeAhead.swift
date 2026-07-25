@@ -8,7 +8,12 @@ extension RecipeRepository {
     in db: Database,
     now: Date
   ) throws {
-    try updateMakeAhead(plan.rendered().nonEmptyMakeAheadText, recipeID: recipeID, in: db, now: now)
+    try updateMakeAhead(
+      plan.orderedForDeposit().rendered().nonEmptyMakeAheadText,
+      recipeID: recipeID,
+      in: db,
+      now: now
+    )
   }
 
   public static func updateMakeAhead(

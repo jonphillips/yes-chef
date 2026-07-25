@@ -3,6 +3,7 @@ import Dependencies
 import DependenciesTestSupport
 import Foundation
 import LLMClientKit
+import Synchronization
 import Testing
 import YesChefCore
 
@@ -280,8 +281,14 @@ extension AIHandoffTests {
       let cold = RecipeChatModel(
         context: .recipe(RecipeChatRecipeContext(recipeID: recipeID, title: "Tomato Sauce"))
       )
-      #expect(await cold.seedIfCold("Open the make-ahead discussion.") == .seeded)
+      #expect(
+        await cold.seedIfCold(
+          "Open the make-ahead discussion.",
+          summary: "Started Make-ahead discussion."
+        ) == .seeded
+      )
       #expect(cold.messages.map(\.text) == ["Open the make-ahead discussion.", "Start with the sauce."])
+      #expect(cold.seedSummary(for: cold.messages[0].id) == "Started Make-ahead discussion.")
 
       let warm = RecipeChatModel(
         context: .recipe(RecipeChatRecipeContext(recipeID: recipeID, title: "Tomato Sauce"))
@@ -290,6 +297,37 @@ extension AIHandoffTests {
       // A warm thread reports `.alreadyWarm`, never `.failed` — the caller keeps the panel's scope.
       #expect(await warm.seedIfCold("Do not send this second opener.") == .alreadyWarm)
       expectNoDifference(warm.messages, existingMessages)
+      #expect(warm.seedSummary(for: warm.messages[0].id) == nil)
+    }
+  }
+
+  @Test
+  @MainActor
+  func seedSummaryDoesNotReplaceTheSeedTextInModelHistory() async {
+    let recordedMessages = Mutex<[[ModelMessage]]>([])
+
+    await withDependencies {
+      $0.uuid = .incrementing
+      $0.modelClient = StubModelClient { request in
+        recordedMessages.withLock { $0.append(request.messages) }
+        return ModelResponse(text: "Start with the sauce.")
+      }
+    } operation: {
+      let model = RecipeChatModel(
+        context: .recipe(RecipeChatRecipeContext(title: "Tomato Sauce"))
+      )
+      await model.seedIfCold(
+        "Open the full make-ahead discussion.",
+        summary: "Started Make-ahead discussion."
+      )
+      await model.send("What should I do first?")
+
+      let latest = recordedMessages.withLock { $0.last ?? [] }
+      #expect(latest.map(\.text) == [
+        "Open the full make-ahead discussion.",
+        "Start with the sauce.",
+        "What should I do first?",
+      ])
     }
   }
 

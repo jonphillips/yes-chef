@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 24, 2026 (**ADR-0045's V1+V2+V3 arc is complete and device-passed.** V2 — the Finalize button (PR [#229](https://github.com/jonphillips/yes-chef/pull/229)) — merged 2026-07-24 → [`DONE-LOG`](DONE-LOG.md), joining V1 (PR [#227](https://github.com/jonphillips/yes-chef/pull/227)) and S3 + V3 (PR [#228](https://github.com/jonphillips/yes-chef/pull/228) / `jon-platform` PR [#33](https://github.com/jonphillips/jon-platform/pull/33)). The architect review of #229 drove three tested in-PR fixes (failed-finalize staging, the RecipeEnrichment truncation sweep, a Finalize→action resolution test). **The live dispatch target is now the dogfood cleanup batch** — three small, already-decided slices (iPhone menu layout, deterministic make-ahead ordering, in-memory seed chip) — because no strategic slice is dispatch-ready yet (ADR-0032 workbench scoping and the rest want a scoping pass first). **Landing S3 fired [ADR-0044](decisions/ADR-0044-provenance-engine-to-llmclientkit.md)'s trigger** — a signal to write the provenance-engine-lift design, not to build it.) Completed-slice history and strategic background live in [`docs/DONE-LOG.md`](DONE-LOG.md).
+Last updated: July 25, 2026 (**ADR-0045's V1+V2+V3 arc is complete and device-passed.** V2 — the Finalize button (PR [#229](https://github.com/jonphillips/yes-chef/pull/229)) — merged 2026-07-24 → [`DONE-LOG`](DONE-LOG.md), joining V1 (PR [#227](https://github.com/jonphillips/yes-chef/pull/227)) and S3 + V3 (PR [#228](https://github.com/jonphillips/yes-chef/pull/228) / `jon-platform` PR [#33](https://github.com/jonphillips/jon-platform/pull/33)). The architect review of #229 drove three tested in-PR fixes (failed-finalize staging, the RecipeEnrichment truncation sweep, a Finalize→action resolution test). **The dogfood cleanup batch shipped in PR [#230](https://github.com/jonphillips/yes-chef/pull/230)** (iPhone menu layout, deterministic make-ahead ordering + a settled timing vocabulary, in-memory seed chip; the architect review drove the vocabulary expansion + prompt-contract fix) → [`DONE-LOG`](DONE-LOG.md) on merge. **The live dispatch target is now retiring the `Menu.prepPlan` BLOB** — [ADR-0040](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md) D4's pre-cut "then drop it" tail, the last step before prod-schema promotion can lock the Menu record type forever. (ADR-0032 workbench scoping and the rest still want a scoping pass first.) **Landing S3 fired [ADR-0044](decisions/ADR-0044-provenance-engine-to-llmclientkit.md)'s trigger** — a signal to write the provenance-engine-lift design, not to build it.) Completed-slice history and strategic background live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
 
 
@@ -17,42 +17,40 @@ live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** re
 
 ## Next Up
 
-**ONE live dispatch target: the dogfood cleanup batch (app + Core; three cohesive small slices, one PR).**
-Dispatch with *"Do the **cleanup batch** effort in `docs/CURRENT_HANDOFF.md`."* If this section is empty or
-missing, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch. Do all three, in
-order; their files are disjoint (menu view / Core deposit / chat panel), so they batch cleanly. **Both design
-forks are already decided — build to the decision, do not re-open them.**
+**ONE live dispatch target: retire the `Menu.prepPlan` BLOB (Core + one schema migration; no app-UI change).**
+Dispatch with *"Do the **prep-plan BLOB retirement** effort in `docs/CURRENT_HANDOFF.md`."* If this section is
+empty or missing, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-**Now dispatchable — [ADR-0045](decisions/ADR-0045-onboard-path-stays-viable.md) V2 merged and device-passed
-2026-07-24** (PR [#229](https://github.com/jonphillips/yes-chef/pull/229) → [`DONE-LOG`](DONE-LOG.md)), which
-also shipped the makeAhead-family truncation guard + 4096 budget. These three are the residual dogfood polish;
-none carries a strategic dependency, and no *big* slice is dispatch-ready (the strategic items below want a
-scoping pass first), so the board runs cleanup while those wait.
+**Why now, not someday.** [ADR-0040](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md) S2 — the
+BLOB→`prepPlanSteps` restructure — **already shipped and device-passed (PR #184)**: the detail view, the
+`PrepPlanStepRepository`, and the handoff/paste path all read and write step rows. `Menu.prepPlan` is now a
+**frozen pre-migration snapshot** with exactly one live reader — the historical migration at
+[`Schema.swift:901`](YesChefPackage/Sources/YesChefCore/Schema.swift#L901) that decoded it into rows. But
+`Menu` is a **synced** record type ([`CloudSync.swift:128`](YesChefPackage/Sources/YesChefCore/CloudSync.swift#L128))
+and every BLOB syncs as a CKAsset ([[sqlitedata-blob-cloudkit-asset]]), so the dead column is a **CKAsset field
+on the Menu record type**. Prod-schema promotion is **additive-only and locks record types permanently**
+(ADR-0040 D4) — promote with the BLOB present and that dead field is welded into the production Menu type
+forever. Dropping it is **free today, impossible after the cut.** This is the ADR's "keep it readable one
+release, then drop it" tail, and the release has passed.
 
-**Slice 1 — menu prep-plan copy buttons crushed on iPhone.** In `MenuViews.swift` the two
-`HandoffCopyPasteControls` ("Copy Prep Plan Prompt" / "Copy Complement Prompt") share one `HStack` and wrap to
-one character per line on compact width (2026-07-24 dogfood screenshot). Stack them vertically (or collapse to
-a menu) on the compact size class; leave the iPad layout. Pre-existing (ADR-0038/0039 era, not V1/V2),
-app-only, no schema.
+**The slice.** Append a `DROP COLUMN "prepPlan"` migration — pattern already proven twice in this file
+(`substitution` at [`Schema.swift:660`](YesChefPackage/Sources/YesChefCore/Schema.swift#L660) and
+`legacyParentCategoryID`), so the SyncEngine-trigger interaction is a **solved problem, not a risk** — then
+remove the property from `Menu` ([`Models.swift:375`](YesChefPackage/Sources/YesChefCore/Models.swift#L375)).
 
-**Slice 2 — deterministic make-ahead deposit ordering.** When a curated make-ahead plan is deposited into a
-recipe, order the steps **earliest-possible-effort first**. **Decision: a deterministic parse of the `when`
-timing labels, NOT an LLM reorder** — curated content must not reshuffle on every regeneration
-([[llm-vs-determinism-surface-boundary]]). Map a fixed phrase set to an ordinal — "up to N days ahead"
-(furthest) → "night before" → "morning of" → "day of" → "just before serving" (last) — stable-sort by it, and
-leave unrecognized labels in their original relative order at the tail. Core + the deposit/commit path (grep
-the make-ahead commit in `YesChefCore` and the playbook commit code).
+**The one sharp edge — a historical migration compiled against the live struct.** The 2026-07-14 migration at
+`Schema.swift:901` reads the old data via `Menu.fetchAll(db)` → `menu.prepPlan`. Delete the property and that
+**already-applied migration stops compiling.** Freeze it first: rewrite that decode to read the column with
+**raw SQL** (`SELECT "id", "prepPlan" FROM "menus"`) so it no longer depends on the evolving `Menu` type, then
+drop the property — same PR. Standard "historical migrations pin to SQL, not the current model."
 
-**Slice 3 — compact seed chip.** Render the auto-seeded section opener (the large machine-authored
-`discussAsk` prompt) as a compact summary in the transcript instead of the full rote text (Jon's dogfood ask).
-**Decision: in-memory-only, NOT a synced column** — it is pure presentation, regenerable from the section, so
-it does not earn synced schema that locks on prod promotion ([[synced-table-cost-calibration]]); a restored
-warm thread showing the full text is acceptable (scroll-to-bottom already lands on the reply). The seed's full
-text still goes to the model (`history()` builds messages from `text`), so carry the summary as a separate
-in-memory marker on `RecipeChatModel` keyed to the seed message id and render it in `ChatMessageBubble`.
+**Also in this same doc:** `Menu.prepPlan` **leaves** the standing prod-promotion list below (it is dropped,
+never promoted); `prepPlanSteps` stays.
 
-**Verification:** app-layer, so the elevated `generic/platform=iOS` build is required evidence, plus the Core
-suite and `scripts/check-drift.sh`.
+**Verification:** Core suite + `scripts/check-drift.sh`; package-only, **no app build required**. Because it is
+a schema/migration change, Jon's device pass must confirm a real library with existing prep plans survives the
+migration and steps still render — the data already lives in `prepPlanSteps`, so the drop is lossless; confirm
+no crash and no drift/erase.
 
 **Not a dispatch target, but the next thing that wants Jon's time — the [ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md)
 scoping session.** Accepted 2026-07-23, but only its *Decision* was ratified; its six open questions still
@@ -100,8 +98,8 @@ prod/TestFlight cut. At that cut, deploy to the production schema the Phase E Sl
 PR #141), **and** the ADR-0021
 synced `recipeVariations` table (Recipe edit proposals S2), **and `Menu.externalProjectName`** (ADR-0038 S2),
 **and the synced `learnings` table including its `sortOrder` column** (ADR-0038 Amd 1 / Amd 5) **and the synced `prepPlanSteps` table**
-(ADR-0040 S2 — which also **retires the `Menu.prepPlan` BLOB**: restructure it *before* this cut, because
-promotion locks the record type permanently), **and the synced `workbenchLog` table including its nullable `hypothesis` / `change` / `rationale` columns** (ADR-0042 S2), **and the synced `recipeDeliberationLog` table** (ADR-0021 V3, PR [#225](https://github.com/jonphillips/yes-chef/pull/225) — **shipped 2026-07-24**; [Amd 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23); the *only* schema that variations arc added — V1+V2 added none); and note the app target
+(ADR-0040 S2). *(The `Menu.prepPlan` BLOB it replaced is **not** on this list — it is being dropped outright
+under Next Up, so it never enters the prod schema.)* **and the synced `workbenchLog` table including its nullable `hypothesis` / `change` / `rationale` columns** (ADR-0042 S2), **and the synced `recipeDeliberationLog` table** (ADR-0021 V3, PR [#225](https://github.com/jonphillips/yes-chef/pull/225) — **shipped 2026-07-24**; [Amd 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23); the *only* schema that variations arc added — V1+V2 added none); and note the app target
 (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 
 ## Ready Efforts (queue)
