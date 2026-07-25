@@ -2,6 +2,12 @@ import Dependencies
 import Foundation
 import SQLiteData
 
+@Selection
+private struct LegacyMenuPrepPlanRow: Sendable {
+  let id: UUID
+  let prepPlan: Data?
+}
+
 extension DependencyValues {
   public mutating func bootstrapDatabase() throws {
     @Dependency(\.context) var context
@@ -898,7 +904,15 @@ extension DependencyValues {
         """)
         .execute(db)
 
-      for menu in try Menu.fetchAll(db) {
+      let menus = try #sql(
+        """
+        SELECT "id", "prepPlan" FROM "menus"
+        """,
+        as: LegacyMenuPrepPlanRow.self
+      )
+      .fetchAll(db)
+
+      for menu in menus {
         for (sortOrder, step) in MenuPrepPlanCoding.decode(menu.prepPlan).enumerated() {
           try PrepPlanStepRecord.insert {
             PrepPlanStepRecord(
@@ -941,6 +955,14 @@ extension DependencyValues {
       ] {
         try db.execute(sql: statement)
       }
+    }
+
+    migrator.registerMigration("Remove legacy menu prep plan BLOB") { db in
+      try #sql("""
+        ALTER TABLE "menus"
+        DROP COLUMN "prepPlan"
+        """)
+        .execute(db)
     }
 
     try migrator.migrate(database)

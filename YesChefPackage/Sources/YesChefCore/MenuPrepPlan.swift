@@ -231,11 +231,6 @@ private extension PrepPlanStep {
 }
 
 public enum MenuPrepPlanCoding {
-  public static func encode(_ steps: [PrepPlanStep]) throws -> Data? {
-    guard !steps.isEmpty else { return nil }
-    return try JSONEncoder().encode(steps)
-  }
-
   public static func decode(_ data: Data?) -> [PrepPlanStep] {
     guard let data else { return [] }
     return (try? JSONDecoder().decode([PrepPlanStep].self, from: data)) ?? []

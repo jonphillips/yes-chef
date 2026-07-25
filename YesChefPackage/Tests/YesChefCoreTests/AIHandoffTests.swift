@@ -335,7 +335,6 @@ struct AIHandoffTests {
         [PrepPlanStep(session: "Wednesday evening", task: "Salt the chicken", serves: "Thursday dinner")]
       )
       expectNoDifference(review.learnings, [])
-      #expect(try Menu.find(menuID).fetchOne(db)?.prepPlan == nil)
       #expect(try AIHandoffRepository.handoff(id: handoffID, in: db)?.status == .imported)
 
       #expect(
@@ -396,7 +395,6 @@ struct AIHandoffTests {
       )
       expectNoDifference(review.unparsedPlanLines, ["Let me know if you'd like changes!"])
       expectNoDifference(review.learnings, ["Salt early for better seasoning."])
-      #expect(try Menu.find(menuID).fetchOne(db)?.prepPlan == nil)
     }
   }
 
@@ -446,7 +444,6 @@ struct AIHandoffTests {
         review.learnings,
         ["Dried bay leaves beat fresh.", "Birria benefits from sitting overnight."]
       )
-      #expect(try Menu.find(menuID).fetchOne(db)?.prepPlan == nil)
     }
   }
 
