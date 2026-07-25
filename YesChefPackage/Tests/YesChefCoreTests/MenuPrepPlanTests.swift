@@ -53,9 +53,6 @@ extension RecipeCoreTests {
         )
       )
 
-      let data = try #require(try MenuPrepPlanCoding.encode(plan.steps))
-      expectNoDifference(MenuPrepPlanCoding.decode(data), plan.steps)
-      expectNoDifference(try MenuPrepPlanCoding.encode([]), nil)
     }
 
     @Test

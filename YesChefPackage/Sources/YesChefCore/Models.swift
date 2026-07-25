@@ -372,7 +372,6 @@ public struct Menu: Codable, Identifiable, Equatable, Sendable {
   public var notes: String?
   public var externalProjectName: String?
   public var dayCount: Int
-  public var prepPlan: Data?
   public var dateCreated: Date
   public var dateModified: Date
 
@@ -382,7 +381,6 @@ public struct Menu: Codable, Identifiable, Equatable, Sendable {
     notes: String? = nil,
     externalProjectName: String? = nil,
     dayCount: Int,
-    prepPlan: Data? = nil,
     dateCreated: Date,
     dateModified: Date
   ) {
@@ -391,7 +389,6 @@ public struct Menu: Codable, Identifiable, Equatable, Sendable {
     self.notes = notes
     self.externalProjectName = externalProjectName
     self.dayCount = dayCount
-    self.prepPlan = prepPlan
     self.dateCreated = dateCreated
     self.dateModified = dateModified
   }

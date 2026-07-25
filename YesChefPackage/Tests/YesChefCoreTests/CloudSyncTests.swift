@@ -70,6 +70,20 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func menuSchemaRetiresTheLegacyPrepPlanBlob() throws {
+      @Dependency(\.defaultDatabase) var database
+
+      try database.read { db in
+        let columnNames = try #sql(
+          "SELECT name FROM pragma_table_info('menus')",
+          as: String.self
+        )
+        .fetchAll(db)
+        #expect(!columnNames.contains("prepPlan"))
+      }
+    }
+
+    @Test
     func mainAppConnectionWritesRowsPickedUpBySyncTriggers() throws {
       let databaseURL = try temporaryCloudSyncDatabaseURL()
       let recipeID = SampleUUIDSequence.uuid(600)
