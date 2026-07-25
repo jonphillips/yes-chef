@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 25, 2026 (**ADR-0045's V1+V2+V3 arc is complete and device-passed.** V2 — the Finalize button (PR [#229](https://github.com/jonphillips/yes-chef/pull/229)) — merged 2026-07-24 → [`DONE-LOG`](DONE-LOG.md), joining V1 (PR [#227](https://github.com/jonphillips/yes-chef/pull/227)) and S3 + V3 (PR [#228](https://github.com/jonphillips/yes-chef/pull/228) / `jon-platform` PR [#33](https://github.com/jonphillips/jon-platform/pull/33)). The architect review of #229 drove three tested in-PR fixes (failed-finalize staging, the RecipeEnrichment truncation sweep, a Finalize→action resolution test). **The dogfood cleanup batch shipped in PR [#230](https://github.com/jonphillips/yes-chef/pull/230)** (iPhone menu layout, deterministic make-ahead ordering + a settled timing vocabulary, in-memory seed chip; the architect review drove the vocabulary expansion + prompt-contract fix) → [`DONE-LOG`](DONE-LOG.md) on merge. **The live dispatch target is now retiring the `Menu.prepPlan` BLOB** — [ADR-0040](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md) D4's pre-cut "then drop it" tail, the last step before prod-schema promotion can lock the Menu record type forever. (ADR-0032 workbench scoping and the rest still want a scoping pass first.) **Landing S3 fired [ADR-0044](decisions/ADR-0044-provenance-engine-to-llmclientkit.md)'s trigger** — a signal to write the provenance-engine-lift design, not to build it.) Completed-slice history and strategic background live in [`docs/DONE-LOG.md`](DONE-LOG.md).
+Last updated: July 25, 2026 (**ADR-0045's V1+V2+V3 arc is complete and device-passed.** V2 — the Finalize button (PR [#229](https://github.com/jonphillips/yes-chef/pull/229)) — merged 2026-07-24 → [`DONE-LOG`](DONE-LOG.md), joining V1 (PR [#227](https://github.com/jonphillips/yes-chef/pull/227)) and S3 + V3 (PR [#228](https://github.com/jonphillips/yes-chef/pull/228) / `jon-platform` PR [#33](https://github.com/jonphillips/jon-platform/pull/33)). The architect review of #229 drove three tested in-PR fixes (failed-finalize staging, the RecipeEnrichment truncation sweep, a Finalize→action resolution test). **The dogfood cleanup batch shipped in PR [#230](https://github.com/jonphillips/yes-chef/pull/230)** (iPhone menu layout, deterministic make-ahead ordering + a settled timing vocabulary, in-memory seed chip; the architect review drove the vocabulary expansion + prompt-contract fix) → [`DONE-LOG`](DONE-LOG.md) on merge. **The `Menu.prepPlan` BLOB is retired** — PR [#231](https://github.com/jonphillips/yes-chef/pull/231) merged 2026-07-25 → [`DONE-LOG`](DONE-LOG.md): the `DROP COLUMN` migration landed, the 2026-07-14 historical migration was frozen to raw SQL so it no longer pins the live `Menu` struct, and the property is gone from `Menu`, so the dead CKAsset field never enters the prod schema. **The live dispatch target is now the inbound-learnings parser floor fix** — `AIHandoff.learningBullets` silently drops any non-bullet learning, the last tracked *defect* (not nit) in the hand-off return path ([[editable-at-the-grain-stored]] lossless-or-loud violation). (ADR-0032 workbench scoping and the rest still want a scoping pass first.) **Landing S3 fired [ADR-0044](decisions/ADR-0044-provenance-engine-to-llmclientkit.md)'s trigger** — a signal to write the provenance-engine-lift design, not to build it.) Completed-slice history and strategic background live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
 
 
@@ -17,40 +17,41 @@ live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** re
 
 ## Next Up
 
-**ONE live dispatch target: retire the `Menu.prepPlan` BLOB (Core + one schema migration; no app-UI change).**
-Dispatch with *"Do the **prep-plan BLOB retirement** effort in `docs/CURRENT_HANDOFF.md`."* If this section is
+**ONE live dispatch target: give the inbound-learnings parser a loud remainder (Core logic + the App-layer callers that thread it — NOT package-only).**
+Dispatch with *"Do the **learnings parser floor** effort in `docs/CURRENT_HANDOFF.md`."* If this section is
 empty or missing, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-**Why now, not someday.** [ADR-0040](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md) S2 — the
-BLOB→`prepPlanSteps` restructure — **already shipped and device-passed (PR #184)**: the detail view, the
-`PrepPlanStepRepository`, and the handoff/paste path all read and write step rows. `Menu.prepPlan` is now a
-**frozen pre-migration snapshot** with exactly one live reader — the historical migration at
-[`Schema.swift:901`](YesChefPackage/Sources/YesChefCore/Schema.swift#L901) that decoded it into rows. But
-`Menu` is a **synced** record type ([`CloudSync.swift:128`](YesChefPackage/Sources/YesChefCore/CloudSync.swift#L128))
-and every BLOB syncs as a CKAsset ([[sqlitedata-blob-cloudkit-asset]]), so the dead column is a **CKAsset field
-on the Menu record type**. Prod-schema promotion is **additive-only and locks record types permanently**
-(ADR-0040 D4) — promote with the BLOB present and that dead field is welded into the production Menu type
-forever. Dropping it is **free today, impossible after the cut.** This is the ADR's "keep it readable one
-release, then drop it" tail, and the release has passed.
+**The defect.** `AIHandoffReturn.learningBullets(from:)`
+([`AIHandoff.swift:894`](YesChefPackage/Sources/YesChefCore/AIHandoff.swift#L894)) keeps only lines starting
+`- ` / `* ` / `• ` and **drops every other line with no trace** — a learning returned as a naked sentence or a
+paragraph simply vanishes. That is a straight [[editable-at-the-grain-stored]] *lossless-or-loud* violation,
+named as a defect in [ADR-0040](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md). It is the
+**deterministic floor** and goes **ahead of** ADR-0038 Amd 4's paraphrase-aware LLM curation *ceiling*
+([[handoff-stateless-both-directions]]).
 
-**The slice.** Append a `DROP COLUMN "prepPlan"` migration — pattern already proven twice in this file
-(`substitution` at [`Schema.swift:660`](YesChefPackage/Sources/YesChefCore/Schema.swift#L660) and
-`legacyParentCategoryID`), so the SyncEngine-trigger interaction is a **solved problem, not a risk** — then
-remove the property from `Menu` ([`Models.swift:375`](YesChefPackage/Sources/YesChefCore/Models.swift#L375)).
+**The fix — reuse the pattern already in this file; do not invent a second convention.** `readerFeedbackReturn`
+([`AIHandoff.swift:862`](YesChefPackage/Sources/YesChefCore/AIHandoff.swift#L862)) already does exactly this for
+tips: it collects a parallel `unparsedLines` and hands it back (the `unparsedLines` channel PR #226 established
+across the three advisory verbs). Give the learnings parse the same remainder output, then thread it into each
+caller's **existing** loud surface — the `unparsedLines` / evidence banner, not a new one:
+- `menuPrepPlan` ([`:845`](YesChefPackage/Sources/YesChefCore/AIHandoff.swift#L845)) folds the learnings
+  remainder into `MenuPrepPlanReturn.unparsedLines` (today that field carries only the *plan* parse's remainder,
+  so a naked-sentence learning escapes even on the one path that already has a channel).
+- `plainText` ([`:886`](YesChefPackage/Sources/YesChefCore/AIHandoff.swift#L886)) has **no remainder slot at
+  all**; its callers — `AIHandoffIntentImport` (the reader-feedback / make-ahead-strategy intent paths) and
+  `HandoffReviewCoordinator.swift:437` — must route the remainder into `readerFeedbackHandoffEvidence` / the
+  `unparsed*` throw they already use.
 
-**The one sharp edge — a historical migration compiled against the live struct.** The 2026-07-14 migration at
-`Schema.swift:901` reads the old data via `Menu.fetchAll(db)` → `menu.prepPlan`. Delete the property and that
-**already-applied migration stops compiling.** Freeze it first: rewrite that decode to read the column with
-**raw SQL** (`SELECT "id", "prepPlan" FROM "menus"`) so it no longer depends on the evolving `Menu` type, then
-drop the property — same PR. Standard "historical migrations pin to SQL, not the current model."
+**The sharp edge — this changes `plainText`'s signature, so it touches `YesChefApp/`.** Not package-only:
+`HandoffReviewCoordinator` and the capture/import views consume these returns, so the generic app build is
+required evidence (see Verification Pattern). Keep the *logic* in Core (the parser + a remainder-bearing return
+shape); only the threading crosses into the App layer.
 
-**Also in this same doc:** `Menu.prepPlan` **leaves** the standing prod-promotion list below (it is dropped,
-never promoted); `prepPlanSteps` stays.
-
-**Verification:** Core suite + `scripts/check-drift.sh`; package-only, **no app build required**. Because it is
-a schema/migration change, Jon's device pass must confirm a real library with existing prep plans survives the
-migration and steps still render — the data already lives in `prepPlanSteps`, so the drop is lossless; confirm
-no crash and no drift/erase.
+**Verification:** Core suite + `scripts/check-drift.sh`, **plus** the elevated generic app build (App-layer
+callers change — a green package build is not sufficient evidence here). Add a Core test that a naked-sentence
+learning **and** a paragraph both land in the remainder rather than vanishing — that regression is the floor.
+No schema change, so no mandatory device pass, but Jon confirms the evidence banner actually shows the remainder
+on a real paste.
 
 **Not a dispatch target, but the next thing that wants Jon's time — the [ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md)
 scoping session.** Accepted 2026-07-23, but only its *Decision* was ratified; its six open questions still
@@ -78,7 +79,7 @@ scoped, deliberately not now**, so it is not built on ADR-0043's momentum
   - **Its sibling — the re-implemented tier selection — is no longer tracked here.** That half (ignored `recipeChatTierPreference`, `availableProviders.first` fallback, silent `.onDevice` on a 16k strict-JSON call → `responseTruncated` instead of *"add an API key"*) is **absorbed by [ADR-0043](decisions/ADR-0043-model-call-chokepoint.md) S3 — now a live dispatch target above**, which removes it structurally rather than patching one call site. **Do not fix it here and do not track it twice.** The two halves are genuinely separate: one is *policy*, the other is *prompt authoring*.
   - **Deliberately NOT part of this:** adding the taste profile or known-learnings to the *extractor*. Those belong to the outbound hand-off ask (where `RecipeHandoffContext` already sends both) because that is where judgment happens. The extractor transcribes a settled decision, and feeding it preference context invites exactly the editorializing D1 exists to stop — and ADR-0043 D6 makes this asymmetry *visible* rather than flattening it.
 - **Workbench synthesis-shaped apply-action** — the draft verb's own action shape (no last-reply gate/chip). ⚠️ Re-read against [ADR-0042 D2/OQ5](decisions/ADR-0042-workbench-handoff-and-the-return-block.md) before dispatching: it is an *in-app* draft verb, and the draft is a structured write.
-- **The inbound learnings parser has no floor, and it fails silently (small; real defect, not a nit).** `AIHandoff.learningBullets` (`AIHandoff.swift:860`) keeps only lines starting `- ` / `* ` / `• ` and **drops everything else with no trace** — a learning returned as a naked sentence or a paragraph vanishes, which is a straight [[editable-at-the-grain-stored]] *lossless-or-loud* violation and is named as a defect in [ADR-0040](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md). *Fix:* tolerant extraction plus a **loud remainder** (the `unparsedLines` pattern PR #226 just established on the three advisory verbs — reuse it, do not invent a second convention). This is the deterministic **floor** and it goes **ahead of** ADR-0038 Amd 4's LLM curation ceiling ([[handoff-stateless-both-directions]]).
+- *(The inbound-learnings parser floor — the silent-drop defect — is **now the live dispatch target** under Next Up above, no longer a carry-forward here.)*
 - **Two small carry-forwards from the PR [#226](https://github.com/jonphillips/yes-chef/pull/226) review (both non-blocking, noted at approval).** `stageReaderFeedback` defaults `unparsedLines` to `[]`, so accepting a single tip through the *in-app* path clears the evidence banner (cosmetic). And a **crowding** observation from the device pass: the Prep Plan disclosure now renders two Copy + two Paste buttons, the meal-plan day header four — routing is correct (a complement result pasted into the prep-plan button hits the unmatched-result confirmation), but it wants a feel on iPhone before anyone adds a fifth.
 - **Open a design ADR** — ADR-0013 meal-planner verbs (needs scope confirmation) or ADR-0014 text editing.
 
@@ -98,8 +99,8 @@ prod/TestFlight cut. At that cut, deploy to the production schema the Phase E Sl
 PR #141), **and** the ADR-0021
 synced `recipeVariations` table (Recipe edit proposals S2), **and `Menu.externalProjectName`** (ADR-0038 S2),
 **and the synced `learnings` table including its `sortOrder` column** (ADR-0038 Amd 1 / Amd 5) **and the synced `prepPlanSteps` table**
-(ADR-0040 S2). *(The `Menu.prepPlan` BLOB it replaced is **not** on this list — it is being dropped outright
-under Next Up, so it never enters the prod schema.)* **and the synced `workbenchLog` table including its nullable `hypothesis` / `change` / `rationale` columns** (ADR-0042 S2), **and the synced `recipeDeliberationLog` table** (ADR-0021 V3, PR [#225](https://github.com/jonphillips/yes-chef/pull/225) — **shipped 2026-07-24**; [Amd 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23); the *only* schema that variations arc added — V1+V2 added none); and note the app target
+(ADR-0040 S2). *(The `Menu.prepPlan` BLOB it replaced was **dropped outright** in PR [#231](https://github.com/jonphillips/yes-chef/pull/231),
+so it never enters the prod schema.)* **and the synced `workbenchLog` table including its nullable `hypothesis` / `change` / `rationale` columns** (ADR-0042 S2), **and the synced `recipeDeliberationLog` table** (ADR-0021 V3, PR [#225](https://github.com/jonphillips/yes-chef/pull/225) — **shipped 2026-07-24**; [Amd 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23); the *only* schema that variations arc added — V1+V2 added none); and note the app target
 (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 
 ## Ready Efforts (queue)
