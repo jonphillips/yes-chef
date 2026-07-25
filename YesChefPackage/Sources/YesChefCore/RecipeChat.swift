@@ -861,7 +861,7 @@ public final class RecipeChatModel: Identifiable {
       messages[0].text == trimmed
     else {
       if let summary = summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty,
-        let seedMessageID = messages.first(where: { $0.role == .user && $0.text == trimmed })?.id
+        let seedMessageID = messages.first?.id
       {
         seedSummaries[seedMessageID] = summary
       }

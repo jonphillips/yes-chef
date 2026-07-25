@@ -49,23 +49,32 @@ public struct MakeAheadPlan: Equatable, Sendable {
 /// The order is the product decision: earliest available effort through serving time.
 private enum MakeAheadTimingRank: Int, Comparable {
   case daysAhead
+  case dayBefore
   case nightBefore
   case morningOf
   case dayOf
-  case justBeforeServing
+  case hoursAhead
+  case minutesAhead
+  case beforeServing
 
   init?(label: String) {
     let normalized = label.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
     if normalized.contains("day ahead") || normalized.contains("days ahead") {
       self = .daysAhead
+    } else if normalized.contains("day before") {
+      self = .dayBefore
     } else if normalized.contains("night before") {
       self = .nightBefore
     } else if normalized.contains("morning of") {
       self = .morningOf
     } else if normalized.contains("day of") {
       self = .dayOf
-    } else if normalized.contains("just before serving") {
-      self = .justBeforeServing
+    } else if normalized.contains("hour ahead") || normalized.contains("hours ahead") {
+      self = .hoursAhead
+    } else if normalized.contains("minute ahead") || normalized.contains("minutes ahead") {
+      self = .minutesAhead
+    } else if normalized.contains("before serving") {
+      self = .beforeServing
     } else {
       return nil
     }
@@ -147,6 +156,8 @@ extension MakeAheadPlanClient: DependencyKey {
     You distill a cooking conversation into a practical make-ahead plan for one recipe.
     The recipe context and conversation are provided by the app. Return ONLY strict JSON:
     {"steps":[{"when":"short timing label","task":"concrete kitchen task","why":"optional brief reason"}]}.
+    Set each `when` to exactly one settled label: `Up to N days ahead`, `Day before`, `Night before`,
+    `Morning of`, `Day of`, `N hours ahead`, `N minutes ahead`, or `Before serving`. Replace N with a number.
     Use only the provided recipe and conversation. Do not invent storage times or food-safety claims.
     Prefer a short, useful plan. Return {"steps":[]} when there is no make-ahead strategy to save.
     """

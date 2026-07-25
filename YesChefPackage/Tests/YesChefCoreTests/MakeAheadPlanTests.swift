@@ -173,6 +173,10 @@ extension RecipeCoreTests {
       expectNoDifference(request?.reasoningEffort, .high)
       expectNoDifference(request?.promptPreferenceKey, AIPromptPreferenceKind.makeAheadPrepPlan.rawValue)
       #expect(request?.messages.first?.text.contains("User-selected subject:\nMake the sauce a day ahead.") == true)
+      let system = try #require(request?.system)
+      for label in makeAheadTimingLabels {
+        #expect(system.contains(label))
+      }
     }
 
     @Test
@@ -618,6 +622,17 @@ extension RecipeCoreTests {
     }
   }
 }
+
+private let makeAheadTimingLabels = [
+  "Up to N days ahead",
+  "Day before",
+  "Night before",
+  "Morning of",
+  "Day of",
+  "N hours ahead",
+  "N minutes ahead",
+  "Before serving",
+]
 
 private func apiKeyStore(_ keys: [FrontierProvider: String]) -> APIKeyStore {
   let storage = Mutex(keys)
