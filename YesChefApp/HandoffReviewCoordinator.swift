@@ -434,13 +434,16 @@ final class HandoffReviewCoordinator {
     sourceID: UUID,
     approvedText: String
   ) throws {
-    let learnings = AIHandoffReturn.learningBullets(from: approvedText)
-    guard !learnings.isEmpty else { throw HandoffReviewError.emptyLearnings }
+    let returned = AIHandoffReturn.learningBullets(from: approvedText)
+    guard returned.unparsedLines.isEmpty else {
+      throw HandoffReviewError.unparsedLearningText(returned.unparsedLines)
+    }
+    guard !returned.learnings.isEmpty else { throw HandoffReviewError.emptyLearnings }
     _ = try database.write { db in
       // Exact-dedup on ingest against what's already stored (ADR-0038 Amd 4). All-duplicate commits
       // insert nothing and succeed — the review item is still consumed.
       try LearningRepository.insertNew(
-        texts: learnings,
+        texts: returned.learnings,
         sourceType: sourceType,
         sourceID: sourceID,
         provenance: .externalHandoff,
@@ -885,6 +888,7 @@ private enum HandoffReviewError: LocalizedError, CustomStringConvertible {
   case emptyLearnings
   case emptyDeliverable
   case unparsedStrategyText([String])
+  case unparsedLearningText([String])
 
   var errorDescription: String? {
     switch self {
@@ -894,6 +898,8 @@ private enum HandoffReviewError: LocalizedError, CustomStringConvertible {
       "Add at least one make-ahead item before saving."
     case let .unparsedStrategyText(lines):
       "Could not save these make-ahead strategy lines: \(lines.joined(separator: " | "))"
+    case let .unparsedLearningText(lines):
+      "Could not save these learning lines. Each learning must begin with a bullet: \(lines.joined(separator: " | "))"
     }
   }
 

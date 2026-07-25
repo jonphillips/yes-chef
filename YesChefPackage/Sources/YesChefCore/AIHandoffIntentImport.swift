@@ -138,6 +138,9 @@ private enum AIHandoffReviewStager {
       throw AIHandoffIntentImportError.wrongTask
     }
     let returned = AIHandoffReturn.plainText(from: payload)
+    guard returned.unparsedLines.isEmpty else {
+      throw AIHandoffIntentImportError.unparsedLearningLines(returned.unparsedLines)
+    }
     guard !returned.deliverable.isEmpty || !returned.learnings.isEmpty else {
       throw AIHandoffIntentImportError.emptyPlan
     }
@@ -182,7 +185,8 @@ private enum AIHandoffReviewStager {
       }
       return .mealPlanMakeAhead(AIHandoffMealPlanMakeAheadReview(
         handoffID: handoff.id, mealPlanItemID: item.id, scheduledDate: item.scheduledDate,
-        strategy: parsed.strategy, learnings: returned.learnings, unparsedStrategyLines: parsed.unparsedLines
+        strategy: parsed.strategy, learnings: returned.learnings,
+        unparsedStrategyLines: parsed.unparsedLines + returned.unparsedLines
       ))
     case .mealPlanComplement:
       let returned = AIHandoffReturn.mealPlanComplement(from: payload)
@@ -204,6 +208,9 @@ private enum AIHandoffReviewStager {
     switch handoff.taskType {
     case .workbenchCompare:
       let returned = AIHandoffReturn.plainText(from: payload)
+      guard returned.unparsedLines.isEmpty else {
+        throw AIHandoffIntentImportError.unparsedLearningLines(returned.unparsedLines)
+      }
       guard !returned.deliverable.isEmpty || !returned.learnings.isEmpty else {
         throw AIHandoffIntentImportError.emptyPlan
       }
