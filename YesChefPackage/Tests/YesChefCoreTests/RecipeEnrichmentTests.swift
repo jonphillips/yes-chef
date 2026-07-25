@@ -1,12 +1,49 @@
 import CustomDump
 import Dependencies
 import Foundation
+import LLMClientKit
 import Testing
 import YesChefCore
 
 extension RecipeCoreTests {
   @Suite
   struct RecipeEnrichmentTests {
+    @Test
+    func chefItUpClientFailsLoudlyWhenAStrictResponseIsTruncated() async {
+      await withDependencies {
+        $0.modelClient = StubModelClient { _ in
+          ModelResponse(text: #"{\"text\":\""#, stopReason: "length")
+        }
+      } operation: {
+        await #expect(throws: StructuredModelResponseError.responseTruncated) {
+          _ = try await ChefItUpPlanClient.liveValue(
+            selection: "Make it special.",
+            messages: [],
+            context: "Recipe context",
+            tier: .frontier(.openai)
+          )
+        }
+      }
+    }
+
+    @Test
+    func serveWithClientFailsLoudlyWhenAStrictResponseIsTruncated() async {
+      await withDependencies {
+        $0.modelClient = StubModelClient { _ in
+          ModelResponse(text: #"{\"items\":["#, stopReason: "length")
+        }
+      } operation: {
+        await #expect(throws: StructuredModelResponseError.responseTruncated) {
+          _ = try await ServeWithPlanClient.liveValue(
+            selection: "Suggest sides.",
+            messages: [],
+            context: "Recipe context",
+            tier: .frontier(.openai)
+          )
+        }
+      }
+    }
+
     @Test
     func playbookEnrichmentTextNormalizesPastedBullets() {
       let display = PlaybookEnrichmentText.displayText(for: """

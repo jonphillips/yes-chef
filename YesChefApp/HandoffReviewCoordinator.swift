@@ -600,6 +600,22 @@ final class HandoffReviewCoordinator {
   }
 }
 
+extension HandoffReviewCoordinator {
+  /// Brings an in-app terminal discussion response into the existing handoff review surface.
+  /// Unlike an external handoff, this does not create an exported prompt or consume a routed
+  /// handoff row; it only uses the shared return parsing and review presentation.
+  func stageOnboardReview(source: HandoffExportSource, result: String) async throws {
+    let review = try await HandoffAppOperations.stageOnboardReview(
+      source: source,
+      result: result,
+      in: database,
+      now: now,
+      handoffID: uuid()
+    )
+    present(review)
+  }
+}
+
 struct HandoffReviewSheet: View {
   let coordinator: HandoffReviewCoordinator
   let review: AIHandoffReview

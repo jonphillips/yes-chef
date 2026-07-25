@@ -172,11 +172,12 @@ extension MealPlanMakeAheadStrategyClient: DependencyKey {
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, context: context),
-      maxTokens: 2048,
+      maxTokens: 4096,
       reasoningEffort: .high,
       promptPreferenceKey: AIPromptPreferenceKind.makeAheadPrepPlan.rawValue
     )
     let response = try await call.complete(using: modelClient)
+    guard !response.wasTruncated else { throw StructuredModelResponseError.responseTruncated }
     return parse(response.text)
   }
 

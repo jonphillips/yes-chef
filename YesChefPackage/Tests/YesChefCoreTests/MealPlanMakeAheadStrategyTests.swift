@@ -117,6 +117,7 @@ extension RecipeCoreTests {
 
       let request = await recorder.first()
       expectNoDifference(request?.tier, .frontier(.anthropic))
+      expectNoDifference(request?.maxTokens, 4096)
       expectNoDifference(request?.reasoningEffort, .high)
       expectNoDifference(request?.promptPreferenceKey, AIPromptPreferenceKind.makeAheadPrepPlan.rawValue)
       #expect(request?.messages.first?.text.contains("Meal plan day context:\nMeal plan day context") == true)
@@ -125,6 +126,24 @@ extension RecipeCoreTests {
       #expect(request?.system?.contains("Do not generate choreography") == true)
       #expect(request?.system?.contains("The recipes hold the cooking") == true)
       #expect(request?.system?.contains("Do not flatten multiple recipes into one blob") == true)
+    }
+
+    @Test
+    func mealPlanMakeAheadStrategyClientFailsLoudlyWhenAStrictResponseIsTruncated() async {
+      await withDependencies {
+        $0.modelClient = StubModelClient { _ in
+          ModelResponse(text: #"{"steps":["#, stopReason: "length")
+        }
+      } operation: {
+        await #expect(throws: StructuredModelResponseError.responseTruncated) {
+          _ = try await MealPlanMakeAheadStrategyClient.liveValue(
+            selection: "Sequence the prep.",
+            messages: [],
+            context: "Meal plan context",
+            tier: .frontier(.anthropic)
+          )
+        }
+      }
     }
 
     @Test

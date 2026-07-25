@@ -720,6 +720,8 @@ public enum RecipeChatErrorText {
       "The model returned an error (\(status))." + (message.map { " \($0)" } ?? "")
     case ModelClientError.malformedResponse:
       "The model returned a response the app could not read."
+    case StructuredModelResponseError.responseTruncated:
+      "The model stopped before finishing the requested plan. Try again."
     case let ModelClientError.provider(message):
       "The model stopped before finishing." + (message.map { " \($0)" } ?? "")
     case let urlError as URLError where urlError.code == .timedOut:

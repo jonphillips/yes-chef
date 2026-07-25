@@ -77,6 +77,22 @@ public extension AIHandoffIntentImport {
     try AIHandoffRepository.markImported(id: handoff.id, at: now, in: db)
     return review
   }
+
+  /// Stages a terminal response from an in-app discussion. The discussion has no exported
+  /// handoff row or routing token, but its result must still flow through the same return parsers
+  /// and review states as a pasted handoff.
+  ///
+  /// An onboard model may include the external contract marker because it learned the convention
+  /// during a discussion. It is optional here: the app, rather than a copied external project,
+  /// owns this transport.
+  static func stageOnboardReview(
+    handoff: AIHandoff,
+    result: String,
+    in db: Database
+  ) throws -> AIHandoffReview {
+    let payload = AIHandoffReturnContract.strippingMarker(from: result) ?? result
+    return try AIHandoffReviewStager.stage(handoff: handoff, payload: payload, in: db)
+  }
 }
 
 private enum AIHandoffReviewStager {

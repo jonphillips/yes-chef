@@ -508,6 +508,31 @@ enum HandoffAppOperations {
       )
     }
   }
+
+  static func stageOnboardReview(
+    source: HandoffExportSource,
+    result: String,
+    in database: any DatabaseWriter,
+    now: Date,
+    handoffID: AIHandoff.ID
+  ) async throws -> AIHandoffReview {
+    let metadata = source.metadata(handoffID: handoffID)
+    let handoff = AIHandoff(
+      id: handoffID,
+      sourceType: metadata.sourceType,
+      sourceID: metadata.sourceID,
+      taskType: metadata.taskType,
+      createdAt: now,
+      exportedPrompt: ""
+    )
+    return try await database.read { db in
+      try AIHandoffIntentImport.stageOnboardReview(
+        handoff: handoff,
+        result: result,
+        in: db
+      )
+    }
+  }
 }
 
 struct OpenHandoffReviewIntent: AppIntent {

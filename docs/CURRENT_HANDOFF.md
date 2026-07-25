@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 24, 2026 (**the 2026-07-24 parallel run is merged and device-passed — [ADR-0045](decisions/ADR-0045-onboard-path-stays-viable.md) V1 (PR [#227](https://github.com/jonphillips/yes-chef/pull/227), seeded section-scoped Ask, Amendments 1+2) and [ADR-0043](decisions/ADR-0043-model-call-chokepoint.md) S3 + [ADR-0045](decisions/ADR-0045-onboard-path-stays-viable.md) V3 (PR [#228](https://github.com/jonphillips/yes-chef/pull/228) + `jon-platform` PR [#33](https://github.com/jonphillips/jon-platform/pull/33), tier-policy unification + the frontier model as a user setting) → [`DONE-LOG`](DONE-LOG.md).** V1 took three device-pass shaping rounds (scroll-to-bottom, the unified Ask ▾ / Discuss ▾ / Done control, and per-recipe warm-thread seeding). **The single live dispatch target is now [ADR-0045](decisions/ADR-0045-onboard-path-stays-viable.md) V2** — the Finalize button, now unblocked by V1 — with three dogfood-driven polish items folded into its architecture pass and one standalone iPhone-layout chip. **Landing S3 fired [ADR-0044](decisions/ADR-0044-provenance-engine-to-llmclientkit.md)'s trigger** — a signal to write the provenance-engine-lift design, not to build it.) Completed-slice history and strategic background live in [`docs/DONE-LOG.md`](DONE-LOG.md).
+Last updated: July 24, 2026 (**ADR-0045's V1+V2+V3 arc is complete and device-passed.** V2 — the Finalize button (PR [#229](https://github.com/jonphillips/yes-chef/pull/229)) — merged 2026-07-24 → [`DONE-LOG`](DONE-LOG.md), joining V1 (PR [#227](https://github.com/jonphillips/yes-chef/pull/227)) and S3 + V3 (PR [#228](https://github.com/jonphillips/yes-chef/pull/228) / `jon-platform` PR [#33](https://github.com/jonphillips/jon-platform/pull/33)). The architect review of #229 drove three tested in-PR fixes (failed-finalize staging, the RecipeEnrichment truncation sweep, a Finalize→action resolution test). **The live dispatch target is now the dogfood cleanup batch** — three small, already-decided slices (iPhone menu layout, deterministic make-ahead ordering, in-memory seed chip) — because no strategic slice is dispatch-ready yet (ADR-0032 workbench scoping and the rest want a scoping pass first). **Landing S3 fired [ADR-0044](decisions/ADR-0044-provenance-engine-to-llmclientkit.md)'s trigger** — a signal to write the provenance-engine-lift design, not to build it.) Completed-slice history and strategic background live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
 
 
@@ -17,42 +17,39 @@ live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** re
 
 ## Next Up
 
-**ONE live dispatch target: [ADR-0045](decisions/ADR-0045-onboard-path-stays-viable.md) V2 — the Finalize
-button + shared return parser (app).** Dispatch with *"Do the **ADR-0045 V2** effort in
-`docs/CURRENT_HANDOFF.md`."* If this section is empty or missing, **STOP and ask Jon — never infer.** See
-`docs/AGENTS.md` § Work Intake & Dispatch. A single dispatch may bundle **several cohesive slices** (one PR);
-do all listed, in order.
+**ONE live dispatch target: the dogfood cleanup batch (app + Core; three cohesive small slices, one PR).**
+Dispatch with *"Do the **cleanup batch** effort in `docs/CURRENT_HANDOFF.md`."* If this section is empty or
+missing, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch. Do all three, in
+order; their files are disjoint (menu view / Core deposit / chat panel), so they batch cleanly. **Both design
+forks are already decided — build to the decision, do not re-open them.**
 
-**Now unblocked — V1 merged and device-passed 2026-07-24** (PR [#227](https://github.com/jonphillips/yes-chef/pull/227) → [`DONE-LOG`](DONE-LOG.md)),
-so the seeded discussion V2 finalizes now exists. **Add the control, send the finalize instruction, run the
-reply through the *same* `AIHandoffReturn` parser the paste/import path uses, and route it into the *same*
-review sheet** — no new parser, no new prompt. The cost is concentrated at one seam: the review plumbing
-(`AIHandoffIntentImport` → `HandoffReviewCoordinator`) assumes a return that arrived via the paste/import
-intent, so the onboard-originated return needs that same entry — most cleanly by lifting the "return → review
-state" step out of the intent-import call site so both callers share it. Read the ADR's **V2** paragraph and
-**OQ1/OQ2** first; they are the spec.
+**Now dispatchable — [ADR-0045](decisions/ADR-0045-onboard-path-stays-viable.md) V2 merged and device-passed
+2026-07-24** (PR [#229](https://github.com/jonphillips/yes-chef/pull/229) → [`DONE-LOG`](DONE-LOG.md)), which
+also shipped the makeAhead-family truncation guard + 4096 budget. These three are the residual dogfood polish;
+none carries a strategic dependency, and no *big* slice is dispatch-ready (the strategic items below want a
+scoping pass first), so the board runs cleanup while those wait.
 
-**⚠️ V2 exists to settle two open questions *empirically*, not to rote-wire.** **OQ1** — Finalize and the
-apply-verbs must not read as two buttons for one job: one control labelled for the deliverable, mechanism
-chosen by tier underneath, decided against the *real* chat layout (the ADR calls this the one fiddly part).
-**OQ2** — make **one real on-device finalize attempt** and let the result decide the on-device route; do not
-guess it in code. Invariants still bind: **do not loosen `requiresSubject`** (D6 — Finalize is gated on a
-non-nil reply subject), no schema, and the meal-calendar / Workbench cold starts stay the OQ3 follow-on.
+**Slice 1 — menu prep-plan copy buttons crushed on iPhone.** In `MenuViews.swift` the two
+`HandoffCopyPasteControls` ("Copy Prep Plan Prompt" / "Copy Complement Prompt") share one `HStack` and wrap to
+one character per line on compact width (2026-07-24 dogfood screenshot). Stack them vertically (or collapse to
+a menu) on the compact size class; leave the iPad layout. Pre-existing (ADR-0038/0039 era, not V1/V2),
+app-only, no schema.
 
-**Fold into V2's architecture pass (Jon's call, 2026-07-24) — three dogfood-driven items, each carrying a
-design fork, so scope them with the architect before build, not as cold worktree chips:** (1) **makeAhead
-truncation + budget** — `MakeAheadPlan.swift` pairs `reasoningEffort: .high` with `maxTokens: 2048` and does
-**no `wasTruncated` check**, so a starved strict-JSON turn silently yields an empty plan ([[reasoning-budget-starves-output]]);
-decision already taken — add the existing `ModelResponse.wasTruncated` guard (fail loud) to the strict-JSON
-clients that lack it and raise the makeAhead-class budget `2048 → 4096`, keeping `.high`. (2) **make-ahead
-deposit order** — sort the deposited plan earliest-possible-effort first; deterministic parse of timing
-phrases vs. an LLM instruction ([[llm-vs-determinism-surface-boundary]] leans deterministic). (3) **seed
-chip** — render the auto-seeded opener as a compact summary instead of the full rote prompt; persisted
-display-summary column (synced schema, [[synced-table-cost-calibration]]) vs. in-memory-only.
+**Slice 2 — deterministic make-ahead deposit ordering.** When a curated make-ahead plan is deposited into a
+recipe, order the steps **earliest-possible-effort first**. **Decision: a deterministic parse of the `when`
+timing labels, NOT an LLM reorder** — curated content must not reshuffle on every regeneration
+([[llm-vs-determinism-surface-boundary]]). Map a fixed phrase set to an ordinal — "up to N days ahead"
+(furthest) → "night before" → "morning of" → "day of" → "just before serving" (last) — stable-sort by it, and
+leave unrecognized labels in their original relative order at the tail. Core + the deposit/commit path (grep
+the make-ahead commit in `YesChefCore` and the playbook commit code).
 
-**Standalone chip, NOT in the V2 pass: menu prep-plan copy buttons crushed on iPhone** (`MenuViews.swift`
-`HandoffCopyPasteControls` wrap one char per line on compact width). Pre-existing, decision-free, app-only —
-a plain worktree/Codex fix.
+**Slice 3 — compact seed chip.** Render the auto-seeded section opener (the large machine-authored
+`discussAsk` prompt) as a compact summary in the transcript instead of the full rote text (Jon's dogfood ask).
+**Decision: in-memory-only, NOT a synced column** — it is pure presentation, regenerable from the section, so
+it does not earn synced schema that locks on prod promotion ([[synced-table-cost-calibration]]); a restored
+warm thread showing the full text is acceptable (scroll-to-bottom already lands on the reply). The seed's full
+text still goes to the model (`history()` builds messages from `text`), so carry the summary as a separate
+in-memory marker on `RecipeChatModel` keyed to the seed message id and render it in `ChatMessageBubble`.
 
 **Verification:** app-layer, so the elevated `generic/platform=iOS` build is required evidence, plus the Core
 suite and `scripts/check-drift.sh`.
