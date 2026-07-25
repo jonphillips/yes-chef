@@ -772,6 +772,7 @@ public final class RecipeChatModel: Identifiable {
   public private(set) var isResponding = false
   public private(set) var errorText: String?
   public private(set) var continuationToken: ModelContinuationToken?
+  private var seedSummaries: [RecipeChatMessage.ID: String] = [:]
 
   @ObservationIgnored @Dependency(\.modelClient) private var modelClient
   @ObservationIgnored @Dependency(\.apiKeyStore) private var apiKeyStore
@@ -850,7 +851,7 @@ public final class RecipeChatModel: Identifiable {
   /// nothing, while the failed one is back to its cold empty state (ADR-0045 A3/A4). Callers that track
   /// what the panel is scoped to must be able to tell them apart.
   @discardableResult
-  public func seedIfCold(_ text: String) async -> RecipeChatSeedOutcome {
+  public func seedIfCold(_ text: String, summary: String? = nil) async -> RecipeChatSeedOutcome {
     guard messages.isEmpty else { return .alreadyWarm }
     guard await send(text) else { return .failed }
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -858,10 +859,22 @@ public final class RecipeChatModel: Identifiable {
       messages.count == 1,
       messages[0].role == .user,
       messages[0].text == trimmed
-    else { return .seeded }
+    else {
+      if let summary = summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty,
+        let seedMessageID = messages.first(where: { $0.role == .user && $0.text == trimmed })?.id
+      {
+        seedSummaries[seedMessageID] = summary
+      }
+      return .seeded
+    }
     messages.removeAll()
     persistCurrentThread()
     return .failed
+  }
+
+  /// Seed summaries are presentation-only: they never join persisted chat or model history.
+  public func seedSummary(for messageID: RecipeChatMessage.ID) -> String? {
+    seedSummaries[messageID]
   }
 
   public func stop() {
@@ -871,6 +884,7 @@ public final class RecipeChatModel: Identifiable {
   public func clear() {
     guard !isResponding else { return }
     messages.removeAll()
+    seedSummaries.removeAll()
     errorText = nil
     continuationToken = nil
     persistCurrentThread()
@@ -1011,6 +1025,7 @@ public final class RecipeChatModel: Identifiable {
   }
 
   private func loadPersistedThread() {
+    seedSummaries.removeAll()
     guard let subject = context.persistenceSubject else { return }
     do {
       let thread = try database.write { db in

@@ -960,7 +960,7 @@ final class RecipeDetailModel {
     Task {
       // Cold thread: seed it, with clean failure handling on the empty panel. Warm thread (restored
       // or ongoing): the cook explicitly picked this section, so append its opener to the transcript.
-      switch await chatModel.seedIfCold(seed) {
+      switch await chatModel.seedIfCold(seed, summary: "Started \(section.chatMenuTitle) discussion.") {
       case .seeded:
         guard isShowing(chatModel) else { return }
         seededAskSection = section

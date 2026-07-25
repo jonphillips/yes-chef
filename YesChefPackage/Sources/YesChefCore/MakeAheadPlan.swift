@@ -9,6 +9,30 @@ public struct MakeAheadPlan: Equatable, Sendable {
     self.steps = steps
   }
 
+  /// Puts recognized relative timing labels in the cook's actionable order for a committed plan.
+  /// Labels outside this small, settled vocabulary deliberately retain their source order at the end.
+  public func orderedForDeposit() -> Self {
+    Self(
+      steps: steps
+        .enumerated()
+        .sorted { lhs, rhs in
+          let lhsRank = MakeAheadTimingRank(label: lhs.element.when)
+          let rhsRank = MakeAheadTimingRank(label: rhs.element.when)
+          return switch (lhsRank, rhsRank) {
+          case let (lhsRank?, rhsRank?):
+            lhsRank == rhsRank ? lhs.offset < rhs.offset : lhsRank < rhsRank
+          case (.some, nil):
+            true
+          case (nil, .some):
+            false
+          case (nil, nil):
+            lhs.offset < rhs.offset
+          }
+        }
+        .map(\.element)
+    )
+  }
+
   public func rendered() -> String {
     steps
       .map { step in
@@ -19,6 +43,36 @@ public struct MakeAheadPlan: Equatable, Sendable {
         return lines.joined(separator: "\n")
       }
       .joined(separator: "\n\n")
+  }
+}
+
+/// The order is the product decision: earliest available effort through serving time.
+private enum MakeAheadTimingRank: Int, Comparable {
+  case daysAhead
+  case nightBefore
+  case morningOf
+  case dayOf
+  case justBeforeServing
+
+  init?(label: String) {
+    let normalized = label.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+    if normalized.contains("day ahead") || normalized.contains("days ahead") {
+      self = .daysAhead
+    } else if normalized.contains("night before") {
+      self = .nightBefore
+    } else if normalized.contains("morning of") {
+      self = .morningOf
+    } else if normalized.contains("day of") {
+      self = .dayOf
+    } else if normalized.contains("just before serving") {
+      self = .justBeforeServing
+    } else {
+      return nil
+    }
+  }
+
+  static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.rawValue < rhs.rawValue
   }
 }
 

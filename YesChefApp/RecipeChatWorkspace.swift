@@ -275,7 +275,11 @@ struct RecipeChatPanel: View {
           LazyVStack(alignment: .leading, spacing: 12) {
             ChatContextHeader(chatModel: chatModel)
             ForEach(chatModel.messages) { message in
-              ChatMessageBubble(message: message, selection: assistantSelection)
+              ChatMessageBubble(
+                message: message,
+                selection: assistantSelection,
+                seedSummary: chatModel.seedSummary(for: message.id)
+              )
                 .id(message.id)
             }
           }
@@ -653,6 +657,7 @@ struct RecipeChatPanel: View {
 private struct ChatMessageBubble: View {
   let message: RecipeChatMessage
   let selection: ChatAssistantSelection
+  let seedSummary: String?
 
   var body: some View {
     HStack {
@@ -675,7 +680,11 @@ private struct ChatMessageBubble: View {
   private var bubbleContent: some View {
     switch message.role {
     case .user:
-      Text(LocalizedStringKey(message.text))
+      if let seedSummary {
+        Text(seedSummary)
+      } else {
+        Text(LocalizedStringKey(message.text))
+      }
     case .assistant:
       SelectableAssistantText(text: message.text, selection: selection)
         .frame(maxWidth: .infinity, alignment: .leading)
