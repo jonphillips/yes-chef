@@ -15,6 +15,13 @@ capture engine (ADR-0007) and the authenticated-capture posture (ADR-0009). Gove
 LLM-vs-determinism surface boundary ([[llm-vs-determinism-surface-boundary]]) and
 [[llm-curation-not-synthesis]].
 
+**Scoping session held 2026-07-25 — all six open questions are resolved and the slice plan is ratified; see
+[Amendment 1](#amendment-1--the-scoping-pass-gated-capture-moves-into-the-in-app-browser-and-the-extract-becomes-synced-content-2026-07-25).**
+Two of the six resolutions **revise** the recommendations below rather than adopt them: the gated-fetch
+mechanism is now **in-app browser capture** (not paste-in — OQ5), and the reduced extract now **syncs** as
+workbench content (not device-local — OQ2). The original Decision and open-question text stand as the
+historical record; the amendment layers the resolutions on top.
+
 ## Context
 
 Workbench chat context (`WorkbenchChatContext`) is a **static serialization** of already-stored data:
@@ -139,3 +146,89 @@ me a page about X"), but it is **not** the mechanism and is **not** mirrored int
   [[llm-curation-not-synthesis]] (reduce = grounded extraction, never flatten),
   [[personal-app-latency-tolerance]] (seconds-on-add is fine), [[reasoning-budget-starves-output]]
   (budget both if the reducer is an LLM call), [[lean-verification-default]].
+
+## Amendment 1 — the scoping pass: gated capture moves into the in-app browser, and the extract becomes synced content (2026-07-25)
+
+The design session ratified in one pass. Four open questions adopt their existing recommendation; **two revise
+it** (OQ5, OQ2), and the revision to OQ5 is what forces the revision to OQ2 — they are one decision with a
+ripple, not two.
+
+### OQ5 (resolved, revises the Decision) — the gated path is the in-app browser, not paste-in
+
+The ratified Decision made **pasted text** the gating fallback. That is now demoted. The mechanism the
+programmatic `fetchHTML` cannot reach — an authenticated, data-gated page ([[paywall-gating-taxonomy]]) — is
+better served by **routing the cook through our in-app browser** (the WebView already behind recipe capture,
+ADR-0009 posture) and offering **"Capture to Workbench"** on the rendered page. The WebView holds the login, so
+the capture is **authenticated by construction** — the same fidelity path recipe capture already trusts, with
+no lossy select-all/copy/paste. Acquisition is therefore **layered by gating**, not a single primitive:
+
+- **Public page → URL paste → programmatic `fetchHTML` → reduce.** The Decision's fast path, unchanged. Low
+  friction; NYT-pixel-style gating parses clean here.
+- **Gated page → in-app browser capture.** Replaces paste-in as the primary gated path. Milk-Street-style
+  server-gated data needs the authenticated DOM, which only the WebView produces.
+- **Paste-in survives only as a last-resort escape hatch** for the rare page even our WebView will not render.
+
+**This dissolves OQ5's hard part.** The question was "how aggressively to detect a login wall and route to
+paste-in vs. show the thin result" — a heuristic that gets edge cases wrong. It collapses to: **a thin/failed
+programmatic fetch offers "Open in browser to capture."** The cook's presence in the authenticated WebView is
+the signal; there is no wall-classifier to tune. Trust boundary is unchanged — captured DOM is still **untrusted
+reference data, never instructions** (the system prompt frames it as data, per Consequences).
+
+**One accepted cost:** browser capture is interactive and one page at a time — no background/batch fetch of many
+URLs. Fine for the workbench's deliberate, low-volume "compare these against this writeup" use; named so it is a
+chosen trade, not a surprise.
+
+### OQ2 (resolved, revises the lean) — the reduced extract syncs; only raw HTML stays transient
+
+The Decision leaned **device-local** for the cached extract, by analogy to the Compare alignment cache. That
+analogy **breaks under OQ5**: the Compare cache is device-local because it is *recomputable* from synced data. A
+browser-captured, authenticated, gated-page extract is **not recomputable on a second device** — device B
+cannot re-fetch (login wall) and browser capture is interactive. A device-local extract would make the
+reference **useless on the other device**, which holds only a bare URL it cannot resolve. So the extract crosses
+from *cache* to *captured content* and **syncs as workbench content.** Three tiers:
+
+- **Reference entry** (URL / label / kind / provenance) — **synced**.
+- **Reduced readable extract** (the text injected into context) — **synced** (the revision). Small,
+  budget-bounded; a synced BLOB is a CKAsset and sync-safe ([[sqlitedata-blob-cloudkit-asset]]), a new synced
+  table is cheap ([[synced-table-cost-calibration]]).
+- **Raw fetched/captured HTML** — **transient**, never persisted; only the reduced text survives.
+
+Consequence: `WorkbenchReference` is a **synced** record type — register it in `CloudSync` and add it to the
+standing prod-promotion list. A typed table, not a notes dump ([[decompose-notes-into-typed-homes]]).
+
+### OQ1, OQ3, OQ4, OQ6 (resolved, adopt the recommendation — with one sharpening)
+
+- **OQ1 — deterministic reduce first, but generic-readability, not the recipe parser.** Reference pages are
+  arbitrary (a technique writeup, a food-science post), so the reducer is a **generic readability extraction**
+  (strip nav/footer/scripts → main/article prose), not the recipe-schema editorial-prose parser, which assumes
+  recipe-page structure. Grounded extraction, never synthesis ([[llm-curation-not-synthesis]]). The **LLM
+  reduce pass stays parked**; when it ships it is the **first LLM call through [ADR-0043](ADR-0043-model-call-chokepoint.md)'s
+  provenance chokepoint carrying a genuinely new context layer — the harder second load test** the chokepoint
+  arc was sequenced around (ADR-0043 D5). Budget thinking + output when it does ([[reasoning-budget-starves-output]]).
+- **OQ3 — trim reference material out first under the on-device 9k budget.** Adopted; it is supplementary to
+  the candidates. ADR-0042 is the relief valve: reference-heavy deliberation **outboards** to a frontier chat
+  where the full extract rides in the handoff payload, so the on-device squeeze rarely reaches the case that
+  needs references.
+- **OQ4 — explicit list first; candidate-source prose parked.** Adopted. The parked follow-on inherits the same
+  gating layering (a candidate whose source is gated needs browser capture, not `fetchHTML`).
+- **OQ6 — park `web_search` public discovery.** Adopted firmly: it is Anthropic-only and un-mirrorable to
+  OpenAI/on-device, so it breaks the provider-agnostic spine that is the whole point of doing the fetch
+  ourselves. Ship the deterministic path; add discovery only if dogfooding asks.
+
+### Slice plan — now ratified, with the amendment folded in
+
+- **S1 — reference-entry model + reduce/cache/store core (`YesChefCore`, no UI).** `WorkbenchReference`
+  (**synced**, entry + reduced extract) plus a core that accepts **either a URL to `fetchHTML` or already-captured
+  content** and runs both through **one** generic-readability reduce → store. Unit-tested with a stubbed fetch
+  client and fixture HTML → asserted reduced text. No network in CI.
+- **S2 — inject into chat context.** Unchanged: extend `WorkbenchChatContext` to serialize reference material
+  behind the frontier budget, deduped against candidates, trimmed-first on-device. Because the extract is now
+  durable synced content, the **same reference layer also composes into the ADR-0042 outboard handoff payload**,
+  not only the onboard chat — one source, both surfaces.
+- **S3 — list UI + in-app browser capture.** The meat of the amendment: add/edit/remove reference entries; the
+  URL fast path; **"Open in browser → Capture to Workbench"** as the gated path; paste-in as last-resort;
+  refresh. Device pass on iPad + iPhone ([[lean-verification-default]]).
+- **Later (parked)** — LLM reduce pass (ADR-0043 load test), candidate-source prose, `web_search` discovery.
+
+**Dispatch status:** ratified ≠ was; **scoped now** — S1 is dispatchable off this amendment. Sequence S1 → S2 →
+S3; S1+S2 are package-verifiable, S3 needs the device pass.
