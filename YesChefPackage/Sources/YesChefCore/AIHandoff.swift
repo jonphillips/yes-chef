@@ -874,9 +874,9 @@ public enum AIHandoffReturn {
     proposedPlan: MenuPrepPlan,
     currentPlan: MenuPrepPlan
   ) -> [String] {
-    var proposedByKey = Dictionary(grouping: proposedPlan.steps) { PrepPlanStepMergeKey($0) }
+    var proposedByKey = Dictionary(grouping: proposedPlan.steps) { PrepPlanStepVisibleContent($0) }
     return currentPlan.steps.compactMap { step in
-      let key = PrepPlanStepMergeKey(step)
+      let key = PrepPlanStepVisibleContent(step)
       var candidates = proposedByKey[key] ?? []
       guard !candidates.isEmpty else {
         let serves = step.serves.map { " → \($0)" } ?? ""
@@ -885,6 +885,26 @@ public enum AIHandoffReturn {
       candidates.removeFirst()
       proposedByKey[key] = candidates
       return nil
+    }
+  }
+
+  public static func droppedSourceDishEvidence(
+    proposedPlan: MenuPrepPlan,
+    currentPlan: MenuPrepPlan
+  ) -> [String] {
+    var proposedByContent = Dictionary(grouping: proposedPlan.steps) { PrepPlanStepVisibleContent($0) }
+    return currentPlan.steps.compactMap { step in
+      guard step.sourceDish != nil else { return nil }
+
+      let content = PrepPlanStepVisibleContent(step)
+      var candidates = proposedByContent[content] ?? []
+      guard let proposedStep = candidates.first else { return nil }
+      candidates.removeFirst()
+      proposedByContent[content] = candidates
+      guard proposedStep.sourceDish == nil else { return nil }
+
+      let serves = step.serves.map { " → \($0)" } ?? ""
+      return "Kept the step but dropped its recipe link (pasted plans can't carry links): \(step.session): \(step.task)\(serves)"
     }
   }
 

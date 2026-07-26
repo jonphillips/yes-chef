@@ -126,7 +126,7 @@ struct AIHandoffMenuPasteTests {
       #expect(
         try database.read { db in
           try PrepPlanStepRepository.steps(for: menuID, in: db).map(PrepPlanStep.init)
-        } == [PrepPlanStep(session: "Saturday", task: "Soak the beans", sourceDish: dishID)]
+        } == [PrepPlanStep(session: "Saturday", task: "Soak the beans")]
       )
     }
   }

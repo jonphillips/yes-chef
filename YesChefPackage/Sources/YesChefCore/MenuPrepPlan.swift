@@ -476,11 +476,11 @@ public enum PrepPlanStepRepository {
     uuid: () -> UUID
   ) throws {
     var existingByContents = Dictionary(grouping: try steps(for: menuID, in: db)) { step in
-      PrepPlanStepMergeKey(step)
+      Contents(step)
     }
     var survivors: [PrepPlanStepRecord] = []
     for (sortOrder, draft) in drafts.enumerated() {
-      let contents = PrepPlanStepMergeKey(draft)
+      let contents = Contents(draft)
       var candidates = existingByContents[contents] ?? []
       let existing = candidates.isEmpty ? nil : candidates.removeFirst()
       existingByContents[contents] = candidates
@@ -492,7 +492,7 @@ public enum PrepPlanStepRepository {
           session: draft.session,
           task: draft.task,
           serves: draft.serves,
-          sourceDish: draft.sourceDish ?? existing?.sourceDish
+          sourceDish: draft.sourceDish
         )
       )
     }
@@ -529,9 +529,44 @@ public enum PrepPlanStepRepository {
       try PrepPlanStepRecord.find(step.id).update { $0.sortOrder = #bind(sortOrder) }.execute(db)
     }
   }
+
+  private struct Contents: Hashable {
+    let session: String
+    let task: String
+    let serves: String?
+    let sourceDish: MenuItem.ID?
+
+    init(_ step: PrepPlanStep) {
+      self.init(
+        session: step.session,
+        task: step.task,
+        serves: step.serves,
+        sourceDish: step.sourceDish
+      )
+    }
+
+    init(_ step: PrepPlanStepRecord) {
+      self.init(
+        session: step.session,
+        task: step.task,
+        serves: step.serves,
+        sourceDish: step.sourceDish
+      )
+    }
+
+    private init(session: String, task: String, serves: String?, sourceDish: MenuItem.ID?) {
+      self.session = session
+      self.task = task
+      self.serves = serves
+      self.sourceDish = sourceDish
+    }
+  }
 }
 
-struct PrepPlanStepMergeKey: Hashable {
+// ADR-0040 D3: row identity asks "is this the same row?" and includes `sourceDish`. This advisory
+// comparison asks "did a human-visible step disappear?" and deliberately ignores it, so parsed text
+// never re-derives hidden identity from matching prose.
+struct PrepPlanStepVisibleContent: Hashable {
   let session: String
   let task: String
   let serves: String?

@@ -14,9 +14,8 @@ extension RecipeCoreTests {
       let menuID = SampleUUIDSequence.uuid(15_250)
       let dayOneStepID = SampleUUIDSequence.uuid(15_251)
       let dayTwoStepID = SampleUUIDSequence.uuid(15_252)
-      let dayOneDishID = SampleUUIDSequence.uuid(15_253)
-      let dayTwoDishID = SampleUUIDSequence.uuid(15_254)
-      let replacementDishID = SampleUUIDSequence.uuid(15_255)
+      let replacementDishID = SampleUUIDSequence.uuid(15_253)
+      let jsonStepID = SampleUUIDSequence.uuid(15_254)
 
       try database.write { db in
         try Menu.insert {
@@ -26,8 +25,8 @@ extension RecipeCoreTests {
         var initialIDs = [dayOneStepID, dayTwoStepID].makeIterator()
         try MenuRepository.applyPrepPlan(
           MenuPrepPlan(steps: [
-            PrepPlanStep(session: "Friday", task: "Salt the pizza dough", sourceDish: dayOneDishID),
-            PrepPlanStep(session: "Saturday", task: "Soak the beans", sourceDish: dayTwoDishID),
+            PrepPlanStep(session: "Friday", task: "Salt the pizza dough"),
+            PrepPlanStep(session: "Saturday", task: "Soak the beans"),
           ]),
           to: menuID,
           in: db,
@@ -51,7 +50,7 @@ extension RecipeCoreTests {
           to: menuID,
           in: db,
           now: now.addingTimeInterval(60),
-          uuid: { SampleUUIDSequence.uuid(15_256) }
+          uuid: { SampleUUIDSequence.uuid(15_255) }
         )
 
         expectNoDifference(
@@ -59,11 +58,11 @@ extension RecipeCoreTests {
           [
             PrepPlanStepRecord(
               id: dayOneStepID, menuID: menuID, sortOrder: 0,
-              session: "Friday", task: "Salt the pizza dough", sourceDish: dayOneDishID
+              session: "Friday", task: "Salt the pizza dough"
             ),
             PrepPlanStepRecord(
               id: dayTwoStepID, menuID: menuID, sortOrder: 1,
-              session: "Saturday", task: "Soak the beans", sourceDish: dayTwoDishID
+              session: "Saturday", task: "Soak the beans"
             ),
           ]
         )
@@ -78,13 +77,13 @@ extension RecipeCoreTests {
           to: menuID,
           in: db,
           now: now.addingTimeInterval(120),
-          uuid: { SampleUUIDSequence.uuid(15_257) }
+          uuid: { jsonStepID }
         )
         expectNoDifference(
           try PrepPlanStepRepository.steps(for: menuID, in: db),
           [
             PrepPlanStepRecord(
-              id: dayOneStepID, menuID: menuID, sortOrder: 0,
+              id: jsonStepID, menuID: menuID, sortOrder: 0,
               session: "Friday", task: "Salt the pizza dough", sourceDish: replacementDishID
             ),
           ]
@@ -94,7 +93,7 @@ extension RecipeCoreTests {
       try database.read { db in
         expectNoDifference(
           try PrepPlanStepRepository.steps(for: menuID, in: db).map(\.id),
-          [dayOneStepID]
+          [jsonStepID]
         )
       }
     }

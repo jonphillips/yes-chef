@@ -118,6 +118,9 @@ private enum AIHandoffReviewStager {
       let advisoryNotes = AIHandoffReturn.omittedCurrentPrepStepEvidence(
         proposedPlan: returned.plan,
         currentPlan: currentPlan
+      ) + AIHandoffReturn.droppedSourceDishEvidence(
+        proposedPlan: returned.plan,
+        currentPlan: currentPlan
       )
       guard !returned.plan.steps.isEmpty || !returned.learnings.isEmpty else {
         throw AIHandoffIntentImportError.emptyPlan

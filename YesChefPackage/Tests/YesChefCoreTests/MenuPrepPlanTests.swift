@@ -534,11 +534,12 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func textImportPreservesSourceDishLinksAndIDsForMatchedSteps() throws {
+    func textImportReplacesSourceDishLinksInsteadOfMatchingThemByTaskText() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 805_600_000)
       let menuID = SampleUUIDSequence.uuid(15_400)
       let linkedStepID = SampleUUIDSequence.uuid(15_401)
+      let textImportStepID = SampleUUIDSequence.uuid(15_402)
       let sourceDishID = SampleUUIDSequence.uuid(15_403)
 
       try database.write { db in
@@ -572,7 +573,7 @@ extension RecipeCoreTests {
           to: menuID,
           in: db,
           now: now,
-          uuid: { SampleUUIDSequence.uuid(15_402) }
+          uuid: { textImportStepID }
         )
       }
 
@@ -581,12 +582,11 @@ extension RecipeCoreTests {
           try PrepPlanStepRepository.steps(for: menuID, in: db),
           [
             PrepPlanStepRecord(
-              id: linkedStepID,
+              id: textImportStepID,
               menuID: menuID,
               sortOrder: 0,
               session: "The day before",
-              task: "Salt the chicken",
-              sourceDish: sourceDishID
+              task: "Salt the chicken"
             )
           ]
         )
