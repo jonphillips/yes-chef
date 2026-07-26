@@ -476,11 +476,11 @@ public enum PrepPlanStepRepository {
     uuid: () -> UUID
   ) throws {
     var existingByContents = Dictionary(grouping: try steps(for: menuID, in: db)) { step in
-      Contents(step)
+      PrepPlanStepMergeKey(step)
     }
     var survivors: [PrepPlanStepRecord] = []
     for (sortOrder, draft) in drafts.enumerated() {
-      let contents = Contents(draft)
+      let contents = PrepPlanStepMergeKey(draft)
       var candidates = existingByContents[contents] ?? []
       let existing = candidates.isEmpty ? nil : candidates.removeFirst()
       existingByContents[contents] = candidates
@@ -492,7 +492,7 @@ public enum PrepPlanStepRepository {
           session: draft.session,
           task: draft.task,
           serves: draft.serves,
-          sourceDish: draft.sourceDish
+          sourceDish: draft.sourceDish ?? existing?.sourceDish
         )
       )
     }
@@ -516,28 +516,6 @@ public enum PrepPlanStepRepository {
     }
   }
 
-  private struct Contents: Hashable {
-    let session: String
-    let task: String
-    let serves: String?
-    let sourceDish: MenuItem.ID?
-
-    init(session: String, task: String, serves: String?, sourceDish: MenuItem.ID?) {
-      self.session = session
-      self.task = task
-      self.serves = serves
-      self.sourceDish = sourceDish
-    }
-
-    init(_ step: PrepPlanStep) {
-      self.init(session: step.session, task: step.task, serves: step.serves, sourceDish: step.sourceDish)
-    }
-
-    init(_ step: PrepPlanStepRecord) {
-      self.init(session: step.session, task: step.task, serves: step.serves, sourceDish: step.sourceDish)
-    }
-  }
-
   private static func nextSortOrder(for menuID: Menu.ID, in db: Database) throws -> Int {
     (try steps(for: menuID, in: db).map(\.sortOrder).max() ?? -1) + 1
   }
@@ -550,6 +528,26 @@ public enum PrepPlanStepRepository {
     for (sortOrder, step) in steps.enumerated() where step.sortOrder != sortOrder {
       try PrepPlanStepRecord.find(step.id).update { $0.sortOrder = #bind(sortOrder) }.execute(db)
     }
+  }
+}
+
+struct PrepPlanStepMergeKey: Hashable {
+  let session: String
+  let task: String
+  let serves: String?
+
+  init(_ step: PrepPlanStep) {
+    self.init(session: step.session, task: step.task, serves: step.serves)
+  }
+
+  init(_ step: PrepPlanStepRecord) {
+    self.init(session: step.session, task: step.task, serves: step.serves)
+  }
+
+  private init(session: String, task: String, serves: String?) {
+    self.session = session
+    self.task = task
+    self.serves = serves
   }
 }
 

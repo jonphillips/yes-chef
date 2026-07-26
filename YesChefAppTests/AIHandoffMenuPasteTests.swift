@@ -73,4 +73,61 @@ struct AIHandoffMenuPasteTests {
       )
     }
   }
+
+  @Test
+  func advisoryNotesStayOutOfEditablePrepTextAndDoNotBlockSaving() async throws {
+    let menuID = UUID(uuidString: "00000000-0000-0000-0000-000000003803")!
+    let handoffID = UUID(uuidString: "00000000-0000-0000-0000-000000003804")!
+    let stepID = UUID(uuidString: "00000000-0000-0000-0000-000000003805")!
+    let dishID = UUID(uuidString: "00000000-0000-0000-0000-000000003806")!
+    let now = Date(timeIntervalSinceReferenceDate: 840_100_000)
+    let advisory = "Existing prep step missing from returned plan: Friday: Salt the chicken"
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+      $0.uuid = .incrementing
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try database.write { db in
+        try Menu.insert {
+          Menu(id: menuID, title: "Beach Menu", dayCount: 2, dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+        try PrepPlanStepRecord.insert {
+          PrepPlanStepRecord(
+            id: stepID,
+            menuID: menuID,
+            sortOrder: 0,
+            session: "Saturday",
+            task: "Soak the beans",
+            sourceDish: dishID
+          )
+        }
+        .execute(db)
+      }
+
+      let review = AIHandoffMenuPrepPlanReview(
+        handoffID: handoffID,
+        menuID: menuID,
+        plan: MenuPrepPlan(
+          steps: [PrepPlanStep(session: "Saturday", task: "Soak the beans", sourceDish: dishID)]
+        ),
+        learnings: [],
+        advisoryNotes: [advisory]
+      )
+      let item = try #require(HandoffReviewCoordinator().reviewItems(for: .menuPrepPlan(review)).first)
+      let editableText = try #require(item.editableText)
+
+      #expect(!editableText.contains(advisory))
+      #expect(item.supportingEvidenceTitle == "Review omitted steps before saving")
+      #expect(item.supportingEvidenceRows == [advisory])
+      try await item.commit(editableText, usingSecondaryCommit: false)
+      #expect(
+        try database.read { db in
+          try PrepPlanStepRepository.steps(for: menuID, in: db).map(PrepPlanStep.init)
+        } == [PrepPlanStep(session: "Saturday", task: "Soak the beans", sourceDish: dishID)]
+      )
+    }
+  }
 }

@@ -614,19 +614,22 @@ public struct AIHandoffMenuPrepPlanReview: Equatable, Sendable {
   public let plan: MenuPrepPlan
   public let learnings: [String]
   public let unparsedPlanLines: [String]
+  public let advisoryNotes: [String]
 
   public init(
     handoffID: AIHandoff.ID,
     menuID: Menu.ID,
     plan: MenuPrepPlan,
     learnings: [String],
-    unparsedPlanLines: [String] = []
+    unparsedPlanLines: [String] = [],
+    advisoryNotes: [String] = []
   ) {
     self.handoffID = handoffID
     self.menuID = menuID
     self.plan = plan
     self.learnings = learnings
     self.unparsedPlanLines = unparsedPlanLines
+    self.advisoryNotes = advisoryNotes
   }
 }
 
@@ -871,12 +874,17 @@ public enum AIHandoffReturn {
     proposedPlan: MenuPrepPlan,
     currentPlan: MenuPrepPlan
   ) -> [String] {
-    currentPlan.steps.filter { currentStep in
-      !proposedPlan.steps.contains(currentStep)
-    }
-    .map { step in
-      let serves = step.serves.map { " → \($0)" } ?? ""
-      return "Existing prep step missing from returned plan: \(step.session): \(step.task)\(serves)"
+    var proposedByKey = Dictionary(grouping: proposedPlan.steps) { PrepPlanStepMergeKey($0) }
+    return currentPlan.steps.compactMap { step in
+      let key = PrepPlanStepMergeKey(step)
+      var candidates = proposedByKey[key] ?? []
+      guard !candidates.isEmpty else {
+        let serves = step.serves.map { " → \($0)" } ?? ""
+        return "Existing prep step missing from returned plan: \(step.session): \(step.task)\(serves)"
+      }
+      candidates.removeFirst()
+      proposedByKey[key] = candidates
+      return nil
     }
   }
 

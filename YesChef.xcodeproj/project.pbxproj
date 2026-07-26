@@ -60,6 +60,7 @@
 		6588EBC345BB11E65929F52F /* MenuPlaybookColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A1F368F34241CAF035C9CA /* MenuPlaybookColumnView.swift */; };
 		68A79CAF1B3EDB56758F1CC1 /* MealCalendarHandoffSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EEED601CE748216744F3637 /* MealCalendarHandoffSource.swift */; };
 		69B8E2AD921E41D8B38D14C7 /* YesChefShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 396029D84F6F6E49A17C47D2 /* YesChefShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		6B55B2CE20BB6B0E56896F50 /* HandoffReviewCoordinator+PrepPlanEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7765C9B42DCEFA4EAC3ED301 /* HandoffReviewCoordinator+PrepPlanEvidence.swift */; };
 		6BB951B199059B6F99196B26 /* AISettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64ABAAA0A5F20303F4C50314 /* AISettingsView.swift */; };
 		6E4C21A5E580147F1C8A1B94 /* AppExternalDatabaseChangeReload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D2AA2B9A5B2A2F4EFDE5A0C /* AppExternalDatabaseChangeReload.swift */; };
 		6EA932A0C074C0342AFD01E4 /* HandoffComplementReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB8E39BFB7BEB3E6A0DA515 /* HandoffComplementReview.swift */; };
@@ -190,6 +191,7 @@
 		76A768628F1345FDF66EDC49 /* MealCalendarViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCalendarViews.swift; sourceTree = "<group>"; };
 		76C7E4899A1093E58F713C2F /* OriginalSnapshotView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OriginalSnapshotView.swift; sourceTree = "<group>"; };
 		771C2C4368450EDD66EC5E77 /* LLMClientKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = LLMClientKit; path = "../../jon-platform/packages/LLMClientKit"; sourceTree = SOURCE_ROOT; };
+		7765C9B42DCEFA4EAC3ED301 /* HandoffReviewCoordinator+PrepPlanEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HandoffReviewCoordinator+PrepPlanEvidence.swift"; sourceTree = "<group>"; };
 		7871BB8EDB397A338B979FCD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		792C0EBCFF5BA678E266946D /* AIHandoffMenuPasteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIHandoffMenuPasteTests.swift; sourceTree = "<group>"; };
 		7B573934FCB2C87190085B3E /* RecipeDetailModel+Adjustment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecipeDetailModel+Adjustment.swift"; sourceTree = "<group>"; };
@@ -381,6 +383,7 @@
 				8CB8E39BFB7BEB3E6A0DA515 /* HandoffComplementReview.swift */,
 				0424EE313AB25F0AD46E963E /* HandoffInAppTransport.swift */,
 				BF6D7AE0E516607E7C801612 /* HandoffReviewCoordinator.swift */,
+				7765C9B42DCEFA4EAC3ED301 /* HandoffReviewCoordinator+PrepPlanEvidence.swift */,
 				18FECD94C6F2E120A02EE0A6 /* IdleTimerDisabledModifier.swift */,
 				7ED8C4BF9300184ABE4E59A5 /* Info.plist */,
 				F50F87C9475E4E92D549DA40 /* MealCalendarDayHeader.swift */,
@@ -640,6 +643,7 @@
 				A988E3254E3FCB7C8001B787 /* HandoffEntities.swift in Sources */,
 				A649C9165C7E76B9D2868241 /* HandoffInAppTransport.swift in Sources */,
 				3B43FC000CAA77FE2FCBAD93 /* HandoffIntents.swift in Sources */,
+				6B55B2CE20BB6B0E56896F50 /* HandoffReviewCoordinator+PrepPlanEvidence.swift in Sources */,
 				2F07342A5ED8AB64EFA742F1 /* HandoffReviewCoordinator.swift in Sources */,
 				26A54D34845DADD8C9E1493D /* IdleTimerDisabledModifier.swift in Sources */,
 				0428A2992F17EBEB4BF5644F /* MealCalendarDayHeader.swift in Sources */,

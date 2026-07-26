@@ -114,8 +114,8 @@ private enum AIHandoffReviewStager {
     case .prepPlan, .learning:
       let steps = try PrepPlanStepRepository.steps(for: menu.id, in: db)
       let currentPlan = MenuPrepPlan(steps: steps.map(PrepPlanStep.init))
-      var returned = AIHandoffReturn.menuPrepPlan(from: payload, currentPlan: currentPlan)
-      returned.unparsedLines += AIHandoffReturn.omittedCurrentPrepStepEvidence(
+      let returned = AIHandoffReturn.menuPrepPlan(from: payload, currentPlan: currentPlan)
+      let advisoryNotes = AIHandoffReturn.omittedCurrentPrepStepEvidence(
         proposedPlan: returned.plan,
         currentPlan: currentPlan
       )
@@ -124,7 +124,8 @@ private enum AIHandoffReviewStager {
       }
       return .menuPrepPlan(AIHandoffMenuPrepPlanReview(
         handoffID: handoff.id, menuID: menu.id, plan: returned.plan,
-        learnings: returned.learnings, unparsedPlanLines: returned.unparsedLines
+        learnings: returned.learnings, unparsedPlanLines: returned.unparsedLines,
+        advisoryNotes: advisoryNotes
       ))
     case .menuComplement:
       let returned = AIHandoffReturn.menuComplement(from: payload, dayCount: menu.dayCount)
