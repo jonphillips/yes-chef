@@ -1,8 +1,12 @@
 # Effort: Dogfood ferry pass — 2026-07-25 (expand control, hand-off regrouping, workbench lifecycle)
 
-**Status:** **Dispatches 1 and 1.5 have shipped** — 1 (commit `12a6612`, 2026-07-25), 1.5 (PRs
-[#234](https://github.com/jonphillips/yes-chef/pull/234) + [#235](https://github.com/jonphillips/yes-chef/pull/235),
-2026-07-26) → [`DONE-LOG`](../DONE-LOG.md). **Dispatch 2 is next**, then 3, one PR each.
+**Status: ✅ COMPLETE, 2026-07-26 — all four dispatches shipped, effort closed.** 1 (commit `12a6612`,
+2026-07-25), 1.5 (PRs [#234](https://github.com/jonphillips/yes-chef/pull/234) +
+[#235](https://github.com/jonphillips/yes-chef/pull/235)), 2 (PR [#237](https://github.com/jonphillips/yes-chef/pull/237)),
+3 (PR [#238](https://github.com/jonphillips/yes-chef/pull/238)) — all 2026-07-26 → [`DONE-LOG`](../DONE-LOG.md),
+which carries what each one actually taught. **This doc is now history: do not dispatch from it.** Dispatch 3
+left a small polish bundle behind that rides the *next* slice, not this effort — see
+[`CURRENT_HANDOFF`](../CURRENT_HANDOFF.md) § Next Up.
 **Summary:** Jon's 2026-07-25 ferry pass over Menu, Recipe, Calendar and Workbench. One shared full-screen
 expand control replaces four drifted copies; the Menu grows the Recipe's pinned-Ask onboard treatment;
 the embedded chat panel stops dumping its chrome into the host toolbar and learns to close itself;
