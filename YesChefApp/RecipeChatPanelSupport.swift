@@ -62,43 +62,57 @@ enum OnboardChatFinalizer {
 struct ChatContextHeader: View {
   let chatModel: RecipeChatModel
 
+  @ViewBuilder
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Text(chatModel.context.seededContextDescription)
-        .font(.footnote)
-        .foregroundStyle(.secondary)
+    if !chatModel.messages.isEmpty {
+      VStack(alignment: .leading, spacing: 6) {
+        Text(chatModel.context.seededContextDescription)
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
 
 struct ChatEmptyState: View {
   let subject: String
+  let hasSectionMenu: Bool
+  let needsReplyForApply: Bool
+
+  private var description: Text? {
+    let clauses = [
+      hasSectionMenu ? "Or choose a section from Discuss to start a guided discussion." : nil,
+      needsReplyForApply ? "Apply actions need an assistant reply first." : nil,
+    ]
+    .compactMap { $0 }
+
+    guard !clauses.isEmpty else { return nil }
+    return Text(clauses.joined(separator: " "))
+  }
 
   var body: some View {
     ContentUnavailableView(
       "Ask anything about this \(subject)",
       systemImage: "sparkles",
-      description: Text("Or choose a section from Discuss to start a guided discussion.")
+      description: description
     )
     .frame(maxWidth: .infinity, minHeight: 220)
   }
 }
 
-struct ChatTierMenu: View {
+struct ChatTierOptions: View {
   let chatModel: RecipeChatModel
 
   var body: some View {
-    @Bindable var chatModel = chatModel
-
-    Menu {
+    Section {
       Button {
         chatModel.useFrontier = false
       } label: {
-        Label("On-device (private)", systemImage: "iphone")
-        if !chatModel.sendsToProvider {
-          Image(systemName: "checkmark")
-        }
+        Label(
+          "On-device (private)",
+          systemImage: chatModel.sendsToProvider ? "iphone" : "checkmark"
+        )
       }
 
       ForEach(FrontierProvider.allCases) { provider in
@@ -106,25 +120,23 @@ struct ChatTierMenu: View {
           chatModel.selectedProvider = provider
           chatModel.useFrontier = true
         } label: {
-          Label("\(provider.displayName) (sends data off device)", systemImage: "network")
-          if chatModel.sendsToProvider, chatModel.selectedProvider == provider {
-            Image(systemName: "checkmark")
-          }
+          Label(
+            "\(provider.displayName) (sends data off device)",
+            systemImage: chatModel.sendsToProvider && chatModel.selectedProvider == provider
+              ? "checkmark"
+              : "network"
+          )
         }
         .disabled(!chatModel.availableProviders.contains(provider))
       }
-    } label: {
-      HStack(spacing: 4) {
-        Image(systemName: chatModel.sendsToProvider ? "network" : "iphone")
-          .foregroundStyle(chatModel.sendsToProvider ? .blue : .green)
-        Text(chatModel.sendsToProvider ? chatModel.selectedProvider.displayName : "On-device")
-          .font(.subheadline)
-        Image(systemName: "chevron.up.chevron.down")
-          .font(.caption2)
-          .foregroundStyle(.secondary)
-      }
+    } header: {
+      Text(activeTierTitle)
     }
-    .accessibilityHint(Text("Choose whether recipe context stays on device or is sent to a configured provider."))
+  }
+
+  private var activeTierTitle: String {
+    let providerName = chatModel.sendsToProvider ? chatModel.selectedProvider.displayName : "On-device"
+    return "Model · \(providerName)"
   }
 }
 

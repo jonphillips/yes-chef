@@ -168,6 +168,12 @@ extension RecipeCoreTests {
 
         let records = await callRecords.records()
         #expect(records[1].tierResolution == .degradedToOnDevice)
+        expectNoDifference(model.messages.last?.resolvedTier, .onDevice)
+
+        let reloaded = RecipeChatModel(
+          context: .recipe(RecipeChatRecipeContext(recipeID: recipeID, title: "Tomato Sauce"))
+        )
+        expectNoDifference(reloaded.messages.last?.resolvedTier, .onDevice)
       }
     }
 

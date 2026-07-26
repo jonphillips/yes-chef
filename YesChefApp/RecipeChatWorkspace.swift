@@ -268,13 +268,13 @@ struct RecipeChatPanel: View {
               .lineLimit(1)
           }
           Spacer(minLength: 8)
-          clearChatButton
-          ChatTierMenu(chatModel: chatModel)
+          chatOptionsMenu
           if let onDismiss {
             Button(action: onDismiss) {
               Image(systemName: "xmark.circle.fill")
             }
             .buttonStyle(.plain)
+            .padding(.leading, 8)
             .accessibilityLabel(Text("Close Ask"))
           }
         }
@@ -288,7 +288,11 @@ struct RecipeChatPanel: View {
           LazyVStack(alignment: .leading, spacing: 12) {
             ChatContextHeader(chatModel: chatModel)
             if chatModel.messages.isEmpty {
-              ChatEmptyState(subject: chatModel.context.subject)
+              ChatEmptyState(
+                subject: chatModel.context.subject,
+                hasSectionMenu: selectSection != nil,
+                needsReplyForApply: applyActionsNeedReply
+              )
             } else {
               ForEach(chatModel.messages) { message in
                 ChatMessageBubble(
@@ -371,12 +375,6 @@ struct RecipeChatPanel: View {
             || committingReviewItemID != nil
             || !visibleApplyActions.contains(where: canRun)
         )
-        if applyActionsNeedReply {
-          Text("Apply actions need an assistant reply first.")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-
         HStack(alignment: .bottom, spacing: 8) {
           TextField("Ask about this \(chatModel.context.subject)", text: $draft, axis: .vertical)
             .textFieldStyle(.roundedBorder)
@@ -428,10 +426,7 @@ struct RecipeChatPanel: View {
           }
         }
         ToolbarItem(placement: .topBarTrailing) {
-          clearChatButton
-        }
-        ToolbarItem(placement: .topBarTrailing) {
-          ChatTierMenu(chatModel: chatModel)
+          chatOptionsMenu
         }
       }
     }
@@ -673,14 +668,34 @@ struct RecipeChatPanel: View {
     return action.extractingTitle
   }
 
-  private var clearChatButton: some View {
-    Button {
-      confirmingClearChat = true
+  private var chatOptionsMenu: some View {
+    Menu {
+      Button(role: .destructive) {
+        confirmingClearChat = true
+      } label: {
+        Label("Clear Chat", systemImage: "trash")
+      }
+      .disabled(chatModel.messages.isEmpty || chatModel.isResponding)
+
+      Divider()
+
+      ChatTierOptions(chatModel: chatModel)
     } label: {
-      Image(systemName: "trash")
+      Image(systemName: "ellipsis")
+        .foregroundStyle(chatOptionsTint)
     }
-    .disabled(chatModel.messages.isEmpty || chatModel.isResponding)
-    .accessibilityLabel(Text("Clear Chat"))
+    .tint(chatOptionsTint)
+    .accessibilityLabel(Text("Chat options"))
+    .accessibilityValue(
+      Text(chatModel.sendsToProvider ? chatModel.selectedProvider.displayName : "On-device")
+    )
+    .accessibilityHint(
+      Text("Choose whether recipe context stays on device or is sent to a configured provider.")
+    )
+  }
+
+  private var chatOptionsTint: Color {
+    chatModel.sendsToProvider ? .blue : .green
   }
 
   private func clearChat() {
@@ -740,8 +755,15 @@ private struct ChatMessageBubble: View {
         Text(LocalizedStringKey(message.text))
       }
     case .assistant:
-      SelectableAssistantText(text: message.text, selection: selection)
-        .frame(maxWidth: .infinity, alignment: .leading)
+      VStack(alignment: .leading, spacing: 6) {
+        SelectableAssistantText(text: message.text, selection: selection)
+          .frame(maxWidth: .infinity, alignment: .leading)
+        if let resolvedTier = message.resolvedTier {
+          Text("Model · \(resolvedTier.displayName)")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+      }
     }
   }
 }

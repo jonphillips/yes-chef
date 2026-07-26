@@ -113,7 +113,7 @@ public enum RecipeChatContext: Equatable, Sendable {
     switch self {
     case let .mealPlan(context): context.seededContextDescription
     case let .menu(context): context.seededContextDescription
-    case .recipe: "Seeded with the recipe on screen."
+    case .recipe: "This conversation can use the recipe on screen."
     case let .workbench(context): context.seededContextDescription
     }
   }
@@ -550,23 +550,6 @@ public struct RecipeChatSection: Equatable, Sendable {
   }
 }
 
-public struct RecipeChatMessage: Identifiable, Sendable, Equatable {
-  public enum Role: String, Codable, QueryBindable, QueryDecodable, Sendable, Equatable {
-    case user
-    case assistant
-  }
-
-  public let id: UUID
-  public var role: Role
-  public var text: String
-
-  public init(id: UUID = UUID(), role: Role, text: String) {
-    self.id = id
-    self.role = role
-    self.text = text
-  }
-}
-
 @MainActor
 public struct ChatApplyAction<Payload: Sendable> {
   public var title: String
@@ -903,6 +886,7 @@ public final class RecipeChatModel: Identifiable {
     let requestMessages = history()
     let resolvedTier = resolvedActiveTier
     let tier = resolvedTier.tier
+    let assistantTier = RecipeChatMessageTier(resolvedTier: tier)
     if continuationToken?.provider != tier.frontierProvider {
       continuationToken = nil
     }
@@ -929,7 +913,8 @@ public final class RecipeChatModel: Identifiable {
         setAssistantText(
           id: assistantID,
           text: response.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? "(No response.)" : response.text
+            ? "(No response.)" : response.text,
+          resolvedTier: assistantTier
         )
       } else {
         let call = ModelCall(
@@ -951,6 +936,7 @@ public final class RecipeChatModel: Identifiable {
         if assistantText(id: assistantID).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
           setAssistantText(id: assistantID, text: "(No response.)")
         }
+        setAssistantResolvedTier(id: assistantID, resolvedTier: assistantTier)
       }
     } catch is CancellationError {
       removePlaceholderIfEmpty(id: assistantID)
@@ -970,6 +956,7 @@ public final class RecipeChatModel: Identifiable {
       You are a concise, practical cooking assistant inside a private recipe app.
       Discuss \(context.promptSubjectDescription), described below. \(taskFraming)
       You propose and explain; you never claim to have edited or saved anything yourself.
+      You never claim to be a particular model, product, company, or provider.
 
       Answer in short plain-prose paragraphs. Use inline Markdown links when useful.
       Do not use headings, tables, horizontal rules, or bold section labels; the panel is narrow.
@@ -1005,11 +992,26 @@ public final class RecipeChatModel: Identifiable {
     messages[index].text += text
   }
 
-  private func setAssistantText(id: RecipeChatMessage.ID, text: String) {
+  private func setAssistantText(
+    id: RecipeChatMessage.ID,
+    text: String,
+    resolvedTier: RecipeChatMessageTier? = nil
+  ) {
     guard
       let index = messages.firstIndex(where: { $0.id == id && $0.role == .assistant })
     else { return }
     messages[index].text = text
+    messages[index].resolvedTier = resolvedTier
+  }
+
+  private func setAssistantResolvedTier(
+    id: RecipeChatMessage.ID,
+    resolvedTier: RecipeChatMessageTier
+  ) {
+    guard
+      let index = messages.firstIndex(where: { $0.id == id && $0.role == .assistant })
+    else { return }
+    messages[index].resolvedTier = resolvedTier
   }
 
   private func removePlaceholderIfEmpty(id: RecipeChatMessage.ID) {

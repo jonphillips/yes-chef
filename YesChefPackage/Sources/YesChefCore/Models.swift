@@ -240,6 +240,7 @@ public struct ChatMessageRecord: Codable, Identifiable, Equatable, Sendable {
   public var subjectID: String
   public var role: RecipeChatMessage.Role
   public var text: String
+  public var resolvedTier: RecipeChatMessageTier?
   public var createdAt: Date
   public var sortOrder: Int
 
@@ -249,6 +250,7 @@ public struct ChatMessageRecord: Codable, Identifiable, Equatable, Sendable {
     subjectID: String,
     role: RecipeChatMessage.Role,
     text: String,
+    resolvedTier: RecipeChatMessageTier? = nil,
     createdAt: Date,
     sortOrder: Int
   ) {
@@ -257,6 +259,7 @@ public struct ChatMessageRecord: Codable, Identifiable, Equatable, Sendable {
     self.subjectID = subjectID
     self.role = role
     self.text = text
+    self.resolvedTier = resolvedTier
     self.createdAt = createdAt
     self.sortOrder = sortOrder
   }

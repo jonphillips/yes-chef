@@ -936,11 +936,14 @@ final class RecipeDetailModel {
     destination = .scaling
   }
 
-  /// Opens an unseeded recipe chat. Section-specific guidance is selected only from the open panel's
+  /// Toggles an unseeded recipe chat. Section-specific guidance is selected only from the open panel's
   /// Discuss menu, so a cook can begin with a free-form question (ADR-0045 Amd 3).
   func askButtonTapped() {
     guard let detail else { return }
-    if case .chat? = destination { return }
+    if case .chat? = destination {
+      destination = nil
+      return
+    }
     seededAskSection = nil
     destination = .chat(RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail))))
   }
