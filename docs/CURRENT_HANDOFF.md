@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 26, 2026 (**ADR-0045's V1+V2+V3 arc is complete and device-passed.** V2 — the Finalize button (PR [#229](https://github.com/jonphillips/yes-chef/pull/229)) — merged 2026-07-24 → [`DONE-LOG`](DONE-LOG.md), joining V1 (PR [#227](https://github.com/jonphillips/yes-chef/pull/227)) and S3 + V3 (PR [#228](https://github.com/jonphillips/yes-chef/pull/228) / `jon-platform` PR [#33](https://github.com/jonphillips/jon-platform/pull/33)). The architect review of #229 drove three tested in-PR fixes (failed-finalize staging, the RecipeEnrichment truncation sweep, a Finalize→action resolution test). **The dogfood cleanup batch shipped in PR [#230](https://github.com/jonphillips/yes-chef/pull/230)** (iPhone menu layout, deterministic make-ahead ordering + a settled timing vocabulary, in-memory seed chip; the architect review drove the vocabulary expansion + prompt-contract fix) → [`DONE-LOG`](DONE-LOG.md) on merge. **The `Menu.prepPlan` BLOB is retired** — PR [#231](https://github.com/jonphillips/yes-chef/pull/231) merged 2026-07-25 → [`DONE-LOG`](DONE-LOG.md): the `DROP COLUMN` migration landed, the 2026-07-14 historical migration was frozen to raw SQL so it no longer pins the live `Menu` struct, and the property is gone from `Menu`, so the dead CKAsset field never enters the prod schema. **The inbound-learnings parser floor is fixed** — PR [#232](https://github.com/jonphillips/yes-chef/pull/232) merged 2026-07-25 → [`DONE-LOG`](DONE-LOG.md): `learningBullets` now emits a loud `unparsedLines` remainder threaded into each caller's existing evidence/throw, so a naked-sentence learning can no longer vanish. **The 2026-07-25 dogfood ferry pass is now the live track and it reordered appetite.** [`efforts/dogfood-ferry-2026-07-25.md`](efforts/dogfood-ferry-2026-07-25.md) runs **1 → 1.5 → 2 → 3**, one PR each: **Dispatch 1 shipped** (PR [#233](https://github.com/jonphillips/yes-chef/pull/233) → [`DONE-LOG`](DONE-LOG.md)) and **Dispatch 1.5 is Next Up**, added 2026-07-26 from the architect review of Dispatch 1's device pass — the embedded chat panel was rendering modal chrome in a non-modal position, leaking its Clear/tier/`Done` into the host navigation bar on **both** the Recipe and the Menu, and the Calendar's chat turned out to be reachable as a column only in day mode. **[ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) S1 is demoted to Ready Efforts, unchanged and still dispatch-ready** — it lost the slot to appetite, not to a problem. **Landing ADR-0043 S3 fired [ADR-0044](decisions/ADR-0044-provenance-engine-to-llmclientkit.md)'s trigger** — a signal to write the provenance-engine-lift design, not to build it.) Completed-slice history and strategic background live in [`docs/DONE-LOG.md`](DONE-LOG.md).
+Last updated: July 26, 2026 (**ADR-0045's V1+V2+V3 arc is complete and device-passed.** V2 — the Finalize button (PR [#229](https://github.com/jonphillips/yes-chef/pull/229)) — merged 2026-07-24 → [`DONE-LOG`](DONE-LOG.md), joining V1 (PR [#227](https://github.com/jonphillips/yes-chef/pull/227)) and S3 + V3 (PR [#228](https://github.com/jonphillips/yes-chef/pull/228) / `jon-platform` PR [#33](https://github.com/jonphillips/jon-platform/pull/33)). The architect review of #229 drove three tested in-PR fixes (failed-finalize staging, the RecipeEnrichment truncation sweep, a Finalize→action resolution test). **The dogfood cleanup batch shipped in PR [#230](https://github.com/jonphillips/yes-chef/pull/230)** (iPhone menu layout, deterministic make-ahead ordering + a settled timing vocabulary, in-memory seed chip; the architect review drove the vocabulary expansion + prompt-contract fix) → [`DONE-LOG`](DONE-LOG.md) on merge. **The `Menu.prepPlan` BLOB is retired** — PR [#231](https://github.com/jonphillips/yes-chef/pull/231) merged 2026-07-25 → [`DONE-LOG`](DONE-LOG.md): the `DROP COLUMN` migration landed, the 2026-07-14 historical migration was frozen to raw SQL so it no longer pins the live `Menu` struct, and the property is gone from `Menu`, so the dead CKAsset field never enters the prod schema. **The inbound-learnings parser floor is fixed** — PR [#232](https://github.com/jonphillips/yes-chef/pull/232) merged 2026-07-25 → [`DONE-LOG`](DONE-LOG.md): `learningBullets` now emits a loud `unparsedLines` remainder threaded into each caller's existing evidence/throw, so a naked-sentence learning can no longer vanish. **The 2026-07-25 dogfood ferry pass is now the live track and it reordered appetite.** [`efforts/dogfood-ferry-2026-07-25.md`](efforts/dogfood-ferry-2026-07-25.md) runs **1 → 1.5 → 2 → 3**, one PR each: **Dispatches 1 and 1.5 have both shipped** (PR [#233](https://github.com/jonphillips/yes-chef/pull/233), then PRs [#234](https://github.com/jonphillips/yes-chef/pull/234) + [#235](https://github.com/jonphillips/yes-chef/pull/235) → [`DONE-LOG`](DONE-LOG.md)), and **Dispatch 2 is Next Up.** 1.5 stopped the embedded chat panel renting the host's navigation bar on the Recipe and the Menu, hoisted the Calendar's chat out of day-mode-only, made Ask a plain toggle, and settled the shared panel header to `Discuss ▾ · ⋯ · ✕`. Its device pass then caught two things worth remembering: the tier **checkmarks could never render** (a SwiftUI `Menu` gives a `Button` label one title and one image; the trailing `Image` was silently discarded, masked for months by the header chip that G5 retired), and a mid-thread provider switch produced a reply **claiming the previous provider** — routing was correct, but `history()` replays the transcript, so the new model continued the old one's persona. Assistant turns now carry the tier that produced them (`chatMessages.resolvedTier`), and **that table is local-only — nothing was added to the prod-promotion list.** **[ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) S1 is demoted to Ready Efforts, unchanged and still dispatch-ready** — it lost the slot to appetite, not to a problem. **Landing ADR-0043 S3 fired [ADR-0044](decisions/ADR-0044-provenance-engine-to-llmclientkit.md)'s trigger** — a signal to write the provenance-engine-lift design, not to build it.) Completed-slice history and strategic background live in [`docs/DONE-LOG.md`](DONE-LOG.md).
 
 
 
@@ -17,52 +17,46 @@ live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** re
 
 ## Next Up
 
-**ONE live dispatch target: [`efforts/dogfood-ferry-2026-07-25.md`](efforts/dogfood-ferry-2026-07-25.md) Dispatch 1.5 — the embedded chat panel owns its chrome, and the Calendar's chat is hoisted (view layer only; no Core, no schema).**
-Dispatch with *"Do the **Dogfood ferry Dispatch 1.5** effort in `docs/CURRENT_HANDOFF.md`."* If this section is
+**ONE live dispatch target: [`efforts/dogfood-ferry-2026-07-25.md`](efforts/dogfood-ferry-2026-07-25.md) Dispatch 2 — hand-off regrouping, scoped asks, and the vocabulary cleanup (view layer only; no Core, no schema).**
+Dispatch with *"Do the **Dogfood ferry Dispatch 2** effort in `docs/CURRENT_HANDOFF.md`."* If this section is
 empty or missing, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
 **The ferry effort is a live multi-dispatch track and the doc is its own dispatcher.** Sequence:
-**1 (shipped) → 1.5 (this) → 2 → 3.** Each dispatch is one PR and is spec'd in full in the effort doc — read
-the dispatch's own section there, not a summary here ([`AGENTS.md`](AGENTS.md) rule 4: the handoff points, it
-does not duplicate). **Dispatches 1.5 and 2 are view-layer-only and add no schema. Dispatch 3 does** — its
+**1 (shipped) → 1.5 (shipped) → 2 (this) → 3.** Each dispatch is one PR and is spec'd in full in the effort
+doc — read the dispatch's own section there, not a summary here ([`AGENTS.md`](AGENTS.md) rule 4: the handoff
+points, it does not duplicate). **Dispatch 2 is view-layer-only and adds no schema. Dispatch 3 does** — its
 Slice E2 adds `workbenches.dateCompleted` and **must** add it to the prod-promotion list below in that same PR
 ([[handoff-bump-rides-in-slice-pr]]); that obligation is the one thing this track cannot carry in the effort
 doc alone.
 
-**Dispatch 1.5's three slices, in order — G1 → G2 → G3.** G1 fixes the **Recipe** (the reference treatment):
-`showsEmbeddedHeader: true` on the inspector panel so its Clear/tier/`Done` stop merging into the host
-navigation bar, a close control in the panel's own header, the section switcher moved out of `.principal` into
-that header, and the unconditional `.navigationTitle` gated. G2 ports the one flag to the **Menu** overlay. G3
-**hoists the Calendar's chat to `MealCalendarWorkspaceView`** so it is a column beside the whole calendar in
-month/week as well as day — today the split is reachable only in day mode and everything else falls to a
-sheet.
+**Why Dispatch 2's slices ship together:** the regrouping and the renaming are the same edit to the same
+controls, so splitting them means touching every hand-off button twice. **D1** gives each `MenuDaySection`
+header a `⋯` beside its Add button (Handoff/Paste Prep · Handoff/Paste Complement). **D2** right-aligns a
+plan-level `⋯` on the Prep Plan title row, retires the `PrepPlanHandoffControls` button row, and **gives Clear
+Prep Plan the confirmation it has never had** — it currently fires immediately on a destructive, un-undoable
+action over generated content. **D3** collapses the Calendar's day-header controls into one `⋯` and gives each
+week-cell its own, **parameterized by that cell's date** — today `handoffAnchorItemID` reads the *selected*
+day, so a cell menu would act on the wrong day. Remaining slices are spec'd in the doc.
 
-**Order is load-bearing: fix the Recipe first, then port.** The Recipe is the treatment the other surfaces are
-being pulled toward; porting from it while it is itself wrong propagates the defect. **G3 has one trap called
-out in the doc — drop `.id(chatContextIdentity)`, do not carry it up.**
+**The finding that shapes this dispatch is in the effort doc, not here — read it.** `PrepPlanStepRecord` has
+**no `dayOffset`** and must not gain one ([ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md):
+one weaveable master plan per menu, banded by horizon). The per-day affordance is a **scoped ask with a woven
+return**, never scoped storage. **Complement is the cheap half** (`MenuComplement` already carries
+`dayOffset`); **prep plan is the work.**
 
-**G4 was added 2026-07-26 and folds into the same PR** ([#234](https://github.com/jonphillips/yes-chef/pull/234), which already carries G1–G3):
-**Ask opens the panel** — the recipe playbook's launcher stops being a section `Menu`, per
-[ADR-0045 Amendment 3](decisions/ADR-0045-onboard-path-stays-viable.md#amendment-3--ask-opens-the-panel-the-launcher-stops-picking-sections-2026-07-26).
-It **lands after G1** (the section switcher it falls back on moves into the embedded header there) and carries a
-**binding condition** — the cold panel needs an empty state and a stated reason on the greyed apply-verbs, or
-V1's *"the feature was removed"* defect returns verbatim. It touches `RecipePlaybookView.swift`, which G1–G3 do
-not, so it does not conflict with the submitted work.
+**This dispatch discharges a logged concern.** The PR [#226](https://github.com/jonphillips/yes-chef/pull/226)
+device pass noted the Prep Plan disclosure rendering two Copy + two Paste buttons and the meal-plan day header
+four, *"wants a feel on iPhone before anyone adds a fifth."* Moving them into overflow menus **is** that fix —
+say so in the PR.
 
-**G5 is queued behind #234 as its own PR** — the panel header settles to `Discuss ▾ · ⋯ · ✕`, the
-disabled-Apply explanation folds into the empty state, and `ChatContextHeader` stops claiming a seed on a
-deliberately unseeded panel. Spec: the effort doc's Slice G5 +
-[ADR-0045 Amendment 3's codicil](decisions/ADR-0045-onboard-path-stays-viable.md#codicil-to-amendment-3--the-embedded-panel-header-contract-2026-07-26).
-**Settle it before it spreads** — all four surfaces render the same `RecipeChatPanel` header. Some items may
-already be fixed by the review-nit pass on #234; check the merged state and skip what is done.
+**Verification:** generic app build (elevated, no signing) + `scripts/check-drift.sh`. Device pass on
+`iPad Pro 13-inch (M5)` + `iPhone 17 Pro` — and **iPhone is the point for D1/D2**, since crowding is the
+defect being fixed.
 
-**Verification:** generic app build (elevated, no signing) + `scripts/check-drift.sh`. No package tests —
-nothing here touches Core. **The iPad device pass is the point of this dispatch**: every defect it fixes is
-invisible on iPhone, which is why they survived Dispatch 1.
-
-**Sequenced ahead of [ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md)** — that ADR's own gate
-("ferry Dispatch 1 lands first") is satisfied, but sending a broken panel affordance into an untested container
-rewrite makes it impossible to attribute what broke.
+**[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) is unblocked but unscheduled.** Its gate
+("ferry Dispatch 1 lands first") was satisfied on 2026-07-25 and Dispatch 1.5's panel work is now merged, so
+nothing holds it except appetite. **When it is picked up, [`efforts/chat-surface-contract.md`](efforts/chat-surface-contract.md)
+S2–S4 want the slot immediately before it** — see Ready Efforts for why.
 
 **ADR-0042 closed 2026-07-21.** S0/S1/S2/S4 shipped and device-passed (→ [`DONE-LOG`](DONE-LOG.md)); **S3 (`workbenchDraft`) stays deferred and un-queued** — no concrete want, its danger receded rather than grew, **do not build it on ADR momentum**; there is no S5. **⚠️ The return contract is v2 — re-copy the project instructions from AI Settings or every verb fails the marker gate.**
 

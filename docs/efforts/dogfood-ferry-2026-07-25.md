@@ -1,7 +1,8 @@
 # Effort: Dogfood ferry pass — 2026-07-25 (expand control, hand-off regrouping, workbench lifecycle)
 
-**Status:** **Dispatch 1 shipped** (commit `12a6612`, 2026-07-25) — remaining dispatches sequenced
-**1.5 → 2 → 3**, one PR each. Dispatch 1.5 was added 2026-07-26 from Jon's return pass on Dispatch 1.
+**Status:** **Dispatches 1 and 1.5 have shipped** — 1 (commit `12a6612`, 2026-07-25), 1.5 (PRs
+[#234](https://github.com/jonphillips/yes-chef/pull/234) + [#235](https://github.com/jonphillips/yes-chef/pull/235),
+2026-07-26) → [`DONE-LOG`](../DONE-LOG.md). **Dispatch 2 is next**, then 3, one PR each.
 **Summary:** Jon's 2026-07-25 ferry pass over Menu, Recipe, Calendar and Workbench. One shared full-screen
 expand control replaces four drifted copies; the Menu grows the Recipe's pinned-Ask onboard treatment;
 the embedded chat panel stops dumping its chrome into the host toolbar and learns to close itself;
@@ -149,6 +150,13 @@ tests — nothing here touches Core. Jon does the device pass on `iPad Pro 13-in
 ---
 
 # DISPATCH 1.5 — the embedded chat panel owns its chrome, and the Calendar's chat is hoisted
+
+> ### ✅ SHIPPED 2026-07-26 — do not re-implement.
+> PRs [#234](https://github.com/jonphillips/yes-chef/pull/234) (G1–G4) + [#235](https://github.com/jonphillips/yes-chef/pull/235)
+> (G5, the architect review, and the device-pass follow-ons) → [`DONE-LOG`](../DONE-LOG.md). The spec below is
+> retained as the record of intent. **One deviation to know about:** it did not stay schema-free — assistant
+> turns now record the tier that produced them (`chatMessages.resolvedTier`), a **local-only** column on an
+> unsynced table, so nothing entered the prod-promotion list.
 
 **Added 2026-07-26** from Jon's device pass on Dispatch 1. **View layer only — no Core, no schema.**
 
