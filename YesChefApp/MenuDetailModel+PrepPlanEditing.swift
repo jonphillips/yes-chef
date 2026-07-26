@@ -15,7 +15,10 @@ extension MenuDetailModel {
           uuid: { uuid() }
         )
       }
-      guard inserted > 0 else { return false }
+      guard inserted > 0 else {
+        toastCenter?.postSuccess("That learning is already saved.")
+        return false
+      }
       toastCenter?.postSuccess("Added learning.")
       return true
     } catch {

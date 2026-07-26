@@ -784,8 +784,7 @@ private struct RecipeReaderView: View {
       Text(note)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .padding(12)
-    .background(.tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+    .attentionCard()
   }
 }
 

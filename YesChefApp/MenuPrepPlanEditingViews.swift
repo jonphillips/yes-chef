@@ -109,6 +109,7 @@ struct LearningsSection: View {
   var reorderLearnings: ([Learning.ID], LearningReorderDestination) -> Void
   @State private var isAdding = false
   @State private var newLearningText = ""
+  @FocusState private var isNewLearningFocused: Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -123,9 +124,30 @@ struct LearningsSection: View {
           }
         }
       }
-      if learnings.isEmpty {
+      if isAdding {
+        VStack(alignment: .leading, spacing: 8) {
+          TextField("Learning", text: $newLearningText, axis: .vertical)
+            .lineLimit(2...6)
+            .focused($isNewLearningFocused)
+          HStack {
+            Button("Cancel") {
+              newLearningText = ""
+              isAdding = false
+            }
+            Spacer()
+            Button("Add") {
+              guard addLearning?(newLearningText) == true else { return }
+              newLearningText = ""
+              isAdding = false
+            }
+            .disabled(newLearningText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          }
+        }
+        .attentionCard()
+      }
+      if learnings.isEmpty && !isAdding {
         ContentUnavailableView("No Learnings Yet", systemImage: "lightbulb", description: Text("Add a cooking observation or keep useful ideas from an AI handoff here."))
-      } else {
+      } else if !learnings.isEmpty {
         VStack(alignment: .leading, spacing: 0) {
           ForEach(learnings, id: \.id) { learning in
             VStack(spacing: 0) {
@@ -144,25 +166,9 @@ struct LearningsSection: View {
           }
         }
       }
-      if isAdding {
-        VStack(alignment: .leading, spacing: 8) {
-          TextField("Learning", text: $newLearningText, axis: .vertical)
-            .lineLimit(2...6)
-          HStack {
-            Button("Cancel") {
-              newLearningText = ""
-              isAdding = false
-            }
-            Spacer()
-            Button("Add") {
-              guard addLearning?(newLearningText) == true else { return }
-              newLearningText = ""
-              isAdding = false
-            }
-            .disabled(newLearningText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-          }
-        }
-      }
+    }
+    .onChange(of: isAdding) { _, isAdding in
+      isNewLearningFocused = isAdding
     }
   }
 }

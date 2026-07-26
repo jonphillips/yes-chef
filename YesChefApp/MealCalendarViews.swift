@@ -50,7 +50,8 @@ struct MealCalendarWorkspaceView: View {
       NavigationStack {
         RecipeChatPanel(
           chatModel: chatModel,
-          applyActions: model.applyActionCatalog(for: chatModel)
+          applyActions: model.applyActionCatalog(for: chatModel),
+          onDismiss: { compactChatModel = nil }
         )
       }
     }
@@ -155,7 +156,8 @@ struct MealCalendarPlannerView: View {
       NavigationStack {
         RecipeChatPanel(
           chatModel: chatModel,
-          applyActions: model.applyActionCatalog(for: chatModel)
+          applyActions: model.applyActionCatalog(for: chatModel),
+          onDismiss: { compactChatModel = nil }
         )
       }
     }

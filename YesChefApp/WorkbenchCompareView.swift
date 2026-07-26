@@ -165,7 +165,8 @@ struct WorkbenchCompareView: View {
       WorkbenchCompareChatSheet(
         chatModel: chatModel,
         applyActions: compactApplyActions(chatModel),
-        activeTierChanged: compactChatActiveTierChanged
+        activeTierChanged: compactChatActiveTierChanged,
+        onDismiss: { compactChatModel = nil }
       )
     }
   }
@@ -198,10 +199,11 @@ private struct WorkbenchCompareChatSheet: View {
   let chatModel: RecipeChatModel
   let applyActions: [AnyChatApplyAction]
   let activeTierChanged: (ModelTier) -> Void
+  let onDismiss: () -> Void
 
   var body: some View {
     NavigationStack {
-      RecipeChatPanel(chatModel: chatModel, applyActions: applyActions)
+      RecipeChatPanel(chatModel: chatModel, applyActions: applyActions, onDismiss: onDismiss)
     }
     .onAppear {
       activeTierChanged(chatModel.activeTier)
