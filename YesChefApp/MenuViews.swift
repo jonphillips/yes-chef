@@ -176,6 +176,9 @@ struct MenuDetailView: View {
           detail: detail,
           handoffTransport: handoffTransport,
           onRecipeSelected: onRecipeSelected,
+          isAskActive: isAskActive,
+          askPrepPlan: askPrepPlan,
+          askComplement: presentComplementAsk,
           regeneratePrepPlan: regeneratePrepPlan
         )
         .navigationTitle(detail.menu.title)
@@ -213,17 +216,12 @@ struct MenuDetailView: View {
     .animation(.snappy(duration: 0.22), value: toolOverlay?.id)
     .toolbar {
       if detailModel.detail != nil {
-        ToolbarItemGroup(placement: .primaryAction) {
+        ToolbarItemGroup(placement: .topBarLeading) {
           if horizontalSizeClass != .compact, let focusButtonTapped {
-            Button {
-              focusButtonTapped()
-            } label: {
-              Label(
-                "Focus",
-                systemImage: isFocusActive ? "rectangle.expand" : "arrow.up.left.and.arrow.down.right"
-              )
-            }
+            FocusToolbarButton(isActive: isFocusActive, action: focusButtonTapped)
           }
+        }
+        ToolbarItemGroup(placement: .primaryAction) {
           if let cookSessionPresentation {
             Button {
               onCookSessionRequested?(cookSessionPresentation)
@@ -234,21 +232,8 @@ struct MenuDetailView: View {
           Button {
             recipeBrowserButtonTapped()
           } label: {
-            Label("Browse Recipes", systemImage: "sidebar.right")
+            Label("Browse Recipes", systemImage: "book.closed")
           }
-          Button {
-            askButtonTapped()
-          } label: {
-            Label("Ask", systemImage: "sparkles")
-          }
-          .tint(isAskActive ? .accentColor : nil)
-          .overlay {
-            if isAskActive {
-              RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(.tint, lineWidth: 3)
-            }
-          }
-          .accessibilityValue(isAskActive ? Text("Panel open") : Text("Panel closed"))
         }
       }
     }
@@ -321,20 +306,36 @@ struct MenuDetailView: View {
     return false
   }
 
-  private func askButtonTapped() {
-    if isAskActive {
-      dismissTool()
-    } else {
-      presentAsk()
-    }
-  }
-
-  private func presentAsk() {
+  private func askPrepPlan() {
     guard let detail = detailModel.detail else { return }
     let context = MenuChatContext(detail: detail)
     let chatModel = chatModel(for: context)
     Task {
-      await chatModel.seedIfCold(context.discussAsk())
+      switch await chatModel.seedIfCold(context.discussAsk(), summary: "Started Prep Plan discussion.") {
+      case .alreadyWarm:
+        _ = await chatModel.send(context.discussAsk())
+      case .seeded, .failed:
+        break
+      }
+    }
+  }
+
+  private func presentComplementAsk() {
+    guard let detail = detailModel.detail else { return }
+    let context = MenuChatContext(detail: detail)
+    let chatModel = chatModel(for: context)
+    let prompt = AIHandoffToken.discussAsk(
+      context: MenuHandoffContext(detail: detail).complementPrompt(),
+      deliverableFormat: .menuComplement,
+      destination: .onboard
+    )
+    Task {
+      switch await chatModel.seedIfCold(prompt, summary: "Started Complement discussion.") {
+      case .alreadyWarm:
+        _ = await chatModel.send(prompt)
+      case .seeded, .failed:
+        break
+      }
     }
   }
 
@@ -390,7 +391,8 @@ struct MenuDetailView: View {
       RecipeChatPanel(
         chatModel: chatModel,
         applyActions: detailModel.applyActionCatalog(for: chatModel),
-        finalization: .menu(menuID: detailModel.menuID)
+        finalization: .menu(menuID: detailModel.menuID),
+        onDismiss: dismissTool
       )
     }
   }
@@ -429,7 +431,6 @@ struct MenuPrepPlanSection: View {
   let handoffTransport: HandoffInAppTransport
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var clearPrepPlan: () -> Void
-  var regeneratePrepPlan: () -> Void
   var createStep: (PrepPlanStep) -> Void
   var updateStep: (PrepPlanStep, PrepPlanStepRecord.ID) -> Void
   var deleteStep: (PrepPlanStepRecord.ID) -> Void
@@ -483,14 +484,6 @@ struct MenuPrepPlanSection: View {
             Label("Add Step", systemImage: "plus")
           }
           .buttonStyle(.bordered)
-
-          Button {
-            regeneratePrepPlan()
-          } label: {
-            Label("Regenerate", systemImage: "sparkles")
-          }
-          .buttonStyle(.bordered)
-          .disabled(steps.isEmpty)
 
           Button(role: .destructive) {
             clearPrepPlan()

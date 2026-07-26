@@ -7,8 +7,13 @@ struct MenuDetailReader: View {
   let detail: MenuDetailData
   let handoffTransport: HandoffInAppTransport
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+  var isAskActive: Bool
+  var askPrepPlan: () -> Void
+  var askComplement: () -> Void
   var regeneratePrepPlan: () -> Void
 
+  @AppStorage(MenuPlaybookColumnPreferences.visibilityStorageKey)
+  private var isPlaybookColumnVisible = true
   @AppStorage(MenuPlaybookColumnPreferences.detentsStorageKey)
   private var persistedPlaybookDetentsData = Data()
   @GestureState private var playbookDragTranslation: CGFloat = 0
@@ -19,6 +24,9 @@ struct MenuDetailReader: View {
     detail: MenuDetailData,
     handoffTransport: HandoffInAppTransport,
     onRecipeSelected: ((RecipeDetailPresentation) -> Void)? = nil,
+    isAskActive: Bool,
+    askPrepPlan: @escaping () -> Void,
+    askComplement: @escaping () -> Void,
     regeneratePrepPlan: @escaping () -> Void
   ) {
     self.model = model
@@ -26,6 +34,9 @@ struct MenuDetailReader: View {
     self.detail = detail
     self.handoffTransport = handoffTransport
     self.onRecipeSelected = onRecipeSelected
+    self.isAskActive = isAskActive
+    self.askPrepPlan = askPrepPlan
+    self.askComplement = askComplement
     self.regeneratePrepPlan = regeneratePrepPlan
   }
 
@@ -42,8 +53,22 @@ struct MenuDetailReader: View {
           compactMenuReader
         }
       }
+      .swipeActionsContainer()
+      .toolbar {
+        if proxy.size.width >= MenuPlaybookColumnMetrics.twoColumnThreshold {
+          ToolbarItem(placement: .primaryAction) {
+            Button {
+              isPlaybookColumnVisible.toggle()
+            } label: {
+              Label(
+                isPlaybookColumnVisible ? "Hide Playbook" : "Show Playbook",
+                systemImage: "sidebar.trailing"
+              )
+            }
+          }
+        }
+      }
     }
-    .swipeActionsContainer()
   }
 
   private var compactMenuReader: some View {
@@ -61,7 +86,7 @@ struct MenuDetailReader: View {
   private func wideMenuColumns(in size: CGSize) -> some View {
     let layout = MenuWideColumnLayout(
       width: size.width,
-      isPlaybookVisible: true
+      isPlaybookVisible: isPlaybookColumnVisible
     )
     let detent = currentPlaybookDetent
     let basePlaybookWidth = layout.playbookWidth(for: detent)
@@ -79,33 +104,35 @@ struct MenuDetailReader: View {
       }
       .frame(width: layout.bodyWidth(playbookWidth: livePlaybookWidth))
 
-      RecipePlaybookResizeHandle(
-        detent: detent,
-        splitAccessibilityLabel: "Dishes and Playbook split",
-        cycle: { currentPlaybookDetent = detent.next },
-        decrement: { currentPlaybookDetent = detent.previous },
-        increment: { currentPlaybookDetent = detent.next }
-      )
-      .simultaneousGesture(
-        DragGesture(minimumDistance: 2)
-          .updating($playbookDragTranslation) { value, state, _ in
-            state = value.translation.width
-          }
-          .onEnded { value in
-            let proposedWidth = layout.proposedPlaybookWidth(
-              base: basePlaybookWidth,
-              translation: value.translation.width
-            )
-            currentPlaybookDetent = layout.nearestDetent(to: proposedWidth)
-          }
-      )
+      if isPlaybookColumnVisible {
+        RecipePlaybookResizeHandle(
+          detent: detent,
+          splitAccessibilityLabel: "Dishes and Playbook split",
+          cycle: { currentPlaybookDetent = detent.next },
+          decrement: { currentPlaybookDetent = detent.previous },
+          increment: { currentPlaybookDetent = detent.next }
+        )
+        .simultaneousGesture(
+          DragGesture(minimumDistance: 2)
+            .updating($playbookDragTranslation) { value, state, _ in
+              state = value.translation.width
+            }
+            .onEnded { value in
+              let proposedWidth = layout.proposedPlaybookWidth(
+                base: basePlaybookWidth,
+                translation: value.translation.width
+              )
+              currentPlaybookDetent = layout.nearestDetent(to: proposedWidth)
+            }
+        )
 
-      ScrollView {
-        menuPlaybook
-          .padding()
-          .frame(maxWidth: .infinity, alignment: .topLeading)
+        ScrollView {
+          menuPlaybook
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .frame(width: livePlaybookWidth, alignment: .topLeading)
       }
-      .frame(width: livePlaybookWidth, alignment: .topLeading)
     }
     .animation(.snappy(duration: 0.22), value: currentPlaybookDetent)
     .frame(width: size.width, height: size.height, alignment: .topLeading)
@@ -158,6 +185,7 @@ struct MenuDetailReader: View {
 
   private var menuPlaybook: some View {
     VStack(alignment: .leading, spacing: 24) {
+      menuPlaybookHeader
       MenuPrepPlanSection(
         steps: detail.prepPlanSteps,
         itemRows: detail.itemRows,
@@ -168,7 +196,6 @@ struct MenuDetailReader: View {
         clearPrepPlan: {
           model.clearPrepPlanButtonTapped(menuID: detailModel.menuID)
         },
-        regeneratePrepPlan: regeneratePrepPlan,
         createStep: detailModel.createPrepPlanStep,
         updateStep: detailModel.updatePrepPlanStep,
         deleteStep: detailModel.deletePrepPlanStep,
@@ -182,5 +209,32 @@ struct MenuDetailReader: View {
         reorderLearnings: detailModel.reorderLearnings
       )
     }
+  }
+
+  private var menuPlaybookHeader: some View {
+    HStack(alignment: .top, spacing: 12) {
+      Spacer()
+      Menu {
+        Button("Prep Plan", action: askPrepPlan)
+        Button("Complement", action: askComplement)
+        Divider()
+        Button("Regenerate whole plan", action: regeneratePrepPlan)
+          .disabled(detail.prepPlanSteps.isEmpty)
+      } label: {
+        Label("Ask", systemImage: "sparkles")
+      }
+      .buttonStyle(.bordered)
+      .buttonBorderShape(.roundedRectangle(radius: 8))
+      .tint(isAskActive ? .accentColor : nil)
+      .overlay {
+        if isAskActive {
+          RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .strokeBorder(.tint, lineWidth: 3)
+        }
+      }
+      .accessibilityValue(isAskActive ? "Panel open" : "Panel closed")
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("Playbook actions")
   }
 }

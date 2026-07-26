@@ -7,6 +7,7 @@ enum RecipePlaybookColumnPreferences {
 }
 
 enum MenuPlaybookColumnPreferences {
+  static let visibilityStorageKey = "MenuReader.isPlaybookColumnVisible"
   static let detentsStorageKey = "MenuReader.playbookColumnDetents"
 
   static func detents(from data: Data) -> [String: RecipePlaybookColumnDetent] {
@@ -19,8 +20,8 @@ enum MenuPlaybookColumnPreferences {
 }
 
 enum MenuPlaybookColumnMetrics {
-  // Starts above the observed ~700pt multitasking pane so a permanent
-  // Playbook never forces a cramped two-column reader. Device-pass tune knob.
+  // Starts above the observed ~700pt multitasking pane so the optional
+  // Playbook column never forces a cramped two-column reader. Device-pass tune knob.
   static let twoColumnThreshold: CGFloat = 820
 }
 
