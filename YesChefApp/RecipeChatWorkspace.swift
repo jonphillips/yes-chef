@@ -236,8 +236,8 @@ struct RecipeChatPanel: View {
   /// playbook sits behind the modal sheet. `nil` for panels with no sections (menu, workbench).
   var selectSection: ((PlaybookSectionKind) -> Void)?
   var activeSection: PlaybookSectionKind?
-  /// When set, the panel shows an explicit **Done** dismiss (a crowded sheet toolbar is awkward to
-  /// swipe past). `nil` for embedded panels that own their own chrome.
+  /// When set, the panel exposes its own close affordance: **Done** in a modal navigation bar or a
+  /// close button in an embedded header. `nil` when its containing workspace owns dismissal.
   var onDismiss: (() -> Void)?
 
   @State private var draft = ""
@@ -258,12 +258,23 @@ struct RecipeChatPanel: View {
     VStack(spacing: 0) {
       if showsEmbeddedHeader {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
-          Text(chatModel.context.title)
-            .font(.headline)
-            .lineLimit(1)
+          if let selectSection {
+            ChatSectionMenu(activeSection: activeSection, select: selectSection)
+          } else {
+            Text(chatModel.context.title)
+              .font(.headline)
+              .lineLimit(1)
+          }
           Spacer(minLength: 8)
           clearChatButton
           ChatTierMenu(chatModel: chatModel)
+          if let onDismiss {
+            Button(action: onDismiss) {
+              Image(systemName: "xmark.circle.fill")
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("Close Ask"))
+          }
         }
         .padding([.horizontal, .top])
         .padding(.bottom, 10)
@@ -381,8 +392,12 @@ struct RecipeChatPanel: View {
       .padding()
       .background(.background)
     }
-    .navigationTitle(chatModel.context.title)
-    .navigationBarTitleDisplayMode(.inline)
+    .modifier(
+      RecipeChatPanelNavigationChrome(
+        title: chatModel.context.title,
+        showsEmbeddedHeader: showsEmbeddedHeader
+      )
+    )
     .toolbar {
       if !showsEmbeddedHeader {
         if let onDismiss {
@@ -651,6 +666,22 @@ struct RecipeChatPanel: View {
     isReviewSheetPresented = false
     actionError = nil
     chatModel.clear()
+  }
+}
+
+private struct RecipeChatPanelNavigationChrome: ViewModifier {
+  let title: String
+  let showsEmbeddedHeader: Bool
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if showsEmbeddedHeader {
+      content
+    } else {
+      content
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+    }
   }
 }
 

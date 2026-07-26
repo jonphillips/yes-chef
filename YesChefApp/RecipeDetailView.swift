@@ -284,6 +284,7 @@ private struct RecipeAskPresentationModifier: ViewModifier {
       finalization: model.seededAskSection.map {
         ChatFinalizeConfiguration.recipe(recipeID: model.recipeID, section: $0)
       },
+      showsEmbeddedHeader: true,
       selectSection: model.askSection,
       activeSection: model.seededAskSection,
       onDismiss: { model.destination = nil }

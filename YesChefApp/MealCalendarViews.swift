@@ -22,34 +22,35 @@ struct MealCalendarStack: View {
 
 struct MealCalendarWorkspaceView: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+  @AppStorage(ChatWorkspaceDetent.storageKey)
+  private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   let model: MealCalendarModel
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
   var isFocusActive = false
   var focusButtonTapped: (() -> Void)?
+  @State private var compactChatModel: RecipeChatModel?
 
   var body: some View {
-    GeometryReader { geometry in
-      if geometry.size.width >= 840 && model.displayMode != .day {
-        MealCalendarWideWorkspace(
-          model: model,
-          agendaWidth: agendaWidth(for: geometry.size.width),
-          weekCellMinHeight: weekCellHeight(for: geometry.size.height),
-          onMenuSelected: onMenuSelected,
-          onRecipeSelected: onRecipeSelected,
-          onCookSessionRequested: onCookSessionRequested
-        )
+    Group {
+      if isChatWorkspaceEnabled {
+        ChatWorkspaceSplit(
+          context: mealPlanChatContext,
+          detentRaw: $chatWorkspaceDetentRaw,
+          applyActions: { chatModel in model.applyActionCatalog(for: chatModel) }
+        ) {
+          calendarContent
+        }
       } else {
-        MealCalendarStackedContent(
-          model: model,
-          showsSelectedDayAgenda: true,
-          monthCellMinHeight: 104,
-          weekCellMinHeight: 260,
-          maxContentWidth: 1120,
-          onMenuSelected: onMenuSelected,
-          onRecipeSelected: onRecipeSelected,
-          onCookSessionRequested: onCookSessionRequested
+        calendarContent
+      }
+    }
+    .sheet(item: $compactChatModel) { chatModel in
+      NavigationStack {
+        RecipeChatPanel(
+          chatModel: chatModel,
+          applyActions: model.applyActionCatalog(for: chatModel)
         )
       }
     }
@@ -61,6 +62,58 @@ struct MealCalendarWorkspaceView: View {
         }
       }
       MealCalendarNavigationToolbar(model: model)
+    }
+  }
+
+  private var calendarContent: some View {
+    GeometryReader { geometry in
+      if geometry.size.width >= 840 && model.displayMode != .day {
+        MealCalendarWideWorkspace(
+          model: model,
+          agendaWidth: agendaWidth(for: geometry.size.width),
+          weekCellMinHeight: weekCellHeight(for: geometry.size.height),
+          chatButtonTapped: chatButtonTapped,
+          onMenuSelected: onMenuSelected,
+          onRecipeSelected: onRecipeSelected,
+          onCookSessionRequested: onCookSessionRequested
+        )
+      } else {
+        MealCalendarStackedContent(
+          model: model,
+          showsSelectedDayAgenda: true,
+          monthCellMinHeight: 104,
+          weekCellMinHeight: 260,
+          maxContentWidth: 1120,
+          chatButtonTapped: chatButtonTapped,
+          onMenuSelected: onMenuSelected,
+          onRecipeSelected: onRecipeSelected,
+          onCookSessionRequested: onCookSessionRequested
+        )
+      }
+    }
+  }
+
+  private var mealPlanChatContext: RecipeChatContext {
+    .mealPlan(
+      MealPlanChatContext(
+        title: model.selectedDateTitle,
+        subjectDate: model.selectedDate,
+        rows: model.selectedDayRows
+      )
+    )
+  }
+
+  private var isChatWorkspaceEnabled: Bool {
+    WideLayout.isEnabled(horizontalSizeClass: horizontalSizeClass)
+  }
+
+  private func chatButtonTapped() {
+    if isChatWorkspaceEnabled {
+      chatWorkspaceDetentRaw = chatWorkspaceDetentRaw == ChatWorkspaceDetent.readerOnly.rawValue
+        ? ChatWorkspaceDetent.balanced.rawValue
+        : ChatWorkspaceDetent.readerOnly.rawValue
+    } else {
+      compactChatModel = RecipeChatModel(context: mealPlanChatContext)
     }
   }
 
@@ -80,6 +133,7 @@ struct MealCalendarPlannerView: View {
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
+  @State private var compactChatModel: RecipeChatModel?
 
   var body: some View {
     MealCalendarStackedContent(
@@ -88,6 +142,7 @@ struct MealCalendarPlannerView: View {
       monthCellMinHeight: 86,
       weekCellMinHeight: 240,
       maxContentWidth: 980,
+      chatButtonTapped: chatButtonTapped,
       onMenuSelected: onMenuSelected,
       onRecipeSelected: onRecipeSelected,
       onCookSessionRequested: onCookSessionRequested
@@ -96,6 +151,28 @@ struct MealCalendarPlannerView: View {
     .toolbar {
       MealCalendarNavigationToolbar(model: model)
     }
+    .sheet(item: $compactChatModel) { chatModel in
+      NavigationStack {
+        RecipeChatPanel(
+          chatModel: chatModel,
+          applyActions: model.applyActionCatalog(for: chatModel)
+        )
+      }
+    }
+  }
+
+  private func chatButtonTapped() {
+    compactChatModel = RecipeChatModel(context: mealPlanChatContext)
+  }
+
+  private var mealPlanChatContext: RecipeChatContext {
+    .mealPlan(
+      MealPlanChatContext(
+        title: model.selectedDateTitle,
+        subjectDate: model.selectedDate,
+        rows: model.selectedDayRows
+      )
+    )
   }
 }
 
@@ -103,6 +180,7 @@ private struct MealCalendarWideWorkspace: View {
   let model: MealCalendarModel
   let agendaWidth: CGFloat
   let weekCellMinHeight: CGFloat
+  var chatButtonTapped: (() -> Void)?
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
@@ -115,6 +193,7 @@ private struct MealCalendarWideWorkspace: View {
         monthCellMinHeight: 118,
         weekCellMinHeight: weekCellMinHeight,
         maxContentWidth: nil,
+        chatButtonTapped: chatButtonTapped,
         onMenuSelected: onMenuSelected,
         onRecipeSelected: onRecipeSelected,
         onCookSessionRequested: onCookSessionRequested
@@ -125,6 +204,7 @@ private struct MealCalendarWideWorkspace: View {
 
       MealCalendarAgendaRail(
         model: model,
+        chatButtonTapped: chatButtonTapped,
         onMenuSelected: onMenuSelected,
         onRecipeSelected: onRecipeSelected,
         onCookSessionRequested: onCookSessionRequested
@@ -141,6 +221,7 @@ private struct MealCalendarStackedContent: View {
   var monthCellMinHeight: CGFloat
   var weekCellMinHeight: CGFloat
   var maxContentWidth: CGFloat?
+  var chatButtonTapped: (() -> Void)?
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
@@ -154,6 +235,7 @@ private struct MealCalendarStackedContent: View {
           model: model,
           monthCellMinHeight: monthCellMinHeight,
           weekCellMinHeight: weekCellMinHeight,
+          chatButtonTapped: chatButtonTapped,
           onMenuSelected: onMenuSelected,
           onRecipeSelected: onRecipeSelected,
           onCookSessionRequested: onCookSessionRequested
@@ -164,7 +246,7 @@ private struct MealCalendarStackedContent: View {
           MealCalendarDayAgendaView(
             model: model,
             showsHeader: true,
-            allowsChatWorkspace: false,
+            chatButtonTapped: chatButtonTapped,
             onMenuSelected: onMenuSelected,
             onRecipeSelected: onRecipeSelected,
             onCookSessionRequested: onCookSessionRequested
@@ -182,6 +264,7 @@ private struct MealCalendarCalendarBody: View {
   let model: MealCalendarModel
   var monthCellMinHeight: CGFloat
   var weekCellMinHeight: CGFloat
+  var chatButtonTapped: (() -> Void)?
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
@@ -196,7 +279,7 @@ private struct MealCalendarCalendarBody: View {
       MealCalendarDayAgendaView(
         model: model,
         showsHeader: true,
-        allowsChatWorkspace: true,
+        chatButtonTapped: chatButtonTapped,
         onMenuSelected: onMenuSelected,
         onRecipeSelected: onRecipeSelected,
         onCookSessionRequested: onCookSessionRequested
@@ -207,6 +290,7 @@ private struct MealCalendarCalendarBody: View {
 
 private struct MealCalendarAgendaRail: View {
   let model: MealCalendarModel
+  var chatButtonTapped: (() -> Void)?
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
@@ -216,7 +300,7 @@ private struct MealCalendarAgendaRail: View {
       MealCalendarDayAgendaView(
         model: model,
         showsHeader: true,
-        allowsChatWorkspace: false,
+        chatButtonTapped: chatButtonTapped,
         onMenuSelected: onMenuSelected,
         onRecipeSelected: onRecipeSelected,
         onCookSessionRequested: onCookSessionRequested
@@ -257,16 +341,12 @@ private struct MealCalendarNavigationToolbar: ToolbarContent {
 }
 
 struct MealCalendarDayAgendaView: View {
-  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-  @AppStorage(ChatWorkspaceDetent.storageKey)
-  private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   let model: MealCalendarModel
   var showsHeader: Bool
-  var allowsChatWorkspace = true
+  var chatButtonTapped: (() -> Void)?
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
-  @State private var compactChatModel: RecipeChatModel?
   @State private var handoffTransport = HandoffInAppTransport()
 
   private var occupiedMealSlots: [MealPlanItemSlot] {
@@ -274,29 +354,7 @@ struct MealCalendarDayAgendaView: View {
   }
 
   var body: some View {
-    Group {
-      if isSplitEnabled {
-        ChatWorkspaceSplit(
-          context: mealPlanChatContext,
-          detentRaw: $chatWorkspaceDetentRaw,
-          applyActions: { chatModel in model.applyActionCatalog(for: chatModel) }
-        ) {
-          agendaContent
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        .id(chatContextIdentity)
-      } else {
-        agendaContent
-      }
-    }
-    .sheet(item: $compactChatModel) { chatModel in
-      NavigationStack {
-        RecipeChatPanel(
-          chatModel: chatModel,
-          applyActions: model.applyActionCatalog(for: chatModel)
-        )
-      }
-    }
+    agendaContent
     .handoffTransportAlert(handoffTransport)
     // This view has no custom `init`, so the transport picks up the shared toast center on appear.
     .onAppear { handoffTransport.toastCenter = model.toastCenter }
@@ -338,25 +396,6 @@ struct MealCalendarDayAgendaView: View {
     }
   }
 
-  private var mealPlanChatContext: RecipeChatContext {
-    .mealPlan(
-      MealPlanChatContext(
-        title: model.selectedDateTitle,
-        subjectDate: model.selectedDate,
-        rows: model.selectedDayRows
-      )
-    )
-  }
-
-  private var isSplitEnabled: Bool {
-    allowsChatWorkspace
-      && WideLayout.isEnabled(horizontalSizeClass: horizontalSizeClass)
-  }
-
-  private var chatContextIdentity: String {
-    String(model.selectedDate.timeIntervalSinceReferenceDate)
-  }
-
   private var cookSessionPresentation: CookSessionPresentation? {
     CookSessionPresentation(plannerTitle: model.selectedDateTitle, rows: model.selectedDayRows)
   }
@@ -371,15 +410,6 @@ struct MealCalendarDayAgendaView: View {
     onCookSessionRequested?(cookSessionPresentation)
   }
 
-  private func chatButtonTapped() {
-    if isSplitEnabled {
-      chatWorkspaceDetentRaw = chatWorkspaceDetentRaw == ChatWorkspaceDetent.readerOnly.rawValue
-        ? ChatWorkspaceDetent.balanced.rawValue
-        : ChatWorkspaceDetent.readerOnly.rawValue
-    } else {
-      compactChatModel = RecipeChatModel(context: mealPlanChatContext)
-    }
-  }
 }
 
 struct MealPlanItemEditorView: View {
@@ -812,119 +842,6 @@ private struct MealCalendarChip: View {
         : Color.accentColor.opacity(row.item.kind == .recipe ? 0.12 : 0.08)
     )
     .clipShape(.rect(cornerRadius: 5))
-  }
-}
-
-private struct MealCalendarDayHeader: View {
-  let model: MealCalendarModel
-  var cookSession: (() -> Void)?
-  var chat: () -> Void
-  var handoffSource: HandoffExportSource?
-  var complementHandoffSource: HandoffExportSource?
-  let handoffTransport: HandoffInAppTransport
-
-  var body: some View {
-    ViewThatFits(in: .horizontal) {
-      // Wide: title and all actions on one row.
-      HStack(alignment: .firstTextBaseline) {
-        titleBlock
-        Spacer()
-        cookButton
-        chatButton
-        handoffControls
-        addMenu
-      }
-      // Narrow (agenda rail): title, then "Cook these" on its own line, then Chat + Add.
-      VStack(alignment: .leading, spacing: 12) {
-        titleBlock
-        if cookSession != nil {
-          cookButton
-            .frame(maxWidth: .infinity)
-        }
-        HStack {
-          chatButton
-          handoffControls
-          addMenu
-          Spacer()
-        }
-      }
-    }
-  }
-
-  private var titleBlock: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Text(model.selectedDateTitle)
-        .font(.largeTitle.bold())
-      Text(itemCountTitle)
-        .font(.subheadline)
-        .foregroundStyle(.secondary)
-    }
-  }
-
-  @ViewBuilder
-  private var cookButton: some View {
-    if let cookSession {
-      Button(action: cookSession) {
-        Label("Cook these", systemImage: "flame")
-      }
-      .buttonStyle(.borderedProminent)
-    }
-  }
-
-  private var chatButton: some View {
-    Button {
-      chat()
-    } label: {
-      Label("Ask", systemImage: "sparkles")
-    }
-    .buttonStyle(.bordered)
-  }
-
-  @ViewBuilder
-  private var handoffControls: some View {
-    if let handoffSource {
-      HStack {
-        HandoffCopyPasteControls(
-          source: handoffSource,
-          transport: handoffTransport,
-          copyLabel: "Copy Make-ahead Prompt"
-        )
-        if let complementHandoffSource {
-          HandoffCopyPasteControls(
-            source: complementHandoffSource,
-            transport: handoffTransport,
-            copyLabel: "Copy Complement Prompt"
-          )
-        }
-      }
-      .buttonStyle(.bordered)
-    }
-  }
-
-  private var addMenu: some View {
-    Menu {
-      Button {
-        model.addItemButtonTapped(kind: .recipe)
-      } label: {
-        Label("Recipe", systemImage: MealPlanItemKind.recipe.systemImage)
-      }
-      Button {
-        model.addItemButtonTapped(kind: .note)
-      } label: {
-        Label("Add Note", systemImage: MealPlanItemKind.note.systemImage)
-      }
-    } label: {
-      Label("Add", systemImage: "plus")
-    }
-    .buttonStyle(.borderedProminent)
-  }
-
-  private var itemCountTitle: String {
-    switch model.selectedDayRows.count {
-    case 0: "No items scheduled"
-    case 1: "1 item scheduled"
-    default: "\(model.selectedDayRows.count) items scheduled"
-    }
   }
 }
 
