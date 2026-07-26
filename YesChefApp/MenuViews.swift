@@ -392,6 +392,7 @@ struct MenuDetailView: View {
         chatModel: chatModel,
         applyActions: detailModel.applyActionCatalog(for: chatModel),
         finalization: .menu(menuID: detailModel.menuID),
+        showsEmbeddedHeader: true,
         onDismiss: dismissTool
       )
     }

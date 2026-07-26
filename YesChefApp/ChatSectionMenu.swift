@@ -1,9 +1,8 @@
 import SwiftUI
 import YesChefCore
 
-/// The section-picking control shared by the playbook's Ask ▾ launcher and the open chat panel's
-/// title (ADR-0045 Amd 2). One affordance, two placements: pick a Playbook section to open a chat
-/// scoped to it, or move an already-open discussion there.
+/// The panel's section-picking control. The playbook's Ask opens an unseeded panel; Discuss ▾ then
+/// starts or moves a section-scoped discussion (ADR-0045 Amd 3).
 struct ChatSectionMenu: View {
   let activeSection: PlaybookSectionKind?
   let select: (PlaybookSectionKind) -> Void
