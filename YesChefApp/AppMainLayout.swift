@@ -5,6 +5,7 @@ import YesChefCore
 
 struct AppMainLayout: View {
   @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
+  @State private var mealCalendarColumnVisibility: NavigationSplitViewVisibility = .doubleColumn
 
   let horizontalSizeClass: UserInterfaceSizeClass?
   let recipeModel: RecipeLibraryModel
@@ -44,14 +45,20 @@ struct AppMainLayout: View {
         )
       }
     } else if selectedSection == .mealCalendar {
-      NavigationSplitView {
+      NavigationSplitView(columnVisibility: $mealCalendarColumnVisibility) {
         AppSidebar(selection: $selectedSection)
       } detail: {
         MealCalendarWorkspaceView(
           model: mealCalendarModel,
           onMenuSelected: openMenuFromCalendar,
           onRecipeSelected: onRecipeSelected,
-          onCookSessionRequested: onCookSessionRequested
+          onCookSessionRequested: onCookSessionRequested,
+          isFocusActive: mealCalendarColumnVisibility == .detailOnly,
+          focusButtonTapped: {
+            mealCalendarColumnVisibility = mealCalendarColumnVisibility == .detailOnly
+              ? .doubleColumn
+              : .detailOnly
+          }
         )
       }
     } else {

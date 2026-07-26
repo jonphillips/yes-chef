@@ -21,10 +21,13 @@ struct MealCalendarStack: View {
 }
 
 struct MealCalendarWorkspaceView: View {
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   let model: MealCalendarModel
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
+  var isFocusActive = false
+  var focusButtonTapped: (() -> Void)?
 
   var body: some View {
     GeometryReader { geometry in
@@ -52,6 +55,11 @@ struct MealCalendarWorkspaceView: View {
     }
     .navigationTitle("Meal Calendar")
     .toolbar {
+      ToolbarItemGroup(placement: .topBarLeading) {
+        if horizontalSizeClass != .compact, let focusButtonTapped {
+          FocusToolbarButton(isActive: isFocusActive, action: focusButtonTapped)
+        }
+      }
       MealCalendarNavigationToolbar(model: model)
     }
   }
@@ -365,7 +373,9 @@ struct MealCalendarDayAgendaView: View {
 
   private func chatButtonTapped() {
     if isSplitEnabled {
-      chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
+      chatWorkspaceDetentRaw = chatWorkspaceDetentRaw == ChatWorkspaceDetent.readerOnly.rawValue
+        ? ChatWorkspaceDetent.balanced.rawValue
+        : ChatWorkspaceDetent.readerOnly.rawValue
     } else {
       compactChatModel = RecipeChatModel(context: mealPlanChatContext)
     }
@@ -865,7 +875,7 @@ private struct MealCalendarDayHeader: View {
     Button {
       chat()
     } label: {
-      Label("Chat", systemImage: "sparkles")
+      Label("Ask", systemImage: "sparkles")
     }
     .buttonStyle(.bordered)
   }

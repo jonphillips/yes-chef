@@ -13,6 +13,7 @@ struct RecipeDetailView: View {
   /// layouts, and the cook session) and only one of them mounts an overlay.
   @State private var toastCenter: AppToastCenter
   @State private var isConfirmingBaseRecipeHandoff = false
+  @State private var isPlaybookToggleAvailable = false
   let libraryModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
@@ -128,6 +129,7 @@ struct RecipeDetailView: View {
       handoffTransport: handoffTransport,
       libraryModel: libraryModel,
       isPlaybookColumnVisible: $isPlaybookColumnVisible,
+      isPlaybookToggleAvailable: $isPlaybookToggleAvailable,
       onRecipeSelected: onRecipeSelected
     )
   }
@@ -140,26 +142,10 @@ struct RecipeDetailView: View {
   private var recipeToolbar: some ToolbarContent {
     ToolbarItemGroup(placement: .topBarLeading) {
       if isSplitEnabled, let focusButtonTapped {
-        Button {
-          focusButtonTapped()
-        } label: {
-          Label(
-            isFocusActive ? "Exit Focus" : "Focus",
-            systemImage: isFocusActive
-              ? "arrow.up.left.and.arrow.down.right.circle.fill"
-              : "arrow.up.left.and.arrow.down.right"
-          )
-        }
-        .tint(isFocusActive ? .accentColor : .primary)
-        .accessibilityValue(Text(isFocusActive ? "Focused" : "Split view"))
+        FocusToolbarButton(isActive: isFocusActive, action: focusButtonTapped)
       }
     }
     ToolbarItemGroup(placement: .primaryAction) {
-      Button {
-        libraryModel.editButtonTapped(recipeID: model.recipeID)
-      } label: {
-        Label("Edit", systemImage: "square.and.pencil")
-      }
       Button {
         groceryModel.addRecipeButtonTapped(
           recipeID: model.recipeID,
@@ -204,6 +190,21 @@ struct RecipeDetailView: View {
         .disabled(!UIPasteboard.general.hasStrings)
       } label: {
         Label("Hand off", systemImage: "sparkles.square.filled.on.square")
+      }
+      if isPlaybookToggleAvailable {
+        Button {
+          isPlaybookColumnVisible.toggle()
+        } label: {
+          Label(
+            isPlaybookColumnVisible ? "Hide Playbook" : "Show Playbook",
+            systemImage: "sidebar.trailing"
+          )
+        }
+      }
+      Button {
+        libraryModel.editButtonTapped(recipeID: model.recipeID)
+      } label: {
+        Label("Edit", systemImage: "square.and.pencil")
       }
     }
     ToolbarItemGroup(placement: .secondaryAction) {
@@ -331,6 +332,7 @@ private struct RecipeReaderView: View {
   let handoffTransport: HandoffInAppTransport
   let libraryModel: RecipeLibraryModel
   @Binding var isPlaybookColumnVisible: Bool
+  @Binding var isPlaybookToggleAvailable: Bool
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   @AppStorage(RecipePlaybookColumnPreferences.detentStorageKey)
@@ -367,19 +369,17 @@ private struct RecipeReaderView: View {
             .frame(maxWidth: .infinity, minHeight: proxy.size.height)
         }
       }
-      .toolbar {
-        if model.recipe != nil, proxy.size.width >= twoColumnThreshold {
-          ToolbarItem(placement: .primaryAction) {
-            Button {
-              isPlaybookColumnVisible.toggle()
-            } label: {
-              Label(
-                isPlaybookColumnVisible ? "Hide Playbook" : "Show Playbook",
-                systemImage: "sidebar.trailing"
-              )
-            }
-          }
-        }
+      .onAppear {
+        isPlaybookToggleAvailable = model.recipe != nil && proxy.size.width >= twoColumnThreshold
+      }
+      .onChange(of: proxy.size.width) { _, width in
+        isPlaybookToggleAvailable = model.recipe != nil && width >= twoColumnThreshold
+      }
+      .onChange(of: model.recipe?.id) {
+        isPlaybookToggleAvailable = model.recipe != nil && proxy.size.width >= twoColumnThreshold
+      }
+      .onDisappear {
+        isPlaybookToggleAvailable = false
       }
     }
     .sheet(isPresented: $isPhotoGalleryPresented) {

@@ -175,17 +175,12 @@ struct WorkbenchDetailView: View {
     }
     .toolbar {
       if model.detail != nil {
-        ToolbarItemGroup(placement: .primaryAction) {
+        ToolbarItemGroup(placement: .topBarLeading) {
           if horizontalSizeClass != .compact, let focusButtonTapped {
-            Button {
-              focusButtonTapped()
-            } label: {
-              Label(
-                "Focus",
-                systemImage: isFocusActive ? "rectangle.expand" : "arrow.up.left.and.arrow.down.right"
-              )
-            }
+            FocusToolbarButton(isActive: isFocusActive, action: focusButtonTapped)
           }
+        }
+        ToolbarItemGroup(placement: .primaryAction) {
           Button {
             model.addCandidatesButtonTapped()
           } label: {
