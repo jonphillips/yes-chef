@@ -282,6 +282,17 @@ extension RecipeCoreTests {
             task: "Marinate the chicken.",
             sourceDish: prepSourceID
           )
+        ],
+        learnings: [
+          Learning(
+            id: SampleUUIDSequence.uuid(13_005),
+            sourceType: .menu,
+            sourceID: menuID,
+            text: "Six pounds of chicken was exactly right.",
+            provenance: .inApp,
+            dateCreated: now,
+            dateModified: now
+          )
         ]
       )
 
@@ -294,6 +305,12 @@ extension RecipeCoreTests {
       #expect(serialized.contains("- Menu item ID: \(itemID.uuidString)"))
       #expect(serialized.contains("- Day: 2 (dayOffset 1)"))
       #expect(serialized.contains("- Meal slot: Dinner"))
+      #expect(
+        serialized.contains(
+          "Already-captured menu learnings — do NOT repeat these; in the learnings section return only genuinely new, durable learnings established this session that are not already listed:"
+        )
+      )
+      #expect(serialized.contains("Six pounds of chicken was exactly right."))
       #expect(serialized.contains("- Prep time: 20 minutes"))
       #expect(serialized.contains("    - 2 pounds chicken thighs"))
       #expect(serialized.contains("- Menu item notes: Serve sliced."))

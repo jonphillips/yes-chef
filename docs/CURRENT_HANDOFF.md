@@ -48,6 +48,21 @@ write path, the title-revert guard); then the generic app build (elevated, no si
 [ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) S1 and
 [`efforts/chat-surface-contract.md`](efforts/chat-surface-contract.md) are both dispatch-ready and waiting.
 
+**⚠️ Dispatch 3 leaves a polish bundle behind, and it rides the *next* slice — whatever that turns out to be.**
+Jon's device pass on PR [#238](https://github.com/jonphillips/yes-chef/pull/238) passed; seven items were
+deferred rather than held for it, itemized in
+[the punch-list comment](https://github.com/jonphillips/yes-chef/pull/238#issuecomment-5085099892) (device
+finding + six review nits). All app-layer, no schema — **batch into one commit on the next slice's PR; it does
+not earn its own.** One item is a decision, not a fix: the Add-a-learning form wants the app's attention-card
+treatment, and that treatment is **already a drifted shape with four copies** —
+[`RecipeAdjustmentReviewView`](../YesChefApp/RecipeAdjustmentReviewView.swift) ~204,
+[`RecipeChatWorkspace`](../YesChefApp/RecipeChatWorkspace.swift) ~958,
+[`RecipeCollectionReviewSheet`](../YesChefApp/RecipeCollectionReviewSheet.swift) ~222, and
+[`RecipeDetailView`](../YesChefApp/RecipeDetailView.swift) ~788, the last already diverged to `padding(12)`
+with no `frame`. **Extract one named modifier and fold all four in rather than adding a fifth copy** — the same
+cure Dispatch 1 applied to the expand control, and the reason to do it now is that the drift is already
+underway. Folding `RecipeDetailView` in changes its padding 12 → 10, so it wants an eye on the device pass.
+
 **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) is unblocked but unscheduled.** Its gate
 ("ferry Dispatch 1 lands first") was satisfied on 2026-07-25 and Dispatch 1.5's panel work is now merged, so
 nothing holds it except appetite. **When it is picked up, [`efforts/chat-surface-contract.md`](efforts/chat-surface-contract.md)
@@ -94,7 +109,7 @@ PR #141), **and** the ADR-0021
 synced `recipeVariations` table (Recipe edit proposals S2), **and `Menu.externalProjectName`** (ADR-0038 S2),
 **and the synced `learnings` table including its `sortOrder` column** (ADR-0038 Amd 1 / Amd 5) **and the synced `prepPlanSteps` table**
 (ADR-0040 S2). *(The `Menu.prepPlan` BLOB it replaced was **dropped outright** in PR [#231](https://github.com/jonphillips/yes-chef/pull/231),
-so it never enters the prod schema.)* **and the synced `workbenchLog` table including its nullable `hypothesis` / `change` / `rationale` columns** (ADR-0042 S2), **and the synced `recipeDeliberationLog` table** (ADR-0021 V3, PR [#225](https://github.com/jonphillips/yes-chef/pull/225) — **shipped 2026-07-24**; [Amd 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23); the *only* schema that variations arc added — V1+V2 added none); and note the app target
+so it never enters the prod schema.)* **and the synced `workbenchLog` table including its nullable `hypothesis` / `change` / `rationale` columns** (ADR-0042 S2), **and `workbenches.dateCompleted`** (Dogfood ferry Dispatch 3), **and the synced `recipeDeliberationLog` table** (ADR-0021 V3, PR [#225](https://github.com/jonphillips/yes-chef/pull/225) — **shipped 2026-07-24**; [Amd 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23); the *only* schema that variations arc added — V1+V2 added none); and note the app target
 (`PantryViews.swift` / `GroceryViews.swift`) compiles only in Jon's device pass, not CI.
 
 ## Ready Efforts (queue)

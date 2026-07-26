@@ -8,6 +8,30 @@ extension AIHandoffTests {
   @Suite
   struct LearningRepositoryTests {
     @Test
+    func insertNewPreservesHandAuthoredProvenance() throws {
+      @Dependency(\.defaultDatabase) var database
+      let menuID = SampleUUIDSequence.uuid(38_030)
+      let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+      try database.write { db in
+        let inserted = try LearningRepository.insertNew(
+          texts: ["Six pounds of chicken was exactly right."],
+          sourceType: .menu,
+          sourceID: menuID,
+          provenance: .inApp,
+          in: db,
+          now: now,
+          uuid: { SampleUUIDSequence.uuid(38_031) }
+        )
+        expectNoDifference(inserted, 1)
+        let learning = try #require(
+          try LearningRepository.learnings(sourceType: .menu, sourceID: menuID, in: db).first
+        )
+        expectNoDifference(learning.provenance, .inApp)
+      }
+    }
+
+    @Test
     func learningsForSourceFilterAndSortInDescendingCreationOrder() throws {
       @Dependency(\.defaultDatabase) var database
       let recipeID = SampleUUIDSequence.uuid(38_040)

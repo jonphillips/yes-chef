@@ -7,6 +7,7 @@ public struct Workbench: Codable, Identifiable, Equatable, Sendable {
   public var title: String
   public var notes: String?
   public var draftRecipeID: Recipe.ID?
+  public var dateCompleted: Date?
   public var sortOrder: Int
   public var dateCreated: Date
   public var dateModified: Date
@@ -16,6 +17,7 @@ public struct Workbench: Codable, Identifiable, Equatable, Sendable {
     title: String,
     notes: String? = nil,
     draftRecipeID: Recipe.ID? = nil,
+    dateCompleted: Date? = nil,
     sortOrder: Int,
     dateCreated: Date,
     dateModified: Date
@@ -24,6 +26,7 @@ public struct Workbench: Codable, Identifiable, Equatable, Sendable {
     self.title = title
     self.notes = notes
     self.draftRecipeID = draftRecipeID
+    self.dateCompleted = dateCompleted
     self.sortOrder = sortOrder
     self.dateCreated = dateCreated
     self.dateModified = dateModified
@@ -226,12 +229,29 @@ public extension RecipeSource {
   }
 }
 
+public struct WorkbenchListData: Equatable, Sendable {
+  public var activeRows: [WorkbenchRowData]
+  public var completedRows: [WorkbenchRowData]
+
+  public init(activeRows: [WorkbenchRowData] = [], completedRows: [WorkbenchRowData] = []) {
+    self.activeRows = activeRows
+    self.completedRows = completedRows
+  }
+
+  public func rows(for filter: WorkbenchListFilter) -> [WorkbenchRowData] {
+    switch filter {
+    case .active: activeRows
+    case .completed: completedRows
+    }
+  }
+}
+
 public struct WorkbenchListRequest: FetchKeyRequest {
   public init() {}
 
-  public func fetch(_ db: Database) throws -> [WorkbenchRowData] {
+  public func fetch(_ db: Database) throws -> WorkbenchListData {
     let candidatesByWorkbenchID = Dictionary(grouping: try WorkbenchCandidate.fetchAll(db), by: \.workbenchID)
-    return try Workbench.fetchAll(db)
+    let rows = try Workbench.fetchAll(db)
       .map { workbench in
         WorkbenchRowData(
           workbench: workbench,
@@ -239,6 +259,29 @@ public struct WorkbenchListRequest: FetchKeyRequest {
         )
       }
       .sorted(by: areWorkbenchRowsInIncreasingOrder)
+    return WorkbenchListData(
+      activeRows: rows.filter { $0.workbench.dateCompleted == nil },
+      completedRows: rows.filter { $0.workbench.dateCompleted != nil }
+    )
+  }
+}
+
+public enum WorkbenchListFilter: Hashable, Sendable {
+  case active
+  case completed
+
+}
+
+/// Pure inline-editor policy: an empty draft is never allowed to replace a stored title.
+public enum WorkbenchInlineEditor {
+  /// The debounce uses this policy so an incomplete draft never writes or rewrites the focused field.
+  public static func titleToPersist(draft: String) -> String? {
+    draft.nonEmptyWorkbenchText
+  }
+
+  /// The blur policy restores the last valid title if the user leaves the field empty.
+  public static func titleForCommit(draft: String, lastGoodTitle: String) -> String {
+    titleToPersist(draft: draft) ?? lastGoodTitle
   }
 }
 
@@ -408,6 +451,18 @@ public enum WorkbenchRepository {
     }
     var workbench = try requireWorkbench(workbenchID, in: db)
     workbench.title = title
+    workbench.dateModified = now
+    try Workbench.upsert { workbench }.execute(db)
+  }
+
+  public static func updateWorkbenchCompletion(
+    workbenchID: Workbench.ID,
+    dateCompleted: Date?,
+    in db: Database,
+    now: Date
+  ) throws {
+    var workbench = try requireWorkbench(workbenchID, in: db)
+    workbench.dateCompleted = dateCompleted
     workbench.dateModified = now
     try Workbench.upsert { workbench }.execute(db)
   }

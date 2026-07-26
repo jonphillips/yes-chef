@@ -168,6 +168,7 @@ struct WorkbenchHandoffEntityQuery: EntityQuery {
     let database = DependencyValues._current.defaultDatabase
     return try await database.read { db in
       try Workbench.fetchAll(db)
+        .filter { $0.dateCompleted == nil }
         .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
         .map(WorkbenchHandoffEntity.init)
     }

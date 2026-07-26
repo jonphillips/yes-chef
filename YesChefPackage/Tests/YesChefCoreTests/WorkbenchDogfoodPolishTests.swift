@@ -8,6 +8,58 @@ extension RecipeCoreTests {
   @Suite
   struct WorkbenchDogfoodPolishTests {
     @Test
+    func completionPersistsAndFiltersWorkbenchLists() throws {
+      @Dependency(\.defaultDatabase) var database
+      let createdAt = Date(timeIntervalSinceReferenceDate: 807_500_000)
+      let completedAt = createdAt.addingTimeInterval(60)
+      var uuids = SampleUUIDSequence(start: 32_000)
+
+      try database.write { db in
+        let activeID = try WorkbenchRepository.addWorkbench(
+          title: "Active",
+          in: db,
+          now: createdAt,
+          uuid: { uuids.next() }
+        )
+        let completedID = try WorkbenchRepository.addWorkbench(
+          title: "Completed",
+          in: db,
+          now: createdAt,
+          uuid: { uuids.next() }
+        )
+        try WorkbenchRepository.updateWorkbenchCompletion(
+          workbenchID: completedID,
+          dateCompleted: completedAt,
+          in: db,
+          now: completedAt
+        )
+
+        let list = try WorkbenchListRequest().fetch(db)
+        expectNoDifference(list.activeRows.map(\.id), [activeID])
+        expectNoDifference(list.completedRows.map(\.id), [completedID])
+        let completed = try #require(try Workbench.find(completedID).fetchOne(db))
+        expectNoDifference(completed.dateCompleted, completedAt)
+      }
+    }
+
+    @Test
+    func inlineTitleCommitRestoresTheLastGoodTitleForAnEmptyDraft() {
+      #expect(WorkbenchInlineEditor.titleToPersist(draft: "  \n") == nil)
+      expectNoDifference(
+        WorkbenchInlineEditor.titleToPersist(draft: "Braised "),
+        "Braised"
+      )
+      expectNoDifference(
+        WorkbenchInlineEditor.titleForCommit(draft: "  \n", lastGoodTitle: "Braised Chicken"),
+        "Braised Chicken"
+      )
+      expectNoDifference(
+        WorkbenchInlineEditor.titleForCommit(draft: "  Weeknight Chicken  ", lastGoodTitle: "Braised Chicken"),
+        "Weeknight Chicken"
+      )
+    }
+
+    @Test
     func workbenchChatUsesCandidateTitleAndSourceWithoutObjectIDs() {
       let candidateID = SampleUUIDSequence.uuid(22_900)
       let recipeID = SampleUUIDSequence.uuid(22_901)

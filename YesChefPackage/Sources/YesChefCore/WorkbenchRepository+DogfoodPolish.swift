@@ -9,6 +9,7 @@ extension WorkbenchRepository {
     let workbenchIDs = try Workbench
       .where { $0.draftRecipeID.eq(recipeID) }
       .fetchAll(db)
+      .filter { $0.dateCompleted == nil }
       .map(\.id)
     guard !workbenchIDs.isEmpty else { return [] }
 

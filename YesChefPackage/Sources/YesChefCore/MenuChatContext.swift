@@ -14,6 +14,7 @@ public struct MenuChatContext: Equatable, Sendable {
   public var dayCount: Int
   public var prepPlan: [PrepPlanStepRecord]
   public var items: [MenuChatItemContext]
+  public var learnings: [Learning]
 
   public init(
     menuID: Menu.ID? = nil,
@@ -21,7 +22,8 @@ public struct MenuChatContext: Equatable, Sendable {
     notes: String? = nil,
     dayCount: Int,
     prepPlan: [PrepPlanStepRecord] = [],
-    items: [MenuChatItemContext] = []
+    items: [MenuChatItemContext] = [],
+    learnings: [Learning] = []
   ) {
     self.menuID = menuID
     self.title = title
@@ -29,6 +31,7 @@ public struct MenuChatContext: Equatable, Sendable {
     self.dayCount = dayCount
     self.prepPlan = prepPlan
     self.items = items
+    self.learnings = learnings
   }
 
   public init(detail: MenuDetailData) {
@@ -38,7 +41,8 @@ public struct MenuChatContext: Equatable, Sendable {
       notes: detail.menu.notes,
       dayCount: detail.menu.dayCount,
       prepPlan: detail.prepPlanSteps,
-      items: detail.itemRows.map(MenuChatItemContext.init(row:))
+      items: detail.itemRows.map(MenuChatItemContext.init(row:)),
+      learnings: detail.learnings
     )
   }
 
@@ -170,7 +174,8 @@ public struct MenuChatContext: Equatable, Sendable {
       ingredientLimit: 0,
       makeAheadCharacterLimit: 0,
       includeMethod: false,
-      omittedItemCount: sortedItems.count
+      omittedItemCount: sortedItems.count,
+      includeLearnings: false
     )
   }
 
@@ -222,7 +227,8 @@ public struct MenuChatContext: Equatable, Sendable {
     ingredientLimit: Int,
     makeAheadCharacterLimit: Int?,
     includeMethod: Bool,
-    omittedItemCount: Int
+    omittedItemCount: Int,
+    includeLearnings: Bool = true
   ) -> MenuChatSerializedContext {
     var budgetNotes: [String] = []
     if !includeMethod, items.contains(where: { !$0.method.isEmpty }) {
@@ -252,6 +258,9 @@ public struct MenuChatContext: Equatable, Sendable {
         "\(omittedItemCount) lower-priority menu item(s) were omitted to stay within the context budget."
       )
     }
+    if !includeLearnings, !learnings.isEmpty {
+      budgetNotes.append("Menu learnings were omitted as the final context-budget reduction.")
+    }
 
     var lines = ["The user is looking at this menu:"]
     lines.append("- Title: \(title.isEmpty ? "(untitled)" : title)")
@@ -267,6 +276,14 @@ public struct MenuChatContext: Equatable, Sendable {
         if let sourceDish = step.sourceDish {
           lines.append("  - Source menu item ID: \(sourceDish.uuidString)")
         }
+      }
+    }
+    if includeLearnings, !learnings.isEmpty {
+      lines.append(
+        "Already-captured menu learnings — do NOT repeat these; in the learnings section return only genuinely new, durable learnings established this session that are not already listed:"
+      )
+      for learning in learnings {
+        lines.append("- \(learning.text)")
       }
     }
     if !budgetNotes.isEmpty {

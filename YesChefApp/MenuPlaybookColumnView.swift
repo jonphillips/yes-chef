@@ -204,6 +204,7 @@ struct MenuDetailReader: View {
       )
       LearningsSection(
         learnings: detail.learnings,
+        addLearning: detailModel.createLearning,
         updateLearning: detailModel.updateLearning,
         deleteLearning: detailModel.deleteLearning,
         reorderLearnings: detailModel.reorderLearnings
