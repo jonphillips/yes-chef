@@ -174,7 +174,8 @@ public struct MenuChatContext: Equatable, Sendable {
       ingredientLimit: 0,
       makeAheadCharacterLimit: 0,
       includeMethod: false,
-      omittedItemCount: sortedItems.count
+      omittedItemCount: sortedItems.count,
+      includeLearnings: false
     )
   }
 
@@ -226,7 +227,8 @@ public struct MenuChatContext: Equatable, Sendable {
     ingredientLimit: Int,
     makeAheadCharacterLimit: Int?,
     includeMethod: Bool,
-    omittedItemCount: Int
+    omittedItemCount: Int,
+    includeLearnings: Bool = true
   ) -> MenuChatSerializedContext {
     var budgetNotes: [String] = []
     if !includeMethod, items.contains(where: { !$0.method.isEmpty }) {
@@ -256,6 +258,9 @@ public struct MenuChatContext: Equatable, Sendable {
         "\(omittedItemCount) lower-priority menu item(s) were omitted to stay within the context budget."
       )
     }
+    if !includeLearnings, !learnings.isEmpty {
+      budgetNotes.append("Menu learnings were omitted as the final context-budget reduction.")
+    }
 
     var lines = ["The user is looking at this menu:"]
     lines.append("- Title: \(title.isEmpty ? "(untitled)" : title)")
@@ -273,8 +278,10 @@ public struct MenuChatContext: Equatable, Sendable {
         }
       }
     }
-    if !learnings.isEmpty {
-      lines.append("Already-captured menu learnings — do NOT repeat these:")
+    if includeLearnings, !learnings.isEmpty {
+      lines.append(
+        "Already-captured menu learnings — do NOT repeat these; in the learnings section return only genuinely new, durable learnings established this session that are not already listed:"
+      )
       for learning in learnings {
         lines.append("- \(learning.text)")
       }

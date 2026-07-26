@@ -103,7 +103,7 @@ struct PrepPlanStepEditorSheet: View {
 
 struct LearningsSection: View {
   let learnings: [Learning]
-  var addLearning: ((String) -> Void)? = nil
+  var addLearning: ((String) -> Bool)? = nil
   var updateLearning: (Learning, String) -> Void
   var deleteLearning: (Learning.ID) -> Void
   var reorderLearnings: ([Learning.ID], LearningReorderDestination) -> Void
@@ -155,7 +155,7 @@ struct LearningsSection: View {
             }
             Spacer()
             Button("Add") {
-              addLearning?(newLearningText)
+              guard addLearning?(newLearningText) == true else { return }
               newLearningText = ""
               isAdding = false
             }

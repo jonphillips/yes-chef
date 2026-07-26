@@ -43,10 +43,6 @@ struct WorkbenchListView: View {
           Text("Completed").tag(WorkbenchListFilter.completed)
         }
         .pickerStyle(.segmented)
-        if selectedFilter == .completed {
-          TextField("Search completed workbenches", text: $completedSearchText)
-            .textFieldStyle(.roundedBorder)
-        }
       }
       .padding(.horizontal)
       .padding(.top, 8)
@@ -62,13 +58,15 @@ struct WorkbenchListView: View {
         }
       }
     }
+    .completedWorkbenchSearch(isEnabled: selectedFilter == .completed, text: $completedSearchText)
   }
 
   private func workbenchRows(for model: WorkbenchLibraryModel) -> [WorkbenchRowData] {
-    guard selectedFilter == .completed else { return model.activeWorkbenchRows }
+    let rows = model.workbenchList.rows(for: selectedFilter)
+    guard selectedFilter == .completed else { return rows }
     let query = completedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !query.isEmpty else { return model.completedWorkbenchRows }
-    return model.completedWorkbenchRows.filter {
+    guard !query.isEmpty else { return rows }
+    return rows.filter {
       $0.workbench.title.localizedCaseInsensitiveContains(query)
         || ($0.workbench.notes?.localizedCaseInsensitiveContains(query) ?? false)
     }
@@ -536,11 +534,11 @@ private struct WorkbenchReader: View {
       lastSavedNotes = detail.workbench.notes
     }
     .onChange(of: detail.workbench.title) { _, title in
-      titleText = title
+      if focusedField != .title { titleText = title }
       lastGoodTitle = title
     }
     .onChange(of: detail.workbench.notes) { _, notes in
-      notesText = notes ?? ""
+      if focusedField != .notes { notesText = notes ?? "" }
       lastSavedNotes = notes
     }
     .onChange(of: titleText) {
@@ -550,14 +548,14 @@ private struct WorkbenchReader: View {
       scheduleNotesSave()
     }
     .onChange(of: focusedField) { oldField, newField in
-      if oldField == .title, newField != .title { commitTitle() }
-      if oldField == .notes, newField != .notes { commitNotes() }
+      if oldField == .title, newField != .title { commitTitleOnBlur() }
+      if oldField == .notes, newField != .notes { persistNotesDraft() }
     }
     .onDisappear {
       titleSaveTask?.cancel()
       notesSaveTask?.cancel()
-      commitTitle()
-      commitNotes()
+      commitTitleOnBlur()
+      persistNotesDraft()
     }
   }
 
@@ -566,7 +564,7 @@ private struct WorkbenchReader: View {
     titleSaveTask = Task { @MainActor in
       do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
       guard !Task.isCancelled else { return }
-      commitTitle()
+      persistTitleDraft()
     }
   }
 
@@ -575,11 +573,18 @@ private struct WorkbenchReader: View {
     notesSaveTask = Task { @MainActor in
       do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
       guard !Task.isCancelled else { return }
-      commitNotes()
+      persistNotesDraft()
     }
   }
 
-  private func commitTitle() {
+  private func persistTitleDraft() {
+    guard let title = WorkbenchInlineEditor.titleToPersist(draft: titleText), title != lastGoodTitle else { return }
+    if model.saveTitleButtonTapped(title) {
+      lastGoodTitle = title
+    }
+  }
+
+  private func commitTitleOnBlur() {
     let title = WorkbenchInlineEditor.titleForCommit(draft: titleText, lastGoodTitle: lastGoodTitle)
     guard title != lastGoodTitle else {
       titleText = title
@@ -591,7 +596,7 @@ private struct WorkbenchReader: View {
     }
   }
 
-  private func commitNotes() {
+  private func persistNotesDraft() {
     let notes = notesText.trimmingCharacters(in: .whitespacesAndNewlines)
     let normalizedNotes = notes.isEmpty ? nil : notes
     guard normalizedNotes != lastSavedNotes else { return }

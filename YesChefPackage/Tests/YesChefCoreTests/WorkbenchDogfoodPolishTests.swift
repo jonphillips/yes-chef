@@ -34,14 +34,9 @@ extension RecipeCoreTests {
           now: completedAt
         )
 
-        expectNoDifference(
-          try WorkbenchListRequest(filter: .active).fetch(db).map(\.id),
-          [activeID]
-        )
-        expectNoDifference(
-          try WorkbenchListRequest(filter: .completed).fetch(db).map(\.id),
-          [completedID]
-        )
+        let list = try WorkbenchListRequest().fetch(db)
+        expectNoDifference(list.activeRows.map(\.id), [activeID])
+        expectNoDifference(list.completedRows.map(\.id), [completedID])
         let completed = try #require(try Workbench.find(completedID).fetchOne(db))
         expectNoDifference(completed.dateCompleted, completedAt)
       }
@@ -49,6 +44,11 @@ extension RecipeCoreTests {
 
     @Test
     func inlineTitleCommitRestoresTheLastGoodTitleForAnEmptyDraft() {
+      #expect(WorkbenchInlineEditor.titleToPersist(draft: "  \n") == nil)
+      expectNoDifference(
+        WorkbenchInlineEditor.titleToPersist(draft: "Braised "),
+        "Braised"
+      )
       expectNoDifference(
         WorkbenchInlineEditor.titleForCommit(draft: "  \n", lastGoodTitle: "Braised Chicken"),
         "Braised Chicken"

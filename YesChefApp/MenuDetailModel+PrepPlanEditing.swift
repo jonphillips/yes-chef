@@ -2,9 +2,9 @@ import Foundation
 import YesChefCore
 
 extension MenuDetailModel {
-  func createLearning(_ text: String) {
+  func createLearning(_ text: String) -> Bool {
     do {
-      _ = try database.write { db in
+      let inserted = try database.write { db in
         try LearningRepository.insertNew(
           texts: [text],
           sourceType: .menu,
@@ -15,10 +15,13 @@ extension MenuDetailModel {
           uuid: { uuid() }
         )
       }
+      guard inserted > 0 else { return false }
       toastCenter?.postSuccess("Added learning.")
+      return true
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
+      return false
     }
   }
 

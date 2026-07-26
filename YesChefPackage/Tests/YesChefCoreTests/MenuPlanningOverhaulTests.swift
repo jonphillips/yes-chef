@@ -9,6 +9,33 @@ extension RecipeCoreTests {
   @Suite
   struct MenuPlanningOverhaulTests {
     @Test
+    func menuChatContextDropsLearningsAsTheFinalBudgetReduction() {
+      let now = Date(timeIntervalSinceReferenceDate: 805_000_000)
+      let menuID = SampleUUIDSequence.uuid(14_700)
+      let context = MenuChatContext(
+        title: "Learning-Heavy Menu",
+        dayCount: 1,
+        learnings: [
+          Learning(
+            id: SampleUUIDSequence.uuid(14_701),
+            sourceType: .menu,
+            sourceID: menuID,
+            text: String(repeating: "A durable observation. ", count: 80),
+            provenance: .inApp,
+            dateCreated: now,
+            dateModified: now
+          )
+        ]
+      )
+
+      let serialized = context.serialized(characterBudget: 300)
+
+      #expect(serialized.count <= 300)
+      #expect(serialized.contains("Menu learnings were omitted as the final context-budget reduction."))
+      #expect(!serialized.contains("A durable observation."))
+    }
+
+    @Test
     func menuChatContextClipsMakeAheadBeforeDroppingDishes() {
       let menuID = SampleUUIDSequence.uuid(14_500)
       let now = Date(timeIntervalSinceReferenceDate: 805_250_000)

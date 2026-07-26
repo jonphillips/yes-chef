@@ -3,6 +3,7 @@ import Dependencies
 import Foundation
 import Observation
 import SQLiteData
+import SwiftUI
 import YesChefCore
 
 @Observable
@@ -21,9 +22,7 @@ final class WorkbenchLibraryModel {
   @ObservationIgnored
   @Dependency(\.uuid) private var uuid
   @ObservationIgnored
-  @Fetch(WorkbenchListRequest(filter: .active), animation: .default) var activeWorkbenchRows: [WorkbenchRowData] = []
-  @ObservationIgnored
-  @Fetch(WorkbenchListRequest(filter: .completed), animation: .default) var completedWorkbenchRows: [WorkbenchRowData] = []
+  @Fetch(WorkbenchListRequest(), animation: .default) var workbenchList = WorkbenchListData()
 
   var destination: Destination?
   var navigationPath: [Workbench.ID] = []
@@ -32,8 +31,7 @@ final class WorkbenchLibraryModel {
   var isShowingError = false
 
   func reloadAfterExternalChange() async {
-    try? await $activeWorkbenchRows.load()
-    try? await $completedWorkbenchRows.load()
+    try? await $workbenchList.load()
   }
 
   func addWorkbenchButtonTapped() {
@@ -540,6 +538,22 @@ final class WorkbenchDetailModel {
         uuid: { uuid() }
       )
     }
+  }
+}
+
+struct WorkbenchCompletedSearch: ViewModifier {
+  let isEnabled: Bool
+  @Binding var text: String
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if isEnabled { content.searchable(text: $text, prompt: "Search completed workbenches") } else { content }
+  }
+}
+
+extension View {
+  func completedWorkbenchSearch(isEnabled: Bool, text: Binding<String>) -> some View {
+    modifier(WorkbenchCompletedSearch(isEnabled: isEnabled, text: text))
   }
 }
 

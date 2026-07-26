@@ -305,7 +305,11 @@ extension RecipeCoreTests {
       #expect(serialized.contains("- Menu item ID: \(itemID.uuidString)"))
       #expect(serialized.contains("- Day: 2 (dayOffset 1)"))
       #expect(serialized.contains("- Meal slot: Dinner"))
-      #expect(serialized.contains("Already-captured menu learnings — do NOT repeat these:"))
+      #expect(
+        serialized.contains(
+          "Already-captured menu learnings — do NOT repeat these; in the learnings section return only genuinely new, durable learnings established this session that are not already listed:"
+        )
+      )
       #expect(serialized.contains("Six pounds of chicken was exactly right."))
       #expect(serialized.contains("- Prep time: 20 minutes"))
       #expect(serialized.contains("    - 2 pounds chicken thighs"))
