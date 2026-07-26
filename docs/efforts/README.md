@@ -24,6 +24,15 @@ it's touched.
 
 ## Active / recent
 
+- [dogfood-ferry-2026-07-25.md](dogfood-ferry-2026-07-25.md) — **Designed** (not dispatched) · Jon's
+  2026-07-25 ferry pass · **Three dispatches, three PRs.** D1: one shared full-screen expand control replaces
+  four drifted copies + the Menu gains the Recipe's pinned-Ask onboard treatment (view layer only). D2:
+  prep-plan/complement hand-offs regroup into per-day and per-plan overflow menus, per-day prep becomes a
+  *scoped ask* over woven storage (no `dayOffset` on the step record — ADR-0034 holds), Clear gains a confirm,
+  and "Prep Plan" stops leaking onto the recipe surface. D3: workbench Active/Completed + edit-in-place +
+  honest delete copy, and menu learnings become hand-authorable through the orphaned `.inApp` provenance.
+  One nullable synced column (`workbenches.dateCompleted`); everything else schema-free. The tab-bar shell is
+  split out as [ADR-0046](../decisions/ADR-0046-sidebar-adaptable-app-shell.md), gated behind D1.
 - [adr-0026-review-collection-sheet.md](adr-0026-review-collection-sheet.md) —
   **Ready to dispatch** (Next Up) · Governed by
   [ADR-0026](../decisions/ADR-0026-review-collection-sheet.md) (Accepted) · Hoist the multi-item
