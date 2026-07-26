@@ -22,6 +22,23 @@ struct HandoffSectionRoutingTests {
   }
 
   @Test
+  func menuDayReturnOnlyMatchesItsOriginalDay() {
+    let menuID = UUID(uuidString: "00000000-0000-0000-0000-000000003904")!
+    let dayTwoHandoff = AIHandoff(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000003905")!,
+      sourceType: .menu,
+      sourceID: menuID,
+      taskType: .prepPlan,
+      dayOffset: 1,
+      createdAt: .distantPast,
+      exportedPrompt: ""
+    )
+
+    #expect(HandoffExportSource.menuDay(menuID, dayOffset: 1).matches(dayTwoHandoff))
+    #expect(!HandoffExportSource.menuDay(menuID, dayOffset: 0).matches(dayTwoHandoff))
+  }
+
+  @Test
   func recipeAdjustmentRoundTripKeepsTheTokenContractMarkerProseAndLearnings() throws {
     let handoffID = UUID(uuidString: "00000000-0000-0000-0000-000000003903")!
     let result = """

@@ -970,6 +970,14 @@ extension DependencyValues {
         ALTER TABLE "chatMessages"
         ADD COLUMN "resolvedTier" TEXT
         """)
+      .execute(db)
+    }
+
+    migrator.registerMigration("Add day scope to local AI handoffs") { db in
+      try #sql("""
+        ALTER TABLE "aiHandoffs"
+        ADD COLUMN "dayOffset" INTEGER
+        """)
         .execute(db)
     }
 

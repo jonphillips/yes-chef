@@ -10,6 +10,8 @@ public struct AIHandoff: Codable, Identifiable, Equatable, Sendable {
   public var sourceType: AIHandoffSourceType
   public var sourceID: UUID
   public var taskType: AIHandoffTaskType
+  /// Present only for a menu handoff initiated from one specific day.
+  public var dayOffset: Int?
   public var createdAt: Date
   public var importedAt: Date?
   public var status: AIHandoffStatus
@@ -21,6 +23,7 @@ public struct AIHandoff: Codable, Identifiable, Equatable, Sendable {
     sourceType: AIHandoffSourceType,
     sourceID: UUID,
     taskType: AIHandoffTaskType,
+    dayOffset: Int? = nil,
     createdAt: Date,
     importedAt: Date? = nil,
     status: AIHandoffStatus = .awaitingReturn,
@@ -31,6 +34,7 @@ public struct AIHandoff: Codable, Identifiable, Equatable, Sendable {
     self.sourceType = sourceType
     self.sourceID = sourceID
     self.taskType = taskType
+    self.dayOffset = dayOffset
     self.createdAt = createdAt
     self.importedAt = importedAt
     self.status = status
@@ -113,9 +117,13 @@ public extension AIHandoff {
   func matches(
     sourceType: AIHandoffSourceType,
     sourceID: UUID,
-    taskType: AIHandoffTaskType
+    taskType: AIHandoffTaskType,
+    dayOffset: Int? = nil
   ) -> Bool {
-    self.sourceType == sourceType && self.sourceID == sourceID && self.taskType == taskType
+    self.sourceType == sourceType
+      && self.sourceID == sourceID
+      && self.taskType == taskType
+      && self.dayOffset == dayOffset
   }
 }
 
@@ -857,6 +865,19 @@ public enum AIHandoffReturn {
       learnings: learnings.learnings,
       unparsedLines: parsed.unparsedLines + learnings.unparsedLines
     )
+  }
+
+  public static func omittedCurrentPrepStepEvidence(
+    proposedPlan: MenuPrepPlan,
+    currentPlan: MenuPrepPlan
+  ) -> [String] {
+    currentPlan.steps.filter { currentStep in
+      !proposedPlan.steps.contains(currentStep)
+    }
+    .map { step in
+      let serves = step.serves.map { " → \($0)" } ?? ""
+      return "Existing prep step missing from returned plan: \(step.session): \(step.task)\(serves)"
+    }
   }
 
   public static func menuComplement(from text: String, dayCount: Int) -> MenuComplementHandoffParseResult {

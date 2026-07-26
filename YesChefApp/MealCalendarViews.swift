@@ -713,7 +713,8 @@ private struct MealCalendarWeekGrid: View {
             summary: summary,
             isSelected: model.isSelectedDate(summary.date),
             isToday: model.isToday(summary.date),
-            minHeight: cellMinHeight
+            minHeight: cellMinHeight,
+            toastCenter: model.toastCenter
           ) {
             model.selectDateButtonTapped(summary.date)
           }
@@ -776,49 +777,54 @@ private struct MealCalendarWeekCell: View {
   let isSelected: Bool
   let isToday: Bool
   let minHeight: CGFloat
+  let toastCenter: AppToastCenter?
   let action: () -> Void
   @State private var handoffTransport = HandoffInAppTransport()
+
+  private var handoffSources: HandoffExportSource.MealPlanSources? {
+    HandoffExportSource.mealPlanSources(on: summary.date, rows: summary.rows)
+  }
 
   var body: some View {
     ZStack(alignment: .topTrailing) {
       Button(action: action) {
-      VStack(alignment: .leading, spacing: 8) {
-        HStack(alignment: .firstTextBaseline) {
-          VStack(alignment: .leading, spacing: 2) {
-            Text(summary.date, format: .dateTime.weekday(.abbreviated))
-              .font(.caption.weight(.semibold))
+        VStack(alignment: .leading, spacing: 8) {
+          HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+              Text(summary.date, format: .dateTime.weekday(.abbreviated))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+              Text(summary.date, format: .dateTime.day())
+                .font(.title3.weight(.bold))
+                .foregroundStyle(isToday ? Color.accentColor : Color.primary)
+            }
+            Spacer(minLength: handoffSources == nil ? 0 : 32)
+          }
+
+          if summary.rows.isEmpty {
+            Text("Open")
+              .font(.caption)
               .foregroundStyle(.secondary)
-            Text(summary.date, format: .dateTime.day())
-              .font(.title3.weight(.bold))
-              .foregroundStyle(isToday ? Color.accentColor : Color.primary)
+          } else {
+            ForEach(summary.rows.prefix(5)) { row in
+              MealCalendarChip(row: row, titleLineLimit: 3)
+            }
           }
-          Spacer(minLength: 32)
-        }
 
-        if summary.rows.isEmpty {
-          Text("Open")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        } else {
-          ForEach(summary.rows.prefix(5)) { row in
-            MealCalendarChip(row: row, titleLineLimit: 3)
-          }
+          Spacer(minLength: 0)
         }
-
-        Spacer(minLength: 0)
-      }
-      .padding(8)
-      .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
-      .background(isSelected ? Color.accentColor.opacity(0.12) : Color(uiColor: .secondarySystemGroupedBackground))
-      .clipShape(.rect(cornerRadius: 8))
-      .overlay {
-        RoundedRectangle(cornerRadius: 8)
-          .stroke(isSelected ? Color.accentColor : Color(uiColor: .separator), lineWidth: isSelected ? 1.5 : 0.5)
-      }
+        .padding(8)
+        .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
+        .background(isSelected ? Color.accentColor.opacity(0.12) : Color(uiColor: .secondarySystemGroupedBackground))
+        .clipShape(.rect(cornerRadius: 8))
+        .overlay {
+          RoundedRectangle(cornerRadius: 8)
+            .stroke(isSelected ? Color.accentColor : Color(uiColor: .separator), lineWidth: isSelected ? 1.5 : 0.5)
+        }
       }
       .buttonStyle(.plain)
 
-      if let sources = HandoffExportSource.mealPlanSources(on: summary.date, rows: summary.rows) {
+      if let sources = handoffSources {
         Menu {
           HandoffMenuActions(
             handoffSource: sources.makeAhead,
@@ -838,6 +844,7 @@ private struct MealCalendarWeekCell: View {
       }
     }
     .handoffTransportAlert(handoffTransport)
+    .onAppear { handoffTransport.toastCenter = toastCenter }
   }
 }
 

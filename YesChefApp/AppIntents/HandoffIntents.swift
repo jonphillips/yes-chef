@@ -157,30 +157,31 @@ extension HandoffExportSource {
     let sourceType: AIHandoffSourceType
     let sourceID: UUID
     let taskType: AIHandoffTaskType
+    let dayOffset: Int?
   }
 
   func metadata(handoffID: AIHandoff.ID) -> Metadata {
     switch self {
     case let .recipeSection(recipeID, section):
-      Metadata(sourceType: .recipe, sourceID: recipeID, taskType: section.handoffTaskType)
+      Metadata(sourceType: .recipe, sourceID: recipeID, taskType: section.handoffTaskType, dayOffset: nil)
     case let .recipeAdjustment(recipeID):
-      Metadata(sourceType: .recipe, sourceID: recipeID, taskType: .adjustRecipe)
+      Metadata(sourceType: .recipe, sourceID: recipeID, taskType: .adjustRecipe, dayOffset: nil)
     case let .menu(menuID):
-      Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan)
+      Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan, dayOffset: nil)
     case let .menuComplement(menuID):
-      Metadata(sourceType: .menu, sourceID: menuID, taskType: .menuComplement)
-    case let .menuDay(menuID, _):
-      Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan)
-    case let .menuDayComplement(menuID, _):
-      Metadata(sourceType: .menu, sourceID: menuID, taskType: .menuComplement)
+      Metadata(sourceType: .menu, sourceID: menuID, taskType: .menuComplement, dayOffset: nil)
+    case let .menuDay(menuID, dayOffset):
+      Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan, dayOffset: dayOffset)
+    case let .menuDayComplement(menuID, dayOffset):
+      Metadata(sourceType: .menu, sourceID: menuID, taskType: .menuComplement, dayOffset: dayOffset)
     case let .mealPlan(mealPlanID):
-      Metadata(sourceType: .mealPlan, sourceID: mealPlanID, taskType: .mealPlanMakeAheadStrategy)
+      Metadata(sourceType: .mealPlan, sourceID: mealPlanID, taskType: .mealPlanMakeAheadStrategy, dayOffset: nil)
     case let .mealPlanComplement(mealPlanID):
-      Metadata(sourceType: .mealPlan, sourceID: mealPlanID, taskType: .mealPlanComplement)
+      Metadata(sourceType: .mealPlan, sourceID: mealPlanID, taskType: .mealPlanComplement, dayOffset: nil)
     case .readerFeedback:
-      Metadata(sourceType: .capture, sourceID: handoffID, taskType: .readerFeedbackCuration)
+      Metadata(sourceType: .capture, sourceID: handoffID, taskType: .readerFeedbackCuration, dayOffset: nil)
     case let .workbench(workbenchID, task):
-      Metadata(sourceType: .workbench, sourceID: workbenchID, taskType: task.handoffTaskType)
+      Metadata(sourceType: .workbench, sourceID: workbenchID, taskType: task.handoffTaskType, dayOffset: nil)
     }
   }
 
@@ -210,7 +211,8 @@ extension HandoffExportSource {
       return handoff.matches(
         sourceType: metadata.sourceType,
         sourceID: metadata.sourceID,
-        taskType: metadata.taskType
+        taskType: metadata.taskType,
+        dayOffset: metadata.dayOffset
       )
     }
   }
@@ -254,12 +256,6 @@ enum HandoffAppOperations {
     MenuChatContext(detail: detail).scoped(toDayOffset: dayOffset)
   }
 
-  private static func dayScopeInstruction(dayOffset: Int) -> String {
-    """
-    This request is only for Day \(dayOffset + 1). The context includes only that day's dishes. Keep every proposed task or complement on Day \(dayOffset + 1); do not plan for another day.
-    """
-  }
-
   private static func menuDayPrepPlanHandoff(
     detail: MenuDetailData,
     dayOffset: Int,
@@ -272,7 +268,7 @@ enum HandoffAppOperations {
     let prompt = AIHandoffToken.prompt(
       handoffID: handoffID,
       title: "\(metadata.taskType.title): \(detail.menu.title), Day \(dayOffset + 1)",
-      context: "\(dayScopeInstruction(dayOffset: dayOffset))\n\n\(context.prepPrompt())",
+      context: "\(MenuDayHandoffScope.prepInstruction(dayOffset: dayOffset))\n\n\(context.prepPrompt())",
       mode: mode
     )
     return AIHandoff(
@@ -280,6 +276,7 @@ enum HandoffAppOperations {
       sourceType: metadata.sourceType,
       sourceID: metadata.sourceID,
       taskType: metadata.taskType,
+      dayOffset: metadata.dayOffset,
       createdAt: now,
       exportedPrompt: prompt
     )
@@ -392,7 +389,7 @@ enum HandoffAppOperations {
     let prompt = AIHandoffToken.prompt(
       handoffID: handoffID,
       title: "\(metadata.taskType.title): \(detail.menu.title), Day \(dayOffset + 1)",
-      context: "\(dayScopeInstruction(dayOffset: dayOffset))\n\n\(MenuHandoffContext(menu: context).complementPrompt())",
+      context: "\(MenuDayHandoffScope.complementInstruction(dayOffset: dayOffset))\n\n\(MenuHandoffContext(menu: context).complementPrompt())",
       mode: mode,
       deliverableFormat: .menuComplement
     )
@@ -401,6 +398,7 @@ enum HandoffAppOperations {
       sourceType: metadata.sourceType,
       sourceID: metadata.sourceID,
       taskType: metadata.taskType,
+      dayOffset: metadata.dayOffset,
       createdAt: now,
       exportedPrompt: prompt
     )
@@ -446,6 +444,7 @@ enum HandoffAppOperations {
       sourceType: metadata.sourceType,
       sourceID: metadata.sourceID,
       taskType: metadata.taskType,
+      dayOffset: metadata.dayOffset,
       createdAt: now,
       exportedPrompt: AIHandoffToken.prompt(
         handoffID: handoffID,
@@ -677,6 +676,7 @@ enum HandoffAppOperations {
       sourceType: metadata.sourceType,
       sourceID: metadata.sourceID,
       taskType: metadata.taskType,
+      dayOffset: metadata.dayOffset,
       createdAt: now,
       exportedPrompt: ""
     )
