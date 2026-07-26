@@ -9,7 +9,12 @@ Status: **Accepted** — ratified by Jon **2026-07-24**, same day it was drafted
 **OQ4 is resolved (auto-send)** and **OQ3 is resolved with a correction that changes V1's scope** — see Open
 questions. **Amendment 1 (2026-07-24, accepted): the onboard seed reuses the outboard prompt's *framing*, not
 its *payload* — D2's reuse claim holds, but "does not re-author any prompt" narrows to the outboard prompt,
-and OQ4's auto-send means auto-send on a *cold* thread only.** See Amendment 1. OQ1 and OQ2 remain open and are **V2 concerns**, so they do not gate V1. Originally drafted as
+and OQ4's auto-send means auto-send on a *cold* thread only.** See Amendment 1. **Amendment 3 (2026-07-26,
+accepted): the recipe playbook's Ask launcher becomes a plain button that opens the panel unseeded — the
+section list moves entirely into the in-panel Discuss ▾, collapsing Amendment 2's "one control in two
+placements" to one placement. D3's intent survives (every section is one control away); D6 is untouched. It
+carries a binding condition — the cold panel needs an empty state and a reason on the greyed verbs, or V1's
+"the feature was removed" defect returns verbatim.** See Amendment 3. OQ1 and OQ2 remain open and are **V2 concerns**, so they do not gate V1. Originally drafted as
 Proposed — 2026-07-24. Jon's call, made explicitly against the "dead code, nuke from orbit"
 alternative he first reached for. Reverses an *implicit* drift (nothing ever decided to retire onboard; it
 decayed because its affordances were never finished). Governed by
@@ -271,6 +276,52 @@ through one method (`RecipeDetailModel.askSection`) that opens-or-switches and *
 the panel's own explicit **Done** button, since a crowded sheet toolbar is awkward to swipe past. The
 per-section overflow `Ask` items are **removed**; the overflows keep Hand-off / Paste / Edit / Clear. "Ask at
 every section" is now satisfied by one menu that lists every section, not by duplicated per-section items.
+
+## Amendment 3 — **Ask opens the panel.** The launcher stops picking sections (2026-07-26)
+
+Accepted 2026-07-26, from Jon's iPhone pass during the dogfood ferry. **Amendment 2 made the playbook's Ask a
+`Menu` over every section, so there is no way to open the panel without first choosing a seeded discussion.**
+Jon's report: *"if I want to just ask 'what's a good substitution for buttermilk' I first have to fake it doing
+a whole complex 1-of-3-choices query."*
+
+**This is the V1 defect's mirror image, and the symmetry is the lesson.** V1 existed because tapping Ask
+produced an empty panel with every apply-verb greyed, and the cook concluded the feature had been removed. The
+fix guaranteed a reply would exist — **by refusing to open the panel without a seed**. That closed the reported
+bug and silently closed the free-form question with it. Both failures come from the same move: treating "the
+panel is open" and "a seeded discussion has started" as one event.
+
+**They are two events, and the launcher only owns the first.**
+
+**Decision — the launcher becomes a plain button.** Tapping **Ask** opens the panel, unseeded, with the input
+focused. The section list is **removed from the launcher**. Section-picking keeps the home it already has: the
+open panel's **Discuss ▾** switcher, which Amendment 2 built and which
+[`RecipePlaybookView.swift`](../../YesChefApp/RecipePlaybookView.swift)'s own comment already calls *"the same
+control once open."* Amendment 2's "one control in two placements" collapses to **one control in one
+placement** — the redundancy was the defect, not the design.
+
+**The tap arithmetic, stated honestly:** a free-form question goes from *unreachable without faking a section*
+to **one tap**; a seeded section discussion goes from two taps to **three** (Ask → Discuss ▾ → section). That is
+the right direction. The buttermilk question is asked mid-cook with one hand; a seeded section discussion is
+deliberate, less frequent, and already the heavier act ([[automation-decays-near-the-stove]]).
+
+**Binding condition — the cold panel must not read as broken, or V1 returns verbatim.** An unseeded panel today
+shows only `ChatContextHeader`'s one-line context footnote above an empty transcript, with the apply-verbs
+greyed and **unexplained**. That is precisely the screen that produced V1's "the feature was removed"
+conclusion. So this amendment does not ship without:
+
+1. **An empty state in the transcript area** naming what the panel is for — ask anything about this recipe, or
+   pick a section from Discuss ▾ to start a guided discussion.
+2. **A stated reason on the greyed apply-verbs** — they need a reply before they can act. Greyed-with-a-reason
+   is a working control; greyed-in-silence is a broken feature.
+
+**D3 is amended, not abandoned.** "Ask is section-scoped at every entry point" was always about *reachability*
+of scoped discussion, not about forcing scope as the price of entry. Every section remains one control away,
+inside the panel. **D6 is untouched** — `requiresSubject` does not loosen, and the apply-verbs still require a
+real assistant reply; the empty state explains that gate rather than removing it.
+
+**Menu surfaces are unaffected.** The Menu's Ask ▾ (Prep Plan · Complement · Regenerate) lists *verbs*, not
+sections, and has no in-panel equivalent to fall back on. It stays a menu. This amendment is about the
+**recipe** launcher, where the duplication actually exists.
 
 ## Related
 

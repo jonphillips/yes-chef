@@ -1,8 +1,10 @@
 # Effort: Dogfood ferry pass — 2026-07-25 (expand control, hand-off regrouping, workbench lifecycle)
 
-**Status:** Designed (spec'd, not dispatched) — **three dispatches, three PRs**, sequenced 1 → 2 → 3.
+**Status:** **Dispatch 1 shipped** (commit `12a6612`, 2026-07-25) — remaining dispatches sequenced
+**1.5 → 2 → 3**, one PR each. Dispatch 1.5 was added 2026-07-26 from Jon's return pass on Dispatch 1.
 **Summary:** Jon's 2026-07-25 ferry pass over Menu, Recipe, Calendar and Workbench. One shared full-screen
 expand control replaces four drifted copies; the Menu grows the Recipe's pinned-Ask onboard treatment;
+the embedded chat panel stops dumping its chrome into the host toolbar and learns to close itself;
 prep-plan/complement hand-offs regroup from button rows into per-day and per-plan overflow menus with settled
 vocabulary; the Workbench gains an Active/Completed lifecycle and edit-in-place; Menu learnings become
 hand-authorable through the `.inApp` provenance that already exists.
@@ -143,6 +145,202 @@ affordance is discoverable without selecting a day first.
 
 **Dispatch 1 verification:** generic app build (elevated, no signing) + `scripts/check-drift.sh`. No package
 tests — nothing here touches Core. Jon does the device pass on `iPad Pro 13-inch (M5)` and `iPhone 17 Pro`.
+
+---
+
+# DISPATCH 1.5 — the embedded chat panel owns its chrome, and the Calendar's chat is hoisted
+
+**Added 2026-07-26** from Jon's device pass on Dispatch 1. **View layer only — no Core, no schema.**
+
+**Why this exists.** Dispatch 1 moved the Menu's Ask from the toolbar into the playbook column
+(Slice C) and made the Calendar's chat button a real toggle (Slice F1). The device pass found the
+Ask panel floating **over** the button that opens it on the Menu, and the Calendar's Ask still
+arriving as a slide-up sheet. Chasing both found one cause and one scoping error — plus a third
+thing: **Jon had only ever exercised the Recipe's Ask on iPhone**, which takes the `.sheet` path and
+is correct. Every defect below is on the iPad path, and the Recipe has it too.
+
+**The order is deliberate: fix the Recipe, then port.** The Recipe is the reference treatment every
+other surface is being pulled toward; fixing the Menu first would mean porting from a surface that is
+itself wrong.
+
+## The finding that shapes this dispatch
+
+`RecipeChatPanel` already carries the right concept. `showsEmbeddedHeader`
+([`RecipeChatWorkspace.swift:233`](../../YesChefApp/RecipeChatWorkspace.swift)) renders the panel's
+title, Clear and tier menu **inside** the panel and contributes **no** toolbar items. The doc comment
+on `onDismiss` (~239) states the intent outright: *"`nil` for embedded panels that own their own
+chrome."*
+
+**Exactly one caller passes it** — `ChatWorkspaceSplit` (~105). The Recipe's `.inspector`
+([`RecipeDetailView.swift:281`](../../YesChefApp/RecipeDetailView.swift)) and the Menu's trailing
+overlay ([`MenuViews.swift:391`](../../YesChefApp/MenuViews.swift)) are equally embedded and both
+leave it `false`, so they render *modal* chrome in a *non-modal* position: SwiftUI merges their
+toolbar items into the **host's** navigation bar. That is the Clear (trash) and the tier menu Jon
+found in the Recipe's main toolbar, and the stray `Done` next to the Focus glyph in the Menu.
+
+**The precedent is already sitting in the same overlay slot.** `MenuRecipeBrowserPanel`
+([`MenuDetailSections.swift:5`](../../YesChefApp/MenuDetailSections.swift)) renders its own
+`Text("Recipes").font(.headline)` header with its Filter control beside it and declares no `.toolbar`
+at all. The chat panel is the odd one out, not the pattern-setter.
+
+**And a launcher cannot be the dismiss.** The Recipe's Ask ▾ is a `Menu` — a section picker, by
+design ([ADR-0045](../decisions/ADR-0045-onboard-path-stays-viable.md) Amd 2) — so it cannot also be
+a toggle, and it should not become one. **Launchers launch; panels close themselves.** Once the panel
+owns a close control, the toggle semantics the Menu's Ask inherited stop mattering, and so does the
+question of whether the Ask button is covered.
+
+## SLICE G1 — the Recipe's inspector panel owns its chrome
+
+1. **`askSlideOver` passes `showsEmbeddedHeader: true`**
+   ([`RecipeDetailView.swift:280`](../../YesChefApp/RecipeDetailView.swift)). Title, Clear and tier
+   stop leaking into the recipe's navigation bar.
+2. **The embedded header gains a close** when `onDismiss` is set. Recommend an `xmark.circle.fill` at
+   the header's **trailing** edge, not a `Done` — this panel commits through Finalize and the review
+   sheet, so "Done" over-promises. `.accessibilityLabel("Close Ask")`.
+3. **The embedded header's title slot becomes `ChatSectionMenu` when `selectSection` is non-nil.**
+   Today the section switcher is a `.principal` toolbar item (~394), which on iPad **replaces the
+   recipe's own navigation title with "Discuss ▾"** while the panel is open. Flipping the flag without
+   this step would silently drop the switcher, which is an affordance, not chrome.
+   `ChatSectionMenu`'s label is already `.font(.headline)`
+   ([`ChatSectionMenu.swift:26`](../../YesChefApp/ChatSectionMenu.swift)), so it drops into the
+   header's title slot as-is.
+4. **Gate `.navigationTitle` / `.navigationBarTitleDisplayMode` behind `!showsEmbeddedHeader`** (~384–385).
+   They are applied unconditionally today, *outside* the existing toolbar gate, so they fight the host
+   title on the Calendar and Workbench splits as well — this is not Recipe-only.
+5. **Rewrite the `onDismiss` doc comment** (~239–241). It currently reads *"`nil` for embedded panels
+   that own their own chrome"* — after this slice embedded panels **do** take an `onDismiss`, and the
+   comment becomes actively misleading.
+6. **The `.sheet` path does not change**
+   ([`RecipeDetailView.swift:254`](../../YesChefApp/RecipeDetailView.swift)). A sheet has its own bar,
+   and `Done` there is correct. This is the iPhone behavior Jon has been living with, and it is the
+   reason none of this surfaced until now.
+
+**Acceptance:** with the Recipe Ask panel open on iPad, the recipe's navigation bar shows only the
+recipe's own items — no trash, no tier menu, no stray `Done`, and the recipe title still reads the
+recipe's title. The panel shows its own header with Discuss ▾, Clear, tier and a close. Closing it
+takes one tap, in the panel. iPhone is unchanged.
+
+## SLICE G2 — the same fix ports to the Menu
+
+`menuToolContent`'s `.chat` case ([`MenuViews.swift:390`](../../YesChefApp/MenuViews.swift)) passes
+`showsEmbeddedHeader: true` and keeps its `onDismiss: dismissTool`. Nothing else in the Menu changes.
+
+This removes the dislocated `Done` and gives the Menu's Ask panel a close that does not depend on
+reaching the button underneath it — which is the actual complaint. **`selectSection` is `nil` for the
+menu context**, so its header keeps the plain title.
+
+**Optional, while in the file:** give `MenuRecipeBrowserPanel` the same close control for symmetry. It
+is not broken — its launcher is a plain toggle `Button`, so tapping Browse Recipes again already closes
+it — so this is consistency, not a fix. Say in the PR which way you went.
+
+**Deliberately NOT decided here — the Menu's panel *geometry*.** Whether the chat should keep floating
+over, push like the Recipe's inspector, or take the playbook column's place is a real Menu-specific
+question (it is the only surface with two body columns already), and the over-presentation is load-bearing
+for the parked drag-from-Browse work — see the comment at
+[`MenuViews.swift:191`](../../YesChefApp/MenuViews.swift). **A panel that covers a control you need is a
+trap; a panel that covers content while open and closes on demand is just a panel.** G2 converts the
+first into the second. Jon decides the geometry after feeling it, not before. **Do not change the
+overlay to an inspector in this dispatch.**
+
+**Acceptance:** the Menu's navigation bar shows only the Menu's own items while the Ask panel is open;
+the panel closes from inside itself.
+
+## SLICE G3 — hoist the Calendar's chat to the workspace
+
+**Slice F1's premise was wrong and that is a spec error, not an implementation one.** F1 described the
+Calendar as "`ChatWorkspaceSplit` with a persisted detent." That is true of **one of three**
+`MealCalendarDayAgendaView` call sites. The other two pass `allowsChatWorkspace: false` — the wide-layout
+agenda rail ([`MealCalendarViews.swift:219`](../../YesChefApp/MealCalendarViews.swift)) and the agenda
+under the month/week grid (~167). The split is reachable **only** when `displayMode == .day`. In month
+or week view — where Jon lives — `chatButtonTapped` falls to `compactChatModel` and presents a sheet.
+Codex implemented F1 correctly (~376); it just only reaches a branch Jon was not standing in.
+
+**Do not simply flip the flag.** Both `false` sites are inside a `ScrollView`, and `ChatWorkspaceSplit`
+is a `GeometryReader` with fixed frames — nesting it in an unbounded-height scroll produces a collapsed
+panel, not a column. The flag is defending something real.
+
+**The fix is to raise the split one level.** `MealCalendarWorkspaceView`
+([`MealCalendarViews.swift:23`](../../YesChefApp/MealCalendarViews.swift)) becomes the
+`ChatWorkspaceSplit` host: its whole body — `MealCalendarWideWorkspace` **or**
+`MealCalendarStackedContent` — is the **reader**, and chat is a sibling column beside the entire
+calendar. Then:
+
+1. The workspace builds `mealPlanChatContext` from `model` (it already holds `model`; the context is
+   just `selectedDateTitle` / `selectedDate` / `selectedDayRows`).
+2. `MealCalendarDayAgendaView` takes a passed-in `chatButtonTapped: (() -> Void)?` instead of owning
+   the decision, and all three call sites route the day header's Ask up to the workspace's detent
+   toggle. `allowsChatWorkspace` disappears with the local split.
+3. **The compact path keeps its sheet.** `compactChatModel` stays for `horizontalSizeClass == .compact`
+   — on iPhone a sheet is right.
+
+> ⚠️ **Drop the `.id(chatContextIdentity)` on the split (~287) — do not carry it up.** Hoisted, that
+> `.id` rebuilds the *entire calendar* every time the selected day changes. It is also **redundant**:
+> `RecipeChatModel.updateContext`
+> ([`RecipeChat.swift:797`](../../YesChefPackage/Sources/YesChefCore/RecipeChat.swift)) already
+> persists the outgoing thread and loads the incoming one when the `persistenceSubject` changes, and
+> the meal-plan subject is `.mealPlanDay(date)`
+> ([`RecipeChatPersistence.swift:71`](../../YesChefPackage/Sources/YesChefCore/RecipeChatPersistence.swift))
+> — per day. `ChatWorkspaceSplit` already calls `updateContext` from `.onChange(of: context)` (~114).
+> So switching days swaps transcripts correctly **without** the `.id`, and dropping it is what makes
+> the hoist safe rather than what makes it risky.
+
+4. **Check day mode on device.** `displayMode == .day` routes through `MealCalendarStackedContent`,
+   which means today's *working* split is **also** nested in a `ScrollView`. Suspect it is quietly
+   degraded. The hoist should fix it by construction — confirm it does.
+
+**Acceptance:** in month, week **and** day view on iPad, the day header's Ask opens a chat **column**
+beside the calendar and the same button closes it; the transcript follows the selected day; changing the
+selected day does not rebuild the calendar; iPhone still gets the sheet.
+
+## SLICE G4 — Ask opens the panel (ADR-0045 Amendment 3)
+
+**Added 2026-07-26, after G1–G3 were already submitted as PR [#234](https://github.com/jonphillips/yes-chef/pull/234) — folds into that PR.** Spec:
+[ADR-0045 Amendment 3](../decisions/ADR-0045-onboard-path-stays-viable.md#amendment-3--ask-opens-the-panel-the-launcher-stops-picking-sections-2026-07-26).
+Touches [`RecipePlaybookView.swift`](../../YesChefApp/RecipePlaybookView.swift), which G1–G3 do **not** touch —
+no conflict with the submitted work.
+
+**The defect:** `askButton` (~114) is a `Menu` over `PlaybookSectionKind.allCases`, so there is no way to open
+the chat without first committing to a seeded section discussion. A cook who wants to type *"what's a good
+substitution for buttermilk"* must first fake a scoped ask. **This is V1's defect mirrored** — V1 fixed "the
+panel opens empty and looks broken" by refusing to open the panel without a seed.
+
+1. **`askButton` becomes a plain `Button`.** It opens the panel unseeded and focuses the input. Keep the
+   existing `.bordered` / radius-8 / `isAskActive` tinted-stroke treatment and the
+   `.accessibilityValue("Panel open" / "Panel closed")` — only the `Menu` and its `ForEach` over sections go.
+   The section list keeps its home in the panel's **Discuss ▾** (Amendment 2), which G1 moves into the embedded
+   header — **so land G4 after G1**, not before.
+2. **Route it through a no-section open path.** `RecipeDetailModel.askSection` is open-or-switch **scoped to a
+   section**; the launcher now needs open-**unseeded**. Do not fake it by passing a default section — that is
+   the exact behavior being removed. `seededAskSection` stays `nil`, which `Discuss ▾` already renders as its
+   *"Discuss"* placeholder ([`ChatSectionMenu.swift:25`](../../YesChefApp/ChatSectionMenu.swift)).
+
+> ⚠️ **The binding condition from the amendment — this slice is not done without it.** An unseeded panel today
+> shows only `ChatContextHeader`'s one-line context footnote over an empty transcript, with the apply-verbs
+> greyed and **unexplained**. That is precisely the screen that produced V1's *"the feature was removed"*
+> conclusion, and shipping step 1 alone re-files that bug. So:
+> **(a)** add an **empty state** in the transcript area when `chatModel.messages.isEmpty` — ask anything about
+> this recipe, or pick a section from Discuss ▾ for a guided discussion; and
+> **(b)** give the greyed apply-verbs a **stated reason** (they need a reply first). Greyed-with-a-reason is a
+> working control; greyed-in-silence is a broken feature. **`requiresSubject` does not loosen** (D6) — the
+> empty state explains the gate, it does not remove it.
+
+3. **Do not touch the Menu's Ask ▾.** It lists *verbs* (Prep Plan · Complement · Regenerate), not sections, and
+   has no in-panel equivalent to fall back on. Amendment 3 is explicit that it stays a menu.
+
+**Acceptance:** one tap on the recipe's Ask opens the panel with the field ready and no seeded turn sent; the
+empty panel states what it is for and why the apply-verbs are greyed; picking a section from Discuss ▾ still
+seeds that section's opener into the open thread; the Menu's Ask ▾ is unchanged. **Testable on iPhone**, unlike
+the rest of this dispatch.
+
+**Dispatch 1.5 verification:** generic app build (elevated, no signing) + `scripts/check-drift.sh`.
+No package tests — nothing here touches Core. Jon does the device pass on `iPad Pro 13-inch (M5)` and
+`iPhone 17 Pro`, **and the iPad pass is the point of this dispatch** — every defect it fixes is invisible
+on iPhone.
+
+**Sequencing note.** This lands **before** [ADR-0046](../decisions/ADR-0046-sidebar-adaptable-app-shell.md).
+That ADR's gate ("Dispatch 1 lands first") is already satisfied, but sending a broken panel affordance into a
+container rewrite with no test coverage means you cannot tell which change broke what. Both fixes live inside
+tab bodies and survive the container move.
 
 ---
 
@@ -339,7 +537,11 @@ appears in the next outbound menu ask.
 - **The sidebar-adaptable tab bar** — [ADR-0046](../decisions/ADR-0046-sidebar-adaptable-app-shell.md), its
   own decision and its own PR, **sequenced after Dispatch 1** so the shared expand control exists before the
   container moves underneath it.
-- **Converging the three chat presentation patterns** (inspector / `ChatWorkspaceSplit` / sheet). Named in
-  Slice F1, not scoped.
+- **Converging the chat presentation patterns.** Named in Slice F1 as three (inspector / `ChatWorkspaceSplit`
+  / sheet); it is really **four** — the Menu's trailing overlay is a fourth. Dispatch 1.5 makes all of them
+  share one *chrome* contract (`showsEmbeddedHeader`) without converging their *geometry*, which is the part
+  that stays unscoped.
+- **The Menu chat panel's geometry** — over vs. push vs. taking the playbook column. Deferred by Slice G2 on
+  purpose; decide after the device pass on a panel that can close itself.
 - **Any `dayOffset` on `PrepPlanStepRecord`.** Reverses ADR-0034; ruled out.
 - **Week-scoped hand-off sources or contexts.** Ruled out.
