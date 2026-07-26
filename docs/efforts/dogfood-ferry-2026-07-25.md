@@ -332,6 +332,74 @@ empty panel states what it is for and why the apply-verbs are greyed; picking a 
 seeds that section's opener into the open thread; the Menu's Ask ▾ is unchanged. **Testable on iPhone**, unlike
 the rest of this dispatch.
 
+## SLICE G5 — the panel header settles: one primary, one overflow, one dismiss
+
+**Added 2026-07-26 from Jon's iPad pass on PR [#234](https://github.com/jonphillips/yes-chef/pull/234) — its own PR, after #234 merges.** Spec:
+[ADR-0045 Amendment 3, codicil](../decisions/ADR-0045-onboard-path-stays-viable.md#codicil-to-amendment-3--the-embedded-panel-header-contract-2026-07-26).
+**This is the slice that makes the panel treatment portable** — every embedded panel (Recipe, Menu, Calendar,
+Workbench) renders the same `RecipeChatPanel` header, so settling it here settles it everywhere. That is
+Jon's stated reason for doing it now rather than after it has spread.
+
+**The observation:** G1 moved the chrome into the panel where it belongs, and that made visible how much of it
+there is. An **empty** panel currently presents Discuss ▾, a trash, a tier chip, a close, a context line, an
+empty state, a disabled Apply, an explanation of the disabled Apply, the input, and Send — ten elements to say
+*"ask me something."*
+
+> ⚠️ **Some of the items below may already be fixed** — Jon dispatched the review nits separately onto #234
+> (the `ChatContextHeader` defect and the Ask-button toggle). **Check the merged state first and skip what is
+> already done**; the acceptance criteria below are what matters, not the diff size.
+
+**1. The header becomes `[ Discuss ▾ | title ] ……… [ ⋯ ] [ ✕ ]`.**
+- **Primary slot** — `ChatSectionMenu` when `selectSection` is non-nil, otherwise the plain `Text(title)`.
+  Unchanged from G1.
+- **`⋯` overflow** — holds **Clear Chat** (destructive role, **keeping its existing `confirmingClearChat`
+  alert**) and the **model/tier** picker (`ChatTierMenu`'s contents, inlined as a section of this menu rather
+  than a nested menu). `.accessibilityLabel("Chat options")`.
+- **`✕` close** — unchanged, and still rendered only when `onDismiss` is non-nil, so the `ChatWorkspaceSplit`
+  surfaces (Calendar, Workbench) keep dismissal in their divider where it already lives.
+
+**Why the overflow, stated as a rule and not a preference:** a **destructive** control must not sit one target
+away from a **dismiss** control. `Clear Chat` already confirms, so a fat-finger costs a Cancel rather than a
+transcript — but adjacency is the wrong shape regardless of the safety net. The tier picker joins it because
+it is the least-used control on the surface (a per-conversation privacy override, not a per-question choice)
+and it should not be paying for header width.
+
+**2. The disabled-Apply explanation folds into the empty state.** Delete the standalone
+`applyActionsNeedReply` footnote above the input; move its sentence into `ChatEmptyState`. The two currently
+explain the same emptiness in two places, four inches apart — that redundancy was my binding condition on
+Amendment 3 being satisfied twice, not a design. **Apply stays visible-but-disabled** (that teaches the
+affordance exists); it just stops narrating. Once a reply exists, neither message renders.
+
+**3. `ChatContextHeader` stops claiming a seed that did not happen** *(may already be fixed on #234)*. It
+renders `seededContextDescription` unconditionally, and the recipe case is the hardcoded string **"Seeded with
+the recipe on screen."** ([`RecipeChat.swift:116`](../../YesChefPackage/Sources/YesChefCore/RecipeChat.swift)).
+Before Amendment 3 the panel was always seeded, so it was true; G4 made it false, and it now renders directly
+above *"Ask anything about this recipe."* Suppress it when `chatModel.messages.isEmpty` — the empty state
+covers the same ground — and **reword the seeded case out of internal vocabulary**: "seeded" is our word, and
+what it means to a cook is *the model can see this recipe*.
+
+**4. The Ask launcher toggles** *(may already be fixed on #234)*. `askButtonTapped` returns early when a chat
+is already open, so the lit button is an indicator styled like a button. Amendment 2's never-close rule applied
+to `askSection`, a **switcher**; the plain opener is not a switcher and closing is now safe. Make the tap close.
+
+**5. Apply the same grouping to the modal sheet path.** The iPhone sheet keeps `Done` at `.topBarLeading` and
+the section switcher at `.principal`, but its trailing `clearChatButton` + `ChatTierMenu` become the same
+single `⋯`. One contract, both presentations — otherwise the iPhone and iPad panels drift apart again, which is
+the class of problem this whole dispatch exists to close.
+
+**Explicitly not in this slice:** `ChatWorkspaceDetent.storageKey` is a **single global key** shared by the
+Calendar workspace ([`MealCalendarViews.swift:25`](../../YesChefApp/MealCalendarViews.swift)) and the Workbench
+([`WorkbenchViews.swift:106`](../../YesChefApp/WorkbenchViews.swift)), so collapsing the chat column on one
+collapses it on the other. **Pre-existing** — the pre-hoist day-agenda split used the same key — but G3 raised
+its blast radius from one calendar mode to the whole surface. It wants a per-surface key; it is a different
+concern from the header and should not ride here.
+
+**Acceptance:** an empty panel presents **one** explanation of its emptiness, not two; the header carries three
+targets (primary, `⋯`, close) with Clear Chat and the tier picker inside the overflow; Clear Chat still
+confirms; no destructive control is adjacent to the close; the context line does not claim a seed on an
+unseeded panel; tapping a lit Ask closes the panel; the iPhone sheet groups its trailing controls the same way.
+**Verify on all four surfaces** — Recipe, Menu, Calendar, Workbench — since they share the header.
+
 **Dispatch 1.5 verification:** generic app build (elevated, no signing) + `scripts/check-drift.sh`.
 No package tests — nothing here touches Core. Jon does the device pass on `iPad Pro 13-inch (M5)` and
 `iPhone 17 Pro`, **and the iPad pass is the point of this dispatch** — every defect it fixes is invisible

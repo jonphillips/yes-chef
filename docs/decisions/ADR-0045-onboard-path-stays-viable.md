@@ -323,6 +323,37 @@ real assistant reply; the empty state explains that gate rather than removing it
 sections, and has no in-panel equivalent to fall back on. It stays a menu. This amendment is about the
 **recipe** launcher, where the duplication actually exists.
 
+### Codicil to Amendment 3 — the embedded panel header contract (2026-07-26)
+
+Added the same day, from Jon's iPad pass on the amendment's own implementation. **Moving the chrome into the
+panel (where it belongs) made visible how much of it there is.** An *empty* panel presented ten elements to say
+*"ask me something"*: Discuss ▾, a trash, a tier chip, a close, a context line, an empty state, a disabled
+Apply, an explanation of the disabled Apply, the input, and Send.
+
+**The embedded header is `[ Discuss ▾ | title ] ……… [ ⋯ ] [ ✕ ]`** — one primary control, one overflow, one
+dismiss. `⋯` holds **Clear Chat** (destructive, keeping its confirmation) and the **model/tier** picker. `✕`
+renders only where the panel owns its dismissal; the `ChatWorkspaceSplit` surfaces keep theirs in the divider.
+
+Two rules, stated so they survive the next surface:
+
+1. **A destructive control is never adjacent to a dismiss control.** Clear Chat already confirms, so a
+   fat-finger costs a Cancel rather than a transcript — but the confirmation is a safety net, not a licence for
+   the adjacency. Destructive goes in the overflow.
+2. **The least-used control does not pay for header width.** The tier picker is a *per-conversation privacy
+   override*, not a per-question choice; it belongs behind the overflow, and it cannot move to AI Settings
+   entirely precisely because the override is the point.
+
+**And the amendment's own binding condition is satisfied once, not twice.** The empty state and the
+disabled-Apply footnote explained the same emptiness in two places; the explanation belongs in the empty state,
+and Apply stays visible-but-disabled without narrating. Relatedly, `ChatContextHeader` must stop announcing
+*"Seeded with the recipe on screen."* on a panel that was deliberately opened **unseeded** — true before this
+amendment, false after it, and "seeded" is internal vocabulary besides.
+
+**This contract is the reason to settle it now.** Every embedded panel — Recipe, Menu, Calendar, Workbench —
+renders the same `RecipeChatPanel` header, and the modal sheet path groups its trailing controls the same way.
+Settling the shape before it spreads is cheaper than harmonizing four copies later, which is the drift this
+ADR's own ferry dispatch exists to undo. Implementation: `efforts/dogfood-ferry-2026-07-25.md` **Slice G5**.
+
 ## Related
 
 - [ADR-0042](ADR-0042-workbench-handoff-and-the-return-block.md) — the `.discuss` ask, the return block, and

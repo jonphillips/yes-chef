@@ -49,6 +49,13 @@ It **lands after G1** (the section switcher it falls back on moves into the embe
 V1's *"the feature was removed"* defect returns verbatim. It touches `RecipePlaybookView.swift`, which G1–G3 do
 not, so it does not conflict with the submitted work.
 
+**G5 is queued behind #234 as its own PR** — the panel header settles to `Discuss ▾ · ⋯ · ✕`, the
+disabled-Apply explanation folds into the empty state, and `ChatContextHeader` stops claiming a seed on a
+deliberately unseeded panel. Spec: the effort doc's Slice G5 +
+[ADR-0045 Amendment 3's codicil](decisions/ADR-0045-onboard-path-stays-viable.md#codicil-to-amendment-3--the-embedded-panel-header-contract-2026-07-26).
+**Settle it before it spreads** — all four surfaces render the same `RecipeChatPanel` header. Some items may
+already be fixed by the review-nit pass on #234; check the merged state and skip what is done.
+
 **Verification:** generic app build (elevated, no signing) + `scripts/check-drift.sh`. No package tests —
 nothing here touches Core. **The iPad device pass is the point of this dispatch**: every defect it fixes is
 invisible on iPhone, which is why they survived Dispatch 1.
