@@ -1023,15 +1023,6 @@ struct MenuPlacementDraftContext: Hashable, Sendable {
   var isEditing: Bool { placementID != nil }
 }
 
-struct MenuDeletionContext: Identifiable, Hashable, Sendable {
-  var menuID: CoreMenu.ID
-  var menuTitle: String
-  var itemCount: Int
-  var placementCount: Int
-
-  var id: CoreMenu.ID { menuID }
-}
-
 struct MenuItemDeletionContext: Identifiable, Hashable, Sendable {
   var itemID: MenuItem.ID
   var title: String

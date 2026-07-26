@@ -103,7 +103,7 @@ struct PrepPlanStepEditorSheet: View {
 
 struct LearningsSection: View {
   let learnings: [Learning]
-  var addLearning: ((String) -> Bool)? = nil
+  var addLearning: ((String) -> LearningCreationResult)? = nil
   var updateLearning: (Learning, String) -> Void
   var deleteLearning: (Learning.ID) -> Void
   var reorderLearnings: ([Learning.ID], LearningReorderDestination) -> Void
@@ -119,6 +119,7 @@ struct LearningsSection: View {
         if addLearning != nil {
           Button {
             isAdding = true
+            isNewLearningFocused = true
           } label: {
             Label("Add Learning", systemImage: "plus")
           }
@@ -136,9 +137,13 @@ struct LearningsSection: View {
             }
             Spacer()
             Button("Add") {
-              guard addLearning?(newLearningText) == true else { return }
-              newLearningText = ""
-              isAdding = false
+              switch addLearning?(newLearningText) {
+              case .some(.added), .some(.duplicate):
+                newLearningText = ""
+                isAdding = false
+              case .some(.failed), .none:
+                break
+              }
             }
             .disabled(newLearningText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
           }

@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// The established transient-attention treatment, centralized so every caller keeps the same visual contract.
-/// The padding and corner radius preserve the values already used by the four pre-existing implementations.
+/// Folding in `RecipeDetailView` intentionally changes its variation note from 12-point padding without a frame
+/// to this treatment's 10-point, full-width presentation.
 private struct AttentionCard: ViewModifier {
   func body(content: Content) -> some View {
     content

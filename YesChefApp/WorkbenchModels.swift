@@ -568,15 +568,6 @@ struct WorkbenchCandidatePhoto: Identifiable, Equatable {
   var id: RecipePhoto.ID { photo.id }
 }
 
-struct WorkbenchDeletionContext: Identifiable, Hashable, Sendable {
-  var workbenchID: Workbench.ID
-  var title: String
-  var candidateCount: Int
-  var workingRecipeTitle: String?
-
-  var id: Workbench.ID { workbenchID }
-}
-
 struct WorkbenchLogEntryEditorState: Identifiable, Hashable, Sendable {
   var entryID: WorkbenchLogEntry.ID?
   var kind: WorkbenchLogEntryKind = .note

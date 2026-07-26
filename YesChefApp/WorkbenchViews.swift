@@ -599,10 +599,9 @@ private struct WorkbenchReader: View {
 
   private func persistNotesDraft() {
     let notes = notesText.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard (notes.isEmpty ? nil : notes) != lastSavedNotes else { return }
-    if model.saveNotesButtonTapped(notesText) {
-      lastSavedNotes = notes.isEmpty ? nil : notes
-    }
+    let normalizedNotes = notes.isEmpty ? nil : notes
+    guard normalizedNotes != lastSavedNotes else { return }
+    if model.saveNotesButtonTapped(notesText) { lastSavedNotes = normalizedNotes }
   }
 
   private func commitNotesOnBlur() {

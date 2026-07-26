@@ -5,20 +5,6 @@ import YesChefCore
 @Suite
 struct RecipeScaleFormattingTests {
   @Test
-  func deletingWorkbenchNamesTheRetainedWorkingRecipeWhenItHasNoCandidates() {
-    let message = deleteWorkbenchMessage(
-      WorkbenchDeletionContext(
-        workbenchID: UUID(),
-        title: "Weeknight Dinners",
-        candidateCount: 0,
-        workingRecipeTitle: "Lemon Chicken"
-      )
-    )
-
-    #expect(message == "Delete Weeknight Dinners? The working recipe Lemon Chicken stays in your library.")
-  }
-
-  @Test
   func ingredientInputCasesUseTheFullAuthoringSet() {
     #expect(
       ScaleFraction.ingredientInputCases.map(\.label) == [
