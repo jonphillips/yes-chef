@@ -939,7 +939,8 @@ final class RecipeDetailModel {
   /// Opens an unseeded recipe chat. Section-specific guidance is selected only from the open panel's
   /// Discuss menu, so a cook can begin with a free-form question (ADR-0045 Amd 3).
   func askButtonTapped() {
-    guard let detail, destination?.chat == nil else { return }
+    guard let detail else { return }
+    if case .chat? = destination { return }
     seededAskSection = nil
     destination = .chat(RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail))))
   }
