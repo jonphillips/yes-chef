@@ -274,6 +274,7 @@ struct RecipeChatPanel: View {
               Image(systemName: "xmark.circle.fill")
             }
             .buttonStyle(.plain)
+            .padding(.leading, 8)
             .accessibilityLabel(Text("Close Ask"))
           }
         }
@@ -287,7 +288,11 @@ struct RecipeChatPanel: View {
           LazyVStack(alignment: .leading, spacing: 12) {
             ChatContextHeader(chatModel: chatModel)
             if chatModel.messages.isEmpty {
-              ChatEmptyState(subject: chatModel.context.subject)
+              ChatEmptyState(
+                subject: chatModel.context.subject,
+                hasSectionMenu: selectSection != nil,
+                needsReplyForApply: applyActionsNeedReply
+              )
             } else {
               ForEach(chatModel.messages) { message in
                 ChatMessageBubble(
@@ -677,8 +682,20 @@ struct RecipeChatPanel: View {
       ChatTierOptions(chatModel: chatModel)
     } label: {
       Image(systemName: "ellipsis")
+        .foregroundStyle(chatOptionsTint)
     }
+    .tint(chatOptionsTint)
     .accessibilityLabel(Text("Chat options"))
+    .accessibilityValue(
+      Text(chatModel.sendsToProvider ? chatModel.selectedProvider.displayName : "On-device")
+    )
+    .accessibilityHint(
+      Text("Choose whether recipe context stays on device or is sent to a configured provider.")
+    )
+  }
+
+  private var chatOptionsTint: Color {
+    chatModel.sendsToProvider ? .blue : .green
   }
 
   private func clearChat() {
@@ -738,8 +755,15 @@ private struct ChatMessageBubble: View {
         Text(LocalizedStringKey(message.text))
       }
     case .assistant:
-      SelectableAssistantText(text: message.text, selection: selection)
-        .frame(maxWidth: .infinity, alignment: .leading)
+      VStack(alignment: .leading, spacing: 6) {
+        SelectableAssistantText(text: message.text, selection: selection)
+          .frame(maxWidth: .infinity, alignment: .leading)
+        if let resolvedTier = message.resolvedTier {
+          Text("Model · \(resolvedTier.displayName)")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+      }
     }
   }
 }

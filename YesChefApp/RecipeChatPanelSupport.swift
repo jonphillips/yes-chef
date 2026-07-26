@@ -77,14 +77,25 @@ struct ChatContextHeader: View {
 
 struct ChatEmptyState: View {
   let subject: String
+  let hasSectionMenu: Bool
+  let needsReplyForApply: Bool
+
+  private var description: Text? {
+    let clauses = [
+      hasSectionMenu ? "Or choose a section from Discuss to start a guided discussion." : nil,
+      needsReplyForApply ? "Apply actions need an assistant reply first." : nil,
+    ]
+    .compactMap { $0 }
+
+    guard !clauses.isEmpty else { return nil }
+    return Text(clauses.joined(separator: " "))
+  }
 
   var body: some View {
     ContentUnavailableView(
       "Ask anything about this \(subject)",
       systemImage: "sparkles",
-      description: Text(
-        "Or choose a section from Discuss to start a guided discussion. Apply actions need an assistant reply first."
-      )
+      description: description
     )
     .frame(maxWidth: .infinity, minHeight: 220)
   }
@@ -94,29 +105,38 @@ struct ChatTierOptions: View {
   let chatModel: RecipeChatModel
 
   var body: some View {
-    @Bindable var chatModel = chatModel
-
-    Button {
-      chatModel.useFrontier = false
-    } label: {
-      Label("On-device (private)", systemImage: "iphone")
-      if !chatModel.sendsToProvider {
-        Image(systemName: "checkmark")
-      }
-    }
-
-    ForEach(FrontierProvider.allCases) { provider in
+    Section {
       Button {
-        chatModel.selectedProvider = provider
-        chatModel.useFrontier = true
+        chatModel.useFrontier = false
       } label: {
-        Label("\(provider.displayName) (sends data off device)", systemImage: "network")
-        if chatModel.sendsToProvider, chatModel.selectedProvider == provider {
-          Image(systemName: "checkmark")
-        }
+        Label(
+          "On-device (private)",
+          systemImage: chatModel.sendsToProvider ? "iphone" : "checkmark"
+        )
       }
-      .disabled(!chatModel.availableProviders.contains(provider))
+
+      ForEach(FrontierProvider.allCases) { provider in
+        Button {
+          chatModel.selectedProvider = provider
+          chatModel.useFrontier = true
+        } label: {
+          Label(
+            "\(provider.displayName) (sends data off device)",
+            systemImage: chatModel.sendsToProvider && chatModel.selectedProvider == provider
+              ? "checkmark"
+              : "network"
+          )
+        }
+        .disabled(!chatModel.availableProviders.contains(provider))
+      }
+    } header: {
+      Text(activeTierTitle)
     }
+  }
+
+  private var activeTierTitle: String {
+    let providerName = chatModel.sendsToProvider ? chatModel.selectedProvider.displayName : "On-device"
+    return "Model · \(providerName)"
   }
 }
 

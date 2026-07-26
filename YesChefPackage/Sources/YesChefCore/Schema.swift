@@ -965,6 +965,14 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Add local chat message tier provenance") { db in
+      try #sql("""
+        ALTER TABLE "chatMessages"
+        ADD COLUMN "resolvedTier" TEXT
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

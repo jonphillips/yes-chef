@@ -102,7 +102,7 @@ public enum RecipeChatStore {
     in db: Database
   ) throws -> [RecipeChatMessage] {
     try rows(for: subject, in: db).map {
-      RecipeChatMessage(id: $0.id, role: $0.role, text: $0.text)
+      RecipeChatMessage(id: $0.id, role: $0.role, text: $0.text, resolvedTier: $0.resolvedTier)
     }
   }
 
@@ -159,6 +159,7 @@ public enum RecipeChatStore {
           subjectID: subject.id,
           role: message.role,
           text: message.text,
+          resolvedTier: message.resolvedTier,
           createdAt: existingCreatedAtByID[message.id] ?? now,
           sortOrder: index
         )
