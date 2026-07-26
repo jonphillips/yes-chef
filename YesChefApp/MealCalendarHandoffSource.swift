@@ -1,16 +1,28 @@
+import Foundation
 import YesChefCore
 
 extension MealCalendarDayAgendaView {
   var handoffSource: HandoffExportSource? {
-    handoffAnchorItemID.map { .mealPlan($0) }
+    HandoffExportSource.mealPlanSources(on: model.selectedDate, rows: model.selectedDayRows)?.makeAhead
   }
 
   var complementHandoffSource: HandoffExportSource? {
-    handoffAnchorItemID.map { .mealPlanComplement($0) }
+    HandoffExportSource.mealPlanSources(on: model.selectedDate, rows: model.selectedDayRows)?.complement
+  }
+}
+
+extension HandoffExportSource {
+  struct MealPlanSources: Sendable {
+    let makeAhead: HandoffExportSource
+    let complement: HandoffExportSource
   }
 
-  private var handoffAnchorItemID: MealPlanItem.ID? {
-    model.selectedDayRows
+  static func mealPlanSources(
+    on date: Date,
+    rows: [MealPlanItemRowData]
+  ) -> MealPlanSources? {
+    rows
+      .filter { Calendar.autoupdatingCurrent.isDate($0.item.scheduledDate, inSameDayAs: date) }
       .sorted { lhs, rhs in
         if lhs.item.mealSlot.sortOrder != rhs.item.mealSlot.sortOrder {
           return lhs.item.mealSlot.sortOrder < rhs.item.mealSlot.sortOrder
@@ -21,6 +33,11 @@ extension MealCalendarDayAgendaView {
         return lhs.item.id.uuidString < rhs.item.id.uuidString
       }
       .first
-      .map(\.item.id)
+      .map { item in
+        MealPlanSources(
+          makeAhead: .mealPlan(item.item.id),
+          complement: .mealPlanComplement(item.item.id)
+        )
+      }
   }
 }

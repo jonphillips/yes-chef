@@ -135,6 +135,8 @@ enum HandoffExportSource: Sendable {
   case recipeAdjustment(Recipe.ID)
   case menu(Menu.ID)
   case menuComplement(Menu.ID)
+  case menuDay(Menu.ID, dayOffset: Int)
+  case menuDayComplement(Menu.ID, dayOffset: Int)
   case mealPlan(MealPlanItem.ID)
   case mealPlanComplement(MealPlanItem.ID)
   case readerFeedback(ReaderFeedbackHandoffContext)
@@ -167,6 +169,10 @@ extension HandoffExportSource {
       Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan)
     case let .menuComplement(menuID):
       Metadata(sourceType: .menu, sourceID: menuID, taskType: .menuComplement)
+    case let .menuDay(menuID, _):
+      Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan)
+    case let .menuDayComplement(menuID, _):
+      Metadata(sourceType: .menu, sourceID: menuID, taskType: .menuComplement)
     case let .mealPlan(mealPlanID):
       Metadata(sourceType: .mealPlan, sourceID: mealPlanID, taskType: .mealPlanMakeAheadStrategy)
     case let .mealPlanComplement(mealPlanID):
@@ -184,6 +190,8 @@ extension HandoffExportSource {
     case .recipeAdjustment: "recipe"
     case .menu: "menu"
     case .menuComplement: "menu"
+    case .menuDay: "menu day"
+    case .menuDayComplement: "menu day"
     case .mealPlan: "meal-plan day"
     case .mealPlanComplement: "meal-plan day"
     case .readerFeedback: "reader feedback"
@@ -206,6 +214,24 @@ extension HandoffExportSource {
       )
     }
   }
+
+  func applyingScope(to review: AIHandoffReview) -> AIHandoffReview {
+    guard case let .menuDayComplement(_, dayOffset) = self,
+      case let .menuComplement(complementReview) = review
+    else { return review }
+
+    let plan = MenuComplementPlan(items: complementReview.plan.items.map { suggestion in
+      var suggestion = suggestion
+      suggestion.dayOffset = dayOffset
+      return suggestion
+    })
+    return .menuComplement(AIHandoffMenuComplementReview(
+      handoffID: complementReview.handoffID,
+      menuID: complementReview.menuID,
+      plan: plan,
+      unparsedBlocks: complementReview.unparsedBlocks
+    ))
+  }
 }
 
 enum WorkbenchHandoffTask: Sendable {
@@ -221,6 +247,165 @@ enum WorkbenchHandoffTask: Sendable {
 }
 
 enum HandoffAppOperations {
+  private static func scopedMenuContext(
+    detail: MenuDetailData,
+    dayOffset: Int
+  ) -> MenuChatContext {
+    MenuChatContext(detail: detail).scoped(toDayOffset: dayOffset)
+  }
+
+  private static func dayScopeInstruction(dayOffset: Int) -> String {
+    """
+    This request is only for Day \(dayOffset + 1). The context includes only that day's dishes. Keep every proposed task or complement on Day \(dayOffset + 1); do not plan for another day.
+    """
+  }
+
+  private static func menuDayPrepPlanHandoff(
+    detail: MenuDetailData,
+    dayOffset: Int,
+    metadata: HandoffExportSource.Metadata,
+    mode: AIHandoffToken.PromptMode,
+    now: Date,
+    handoffID: AIHandoff.ID
+  ) -> AIHandoff {
+    let context = scopedMenuContext(detail: detail, dayOffset: dayOffset)
+    let prompt = AIHandoffToken.prompt(
+      handoffID: handoffID,
+      title: "\(metadata.taskType.title): \(detail.menu.title), Day \(dayOffset + 1)",
+      context: "\(dayScopeInstruction(dayOffset: dayOffset))\n\n\(context.prepPrompt())",
+      mode: mode
+    )
+    return AIHandoff(
+      id: handoffID,
+      sourceType: metadata.sourceType,
+      sourceID: metadata.sourceID,
+      taskType: metadata.taskType,
+      createdAt: now,
+      exportedPrompt: prompt
+    )
+  }
+
+  private static func menuPrepPlanHandoff(
+    detail: MenuDetailData,
+    metadata: HandoffExportSource.Metadata,
+    mode: AIHandoffToken.PromptMode,
+    now: Date,
+    handoffID: AIHandoff.ID
+  ) -> AIHandoff {
+    let prompt = AIHandoffToken.prompt(
+      handoffID: handoffID,
+      title: "\(metadata.taskType.title): \(detail.menu.title)",
+      context: MenuChatContext(detail: detail).prepPrompt(),
+      mode: mode
+    )
+    return AIHandoff(
+      id: handoffID,
+      sourceType: metadata.sourceType,
+      sourceID: metadata.sourceID,
+      taskType: metadata.taskType,
+      createdAt: now,
+      exportedPrompt: prompt
+    )
+  }
+
+  private static func menuComplementHandoff(
+    detail: MenuDetailData,
+    metadata: HandoffExportSource.Metadata,
+    mode: AIHandoffToken.PromptMode,
+    now: Date,
+    handoffID: AIHandoff.ID
+  ) -> AIHandoff {
+    let prompt = AIHandoffToken.prompt(
+      handoffID: handoffID,
+      title: "\(metadata.taskType.title): \(detail.menu.title)",
+      context: MenuHandoffContext(detail: detail).complementPrompt(),
+      mode: mode,
+      deliverableFormat: .menuComplement
+    )
+    return AIHandoff(
+      id: handoffID,
+      sourceType: metadata.sourceType,
+      sourceID: metadata.sourceID,
+      taskType: metadata.taskType,
+      createdAt: now,
+      exportedPrompt: prompt
+    )
+  }
+
+  private static func recipeSectionHandoff(
+    detail: RecipeDetailData,
+    section: PlaybookSectionKind,
+    metadata: HandoffExportSource.Metadata,
+    mode: AIHandoffToken.PromptMode,
+    now: Date,
+    handoffID: AIHandoff.ID
+  ) -> AIHandoff {
+    let prompt = AIHandoffToken.prompt(
+      handoffID: handoffID,
+      title: "\(metadata.taskType.title): \(detail.recipe.title)",
+      context: RecipeHandoffContext(detail: detail).prompt(for: section),
+      mode: mode,
+      deliverableFormat: section.deliverableFormat
+    )
+    return AIHandoff(
+      id: handoffID,
+      sourceType: metadata.sourceType,
+      sourceID: metadata.sourceID,
+      taskType: metadata.taskType,
+      createdAt: now,
+      exportedPrompt: prompt
+    )
+  }
+
+  private static func recipeAdjustmentHandoff(
+    detail: RecipeDetailData,
+    metadata: HandoffExportSource.Metadata,
+    mode: AIHandoffToken.PromptMode,
+    now: Date,
+    handoffID: AIHandoff.ID
+  ) -> AIHandoff {
+    let prompt = AIHandoffToken.prompt(
+      handoffID: handoffID,
+      title: "\(metadata.taskType.title): \(detail.recipe.title)",
+      context: RecipeHandoffContext(detail: detail).prompt(forTask: .adjustRecipe),
+      mode: mode
+    )
+    return AIHandoff(
+      id: handoffID,
+      sourceType: metadata.sourceType,
+      sourceID: metadata.sourceID,
+      taskType: metadata.taskType,
+      createdAt: now,
+      exportedPrompt: prompt
+    )
+  }
+
+  private static func menuDayComplementHandoff(
+    detail: MenuDetailData,
+    dayOffset: Int,
+    metadata: HandoffExportSource.Metadata,
+    mode: AIHandoffToken.PromptMode,
+    now: Date,
+    handoffID: AIHandoff.ID
+  ) -> AIHandoff {
+    let context = scopedMenuContext(detail: detail, dayOffset: dayOffset)
+    let prompt = AIHandoffToken.prompt(
+      handoffID: handoffID,
+      title: "\(metadata.taskType.title): \(detail.menu.title), Day \(dayOffset + 1)",
+      context: "\(dayScopeInstruction(dayOffset: dayOffset))\n\n\(MenuHandoffContext(menu: context).complementPrompt())",
+      mode: mode,
+      deliverableFormat: .menuComplement
+    )
+    return AIHandoff(
+      id: handoffID,
+      sourceType: metadata.sourceType,
+      sourceID: metadata.sourceID,
+      taskType: metadata.taskType,
+      createdAt: now,
+      exportedPrompt: prompt
+    )
+  }
+
   private static func mealPlanHandoffContext(
     mealPlanID: MealPlanItem.ID,
     in database: any DatabaseWriter
@@ -290,19 +475,12 @@ enum HandoffAppOperations {
       }) else {
         throw HandoffIntentSurfaceError.sourceNotFound
       }
-      let prompt = AIHandoffToken.prompt(
-        handoffID: handoffID,
-        title: "\(metadata.taskType.title): \(detail.menu.title)",
-        context: MenuChatContext(detail: detail).prepPrompt(),
-        mode: mode
-      )
-      handoff = AIHandoff(
-        id: handoffID,
-        sourceType: metadata.sourceType,
-        sourceID: metadata.sourceID,
-        taskType: metadata.taskType,
-        createdAt: now,
-        exportedPrompt: prompt
+      handoff = menuPrepPlanHandoff(
+        detail: detail,
+        metadata: metadata,
+        mode: mode,
+        now: now,
+        handoffID: handoffID
       )
       externalProjectName = detail.menu.externalProjectName
 
@@ -312,20 +490,44 @@ enum HandoffAppOperations {
       }) else {
         throw HandoffIntentSurfaceError.sourceNotFound
       }
-      let prompt = AIHandoffToken.prompt(
-        handoffID: handoffID,
-        title: "\(metadata.taskType.title): \(detail.menu.title)",
-        context: MenuHandoffContext(detail: detail).complementPrompt(),
+      handoff = menuComplementHandoff(
+        detail: detail,
+        metadata: metadata,
         mode: mode,
-        deliverableFormat: .menuComplement
+        now: now,
+        handoffID: handoffID
       )
-      handoff = AIHandoff(
-        id: handoffID,
-        sourceType: metadata.sourceType,
-        sourceID: metadata.sourceID,
-        taskType: metadata.taskType,
-        createdAt: now,
-        exportedPrompt: prompt
+      externalProjectName = detail.menu.externalProjectName
+
+    case let .menuDay(menuID, dayOffset):
+      guard let detail = try await database.read({ db in
+        try MenuDetailRequest(menuID: menuID).fetch(db)
+      }) else {
+        throw HandoffIntentSurfaceError.sourceNotFound
+      }
+      handoff = menuDayPrepPlanHandoff(
+        detail: detail,
+        dayOffset: dayOffset,
+        metadata: metadata,
+        mode: mode,
+        now: now,
+        handoffID: handoffID
+      )
+      externalProjectName = detail.menu.externalProjectName
+
+    case let .menuDayComplement(menuID, dayOffset):
+      guard let detail = try await database.read({ db in
+        try MenuDetailRequest(menuID: menuID).fetch(db)
+      }) else {
+        throw HandoffIntentSurfaceError.sourceNotFound
+      }
+      handoff = menuDayComplementHandoff(
+        detail: detail,
+        dayOffset: dayOffset,
+        metadata: metadata,
+        mode: mode,
+        now: now,
+        handoffID: handoffID
       )
       externalProjectName = detail.menu.externalProjectName
 
@@ -335,20 +537,13 @@ enum HandoffAppOperations {
       }) else {
         throw HandoffIntentSurfaceError.sourceNotFound
       }
-      let prompt = AIHandoffToken.prompt(
-        handoffID: handoffID,
-        title: "\(metadata.taskType.title): \(detail.recipe.title)",
-        context: RecipeHandoffContext(detail: detail).prompt(for: section),
+      handoff = recipeSectionHandoff(
+        detail: detail,
+        section: section,
+        metadata: metadata,
         mode: mode,
-        deliverableFormat: section.deliverableFormat
-      )
-      handoff = AIHandoff(
-        id: handoffID,
-        sourceType: metadata.sourceType,
-        sourceID: metadata.sourceID,
-        taskType: metadata.taskType,
-        createdAt: now,
-        exportedPrompt: prompt
+        now: now,
+        handoffID: handoffID
       )
 
     case let .recipeAdjustment(recipeID):
@@ -357,19 +552,12 @@ enum HandoffAppOperations {
       }) else {
         throw HandoffIntentSurfaceError.sourceNotFound
       }
-      let prompt = AIHandoffToken.prompt(
-        handoffID: handoffID,
-        title: "\(metadata.taskType.title): \(detail.recipe.title)",
-        context: RecipeHandoffContext(detail: detail).prompt(forTask: .adjustRecipe),
-        mode: mode
-      )
-      handoff = AIHandoff(
-        id: handoffID,
-        sourceType: metadata.sourceType,
-        sourceID: metadata.sourceID,
-        taskType: metadata.taskType,
-        createdAt: now,
-        exportedPrompt: prompt
+      handoff = recipeAdjustmentHandoff(
+        detail: detail,
+        metadata: metadata,
+        mode: mode,
+        now: now,
+        handoffID: handoffID
       )
 
     case let .mealPlan(mealPlanID):
@@ -409,13 +597,7 @@ enum HandoffAppOperations {
       )
 
     case let .readerFeedback(context):
-      handoff = readerFeedbackHandoff(
-        handoffID: handoffID,
-        metadata: metadata,
-        context: context,
-        mode: mode,
-        now: now
-      )
+      handoff = readerFeedbackHandoff(handoffID: handoffID, metadata: metadata, context: context, mode: mode, now: now)
 
     case let .workbench(workbenchID, task):
       guard let detail = try await database.read({ db in

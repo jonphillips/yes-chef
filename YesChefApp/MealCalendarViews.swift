@@ -777,9 +777,11 @@ private struct MealCalendarWeekCell: View {
   let isToday: Bool
   let minHeight: CGFloat
   let action: () -> Void
+  @State private var handoffTransport = HandoffInAppTransport()
 
   var body: some View {
-    Button(action: action) {
+    ZStack(alignment: .topTrailing) {
+      Button(action: action) {
       VStack(alignment: .leading, spacing: 8) {
         HStack(alignment: .firstTextBaseline) {
           VStack(alignment: .leading, spacing: 2) {
@@ -790,7 +792,7 @@ private struct MealCalendarWeekCell: View {
               .font(.title3.weight(.bold))
               .foregroundStyle(isToday ? Color.accentColor : Color.primary)
           }
-          Spacer(minLength: 0)
+          Spacer(minLength: 32)
         }
 
         if summary.rows.isEmpty {
@@ -813,8 +815,29 @@ private struct MealCalendarWeekCell: View {
         RoundedRectangle(cornerRadius: 8)
           .stroke(isSelected ? Color.accentColor : Color(uiColor: .separator), lineWidth: isSelected ? 1.5 : 0.5)
       }
+      }
+      .buttonStyle(.plain)
+
+      if let sources = HandoffExportSource.mealPlanSources(on: summary.date, rows: summary.rows) {
+        Menu {
+          HandoffMenuActions(
+            handoffSource: sources.makeAhead,
+            complementHandoffSource: sources.complement,
+            transport: handoffTransport,
+            prepLabel: "Handoff Make-ahead",
+            pastePrepLabel: "Paste Make-ahead",
+            complementLabel: "Handoff Complement",
+            pasteComplementLabel: "Paste Complement"
+          )
+        } label: {
+          Label("Handoff actions", systemImage: "ellipsis.circle")
+            .labelStyle(.iconOnly)
+        }
+        .padding(8)
+        .accessibilityLabel("Handoff actions for \(summary.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))")
+      }
     }
-    .buttonStyle(.plain)
+    .handoffTransportAlert(handoffTransport)
   }
 }
 

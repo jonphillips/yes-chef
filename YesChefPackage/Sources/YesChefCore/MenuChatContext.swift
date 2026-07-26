@@ -72,6 +72,12 @@ public struct MenuChatContext: Equatable, Sendable {
     budgetedSerialization(characterBudget: characterBudget).text
   }
 
+  public func scoped(toDayOffset dayOffset: Int) -> Self {
+    var context = self
+    context.items = items.filter { $0.dayOffset == dayOffset }
+    return context
+  }
+
   public static func serializedCharacterBudget(for tier: ModelTier) -> Int {
     switch tier {
     case .onDevice:

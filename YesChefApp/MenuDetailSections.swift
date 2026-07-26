@@ -72,6 +72,7 @@ struct MenuDishList: View {
   let detailModel: MenuDetailModel
   let menu: CoreMenu
   let detail: MenuDetailData
+  let handoffTransport: HandoffInAppTransport
   var isInitiallyExpanded = true
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   @State private var dayExpansionOverrides: [Int: Bool] = [:]
@@ -98,6 +99,7 @@ struct MenuDishList: View {
           dayOffset: dayOffset,
           scheduledDate: scheduledDate(for: dayOffset),
           rows: detail.itemRows.filter { $0.item.dayOffset == dayOffset },
+          handoffTransport: handoffTransport,
           isExpanded: isExpanded,
           onToggle: {
             dayExpansionOverrides[dayOffset] = !isExpanded
@@ -155,6 +157,7 @@ private struct MenuDaySection: View {
   let dayOffset: Int
   let scheduledDate: Date?
   let rows: [MenuItemRowData]
+  let handoffTransport: HandoffInAppTransport
   let isExpanded: Bool
   var onToggle: () -> Void
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
@@ -194,6 +197,22 @@ private struct MenuDaySection: View {
             .labelStyle(.iconOnly)
         }
         .accessibilityLabel("Add recipe to Day \(dayNumber)")
+
+        Menu {
+          HandoffMenuActions(
+            handoffSource: .menuDay(menu.id, dayOffset: dayOffset),
+            complementHandoffSource: .menuDayComplement(menu.id, dayOffset: dayOffset),
+            transport: handoffTransport,
+            prepLabel: "Handoff Prep",
+            pastePrepLabel: "Paste Prep",
+            complementLabel: "Handoff Complement",
+            pasteComplementLabel: "Paste Complement"
+          )
+        } label: {
+          Label("Day \(dayNumber) Handoff", systemImage: "ellipsis.circle")
+            .labelStyle(.iconOnly)
+        }
+        .accessibilityLabel("Day \(dayNumber) handoff actions")
       }
 
       if isExpanded, rows.isEmpty {

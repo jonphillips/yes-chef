@@ -61,7 +61,7 @@ final class HandoffInAppTransport {
         in: database,
         now: now
       )
-      handoffReviewCoordinator.present(review)
+      handoffReviewCoordinator.present(source.applyingScope(to: review))
     } catch {
       present(error)
     }
@@ -123,7 +123,7 @@ final class HandoffInAppTransport {
         now: now,
         handoffID: uuid()
       )
-      handoffReviewCoordinator.present(review)
+      handoffReviewCoordinator.present(unmatchedSource.applyingScope(to: review))
     } catch {
       present(error)
     }
@@ -178,6 +178,43 @@ struct HandoffCopyPasteControls: View {
       }
       .accessibilityLabel("Paste \(copyLabel) Result")
     }
+  }
+}
+
+struct HandoffMenuActions: View {
+  let handoffSource: HandoffExportSource
+  let complementHandoffSource: HandoffExportSource
+  let transport: HandoffInAppTransport
+  var prepLabel = "Handoff Prep"
+  var pastePrepLabel = "Paste Prep"
+  var complementLabel = "Handoff Complement"
+  var pasteComplementLabel = "Paste Complement"
+
+  var body: some View {
+    Button(prepLabel) {
+      Task { await transport.copyPrompt(for: handoffSource) }
+    }
+    Button(pastePrepLabel) {
+      Task {
+        await transport.pastedResultsReceived(
+          [UIPasteboard.general.string ?? ""],
+          source: handoffSource
+        )
+      }
+    }
+    .disabled(!UIPasteboard.general.hasStrings)
+    Button(complementLabel) {
+      Task { await transport.copyPrompt(for: complementHandoffSource) }
+    }
+    Button(pasteComplementLabel) {
+      Task {
+        await transport.pastedResultsReceived(
+          [UIPasteboard.general.string ?? ""],
+          source: complementHandoffSource
+        )
+      }
+    }
+    .disabled(!UIPasteboard.general.hasStrings)
   }
 }
 

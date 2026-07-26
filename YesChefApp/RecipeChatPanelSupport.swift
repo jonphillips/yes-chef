@@ -10,7 +10,7 @@ struct ChatFinalizeConfiguration {
   static func recipe(recipeID: Recipe.ID, section: PlaybookSectionKind) -> Self {
     let actionID: AnyChatApplyAction.ID
     switch section {
-    case .makeAhead: actionID = "Create Prep Plan"
+    case .makeAhead: actionID = "Create Make-ahead"
     case .chefItUp: actionID = "Chef It Up"
     case .serveWith: actionID = "Capture Side Dishes"
     }

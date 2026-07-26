@@ -67,22 +67,22 @@ struct MealCalendarDayHeader: View {
 
   @ViewBuilder
   private var handoffControls: some View {
-    if let handoffSource {
-      HStack {
-        HandoffCopyPasteControls(
-          source: handoffSource,
+    if let handoffSource, let complementHandoffSource {
+      Menu {
+        HandoffMenuActions(
+          handoffSource: handoffSource,
+          complementHandoffSource: complementHandoffSource,
           transport: handoffTransport,
-          copyLabel: "Copy Make-ahead Prompt"
+          prepLabel: "Handoff Make-ahead",
+          pastePrepLabel: "Paste Make-ahead",
+          complementLabel: "Handoff Complement",
+          pasteComplementLabel: "Paste Complement"
         )
-        if let complementHandoffSource {
-          HandoffCopyPasteControls(
-            source: complementHandoffSource,
-            transport: handoffTransport,
-            copyLabel: "Copy Complement Prompt"
-          )
-        }
+      } label: {
+        Label("Day handoff actions", systemImage: "ellipsis.circle")
+          .labelStyle(.iconOnly)
       }
-      .buttonStyle(.bordered)
+      .accessibilityLabel("Day handoff actions")
     }
   }
 

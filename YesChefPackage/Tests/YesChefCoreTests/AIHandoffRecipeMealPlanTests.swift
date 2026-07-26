@@ -238,6 +238,38 @@ extension AIHandoffTests {
   }
 
   @Test
+  func menuContextCanScopeAHandOffToOneDayWithoutLeakingOtherDishes() {
+    let context = MenuChatContext(
+      title: "Weekend Menu",
+      dayCount: 2,
+      items: [
+        MenuChatItemContext(
+          id: SampleUUIDSequence.uuid(38_044),
+          title: "Friday Pizza",
+          kind: .recipe,
+          dayOffset: 0,
+          mealSlot: .dinner,
+          sortOrder: 0
+        ),
+        MenuChatItemContext(
+          id: SampleUUIDSequence.uuid(38_045),
+          title: "Saturday Soup",
+          kind: .recipe,
+          dayOffset: 1,
+          mealSlot: .dinner,
+          sortOrder: 0
+        ),
+      ]
+    )
+
+    let scoped = context.scoped(toDayOffset: 1)
+    let prompt = MenuHandoffContext(menu: scoped).complementPrompt()
+
+    #expect(prompt.contains("Saturday Soup"))
+    #expect(!prompt.contains("Friday Pizza"))
+  }
+
+  @Test
   func onboardSectionPromptsLeaveTheRecipeToTheChatSystemPromptAndKeepLearnings() {
     let context = RecipeHandoffContext(recipe: RecipeChatRecipeContext(
       title: "Cumin Chili",
