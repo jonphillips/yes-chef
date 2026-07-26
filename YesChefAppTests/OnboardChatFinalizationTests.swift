@@ -51,8 +51,14 @@ struct OnboardChatFinalizationTests {
       )
       let recipeCatalog = RecipeDetailModel(recipeID: recipeID).applyActionCatalog(for: recipeChat)
 
+      let expectedRecipeActionIDs: [PlaybookSectionKind: AnyChatApplyAction.ID] = [
+        .makeAhead: "Create Make-ahead",
+        .chefItUp: "Chef It Up",
+        .serveWith: "Capture Side Dishes",
+      ]
       for section in PlaybookSectionKind.allCases {
         let configuration = ChatFinalizeConfiguration.recipe(recipeID: recipeID, section: section)
+        #expect(configuration.actionID == expectedRecipeActionIDs[section])
         #expect(recipeCatalog.contains { $0.id == configuration.actionID })
       }
 

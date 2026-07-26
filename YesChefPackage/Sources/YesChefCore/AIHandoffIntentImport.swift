@@ -113,13 +113,22 @@ private enum AIHandoffReviewStager {
     switch handoff.taskType {
     case .prepPlan, .learning:
       let steps = try PrepPlanStepRepository.steps(for: menu.id, in: db)
-      let returned = AIHandoffReturn.menuPrepPlan(from: payload, currentPlan: MenuPrepPlan(steps: steps.map(PrepPlanStep.init)))
+      let currentPlan = MenuPrepPlan(steps: steps.map(PrepPlanStep.init))
+      let returned = AIHandoffReturn.menuPrepPlan(from: payload, currentPlan: currentPlan)
+      let advisoryNotes = AIHandoffReturn.omittedCurrentPrepStepEvidence(
+        proposedPlan: returned.plan,
+        currentPlan: currentPlan
+      ) + AIHandoffReturn.droppedSourceDishEvidence(
+        proposedPlan: returned.plan,
+        currentPlan: currentPlan
+      )
       guard !returned.plan.steps.isEmpty || !returned.learnings.isEmpty else {
         throw AIHandoffIntentImportError.emptyPlan
       }
       return .menuPrepPlan(AIHandoffMenuPrepPlanReview(
         handoffID: handoff.id, menuID: menu.id, plan: returned.plan,
-        learnings: returned.learnings, unparsedPlanLines: returned.unparsedLines
+        learnings: returned.learnings, unparsedPlanLines: returned.unparsedLines,
+        advisoryNotes: advisoryNotes
       ))
     case .menuComplement:
       let returned = AIHandoffReturn.menuComplement(from: payload, dayCount: menu.dayCount)

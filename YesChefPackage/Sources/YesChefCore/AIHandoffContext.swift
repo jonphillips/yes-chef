@@ -352,6 +352,10 @@ public struct MenuHandoffContext: Equatable, Sendable {
     self.menu = MenuChatContext(detail: detail)
   }
 
+  public init(menu: MenuChatContext) {
+    self.menu = menu
+  }
+
   public func complementPrompt() -> String {
     @Dependency(\.aiPromptPreferences) var preferences
     let settings = preferences.current()

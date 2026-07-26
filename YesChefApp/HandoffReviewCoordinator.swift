@@ -62,10 +62,8 @@ final class HandoffReviewCoordinator {
           presentation: .sheet,
           editableTitle: "Prep plan",
           editableText: editableText,
-          supportingEvidenceTitle: review.unparsedPlanLines.isEmpty
-            ? nil
-            : "Couldn't parse — fix or remove these lines before saving",
-          supportingEvidenceRows: review.unparsedPlanLines,
+          supportingEvidenceTitle: prepPlanEvidenceTitle(for: review),
+          supportingEvidenceRows: review.unparsedPlanLines + review.advisoryNotes,
           commitTitle: "Save Prep Plan",
           committingTitle: "Saving Prep Plan…",
           committedTitle: "Saved Prep Plan",

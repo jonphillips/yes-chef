@@ -238,6 +238,84 @@ extension AIHandoffTests {
   }
 
   @Test
+  func menuContextCanScopeAHandOffToOneDayWithoutLeakingOtherDishes() {
+    let context = MenuChatContext(
+      title: "Weekend Menu",
+      dayCount: 2,
+      items: [
+        MenuChatItemContext(
+          id: SampleUUIDSequence.uuid(38_044),
+          title: "Friday Pizza",
+          kind: .recipe,
+          dayOffset: 0,
+          mealSlot: .dinner,
+          sortOrder: 0
+        ),
+        MenuChatItemContext(
+          id: SampleUUIDSequence.uuid(38_045),
+          title: "Saturday Soup",
+          kind: .recipe,
+          dayOffset: 1,
+          mealSlot: .dinner,
+          sortOrder: 0
+        ),
+      ]
+    )
+
+    let scoped = context.scoped(toDayOffset: 1)
+    let prompt = MenuHandoffContext(menu: scoped).complementPrompt()
+
+    #expect(prompt.contains("Saturday Soup"))
+    #expect(!prompt.contains("Friday Pizza"))
+  }
+
+  @Test
+  func dayScopedPrepPromptKeepsTheWholeCurrentPlanWhileScopingDishes() {
+    let context = MenuChatContext(
+      title: "Weekend Menu",
+      dayCount: 2,
+      prepPlan: [
+        PrepPlanStepRecord(
+          id: SampleUUIDSequence.uuid(38_046), menuID: SampleUUIDSequence.uuid(38_047), sortOrder: 0,
+          session: "Friday", task: "Salt the pizza dough"
+        ),
+        PrepPlanStepRecord(
+          id: SampleUUIDSequence.uuid(38_048), menuID: SampleUUIDSequence.uuid(38_047), sortOrder: 1,
+          session: "Saturday", task: "Soak the beans"
+        ),
+      ],
+      items: [
+        MenuChatItemContext(
+          id: SampleUUIDSequence.uuid(38_049), title: "Friday Pizza", kind: .recipe, dayOffset: 0,
+          mealSlot: .dinner, sortOrder: 0
+        ),
+        MenuChatItemContext(
+          id: SampleUUIDSequence.uuid(38_050), title: "Saturday Soup", kind: .recipe, dayOffset: 1,
+          mealSlot: .dinner, sortOrder: 0
+        ),
+      ]
+    )
+
+    let scoped = context.scoped(toDayOffset: 1)
+    let prompt = "\(MenuDayHandoffScope.prepInstruction(dayOffset: 1))\n\n\(scoped.prepPrompt())"
+
+    #expect(scoped.dayCount == 1)
+    #expect(scoped.items.map(\.title) == ["Saturday Soup"])
+    #expect(scoped.prepPlan.map(\.task) == ["Salt the pizza dough", "Soak the beans"])
+    #expect(prompt.contains("Salt the pizza dough"))
+    #expect(prompt.contains("preserve every existing step for other days verbatim and in place"))
+  }
+
+  @Test
+  func dayScopedPrepAndComplementInstructionsHaveDifferentHorizonRules() {
+    let prep = MenuDayHandoffScope.prepInstruction(dayOffset: 0)
+    let complement = MenuDayHandoffScope.complementInstruction(dayOffset: 0)
+
+    #expect(!prep.contains("do not plan for another day"))
+    #expect(complement.contains("do not plan for another day"))
+  }
+
+  @Test
   func onboardSectionPromptsLeaveTheRecipeToTheChatSystemPromptAndKeepLearnings() {
     let context = RecipeHandoffContext(recipe: RecipeChatRecipeContext(
       title: "Cumin Chili",

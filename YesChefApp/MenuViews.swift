@@ -428,7 +428,6 @@ struct MenuPrepPlanSection: View {
   let steps: [PrepPlanStepRecord]
   let itemRows: [MenuItemRowData]
   let handoffSource: HandoffExportSource
-  let complementHandoffSource: HandoffExportSource
   let handoffTransport: HandoffInAppTransport
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var clearPrepPlan: () -> Void
@@ -440,6 +439,7 @@ struct MenuPrepPlanSection: View {
   @State private var expandedSessionIDs: Set<MenuPrepPlanSessionBand.ID> = []
   @State private var editor: PrepPlanStepEditorDraft?
   @State private var expansionOverride: Bool?
+  @State private var isClearConfirmationPresented = false
 
   private var sessionBands: [MenuPrepPlanSessionBand] {
     MenuPrepPlanSessionBand.grouping(steps)
@@ -468,16 +468,33 @@ struct MenuPrepPlanSection: View {
         .accessibilityLabel(isExpanded ? "Collapse Prep Plan" : "Expand Prep Plan")
 
         Spacer()
+
+        Menu {
+          Button("Handoff Prep") {
+            Task { await handoffTransport.copyPrompt(for: handoffSource) }
+          }
+          Button("Paste Prep") {
+            Task {
+              await handoffTransport.pastedResultsReceived(
+                [UIPasteboard.general.string ?? ""],
+                source: handoffSource
+              )
+            }
+          }
+          .disabled(!UIPasteboard.general.hasStrings)
+          Divider()
+          Button("Clear Prep Plan", role: .destructive) {
+            isClearConfirmationPresented = true
+          }
+          .disabled(steps.isEmpty)
+        } label: {
+          Label("Prep Plan Actions", systemImage: "ellipsis.circle")
+            .labelStyle(.iconOnly)
+        }
+        .accessibilityLabel("Prep Plan actions")
       }
 
       if isExpanded {
-        PrepPlanHandoffControls(
-          handoffSource: handoffSource,
-          complementHandoffSource: complementHandoffSource,
-          handoffTransport: handoffTransport
-        )
-        .buttonStyle(.bordered)
-
         HStack {
           Button {
             editor = PrepPlanStepEditorDraft()
@@ -485,14 +502,6 @@ struct MenuPrepPlanSection: View {
             Label("Add Step", systemImage: "plus")
           }
           .buttonStyle(.bordered)
-
-          Button(role: .destructive) {
-            clearPrepPlan()
-          } label: {
-            Label("Clear", systemImage: "xmark.circle")
-          }
-          .buttonStyle(.bordered)
-          .disabled(steps.isEmpty)
         }
 
         if steps.isEmpty {
@@ -534,6 +543,14 @@ struct MenuPrepPlanSection: View {
           createStep(savedDraft.step)
         }
       }
+    }
+    .confirmationDialog("Clear Prep Plan?", isPresented: $isClearConfirmationPresented) {
+      Button("Clear Prep Plan", role: .destructive) {
+        clearPrepPlan()
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("This permanently removes every step in this prep plan.")
     }
   }
 
@@ -581,43 +598,6 @@ private struct MenuPrepPlanSessionBand: Identifiable {
 
   private static func displaySteps(for steps: [PrepPlanStepRecord], in session: String) -> [Step] {
     steps.map { Step(id: $0.id, step: $0) }
-  }
-}
-
-private struct PrepPlanHandoffControls: View {
-  let handoffSource: HandoffExportSource
-  let complementHandoffSource: HandoffExportSource
-  let handoffTransport: HandoffInAppTransport
-
-  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-
-  var body: some View {
-    Group {
-      if horizontalSizeClass == .compact {
-        VStack(alignment: .leading) {
-          controls
-        }
-      } else {
-        HStack {
-          controls
-        }
-      }
-    }
-  }
-
-  private var controls: some View {
-    Group {
-      HandoffCopyPasteControls(
-        source: handoffSource,
-        transport: handoffTransport,
-        copyLabel: "Copy Prep Plan Prompt"
-      )
-      HandoffCopyPasteControls(
-        source: complementHandoffSource,
-        transport: handoffTransport,
-        copyLabel: "Copy Complement Prompt"
-      )
-    }
   }
 }
 

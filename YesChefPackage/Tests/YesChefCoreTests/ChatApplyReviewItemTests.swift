@@ -10,7 +10,7 @@ extension RecipeCoreTests {
     func editableReviewItemCommitsApprovedText() async throws {
       var committedText: String?
       let action = ChatApplyAction<MakeAheadPlan>(
-        title: "Create Prep Plan",
+        title: "Create Make-ahead",
         extractingTitle: "Summarizing make-ahead...",
         reviewTitle: "Review make-ahead",
         commitTitle: "Commit to Make-ahead",

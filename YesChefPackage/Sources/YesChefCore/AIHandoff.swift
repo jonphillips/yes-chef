@@ -10,6 +10,8 @@ public struct AIHandoff: Codable, Identifiable, Equatable, Sendable {
   public var sourceType: AIHandoffSourceType
   public var sourceID: UUID
   public var taskType: AIHandoffTaskType
+  /// Present only for a menu handoff initiated from one specific day.
+  public var dayOffset: Int?
   public var createdAt: Date
   public var importedAt: Date?
   public var status: AIHandoffStatus
@@ -21,6 +23,7 @@ public struct AIHandoff: Codable, Identifiable, Equatable, Sendable {
     sourceType: AIHandoffSourceType,
     sourceID: UUID,
     taskType: AIHandoffTaskType,
+    dayOffset: Int? = nil,
     createdAt: Date,
     importedAt: Date? = nil,
     status: AIHandoffStatus = .awaitingReturn,
@@ -31,6 +34,7 @@ public struct AIHandoff: Codable, Identifiable, Equatable, Sendable {
     self.sourceType = sourceType
     self.sourceID = sourceID
     self.taskType = taskType
+    self.dayOffset = dayOffset
     self.createdAt = createdAt
     self.importedAt = importedAt
     self.status = status
@@ -113,9 +117,13 @@ public extension AIHandoff {
   func matches(
     sourceType: AIHandoffSourceType,
     sourceID: UUID,
-    taskType: AIHandoffTaskType
+    taskType: AIHandoffTaskType,
+    dayOffset: Int? = nil
   ) -> Bool {
-    self.sourceType == sourceType && self.sourceID == sourceID && self.taskType == taskType
+    self.sourceType == sourceType
+      && self.sourceID == sourceID
+      && self.taskType == taskType
+      && self.dayOffset == dayOffset
   }
 }
 
@@ -606,19 +614,22 @@ public struct AIHandoffMenuPrepPlanReview: Equatable, Sendable {
   public let plan: MenuPrepPlan
   public let learnings: [String]
   public let unparsedPlanLines: [String]
+  public let advisoryNotes: [String]
 
   public init(
     handoffID: AIHandoff.ID,
     menuID: Menu.ID,
     plan: MenuPrepPlan,
     learnings: [String],
-    unparsedPlanLines: [String] = []
+    unparsedPlanLines: [String] = [],
+    advisoryNotes: [String] = []
   ) {
     self.handoffID = handoffID
     self.menuID = menuID
     self.plan = plan
     self.learnings = learnings
     self.unparsedPlanLines = unparsedPlanLines
+    self.advisoryNotes = advisoryNotes
   }
 }
 
@@ -857,6 +868,44 @@ public enum AIHandoffReturn {
       learnings: learnings.learnings,
       unparsedLines: parsed.unparsedLines + learnings.unparsedLines
     )
+  }
+
+  public static func omittedCurrentPrepStepEvidence(
+    proposedPlan: MenuPrepPlan,
+    currentPlan: MenuPrepPlan
+  ) -> [String] {
+    var proposedByKey = Dictionary(grouping: proposedPlan.steps) { PrepPlanStepVisibleContent($0) }
+    return currentPlan.steps.compactMap { step in
+      let key = PrepPlanStepVisibleContent(step)
+      var candidates = proposedByKey[key] ?? []
+      guard !candidates.isEmpty else {
+        let serves = step.serves.map { " → \($0)" } ?? ""
+        return "Existing prep step missing from returned plan: \(step.session): \(step.task)\(serves)"
+      }
+      candidates.removeFirst()
+      proposedByKey[key] = candidates
+      return nil
+    }
+  }
+
+  public static func droppedSourceDishEvidence(
+    proposedPlan: MenuPrepPlan,
+    currentPlan: MenuPrepPlan
+  ) -> [String] {
+    var proposedByContent = Dictionary(grouping: proposedPlan.steps) { PrepPlanStepVisibleContent($0) }
+    return currentPlan.steps.compactMap { step in
+      guard step.sourceDish != nil else { return nil }
+
+      let content = PrepPlanStepVisibleContent(step)
+      var candidates = proposedByContent[content] ?? []
+      guard let proposedStep = candidates.first else { return nil }
+      candidates.removeFirst()
+      proposedByContent[content] = candidates
+      guard proposedStep.sourceDish == nil else { return nil }
+
+      let serves = step.serves.map { " → \($0)" } ?? ""
+      return "Kept the step but dropped its recipe link (pasted plans can't carry links): \(step.session): \(step.task)\(serves)"
+    }
   }
 
   public static func menuComplement(from text: String, dayCount: Int) -> MenuComplementHandoffParseResult {

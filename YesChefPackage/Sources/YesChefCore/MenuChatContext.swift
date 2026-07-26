@@ -72,6 +72,13 @@ public struct MenuChatContext: Equatable, Sendable {
     budgetedSerialization(characterBudget: characterBudget).text
   }
 
+  public func scoped(toDayOffset dayOffset: Int) -> Self {
+    var context = self
+    context.dayCount = 1
+    context.items = items.filter { $0.dayOffset == dayOffset }
+    return context
+  }
+
   public static func serializedCharacterBudget(for tier: ModelTier) -> Int {
     switch tier {
     case .onDevice:
@@ -311,6 +318,20 @@ public struct MenuChatContext: Equatable, Sendable {
       }
     }
     return MenuChatSerializedContext(text: lines.joined(separator: "\n"), notes: budgetNotes)
+  }
+}
+
+public enum MenuDayHandoffScope {
+  public static func prepInstruction(dayOffset: Int) -> String {
+    """
+    This request focuses on Day \(dayOffset + 1) dishes. The context includes only that day's dishes, but it also includes the full current prep plan for the menu. Return the whole menu prep plan: preserve every existing step for other days verbatim and in place, and weave Day \(dayOffset + 1) changes into the existing horizon bands rather than adding a new appended section. Anything omitted from the reply will be deleted.
+    """
+  }
+
+  public static func complementInstruction(dayOffset: Int) -> String {
+    """
+    This request is only for Day \(dayOffset + 1). The context includes only that day's dishes. Keep every proposed task or complement on Day \(dayOffset + 1); do not plan for another day.
+    """
   }
 }
 

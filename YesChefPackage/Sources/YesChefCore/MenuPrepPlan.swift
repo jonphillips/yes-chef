@@ -516,28 +516,6 @@ public enum PrepPlanStepRepository {
     }
   }
 
-  private struct Contents: Hashable {
-    let session: String
-    let task: String
-    let serves: String?
-    let sourceDish: MenuItem.ID?
-
-    init(session: String, task: String, serves: String?, sourceDish: MenuItem.ID?) {
-      self.session = session
-      self.task = task
-      self.serves = serves
-      self.sourceDish = sourceDish
-    }
-
-    init(_ step: PrepPlanStep) {
-      self.init(session: step.session, task: step.task, serves: step.serves, sourceDish: step.sourceDish)
-    }
-
-    init(_ step: PrepPlanStepRecord) {
-      self.init(session: step.session, task: step.task, serves: step.serves, sourceDish: step.sourceDish)
-    }
-  }
-
   private static func nextSortOrder(for menuID: Menu.ID, in db: Database) throws -> Int {
     (try steps(for: menuID, in: db).map(\.sortOrder).max() ?? -1) + 1
   }
@@ -550,6 +528,61 @@ public enum PrepPlanStepRepository {
     for (sortOrder, step) in steps.enumerated() where step.sortOrder != sortOrder {
       try PrepPlanStepRecord.find(step.id).update { $0.sortOrder = #bind(sortOrder) }.execute(db)
     }
+  }
+
+  private struct Contents: Hashable {
+    let session: String
+    let task: String
+    let serves: String?
+    let sourceDish: MenuItem.ID?
+
+    init(_ step: PrepPlanStep) {
+      self.init(
+        session: step.session,
+        task: step.task,
+        serves: step.serves,
+        sourceDish: step.sourceDish
+      )
+    }
+
+    init(_ step: PrepPlanStepRecord) {
+      self.init(
+        session: step.session,
+        task: step.task,
+        serves: step.serves,
+        sourceDish: step.sourceDish
+      )
+    }
+
+    private init(session: String, task: String, serves: String?, sourceDish: MenuItem.ID?) {
+      self.session = session
+      self.task = task
+      self.serves = serves
+      self.sourceDish = sourceDish
+    }
+  }
+}
+
+// ADR-0040 D3: row identity asks "is this the same row?" and includes `sourceDish`. This advisory
+// comparison asks "did a human-visible step disappear?" and deliberately ignores it, so parsed text
+// never re-derives hidden identity from matching prose.
+struct PrepPlanStepVisibleContent: Hashable {
+  let session: String
+  let task: String
+  let serves: String?
+
+  init(_ step: PrepPlanStep) {
+    self.init(session: step.session, task: step.task, serves: step.serves)
+  }
+
+  init(_ step: PrepPlanStepRecord) {
+    self.init(session: step.session, task: step.task, serves: step.serves)
+  }
+
+  private init(session: String, task: String, serves: String?) {
+    self.session = session
+    self.task = task
+    self.serves = serves
   }
 }
 
