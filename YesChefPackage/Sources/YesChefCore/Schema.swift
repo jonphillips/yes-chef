@@ -989,6 +989,24 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Create workbench references") { db in
+      try #sql("""
+        CREATE TABLE "workbenchReferences" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "workbenchID" TEXT NOT NULL REFERENCES "workbenches"("id") ON DELETE CASCADE,
+          "sourceURL" TEXT,
+          "label" TEXT NOT NULL,
+          "captureKind" TEXT NOT NULL,
+          "reducedText" TEXT NOT NULL,
+          "reductionStatus" TEXT NOT NULL,
+          "dateCreated" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+      try db.execute(sql: #"CREATE INDEX "index_workbenchReferences_on_workbenchID" ON "workbenchReferences"("workbenchID")"#)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

@@ -132,6 +132,7 @@ public enum YesChefCloudSync {
         Workbench.self,
         WorkbenchCandidate.self,
         WorkbenchLogEntry.self,
+        WorkbenchReference.self,
         RecipeVariation.self,
         RecipeDeliberationLogEntry.self,
         GroceryList.self,

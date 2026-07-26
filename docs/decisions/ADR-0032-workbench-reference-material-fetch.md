@@ -227,7 +227,10 @@ standing prod-promotion list. A typed table, not a notes dump ([[decompose-notes
   not only the onboard chat — one source, both surfaces.
 - **S3 — list UI + in-app browser capture.** The meat of the amendment: add/edit/remove reference entries; the
   URL fast path; **"Open in browser → Capture to Workbench"** as the gated path; paste-in as last-resort;
-  refresh. Device pass on iPad + iPhone ([[lean-verification-default]]).
+  refresh. Refresh is an explicit replacement of the selected durable extract: S3 makes its source/capture kind
+  visible and confirms a replacement, because a public fetch may be less complete than an authenticated browser
+  capture; S1 deliberately does not rank or merge them. Device pass on iPad + iPhone
+  ([[lean-verification-default]]).
 - **Later (parked)** — LLM reduce pass (ADR-0043 load test), candidate-source prose, `web_search` discovery.
 
 **Dispatch status:** ratified ≠ was; **scoped now** — S1 is dispatchable off this amendment. Sequence S1 → S2 →
