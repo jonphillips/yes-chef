@@ -936,11 +936,18 @@ final class RecipeDetailModel {
     destination = .scaling
   }
 
+  /// Opens an unseeded recipe chat. Section-specific guidance is selected only from the open panel's
+  /// Discuss menu, so a cook can begin with a free-form question (ADR-0045 Amd 3).
+  func askButtonTapped() {
+    guard let detail, destination?.chat == nil else { return }
+    seededAskSection = nil
+    destination = .chat(RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail))))
+  }
+
   /// Open the recipe chat scoped to `section`, or move an already-open chat to it, keeping the
-  /// transcript. Both the playbook **Ask ▾** launcher and the in-panel **Discuss ▾** switcher route
-  /// here — one section-picking affordance, not two (ADR-0045 Amd 2). It never *closes* the panel;
-  /// dismissal is the panel's own **Done** button. On iPhone the chat is a full-height modal sheet
-  /// that hides the playbook, so an in-panel switch is the only way to re-scope there.
+  /// transcript. The in-panel **Discuss ▾** switcher routes here. It never *closes* the panel;
+  /// dismissal is the panel's own control. On iPhone the chat is a full-height modal sheet that
+  /// hides the playbook, so an in-panel switch is the only way to re-scope there.
   func askSection(_ section: PlaybookSectionKind) {
     guard let detail else { return }
     let seed = RecipeHandoffContext(detail: detail).discussAsk(for: section)

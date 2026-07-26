@@ -259,6 +259,7 @@ private struct RecipeAskPresentationModifier: ViewModifier {
             finalization: model.seededAskSection.map {
               ChatFinalizeConfiguration.recipe(recipeID: model.recipeID, section: $0)
             },
+            focusesInputOnAppear: model.seededAskSection == nil,
             selectSection: model.askSection,
             activeSection: model.seededAskSection,
             onDismiss: { model.destination = nil }
@@ -285,6 +286,7 @@ private struct RecipeAskPresentationModifier: ViewModifier {
         ChatFinalizeConfiguration.recipe(recipeID: model.recipeID, section: $0)
       },
       showsEmbeddedHeader: true,
+      focusesInputOnAppear: model.seededAskSection == nil,
       selectSection: model.askSection,
       activeSection: model.seededAskSection,
       onDismiss: { model.destination = nil }
@@ -620,7 +622,7 @@ private struct RecipeReaderView: View {
       RecipePlaybookView(
         model: model,
         handoffTransport: handoffTransport,
-        ask: model.askSection
+        ask: model.askButtonTapped
       )
     }
   }
@@ -680,7 +682,7 @@ private struct RecipeReaderView: View {
           RecipePlaybookView(
             model: model,
             handoffTransport: handoffTransport,
-            ask: model.askSection
+            ask: model.askButtonTapped
           )
           .padding()
           .frame(maxWidth: .infinity, alignment: .topLeading)

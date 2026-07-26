@@ -72,6 +72,19 @@ struct ChatContextHeader: View {
   }
 }
 
+struct ChatEmptyState: View {
+  let subject: String
+
+  var body: some View {
+    ContentUnavailableView(
+      "Ask anything about this \(subject)",
+      systemImage: "sparkles",
+      description: Text("Or choose a section from Discuss to start a guided discussion.")
+    )
+    .frame(maxWidth: .infinity, minHeight: 220)
+  }
+}
+
 struct ChatTierMenu: View {
   let chatModel: RecipeChatModel
 

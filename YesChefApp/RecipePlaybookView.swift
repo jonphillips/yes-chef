@@ -5,7 +5,7 @@ import YesChefCore
 struct RecipePlaybookView: View {
   let model: RecipeDetailModel
   let handoffTransport: HandoffInAppTransport
-  let ask: (PlaybookSectionKind) -> Void
+  let ask: () -> Void
 
   @State private var isMakeAheadExpanded = true
   @State private var isNotesExpanded = true
@@ -112,21 +112,7 @@ struct RecipePlaybookView: View {
   }
 
   private var askButton: some View {
-    // One section-picking launcher (ADR-0045 Amd 2), replacing both the old single-section Ask
-    // button and the per-section menu's Ask item. Picking a section opens the chat scoped to it,
-    // or moves an already-open chat there; the in-panel Discuss ▾ is the same control once open.
-    Menu {
-      ForEach(PlaybookSectionKind.allCases) { section in
-        Button {
-          ask(section)
-        } label: {
-          Text(section.title)
-          if model.seededAskSection == section {
-            Image(systemName: "checkmark")
-          }
-        }
-      }
-    } label: {
+    Button(action: ask) {
       Label("Ask", systemImage: "sparkles")
     }
     .buttonStyle(.bordered)
@@ -294,8 +280,8 @@ struct RecipePlaybookView: View {
         editingSection = section
       }
 
-      // No per-section "Ask" here (ADR-0045 Amd 2) — section-scoped discussion is reached through
-      // the single Ask ▾ launcher above and the in-panel Discuss ▾, so it is one affordance, not two.
+      // No per-section "Ask" here — the playbook opens an unseeded panel, and its Discuss ▾ switcher
+      // is the one home for section-scoped discussion (ADR-0045 Amd 3).
 
       if isFilled {
         Button("Clear", role: .destructive) {

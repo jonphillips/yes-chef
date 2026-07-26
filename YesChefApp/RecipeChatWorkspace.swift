@@ -231,9 +231,10 @@ struct RecipeChatPanel: View {
   /// competing controls for the same result (ADR-0045 V2 / OQ1).
   var finalization: ChatFinalizeConfiguration?
   var showsEmbeddedHeader = false
-  /// When set, the panel's title becomes a **Discuss ▾** section switcher — the same section-picking
-  /// control as the playbook's Ask ▾ launcher, and the only way to re-scope on iPhone where the
-  /// playbook sits behind the modal sheet. `nil` for panels with no sections (menu, workbench).
+  var focusesInputOnAppear = false
+  /// When set, the panel's title becomes a **Discuss ▾** section switcher — the sole section-picking
+  /// control after the playbook's Ask opens an unseeded panel. It is the only way to re-scope on
+  /// iPhone, where the playbook sits behind the modal sheet. `nil` for panels with no sections.
   var selectSection: ((PlaybookSectionKind) -> Void)?
   var activeSection: PlaybookSectionKind?
   /// When set, the panel exposes its own close affordance: **Done** in a modal navigation bar or a
@@ -250,6 +251,7 @@ struct RecipeChatPanel: View {
   @State private var actionError: String?
   @State private var confirmingClearChat = false
   @State private var isFinalizing = false
+  @FocusState private var isDraftFocused: Bool
   @Dependency(\.handoffReviewCoordinator) private var handoffReviewCoordinator
 
   var body: some View {
@@ -285,13 +287,17 @@ struct RecipeChatPanel: View {
         ScrollView {
           LazyVStack(alignment: .leading, spacing: 12) {
             ChatContextHeader(chatModel: chatModel)
-            ForEach(chatModel.messages) { message in
-              ChatMessageBubble(
-                message: message,
-                selection: assistantSelection,
-                seedSummary: chatModel.seedSummary(for: message.id)
-              )
-                .id(message.id)
+            if chatModel.messages.isEmpty {
+              ChatEmptyState(subject: chatModel.context.subject)
+            } else {
+              ForEach(chatModel.messages) { message in
+                ChatMessageBubble(
+                  message: message,
+                  selection: assistantSelection,
+                  seedSummary: chatModel.seedSummary(for: message.id)
+                )
+                  .id(message.id)
+              }
             }
           }
           .padding()
@@ -365,11 +371,17 @@ struct RecipeChatPanel: View {
             || committingReviewItemID != nil
             || !visibleApplyActions.contains(where: canRun)
         )
+        if applyActionsNeedReply {
+          Text("Apply actions need an assistant reply first.")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
 
         HStack(alignment: .bottom, spacing: 8) {
           TextField("Ask about this \(chatModel.context.subject)", text: $draft, axis: .vertical)
             .textFieldStyle(.roundedBorder)
             .lineLimit(2...4)
+            .focused($isDraftFocused)
             .onSubmit {
               Task { await sendDraft() }
             }
@@ -398,6 +410,11 @@ struct RecipeChatPanel: View {
         showsEmbeddedHeader: showsEmbeddedHeader
       )
     )
+    .onAppear {
+      if focusesInputOnAppear {
+        isDraftFocused = true
+      }
+    }
     .toolbar {
       if !showsEmbeddedHeader {
         if let onDismiss {
@@ -612,6 +629,12 @@ struct RecipeChatPanel: View {
 
   private var canFinalize: Bool {
     latestReplySubject != nil
+  }
+
+  private var applyActionsNeedReply: Bool {
+    latestReplySubject == nil
+      && selectionSubject == nil
+      && visibleApplyActions.contains(where: \.requiresSubject)
   }
 
   private func actionSubject(for action: AnyChatApplyAction) -> ChatActionSubject? {
