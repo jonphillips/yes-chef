@@ -31,7 +31,17 @@ xcodebuild "$@" >"$log" 2>&1
 status=$?
 set -e
 
-rg -n "error:|warning:|BUILD SUCCEEDED|BUILD FAILED|Testing failed|Linker command failed|The following build commands failed" "$log" || true
+# grep, not rg: ripgrep is not a project prerequisite, and when it is missing
+# the summary silently vanishes. Exit 1 just means "no matching lines"; anything
+# higher is a real search failure and is worth saying out loud. xcodebuild's own
+# status stays authoritative either way.
+set +e
+grep -nE "error:|warning:|BUILD SUCCEEDED|BUILD FAILED|Testing failed|Linker command failed|The following build commands failed" "$log"
+grep_status=$?
+set -e
+if (( grep_status > 1 )); then
+  echo "--- summary unavailable: grep failed (exit $grep_status)" >&2
+fi
 
 echo "--- exit=$status  full log: $log"
 exit "$status"
