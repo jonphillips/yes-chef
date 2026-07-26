@@ -150,11 +150,10 @@ func deleteMenuMessage(_ context: MenuDeletionContext) -> String {
 }
 
 func deleteWorkbenchMessage(_ context: WorkbenchDeletionContext) -> String {
-  guard context.candidateCount > 0 else {
-    return "Delete \(context.title)?"
-  }
   let candidateText = context.candidateCount == 1 ? "1 candidate" : "\(context.candidateCount) candidates"
-  return "Delete \(context.title) and its \(candidateText)?"
+  return context.candidateCount > 0
+    ? "Delete \(context.title) and its \(candidateText)? The recipes stay in your library."
+    : "Delete \(context.title)? Any recipes stay in your library."
 }
 
 private enum AppMainColumnSection {

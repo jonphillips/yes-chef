@@ -2,6 +2,26 @@ import Foundation
 import YesChefCore
 
 extension MenuDetailModel {
+  func createLearning(_ text: String) {
+    do {
+      _ = try database.write { db in
+        try LearningRepository.insertNew(
+          texts: [text],
+          sourceType: .menu,
+          sourceID: menuID,
+          provenance: .inApp,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+      toastCenter?.postSuccess("Added learning.")
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
   func createPrepPlanStep(_ draft: PrepPlanStep) {
     do {
       try database.write { db in

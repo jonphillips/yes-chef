@@ -978,6 +978,14 @@ extension DependencyValues {
         ALTER TABLE "aiHandoffs"
         ADD COLUMN "dayOffset" INTEGER
         """)
+      .execute(db)
+    }
+
+    migrator.registerMigration("Add workbench completion date") { db in
+      try #sql("""
+        ALTER TABLE "workbenches"
+        ADD COLUMN "dateCompleted" TEXT
+        """)
         .execute(db)
     }
 

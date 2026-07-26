@@ -103,15 +103,28 @@ struct PrepPlanStepEditorSheet: View {
 
 struct LearningsSection: View {
   let learnings: [Learning]
+  var addLearning: ((String) -> Void)? = nil
   var updateLearning: (Learning, String) -> Void
   var deleteLearning: (Learning.ID) -> Void
   var reorderLearnings: ([Learning.ID], LearningReorderDestination) -> Void
+  @State private var isAdding = false
+  @State private var newLearningText = ""
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("Learnings").font(.title2.weight(.semibold))
+      HStack {
+        Text("Learnings").font(.title2.weight(.semibold))
+        Spacer()
+        if addLearning != nil {
+          Button {
+            isAdding = true
+          } label: {
+            Label("Add Learning", systemImage: "plus")
+          }
+        }
+      }
       if learnings.isEmpty {
-        ContentUnavailableView("No Learnings Yet", systemImage: "lightbulb", description: Text("Useful ideas returned from an AI handoff appear here."))
+        ContentUnavailableView("No Learnings Yet", systemImage: "lightbulb", description: Text("Add a cooking observation or keep useful ideas from an AI handoff here."))
       } else {
         VStack(alignment: .leading, spacing: 0) {
           ForEach(learnings, id: \.id) { learning in
@@ -131,6 +144,25 @@ struct LearningsSection: View {
           }
         }
       }
+      if isAdding {
+        VStack(alignment: .leading, spacing: 8) {
+          TextField("Learning", text: $newLearningText, axis: .vertical)
+            .lineLimit(2...6)
+          HStack {
+            Button("Cancel") {
+              newLearningText = ""
+              isAdding = false
+            }
+            Spacer()
+            Button("Add") {
+              addLearning?(newLearningText)
+              newLearningText = ""
+              isAdding = false
+            }
+            .disabled(newLearningText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          }
+        }
+      }
     }
   }
 }
@@ -146,7 +178,20 @@ struct LearningRow: View {
       if isEditing { VStack(alignment: .leading, spacing: 8) {
         TextField("Learning", text: $draft, axis: .vertical).lineLimit(2...6)
         HStack { Button("Cancel") { draft = learning.text; isEditing = false }; Spacer(); Button("Save") { update(learning, draft); isEditing = false }.disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
-      } } else { Button { draft = learning.text; isEditing = true } label: { Text(learning.text).frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain).accessibilityLabel("Edit learning: \(learning.text)") }
+      } } else {
+        Button { draft = learning.text; isEditing = true } label: {
+          VStack(alignment: .leading, spacing: 4) {
+            Text(learning.text).frame(maxWidth: .infinity, alignment: .leading)
+            if learning.provenance == .inApp {
+              Label("Hand-authored", systemImage: "pencil")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+          }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Edit learning: \(learning.text)")
+      }
     }
     .padding(.vertical, 12)
     .swipeActions { Button(role: .destructive) { delete(learning.id) } label: { Label("Delete", systemImage: "trash") } }

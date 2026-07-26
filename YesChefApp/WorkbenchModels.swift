@@ -21,7 +21,9 @@ final class WorkbenchLibraryModel {
   @ObservationIgnored
   @Dependency(\.uuid) private var uuid
   @ObservationIgnored
-  @Fetch(WorkbenchListRequest(), animation: .default) var workbenchRows: [WorkbenchRowData] = []
+  @Fetch(WorkbenchListRequest(filter: .active), animation: .default) var activeWorkbenchRows: [WorkbenchRowData] = []
+  @ObservationIgnored
+  @Fetch(WorkbenchListRequest(filter: .completed), animation: .default) var completedWorkbenchRows: [WorkbenchRowData] = []
 
   var destination: Destination?
   var navigationPath: [Workbench.ID] = []
@@ -30,7 +32,8 @@ final class WorkbenchLibraryModel {
   var isShowingError = false
 
   func reloadAfterExternalChange() async {
-    try? await $workbenchRows.load()
+    try? await $activeWorkbenchRows.load()
+    try? await $completedWorkbenchRows.load()
   }
 
   func addWorkbenchButtonTapped() {
@@ -71,6 +74,30 @@ final class WorkbenchLibraryModel {
         candidateCount: row.candidateCount
       )
     )
+  }
+
+  func markWorkbenchCompletedButtonTapped(_ row: WorkbenchRowData) {
+    updateWorkbenchCompletion(row, dateCompleted: now)
+  }
+
+  func markWorkbenchActiveButtonTapped(_ row: WorkbenchRowData) {
+    updateWorkbenchCompletion(row, dateCompleted: nil)
+  }
+
+  private func updateWorkbenchCompletion(_ row: WorkbenchRowData, dateCompleted: Date?) {
+    do {
+      try database.write { db in
+        try WorkbenchRepository.updateWorkbenchCompletion(
+          workbenchID: row.id,
+          dateCompleted: dateCompleted,
+          in: db,
+          now: now
+        )
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
   }
 
   func confirmDeleteWorkbenchButtonTapped(_ context: WorkbenchDeletionContext) {
@@ -343,7 +370,7 @@ final class WorkbenchDetailModel {
     return actions
   }
 
-  func saveNotesButtonTapped(_ notes: String) {
+  func saveNotesButtonTapped(_ notes: String) -> Bool {
     do {
       try database.write { db in
         try WorkbenchRepository.updateWorkbenchNotes(
@@ -353,13 +380,15 @@ final class WorkbenchDetailModel {
           now: now
         )
       }
+      return true
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
+      return false
     }
   }
 
-  func saveTitleButtonTapped(_ title: String) {
+  func saveTitleButtonTapped(_ title: String) -> Bool {
     do {
       try database.write { db in
         try WorkbenchRepository.updateWorkbenchTitle(
@@ -369,9 +398,11 @@ final class WorkbenchDetailModel {
           now: now
         )
       }
+      return true
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
+      return false
     }
   }
 

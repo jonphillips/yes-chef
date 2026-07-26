@@ -10,6 +10,8 @@ struct WorkbenchListView: View {
 
   let model: WorkbenchLibraryModel
   var style: Style
+  @State private var selectedFilter: WorkbenchListFilter = .active
+  @State private var completedSearchText = ""
 
   var body: some View {
     @Bindable var model = model
@@ -18,34 +20,39 @@ struct WorkbenchListView: View {
       switch style {
       case .navigation:
         List {
-          ForEach(model.workbenchRows) { row in
+          ForEach(workbenchRows(for: model)) { row in
             NavigationLink(value: row.id) {
               WorkbenchRowView(row: row)
             }
-            .swipeActions {
-              Button(role: .destructive) {
-                model.deleteWorkbenchButtonTapped(row)
-              } label: {
-                Label("Delete", systemImage: "trash")
-              }
-            }
+            .workbenchSwipeActions(row, model: model)
           }
         }
       case .selection:
-        List(model.workbenchRows, selection: $model.selectedWorkbenchID) { row in
+        List(workbenchRows(for: model), selection: $model.selectedWorkbenchID) { row in
           WorkbenchRowView(row: row)
             .tag(row.id)
-            .swipeActions {
-              Button(role: .destructive) {
-                model.deleteWorkbenchButtonTapped(row)
-              } label: {
-                Label("Delete", systemImage: "trash")
-              }
-            }
+            .workbenchSwipeActions(row, model: model)
         }
       }
     }
     .navigationTitle("Workbenches")
+    .safeAreaInset(edge: .top) {
+      VStack(spacing: 8) {
+        Picker("Workbench status", selection: $selectedFilter) {
+          Text("Active").tag(WorkbenchListFilter.active)
+          Text("Completed").tag(WorkbenchListFilter.completed)
+        }
+        .pickerStyle(.segmented)
+        if selectedFilter == .completed {
+          TextField("Search completed workbenches", text: $completedSearchText)
+            .textFieldStyle(.roundedBorder)
+        }
+      }
+      .padding(.horizontal)
+      .padding(.top, 8)
+      .padding(.bottom, 4)
+      .background(.bar)
+    }
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Button {
@@ -53,6 +60,43 @@ struct WorkbenchListView: View {
         } label: {
           Label("Add Workbench", systemImage: "plus")
         }
+      }
+    }
+  }
+
+  private func workbenchRows(for model: WorkbenchLibraryModel) -> [WorkbenchRowData] {
+    guard selectedFilter == .completed else { return model.activeWorkbenchRows }
+    let query = completedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !query.isEmpty else { return model.completedWorkbenchRows }
+    return model.completedWorkbenchRows.filter {
+      $0.workbench.title.localizedCaseInsensitiveContains(query)
+        || ($0.workbench.notes?.localizedCaseInsensitiveContains(query) ?? false)
+    }
+  }
+}
+
+private extension View {
+  func workbenchSwipeActions(_ row: WorkbenchRowData, model: WorkbenchLibraryModel) -> some View {
+    swipeActions {
+      if row.workbench.dateCompleted == nil {
+        Button {
+          model.markWorkbenchCompletedButtonTapped(row)
+        } label: {
+          Label("Mark Completed", systemImage: "checkmark.circle")
+        }
+        .tint(.green)
+      } else {
+        Button {
+          model.markWorkbenchActiveButtonTapped(row)
+        } label: {
+          Label("Mark Active", systemImage: "arrow.uturn.backward.circle")
+        }
+        .tint(.blue)
+      }
+      Button(role: .destructive) {
+        model.deleteWorkbenchButtonTapped(row)
+      } label: {
+        Label("Delete", systemImage: "trash")
       }
     }
   }
@@ -327,6 +371,11 @@ struct WorkbenchDetailView: View {
 }
 
 private struct WorkbenchReader: View {
+  private enum FocusedField: Hashable {
+    case title
+    case notes
+  }
+
   let model: WorkbenchDetailModel
   let detail: WorkbenchDetailData
   let handoffTransport: HandoffInAppTransport
@@ -334,37 +383,35 @@ private struct WorkbenchReader: View {
 
   @State private var titleText = ""
   @State private var notesText = ""
+  @State private var lastGoodTitle = ""
+  @State private var lastSavedNotes: String?
+  @State private var titleSaveTask: Task<Void, Never>?
+  @State private var notesSaveTask: Task<Void, Never>?
+  @FocusState private var focusedField: FocusedField?
 
   var body: some View {
     List {
       Section {
         VStack(alignment: .leading, spacing: 10) {
-          StackedTextField(title: "Title", text: $titleText)
+          StackedFormField(title: "Title") {
+            TextField("Title", text: $titleText)
+              .focused($focusedField, equals: .title)
+          }
             .font(.title2.weight(.semibold))
-          Button {
-            model.saveTitleButtonTapped(titleText)
-          } label: {
-            Label("Save Title", systemImage: "square.and.arrow.down")
-          }
-          .buttonStyle(.bordered)
-          .disabled(titleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-          TextEditor(text: $notesText)
-            .frame(minHeight: 80)
-            .overlay(alignment: .topLeading) {
-              if notesText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text("Notes")
-                  .foregroundStyle(.tertiary)
-                  .padding(.top, 8)
-                  .padding(.leading, 5)
-                  .allowsHitTesting(false)
+          StackedFormField(title: "Notes") {
+            TextEditor(text: $notesText)
+              .focused($focusedField, equals: .notes)
+              .frame(minHeight: 80)
+              .overlay(alignment: .topLeading) {
+                if notesText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                  Text("Notes")
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 8)
+                    .padding(.leading, 5)
+                    .allowsHitTesting(false)
+                }
               }
-            }
-          Button {
-            model.saveNotesButtonTapped(notesText)
-          } label: {
-            Label("Save Notes", systemImage: "square.and.arrow.down")
           }
-          .buttonStyle(.bordered)
         }
         .padding(.vertical, 4)
       }
@@ -485,12 +532,71 @@ private struct WorkbenchReader: View {
     .onAppear {
       titleText = detail.workbench.title
       notesText = detail.workbench.notes ?? ""
+      lastGoodTitle = detail.workbench.title
+      lastSavedNotes = detail.workbench.notes
     }
     .onChange(of: detail.workbench.title) { _, title in
       titleText = title
+      lastGoodTitle = title
     }
     .onChange(of: detail.workbench.notes) { _, notes in
       notesText = notes ?? ""
+      lastSavedNotes = notes
+    }
+    .onChange(of: titleText) {
+      scheduleTitleSave()
+    }
+    .onChange(of: notesText) {
+      scheduleNotesSave()
+    }
+    .onChange(of: focusedField) { oldField, newField in
+      if oldField == .title, newField != .title { commitTitle() }
+      if oldField == .notes, newField != .notes { commitNotes() }
+    }
+    .onDisappear {
+      titleSaveTask?.cancel()
+      notesSaveTask?.cancel()
+      commitTitle()
+      commitNotes()
+    }
+  }
+
+  private func scheduleTitleSave() {
+    titleSaveTask?.cancel()
+    titleSaveTask = Task { @MainActor in
+      do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+      guard !Task.isCancelled else { return }
+      commitTitle()
+    }
+  }
+
+  private func scheduleNotesSave() {
+    notesSaveTask?.cancel()
+    notesSaveTask = Task { @MainActor in
+      do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+      guard !Task.isCancelled else { return }
+      commitNotes()
+    }
+  }
+
+  private func commitTitle() {
+    let title = WorkbenchInlineEditor.titleForCommit(draft: titleText, lastGoodTitle: lastGoodTitle)
+    guard title != lastGoodTitle else {
+      titleText = title
+      return
+    }
+    titleText = title
+    if model.saveTitleButtonTapped(title) {
+      lastGoodTitle = title
+    }
+  }
+
+  private func commitNotes() {
+    let notes = notesText.trimmingCharacters(in: .whitespacesAndNewlines)
+    let normalizedNotes = notes.isEmpty ? nil : notes
+    guard normalizedNotes != lastSavedNotes else { return }
+    if model.saveNotesButtonTapped(notesText) {
+      lastSavedNotes = normalizedNotes
     }
   }
 }

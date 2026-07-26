@@ -7,6 +7,7 @@ public struct Workbench: Codable, Identifiable, Equatable, Sendable {
   public var title: String
   public var notes: String?
   public var draftRecipeID: Recipe.ID?
+  public var dateCompleted: Date?
   public var sortOrder: Int
   public var dateCreated: Date
   public var dateModified: Date
@@ -16,6 +17,7 @@ public struct Workbench: Codable, Identifiable, Equatable, Sendable {
     title: String,
     notes: String? = nil,
     draftRecipeID: Recipe.ID? = nil,
+    dateCompleted: Date? = nil,
     sortOrder: Int,
     dateCreated: Date,
     dateModified: Date
@@ -24,6 +26,7 @@ public struct Workbench: Codable, Identifiable, Equatable, Sendable {
     self.title = title
     self.notes = notes
     self.draftRecipeID = draftRecipeID
+    self.dateCompleted = dateCompleted
     self.sortOrder = sortOrder
     self.dateCreated = dateCreated
     self.dateModified = dateModified
@@ -227,11 +230,16 @@ public extension RecipeSource {
 }
 
 public struct WorkbenchListRequest: FetchKeyRequest {
-  public init() {}
+  public var filter: WorkbenchListFilter
+
+  public init(filter: WorkbenchListFilter = .active) {
+    self.filter = filter
+  }
 
   public func fetch(_ db: Database) throws -> [WorkbenchRowData] {
     let candidatesByWorkbenchID = Dictionary(grouping: try WorkbenchCandidate.fetchAll(db), by: \.workbenchID)
     return try Workbench.fetchAll(db)
+      .filter { filter.includes($0) }
       .map { workbench in
         WorkbenchRowData(
           workbench: workbench,
@@ -239,6 +247,25 @@ public struct WorkbenchListRequest: FetchKeyRequest {
         )
       }
       .sorted(by: areWorkbenchRowsInIncreasingOrder)
+  }
+}
+
+public enum WorkbenchListFilter: Hashable, Sendable {
+  case active
+  case completed
+
+  func includes(_ workbench: Workbench) -> Bool {
+    switch self {
+    case .active: workbench.dateCompleted == nil
+    case .completed: workbench.dateCompleted != nil
+    }
+  }
+}
+
+/// Pure inline-editor policy: an empty draft is never allowed to replace a stored title.
+public enum WorkbenchInlineEditor {
+  public static func titleForCommit(draft: String, lastGoodTitle: String) -> String {
+    draft.nonEmptyWorkbenchText ?? lastGoodTitle
   }
 }
 
@@ -408,6 +435,18 @@ public enum WorkbenchRepository {
     }
     var workbench = try requireWorkbench(workbenchID, in: db)
     workbench.title = title
+    workbench.dateModified = now
+    try Workbench.upsert { workbench }.execute(db)
+  }
+
+  public static func updateWorkbenchCompletion(
+    workbenchID: Workbench.ID,
+    dateCompleted: Date?,
+    in db: Database,
+    now: Date
+  ) throws {
+    var workbench = try requireWorkbench(workbenchID, in: db)
+    workbench.dateCompleted = dateCompleted
     workbench.dateModified = now
     try Workbench.upsert { workbench }.execute(db)
   }
