@@ -268,8 +268,7 @@ struct RecipeChatPanel: View {
               .lineLimit(1)
           }
           Spacer(minLength: 8)
-          clearChatButton
-          ChatTierMenu(chatModel: chatModel)
+          chatOptionsMenu
           if let onDismiss {
             Button(action: onDismiss) {
               Image(systemName: "xmark.circle.fill")
@@ -371,12 +370,6 @@ struct RecipeChatPanel: View {
             || committingReviewItemID != nil
             || !visibleApplyActions.contains(where: canRun)
         )
-        if applyActionsNeedReply {
-          Text("Apply actions need an assistant reply first.")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-
         HStack(alignment: .bottom, spacing: 8) {
           TextField("Ask about this \(chatModel.context.subject)", text: $draft, axis: .vertical)
             .textFieldStyle(.roundedBorder)
@@ -428,10 +421,7 @@ struct RecipeChatPanel: View {
           }
         }
         ToolbarItem(placement: .topBarTrailing) {
-          clearChatButton
-        }
-        ToolbarItem(placement: .topBarTrailing) {
-          ChatTierMenu(chatModel: chatModel)
+          chatOptionsMenu
         }
       }
     }
@@ -673,14 +663,22 @@ struct RecipeChatPanel: View {
     return action.extractingTitle
   }
 
-  private var clearChatButton: some View {
-    Button {
-      confirmingClearChat = true
+  private var chatOptionsMenu: some View {
+    Menu {
+      Button(role: .destructive) {
+        confirmingClearChat = true
+      } label: {
+        Label("Clear Chat", systemImage: "trash")
+      }
+      .disabled(chatModel.messages.isEmpty || chatModel.isResponding)
+
+      Divider()
+
+      ChatTierOptions(chatModel: chatModel)
     } label: {
-      Image(systemName: "trash")
+      Image(systemName: "ellipsis")
     }
-    .disabled(chatModel.messages.isEmpty || chatModel.isResponding)
-    .accessibilityLabel(Text("Clear Chat"))
+    .accessibilityLabel(Text("Chat options"))
   }
 
   private func clearChat() {

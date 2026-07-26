@@ -113,7 +113,7 @@ public enum RecipeChatContext: Equatable, Sendable {
     switch self {
     case let .mealPlan(context): context.seededContextDescription
     case let .menu(context): context.seededContextDescription
-    case .recipe: "Seeded with the recipe on screen."
+    case .recipe: "This conversation can use the recipe on screen."
     case let .workbench(context): context.seededContextDescription
     }
   }

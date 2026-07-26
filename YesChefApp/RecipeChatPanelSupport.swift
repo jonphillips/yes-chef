@@ -62,13 +62,16 @@ enum OnboardChatFinalizer {
 struct ChatContextHeader: View {
   let chatModel: RecipeChatModel
 
+  @ViewBuilder
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Text(chatModel.context.seededContextDescription)
-        .font(.footnote)
-        .foregroundStyle(.secondary)
+    if !chatModel.messages.isEmpty {
+      VStack(alignment: .leading, spacing: 6) {
+        Text(chatModel.context.seededContextDescription)
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
 
@@ -79,52 +82,41 @@ struct ChatEmptyState: View {
     ContentUnavailableView(
       "Ask anything about this \(subject)",
       systemImage: "sparkles",
-      description: Text("Or choose a section from Discuss to start a guided discussion.")
+      description: Text(
+        "Or choose a section from Discuss to start a guided discussion. Apply actions need an assistant reply first."
+      )
     )
     .frame(maxWidth: .infinity, minHeight: 220)
   }
 }
 
-struct ChatTierMenu: View {
+struct ChatTierOptions: View {
   let chatModel: RecipeChatModel
 
   var body: some View {
     @Bindable var chatModel = chatModel
 
-    Menu {
+    Button {
+      chatModel.useFrontier = false
+    } label: {
+      Label("On-device (private)", systemImage: "iphone")
+      if !chatModel.sendsToProvider {
+        Image(systemName: "checkmark")
+      }
+    }
+
+    ForEach(FrontierProvider.allCases) { provider in
       Button {
-        chatModel.useFrontier = false
+        chatModel.selectedProvider = provider
+        chatModel.useFrontier = true
       } label: {
-        Label("On-device (private)", systemImage: "iphone")
-        if !chatModel.sendsToProvider {
+        Label("\(provider.displayName) (sends data off device)", systemImage: "network")
+        if chatModel.sendsToProvider, chatModel.selectedProvider == provider {
           Image(systemName: "checkmark")
         }
       }
-
-      ForEach(FrontierProvider.allCases) { provider in
-        Button {
-          chatModel.selectedProvider = provider
-          chatModel.useFrontier = true
-        } label: {
-          Label("\(provider.displayName) (sends data off device)", systemImage: "network")
-          if chatModel.sendsToProvider, chatModel.selectedProvider == provider {
-            Image(systemName: "checkmark")
-          }
-        }
-        .disabled(!chatModel.availableProviders.contains(provider))
-      }
-    } label: {
-      HStack(spacing: 4) {
-        Image(systemName: chatModel.sendsToProvider ? "network" : "iphone")
-          .foregroundStyle(chatModel.sendsToProvider ? .blue : .green)
-        Text(chatModel.sendsToProvider ? chatModel.selectedProvider.displayName : "On-device")
-          .font(.subheadline)
-        Image(systemName: "chevron.up.chevron.down")
-          .font(.caption2)
-          .foregroundStyle(.secondary)
-      }
+      .disabled(!chatModel.availableProviders.contains(provider))
     }
-    .accessibilityHint(Text("Choose whether recipe context stays on device or is sent to a configured provider."))
   }
 }
 
