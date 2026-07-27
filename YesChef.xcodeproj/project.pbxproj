@@ -35,11 +35,14 @@
 		33DD122054891894F173D788 /* YesChefApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03DFCF817329BEE674E95B72 /* YesChefApp.swift */; };
 		36753CBE212E39908AA91B4E /* HandoffSectionRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E669665E13FA2090694CB0 /* HandoffSectionRoutingTests.swift */; };
 		3846277BD575C412195ACF75 /* FocusToolbarButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF86C88A023D5D19CDE64102 /* FocusToolbarButton.swift */; };
+		38632A8F2F9B0F5C90683882 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = A8C5256090D9AFFD84E0AD32 /* Dependencies */; };
 		386D42C820E47D4CC0306130 /* RecipeAdjustmentReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D667D9221C270FF5442B4CC8 /* RecipeAdjustmentReviewView.swift */; };
+		39910D0EBA5752CE0EF217D8 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 09D0A75A465598EE79E0441F /* ZIPFoundation */; };
 		3AF6F47B328D293D8DDEB2C5 /* RecipeDetailModel+Enrichment.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE43F12069919277037EDE55 /* RecipeDetailModel+Enrichment.swift */; };
 		3B43FC000CAA77FE2FCBAD93 /* HandoffIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75337F357939E23B8A594784 /* HandoffIntents.swift */; };
 		3C511415F03094402001B7D2 /* RecipeScaleFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD810D780BF1E28B4D82992D /* RecipeScaleFormatting.swift */; };
 		3E8AE18096153006398A5FD8 /* WorkbenchCompareAlignmentModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A40B028294CBF15EA2F4F72 /* WorkbenchCompareAlignmentModelTests.swift */; };
+		410DE555132BA6ED513C55C6 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 23B55C4E25C2510FF2AB49D3 /* GRDB */; };
 		44F69263795B85BC859E1591 /* PantryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 870CDB16B3140953C11EFDDC /* PantryViews.swift */; };
 		4530607B3DE651BAE0CC6641 /* RecipeListRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B9BCF538013B597BB0D401 /* RecipeListRow.swift */; };
 		47B32696007AA6735D4B282B /* SharePreprocessor.js in Resources */ = {isa = PBXBuildFile; fileRef = B9CC26315C4C3E333C66F625 /* SharePreprocessor.js */; };
@@ -47,7 +50,7 @@
 		5556826F5F47C4461DD123F2 /* MenuDetailChatPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC10A57FB9A55D40CD97546E /* MenuDetailChatPresentation.swift */; };
 		55781455886CF630A357095F /* AppNavigationHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C53BF3A6DACBE4FF07F30717 /* AppNavigationHelpers.swift */; };
 		5646D5F153EB359225213D48 /* MenuDetailModel+Chat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C19798C43815D368E19636A /* MenuDetailModel+Chat.swift */; };
-		5802E0EACFD7C085AB84EB77 /* SwiftUINavigation in Frameworks */ = {isa = PBXBuildFile; productRef = AD2559042536058C97728A19 /* SwiftUINavigation */; };
+		5802E0EACFD7C085AB84EB77 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = 87DE389964638E7777ABB383 /* SQLiteData */; };
 		587E4FEB200F87C5D6A066B1 /* BrowserViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6695544EB0BE23557D34BFA5 /* BrowserViews.swift */; };
 		58947ACE0A30F7F3182C5833 /* AISettingsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F3ADFFD14E222AAFF380E6 /* AISettingsModel.swift */; };
 		5A3CE29C1018A68874A977A2 /* RecipeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76906E88E579D71619461798 /* RecipeEditorView.swift */; };
@@ -60,6 +63,8 @@
 		626E267DA14C0FFA47BE6412 /* WorkbenchCompareAlignmentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B48DD3E004C108C6CC348A /* WorkbenchCompareAlignmentModel.swift */; };
 		627BE832B346246A69355F57 /* SyncHealthModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EA663A481CAE11E140B6830 /* SyncHealthModel.swift */; };
 		638EB65557B6EADDD89B33DD /* WebExtractorKit in Frameworks */ = {isa = PBXBuildFile; productRef = 161A231BCBA04E0D71C67DF2 /* WebExtractorKit */; };
+		64A2147BA244A92AD003A696 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = 86859006FF66FAFF04016AA2 /* SQLiteData */; };
+		6506971951AC784BCA68EFD5 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 3576C349C92C3F1CA77B4BC5 /* GRDB */; };
 		6588EBC345BB11E65929F52F /* MenuPlaybookColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A1F368F34241CAF035C9CA /* MenuPlaybookColumnView.swift */; };
 		68A79CAF1B3EDB56758F1CC1 /* MealCalendarHandoffSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EEED601CE748216744F3637 /* MealCalendarHandoffSource.swift */; };
 		69B8E2AD921E41D8B38D14C7 /* YesChefShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 396029D84F6F6E49A17C47D2 /* YesChefShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -74,6 +79,7 @@
 		76A09E387271E9757E7AA9B8 /* MenuViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26A031F93AA06D9ADCD5C36D /* MenuViews.swift */; };
 		79EB117D8A2F3B3945E31C03 /* RecipeChatPanelSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F5CC1002FE379723FA1363E /* RecipeChatPanelSupport.swift */; };
 		7C57B8AB73C6BE68948F80F7 /* RecipePlaybookColumnLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 492BC4D75288EEB6446263F7 /* RecipePlaybookColumnLayout.swift */; };
+		81D2D9D82209A65C59F7D435 /* SwiftUINavigation in Frameworks */ = {isa = PBXBuildFile; productRef = AD2559042536058C97728A19 /* SwiftUINavigation */; };
 		866C7FBB7E3079ECED997DEB /* MealCalendarModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B49D2E9B66A731DB272F063C /* MealCalendarModels.swift */; };
 		86E285EF8664CE66215DBDF0 /* RecipeVariationEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5AE2D975575189A0B728A1 /* RecipeVariationEditor.swift */; };
 		8E95908F8BEB4303046C257B /* WorkbenchCompletedSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 103972B7C1A0B400B648CB18 /* WorkbenchCompletedSearch.swift */; };
@@ -91,7 +97,7 @@
 		A988E3254E3FCB7C8001B787 /* HandoffEntities.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55509395111AAC5A4B7E5AB /* HandoffEntities.swift */; };
 		A9FBE5AA277DCBB1A66A417E /* GroceryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27FA69A8957E5DC8A49A9E3F /* GroceryViews.swift */; };
 		AC5E169D7FD4E2A968FE17C3 /* AppMainLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D076ED31F43B8378E0DFA2F /* AppMainLayout.swift */; };
-		ADDF8E556B8570CC0D68D5A0 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 09D0A75A465598EE79E0441F /* ZIPFoundation */; };
+		ADDF8E556B8570CC0D68D5A0 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 517D768EFBEA670F5B8416DE /* GRDB */; };
 		AE11AE8D6A7D9F8E06642477 /* GroceryPantryReviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C2EE75870C5C9AAD099505 /* GroceryPantryReviewViews.swift */; };
 		AEEFD13CB08E83C9958ACC8E /* AppDestinationPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10717DBD3251B160509FD4E9 /* AppDestinationPresentation.swift */; };
 		B197F2566EB325113BC5D498 /* ChatWorkspaceDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 471D8E1304E5EF631EB996C3 /* ChatWorkspaceDivider.swift */; };
@@ -102,18 +108,20 @@
 		B46A558486B6A2B676650ABF /* AttentionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18C58B2B2BF5D8C5766C1902 /* AttentionCard.swift */; };
 		B7E58D7FBEB23C7DDDBA0DD1 /* AppNavigationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85D49CBB7931A65D53EC1654 /* AppNavigationModels.swift */; };
 		BE4BD3C03012A0A5F11A6852 /* ChatSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = F23F8E8EAB36E54DADF23A71 /* ChatSurface.swift */; };
+		BF6E63936FB6FA4E4CFDD8CA /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = E94FE1F285F6B338A789EE95 /* SQLiteData */; };
 		C4460AA94AC3679029FA4CBC /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C469ECE48285073F98E35D10 /* ShareViewController.swift */; };
 		C4D9F1DEA1A0CA728D2578D3 /* YesChefCore in Frameworks */ = {isa = PBXBuildFile; productRef = F8B7EFEDFB9B5499B0B98F9B /* YesChefCore */; };
 		CB4F5CEA046A10EF5FDE0892 /* RecipeDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CCF32B5108C44892607FF3B /* RecipeDetailView.swift */; };
 		CCFC4DC9297E465E3E045AAA /* CookSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90AEA6C80CDEFF87884B65A7 /* CookSessionView.swift */; };
 		CD5717B4A411916DC9E7499F /* RecipeChatWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07C439846D3B6561F2CFE399 /* RecipeChatWorkspace.swift */; };
 		CFBABC506840D72E020E663D /* RecipeScaleFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9095EE24ABAA5DC23259EDE9 /* RecipeScaleFormattingTests.swift */; };
-		D20B0260FC41D720A3A8DFAF /* DependenciesTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 7B5AF2BC1B39A7657BB8B071 /* DependenciesTestSupport */; };
+		D20B0260FC41D720A3A8DFAF /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = E526F7B4800D1EBE4D8A2A3E /* Dependencies */; };
 		D4ECC1340963D28E217E0727 /* RecipeListPresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = E48B9ACFF26E71C15146E3E9 /* RecipeListPresets.swift */; };
 		D778483B6523AB97BDE06ED6 /* MenuModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7090DA55279458851517DD5A /* MenuModels.swift */; };
 		D8FB35A8C0D8195A104EE90D /* RecipeImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE2CEAA7C5D5836E123F474 /* RecipeImageLoader.swift */; };
 		E04A28BE098B255C0B136810 /* AIHandoffMenuPasteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 792C0EBCFF5BA678E266946D /* AIHandoffMenuPasteTests.swift */; };
-		E3281DDA81614C3985E3BB8E /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = F6DB8F903598A87E2AA0443F /* CasePaths */; };
+		E3281DDA81614C3985E3BB8E /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = 94BD562408492AC6E81B0035 /* Dependencies */; };
+		E8641F57EEFE217A67AD299E /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = F6DB8F903598A87E2AA0443F /* CasePaths */; };
 		E9B700F7600DB2A95017E9B8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = BCD1FADF980D78977F069A1D /* AppIcon.icon */; };
 		EB63D8755383729654D000AC /* SeedCoverageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 556B8CD9C6727F96C1BD4684 /* SeedCoverageView.swift */; };
 		ECE0E06AEF0B9DCD549F077E /* LLMClientKit in Frameworks */ = {isa = PBXBuildFile; productRef = 2CA1F8E404895981FD32307C /* LLMClientKit */; };
@@ -281,7 +289,9 @@
 			files = (
 				C4D9F1DEA1A0CA728D2578D3 /* YesChefCore in Frameworks */,
 				ECE0E06AEF0B9DCD549F077E /* LLMClientKit in Frameworks */,
-				D20B0260FC41D720A3A8DFAF /* DependenciesTestSupport in Frameworks */,
+				D20B0260FC41D720A3A8DFAF /* Dependencies in Frameworks */,
+				64A2147BA244A92AD003A696 /* SQLiteData in Frameworks */,
+				6506971951AC784BCA68EFD5 /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -290,6 +300,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				9ADADC85EDEC6208590FC533 /* YesChefCore in Frameworks */,
+				38632A8F2F9B0F5C90683882 /* Dependencies in Frameworks */,
+				BF6E63936FB6FA4E4CFDD8CA /* SQLiteData in Frameworks */,
+				410DE555132BA6ED513C55C6 /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -301,9 +314,12 @@
 				638EB65557B6EADDD89B33DD /* WebExtractorKit in Frameworks */,
 				754138B487846E702D9E769E /* LLMClientKit in Frameworks */,
 				0448097B16770EDEA54D2BE8 /* CloudSyncKit in Frameworks */,
-				E3281DDA81614C3985E3BB8E /* CasePaths in Frameworks */,
-				5802E0EACFD7C085AB84EB77 /* SwiftUINavigation in Frameworks */,
-				ADDF8E556B8570CC0D68D5A0 /* ZIPFoundation in Frameworks */,
+				E3281DDA81614C3985E3BB8E /* Dependencies in Frameworks */,
+				5802E0EACFD7C085AB84EB77 /* SQLiteData in Frameworks */,
+				ADDF8E556B8570CC0D68D5A0 /* GRDB in Frameworks */,
+				E8641F57EEFE217A67AD299E /* CasePaths in Frameworks */,
+				81D2D9D82209A65C59F7D435 /* SwiftUINavigation in Frameworks */,
+				39910D0EBA5752CE0EF217D8 /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -498,7 +514,9 @@
 			packageProductDependencies = (
 				F8B7EFEDFB9B5499B0B98F9B /* YesChefCore */,
 				2CA1F8E404895981FD32307C /* LLMClientKit */,
-				7B5AF2BC1B39A7657BB8B071 /* DependenciesTestSupport */,
+				E526F7B4800D1EBE4D8A2A3E /* Dependencies */,
+				86859006FF66FAFF04016AA2 /* SQLiteData */,
+				3576C349C92C3F1CA77B4BC5 /* GRDB */,
 			);
 			productName = YesChefTests;
 			productReference = 59E522447CE52337EC8C4546 /* YesChefTests.xctest */;
@@ -519,6 +537,9 @@
 			name = YesChefShareExtension;
 			packageProductDependencies = (
 				13643DFF3682EB50C6B096D2 /* YesChefCore */,
+				A8C5256090D9AFFD84E0AD32 /* Dependencies */,
+				E94FE1F285F6B338A789EE95 /* SQLiteData */,
+				23B55C4E25C2510FF2AB49D3 /* GRDB */,
 			);
 			productName = YesChefShareExtension;
 			productReference = 396029D84F6F6E49A17C47D2 /* YesChefShareExtension.appex */;
@@ -544,6 +565,9 @@
 				161A231BCBA04E0D71C67DF2 /* WebExtractorKit */,
 				466487297E618AB02C1103AB /* LLMClientKit */,
 				206B15F35921C468940B34DC /* CloudSyncKit */,
+				94BD562408492AC6E81B0035 /* Dependencies */,
+				87DE389964638E7777ABB383 /* SQLiteData */,
+				517D768EFBEA670F5B8416DE /* GRDB */,
 				F6DB8F903598A87E2AA0443F /* CasePaths */,
 				AD2559042536058C97728A19 /* SwiftUINavigation */,
 				09D0A75A465598EE79E0441F /* ZIPFoundation */,
@@ -584,6 +608,8 @@
 			packageReferences = (
 				9E510FCDFD2C866AB4A61A46 /* XCRemoteSwiftPackageReference "swift-case-paths" */,
 				A927C2C338F67E8F2C611140 /* XCRemoteSwiftPackageReference "swift-dependencies" */,
+				A9A58BB4AFC674A75EA282BA /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+				0FE2DAE45E5731FFCF8C21D2 /* XCRemoteSwiftPackageReference "sqlite-data" */,
 				8C626E2F21AE016D9E0C1DB5 /* XCRemoteSwiftPackageReference "swift-navigation" */,
 				8905B07D7FD63BCF3E395911 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 				31B99064C169F69BEBFDCDFC /* XCLocalSwiftPackageReference "../../jon-platform/packages/CloudSyncKit" */,
@@ -1072,6 +1098,14 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		0FE2DAE45E5731FFCF8C21D2 /* XCRemoteSwiftPackageReference "sqlite-data" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/sqlite-data";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
 		8905B07D7FD63BCF3E395911 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
@@ -1104,6 +1138,14 @@
 				minimumVersion = 1.0.0;
 			};
 		};
+		A9A58BB4AFC674A75EA282BA /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.6.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1128,23 +1170,63 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = CloudSyncKit;
 		};
+		23B55C4E25C2510FF2AB49D3 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A9A58BB4AFC674A75EA282BA /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
 		2CA1F8E404895981FD32307C /* LLMClientKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = LLMClientKit;
+		};
+		3576C349C92C3F1CA77B4BC5 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A9A58BB4AFC674A75EA282BA /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
 		};
 		466487297E618AB02C1103AB /* LLMClientKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = LLMClientKit;
 		};
-		7B5AF2BC1B39A7657BB8B071 /* DependenciesTestSupport */ = {
+		517D768EFBEA670F5B8416DE /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A9A58BB4AFC674A75EA282BA /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+		86859006FF66FAFF04016AA2 /* SQLiteData */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0FE2DAE45E5731FFCF8C21D2 /* XCRemoteSwiftPackageReference "sqlite-data" */;
+			productName = SQLiteData;
+		};
+		87DE389964638E7777ABB383 /* SQLiteData */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0FE2DAE45E5731FFCF8C21D2 /* XCRemoteSwiftPackageReference "sqlite-data" */;
+			productName = SQLiteData;
+		};
+		94BD562408492AC6E81B0035 /* Dependencies */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A927C2C338F67E8F2C611140 /* XCRemoteSwiftPackageReference "swift-dependencies" */;
-			productName = DependenciesTestSupport;
+			productName = Dependencies;
+		};
+		A8C5256090D9AFFD84E0AD32 /* Dependencies */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A927C2C338F67E8F2C611140 /* XCRemoteSwiftPackageReference "swift-dependencies" */;
+			productName = Dependencies;
 		};
 		AD2559042536058C97728A19 /* SwiftUINavigation */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 8C626E2F21AE016D9E0C1DB5 /* XCRemoteSwiftPackageReference "swift-navigation" */;
 			productName = SwiftUINavigation;
+		};
+		E526F7B4800D1EBE4D8A2A3E /* Dependencies */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A927C2C338F67E8F2C611140 /* XCRemoteSwiftPackageReference "swift-dependencies" */;
+			productName = Dependencies;
+		};
+		E94FE1F285F6B338A789EE95 /* SQLiteData */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0FE2DAE45E5731FFCF8C21D2 /* XCRemoteSwiftPackageReference "sqlite-data" */;
+			productName = SQLiteData;
 		};
 		F6DB8F903598A87E2AA0443F /* CasePaths */ = {
 			isa = XCSwiftPackageProductDependency;

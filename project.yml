@@ -15,6 +15,21 @@ packages:
   Dependencies:
     url: https://github.com/pointfreeco/swift-dependencies
     from: 1.0.0
+  # SQLiteData and GRDB are declared here so the app and the share extension can
+  # LINK them, not merely compile against them. Both reach the type checker for
+  # free (`import YesChefCore` re-exports SQLiteData, which `@_exported`-re-exports
+  # GRDB's `Database`/`DatabaseWriter`), and both are absent from the linker's
+  # search path once these package products build as dynamic frameworks — which
+  # they do for every target in the graph as soon as a test bundle is in the
+  # build. The plain `build` linked statically and never noticed. Same defect,
+  # same fix, as the GRDB entries in YesChefPackage/Package.swift and
+  # jon-platform/packages/CloudSyncKit/Package.swift.
+  SQLiteData:
+    url: https://github.com/pointfreeco/sqlite-data
+    from: 1.0.0
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: 7.6.0
   CasePaths:
     url: https://github.com/pointfreeco/swift-case-paths
     from: 1.0.0
@@ -53,6 +68,12 @@ targets:
         product: LLMClientKit
       - package: CloudSyncKit
         product: CloudSyncKit
+      - package: Dependencies
+        product: Dependencies
+      - package: SQLiteData
+        product: SQLiteData
+      - package: GRDB
+        product: GRDB
       - package: CasePaths
         product: CasePaths
       - package: SwiftNavigation
@@ -81,6 +102,12 @@ targets:
     dependencies:
       - package: YesChefPackage
         product: YesChefCore
+      - package: Dependencies
+        product: Dependencies
+      - package: SQLiteData
+        product: SQLiteData
+      - package: GRDB
+        product: GRDB
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jonphillips.yeschef.share-extension
@@ -103,8 +130,25 @@ targets:
         product: YesChefCore
       - package: LLMClientKit
         product: LLMClientKit
+      # NOT DependenciesTestSupport. Xcode builds every other package product in
+      # this graph as a dynamic framework, but DependenciesTestSupport only ever
+      # builds static ("DependenciesTestSupport-product", never
+      # "…dynamic-product"), so linking it drags a second static copy of the
+      # whole Dependencies target into the test bundle — 401 duplicate symbols,
+      # including a second `DependencyValues.$_current` TaskLocal.
+      #
+      # Task-local identity is the address of the TaskLocal object, so with two
+      # copies loaded, `withDependencies { }` set from the test bundle is
+      # INVISIBLE to app-module code reading the framework's copy. Overrides
+      # silently did nothing and the live dependency ran instead: 11 of the 26
+      # tests failed for that reason alone. Nothing here uses its API — the
+      # `.test` context is detected by Dependencies at runtime without it.
       - package: Dependencies
-        product: DependenciesTestSupport
+        product: Dependencies
+      - package: SQLiteData
+        product: SQLiteData
+      - package: GRDB
+        product: GRDB
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jonphillips.yeschef.tests

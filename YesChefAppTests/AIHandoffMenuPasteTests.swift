@@ -1,5 +1,4 @@
 import Dependencies
-import DependenciesTestSupport
 import Foundation
 import Testing
 import YesChefCore
@@ -89,7 +88,7 @@ struct AIHandoffMenuPasteTests {
       $0.uuid = .incrementing
     } operation: {
       @Dependency(\.defaultDatabase) var database
-      try database.write { db in
+      try await database.write { db in
         try Menu.insert {
           Menu(id: menuID, title: "Beach Menu", dayCount: 2, dateCreated: now, dateModified: now)
         }
@@ -123,11 +122,10 @@ struct AIHandoffMenuPasteTests {
       #expect(item.supportingEvidenceTitle == "Review omitted steps before saving")
       #expect(item.supportingEvidenceRows == [advisory])
       try await item.commit(editableText, usingSecondaryCommit: false)
-      #expect(
-        try database.read { db in
-          try PrepPlanStepRepository.steps(for: menuID, in: db).map(PrepPlanStep.init)
-        } == [PrepPlanStep(session: "Saturday", task: "Soak the beans")]
-      )
+      let remainingSteps = try await database.read { db in
+        try PrepPlanStepRepository.steps(for: menuID, in: db).map(PrepPlanStep.init)
+      }
+      #expect(remainingSteps == [PrepPlanStep(session: "Saturday", task: "Soak the beans")])
     }
   }
 }
