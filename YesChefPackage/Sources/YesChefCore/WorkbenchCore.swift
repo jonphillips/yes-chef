@@ -167,17 +167,20 @@ public struct WorkbenchDetailData: Equatable, Sendable {
   public var workbench: Workbench
   public var candidateRows: [WorkbenchCandidateRowData]
   public var logEntries: [WorkbenchLogEntry]
+  public var references: [WorkbenchReference]
   public var draftRecipeDetail: RecipeDetailData?
 
   public init(
     workbench: Workbench,
     candidateRows: [WorkbenchCandidateRowData] = [],
     logEntries: [WorkbenchLogEntry] = [],
+    references: [WorkbenchReference] = [],
     draftRecipeDetail: RecipeDetailData? = nil
   ) {
     self.workbench = workbench
     self.candidateRows = candidateRows
     self.logEntries = logEntries
+    self.references = references
     self.draftRecipeDetail = draftRecipeDetail
   }
 }
@@ -309,8 +312,14 @@ public struct WorkbenchDetailRequest: FetchKeyRequest {
       .where { $0.workbenchID.eq(workbenchID) }
       .fetchAll(db)
       .sorted(by: areWorkbenchLogEntriesInIncreasingOrder)
+    let references = try WorkbenchReferenceRepository.references(for: workbenchID, in: db)
 
-    return WorkbenchDetailData(workbench: workbench, candidateRows: candidateRows, logEntries: logEntries)
+    return WorkbenchDetailData(
+      workbench: workbench,
+      candidateRows: candidateRows,
+      logEntries: logEntries,
+      references: references
+    )
       .withDraftRecipeDetail(try workbench.draftRecipeID.flatMap { try RecipeRepository.fetchDetail(recipeID: $0, in: db) })
   }
 }
@@ -717,6 +726,7 @@ private extension WorkbenchDetailData {
       workbench: workbench,
       candidateRows: candidateRows,
       logEntries: logEntries,
+      references: references,
       draftRecipeDetail: draftRecipeDetail
     )
   }

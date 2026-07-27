@@ -58,6 +58,57 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func workbenchDetailIncludesReferencesInCreationOrder() async throws {
+      @Dependency(\.defaultDatabase) var database
+      let createdAt = Date(timeIntervalSinceReferenceDate: 842_050_000)
+      let workbenchID = SampleUUIDSequence.uuid(39_050)
+      let firstReferenceID = SampleUUIDSequence.uuid(39_051)
+      let secondReferenceID = SampleUUIDSequence.uuid(39_052)
+
+      try await database.write { db in
+        try Workbench.insert {
+          Workbench(
+            id: workbenchID,
+            title: "Reference order",
+            sortOrder: 0,
+            dateCreated: createdAt,
+            dateModified: createdAt
+          )
+        }
+        .execute(db)
+        try WorkbenchReference.insert {
+          WorkbenchReference(
+            id: secondReferenceID,
+            workbenchID: workbenchID,
+            label: "Second",
+            captureKind: .urlFetch,
+            reducedText: "Second extract.",
+            reductionStatus: .complete,
+            dateCreated: createdAt.addingTimeInterval(1),
+            dateModified: createdAt.addingTimeInterval(1)
+          )
+        }
+        .execute(db)
+        try WorkbenchReference.insert {
+          WorkbenchReference(
+            id: firstReferenceID,
+            workbenchID: workbenchID,
+            label: "First",
+            captureKind: .urlFetch,
+            reducedText: "First extract.",
+            reductionStatus: .complete,
+            dateCreated: createdAt,
+            dateModified: createdAt
+          )
+        }
+        .execute(db)
+
+        let detail = try #require(try WorkbenchDetailRequest(workbenchID: workbenchID).fetch(db))
+        expectNoDifference(detail.references.map(\.id), [firstReferenceID, secondReferenceID])
+      }
+    }
+
+    @Test
     func browserCapturedHTMLUsesTheSameReducerWithoutFetching() async throws {
       let url = try #require(URL(string: "https://example.com/technique/captured"))
       let client = WebRecipeCaptureClient(
