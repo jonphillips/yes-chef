@@ -8,8 +8,8 @@ holding**. We stay in CloudKit **Development** by design; prod-schema promotion 
 own section below.
 
 The **short entry point** for a fresh Yes Chef conversation. It holds **Next Up** (the dispatch target), the
-**Architect track**, the **Standing guards**, the **Ready Efforts** queue, the **prod-schema promotion
-list**, and the **Verification Pattern** — nothing else. Completed-slice history and strategic background
+**Standing guards**, the **Ready Efforts** queue, the **prod-schema promotion list**, and the **Verification
+Pattern** — nothing else. Completed-slice history and strategic background
 live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** read it on a dispatch).
 `docs/AGENTS.md` remains the authoritative project/agent guide.
 
@@ -53,32 +53,6 @@ the first section** of each. **No schema.**
 Core, not the editor view). S3 touches `YesChefApp/` and needs the elevated `generic/platform=iOS` build as
 required evidence. No simulator installs; Jon device-passes on the captured Samin recipe — a single-section
 recipe editing exactly as it does today is the canary.
-
-## Architect track (parallel — NOT a Codex dispatch)
-
-**Fix the app test target.** Jon has the prompt; Claude works this in its own session, off to the side of
-the Codex dispatch above. It touches build/test infrastructure and jon-platform, not product code, so the
-two should not collide. **Do not fold this into a product dispatch and do not let a dispatch "fix it along
-the way."**
-
-**The diagnosis has now been wrong three times, each time by reading the first error as the blocker.** The
-record, corrected 2026-07-27 by direct probe:
-
-- `xcodebuild build-for-testing` first dies on **two missing `await`s** in `YesChefAppTests/AIHandoffMenuPasteTests.swift`
-  (`:92` and `:127` — `database.write` / `database.read` inside an async `operation:`). Real, pre-existing
-  on `main`, two lines.
-- Patch those and it clears them and hits **`CloudSyncKitdynamic-product: clang: error: linker command
-  failed`** — the same wall the original brief recorded. The 2026-07-27 "missing GRDB /
-  StructuredQueriesCore conformance symbols" reading never got past this either.
-- So the wall has not moved, and **the `.dynamic` product missing conformance symbols from its own static
-  dependencies still reads like a SwiftPM product-type problem, not a hard restriction.** First step is one
-  probe that captures the *complete* undefined-symbol list rather than the first line.
-
-**What it unblocks.** [`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) (23 tests
-executed by nothing; only 4 are stranded by the target, the other 19 by pure logic sitting in `YesChefApp/`)
-and the standing "a test only counts in `YesChefPackage/Tests/`" rule in the Verification Pattern. **Three
-efforts in a row have now written a test into a target that runs nothing.** The move-to-Core slices stand on
-their own merits either way — the *"don't bother fixing it"* conclusion is what this track retires.
 
 ## Standing guards
 
@@ -158,6 +132,15 @@ rewrites by matching on content.
   `PlaybookEnrichmentDisplayText` splits multi-line strings at render time. Do not decompose them on momentum.
 - **Reorder is opt-in:** `RecipeNote` has no `sortOrder`, so Reader Feedback edits and deletes per row but does
   **not** reorder, and does **not** gain a column to make the shape uniform.
+
+**[`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) — the one optional follow-on
+left after the app test target was fixed. Small, unhurried, no decisions outstanding.** Move
+`WorkbenchCompareAlignmentModel` and `RecipeScaleFormatting` — SwiftUI-free logic sitting in `YesChefApp/` —
+down to Core. **Queue it on the "keep pure logic out of the App layer" corollary, not on testability:** the
+original "these tests execute nowhere" premise is gone, the target runs. Two riders — the yield-scaling fix
+already left two app-layer assertions redundant (flagged in place for this sweep rather than deleted
+drive-by), and adding a file to `YesChefAppTests` without re-running `xcodegen generate` silently excludes it
+from the bundle, so fewer files in that target is fewer chances to hit it.
 
 **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell. Unblocked
 but unscheduled.** Its gate was satisfied 2026-07-25; nothing holds it except appetite. It moves all eight
@@ -284,11 +267,11 @@ regardless. So verify with **compiler + tests once**, then hand off:
 - **Corollary — keep pure logic out of the App layer.** String formatting, serialization, and parsing belong
   in `YesChefPackage` (which Codex *can* compile and test). #185's break was `HandoffIntents.swift` calling
   `date: .full` — logic that belonged in Core, where the package build would have caught it instantly.
-- **⚠️ `YesChefAppTests` is compiled and run by nothing — do not put a new test there.** Not
-  `check-drift.sh`, not CI (same command), not the generic app build (`build` never compiles the test
-  target). **A test only counts if it lands in `YesChefPackage/Tests/`.** *The Architect track above is
-  actively retiring this constraint; until it lands, the rule holds — and **report the first error you hit as
-  the first error, not as the blocker**, which is how this diagnosis went wrong three times.*
+- **`YesChefAppTests` compiles and links on every `check-drift.sh` run, but only *executes* behind
+  `YESCHEF_RUN_APP_TESTS=1`** (it boots a simulator, and there is a teardown hang). All 26 pass as of
+  2026-07-27. So the old "a test there counts for nothing" rule is retired — but **Core is still the default
+  home**, because `YesChefPackage/Tests/` runs on every dispatch with no flag and no simulator. Put a test in
+  the app target only when it genuinely needs the app target, and say in the PR that you ran it with the flag.
 - **Note:** parts of the app target (`PantryViews.swift` / `GroceryViews.swift`) compile only in Jon's device
   pass, not in CI.
 - **Do not install/launch on simulators by default** — hand straight to Jon's UI pass. Only boot a simulator
