@@ -43,6 +43,9 @@ This ADR is that fallback.
 
 Deterministic-first is not a new branch and not a heuristic. `ParsedRecipePage.warnings` already contains
 `.noIngredients` / `.noInstructions` / `.noStructuredRecipeData`; the escalation predicate **is** that set.
+**Corrected by [Amendment 1](#amendment-1--the-ladders-arithmetic-the-gates-membership-and-an-escalation-point-that-does-not-exist-2026-07-27):
+the predicate is the first two only — `.noStructuredRecipeData` fires on per-site-extracted pages that are
+missing nothing.**
 A page carrying schema.org (NYT, Milk Street, every recipe blog with a plugin) never reaches the model —
 it stays fast, free, offline-capable, and reproducible. **Never LLM-first**, and never "LLM to double-check
 the deterministic result": a model that can overrule a machine contract is a model that can corrupt a clean
@@ -109,6 +112,9 @@ plausible-looking invented recipe content. A gap must come back **as a gap** so 
 `jsonLDPriority = 2`. LLM-extracted scalars enter at a **new rung below chrome** — so if a deterministic
 source ever produces a value for the same attribute, it wins automatically, with no special-casing. "The
 model never overrules the contract" becomes an integer, not a code path.
+**Extended by [Amendment 1](#amendment-1--the-ladders-arithmetic-the-gates-membership-and-an-escalation-point-that-does-not-exist-2026-07-27):
+votes carry scalars only, so the ingredient and instruction lists need whole-half suppression — the integer
+does not reach them.**
 
 The call registers at the ADR-0043 chokepoint like every other (`surface: .capture`, its own task case), and
 the review form marks model-extracted sections visibly so Jon knows which fields to read hardest.
@@ -144,7 +150,10 @@ must keep distinguishable.
   the ADR-0045 D7 model setting and any degradation still apply — the default is frontier, not a hardcoded
   frontier-only call.
 - **OQ2 — the share extension does not escalate. Confirmed.** The extension captures and stores exactly as
-  today; escalation happens when the **app** opens the draft. The extension must never do network or model
+  today; escalation happens when the **app** opens the draft. **Corrected by
+  [Amendment 1](#amendment-1--the-ladders-arithmetic-the-gates-membership-and-an-escalation-point-that-does-not-exist-2026-07-27):
+  there is no app-side draft open — the extension commits directly — so a shared no-contract page gets no
+  fallback at all. The model-free extension half stands.** The extension must never do network or model
   work — [[extension-sync-construct-not-run]] is the precedent for how expensively that fails.
   **Design consequence, binding:** `WebRecipePageParser.parse` is a **pure synchronous** function, so the
   escalation cannot live inside it. The gate sits at the existing async boundary
@@ -165,6 +174,53 @@ must keep distinguishable.
   welcome where volume justifies them. The fallback's job is to make sure *not* writing one is never
   blocking: every site works on day one, and a per-site extractor becomes an optimization taken on evidence
   (repeat captures, cost) rather than a prerequisite for capturing at all.
+
+## Amendment 1 — the ladder's arithmetic, the gate's membership, and an escalation point that does not exist (2026-07-27)
+
+Written from the architect review of PR [#245](https://github.com/jonphillips/yes-chef/pull/245). Three of these
+correct **this ADR**, not the implementation of it.
+
+**1 — D6's guarantee needed a second mechanism, because the vote ladder only carries scalars.** D6 says the
+model enters "at a new rung below chrome" and OQ3 says "the priority ladder then discards any half that a
+deterministic source already produced." The first is true and shipped — `modelPriority = -1` loses to every
+deterministic source by arithmetic. But `RecipeAttributeVotes` reconciles **scalar page facts only**; the
+ingredient and instruction lists have no votes at all, and `RecipeParseBuilder` simply *appends* them. So on a
+page where the gate fires for a missing half, the model's copy of the half that **was** extracted landed
+alongside the deterministic one and the review form showed the recipe twice. Byte-identical lines deduped on
+their own, which is precisely what made it look correct.
+
+**The rule, now explicit: suppression is per half.** The merge drops a whole half the deterministic ladder
+already produced before applying the extraction. Per half rather than per section because the gate fires on a
+*missing half* — a half that exists is the deterministic ladder's outright win, which is D1 and D6 read
+together. Scalars stay on the vote ladder; nothing about `modelPriority` changes.
+
+**The test-design corollary is the durable half of this.** The slice's partial-page test fed the model
+**byte-identical** ingredient lines, so exact-string dedupe hid the defect and the test could not have failed.
+A merge test whose fixture echoes the deterministic wording proves nothing about merging — **the model
+rewording something is the normal case, not the edge case.** Both directions are now pinned with reworded
+model output.
+
+**2 — the gate is `.noIngredients` / `.noInstructions`; `.noStructuredRecipeData` is excluded.** D1 names all
+three warnings as the predicate. That is wrong as written: a per-site extractor (`RecipeMilkStreetExtractor`,
+and every future one OQ5 invites) produces both halves from a page carrying **no** machine contract, so it
+warns `.noStructuredRecipeData` while having nothing missing. Including it would send exactly those pages to
+the model, against D1's own "the model only runs where the deterministic path produced nothing." The
+predicate is *a half is missing*, not *no contract was found*.
+
+**3 — OQ2's escalation point does not exist, and nothing built it.** OQ2 concluded "escalation happens when
+the **app** opens the draft." There is no such moment: `ShareViewController` reviews and commits straight to
+the database, so a share-extension capture never becomes an app-side draft. The binding half of OQ2 stands and
+is upheld — the extension does no network or model work, and `WebRecipePageParser.parse` stays pure — but the
+consequence is that **a no-contract page captured through the share sheet gets no fallback at all, not a
+deferred one.** Stated rather than papered over: the in-app paths (URL fetch, both browsers) escalate; the
+share sheet does not. Closing that means either handing the extension's draft to the app for review or giving
+the app a capture inbox, and it gets scoped on evidence — a real page Jon actually shares — rather than on
+this ADR's momentum ([[withdraw-not-defer-orphaned-schema]] logic applied to a want, not a table).
+
+**4 — OQ1's "the normal path" means the shared `resolveTier`, not a local switch.** Resolving the tier at the
+call site cannot produce `.degradedToOnDevice`, so an ADR-0043 record would claim the cook selected a provider
+whose key had since been removed. Capture resolves through `resolveTier(…, requirement: .onDeviceCompatible)`
+like every other call: frontier by default per OQ1, honest degradation, one home for the policy.
 
 ## Slices
 

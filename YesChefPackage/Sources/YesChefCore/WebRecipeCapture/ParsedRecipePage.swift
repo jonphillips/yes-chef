@@ -75,6 +75,10 @@ public struct ParsedRecipePage: Equatable, Sendable {
   public var bodyText: String?
   public var originalHTML: String
   public var warnings: [WebRecipeCaptureWarning]
+  /// In-memory review provenance only; this is never persisted without a human save.
+  public var modelExtractedIngredientSections: [ParsedRecipeIngredientSection]
+  /// In-memory review provenance only; this is never persisted without a human save.
+  public var modelExtractedInstructionSections: [ParsedRecipeInstructionSection]
 
   public init(
     sourceURL: URL? = nil,
@@ -100,7 +104,9 @@ public struct ParsedRecipePage: Equatable, Sendable {
     textExcerpt: String? = nil,
     bodyText: String? = nil,
     originalHTML: String = "",
-    warnings: [WebRecipeCaptureWarning] = []
+    warnings: [WebRecipeCaptureWarning] = [],
+    modelExtractedIngredientSections: [ParsedRecipeIngredientSection] = [],
+    modelExtractedInstructionSections: [ParsedRecipeInstructionSection] = []
   ) {
     self.sourceURL = sourceURL
     self.title = title
@@ -126,6 +132,8 @@ public struct ParsedRecipePage: Equatable, Sendable {
     self.bodyText = bodyText
     self.originalHTML = originalHTML
     self.warnings = warnings
+    self.modelExtractedIngredientSections = modelExtractedIngredientSections
+    self.modelExtractedInstructionSections = modelExtractedInstructionSections
   }
 
   public var isEmpty: Bool {

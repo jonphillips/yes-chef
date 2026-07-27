@@ -16,6 +16,7 @@ enum RecipePageAttribute: Hashable {
 /// Harvested from GalavantCapture's `AttributeVotes`: scalar page facts vote by
 /// source priority first, then corroboration count, then first-seen order.
 struct RecipeAttributeVotes {
+  static let modelPriority = -1
   static let chromePriority = 0
   static let microdataPriority = 1
   static let jsonLDPriority = 2

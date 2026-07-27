@@ -14,12 +14,7 @@ public enum WebRecipePageParser {
       return builder.build(capturedAt: capturedAt)
     }
 
-    RecipeJSONLDExtractor.extract(from: document, into: &builder)
-    RecipeMetaExtractor.extract(from: document, into: &builder)
-    RecipeMicrodataExtractor.extract(from: document, into: &builder)
-    RecipeMilkStreetExtractor.extract(from: document, into: &builder)
-    RecipeBodyImageExtractor.extract(from: document, into: &builder)
-    RecipeEditorialProseExtractor.extract(from: document, into: &builder)
+    extractDeterministicRecipeData(from: document, into: &builder)
 
     var page = builder.build(capturedAt: capturedAt)
     if let cleaned = cleanedBodyText(from: document) {
@@ -33,34 +28,47 @@ public enum WebRecipePageParser {
   /// full `bodyText` remains uncapped for later fallback extraction.
   private static let summaryLeadLength = 1500
 
-  private static func cleanedBodyText(from document: Document) -> String? {
-    for selector in [
-      "script", "style", "noscript", "nav", "header", "footer", "aside",
-      "[class*=cookie]", "[class*=consent]", "[class*=breadcrumb]",
-    ] {
-      _ = try? document.select(selector).remove()
+  static func merging(
+    _ page: ParsedRecipePage,
+    with extraction: RecipeExtraction
+  ) -> ParsedRecipePage {
+    var builder = RecipeParseBuilder(sourceURL: page.sourceURL, originalHTML: page.originalHTML)
+    guard let document = try? SwiftSoup.parse(page.originalHTML, page.sourceURL?.absoluteString ?? "") else {
+      return page
     }
-    removeLinkDenseBlocks(in: document)
+
+    extractDeterministicRecipeData(from: document, into: &builder)
+    let deterministicPage = builder.build(capturedAt: page.capturedAt)
+    let contribution = extraction.suppressingHalvesAlreadyExtracted(in: deterministicPage)
+    contribution.apply(to: &builder)
+    var mergedPage = builder.build(capturedAt: page.capturedAt)
+    if let cleaned = cleanedBodyText(from: document) {
+      mergedPage.bodyText = cleaned
+      mergedPage.textExcerpt = truncate(cleaned, to: summaryLeadLength)
+    }
+    mergedPage.processedImages = page.processedImages
+    mergedPage.readerFeedbackBlocks = page.readerFeedbackBlocks
+    mergedPage.modelExtractedIngredientSections = contribution.parsedIngredientSections
+    mergedPage.modelExtractedInstructionSections = contribution.parsedInstructionSections
+    return mergedPage
+  }
+
+  private static func extractDeterministicRecipeData(from document: Document, into builder: inout RecipeParseBuilder) {
+    RecipeJSONLDExtractor.extract(from: document, into: &builder)
+    RecipeMetaExtractor.extract(from: document, into: &builder)
+    RecipeMicrodataExtractor.extract(from: document, into: &builder)
+    RecipeMilkStreetExtractor.extract(from: document, into: &builder)
+    RecipeBodyImageExtractor.extract(from: document, into: &builder)
+    RecipeEditorialProseExtractor.extract(from: document, into: &builder)
+  }
+
+  private static func cleanedBodyText(from document: Document) -> String? {
+    RecipePageDocumentCleaner.clean(document)
     guard let raw = try? document.body()?.text(), !raw.isEmpty else { return nil }
     let collapsed = raw.components(separatedBy: .whitespacesAndNewlines)
       .filter { !$0.isEmpty }
       .joined(separator: " ")
     return collapsed.isEmpty ? nil : collapsed
-  }
-
-  private static func removeLinkDenseBlocks(in document: Document) {
-    guard let candidates = try? document.select("ul, ol, div") else { return }
-    for element in candidates.array() {
-      guard element.parent() != nil else { continue }
-      guard
-        let links = try? element.select("a"), links.size() >= 4,
-        let total = try? element.text(), !total.isEmpty
-      else { continue }
-      let linkText = links.array().compactMap { try? $0.text() }.joined()
-      if Double(linkText.count) / Double(total.count) > 0.6 {
-        try? element.remove()
-      }
-    }
   }
 
   private static func truncate(_ text: String, to limit: Int) -> String {
