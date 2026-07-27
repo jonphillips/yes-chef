@@ -215,7 +215,10 @@ struct WorkbenchDetailView: View {
         ContentUnavailableView("Workbench Not Found", systemImage: "hammer")
       }
     }
-    .task(id: model.detail?.workbench.dateModified) {
+    // Keyed on both inputs: the split turning on (a size-class change on iPad) needs the first load, and
+    // every workbench write bumps `dateModified`, which is what keeps `ChatWorkspaceSplit`'s live
+    // `onChange(of: context)` firing without a standing full-extract fetch.
+    .task(id: isSplitEnabled ? model.detail?.workbench.dateModified : nil) {
       if isSplitEnabled {
         _ = await model.loadChatContext()
       }

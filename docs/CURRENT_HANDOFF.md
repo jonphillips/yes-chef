@@ -16,37 +16,40 @@ project/agent guide.
 
 ## Next Up
 
-**ONE live dispatch target: [ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) S3 — the
-reference list UI + the in-app browser's "Capture to Workbench".**
-Dispatch with *"Do the **ADR-0032 S3** effort in `docs/CURRENT_HANDOFF.md`."* If this section is
+**ONE live dispatch target: [`efforts/chat-surface-contract.md`](efforts/chat-surface-contract.md) S2–S4 —
+the chat panel gets a surface contract.**
+Dispatch with *"Do the **chat-surface contract S2–S4** effort in `docs/CURRENT_HANDOFF.md`."* If this section is
 empty or missing, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-**Verification: app-layer, and it wants Jon's device pass.** No schema — S1 landed the synced table and the
-reducer, S2 landed the context injection, so this slice is UI over an already-complete core. The elevated
-`generic/platform=iOS` build is **required evidence** (see Verification Pattern), plus
-`scripts/check-drift.sh`. Keep new logic testable — anything pure belongs in `YesChefPackage`, not
-`YesChefApp/`.
+**Verification: app-layer, no Core, no schema, no device pass expected** beyond confirming nothing moved
+visually (the effort's own "what this is not": if any surface looks different other than S1's already-shipped
+`Done`, that is a regression). The elevated `generic/platform=iOS` build is **required evidence** (see
+Verification Pattern), plus `scripts/check-drift.sh`.
 
-**Already scoped — do not re-scope it.** Full scope is the ADR-0032 entry in Ready Efforts. Four things a
-dispatch must not miss:
+**Already scoped — do not re-scope it.** Full scope, including the eight-call-site table and the `ChatSurface`
+shape, is in the effort doc; S1 shipped in PR #240. **S2 and S3 land in one PR** (the detent identity has
+nowhere to live until the descriptor exists). Three things a dispatch must not miss:
 
-1. **Read the ADR *including Amendment 1*.** Two of its resolutions revise the original Decision text. Do not
-   scope off the pre-amendment Decision — in particular, **paste-in is demoted to a last resort**; the primary
-   gated path is the in-app browser.
-2. **Refresh is an explicit replacement of a durable, non-recomputable extract.** A public `fetchHTML` refresh
-   of a `.browserCapture` reference can overwrite an authenticated extract with a login-wall teaser. Show the
-   capture kind, confirm the replacement, route a browser-captured reference's refresh back through the
-   browser. `store` throws `duplicateSourceURL(existingID)` rather than overwriting — that error is the
-   "already here — refresh it?" affordance, not a failure to hide.
-3. **`isThin` (raw extract under 1,500 characters) is the "Open in browser to capture" signal.** The threshold
-   is a guess until real pages run through it — watch whether legitimately short notes trigger a pointless
-   WebView render.
-4. **Two S2 carry-forwards land naturally here.** (a) S1 caps an extract at 256,000 UTF-8 bytes while the
-   frontier context budget is 160,000 characters, so an extract between the two is stored, synced and listed
-   yet can **never** reach any model at any tier — either mark it in the list or pull the cap down to the
-   frontier budget. (b) `WorkbenchDetailRequest` hauls full extracts on the always-on `@Fetch`
-   (`WorkbenchModels.swift:167`); if the list needs only label/kind/status, keep `reducedText` out of it
-   ([[sqlitedata-fetch-writer-convoy]]).
+1. **The rules are the point; without them this is a rename.** `sections`, `dismissal` and `presentation`
+   take **no default** — those are the three questions four surfaces have so far answered by omission.
+   `presentation` must make the `showsEmbeddedHeader` + `onDismiss` disagreement *unrepresentable*, not
+   documented. Acceptance is that a hypothetical ninth surface **fails to compile** until it states all three.
+2. **⚠️ S4's test target runs nothing — resolve this before writing S4, it is the one open constraint.**
+   The effort says put the per-surface resolution test in `YesChefAppTests`; that target executes **zero**
+   tests (see the `app-target-tests-to-core` entry below), so S4 as written would ship the safety artifact
+   for an eight-call-site refactor in a target that never runs it. The effort also says "nothing here enters
+   `YesChefPackage`." Those two sentences now conflict. **Architect recommendation: split the value** — the
+   *resolution* logic (what a surface resolves to, given its inputs) is pure and belongs in `YesChefCore`
+   where S4's assertions actually execute; the SwiftUI-typed closures stay in `YesChefApp`. If that split
+   proves ugly, the fallback is sequencing `app-target-tests-to-core` S1+S2 first — **not** writing S4 into a
+   dead target. **Do not land S2 without a running S4.**
+3. **Migrate the existing detent key forward.** `"recipeChatWorkspaceDetent"` becomes the Calendar's
+   identity so a dogfood device does not reset to `.balanced` on first launch; the two Workbench split sites
+   may start fresh.
+
+**Why now:** this wants the slot immediately before
+[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md), which moves all eight call sites. Landing the
+descriptor first relocates **one type** instead of eight argument lists.
 
 ## Standing guards
 
@@ -86,17 +89,29 @@ target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](
 - **Sequence S1 → S2** — S1 changes the shape of `serves` ("Saturday's Korean Bavette"), so S2's matcher wants writing against the post-dates output. They can still share one dispatch.
 - **Do not auto-relink without a human gate** (ADR-0040 D3), and **do not add a date to `PrepPlanStepRecord`** (ADR-0034 D1). The dogfood data shows why the first is wrong: exact match succeeds on `Korean Bavette` and fails on `…Salad (Korean)`, so half the chips would silently return and half would not.
 
-**[ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) — the workbench reference-material fetch (scoped 2026-07-25; S1 + S2 shipped).** **S3 is under Next Up and is the last slice.**
-- **Read the ADR *including Amendment 1*.** The six-OQ pass resolved every open question and ratified the slice plan; **two resolutions revise the original Decision** — gated capture moves into the **in-app browser** (OQ5) and the **reduced extract becomes synced content** (OQ2). Do **not** scope off the pre-amendment Decision text.
-- **What S1 + S2 already give it:** `WorkbenchReferenceRepository` stores/refreshes/reads/deletes the rows (each carrying `reducedText`, tracking-stripped `sourceURL`, `captureKind`, `reductionStatus`), `WorkbenchReferenceCapture.reduce` serves both a public URL and already-captured authenticated HTML through one reducer, and `WorkbenchDetailData` → `WorkbenchChatContext` already carries the extracts into the chat and both outboard hand-offs. **S3 adds no core** — it is the acquisition and management UI over a finished core.
-- **S3 — the list UI + in-app browser "Capture to Workbench"** (the gated path; paste-in demoted to last resort; device pass on iPad + iPhone).
-  **Refresh is an explicit replacement of a durable extract, and S1 deliberately does not rank or merge sources.** A public `fetchHTML` refresh of a `.browserCapture` reference can replace an authenticated extract with a login-wall teaser, and it is **not recomputable** ([[paywall-gating-taxonomy]]) — so S3 shows the capture kind, confirms the replacement, and routes a browser-captured reference's refresh back through the browser. `store` throws `duplicateSourceURL(existingID)` rather than overwriting; that error is S3's "already here — refresh it?" affordance.
-  **`WorkbenchReferenceReducedContent.isThin`** (raw extract under 1,500 characters) is the signal for the "Open in browser to capture" offer. The threshold is a guess until real pages run through it — watch whether legitimately short notes trigger a pointless WebView render.
-- **Parked, unchanged:** the LLM reduce pass (when it ships it is [ADR-0043](decisions/ADR-0043-model-call-chokepoint.md)'s harder load test), candidate-source prose, `web_search` discovery.
-
-**[`efforts/chat-surface-contract.md`](efforts/chat-surface-contract.md) S2–S4 — the chat panel gets a surface contract (scoped 2026-07-26).** App-layer only; no Core, no schema. `RecipeChatPanel` is shared but its **contract** is not: eight call sites, eight parameters, **six defaulted** — so four surfaces silently opted out of a dismiss control and three inherited Recipe's copy. Replace the loose argument list with one `ChatSurface` descriptor that takes **no default** on dismissal, sections, or presentation. **S1 (the four missing `Done` controls) has shipped; S2–S4 stay here.**
+**[`efforts/chat-surface-contract.md`](efforts/chat-surface-contract.md) — the chat panel gets a surface contract (scoped 2026-07-26).** **S2–S4 are under Next Up.** App-layer only; no Core, no schema. `RecipeChatPanel` is shared but its **contract** is not: eight call sites, eight parameters, **six defaulted** — so four surfaces silently opted out of a dismiss control and three inherited Recipe's copy. Replace the loose argument list with one `ChatSurface` descriptor that takes **no default** on dismissal, sections, or presentation. **S1 (the four missing `Done` controls) has shipped.**
 - **S2–S4 want the slot immediately before [ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md).** That rewrite moves all eight call sites, so landing the descriptor first means it relocates **one type** instead of eight argument lists; landing it after means the new shell inherits the same defaulted-omission shape.
-- **S4 (the per-surface resolution test) is a gate on S2, not a nicety** — the panel has no direct coverage today, which is exactly why the four missing dismiss controls went unnoticed.
+- **S4 (the per-surface resolution test) is a gate on S2, not a nicety** — the panel has no direct coverage today, which is exactly why the four missing dismiss controls went unnoticed. **But `YesChefAppTests` runs nothing**, so where S4's assertions live is the dispatch's one open constraint — see Next Up item 2.
+
+### From the 2026-07-26 dogfood pass — three items, all scoped, none dispatched
+
+**[`efforts/grocery-rapid-add-2026-07-26.md`](efforts/grocery-rapid-add-2026-07-26.md) — persistent grocery Add Item field + Accept All on review (scoped 2026-07-26). READY.** One dispatch, five slices, **no schema**; all three product confirms closed. Slices A/B the field + fraction pills, C the debounce, D the stale-sheet fix, E the review-sheet Accept All (unrelated, rides along — it touches none of the same files).
+- **Slice C is the one that decides whether the feature is good, and it is the one that looks skippable.** `categorizeUncachedItems()` already fires after every add and does **three whole-table `fetchAll` scans + two write transactions + two full `$itemRows` reloads** — fine at one add per sheet, an [ADR-0029](decisions/ADR-0029-main-thread-write-and-fetch-cost.md) writer convoy at ten adds in twenty seconds, which is exactly what Slices A/B create.
+- **Two scope cuts already found:** deterministic area assignment is **already wired** (`addCustomItem` falls back to `GroceryStoreArea.seed`), and so is the deferred model sweep. Do not add a second seeding path.
+- **Slice E's trap:** the file holds *two* definitions of "unedited" (`.sheet` → `editableText ?? summary`; `.inline` → `summary`). Accept All must honour each per-presentation or it silently commits different content than tapping through. Extract one `unmodifiedApprovedText` so they cannot drift.
+
+**[`efforts/capture-llm-fallback-2026-07-26.md`](efforts/capture-llm-fallback-2026-07-26.md) — LLM capture fallback for pages with no machine contract (scoped 2026-07-26). READY.** Design ratified in [ADR-0047](decisions/ADR-0047-llm-capture-fallback.md); all five OQs closed. One dispatch, S1a–S1c in one PR then S2; Core-heavy, **no schema**. Capture has contained **zero model calls** since ADR-0007; Substack (and the whole no-markup category) ships no JSON-LD/microdata/hRecipe, so three extractors miss outright. **Capture pills are rejected, not deferred** — `RecipeCaptureView` is already the correction surface.
+- **The gate is the warnings the parser already computes** (`.noIngredients` / `.noInstructions` / `.noStructuredRecipeData`) — contract-bearing pages never reach the model.
+- **⚠️ The model's input is a structure-preserving serialization, NEVER `bodyText`.** `cleanedBodyText` is `.text()`-flattened; on a no-contract page the `<ul>`/`<ol>`/`<h#>` structure *is* the recipe boundary. Reusing `bodyText` because it sits there uncapped fails a dogfood round while looking like a model-quality problem.
+- **The gate cannot live in `WebRecipePageParser.parse`** (pure and synchronous) **and cannot be appended to `capture(url:)` either** — `browserCapture` is **synchronous** and is the exact path that failed on Substack. The effort's answer is a separate `escalate(draft:)` the app calls after any capture path; the share extension satisfies "never escalates" by never calling it.
+- Provenance is a **priority rung** below `chromePriority`, so a deterministic source always wins by arithmetic.
+
+**[`efforts/playbook-edit-grain-2026-07-26.md`](efforts/playbook-edit-grain-2026-07-26.md) — Playbook edit affordances are a readout of storage grain (scoped 2026-07-26). Dispatch 1 READY; Dispatch 2 sequenced behind it.** Design ratified in [ADR-0048](decisions/ADR-0048-playbook-edit-grain.md), all OQs now closed. **Dispatch 1 (S1+S2) is schema-free and answers most of the original complaint**: extract the Learnings row editor, Reader Feedback adopts it (already `recipeNotes` rows — its Edit tap and scrollable `TextEditor` have no storage justification). S2 is the loud decode. S3 is the real one: `Recipe.serveWith` is a **JSON blob whose items are `Identifiable` with UUIDs** — identity without a row, and `reconciledServeWithItems` already exists solely to carry those UUIDs across whole-blob rewrites by matching on content.
+- **S3's primary test, not a detail:** the regeneration path must **upsert by identity and preserve hand-authored rows**. Delete-and-reinsert reproduces the exact identity loss the slice exists to remove.
+- **Make Ahead / Chef It Up stay prose (D4), deferred not scheduled** — they only *look* like lists because `PlaybookEnrichmentDisplayText` splits multi-line strings at render time. Do not decompose them on this ADR's momentum.
+- **Reorder is opt-in, not assumed:** `RecipeNote` has no `sortOrder`, so Reader Feedback edits and deletes per row but does **not** reorder — and does **not** gain a column to make the shape uniform.
+
+**[ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) — the workbench reference-material fetch. COMPLETE (S1–S3 shipped 2026-07-26); nothing queued, device pass owed on S3.** Write-up in [`DONE-LOG`](DONE-LOG.md). The parked follow-ons stay parked and are **not** dispatchable without Jon scoping them: the LLM reduce pass (when it ships it is [ADR-0043](decisions/ADR-0043-model-call-chokepoint.md)'s harder load test), candidate-source prose, and `web_search` public discovery — OQ6 rejected the last firmly enough that re-queueing it needs a dogfooding reason, not momentum. **Two live caveats ride into the device pass:** `pastedText` is a new raw value in a synced enum column, so **update both devices before saving a pasted-text reference**; and the `isThin` 1,500-character threshold is still a guess against real pages.
 
 **[`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) — the app test target runs nothing; move the logic (scoped 2026-07-26).** No schema, no UI, no behavior change, no device pass. `YesChefAppTests` holds **23 tests executed by nothing**; only 4 are stranded by the target, the other **19 by pure logic sitting in `YesChefApp/`**. Five moves recover them — S1 two whole files (11 tests), S2 three extractions (8), S3 marks the rest.
 - **The pass signal is the test count, not a green run** — 462 today, **481** after S1+S2. Green at 462 means the moved suites were never discovered, which is the failure this ends.
