@@ -53,7 +53,10 @@ struct ChatSurface {
   let sections: Sections
   let presentation: Presentation
 
-  init(content: Content, sections: Sections, presentation: Presentation) {
+  /// Private so the static factories below are the *only* construction path — the same rule
+  /// `scripts/check-drift.sh` guards textually, enforced here by the compiler. A host that needs a
+  /// new shape adds a named factory, which is what makes every surface's contract greppable.
+  private init(content: Content, sections: Sections, presentation: Presentation) {
     self.content = content
     self.sections = sections
     self.presentation = presentation
