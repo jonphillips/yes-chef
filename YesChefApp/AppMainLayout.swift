@@ -133,29 +133,6 @@ struct AppMainLayout: View {
   }
 }
 
-func deleteMenuMessage(_ context: MenuDeletionContext) -> String {
-  var details: [String] = []
-  if context.itemCount > 0 {
-    details.append(context.itemCount == 1 ? "1 dish" : "\(context.itemCount) dishes")
-  }
-  if context.placementCount > 0 {
-    details.append(
-      context.placementCount == 1 ? "1 calendar placement" : "\(context.placementCount) calendar placements"
-    )
-  }
-  guard !details.isEmpty else {
-    return "Delete \(context.menuTitle)?"
-  }
-  return "Delete \(context.menuTitle) and its \(details.joined(separator: " and "))?"
-}
-
-func deleteWorkbenchMessage(_ context: WorkbenchDeletionContext) -> String {
-  let candidateText = context.candidateCount == 1 ? "1 candidate" : "\(context.candidateCount) candidates"
-  return context.candidateCount > 0
-    ? "Delete \(context.title) and its \(candidateText)? The recipes stay in your library."
-    : "Delete \(context.title)? Any recipes stay in your library."
-}
-
 private enum AppMainColumnSection {
   case recipes
   case workbenches

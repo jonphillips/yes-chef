@@ -252,7 +252,8 @@ struct WorkbenchDetailView: View {
       NavigationStack {
         RecipeChatPanel(
           chatModel: chatModel,
-          applyActions: model.applyActionCatalog(for: chatModel)
+          applyActions: model.applyActionCatalog(for: chatModel),
+          onDismiss: { model.destination = nil }
         )
       }
     }
@@ -549,13 +550,13 @@ private struct WorkbenchReader: View {
     }
     .onChange(of: focusedField) { oldField, newField in
       if oldField == .title, newField != .title { commitTitleOnBlur() }
-      if oldField == .notes, newField != .notes { persistNotesDraft() }
+      if oldField == .notes, newField != .notes { commitNotesOnBlur() }
     }
     .onDisappear {
       titleSaveTask?.cancel()
       notesSaveTask?.cancel()
       commitTitleOnBlur()
-      persistNotesDraft()
+      commitNotesOnBlur()
     }
   }
 
@@ -600,9 +601,12 @@ private struct WorkbenchReader: View {
     let notes = notesText.trimmingCharacters(in: .whitespacesAndNewlines)
     let normalizedNotes = notes.isEmpty ? nil : notes
     guard normalizedNotes != lastSavedNotes else { return }
-    if model.saveNotesButtonTapped(notesText) {
-      lastSavedNotes = normalizedNotes
-    }
+    if model.saveNotesButtonTapped(notesText) { lastSavedNotes = normalizedNotes }
+  }
+
+  private func commitNotesOnBlur() {
+    notesText = notesText.trimmingCharacters(in: .whitespacesAndNewlines)
+    persistNotesDraft()
   }
 }
 

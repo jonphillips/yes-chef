@@ -269,7 +269,6 @@ public struct WorkbenchListRequest: FetchKeyRequest {
 public enum WorkbenchListFilter: Hashable, Sendable {
   case active
   case completed
-
 }
 
 /// Pure inline-editor policy: an empty draft is never allowed to replace a stored title.

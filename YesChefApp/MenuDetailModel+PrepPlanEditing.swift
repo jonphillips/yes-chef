@@ -1,8 +1,14 @@
 import Foundation
 import YesChefCore
 
+enum LearningCreationResult {
+  case added
+  case duplicate
+  case failed
+}
+
 extension MenuDetailModel {
-  func createLearning(_ text: String) -> Bool {
+  func createLearning(_ text: String) -> LearningCreationResult {
     do {
       let inserted = try database.write { db in
         try LearningRepository.insertNew(
@@ -15,13 +21,16 @@ extension MenuDetailModel {
           uuid: { uuid() }
         )
       }
-      guard inserted > 0 else { return false }
+      guard inserted > 0 else {
+        toastCenter?.postSuccess("That learning is already saved.")
+        return .duplicate
+      }
       toastCenter?.postSuccess("Added learning.")
-      return true
+      return .added
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
-      return false
+      return .failed
     }
   }
 

@@ -73,6 +73,7 @@
 		7C57B8AB73C6BE68948F80F7 /* RecipePlaybookColumnLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 492BC4D75288EEB6446263F7 /* RecipePlaybookColumnLayout.swift */; };
 		866C7FBB7E3079ECED997DEB /* MealCalendarModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B49D2E9B66A731DB272F063C /* MealCalendarModels.swift */; };
 		86E285EF8664CE66215DBDF0 /* RecipeVariationEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5AE2D975575189A0B728A1 /* RecipeVariationEditor.swift */; };
+		8E95908F8BEB4303046C257B /* WorkbenchCompletedSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 103972B7C1A0B400B648CB18 /* WorkbenchCompletedSearch.swift */; };
 		8F57A869816A807774297561 /* WideLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E98DAAE2876452488D71CD0 /* WideLayout.swift */; };
 		91DE45EFBB52B916289EEB1D /* GroceryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21092B09A19EF04372E6A66D /* GroceryModels.swift */; };
 		92B6078CD3AE6AE5320A87F8 /* RecipeCategoryFilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9FE33039715323689ED24FD /* RecipeCategoryFilterView.swift */; };
@@ -91,6 +92,7 @@
 		AE11AE8D6A7D9F8E06642477 /* GroceryPantryReviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C2EE75870C5C9AAD099505 /* GroceryPantryReviewViews.swift */; };
 		AEEFD13CB08E83C9958ACC8E /* AppDestinationPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10717DBD3251B160509FD4E9 /* AppDestinationPresentation.swift */; };
 		B25C46B6E82993FF7971FCE0 /* SettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A4FCB37DBBA09D6123D7989 /* SettingsViews.swift */; };
+		B46A558486B6A2B676650ABF /* AttentionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18C58B2B2BF5D8C5766C1902 /* AttentionCard.swift */; };
 		B7E58D7FBEB23C7DDDBA0DD1 /* AppNavigationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85D49CBB7931A65D53EC1654 /* AppNavigationModels.swift */; };
 		C4460AA94AC3679029FA4CBC /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C469ECE48285073F98E35D10 /* ShareViewController.swift */; };
 		C4D9F1DEA1A0CA728D2578D3 /* YesChefCore in Frameworks */ = {isa = PBXBuildFile; productRef = F8B7EFEDFB9B5499B0B98F9B /* YesChefCore */; };
@@ -153,8 +155,10 @@
 		07FEC345E664B62E662EA479 /* YesChefPackage */ = {isa = PBXFileReference; lastKnownFileType = folder; name = YesChefPackage; path = YesChefPackage; sourceTree = SOURCE_ROOT; };
 		0BA4CA05A4077E714D63D297 /* CategoryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryModels.swift; sourceTree = "<group>"; };
 		0D2AA2B9A5B2A2F4EFDE5A0C /* AppExternalDatabaseChangeReload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppExternalDatabaseChangeReload.swift; sourceTree = "<group>"; };
+		103972B7C1A0B400B648CB18 /* WorkbenchCompletedSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchCompletedSearch.swift; sourceTree = "<group>"; };
 		10717DBD3251B160509FD4E9 /* AppDestinationPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDestinationPresentation.swift; sourceTree = "<group>"; };
 		17E669665E13FA2090694CB0 /* HandoffSectionRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffSectionRoutingTests.swift; sourceTree = "<group>"; };
+		18C58B2B2BF5D8C5766C1902 /* AttentionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionCard.swift; sourceTree = "<group>"; };
 		18FECD94C6F2E120A02EE0A6 /* IdleTimerDisabledModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdleTimerDisabledModifier.swift; sourceTree = "<group>"; };
 		20C2EE75870C5C9AAD099505 /* GroceryPantryReviewViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryPantryReviewViews.swift; sourceTree = "<group>"; };
 		21092B09A19EF04372E6A66D /* GroceryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryModels.swift; sourceTree = "<group>"; };
@@ -369,6 +373,7 @@
 				85D49CBB7931A65D53EC1654 /* AppNavigationModels.swift */,
 				851ED481B27014D93BC3E92F /* AppToastCenter.swift */,
 				7871BB8EDB397A338B979FCD /* Assets.xcassets */,
+				18C58B2B2BF5D8C5766C1902 /* AttentionCard.swift */,
 				CA17898A1596E60044FEFE09 /* BrowserModels.swift */,
 				6695544EB0BE23557D34BFA5 /* BrowserViews.swift */,
 				0BA4CA05A4077E714D63D297 /* CategoryModels.swift */,
@@ -440,6 +445,7 @@
 				4E98DAAE2876452488D71CD0 /* WideLayout.swift */,
 				46B48DD3E004C108C6CC348A /* WorkbenchCompareAlignmentModel.swift */,
 				4ADDB4E672F69BB9AD2EB58F /* WorkbenchCompareView.swift */,
+				103972B7C1A0B400B648CB18 /* WorkbenchCompletedSearch.swift */,
 				993185593DBEA80FD058C270 /* WorkbenchModels.swift */,
 				A809D8DA30A2274B2B0E1982 /* WorkbenchViews.swift */,
 				2CBD5500A3AAE5279A9F007F /* YesChef.entitlements */,
@@ -628,6 +634,7 @@
 				55781455886CF630A357095F /* AppNavigationHelpers.swift in Sources */,
 				B7E58D7FBEB23C7DDDBA0DD1 /* AppNavigationModels.swift in Sources */,
 				745EB823B218D91E3AA60FC8 /* AppToastCenter.swift in Sources */,
+				B46A558486B6A2B676650ABF /* AttentionCard.swift in Sources */,
 				5E37B8E000D5405FCB9B695A /* BrowserModels.swift in Sources */,
 				587E4FEB200F87C5D6A066B1 /* BrowserViews.swift in Sources */,
 				A7663D81E209037F796813A4 /* CategoryModels.swift in Sources */,
@@ -700,6 +707,7 @@
 				8F57A869816A807774297561 /* WideLayout.swift in Sources */,
 				626E267DA14C0FFA47BE6412 /* WorkbenchCompareAlignmentModel.swift in Sources */,
 				5D89C590DAD9C0F7917D0A9F /* WorkbenchCompareView.swift in Sources */,
+				8E95908F8BEB4303046C257B /* WorkbenchCompletedSearch.swift in Sources */,
 				EDF8C533F173768E0A3C6487 /* WorkbenchModels.swift in Sources */,
 				A8CFCA1AA97D00A5DEB1BE7D /* WorkbenchViews.swift in Sources */,
 				33DD122054891894F173D788 /* YesChefApp.swift in Sources */,

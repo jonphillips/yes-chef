@@ -217,8 +217,6 @@ private struct CollectionReviewLaunchRow: View {
         .disabled(isCommitting)
       }
     }
-    .padding(10)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(.tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+    .attentionCard()
   }
 }

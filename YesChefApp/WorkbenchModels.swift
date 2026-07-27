@@ -3,7 +3,6 @@ import Dependencies
 import Foundation
 import Observation
 import SQLiteData
-import SwiftUI
 import YesChefCore
 
 @Observable
@@ -69,9 +68,17 @@ final class WorkbenchLibraryModel {
       WorkbenchDeletionContext(
         workbenchID: row.id,
         title: row.workbench.title,
-        candidateCount: row.candidateCount
+        candidateCount: row.candidateCount,
+        workingRecipeTitle: workingRecipeTitle(for: row.workbench.draftRecipeID)
       )
     )
+  }
+
+  private func workingRecipeTitle(for recipeID: Recipe.ID?) -> String? {
+    guard let recipeID else { return nil }
+    return try? database.read { db in
+      try Recipe.find(recipeID).fetchOne(db)?.title
+    }
   }
 
   func markWorkbenchCompletedButtonTapped(_ row: WorkbenchRowData) {
@@ -541,22 +548,6 @@ final class WorkbenchDetailModel {
   }
 }
 
-struct WorkbenchCompletedSearch: ViewModifier {
-  let isEnabled: Bool
-  @Binding var text: String
-
-  @ViewBuilder
-  func body(content: Content) -> some View {
-    if isEnabled { content.searchable(text: $text, prompt: "Search completed workbenches") } else { content }
-  }
-}
-
-extension View {
-  func completedWorkbenchSearch(isEnabled: Bool, text: Binding<String>) -> some View {
-    modifier(WorkbenchCompletedSearch(isEnabled: isEnabled, text: text))
-  }
-}
-
 private enum WorkbenchDetailError: Error, CustomStringConvertible, LocalizedError {
   case emptyDraftRecipe
 
@@ -575,14 +566,6 @@ struct WorkbenchCandidatePhoto: Identifiable, Equatable {
   let candidateTitle: String
 
   var id: RecipePhoto.ID { photo.id }
-}
-
-struct WorkbenchDeletionContext: Identifiable, Hashable, Sendable {
-  var workbenchID: Workbench.ID
-  var title: String
-  var candidateCount: Int
-
-  var id: Workbench.ID { workbenchID }
 }
 
 struct WorkbenchLogEntryEditorState: Identifiable, Hashable, Sendable {

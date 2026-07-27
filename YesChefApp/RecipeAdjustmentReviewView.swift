@@ -199,9 +199,7 @@ private struct MethodBeforeAfterView: View {
             .foregroundStyle(.secondary)
           Text(methodNote)
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+        .attentionCard()
       }
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
