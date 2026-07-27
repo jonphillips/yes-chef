@@ -26,26 +26,25 @@ the architect still reviews at slice resolution. Found in Jon's device pass of P
 [#245](https://github.com/jonphillips/yes-chef/pull/245) on the Samin capture: **the edit sheet showed only
 the first section** of each. **No schema.**
 
-**The one open question is closed — Jon settled it 2026-07-27: no heading promotion in the editor.** The
-explicit "Add section" control is the only way to make a section there, per ADR-0040 D2; promote-on-paste was
-considered and declined with it. A typed `For the sauce:` line stays an ingredient line or a step, and a
-pasted multi-section recipe becomes one section — **intended behaviour, not a defect to fix on momentum from
-what the capture channel does.** Nothing gates this dispatch now.
-
-**Four things a dispatch must not miss:**
+**Five things a dispatch must not miss:**
 
 1. **Nothing is lost and nothing is corrupt** — `mergedSections` / `mergedIngredientLines` replace only the
    edited section, and import assigns instruction steps a **global** running `sortOrder` so document order
    is intact. This is "you cannot edit or see most of your recipe," not "editing eats your recipe." Do not
    open it as a data-loss fix.
-2. **The ordering hazard S2 would have tripped is already retired.** S1 shipped
+2. **In the editor, sections are made by the Add section control and never by typed text.** A typed
+   `For the sauce:` line stays an ingredient line or a step, and a pasted multi-section recipe becomes one
+   section — intended, per ADR-0040 D2 (the human edits fields, never the wire format), and **not an
+   asymmetry to fix on momentum from what the capture channel does.** Settled by Jon 2026-07-27;
+   promote-on-paste was declined with it. Reasoning lives in the effort's *Settled question* section.
+3. **The ordering hazard S2 would have tripped is already retired.** S1 shipped
    `InstructionStepGroup.groups(sections:steps:)`, so nothing keys on step `sortOrder` being globally
    unique any more and **per-section renumbering on save is now correct rather than a collision.** S2 may
    assume it.
-3. **Deletion is the new behaviour in S2.** The save path only ever merges, so removing a section is the one
+4. **Deletion is the new behaviour in S2.** The save path only ever merges, so removing a section is the one
    case with no existing expression — that is where the tests should be hardest. The primary pin is the
    quieter one: a two-section recipe round-trips draft → save → detail **unchanged**.
-4. **There is exactly one instruction-ordering rule and it is not to be re-derived.** Everything that orders
+5. **There is exactly one instruction-ordering rule and it is not to be re-derived.** Everything that orders
    or groups steps calls `InstructionStepGroup.groups(sections:steps:)`. S1 twice grew a second copy — once
    by omission, once while deleting the first — so a new private sorter in the editor path is a review
    rejection, not a nit.
