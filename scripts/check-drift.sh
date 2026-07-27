@@ -117,6 +117,128 @@ fi
 swift test --package-path YesChefPackage
 
 # ---------------------------------------------------------------------------
+# The app test target (YesChefAppTests → the YesChefTests bundle)
+#
+# Until 2026-07-27 this script ended at the line above, and that was the whole
+# problem: `swift test --package-path YesChefPackage` covers the package and
+# nothing else. YesChefAppTests held 26 tests that no command in this repo —
+# not this script, not ci.yml, not the standing `generic/platform=iOS` build —
+# ever compiled, let alone ran. They had drifted for months and this script
+# reported green the entire time. That is the same "a check that reports the
+# wrong thing when it finds nothing" failure the bundle-id and ChatSurface
+# guards above are written to prevent, arriving from an unguarded direction:
+# not a search that matched nothing, but a target that was never asked.
+#
+# What runs here is `build-for-testing`, not `test`. That is a deliberate split:
+#
+#   • `build-for-testing` compiles AND LINKS the test bundle. It needs a
+#     simulator *destination* but never boots one, and it costs ~10s
+#     incrementally. It is what catches the failure mode that actually
+#     accumulated — code that was not even known to compile.
+#   • Running the tests boots a simulator. That is exactly the loop the
+#     Verification Pattern keeps Codex out of, and empirically `xcodebuild
+#     test-without-building` hung past 10 minutes in its teardown phase on 2 of
+#     3 local runs even though the tests themselves finished in 0.6s. An
+#     unattended gate cannot depend on that.
+#
+# So execution is opt-in via YESCHEF_RUN_APP_TESTS=1, and the block below always
+# prints where app-test execution stands so the gap is never silent again.
+#
+# 14 of the 26 tests currently FAIL when run — they encode expectations that
+# drifted from the code while nothing executed them. That inventory and its
+# open decisions live in docs/efforts/app-target-tests-to-core.md. Do not
+# quietly edit those assertions to match today's behavior; each one is a real
+# question about which side is wrong.
+# ---------------------------------------------------------------------------
+
+app_test_scheme="YesChef"
+app_test_destination="platform=iOS Simulator,name=iPhone 17 Pro"
+
+if [[ -n "${YESCHEF_SKIP_APP_TEST_BUILD:-}" ]]; then
+  cat >&2 <<EOF
+
+==============================================================================
+  APP TEST TARGET NOT VERIFIED — YESCHEF_SKIP_APP_TEST_BUILD is set.
+  YesChefAppTests was neither compiled nor run by this invocation. Green below
+  says nothing about it. Unset the variable before treating a run as complete.
+==============================================================================
+
+EOF
+else
+  # Before building: assert the target is still WIRED. A build that compiles
+  # nothing exits 0, so the build's own status cannot distinguish "the tests
+  # pass the compiler" from "the tests are no longer part of this scheme" —
+  # which is the state the repo was in, in effect, for months. Both inputs are
+  # checked in, so this costs nothing and follows the same idiom as the
+  # bundle-id and ChatSurface guards above: zero hits means the check did not
+  # really run, and that is a failure, not a pass.
+  app_test_scheme_file="YesChef.xcodeproj/xcshareddata/xcschemes/YesChef.xcscheme"
+  if [[ ! -f "$app_test_scheme_file" ]]; then
+    printf 'check-drift.sh: expected file not found: %s\n' "$app_test_scheme_file" >&2
+    exit 1
+  fi
+  if ! grep -q 'BuildableName *= *"YesChefTests.xctest"' "$app_test_scheme_file"; then
+    cat >&2 <<EOF
+check-drift.sh: $app_test_scheme_file has no YesChefTests testable reference.
+The app test target is not in the scheme's test action, so build-for-testing
+would not build it and a green run below would mean nothing. Restore it in
+project.yml and run xcodegen generate.
+EOF
+    exit 1
+  fi
+
+  set +e
+  app_test_source_count="$(find YesChefAppTests -type f -name '*.swift' 2>/dev/null | wc -l | tr -d ' ')"
+  set -e
+  if (( app_test_source_count == 0 )); then
+    cat >&2 <<'EOF'
+check-drift.sh: found no Swift sources in YesChefAppTests.
+build-for-testing would build an empty bundle and report success. Refusing to
+report success on a check that inspected nothing.
+EOF
+    exit 1
+  fi
+  echo "App test target: $app_test_source_count source file(s), wired into the scheme."
+
+  echo "Building the app test target (YesChefTests) for ${app_test_destination}..."
+  # `set +e` rather than relying on `set -e`: the point of this stage is to say
+  # WHY it failed, and `set -e` would exit before the message.
+  set +e
+  xcodebuild build-for-testing \
+    -scheme "$app_test_scheme" \
+    -destination "$app_test_destination" \
+    -skipMacroValidation \
+    CODE_SIGNING_ALLOWED=NO
+  app_test_build_status=$?
+  set -e
+  if (( app_test_build_status != 0 )); then
+    cat >&2 <<EOF
+check-drift.sh: build-for-testing failed for scheme $app_test_scheme (exit $app_test_build_status).
+Nothing else in this repo compiles YesChefAppTests, so a break here is usually
+stale test code rather than a regression in the app.
+EOF
+    exit 1
+  fi
+
+  if [[ -n "${YESCHEF_RUN_APP_TESTS:-}" ]]; then
+    echo "Running the app test target (YESCHEF_RUN_APP_TESTS is set)..."
+    xcodebuild test-without-building \
+      -scheme "$app_test_scheme" \
+      -destination "$app_test_destination" \
+      -skipMacroValidation \
+      CODE_SIGNING_ALLOWED=NO
+  else
+    cat <<'EOF'
+
+App test target: COMPILED AND LINKED, NOT RUN.
+Set YESCHEF_RUN_APP_TESTS=1 to execute it (boots a simulator; expect 14 of 26
+to fail — see docs/efforts/app-target-tests-to-core.md for the inventory).
+
+EOF
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 # Handoff hygiene (WARN ONLY — never fails the build)
 #
 # docs/CURRENT_HANDOFF.md drifts because nobody sees its size until they happen

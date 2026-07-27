@@ -15,6 +15,21 @@ packages:
   Dependencies:
     url: https://github.com/pointfreeco/swift-dependencies
     from: 1.0.0
+  # SQLiteData and GRDB are declared here so the app and the share extension can
+  # LINK them, not merely compile against them. Both reach the type checker for
+  # free (`import YesChefCore` re-exports SQLiteData, which `@_exported`-re-exports
+  # GRDB's `Database`/`DatabaseWriter`), and both are absent from the linker's
+  # search path once these package products build as dynamic frameworks — which
+  # they do for every target in the graph as soon as a test bundle is in the
+  # build. The plain `build` linked statically and never noticed. Same defect,
+  # same fix, as the GRDB entries in YesChefPackage/Package.swift and
+  # jon-platform/packages/CloudSyncKit/Package.swift.
+  SQLiteData:
+    url: https://github.com/pointfreeco/sqlite-data
+    from: 1.0.0
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: 7.6.0
   CasePaths:
     url: https://github.com/pointfreeco/swift-case-paths
     from: 1.0.0
@@ -53,6 +68,12 @@ targets:
         product: LLMClientKit
       - package: CloudSyncKit
         product: CloudSyncKit
+      - package: Dependencies
+        product: Dependencies
+      - package: SQLiteData
+        product: SQLiteData
+      - package: GRDB
+        product: GRDB
       - package: CasePaths
         product: CasePaths
       - package: SwiftNavigation
@@ -81,6 +102,12 @@ targets:
     dependencies:
       - package: YesChefPackage
         product: YesChefCore
+      - package: Dependencies
+        product: Dependencies
+      - package: SQLiteData
+        product: SQLiteData
+      - package: GRDB
+        product: GRDB
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jonphillips.yeschef.share-extension
@@ -104,7 +131,13 @@ targets:
       - package: LLMClientKit
         product: LLMClientKit
       - package: Dependencies
+        product: Dependencies
+      - package: Dependencies
         product: DependenciesTestSupport
+      - package: SQLiteData
+        product: SQLiteData
+      - package: GRDB
+        product: GRDB
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jonphillips.yeschef.tests
