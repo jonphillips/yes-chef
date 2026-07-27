@@ -93,10 +93,12 @@
 		ADDF8E556B8570CC0D68D5A0 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 09D0A75A465598EE79E0441F /* ZIPFoundation */; };
 		AE11AE8D6A7D9F8E06642477 /* GroceryPantryReviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C2EE75870C5C9AAD099505 /* GroceryPantryReviewViews.swift */; };
 		AEEFD13CB08E83C9958ACC8E /* AppDestinationPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10717DBD3251B160509FD4E9 /* AppDestinationPresentation.swift */; };
+		B197F2566EB325113BC5D498 /* ChatWorkspaceDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 471D8E1304E5EF631EB996C3 /* ChatWorkspaceDivider.swift */; };
 		B25C46B6E82993FF7971FCE0 /* SettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A4FCB37DBBA09D6123D7989 /* SettingsViews.swift */; };
 		B272D3EEC8E70834165F4E67 /* WorkbenchCandidatePickerViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F811B4BCF619BB9EFC3CFFA /* WorkbenchCandidatePickerViews.swift */; };
 		B46A558486B6A2B676650ABF /* AttentionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18C58B2B2BF5D8C5766C1902 /* AttentionCard.swift */; };
 		B7E58D7FBEB23C7DDDBA0DD1 /* AppNavigationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85D49CBB7931A65D53EC1654 /* AppNavigationModels.swift */; };
+		BE4BD3C03012A0A5F11A6852 /* ChatSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = F23F8E8EAB36E54DADF23A71 /* ChatSurface.swift */; };
 		C4460AA94AC3679029FA4CBC /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C469ECE48285073F98E35D10 /* ShareViewController.swift */; };
 		C4D9F1DEA1A0CA728D2578D3 /* YesChefCore in Frameworks */ = {isa = PBXBuildFile; productRef = F8B7EFEDFB9B5499B0B98F9B /* YesChefCore */; };
 		CB4F5CEA046A10EF5FDE0892 /* RecipeDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CCF32B5108C44892607FF3B /* RecipeDetailView.swift */; };
@@ -174,6 +176,7 @@
 		3EA663A481CAE11E140B6830 /* SyncHealthModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncHealthModel.swift; sourceTree = "<group>"; };
 		46B48DD3E004C108C6CC348A /* WorkbenchCompareAlignmentModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchCompareAlignmentModel.swift; sourceTree = "<group>"; };
 		46B9BCF538013B597BB0D401 /* RecipeListRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeListRow.swift; sourceTree = "<group>"; };
+		471D8E1304E5EF631EB996C3 /* ChatWorkspaceDivider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatWorkspaceDivider.swift; sourceTree = "<group>"; };
 		492BC4D75288EEB6446263F7 /* RecipePlaybookColumnLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipePlaybookColumnLayout.swift; sourceTree = "<group>"; };
 		4A44F5DE22E861C4E705A6BB /* RecipeVariationPromotionPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeVariationPromotionPresentation.swift; sourceTree = "<group>"; };
 		4ADDB4E672F69BB9AD2EB58F /* WorkbenchCompareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchCompareView.swift; sourceTree = "<group>"; };
@@ -255,6 +258,7 @@
 		E8DD44679AA1444215DC743E /* RecipeFilterPickerViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeFilterPickerViews.swift; sourceTree = "<group>"; };
 		EA3742E4519F6D798F171F80 /* MealCalendarRowHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCalendarRowHelpers.swift; sourceTree = "<group>"; };
 		ED3C57E4D25E07B0D4161163 /* CategoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryViews.swift; sourceTree = "<group>"; };
+		F23F8E8EAB36E54DADF23A71 /* ChatSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSurface.swift; sourceTree = "<group>"; };
 		F24A24C21F9F96CE16EB2F8A /* RecipeCollectionReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeCollectionReviewSheet.swift; sourceTree = "<group>"; };
 		F50F87C9475E4E92D549DA40 /* MealCalendarDayHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCalendarDayHeader.swift; sourceTree = "<group>"; };
 		F525FBEF3A3BE1B4BAF539FA /* ChatSectionMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSectionMenu.swift; sourceTree = "<group>"; };
@@ -385,6 +389,8 @@
 				0BA4CA05A4077E714D63D297 /* CategoryModels.swift */,
 				ED3C57E4D25E07B0D4161163 /* CategoryViews.swift */,
 				F525FBEF3A3BE1B4BAF539FA /* ChatSectionMenu.swift */,
+				F23F8E8EAB36E54DADF23A71 /* ChatSurface.swift */,
+				471D8E1304E5EF631EB996C3 /* ChatWorkspaceDivider.swift */,
 				90AEA6C80CDEFF87884B65A7 /* CookSessionView.swift */,
 				FF86C88A023D5D19CDE64102 /* FocusToolbarButton.swift */,
 				5ECE090CEFE3F26041ED2617 /* FormFields.swift */,
@@ -649,6 +655,8 @@
 				A7663D81E209037F796813A4 /* CategoryModels.swift in Sources */,
 				22E5C9EEE3DB5F09E84941BA /* CategoryViews.swift in Sources */,
 				0F67C6FCA2D8BF9623A06654 /* ChatSectionMenu.swift in Sources */,
+				BE4BD3C03012A0A5F11A6852 /* ChatSurface.swift in Sources */,
+				B197F2566EB325113BC5D498 /* ChatWorkspaceDivider.swift in Sources */,
 				CCFC4DC9297E465E3E045AAA /* CookSessionView.swift in Sources */,
 				3846277BD575C412195ACF75 /* FocusToolbarButton.swift in Sources */,
 				F476873699D33AE440049145 /* FormFields.swift in Sources */,

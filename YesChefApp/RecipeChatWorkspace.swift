@@ -5,8 +5,6 @@ import UIKit
 import YesChefCore
 
 enum ChatWorkspaceDetent: String, CaseIterable {
-  static let storageKey = "recipeChatWorkspaceDetent"
-
   case readerOnly
   case balanced
   case chatDive
@@ -39,6 +37,7 @@ enum ChatWorkspaceDetent: String, CaseIterable {
 struct ChatWorkspaceSplit<Reader: View>: View {
   let context: RecipeChatContext
   let detentRaw: Binding<String>
+  let detentIdentity: ChatSurfaceResolution.DetentIdentity
   let activeTierChanged: (ModelTier) -> Void
   let applyActions: (RecipeChatModel) -> [AnyChatApplyAction]
   let reader: Reader
@@ -49,12 +48,14 @@ struct ChatWorkspaceSplit<Reader: View>: View {
   init(
     context: RecipeChatContext,
     detentRaw: Binding<String>,
+    detentIdentity: ChatSurfaceResolution.DetentIdentity,
     activeTierChanged: @escaping (ModelTier) -> Void = { _ in },
     applyActions: @escaping (RecipeChatModel) -> [AnyChatApplyAction],
     @ViewBuilder reader: () -> Reader
   ) {
     self.context = context
     self.detentRaw = detentRaw
+    self.detentIdentity = detentIdentity
     self.activeTierChanged = activeTierChanged
     self.applyActions = applyActions
     self.reader = reader()
@@ -101,8 +102,7 @@ struct ChatWorkspaceSplit<Reader: View>: View {
         if liveChatWidth > 1 {
           RecipeChatPanel(
             chatModel: chatModel,
-            applyActions: applyActions(chatModel),
-            showsEmbeddedHeader: true
+            surface: chatSurface
           )
           .frame(width: liveChatWidth)
           .transition(.move(edge: .trailing).combined(with: .opacity))
@@ -114,12 +114,17 @@ struct ChatWorkspaceSplit<Reader: View>: View {
     .onChange(of: context) { _, context in
       chatModel.updateContext(context)
     }
-    .onAppear {
-      activeTierChanged(chatModel.activeTier)
-    }
-    .onChange(of: chatModel.activeTier) { _, tier in
-      activeTierChanged(tier)
-    }
+  }
+
+  private var chatSurface: ChatSurface {
+    ChatSurface(
+      content: .init(
+        applyActions: applyActions(chatModel),
+        activeTierChanged: activeTierChanged
+      ),
+      sections: .none,
+      presentation: .column(detent: detentIdentity)
+    )
   }
 
   private var currentDetent: ChatWorkspaceDetent {
@@ -185,61 +190,9 @@ private enum ChatWorkspaceMetrics {
   static let minimumSegmentedReaderWidth: CGFloat = 240
 }
 
-private struct ChatWorkspaceDivider: View {
-  static let dividerWidth: CGFloat = 22
-
-  let detent: ChatWorkspaceDetent
-  let cycle: () -> Void
-  let decrement: () -> Void
-  let increment: () -> Void
-
-  var body: some View {
-    Button(action: cycle) {
-      ZStack {
-        Rectangle()
-          .fill(.separator)
-          .frame(width: 1)
-        Capsule()
-          .fill(.secondary.opacity(0.55))
-          .frame(width: 5, height: 48)
-      }
-      .frame(minWidth: Self.dividerWidth, maxWidth: Self.dividerWidth, maxHeight: .infinity)
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-    .accessibilityLabel(Text("Recipe and chat split"))
-    .accessibilityValue(Text(detent.title))
-    .accessibilityHint(Text("Cycles between reader only, balanced, and chat dive."))
-    .accessibilityAdjustableAction { direction in
-      switch direction {
-      case .increment:
-        increment()
-      case .decrement:
-        decrement()
-      @unknown default:
-        break
-      }
-    }
-  }
-}
-
 struct RecipeChatPanel: View {
   let chatModel: RecipeChatModel
-  let applyActions: [AnyChatApplyAction]
-  /// The one deliverable control for a seeded discussion. It chooses terminal-return parsing on
-  /// frontier models and the existing structured extractor on-device, rather than exposing two
-  /// competing controls for the same result (ADR-0045 V2 / OQ1).
-  var finalization: ChatFinalizeConfiguration?
-  var showsEmbeddedHeader = false
-  var focusesInputOnAppear = false
-  /// When set, the panel's title becomes a **Discuss ▾** section switcher — the sole section-picking
-  /// control after the playbook's Ask opens an unseeded panel. It is the only way to re-scope on
-  /// iPhone, where the playbook sits behind the modal sheet. `nil` for panels with no sections.
-  var selectSection: ((PlaybookSectionKind) -> Void)?
-  var activeSection: PlaybookSectionKind?
-  /// When set, the panel exposes its own close affordance: **Done** in a modal navigation bar or a
-  /// close button in an embedded header. `nil` when its containing workspace owns dismissal.
-  var onDismiss: (() -> Void)?
+  let surface: ChatSurface
 
   @State private var draft = ""
   @State private var assistantSelection = ChatAssistantSelection()
@@ -409,9 +362,13 @@ struct RecipeChatPanel: View {
       )
     )
     .onAppear {
-      if focusesInputOnAppear {
+      if surface.content.focusesInputOnAppear {
         isDraftFocused = true
       }
+      surface.content.activeTierChanged(chatModel.activeTier)
+    }
+    .onChange(of: chatModel.activeTier) { _, tier in
+      surface.content.activeTierChanged(tier)
     }
     .toolbar {
       if !showsEmbeddedHeader {
@@ -459,6 +416,36 @@ struct RecipeChatPanel: View {
         }
       )
     }
+  }
+
+  private var applyActions: [AnyChatApplyAction] {
+    surface.content.applyActions
+  }
+
+  private var finalization: ChatFinalizeConfiguration? {
+    surface.content.finalization
+  }
+
+  private var showsEmbeddedHeader: Bool {
+    if case .embeddedHeader = surface.presentation {
+      true
+    } else {
+      false
+    }
+  }
+
+  private var selectSection: ((PlaybookSectionKind) -> Void)? {
+    guard case let .switchable(select, _) = surface.sections else { return nil }
+    return select
+  }
+
+  private var activeSection: PlaybookSectionKind? {
+    guard case let .switchable(_, active) = surface.sections else { return nil }
+    return active
+  }
+
+  private var onDismiss: (() -> Void)? {
+    surface.presentation.onDismiss
   }
 
   private func sendDraft() async {

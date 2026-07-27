@@ -145,7 +145,10 @@ struct WorkbenchDetailColumn: View {
 
 struct WorkbenchDetailView: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-  @AppStorage(ChatWorkspaceDetent.storageKey) private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
+  @AppStorage(ChatSurfaceResolution.DetentIdentity.workbenchDetail.rawValue)
+  private var workbenchDetailChatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
+  @AppStorage(ChatSurfaceResolution.DetentIdentity.workbenchCompare.rawValue)
+  private var workbenchCompareChatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   @State private var model: WorkbenchDetailModel
   @State private var compareTier: ModelTier = .onDevice
   @State private var handoffTransport: HandoffInAppTransport
@@ -184,7 +187,8 @@ struct WorkbenchDetailView: View {
           if isSplitEnabled, let chatContext = model.chatContext {
             ChatWorkspaceSplit(
               context: .workbench(chatContext),
-              detentRaw: $chatWorkspaceDetentRaw,
+              detentRaw: $workbenchDetailChatWorkspaceDetentRaw,
+              detentIdentity: .workbenchDetail,
               activeTierChanged: { compareTier = $0 },
               applyActions: { chatModel in
                 model.applyActionCatalog(for: chatModel)
@@ -260,8 +264,11 @@ struct WorkbenchDetailView: View {
       NavigationStack {
         RecipeChatPanel(
           chatModel: chatModel,
-          applyActions: model.applyActionCatalog(for: chatModel),
-          onDismiss: { model.destination = nil }
+          surface: ChatSurface(
+            content: .init(applyActions: model.applyActionCatalog(for: chatModel)),
+            sections: .none,
+            presentation: .modalSheet(onDismiss: { model.destination = nil })
+          )
         )
       }
     }
@@ -338,7 +345,8 @@ struct WorkbenchDetailView: View {
       if isRegularWidth, let chatContext = model.chatContext {
         ChatWorkspaceSplit(
           context: .workbench(chatContext),
-          detentRaw: $chatWorkspaceDetentRaw,
+          detentRaw: $workbenchCompareChatWorkspaceDetentRaw,
+          detentIdentity: .workbenchCompare,
           activeTierChanged: { compareTier = $0 },
           applyActions: { chatModel in
             model.applyActionCatalog(for: chatModel)

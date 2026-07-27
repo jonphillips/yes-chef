@@ -22,7 +22,7 @@ struct MealCalendarStack: View {
 
 struct MealCalendarWorkspaceView: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-  @AppStorage(ChatWorkspaceDetent.storageKey)
+  @AppStorage(ChatSurfaceResolution.DetentIdentity.calendar.rawValue)
   private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   let model: MealCalendarModel
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
@@ -38,6 +38,7 @@ struct MealCalendarWorkspaceView: View {
         ChatWorkspaceSplit(
           context: mealPlanChatContext,
           detentRaw: $chatWorkspaceDetentRaw,
+          detentIdentity: .calendar,
           applyActions: { chatModel in model.applyActionCatalog(for: chatModel) }
         ) {
           calendarContent
@@ -50,8 +51,11 @@ struct MealCalendarWorkspaceView: View {
       NavigationStack {
         RecipeChatPanel(
           chatModel: chatModel,
-          applyActions: model.applyActionCatalog(for: chatModel),
-          onDismiss: { compactChatModel = nil }
+          surface: ChatSurface(
+            content: .init(applyActions: model.applyActionCatalog(for: chatModel)),
+            sections: .none,
+            presentation: .modalSheet(onDismiss: { compactChatModel = nil })
+          )
         )
       }
     }
@@ -156,8 +160,11 @@ struct MealCalendarPlannerView: View {
       NavigationStack {
         RecipeChatPanel(
           chatModel: chatModel,
-          applyActions: model.applyActionCatalog(for: chatModel),
-          onDismiss: { compactChatModel = nil }
+          surface: ChatSurface(
+            content: .init(applyActions: model.applyActionCatalog(for: chatModel)),
+            sections: .none,
+            presentation: .modalSheet(onDismiss: { compactChatModel = nil })
+          )
         )
       }
     }
