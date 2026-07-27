@@ -6,12 +6,7 @@ import YesChefCore
 /// The three structural choices have no defaults. In particular, panel-owned presentations cannot
 /// omit their dismissal choice, while a column is explicitly embedded and host-owned.
 struct ChatSurface {
-  enum DetentIdentity: String, Equatable {
-    /// The existing key deliberately remains Calendar's identity, preserving a cook's current detent.
-    case calendar = "recipeChatWorkspaceDetent"
-    case workbenchDetail = "workbenchDetailChatWorkspaceDetent"
-    case workbenchCompare = "workbenchCompareChatWorkspaceDetent"
-  }
+  typealias DetentIdentity = ChatSurfaceResolution.DetentIdentity
 
   struct Content {
     let applyActions: [AnyChatApplyAction]
@@ -31,10 +26,7 @@ struct ChatSurface {
     case column(detent: DetentIdentity)
 
     var drawsEmbeddedHeader: Bool {
-      switch self {
-      case .modalSheet: false
-      case .embeddedHeader, .column: true
-      }
+      resolvedPresentation.drawsEmbeddedHeader
     }
 
     var onDismiss: (() -> Void)? {
@@ -45,33 +37,16 @@ struct ChatSurface {
     }
 
     var panelOwnsActiveTierPropagation: Bool {
+      resolvedPresentation.panelOwnsActiveTierPropagation
+    }
+
+    var resolvedPresentation: ChatSurfaceResolution.Presentation {
       switch self {
-      case .column: false
-      case .modalSheet, .embeddedHeader: true
+      case .modalSheet: .modalSheet
+      case .embeddedHeader: .embeddedHeader
+      case let .column(detent): .column(detent: detent)
       }
     }
-  }
-
-  struct ResolvedContract: Equatable {
-    enum Sections: Equatable {
-      case none
-      case switchable
-    }
-
-    enum Dismissal: Equatable {
-      case hostOwned
-      case panelOwned
-    }
-
-    enum Presentation: Equatable {
-      case modalSheet
-      case embeddedHeader
-      case column(detent: DetentIdentity)
-    }
-
-    let sections: Sections
-    let dismissal: Dismissal
-    let presentation: Presentation
   }
 
   let content: Content
@@ -142,33 +117,17 @@ struct ChatSurface {
     sheet(content: content, onDismiss: onDismiss)
   }
 
-  var resolvedContract: ResolvedContract {
-    let resolvedSections: ResolvedContract.Sections
+  var resolvedContract: ChatSurfaceResolution {
+    let resolvedSections: ChatSurfaceResolution.Sections
     switch sections {
     case .none: resolvedSections = .none
     case .switchable: resolvedSections = .switchable
     }
 
-    switch presentation {
-    case .modalSheet:
-      return ResolvedContract(
-        sections: resolvedSections,
-        dismissal: .panelOwned,
-        presentation: .modalSheet
-      )
-    case .embeddedHeader:
-      return ResolvedContract(
-        sections: resolvedSections,
-        dismissal: .panelOwned,
-        presentation: .embeddedHeader
-      )
-    case let .column(detent):
-      return ResolvedContract(
-        sections: resolvedSections,
-        dismissal: .hostOwned,
-        presentation: .column(detent: detent)
-      )
-    }
+    return ChatSurfaceResolution(
+      sections: resolvedSections,
+      presentation: presentation.resolvedPresentation
+    )
   }
 
   private static func column(content: Content, detent: DetentIdentity) -> Self {

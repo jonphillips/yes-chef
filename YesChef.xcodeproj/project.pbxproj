@@ -94,7 +94,6 @@
 		AE11AE8D6A7D9F8E06642477 /* GroceryPantryReviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C2EE75870C5C9AAD099505 /* GroceryPantryReviewViews.swift */; };
 		AEEFD13CB08E83C9958ACC8E /* AppDestinationPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10717DBD3251B160509FD4E9 /* AppDestinationPresentation.swift */; };
 		B197F2566EB325113BC5D498 /* ChatWorkspaceDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 471D8E1304E5EF631EB996C3 /* ChatWorkspaceDivider.swift */; };
-		B1A4B0832475BA500093C538 /* ChatSurfaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4802BA56B714BCEF8679A289 /* ChatSurfaceTests.swift */; };
 		B25C46B6E82993FF7971FCE0 /* SettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A4FCB37DBBA09D6123D7989 /* SettingsViews.swift */; };
 		B272D3EEC8E70834165F4E67 /* WorkbenchCandidatePickerViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F811B4BCF619BB9EFC3CFFA /* WorkbenchCandidatePickerViews.swift */; };
 		B46A558486B6A2B676650ABF /* AttentionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18C58B2B2BF5D8C5766C1902 /* AttentionCard.swift */; };
@@ -178,7 +177,6 @@
 		46B48DD3E004C108C6CC348A /* WorkbenchCompareAlignmentModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchCompareAlignmentModel.swift; sourceTree = "<group>"; };
 		46B9BCF538013B597BB0D401 /* RecipeListRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeListRow.swift; sourceTree = "<group>"; };
 		471D8E1304E5EF631EB996C3 /* ChatWorkspaceDivider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatWorkspaceDivider.swift; sourceTree = "<group>"; };
-		4802BA56B714BCEF8679A289 /* ChatSurfaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSurfaceTests.swift; sourceTree = "<group>"; };
 		492BC4D75288EEB6446263F7 /* RecipePlaybookColumnLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipePlaybookColumnLayout.swift; sourceTree = "<group>"; };
 		4A44F5DE22E861C4E705A6BB /* RecipeVariationPromotionPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeVariationPromotionPresentation.swift; sourceTree = "<group>"; };
 		4ADDB4E672F69BB9AD2EB58F /* WorkbenchCompareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchCompareView.swift; sourceTree = "<group>"; };
@@ -322,7 +320,6 @@
 			children = (
 				792C0EBCFF5BA678E266946D /* AIHandoffMenuPasteTests.swift */,
 				842FC32385274C6E7D875B4D /* ChatAssistantSelectionTests.swift */,
-				4802BA56B714BCEF8679A289 /* ChatSurfaceTests.swift */,
 				17E669665E13FA2090694CB0 /* HandoffSectionRoutingTests.swift */,
 				A09330F46A0E8E28834FD02B /* MenuWideColumnLayoutTests.swift */,
 				669BA3E9D8C0F3631F217603 /* OnboardChatFinalizationTests.swift */,
@@ -624,7 +621,6 @@
 			files = (
 				E04A28BE098B255C0B136810 /* AIHandoffMenuPasteTests.swift in Sources */,
 				0CC37A24661F09BC79B0D2DD /* ChatAssistantSelectionTests.swift in Sources */,
-				B1A4B0832475BA500093C538 /* ChatSurfaceTests.swift in Sources */,
 				36753CBE212E39908AA91B4E /* HandoffSectionRoutingTests.swift in Sources */,
 				2332533F5D83A3EF69B7F960 /* MenuWideColumnLayoutTests.swift in Sources */,
 				24F9A4FFD871728DA7782411 /* OnboardChatFinalizationTests.swift in Sources */,

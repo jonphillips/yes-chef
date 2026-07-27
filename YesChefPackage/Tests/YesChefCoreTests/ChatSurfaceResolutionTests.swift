@@ -1,0 +1,53 @@
+import CustomDump
+import Testing
+import YesChefCore
+
+@Suite
+struct ChatSurfaceResolutionTests {
+  @Test
+  func preservesThePresentationContract() {
+    expectNoDifference(
+      ChatSurfaceResolution.DetentIdentity.calendar.rawValue,
+      "recipeChatWorkspaceDetent"
+    )
+    expectNoDifference(
+      Set(ChatSurfaceResolution.DetentIdentity.allCases.map(\.rawValue)).count,
+      3
+    )
+
+    assertPresentation(
+      .modalSheet,
+      dismissal: .panelOwned,
+      drawsEmbeddedHeader: false,
+      panelOwnsActiveTierPropagation: true
+    )
+    assertPresentation(
+      .embeddedHeader,
+      dismissal: .panelOwned,
+      drawsEmbeddedHeader: true,
+      panelOwnsActiveTierPropagation: true
+    )
+    assertPresentation(
+      .column(detent: .calendar),
+      dismissal: .hostOwned,
+      drawsEmbeddedHeader: true,
+      panelOwnsActiveTierPropagation: false
+    )
+  }
+
+  private func assertPresentation(
+    _ presentation: ChatSurfaceResolution.Presentation,
+    dismissal: ChatSurfaceResolution.Dismissal,
+    drawsEmbeddedHeader: Bool,
+    panelOwnsActiveTierPropagation: Bool
+  ) {
+    let resolution = ChatSurfaceResolution(sections: .none, presentation: presentation)
+
+    expectNoDifference(resolution.dismissal, dismissal)
+    expectNoDifference(resolution.presentation.drawsEmbeddedHeader, drawsEmbeddedHeader)
+    expectNoDifference(
+      resolution.presentation.panelOwnsActiveTierPropagation,
+      panelOwnsActiveTierPropagation
+    )
+  }
+}
