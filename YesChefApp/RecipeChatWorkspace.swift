@@ -216,8 +216,8 @@ struct RecipeChatPanel: View {
     VStack(spacing: 0) {
       if showsEmbeddedHeader {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
-          if let selectStarter {
-            ChatSectionMenu(starters: starters, activeStarterID: activeStarterID, select: selectStarter)
+          if !starters.isEmpty, let selectStarter {
+            ChatStarterMenu(starters: starters, activeStarterID: activeStarterID, select: selectStarter)
           } else {
             Text(chatModel.context.title)
               .font(.headline)
@@ -384,9 +384,9 @@ struct RecipeChatPanel: View {
             Button("Done") { onDismiss() }
           }
         }
-        if let selectStarter {
+        if !starters.isEmpty, let selectStarter {
           ToolbarItem(placement: .principal) {
-            ChatSectionMenu(starters: starters, activeStarterID: activeStarterID, select: selectStarter)
+            ChatStarterMenu(starters: starters, activeStarterID: activeStarterID, select: selectStarter)
           }
         }
         ToolbarItem(placement: .topBarTrailing) {

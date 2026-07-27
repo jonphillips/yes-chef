@@ -1,3 +1,6 @@
+import Dependencies
+import DependenciesTestSupport
+import Foundation
 import Testing
 import YesChefCore
 @testable import YesChef
@@ -21,6 +24,7 @@ struct ChatSurfaceTests {
       .init(id: "serveWith", title: "Serve With"),
     ])
     #expect(activeStarterID(in: recipe) == "chefItUp")
+    #expect(recipe.resolvedContract.sections == .starters)
     #expect(selectedRecipeSection == nil)
     select("serveWith", in: recipe)
     #expect(selectedRecipeSection == .serveWith)
@@ -52,6 +56,7 @@ struct ChatSurfaceTests {
 
     #expect(starters(in: menu) == menuStarters)
     #expect(activeStarterID(in: menu) == "prepPlan")
+    #expect(menu.resolvedContract.sections == .starters)
     #expect(selectedMenuStarterID == nil)
     select("complement", in: menu)
     #expect(selectedMenuStarterID == "complement")
@@ -73,6 +78,34 @@ struct ChatSurfaceTests {
       #expect(starters(in: surface).isEmpty)
       #expect(activeStarterID(in: surface) == nil)
       #expect(surface.resolvedContract.sections == .none)
+    }
+  }
+
+  @Test
+  func menuToolIsTheOnlyChatPresentationState() throws {
+    try withDependencies {
+      try $0.bootstrapDatabase()
+    } operation: {
+      let model = MenuDetailModel(menuID: UUID())
+      let chatModel = RecipeChatModel(context: .menu(MenuChatContext(title: "Test", dayCount: 1)))
+
+      model.tool = .chat(chatModel)
+      model.activeChatStarterID = "prepPlan"
+      model.recipeBrowserButtonTapped()
+
+      guard case .recipeBrowser? = model.tool else {
+        Issue.record("Browse Recipes should replace the chat tool.")
+        return
+      }
+      #expect(model.chatModel == nil)
+      #expect(model.activeChatStarterID == nil)
+
+      model.tool = .chat(chatModel)
+      model.activeChatStarterID = "prepPlan"
+      model.tool = nil
+
+      #expect(model.chatModel == nil)
+      #expect(model.activeChatStarterID == nil)
     }
   }
 

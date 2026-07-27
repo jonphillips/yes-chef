@@ -143,7 +143,7 @@ struct ChatSurface {
     let resolvedSections: ChatSurfaceResolution.Sections
     switch sections {
     case .none: resolvedSections = .none
-    case .starters: resolvedSections = .switchable
+    case .starters: resolvedSections = .starters
     }
 
     return ChatSurfaceResolution(

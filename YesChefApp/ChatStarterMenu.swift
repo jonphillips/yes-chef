@@ -3,7 +3,7 @@ import YesChefCore
 
 /// The panel's discussion-starter picker. Hosts decide which prompts they offer; the playbook's
 /// Ask opens an unseeded panel and Discuss ▾ starts or moves a guided discussion (ADR-0045 Amd 3).
-struct ChatSectionMenu: View {
+struct ChatStarterMenu: View {
   let starters: [ChatSurface.ChatStarter]
   let activeStarterID: ChatSurface.ChatStarter.ID?
   let select: (ChatSurface.ChatStarter.ID) -> Void
@@ -34,8 +34,8 @@ struct ChatSectionMenu: View {
       }
       .foregroundStyle(.primary)
     }
-    .accessibilityLabel(Text("Discuss section"))
-    .accessibilityHint(Text("Move this discussion to another Playbook section."))
+    .accessibilityLabel(Text("Discuss"))
+    .accessibilityHint(Text("Choose a starter for a guided discussion."))
   }
 }
 

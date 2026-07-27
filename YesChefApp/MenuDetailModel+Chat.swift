@@ -17,25 +17,39 @@ extension MenuDetailModel {
     MenuChatStarter.allCases.map(\.starter)
   }
 
+  var chatModel: RecipeChatModel? {
+    guard case let .chat(chatModel) = tool else { return nil }
+    return chatModel
+  }
+
   /// Toggles an unseeded menu chat. Guided prompts remain inside the panel's Discuss menu, so
   /// opening Ask is always free and immediately ready for a cook's own question.
   func askButtonTapped() {
     guard let detail else { return }
-    guard chatModel == nil else {
-      dismissChat()
+    if case .chat? = tool {
+      dismissTool()
       return
     }
     activeChatStarterID = nil
-    chatModel = RecipeChatModel(context: .menu(MenuChatContext(detail: detail)))
+    tool = .chat(RecipeChatModel(context: .menu(MenuChatContext(detail: detail))))
   }
 
-  func dismissChat() {
-    chatModel = nil
-    activeChatStarterID = nil
+  func recipeBrowserButtonTapped() {
+    if case .recipeBrowser? = tool {
+      dismissTool()
+    } else {
+      activeChatStarterID = nil
+      tool = .recipeBrowser
+    }
+  }
+
+  func dismissTool() {
+    tool = nil
   }
 
   func selectChatStarter(_ starterID: ChatSurface.ChatStarter.ID) {
     guard let starter = MenuChatStarter(rawValue: starterID), let detail else { return }
+    guard activeChatStarterID != starterID else { return }
     let context = MenuChatContext(detail: detail)
     let prompt: String
     let summary: String
@@ -56,7 +70,6 @@ extension MenuDetailModel {
     // The chat can be opened before a starter is selected. Reuse that live thread so selecting a
     // second starter appends its opener instead of silently retaining the prior discussion scope.
     let chatModel = chatModel(for: context)
-    guard activeChatStarterID != starterID else { return }
 
     Task {
       switch await chatModel.seedIfCold(prompt, summary: summary) {
@@ -75,6 +88,9 @@ extension MenuDetailModel {
 
   func regeneratePrepPlan() {
     guard let detail else { return }
+    // Regeneration creates a new deliverable; it is not a guided discussion-starter selection.
+    // Keep Discuss unselected rather than presenting a regeneration as a Prep Plan conversation.
+    activeChatStarterID = nil
     let context = MenuChatContext(detail: detail)
     let chatModel = chatModel(for: context)
     Task {
@@ -88,7 +104,7 @@ extension MenuDetailModel {
       return chatModel
     }
     let chatModel = RecipeChatModel(context: .menu(context))
-    self.chatModel = chatModel
+    tool = .chat(chatModel)
     return chatModel
   }
 

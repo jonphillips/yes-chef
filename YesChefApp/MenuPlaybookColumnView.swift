@@ -225,8 +225,11 @@ struct MenuDetailReader: View {
         }
       }
       .accessibilityValue(isAskActive ? "Panel open" : "Panel closed")
-      Button("Regenerate whole plan", action: regeneratePrepPlan)
-        .disabled(detail.prepPlanSteps.isEmpty)
+      Button(action: regeneratePrepPlan) {
+        Label("Regenerate whole plan", systemImage: "arrow.clockwise")
+      }
+      .buttonStyle(.bordered)
+      .disabled(detail.prepPlanSteps.isEmpty)
     }
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Playbook actions")

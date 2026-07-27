@@ -82,7 +82,7 @@ struct ChatEmptyState: View {
 
   private var description: Text? {
     let clauses = [
-      hasStarters ? "Or choose a discussion starter to begin." : nil,
+      hasStarters ? "Or choose a starter from Discuss to begin." : nil,
       needsReplyForApply ? "Apply actions need an assistant reply first." : nil,
     ]
     .compactMap { $0 }
