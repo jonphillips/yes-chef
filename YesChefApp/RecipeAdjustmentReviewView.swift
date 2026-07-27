@@ -180,22 +180,28 @@ private struct MethodBeforeAfterView: View {
         Text("No instructions")
           .foregroundStyle(.secondary)
       } else {
-        ForEach(groups) { group in
-          VStack(alignment: .leading, spacing: 8) {
-            if let name = group.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
-              Text(name)
-                .font(.subheadline.bold())
-                .foregroundStyle(.secondary)
-            }
-            ForEach(Array(group.steps.enumerated()), id: \.element.id) { index, step in
-              HStack(alignment: .top, spacing: 10) {
-                Text("\(index + 1)")
-                  .font(.caption.bold())
-                  .foregroundStyle(.white)
-                  .frame(width: 24, height: 24)
-                  .background(Circle().fill(Color.accentColor))
-                Text(step.text)
-                  .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 20) {
+          ForEach(Array(groups.enumerated()), id: \.element.id) { groupIndex, group in
+            let stepNumberOffset = groups.prefix(groupIndex).reduce(0) { $0 + $1.steps.count }
+            VStack(alignment: .leading, spacing: 8) {
+              if let name = group.name {
+                Text(name)
+                  .font(.subheadline.bold())
+                  .foregroundStyle(.secondary)
+                  .accessibilityAddTraits(.isHeader)
+              }
+              VStack(alignment: .leading, spacing: 14) {
+                ForEach(Array(group.steps.enumerated()), id: \.element.id) { index, step in
+                  HStack(alignment: .top, spacing: 10) {
+                    Text("\(stepNumberOffset + index + 1)")
+                      .font(.caption.bold())
+                      .foregroundStyle(.white)
+                      .frame(width: 24, height: 24)
+                      .background(Circle().fill(Color.accentColor))
+                    Text(step.text)
+                      .frame(maxWidth: .infinity, alignment: .leading)
+                  }
+                }
               }
             }
           }

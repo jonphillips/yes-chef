@@ -7,6 +7,7 @@ import OSLog
 /// public: the prompts and model responses are the diagnostic signal.
 public enum AppLog {
   public static let applyAction = Logger(subsystem: subsystem, category: "applyAction")
+  public static let dataIntegrity = Logger(subsystem: subsystem, category: "dataIntegrity")
   public static let llm = Logger(subsystem: subsystem, category: "llm")
 
   /// Interactive-latency diagnostics (ADR-0029). Paired with `performanceSignposter`

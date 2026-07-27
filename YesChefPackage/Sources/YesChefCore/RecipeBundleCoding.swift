@@ -51,7 +51,7 @@ public enum RecipeBundleCoding {
     }
 
     public var instructions: [String] {
-      instructionSteps.sorted { $0.sortOrder < $1.sortOrder }.map(\.text)
+      sortedInstructionSteps(instructionSteps, sections: instructionSections).map(\.text)
     }
 
     public var notes: [String] {
@@ -91,7 +91,7 @@ public enum RecipeBundleCoding {
       ingredientSections: ingredientSections,
       ingredientLines: ingredientLines.sorted { $0.sortOrder < $1.sortOrder },
       instructionSections: instructionSections,
-      instructionSteps: instructionSteps.sorted { $0.sortOrder < $1.sortOrder },
+      instructionSteps: sortedInstructionSteps(instructionSteps, sections: instructionSections),
       recipeNotes: notes.sorted { $0.dateCreated < $1.dateCreated },
       photos: leanSnapshotPhotos(photos),
       tagNames: tagNames,
@@ -117,5 +117,23 @@ public enum RecipeBundleCoding {
         photo.thumbnailData = nil
         return photo
       }
+  }
+
+  private static func sortedInstructionSteps(
+    _ steps: [InstructionStep],
+    sections: [InstructionSection]
+  ) -> [InstructionStep] {
+    let sectionSortOrders = Dictionary(uniqueKeysWithValues: sections.map { ($0.id, $0.sortOrder) })
+    return steps.sorted { lhs, rhs in
+      let lhsSectionSortOrder = sectionSortOrders[lhs.sectionID] ?? Int.max
+      let rhsSectionSortOrder = sectionSortOrders[rhs.sectionID] ?? Int.max
+      if lhsSectionSortOrder != rhsSectionSortOrder {
+        return lhsSectionSortOrder < rhsSectionSortOrder
+      }
+      if lhs.sortOrder != rhs.sortOrder {
+        return lhs.sortOrder < rhs.sortOrder
+      }
+      return lhs.id.uuidString < rhs.id.uuidString
+    }
   }
 }

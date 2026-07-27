@@ -69,9 +69,9 @@ the section it is given, and the editor only ever gives it section 1. So saving 
 the ordering hazard have the same fix**: group by section and sort by `(section.sortOrder, step.sortOrder)`,
 and global uniqueness stops being load-bearing at all.
 
-**And yes to numbering within sections** — restart at 1 under each section name, which is how the source
-page reads and how the model returned it. Continuous numbering across sections is the alternative; it only
-wins if a step ever cross-references another by number, which nothing in the app does.
+**Reader and Compare number within sections** — restart at 1 under each section name, which is how the source
+page reads and how the model returned it. The adjustment review is the deliberate continuous-numbering
+exception, recorded with S1 below.
 
 ## Sections vs. headings — the distinction the symptom exposed
 
@@ -104,6 +104,12 @@ ordering hazard before the editor work has a chance to trip it.
   model** — it is the thing production reads, so a Core test pins the tie-breaking case (two sections whose
   steps share a `sortOrder`) instead of restating the mapping. Sections with no name render their steps
   without a subhead, so a single-section recipe looks exactly as it does today — that is the canary.
+
+**Amendment — adjustment numbering (2026-07-27).** The exception to per-section numbering is the adjustment
+review: `RecipeMethodStepReplacement.stepNumber`, `adjustmentContext`, and the unresolved-instruction-step
+error all refer to a global step number. Reader and Compare restart at 1 per section; the adjustment review
+keeps continuous numbering so that those references match what the cook sees.
+
 - **S2 — Core: the editor draft carries every section (no UI).** `RecipeEditorDraft` grows an ordered array
   of section drafts (id, name, text) for ingredients and instructions instead of the four flat fields;
   `save` reconciles each by section ID and handles renames, adds, reorders, and removals — a section deleted
