@@ -30,12 +30,12 @@ public enum RecipeStructuredTextSerializer {
 
   private static func block(for element: Element) -> String? {
     let tagName = element.tagName().lowercased()
-    let rawText: String?
-    if tagName == "li" {
-      rawText = element.ownText()
-    } else {
-      rawText = try? element.text()
-    }
+    // Publishers such as Substack commonly wrap each list item in a paragraph
+    // (`<li><p>…</p></li>`). `ownText()` sees no direct text in that shape,
+    // which silently removes the entire ingredient list from the model prompt.
+    // `text()` preserves the item contents; nested-list duplication is less
+    // harmful than dropping a recipe's only ingredients.
+    let rawText = try? element.text()
     guard let text = normalized(rawText), !text.isEmpty else { return nil }
 
     switch tagName {
