@@ -417,8 +417,8 @@ enum HandoffAppOperations {
       var recipeMethodLinesByID: [Recipe.ID: [String]] = [:]
       for recipeID in Set(rows.compactMap { $0.recipe?.id }) {
         guard let detail = try RecipeRepository.fetchDetail(recipeID: recipeID, in: db) else { continue }
-        recipeMethodLinesByID[recipeID] = detail.instructionSteps
-          .sorted { $0.sortOrder < $1.sortOrder }
+        recipeMethodLinesByID[recipeID] = detail.instructionGroups
+          .flatMap(\.steps)
           .map(\.text)
       }
       return (

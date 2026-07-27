@@ -175,20 +175,35 @@ private struct MethodBeforeAfterView: View {
     VStack(alignment: .leading, spacing: 14) {
       Text(title)
         .font(.headline)
-      let steps = detail.instructionSteps.sorted { $0.sortOrder < $1.sortOrder }
-      if steps.isEmpty {
+      let groups = detail.instructionGroups
+      if groups.isEmpty {
         Text("No instructions")
           .foregroundStyle(.secondary)
       } else {
-        ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
-          HStack(alignment: .top, spacing: 10) {
-            Text("\(index + 1)")
-              .font(.caption.bold())
-              .foregroundStyle(.white)
-              .frame(width: 24, height: 24)
-              .background(Circle().fill(Color.accentColor))
-            Text(step.text)
-              .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 20) {
+          ForEach(Array(groups.enumerated()), id: \.element.id) { groupIndex, group in
+            let stepNumberOffset = groups.prefix(groupIndex).reduce(0) { $0 + $1.steps.count }
+            VStack(alignment: .leading, spacing: 8) {
+              if let name = group.name {
+                Text(name)
+                  .font(.subheadline.bold())
+                  .foregroundStyle(.secondary)
+                  .accessibilityAddTraits(.isHeader)
+              }
+              VStack(alignment: .leading, spacing: 14) {
+                ForEach(Array(group.steps.enumerated()), id: \.element.id) { index, step in
+                  HStack(alignment: .top, spacing: 10) {
+                    Text("\(stepNumberOffset + index + 1)")
+                      .font(.caption.bold())
+                      .foregroundStyle(.white)
+                      .frame(width: 24, height: 24)
+                      .background(Circle().fill(Color.accentColor))
+                    Text(step.text)
+                      .frame(maxWidth: .infinity, alignment: .leading)
+                  }
+                }
+              }
+            }
           }
         }
       }

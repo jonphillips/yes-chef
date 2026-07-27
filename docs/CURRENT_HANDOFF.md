@@ -20,10 +20,17 @@ live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** re
 Dispatch with *"Do the **recipe section grain** effort in `docs/CURRENT_HANDOFF.md`."* If this section
 is empty or missing, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-Both halves found in Jon's device pass of PR [#245](https://github.com/jonphillips/yes-chef/pull/245) on the
-Samin capture: **the edit sheet showed only the first section** of each, and **instructions display with no
-sections at all** while ingredients display grouped. Three slices, **no schema** — S1 read-side instruction
-grouping, S2 Core editor draft, S3 editor UI. **Dispatch S1 alone first.**
+**S2 + S3 batched into one dispatch/PR** — the editor draft carries every section, then the editor renders
+them. They share files and one mental model (S3 is a readout of the shape S2 defines), so they amortize;
+the architect still reviews at slice resolution. Found in Jon's device pass of PR
+[#245](https://github.com/jonphillips/yes-chef/pull/245) on the Samin capture: **the edit sheet showed only
+the first section** of each. **No schema.**
+
+**The one open question is closed — Jon settled it 2026-07-27: no heading promotion in the editor.** The
+explicit "Add section" control is the only way to make a section there, per ADR-0040 D2; promote-on-paste was
+considered and declined with it. A typed `For the sauce:` line stays an ingredient line or a step, and a
+pasted multi-section recipe becomes one section — **intended behaviour, not a defect to fix on momentum from
+what the capture channel does.** Nothing gates this dispatch now.
 
 **Four things a dispatch must not miss:**
 
@@ -31,21 +38,22 @@ grouping, S2 Core editor draft, S3 editor UI. **Dispatch S1 alone first.**
    edited section, and import assigns instruction steps a **global** running `sortOrder` so document order
    is intact. This is "you cannot edit or see most of your recipe," not "editing eats your recipe." Do not
    open it as a data-loss fix.
-2. **S1 is a correctness fix wearing a display fix's clothes.** The flat instruction list depends on step
-   `sortOrder` being globally unique, and an editor save renumbers one section from 0 — ties, then unstable
-   order. Grouping by section and sorting `(section.sortOrder, step.sortOrder)` retires that dependency.
-   **Ship S1 before S2** so the editor work cannot trip it.
+2. **The ordering hazard S2 would have tripped is already retired.** S1 shipped
+   `InstructionStepGroup.groups(sections:steps:)`, so nothing keys on step `sortOrder` being globally
+   unique any more and **per-section renumbering on save is now correct rather than a collision.** S2 may
+   assume it.
 3. **Deletion is the new behaviour in S2.** The save path only ever merges, so removing a section is the one
-   case with no existing expression — that is where the tests should be hardest.
-4. **⚠️ One open question is Jon's and is NOT the dispatch's to settle** — whether the editor's text box
-   promotes typed `For the sauce:` headings into sections the way the capture channel does. The
-   recommendation is no (ADR-0040 D2). **Do not implement heading promotion in the editor without an
-   answer.**
+   case with no existing expression — that is where the tests should be hardest. The primary pin is the
+   quieter one: a two-section recipe round-trips draft → save → detail **unchanged**.
+4. **There is exactly one instruction-ordering rule and it is not to be re-derived.** Everything that orders
+   or groups steps calls `InstructionStepGroup.groups(sections:steps:)`. S1 twice grew a second copy — once
+   by omission, once while deleting the first — so a new private sorter in the editor path is a review
+   rejection, not a nit.
 
-**Verification.** S1/S2 are package tests where `scripts/check-drift.sh` actually runs (put the grouping rule
-in Core, not the app display model). S1 and S3 touch `YesChefApp/` and need the elevated
-`generic/platform=iOS` build as required evidence. No simulator installs; Jon device-passes on the captured
-Samin recipe — a single-section recipe looking unchanged is the canary.
+**Verification.** S2 is package tests where `scripts/check-drift.sh` actually runs (put the reconciliation in
+Core, not the editor view). S3 touches `YesChefApp/` and needs the elevated `generic/platform=iOS` build as
+required evidence. No simulator installs; Jon device-passes on the captured Samin recipe — a single-section
+recipe editing exactly as it does today is the canary.
 
 ## Architect track (parallel — NOT a Codex dispatch)
 
@@ -219,7 +227,11 @@ selection (per-bubble `UITextView` caps the payload).
 
 ## Device passes owed
 
-Not work, a checklist. **[ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) S3** (complete,
+Not work, a checklist. **Recipe section grain S1** (PR [#246](https://github.com/jonphillips/yes-chef/pull/246))
+owes the Samin capture showing its three instruction sections with subheads, and — the canary — a
+single-section recipe looking and spacing exactly as it did before; the reader and Compare restart numbering
+per section while the adjustment review stays continuous, which is deliberate.
+**[ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) S3** (complete,
 nothing queued) carries two live caveats into its pass: `pastedText` is a new raw value in a synced enum
 column, so **update both devices before saving a pasted-text reference**, and the `isThin` 1,500-character
 threshold is still a guess against real pages. **PRs #243 + #244** owe one combined pass over all four chat

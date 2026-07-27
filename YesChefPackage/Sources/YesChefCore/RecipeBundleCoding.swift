@@ -51,7 +51,9 @@ public enum RecipeBundleCoding {
     }
 
     public var instructions: [String] {
-      instructionSteps.sorted { $0.sortOrder < $1.sortOrder }.map(\.text)
+      InstructionStepGroup.groups(sections: instructionSections, steps: instructionSteps)
+        .flatMap(\.steps)
+        .map(\.text)
     }
 
     public var notes: [String] {
@@ -91,7 +93,8 @@ public enum RecipeBundleCoding {
       ingredientSections: ingredientSections,
       ingredientLines: ingredientLines.sorted { $0.sortOrder < $1.sortOrder },
       instructionSections: instructionSections,
-      instructionSteps: instructionSteps.sorted { $0.sortOrder < $1.sortOrder },
+      instructionSteps: InstructionStepGroup.groups(sections: instructionSections, steps: instructionSteps)
+        .flatMap(\.steps),
       recipeNotes: notes.sorted { $0.dateCreated < $1.dateCreated },
       photos: leanSnapshotPhotos(photos),
       tagNames: tagNames,

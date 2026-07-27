@@ -125,7 +125,7 @@ public struct RecipeAdjustmentProposal: Codable, Equatable, Sendable {
       ingredientLines = sortedIngredientLines(ingredientLines, sections: ingredientSections)
     }
 
-    var instructionSteps = sortedInstructionSteps(detail.instructionSteps, sections: detail.instructionSections)
+    var instructionSteps = detail.instructionGroups.flatMap(\.steps)
     for replacement in methodStepReplacements {
       guard let index = replacement.index(in: instructionSteps) else {
         throw RecipeAdjustmentError.unresolvedInstructionStep(replacement.displayText)
@@ -1139,7 +1139,7 @@ public extension RecipeDetailData {
 
     let baseSteps = Dictionary(uniqueKeysWithValues: instructionSteps.map { ($0.id, $0) })
     let editedSteps = Dictionary(uniqueKeysWithValues: edited.instructionSteps.map { ($0.id, $0) })
-    for base in sortedInstructionSteps(instructionSteps, sections: instructionSections) {
+    for base in instructionGroups.flatMap(\.steps) {
       guard let current = editedSteps[base.id] else {
         unrepresentable.append(.instructionStepRemoved(base.text))
         continue
@@ -1153,7 +1153,7 @@ public extension RecipeDetailData {
         )
       }
     }
-    for step in sortedInstructionSteps(edited.instructionSteps, sections: edited.instructionSections)
+    for step in edited.instructionGroups.flatMap(\.steps)
     where baseSteps[step.id] == nil {
       unrepresentable.append(.instructionStepAdded(step.text))
     }
@@ -1233,7 +1233,6 @@ public extension RecipeDetailData {
 
 private func adjustmentContext(_ detail: RecipeDetailData) -> String {
   let ingredientLinesBySection = Dictionary(grouping: detail.ingredientLines) { $0.sectionID }
-  let instructionStepsBySection = Dictionary(grouping: detail.instructionSteps) { $0.sectionID }
   var stepNumber = 1
   var lines: [String] = []
   lines.append("- Title: \(detail.recipe.title)")
@@ -1248,9 +1247,9 @@ private func adjustmentContext(_ detail: RecipeDetailData) -> String {
     }
   }
   lines.append("Instructions:")
-  for section in detail.instructionSections.sorted(by: { $0.sortOrder < $1.sortOrder }) {
-    if let name = section.name { lines.append("- Section: \(name)") }
-    for step in (instructionStepsBySection[section.id] ?? []).sorted(by: { $0.sortOrder < $1.sortOrder }) {
+  for group in detail.instructionGroups {
+    if let name = group.name { lines.append("- Section: \(name)") }
+    for step in group.steps {
       lines.append("  - id=\(step.id.uuidString) step=\(stepNumber) text=\(step.text)")
       stepNumber += 1
     }
@@ -1318,24 +1317,6 @@ private func sortedIngredientLines(
 ) -> [IngredientLine] {
   let sectionSortOrders = Dictionary(uniqueKeysWithValues: sections.map { ($0.id, $0.sortOrder) })
   return lines.sorted { lhs, rhs in
-    let lhsSectionSortOrder = sectionSortOrders[lhs.sectionID] ?? Int.max
-    let rhsSectionSortOrder = sectionSortOrders[rhs.sectionID] ?? Int.max
-    if lhsSectionSortOrder != rhsSectionSortOrder {
-      return lhsSectionSortOrder < rhsSectionSortOrder
-    }
-    if lhs.sortOrder != rhs.sortOrder {
-      return lhs.sortOrder < rhs.sortOrder
-    }
-    return lhs.id.uuidString < rhs.id.uuidString
-  }
-}
-
-private func sortedInstructionSteps(
-  _ steps: [InstructionStep],
-  sections: [InstructionSection]
-) -> [InstructionStep] {
-  let sectionSortOrders = Dictionary(uniqueKeysWithValues: sections.map { ($0.id, $0.sortOrder) })
-  return steps.sorted { lhs, rhs in
     let lhsSectionSortOrder = sectionSortOrders[lhs.sectionID] ?? Int.max
     let rhsSectionSortOrder = sectionSortOrders[rhs.sectionID] ?? Int.max
     if lhsSectionSortOrder != rhsSectionSortOrder {

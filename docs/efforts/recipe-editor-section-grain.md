@@ -4,8 +4,10 @@
 [#245](https://github.com/jonphillips/yes-chef/pull/245) (the ADR-0047 capture fallback): *"the turkey
 zucchini recipe came across with sections defined around the sauce and the meatballs, but my edit recipe
 sheet only showed the first section,"* then *"it's strange that the ingredients are sectioned off, but the
-instructions are not … it definitely requires me to think about it."* Dispatch-ready after the one open
-question below is answered. **No schema** — the tables this needs already exist and already sync.
+instructions are not … it definitely requires me to think about it."* **S1 shipped (PR
+[#246](https://github.com/jonphillips/yes-chef/pull/246)); S2 + S3 are dispatch-ready — the one open question
+was closed by Jon 2026-07-27 (see below).** **No schema** — the tables this needs already exist and already
+sync.
 
 **Owner:** Codex (implement) · Claude (architect/review) · Jon (product/device pass).
 
@@ -69,9 +71,9 @@ the section it is given, and the editor only ever gives it section 1. So saving 
 the ordering hazard have the same fix**: group by section and sort by `(section.sortOrder, step.sortOrder)`,
 and global uniqueness stops being load-bearing at all.
 
-**And yes to numbering within sections** — restart at 1 under each section name, which is how the source
-page reads and how the model returned it. Continuous numbering across sections is the alternative; it only
-wins if a step ever cross-references another by number, which nothing in the app does.
+**Reader and Compare number within sections** — restart at 1 under each section name, which is how the source
+page reads and how the model returned it. The adjustment review is the deliberate continuous-numbering
+exception, recorded with S1 below.
 
 ## Sections vs. headings — the distinction the symptom exposed
 
@@ -104,6 +106,12 @@ ordering hazard before the editor work has a chance to trip it.
   model** — it is the thing production reads, so a Core test pins the tie-breaking case (two sections whose
   steps share a `sortOrder`) instead of restating the mapping. Sections with no name render their steps
   without a subhead, so a single-section recipe looks exactly as it does today — that is the canary.
+
+**Amendment — adjustment numbering (2026-07-27).** The exception to per-section numbering is the adjustment
+review: `RecipeMethodStepReplacement.stepNumber`, `adjustmentContext`, and the unresolved-instruction-step
+error all refer to a global step number. Reader and Compare restart at 1 per section; the adjustment review
+keeps continuous numbering so that those references match what the cook sees.
+
 - **S2 — Core: the editor draft carries every section (no UI).** `RecipeEditorDraft` grows an ordered array
   of section drafts (id, name, text) for ingredients and instructions instead of the four flat fields;
   `save` reconciles each by section ID and handles renames, adds, reorders, and removals — a section deleted
@@ -115,13 +123,18 @@ ordering hazard before the editor work has a chance to trip it.
   blocks with add / rename / delete, following the ADR-0048 grain rule — *the affordance is a readout of
   storage, and storage here is rows*. Needs the elevated `generic/platform=iOS` build.
 
-## Open question — one, and it needs Jon
+## Settled question — closed by Jon 2026-07-27
 
-**Does the editor's text box promote typed headings to sections, the way capture does?**
+**Does the editor's text box promote typed headings to sections, the way capture does? — No.**
 
-The recommendation is **no**: per ADR-0040 D2 the human edits fields, never the wire format, and a heuristic
-that silently converts a line you typed into a structural section is exactly the hidden-state re-derivation
-that ADR forbids. S2's explicit "Add section" control is the honest affordance. But it is Jon's call, because
-the cost is real — pasting a whole recipe with `For the sauce:` headings into the editor would produce one
-long section, where capture would have produced two, and that inconsistency is *also* confusing. A middle
-option exists: promote on **paste only**, visibly, with the result editable afterward.
+Per ADR-0040 D2 the human edits fields, never the wire format, and a heuristic that silently converts a line
+you typed into a structural section is exactly the hidden-state re-derivation that ADR forbids. **S2's
+explicit "Add section" control is the only way to make a section in the editor.** The promote-on-paste middle
+option was considered and declined with the rest — it is the same heuristic wearing a narrower trigger, and a
+paste that silently restructures is harder to explain than one that doesn't.
+
+**The accepted cost, stated so it is not re-litigated as a bug:** pasting a whole recipe with `For the sauce:`
+headings into the editor produces **one** section, where capture would have produced two. Typing that line
+gives you an ingredient line or a step reading "For the sauce:", exactly as it does today. That asymmetry
+between the two channels is now intended behaviour, not a defect — the editor's answer to "I want a section"
+is the Add section control.

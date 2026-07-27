@@ -488,19 +488,33 @@ private struct WorkbenchCompareRecipeDetail: View {
 
         ingredients
 
-        if !detail.instructionSteps.isEmpty {
+        if !detail.instructionGroups.isEmpty {
           VStack(alignment: .leading, spacing: 12) {
             Text("Directions")
               .font(.title3.bold())
-            ForEach(Array(detail.instructionSteps.enumerated()), id: \.element.id) { index, step in
-              HStack(alignment: .top, spacing: 12) {
-                Text("\(index + 1)")
-                  .font(.caption.bold())
-                  .foregroundStyle(.white)
-                  .frame(width: 26, height: 26)
-                  .background(Circle().fill(Color.accentColor))
-                Text(step.text)
-                  .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 18) {
+              ForEach(detail.instructionGroups) { group in
+                VStack(alignment: .leading, spacing: 8) {
+                  if let name = group.name {
+                    Text(name)
+                      .font(.subheadline.bold())
+                      .foregroundStyle(.secondary)
+                      .accessibilityAddTraits(.isHeader)
+                  }
+                  VStack(alignment: .leading, spacing: 12) {
+                    ForEach(Array(group.steps.enumerated()), id: \.element.id) { index, step in
+                      HStack(alignment: .top, spacing: 12) {
+                        Text("\(index + 1)")
+                          .font(.caption.bold())
+                          .foregroundStyle(.white)
+                          .frame(width: 26, height: 26)
+                          .background(Circle().fill(Color.accentColor))
+                        Text(step.text)
+                          .frame(maxWidth: .infinity, alignment: .leading)
+                      }
+                    }
+                  }
+                }
               }
             }
           }

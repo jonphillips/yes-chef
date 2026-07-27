@@ -430,7 +430,6 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
 
   public init(detail: RecipeDetailData) {
     let ingredientLinesBySection = Dictionary(grouping: detail.ingredientLines) { $0.sectionID }
-    let instructionStepsBySection = Dictionary(grouping: detail.instructionSteps) { $0.sectionID }
     self.init(
       recipeID: detail.recipe.id,
       title: detail.recipe.title,
@@ -452,17 +451,13 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
           )
         }
         .filter { !$0.lines.isEmpty },
-      instructionSections: detail.instructionSections
-        .sorted { $0.sortOrder < $1.sortOrder }
-        .map { section in
+      instructionSections: detail.instructionGroups
+        .map { group in
           RecipeChatSection(
-            name: section.name,
-            lines: (instructionStepsBySection[section.id] ?? [])
-              .sorted { $0.sortOrder < $1.sortOrder }
-              .map(\.text)
+            name: group.name,
+            lines: group.steps.map(\.text)
           )
-        }
-        .filter { !$0.lines.isEmpty },
+        },
       notes: detail.notes
         .filter { $0.noteType == .general }
         .sorted { $0.dateCreated < $1.dateCreated }

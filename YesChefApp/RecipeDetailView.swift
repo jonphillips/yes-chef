@@ -719,7 +719,7 @@ private struct RecipeReaderView: View {
       if let note = model.activeVariationNote {
         variationMethodNote(note)
       }
-      if !model.instructionSteps.isEmpty {
+      if !model.instructionGroups.isEmpty {
         instructions
       }
       if !model.workbenchCandidateLinks.isEmpty {
@@ -769,15 +769,27 @@ private struct RecipeReaderView: View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Instructions")
         .font(.title2.bold())
-      VStack(alignment: .leading, spacing: 14) {
-        ForEach(Array(model.instructionSteps.enumerated()), id: \.element.id) { index, step in
-          HStack(alignment: .top, spacing: 12) {
-            Text("\(index + 1)")
-              .font(.caption.bold())
-              .foregroundStyle(.white)
-              .frame(width: 26, height: 26)
-              .background(Circle().fill(Color.accentColor))
-            Text(step.text)
+      VStack(alignment: .leading, spacing: 20) {
+        ForEach(model.instructionGroups) { group in
+          VStack(alignment: .leading, spacing: 8) {
+            if let name = group.name {
+              Text(name)
+                .font(.subheadline.bold())
+                .foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
+            }
+            VStack(alignment: .leading, spacing: 14) {
+              ForEach(Array(group.steps.enumerated()), id: \.element.id) { index, step in
+                HStack(alignment: .top, spacing: 12) {
+                  Text("\(index + 1)")
+                    .font(.caption.bold())
+                    .foregroundStyle(.white)
+                    .frame(width: 26, height: 26)
+                    .background(Circle().fill(Color.accentColor))
+                  Text(step.text)
+                }
+              }
+            }
           }
         }
       }

@@ -119,5 +119,65 @@ extension RecipeCoreTests {
       expectNoDifference(decoded.photos.first?.displayData, displayData)
       expectNoDifference(decoded.photos.first?.thumbnailData, thumbnailData)
     }
+
+    @Test
+    func snapshotsOrderInstructionStepsBySectionBeforeStep() throws {
+      let recipeID = SampleUUIDSequence.uuid(13)
+      let prepSectionID = SampleUUIDSequence.uuid(14)
+      let cookSectionID = SampleUUIDSequence.uuid(15)
+      let recipe = Recipe(
+        id: recipeID,
+        title: "Sectioned Snapshot",
+        dateCreated: .distantPast,
+        dateModified: .distantPast
+      )
+      let snapshot = try RecipeBundleCoding.decodeSnapshot(
+        RecipeBundleCoding.snapshotData(
+          recipe: recipe,
+          source: nil,
+          ingredientSections: [],
+          ingredientLines: [],
+          instructionSections: [
+            InstructionSection(id: cookSectionID, recipeID: recipeID, name: "Cook", sortOrder: 1),
+            InstructionSection(id: prepSectionID, recipeID: recipeID, name: "Prep", sortOrder: 0),
+          ],
+          instructionSteps: [
+            InstructionStep(
+              id: SampleUUIDSequence.uuid(16),
+              recipeID: recipeID,
+              sectionID: cookSectionID,
+              text: "Roast until browned.",
+              sortOrder: 0
+            ),
+            InstructionStep(
+              id: SampleUUIDSequence.uuid(17),
+              recipeID: recipeID,
+              sectionID: prepSectionID,
+              text: "Season the chicken.",
+              sortOrder: 1
+            ),
+            InstructionStep(
+              id: SampleUUIDSequence.uuid(18),
+              recipeID: recipeID,
+              sectionID: prepSectionID,
+              text: "Heat the oven.",
+              sortOrder: 0
+            ),
+          ],
+          notes: [],
+          tagNames: [],
+          categoryNames: []
+        )
+      )
+
+      expectNoDifference(
+        snapshot.instructions,
+        ["Heat the oven.", "Season the chicken.", "Roast until browned."]
+      )
+      expectNoDifference(
+        snapshot.instructionSteps.map(\.text),
+        ["Heat the oven.", "Season the chicken.", "Roast until browned."]
+      )
+    }
   }
 }
