@@ -144,11 +144,10 @@ swift test --package-path YesChefPackage
 # So execution is opt-in via YESCHEF_RUN_APP_TESTS=1, and the block below always
 # prints where app-test execution stands so the gap is never silent again.
 #
-# 14 of the 26 tests currently FAIL when run — they encode expectations that
-# drifted from the code while nothing executed them. That inventory and its
-# open decisions live in docs/efforts/app-target-tests-to-core.md. Do not
-# quietly edit those assertions to match today's behavior; each one is a real
-# question about which side is wrong.
+# 21 of the 26 tests pass when run; 5 issues remain in 3 suites, inventoried in
+# docs/efforts/app-target-tests-to-core.md. Two are missing dependency
+# overrides, two are a live servings-scaling bug, one is an open product
+# question. Do not quietly edit those assertions to match today's behavior.
 # ---------------------------------------------------------------------------
 
 app_test_scheme="YesChef"
@@ -231,8 +230,8 @@ EOF
     cat <<'EOF'
 
 App test target: COMPILED AND LINKED, NOT RUN.
-Set YESCHEF_RUN_APP_TESTS=1 to execute it (boots a simulator; expect 14 of 26
-to fail — see docs/efforts/app-target-tests-to-core.md for the inventory).
+Set YESCHEF_RUN_APP_TESTS=1 to execute it (boots a simulator; expect 21 of 26
+to pass — see docs/efforts/app-target-tests-to-core.md for the 5 that do not).
 
 EOF
   fi

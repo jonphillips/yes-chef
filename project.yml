@@ -130,10 +130,21 @@ targets:
         product: YesChefCore
       - package: LLMClientKit
         product: LLMClientKit
+      # NOT DependenciesTestSupport. Xcode builds every other package product in
+      # this graph as a dynamic framework, but DependenciesTestSupport only ever
+      # builds static ("DependenciesTestSupport-product", never
+      # "…dynamic-product"), so linking it drags a second static copy of the
+      # whole Dependencies target into the test bundle — 401 duplicate symbols,
+      # including a second `DependencyValues.$_current` TaskLocal.
+      #
+      # Task-local identity is the address of the TaskLocal object, so with two
+      # copies loaded, `withDependencies { }` set from the test bundle is
+      # INVISIBLE to app-module code reading the framework's copy. Overrides
+      # silently did nothing and the live dependency ran instead: 11 of the 26
+      # tests failed for that reason alone. Nothing here uses its API — the
+      # `.test` context is detected by Dependencies at runtime without it.
       - package: Dependencies
         product: Dependencies
-      - package: Dependencies
-        product: DependenciesTestSupport
       - package: SQLiteData
         product: SQLiteData
       - package: GRDB

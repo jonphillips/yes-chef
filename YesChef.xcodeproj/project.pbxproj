@@ -62,14 +62,13 @@
 		626E267DA14C0FFA47BE6412 /* WorkbenchCompareAlignmentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B48DD3E004C108C6CC348A /* WorkbenchCompareAlignmentModel.swift */; };
 		627BE832B346246A69355F57 /* SyncHealthModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EA663A481CAE11E140B6830 /* SyncHealthModel.swift */; };
 		638EB65557B6EADDD89B33DD /* WebExtractorKit in Frameworks */ = {isa = PBXBuildFile; productRef = 161A231BCBA04E0D71C67DF2 /* WebExtractorKit */; };
-		64A2147BA244A92AD003A696 /* DependenciesTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 7B5AF2BC1B39A7657BB8B071 /* DependenciesTestSupport */; };
-		6506971951AC784BCA68EFD5 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = 86859006FF66FAFF04016AA2 /* SQLiteData */; };
+		64A2147BA244A92AD003A696 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = 86859006FF66FAFF04016AA2 /* SQLiteData */; };
+		6506971951AC784BCA68EFD5 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 3576C349C92C3F1CA77B4BC5 /* GRDB */; };
 		6588EBC345BB11E65929F52F /* MenuPlaybookColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A1F368F34241CAF035C9CA /* MenuPlaybookColumnView.swift */; };
 		68A79CAF1B3EDB56758F1CC1 /* MealCalendarHandoffSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EEED601CE748216744F3637 /* MealCalendarHandoffSource.swift */; };
 		69B8E2AD921E41D8B38D14C7 /* YesChefShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 396029D84F6F6E49A17C47D2 /* YesChefShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		6B55B2CE20BB6B0E56896F50 /* HandoffReviewCoordinator+PrepPlanEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7765C9B42DCEFA4EAC3ED301 /* HandoffReviewCoordinator+PrepPlanEvidence.swift */; };
 		6BB951B199059B6F99196B26 /* AISettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64ABAAA0A5F20303F4C50314 /* AISettingsView.swift */; };
-		6DA879B39E3EDAD274830CFD /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 3576C349C92C3F1CA77B4BC5 /* GRDB */; };
 		6E4C21A5E580147F1C8A1B94 /* AppExternalDatabaseChangeReload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D2AA2B9A5B2A2F4EFDE5A0C /* AppExternalDatabaseChangeReload.swift */; };
 		6EA932A0C074C0342AFD01E4 /* HandoffComplementReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB8E39BFB7BEB3E6A0DA515 /* HandoffComplementReview.swift */; };
 		70367DA49A5A79CABD32C9C4 /* RecipePhotoViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71BB04447CDD6B75A1CD330A /* RecipePhotoViews.swift */; };
@@ -289,9 +288,8 @@
 				C4D9F1DEA1A0CA728D2578D3 /* YesChefCore in Frameworks */,
 				ECE0E06AEF0B9DCD549F077E /* LLMClientKit in Frameworks */,
 				D20B0260FC41D720A3A8DFAF /* Dependencies in Frameworks */,
-				64A2147BA244A92AD003A696 /* DependenciesTestSupport in Frameworks */,
-				6506971951AC784BCA68EFD5 /* SQLiteData in Frameworks */,
-				6DA879B39E3EDAD274830CFD /* GRDB in Frameworks */,
+				64A2147BA244A92AD003A696 /* SQLiteData in Frameworks */,
+				6506971951AC784BCA68EFD5 /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -514,7 +512,6 @@
 				F8B7EFEDFB9B5499B0B98F9B /* YesChefCore */,
 				2CA1F8E404895981FD32307C /* LLMClientKit */,
 				E526F7B4800D1EBE4D8A2A3E /* Dependencies */,
-				7B5AF2BC1B39A7657BB8B071 /* DependenciesTestSupport */,
 				86859006FF66FAFF04016AA2 /* SQLiteData */,
 				3576C349C92C3F1CA77B4BC5 /* GRDB */,
 			);
@@ -1191,11 +1188,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A9A58BB4AFC674A75EA282BA /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
-		};
-		7B5AF2BC1B39A7657BB8B071 /* DependenciesTestSupport */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A927C2C338F67E8F2C611140 /* XCRemoteSwiftPackageReference "swift-dependencies" */;
-			productName = DependenciesTestSupport;
 		};
 		86859006FF66FAFF04016AA2 /* SQLiteData */ = {
 			isa = XCSwiftPackageProductDependency;
