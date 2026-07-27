@@ -26,6 +26,7 @@ struct AIHandoffMenuPasteTests {
     try withDependencies {
       try $0.bootstrapDatabase()
       $0.date.now = now
+      $0.uuid = .incrementing
     } operation: {
       @Dependency(\.defaultDatabase) var database
       try database.write { db in
@@ -125,7 +126,14 @@ struct AIHandoffMenuPasteTests {
       let remainingSteps = try await database.read { db in
         try PrepPlanStepRepository.steps(for: menuID, in: db).map(PrepPlanStep.init)
       }
-      #expect(remainingSteps == [PrepPlanStep(session: "Saturday", task: "Soak the beans")])
+      // `sourceDish` survives the commit. It is not incidental: `droppedSourceDishEvidence` exists
+      // to warn when the returned plan loses a step's dish link, so preserving it through a
+      // round-trip is the behavior being protected here.
+      #expect(
+        remainingSteps == [
+          PrepPlanStep(session: "Saturday", task: "Soak the beans", sourceDish: dishID)
+        ]
+      )
     }
   }
 }

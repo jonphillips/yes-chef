@@ -18,8 +18,26 @@ struct RecipeYieldScalingTests {
     expectNoDifference(RecipeYieldScaler.scaledText(text, factor: factor), expected)
   }
 
+  /// The number is routinely preceded by a word, and every one of these used to scale to nothing at
+  /// all — silently, while "4–6 servings" worked — because the scaler anchored at the start of the
+  /// string. The recipe's own phrasing is kept; only the number moves.
+  @Test(arguments: [
+    ("Serves 2", 3.0, "Serves 6"),
+    ("Serves 2 to 4", 3.0, "Serves 6–12"),
+    ("Serves 4-6", 0.5, "Serves 2–3"),
+    ("Yield: 6", 0.5, "Yield: 3"),
+    ("Makes 4 dozen cookies", 2.0, "Makes 8 dozen cookies"),
+  ])
+  func scalesYieldQuantityThatFollowsAWord(
+    text: String,
+    factor: Double,
+    expected: String
+  ) {
+    expectNoDifference(RecipeYieldScaler.scaledText(text, factor: factor), expected)
+  }
+
   @Test
-  func leavesYieldWithoutLeadingNumberUnscaled() {
+  func leavesYieldWithNoNumberAtAllUnscaled() {
     expectNoDifference(RecipeYieldScaler.scaledText("Makes plenty", factor: 2), "Makes plenty")
   }
 
