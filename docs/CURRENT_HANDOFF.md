@@ -26,11 +26,11 @@ the architect still reviews at slice resolution. Found in Jon's device pass of P
 [#245](https://github.com/jonphillips/yes-chef/pull/245) on the Samin capture: **the edit sheet showed only
 the first section** of each. **No schema.**
 
-**⚠️ BLOCKED ON JON — do not dispatch until the open question is answered.** Whether the editor's text box
-promotes typed `For the sauce:` headings into sections the way the capture channel does. The recommendation
-is **no** (ADR-0040 D2 — the human edits fields, never the wire format; S2's explicit "Add section" control
-is the honest affordance), with a middle option of promote-on-paste-only. **The dispatch does not settle
-this and must not implement heading promotion without an answer.** See the effort's Open Question.
+**The one open question is closed — Jon settled it 2026-07-27: no heading promotion in the editor.** The
+explicit "Add section" control is the only way to make a section there, per ADR-0040 D2; promote-on-paste was
+considered and declined with it. A typed `For the sauce:` line stays an ingredient line or a step, and a
+pasted multi-section recipe becomes one section — **intended behaviour, not a defect to fix on momentum from
+what the capture channel does.** Nothing gates this dispatch now.
 
 **Four things a dispatch must not miss:**
 

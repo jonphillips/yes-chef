@@ -4,8 +4,10 @@
 [#245](https://github.com/jonphillips/yes-chef/pull/245) (the ADR-0047 capture fallback): *"the turkey
 zucchini recipe came across with sections defined around the sauce and the meatballs, but my edit recipe
 sheet only showed the first section,"* then *"it's strange that the ingredients are sectioned off, but the
-instructions are not … it definitely requires me to think about it."* Dispatch-ready after the one open
-question below is answered. **No schema** — the tables this needs already exist and already sync.
+instructions are not … it definitely requires me to think about it."* **S1 shipped (PR
+[#246](https://github.com/jonphillips/yes-chef/pull/246)); S2 + S3 are dispatch-ready — the one open question
+was closed by Jon 2026-07-27 (see below).** **No schema** — the tables this needs already exist and already
+sync.
 
 **Owner:** Codex (implement) · Claude (architect/review) · Jon (product/device pass).
 
@@ -121,13 +123,18 @@ keeps continuous numbering so that those references match what the cook sees.
   blocks with add / rename / delete, following the ADR-0048 grain rule — *the affordance is a readout of
   storage, and storage here is rows*. Needs the elevated `generic/platform=iOS` build.
 
-## Open question — one, and it needs Jon
+## Settled question — closed by Jon 2026-07-27
 
-**Does the editor's text box promote typed headings to sections, the way capture does?**
+**Does the editor's text box promote typed headings to sections, the way capture does? — No.**
 
-The recommendation is **no**: per ADR-0040 D2 the human edits fields, never the wire format, and a heuristic
-that silently converts a line you typed into a structural section is exactly the hidden-state re-derivation
-that ADR forbids. S2's explicit "Add section" control is the honest affordance. But it is Jon's call, because
-the cost is real — pasting a whole recipe with `For the sauce:` headings into the editor would produce one
-long section, where capture would have produced two, and that inconsistency is *also* confusing. A middle
-option exists: promote on **paste only**, visibly, with the result editable afterward.
+Per ADR-0040 D2 the human edits fields, never the wire format, and a heuristic that silently converts a line
+you typed into a structural section is exactly the hidden-state re-derivation that ADR forbids. **S2's
+explicit "Add section" control is the only way to make a section in the editor.** The promote-on-paste middle
+option was considered and declined with the rest — it is the same heuristic wearing a narrower trigger, and a
+paste that silently restructures is harder to explain than one that doesn't.
+
+**The accepted cost, stated so it is not re-litigated as a bug:** pasting a whole recipe with `For the sauce:`
+headings into the editor produces **one** section, where capture would have produced two. Typing that line
+gives you an ingredient line or a step reading "For the sauce:", exactly as it does today. That asymmetry
+between the two channels is now intended behaviour, not a defect — the editor's answer to "I want a section"
+is the Add section control.
