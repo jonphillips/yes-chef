@@ -1,6 +1,5 @@
 import LLMClientKit
 import SwiftUI
-import WebExtractorKit
 import YesChefCore
 
 struct WorkbenchListView: View {
@@ -181,9 +180,8 @@ struct WorkbenchDetailView: View {
 
     Group {
       if let detail = model.detail {
-        let chatContext = model.chatContext ?? WorkbenchChatContext(detail: detail)
         Group {
-          if isSplitEnabled {
+          if isSplitEnabled, let chatContext = model.chatContext {
             ChatWorkspaceSplit(
               context: .workbench(chatContext),
               detentRaw: $chatWorkspaceDetentRaw,
@@ -215,6 +213,11 @@ struct WorkbenchDetailView: View {
         .navigationTitle(detail.workbench.title)
       } else {
         ContentUnavailableView("Workbench Not Found", systemImage: "hammer")
+      }
+    }
+    .task(id: isSplitEnabled) {
+      if isSplitEnabled {
+        _ = await model.loadChatContext()
       }
     }
     .toolbar {
@@ -269,16 +272,6 @@ struct WorkbenchDetailView: View {
         WorkbenchReferenceEditorView(model: model, editorState: editorState)
       }
     }
-    .fullScreenCover(item: $model.destination.referenceBrowserCapture) { context in
-      WebExtractorBrowser(
-        startURL: context.startURL,
-        title: "Capture Reference",
-        confirmLabel: "Capture to Workbench",
-        onExtract: { html, sourceURL in
-          await model.browserReferenceCaptured(context, html: html, sourceURL: sourceURL)
-        }
-      )
-    }
     .alert("Workbench Error", isPresented: $model.isShowingError) {
       Button("OK") {}
     } message: {
@@ -316,30 +309,6 @@ struct WorkbenchDetailView: View {
           : "This deletes the draft working recipe so you can draft a new one. This can't be undone."
       )
     }
-    .confirmationDialog(
-      "This URL is already reference material",
-      item: $model.duplicateReference,
-      titleVisibility: .visible
-    ) { context in
-      Button("Refresh Existing Reference") {
-        model.confirmDuplicateReferenceButtonTapped(context)
-      }
-      Button("Cancel", role: .cancel) {}
-    } message: { context in
-      Text("Refresh the existing reference with this newly fetched extract? This replaces its durable captured text.")
-    }
-    .confirmationDialog(
-      "Refresh Reference?",
-      item: $model.referenceRefreshConfirmation,
-      titleVisibility: .visible
-    ) { reference in
-      Button("Replace Extract") {
-        model.confirmReferenceRefreshButtonTapped(reference)
-      }
-      Button("Cancel", role: .cancel) {}
-    } message: { context in
-      Text("This replaces the durable (context.captureKind.referenceDisplayName.lowercased()) extract. It may be less complete than the current one.")
-    }
     // Full-screen focus cover on regular-width iPad (no third pane — the chat split owns the detail);
     // a sheet on compact iPhone. Same responsive Compare view either way.
     .fullScreenCover(
@@ -363,9 +332,9 @@ struct WorkbenchDetailView: View {
 
   @ViewBuilder private var compareCover: some View {
     if let detail = model.detail {
-      if isRegularWidth {
+      if isRegularWidth, let chatContext = model.chatContext {
         ChatWorkspaceSplit(
-          context: .workbench(model.chatContext ?? WorkbenchChatContext(detail: detail)),
+          context: .workbench(chatContext),
           detentRaw: $chatWorkspaceDetentRaw,
           activeTierChanged: { compareTier = $0 },
           applyActions: { chatModel in
@@ -383,7 +352,7 @@ struct WorkbenchDetailView: View {
           detail: detail,
           alignmentModel: model.compareAlignmentModel,
           tier: compareTier,
-          compactChatContext: .workbench(model.chatContext ?? WorkbenchChatContext(detail: detail)),
+          compactChatContext: model.chatContext.map { .workbench($0) },
           compactChatActiveTierChanged: { compareTier = $0 },
           compactApplyActions: { chatModel in
             model.applyActionCatalog(for: chatModel)
@@ -398,6 +367,7 @@ struct WorkbenchDetailView: View {
       working: detail.draftRecipeDetail,
       candidates: detail.candidateRows.compactMap(\.recipeDetail)
     )
+    _ = await model.loadChatContext()
     model.compareButtonTapped()
   }
 

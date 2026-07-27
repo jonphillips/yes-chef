@@ -134,7 +134,6 @@ final class WorkbenchDetailModel {
     case chat(RecipeChatModel)
     case logEntryEditor(WorkbenchLogEntryEditorState)
     case referenceEditor(WorkbenchReferenceEditorState)
-    case referenceBrowserCapture(WorkbenchReferenceBrowserCaptureContext)
   }
 
   let workbenchID: Workbench.ID
@@ -152,8 +151,6 @@ final class WorkbenchDetailModel {
   @ObservationIgnored
   @Fetch var detail: WorkbenchDetailData?
   @ObservationIgnored
-  @Fetch var chatContext: WorkbenchChatContext?
-  @ObservationIgnored
   @Fetch var referenceRows: [WorkbenchReferenceListRow] = []
   @ObservationIgnored
   @Fetch(RecipeListRequest(), animation: .default) var recipeRows: [RecipeListRowData] = []
@@ -163,6 +160,9 @@ final class WorkbenchDetailModel {
   var isShowingError = false
   var isConfirmingRemoveWorkingRecipe = false
   var isShowingCompare = false
+  var chatContext: WorkbenchChatContext?
+  var browserReferenceCapture: WorkbenchReferenceBrowserCaptureContext?
+  var browserReferenceCaptureStored = false
   var thinReferenceCapture: WorkbenchThinReferenceCaptureContext?
   var referenceRefreshConfirmation: WorkbenchReferenceReplacementContext?
   var duplicateReference: WorkbenchDuplicateReferenceContext?
@@ -177,11 +177,6 @@ final class WorkbenchDetailModel {
     self.openRecipe = openRecipe
     self.toastCenter = toastCenter
     _detail = Fetch(wrappedValue: nil, WorkbenchDetailRequest(workbenchID: workbenchID), animation: .default)
-    _chatContext = Fetch(
-      wrappedValue: nil,
-      WorkbenchChatContextRequest(workbenchID: workbenchID),
-      animation: .default
-    )
     _referenceRows = Fetch(
       wrappedValue: [],
       WorkbenchReferenceListRequest(workbenchID: workbenchID),
@@ -240,9 +235,25 @@ final class WorkbenchDetailModel {
   }
 
   func chatButtonTapped() {
-    guard let detail else { return }
-    let context = chatContext ?? WorkbenchChatContext(detail: detail)
-    destination = .chat(RecipeChatModel(context: .workbench(context)))
+    Task { [weak self] in
+      guard let self, let context = await loadChatContext() else { return }
+      destination = .chat(RecipeChatModel(context: .workbench(context)))
+    }
+  }
+
+  @discardableResult
+  func loadChatContext() async -> WorkbenchChatContext? {
+    do {
+      let context = try await database.read { db in
+        try WorkbenchChatContextRequest(workbenchID: workbenchID).fetch(db)
+      }
+      chatContext = context
+      return context
+    } catch {
+      errorMessage = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+      isShowingError = true
+      return nil
+    }
   }
 
   func openWorkingRecipeButtonTapped() {

@@ -40,6 +40,19 @@ public struct WorkbenchReference: Codable, Identifiable, Equatable, Sendable {
 public enum WorkbenchReferenceCaptureKind: String, Codable, QueryBindable, QueryDecodable, Sendable {
   case urlFetch
   case browserCapture
+  case pastedText
+
+  public var displayName: String {
+    switch self {
+    case .urlFetch: "URL fetch"
+    case .browserCapture: "Captured content"
+    case .pastedText: "Pasted text"
+    }
+  }
+
+  public var replacementConfirmationMessage: String {
+    "This replaces the durable \(displayName.lowercased()) extract. It may be less complete than the current one."
+  }
 }
 
 public enum WorkbenchReferenceReductionStatus: String, Codable, QueryBindable, QueryDecodable, Sendable {
@@ -50,6 +63,7 @@ public enum WorkbenchReferenceReductionStatus: String, Codable, QueryBindable, Q
 public enum WorkbenchReferenceContentSource: Equatable, Sendable {
   case url(URL)
   case capturedHTML(html: String, sourceURL: URL?)
+  case pastedText(text: String, sourceURL: URL?)
 }
 
 public struct WorkbenchReferenceReducedContent: Equatable, Sendable {
@@ -121,6 +135,11 @@ public enum WorkbenchReferenceCapture {
         throw WorkbenchReferenceCaptureError.noReadableContent
       }
       return content(from: reduced, sourceURL: capturedURL, captureKind: .browserCapture)
+    case let .pastedText(text, sourceURL):
+      guard let reduced = WorkbenchReferenceReadabilityReducer.reduce(html: text) else {
+        throw WorkbenchReferenceCaptureError.noReadableContent
+      }
+      return content(from: reduced, sourceURL: sourceURL, captureKind: .pastedText)
     }
   }
 
@@ -311,6 +330,16 @@ public enum WorkbenchReferenceRepository {
     guard var reference = try WorkbenchReference.find(referenceID).fetchOne(db) else {
       throw WorkbenchReferenceRepositoryError.referenceNotFound(referenceID)
     }
+    if let sourceURL = content.sourceURL,
+       let existing = try existingReference(
+         workbenchID: reference.workbenchID,
+         sourceURL: sourceURL,
+         excluding: referenceID,
+         in: db
+       )
+    {
+      throw WorkbenchReferenceRepositoryError.duplicateSourceURL(existing.id)
+    }
     reference.sourceURL = content.sourceURL ?? reference.sourceURL
     reference.captureKind = content.captureKind
     reference.reducedText = content.reducedText
@@ -379,13 +408,14 @@ public enum WorkbenchReferenceRepository {
   private static func existingReference(
     workbenchID: Workbench.ID,
     sourceURL: String?,
+    excluding excludedReferenceID: WorkbenchReference.ID? = nil,
     in db: Database
   ) throws -> WorkbenchReference? {
     guard let sourceURL else { return nil }
     return try WorkbenchReference
       .where { $0.workbenchID.eq(workbenchID) }
       .fetchAll(db)
-      .filter { $0.sourceURL == sourceURL }
+      .filter { $0.sourceURL == sourceURL && $0.id != excludedReferenceID }
       .sorted(by: areWorkbenchReferencesInIncreasingOrder)
       .first
   }
@@ -421,8 +451,22 @@ private func areWorkbenchReferencesInIncreasingOrder(
   _ lhs: WorkbenchReference,
   _ rhs: WorkbenchReference
 ) -> Bool {
-  if lhs.dateCreated != rhs.dateCreated {
-    return lhs.dateCreated < rhs.dateCreated
+  areWorkbenchReferenceValuesInIncreasingOrder(
+    lhs.dateCreated,
+    lhs.id,
+    rhs.dateCreated,
+    rhs.id
+  )
+}
+
+func areWorkbenchReferenceValuesInIncreasingOrder(
+  _ lhsDateCreated: Date,
+  _ lhsID: WorkbenchReference.ID,
+  _ rhsDateCreated: Date,
+  _ rhsID: WorkbenchReference.ID
+) -> Bool {
+  if lhsDateCreated != rhsDateCreated {
+    return lhsDateCreated < rhsDateCreated
   }
-  return lhs.id.uuidString < rhs.id.uuidString
+  return lhsID.uuidString < rhsID.uuidString
 }

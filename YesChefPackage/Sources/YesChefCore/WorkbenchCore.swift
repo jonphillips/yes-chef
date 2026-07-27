@@ -823,10 +823,12 @@ private func areWorkbenchReferenceRowsInIncreasingOrder(
   _ lhs: WorkbenchReferenceListRow,
   _ rhs: WorkbenchReferenceListRow
 ) -> Bool {
-  if lhs.dateCreated != rhs.dateCreated {
-    return lhs.dateCreated < rhs.dateCreated
-  }
-  return lhs.id.uuidString < rhs.id.uuidString
+  areWorkbenchReferenceValuesInIncreasingOrder(
+    lhs.dateCreated,
+    lhs.id,
+    rhs.dateCreated,
+    rhs.id
+  )
 }
 
 private func areWorkbenchRowsInIncreasingOrder(_ lhs: WorkbenchRowData, _ rhs: WorkbenchRowData) -> Bool {

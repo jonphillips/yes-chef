@@ -38,7 +38,7 @@ public struct WorkbenchChatContext: Equatable, Sendable {
     self.candidates = candidates
   }
 
-  public init(detail: WorkbenchDetailData, references: [WorkbenchReference] = []) {
+  public init(detail: WorkbenchDetailData, references: [WorkbenchReference]) {
     self.init(
       workbenchID: detail.workbench.id,
       title: detail.workbench.title,
@@ -351,6 +351,7 @@ private extension WorkbenchReferenceCaptureKind {
     switch self {
     case .urlFetch: "URL fetch"
     case .browserCapture: "Browser capture"
+    case .pastedText: "Pasted text"
     }
   }
 }

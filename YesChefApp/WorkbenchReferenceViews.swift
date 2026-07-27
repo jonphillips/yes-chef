@@ -1,4 +1,5 @@
 import SwiftUI
+import WebExtractorKit
 import YesChefCore
 
 struct WorkbenchReferenceRow: View {
@@ -16,7 +17,7 @@ struct WorkbenchReferenceRow: View {
               .font(.headline)
               .foregroundStyle(.primary)
             Spacer(minLength: 8)
-            Label(reference.captureKind.referenceDisplayName, systemImage: reference.captureKind.systemImage)
+            Label(reference.captureKind.displayName, systemImage: reference.captureKind.systemImage)
               .font(.caption)
               .foregroundStyle(.secondary)
           }
@@ -116,8 +117,9 @@ struct WorkbenchReferenceEditorView: View {
       ToolbarItem(placement: .confirmationAction) {
         if editorState.referenceID != nil {
           Button("Save Label") {
-            model.saveReferenceLabelButtonTapped(editorState)
-            dismiss()
+            if model.saveReferenceLabelButtonTapped(editorState) {
+              dismiss()
+            }
           }
           .disabled(!hasLabel || isCapturing)
         } else {
@@ -175,6 +177,44 @@ struct WorkbenchReferenceEditorView: View {
     } message: { _ in
       Text("A short extract can be a login wall or teaser. Open the page in Yes Chef’s browser, sign in if needed, then capture the rendered page.")
     }
+    .confirmationDialog(
+      "Refresh Reference?",
+      item: $model.referenceRefreshConfirmation,
+      titleVisibility: .visible
+    ) { context in
+      Button("Replace Extract") {
+        model.confirmReferenceRefreshButtonTapped(context)
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: { context in
+      Text(context.captureKind.replacementConfirmationMessage)
+    }
+    .confirmationDialog(
+      "This URL is already reference material",
+      item: $model.duplicateReference,
+      titleVisibility: .visible
+    ) { context in
+      Button("Refresh Existing Reference") {
+        model.confirmDuplicateReferenceButtonTapped(context)
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: { _ in
+      Text("Refresh the existing reference with this newly fetched extract? This replaces its durable captured text.")
+    }
+    .fullScreenCover(item: $model.browserReferenceCapture, onDismiss: {
+      if model.browserReferenceCaptureDismissed() {
+        dismiss()
+      }
+    }) { context in
+      WebExtractorBrowser(
+        startURL: context.startURL,
+        title: "Capture Reference",
+        confirmLabel: "Capture to Workbench",
+        onExtract: { html, sourceURL in
+          await model.browserReferenceCaptured(context, html: html, sourceURL: sourceURL)
+        }
+      )
+    }
   }
 
   private var hasLabel: Bool {
@@ -190,18 +230,12 @@ struct WorkbenchReferenceEditorView: View {
   }
 }
 
-private extension WorkbenchReferenceCaptureKind {
-  var referenceDisplayName: String {
-    switch self {
-    case .urlFetch: "URL fetch"
-    case .browserCapture: "Captured content"
-    }
-  }
-
+extension WorkbenchReferenceCaptureKind {
   var systemImage: String {
     switch self {
     case .urlFetch: "link"
     case .browserCapture: "safari"
+    case .pastedText: "doc.on.clipboard"
     }
   }
 }

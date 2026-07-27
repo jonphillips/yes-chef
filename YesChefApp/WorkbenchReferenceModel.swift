@@ -11,8 +11,9 @@ extension WorkbenchDetailModel {
     destination = .referenceEditor(WorkbenchReferenceEditorState(reference: reference))
   }
 
-  func saveReferenceLabelButtonTapped(_ editor: WorkbenchReferenceEditorState) {
-    guard let referenceID = editor.referenceID else { return }
+  @discardableResult
+  func saveReferenceLabelButtonTapped(_ editor: WorkbenchReferenceEditorState) -> Bool {
+    guard let referenceID = editor.referenceID else { return false }
     do {
       try database.write { db in
         try WorkbenchReferenceRepository.updateLabel(
@@ -22,10 +23,11 @@ extension WorkbenchDetailModel {
           now: now
         )
       }
-      destination = nil
       toastCenter?.postSuccess("Reference updated.")
+      return true
     } catch {
       showReferenceError(error)
+      return false
     }
   }
 
@@ -40,7 +42,7 @@ extension WorkbenchDetailModel {
   }
 
   func refreshReferenceButtonTapped(_ reference: WorkbenchReferenceListRow) {
-    referenceRefreshConfirmation = WorkbenchReferenceReplacementContext(reference: reference)
+    destination = .referenceEditor(WorkbenchReferenceEditorState(reference: reference))
   }
 
   func confirmReferenceRefreshButtonTapped(_ context: WorkbenchReferenceReplacementContext) {
@@ -51,12 +53,10 @@ extension WorkbenchDetailModel {
       return
     }
     if context.captureKind == .browserCapture {
-      destination = .referenceBrowserCapture(
-        WorkbenchReferenceBrowserCaptureContext(
-          referenceID: context.editor.referenceID,
-          label: context.editor.label,
-          startURL: url
-        )
+      browserReferenceCapture = WorkbenchReferenceBrowserCaptureContext(
+        referenceID: context.editor.referenceID,
+        label: context.editor.label,
+        startURL: url
       )
       return
     }
@@ -88,7 +88,7 @@ extension WorkbenchDetailModel {
         thinReferenceCapture = WorkbenchThinReferenceCaptureContext(editor: editor, content: content)
         return
       }
-      storeReference(content, using: editor)
+      _ = storeReference(content, using: editor)
     } catch is CancellationError {
     } catch {
       showReferenceError(error)
@@ -97,18 +97,16 @@ extension WorkbenchDetailModel {
 
   func useThinReferenceButtonTapped(_ context: WorkbenchThinReferenceCaptureContext) {
     thinReferenceCapture = nil
-    storeReference(context.content, using: context.editor)
+    _ = storeReference(context.content, using: context.editor)
   }
 
   func openBrowserForThinReferenceButtonTapped(_ context: WorkbenchThinReferenceCaptureContext) {
     thinReferenceCapture = nil
     guard let startURL = context.editor.url else { return }
-    destination = .referenceBrowserCapture(
-      WorkbenchReferenceBrowserCaptureContext(
-        referenceID: context.editor.referenceID,
-        label: context.editor.label,
-        startURL: startURL
-      )
+    browserReferenceCapture = WorkbenchReferenceBrowserCaptureContext(
+      referenceID: context.editor.referenceID,
+      label: context.editor.label,
+      startURL: startURL
     )
   }
 
@@ -122,10 +120,10 @@ extension WorkbenchDetailModel {
 
     do {
       let content = try await WorkbenchReferenceCapture.reduce(
-        .capturedHTML(html: trimmedText, sourceURL: editor.url),
+        .pastedText(text: trimmedText, sourceURL: editor.url),
         using: referenceCaptureClient
       )
-      storeReference(content, using: editor)
+      _ = storeReference(content, using: editor)
     } catch is CancellationError {
     } catch {
       showReferenceError(error)
@@ -142,14 +140,24 @@ extension WorkbenchDetailModel {
         .capturedHTML(html: html, sourceURL: sourceURL),
         using: referenceCaptureClient
       )
-      storeReference(content, using: context.editor)
-      destination = nil
+      guard storeReference(content, using: context.editor, dismissEditor: false) else {
+        return .notFound(
+          message: "This URL is already reference material. Close the browser to choose whether to refresh it."
+        )
+      }
+      browserReferenceCaptureStored = true
       return .extracted
     } catch is CancellationError {
       return .notFound(message: "Capture cancelled.")
     } catch {
-      return .notFound(message: String(describing: error))
+      return .notFound(message: (error as? LocalizedError)?.errorDescription ?? "This page could not be captured.")
     }
+  }
+
+  func browserReferenceCaptureDismissed() -> Bool {
+    browserReferenceCapture = nil
+    defer { browserReferenceCaptureStored = false }
+    return browserReferenceCaptureStored
   }
 
   func confirmDuplicateReferenceButtonTapped(_ context: WorkbenchDuplicateReferenceContext) {
@@ -172,8 +180,9 @@ extension WorkbenchDetailModel {
 
   private func storeReference(
     _ content: WorkbenchReferenceReducedContent,
-    using editor: WorkbenchReferenceEditorState
-  ) {
+    using editor: WorkbenchReferenceEditorState,
+    dismissEditor: Bool = true
+  ) -> Bool {
     do {
       try database.write { db in
         if let referenceID = editor.referenceID {
@@ -200,17 +209,21 @@ extension WorkbenchDetailModel {
           )
         }
       }
-      destination = nil
+      if dismissEditor {
+        destination = nil
+      }
       toastCenter?.postSuccess(editor.referenceID == nil ? "Reference added." : "Reference updated.")
+      return true
     } catch let WorkbenchReferenceRepositoryError.duplicateSourceURL(existingReferenceID) {
       duplicateReference = WorkbenchDuplicateReferenceContext(
         existingReferenceID: existingReferenceID,
         label: editor.label,
         content: content
       )
-      destination = nil
+      return false
     } catch {
       showReferenceError(error)
+      return false
     }
   }
 

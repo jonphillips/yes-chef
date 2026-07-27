@@ -109,7 +109,17 @@ extension RecipeCoreTests {
 
         let context = try #require(try WorkbenchChatContextRequest(workbenchID: workbenchID).fetch(db))
         expectNoDifference(context.references.map(\.label), ["First", "Second"])
+        #expect(context.compareHandoffPrompt().contains("First extract."))
+        #expect(context.experimentsHandoffPrompt().contains("Second extract."))
       }
+    }
+
+    @Test
+    func captureKindBuildsTheReplacementConfirmationMessage() {
+      expectNoDifference(
+        WorkbenchReferenceCaptureKind.browserCapture.replacementConfirmationMessage,
+        "This replaces the durable captured content extract. It may be less complete than the current one."
+      )
     }
 
     @Test
@@ -132,6 +142,21 @@ extension RecipeCoreTests {
         reduced.reducedText,
         "Why gelatin matters\n\nSimmer chicken wings gently for a silkier stock."
       )
+    }
+
+    @Test
+    func pastedTextKeepsItsDistinctCaptureKind() async throws {
+      let client = WebRecipeCaptureClient(
+        fetchHTML: { _ in throw WebRecipeCaptureClientError.unimplementedFetch },
+        renderHTML: { _ in nil }
+      )
+
+      let reduced = try await WorkbenchReferenceCapture.reduce(
+        .pastedText(text: Self.referenceHTML, sourceURL: nil),
+        using: client
+      )
+
+      expectNoDifference(reduced.captureKind, .pastedText)
     }
 
     @Test
@@ -383,6 +408,17 @@ extension RecipeCoreTests {
               in: db,
               now: updatedAt,
               uuid: { SampleUUIDSequence.uuid(39_203) }
+            )
+          }
+        )
+        #expect(
+          throws: WorkbenchReferenceRepositoryError.duplicateSourceURL(duplicateID),
+          performing: {
+            try WorkbenchReferenceRepository.refresh(
+              referenceID: referenceID,
+              content: initialContent,
+              in: db,
+              now: updatedAt
             )
           }
         )
