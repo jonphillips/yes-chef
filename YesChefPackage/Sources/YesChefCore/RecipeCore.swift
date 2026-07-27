@@ -284,6 +284,18 @@ public enum RecipeRepository {
       .filter { equipment in recipeEquipment.contains { $0.equipmentID == equipment.id } }
       .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
 
+    let knownInstructionSectionIDs = Set(instructionSections.map(\.id))
+    let orphanSteps = instructionSteps.filter { !knownInstructionSectionIDs.contains($0.sectionID) }
+    if !orphanSteps.isEmpty {
+      let orphanSectionIDs = Set(orphanSteps.map(\.sectionID))
+        .map(\.uuidString)
+        .sorted()
+        .joined(separator: ",")
+      AppLog.dataIntegrity.warning(
+        "instruction-section-orphans recipeID=\(recipe.id.uuidString, privacy: .public) orphanStepCount=\(orphanSteps.count, privacy: .public) unknownSectionIDs=\(orphanSectionIDs, privacy: .public)"
+      )
+    }
+
     return RecipeDetailData(
       recipe: recipe,
       source: source,

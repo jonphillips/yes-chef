@@ -17,13 +17,14 @@ public struct InstructionStepGroup: Identifiable, Equatable, Sendable {
   }
 }
 
-public extension RecipeDetailData {
-  /// Presents instructions in their persisted section order rather than relying on globally unique step orders.
-  /// This projection is total over `instructionSteps`, making `isEmpty` call-site gates safe.
-  var instructionGroups: [InstructionStepGroup] {
-    let stepsBySection = Dictionary(grouping: instructionSteps) { $0.sectionID }
-    let knownSectionIDs = Set(instructionSections.map(\.id))
-    let knownGroups: [InstructionStepGroup] = instructionSections
+public extension InstructionStepGroup {
+  static func groups(
+    sections: [InstructionSection],
+    steps: [InstructionStep]
+  ) -> [InstructionStepGroup] {
+    let stepsBySection = Dictionary(grouping: steps) { $0.sectionID }
+    let knownSectionIDs = Set(sections.map(\.id))
+    let knownGroups: [InstructionStepGroup] = sections
       .sorted { lhs, rhs in
         if lhs.sortOrder != rhs.sortOrder {
           return lhs.sortOrder < rhs.sortOrder
@@ -51,15 +52,15 @@ public extension RecipeDetailData {
       return lhs.group.id.uuidString < rhs.group.id.uuidString
     }
 
-    if !orphanGroups.isEmpty {
-      let orphanStepCount = orphanGroups.reduce(0) { $0 + $1.group.steps.count }
-      let orphanSectionIDs = orphanGroups.map { $0.group.id.uuidString }.joined(separator: ",")
-      AppLog.dataIntegrity.warning(
-        "instruction-section-orphans recipeID=\(recipe.id.uuidString, privacy: .public) orphanStepCount=\(orphanStepCount, privacy: .public) unknownSectionIDs=\(orphanSectionIDs, privacy: .public)"
-      )
-    }
-
     return knownGroups + orphanGroups.map(\.group)
+  }
+}
+
+public extension RecipeDetailData {
+  /// Presents instructions in their persisted section order rather than relying on globally unique step orders.
+  /// This projection is total over `instructionSteps`, making `isEmpty` call-site gates safe.
+  var instructionGroups: [InstructionStepGroup] {
+    InstructionStepGroup.groups(sections: instructionSections, steps: instructionSteps)
   }
 }
 
