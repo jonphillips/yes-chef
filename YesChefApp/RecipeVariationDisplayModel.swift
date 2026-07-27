@@ -60,8 +60,8 @@ extension RecipeDetailModel {
       }
   }
 
-  var instructionSteps: [InstructionStep] {
-    displayDetail?.instructionSteps.sorted { $0.sortOrder < $1.sortOrder } ?? []
+  var instructionGroups: [InstructionStepGroup] {
+    displayDetail?.instructionGroups ?? []
   }
 
   var visibleNotes: [RecipeNote] {
