@@ -1,5 +1,15 @@
 import SwiftUI
 
+enum ChatWorkspaceMetrics {
+  static let balancedMinimumChatWidth: CGFloat = 340
+  static let balancedMaximumChatWidth: CGFloat = 460
+  static let balancedWidthFraction: CGFloat = 0.34
+  static let balancedAvailableWidthLimit: CGFloat = 0.5
+  static let chatDiveMinimumChatWidth: CGFloat = 440
+  static let chatDiveWidthFraction: CGFloat = 0.75
+  static let minimumSegmentedReaderWidth: CGFloat = 240
+}
+
 struct ChatWorkspaceDivider: View {
   static let dividerWidth: CGFloat = 22
 

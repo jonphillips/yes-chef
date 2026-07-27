@@ -3,9 +3,16 @@ import YesChefCore
 
 /// A host's complete contract with the shared chat panel.
 ///
-/// The three structural choices have no defaults. In particular, presentation owns dismissal, so
-/// a host cannot accidentally combine an embedded header with an absent close affordance.
+/// The three structural choices have no defaults. In particular, panel-owned presentations cannot
+/// omit their dismissal choice, while a column is explicitly embedded and host-owned.
 struct ChatSurface {
+  enum DetentIdentity: String, Equatable {
+    /// The existing key deliberately remains Calendar's identity, preserving a cook's current detent.
+    case calendar = "recipeChatWorkspaceDetent"
+    case workbenchDetail = "workbenchDetailChatWorkspaceDetent"
+    case workbenchCompare = "workbenchCompareChatWorkspaceDetent"
+  }
+
   struct Content {
     let applyActions: [AnyChatApplyAction]
     var finalization: ChatFinalizeConfiguration? = nil
@@ -16,25 +23,17 @@ struct ChatSurface {
   enum Sections {
     case none
     case switchable(select: (PlaybookSectionKind) -> Void, active: PlaybookSectionKind?)
-
-    var resolution: ChatSurfaceResolution.Sections {
-      switch self {
-      case .none: .none
-      case .switchable: .switchable
-      }
-    }
   }
 
   enum Presentation {
     case modalSheet(onDismiss: () -> Void)
     case embeddedHeader(onDismiss: () -> Void)
-    case column(detent: ChatSurfaceResolution.DetentIdentity)
+    case column(detent: DetentIdentity)
 
-    var resolution: ChatSurfaceResolution.Presentation {
+    var drawsEmbeddedHeader: Bool {
       switch self {
-      case .modalSheet: .modalSheet
-      case .embeddedHeader: .embeddedHeader
-      case let .column(detent): .column(detent: detent)
+      case .modalSheet: false
+      case .embeddedHeader, .column: true
       }
     }
 
@@ -44,6 +43,35 @@ struct ChatSurface {
       case .column: nil
       }
     }
+
+    var panelOwnsActiveTierPropagation: Bool {
+      switch self {
+      case .column: false
+      case .modalSheet, .embeddedHeader: true
+      }
+    }
+  }
+
+  struct ResolvedContract: Equatable {
+    enum Sections: Equatable {
+      case none
+      case switchable
+    }
+
+    enum Dismissal: Equatable {
+      case hostOwned
+      case panelOwned
+    }
+
+    enum Presentation: Equatable {
+      case modalSheet
+      case embeddedHeader
+      case column(detent: DetentIdentity)
+    }
+
+    let sections: Sections
+    let dismissal: Dismissal
+    let presentation: Presentation
   }
 
   let content: Content
@@ -56,7 +84,98 @@ struct ChatSurface {
     self.presentation = presentation
   }
 
-  var resolution: ChatSurfaceResolution {
-    ChatSurfaceResolution(sections: sections.resolution, presentation: presentation.resolution)
+  static func recipeAskSheet(
+    content: Content,
+    selectSection: @escaping (PlaybookSectionKind) -> Void,
+    activeSection: PlaybookSectionKind?,
+    onDismiss: @escaping () -> Void
+  ) -> Self {
+    Self(
+      content: content,
+      sections: .switchable(select: selectSection, active: activeSection),
+      presentation: .modalSheet(onDismiss: onDismiss)
+    )
+  }
+
+  static func recipeAskInspector(
+    content: Content,
+    selectSection: @escaping (PlaybookSectionKind) -> Void,
+    activeSection: PlaybookSectionKind?,
+    onDismiss: @escaping () -> Void
+  ) -> Self {
+    Self(
+      content: content,
+      sections: .switchable(select: selectSection, active: activeSection),
+      presentation: .embeddedHeader(onDismiss: onDismiss)
+    )
+  }
+
+  static func menuTool(content: Content, onDismiss: @escaping () -> Void) -> Self {
+    Self(content: content, sections: .none, presentation: .embeddedHeader(onDismiss: onDismiss))
+  }
+
+  static func calendarWorkspaceColumn(content: Content) -> Self {
+    column(content: content, detent: .calendar)
+  }
+
+  static func workbenchDetailColumn(content: Content) -> Self {
+    column(content: content, detent: .workbenchDetail)
+  }
+
+  static func workbenchCompareColumn(content: Content) -> Self {
+    column(content: content, detent: .workbenchCompare)
+  }
+
+  static func calendarCompactSheet(content: Content, onDismiss: @escaping () -> Void) -> Self {
+    sheet(content: content, onDismiss: onDismiss)
+  }
+
+  static func calendarDayCompactSheet(content: Content, onDismiss: @escaping () -> Void) -> Self {
+    sheet(content: content, onDismiss: onDismiss)
+  }
+
+  static func workbenchCompactSheet(content: Content, onDismiss: @escaping () -> Void) -> Self {
+    sheet(content: content, onDismiss: onDismiss)
+  }
+
+  static func workbenchCompareCompactSheet(content: Content, onDismiss: @escaping () -> Void) -> Self {
+    sheet(content: content, onDismiss: onDismiss)
+  }
+
+  var resolvedContract: ResolvedContract {
+    let resolvedSections: ResolvedContract.Sections
+    switch sections {
+    case .none: resolvedSections = .none
+    case .switchable: resolvedSections = .switchable
+    }
+
+    switch presentation {
+    case .modalSheet:
+      return ResolvedContract(
+        sections: resolvedSections,
+        dismissal: .panelOwned,
+        presentation: .modalSheet
+      )
+    case .embeddedHeader:
+      return ResolvedContract(
+        sections: resolvedSections,
+        dismissal: .panelOwned,
+        presentation: .embeddedHeader
+      )
+    case let .column(detent):
+      return ResolvedContract(
+        sections: resolvedSections,
+        dismissal: .hostOwned,
+        presentation: .column(detent: detent)
+      )
+    }
+  }
+
+  private static func column(content: Content, detent: DetentIdentity) -> Self {
+    Self(content: content, sections: .none, presentation: .column(detent: detent))
+  }
+
+  private static func sheet(content: Content, onDismiss: @escaping () -> Void) -> Self {
+    Self(content: content, sections: .none, presentation: .modalSheet(onDismiss: onDismiss))
   }
 }

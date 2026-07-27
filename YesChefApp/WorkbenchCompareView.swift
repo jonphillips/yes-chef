@@ -205,13 +205,12 @@ private struct WorkbenchCompareChatSheet: View {
     NavigationStack {
       RecipeChatPanel(
         chatModel: chatModel,
-        surface: ChatSurface(
+        surface: .workbenchCompareCompactSheet(
           content: .init(
             applyActions: applyActions,
             activeTierChanged: activeTierChanged
           ),
-          sections: .none,
-          presentation: .modalSheet(onDismiss: onDismiss)
+          onDismiss: onDismiss
         )
       )
     }

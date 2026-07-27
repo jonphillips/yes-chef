@@ -255,7 +255,7 @@ private struct RecipeAskPresentationModifier: ViewModifier {
         NavigationStack {
           RecipeChatPanel(
             chatModel: chatModel,
-            surface: ChatSurface(
+            surface: .recipeAskSheet(
               content: .init(
                 applyActions: model.applyActionCatalog(for: chatModel),
                 finalization: model.seededAskSection.map {
@@ -263,8 +263,9 @@ private struct RecipeAskPresentationModifier: ViewModifier {
                 },
                 focusesInputOnAppear: model.seededAskSection == nil
               ),
-              sections: .switchable(select: model.askSection, active: model.seededAskSection),
-              presentation: .modalSheet(onDismiss: { model.destination = nil })
+              selectSection: model.askSection,
+              activeSection: model.seededAskSection,
+              onDismiss: { model.destination = nil }
             )
           )
         }
@@ -284,7 +285,7 @@ private struct RecipeAskPresentationModifier: ViewModifier {
   private func askSlideOver(_ chatModel: RecipeChatModel) -> some View {
     RecipeChatPanel(
       chatModel: chatModel,
-      surface: ChatSurface(
+      surface: .recipeAskInspector(
         content: .init(
           applyActions: model.applyActionCatalog(for: chatModel),
           finalization: model.seededAskSection.map {
@@ -292,8 +293,9 @@ private struct RecipeAskPresentationModifier: ViewModifier {
           },
           focusesInputOnAppear: model.seededAskSection == nil
         ),
-        sections: .switchable(select: model.askSection, active: model.seededAskSection),
-        presentation: .embeddedHeader(onDismiss: { model.destination = nil })
+        selectSection: model.askSection,
+        activeSection: model.seededAskSection,
+        onDismiss: { model.destination = nil }
       )
     )
     .inspectorColumnWidth(

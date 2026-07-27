@@ -390,13 +390,12 @@ struct MenuDetailView: View {
     case let .chat(chatModel):
       RecipeChatPanel(
         chatModel: chatModel,
-        surface: ChatSurface(
+        surface: .menuTool(
           content: .init(
             applyActions: detailModel.applyActionCatalog(for: chatModel),
             finalization: .menu(menuID: detailModel.menuID)
           ),
-          sections: .none,
-          presentation: .embeddedHeader(onDismiss: dismissTool)
+          onDismiss: dismissTool
         )
       )
     }

@@ -36,29 +36,34 @@ enum ChatWorkspaceDetent: String, CaseIterable {
 
 struct ChatWorkspaceSplit<Reader: View>: View {
   let context: RecipeChatContext
-  let detentRaw: Binding<String>
-  let detentIdentity: ChatSurfaceResolution.DetentIdentity
+  let detentIdentity: ChatSurface.DetentIdentity
+  let toggleRequest: Int
   let activeTierChanged: (ModelTier) -> Void
   let applyActions: (RecipeChatModel) -> [AnyChatApplyAction]
   let reader: Reader
 
+  @AppStorage private var detentRaw: String
   @State private var chatModel: RecipeChatModel
   @GestureState private var dragTranslation: CGFloat = 0
 
   init(
     context: RecipeChatContext,
-    detentRaw: Binding<String>,
-    detentIdentity: ChatSurfaceResolution.DetentIdentity,
+    detentIdentity: ChatSurface.DetentIdentity,
+    toggleRequest: Int = 0,
     activeTierChanged: @escaping (ModelTier) -> Void = { _ in },
     applyActions: @escaping (RecipeChatModel) -> [AnyChatApplyAction],
     @ViewBuilder reader: () -> Reader
   ) {
     self.context = context
-    self.detentRaw = detentRaw
     self.detentIdentity = detentIdentity
+    self.toggleRequest = toggleRequest
     self.activeTierChanged = activeTierChanged
     self.applyActions = applyActions
     self.reader = reader()
+    _detentRaw = AppStorage(
+      wrappedValue: ChatWorkspaceDetent.balanced.rawValue,
+      detentIdentity.rawValue
+    )
     _chatModel = State(wrappedValue: RecipeChatModel(context: context))
   }
 
@@ -114,25 +119,35 @@ struct ChatWorkspaceSplit<Reader: View>: View {
     .onChange(of: context) { _, context in
       chatModel.updateContext(context)
     }
+    .onAppear {
+      activeTierChanged(chatModel.activeTier)
+    }
+    .onChange(of: chatModel.activeTier) { _, tier in
+      activeTierChanged(tier)
+    }
+    .onChange(of: toggleRequest) { _, _ in
+      currentDetent = currentDetent == .readerOnly ? .balanced : .readerOnly
+    }
   }
 
   private var chatSurface: ChatSurface {
-    ChatSurface(
-      content: .init(
-        applyActions: applyActions(chatModel),
-        activeTierChanged: activeTierChanged
-      ),
-      sections: .none,
-      presentation: .column(detent: detentIdentity)
-    )
+    let content = ChatSurface.Content(applyActions: applyActions(chatModel))
+    switch detentIdentity {
+    case .calendar:
+      return ChatSurface.calendarWorkspaceColumn(content: content)
+    case .workbenchDetail:
+      return ChatSurface.workbenchDetailColumn(content: content)
+    case .workbenchCompare:
+      return ChatSurface.workbenchCompareColumn(content: content)
+    }
   }
 
   private var currentDetent: ChatWorkspaceDetent {
     get {
-      ChatWorkspaceDetent(rawValue: detentRaw.wrappedValue) ?? .balanced
+      ChatWorkspaceDetent(rawValue: detentRaw) ?? .balanced
     }
     nonmutating set {
-      detentRaw.wrappedValue = newValue.rawValue
+      detentRaw = newValue.rawValue
     }
   }
 
@@ -176,18 +191,6 @@ struct ChatWorkspaceSplit<Reader: View>: View {
   private func cycleDetent() {
     currentDetent = currentDetent.next
   }
-}
-
-private enum ChatWorkspaceMetrics {
-  static let balancedMinimumChatWidth: CGFloat = 340
-  static let balancedMaximumChatWidth: CGFloat = 460
-  static let balancedWidthFraction: CGFloat = 0.34
-  static let balancedAvailableWidthLimit: CGFloat = 0.5
-  static let chatDiveMinimumChatWidth: CGFloat = 440
-  // Dogfood batch 4: chat-dive should settle at roughly three quarters of iPad width.
-  static let chatDiveWidthFraction: CGFloat = 0.75
-  // 37.5% of RecipeReaderView's 640pt two-column threshold, preserving a narrow segmented reader.
-  static let minimumSegmentedReaderWidth: CGFloat = 240
 }
 
 struct RecipeChatPanel: View {
@@ -365,10 +368,14 @@ struct RecipeChatPanel: View {
       if surface.content.focusesInputOnAppear {
         isDraftFocused = true
       }
-      surface.content.activeTierChanged(chatModel.activeTier)
+      if surface.presentation.panelOwnsActiveTierPropagation {
+        surface.content.activeTierChanged(chatModel.activeTier)
+      }
     }
     .onChange(of: chatModel.activeTier) { _, tier in
-      surface.content.activeTierChanged(tier)
+      if surface.presentation.panelOwnsActiveTierPropagation {
+        surface.content.activeTierChanged(tier)
+      }
     }
     .toolbar {
       if !showsEmbeddedHeader {
@@ -427,11 +434,7 @@ struct RecipeChatPanel: View {
   }
 
   private var showsEmbeddedHeader: Bool {
-    if case .embeddedHeader = surface.presentation {
-      true
-    } else {
-      false
-    }
+    surface.presentation.drawsEmbeddedHeader
   }
 
   private var selectSection: ((PlaybookSectionKind) -> Void)? {
