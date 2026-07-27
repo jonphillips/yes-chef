@@ -216,8 +216,8 @@ struct RecipeChatPanel: View {
     VStack(spacing: 0) {
       if showsEmbeddedHeader {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
-          if let selectSection {
-            ChatSectionMenu(activeSection: activeSection, select: selectSection)
+          if let selectStarter {
+            ChatSectionMenu(starters: starters, activeStarterID: activeStarterID, select: selectStarter)
           } else {
             Text(chatModel.context.title)
               .font(.headline)
@@ -246,7 +246,7 @@ struct RecipeChatPanel: View {
             if chatModel.messages.isEmpty {
               ChatEmptyState(
                 subject: chatModel.context.subject,
-                hasSectionMenu: selectSection != nil,
+                hasStarters: !starters.isEmpty,
                 needsReplyForApply: applyActionsNeedReply
               )
             } else {
@@ -384,9 +384,9 @@ struct RecipeChatPanel: View {
             Button("Done") { onDismiss() }
           }
         }
-        if let selectSection {
+        if let selectStarter {
           ToolbarItem(placement: .principal) {
-            ChatSectionMenu(activeSection: activeSection, select: selectSection)
+            ChatSectionMenu(starters: starters, activeStarterID: activeStarterID, select: selectStarter)
           }
         }
         ToolbarItem(placement: .topBarTrailing) {
@@ -437,13 +437,18 @@ struct RecipeChatPanel: View {
     surface.presentation.drawsEmbeddedHeader
   }
 
-  private var selectSection: ((PlaybookSectionKind) -> Void)? {
-    guard case let .switchable(select, _) = surface.sections else { return nil }
+  private var starters: [ChatSurface.ChatStarter] {
+    guard case let .starters(starters, _, _) = surface.sections else { return [] }
+    return starters
+  }
+
+  private var selectStarter: ((ChatSurface.ChatStarter.ID) -> Void)? {
+    guard case let .starters(_, _, select) = surface.sections else { return nil }
     return select
   }
 
-  private var activeSection: PlaybookSectionKind? {
-    guard case let .switchable(_, active) = surface.sections else { return nil }
+  private var activeStarterID: ChatSurface.ChatStarter.ID? {
+    guard case let .starters(_, active, _) = surface.sections else { return nil }
     return active
   }
 

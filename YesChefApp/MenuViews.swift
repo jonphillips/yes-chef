@@ -177,8 +177,7 @@ struct MenuDetailView: View {
           handoffTransport: handoffTransport,
           onRecipeSelected: onRecipeSelected,
           isAskActive: isAskActive,
-          askPrepPlan: askPrepPlan,
-          askComplement: presentComplementAsk,
+          askButtonTapped: askButtonTapped,
           regeneratePrepPlan: regeneratePrepPlan
         )
         .navigationTitle(detail.menu.title)
@@ -210,6 +209,9 @@ struct MenuDetailView: View {
     }
     .onChange(of: usesToolOverlay) {
       if !usesToolOverlay {
+        if case .chat? = toolOverlay {
+          detailModel.dismissChat()
+        }
         toolOverlay = nil
       }
     }
@@ -300,62 +302,23 @@ struct MenuDetailView: View {
   }
 
   private var isAskActive: Bool {
-    if case .chat? = toolOverlay ?? compactTool {
-      return true
-    }
-    return false
+    detailModel.chatModel != nil
   }
 
-  private func askPrepPlan() {
-    guard let detail = detailModel.detail else { return }
-    let context = MenuChatContext(detail: detail)
-    let chatModel = chatModel(for: context)
-    Task {
-      switch await chatModel.seedIfCold(context.discussAsk(), summary: "Started Prep Plan discussion.") {
-      case .alreadyWarm:
-        _ = await chatModel.send(context.discussAsk())
-      case .seeded, .failed:
-        break
-      }
-    }
-  }
-
-  private func presentComplementAsk() {
-    guard let detail = detailModel.detail else { return }
-    let context = MenuChatContext(detail: detail)
-    let chatModel = chatModel(for: context)
-    let prompt = AIHandoffToken.discussAsk(
-      context: MenuHandoffContext(detail: detail).complementPrompt(),
-      deliverableFormat: .menuComplement,
-      destination: .onboard
-    )
-    Task {
-      switch await chatModel.seedIfCold(prompt, summary: "Started Complement discussion.") {
-      case .alreadyWarm:
-        _ = await chatModel.send(prompt)
-      case .seeded, .failed:
-        break
-      }
+  private func askButtonTapped() {
+    detailModel.askButtonTapped()
+    if let chatModel = detailModel.chatModel {
+      presentTool(.chat(chatModel))
+    } else {
+      dismissTool()
     }
   }
 
   private func regeneratePrepPlan() {
-    guard let detail = detailModel.detail else { return }
-    let context = MenuChatContext(detail: detail)
-    let chatModel = chatModel(for: context)
-    Task {
-      await chatModel.send(context.discussAsk())
+    detailModel.regeneratePrepPlan()
+    if let chatModel = detailModel.chatModel {
+      presentTool(.chat(chatModel))
     }
-  }
-
-  private func chatModel(for context: MenuChatContext) -> RecipeChatModel {
-    if case let .chat(chatModel)? = toolOverlay ?? compactTool {
-      chatModel.updateContext(.menu(context))
-      return chatModel
-    }
-    let chatModel = RecipeChatModel(context: .menu(context))
-    presentTool(.chat(chatModel))
-    return chatModel
   }
 
   private func recipeBrowserButtonTapped() {
@@ -393,12 +356,21 @@ struct MenuDetailView: View {
         surface: .menuTool(
           content: .init(
             applyActions: detailModel.applyActionCatalog(for: chatModel),
-            finalization: .menu(menuID: detailModel.menuID)
+            finalization: .menu(menuID: detailModel.menuID),
+            focusesInputOnAppear: detailModel.activeChatStarterID == nil
           ),
-          onDismiss: dismissTool
+          starters: detailModel.chatStarters,
+          activeStarterID: detailModel.activeChatStarterID,
+          selectStarter: detailModel.selectChatStarter,
+          onDismiss: dismissChat
         )
       )
     }
+  }
+
+  private func dismissChat() {
+    detailModel.dismissChat()
+    dismissTool()
   }
 }
 

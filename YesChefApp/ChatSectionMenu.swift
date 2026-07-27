@@ -1,27 +1,32 @@
 import SwiftUI
 import YesChefCore
 
-/// The panel's section-picking control. The playbook's Ask opens an unseeded panel; Discuss ▾ then
-/// starts or moves a section-scoped discussion (ADR-0045 Amd 3).
+/// The panel's discussion-starter picker. Hosts decide which prompts they offer; the playbook's
+/// Ask opens an unseeded panel and Discuss ▾ starts or moves a guided discussion (ADR-0045 Amd 3).
 struct ChatSectionMenu: View {
-  let activeSection: PlaybookSectionKind?
-  let select: (PlaybookSectionKind) -> Void
+  let starters: [ChatSurface.ChatStarter]
+  let activeStarterID: ChatSurface.ChatStarter.ID?
+  let select: (ChatSurface.ChatStarter.ID) -> Void
+
+  private var activeStarter: ChatSurface.ChatStarter? {
+    starters.first { $0.id == activeStarterID }
+  }
 
   var body: some View {
     Menu {
-      ForEach(PlaybookSectionKind.allCases) { section in
+      ForEach(starters) { starter in
         Button {
-          select(section)
+          select(starter.id)
         } label: {
-          Text(section.chatMenuTitle)
-          if section == activeSection {
+          Text(starter.title)
+          if starter.id == activeStarterID {
             Image(systemName: "checkmark")
           }
         }
       }
     } label: {
       HStack(spacing: 3) {
-        Text(activeSection?.chatMenuTitle ?? "Discuss")
+        Text(activeStarter?.title ?? "Discuss")
           .font(.headline)
         Image(systemName: "chevron.down")
           .font(.caption2)

@@ -77,12 +77,12 @@ struct ChatContextHeader: View {
 
 struct ChatEmptyState: View {
   let subject: String
-  let hasSectionMenu: Bool
+  let hasStarters: Bool
   let needsReplyForApply: Bool
 
   private var description: Text? {
     let clauses = [
-      hasSectionMenu ? "Or choose a section from Discuss to start a guided discussion." : nil,
+      hasStarters ? "Or choose a discussion starter to begin." : nil,
       needsReplyForApply ? "Apply actions need an assistant reply first." : nil,
     ]
     .compactMap { $0 }

@@ -46,6 +46,7 @@
 		47B32696007AA6735D4B282B /* SharePreprocessor.js in Resources */ = {isa = PBXBuildFile; fileRef = B9CC26315C4C3E333C66F625 /* SharePreprocessor.js */; };
 		5556826F5F47C4461DD123F2 /* MenuDetailChatPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC10A57FB9A55D40CD97546E /* MenuDetailChatPresentation.swift */; };
 		55781455886CF630A357095F /* AppNavigationHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C53BF3A6DACBE4FF07F30717 /* AppNavigationHelpers.swift */; };
+		5646D5F153EB359225213D48 /* MenuDetailModel+Chat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C19798C43815D368E19636A /* MenuDetailModel+Chat.swift */; };
 		5802E0EACFD7C085AB84EB77 /* SwiftUINavigation in Frameworks */ = {isa = PBXBuildFile; productRef = AD2559042536058C97728A19 /* SwiftUINavigation */; };
 		587E4FEB200F87C5D6A066B1 /* BrowserViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6695544EB0BE23557D34BFA5 /* BrowserViews.swift */; };
 		58947ACE0A30F7F3182C5833 /* AISettingsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F3ADFFD14E222AAFF380E6 /* AISettingsModel.swift */; };
@@ -94,6 +95,7 @@
 		AE11AE8D6A7D9F8E06642477 /* GroceryPantryReviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C2EE75870C5C9AAD099505 /* GroceryPantryReviewViews.swift */; };
 		AEEFD13CB08E83C9958ACC8E /* AppDestinationPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10717DBD3251B160509FD4E9 /* AppDestinationPresentation.swift */; };
 		B197F2566EB325113BC5D498 /* ChatWorkspaceDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 471D8E1304E5EF631EB996C3 /* ChatWorkspaceDivider.swift */; };
+		B1A4B0832475BA500093C538 /* ChatSurfaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4802BA56B714BCEF8679A289 /* ChatSurfaceTests.swift */; };
 		B25C46B6E82993FF7971FCE0 /* SettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A4FCB37DBBA09D6123D7989 /* SettingsViews.swift */; };
 		B272D3EEC8E70834165F4E67 /* WorkbenchCandidatePickerViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F811B4BCF619BB9EFC3CFFA /* WorkbenchCandidatePickerViews.swift */; };
 		B46A558486B6A2B676650ABF /* AttentionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18C58B2B2BF5D8C5766C1902 /* AttentionCard.swift */; };
@@ -177,6 +179,7 @@
 		46B48DD3E004C108C6CC348A /* WorkbenchCompareAlignmentModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchCompareAlignmentModel.swift; sourceTree = "<group>"; };
 		46B9BCF538013B597BB0D401 /* RecipeListRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeListRow.swift; sourceTree = "<group>"; };
 		471D8E1304E5EF631EB996C3 /* ChatWorkspaceDivider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatWorkspaceDivider.swift; sourceTree = "<group>"; };
+		4802BA56B714BCEF8679A289 /* ChatSurfaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSurfaceTests.swift; sourceTree = "<group>"; };
 		492BC4D75288EEB6446263F7 /* RecipePlaybookColumnLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipePlaybookColumnLayout.swift; sourceTree = "<group>"; };
 		4A44F5DE22E861C4E705A6BB /* RecipeVariationPromotionPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeVariationPromotionPresentation.swift; sourceTree = "<group>"; };
 		4ADDB4E672F69BB9AD2EB58F /* WorkbenchCompareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchCompareView.swift; sourceTree = "<group>"; };
@@ -225,6 +228,7 @@
 		95B7026C795D2C7ADE1E0837 /* WorkbenchReferenceModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchReferenceModel.swift; sourceTree = "<group>"; };
 		993185593DBEA80FD058C270 /* WorkbenchModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchModels.swift; sourceTree = "<group>"; };
 		9A5AE2D975575189A0B728A1 /* RecipeVariationEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeVariationEditor.swift; sourceTree = "<group>"; };
+		9C19798C43815D368E19636A /* MenuDetailModel+Chat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuDetailModel+Chat.swift"; sourceTree = "<group>"; };
 		9EAAE31879D63DD62F7855F8 /* SeedCoverageModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedCoverageModel.swift; sourceTree = "<group>"; };
 		A09330F46A0E8E28834FD02B /* MenuWideColumnLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuWideColumnLayoutTests.swift; sourceTree = "<group>"; };
 		A809D8DA30A2274B2B0E1982 /* WorkbenchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchViews.swift; sourceTree = "<group>"; };
@@ -320,6 +324,7 @@
 			children = (
 				792C0EBCFF5BA678E266946D /* AIHandoffMenuPasteTests.swift */,
 				842FC32385274C6E7D875B4D /* ChatAssistantSelectionTests.swift */,
+				4802BA56B714BCEF8679A289 /* ChatSurfaceTests.swift */,
 				17E669665E13FA2090694CB0 /* HandoffSectionRoutingTests.swift */,
 				A09330F46A0E8E28834FD02B /* MenuWideColumnLayoutTests.swift */,
 				669BA3E9D8C0F3631F217603 /* OnboardChatFinalizationTests.swift */,
@@ -409,6 +414,7 @@
 				EA3742E4519F6D798F171F80 /* MealCalendarRowHelpers.swift */,
 				76A768628F1345FDF66EDC49 /* MealCalendarViews.swift */,
 				DC10A57FB9A55D40CD97546E /* MenuDetailChatPresentation.swift */,
+				9C19798C43815D368E19636A /* MenuDetailModel+Chat.swift */,
 				A8FDE8F827374CA795E7D125 /* MenuDetailModel+PrepPlanEditing.swift */,
 				754E1448B0A85B0698EFD056 /* MenuDetailSections.swift */,
 				7090DA55279458851517DD5A /* MenuModels.swift */,
@@ -621,6 +627,7 @@
 			files = (
 				E04A28BE098B255C0B136810 /* AIHandoffMenuPasteTests.swift in Sources */,
 				0CC37A24661F09BC79B0D2DD /* ChatAssistantSelectionTests.swift in Sources */,
+				B1A4B0832475BA500093C538 /* ChatSurfaceTests.swift in Sources */,
 				36753CBE212E39908AA91B4E /* HandoffSectionRoutingTests.swift in Sources */,
 				2332533F5D83A3EF69B7F960 /* MenuWideColumnLayoutTests.swift in Sources */,
 				24F9A4FFD871728DA7782411 /* OnboardChatFinalizationTests.swift in Sources */,
@@ -676,6 +683,7 @@
 				0577DC99A3BD2368B5CC7EF8 /* MealCalendarRowHelpers.swift in Sources */,
 				F3F3ED67EB4980A43151000F /* MealCalendarViews.swift in Sources */,
 				5556826F5F47C4461DD123F2 /* MenuDetailChatPresentation.swift in Sources */,
+				5646D5F153EB359225213D48 /* MenuDetailModel+Chat.swift in Sources */,
 				15A3B11099759D157C41626E /* MenuDetailModel+PrepPlanEditing.swift in Sources */,
 				06727A8A1C8BD3973911EE23 /* MenuDetailSections.swift in Sources */,
 				D778483B6523AB97BDE06ED6 /* MenuModels.swift in Sources */,

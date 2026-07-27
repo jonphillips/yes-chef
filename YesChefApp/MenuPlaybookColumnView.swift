@@ -8,8 +8,7 @@ struct MenuDetailReader: View {
   let handoffTransport: HandoffInAppTransport
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var isAskActive: Bool
-  var askPrepPlan: () -> Void
-  var askComplement: () -> Void
+  var askButtonTapped: () -> Void
   var regeneratePrepPlan: () -> Void
 
   @AppStorage(MenuPlaybookColumnPreferences.visibilityStorageKey)
@@ -25,8 +24,7 @@ struct MenuDetailReader: View {
     handoffTransport: HandoffInAppTransport,
     onRecipeSelected: ((RecipeDetailPresentation) -> Void)? = nil,
     isAskActive: Bool,
-    askPrepPlan: @escaping () -> Void,
-    askComplement: @escaping () -> Void,
+    askButtonTapped: @escaping () -> Void,
     regeneratePrepPlan: @escaping () -> Void
   ) {
     self.model = model
@@ -35,8 +33,7 @@ struct MenuDetailReader: View {
     self.handoffTransport = handoffTransport
     self.onRecipeSelected = onRecipeSelected
     self.isAskActive = isAskActive
-    self.askPrepPlan = askPrepPlan
-    self.askComplement = askComplement
+    self.askButtonTapped = askButtonTapped
     self.regeneratePrepPlan = regeneratePrepPlan
   }
 
@@ -215,13 +212,7 @@ struct MenuDetailReader: View {
   private var menuPlaybookHeader: some View {
     HStack(alignment: .top, spacing: 12) {
       Spacer()
-      Menu {
-        Button("Prep Plan", action: askPrepPlan)
-        Button("Complement", action: askComplement)
-        Divider()
-        Button("Regenerate whole plan", action: regeneratePrepPlan)
-          .disabled(detail.prepPlanSteps.isEmpty)
-      } label: {
+      Button(action: askButtonTapped) {
         Label("Ask", systemImage: "sparkles")
       }
       .buttonStyle(.bordered)
@@ -234,6 +225,8 @@ struct MenuDetailReader: View {
         }
       }
       .accessibilityValue(isAskActive ? "Panel open" : "Panel closed")
+      Button("Regenerate whole plan", action: regeneratePrepPlan)
+        .disabled(detail.prepPlanSteps.isEmpty)
     }
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Playbook actions")

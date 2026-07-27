@@ -239,7 +239,7 @@ struct WorkbenchDetailView: View {
             Button {
               model.chatButtonTapped()
             } label: {
-              Label("Chat", systemImage: "sparkles")
+              Label("Ask", systemImage: "sparkles")
             }
           }
         }
