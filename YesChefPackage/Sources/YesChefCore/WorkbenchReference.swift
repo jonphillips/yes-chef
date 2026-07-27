@@ -149,10 +149,9 @@ public enum WorkbenchReferenceReadabilityReducer {
   /// A short raw DOM extract may be a teaser rather than the full reference. URL capture retries rendered DOM
   /// below this threshold, and S3 uses the resulting signal for its browser affordance.
   public static let thinExtractCharacterCount = 1_500
-  /// Keeps the stored TEXT payload at 256 KB, comfortably below CloudKit's roughly 1 MB non-asset record
-  /// ceiling while leaving S2's 160k-character frontier context budget meaningful. This is measured in UTF-8
-  /// bytes so compound Unicode sequences cannot evade the sync safety budget.
-  public static let maximumExtractUTF8ByteCount = 256_000
+  /// Keeps the stored TEXT payload within the frontier handoff budget. This is measured in UTF-8 bytes so
+  /// compound Unicode sequences cannot exceed the character-oriented context budget.
+  public static let maximumExtractUTF8ByteCount = 160_000
   private static let truncationSeparator = "\n\n"
   private static let truncationNotice = "[Reference extract truncated. Open the source for the remaining text.]"
 
@@ -316,6 +315,31 @@ public enum WorkbenchReferenceRepository {
     reference.captureKind = content.captureKind
     reference.reducedText = content.reducedText
     reference.reductionStatus = content.reductionStatus
+    reference.dateModified = now
+    try WorkbenchReference.upsert { reference }.execute(db)
+
+    guard var workbench = try Workbench.find(reference.workbenchID).fetchOne(db) else {
+      throw WorkbenchRepositoryError.workbenchNotFound(reference.workbenchID)
+    }
+    workbench.dateModified = now
+    try Workbench.upsert { workbench }.execute(db)
+  }
+
+  public static func updateLabel(
+    referenceID: WorkbenchReference.ID,
+    label: String,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard let label = label.nonEmptyWorkbenchReferenceText else {
+      throw WorkbenchReferenceRepositoryError.emptyLabel
+    }
+    guard var reference = try WorkbenchReference.find(referenceID).fetchOne(db) else {
+      throw WorkbenchReferenceRepositoryError.referenceNotFound(referenceID)
+    }
+    guard reference.label != label else { return }
+
+    reference.label = label
     reference.dateModified = now
     try WorkbenchReference.upsert { reference }.execute(db)
 

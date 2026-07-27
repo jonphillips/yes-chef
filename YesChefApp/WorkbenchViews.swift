@@ -1,5 +1,6 @@
 import LLMClientKit
 import SwiftUI
+import WebExtractorKit
 import YesChefCore
 
 struct WorkbenchListView: View {
@@ -180,10 +181,11 @@ struct WorkbenchDetailView: View {
 
     Group {
       if let detail = model.detail {
+        let chatContext = model.chatContext ?? WorkbenchChatContext(detail: detail)
         Group {
           if isSplitEnabled {
             ChatWorkspaceSplit(
-              context: .workbench(WorkbenchChatContext(detail: detail)),
+              context: .workbench(chatContext),
               detentRaw: $chatWorkspaceDetentRaw,
               activeTierChanged: { compareTier = $0 },
               applyActions: { chatModel in
@@ -262,6 +264,21 @@ struct WorkbenchDetailView: View {
         WorkbenchLogEntryEditorView(model: model, editorState: editorState)
       }
     }
+    .sheet(item: $model.destination.referenceEditor) { editorState in
+      NavigationStack {
+        WorkbenchReferenceEditorView(model: model, editorState: editorState)
+      }
+    }
+    .fullScreenCover(item: $model.destination.referenceBrowserCapture) { context in
+      WebExtractorBrowser(
+        startURL: context.startURL,
+        title: "Capture Reference",
+        confirmLabel: "Capture to Workbench",
+        onExtract: { html, sourceURL in
+          await model.browserReferenceCaptured(context, html: html, sourceURL: sourceURL)
+        }
+      )
+    }
     .alert("Workbench Error", isPresented: $model.isShowingError) {
       Button("OK") {}
     } message: {
@@ -299,6 +316,30 @@ struct WorkbenchDetailView: View {
           : "This deletes the draft working recipe so you can draft a new one. This can't be undone."
       )
     }
+    .confirmationDialog(
+      "This URL is already reference material",
+      item: $model.duplicateReference,
+      titleVisibility: .visible
+    ) { context in
+      Button("Refresh Existing Reference") {
+        model.confirmDuplicateReferenceButtonTapped(context)
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: { context in
+      Text("Refresh the existing reference with this newly fetched extract? This replaces its durable captured text.")
+    }
+    .confirmationDialog(
+      "Refresh Reference?",
+      item: $model.referenceRefreshConfirmation,
+      titleVisibility: .visible
+    ) { reference in
+      Button("Replace Extract") {
+        model.confirmReferenceRefreshButtonTapped(reference)
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: { context in
+      Text("This replaces the durable (context.captureKind.referenceDisplayName.lowercased()) extract. It may be less complete than the current one.")
+    }
     // Full-screen focus cover on regular-width iPad (no third pane — the chat split owns the detail);
     // a sheet on compact iPhone. Same responsive Compare view either way.
     .fullScreenCover(
@@ -324,7 +365,7 @@ struct WorkbenchDetailView: View {
     if let detail = model.detail {
       if isRegularWidth {
         ChatWorkspaceSplit(
-          context: .workbench(WorkbenchChatContext(detail: detail)),
+          context: .workbench(model.chatContext ?? WorkbenchChatContext(detail: detail)),
           detentRaw: $chatWorkspaceDetentRaw,
           activeTierChanged: { compareTier = $0 },
           applyActions: { chatModel in
@@ -342,7 +383,7 @@ struct WorkbenchDetailView: View {
           detail: detail,
           alignmentModel: model.compareAlignmentModel,
           tier: compareTier,
-          compactChatContext: .workbench(WorkbenchChatContext(detail: detail)),
+          compactChatContext: .workbench(model.chatContext ?? WorkbenchChatContext(detail: detail)),
           compactChatActiveTierChanged: { compareTier = $0 },
           compactApplyActions: { chatModel in
             model.applyActionCatalog(for: chatModel)
@@ -480,6 +521,37 @@ private struct WorkbenchReader: View {
           )
           .buttonStyle(.bordered)
         }
+      }
+
+      Section {
+        if model.referenceRows.isEmpty {
+          ContentUnavailableView("No Reference Material", systemImage: "doc.text.magnifyingglass")
+            .frame(maxWidth: .infinity, minHeight: 150)
+        } else {
+          ForEach(model.referenceRows) { reference in
+            WorkbenchReferenceRow(model: model, reference: reference)
+          }
+          .onDelete { offsets in
+            for offset in offsets {
+              guard model.referenceRows.indices.contains(offset) else { continue }
+              model.deleteReferenceButtonTapped(referenceID: model.referenceRows[offset].id)
+            }
+          }
+        }
+      } header: {
+        HStack {
+          Text("Reference Material")
+          Spacer()
+          Button {
+            model.addReferenceButtonTapped()
+          } label: {
+            Label("Add Reference", systemImage: "plus")
+              .labelStyle(.iconOnly)
+          }
+          .accessibilityLabel(Text("Add reference material"))
+        }
+      } footer: {
+        Text("Reference extracts are untrusted source data for the workbench discussion, never instructions.")
       }
 
       Section {
@@ -920,102 +992,6 @@ private struct WorkbenchCandidateRow: View {
 
   private var sourceDisplayName: String {
     row.recipeDetail?.source?.workbenchDisplayName ?? "No source recorded"
-  }
-}
-
-private struct WorkbenchCandidatePickerView: View {
-  @Environment(\.dismiss) private var dismiss
-  let model: WorkbenchDetailModel
-  @State private var selection: Set<Recipe.ID> = []
-  @State private var searchText = ""
-
-  var body: some View {
-    List(selection: $selection) {
-      ForEach(filteredRecipeRows) { row in
-        RecipeListRow(
-          row: row,
-          options: RecipeListViewOptions(
-            density: .compact,
-            showsSourceMetadata: true,
-            showsCategoryMetadata: false
-          )
-        )
-        .tag(row.recipe.id)
-        .disabled(model.existingCandidateRecipeIDs.contains(row.recipe.id))
-      }
-    }
-    .environment(\.editMode, .constant(.active))
-    .navigationTitle("Add Candidates")
-    .searchable(
-      text: $searchText,
-      placement: .navigationBarDrawer(displayMode: .always),
-      prompt: "Search recipes"
-    )
-    .toolbar {
-      ToolbarItem(placement: .cancellationAction) {
-        Button("Cancel") {
-          dismiss()
-        }
-      }
-      ToolbarItem(placement: .confirmationAction) {
-        Button("Add") {
-          if model.addCandidatesButtonTapped(recipeIDs: selection) {
-            dismiss()
-          }
-        }
-        .disabled(selection.isEmpty)
-      }
-    }
-  }
-
-  private var filteredRecipeRows: [RecipeListRowData] {
-    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !query.isEmpty else { return model.availableRecipeRows }
-    return model.availableRecipeRows.filter { row in
-      RecipeSearchMatcher.matches(query: query, in: row.recipe.title, row.recipe.subtitle)
-    }
-  }
-}
-
-private struct WorkbenchCandidatePhotoPickerView: View {
-  @Environment(\.dismiss) private var dismiss
-  let model: WorkbenchDetailModel
-
-  var body: some View {
-    List(model.candidatePhotoChoices) { choice in
-      Button {
-        model.selectCandidatePhotoButtonTapped(photoID: choice.photo.id)
-      } label: {
-        HStack(spacing: 12) {
-          RecipePhotoImage(
-            photoID: choice.photo.id,
-            checksum: choice.photo.checksum,
-            variant: .thumbnail,
-            thumbnailData: choice.photo.thumbnailData
-          )
-          .frame(width: 72, height: 72)
-          .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-          .clipShape(RoundedRectangle(cornerRadius: 8))
-          VStack(alignment: .leading, spacing: 4) {
-            Text(choice.candidateTitle)
-              .font(.headline)
-            Text("Use this candidate photo")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-          Spacer(minLength: 0)
-        }
-      }
-      .buttonStyle(.plain)
-    }
-    .navigationTitle("Choose Candidate Photo")
-    .toolbar {
-      ToolbarItem(placement: .cancellationAction) {
-        Button("Cancel") {
-          dismiss()
-        }
-      }
-    }
   }
 }
 

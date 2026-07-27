@@ -3,6 +3,7 @@ import Dependencies
 import Foundation
 import Observation
 import SQLiteData
+import WebExtractorKit
 import YesChefCore
 
 @Observable
@@ -132,20 +133,28 @@ final class WorkbenchDetailModel {
     case candidatePhotoPicker
     case chat(RecipeChatModel)
     case logEntryEditor(WorkbenchLogEntryEditorState)
+    case referenceEditor(WorkbenchReferenceEditorState)
+    case referenceBrowserCapture(WorkbenchReferenceBrowserCaptureContext)
   }
 
   let workbenchID: Workbench.ID
   @ObservationIgnored private let openRecipe: (Recipe.ID) -> Void
-  @ObservationIgnored private let toastCenter: AppToastCenter?
+  @ObservationIgnored let toastCenter: AppToastCenter?
 
   @ObservationIgnored
-  @Dependency(\.date.now) private var now
+  @Dependency(\.date.now) var now
   @ObservationIgnored
-  @Dependency(\.defaultDatabase) private var database
+  @Dependency(\.defaultDatabase) var database
   @ObservationIgnored
-  @Dependency(\.uuid) private var uuid
+  @Dependency(\.uuid) var uuid
+  @ObservationIgnored
+  @Dependency(\.webRecipeCaptureClient) var referenceCaptureClient
   @ObservationIgnored
   @Fetch var detail: WorkbenchDetailData?
+  @ObservationIgnored
+  @Fetch var chatContext: WorkbenchChatContext?
+  @ObservationIgnored
+  @Fetch var referenceRows: [WorkbenchReferenceListRow] = []
   @ObservationIgnored
   @Fetch(RecipeListRequest(), animation: .default) var recipeRows: [RecipeListRowData] = []
 
@@ -154,6 +163,9 @@ final class WorkbenchDetailModel {
   var isShowingError = false
   var isConfirmingRemoveWorkingRecipe = false
   var isShowingCompare = false
+  var thinReferenceCapture: WorkbenchThinReferenceCaptureContext?
+  var referenceRefreshConfirmation: WorkbenchReferenceReplacementContext?
+  var duplicateReference: WorkbenchDuplicateReferenceContext?
   let compareAlignmentModel = WorkbenchCompareAlignmentModel()
 
   init(
@@ -165,6 +177,16 @@ final class WorkbenchDetailModel {
     self.openRecipe = openRecipe
     self.toastCenter = toastCenter
     _detail = Fetch(wrappedValue: nil, WorkbenchDetailRequest(workbenchID: workbenchID), animation: .default)
+    _chatContext = Fetch(
+      wrappedValue: nil,
+      WorkbenchChatContextRequest(workbenchID: workbenchID),
+      animation: .default
+    )
+    _referenceRows = Fetch(
+      wrappedValue: [],
+      WorkbenchReferenceListRequest(workbenchID: workbenchID),
+      animation: .default
+    )
   }
 
   var availableRecipeRows: [RecipeListRowData] {
@@ -219,7 +241,8 @@ final class WorkbenchDetailModel {
 
   func chatButtonTapped() {
     guard let detail else { return }
-    destination = .chat(RecipeChatModel(context: .workbench(WorkbenchChatContext(detail: detail))))
+    let context = chatContext ?? WorkbenchChatContext(detail: detail)
+    destination = .chat(RecipeChatModel(context: .workbench(context)))
   }
 
   func openWorkingRecipeButtonTapped() {

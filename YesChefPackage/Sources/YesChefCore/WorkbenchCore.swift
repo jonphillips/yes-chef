@@ -167,21 +167,73 @@ public struct WorkbenchDetailData: Equatable, Sendable {
   public var workbench: Workbench
   public var candidateRows: [WorkbenchCandidateRowData]
   public var logEntries: [WorkbenchLogEntry]
-  public var references: [WorkbenchReference]
   public var draftRecipeDetail: RecipeDetailData?
 
   public init(
     workbench: Workbench,
     candidateRows: [WorkbenchCandidateRowData] = [],
     logEntries: [WorkbenchLogEntry] = [],
-    references: [WorkbenchReference] = [],
     draftRecipeDetail: RecipeDetailData? = nil
   ) {
     self.workbench = workbench
     self.candidateRows = candidateRows
     self.logEntries = logEntries
-    self.references = references
     self.draftRecipeDetail = draftRecipeDetail
+  }
+}
+
+public struct WorkbenchReferenceListRow: Identifiable, Equatable, Sendable {
+  public let id: WorkbenchReference.ID
+  public var sourceURL: String?
+  public var label: String
+  public var captureKind: WorkbenchReferenceCaptureKind
+  public var reductionStatus: WorkbenchReferenceReductionStatus
+  public var dateCreated: Date
+  public var dateModified: Date
+
+  public init(
+    id: WorkbenchReference.ID,
+    sourceURL: String? = nil,
+    label: String,
+    captureKind: WorkbenchReferenceCaptureKind,
+    reductionStatus: WorkbenchReferenceReductionStatus,
+    dateCreated: Date,
+    dateModified: Date
+  ) {
+    self.id = id
+    self.sourceURL = sourceURL
+    self.label = label
+    self.captureKind = captureKind
+    self.reductionStatus = reductionStatus
+    self.dateCreated = dateCreated
+    self.dateModified = dateModified
+  }
+}
+
+public struct WorkbenchReferenceListRequest: FetchKeyRequest {
+  public var workbenchID: Workbench.ID
+
+  public init(workbenchID: Workbench.ID) {
+    self.workbenchID = workbenchID
+  }
+
+  public func fetch(_ db: Database) throws -> [WorkbenchReferenceListRow] {
+    try WorkbenchReference
+      .where { $0.workbenchID.eq(workbenchID) }
+      .select {
+        WorkbenchReferenceListSelection.Columns(
+          id: $0.id,
+          sourceURL: $0.sourceURL,
+          label: $0.label,
+          captureKind: $0.captureKind,
+          reductionStatus: $0.reductionStatus,
+          dateCreated: $0.dateCreated,
+          dateModified: $0.dateModified
+        )
+      }
+      .fetchAll(db)
+      .map(WorkbenchReferenceListRow.init(selection:))
+      .sorted(by: areWorkbenchReferenceRowsInIncreasingOrder)
   }
 }
 
@@ -312,15 +364,26 @@ public struct WorkbenchDetailRequest: FetchKeyRequest {
       .where { $0.workbenchID.eq(workbenchID) }
       .fetchAll(db)
       .sorted(by: areWorkbenchLogEntriesInIncreasingOrder)
-    let references = try WorkbenchReferenceRepository.references(for: workbenchID, in: db)
-
     return WorkbenchDetailData(
       workbench: workbench,
       candidateRows: candidateRows,
-      logEntries: logEntries,
-      references: references
+      logEntries: logEntries
     )
       .withDraftRecipeDetail(try workbench.draftRecipeID.flatMap { try RecipeRepository.fetchDetail(recipeID: $0, in: db) })
+  }
+}
+
+public struct WorkbenchChatContextRequest: FetchKeyRequest {
+  public var workbenchID: Workbench.ID
+
+  public init(workbenchID: Workbench.ID) {
+    self.workbenchID = workbenchID
+  }
+
+  public func fetch(_ db: Database) throws -> WorkbenchChatContext? {
+    guard let detail = try WorkbenchDetailRequest(workbenchID: workbenchID).fetch(db) else { return nil }
+    let references = try WorkbenchReferenceRepository.references(for: workbenchID, in: db)
+    return WorkbenchChatContext(detail: detail, references: references)
   }
 }
 
@@ -726,10 +789,44 @@ private extension WorkbenchDetailData {
       workbench: workbench,
       candidateRows: candidateRows,
       logEntries: logEntries,
-      references: references,
       draftRecipeDetail: draftRecipeDetail
     )
   }
+}
+
+@Selection
+private struct WorkbenchReferenceListSelection: Equatable, Sendable {
+  let id: WorkbenchReference.ID
+  let sourceURL: String?
+  let label: String
+  let captureKind: WorkbenchReferenceCaptureKind
+  let reductionStatus: WorkbenchReferenceReductionStatus
+  let dateCreated: Date
+  let dateModified: Date
+}
+
+private extension WorkbenchReferenceListRow {
+  init(selection: WorkbenchReferenceListSelection) {
+    self.init(
+      id: selection.id,
+      sourceURL: selection.sourceURL,
+      label: selection.label,
+      captureKind: selection.captureKind,
+      reductionStatus: selection.reductionStatus,
+      dateCreated: selection.dateCreated,
+      dateModified: selection.dateModified
+    )
+  }
+}
+
+private func areWorkbenchReferenceRowsInIncreasingOrder(
+  _ lhs: WorkbenchReferenceListRow,
+  _ rhs: WorkbenchReferenceListRow
+) -> Bool {
+  if lhs.dateCreated != rhs.dateCreated {
+    return lhs.dateCreated < rhs.dateCreated
+  }
+  return lhs.id.uuidString < rhs.id.uuidString
 }
 
 private func areWorkbenchRowsInIncreasingOrder(_ lhs: WorkbenchRowData, _ rhs: WorkbenchRowData) -> Bool {

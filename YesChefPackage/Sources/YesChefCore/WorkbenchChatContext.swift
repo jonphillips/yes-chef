@@ -38,14 +38,14 @@ public struct WorkbenchChatContext: Equatable, Sendable {
     self.candidates = candidates
   }
 
-  public init(detail: WorkbenchDetailData) {
+  public init(detail: WorkbenchDetailData, references: [WorkbenchReference] = []) {
     self.init(
       workbenchID: detail.workbench.id,
       title: detail.workbench.title,
       notes: detail.workbench.notes,
       draftRecipe: detail.draftRecipeDetail.map(RecipeChatRecipeContext.init(detail:)),
       logEntries: detail.logEntries.map(WorkbenchLogEntryChatContext.init(entry:)),
-      references: detail.references.map(WorkbenchReferenceChatContext.init(reference:)),
+      references: references.map(WorkbenchReferenceChatContext.init(reference:)),
       candidates: detail.candidateRows.map(WorkbenchCandidateChatContext.init(row:))
     )
   }
