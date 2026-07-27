@@ -15,35 +15,37 @@ live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** re
 
 ## Next Up
 
-**ONE live dispatch target: [`efforts/capture-llm-fallback-2026-07-26.md`](efforts/capture-llm-fallback-2026-07-26.md)
-— an LLM capture fallback for pages with no machine contract.**
-Dispatch with *"Do the **capture LLM fallback** effort in `docs/CURRENT_HANDOFF.md`."* If this section is
-empty or missing, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
+**ONE live dispatch target: [`efforts/recipe-editor-section-grain.md`](efforts/recipe-editor-section-grain.md)
+— recipe sections are stored, read, and edited at three different grains.**
+Dispatch with *"Do the **recipe section grain** effort in `docs/CURRENT_HANDOFF.md`."* If this section
+is empty or missing, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-Design ratified in [ADR-0047](decisions/ADR-0047-llm-capture-fallback.md); all five OQs closed. One
-dispatch — S1a–S1c in one PR, then S2. **Core-heavy, no schema.** Capture has contained **zero model calls**
-since ADR-0007; Substack (and the whole no-markup category) ships no JSON-LD/microdata/hRecipe, so three
-extractors miss outright. **Capture pills are rejected, not deferred** — `RecipeCaptureView` is already the
-correction surface.
+Both halves found in Jon's device pass of PR [#245](https://github.com/jonphillips/yes-chef/pull/245) on the
+Samin capture: **the edit sheet showed only the first section** of each, and **instructions display with no
+sections at all** while ingredients display grouped. Three slices, **no schema** — S1 read-side instruction
+grouping, S2 Core editor draft, S3 editor UI. **Dispatch S1 alone first.**
 
-**Already scoped — do not re-scope it.** Four things a dispatch must not miss:
+**Four things a dispatch must not miss:**
 
-1. **The gate is the warnings the parser already computes** (`.noIngredients` / `.noInstructions` /
-   `.noStructuredRecipeData`) — contract-bearing pages never reach the model.
-2. **⚠️ The model's input is a structure-preserving serialization, NEVER `bodyText`.** `cleanedBodyText` is
-   `.text()`-flattened; on a no-contract page the `<ul>`/`<ol>`/`<h#>` structure *is* the recipe boundary.
-   Reusing `bodyText` because it sits there uncapped fails a dogfood round while looking like a
-   model-quality problem.
-3. **The gate cannot live in `WebRecipePageParser.parse`** (pure and synchronous) **and cannot be appended
-   to `capture(url:)` either** — `browserCapture` is **synchronous** and is the exact path that failed on
-   Substack. The answer is a separate `escalate(draft:)` the app calls after any capture path; the share
-   extension satisfies "never escalates" by never calling it.
-4. Provenance is a **priority rung** below `chromePriority`, so a deterministic source always wins by
-   arithmetic.
+1. **Nothing is lost and nothing is corrupt** — `mergedSections` / `mergedIngredientLines` replace only the
+   edited section, and import assigns instruction steps a **global** running `sortOrder` so document order
+   is intact. This is "you cannot edit or see most of your recipe," not "editing eats your recipe." Do not
+   open it as a data-loss fix.
+2. **S1 is a correctness fix wearing a display fix's clothes.** The flat instruction list depends on step
+   `sortOrder` being globally unique, and an editor save renumbers one section from 0 — ties, then unstable
+   order. Grouping by section and sorting `(section.sortOrder, step.sortOrder)` retires that dependency.
+   **Ship S1 before S2** so the editor work cannot trip it.
+3. **Deletion is the new behaviour in S2.** The save path only ever merges, so removing a section is the one
+   case with no existing expression — that is where the tests should be hardest.
+4. **⚠️ One open question is Jon's and is NOT the dispatch's to settle** — whether the editor's text box
+   promotes typed `For the sauce:` headings into sections the way the capture channel does. The
+   recommendation is no (ADR-0040 D2). **Do not implement heading promotion in the editor without an
+   answer.**
 
-**Verification.** S1a/S1b are package tests where `scripts/check-drift.sh` actually runs. S1c and S2 touch
-`YesChefApp/` and therefore need the elevated `generic/platform=iOS` build as required evidence. No
-simulator installs; Jon device-passes on the Substack page.
+**Verification.** S1/S2 are package tests where `scripts/check-drift.sh` actually runs (put the grouping rule
+in Core, not the app display model). S1 and S3 touch `YesChefApp/` and need the elevated
+`generic/platform=iOS` build as required evidence. No simulator installs; Jon device-passes on the captured
+Samin recipe — a single-section recipe looking unchanged is the canary.
 
 ## Architect track (parallel — NOT a Codex dispatch)
 

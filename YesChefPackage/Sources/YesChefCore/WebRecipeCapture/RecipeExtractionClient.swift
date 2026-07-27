@@ -37,31 +37,28 @@ extension RecipeExtractionClient: DependencyKey {
   public static var liveValue: Self {
     Self { structuredPageText in
       @Dependency(\.modelClient) var modelClient
+      @Dependency(\.apiKeyStore) var apiKeyStore
       @Dependency(\.recipeChatProviderPreference) var providerPreference
       @Dependency(\.recipeChatTierPreference) var tierPreference
 
-      let useFrontier = tierPreference.current()
-      let tier: ModelTier
-      let tierResolution: ModelCallTierResolution
-      switch useFrontier {
-      case false:
-        tier = .onDevice
-        tierResolution = .userSelectedTier
-      case true:
-        tier = providerPreference.current().map(ModelTier.frontier) ?? .frontierPreferred
-        tierResolution = .userSelectedTier
-      case nil:
-        // A capture is low-volume and user initiated, so it prefers the strongest
-        // configured model. The tiered boundary still degrades to on-device when
-        // no frontier key exists; no provider is hardcoded at this call site.
-        tier = .frontierPreferred
-        tierResolution = .configuredPreferences
-      }
+      // A capture is low-volume and user initiated, so it prefers the strongest
+      // configured model (ADR-0047 OQ1). Tier policy has one home: routing this
+      // through `resolveTier` is what keeps a key-less frontier preference an
+      // honest `.degradedToOnDevice` record rather than a call that claims the
+      // cook chose a provider they no longer have a key for. `.onDeviceCompatible`
+      // because extraction degrades rather than fails when no key exists.
+      let availableProviders = FrontierProvider.allCases.filter { apiKeyStore.key($0) != nil }
+      let resolvedTier = try resolveTier(
+        useFrontier: tierPreference.current(),
+        preferredProvider: providerPreference.current(),
+        availableProviders: availableProviders,
+        requirement: .onDeviceCompatible
+      )
 
       let response = try await call(
         structuredPageText: structuredPageText,
-        tier: tier,
-        tierResolution: tierResolution
+        tier: resolvedTier.tier,
+        tierResolution: resolvedTier.resolution
       )
       .complete(using: modelClient)
       guard !response.wasTruncated else { throw RecipeExtractionError.responseTruncated }
@@ -225,6 +222,24 @@ public struct RecipeExtraction: Codable, Equatable, Sendable {
       guard !steps.isEmpty else { return nil }
       return InstructionSection(name: section.name?.nonEmpty, steps: steps)
     }
+    return copy
+  }
+
+  /// Drops a whole half the deterministic ladder already produced (ADR-0047 D6/OQ3).
+  ///
+  /// Scalars are protected by `RecipeAttributeVotes`, where `modelPriority` loses to
+  /// every deterministic source by arithmetic. The ingredient and instruction lists
+  /// have **no** vote ladder — `RecipeParseBuilder` appends them — so without this the
+  /// model's copy of an already-extracted half lands *alongside* the deterministic one
+  /// and the review form shows the recipe twice. Byte-identical lines dedupe on their
+  /// own; the merge cannot rely on the model rewording nothing.
+  ///
+  /// Suppression is per half, not per section: the gate fires on a missing half, so a
+  /// half that exists is the deterministic ladder's outright win.
+  func suppressingHalvesAlreadyExtracted(in page: ParsedRecipePage) -> Self {
+    var copy = self
+    if !page.warnings.contains(.noIngredients) { copy.ingredientSections = [] }
+    if !page.warnings.contains(.noInstructions) { copy.instructionSections = [] }
     return copy
   }
 

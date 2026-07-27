@@ -2,6 +2,7 @@ import CustomDump
 import Dependencies
 import Foundation
 import LLMClientKit
+import Synchronization
 import Testing
 @testable import YesChefCore
 
@@ -34,7 +35,10 @@ extension RecipeCoreTests {
         capturedAt: .init(timeIntervalSinceReferenceDate: 900_000_000)
       )
 
+      let callRecords = ModelCallRecordCollector()
       let (escalated, rerun) = try await withDependencies {
+        $0.apiKeyStore = recipeExtractionAPIKeyStore([.anthropic: "sk-anthropic"])
+        $0.modelCallRecordSink = .inMemory(callRecords)
         $0.modelClient = StubModelClient { request in
           await recorder.append(request)
           return ModelResponse(text: Self.saminExtractionJSON)
@@ -60,11 +64,43 @@ extension RecipeCoreTests {
 
       let request = await recorder.first()
       let requestCount = await recorder.count
-      expectNoDifference(request?.tier, .frontierPreferred)
+      expectNoDifference(request?.tier, .frontier(.anthropic))
       expectNoDifference(request?.reasoningEffort, .high)
       expectNoDifference(request?.maxTokens, RecipeExtractionClient.maxTokens)
       #expect(request?.messages.first?.text.contains("## For the Sour Cream & Sumac Sauce") == true)
       expectNoDifference(requestCount, 2)
+
+      let recordedCall = await callRecords.records().first
+      expectNoDifference(recordedCall?.surface, .capture)
+      expectNoDifference(recordedCall?.task, .recipeExtraction)
+      expectNoDifference(recordedCall?.tierResolution, .configuredPreferences)
+      expectNoDifference(recordedCall?.contextLayers, ModelCallContextLayers(included: [.structuredPageText]))
+    }
+
+    @Test
+    func aFrontierPreferenceWithNoKeyDegradesOnDeviceAndSaysSo() async throws {
+      let callRecords = ModelCallRecordCollector()
+      let client = captureClient()
+      let draft = client.browserCapture(
+        html: try Fixture.saminMeatballs(),
+        sourceURL: nil,
+        capturedAt: .init(timeIntervalSinceReferenceDate: 900_200_000)
+      )
+
+      let escalated = try await withDependencies {
+        $0.apiKeyStore = recipeExtractionAPIKeyStore([:])
+        $0.recipeChatTierPreference = RecipeChatTierPreference(current: { true }, set: { _ in })
+        $0.modelCallRecordSink = .inMemory(callRecords)
+        $0.modelClient = StubModelClient { _ in ModelResponse(text: Self.saminExtractionJSON) }
+        $0.recipeExtractionClient = .liveValue
+      } operation: {
+        try await client.escalate(draft: draft)
+      }
+
+      #expect(!escalated.page.ingredientSections.isEmpty)
+      let recordedCall = await callRecords.records().first
+      expectNoDifference(recordedCall?.tier, .onDevice)
+      expectNoDifference(recordedCall?.tierResolution, .degradedToOnDevice)
     }
 
     @Test
@@ -85,6 +121,10 @@ extension RecipeCoreTests {
       expectNoDifference(escalated, draft)
     }
 
+    /// The model is deliberately given *reworded* ingredients here. Byte-identical
+    /// lines dedupe on their own, so a fixture that echoes the deterministic wording
+    /// cannot tell suppression from luck — and the merge must not depend on the model
+    /// rewording nothing.
     @Test
     func deterministicIngredientsSurviveAModelInstructionMerge() async throws {
       let client = captureClient()
@@ -100,7 +140,7 @@ extension RecipeCoreTests {
         $0.recipeExtractionClient = RecipeExtractionClient { _ in
           RecipeExtraction(
             title: "Model Beans",
-            ingredientSections: [.init(name: "Beans", lines: ["1 pound dried beans", "Water"])],
+            ingredientSections: [.init(name: "Beans", lines: ["1 lb dried beans", "Water, for soaking"])],
             instructionSections: [.init(name: "Cook", steps: ["Soak the beans.", "Simmer until tender."])]
           )
         }
@@ -109,9 +149,42 @@ extension RecipeCoreTests {
       }
 
       expectNoDifference(escalated.page.title, "Partial Beans")
-      expectNoDifference(escalated.page.ingredientSections.flatMap(\.lines), ["1 pound dried beans", "Water"])
+      expectNoDifference(escalated.page.ingredientSections, [.init(name: nil, lines: ["1 pound dried beans", "Water"])])
+      expectNoDifference(escalated.page.modelExtractedIngredientSections, [])
       expectNoDifference(escalated.page.instructionSections, [
         .init(name: "Cook", steps: ["Soak the beans.", "Simmer until tender."]),
+      ])
+      expectNoDifference(escalated.page.modelExtractedInstructionSections, escalated.page.instructionSections)
+    }
+
+    @Test
+    func deterministicInstructionsSurviveAModelIngredientMerge() async throws {
+      let client = captureClient()
+      let html = """
+        <article itemscope itemtype="https://schema.org/Recipe">
+          <h1 itemprop="name">Partial Broth</h1>
+          <ol><li itemprop="recipeInstructions">Simmer the bones for six hours.</li></ol>
+        </article>
+        """
+      let draft = client.browserCapture(html: html, sourceURL: nil, capturedAt: .init(timeIntervalSinceReferenceDate: 900_300_000))
+
+      let escalated = try await withDependencies {
+        $0.recipeExtractionClient = RecipeExtractionClient { _ in
+          RecipeExtraction(
+            ingredientSections: [.init(name: "Broth", lines: ["2 pounds beef bones", "1 onion"])],
+            instructionSections: [.init(name: "Simmer", steps: ["Simmer bones for 6 hours."])]
+          )
+        }
+      } operation: {
+        try await client.escalate(draft: draft)
+      }
+
+      expectNoDifference(escalated.page.instructionSections, [
+        .init(name: nil, steps: ["Simmer the bones for six hours."]),
+      ])
+      expectNoDifference(escalated.page.modelExtractedInstructionSections, [])
+      expectNoDifference(escalated.page.ingredientSections, [
+        .init(name: "Broth", lines: ["2 pounds beef bones", "1 onion"]),
       ])
     }
 
@@ -156,6 +229,14 @@ extension RecipeCoreTests {
       WebRecipeCaptureClient(fetchHTML: { _ in "" }, renderHTML: { _ in nil })
     }
   }
+}
+
+private func recipeExtractionAPIKeyStore(_ keys: [FrontierProvider: String]) -> APIKeyStore {
+  let storage = Mutex(keys)
+  return APIKeyStore(
+    read: { provider in storage.withLock { $0[provider] } },
+    write: { provider, key in storage.withLock { $0[provider] = key } }
+  )
 }
 
 private actor RecipeExtractionRequestRecorder {

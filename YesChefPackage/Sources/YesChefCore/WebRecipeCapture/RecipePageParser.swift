@@ -39,7 +39,8 @@ public enum WebRecipePageParser {
 
     extractDeterministicRecipeData(from: document, into: &builder)
     let deterministicPage = builder.build(capturedAt: page.capturedAt)
-    extraction.apply(to: &builder)
+    let contribution = extraction.suppressingHalvesAlreadyExtracted(in: deterministicPage)
+    contribution.apply(to: &builder)
     var mergedPage = builder.build(capturedAt: page.capturedAt)
     if let cleaned = cleanedBodyText(from: document) {
       mergedPage.bodyText = cleaned
@@ -47,12 +48,8 @@ public enum WebRecipePageParser {
     }
     mergedPage.processedImages = page.processedImages
     mergedPage.readerFeedbackBlocks = page.readerFeedbackBlocks
-    mergedPage.modelExtractedIngredientSections = extraction.parsedIngredientSections.filter {
-      !deterministicPage.ingredientSections.contains($0)
-    }
-    mergedPage.modelExtractedInstructionSections = extraction.parsedInstructionSections.filter {
-      !deterministicPage.instructionSections.contains($0)
-    }
+    mergedPage.modelExtractedIngredientSections = contribution.parsedIngredientSections
+    mergedPage.modelExtractedInstructionSections = contribution.parsedInstructionSections
     return mergedPage
   }
 

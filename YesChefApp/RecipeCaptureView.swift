@@ -58,10 +58,12 @@ struct RecipeCaptureView: View {
           .disabled(!model.canFetch)
         }
       } footer: {
-        if model.isFetching {
-          ProgressView("Fetching recipe page")
-        } else if model.isExtracting {
+        // Extraction runs inside the fetch, so the narrower state reports first —
+        // otherwise the model call, the slowest step here, hides behind "Fetching".
+        if model.isExtracting {
           ProgressView("Extracting recipe from page")
+        } else if model.isFetching {
+          ProgressView("Fetching recipe page")
         }
       }
 
