@@ -103,8 +103,64 @@ extension RecipeCoreTests {
         }
         .execute(db)
 
-        let detail = try #require(try WorkbenchDetailRequest(workbenchID: workbenchID).fetch(db))
-        expectNoDifference(detail.references.map(\.id), [firstReferenceID, secondReferenceID])
+        let rows = try WorkbenchReferenceListRequest(workbenchID: workbenchID).fetch(db)
+        expectNoDifference(rows.map(\.id), [firstReferenceID, secondReferenceID])
+        expectNoDifference(rows.map(\.label), ["First", "Second"])
+
+        let context = try #require(try WorkbenchChatContextRequest(workbenchID: workbenchID).fetch(db))
+        expectNoDifference(context.references.map(\.label), ["First", "Second"])
+        #expect(context.compareHandoffPrompt().contains("First extract."))
+        #expect(context.experimentsHandoffPrompt().contains("Second extract."))
+      }
+    }
+
+    @Test
+    func captureKindBuildsTheReplacementConfirmationMessage() {
+      expectNoDifference(
+        WorkbenchReferenceCaptureKind.browserCapture.replacementConfirmationMessage,
+        "This replaces the durable captured content extract. It may be less complete than the current one."
+      )
+    }
+
+    @Test
+    func chatContextRequestReloadsReferenceMaterialAfterAWrite() async throws {
+      @Dependency(\.defaultDatabase) var database
+      let createdAt = Date(timeIntervalSinceReferenceDate: 842_075_000)
+      let workbenchID = SampleUUIDSequence.uuid(39_075)
+      let referenceID = SampleUUIDSequence.uuid(39_076)
+
+      try await database.write { db in
+        try Workbench.insert {
+          Workbench(
+            id: workbenchID,
+            title: "Live context",
+            sortOrder: 0,
+            dateCreated: createdAt,
+            dateModified: createdAt
+          )
+        }
+        .execute(db)
+        let initialContext = try #require(try WorkbenchChatContextRequest(workbenchID: workbenchID).fetch(db))
+        expectNoDifference(initialContext.references, [])
+
+        _ = try WorkbenchReferenceRepository.store(
+          workbenchID: workbenchID,
+          label: "Fresh technique",
+          content: WorkbenchReferenceReducedContent(
+            sourceURL: "https://example.com/live-context",
+            captureKind: .urlFetch,
+            reducedText: "New reference material.",
+            reductionStatus: .complete,
+            isThin: true
+          ),
+          in: db,
+          now: createdAt.addingTimeInterval(1),
+          uuid: { referenceID }
+        )
+
+        let reloadedContext = try #require(try WorkbenchChatContextRequest(workbenchID: workbenchID).fetch(db))
+        expectNoDifference(reloadedContext.references.map(\.label), ["Fresh technique"])
+        #expect(reloadedContext.serialized(for: .frontierPreferred).contains("New reference material."))
       }
     }
 
@@ -128,6 +184,21 @@ extension RecipeCoreTests {
         reduced.reducedText,
         "Why gelatin matters\n\nSimmer chicken wings gently for a silkier stock."
       )
+    }
+
+    @Test
+    func pastedTextKeepsItsDistinctCaptureKind() async throws {
+      let client = WebRecipeCaptureClient(
+        fetchHTML: { _ in throw WebRecipeCaptureClientError.unimplementedFetch },
+        renderHTML: { _ in nil }
+      )
+
+      let reduced = try await WorkbenchReferenceCapture.reduce(
+        .pastedText(text: Self.referenceHTML, sourceURL: nil),
+        using: client
+      )
+
+      expectNoDifference(reduced.captureKind, .pastedText)
     }
 
     @Test
@@ -382,6 +453,17 @@ extension RecipeCoreTests {
             )
           }
         )
+        #expect(
+          throws: WorkbenchReferenceRepositoryError.duplicateSourceURL(duplicateID),
+          performing: {
+            try WorkbenchReferenceRepository.refresh(
+              referenceID: referenceID,
+              content: initialContent,
+              in: db,
+              now: updatedAt
+            )
+          }
+        )
         try WorkbenchReferenceRepository.refresh(
           referenceID: referenceID,
           content: refreshedContent,
@@ -416,6 +498,58 @@ extension RecipeCoreTests {
           try Workbench.find(workbenchID).fetchOne(db)?.dateModified,
           deletedAt
         )
+      }
+    }
+
+    @Test
+    func updatingAReferenceLabelPreservesTheCapturedExtractAndStableID() async throws {
+      @Dependency(\.defaultDatabase) var database
+      let createdAt = Date(timeIntervalSinceReferenceDate: 842_250_000)
+      let updatedAt = createdAt.addingTimeInterval(60)
+      let workbenchID = SampleUUIDSequence.uuid(39_250)
+      let referenceID = SampleUUIDSequence.uuid(39_251)
+      let content = WorkbenchReferenceReducedContent(
+        sourceURL: "https://example.com/reference",
+        captureKind: .browserCapture,
+        reducedText: "Authenticated captured extract.",
+        reductionStatus: .complete,
+        isThin: true
+      )
+
+      try await database.write { db in
+        try Workbench.insert {
+          Workbench(
+            id: workbenchID,
+            title: "Label edit",
+            sortOrder: 0,
+            dateCreated: createdAt,
+            dateModified: createdAt
+          )
+        }
+        .execute(db)
+        _ = try WorkbenchReferenceRepository.store(
+          workbenchID: workbenchID,
+          label: "Original label",
+          content: content,
+          in: db,
+          now: createdAt,
+          uuid: { referenceID }
+        )
+
+        try WorkbenchReferenceRepository.updateLabel(
+          referenceID: referenceID,
+          label: "Updated label",
+          in: db,
+          now: updatedAt
+        )
+
+        let reference = try #require(try WorkbenchReference.find(referenceID).fetchOne(db))
+        expectNoDifference(reference.id, referenceID)
+        expectNoDifference(reference.label, "Updated label")
+        expectNoDifference(reference.reducedText, content.reducedText)
+        expectNoDifference(reference.captureKind, .browserCapture)
+        expectNoDifference(reference.dateCreated, createdAt)
+        expectNoDifference(reference.dateModified, updatedAt)
       }
     }
 

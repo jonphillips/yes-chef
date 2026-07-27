@@ -599,8 +599,8 @@ enum HandoffAppOperations {
       handoff = readerFeedbackHandoff(handoffID: handoffID, metadata: metadata, context: context, mode: mode, now: now)
 
     case let .workbench(workbenchID, task):
-      guard let detail = try await database.read({ db in
-        try WorkbenchDetailRequest(workbenchID: workbenchID).fetch(db)
+      guard let workbenchContext = try await database.read({ db in
+        try WorkbenchChatContextRequest(workbenchID: workbenchID).fetch(db)
       }) else {
         throw HandoffIntentSurfaceError.sourceNotFound
       }
@@ -608,15 +608,15 @@ enum HandoffAppOperations {
       let deliverableFormat: AIHandoffToken.DeliverableFormat
       switch task {
       case .compare:
-        context = WorkbenchChatContext(detail: detail).compareHandoffPrompt()
+        context = workbenchContext.compareHandoffPrompt()
         deliverableFormat = .menuPrepPlan
       case .experiments:
-        context = WorkbenchChatContext(detail: detail).experimentsHandoffPrompt()
+        context = workbenchContext.experimentsHandoffPrompt()
         deliverableFormat = .workbenchExperiments
       }
       let prompt = AIHandoffToken.prompt(
         handoffID: handoffID,
-        title: "\(metadata.taskType.title): \(detail.workbench.title)",
+        title: "\(metadata.taskType.title): \(workbenchContext.title)",
         context: context,
         mode: mode,
         deliverableFormat: deliverableFormat
