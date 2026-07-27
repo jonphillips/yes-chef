@@ -123,6 +123,48 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func chatContextRequestReloadsReferenceMaterialAfterAWrite() async throws {
+      @Dependency(\.defaultDatabase) var database
+      let createdAt = Date(timeIntervalSinceReferenceDate: 842_075_000)
+      let workbenchID = SampleUUIDSequence.uuid(39_075)
+      let referenceID = SampleUUIDSequence.uuid(39_076)
+
+      try await database.write { db in
+        try Workbench.insert {
+          Workbench(
+            id: workbenchID,
+            title: "Live context",
+            sortOrder: 0,
+            dateCreated: createdAt,
+            dateModified: createdAt
+          )
+        }
+        .execute(db)
+        let initialContext = try #require(try WorkbenchChatContextRequest(workbenchID: workbenchID).fetch(db))
+        expectNoDifference(initialContext.references, [])
+
+        _ = try WorkbenchReferenceRepository.store(
+          workbenchID: workbenchID,
+          label: "Fresh technique",
+          content: WorkbenchReferenceReducedContent(
+            sourceURL: "https://example.com/live-context",
+            captureKind: .urlFetch,
+            reducedText: "New reference material.",
+            reductionStatus: .complete,
+            isThin: true
+          ),
+          in: db,
+          now: createdAt.addingTimeInterval(1),
+          uuid: { referenceID }
+        )
+
+        let reloadedContext = try #require(try WorkbenchChatContextRequest(workbenchID: workbenchID).fetch(db))
+        expectNoDifference(reloadedContext.references.map(\.label), ["Fresh technique"])
+        #expect(reloadedContext.serialized(for: .frontierPreferred).contains("New reference material."))
+      }
+    }
+
+    @Test
     func browserCapturedHTMLUsesTheSameReducerWithoutFetching() async throws {
       let url = try #require(URL(string: "https://example.com/technique/captured"))
       let client = WebRecipeCaptureClient(

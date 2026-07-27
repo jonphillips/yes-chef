@@ -42,7 +42,7 @@ struct WorkbenchReferenceRow: View {
           Button {
             model.refreshReferenceButtonTapped(reference)
           } label: {
-            Label("Refresh", systemImage: "arrow.clockwise")
+            Label("Manage", systemImage: "square.and.pencil")
           }
           .buttonStyle(.bordered)
           .controlSize(.small)
@@ -198,8 +198,8 @@ struct WorkbenchReferenceEditorView: View {
         model.confirmDuplicateReferenceButtonTapped(context)
       }
       Button("Cancel", role: .cancel) {}
-    } message: { _ in
-      Text("Refresh the existing reference with this newly fetched extract? This replaces its durable captured text.")
+    } message: { context in
+      Text("Refresh \(context.existingReferenceLabel) with this newly fetched extract? It replaces that reference’s durable captured text; \(context.label) remains unchanged.")
     }
     .fullScreenCover(item: $model.browserReferenceCapture, onDismiss: {
       if model.browserReferenceCaptureDismissed() {

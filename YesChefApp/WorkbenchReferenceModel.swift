@@ -217,6 +217,7 @@ extension WorkbenchDetailModel {
     } catch let WorkbenchReferenceRepositoryError.duplicateSourceURL(existingReferenceID) {
       duplicateReference = WorkbenchDuplicateReferenceContext(
         existingReferenceID: existingReferenceID,
+        existingReferenceLabel: referenceRows.first { $0.id == existingReferenceID }?.label ?? "existing reference",
         label: editor.label,
         content: content
       )
@@ -295,6 +296,7 @@ struct WorkbenchReferenceReplacementContext: Identifiable {
 struct WorkbenchDuplicateReferenceContext: Identifiable {
   let id = UUID()
   var existingReferenceID: WorkbenchReference.ID
+  var existingReferenceLabel: String
   var label: String
   var content: WorkbenchReferenceReducedContent
 }

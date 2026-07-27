@@ -215,7 +215,7 @@ struct WorkbenchDetailView: View {
         ContentUnavailableView("Workbench Not Found", systemImage: "hammer")
       }
     }
-    .task(id: isSplitEnabled) {
+    .task(id: model.detail?.workbench.dateModified) {
       if isSplitEnabled {
         _ = await model.loadChatContext()
       }
