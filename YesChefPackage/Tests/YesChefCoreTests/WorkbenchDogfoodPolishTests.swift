@@ -131,6 +131,42 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func workbenchChatTrimsFittingReferencesBeforeCandidatesOnDevice() {
+      let referenceText = String(repeating: "Rendered source detail. ", count: 100)
+      let candidateText = String(repeating: "Candidate recipe detail. ", count: 102)
+      let context = WorkbenchChatContext(
+        title: "Birria",
+        references: [
+          WorkbenchReferenceChatContext(
+            sourceURL: "https://example.com/chiles",
+            label: "Chile technique",
+            captureKind: .browserCapture,
+            reducedText: referenceText,
+            reductionStatus: .complete,
+            dateCreated: Date(timeIntervalSinceReferenceDate: 808_005_000)
+          )
+        ],
+        candidates: (0..<3).map { index in
+          WorkbenchCandidateChatContext(
+            id: SampleUUIDSequence.uuid(22_910 + index),
+            title: "Candidate \(index)",
+            sourceURL: "https://example.com/candidate-\(index)",
+            sortOrder: index,
+            ingredientSections: [RecipeChatSection(lines: [candidateText])]
+          )
+        }
+      )
+
+      let onDevice = context.serialized(for: .onDevice)
+
+      #expect(onDevice.count <= WorkbenchChatContext.onDeviceSerializedCharacterBudget)
+      #expect(!onDevice.contains(referenceText))
+      #expect(onDevice.contains("Candidate 2"))
+      #expect(onDevice.contains("1 reference material item(s) were omitted before candidate recipes"))
+      #expect(!onDevice.contains("lower-priority candidate(s) were omitted"))
+    }
+
+    @Test
     func workbenchChatDeduplicatesReferenceMaterialAgainstNormalizedCandidateSources() {
       let referenceText = "This extract belongs to the candidate recipe."
       let serialized = WorkbenchChatContext(
@@ -159,6 +195,39 @@ extension RecipeCoreTests {
       #expect(!serialized.contains("Duplicate source"))
       #expect(!serialized.contains(referenceText))
       #expect(serialized.contains("matched a candidate source and were omitted to avoid duplicate evidence"))
+    }
+
+    @Test
+    func workbenchChatRetainsReferenceWhenMatchingCandidateIsOutsideSoftCap() {
+      let referenceText = "This extract belongs to a candidate beyond the soft cap."
+      let serialized = WorkbenchChatContext(
+        title: "Birria",
+        references: [
+          WorkbenchReferenceChatContext(
+            sourceURL: "https://example.com/late-candidate",
+            label: "Late candidate source",
+            captureKind: .urlFetch,
+            reducedText: referenceText,
+            reductionStatus: .complete,
+            dateCreated: Date(timeIntervalSinceReferenceDate: 808_020_000)
+          )
+        ],
+        candidates: (0...WorkbenchChatContext.softCandidateCap).map { index in
+          WorkbenchCandidateChatContext(
+            id: SampleUUIDSequence.uuid(22_920 + index),
+            title: "Candidate \(index)",
+            sourceURL: index == WorkbenchChatContext.softCandidateCap
+              ? "https://example.com/late-candidate"
+              : nil,
+            sortOrder: index
+          )
+        }
+      )
+      .serialized(for: .frontierPreferred)
+
+      #expect(serialized.contains("Late candidate source"))
+      #expect(serialized.contains(referenceText))
+      #expect(!serialized.contains("matched a candidate source and were omitted"))
     }
 
     @Test

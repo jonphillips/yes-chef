@@ -102,47 +102,34 @@ public struct WorkbenchChatContext: Equatable, Sendable {
     let cappedCandidates = Array(sortedCandidates.prefix(Self.softCandidateCap))
     let eligibleReferences = references.filter { reference in
       guard let sourceURL = normalizedSourceURL(reference.sourceURL) else { return true }
-      return !sortedCandidates.contains { normalizedSourceURL($0.sourceURL) == sourceURL }
+      return !cappedCandidates.contains { normalizedSourceURL($0.sourceURL) == sourceURL }
     }
     let deduplicatedReferenceCount = references.count - eligibleReferences.count
 
-    if characterBudget <= Self.onDeviceSerializedCharacterBudget {
-      for referenceCount in stride(from: eligibleReferences.count, through: 0, by: -1) {
-        for candidateCount in stride(from: cappedCandidates.count, through: 0, by: -1) {
-          let candidate = renderedContext(
-            references: Array(eligibleReferences.prefix(referenceCount)),
-            omittedReferenceCount: eligibleReferences.count - referenceCount,
-            deduplicatedReferenceCount: deduplicatedReferenceCount,
-            candidates: Array(cappedCandidates.prefix(candidateCount)),
-            omittedCandidateCount: sortedCandidates.count - candidateCount,
-            characterBudget: characterBudget
-          )
-          if candidate.text.count <= characterBudget {
-            return candidate
-          }
-        }
-      }
-    } else {
-      for candidateCount in stride(from: cappedCandidates.count, through: 0, by: -1) {
-        for referenceCount in stride(from: eligibleReferences.count, through: 0, by: -1) {
-          let candidate = renderedContext(
-            references: Array(eligibleReferences.prefix(referenceCount)),
-            omittedReferenceCount: eligibleReferences.count - referenceCount,
-            deduplicatedReferenceCount: deduplicatedReferenceCount,
-            candidates: Array(cappedCandidates.prefix(candidateCount)),
-            omittedCandidateCount: sortedCandidates.count - candidateCount,
-            characterBudget: characterBudget
-          )
-          if candidate.text.count <= characterBudget {
-            return candidate
-          }
+    let budgetEligibleReferences = eligibleReferences.filter { reference in
+      reference.reducedText.count <= characterBudget
+    }
+    let oversizedReferenceCount = eligibleReferences.count - budgetEligibleReferences.count
+
+    for candidateCount in stride(from: cappedCandidates.count, through: 0, by: -1) {
+      for referenceCount in stride(from: budgetEligibleReferences.count, through: 0, by: -1) {
+        let candidate = renderedContext(
+          references: Array(budgetEligibleReferences.prefix(referenceCount)),
+          omittedReferenceCount: oversizedReferenceCount + budgetEligibleReferences.count - referenceCount,
+          deduplicatedReferenceCount: deduplicatedReferenceCount,
+          candidates: Array(cappedCandidates.prefix(candidateCount)),
+          omittedCandidateCount: sortedCandidates.count - candidateCount,
+          characterBudget: characterBudget
+        )
+        if candidate.text.count <= characterBudget {
+          return candidate
         }
       }
     }
 
     return renderedContext(
       references: [],
-      omittedReferenceCount: eligibleReferences.count,
+      omittedReferenceCount: oversizedReferenceCount + budgetEligibleReferences.count,
       deduplicatedReferenceCount: deduplicatedReferenceCount,
       candidates: [],
       omittedCandidateCount: sortedCandidates.count,
