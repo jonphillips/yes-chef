@@ -40,6 +40,7 @@ public struct ModelCallRecord: Equatable, Sendable {
 }
 
 public enum ModelCallSurface: String, Equatable, Sendable {
+  case capture
   case grocery
   case mealPlan
   case menu
@@ -61,6 +62,7 @@ public enum ModelCallTask: String, Equatable, Sendable {
   case noteHarvest
   case prepPlan
   case recipeAdjustment
+  case recipeExtraction
   case serveWith
   case workbenchComparison
   case workbenchDraft
@@ -89,6 +91,7 @@ public enum ModelCallContextLayer: String, CaseIterable, Hashable, Sendable {
   case readerComments
   case recipe
   case selection
+  case structuredPageText
   case tasteProfile
   case workbench
 }

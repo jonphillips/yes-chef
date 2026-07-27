@@ -100,6 +100,19 @@ public struct WebRecipeCaptureClient: Sendable {
     )
   }
 
+  /// Adds the model-backed third rung only after deterministic parsing reports a
+  /// recipe gap. The synchronous browser path stays synchronous; app callers
+  /// choose to await this uniform post-capture step while the share extension
+  /// simply never invokes it.
+  public func escalate(draft: WebRecipeCaptureDraft) async throws -> WebRecipeCaptureDraft {
+    try await extract(draft: draft, forcingExtraction: false)
+  }
+
+  /// Re-runs extraction from the retained HTML without refetching the page.
+  public func reextract(draft: WebRecipeCaptureDraft) async throws -> WebRecipeCaptureDraft {
+    try await extract(draft: draft, forcingExtraction: true)
+  }
+
   public func hydrateHeroImage(in draft: WebRecipeCaptureDraft) async -> WebRecipeCaptureDraft {
     guard let heroURL = draft.page.imageURLs.first, draft.page.processedImages[heroURL] == nil else {
       return draft
@@ -120,6 +133,28 @@ public struct WebRecipeCaptureClient: Sendable {
       return draft
     }
     return hydratedDraft
+  }
+
+  private func extract(
+    draft: WebRecipeCaptureDraft,
+    forcingExtraction: Bool
+  ) async throws -> WebRecipeCaptureDraft {
+    guard forcingExtraction
+      || draft.page.warnings.contains(.noIngredients)
+      || draft.page.warnings.contains(.noInstructions)
+    else { return draft }
+
+    guard let structuredPageText = RecipeStructuredTextSerializer.serialize(
+      html: draft.page.originalHTML,
+      sourceURL: draft.page.sourceURL
+    ) else {
+      throw RecipeExtractionError.emptyRecipe
+    }
+    @Dependency(\.recipeExtractionClient) var recipeExtractionClient
+    let extraction = try await recipeExtractionClient(structuredPageText: structuredPageText)
+    var escalatedDraft = draft
+    escalatedDraft.page = WebRecipePageParser.merging(draft.page, with: extraction)
+    return escalatedDraft
   }
 
   public func capture(

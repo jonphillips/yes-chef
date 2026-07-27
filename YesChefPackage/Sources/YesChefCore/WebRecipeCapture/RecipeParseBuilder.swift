@@ -52,6 +52,12 @@ struct RecipeParseBuilder {
     appendInstructionSection(name: name?.trimmingCharacters(in: .whitespacesAndNewlines), steps: cleanedSteps)
   }
 
+  mutating func addIngredientSection(name: String?, lines: [String]) {
+    let heading = name?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+    if let heading { addIngredient("\(heading):") }
+    for line in lines { addIngredient(line) }
+  }
+
   mutating func addEditorialBlock(label: String, text: String) {
     let block = ParsedRecipeEditorialBlock(label: label, text: text)
     guard !block.text.isEmpty, !editorialBlocks.contains(block) else { return }

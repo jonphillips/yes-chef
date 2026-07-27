@@ -397,17 +397,19 @@ final class RecipeCaptureModel {
   var isShowingDiscardConfirmation = false
   var isPresentingBrowser = false
   var isFetching = false
+  var isExtracting = false
   var isCommitting = false
+  var modelExtractionError: String?
   var readerFeedbackProposals: [ReaderFeedbackTip] = []
   var readerFeedbackComments: [RawComment] = []
   var readerFeedbackHandoffEvidence: [String] = []
 
   var canFetch: Bool {
-    normalizedURL != nil && !isFetching && !isCommitting
+    normalizedURL != nil && !isFetching && !isExtracting && !isCommitting
   }
 
   var canCommit: Bool {
-    draft != nil && !isFetching && !isCommitting
+    draft != nil && !isFetching && !isExtracting && !isCommitting
   }
 
   var hasUnsavedReviewChanges: Bool {
@@ -455,7 +457,9 @@ final class RecipeCaptureModel {
     isShowingDiscardConfirmation = false
     isPresentingBrowser = false
     isFetching = false
+    isExtracting = false
     isCommitting = false
+    modelExtractionError = nil
     readerFeedbackProposals = []
     readerFeedbackComments = []
     readerFeedbackHandoffEvidence = []
@@ -486,7 +490,8 @@ final class RecipeCaptureModel {
 
     do {
       let capturedDraft = try await captureClient.capture(url: url, capturedAt: now)
-      draft = await captureClient.hydrateHeroImage(in: capturedDraft)
+      let escalatedDraft = await escalating(capturedDraft)
+      draft = await captureClient.hydrateHeroImage(in: escalatedDraft)
     } catch is CancellationError {
     } catch {
       showError(String(describing: error))
@@ -499,59 +504,30 @@ final class RecipeCaptureModel {
       sourceURL: sourceURL,
       capturedAt: now
     )
-    guard capturedDraft.isUsable else {
+    let escalatedDraft = await escalating(capturedDraft)
+    guard escalatedDraft.isUsable else {
+      draft = escalatedDraft
+      if let modelExtractionError {
+        return .notFound(message: "Recipe extraction failed: \(modelExtractionError)")
+      }
       return .notFound(message: "No recipe found on this page - sign in or open the recipe, then try again.")
     }
-    draft = await captureClient.hydrateHeroImage(in: capturedDraft)
+    draft = await captureClient.hydrateHeroImage(in: escalatedDraft)
     return .extracted
   }
 
-  func stageReaderFeedback(
-    tips: [ReaderFeedbackTip],
-    comments: [RawComment],
-    unparsedLines: [String] = []
-  ) {
-    readerFeedbackComments = comments
-    readerFeedbackHandoffEvidence = unparsedLines
-    guard !tips.isEmpty else { return }
-    let acceptedKeys = Set(readerFeedbackBlocks.map { $0.text.lowercased() })
-    var seen = Set(readerFeedbackProposals.map { $0.text.lowercased() })
-    readerFeedbackProposals.append(
-      contentsOf: tips.filter { tip in
-        let key = tip.text.lowercased()
-        return !acceptedKeys.contains(key) && seen.insert(key).inserted
-      }
-    )
-  }
-
-  func promoteReaderFeedbackComment(_ comment: RawComment, commentNumber: Int) -> ReaderFeedbackTip {
-    let tip = ReaderFeedbackTip(
-      text: comment.text,
-      provenanceKind: .singularPreserved,
-      supportCount: 1,
-      backingComments: [
-        ReaderFeedbackBackingComment(
-          commentNumber: commentNumber,
-          text: comment.text,
-          helpfulCount: comment.helpfulCount
-        )
-      ]
-    )
-    stageReaderFeedback(tips: [tip], comments: readerFeedbackComments)
-    return tip
-  }
-
-  func acceptReaderFeedbackTip(_ tip: ReaderFeedbackTip, approvedText: String) {
-    let trimmed = approvedText.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return }
-    var blocks = readerFeedbackBlocks
-    blocks.append(ParsedRecipeReaderFeedbackBlock(text: trimmed))
-    readerFeedbackBlocks = blocks
-    discardReaderFeedbackTip(tip)
-  }
-
-  func discardReaderFeedbackTip(_ tip: ReaderFeedbackTip) {
-    readerFeedbackProposals.removeAll { $0.id == tip.id }
+  func rerunExtractionButtonTapped() async {
+    guard let draft else { return }
+    isExtracting = true
+    defer { isExtracting = false }
+    do {
+      modelExtractionError = nil
+      let reextractedDraft = try await captureClient.reextract(draft: draft)
+      self.draft = await captureClient.hydrateHeroImage(in: reextractedDraft)
+    } catch is CancellationError {
+    } catch {
+      modelExtractionError = RecipeChatErrorText.describe(error)
+    }
   }
 
   func commitButtonTapped() async -> RecipeImportBundleResult? {
@@ -629,6 +605,20 @@ final class RecipeCaptureModel {
     let candidate = trimmed.contains("://") ? trimmed : "https://\(trimmed)"
     guard let url = URL(string: candidate), url.host()?.isEmpty == false else { return nil }
     return url
+  }
+
+  private func escalating(_ capturedDraft: WebRecipeCaptureDraft) async -> WebRecipeCaptureDraft {
+    isExtracting = true
+    defer { isExtracting = false }
+    do {
+      modelExtractionError = nil
+      return try await captureClient.escalate(draft: capturedDraft)
+    } catch is CancellationError {
+      return capturedDraft
+    } catch {
+      modelExtractionError = RecipeChatErrorText.describe(error)
+      return capturedDraft
+    }
   }
 
   private func showError(_ message: String) {

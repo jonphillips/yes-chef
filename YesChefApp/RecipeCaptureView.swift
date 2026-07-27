@@ -60,6 +60,8 @@ struct RecipeCaptureView: View {
       } footer: {
         if model.isFetching {
           ProgressView("Fetching recipe page")
+        } else if model.isExtracting {
+          ProgressView("Extracting recipe from page")
         }
       }
 
@@ -259,6 +261,35 @@ private struct RecipeCaptureReviewSections: View {
         }
       }
 
+      if let modelExtractionError = model.modelExtractionError {
+        Section("Recipe Extraction") {
+          Label("Model extraction failed", systemImage: "exclamationmark.triangle")
+            .foregroundStyle(.orange)
+          Text(modelExtractionError)
+            .foregroundStyle(.secondary)
+          Button {
+            Task { await model.rerunExtractionButtonTapped() }
+          } label: {
+            Label("Try Extraction Again", systemImage: "arrow.clockwise")
+          }
+          .disabled(model.isExtracting || model.isCommitting)
+        }
+      } else if !page.modelExtractedIngredientSections.isEmpty || !page.modelExtractedInstructionSections.isEmpty {
+        Section("Recipe Extraction") {
+          Label("Model-extracted sections", systemImage: "sparkles")
+            .foregroundStyle(.secondary)
+          Text(modelExtractedSectionNames)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+          Button {
+            Task { await model.rerunExtractionButtonTapped() }
+          } label: {
+            Label("Run Extraction Again", systemImage: "arrow.clockwise")
+          }
+          .disabled(model.isExtracting || model.isCommitting)
+        }
+      }
+
       if !model.editorialBlocks.isEmpty {
         Section("Notes") {
           ForEach(model.editorialBlocks.indices, id: \.self) { index in
@@ -420,6 +451,12 @@ private struct RecipeCaptureReviewSections: View {
         return section.steps
       }
       .joined(separator: "\n")
+  }
+
+  private var modelExtractedSectionNames: String {
+    let ingredientNames = page.modelExtractedIngredientSections.map { $0.name ?? "Ingredients" }
+    let instructionNames = page.modelExtractedInstructionSections.map { $0.name ?? "Instructions" }
+    return (ingredientNames + instructionNames).joined(separator: " • ")
   }
 }
 
