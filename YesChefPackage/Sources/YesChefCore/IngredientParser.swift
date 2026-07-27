@@ -41,8 +41,35 @@ public enum QuantityParser {
     leadingQuantity(in: text)?.value
   }
 
+  /// The quantity at the *start* of `text`, or nil if it does not begin with one.
+  ///
+  /// This anchoring is deliberate and load-bearing for ingredient lines: in "1 cup onions" the
+  /// leading number is the quantity, and a line like "onions, about 2 handfuls" must NOT scale off
+  /// the 2. Do not relax it — see `firstQuantity(in:)` for the searching variant.
   public static func leadingQuantity(in text: String) -> LeadingQuantity? {
-    guard let first = quantity(at: text.startIndex, in: text) else { return nil }
+    quantity(startingAt: text.startIndex, in: text)
+  }
+
+  /// The first quantity found anywhere in `text`.
+  ///
+  /// For yield and servings text, where the number is routinely preceded by a word — "Serves 2",
+  /// "Makes 4 dozen", "Yield: 6". `leadingQuantity` returns nil for all of those, which silently
+  /// meant "do not scale". Ranges are still picked up when the connector follows the first number,
+  /// so "Serves 2 to 4" reads as 2...4 exactly like "2 to 4 servings" already does.
+  public static func firstQuantity(in text: String) -> LeadingQuantity? {
+    var index = text.startIndex
+    while index < text.endIndex {
+      if let found = quantity(startingAt: index, in: text) { return found }
+      // Advance one whitespace-separated token and retry. `quantity(at:in:)` reads the token at its
+      // start index, so stepping token by token is what makes this a search rather than a rescan.
+      guard let tokenEnd = text[index...].firstIndex(where: \.isWhitespace) else { return nil }
+      index = skipWhitespace(in: text, from: tokenEnd)
+    }
+    return nil
+  }
+
+  private static func quantity(startingAt index: String.Index, in text: String) -> LeadingQuantity? {
+    guard let first = quantity(at: index, in: text) else { return nil }
 
     var end = first.range.upperBound
     let afterFirst = skipWhitespace(in: text, from: end)

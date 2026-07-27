@@ -43,6 +43,9 @@ struct OnboardChatFinalizationTests {
   func everyOnboardFinalizerActionResolvesInItsActualCatalog() throws {
     try withDependencies {
       try $0.bootstrapDatabase()
+      // Building the catalogs reaches for `\.date`; without an override that is an unimplemented
+      // dependency access and Dependencies reports it as a test issue.
+      $0.date = .constant(Date(timeIntervalSinceReferenceDate: 840_100_000))
     } operation: {
       let recipeID = UUID(uuidString: "00000000-0000-0000-0000-000000004511")!
       let recipeChat = RecipeChatModel(

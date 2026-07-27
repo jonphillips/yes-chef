@@ -1,17 +1,15 @@
-# Effort: The app test target runs — 21 of 26 pass, 5 real issues remain
+# Effort: The app test target runs — 26 of 26 pass
 
-**Type:** Test-coverage recovery. The target is **fixed, wired in, and mostly green**; what remains
-is two harness nits, one live scaling bug, and one product question.
-**Status:** **Re-scoped 2026-07-27** after the target was fixed. Supersedes the 2026-07-26 version,
-whose central claim ("the target is broken and fixing it is not this effort") turned out to be wrong.
-**Summary:** `YesChefAppTests` compiles, links and runs: **26 tests, 21 pass, 5 issues in 3 suites.**
-The build-and-link half is a hard gate in `scripts/check-drift.sh` as of this change. Two separate
-linkage defects were behind everything — undeclared GRDB/SQLiteData dependencies (which stopped the
-target building at all) and a duplicated `Dependencies` runtime in the test bundle (which silently
-voided every `withDependencies` override).
+**Type:** Test-coverage recovery. **Complete** apart from one optional follow-on.
+**Status:** **Done 2026-07-27.** Supersedes the 2026-07-26 version, whose central claim ("the target
+is broken and fixing it is not this effort") was wrong.
+**Summary:** `YesChefAppTests` went from *compiled and executed by nothing* to **26/26 green**, gated
+in `scripts/check-drift.sh`. Three defects were behind it: undeclared GRDB/SQLiteData dependencies
+(the target could not link), a duplicated `Dependencies` runtime in the test bundle (every
+`withDependencies` override silently did nothing), and — once those were out of the way — three stale
+expectations plus **one live user-visible bug in recipe scaling**.
 **Related:** `CURRENT_HANDOFF` § Verification Pattern; [[lean-verification-default]].
-**Owner:** Claude (diagnosis + target fix, done) · Jon (**the 3 decisions below**) · Codex (the work
-they turn into).
+**Owner:** Claude. No decisions outstanding.
 
 ---
 
@@ -105,16 +103,17 @@ add a second thing that skips itself. `scripts/check-drift.sh` is the real gate.
 Execution is opt-in for two reasons: it boots a simulator, which is exactly the loop the Verification
 Pattern keeps Codex out of ([[lean-verification-default]]); and `xcodebuild test-without-building`
 **hung past 10 minutes in teardown on 2 of 3 local runs** even though the tests themselves finished in
-0.6s. An unattended gate cannot depend on that. Make it mandatory once the 5 below are green and the
-teardown hang is understood.
+0.6s. An unattended gate cannot depend on that. The suite is green, so the only thing still standing
+between opt-in and mandatory is that hang.
 
 ---
 
-## The failures — 14 became 5
+## The failures — 14, then 5, then 0
 
 The first pass through this inventory blamed "drifted expectations". **That was wrong for 11 of the
-14.** They were failing because of a second, statically-linked copy of the `Dependencies` runtime in
-the test bundle.
+14**, and partly wrong again about the 5 that survived. Recording both corrections, because the
+pattern is the point: a suite nothing has run accumulates several unrelated defects at once, and the
+loudest theory is rarely the whole story.
 
 ### The duplicated Dependencies runtime (11 tests)
 
@@ -130,81 +129,84 @@ task-locals, so `withDependencies { }` written in a test set the test bundle's c
 code (`MenuDetailModel`, `WorkbenchCompareAlignmentModel`) read the framework's copy and got the
 **live** dependency. Overrides silently did nothing.
 
-Two probes pinned it down: an `@Observable @MainActor` model declared *in the test target* sees the
-override fine, while the real model — identical declaration, but compiled into `YesChef.debug.dylib`
-— never called the stub aligner even with the disk cache stubbed out. That ruled out the three
-theories that came first (escaped `withDependencies` scope, a stale disk-cache hit, and mismatched
-framework linkage) and left binary layout as the only candidate; `nm` confirmed it.
+Two probes pinned it: an `@Observable @MainActor` model declared *in the test target* sees the
+override fine, while the real model — identical declaration, compiled into `YesChef.debug.dylib` —
+never called the stub aligner even with the disk cache stubbed out. That ruled out the three theories
+that came first (escaped `withDependencies` scope, a stale disk-cache hit, mismatched framework
+linkage) and left binary layout; `nm` confirmed it.
 
-Dropping `DependenciesTestSupport` (nothing here uses its API; `Dependencies` detects the `.test`
-context on its own at runtime) removes the duplicate — **0** duplicate symbols — and takes the suite
-from 14 failures to 5. `WorkbenchCompareAlignmentModelTests`, `ChatSurfaceTests` and
-`ChatAssistantSelectionTests` now pass in full.
+Dropping `DependenciesTestSupport` — nothing here used its API, and `Dependencies` detects `.test`
+context at runtime on its own — takes duplicate symbols to **0** and failures from 14 to 5.
 
-**The lesson generalises past this repo:** any test target linking a static-only package product
-alongside dynamic frameworks of the same package can silently lose its dependency overrides. It
-fails as wrong *behavior*, never as a link error.
+> **Generalises past this repo:** any test target linking a static-only package product alongside
+> dynamic frameworks of the same package can silently lose its dependency overrides. It presents as
+> wrong *behavior*, never as a link error.
 
-### What actually remains (5 issues, 3 suites)
+### `RecipeYieldScaler` dropped the leading anchor — a live user-visible bug (2 tests)
 
-**1. Two missing dependency overrides — trivial, no judgment needed.**
+The only one of the five that was a product defect, and git dates it exactly:
 
-- `duplicatePasteInformsWithoutReplacingTheImportedPlan` reads `\.uuid` without overriding it
-  (`UUID.swift:67`). The sibling test in the same file already does `$0.uuid = .incrementing`.
-- `everyOnboardFinalizerActionResolvesInItsActualCatalog` reads `\.date` without overriding it
-  (`Date.swift:37`).
+- **Jul 12** (`cf44929`) — `ScaleText.scaledServingsSummary(servingsText:baseServings:factor:)` lands
+  with an *unanchored* regex and a `baseServings` fallback. These tests are written against it.
+- **Jul 16** (`bd7cafb`, "Dogfood polish batch") — production switches to
+  `RecipeYieldScaler.scaledText`, which keeps the recipe's own phrasing instead of normalising to
+  "N servings". Better design, but it also swapped the unanchored search for
+  `QuantityParser.leadingQuantity`, which anchors at `text.startIndex`.
+- **Jul 18** (`e452044`) — the test is mechanically re-pointed at the new API with its **old expected
+  strings left untouched**. Nothing runs it. Nine days later, nobody knows.
 
-Both are the standard "unimplemented dependency accessed in a test" report. Add the overrides.
+Net effect in the app: `"4–6 servings"` scaled correctly while `"Serves 2"`, `"Serves 2 to 4"`,
+`"Makes 4 dozen"` and `"Yield: 6"` **silently did not scale at all**.
 
-**2. `RecipeYieldScaler` drops the leading anchor — a live user-visible bug.**
+Fixed by giving `QuantityParser` a `firstQuantity(in:)` search entry point and using it from
+`RecipeYieldScaler` only. **`leadingQuantity` is unchanged and must stay that way** — `IngredientScaler`
+depends on the anchor so that "onions, about 2 handfuls" does not scale off the 2. Corroboration that
+searching is the right semantics for yield text: `ServingParser.servings(from:)`, sitting three
+functions away, already scanned rather than anchored.
 
-Git settles this one. On **Jul 12** (`cf44929`) `ScaleText.scaledServingsSummary(servingsText:baseServings:factor:)`
-was added with an unanchored regex plus a `baseServings` fallback, and these tests were written
-against it. On **Jul 16** (`bd7cafb`, "Dogfood polish batch") production switched to
-`RecipeYieldScaler.scaledText(_:factor:)`, which preserves the source phrasing instead of normalising
-to "N servings" — a deliberate, better design. But it also swapped the unanchored search for
-`QuantityParser.leadingQuantity`, which anchors at `text.startIndex`. On **Jul 18** (`e452044`) the
-test was mechanically re-pointed at the new API with its **old expected strings left untouched**.
-Nothing ever ran it.
+Coverage now lives in Core, where the code is: `RecipeYieldScalingTests` gained five cases that run
+in `swift test` on every dispatch. The two app-layer assertions were re-baselined to the
+preserve-phrasing contract ("Serves 2" ×3 → "Serves 6") and are now redundant — candidates for the
+sweep below.
 
-Today: `"4–6 servings"` scales correctly, `"Serves 2 to 4"` and `"Serves 2"` **silently do not
-scale at all**. `QuantityParser.rangeStart` already handles both `to` and dashes, so the anchor is
-the only thing in the way.
+### Three stale expectations (3 tests)
 
-Fix in two parts, in this order:
-- Give `QuantityParser` a *search* entry point and use it from `RecipeYieldScaler` only. **Do not
-  change `leadingQuantity` itself** — `IngredientScaler` relies on the anchor for ingredient lines
-  ("1 cup onions"), where matching a later number would be wrong.
-- Then re-baseline the two assertions to the preserve-phrasing contract: `"Serves 2 to 4"` ×3 →
-  `"Serves 6 to 12"`, `"Serves 2"` ×3 → `"Serves 6"`. That is a deliberate re-baseline with a reason,
-  not a match-to-behavior edit.
-
-**3. `advisoryNotesStayOutOfEditablePrepTextAndDoNotBlockSaving` — one real behavior question.**
-
-Committing the reviewed plan should drop the step the model omitted; both steps remain. This is the
-only one of the original 14 that is still an open product question. Worth answering directly rather
-than adjusting the test.
+- Two missing dependency overrides (`\.uuid`, `\.date`) — the standard "unimplemented dependency
+  accessed in a test" report. A sibling test in the same file already did it correctly.
+- `advisoryNotesStayOutOfEditablePrepTextAndDoNotBlockSaving` — **not** the open product question an
+  earlier revision of this doc claimed. The advisory behavior it guards is correct and its assertions
+  pass: advisories stay out of `editableText`, surface as `supportingEvidenceRows`, and do not block
+  the commit. The single mismatch was `sourceDish`, which the commit **preserves** and the expectation
+  did not carry. Preserving it is right — `droppedSourceDishEvidence` exists precisely to warn when a
+  returned plan loses that link. Expectation updated.
 
 ## What happened to the "move the logic to Core" plan
 
-The 2026-07-26 plan was to move five types to `YesChefCore` so 19 of the tests would run under
-`swift test`. Its premise — *the target cannot run, so relocate the tests to somewhere that can* — is
-gone. Two of its arguments survive on their own merits, and neither is urgent:
+The 2026-07-26 plan was to move five types to `YesChefCore` so 19 stranded tests would run under
+`swift test`. Its premise — *the target cannot run, so relocate the tests somewhere that can* — is
+gone: the target runs. Its second argument, that app-layer models holding `@Fetch` are inherently
+awkward to test in place, is gone too; that was the duplicated `Dependencies` runtime wearing a
+costume, and those suites now pass untouched.
 
-- `WorkbenchCompareAlignmentModel` and `RecipeScaleFormatting` are SwiftUI-free logic sitting in the
-  app layer. Worth fixing for the standing "keep pure logic out of the App layer" corollary and its
-  scar (PR #185) — **not** for the test target's sake any more.
-- Cause A is a real, recurring tax on testing anything holding a `@Fetch`.
+**One argument survives, on its own merits and unhurried:** `WorkbenchCompareAlignmentModel` and
+`RecipeScaleFormatting` are SwiftUI-free logic sitting in the app layer, which the standing "keep pure
+logic out of the App layer" corollary says they should not be. Worth doing for that reason, not for
+testability. Two small pieces of evidence for whoever picks it up:
 
-Recommended order: **decide the 14 first.** Moving a test that encodes a wrong expectation just
-relocates the wrong expectation, and moving one that fails for reason A hides the harness problem
-instead of settling it.
+- The scaling fix landed its real coverage in `YesChefCoreTests` because that is where the code lives,
+  which left the two app-layer assertions redundant. That is the sweep making its own case.
+- Adding a Swift file to `YesChefAppTests` without re-running `xcodegen generate` silently excludes it
+  from the bundle — the build stays green and the test never runs. Found the hard way while probing.
+  Fewer files in that target is fewer chances to hit it.
 
 ## Verification
 
 - `scripts/check-drift.sh` — green, including the new app-test stage.
-- `swift test --package-path YesChefPackage` — 468 tests, green.
+- `swift test --package-path YesChefPackage` — **476 tests, green** (was 468; +5 yield-scaling cases).
 - `xcodebuild -scheme YesChef -destination 'generic/platform=iOS' -skipMacroValidation CODE_SIGNING_ALLOWED=NO build` — green.
 - `xcodebuild build-for-testing -scheme YesChef -destination 'platform=iOS Simulator,name=iPhone 17 Pro' …` — **TEST BUILD SUCCEEDED**, reproduced from cleared DerivedData.
-- `YESCHEF_RUN_APP_TESTS=1 scripts/check-drift.sh` — 26 tests, 21 pass, 5 issues as inventoried above.
-- **No device pass.** Nothing user-facing changed.
+- `YESCHEF_RUN_APP_TESTS=1 scripts/check-drift.sh` — **26 tests, 26 pass.**
+- **Device pass wanted for the scaling fix.** Everything else here is build plumbing, but
+  `RecipeYieldScaler` is a real behavior change on a visible surface: open a recipe whose servings
+  text leads with a word ("Serves 4", "Makes 4 dozen") and scale it. Before this change the line sat
+  unchanged; it should now track the scale factor while keeping its own wording.

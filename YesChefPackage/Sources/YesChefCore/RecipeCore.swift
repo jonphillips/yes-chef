@@ -960,21 +960,27 @@ public enum IngredientScaler {
 }
 
 public enum RecipeYieldScaler {
+  /// Scales the yield/servings number in place, keeping the recipe's own phrasing: "Serves 2" at 3×
+  /// reads "Serves 6", not "6 servings".
+  ///
+  /// Uses `firstQuantity`, not `leadingQuantity`. Anchoring at the start of the string meant every
+  /// phrasing that leads with a word — "Serves 2", "Makes 4 dozen", "Yield: 6" — returned nil and
+  /// scaled to nothing at all, silently, while "4–6 servings" scaled fine.
   public static func scaledText(_ text: String?, factor: Double) -> String? {
-    guard let text, factor != 1, let leadingQuantity = QuantityParser.leadingQuantity(in: text) else {
+    guard let text, factor != 1, let quantity = QuantityParser.firstQuantity(in: text) else {
       return text
     }
 
-    let scaledLeadingText: String
-    if let upperBound = leadingQuantity.upperBound {
-      scaledLeadingText = "\(IngredientScaler.formattedQuantity(leadingQuantity.value * factor))–\(IngredientScaler.formattedQuantity(upperBound * factor))"
+    let scaledQuantityText: String
+    if let upperBound = quantity.upperBound {
+      scaledQuantityText = "\(IngredientScaler.formattedQuantity(quantity.value * factor))–\(IngredientScaler.formattedQuantity(upperBound * factor))"
     } else {
-      scaledLeadingText = IngredientScaler.formattedQuantity(leadingQuantity.value * factor)
+      scaledQuantityText = IngredientScaler.formattedQuantity(quantity.value * factor)
     }
 
-    return String(text[..<leadingQuantity.range.lowerBound])
-      + scaledLeadingText
-      + String(text[leadingQuantity.range.upperBound...])
+    return String(text[..<quantity.range.lowerBound])
+      + scaledQuantityText
+      + String(text[quantity.range.upperBound...])
   }
 }
 
