@@ -235,6 +235,10 @@ final class WorkbenchDetailModel {
   }
 
   func chatButtonTapped() {
+    if case .chat? = destination {
+      destination = nil
+      return
+    }
     Task { [weak self] in
       guard let self, let context = await loadChatContext() else { return }
       destination = .chat(RecipeChatModel(context: .workbench(context)))

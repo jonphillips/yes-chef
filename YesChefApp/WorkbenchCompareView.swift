@@ -121,9 +121,13 @@ struct WorkbenchCompareView: View {
         if let compactChatContext {
           ToolbarItem(placement: .topBarLeading) {
             Button {
-              compactChatModel = RecipeChatModel(context: compactChatContext)
+              if compactChatModel != nil {
+                compactChatModel = nil
+              } else {
+                compactChatModel = RecipeChatModel(context: compactChatContext)
+              }
             } label: {
-              Label("Chat", systemImage: "sparkles")
+              Label("Ask", systemImage: "sparkles")
             }
           }
         }

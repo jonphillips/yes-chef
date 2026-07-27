@@ -8,6 +8,11 @@ import YesChefCore
 struct ChatSurface {
   typealias DetentIdentity = ChatSurfaceResolution.DetentIdentity
 
+  struct ChatStarter: Identifiable, Equatable {
+    let id: String
+    let title: String
+  }
+
   struct Content {
     let applyActions: [AnyChatApplyAction]
     var finalization: ChatFinalizeConfiguration? = nil
@@ -17,7 +22,11 @@ struct ChatSurface {
 
   enum Sections {
     case none
-    case switchable(select: (PlaybookSectionKind) -> Void, active: PlaybookSectionKind?)
+    case starters(
+      [ChatStarter],
+      active: ChatStarter.ID?,
+      select: (ChatStarter.ID) -> Void
+    )
   }
 
   enum Presentation {
@@ -70,7 +79,7 @@ struct ChatSurface {
   ) -> Self {
     Self(
       content: content,
-      sections: .switchable(select: selectSection, active: activeSection),
+      sections: recipeStarters(selectSection: selectSection, activeSection: activeSection),
       presentation: .modalSheet(onDismiss: onDismiss)
     )
   }
@@ -83,13 +92,23 @@ struct ChatSurface {
   ) -> Self {
     Self(
       content: content,
-      sections: .switchable(select: selectSection, active: activeSection),
+      sections: recipeStarters(selectSection: selectSection, activeSection: activeSection),
       presentation: .embeddedHeader(onDismiss: onDismiss)
     )
   }
 
-  static func menuTool(content: Content, onDismiss: @escaping () -> Void) -> Self {
-    Self(content: content, sections: .none, presentation: .embeddedHeader(onDismiss: onDismiss))
+  static func menuTool(
+    content: Content,
+    starters: [ChatStarter],
+    activeStarterID: ChatStarter.ID?,
+    selectStarter: @escaping (ChatStarter.ID) -> Void,
+    onDismiss: @escaping () -> Void
+  ) -> Self {
+    Self(
+      content: content,
+      sections: .starters(starters, active: activeStarterID, select: selectStarter),
+      presentation: .embeddedHeader(onDismiss: onDismiss)
+    )
   }
 
   static func calendarWorkspaceColumn(content: Content) -> Self {
@@ -124,7 +143,7 @@ struct ChatSurface {
     let resolvedSections: ChatSurfaceResolution.Sections
     switch sections {
     case .none: resolvedSections = .none
-    case .switchable: resolvedSections = .switchable
+    case .starters: resolvedSections = .starters
     }
 
     return ChatSurfaceResolution(
@@ -139,5 +158,18 @@ struct ChatSurface {
 
   private static func sheet(content: Content, onDismiss: @escaping () -> Void) -> Self {
     Self(content: content, sections: .none, presentation: .modalSheet(onDismiss: onDismiss))
+  }
+
+  private static func recipeStarters(
+    selectSection: @escaping (PlaybookSectionKind) -> Void,
+    activeSection: PlaybookSectionKind?
+  ) -> Sections {
+    .starters(
+      PlaybookSectionKind.allCases.map { ChatStarter(id: $0.rawValue, title: $0.chatMenuTitle) },
+      active: activeSection?.rawValue
+    ) { starterID in
+      guard let section = PlaybookSectionKind(rawValue: starterID) else { return }
+      selectSection(section)
+    }
   }
 }

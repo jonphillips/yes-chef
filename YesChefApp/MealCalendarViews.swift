@@ -113,6 +113,8 @@ struct MealCalendarWorkspaceView: View {
   private func chatButtonTapped() {
     if isChatWorkspaceEnabled {
       chatToggleRequest += 1
+    } else if compactChatModel != nil {
+      compactChatModel = nil
     } else {
       compactChatModel = RecipeChatModel(context: mealPlanChatContext)
     }
@@ -166,7 +168,11 @@ struct MealCalendarPlannerView: View {
   }
 
   private func chatButtonTapped() {
-    compactChatModel = RecipeChatModel(context: mealPlanChatContext)
+    if compactChatModel != nil {
+      compactChatModel = nil
+    } else {
+      compactChatModel = RecipeChatModel(context: mealPlanChatContext)
+    }
   }
 
   private var mealPlanChatContext: RecipeChatContext {

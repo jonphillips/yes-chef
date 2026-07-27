@@ -1,171 +1,234 @@
 # Current Handoff
 
-Last updated: July 26, 2026.
+Last updated: July 27, 2026.
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
 holding**. We stay in CloudKit **Development** by design; prod-schema promotion is the held ops step in its
 own section below.
 
-The **short entry point** for a fresh Yes Chef conversation. This file is deliberately lean: it holds
-**Next Up** (the dispatch target), the **Standing guards**, the **Ready Efforts** queue, the **prod-schema
-promotion list**, and the **Verification Pattern** — nothing else. Completed-slice history, the
-implemented-behavior checkpoint, and strategic background live in [`docs/DONE-LOG.md`](DONE-LOG.md)
-(read-rarely archive — do **not** read it on a dispatch). `docs/AGENTS.md` remains the authoritative
-project/agent guide.
+The **short entry point** for a fresh Yes Chef conversation. It holds **Next Up** (the dispatch target), the
+**Architect track**, the **Standing guards**, the **Ready Efforts** queue, the **prod-schema promotion
+list**, and the **Verification Pattern** — nothing else. Completed-slice history and strategic background
+live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** read it on a dispatch).
+`docs/AGENTS.md` remains the authoritative project/agent guide.
 
 ## Next Up
 
-**ONE live dispatch target: [`efforts/chat-ask-uniformity.md`](efforts/chat-ask-uniformity.md) S1–S4 —
-one Ask, on every surface.**
-Dispatch with *"Do the **chat-ask uniformity** effort in `docs/CURRENT_HANDOFF.md`."* If this section is
+**ONE live dispatch target: [`efforts/capture-llm-fallback-2026-07-26.md`](efforts/capture-llm-fallback-2026-07-26.md)
+— an LLM capture fallback for pages with no machine contract.**
+Dispatch with *"Do the **capture LLM fallback** effort in `docs/CURRENT_HANDOFF.md`."* If this section is
 empty or missing, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-**Verification: app-layer, no Core, no schema.** Elevated `generic/platform=iOS` build is **required
-evidence** (see Verification Pattern), plus `scripts/check-drift.sh`. **A device pass is expected here** —
-unlike its predecessor, this effort changes what the cook sees.
+Design ratified in [ADR-0047](decisions/ADR-0047-llm-capture-fallback.md); all five OQs closed. One
+dispatch — S1a–S1c in one PR, then S2. **Core-heavy, no schema.** Capture has contained **zero model calls**
+since ADR-0007; Substack (and the whole no-markup category) ships no JSON-LD/microdata/hRecipe, so three
+extractors miss outright. **Capture pills are rejected, not deferred** — `RecipeCaptureView` is already the
+correction surface.
 
-**Already scoped — do not re-scope it.** Full scope is in the effort doc. Three things a dispatch must not
-miss:
+**Already scoped — do not re-scope it.** Four things a dispatch must not miss:
 
-1. **The Menu is the only live defect; do not "fix" the other five.** Three surfaces present the panel as a
-   modal sheet that covers their own Ask button, so their missing toggle is unreachable and is *not* a bug.
-   The Menu's panel is an embedded tool rendered beside its button, and its pre-flight verb menu means
-   **there is no way to open a Menu chat without paying for an LLM call.** That is the slice.
-2. **Port the Recipe's warm-thread guard; do not re-derive it.**
-   [`RecipeModels.swift:962–967`](../YesChefApp/RecipeModels.swift) already solves "a freshly-opened panel
-   may restore a warm thread from an earlier section." Once the Menu's Ask opens the panel *before* a
-   starter is picked — the normal case after S2 — the Menu hits that trap identically.
-3. **Uniformity is cross-surface, not cross-device** (Jon, 2026-07-27). Modal sheets keep the iOS nav bar;
-   embedded and column presentations keep the in-panel header row. **That divergence is closed as intended
-   behaviour — do not "unify" it.**
+1. **The gate is the warnings the parser already computes** (`.noIngredients` / `.noInstructions` /
+   `.noStructuredRecipeData`) — contract-bearing pages never reach the model.
+2. **⚠️ The model's input is a structure-preserving serialization, NEVER `bodyText`.** `cleanedBodyText` is
+   `.text()`-flattened; on a no-contract page the `<ul>`/`<ol>`/`<h#>` structure *is* the recipe boundary.
+   Reusing `bodyText` because it sits there uncapped fails a dogfood round while looking like a
+   model-quality problem.
+3. **The gate cannot live in `WebRecipePageParser.parse`** (pure and synchronous) **and cannot be appended
+   to `capture(url:)` either** — `browserCapture` is **synchronous** and is the exact path that failed on
+   Substack. The answer is a separate `escalate(draft:)` the app calls after any capture path; the share
+   extension satisfies "never escalates" by never calling it.
+4. Provenance is a **priority rung** below `chromePriority`, so a deterministic source always wins by
+   arithmetic.
 
-**Owed from PR #243, non-blocking:** the device pass on all four chat surfaces, confirming nothing moved
-visually.
+**Verification.** S1a/S1b are package tests where `scripts/check-drift.sh` actually runs. S1c and S2 touch
+`YesChefApp/` and therefore need the elevated `generic/platform=iOS` build as required evidence. No
+simulator installs; Jon device-passes on the Substack page.
 
-**Why now:** same slot argument as its predecessor — this wants to land before
-[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md), which moves all eight call sites and should
-inherit one Ask rather than six.
+## Architect track (parallel — NOT a Codex dispatch)
+
+**Fix the app test target.** Jon has the prompt; Claude works this in its own session, off to the side of
+the Codex dispatch above. It touches build/test infrastructure and jon-platform, not product code, so the
+two should not collide. **Do not fold this into a product dispatch and do not let a dispatch "fix it along
+the way."**
+
+**The diagnosis has now been wrong three times, each time by reading the first error as the blocker.** The
+record, corrected 2026-07-27 by direct probe:
+
+- `xcodebuild build-for-testing` first dies on **two missing `await`s** in `YesChefAppTests/AIHandoffMenuPasteTests.swift`
+  (`:92` and `:127` — `database.write` / `database.read` inside an async `operation:`). Real, pre-existing
+  on `main`, two lines.
+- Patch those and it clears them and hits **`CloudSyncKitdynamic-product: clang: error: linker command
+  failed`** — the same wall the original brief recorded. The 2026-07-27 "missing GRDB /
+  StructuredQueriesCore conformance symbols" reading never got past this either.
+- So the wall has not moved, and **the `.dynamic` product missing conformance symbols from its own static
+  dependencies still reads like a SwiftPM product-type problem, not a hard restriction.** First step is one
+  probe that captures the *complete* undefined-symbol list rather than the first line.
+
+**What it unblocks.** [`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) (23 tests
+executed by nothing; only 4 are stranded by the target, the other 19 by pure logic sitting in `YesChefApp/`)
+and the standing "a test only counts in `YesChefPackage/Tests/`" rule in the Verification Pattern. **Three
+efforts in a row have now written a test into a target that runs nothing.** The move-to-Core slices stand on
+their own merits either way — the *"don't bother fixing it"* conclusion is what this track retires.
 
 ## Standing guards
 
-Closed decisions that stay closed. Each is already written up in its ADR and `DONE-LOG`; they live here
-only so a dispatch does not re-queue them. **Nothing in this section is work.**
+Closed decisions that stay closed, here only so a dispatch does not re-queue them. **Nothing in this
+section is work.**
 
 - **⚠️ The ADR-0042 return contract is v2** — re-copy the project instructions from AI Settings or every
-  verb fails the marker gate. (Operational, not historical: it bites on any hand-off dogfooding session.)
+  verb fails the marker gate. (Operational: it bites on any hand-off dogfooding session.)
 - **ADR-0021 (variations) and ADR-0023 (recipe edit proposals) have nothing queued.** ADR-0023's *iterative
-  refine loop* is **WITHDRAWN** (ADR-0042 D7 — refinement happens in the live external thread; an in-app
-  multi-turn proposal loop is a worse copy of it, **do not rebuild it**). Per ADR-0042 D2 the in-app adjust
-  verb stays the **only** path that writes a structured delta.
-- **ADR-0042 S3 (`workbenchDraft`) stays deferred and un-queued** — no concrete want, its danger receded
-  rather than grew. **Do not build it on ADR momentum.** There is no S5.
+  refine loop* is **WITHDRAWN** (ADR-0042 D7 — refinement happens in the live external thread; **do not
+  rebuild it**). Per D2 the in-app adjust verb stays the **only** path that writes a structured delta.
+- **ADR-0042 S3 (`workbenchDraft`) stays deferred and un-queued** — no concrete want. **Do not build it on
+  ADR momentum.** There is no S5.
 - **`PlaybookSectionMeta` is not queued anywhere — do not resurrect it.** ADR-0041 closed at S2.6, S3
   withdrawn ([Amd 3](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-3--s3-is-withdrawn-the-conversation-url-does-not-exist-2026-07-19)).
-  If section provenance is ever wanted, it designs its own storage against its own consumer
+  If section provenance is ever wanted it designs its own storage against its own consumer
   ([[withdraw-not-defer-orphaned-schema]]).
-- **Both candidates Jon named 2026-07-21 are discharged — do not re-queue either.** Variations (the whole
-  ADR-0021 arc shipped and device-passed) and "Menu is under-served by hand-off verbs" (discharged by
-  ADR-0043's load test). Parked **ADR-0013** meal-planner verbs remain separate and unscoped — see Ready
-  Efforts.
-- **The Recipe Workbench store/curate/compare arc (ADR-0019) is complete**, S1–S4 shipped. Its remaining
-  parked follow-ons live in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md), not here.
-- **The workbench's experiment-outcome verb is NOT scoped** — only its *placement* is ratified (an ADR-0042
-  amendment: D8's corollary that a conjecture suppresses learnings but a **cooked** experiment is findings,
-  so learnings come back on). That amendment gets written **when that half is scoped, deliberately not now.**
+- **Both candidates Jon named 2026-07-21 are discharged** — variations (whole ADR-0021 arc shipped and
+  device-passed) and "Menu is under-served by hand-off verbs" (discharged by ADR-0043's load test). Parked
+  **ADR-0013** meal-planner verbs remain separate and unscoped — see Ready Efforts.
+- **The Recipe Workbench store/curate/compare arc (ADR-0019) is complete**, S1–S4 shipped. Parked follow-ons
+  live in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md), not here.
+- **The workbench's experiment-outcome verb is NOT scoped** — only its *placement* is ratified (ADR-0042 D8's
+  corollary: a conjecture suppresses learnings, a **cooked** experiment is findings, so learnings come back
+  on). That amendment gets written when that half is scoped, **deliberately not now.**
+- **Chat entry points are unified and closed** ([`efforts/chat-ask-uniformity.md`](efforts/chat-ask-uniformity.md),
+  PR #244). Uniformity is **cross-surface, not cross-device**: modal sheets keep the iOS nav bar, embedded
+  and column presentations keep the in-panel header row. **That divergence is intended — do not "unify" it.**
+  The Calendar/Workbench detent split and the Recipe inspector belong to ADR-0046, not to a chat pass.
 
 ## Ready Efforts (queue)
 
-Drawn into **Next Up** as needed (one dispatch, one or more cohesive slices); not itself a dispatch
-target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](DONE-LOG.md).
+Drawn into **Next Up** as needed; not itself a dispatch target. Completed efforts live in
+[`docs/DONE-LOG.md`](DONE-LOG.md).
 
-**[`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) — the prep plan knows things the model doesn't (scoped 2026-07-26).** Two slices, **no schema** — both use fields that already exist and already sync.
-- **S1 (Core only) — the menu's placement dates reach `MenuChatContext`.** [ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md) D2 retired the fixed horizon enum *because* real session labels are concrete ("Wednesday evening", "Saturday · ~3 hrs out") — but the context carries **no date of any kind**, so a placed menu and an unplaced one send byte-identical context and the model falls back to relative horizons ("One day ahead" — ahead of *which* day?). That is the exact ambiguity ADR-0034's Context section opens with. Serialize the per-day dates, and ask for day-anchored sessions **only when the menu is placed** (unplaced keeps today's relative wording). **No app build needed** — no UI.
-- **S2 — the dish picker; `sourceDish` becomes human-settable for the first time.** It is write-only from the LLM today (`PrepPlanStepEditorDraft` has no dish field, `PrepPlanStepRepository.update` has no parameter), while every outboard text return drops it by design (ADR-0040 D3). So links only decay and nothing can restore them. A picker defaulting to a `serves` → menu-item match, **suggestion visibly marked as a suggestion**, nothing written until save.
-- **Sequence S1 → S2** — S1 changes the shape of `serves` ("Saturday's Korean Bavette"), so S2's matcher wants writing against the post-dates output. They can still share one dispatch.
-- **Do not auto-relink without a human gate** (ADR-0040 D3), and **do not add a date to `PrepPlanStepRecord`** (ADR-0034 D1). The dogfood data shows why the first is wrong: exact match succeeds on `Korean Bavette` and fails on `…Salad (Korean)`, so half the chips would silently return and half would not.
+**[`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) — the prep plan
+knows things the model doesn't (scoped 2026-07-26).** Two slices, **no schema** — both use fields that
+already exist and already sync.
+- **S1 (Core only) — the menu's placement dates reach `MenuChatContext`.**
+  [ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md) D2 retired the fixed horizon enum
+  *because* real session labels are concrete ("Saturday · ~3 hrs out") — but the context carries **no date of
+  any kind**, so a placed menu and an unplaced one send byte-identical context and the model falls back to
+  "One day ahead" — ahead of *which* day? Serialize the per-day dates; ask for day-anchored sessions **only
+  when the menu is placed**. **No app build needed.**
+- **S2 — the dish picker; `sourceDish` becomes human-settable for the first time.** It is write-only from the
+  LLM today, while every outboard text return drops it by design (ADR-0040 D3), so links only decay. A picker
+  defaulting to a `serves` → menu-item match, **suggestion visibly marked as a suggestion**, nothing written
+  until save.
+- **Sequence S1 → S2** (S1 changes the shape of `serves`), one dispatch. **Do not auto-relink without a human
+  gate** and **do not add a date to `PrepPlanStepRecord`** (ADR-0034 D1) — exact match succeeds on
+  `Korean Bavette` and fails on `…Salad (Korean)`, so half the chips would silently return.
 
-**[`efforts/chat-ask-uniformity.md`](efforts/chat-ask-uniformity.md) — one Ask, on every surface (scoped 2026-07-27).** **S1–S4 are under Next Up.** App-layer only; no Core, no schema. The follow-on that spends what the surface contract bought. `ChatSurface.Sections` is typed to `PlaybookSectionKind` — a Recipe concept — so the Menu could not express "here are things you can start a discussion about" and grew a pre-flight verb menu *outside* the panel instead. That menu is why **a Menu chat cannot be opened without buying a discussion first.** Generalize `Sections` to host-supplied starters and both the entry-point defect and the title-slot divergence close in one change.
-- **Answers [`chat-surface-contract.md`](efforts/chat-surface-contract.md)'s Open Question 1** — the Menu's `sections: .none` shipped un-asked, and this is the real answer to it.
-- **S4 inherits the dead-test-target problem.** Write it, do not report it as passing, and see the Verification Pattern's `YesChefAppTests` warning.
-- **Wants the slot before [ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md)**, same argument as its predecessor.
+**[`efforts/grocery-rapid-add-2026-07-26.md`](efforts/grocery-rapid-add-2026-07-26.md) — persistent grocery
+Add Item field + Accept All on review. READY.** One dispatch, five slices, **no schema**; all three product
+confirms closed. A/B the field + fraction pills, C the debounce, D the stale-sheet fix, E the review-sheet
+Accept All (unrelated, rides along).
+- **Slice C decides whether the feature is good, and it is the one that looks skippable.**
+  `categorizeUncachedItems()` already fires after every add and does **three whole-table `fetchAll` scans +
+  two write transactions + two full `$itemRows` reloads** — fine at one add, an
+  [ADR-0029](decisions/ADR-0029-main-thread-write-and-fetch-cost.md) writer convoy at ten adds in twenty
+  seconds, which is exactly what A/B create.
+- **Two scope cuts already found:** deterministic area assignment is **already wired** (`addCustomItem` falls
+  back to `GroceryStoreArea.seed`), and so is the deferred model sweep. Do not add a second seeding path.
+- **Slice E's trap:** the file holds *two* definitions of "unedited" (`.sheet` → `editableText ?? summary`;
+  `.inline` → `summary`). Extract one `unmodifiedApprovedText` so they cannot drift.
 
-### From the 2026-07-26 dogfood pass — three items, all scoped, none dispatched
+**[`efforts/playbook-edit-grain-2026-07-26.md`](efforts/playbook-edit-grain-2026-07-26.md) — Playbook edit
+affordances are a readout of storage grain. Dispatch 1 READY; Dispatch 2 behind it.** Ratified in
+[ADR-0048](decisions/ADR-0048-playbook-edit-grain.md), all OQs closed. **Dispatch 1 (S1+S2) is schema-free**:
+extract the Learnings row editor, Reader Feedback adopts it (already `recipeNotes` rows); S2 is the loud
+decode. S3 is the real one — `Recipe.serveWith` is a **JSON blob whose items are `Identifiable` with UUIDs**,
+identity without a row, with `reconciledServeWithItems` existing solely to carry those UUIDs across whole-blob
+rewrites by matching on content.
+- **S3's primary test, not a detail:** the regeneration path must **upsert by identity and preserve
+  hand-authored rows**. Delete-and-reinsert reproduces the exact identity loss the slice exists to remove.
+- **Make Ahead / Chef It Up stay prose (D4)** — they only *look* like lists because
+  `PlaybookEnrichmentDisplayText` splits multi-line strings at render time. Do not decompose them on momentum.
+- **Reorder is opt-in:** `RecipeNote` has no `sortOrder`, so Reader Feedback edits and deletes per row but does
+  **not** reorder, and does **not** gain a column to make the shape uniform.
 
-**[`efforts/grocery-rapid-add-2026-07-26.md`](efforts/grocery-rapid-add-2026-07-26.md) — persistent grocery Add Item field + Accept All on review (scoped 2026-07-26). READY.** One dispatch, five slices, **no schema**; all three product confirms closed. Slices A/B the field + fraction pills, C the debounce, D the stale-sheet fix, E the review-sheet Accept All (unrelated, rides along — it touches none of the same files).
-- **Slice C is the one that decides whether the feature is good, and it is the one that looks skippable.** `categorizeUncachedItems()` already fires after every add and does **three whole-table `fetchAll` scans + two write transactions + two full `$itemRows` reloads** — fine at one add per sheet, an [ADR-0029](decisions/ADR-0029-main-thread-write-and-fetch-cost.md) writer convoy at ten adds in twenty seconds, which is exactly what Slices A/B create.
-- **Two scope cuts already found:** deterministic area assignment is **already wired** (`addCustomItem` falls back to `GroceryStoreArea.seed`), and so is the deferred model sweep. Do not add a second seeding path.
-- **Slice E's trap:** the file holds *two* definitions of "unedited" (`.sheet` → `editableText ?? summary`; `.inline` → `summary`). Accept All must honour each per-presentation or it silently commits different content than tapping through. Extract one `unmodifiedApprovedText` so they cannot drift.
+**[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell. Unblocked
+but unscheduled.** Its gate was satisfied 2026-07-25; nothing holds it except appetite. It moves all eight
+chat call sites, which now inherit **one** Ask rather than six.
 
-**[`efforts/capture-llm-fallback-2026-07-26.md`](efforts/capture-llm-fallback-2026-07-26.md) — LLM capture fallback for pages with no machine contract (scoped 2026-07-26). READY.** Design ratified in [ADR-0047](decisions/ADR-0047-llm-capture-fallback.md); all five OQs closed. One dispatch, S1a–S1c in one PR then S2; Core-heavy, **no schema**. Capture has contained **zero model calls** since ADR-0007; Substack (and the whole no-markup category) ships no JSON-LD/microdata/hRecipe, so three extractors miss outright. **Capture pills are rejected, not deferred** — `RecipeCaptureView` is already the correction surface.
-- **The gate is the warnings the parser already computes** (`.noIngredients` / `.noInstructions` / `.noStructuredRecipeData`) — contract-bearing pages never reach the model.
-- **⚠️ The model's input is a structure-preserving serialization, NEVER `bodyText`.** `cleanedBodyText` is `.text()`-flattened; on a no-contract page the `<ul>`/`<ol>`/`<h#>` structure *is* the recipe boundary. Reusing `bodyText` because it sits there uncapped fails a dogfood round while looking like a model-quality problem.
-- **The gate cannot live in `WebRecipePageParser.parse`** (pure and synchronous) **and cannot be appended to `capture(url:)` either** — `browserCapture` is **synchronous** and is the exact path that failed on Substack. The effort's answer is a separate `escalate(draft:)` the app calls after any capture path; the share extension satisfies "never escalates" by never calling it.
-- Provenance is a **priority rung** below `chromePriority`, so a deterministic source always wins by arithmetic.
+**ADR-0045 leftovers — two cold-start entry points, each its own small slice.** The meal-calendar day-header
+Chat and the Workbench Chat, same dead end, no section to carry. Recorded in the ADR, deliberately not folded
+into V1. **Open for Jon:** now that starters are host-supplied, do the Calendar and Workbench want starters of
+their own ("Plan this week", "What should I prep tonight?")? They pass `.none` today, which is an explicit
+answer rather than an omission — worth deciding before ADR-0046 rearranges these surfaces.
 
-**[`efforts/playbook-edit-grain-2026-07-26.md`](efforts/playbook-edit-grain-2026-07-26.md) — Playbook edit affordances are a readout of storage grain (scoped 2026-07-26). Dispatch 1 READY; Dispatch 2 sequenced behind it.** Design ratified in [ADR-0048](decisions/ADR-0048-playbook-edit-grain.md), all OQs now closed. **Dispatch 1 (S1+S2) is schema-free and answers most of the original complaint**: extract the Learnings row editor, Reader Feedback adopts it (already `recipeNotes` rows — its Edit tap and scrollable `TextEditor` have no storage justification). S2 is the loud decode. S3 is the real one: `Recipe.serveWith` is a **JSON blob whose items are `Identifiable` with UUIDs** — identity without a row, and `reconciledServeWithItems` already exists solely to carry those UUIDs across whole-blob rewrites by matching on content.
-- **S3's primary test, not a detail:** the regeneration path must **upsert by identity and preserve hand-authored rows**. Delete-and-reinsert reproduces the exact identity loss the slice exists to remove.
-- **Make Ahead / Chef It Up stay prose (D4), deferred not scheduled** — they only *look* like lists because `PlaybookEnrichmentDisplayText` splits multi-line strings at render time. Do not decompose them on this ADR's momentum.
-- **Reorder is opt-in, not assumed:** `RecipeNote` has no `sortOrder`, so Reader Feedback edits and deletes per row but does **not** reorder — and does **not** gain a column to make the shape uniform.
+**ADR-0041 deferred follow-ons** (on the record, **not** dispatchable without Jon scoping them) — the **menu**
+Playbook sections getting the same per-section toolbar, and section-selection checkboxes on the whole-recipe
+hand-off (the scoped per-section verbs make these *less* necessary, not more).
 
-**[ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) — the workbench reference-material fetch. COMPLETE (S1–S3 shipped 2026-07-26); nothing queued, device pass owed on S3.** Write-up in [`DONE-LOG`](DONE-LOG.md). The parked follow-ons stay parked and are **not** dispatchable without Jon scoping them: the LLM reduce pass (when it ships it is [ADR-0043](decisions/ADR-0043-model-call-chokepoint.md)'s harder load test), candidate-source prose, and `web_search` public discovery — OQ6 rejected the last firmly enough that re-queueing it needs a dogfooding reason, not momentum. **Two live caveats ride into the device pass:** `pastedText` is a new raw value in a synced enum column, so **update both devices before saving a pasted-text reference**; and the `isThin` 1,500-character threshold is still a guess against real pages.
+**Drag recipes from Browse into a meal (BLOCKED on iPadOS Beta 4).** The pipeline is **already wired** —
+`MenuRecipeBrowserPanel` rows are `.draggable(MenuDraggedRecipe)`, `MenuDishDayList` has a matching
+`.dropDestination`, and the slide-over keeps the Dishes body interactive beneath it — but drag-and-drop is not
+firing reliably in the current betas. **Retry after Beta 4;** then it's confirm-E2E + polish, no schema.
 
-**[`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) — the app test target runs nothing; move the logic (scoped 2026-07-26).** No schema, no UI, no behavior change, no device pass. `YesChefAppTests` holds **23 tests executed by nothing**; only 4 are stranded by the target, the other **19 by pure logic sitting in `YesChefApp/`**. Five moves recover them — S1 two whole files (11 tests), S2 three extractions (8), S3 marks the rest.
-- **The pass signal is the test count, not a green run** — 462 today, **481** after S1+S2. Green at 462 means the moved suites were never discovered, which is the failure this ends.
-- **Do not try to fix the test target** *without re-diagnosing first — and that re-diagnosis is underway.* This brief records `CloudSyncKitdynamic-product` failing to link `SwiftUICore` ("not an allowed client"). A `build-for-testing` run on 2026-07-27 instead died on **missing GRDB / StructuredQueriesCore conformance symbols**, reproducibly and identically on `main` — a different failure, and one whose signature (a `.dynamic` product missing conformance symbols from its own static dependencies) reads like a SwiftPM product-type problem rather than a hard restriction. The "move the logic to Core" slices stand on their own merits regardless; the ***"don't bother fixing it"*** conclusion was reached against a failure mode that is no longer the one you get.
+**Meal-Planner chat verbs** (ADR-0013 + `efforts/cooking-workspace.md`) — the one remaining named
+actionable-chat verb instance. Classify each verb's commit shape first ([[chat-verb-commit-shapes]]) — likely
+no-commit advisory or a per-day note, not a per-recipe write; respect [[llm-curation-not-synthesis]].
+**Confirm with Jon what verb scope remains.**
 
-**[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell. Unblocked but unscheduled.** Its gate ("ferry Dispatch 1 lands first") was satisfied 2026-07-25 and Dispatch 1.5's panel work is merged, so nothing holds it except appetite.
+**Recipe text normalization** — de-cap old all-caps Milk Street imports, strip manual instruction numbers now
+that we auto-number. **Unscoped**; parked in [`docs/open-questions.md`](open-questions.md). Interacts with
+ADR-0014, so sequence them.
 
-**ADR-0045 leftovers — two cold-start entry points, each its own small slice.** The meal-calendar day-header Chat and the Workbench Chat are the fourth and fifth cold-start entry points OQ3's check turned up — same dead end, no section to carry. Recorded in the ADR and deliberately not folded into V1.
-
-**ADR-0041 deferred follow-ons** (on the record in the ADR, **not** dispatchable without Jon scoping them) — the **menu** Playbook sections getting the same per-section toolbar (ADR-0039 Amd 2/3's shared Enrichment column; ADR-0041 deliberately scoped to the *recipe*), and section-selection checkboxes on the whole-recipe hand-off (the scoped per-section verbs make these *less* necessary, not more).
-
-**Drag recipes from Browse into a meal (BLOCKED on iPadOS Beta 4)** — surfaced by the Amendment 3 *over*
-presentation (PR #197). The pipeline is **already wired**: `MenuRecipeBrowserPanel` rows are
-`.draggable(MenuDraggedRecipe)` and `MenuDishDayList` has
-`.dropDestination(for: MenuDraggedRecipe.self) { model.addRecipesToMenu(…) }`, and the slide-over keeps the
-Dishes body interactive beneath it. **But drag-and-drop is not firing reliably in the current betas** — Jon
-(with Fable and GPT-5.6 Sol) could not get it to work; **retry after Beta 4.** Not dispatchable until then; when
-it unblocks it's mostly confirm-E2E + polish (drop highlight, autoscroll, multi-select), no schema.
-
-**Meal-Planner chat verbs** (ADR-0013 follow-on + `efforts/cooking-workspace.md`) — the one remaining named
-actionable-chat verb instance. Classify each new verb's commit shape first ([[chat-verb-commit-shapes]]) —
-likely no-commit advisory or a per-day note, not a per-recipe write; respect [[llm-curation-not-synthesis]].
-Design in [ADR-0013](decisions/ADR-0013-meal-planner-actionable-chat.md) +
-[`efforts/cooking-workspace.md`](efforts/cooking-workspace.md). **Confirm with Jon what verb scope remains.**
-
-**Recipe text normalization** — a "normalize recipe" function (de-cap old all-caps Milk Street imports,
-strip manual instruction numbers now that we auto-number). **Unscoped** — no natural existing effort home;
-parked in [`docs/open-questions.md`](open-questions.md) until scoped. Interacts with ADR-0014 (text-editing
-model), so sequence them.
-
-**Open design ADR (discussion, not yet Accepted)** — [ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md)
-recipe text editing (header toggles vs. rich text / bold-italic), opened from the 2026-07-04 dogfood pass.
-Decide with Jon before any implementation — **and note it narrowed on 2026-07-21**: ADR-0021 Amd1-D5 needs
-ADR-0014 only for **section headers inside a variation**, which is the one edit the op vocabulary cannot
-express.
+**Open design ADR (discussion, not yet Accepted)** —
+[ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md) recipe text editing (header toggles vs. rich
+text). Decide with Jon before any implementation — **it narrowed on 2026-07-21**: ADR-0021 Amd1-D5 needs it
+only for **section headers inside a variation**, the one edit the op vocabulary cannot express.
 
 **Small nits — not urgent, fold into a passing dispatch:**
-- **Workbench log-editor** (from the ADR-0042 S2 review): the `canSave` / `normalizedLogEntryDraft` mismatch when a body is combined with partially-filled typed fields, the dead save spinner, and the pre-existing compare `.menuPrepPlan` mislabel.
-- **The S4 brief extractor's prompt is framed for a conversation, but S4 hands it a decision** (found 2026-07-21; silent-failure risk). `instructions` opens *"You extract a proposed edit … from a cooking **conversation**,"* the prompt says *"**Conversation so far:**"* and closes *"Extract only the concrete recipe edit **the user is asking to review**"* — while `HandoffReviewCoordinator.draftRecipeAdjustment` wraps the finished brief as a single fake `.user` message and passes `selection: ""`. So a **decided** revision is presented as an **in-progress ask**, inviting the extractor to infer or hedge where the whole point of Amd1-D1 is that the human already decided. Under-extraction here is **silent** — a 3-change brief that yields 2 ops just shows a shorter side-by-side. *Fix:* a task-specific framing for the brief path ("this is a decided revision; transcribe every change faithfully and completely"), **not** a second client. **Deliberately NOT part of this:** adding the taste profile or known-learnings to the *extractor* — those belong to the outbound hand-off ask (where `RecipeHandoffContext` already sends both) because that is where judgment happens; feeding the extractor preference context invites exactly the editorializing D1 exists to stop.
-- **Workbench synthesis-shaped apply-action** — the draft verb's own action shape (no last-reply gate/chip); app-layer only, small, spec in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md)'s "Out of scope" section. ⚠️ Re-read against [ADR-0042 D2/OQ5](decisions/ADR-0042-workbench-handoff-and-the-return-block.md) before dispatching: it is an *in-app* draft verb, and the draft is a structured write.
-- **`stageReaderFeedback` defaults `unparsedLines` to `[]`**, so accepting a single tip through the *in-app* path clears the evidence banner (cosmetic).
+- **The S4 brief extractor's prompt is framed for a conversation, but S4 hands it a decision** (silent-failure
+  risk). `instructions` opens *"You extract a proposed edit … from a cooking **conversation**"* and closes
+  *"the user is asking to review"* — while `HandoffReviewCoordinator.draftRecipeAdjustment` wraps a finished
+  brief as one fake `.user` message with `selection: ""`. A **decided** revision is presented as an
+  **in-progress ask**, inviting the extractor to hedge where Amd1-D1's whole point is that the human already
+  decided; under-extraction is **silent** (a 3-change brief yielding 2 ops just looks shorter). *Fix:* a
+  task-specific framing for the brief path, **not** a second client. **Deliberately NOT part of this:** taste
+  profile or known-learnings into the *extractor* — those belong to the outbound ask, where judgment happens.
+- **Workbench log-editor** (ADR-0042 S2 review): the `canSave` / `normalizedLogEntryDraft` mismatch when a body
+  is combined with partially-filled typed fields, the dead save spinner, the compare `.menuPrepPlan` mislabel.
+- **Workbench synthesis-shaped apply-action** — the draft verb's own action shape (no last-reply gate/chip);
+  spec in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md). ⚠️ Re-read against ADR-0042 D2/OQ5
+  first: it is an *in-app* draft verb and the draft is a structured write.
+- **`stageReaderFeedback` defaults `unparsedLines` to `[]`**, so accepting a single tip through the *in-app*
+  path clears the evidence banner (cosmetic).
+- **From the PR #244 review, all one-liners:** `MenuDetailModel.tool`'s `didSet` and
+  `recipeBrowserButtonTapped` both clear `activeChatStarterID` — say it once
+  (`didSet { if chatModel == nil { … } }`); `MenuDetailReader`'s `isAskActive`/`askButtonTapped`/
+  `regeneratePrepPlan` closure params are now pure passthroughs to a `detailModel` it already receives (fine
+  to leave for ADR-0046); `namesStarterContractsForEveryHost` asserts `.starters == .starters` and proves
+  nothing.
 
-**Still-deferred, separate future efforts** (not follow-through on any shipped effort): ADR-0027 **OQ4**
-(a note-worthiness taste preference); **ADR-0036 S3** — promote a `RecipeNote` deposited *on a recipe*;
-**ADR-0038 Amd 4 — smart Learning curation** (an LLM pass reconciling incoming-vs-existing learnings —
-dedup/merge/supersede — with the review sheet surfacing existing learnings; the deterministic exact-dedup
-*floor* already shipped, so this is the paraphrase-aware ceiling, not urgent —
-[[handoff-stateless-both-directions]]). Comment ingestion stays in `docs/open-questions.md` until it is a
-scoped effort.
+**Still-deferred, separate future efforts:** ADR-0027 **OQ4** (a note-worthiness taste preference);
+**ADR-0036 S3** — promote a `RecipeNote` deposited *on a recipe*; **ADR-0038 Amd 4 — smart Learning
+curation** (an LLM pass reconciling incoming-vs-existing learnings; the deterministic exact-dedup *floor*
+already shipped, so this is the paraphrase-aware ceiling, not urgent —
+[[handoff-stateless-both-directions]]). Comment ingestion stays in `docs/open-questions.md`.
 
-**Parked to `docs/open-questions.md` (design forks, decide with Jon before build):** multi-bubble /
-whole-transcript chat selection (per-bubble `UITextView` caps the payload).
+**Parked to `docs/open-questions.md` (decide with Jon before build):** multi-bubble / whole-transcript chat
+selection (per-bubble `UITextView` caps the payload).
+
+## Device passes owed
+
+Not work, a checklist. **[ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) S3** (complete,
+nothing queued) carries two live caveats into its pass: `pastedText` is a new raw value in a synced enum
+column, so **update both devices before saving a pasted-text reference**, and the `isThin` 1,500-character
+threshold is still a guess against real pages. **PRs #243 + #244** owe one combined pass over all four chat
+surfaces — Menu, Recipe (the canary, must be unchanged), Calendar, Workbench — plus the new
+rotation behaviour: the Menu panel now migrates between overlay and sheet in both directions instead of being
+torn down.
 
 ## Prod-schema promotion list
 
 **Standing release follow-up — not a dispatch. A pre-cut ops step Jon runs.** We stay in the CloudKit
-**Development** environment (dev stance) so the schema keeps evolving freely; promoting to **Production** is
+**Development** environment so the schema keeps evolving freely; promoting to **Production** is
 additive-only and **permanently locks those record types**, so it is deliberately **held** until an actual
 prod/TestFlight cut. At that cut, deploy the following to the production schema:
 
@@ -192,41 +255,33 @@ mistakes have been made — verify against `CloudSync.swift`, not against intuit
 
 ## Verification Pattern
 
-Lean by default — the cost center is the build/simulator loop, not the code, and Jon does the
-device pass regardless. So verify with **compiler + tests once**, then hand off:
+Lean by default — the cost center is the build/simulator loop, not the code, and Jon does the device pass
+regardless. So verify with **compiler + tests once**, then hand off:
 
 - Run `xcodegen generate` after adding Swift source files.
 - For package/logic-only changes, `swift build` the package (cheaper than a full app build).
-- Otherwise run the app build with **elevated/unsandboxed permissions**, no simulator, and no signing
-  identity:
+- Otherwise run the app build with **elevated/unsandboxed permissions**, no simulator, no signing identity:
   `scripts/xcodebuild-summary.sh -scheme YesChef -destination 'generic/platform=iOS' -skipMacroValidation CODE_SIGNING_ALLOWED=NO build`.
 - Run `scripts/check-drift.sh`.
-- **The generic app build is required evidence for `YesChefApp/` changes.** `scripts/check-drift.sh` compiles
-  only `YesChefPackage`; a green package build and `swiftc -parse` are not App-target evidence. The default
-  Codex sandbox can SIGTERM Xcode before compilation by denying Xcode's user-level service/cache access, so
-  start with the elevated command above. A sandbox-shaped `143` is not an expected green result. If the
-  elevated build cannot reach the compiler, record the full-log path and **the architect runs the same generic
-  build locally before approving.** Once a build reaches the compiler, source errors must be fixed and the
-  same command rerun to verify.
+- **The generic app build is required evidence for `YesChefApp/` changes.** `check-drift.sh` compiles only
+  `YesChefPackage`; a green package build and `swiftc -parse` are not App-target evidence. The default Codex
+  sandbox can SIGTERM Xcode before compilation by denying user-level service/cache access, so start with the
+  elevated command. A sandbox-shaped `143` is not a green result. If the elevated build cannot reach the
+  compiler, record the full-log path and **the architect runs the same build locally before approving.**
 - **Corollary — keep pure logic out of the App layer.** String formatting, serialization, and parsing belong
-  in `YesChefPackage` (which Codex *can* compile and test), not in `YesChefApp/`. #185's build break was
-  `HandoffIntents.swift` calling `date: .full` (invalid `Date.FormatStyle.DateStyle`) — logic that belongs in
-  `MealPlanHandoffContext` in Core, where the package build would have caught it instantly.
+  in `YesChefPackage` (which Codex *can* compile and test). #185's break was `HandoffIntents.swift` calling
+  `date: .full` — logic that belonged in Core, where the package build would have caught it instantly.
 - **⚠️ `YesChefAppTests` is compiled and run by nothing — do not put a new test there.** Not
-  `scripts/check-drift.sh` (it ends in `swift test --package-path YesChefPackage`), not CI (same command), and
-  not the generic app build (`build` never compiles the test target). A `build-for-testing` attempt dies at a
-  CloudSyncKit dynamic-product link error before reaching the target, so the seven files already in it are not
-  even known to compile. **A test only counts if it lands in `YesChefPackage/Tests/`** — which is the same
-  corollary above, arriving from the other direction: if the logic is pure enough to test, move it to Core and
-  test it there. *Recovering the 23 tests already stranded there is scoped as
-  [`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) in Ready Efforts.*
+  `check-drift.sh`, not CI (same command), not the generic app build (`build` never compiles the test
+  target). **A test only counts if it lands in `YesChefPackage/Tests/`.** *The Architect track above is
+  actively retiring this constraint; until it lands, the rule holds — and **report the first error you hit as
+  the first error, not as the blocker**, which is how this diagnosis went wrong three times.*
 - **Note:** parts of the app target (`PantryViews.swift` / `GroceryViews.swift`) compile only in Jon's device
   pass, not in CI.
-- **Do not install/launch on simulators by default** — skip the install loop and hand straight to
-  Jon's UI pass. Only boot/install a simulator when a change genuinely can't be confirmed from build
-  + tests, and say why in the PR.
-- **Fail fast, without false escape hatches.** Do not try alternate destinations, simulator resets, or install
-  loops. The only build command is the elevated generic command above; an environment failure that prevents it
-  reaching the compiler is an architect gate, not a successful Codex verification. Device install is Jon's pass.
+- **Do not install/launch on simulators by default** — hand straight to Jon's UI pass. Only boot a simulator
+  when a change genuinely can't be confirmed from build + tests, and say why in the PR.
+- **Fail fast, without false escape hatches.** No alternate destinations, simulator resets, or install loops.
+  An environment failure that prevents the elevated build reaching the compiler is an architect gate, not a
+  successful Codex verification.
 
 Jon performs the primary UI testing pass on `iPad Pro 13-inch (M5) (16GB)` and `iPhone 17 Pro`.

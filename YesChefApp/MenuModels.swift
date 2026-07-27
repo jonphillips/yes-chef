@@ -497,6 +497,14 @@ final class MenuDetailModel {
   var information: Information?
   var errorMessage: String?
   var isShowingError = false
+  var tool: MenuDetailInspector? {
+    didSet {
+      if tool == nil {
+        activeChatStarterID = nil
+      }
+    }
+  }
+  var activeChatStarterID: ChatSurface.ChatStarter.ID?
   @ObservationIgnored var toastCenter: AppToastCenter?
 
   init(menuID: CoreMenu.ID, toastCenter: AppToastCenter? = nil) {

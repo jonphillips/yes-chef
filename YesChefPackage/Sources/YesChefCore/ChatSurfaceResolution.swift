@@ -11,7 +11,7 @@ public struct ChatSurfaceResolution: Equatable, Sendable {
 
   public enum Sections: Equatable, Sendable {
     case none
-    case switchable
+    case starters
   }
 
   public enum Dismissal: Equatable, Sendable {

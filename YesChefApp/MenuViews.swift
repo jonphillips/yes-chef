@@ -142,8 +142,6 @@ struct MenuDetailView: View {
   var isFocusActive = false
   var focusButtonTapped: (() -> Void)?
   @State private var detailModel: MenuDetailModel
-  @State private var toolOverlay: MenuDetailInspector?
-  @State private var compactTool: MenuDetailInspector?
   @State private var handoffTransport: HandoffInAppTransport
 
   init(
@@ -177,8 +175,7 @@ struct MenuDetailView: View {
           handoffTransport: handoffTransport,
           onRecipeSelected: onRecipeSelected,
           isAskActive: isAskActive,
-          askPrepPlan: askPrepPlan,
-          askComplement: presentComplementAsk,
+          askButtonTapped: askButtonTapped,
           regeneratePrepPlan: regeneratePrepPlan
         )
         .navigationTitle(detail.menu.title)
@@ -187,13 +184,13 @@ struct MenuDetailView: View {
       }
     }
     .overlay(alignment: .trailing) {
-      if usesToolOverlay, let toolOverlay {
+      if usesToolOverlay, let tool = detailModel.tool {
         // Keep the menu interactive beneath the panel so recipes can later be
         // dragged from Browse Recipes into a meal. The toolbar toggles dismiss it.
         menuToolContent(
-          toolOverlay,
+          tool,
           onRecipeSelected: { presentation in
-            self.toolOverlay = nil
+            detailModel.dismissTool()
             onRecipeSelected?(presentation)
           }
         )
@@ -208,12 +205,7 @@ struct MenuDetailView: View {
         .transition(.move(edge: .trailing).combined(with: .opacity))
       }
     }
-    .onChange(of: usesToolOverlay) {
-      if !usesToolOverlay {
-        toolOverlay = nil
-      }
-    }
-    .animation(.snappy(duration: 0.22), value: toolOverlay?.id)
+    .animation(.snappy(duration: 0.22), value: detailModel.tool?.id)
     .toolbar {
       if detailModel.detail != nil {
         ToolbarItemGroup(placement: .topBarLeading) {
@@ -230,19 +222,19 @@ struct MenuDetailView: View {
             }
           }
           Button {
-            recipeBrowserButtonTapped()
+            detailModel.recipeBrowserButtonTapped()
           } label: {
             Label("Browse Recipes", systemImage: "book.closed")
           }
         }
       }
     }
-    .sheet(item: $compactTool) { tool in
+    .sheet(item: compactTool) { tool in
       NavigationStack {
         menuToolContent(
           tool,
           onRecipeSelected: { presentation in
-            compactTool = nil
+            detailModel.dismissTool()
             onRecipeSelected?(presentation)
           }
         )
@@ -300,83 +292,15 @@ struct MenuDetailView: View {
   }
 
   private var isAskActive: Bool {
-    if case .chat? = toolOverlay ?? compactTool {
-      return true
-    }
-    return false
+    detailModel.chatModel != nil
   }
 
-  private func askPrepPlan() {
-    guard let detail = detailModel.detail else { return }
-    let context = MenuChatContext(detail: detail)
-    let chatModel = chatModel(for: context)
-    Task {
-      switch await chatModel.seedIfCold(context.discussAsk(), summary: "Started Prep Plan discussion.") {
-      case .alreadyWarm:
-        _ = await chatModel.send(context.discussAsk())
-      case .seeded, .failed:
-        break
-      }
-    }
-  }
-
-  private func presentComplementAsk() {
-    guard let detail = detailModel.detail else { return }
-    let context = MenuChatContext(detail: detail)
-    let chatModel = chatModel(for: context)
-    let prompt = AIHandoffToken.discussAsk(
-      context: MenuHandoffContext(detail: detail).complementPrompt(),
-      deliverableFormat: .menuComplement,
-      destination: .onboard
-    )
-    Task {
-      switch await chatModel.seedIfCold(prompt, summary: "Started Complement discussion.") {
-      case .alreadyWarm:
-        _ = await chatModel.send(prompt)
-      case .seeded, .failed:
-        break
-      }
-    }
+  private func askButtonTapped() {
+    detailModel.askButtonTapped()
   }
 
   private func regeneratePrepPlan() {
-    guard let detail = detailModel.detail else { return }
-    let context = MenuChatContext(detail: detail)
-    let chatModel = chatModel(for: context)
-    Task {
-      await chatModel.send(context.discussAsk())
-    }
-  }
-
-  private func chatModel(for context: MenuChatContext) -> RecipeChatModel {
-    if case let .chat(chatModel)? = toolOverlay ?? compactTool {
-      chatModel.updateContext(.menu(context))
-      return chatModel
-    }
-    let chatModel = RecipeChatModel(context: .menu(context))
-    presentTool(.chat(chatModel))
-    return chatModel
-  }
-
-  private func recipeBrowserButtonTapped() {
-    if case .recipeBrowser? = toolOverlay ?? compactTool {
-      dismissTool()
-    } else {
-      presentTool(.recipeBrowser)
-    }
-  }
-
-  private func presentTool(_ tool: MenuDetailInspector) {
-    if usesToolOverlay {
-      toolOverlay = tool
-    } else {
-      compactTool = tool
-    }
-  }
-
-  private func dismissTool() {
-    toolOverlay = nil
-    compactTool = nil
+    detailModel.regeneratePrepPlan()
   }
 
   @ViewBuilder
@@ -393,12 +317,26 @@ struct MenuDetailView: View {
         surface: .menuTool(
           content: .init(
             applyActions: detailModel.applyActionCatalog(for: chatModel),
-            finalization: .menu(menuID: detailModel.menuID)
+            finalization: .menu(menuID: detailModel.menuID),
+            focusesInputOnAppear: detailModel.activeChatStarterID == nil
           ),
-          onDismiss: dismissTool
+          starters: detailModel.chatStarters,
+          activeStarterID: detailModel.activeChatStarterID,
+          selectStarter: detailModel.selectChatStarter,
+          onDismiss: detailModel.dismissTool
         )
       )
     }
+  }
+
+  private var compactTool: Binding<MenuDetailInspector?> {
+    Binding(
+      get: { usesToolOverlay ? nil : detailModel.tool },
+      set: { tool in
+        guard !usesToolOverlay else { return }
+        detailModel.tool = tool
+      }
+    )
   }
 }
 
