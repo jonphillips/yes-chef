@@ -16,32 +16,37 @@ project/agent guide.
 
 ## Next Up
 
-**ONE live dispatch target: [ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) S2 — the
-workbench's reference material reaches the model.**
-Dispatch with *"Do the **ADR-0032 S2** effort in `docs/CURRENT_HANDOFF.md`."* If this section is
+**ONE live dispatch target: [ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) S3 — the
+reference list UI + the in-app browser's "Capture to Workbench".**
+Dispatch with *"Do the **ADR-0032 S3** effort in `docs/CURRENT_HANDOFF.md`."* If this section is
 empty or missing, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-**Verification: package-first.** `swift build` the package + `scripts/check-drift.sh`. No schema — S1 already
-landed the synced table and the reducer. **Keep it package-verifiable by construction:** route the references
-through `WorkbenchDetailData` so the app-layer construction site (`WorkbenchModels.swift:222`, which builds
-`WorkbenchChatContext(detail:)` and nothing else) does not change. If the change does reach `YesChefApp/`, the
-elevated generic build becomes required evidence — see Verification Pattern.
+**Verification: app-layer, and it wants Jon's device pass.** No schema — S1 landed the synced table and the
+reducer, S2 landed the context injection, so this slice is UI over an already-complete core. The elevated
+`generic/platform=iOS` build is **required evidence** (see Verification Pattern), plus
+`scripts/check-drift.sh`. Keep new logic testable — anything pure belongs in `YesChefPackage`, not
+`YesChefApp/`.
 
 **Already scoped — do not re-scope it.** Full scope is the ADR-0032 entry in Ready Efforts. Four things a
 dispatch must not miss:
 
 1. **Read the ADR *including Amendment 1*.** Two of its resolutions revise the original Decision text. Do not
-   scope off the pre-amendment Decision.
-2. **One serializer, two surfaces.** The extract is durable synced content, so the same layer composes into
-   the ADR-0042 outboard handoff payload as well as `WorkbenchChatContext`. One source, both surfaces — not
-   two serializers that drift apart.
-3. **A `.truncated` row already carries its own in-band notice** — the serializer must not silently re-clip
-   it. Trimmed-first on-device, full behind the frontier budget, deduped against candidates by `sourceURL`.
-4. **Fetched web text is untrusted data, never instructions.** The system prompt frames it as data; advisory
-   read, never a write.
-
-**The dispatch after this one is ADR-0032 S3** (the list UI + the in-app browser's "Capture to Workbench";
-scope in Ready Efforts). It wants a device pass and S2 does not, so they stay separate PRs.
+   scope off the pre-amendment Decision — in particular, **paste-in is demoted to a last resort**; the primary
+   gated path is the in-app browser.
+2. **Refresh is an explicit replacement of a durable, non-recomputable extract.** A public `fetchHTML` refresh
+   of a `.browserCapture` reference can overwrite an authenticated extract with a login-wall teaser. Show the
+   capture kind, confirm the replacement, route a browser-captured reference's refresh back through the
+   browser. `store` throws `duplicateSourceURL(existingID)` rather than overwriting — that error is the
+   "already here — refresh it?" affordance, not a failure to hide.
+3. **`isThin` (raw extract under 1,500 characters) is the "Open in browser to capture" signal.** The threshold
+   is a guess until real pages run through it — watch whether legitimately short notes trigger a pointless
+   WebView render.
+4. **Two S2 carry-forwards land naturally here.** (a) S1 caps an extract at 256,000 UTF-8 bytes while the
+   frontier context budget is 160,000 characters, so an extract between the two is stored, synced and listed
+   yet can **never** reach any model at any tier — either mark it in the list or pull the cap down to the
+   frontier budget. (b) `WorkbenchDetailRequest` hauls full extracts on the always-on `@Fetch`
+   (`WorkbenchModels.swift:167`); if the list needs only label/kind/status, keep `reducedText` out of it
+   ([[sqlitedata-fetch-writer-convoy]]).
 
 ## Standing guards
 
@@ -81,11 +86,9 @@ target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](
 - **Sequence S1 → S2** — S1 changes the shape of `serves` ("Saturday's Korean Bavette"), so S2's matcher wants writing against the post-dates output. They can still share one dispatch.
 - **Do not auto-relink without a human gate** (ADR-0040 D3), and **do not add a date to `PrepPlanStepRecord`** (ADR-0034 D1). The dogfood data shows why the first is wrong: exact match succeeds on `Korean Bavette` and fails on `…Salad (Korean)`, so half the chips would silently return and half would not.
 
-**[ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) — the workbench reference-material fetch (scoped 2026-07-25; S1 shipped).** **S2 is under Next Up; S3 stays queued behind it.**
+**[ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) — the workbench reference-material fetch (scoped 2026-07-25; S1 + S2 shipped).** **S3 is under Next Up and is the last slice.**
 - **Read the ADR *including Amendment 1*.** The six-OQ pass resolved every open question and ratified the slice plan; **two resolutions revise the original Decision** — gated capture moves into the **in-app browser** (OQ5) and the **reduced extract becomes synced content** (OQ2). Do **not** scope off the pre-amendment Decision text.
-- **S2 — inject reference material into `WorkbenchChatContext`** (behind the frontier budget, deduped against candidates, trimmed-first on-device; because the extract is durable synced content, the same layer also composes into the ADR-0042 outboard handoff payload — one source, both surfaces; package-verifiable).
-  **What S1 already gives it:** `WorkbenchReferenceRepository.references(for:)` returns the workbench's rows in creation order, each carrying `reducedText`, `sourceURL` (tracking-stripped, so it compares cleanly against a candidate's `RecipeSource.url` for the dedupe), `captureKind`, and `reductionStatus` — a `.truncated` row already carries its own in-band notice, so the serializer must not silently re-clip it.
-  **Fetched/captured web text is untrusted data, never instructions** — the system prompt frames it as data ([[llm-vs-determinism-surface-boundary]]; advisory read, never a write).
+- **What S1 + S2 already give it:** `WorkbenchReferenceRepository` stores/refreshes/reads/deletes the rows (each carrying `reducedText`, tracking-stripped `sourceURL`, `captureKind`, `reductionStatus`), `WorkbenchReferenceCapture.reduce` serves both a public URL and already-captured authenticated HTML through one reducer, and `WorkbenchDetailData` → `WorkbenchChatContext` already carries the extracts into the chat and both outboard hand-offs. **S3 adds no core** — it is the acquisition and management UI over a finished core.
 - **S3 — the list UI + in-app browser "Capture to Workbench"** (the gated path; paste-in demoted to last resort; device pass on iPad + iPhone).
   **Refresh is an explicit replacement of a durable extract, and S1 deliberately does not rank or merge sources.** A public `fetchHTML` refresh of a `.browserCapture` reference can replace an authenticated extract with a login-wall teaser, and it is **not recomputable** ([[paywall-gating-taxonomy]]) — so S3 shows the capture kind, confirms the replacement, and routes a browser-captured reference's refresh back through the browser. `store` throws `duplicateSourceURL(existingID)` rather than overwriting; that error is S3's "already here — refresh it?" affordance.
   **`WorkbenchReferenceReducedContent.isThin`** (raw extract under 1,500 characters) is the signal for the "Open in browser to capture" offer. The threshold is a guess until real pages run through it — watch whether legitimately short notes trigger a pointless WebView render.
@@ -96,7 +99,7 @@ target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](
 - **S4 (the per-surface resolution test) is a gate on S2, not a nicety** — the panel has no direct coverage today, which is exactly why the four missing dismiss controls went unnoticed.
 
 **[`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) — the app test target runs nothing; move the logic (scoped 2026-07-26).** No schema, no UI, no behavior change, no device pass. `YesChefAppTests` holds **23 tests executed by nothing**; only 4 are stranded by the target, the other **19 by pure logic sitting in `YesChefApp/`**. Five moves recover them — S1 two whole files (11 tests), S2 three extractions (8), S3 marks the rest.
-- **The pass signal is the test count, not a green run** — 457 today, **476** after S1+S2. Green at 457 means the moved suites were never discovered, which is the failure this ends.
+- **The pass signal is the test count, not a green run** — 462 today, **481** after S1+S2. Green at 462 means the moved suites were never discovered, which is the failure this ends.
 - **Do not try to fix the test target.** Confirmed against cleared DerivedData: `CloudSyncKitdynamic-product` cannot link `SwiftUICore` ("not an allowed client"). Real linkage defect, cross-repo in `jon-platform`, for four tests, plus a simulator run this project does not do.
 
 **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell. Unblocked but unscheduled.** Its gate ("ferry Dispatch 1 lands first") was satisfied 2026-07-25 and Dispatch 1.5's panel work is merged, so nothing holds it except appetite.
