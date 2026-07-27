@@ -203,13 +203,16 @@ private struct WorkbenchCompareChatSheet: View {
 
   var body: some View {
     NavigationStack {
-      RecipeChatPanel(chatModel: chatModel, applyActions: applyActions, onDismiss: onDismiss)
-    }
-    .onAppear {
-      activeTierChanged(chatModel.activeTier)
-    }
-    .onChange(of: chatModel.activeTier) { _, tier in
-      activeTierChanged(tier)
+      RecipeChatPanel(
+        chatModel: chatModel,
+        surface: .workbenchCompareCompactSheet(
+          content: .init(
+            applyActions: applyActions,
+            activeTierChanged: activeTierChanged
+          ),
+          onDismiss: onDismiss
+        )
+      )
     }
   }
 }

@@ -22,14 +22,13 @@ struct MealCalendarStack: View {
 
 struct MealCalendarWorkspaceView: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-  @AppStorage(ChatWorkspaceDetent.storageKey)
-  private var chatWorkspaceDetentRaw = ChatWorkspaceDetent.balanced.rawValue
   let model: MealCalendarModel
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
   var isFocusActive = false
   var focusButtonTapped: (() -> Void)?
+  @State private var chatToggleRequest = 0
   @State private var compactChatModel: RecipeChatModel?
 
   var body: some View {
@@ -37,7 +36,8 @@ struct MealCalendarWorkspaceView: View {
       if isChatWorkspaceEnabled {
         ChatWorkspaceSplit(
           context: mealPlanChatContext,
-          detentRaw: $chatWorkspaceDetentRaw,
+          detentIdentity: .calendar,
+          toggleRequest: chatToggleRequest,
           applyActions: { chatModel in model.applyActionCatalog(for: chatModel) }
         ) {
           calendarContent
@@ -50,8 +50,10 @@ struct MealCalendarWorkspaceView: View {
       NavigationStack {
         RecipeChatPanel(
           chatModel: chatModel,
-          applyActions: model.applyActionCatalog(for: chatModel),
-          onDismiss: { compactChatModel = nil }
+          surface: .calendarCompactSheet(
+            content: .init(applyActions: model.applyActionCatalog(for: chatModel)),
+            onDismiss: { compactChatModel = nil }
+          )
         )
       }
     }
@@ -110,9 +112,7 @@ struct MealCalendarWorkspaceView: View {
 
   private func chatButtonTapped() {
     if isChatWorkspaceEnabled {
-      chatWorkspaceDetentRaw = chatWorkspaceDetentRaw == ChatWorkspaceDetent.readerOnly.rawValue
-        ? ChatWorkspaceDetent.balanced.rawValue
-        : ChatWorkspaceDetent.readerOnly.rawValue
+      chatToggleRequest += 1
     } else {
       compactChatModel = RecipeChatModel(context: mealPlanChatContext)
     }
@@ -156,8 +156,10 @@ struct MealCalendarPlannerView: View {
       NavigationStack {
         RecipeChatPanel(
           chatModel: chatModel,
-          applyActions: model.applyActionCatalog(for: chatModel),
-          onDismiss: { compactChatModel = nil }
+          surface: .calendarDayCompactSheet(
+            content: .init(applyActions: model.applyActionCatalog(for: chatModel)),
+            onDismiss: { compactChatModel = nil }
+          )
         )
       }
     }

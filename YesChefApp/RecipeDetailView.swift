@@ -255,14 +255,18 @@ private struct RecipeAskPresentationModifier: ViewModifier {
         NavigationStack {
           RecipeChatPanel(
             chatModel: chatModel,
-            applyActions: model.applyActionCatalog(for: chatModel),
-            finalization: model.seededAskSection.map {
-              ChatFinalizeConfiguration.recipe(recipeID: model.recipeID, section: $0)
-            },
-            focusesInputOnAppear: model.seededAskSection == nil,
-            selectSection: model.askSection,
-            activeSection: model.seededAskSection,
-            onDismiss: { model.destination = nil }
+            surface: .recipeAskSheet(
+              content: .init(
+                applyActions: model.applyActionCatalog(for: chatModel),
+                finalization: model.seededAskSection.map {
+                  ChatFinalizeConfiguration.recipe(recipeID: model.recipeID, section: $0)
+                },
+                focusesInputOnAppear: model.seededAskSection == nil
+              ),
+              selectSection: model.askSection,
+              activeSection: model.seededAskSection,
+              onDismiss: { model.destination = nil }
+            )
           )
         }
       }
@@ -281,15 +285,18 @@ private struct RecipeAskPresentationModifier: ViewModifier {
   private func askSlideOver(_ chatModel: RecipeChatModel) -> some View {
     RecipeChatPanel(
       chatModel: chatModel,
-      applyActions: model.applyActionCatalog(for: chatModel),
-      finalization: model.seededAskSection.map {
-        ChatFinalizeConfiguration.recipe(recipeID: model.recipeID, section: $0)
-      },
-      showsEmbeddedHeader: true,
-      focusesInputOnAppear: model.seededAskSection == nil,
-      selectSection: model.askSection,
-      activeSection: model.seededAskSection,
-      onDismiss: { model.destination = nil }
+      surface: .recipeAskInspector(
+        content: .init(
+          applyActions: model.applyActionCatalog(for: chatModel),
+          finalization: model.seededAskSection.map {
+            ChatFinalizeConfiguration.recipe(recipeID: model.recipeID, section: $0)
+          },
+          focusesInputOnAppear: model.seededAskSection == nil
+        ),
+        selectSection: model.askSection,
+        activeSection: model.seededAskSection,
+        onDismiss: { model.destination = nil }
+      )
     )
     .inspectorColumnWidth(
       min: RecipeAskSlideOverMetrics.minimumWidth,

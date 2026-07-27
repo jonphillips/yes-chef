@@ -72,6 +72,48 @@ if [[ -z "${DEVELOPER_DIR:-}" && -d /Applications/Xcode-beta.app/Contents/Develo
   export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
 fi
 
+# ChatSurface's static factories are the only allowed construction path. Search
+# every app Swift source with grep so a raw initializer cannot quietly spread
+# past the contract definition. As above, grep exit 1 means "no matches";
+# only an actual search failure is fatal.
+chat_surface_definition="YesChefApp/ChatSurface.swift"
+chat_surface_source_count=0
+unexpected_chat_surface_initializers=""
+
+while IFS= read -r source; do
+  chat_surface_source_count=$((chat_surface_source_count + 1))
+  set +e
+  chat_surface_hits="$(grep -nE -- 'ChatSurface[[:space:]]*\(' "$source")"
+  status=$?
+  set -e
+  if (( status > 1 )); then
+    printf 'check-drift.sh: ChatSurface initializer search failed on %s (grep exit %d)\n' "$source" "$status" >&2
+    exit 1
+  fi
+  if [[ -n "$chat_surface_hits" && "$source" != "$chat_surface_definition" ]]; then
+    unexpected_chat_surface_initializers="${unexpected_chat_surface_initializers}
+$source:
+$chat_surface_hits
+"
+  fi
+done < <(find YesChefApp -type f -name '*.swift' -print)
+
+if (( chat_surface_source_count == 0 )); then
+  cat >&2 <<'EOF'
+check-drift.sh: found no YesChefApp Swift sources to inspect for raw ChatSurface initializers.
+The construction-path guard did not really run. Refusing to report success.
+EOF
+  exit 1
+fi
+
+if [[ -n "$unexpected_chat_surface_initializers" ]]; then
+  cat <<EOF
+Raw ChatSurface initializers are only allowed in $chat_surface_definition:
+$unexpected_chat_surface_initializers
+EOF
+  exit 1
+fi
+
 swift test --package-path YesChefPackage
 
 # ---------------------------------------------------------------------------
@@ -208,4 +250,3 @@ if (( handoff_warning_count > 0 )); then
   printf '%s\n' "=============================================================================="
   printf '%s\n' "$handoff_warnings"
 fi
-

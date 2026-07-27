@@ -16,40 +16,36 @@ project/agent guide.
 
 ## Next Up
 
-**ONE live dispatch target: [`efforts/chat-surface-contract.md`](efforts/chat-surface-contract.md) S2–S4 —
-the chat panel gets a surface contract.**
-Dispatch with *"Do the **chat-surface contract S2–S4** effort in `docs/CURRENT_HANDOFF.md`."* If this section is
+**ONE live dispatch target: [`efforts/chat-ask-uniformity.md`](efforts/chat-ask-uniformity.md) S1–S4 —
+one Ask, on every surface.**
+Dispatch with *"Do the **chat-ask uniformity** effort in `docs/CURRENT_HANDOFF.md`."* If this section is
 empty or missing, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-**Verification: app-layer, no Core, no schema, no device pass expected** beyond confirming nothing moved
-visually (the effort's own "what this is not": if any surface looks different other than S1's already-shipped
-`Done`, that is a regression). The elevated `generic/platform=iOS` build is **required evidence** (see
-Verification Pattern), plus `scripts/check-drift.sh`.
+**Verification: app-layer, no Core, no schema.** Elevated `generic/platform=iOS` build is **required
+evidence** (see Verification Pattern), plus `scripts/check-drift.sh`. **A device pass is expected here** —
+unlike its predecessor, this effort changes what the cook sees.
 
-**Already scoped — do not re-scope it.** Full scope, including the eight-call-site table and the `ChatSurface`
-shape, is in the effort doc; S1 shipped in PR #240. **S2 and S3 land in one PR** (the detent identity has
-nowhere to live until the descriptor exists). Three things a dispatch must not miss:
+**Already scoped — do not re-scope it.** Full scope is in the effort doc. Three things a dispatch must not
+miss:
 
-1. **The rules are the point; without them this is a rename.** `sections`, `dismissal` and `presentation`
-   take **no default** — those are the three questions four surfaces have so far answered by omission.
-   `presentation` must make the `showsEmbeddedHeader` + `onDismiss` disagreement *unrepresentable*, not
-   documented. Acceptance is that a hypothetical ninth surface **fails to compile** until it states all three.
-2. **⚠️ S4's test target runs nothing — resolve this before writing S4, it is the one open constraint.**
-   The effort says put the per-surface resolution test in `YesChefAppTests`; that target executes **zero**
-   tests (see the `app-target-tests-to-core` entry below), so S4 as written would ship the safety artifact
-   for an eight-call-site refactor in a target that never runs it. The effort also says "nothing here enters
-   `YesChefPackage`." Those two sentences now conflict. **Architect recommendation: split the value** — the
-   *resolution* logic (what a surface resolves to, given its inputs) is pure and belongs in `YesChefCore`
-   where S4's assertions actually execute; the SwiftUI-typed closures stay in `YesChefApp`. If that split
-   proves ugly, the fallback is sequencing `app-target-tests-to-core` S1+S2 first — **not** writing S4 into a
-   dead target. **Do not land S2 without a running S4.**
-3. **Migrate the existing detent key forward.** `"recipeChatWorkspaceDetent"` becomes the Calendar's
-   identity so a dogfood device does not reset to `.balanced` on first launch; the two Workbench split sites
-   may start fresh.
+1. **The Menu is the only live defect; do not "fix" the other five.** Three surfaces present the panel as a
+   modal sheet that covers their own Ask button, so their missing toggle is unreachable and is *not* a bug.
+   The Menu's panel is an embedded tool rendered beside its button, and its pre-flight verb menu means
+   **there is no way to open a Menu chat without paying for an LLM call.** That is the slice.
+2. **Port the Recipe's warm-thread guard; do not re-derive it.**
+   [`RecipeModels.swift:962–967`](../YesChefApp/RecipeModels.swift) already solves "a freshly-opened panel
+   may restore a warm thread from an earlier section." Once the Menu's Ask opens the panel *before* a
+   starter is picked — the normal case after S2 — the Menu hits that trap identically.
+3. **Uniformity is cross-surface, not cross-device** (Jon, 2026-07-27). Modal sheets keep the iOS nav bar;
+   embedded and column presentations keep the in-panel header row. **That divergence is closed as intended
+   behaviour — do not "unify" it.**
 
-**Why now:** this wants the slot immediately before
-[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md), which moves all eight call sites. Landing the
-descriptor first relocates **one type** instead of eight argument lists.
+**Owed from PR #243, non-blocking:** the device pass on all four chat surfaces, confirming nothing moved
+visually.
+
+**Why now:** same slot argument as its predecessor — this wants to land before
+[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md), which moves all eight call sites and should
+inherit one Ask rather than six.
 
 ## Standing guards
 
@@ -89,9 +85,10 @@ target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](
 - **Sequence S1 → S2** — S1 changes the shape of `serves` ("Saturday's Korean Bavette"), so S2's matcher wants writing against the post-dates output. They can still share one dispatch.
 - **Do not auto-relink without a human gate** (ADR-0040 D3), and **do not add a date to `PrepPlanStepRecord`** (ADR-0034 D1). The dogfood data shows why the first is wrong: exact match succeeds on `Korean Bavette` and fails on `…Salad (Korean)`, so half the chips would silently return and half would not.
 
-**[`efforts/chat-surface-contract.md`](efforts/chat-surface-contract.md) — the chat panel gets a surface contract (scoped 2026-07-26).** **S2–S4 are under Next Up.** App-layer only; no Core, no schema. `RecipeChatPanel` is shared but its **contract** is not: eight call sites, eight parameters, **six defaulted** — so four surfaces silently opted out of a dismiss control and three inherited Recipe's copy. Replace the loose argument list with one `ChatSurface` descriptor that takes **no default** on dismissal, sections, or presentation. **S1 (the four missing `Done` controls) has shipped.**
-- **S2–S4 want the slot immediately before [ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md).** That rewrite moves all eight call sites, so landing the descriptor first means it relocates **one type** instead of eight argument lists; landing it after means the new shell inherits the same defaulted-omission shape.
-- **S4 (the per-surface resolution test) is a gate on S2, not a nicety** — the panel has no direct coverage today, which is exactly why the four missing dismiss controls went unnoticed. **But `YesChefAppTests` runs nothing**, so where S4's assertions live is the dispatch's one open constraint — see Next Up item 2.
+**[`efforts/chat-ask-uniformity.md`](efforts/chat-ask-uniformity.md) — one Ask, on every surface (scoped 2026-07-27).** **S1–S4 are under Next Up.** App-layer only; no Core, no schema. The follow-on that spends what the surface contract bought. `ChatSurface.Sections` is typed to `PlaybookSectionKind` — a Recipe concept — so the Menu could not express "here are things you can start a discussion about" and grew a pre-flight verb menu *outside* the panel instead. That menu is why **a Menu chat cannot be opened without buying a discussion first.** Generalize `Sections` to host-supplied starters and both the entry-point defect and the title-slot divergence close in one change.
+- **Answers [`chat-surface-contract.md`](efforts/chat-surface-contract.md)'s Open Question 1** — the Menu's `sections: .none` shipped un-asked, and this is the real answer to it.
+- **S4 inherits the dead-test-target problem.** Write it, do not report it as passing, and see the Verification Pattern's `YesChefAppTests` warning.
+- **Wants the slot before [ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md)**, same argument as its predecessor.
 
 ### From the 2026-07-26 dogfood pass — three items, all scoped, none dispatched
 
@@ -115,7 +112,7 @@ target. Completed efforts and their full write-ups live in [`docs/DONE-LOG.md`](
 
 **[`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) — the app test target runs nothing; move the logic (scoped 2026-07-26).** No schema, no UI, no behavior change, no device pass. `YesChefAppTests` holds **23 tests executed by nothing**; only 4 are stranded by the target, the other **19 by pure logic sitting in `YesChefApp/`**. Five moves recover them — S1 two whole files (11 tests), S2 three extractions (8), S3 marks the rest.
 - **The pass signal is the test count, not a green run** — 462 today, **481** after S1+S2. Green at 462 means the moved suites were never discovered, which is the failure this ends.
-- **Do not try to fix the test target.** Confirmed against cleared DerivedData: `CloudSyncKitdynamic-product` cannot link `SwiftUICore` ("not an allowed client"). Real linkage defect, cross-repo in `jon-platform`, for four tests, plus a simulator run this project does not do.
+- **Do not try to fix the test target** *without re-diagnosing first — and that re-diagnosis is underway.* This brief records `CloudSyncKitdynamic-product` failing to link `SwiftUICore` ("not an allowed client"). A `build-for-testing` run on 2026-07-27 instead died on **missing GRDB / StructuredQueriesCore conformance symbols**, reproducibly and identically on `main` — a different failure, and one whose signature (a `.dynamic` product missing conformance symbols from its own static dependencies) reads like a SwiftPM product-type problem rather than a hard restriction. The "move the logic to Core" slices stand on their own merits regardless; the ***"don't bother fixing it"*** conclusion was reached against a failure mode that is no longer the one you get.
 
 **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell. Unblocked but unscheduled.** Its gate ("ferry Dispatch 1 lands first") was satisfied 2026-07-25 and Dispatch 1.5's panel work is merged, so nothing holds it except appetite.
 
