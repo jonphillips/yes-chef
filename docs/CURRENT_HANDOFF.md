@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 27, 2026.
+Last updated: July 28, 2026.
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -15,44 +15,38 @@ live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** re
 
 ## Next Up
 
-**ONE live dispatch target: [`efforts/recipe-editor-section-grain.md`](efforts/recipe-editor-section-grain.md)
-— recipe sections are stored, read, and edited at three different grains.**
-Dispatch with *"Do the **recipe section grain** effort in `docs/CURRENT_HANDOFF.md`."* If this section
+**ONE live dispatch target: [ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) **S1 — Export.**
+A CloudKit-independent durability net: a `VACUUM INTO` whole-database snapshot the user writes to Files /
+iCloud Drive.** Dispatch with *"Do **ADR-0030 S1 (Export)** from `docs/CURRENT_HANDOFF.md`."* If this section
 is empty or missing, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-**S2 + S3 batched into one dispatch/PR** — the editor draft carries every section, then the editor renders
-them. They share files and one mental model (S3 is a readout of the shape S2 defines), so they amortize;
-the architect still reviews at slice resolution. Found in Jon's device pass of PR
-[#245](https://github.com/jonphillips/yes-chef/pull/245) on the Samin capture: **the edit sheet showed only
-the first section** of each. **No schema.**
+**The scope (ADR §Slices S1).** A snapshot writer in **Core** — `VACUUM INTO` a single `.sqlite` file (OQ2:
+pick `VACUUM INTO` vs GRDB `DatabaseWriter.backup` here; both give a consistent transaction that folds
+`-wal`/`-shm` so there are **no sidecar files**) — plus a Settings row that runs it and hands the file to
+`fileExporter`. Stamp a `schemaVersion` / app-version marker the future restore path can read (`PRAGMA
+user_version` or a one-row `backupMeta` table). **No schema change to the synced model.**
 
-**Five things a dispatch must not miss:**
+**Four things a dispatch must not miss:**
 
-1. **Nothing is lost and nothing is corrupt** — `mergedSections` / `mergedIngredientLines` replace only the
-   edited section, and import assigns instruction steps a **global** running `sortOrder` so document order
-   is intact. This is "you cannot edit or see most of your recipe," not "editing eats your recipe." Do not
-   open it as a data-loss fix.
-2. **In the editor, sections are made by the Add section control and never by typed text.** A typed
-   `For the sauce:` line stays an ingredient line or a step, and a pasted multi-section recipe becomes one
-   section — intended, per ADR-0040 D2 (the human edits fields, never the wire format), and **not an
-   asymmetry to fix on momentum from what the capture channel does.** Settled by Jon 2026-07-27;
-   promote-on-paste was declined with it. Reasoning lives in the effort's *Settled question* section.
-3. **The ordering hazard S2 would have tripped is already retired.** S1 shipped
-   `InstructionStepGroup.groups(sections:steps:)`, so nothing keys on step `sortOrder` being globally
-   unique any more and **per-section renumbering on save is now correct rather than a collision.** S2 may
-   assume it.
-4. **Deletion is the new behaviour in S2.** The save path only ever merges, so removing a section is the one
-   case with no existing expression — that is where the tests should be hardest. The primary pin is the
-   quieter one: a two-section recipe round-trips draft → save → detail **unchanged**.
-5. **There is exactly one instruction-ordering rule and it is not to be re-derived.** Everything that orders
-   or groups steps calls `InstructionStepGroup.groups(sections:steps:)`. S1 twice grew a second copy — once
-   by omission, once while deleting the first — so a new private sorter in the editor path is a review
-   rejection, not a nit.
+1. **This is a byte-exact file copy, not a serialization surface.** Images are BLOBs **inside** the row
+   (`RecipePhoto.displayData` / `.thumbnailData`), so one `.sqlite` file is the whole library — recipes,
+   menus, notes, every photo byte — with **zero encode code**. Do **not** build a JSON/portable export; that
+   is a deliberately separate, parked goal (D5), and re-encoding 44k+ rows is exactly the
+   deterministic-data surface [[llm-vs-determinism-surface-boundary]] says to avoid.
+2. **The read must be consistent even while the app is writing.** `VACUUM INTO` / `.backup` read a single
+   transaction; confirm the WAL checkpoint behaviour so the snapshot is one self-contained file. A torn
+   snapshot that needs a `-wal` sidecar is the failure mode to test against.
+3. **This is orthogonal to sync — do not touch the SyncEngine, zones, or triggers.** It reads the same store
+   everything else uses. Explicitly **not** [[debug-erase-vs-sync-triggers]] / zone-rebuild territory. The
+   sync-metadata *strip* belongs to S2 (restore), not here.
+4. **The app never phones the file home.** The user picks the destination through `fileExporter` / a document
+   picker; default filename carries a timestamp (`YesChef-Backup-2026-07-28.sqlite`).
 
-**Verification.** S2 is package tests where `scripts/check-drift.sh` actually runs (put the reconciliation in
-Core, not the editor view). S3 touches `YesChefApp/` and needs the elevated `generic/platform=iOS` build as
-required evidence. No simulator installs; Jon device-passes on the captured Samin recipe — a single-section
-recipe editing exactly as it does today is the canary.
+**Verification.** Put the snapshot writer in **Core** so package tests exercise it (`scripts/check-drift.sh`
+compiles `YesChefPackage`) — the unit test is: snapshot a seeded temp DB, reopen the copy, assert row counts
+match. The Settings row touches `YesChefApp/` and needs the elevated `generic/platform=iOS` build as required
+evidence. No simulator installs; Jon device-passes the Settings → Export → Files round-trip. **S2 (restore)
+and S3 (auto/pre-migration snapshots) are separate later dispatches — S1 does not build them.**
 
 ## Standing guards
 

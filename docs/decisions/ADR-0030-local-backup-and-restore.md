@@ -9,7 +9,7 @@
 > the database file, not separate assets — so this is a byte-exact copy, **not** a serialization
 > surface. A structured/portable (JSON) export is an explicitly separate, later concern.
 
-Status: **Proposed** — 2026-07-12. Extends **[ADR-0001](ADR-0001-persistence-sqlitedata.md)**
+Status: **Accepted** — 2026-07-12; accepted 2026-07-27. Extends **[ADR-0001](ADR-0001-persistence-sqlitedata.md)**
 (SQLiteData persistence) and **[ADR-0002](ADR-0002-cloudkit-sync-no-server.md)** (CloudKit sync, no
 server). Depends on the images-in-DB model from **[ADR-0005](ADR-0005-image-storage-and-processing.md)**.
 Motivated by [[post-browser-sync-vs-features-tension]] (the solvable sync/**backup** gate) now that
@@ -68,9 +68,15 @@ an **automatic pre-restore snapshot** of the current store so a mis-click is und
 validates the incoming file (is it a YesChef DB? is its schema version restorable by the current
 migrator?) before touching the live store.
 
-**4. Manual first; automatic later.** S1/S2 ship a Settings affordance — "Export a backup" and
-"Restore from a backup." **Automatic/periodic** snapshots (e.g. a rolling local backup on a cadence,
-or on app-update boundaries) are a **separate S3**, not required for the durability net.
+**4. Manual first; automatic later — but one automatic trigger is privileged.** S1/S2 ship a
+Settings affordance — "Export a backup" and "Restore from a backup." **Automatic/periodic** snapshots
+(e.g. a rolling local backup on a cadence, or on app-update boundaries) are a **separate S3**, not
+required for the durability net. The **one** automatic trigger worth singling out is a
+**pre-migration snapshot** taken immediately before `migrator.migrate` runs: schema-change is exactly
+where the library's most-feared footgun bites (the `-YesChefEraseDatabaseOnSchemaChange` erase that
+has wiped the dogfood store, [[debug-erase-vs-sync-triggers]]), so a rolling auto-snapshot at that
+boundary is the single cheapest catch for that class of bug. It rides in S3, not S1/S2, but it is the
+*first* auto-trigger to build.
 
 **5. Non-goal (for now): structured/portable export.** A human-readable JSON/zip export for interop
 with *other* apps is a real but **different** goal (portability, not durability) with a real
@@ -86,6 +92,9 @@ backup does not block it and vice-versa.
 - **S2 — Restore.** Validation (magic/marker + schema-compat check), auto pre-restore snapshot,
   atomic swap of the store file, sync-metadata strip, re-open with sync **off**. Confirm-and-undo UX.
 - **S3 (optional, later) — Automatic snapshots.** Cadence/trigger + retention (keep N), local-only.
+  **Build the pre-migration snapshot first** (Decision 4): a rolling local snapshot taken right before
+  `migrator.migrate` runs, keep N, so a bad/erasing migration is always recoverable from the step
+  before it. App-update-boundary and periodic snapshots follow.
 
 ## Consequences
 

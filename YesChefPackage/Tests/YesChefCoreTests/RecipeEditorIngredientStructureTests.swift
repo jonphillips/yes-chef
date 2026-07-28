@@ -55,8 +55,8 @@ extension RecipeCoreTests {
 
         let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
         var draft = RecipeEditorDraft(detail: detail)
-        draft.ingredientSectionName = "Cake"
-        draft.ingredientLineDrafts[0].isHeader = true
+        draft.ingredientSections[0].name = "Cake"
+        draft.ingredientSections[0].lineDrafts[0].isHeader = true
 
         try RecipeRepository.save(
           draft: draft,

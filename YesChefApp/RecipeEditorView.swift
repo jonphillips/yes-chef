@@ -6,7 +6,7 @@ import YesChefCore
 struct RecipeEditorView: View {
   @State private var model: RecipeEditorModel
   @State private var selectedHeroPhotoItem: PhotosPickerItem?
-  @FocusState private var isIngredientTextFocused: Bool
+  @FocusState private var focusedIngredientSectionID: IngredientSection.ID?
   @Environment(\.dismiss) private var dismiss
 
   init(recipeID: Recipe.ID?) {
@@ -73,30 +73,75 @@ struct RecipeEditorView: View {
         RecipeCategorySelectionField(model: model)
       }
 
-      Section("Ingredients") {
-        StackedTextField(title: "Section title", text: $model.draft.ingredientSectionName)
-        StackedTextEditor(
-          title: "Ingredients",
-          text: $model.draft.ingredientText,
-          minHeight: 180,
-          font: .body.monospacedDigit()
-        )
-        .focused($isIngredientTextFocused)
-        .onChange(of: model.draft.ingredientText) { _, _ in
-          model.ingredientTextChanged()
-        }
+      ForEach($model.draft.ingredientSections) { $section in
+        Section {
+          StackedTextField(title: "Section title", text: $section.name)
+          StackedTextEditor(
+            title: "Ingredients",
+            text: $section.text,
+            minHeight: 180,
+            font: .body.monospacedDigit()
+          )
+          .focused($focusedIngredientSectionID, equals: section.id)
+          .onChange(of: section.text) { _, _ in
+            model.ingredientTextChanged(sectionID: section.id)
+          }
 
-        ForEach($model.draft.ingredientLineDrafts) { $line in
-          IngredientLineStructureEditor(line: $line)
+          ForEach($section.lineDrafts) { $line in
+            IngredientLineStructureEditor(line: $line)
+          }
+
+          if model.draft.ingredientSections.count > 1 {
+            Button(role: .destructive) {
+              model.deleteIngredientSection(id: section.id)
+            } label: {
+              Label("Delete Section", systemImage: "trash")
+            }
+          }
+        } header: {
+          if section.id == model.draft.ingredientSections.first?.id {
+            Text("Ingredients")
+          }
         }
       }
 
-      Section("Instructions") {
-        StackedTextEditor(
-          title: "Instructions",
-          text: $model.draft.instructionText,
-          minHeight: 220
-        )
+      Section {
+        Button {
+          model.addIngredientSection()
+        } label: {
+          Label("Add Ingredient Section", systemImage: "plus")
+        }
+      }
+
+      ForEach($model.draft.instructionSections) { $section in
+        Section {
+          StackedTextField(title: "Section title", text: $section.name)
+          StackedTextEditor(
+            title: "Instructions",
+            text: $section.text,
+            minHeight: 220
+          )
+
+          if model.draft.instructionSections.count > 1 {
+            Button(role: .destructive) {
+              model.deleteInstructionSection(id: section.id)
+            } label: {
+              Label("Delete Section", systemImage: "trash")
+            }
+          }
+        } header: {
+          if section.id == model.draft.instructionSections.first?.id {
+            Text("Instructions")
+          }
+        }
+      }
+
+      Section {
+        Button {
+          model.addInstructionSection()
+        } label: {
+          Label("Add Instruction Section", systemImage: "plus")
+        }
       }
 
       Section("Notes") {
@@ -108,10 +153,10 @@ struct RecipeEditorView: View {
       }
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      if isIngredientTextFocused {
+      if let focusedIngredientSectionID {
         IngredientFractionPillRow { fraction in
-          model.ingredientFractionTapped(fraction)
-          isIngredientTextFocused = true
+          model.ingredientFractionTapped(fraction, sectionID: focusedIngredientSectionID)
+          self.focusedIngredientSectionID = focusedIngredientSectionID
         }
         .padding(.horizontal)
         .background(.bar)

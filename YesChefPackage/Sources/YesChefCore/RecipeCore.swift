@@ -336,36 +336,19 @@ extension RecipeRepository {
     let existingPhotos = try draft.id.flatMap { existingRecipeID in
       try RecipePhoto.where { $0.recipeID.eq(existingRecipeID) }.order { $0.sortOrder }.fetchAll(db)
     } ?? []
-    let existingIngredientSection = existingDetail?.ingredientSections.sorted { $0.sortOrder < $1.sortOrder }.first
-    let existingInstructionSection = existingDetail?.instructionSections.sorted { $0.sortOrder < $1.sortOrder }.first
-    let ingredientSection = existingIngredientSection
-      ?? IngredientSection(id: uuid(), recipeID: recipeID, name: nil, sortOrder: 0)
-    var editableIngredientSection = ingredientSection
-    editableIngredientSection.name = draft.ingredientSectionName.nonEmpty
-    let instructionSection = existingInstructionSection
-      ?? InstructionSection(id: uuid(), recipeID: recipeID, name: nil, sortOrder: 0)
-    let ingredientLines = IngredientParser.lines(
-      from: draft.ingredientText,
+    let ingredientPlan = RecipeEditorSectionReconcile.ingredients(
+      draftSections: draft.ingredientSections,
+      existingSections: existingDetail?.ingredientSections ?? [],
+      existingLines: existingDetail?.ingredientLines ?? [],
       recipeID: recipeID,
-      sectionID: editableIngredientSection.id,
       uuid: uuid
     )
-    let reconciledIngredientLines = applyIngredientLineDrafts(
-      draft.ingredientLineDrafts,
-      to: reconcileIngredientLines(
-        ingredientLines,
-        existing: existingDetail?.ingredientLines.filter { $0.sectionID == editableIngredientSection.id } ?? []
-      )
-    )
-    let instructionSteps = InstructionParser.steps(
-      from: draft.instructionText,
+    let instructionPlan = RecipeEditorSectionReconcile.instructions(
+      draftSections: draft.instructionSections,
+      existingSections: existingDetail?.instructionSections ?? [],
+      existingSteps: existingDetail?.instructionSteps ?? [],
       recipeID: recipeID,
-      sectionID: instructionSection.id,
       uuid: uuid
-    )
-    let reconciledInstructionSteps = reconcileInstructionSteps(
-      instructionSteps,
-      existing: existingDetail?.instructionSteps.filter { $0.sectionID == instructionSection.id } ?? []
     )
     let generalNotes = reconcileGeneralNotes(
       draft.noteText,
@@ -408,24 +391,10 @@ extension RecipeRepository {
       existingSource: existingDetail?.source,
       uuid: uuid
     )
-    let snapshotIngredientSections = mergedSections(
-      existingDetail?.ingredientSections ?? [],
-      replacing: editableIngredientSection
-    )
-    let snapshotIngredientLines = mergedIngredientLines(
-      existingDetail?.ingredientLines ?? [],
-      replacingSectionID: editableIngredientSection.id,
-      with: reconciledIngredientLines
-    )
-    let snapshotInstructionSections = mergedSections(
-      existingDetail?.instructionSections ?? [],
-      replacing: instructionSection
-    )
-    let snapshotInstructionSteps = mergedInstructionSteps(
-      existingDetail?.instructionSteps ?? [],
-      replacingSectionID: instructionSection.id,
-      with: reconciledInstructionSteps
-    )
+    let snapshotIngredientSections = ingredientPlan.snapshotSections
+    let snapshotIngredientLines = ingredientPlan.snapshotLines
+    let snapshotInstructionSections = instructionPlan.snapshotSections
+    let snapshotInstructionSteps = instructionPlan.snapshotSteps
     let snapshotNotes = (existingDetail?.notes.filter { $0.noteType != .general } ?? []) + generalNotes
     let photos = mergedPhotos(
       existingPhotos,
@@ -457,12 +426,10 @@ extension RecipeRepository {
     try replaceSource(source, recipeID: recipeID, in: db)
     try saveEditableChildren(
       recipeID: recipeID,
-      ingredientSection: editableIngredientSection,
-      ingredientLines: reconciledIngredientLines,
-      existingIngredientLines: existingDetail?.ingredientLines.filter { $0.sectionID == editableIngredientSection.id } ?? [],
-      instructionSection: instructionSection,
-      instructionSteps: reconciledInstructionSteps,
-      existingInstructionSteps: existingDetail?.instructionSteps.filter { $0.sectionID == instructionSection.id } ?? [],
+      ingredientPlan: ingredientPlan,
+      existingIngredientLines: existingDetail?.ingredientLines ?? [],
+      instructionPlan: instructionPlan,
+      existingInstructionSteps: existingDetail?.instructionSteps ?? [],
       generalNotes: generalNotes,
       existingGeneralNotes: existingDetail?.notes.filter { $0.noteType == .general } ?? [],
       in: db
@@ -593,41 +560,54 @@ extension RecipeRepository {
 
   private static func saveEditableChildren(
     recipeID: Recipe.ID,
-    ingredientSection: IngredientSection,
-    ingredientLines: [IngredientLine],
+    ingredientPlan: RecipeEditorSectionReconcile.IngredientPlan,
     existingIngredientLines: [IngredientLine],
-    instructionSection: InstructionSection,
-    instructionSteps: [InstructionStep],
+    instructionPlan: RecipeEditorSectionReconcile.InstructionPlan,
     existingInstructionSteps: [InstructionStep],
     generalNotes: [RecipeNote],
     existingGeneralNotes: [RecipeNote],
     in db: Database
   ) throws {
-    try IngredientSection.upsert { ingredientSection }.execute(db)
-
-    for line in ingredientLines {
-      try IngredientLine.upsert { line }.execute(db)
+    let existingIngredientLinesBySection = Dictionary(grouping: existingIngredientLines, by: \.sectionID)
+    for section in ingredientPlan.sections {
+      try IngredientSection.upsert { section }.execute(db)
+      let lines = ingredientPlan.linesBySectionID[section.id] ?? []
+      for line in lines {
+        try IngredientLine.upsert { line }.execute(db)
+      }
+      try deleteMissingRows(
+        existingIngredientLinesBySection[section.id] ?? [],
+        keeping: Set(lines.map(\.id)),
+        in: db
+      )
     }
-    try deleteMissingRows(existingIngredientLines, keeping: Set(ingredientLines.map(\.id)), in: db)
-
-    try InstructionSection.upsert { instructionSection }.execute(db)
-
-    for step in instructionSteps {
-      try InstructionStep.upsert { step }.execute(db)
+    for sectionID in ingredientPlan.removedSectionIDs {
+      try deleteMissingRows(existingIngredientLinesBySection[sectionID] ?? [], keeping: [], in: db)
+      try #sql("DELETE FROM \"ingredientSections\" WHERE \"id\" = \(bind: sectionID)").execute(db)
     }
-    try deleteMissingRows(existingInstructionSteps, keeping: Set(instructionSteps.map(\.id)), in: db)
+
+    let existingInstructionStepsBySection = Dictionary(grouping: existingInstructionSteps, by: \.sectionID)
+    for section in instructionPlan.sections {
+      try InstructionSection.upsert { section }.execute(db)
+      let steps = instructionPlan.stepsBySectionID[section.id] ?? []
+      for step in steps {
+        try InstructionStep.upsert { step }.execute(db)
+      }
+      try deleteMissingRows(
+        existingInstructionStepsBySection[section.id] ?? [],
+        keeping: Set(steps.map(\.id)),
+        in: db
+      )
+    }
+    for sectionID in instructionPlan.removedSectionIDs {
+      try deleteMissingRows(existingInstructionStepsBySection[sectionID] ?? [], keeping: [], in: db)
+      try #sql("DELETE FROM \"instructionSections\" WHERE \"id\" = \(bind: sectionID)").execute(db)
+    }
 
     for note in generalNotes {
       try insert(note, in: db)
     }
     try deleteMissingRows(existingGeneralNotes, keeping: Set(generalNotes.map(\.id)), in: db)
-
-    if ingredientLines.isEmpty {
-      try #sql("DELETE FROM \"ingredientSections\" WHERE \"id\" = \(bind: ingredientSection.id)").execute(db)
-    }
-    if instructionSteps.isEmpty {
-      try #sql("DELETE FROM \"instructionSections\" WHERE \"id\" = \(bind: instructionSection.id)").execute(db)
-    }
 
     _ = recipeID
   }
@@ -668,7 +648,7 @@ extension RecipeRepository {
     try deleteMissingRows(existingRecipeTags, keeping: keptRecipeTagIDs, in: db)
   }
 
-  private static func reconcileInstructionSteps(
+  static func reconcileInstructionSteps(
     _ parsedSteps: [InstructionStep],
     existing existingSteps: [InstructionStep]
   ) -> [InstructionStep] {
@@ -717,52 +697,6 @@ extension RecipeRepository {
         dateModified: now
       )
     }
-  }
-
-  private static func mergedSections(
-    _ sections: [IngredientSection],
-    replacing section: IngredientSection
-  ) -> [IngredientSection] {
-    (sections.filter { $0.id != section.id } + [section])
-      .sorted { $0.sortOrder < $1.sortOrder }
-  }
-
-  private static func mergedSections(
-    _ sections: [InstructionSection],
-    replacing section: InstructionSection
-  ) -> [InstructionSection] {
-    (sections.filter { $0.id != section.id } + [section])
-      .sorted { $0.sortOrder < $1.sortOrder }
-  }
-
-  private static func mergedIngredientLines(
-    _ lines: [IngredientLine],
-    replacingSectionID sectionID: IngredientSection.ID,
-    with replacementLines: [IngredientLine]
-  ) -> [IngredientLine] {
-    (lines.filter { $0.sectionID != sectionID } + replacementLines)
-      .sorted { lhs, rhs in
-        if lhs.sectionID == rhs.sectionID {
-          lhs.sortOrder < rhs.sortOrder
-        } else {
-          lhs.sectionID.uuidString < rhs.sectionID.uuidString
-        }
-      }
-  }
-
-  private static func mergedInstructionSteps(
-    _ steps: [InstructionStep],
-    replacingSectionID sectionID: InstructionSection.ID,
-    with replacementSteps: [InstructionStep]
-  ) -> [InstructionStep] {
-    (steps.filter { $0.sectionID != sectionID } + replacementSteps)
-      .sorted { lhs, rhs in
-        if lhs.sectionID == rhs.sectionID {
-          lhs.sortOrder < rhs.sortOrder
-        } else {
-          lhs.sectionID.uuidString < rhs.sectionID.uuidString
-        }
-      }
   }
 
   private static func deleteMissingRows(
@@ -1032,7 +966,7 @@ private extension String {
   }
 }
 
-private func applyIngredientLineDrafts(
+func applyIngredientLineDrafts(
   _ drafts: [RecipeIngredientLineDraft],
   to lines: [IngredientLine]
 ) -> [IngredientLine] {
@@ -1050,7 +984,7 @@ private func applyIngredientLineDrafts(
   }
 }
 
-private func reconcileIngredientLines(
+func reconcileIngredientLines(
   _ parsedLines: [IngredientLine],
   existing existingLines: [IngredientLine]
 ) -> [IngredientLine] {

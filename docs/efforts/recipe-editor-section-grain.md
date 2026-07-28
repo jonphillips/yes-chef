@@ -4,10 +4,10 @@
 [#245](https://github.com/jonphillips/yes-chef/pull/245) (the ADR-0047 capture fallback): *"the turkey
 zucchini recipe came across with sections defined around the sauce and the meatballs, but my edit recipe
 sheet only showed the first section,"* then *"it's strange that the ingredients are sectioned off, but the
-instructions are not … it definitely requires me to think about it."* **S1 shipped (PR
-[#246](https://github.com/jonphillips/yes-chef/pull/246)); S2 + S3 are dispatch-ready — the one open question
-was closed by Jon 2026-07-27 (see below).** **No schema** — the tables this needs already exist and already
-sync.
+instructions are not … it definitely requires me to think about it."* **✅ COMPLETE — S1 shipped (PR
+[#246](https://github.com/jonphillips/yes-chef/pull/246)); S2 + S3 shipped and device-passed 2026-07-28 (PR
+[#249](https://github.com/jonphillips/yes-chef/pull/249)).** **No schema** — the tables this needs already
+exist and already sync.
 
 **Owner:** Codex (implement) · Claude (architect/review) · Jon (product/device pass).
 
