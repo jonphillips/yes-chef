@@ -126,6 +126,7 @@ struct DatabaseBackupTests {
     ))
     #expect(FileManager.default.fileExists(atPath: metadataURL.path))
     #expect(metadataTableNames.contains("sqlitedata_icloud_metadata"))
+    // Keep the engine alive until the assertions finish; it owns the real attachment under test.
     _ = syncDatabase.syncEngine
   }
 
@@ -136,8 +137,23 @@ struct DatabaseBackupTests {
     let backupURL = directoryURL.appendingPathComponent("backup.sqlite", isDirectory: false)
     let invalidMarkerURL = directoryURL.appendingPathComponent("invalid-marker.sqlite", isDirectory: false)
     let newerBackupURL = directoryURL.appendingPathComponent("newer.sqlite", isDirectory: false)
+    let nonDatabaseURL = directoryURL.appendingPathComponent("not-a-database.sqlite", isDirectory: false)
     let database = try pathBackedDatabase(at: sourceURL)
     let backup = try await YesChefDatabaseBackup.snapshot(from: database, to: backupURL)
+
+    try Data("not a SQLite database".utf8).write(to: nonDatabaseURL)
+    do {
+      _ = try YesChefDatabaseBackup.schemaVersion(in: nonDatabaseURL)
+      #expect(Bool(false))
+    } catch {
+      let isNotYesChefBackup: Bool
+      if case .notYesChefBackup = error as? YesChefDatabaseBackup.BackupError {
+        isNotYesChefBackup = true
+      } else {
+        isNotYesChefBackup = false
+      }
+      #expect(isNotYesChefBackup)
+    }
 
     try FileManager.default.copyItem(at: backupURL, to: invalidMarkerURL)
     let invalidMarkerDatabase = try DatabaseQueue(path: invalidMarkerURL.path)
@@ -233,6 +249,7 @@ struct DatabaseBackupTests {
     #expect(restoredRecipe?.title == "Replacement Recipe")
     #expect(metadataTableNames.contains("sqlitedata_icloud_metadata"))
     #expect(!FileManager.default.fileExists(atPath: metadataURL.path))
+    // Keep the engine alive until replacement removes the real attachment under test.
     _ = syncDatabase.syncEngine
   }
 

@@ -96,8 +96,10 @@ public enum YesChefDatabaseBackup {
       }
     } catch let error as BackupError {
       throw error
-    } catch {
+    } catch let error as DatabaseError where error.resultCode == .SQLITE_NOTADB {
       throw BackupError.notYesChefBackup
+    } catch {
+      throw error
     }
   }
 
@@ -216,8 +218,10 @@ public enum YesChefDatabaseBackup {
       return try database.read { db in
         try Int.fetchOne(db, sql: "PRAGMA user_version") ?? 0
       }
-    } catch {
+    } catch let error as DatabaseError where error.resultCode == .SQLITE_NOTADB {
       throw BackupError.notYesChefBackup
+    } catch {
+      throw error
     }
   }
 
@@ -358,7 +362,7 @@ public final class YesChefDatabaseBackupRestoreModel {
       discardPreparedRestore()
       let liveStoreURL = try YesChefDatabaseStorage.liveSharedDatabaseURL()
       let workingDirectory = try restoreWorkingDirectory(for: liveStoreURL)
-      try discardStaleRestoreCandidates(in: workingDirectory)
+      discardStaleRestoreCandidates(in: workingDirectory)
       let stagingURL = workingDirectory.appendingPathComponent(
         "\(Self.stagingFilenamePrefix)\(uuid().uuidString).sqlite",
         isDirectory: false
@@ -383,6 +387,7 @@ public final class YesChefDatabaseBackupRestoreModel {
 
     isRestoring = true
     defer { isRestoring = false }
+    var beganDatabaseClose = false
 
     do {
       let liveStoreURL = try YesChefDatabaseStorage.liveSharedDatabaseURL()
@@ -395,6 +400,7 @@ public final class YesChefDatabaseBackupRestoreModel {
       _ = try await YesChefDatabaseBackup.snapshot(from: database, to: preRestoreURL)
 
       syncEngine.stop()
+      beganDatabaseClose = true
       try database.close()
       try YesChefDatabaseBackup.replaceLiveStore(
         at: liveStoreURL,
@@ -408,7 +414,9 @@ public final class YesChefDatabaseBackupRestoreModel {
       return true
     } catch {
       discardPreparedRestore()
-      errorMessage = error.localizedDescription
+      errorMessage = beganDatabaseClose
+        ? "Yes Chef needs to be restarted before another restore can be attempted. \(error.localizedDescription)"
+        : error.localizedDescription
       return false
     }
   }
@@ -454,12 +462,13 @@ public final class YesChefDatabaseBackupRestoreModel {
     )
   }
 
-  private func discardStaleRestoreCandidates(in directoryURL: URL) throws {
-    for fileURL in try FileManager.default.contentsOfDirectory(
+  private func discardStaleRestoreCandidates(in directoryURL: URL) {
+    let candidatePrefixes = [Self.stagingFilenamePrefix, ".\(Self.stagingFilenamePrefix)"]
+    for fileURL in (try? FileManager.default.contentsOfDirectory(
       at: directoryURL,
       includingPropertiesForKeys: nil
-    ) where fileURL.lastPathComponent.hasPrefix(Self.stagingFilenamePrefix) {
-      try FileManager.default.removeItem(at: fileURL)
+    )) ?? [] where candidatePrefixes.contains(where: fileURL.lastPathComponent.hasPrefix) {
+      try? FileManager.default.removeItem(at: fileURL)
     }
   }
 

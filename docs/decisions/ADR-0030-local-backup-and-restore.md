@@ -111,6 +111,11 @@ backup does not block it and vice-versa.
   much-older app is refused, not corrupted.
 - **No new sync schema, no zone rebuild.** This is orthogonal to the sync pipeline; it reads the same
   store everything else uses. Explicitly **not** [[debug-erase-vs-sync-triggers]] territory.
+- **Accepted share-extension coordination risk.** Restore replaces the app-group store without an
+  `NSFileCoordinator` or a lock that waits for the share extension's connection. An in-flight extension save
+  can therefore write to the unlinked prior inode and lose that write when its WAL is discarded. This is an
+  accepted v1 risk for a rare, destructive, user-initiated operation; the user should not restore while a
+  share-sheet save is in progress. See [[extension-sync-construct-not-run]].
 - **Plaintext at rest.** The SQLite store is unencrypted, so a backup file is plaintext recipe data
   (+ images) wherever the user puts it. For a personal recipe app in the user's own iCloud Drive this
   is acceptable; called out in OQ3 rather than assumed.
