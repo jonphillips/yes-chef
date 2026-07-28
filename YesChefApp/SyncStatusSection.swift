@@ -1,5 +1,6 @@
 import CloudSyncKit
 import SwiftUI
+import YesChefCore
 
 /// The sync-health row in Settings (jon-platform ADR-0003): a colored dot + one line
 /// saying whether CloudKit sync is live, local-only, or broken — tappable to a small
@@ -62,6 +63,7 @@ private struct SyncStatusDot: View {
 struct SyncStatusDetailView: View {
   let model: SyncHealthModel
   @Environment(\.dismiss) private var dismiss
+  @State private var isConfirmingRestoreSyncEnablement = false
 
   var body: some View {
     NavigationStack {
@@ -113,6 +115,16 @@ struct SyncStatusDetailView: View {
           Button("Done") { dismiss() }
         }
       }
+      .alert("Turn On iCloud Sync?", isPresented: $isConfirmingRestoreSyncEnablement) {
+        Button("Turn On Sync") {
+          Task { await model.enableSyncButtonTapped() }
+        }
+        Button("Cancel", role: .cancel) {}
+      } message: {
+        Text(
+          "This device will merge with iCloud. Anything still in iCloud will overwrite the restored version, and recipes the backup has that iCloud doesn't will be uploaded to it.\n\nIf you restored because something in iCloud went wrong, keep sync off."
+        )
+      }
     }
   }
 
@@ -153,7 +165,12 @@ struct SyncStatusDetailView: View {
 
   private func primaryAction() async {
     switch model.displayStatus {
-    case .disabled: await model.enableSyncButtonTapped()
+    case .disabled:
+      if YesChefCloudSync.isDisabledByRestore() {
+        isConfirmingRestoreSyncEnablement = true
+      } else {
+        await model.enableSyncButtonTapped()
+      }
     default: await model.tryAgainButtonTapped()
     }
   }

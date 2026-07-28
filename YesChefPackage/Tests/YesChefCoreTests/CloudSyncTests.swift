@@ -59,6 +59,47 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func restoreKeepsSyncOffUntilTheUserReenablesIt() throws {
+      let defaults = try #require(
+        UserDefaults(suiteName: "YesChefCloudSyncRestoreTests-\(UUID().uuidString)")
+      )
+
+      #expect(!YesChefCloudSync.isDisabledByRestore(defaults: defaults))
+      YesChefCloudSync.disableForRestore(defaults: defaults)
+      #expect(YesChefCloudSync.isDisabledByRestore(defaults: defaults))
+      #expect(
+        !YesChefCloudSync.isManuallyEnabled(
+          defaults: defaults,
+          environment: ["YES_CHEF_CLOUDKIT_SYNC_ENABLED": "1"],
+          arguments: ["-YesChefCloudKitSyncEnabled"]
+        )
+      )
+
+      YesChefCloudSync.persistManualEnablementFromLaunchEnvironment(
+        defaults: defaults,
+        environment: ["YES_CHEF_CLOUDKIT_SYNC_ENABLED": "1"],
+        arguments: ["-YesChefCloudKitSyncEnabled"]
+      )
+      #expect(
+        !YesChefCloudSync.isManuallyEnabled(
+          defaults: defaults,
+          environment: [:],
+          arguments: []
+        )
+      )
+
+      YesChefCloudSync.setManuallyEnabled(true, defaults: defaults)
+      #expect(!YesChefCloudSync.isDisabledByRestore(defaults: defaults))
+      #expect(
+        YesChefCloudSync.isManuallyEnabled(
+          defaults: defaults,
+          environment: [:],
+          arguments: []
+        )
+      )
+    }
+
+    @Test
     func bootstrapAttachesMetadatabase() throws {
       @Dependency(\.defaultDatabase) var database
 

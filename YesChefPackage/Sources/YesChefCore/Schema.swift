@@ -49,7 +49,8 @@ extension DependencyValues {
 
   public mutating func bootstrapDatabase(
     path: String?,
-    syncMode: YesChefCloudSync.BootstrapMode
+    syncMode: YesChefCloudSync.BootstrapMode,
+    eraseDatabaseOnSchemaChange: Bool? = nil
   ) throws {
     var configuration = Configuration()
     configuration.prepareDatabase { db in
@@ -77,8 +78,8 @@ extension DependencyValues {
       // ("my database is gone"). Gate it behind an explicit launch argument: add
       // -YesChefEraseDatabaseOnSchemaChange to the scheme only when you actually want a
       // clean-slate dev DB, instead of firing on every DEBUG launch.
-      migrator.eraseDatabaseOnSchemaChange =
-        ProcessInfo.processInfo.arguments.contains("-YesChefEraseDatabaseOnSchemaChange")
+      migrator.eraseDatabaseOnSchemaChange = eraseDatabaseOnSchemaChange
+        ?? ProcessInfo.processInfo.arguments.contains("-YesChefEraseDatabaseOnSchemaChange")
     #endif
 
     migrator.registerMigration("Create MVP recipe library schema") { db in
@@ -1020,6 +1021,25 @@ extension DependencyValues {
         for: database,
         startImmediately: startImmediately
       )
+    }
+  }
+
+  /// Runs only the app's append-only migrator against an isolated restore candidate. It never
+  /// honors the DEBUG erase switch: a backup is recovery data, not a disposable dev database.
+  public static func migrateRestoreCandidate(at databaseURL: URL) throws {
+    // SQLiteData deliberately gives test-context databases an ephemeral path even when one is
+    // supplied. This scoped live context makes the explicit restore-candidate path authoritative;
+    // it does not use the app's shared-store URL.
+    try withDependencies {
+      $0.context = .live
+    } operation: {
+      var dependencies = DependencyValues()
+      try dependencies.bootstrapDatabase(
+        path: databaseURL.path,
+        syncMode: .disabled,
+        eraseDatabaseOnSchemaChange: false
+      )
+      try dependencies.defaultDatabase.close()
     }
   }
 
