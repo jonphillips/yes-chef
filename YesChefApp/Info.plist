@@ -26,6 +26,8 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>UILaunchScreen</key>
+	<dict/>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
@@ -46,7 +48,5 @@
 			</dict>
 		</dict>
 	</array>
-	<key>UILaunchScreen</key>
-	<dict/>
 </dict>
 </plist>

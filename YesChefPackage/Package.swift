@@ -28,6 +28,15 @@ let package = Package(
     // SwiftPM unifies the graph to one resolution. See CloudSyncKit's manifest
     // for the same note — that package had the same latent defect.
     .package(url: "https://github.com/groue/GRDB.swift", from: "7.6.0"),
+    // StructuredQueriesCore is the same defect as GRDB above, and it was missed
+    // when GRDB was fixed: the `@Table` macro expands to `QueryExpression` /
+    // `QueryBindable` / `QueryRepresentable` conformances on `Foundation.Data`,
+    // `Date` and `UUID` that live in StructuredQueriesCore, and every generated
+    // `_columnWidth` and `Updates<…>` closure references them from YesChefCore.o.
+    // `import SQLiteData` supplies them to the type checker and not to the
+    // linker. CloudSyncKit's manifest already carries this dependency for the
+    // same reason; this package needed it too.
+    .package(url: "https://github.com/pointfreeco/swift-structured-queries", from: "0.31.0"),
     .package(path: "../../../jon-platform/packages/LLMClientKit"),
     .package(path: "../../../jon-platform/packages/CloudSyncKit"),
   ],
@@ -40,6 +49,7 @@ let package = Package(
         .product(name: "GRDB", package: "GRDB.swift"),
         .product(name: "LLMClientKit", package: "LLMClientKit"),
         .product(name: "SQLiteData", package: "sqlite-data"),
+        .product(name: "StructuredQueriesCore", package: "swift-structured-queries"),
         .product(name: "SwiftSoup", package: "SwiftSoup"),
       ]
     ),
