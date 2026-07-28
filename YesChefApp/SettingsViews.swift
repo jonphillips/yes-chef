@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import YesChefCore
 
 struct SettingsView: View {
@@ -6,6 +7,10 @@ struct SettingsView: View {
   let groceryModel: GroceryLibraryModel
   private let selectedPane: Binding<SettingsPane?>?
   @State private var syncHealth = SyncHealthModel()
+  @State private var backupExport = YesChefDatabaseBackupExportModel()
+  @State private var backupExportDocument: BackupExportDocument?
+  @State private var backupExportFilename = "YesChef-Backup.sqlite"
+  @State private var isPresentingBackupExporter = false
   @Environment(\.scenePhase) private var scenePhase
 
   init(
@@ -35,6 +40,18 @@ struct SettingsView: View {
       }
 
       Section("Import & Export") {
+        Button {
+          Task {
+            guard let snapshot = await backupExport.prepareBackupForExport() else { return }
+            backupExportDocument = BackupExportDocument(snapshot: snapshot)
+            backupExportFilename = backupExport.defaultFilename()
+            isPresentingBackupExporter = true
+          }
+        } label: {
+          Label("Export a Backup", systemImage: "externaldrive.badge.checkmark")
+        }
+        .disabled(backupExport.isPreparing)
+
         Button {
           model.importPaprikaExportButtonTapped()
         } label: {
@@ -75,6 +92,48 @@ struct SettingsView: View {
     .onChange(of: syncHealth.isSynchronizing) { _, _ in
       Task { await syncHealth.refresh() }
     }
+    .fileExporter(
+      isPresented: $isPresentingBackupExporter,
+      document: backupExportDocument,
+      contentType: .yesChefSQLiteBackup,
+      defaultFilename: backupExportFilename,
+      onCompletion: backupExportCompleted,
+      onCancellation: backupExportCancelled
+    )
+    .alert("Could Not Export Backup", isPresented: backupExportErrorPresented) {
+      Button("OK") {
+        backupExport.dismissError()
+      }
+    } message: {
+      Text(backupExport.errorMessage ?? "")
+    }
+  }
+
+  private var backupExportErrorPresented: Binding<Bool> {
+    Binding(
+      get: { backupExport.errorMessage != nil },
+      set: { isPresented in
+        guard !isPresented else { return }
+        backupExport.dismissError()
+      }
+    )
+  }
+
+  private func backupExportCompleted(_ result: Result<URL, any Error>) {
+    defer { clearPreparedBackup() }
+    guard case let .failure(error) = result else { return }
+    backupExport.recordExportFailure(error)
+  }
+
+  private func backupExportCancelled() {
+    clearPreparedBackup()
+  }
+
+  private func clearPreparedBackup() {
+    if let backupExportDocument {
+      backupExport.discard(backupExportDocument.snapshot)
+    }
+    backupExportDocument = nil
   }
 
   @ViewBuilder private var categoryRow: some View {
@@ -180,6 +239,46 @@ struct SettingsView: View {
     }
   }
 #endif
+}
+
+private final class BackupExportDocument: WritableDocument {
+  typealias Writer = BackupExportDocumentWriter
+
+  static let writableContentTypes: [UTType] = [.yesChefSQLiteBackup]
+
+  let snapshot: YesChefDatabaseBackup.Snapshot
+
+  init(snapshot: YesChefDatabaseBackup.Snapshot) {
+    self.snapshot = snapshot
+  }
+
+  func writer(configuration: sending DocumentWriteConfiguration) -> sending BackupExportDocumentWriter {
+    BackupExportDocumentWriter()
+  }
+
+  func snapshot(contentType: UTType) async throws -> sending URL {
+    snapshot.fileURL
+  }
+}
+
+private struct BackupExportDocumentWriter: DocumentWriter {
+  typealias Snapshot = URL
+
+  func write(
+    snapshot: sending URL,
+    to destination: sending URL,
+    previous: sending URL?,
+    progress: consuming Subprogress
+  ) async throws {
+    try FileManager.default.copyItem(at: snapshot, to: destination)
+  }
+}
+
+private extension UTType {
+  static let yesChefSQLiteBackup = UTType(
+    exportedAs: "com.jonphillips.yeschef.database-backup",
+    conformingTo: .data
+  )
 }
 
 struct SettingsDetailPane: View {
