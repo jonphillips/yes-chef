@@ -44,6 +44,46 @@ struct RecipeTextMarkupTests {
   }
 
   @Test
+  func ingredientParserKeepsOptionalFlagWhenItAppearsInAnAuthorNote() {
+    let originalText = "¼ lb. ground pork [OPTIONAL]"
+    let line = IngredientParser.lines(
+      from: originalText,
+      recipeID: SampleUUIDSequence.uuid(4),
+      sectionID: SampleUUIDSequence.uuid(5),
+      uuid: { SampleUUIDSequence.uuid(6) }
+    )[0]
+
+    expectNoDifference(line.originalText, originalText)
+    expectNoDifference(line.item, "ground pork")
+    expectNoDifference(line.comment, "OPTIONAL")
+    expectNoDifference(line.isOptional, true)
+  }
+
+  @Test
+  func ingredientParserKeepsOptionalFlagForSichuanPeppercornsAuthorNote() {
+    let line = IngredientParser.lines(
+      from: "1 tsp ground sichuan peppercorns [OPTIONAL]",
+      recipeID: SampleUUIDSequence.uuid(7),
+      sectionID: SampleUUIDSequence.uuid(8),
+      uuid: { SampleUUIDSequence.uuid(9) }
+    )[0]
+
+    expectNoDifference(line.isOptional, true)
+  }
+
+  @Test
+  func ingredientParserLeavesQuantityBearingSaltVariantsShoppable() {
+    let line = IngredientParser.lines(
+      from: "2 cups kosher salt [Diamond Crystal]",
+      recipeID: SampleUUIDSequence.uuid(10),
+      sectionID: SampleUUIDSequence.uuid(11),
+      uuid: { SampleUUIDSequence.uuid(12) }
+    )[0]
+
+    expectNoDifference(line.doNotShop, false)
+  }
+
+  @Test
   func recipeProseMarkdownRoundTripsWithoutChangingStructuredRows() throws {
     @Dependency(\.defaultDatabase) var database
     let now = Date(timeIntervalSinceReferenceDate: 0)

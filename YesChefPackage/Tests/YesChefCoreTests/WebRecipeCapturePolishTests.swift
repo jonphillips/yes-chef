@@ -8,6 +8,26 @@ extension RecipeCoreTests {
   @Suite
   struct WebRecipeCapturePolishTests {
     @Test
+    func capturedIngredientPreservesBracketedMetricComment() throws {
+      let originalText = "1 cup [140 g] raw whole cashews"
+      let page = ParsedRecipePage(
+        title: "Cashew Sauce",
+        ingredientSections: [ParsedRecipeIngredientSection(lines: [originalText])],
+        capturedAt: Date(timeIntervalSinceReferenceDate: 803_250_000)
+      )
+      var uuids = SampleUUIDSequence(start: 22_500)
+
+      let bundle = try page.makeRecipeBundle(
+        now: Date(timeIntervalSinceReferenceDate: 803_250_000),
+        uuid: { uuids.next() }
+      )
+      let line = try #require(bundle.ingredientLines.first)
+
+      expectNoDifference(line.originalText, originalText)
+      expectNoDifference(line.comment, "140 g")
+    }
+
+    @Test
     func incomingSourceURLStripsTrackersAndFragmentButCanonicalStaysPreferred() async throws {
       let incomingURL = try #require(
         URL(string: "https://example.com/recipes/fallback?utm_source=newsletter&id=123#comments")
