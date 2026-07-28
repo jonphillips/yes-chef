@@ -425,18 +425,23 @@ extension AIHandoffTests {
     }
   }
 
-  /// The Playbook hands off in `.discuss` mode, and each context owns its format — so each blob
-  /// section's own prompt has to carry the flat-list contract or the return comes back as a headed report.
+  /// The Playbook hands off in `.discuss` mode, and each context owns its format. Chef It Up stays a flat
+  /// line list; make-ahead carries the shared timing vocabulary so it matches the onboard extractor and the
+  /// stored `Recipe.makeAhead` field instead of drifting back into a generic headed report.
   @Test
-  func blobSectionPromptsPinTheirReturnToAFlatLineList() {
+  func blobSectionPromptsPinTheirReturnFormat() {
     let context = RecipeHandoffContext(recipe: RecipeChatRecipeContext(title: "Chili"))
 
-    for prompt in [context.prompt(for: .makeAhead), context.prompt(for: .chefItUp)] {
-      #expect(prompt.contains("one make-ahead step per line") || prompt.contains("one upgrade per line"))
-      #expect(prompt.contains("No headings, no section titles, no nested or Markdown bullets"))
-      #expect(prompt.contains("no assessment of what the recipe already does well"))
-      #expect(prompt.contains("Six lines at most"))
-    }
+    let chefItUp = context.prompt(for: .chefItUp)
+    #expect(chefItUp.contains("one upgrade per line"))
+    #expect(chefItUp.contains("No headings, no section titles, no nested or Markdown bullets"))
+    #expect(chefItUp.contains("no assessment of what the recipe already does well"))
+    #expect(chefItUp.contains("Six lines at most"))
+
+    let makeAhead = context.prompt(for: .makeAhead)
+    #expect(makeAhead.contains("one make-ahead step per line as `When: task`"))
+    #expect(makeAhead.contains(MakeAheadTiming.canonicalLabelList))
+    #expect(makeAhead.contains("no assessment of what the recipe already does well"))
   }
 
   @Test
