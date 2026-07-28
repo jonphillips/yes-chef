@@ -1,6 +1,7 @@
 # Current Handoff
 
-Last updated: July 28, 2026. (ADR-0030 S1 Export shipped + device-passed; live target is now S2 Restore.)
+Last updated: July 28, 2026. (ADR-0030 S1+S2 shipped — the durability net has both halves; live target is now
+ADR-0014 recipe text editing.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -15,51 +16,43 @@ live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** re
 
 ## Next Up
 
-**ONE live dispatch target: [ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) **S2 — Restore.**
-Read one `.sqlite` snapshot back into the live store — the recover half of the durability net. S1 (Export)
-shipped and device-passed 2026-07-28 (PR [#250](https://github.com/jonphillips/yes-chef/pull/250)).** Dispatch
-with *"Do **ADR-0030 S2 (Restore)** from `docs/CURRENT_HANDOFF.md`."* If this section is empty or missing,
-**STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
+**ONE live dispatch target: [ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md) **recipe text editing —
+D3 then D2**, the two markup-in-text slices.** Both are additive, render/parse-level, and share one surface
+(text stored in columns the app already has). Dispatch with *"Do **ADR-0014 D3+D2** from
+`docs/CURRENT_HANDOFF.md`."* If this section is empty or missing, **STOP and ask Jon — never infer.**
+See `docs/AGENTS.md` § Work Intake & Dispatch. **Amendment 1 (Amd1-D1, the colon/section rework) is ratified
+and dispatchable but is NOT this dispatch** — it is the meaty one and gets its own, per the ADR's own
+`D3 → D2 → D1` order.
 
-**The scope (ADR §Slices S2).** Validate an incoming file (is it a YesChef DB? is its stamped schema version
-restorable by the current migrator?), take an **automatic pre-restore snapshot** of the current store so a
-mis-click is undoable, **atomically swap** the store file, **remove the prior sync metadatabase**, and reopen
-with sync **off** — then the user re-enables sync, which reconciles the restored rows through the normal path. Confirm-
-and-undo UX. Restore is replace-only for v1 (OQ4 — merge is a later, harder question, out of scope).
+**The scope.**
+- **D3 — `[square bracket]` = author note.** A bracketed span inside an ingredient line is a Jon note,
+  rendered de-emphasized. **Pure render rule + parser-ignore, no schema.** The ingredient parser must treat
+  the span as annotation rather than item/quantity/unit — it can land in the existing `comment` field — and
+  the bracket **stays in `originalText`** so the round-trip is lossless.
+- **D2 — inline styling on free-text fields only.** Markdown stored inline in the existing `String` columns
+  (`**bold**`, `*italic*`), rendered with `AttributedString(markdown:)`. **Free-text fields only** —
+  `summary`, notes, tip blocks. Ingredient and instruction rows stay structural; no inline styling there.
+  The attributed-run model was considered and **rejected** (heavier, no round-trip benefit, worse in the raw
+  store). Editor affordance can start as raw Markdown passthrough.
 
-**What S1 left on the table — read before scoping:**
+**Read before scoping:**
 
-1. **The metadatabase reset is the load-bearing step, and S1's export cannot do it.** SQLiteData keeps its
-   SyncEngine metadata and `PendingRecordZoneChange` bookkeeping in a sibling attached metadatabase, not in
-   the main database that `VACUUM INTO` exports. A restore must **not** leave that prior local peer beside the
-   replacement store: atomically replace the main file first, then remove the live attached metadatabase and
-   its SQLite sidecars (D2). The user re-enables sync from a fresh local peer. Keep restore a
-   *local* operation — it must never risk stomping the cloud. Explicitly **not**
-   [[debug-erase-vs-sync-triggers]] / zone-rebuild territory.
-2. **OQ1 must be confirmed on device before S2 is called done.** When sync re-enables onto a restored store,
-   does CloudKit treat the restored UUID-PK rows as **updates to existing records**, or does it need a fresh
-   association? This touches the same SyncEngine internals as ADR-0028; a build-green report is **not** a pass
-   here.
-3. **The compat check gates on the append-only invariant, not a bare count.** S1 stamps `PRAGMA user_version`
-   with the applied-migration **count**. That is a sound version *only because* migrations stay append-only
-   (`Schema.swift` "stable prefix" rule) — count-equality is **not** identifier-equality. The restore-time
-   check must refuse a backup **newer** than the current app can migrate (honest "this backup is newer/older
-   than this app can restore"), and must run the migrator **forward** on an older-but-valid backup rather than
-   assume the on-disk schema is current.
-4. **Consume `YesChefDatabaseBackup.schemaVersion(in:)`, don't re-copy its SQL.** S1 already added that public
-   reader (currently unused) — it duplicates the `COUNT(*) FROM grdb_migrations` literal `stampSchemaVersion`
-   carries. S2 is its intended consumer; wire the validation through it and collapse the SQL to **one** home.
-5. **Byte-exact, not serialization — unchanged.** A JSON/portable export stays a deliberately separate, parked
-   goal (D5 / [[llm-vs-determinism-surface-boundary]]); S2 reads the DB file, it does not re-encode rows.
+1. **`normalize-recipe` gains a markup-awareness requirement, and it now has three things to respect.** It
+   must not strip or re-case inside `**`/`*` runs (D2) or `[…]` spans (D3) — **and per Amendment 1 it must
+   leave trailing colons alone**, because stripping one would silently restructure a recipe once Amd1-D1
+   lands. Normalization runs on import before user styling exists, so the live conflict is small, but any
+   re-run pass has to honour all three.
+2. **Anything that displays `summary`/notes must render through the Markdown path** or it will show literal
+   `**`. Audit the display sites as part of D2 rather than leaving them to surface one at a time.
+3. **D3's bracket rule is ingredient-line scoped.** Do not extend it to instruction steps on momentum.
+4. **Do not touch `isHeader` or the editor's section handling in this dispatch.** Both are Amd1-D1's subject
+   and its mechanism supersedes the original D1 — a drive-by here would collide with it.
 
-**Verification.** Restore validation + metadatabase reset belongs in **Core** so package tests exercise it
-(snapshot a seeded, sync-configured temp DB, corrupt/downgrade its marker, assert the compat check refuses it;
-assert the snapshot has only the main-store rows, then assert the real live attached metadatabase is gone after
-the swap). The Settings row + confirm-and-undo UX touches
-`YesChefApp/` and needs the elevated `generic/platform=iOS` build as required evidence. No simulator installs;
-Jon device-passes the Export → Restore → re-enable-sync round-trip (this is where OQ1 gets answered).
-**S3 (auto/pre-migration snapshots) is a separate later dispatch — build the pre-migration snapshot first when
-it comes, per D4.**
+**Verification.** Both slices are parser/render logic, so the tests belong in **Core**: bracket spans parse as
+annotation with `originalText` preserved byte-for-byte, and Markdown round-trips through the free-text columns
+without leaking into ingredient/instruction rows. The display-site audit touches `YesChefApp/` and needs the
+elevated `generic/platform=iOS` build as required evidence. No simulator installs; Jon device-passes the
+rendering.
 
 ## Standing guards
 
@@ -177,16 +170,36 @@ no-commit advisory or a per-day note, not a per-recipe write; respect [[llm-cura
 that we auto-number. **Unscoped**; parked in [`docs/open-questions.md`](open-questions.md). Interacts with
 ADR-0014, so sequence them.
 
-**[ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md) recipe text editing — Amendment 1 RATIFIED
-2026-07-28, dispatchable.** A header is *syntax* (a line ending in `:`), a section is *storage*, and the split
-happens at **edit time** — typing or pasting a header line splits the editor card in place, with UUIDs in
-hand, so the save path is untouched. The `isHeader` toggle and `applyIngredientLineDrafts` both go away;
-Amd1-D1a adds a per-line "Start a section here" action so typing markup is never the only door. **No
-migration** — audited against a live backup: 10 header lines in 4 recipes (one already hand-fixed), 0 grocery
-sources and 0 variation deltas anchoring them. Read Amendment 1 before slicing D1; its original mechanism is
-superseded. **Amd1-D4 is NOT resolved:** a header inside a *variation* still hits
+**[ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md) **Amd1-D1** — the colon/section rework.
+RATIFIED 2026-07-28, dispatchable, and the meatiest slice of the ADR. Sequenced behind D3+D2 (now in Next
+Up), though it does not strictly depend on them.** A header is *syntax* (a line ending in `:`), a section is
+*storage*, and the split happens at **edit time** — typing or pasting a header line splits the editor card in
+place, with UUIDs in hand, so the save path is untouched. The `isHeader` toggle and `applyIngredientLineDrafts`
+both go away; Amd1-D1a adds a per-line "Start a section here" action so typing markup is never the only door.
+**No migration** — audited against a live backup: 10 header lines in 4 recipes (one already hand-fixed), 0
+grocery sources and 0 variation deltas anchoring them. Read Amendment 1 before slicing D1; its original
+mechanism is superseded. **Amd1-D4 is NOT resolved:** a header inside a *variation* still hits
 `RecipeVariationUnrepresentableEdit.ingredientSectionAdded` — that is ADR-0021's delta-vocabulary call, and
-nothing is broken today (0 variations anchor a header).
+nothing is broken today (0 variations anchor a header). **Instruction sections stay out of scope** — the colon
+rule is ingredient-only until someone specifies the instruction variant (steps routinely contain mid-prose
+colons), so instruction sections keep explicit card names.
+
+**[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) leftovers — one owed confirmation and S3.**
+- **The owed OQ1 confirmation (small, do it before trusting the net).** Amendment 1 is **Proposed**, not
+  Accepted: its four-step mechanism is a code reading. Confirm it in an **isolated CloudKit container** — one
+  line in `YesChefCloudSync.configuration.containerIdentifier` plus a new container in the dashboard — against
+  a small seeded library on two simulators: export → mutate → restore → re-enable → observe. **Explicitly not
+  against the live zone**, where the same experiment costs a ~44k-record push and can resurrect deleted rows
+  on both devices with no undo. The one thing to watch is whether a missing `_lastKnownServerRecordAllFields`
+  really collapses the merge into a whole-record overwrite; if SQLiteData backfills a baseline first, the
+  amendment softens considerably.
+- **S3 — automatic snapshots.** Cadence/trigger + retention (keep N), local-only. **Build the pre-migration
+  snapshot first** (D4): a rolling local snapshot taken right before `migrator.migrate` runs, so a
+  bad/erasing migration is always recoverable from the step before it — the single cheapest catch for the
+  [[debug-erase-vs-sync-triggers]] class of bug. App-update-boundary and periodic snapshots follow.
+- **OQ5 (restore-authoritative — reset the zone and re-upload) is parked, not queued.** It is the only true
+  cure for a poisoned zone and it is irreversible; **do not build it on ADR momentum**
+  ([[withdraw-not-defer-orphaned-schema]]). It gets its own slice and its own justification, or none at all.
 
 **Small nits — not urgent, fold into a passing dispatch:**
 - **The S4 brief extractor's prompt is framed for a conversation, but S4 hands it a decision** (silent-failure
@@ -222,7 +235,12 @@ selection (per-bubble `UITextView` caps the payload).
 
 ## Device passes owed
 
-Not work, a checklist. **Recipe section grain S1** (PR [#246](https://github.com/jonphillips/yes-chef/pull/246))
+Not work, a checklist. **[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) S2**
+(PR [#252](https://github.com/jonphillips/yes-chef/pull/252)) owes the **local** round-trip on device — pick a
+backup through the Files importer, confirm, relaunch, and land on the restored library, then Undo Last Restore
+back. **Keep sync off for this pass**; the sync-reconciliation half is the separate isolated-container job in
+Ready Efforts, deliberately not run against the live zone. *(Delete this if you already ran it.)*
+**Recipe section grain S1** (PR [#246](https://github.com/jonphillips/yes-chef/pull/246))
 owes the Samin capture showing its three instruction sections with subheads, and — the canary — a
 single-section recipe looking and spacing exactly as it did before; the reader and Compare restart numbering
 per section while the adjustment review stays continuous, which is deliberate.
