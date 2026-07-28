@@ -415,7 +415,7 @@ public final class YesChefDatabaseBackupRestoreModel {
     } catch {
       discardPreparedRestore()
       errorMessage = beganDatabaseClose
-        ? "Yes Chef needs to be restarted before another restore can be attempted. \(error.localizedDescription)"
+        ? "Yes Chef could not finish the restore and must be reopened before you can keep using it. \(error.localizedDescription)"
         : error.localizedDescription
       return false
     }

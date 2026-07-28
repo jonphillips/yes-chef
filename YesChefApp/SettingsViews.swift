@@ -143,7 +143,7 @@ struct SettingsView: View {
         backupRestore.discardPreparedRestore()
       }
     } message: {
-      Text("This replaces the library on this device. Yes Chef will first save an automatic undo backup, and iCloud sync will stay off until you turn it on again.")
+      Text("This replaces the library on this device. Yes Chef saves an automatic undo backup first.\n\niCloud sync stays off until you turn it back on. When you do, anything still in iCloud will overwrite the restored version.")
     }
     .fullScreenCover(isPresented: $isPresentingRestoreRestartCover) {
       RestoreRestartCover()
@@ -320,9 +320,7 @@ private struct RestoreRestartCover: View {
     ContentUnavailableView(
       "Restart Yes Chef",
       systemImage: "arrow.clockwise",
-      description: Text(
-        "Your backup is restored. Close and reopen Yes Chef to use it. You can undo this restore from Settings after reopening."
-      )
+      description: "Your backup is restored — close and reopen Yes Chef to use it. You can undo this restore from Settings after reopening.\n\niCloud sync is off. Turning it back on merges this device with iCloud, and iCloud's copy wins for anything it still has. If you restored because something in iCloud went wrong, leave sync off."
     )
     .interactiveDismissDisabled()
   }
