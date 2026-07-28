@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: July 28, 2026.
+Last updated: July 28, 2026. (ADR-0030 S1 Export shipped + device-passed; live target is now S2 Restore.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -15,38 +15,50 @@ live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** re
 
 ## Next Up
 
-**ONE live dispatch target: [ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) **S1 — Export.**
-A CloudKit-independent durability net: a `VACUUM INTO` whole-database snapshot the user writes to Files /
-iCloud Drive.** Dispatch with *"Do **ADR-0030 S1 (Export)** from `docs/CURRENT_HANDOFF.md`."* If this section
-is empty or missing, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
+**ONE live dispatch target: [ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) **S2 — Restore.**
+Read one `.sqlite` snapshot back into the live store — the recover half of the durability net. S1 (Export)
+shipped and device-passed 2026-07-28 (PR [#250](https://github.com/jonphillips/yes-chef/pull/250)).** Dispatch
+with *"Do **ADR-0030 S2 (Restore)** from `docs/CURRENT_HANDOFF.md`."* If this section is empty or missing,
+**STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-**The scope (ADR §Slices S1).** A snapshot writer in **Core** — `VACUUM INTO` a single `.sqlite` file (OQ2:
-pick `VACUUM INTO` vs GRDB `DatabaseWriter.backup` here; both give a consistent transaction that folds
-`-wal`/`-shm` so there are **no sidecar files**) — plus a Settings row that runs it and hands the file to
-`fileExporter`. Stamp a `schemaVersion` / app-version marker the future restore path can read (`PRAGMA
-user_version` or a one-row `backupMeta` table). **No schema change to the synced model.**
+**The scope (ADR §Slices S2).** Validate an incoming file (is it a YesChef DB? is its stamped schema version
+restorable by the current migrator?), take an **automatic pre-restore snapshot** of the current store so a
+mis-click is undoable, **atomically swap** the store file, **strip sync metadata**, and reopen with sync
+**off** — then the user re-enables sync, which reconciles the restored rows through the normal path. Confirm-
+and-undo UX. Restore is replace-only for v1 (OQ4 — merge is a later, harder question, out of scope).
 
-**Four things a dispatch must not miss:**
+**What S1 left on the table — read before scoping:**
 
-1. **This is a byte-exact file copy, not a serialization surface.** Images are BLOBs **inside** the row
-   (`RecipePhoto.displayData` / `.thumbnailData`), so one `.sqlite` file is the whole library — recipes,
-   menus, notes, every photo byte — with **zero encode code**. Do **not** build a JSON/portable export; that
-   is a deliberately separate, parked goal (D5), and re-encoding 44k+ rows is exactly the
-   deterministic-data surface [[llm-vs-determinism-surface-boundary]] says to avoid.
-2. **The read must be consistent even while the app is writing.** `VACUUM INTO` / `.backup` read a single
-   transaction; confirm the WAL checkpoint behaviour so the snapshot is one self-contained file. A torn
-   snapshot that needs a `-wal` sidecar is the failure mode to test against.
-3. **This is orthogonal to sync — do not touch the SyncEngine, zones, or triggers.** It reads the same store
-   everything else uses. Explicitly **not** [[debug-erase-vs-sync-triggers]] / zone-rebuild territory. The
-   sync-metadata *strip* belongs to S2 (restore), not here.
-4. **The app never phones the file home.** The user picks the destination through `fileExporter` / a document
-   picker; default filename carries a timestamp (`YesChef-Backup-2026-07-28.sqlite`).
+1. **The strip is the load-bearing step, and S1's export does not do it.** The exported file is a `VACUUM INTO`
+   copy of the *whole* store, so it **still carries the SyncEngine metadata and `PendingRecordZoneChange`
+   bookkeeping** — the tables ADR-0028 and [[extension-sync-construct-not-run]] revolve around. A restored
+   file must **not** masquerade as an already-synced peer of the CloudKit zone (D2). Strip/ignore that metadata
+   and land app data into a **fresh local store with sync disabled**; the user re-enables. Keep restore a
+   *local* operation — it must never risk stomping the cloud. Explicitly **not**
+   [[debug-erase-vs-sync-triggers]] / zone-rebuild territory.
+2. **OQ1 must be confirmed on device before S2 is called done.** When sync re-enables onto a restored store,
+   does CloudKit treat the restored UUID-PK rows as **updates to existing records**, or does it need a fresh
+   association? This touches the same SyncEngine internals as ADR-0028; a build-green report is **not** a pass
+   here.
+3. **The compat check gates on the append-only invariant, not a bare count.** S1 stamps `PRAGMA user_version`
+   with the applied-migration **count**. That is a sound version *only because* migrations stay append-only
+   (`Schema.swift` "stable prefix" rule) — count-equality is **not** identifier-equality. The restore-time
+   check must refuse a backup **newer** than the current app can migrate (honest "this backup is newer/older
+   than this app can restore"), and must run the migrator **forward** on an older-but-valid backup rather than
+   assume the on-disk schema is current.
+4. **Consume `YesChefDatabaseBackup.schemaVersion(in:)`, don't re-copy its SQL.** S1 already added that public
+   reader (currently unused) — it duplicates the `COUNT(*) FROM grdb_migrations` literal `stampSchemaVersion`
+   carries. S2 is its intended consumer; wire the validation through it and collapse the SQL to **one** home.
+5. **Byte-exact, not serialization — unchanged.** A JSON/portable export stays a deliberately separate, parked
+   goal (D5 / [[llm-vs-determinism-surface-boundary]]); S2 reads the DB file, it does not re-encode rows.
 
-**Verification.** Put the snapshot writer in **Core** so package tests exercise it (`scripts/check-drift.sh`
-compiles `YesChefPackage`) — the unit test is: snapshot a seeded temp DB, reopen the copy, assert row counts
-match. The Settings row touches `YesChefApp/` and needs the elevated `generic/platform=iOS` build as required
-evidence. No simulator installs; Jon device-passes the Settings → Export → Files round-trip. **S2 (restore)
-and S3 (auto/pre-migration snapshots) are separate later dispatches — S1 does not build them.**
+**Verification.** Restore validation + strip logic belongs in **Core** so package tests exercise it (snapshot a
+seeded temp DB, corrupt/downgrade its marker, assert the compat check refuses it; strip, reopen, assert the
+sync-metadata tables are gone and app rows survive). The Settings row + confirm-and-undo UX touches
+`YesChefApp/` and needs the elevated `generic/platform=iOS` build as required evidence. No simulator installs;
+Jon device-passes the Export → Restore → re-enable-sync round-trip (this is where OQ1 gets answered).
+**S3 (auto/pre-migration snapshots) is a separate later dispatch — build the pre-migration snapshot first when
+it comes, per D4.**
 
 ## Standing guards
 

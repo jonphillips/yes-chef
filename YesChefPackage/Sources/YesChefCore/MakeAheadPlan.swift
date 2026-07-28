@@ -46,6 +46,15 @@ public struct MakeAheadPlan: Equatable, Sendable {
   }
 }
 
+public enum MakeAheadTiming {
+  /// The settled relative-timing vocabulary every make-ahead producer shares — the onboard extractor,
+  /// the outboard hand-off, and the stored `Recipe.makeAhead` field — so a preference written into the
+  /// one "Make-ahead & Prep Plans" setting reads the same way through every door instead of drifting
+  /// into different label sets.
+  public static let canonicalLabelList =
+    "`Up to N days ahead`, `Day before`, `Night before`, `Morning of`, `Day of`, `N hours ahead`, `N minutes ahead`, or `Before serving`"
+}
+
 /// The order is the product decision: earliest available effort through serving time.
 private enum MakeAheadTimingRank: Int, Comparable {
   case daysAhead
@@ -156,8 +165,7 @@ extension MakeAheadPlanClient: DependencyKey {
     You distill a cooking conversation into a practical make-ahead plan for one recipe.
     The recipe context and conversation are provided by the app. Return ONLY strict JSON:
     {"steps":[{"when":"short timing label","task":"concrete kitchen task","why":"optional brief reason"}]}.
-    Set each `when` to exactly one settled label: `Up to N days ahead`, `Day before`, `Night before`,
-    `Morning of`, `Day of`, `N hours ahead`, `N minutes ahead`, or `Before serving`. Replace N with a number.
+    Set each `when` to exactly one settled label: \(MakeAheadTiming.canonicalLabelList). Replace N with a number.
     Use only the provided recipe and conversation. Do not invent storage times or food-safety claims.
     Prefer a short, useful plan. Return {"steps":[]} when there is no make-ahead strategy to save.
     """

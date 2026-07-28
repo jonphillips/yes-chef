@@ -110,7 +110,11 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     ingredients as context; suggest only work that can happen before cooking or serving. Do not rewrite the
     recipe or turn the response into a merged mega-recipe.
 
-    \(lineListFormat("make-ahead step"))
+    Return format: one make-ahead step per line as `When: task` — a timing label, a colon, then a single \
+    concrete action the cook can take before cooking or serving. Order steps from earliest to just before \
+    serving, and use only these timing labels, exactly: \(MakeAheadTiming.canonicalLabelList) (replace N with \
+    a number). No bullets, no Markdown emphasis, no introduction, and no assessment of what the recipe already \
+    does well. Six steps at most — fewer if there is less worth saying.
 
     Taste profile:
     \(tasteProfile)
