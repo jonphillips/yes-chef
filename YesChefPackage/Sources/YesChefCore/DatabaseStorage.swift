@@ -1,4 +1,5 @@
 import Foundation
+import SQLiteData
 
 public enum YesChefDatabaseStorage {
   public static let appGroupIdentifier = "group.com.jonphillips.yeschef"
@@ -36,6 +37,25 @@ public enum YesChefDatabaseStorage {
       .deletingLastPathComponent()
       .appendingPathComponent(".\(databaseURL.deletingPathExtension().lastPathComponent)")
       .appendingPathExtension("metadata-\(containerIdentifier).sqlite")
+      .resolvingSymlinksInPath()
+  }
+
+  /// The metadatabase is attached on every live connection. Prefer that runtime path over the
+  /// naming fallback above so an upstream SQLiteData rename cannot silently retain a prior peer.
+  public static func attachedSyncMetadataURL(
+    in database: any DatabaseReader,
+    fallbackFor databaseURL: URL,
+    containerIdentifier: String
+  ) throws -> URL {
+    try database.read { db in
+      if let path = try String.fetchOne(
+        db,
+        sql: "SELECT file FROM pragma_database_list WHERE name = 'sqlitedata_icloud'"
+      ), !path.isEmpty {
+        return URL(fileURLWithPath: path).resolvingSymlinksInPath()
+      }
+      return syncMetadataURL(for: databaseURL, containerIdentifier: containerIdentifier)
+    }
   }
 
   public static func liveSharedDatabaseURL(fileManager: FileManager = .default) throws -> URL {

@@ -4,7 +4,7 @@ import SQLiteData
 import Testing
 import YesChefCore
 
-@Suite
+@Suite(.serialized)
 struct DatabaseBackupTests {
   @Test
   func snapshotIsSelfContainedAndPreservesSeededRows() async throws {
@@ -68,12 +68,13 @@ struct DatabaseBackupTests {
   }
 
   @Test
-  func restorePreparationStripsSyncMetadataAndPreservesAppRows() async throws {
+  func restorePreparationPreservesAppRowsAndSnapshotsExcludeAttachedSyncMetadata() async throws {
     let directoryURL = try temporaryDirectory()
     let sourceURL = directoryURL.appendingPathComponent("source.sqlite", isDirectory: false)
     let backupURL = directoryURL.appendingPathComponent("backup.sqlite", isDirectory: false)
     let stagingURL = directoryURL.appendingPathComponent("staging.sqlite", isDirectory: false)
-    let database = try pathBackedDatabase(at: sourceURL)
+    let syncDatabase = try syncConfiguredDatabase(at: sourceURL)
+    let database = syncDatabase.database
     let recipeID = SampleUUIDSequence.uuid(3)
 
     try await database.write { db in
@@ -89,9 +90,8 @@ struct DatabaseBackupTests {
     }
     let backup = try await YesChefDatabaseBackup.snapshot(from: database, to: backupURL)
     let backupDatabase = try DatabaseQueue(path: backupURL.path)
-    try await backupDatabase.write { db in
-      try db.execute(sql: "CREATE TABLE sqlitedata_icloud_metadata (value TEXT)")
-      try db.execute(sql: "CREATE TABLE sqlitedata_icloud_pendingRecordZoneChanges (value TEXT)")
+    let snapshotTableNames = try await backupDatabase.read { db in
+      try String.fetchAll(db, sql: "SELECT name FROM sqlite_master WHERE type = 'table'")
     }
     try backupDatabase.close()
 
@@ -105,16 +105,28 @@ struct DatabaseBackupTests {
     let restoredRecipe = try await restoredDatabase.read { db in
       try Recipe.find(recipeID).fetchOne(db)
     }
-    let syncMetadataTables = try await restoredDatabase.read { db in
-      try String.fetchAll(
-        db,
-        sql: "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'sqlitedata_icloud_%'"
-      )
-    }
     try restoredDatabase.close()
 
     #expect(restoredRecipe?.title == "Restored Recipe")
-    #expect(syncMetadataTables.isEmpty)
+    #expect(!snapshotTableNames.contains { $0.hasPrefix("sqlitedata_icloud_") })
+    let metadataURL = try YesChefDatabaseStorage.attachedSyncMetadataURL(
+      in: database,
+      fallbackFor: sourceURL,
+      containerIdentifier: YesChefCloudSync.containerIdentifier
+    )
+    let metadataTableNames = try await database.read { db in
+      try String.fetchAll(
+        db,
+        sql: "SELECT name FROM sqlitedata_icloud.sqlite_master WHERE type = 'table'"
+      )
+    }
+    #expect(metadataURL == YesChefDatabaseStorage.syncMetadataURL(
+      for: sourceURL,
+      containerIdentifier: YesChefCloudSync.containerIdentifier
+    ))
+    #expect(FileManager.default.fileExists(atPath: metadataURL.path))
+    #expect(metadataTableNames.contains("sqlitedata_icloud_metadata"))
+    _ = syncDatabase.syncEngine
   }
 
   @Test
@@ -165,13 +177,14 @@ struct DatabaseBackupTests {
   }
 
   @Test
-  func replaceLiveStoreDiscardsPreviousSyncMetadata() async throws {
+  func replaceLiveStoreDiscardsTheActualAttachedSyncMetadata() async throws {
     let directoryURL = try temporaryDirectory()
     let liveStoreURL = directoryURL.appendingPathComponent("live.sqlite", isDirectory: false)
     let sourceURL = directoryURL.appendingPathComponent("source.sqlite", isDirectory: false)
     let backupURL = directoryURL.appendingPathComponent("backup.sqlite", isDirectory: false)
     let stagingURL = directoryURL.appendingPathComponent("staging.sqlite", isDirectory: false)
-    let liveDatabase = try pathBackedDatabase(at: liveStoreURL)
+    let syncDatabase = try syncConfiguredDatabase(at: liveStoreURL)
+    let liveDatabase = syncDatabase.database
     let sourceDatabase = try pathBackedDatabase(at: sourceURL)
     let recipeID = SampleUUIDSequence.uuid(4)
 
@@ -193,11 +206,17 @@ struct DatabaseBackupTests {
       currentSchemaVersion: backup.schemaVersion,
       migrate: { _ in }
     )
-    let metadataURL = YesChefDatabaseStorage.syncMetadataURL(
-      for: liveStoreURL,
+    let metadataURL = try YesChefDatabaseStorage.attachedSyncMetadataURL(
+      in: liveDatabase,
+      fallbackFor: liveStoreURL,
       containerIdentifier: YesChefCloudSync.containerIdentifier
     )
-    FileManager.default.createFile(atPath: metadataURL.path, contents: Data())
+    let metadataTableNames = try await liveDatabase.read { db in
+      try String.fetchAll(
+        db,
+        sql: "SELECT name FROM sqlitedata_icloud.sqlite_master WHERE type = 'table'"
+      )
+    }
 
     try liveDatabase.close()
     try YesChefDatabaseBackup.replaceLiveStore(
@@ -212,7 +231,74 @@ struct DatabaseBackupTests {
     try restoredDatabase.close()
 
     #expect(restoredRecipe?.title == "Replacement Recipe")
+    #expect(metadataTableNames.contains("sqlitedata_icloud_metadata"))
     #expect(!FileManager.default.fileExists(atPath: metadataURL.path))
+    _ = syncDatabase.syncEngine
+  }
+
+  @Test
+  func restorePreparationForwardMigratesAGenuineNMinusOneBackup() async throws {
+    let directoryURL = try temporaryDirectory()
+    let sourceURL = directoryURL.appendingPathComponent("source.sqlite", isDirectory: false)
+    let backupURL = directoryURL.appendingPathComponent("backup.sqlite", isDirectory: false)
+    let stagingURL = directoryURL.appendingPathComponent("staging.sqlite", isDirectory: false)
+    let sourceDatabase = try pathBackedDatabase(at: sourceURL)
+    let recipeID = SampleUUIDSequence.uuid(5)
+
+    try await sourceDatabase.write { db in
+      try Recipe.insert {
+        Recipe(
+          id: recipeID,
+          title: "Forward Migrated Recipe",
+          dateCreated: Date(timeIntervalSinceReferenceDate: 811_000_000),
+          dateModified: Date(timeIntervalSinceReferenceDate: 811_000_000)
+        )
+      }
+      .execute(db)
+    }
+    let backup = try await YesChefDatabaseBackup.snapshot(from: sourceDatabase, to: backupURL)
+    let backupDatabase = try DatabaseQueue(path: backupURL.path)
+    let latestMigrationIdentifier = try await backupDatabase.read { db in
+      try String.fetchOne(
+        db,
+        sql: "SELECT identifier FROM grdb_migrations ORDER BY rowid DESC LIMIT 1"
+      )
+    }
+    // This deliberately removes the current append-only tail migration. Update this assertion
+    // when a later migration is appended so the fixture remains exactly one migration behind.
+    #expect(latestMigrationIdentifier == "Create workbench references")
+    try await backupDatabase.write { db in
+      try db.execute(sql: "DROP TABLE workbenchReferences")
+      try db.execute(
+        sql: "DELETE FROM grdb_migrations WHERE identifier = ?",
+        arguments: ["Create workbench references"]
+      )
+      try db.execute(sql: "PRAGMA user_version = \(backup.schemaVersion - 1)")
+    }
+    try backupDatabase.close()
+
+    let prepared = try await YesChefDatabaseBackup.prepareRestore(
+      from: backupURL,
+      to: stagingURL,
+      currentSchemaVersion: backup.schemaVersion,
+      migrate: DependencyValues.migrateRestoreCandidate(at:)
+    )
+    let restoredDatabase = try DatabaseQueue(path: prepared.fileURL.path)
+    let restoredRecipe = try await restoredDatabase.read { db in
+      try Recipe.find(recipeID).fetchOne(db)
+    }
+    let workbenchReferenceCount = try await restoredDatabase.read { db in
+      try WorkbenchReference.fetchCount(db)
+    }
+    let restoredMarker = try await restoredDatabase.read { db in
+      try Int.fetchOne(db, sql: "PRAGMA user_version")
+    }
+    try restoredDatabase.close()
+
+    #expect(restoredRecipe?.title == "Forward Migrated Recipe")
+    #expect(workbenchReferenceCount == 0)
+    #expect(prepared.schemaVersion == backup.schemaVersion)
+    #expect(restoredMarker == backup.schemaVersion)
   }
 }
 
@@ -236,4 +322,12 @@ private func pathBackedDatabase(at url: URL) throws -> any DatabaseWriter {
     try dependencies.bootstrapDatabase(path: url.path)
     return dependencies.defaultDatabase
   }
+}
+
+private func syncConfiguredDatabase(
+  at url: URL
+) throws -> (database: any DatabaseWriter, syncEngine: SyncEngine) {
+  let database = try pathBackedDatabase(at: url)
+  let syncEngine = try YesChefCloudSync.makeSyncEngine(for: database, startImmediately: false)
+  return (database, syncEngine)
 }

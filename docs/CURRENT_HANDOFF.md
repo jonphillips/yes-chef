@@ -23,17 +23,17 @@ with *"Do **ADR-0030 S2 (Restore)** from `docs/CURRENT_HANDOFF.md`."* If this se
 
 **The scope (ADR §Slices S2).** Validate an incoming file (is it a YesChef DB? is its stamped schema version
 restorable by the current migrator?), take an **automatic pre-restore snapshot** of the current store so a
-mis-click is undoable, **atomically swap** the store file, **strip sync metadata**, and reopen with sync
-**off** — then the user re-enables sync, which reconciles the restored rows through the normal path. Confirm-
+mis-click is undoable, **atomically swap** the store file, **remove the prior sync metadatabase**, and reopen
+with sync **off** — then the user re-enables sync, which reconciles the restored rows through the normal path. Confirm-
 and-undo UX. Restore is replace-only for v1 (OQ4 — merge is a later, harder question, out of scope).
 
 **What S1 left on the table — read before scoping:**
 
-1. **The strip is the load-bearing step, and S1's export does not do it.** The exported file is a `VACUUM INTO`
-   copy of the *whole* store, so it **still carries the SyncEngine metadata and `PendingRecordZoneChange`
-   bookkeeping** — the tables ADR-0028 and [[extension-sync-construct-not-run]] revolve around. A restored
-   file must **not** masquerade as an already-synced peer of the CloudKit zone (D2). Strip/ignore that metadata
-   and land app data into a **fresh local store with sync disabled**; the user re-enables. Keep restore a
+1. **The metadatabase reset is the load-bearing step, and S1's export cannot do it.** SQLiteData keeps its
+   SyncEngine metadata and `PendingRecordZoneChange` bookkeeping in a sibling attached metadatabase, not in
+   the main database that `VACUUM INTO` exports. A restore must **not** leave that prior local peer beside the
+   replacement store: atomically replace the main file first, then remove the live attached metadatabase and
+   its SQLite sidecars (D2). The user re-enables sync from a fresh local peer. Keep restore a
    *local* operation — it must never risk stomping the cloud. Explicitly **not**
    [[debug-erase-vs-sync-triggers]] / zone-rebuild territory.
 2. **OQ1 must be confirmed on device before S2 is called done.** When sync re-enables onto a restored store,
@@ -52,9 +52,10 @@ and-undo UX. Restore is replace-only for v1 (OQ4 — merge is a later, harder qu
 5. **Byte-exact, not serialization — unchanged.** A JSON/portable export stays a deliberately separate, parked
    goal (D5 / [[llm-vs-determinism-surface-boundary]]); S2 reads the DB file, it does not re-encode rows.
 
-**Verification.** Restore validation + strip logic belongs in **Core** so package tests exercise it (snapshot a
-seeded temp DB, corrupt/downgrade its marker, assert the compat check refuses it; strip, reopen, assert the
-sync-metadata tables are gone and app rows survive). The Settings row + confirm-and-undo UX touches
+**Verification.** Restore validation + metadatabase reset belongs in **Core** so package tests exercise it
+(snapshot a seeded, sync-configured temp DB, corrupt/downgrade its marker, assert the compat check refuses it;
+assert the snapshot has only the main-store rows, then assert the real live attached metadatabase is gone after
+the swap). The Settings row + confirm-and-undo UX touches
 `YesChefApp/` and needs the elevated `generic/platform=iOS` build as required evidence. No simulator installs;
 Jon device-passes the Export → Restore → re-enable-sync round-trip (this is where OQ1 gets answered).
 **S3 (auto/pre-migration snapshots) is a separate later dispatch — build the pre-migration snapshot first when

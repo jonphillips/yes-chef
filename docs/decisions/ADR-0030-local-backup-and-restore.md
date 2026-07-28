@@ -53,14 +53,14 @@ into one file — no torn snapshot even while the app is writing. The user choos
 phones a file home. Default filename carries a timestamp, e.g. `YesChef-Backup-2026-07-12.sqlite`.
 This captures **every** synced *and* local table and every image BLOB, byte-for-byte.
 
-**2. Exclude sync-internal state from what a restore trusts.** The live DB carries SQLiteData's
-SyncEngine metadata and the `PendingRecordZoneChange` bookkeeping (the tables ADR-0028 and
-[[extension-sync-construct-not-run]] revolve around). A restored file must **not** masquerade as an
-already-synced peer of the CloudKit zone. Chosen approach (see OQ1): the snapshot may contain those
-tables, but **restore strips/ignores sync metadata and lands the app data into a fresh local store
-with sync disabled**; the user then re-enables sync, which reconciles the restored rows against
-CloudKit through the normal path. This keeps restore a *local* operation and never risks a restore
-stomping the cloud.
+**2. Exclude sync-internal state from what a restore trusts.** SQLiteData keeps SyncEngine metadata and
+the `PendingRecordZoneChange` bookkeeping (the tables ADR-0028 and
+[[extension-sync-construct-not-run]] revolve around) in a sibling attached metadatabase. A `VACUUM INTO`
+snapshot copies only the main store, so it does not contain that peer state. A restored main file must still
+**not** inherit the old local peer: after the main file is atomically replaced, restore removes the actual
+attached metadatabase and its SQLite sidecars, then reopens with sync disabled. The user re-enables sync,
+which reconciles the restored rows against CloudKit through the normal path. This keeps restore a *local*
+operation and never risks a restore stomping the cloud.
 
 **3. Restore = import one snapshot, deliberately and reversibly.** Restore is a destructive,
 explicitly-confirmed action (it replaces the current local library). Before swapping, the app takes
@@ -90,7 +90,8 @@ backup does not block it and vice-versa.
   the restore path can read (a `PRAGMA user_version` or a one-row `backupMeta` table). Package-level
   logic is unit-testable (snapshot a seeded temp DB, reopen it, assert row counts match).
 - **S2 — Restore.** Validation (magic/marker + schema-compat check), auto pre-restore snapshot,
-  atomic swap of the store file, sync-metadata strip, re-open with sync **off**. Confirm-and-undo UX.
+  atomic swap of the store file, removal of the prior attached sync metadatabase, re-open with sync **off**.
+  Confirm-and-undo UX.
 - **S3 (optional, later) — Automatic snapshots.** Cadence/trigger + retention (keep N), local-only.
   **Build the pre-migration snapshot first** (Decision 4): a rolling local snapshot taken right before
   `migrator.migrate` runs, keep N, so a bad/erasing migration is always recoverable from the step

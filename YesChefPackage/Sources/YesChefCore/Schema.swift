@@ -1027,6 +1027,9 @@ extension DependencyValues {
   /// Runs only the app's append-only migrator against an isolated restore candidate. It never
   /// honors the DEBUG erase switch: a backup is recovery data, not a disposable dev database.
   public static func migrateRestoreCandidate(at databaseURL: URL) throws {
+    // SQLiteData deliberately gives test-context databases an ephemeral path even when one is
+    // supplied. This scoped live context makes the explicit restore-candidate path authoritative;
+    // it does not use the app's shared-store URL.
     try withDependencies {
       $0.context = .live
     } operation: {

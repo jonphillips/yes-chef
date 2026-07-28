@@ -83,18 +83,27 @@ public enum YesChefDatabaseBackup {
   /// The applied Yes Chef migration count. Migration registrations are append-only, so this is
   /// the restore compatibility version stamped on exported snapshots.
   public static func schemaVersion(in databaseURL: URL) throws -> Int {
-    let database = try DatabaseQueue(path: databaseURL.path)
-    defer { try? database.close() }
-    return try database.read { db in
-      guard try databaseContainsRecipeSchema(db) else {
-        throw BackupError.notYesChefBackup
+    do {
+      var configuration = Configuration()
+      configuration.readonly = true
+      let database = try DatabaseQueue(path: databaseURL.path, configuration: configuration)
+      defer { try? database.close() }
+      return try database.read { db in
+        guard try databaseContainsRecipeSchema(db) else {
+          throw BackupError.notYesChefBackup
+        }
+        return try Int.fetchOne(db, sql: #"SELECT COUNT(*) FROM "grdb_migrations""#) ?? 0
       }
-      return try Int.fetchOne(db, sql: #"SELECT COUNT(*) FROM "grdb_migrations""#) ?? 0
+    } catch let error as BackupError {
+      throw error
+    } catch {
+      throw BackupError.notYesChefBackup
     }
   }
 
-  /// Copies, validates, forward-migrates, and removes any persisted sync bookkeeping from a
-  /// candidate. The caller can then atomically replace the closed live store with this file.
+  /// Copies, validates, and forward-migrates a candidate. SQLiteData's sync bookkeeping is in a
+  /// separate attached metadatabase, so `VACUUM INTO` never puts it in this main-store snapshot.
+  /// The caller removes that live metadatabase after swapping the closed store.
   public static func prepareRestore(
     from sourceURL: URL,
     to stagingURL: URL,
@@ -121,8 +130,6 @@ public enum YesChefDatabaseBackup {
     syncMetadataURL: URL,
     fileManager: FileManager = .default
   ) throws {
-    try removeSQLiteSidecars(for: liveStoreURL, fileManager: fileManager)
-    try removeDatabaseAndSQLiteSidecars(for: syncMetadataURL, fileManager: fileManager)
     try removeSQLiteSidecars(for: preparedRestore.fileURL, fileManager: fileManager)
     _ = try fileManager.replaceItemAt(
       liveStoreURL,
@@ -130,7 +137,8 @@ public enum YesChefDatabaseBackup {
       backupItemName: nil,
       options: []
     )
-    try removeSQLiteSidecars(for: preparedRestore.fileURL, fileManager: fileManager)
+    try removeSQLiteSidecars(for: liveStoreURL, fileManager: fileManager)
+    try removeDatabaseAndSQLiteSidecars(for: syncMetadataURL, fileManager: fileManager)
   }
 
   private static func stampSchemaVersion(on snapshotURL: URL) throws -> Int {
@@ -181,7 +189,13 @@ public enum YesChefDatabaseBackup {
     guard migratedSchemaVersion == currentSchemaVersion else {
       throw BackupError.invalidSchemaVersionMarker
     }
-    try stripSyncMetadata(from: stagingURL)
+    let stampedMigratedSchemaVersion = try stampSchemaVersion(on: stagingURL)
+    guard stampedMigratedSchemaVersion == currentSchemaVersion else {
+      throw BackupError.invalidSchemaVersionMarker
+    }
+    try checkpointPreparedStore(at: stagingURL)
+    // `migrateRestoreCandidate` attaches a metadatabase while it opens the staging database;
+    // remove that transient sidecar so only the main snapshot is eligible for the swap.
     try removeDatabaseAndSQLiteSidecars(
       for: YesChefDatabaseStorage.syncMetadataURL(
         for: stagingURL,
@@ -194,10 +208,16 @@ public enum YesChefDatabaseBackup {
   }
 
   private static func schemaVersionMarker(in databaseURL: URL) throws -> Int {
-    let database = try DatabaseQueue(path: databaseURL.path)
-    defer { try? database.close() }
-    return try database.read { db in
-      try Int.fetchOne(db, sql: "PRAGMA user_version") ?? 0
+    do {
+      var configuration = Configuration()
+      configuration.readonly = true
+      let database = try DatabaseQueue(path: databaseURL.path, configuration: configuration)
+      defer { try? database.close() }
+      return try database.read { db in
+        try Int.fetchOne(db, sql: "PRAGMA user_version") ?? 0
+      }
+    } catch {
+      throw BackupError.notYesChefBackup
     }
   }
 
@@ -209,19 +229,9 @@ public enum YesChefDatabaseBackup {
     return Set(tableNames) == Set(["grdb_migrations", "recipes"])
   }
 
-  private static func stripSyncMetadata(from databaseURL: URL) throws {
+  private static func checkpointPreparedStore(at databaseURL: URL) throws {
     let database = try DatabaseQueue(path: databaseURL.path)
     defer { try? database.close() }
-    try database.write { db in
-      let tableNames = try String.fetchAll(
-        db,
-        sql: "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'sqlitedata_icloud_%'"
-      )
-      for tableName in tableNames {
-        let escapedName = tableName.replacingOccurrences(of: "\"", with: "\"\"")
-        try db.execute(sql: "DROP TABLE \"\(escapedName)\"")
-      }
-    }
     _ = try database.writeWithoutTransaction { db in
       try db.checkpoint(.truncate)
     }
@@ -299,6 +309,8 @@ public final class YesChefDatabaseBackupExportModel {
 public final class YesChefDatabaseBackupRestoreModel {
   private static let preRestoreDirectoryName = "Pre-Restore Backups"
   private static let preRestoreDefaultsKey = "YesChefDatabaseBackupLastPreRestorePath"
+  private static let preRestoreFilenamePrefix = "YesChef-PreRestore-"
+  private static let stagingFilenamePrefix = "YesChef-Restore-"
 
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored @Dependency(\.defaultSyncEngine) private var syncEngine
@@ -308,8 +320,11 @@ public final class YesChefDatabaseBackupRestoreModel {
   public private(set) var isPreparing = false
   public private(set) var isRestoring = false
   public private(set) var errorMessage: String?
+  public private(set) var hasUndoableRestore = false
 
-  public init() {}
+  public init() {
+    hasUndoableRestore = Self.lastPreRestoreURL != nil
+  }
 
   public var isPrepared: Bool {
     get { preparedRestore != nil }
@@ -325,11 +340,6 @@ public final class YesChefDatabaseBackupRestoreModel {
       guard !newValue else { return }
       dismissError()
     }
-  }
-
-  public var hasUndoableRestore: Bool {
-    guard let url = lastPreRestoreURL else { return false }
-    return FileManager.default.fileExists(atPath: url.path)
   }
 
   public func prepareRestore(from sourceURL: URL) async {
@@ -348,8 +358,9 @@ public final class YesChefDatabaseBackupRestoreModel {
       discardPreparedRestore()
       let liveStoreURL = try YesChefDatabaseStorage.liveSharedDatabaseURL()
       let workingDirectory = try restoreWorkingDirectory(for: liveStoreURL)
+      try discardStaleRestoreCandidates(in: workingDirectory)
       let stagingURL = workingDirectory.appendingPathComponent(
-        "YesChef-Restore-\(uuid().uuidString).sqlite",
+        "\(Self.stagingFilenamePrefix)\(uuid().uuidString).sqlite",
         isDirectory: false
       )
       preparedRestore = try await YesChefDatabaseBackup.prepareRestore(
@@ -375,25 +386,28 @@ public final class YesChefDatabaseBackupRestoreModel {
 
     do {
       let liveStoreURL = try YesChefDatabaseStorage.liveSharedDatabaseURL()
+      let syncMetadataURL = try YesChefDatabaseStorage.attachedSyncMetadataURL(
+        in: database,
+        fallbackFor: liveStoreURL,
+        containerIdentifier: YesChefCloudSync.containerIdentifier
+      )
       let preRestoreURL = try makePreRestoreURL(for: liveStoreURL)
       _ = try await YesChefDatabaseBackup.snapshot(from: database, to: preRestoreURL)
 
       syncEngine.stop()
-      YesChefCloudSync.disableForRestore()
       try database.close()
       try YesChefDatabaseBackup.replaceLiveStore(
         at: liveStoreURL,
         with: preparedRestore,
-        syncMetadataURL: YesChefDatabaseStorage.syncMetadataURL(
-          for: liveStoreURL,
-          containerIdentifier: YesChefCloudSync.containerIdentifier
-        )
+        syncMetadataURL: syncMetadataURL
       )
-      UserDefaults.standard.set(preRestoreURL.path, forKey: Self.preRestoreDefaultsKey)
+      YesChefCloudSync.disableForRestore()
+      recordSuccessfulPreRestore(at: preRestoreURL)
       self.preparedRestore = nil
       errorMessage = nil
       return true
     } catch {
+      discardPreparedRestore()
       errorMessage = error.localizedDescription
       return false
     }
@@ -421,13 +435,6 @@ public final class YesChefDatabaseBackupRestoreModel {
     errorMessage = error.localizedDescription
   }
 
-  private var lastPreRestoreURL: URL? {
-    guard let path = UserDefaults.standard.string(forKey: Self.preRestoreDefaultsKey) else {
-      return nil
-    }
-    return URL(fileURLWithPath: path)
-  }
-
   private func restoreWorkingDirectory(for liveStoreURL: URL) throws -> URL {
     let directoryURL = liveStoreURL
       .deletingLastPathComponent()
@@ -442,8 +449,46 @@ public final class YesChefDatabaseBackupRestoreModel {
   private func makePreRestoreURL(for liveStoreURL: URL) throws -> URL {
     let directoryURL = try restoreWorkingDirectory(for: liveStoreURL)
     return directoryURL.appendingPathComponent(
-      "YesChef-PreRestore-\(uuid().uuidString).sqlite",
+      "\(Self.preRestoreFilenamePrefix)\(uuid().uuidString).sqlite",
       isDirectory: false
     )
+  }
+
+  private func discardStaleRestoreCandidates(in directoryURL: URL) throws {
+    for fileURL in try FileManager.default.contentsOfDirectory(
+      at: directoryURL,
+      includingPropertiesForKeys: nil
+    ) where fileURL.lastPathComponent.hasPrefix(Self.stagingFilenamePrefix) {
+      try FileManager.default.removeItem(at: fileURL)
+    }
+  }
+
+  private func recordSuccessfulPreRestore(at preRestoreURL: URL) {
+    let directoryURL = preRestoreURL.deletingLastPathComponent()
+    let preRestoreURLs = (try? FileManager.default.contentsOfDirectory(
+      at: directoryURL,
+      includingPropertiesForKeys: nil
+    )) ?? []
+    for fileURL in preRestoreURLs where
+      fileURL != preRestoreURL && fileURL.lastPathComponent.hasPrefix(Self.preRestoreFilenamePrefix)
+    {
+      try? FileManager.default.removeItem(at: fileURL)
+    }
+    UserDefaults.standard.set(preRestoreURL.path, forKey: Self.preRestoreDefaultsKey)
+    hasUndoableRestore = true
+  }
+
+  private var lastPreRestoreURL: URL? {
+    Self.lastPreRestoreURL
+  }
+
+  private static var lastPreRestoreURL: URL? {
+    guard
+      let path = UserDefaults.standard.string(forKey: preRestoreDefaultsKey),
+      FileManager.default.fileExists(atPath: path)
+    else {
+      return nil
+    }
+    return URL(fileURLWithPath: path)
   }
 }

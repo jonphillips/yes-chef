@@ -13,7 +13,7 @@ struct SettingsView: View {
   @State private var backupExportFilename = "YesChef-Backup.sqlite"
   @State private var isPresentingBackupExporter = false
   @State private var isPresentingBackupImporter = false
-  @State private var isPresentingRestoreRestartNotice = false
+  @State private var isPresentingRestoreRestartCover = false
   @Environment(\.scenePhase) private var scenePhase
 
   init(
@@ -58,7 +58,13 @@ struct SettingsView: View {
         Button {
           isPresentingBackupImporter = true
         } label: {
-          Label("Restore from a Backup", systemImage: "externaldrive.badge.plus")
+          HStack {
+            Label("Restore from a Backup", systemImage: "externaldrive.badge.plus")
+            if backupRestore.isPreparing || backupRestore.isRestoring {
+              Spacer()
+              ProgressView()
+            }
+          }
         }
         .disabled(backupRestore.isPreparing || backupRestore.isRestoring)
 
@@ -129,7 +135,7 @@ struct SettingsView: View {
       Button("Restore", role: .destructive) {
         Task {
           if await backupRestore.restorePreparedBackup() {
-            isPresentingRestoreRestartNotice = true
+            isPresentingRestoreRestartCover = true
           }
         }
       }
@@ -139,10 +145,8 @@ struct SettingsView: View {
     } message: {
       Text("This replaces the library on this device. Yes Chef will first save an automatic undo backup, and iCloud sync will stay off until you turn it on again.")
     }
-    .alert("Restart Yes Chef", isPresented: $isPresentingRestoreRestartNotice) {
-      Button("OK") {}
-    } message: {
-      Text("Your backup is restored. Close and reopen Yes Chef to use it. You can undo this restore from Settings after reopening.")
+    .fullScreenCover(isPresented: $isPresentingRestoreRestartCover) {
+      RestoreRestartCover()
     }
     .alert("Could Not Export Backup", isPresented: backupExportErrorPresented) {
       Button("OK") {
@@ -309,6 +313,19 @@ struct SettingsView: View {
     }
   }
 #endif
+}
+
+private struct RestoreRestartCover: View {
+  var body: some View {
+    ContentUnavailableView(
+      "Restart Yes Chef",
+      systemImage: "arrow.clockwise",
+      description: Text(
+        "Your backup is restored. Close and reopen Yes Chef to use it. You can undo this restore from Settings after reopening."
+      )
+    )
+    .interactiveDismissDisabled()
+  }
 }
 
 private final class BackupExportDocument: WritableDocument {
