@@ -9,6 +9,79 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0014 D3+D2 — Recipe text markup: bracket author notes and Markdown prose, both proven against the live library
+
+**✅ Done 2026-07-28.** PR [#254](https://github.com/jonphillips/yes-chef/pull/254), branch
+`codex/adr-0014-d3-d2-markup-text`, merge `5ef1e97`, five commits `f091917` → `cbdfd3c` across **two
+architect review rounds** plus one device-review fix from Jon. Spec:
+[ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md) D3 then D2. Owner: Codex implement, Claude
+architect/review. **No schema, nothing added to the prod-promotion list** — both decisions are
+render/parse rules over columns that already exist and already sync. Full review:
+[`reviews/REVIEW-2026-07-28-adr-0014-d3-d2-pr-254.md`](reviews/REVIEW-2026-07-28-adr-0014-d3-d2-pr-254.md).
+
+**The shipped work.** `IngredientAuthorNote.segments(in:)` splits complete `[…]` spans from surrounding
+ingredient text (an unmatched `[` stays ordinary text, so a half-typed editor value never loses content);
+the parser reads quantity/unit/item/preparation from the bracket-stripped `parsingText`, lands the
+annotation in the existing `comment` field, and keeps the bracket byte-for-byte in `originalText`.
+`RecipeMarkdownText` renders `summary`, recipe/source notes, Playbook prose, and original-snapshot prose
+through `AttributedString(markdown:)`; `IngredientLineText` renders bracket spans subdued. The editor stays
+raw-Markdown passthrough. Ingredient and instruction **rows** remain structural — D2's boundary held.
+
+**The device review caught the one thing tests could not: `.full` Markdown parsing ate the line breaks.**
+Make-ahead's `•` bullets collapsed onto one line and Notes ran together, because full-syntax parsing treats
+single newlines as soft wraps. Fixed with `.inlineOnlyPreservingWhitespace` (`96c742b`). **The architect
+then certified the fix against the whole library rather than the sample**: all 455 non-empty
+`summary`/`makeAhead`/`chefItUp`/`recipeNotes.text`/`sourceNotes` values from the 2026-07-28 backup were run
+through the exact parsing options the view uses — **0 changed a single character, 0 threw.** Jon's
+footnote-asterisk convention (`*Note: … **Note: …`, present in 14 notes) survives because neither `*` has a
+valid right-flanking partner. That is the case a naive `.full` parse would have silently corrupted.
+
+**Review round 2 found a silent data regression by measuring, not reading.** Moving the `isOptional` check
+onto `parsingText` looked symmetrical with the four parsed fields — but "optional" written as a bracketed
+aside is how a cook actually writes it, and **two real library rows** (`¼ lb. ground pork [OPTIONAL]`,
+`1 tsp ground sichuan peppercorns [OPTIONAL]`) were `isOptional = 1` and would have flipped to `0` on their
+next save with no signal. `isOptional` went back to reading the full text; `doNotShop` correctly **stayed**
+on `parsingText`, where the exact whole-string match now makes `kosher salt [Diamond Crystal]` stop being
+shopped. Same round: the web-capture path (`ParsedRecipePage`) was the only ingredient-line construction
+site bypassing `IngredientParser.lines`, so captured recipes dropped `comment` and re-parsed *differently*
+on their first editor save. Fixed by threading the field, **deliberately not** by swapping to `.lines` —
+that would have silently changed `isHeader`, `doNotShop`, and `sortOrder` sequencing, three behaviors
+belonging to Amd1-D1.
+
+**A test that could not fail was caught by mutation, not by reading it.** The `doNotShop` regression pin
+used `2 cups kosher salt [Diamond Crystal]`, whose parsing text (`"2 cups kosher salt"`) fails the exact
+match either way — so it passed whether the implementation read the stripped text or the full original. The
+architect proved it by reverting the implementation and watching all six tests stay green, then re-pinned on
+the **bare** form where the two implementations actually differ, and re-verified that the new test fails on
+the regression and only it does (`cbdfd3c`). **Same lesson as ADR-0030 S2's manufactured-evidence test, in a
+different disguise: a green test certifies nothing until you have seen it go red.**
+
+**Accepted on the record, not fixed: the bracket convention was already occupied.** D3 assumed `[…]` means
+"a Jon note." Measured against the library, **83 bracketed ingredient lines across 27 recipes — all
+shoppable, none previously carrying a `comment`** — are overwhelmingly publisher *metric equivalents*
+(`140g`, `230 g`, `4 cm`, and one `click for printable recipe`). Those now populate `comment`, which
+`groceryNotes` renders on the grocery list. **Jon's call 2026-07-28: live with it and see how it reads on a
+real shop.**
+
+**Deferred to a batched follow-on, recorded so it is not lost:** the Markdown policy and the
+segment→`AttributedString` assembly live in the **app target**, so the line-break test asserts *Foundation's*
+behavior and would stay green if the view reverted to `.full` — the defect the slice exists to fix, left
+uncovered. Lift both into Core, sweep the one missed render site (`WorkbenchViews` summary shows literal
+`**`), and drop the iOS-26-deprecated `Text` `+` concatenation in `IngredientLineText` while doing it.
+
+**`normalize-recipe` was investigated and turns out not to exist** — the ADR's markup-awareness requirement
+constrains a future thing, not live code. Measuring the library to establish that produced
+[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md), where the real finding is
+that ATK/Cook's "Gather Your Ingredients" is page chrome captured as content: **101 shoppable ingredient
+lines + 70 section names across 171 recipes**, all canonicalizing to the single grocery key
+`gather your ingredient`. Latent, not manifest — 0 `groceryItemSources` point at them yet.
+
+**Verification.** Package suite **501 tests / 96 suites** green at the merge head (496 → 501). Elevated
+`generic/platform=iOS` build `** BUILD SUCCEEDED **`, run by the architect rather than taken on report.
+`check-drift.sh` was **not** clean — it fails identically on clean `main`, the same
+[[exported-import-not-link-time]] linker seam inside the *sqlite-data* dependency's dynamic test-bundle
+build that PR #249 flagged and deferred. Not caused by this change; **now under separate investigation.**
+
 ## ADR-0030 S2 — Local backup restore: the recover half, and the discovery that the net covers a lost zone but not a poisoned one
 
 **✅ Done 2026-07-28. This closes the ADR-0030 durability net for S1+S2; S3 (automatic snapshots) is a separate later dispatch.** PR [#252](https://github.com/jonphillips/yes-chef/pull/252), branch `codex/adr-0030-s2-restore`, merge `eacc57f`, six commits `a95e503` → `f48753d` across **three architect review rounds**. Spec: [ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) S2, which gained **Amendment 1** out of this review. Owner: Codex implement, Claude architect/review. **No schema, nothing added to the prod-promotion list** — restore swaps a *file*; it touches no synced model. Verified by the architect at the review head rather than on report: `DatabaseBackupTests` **6/6 green** run locally (2 → 6), including two tests that construct a real `SyncEngine` and one that forward-migrates a genuine N−1 backup. The PR additionally reports `scripts/check-drift.sh` and the elevated `generic/platform=iOS` build green.

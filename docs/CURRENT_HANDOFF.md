@@ -1,7 +1,7 @@
 # Current Handoff
 
-Last updated: July 28, 2026. (ADR-0030 S1+S2 shipped — the durability net has both halves; live target is now
-ADR-0014 recipe text editing.)
+Last updated: July 28, 2026. (ADR-0014 D3+D2 shipped — recipe prose carries Markdown and bracket author
+notes; live target is now ADR-0014 **Amendment 1**, the colon/section rework.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -16,43 +16,59 @@ live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** re
 
 ## Next Up
 
-**ONE live dispatch target: [ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md) **recipe text editing —
-D3 then D2**, the two markup-in-text slices.** Both are additive, render/parse-level, and share one surface
-(text stored in columns the app already has). Dispatch with *"Do **ADR-0014 D3+D2** from
-`docs/CURRENT_HANDOFF.md`."* If this section is empty or missing, **STOP and ask Jon — never infer.**
-See `docs/AGENTS.md` § Work Intake & Dispatch. **Amendment 1 (Amd1-D1, the colon/section rework) is ratified
-and dispatchable but is NOT this dispatch** — it is the meaty one and gets its own, per the ADR's own
-`D3 → D2 → D1` order.
+**ONE live dispatch target: [ADR-0014 Amendment 1](decisions/ADR-0014-recipe-text-editing-model.md#amendment-1--the-header-is-syntax-the-section-is-storage-and-the-split-happens-at-edit-time-2026-07-28)
+— the colon is the authoring syntax, the section is the storage, and the split happens at *edit* time.**
+Dispatch with *"Do **ADR-0014 Amd1** from `docs/CURRENT_HANDOFF.md`."* If this section is empty or missing,
+**STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch. This is the meaty one; D3
+and D2 shipped 2026-07-28 (PR #254).
 
-**The scope.**
-- **D3 — `[square bracket]` = author note.** A bracketed span inside an ingredient line is a Jon note,
-  rendered de-emphasized. **Pure render rule + parser-ignore, no schema.** The ingredient parser must treat
-  the span as annotation rather than item/quantity/unit — it can land in the existing `comment` field — and
-  the bracket **stays in `originalText`** so the round-trip is lossless.
-- **D2 — inline styling on free-text fields only.** Markdown stored inline in the existing `String` columns
-  (`**bold**`, `*italic*`), rendered with `AttributedString(markdown:)`. **Free-text fields only** —
-  `summary`, notes, tip blocks. Ingredient and instruction rows stay structural; no inline styling there.
-  The attributed-run model was considered and **rejected** (heavier, no round-trip benefit, worse in the raw
-  store). Editor affordance can start as raw Markdown passthrough.
+**The scope.** Ratified by Jon 2026-07-28, all open questions closed in the amendment itself.
+- **Amd1-D1 — a line that reads as a header *is* a header.** Rule: **ends in `:` and parses no leading
+  quantity** (the quantity guard keeps `Salt:`-shaped ingredient lines out; today's bare `hasSuffix(":")` is
+  too loose). Its text minus the colon becomes the section `name`. **Storage does not change** —
+  `IngredientSection` / `InstructionSection` rows stay the grain.
+- **Amd1-D1a — a second, explicit door.** A per-line **"Start a section here"** swipe/context-menu action, on
+  the line, **not** a persistent parallel list of controls. Required, not optional: **6 of Jon's 10 existing
+  headers are colon-free**, so typing markup must be a shortcut and never the only path.
+- **Amd1-D2 — the split happens at edit time, never at save time.** Typing or pasting a header line mid-card
+  **splits that card in two**, minting the new section's UUID and moving line drafts across **with their own
+  IDs intact**; clearing a card's name **merges it back up**. **The save path is untouched** —
+  `RecipeEditorSectionReconcile` still receives explicit section IDs.
+- **Amd1-D3 — retire `isHeader` as an authoring concept.** `applyIngredientLineDrafts` collapses to nothing
+  and the `Toggle("Header")` list goes with it. **Write no migration** — see below.
 
 **Read before scoping:**
 
-1. **`normalize-recipe` gains a markup-awareness requirement, and it now has three things to respect.** It
-   must not strip or re-case inside `**`/`*` runs (D2) or `[…]` spans (D3) — **and per Amendment 1 it must
-   leave trailing colons alone**, because stripping one would silently restructure a recipe once Amd1-D1
-   lands. Normalization runs on import before user styling exists, so the live conflict is small, but any
-   re-run pass has to honour all three.
-2. **Anything that displays `summary`/notes must render through the Markdown path** or it will show literal
-   `**`. Audit the display sites as part of D2 rather than leaving them to surface one at a time.
-3. **D3's bracket rule is ingredient-line scoped.** Do not extend it to instruction steps on momentum.
-4. **Do not touch `isHeader` or the editor's section handling in this dispatch.** Both are Amd1-D1's subject
-   and its mechanism supersedes the original D1 — a drive-by here would collide with it.
+1. **⚠️ Write NO data migration, and mint no deterministic UUIDs.** The amendment works through the full
+   post-engine hazard analysis and then **discharges it by measurement**: only **10** `isHeader = 1` rows
+   exist, across **4** recipes, with **0** `groceryItemSources` and **0** variation deltas anchoring them.
+   **Decision: Jon fixes those four recipes by hand in the app after the slice ships.** Do not build the
+   migration the analysis describes — it is recorded as the general shape, not as this slice's work.
+2. **The section `name` column stores the COLON-FREE form.** The colon exists only in the flat-text
+   projection the editor renders and re-parses. Storing it in `name` appends another on every round-trip
+   (`Warm Vinaigrette::`). This is the implementation trap the amendment calls out by name.
+3. **Derivation-on-save is the rejected alternative, and the reason is silent data loss.** Re-deriving a
+   section from bare text means matching a group back to a row; the line reconcile is scoped by
+   `existingLinesBySection[draftSection.id]`, so a rename that reads as delete+insert drops `canonicalName`,
+   `shoppingCategory`, `doNotShop` and merged parse confidence for the whole group. Manipulate identity where
+   identity exists — in the editor, with UUIDs in hand.
+4. **The colon rule is ingredient-only.** Instruction step text routinely contains mid-prose colons;
+   instruction sections keep explicit card names until someone specifies the variant.
+5. **This does NOT hand ADR-0021 Amd1-D5 a free ride** (Amd1-D4). `derivingVariation` diffs structures matched
+   by section ID, so a live split mints a new section and hits `.ingredientSectionAdded` →
+   `variationNeedsReview`. That needs a **delta-vocabulary** decision and it is **ADR-0021's, not this
+   slice's** — do not extend the delta ops here.
 
-**Verification.** Both slices are parser/render logic, so the tests belong in **Core**: bracket spans parse as
-annotation with `originalText` preserved byte-for-byte, and Markdown round-trips through the free-text columns
-without leaking into ingredient/instruction rows. The display-site audit touches `YesChefApp/` and needs the
-elevated `generic/platform=iOS` build as required evidence. No simulator installs; Jon device-passes the
-rendering.
+**Verification.** The colon rule and the split/merge logic belong in **Core** (`RecipeEditorDraft`,
+`RecipeEditorSectionReconcile`) where the package suite runs with no simulator; the editor affordances touch
+`YesChefApp/` and need the elevated `generic/platform=iOS` build as required evidence. **Pin the round-trip
+explicitly**: a header typed with a colon must not accumulate colons in `name` across save→reload→save. No
+simulator installs; Jon device-passes the editor.
+
+⚠️ **`check-drift.sh` currently fails on clean `main`** at a linker error inside the *sqlite-data*
+dependency's dynamic test-bundle build ([[exported-import-not-link-time]]). It is **not** caused by your
+change and is under separate investigation — report it as pre-existing and rely on the package suite plus the
+generic app build. Do not attempt to fix it inside this dispatch.
 
 ## Standing guards
 
@@ -87,6 +103,23 @@ section is work.**
 
 Drawn into **Next Up** as needed; not itself a dispatch target. Completed efforts live in
 [`docs/DONE-LOG.md`](DONE-LOG.md).
+
+**[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md) — ATK's "Gather Your
+Ingredients" is a latent grocery bug (scoped 2026-07-28). P1 only; **no schema**.** 101 ingredient lines +
+70 section names across **171 recipes** are page chrome captured as content — the lines are **shoppable**
+(`isHeader = 0`, `doNotShop = 0`) and all canonicalize to the single key `gather your ingredient`, so any of
+those recipes on a menu puts "Gather your ingredient" on the grocery list. Latent only because 0
+`groceryItemSources` point at them yet.
+- **Delete, do not de-cap** — a tidier meaningless section is still meaningless. Lines: delete the row.
+  Sections: **clear the name, keep the section** (`ingredientLines.sectionID` is `ON DELETE CASCADE`, so
+  dropping it takes every ingredient with it).
+- **⚠️ This one really does need the post-engine pass** that ADR-0014 Amd1-D3 described and then dodged at 10
+  rows. Migrations run before `makeSyncEngine`, both tables already exist and are already cached, so a repair
+  in the migrator uploads nothing and each device diverges silently. **The 101 deletes are the unrepeatable
+  part** — a delete that never uploads leaves the row alive in CloudKit, and any later full-zone fetch
+  resurrects it. See [[migration-writes-bypass-sync-triggers]]. Take a backup first.
+- **P2 (Milk Street's 2,597 all-caps lines) is DECLINED** by Jon 2026-07-28 — do not build a casing pass on
+  momentum. P3 (214 all-caps section names) is parked behind both P2 and Amd1-D1.
 
 **[`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) — the prep plan
 knows things the model doesn't (scoped 2026-07-26).** Two slices, **no schema** — both use fields that
