@@ -949,7 +949,7 @@ final class MenuDetailModel {
 
     let recipeID = try database.write { db in
       try RecipeRepository.save(
-        draft: review.promotion.editorDraft(for: approvedRecipe),
+        draft: review.promotion.editorDraft(for: approvedRecipe, uuid: { uuid() }),
         in: db,
         now: now,
         uuid: { uuid() }

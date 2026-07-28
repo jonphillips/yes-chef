@@ -568,21 +568,21 @@ extension RecipeRepository {
     existingGeneralNotes: [RecipeNote],
     in db: Database
   ) throws {
-    let existingIngredientLinesBySection = Dictionary(grouping: existingIngredientLines, by: \.sectionID)
     for section in ingredientPlan.sections {
       try IngredientSection.upsert { section }.execute(db)
       let lines = ingredientPlan.linesBySectionID[section.id] ?? []
       for line in lines {
         try IngredientLine.upsert { line }.execute(db)
       }
-      try deleteMissingRows(
-        existingIngredientLinesBySection[section.id] ?? [],
-        keeping: Set(lines.map(\.id)),
-        in: db
-      )
     }
+    // A draft line may have moved to a newly minted section. Delete only after every upsert, and
+    // consider identity across the whole recipe rather than the line's former section.
+    try deleteMissingRows(
+      existingIngredientLines,
+      keeping: Set(ingredientPlan.snapshotLines.map(\.id)),
+      in: db
+    )
     for sectionID in ingredientPlan.removedSectionIDs {
-      try deleteMissingRows(existingIngredientLinesBySection[sectionID] ?? [], keeping: [], in: db)
       try #sql("DELETE FROM \"ingredientSections\" WHERE \"id\" = \(bind: sectionID)").execute(db)
     }
 
@@ -968,16 +968,40 @@ private extension String {
 
 func reconcileIngredientLines(
   _ parsedLines: [IngredientLine],
-  existing existingLines: [IngredientLine]
+  drafts: [RecipeIngredientLineDraft],
+  existingByID: [IngredientLine.ID: IngredientLine]
 ) -> [IngredientLine] {
-  var unmatchedExistingLines = existingLines.sorted { $0.sortOrder < $1.sortOrder }
+  var unmatchedDrafts = drafts.sorted { $0.sortOrder < $1.sortOrder }
   return parsedLines.map { parsedLine in
-    guard let matchIndex = unmatchedExistingLines.firstIndex(where: { $0.originalText == parsedLine.originalText })
+    guard let matchIndex = unmatchedDrafts.firstIndex(where: {
+      $0.originalText == parsedLine.originalText && $0.sortOrder == parsedLine.sortOrder
+    }) ?? unmatchedDrafts.firstIndex(where: { $0.originalText == parsedLine.originalText })
     else { return parsedLine }
 
-    let existingLine = unmatchedExistingLines.remove(at: matchIndex)
+    let draft = unmatchedDrafts.remove(at: matchIndex)
+    guard let existingLine = existingByID[draft.id] else {
+      return IngredientLine(
+        id: draft.id,
+        recipeID: parsedLine.recipeID,
+        sectionID: parsedLine.sectionID,
+        originalText: parsedLine.originalText,
+        quantity: parsedLine.quantity,
+        quantityText: parsedLine.quantityText,
+        unit: parsedLine.unit,
+        item: parsedLine.item,
+        canonicalName: parsedLine.canonicalName,
+        preparation: parsedLine.preparation,
+        comment: parsedLine.comment,
+        isOptional: parsedLine.isOptional,
+        shoppingCategory: parsedLine.shoppingCategory,
+        doNotShop: parsedLine.doNotShop,
+        isHeader: parsedLine.isHeader,
+        sortOrder: parsedLine.sortOrder,
+        confidence: parsedLine.confidence
+      )
+    }
     return IngredientLine(
-      id: existingLine.id,
+      id: draft.id,
       recipeID: parsedLine.recipeID,
       sectionID: parsedLine.sectionID,
       originalText: parsedLine.originalText,
@@ -985,8 +1009,8 @@ func reconcileIngredientLines(
       quantityText: parsedLine.quantityText ?? existingLine.quantityText,
       unit: parsedLine.unit ?? existingLine.unit,
       item: parsedLine.item ?? existingLine.item,
-      canonicalName: parsedLine.canonicalName
-        ?? existingLine.canonicalName
+      canonicalName: existingLine.canonicalName
+        ?? parsedLine.canonicalName
         ?? CanonicalIngredient.canonicalName((parsedLine.item ?? existingLine.item) ?? parsedLine.originalText),
       preparation: parsedLine.preparation ?? existingLine.preparation,
       comment: parsedLine.comment ?? existingLine.comment,

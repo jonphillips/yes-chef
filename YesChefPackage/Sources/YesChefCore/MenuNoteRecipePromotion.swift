@@ -22,8 +22,11 @@ public struct MenuNoteRecipePromotion: Equatable, Sendable {
     draftRecipe = RecipeParseBuilder.draftRecipe(title: menuItem.title, prose: prose)
   }
 
-  public func editorDraft(for approvedRecipe: WorkbenchDraftRecipe) -> RecipeEditorDraft {
-    approvedRecipe.editorDraft(libraryPlacement: .main).withMenuNoteProvenance(
+  public func editorDraft(
+    for approvedRecipe: WorkbenchDraftRecipe,
+    uuid: () -> UUID
+  ) -> RecipeEditorDraft {
+    approvedRecipe.editorDraft(libraryPlacement: .main, uuid: uuid).withMenuNoteProvenance(
       originalTitle: originalTitle,
       originalProse: originalProse
     )

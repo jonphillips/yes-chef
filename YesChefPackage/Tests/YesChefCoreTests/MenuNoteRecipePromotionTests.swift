@@ -46,11 +46,44 @@ extension RecipeCoreTests {
           rationale: "Promoted from a menu note."
         )
       )
-      let editorDraft = promotion.editorDraft(for: promotion.draftRecipe)
+      let editorDraft = promotion.editorDraft(
+        for: promotion.draftRecipe,
+        uuid: { SampleUUIDSequence.uuid(40_003) }
+      )
       expectNoDifference(editorDraft.sourceName, "")
       expectNoDifference(editorDraft.sourceNotes, "")
       #expect(editorDraft.noteText.contains("From menu note \"Chile-Lime Cauliflower\":"))
       #expect(editorDraft.noteText.contains("1 head cauliflower"))
+    }
+
+    @Test
+    func promotionDraftPromotesIngredientColonHeadingsBeforeSave() throws {
+      let now = Date(timeIntervalSinceReferenceDate: 807_150_000)
+      let menuItem = MenuItem(
+        id: SampleUUIDSequence.uuid(40_050),
+        menuID: SampleUUIDSequence.uuid(40_051),
+        kind: .note,
+        title: "Sauce",
+        dayOffset: 0,
+        mealSlot: .dinner,
+        notes: """
+          Ingredients:
+          For the sauce:
+          1 cup cream
+          """,
+        sortOrder: 0,
+        dateCreated: now,
+        dateModified: now
+      )
+      let promotion = try #require(MenuNoteRecipePromotion(menuItem: menuItem))
+
+      let draft = promotion.editorDraft(
+        for: promotion.draftRecipe,
+        uuid: { SampleUUIDSequence.uuid(40_052) }
+      )
+
+      expectNoDifference(draft.ingredientSections.map(\.name), ["For the sauce"])
+      expectNoDifference(draft.ingredientSections.map(\.text), ["1 cup cream"])
     }
 
     @Test
@@ -87,7 +120,7 @@ extension RecipeCoreTests {
         let noteItem = try #require(try MenuItem.find(noteItemID).fetchOne(db))
         let promotion = try #require(MenuNoteRecipePromotion(menuItem: noteItem))
         let recipeID = try RecipeRepository.save(
-          draft: promotion.editorDraft(for: promotion.draftRecipe),
+          draft: promotion.editorDraft(for: promotion.draftRecipe, uuid: { uuids.next() }),
           in: db,
           now: now,
           uuid: { uuids.next() }

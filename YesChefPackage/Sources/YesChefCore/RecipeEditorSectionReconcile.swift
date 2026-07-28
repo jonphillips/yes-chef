@@ -4,17 +4,17 @@ import Foundation
 ///
 /// The editor now carries every ingredient and instruction section (ADR-0048's grain rule: the
 /// affordance is a readout of storage, and storage here is rows). This turns each draft section into
-/// the rows to upsert plus the identifiers to delete, **scoped per section** so a save never touches a
-/// section the draft did not describe — including orphan lines/steps whose section row no longer exists,
-/// which are carried through untouched. A draft section that parses to nothing is dropped, and an
-/// existing section it corresponds to is removed.
+/// the rows to upsert plus the identifiers to delete. Ingredient line identity is global to the recipe,
+/// so a line may move between cards without being deleted and recreated. Orphan lines/steps whose section
+/// row no longer exists are carried through untouched. An empty named ingredient section is kept; an empty
+/// unnamed section is dropped.
 enum RecipeEditorSectionReconcile {
   struct IngredientPlan: Equatable {
-    /// Sections to upsert, in draft order with `sortOrder` assigned by position. Empty sections excluded.
+    /// Sections to upsert, in draft order with `sortOrder` assigned by position. Empty named sections kept.
     var sections: [IngredientSection]
     /// Reconciled lines to upsert, keyed by section id (kept sections only).
     var linesBySectionID: [IngredientSection.ID: [IngredientLine]]
-    /// Existing sections the save must delete — removed from the draft, or emptied.
+    /// Existing sections the save must delete — removed from the draft, or now empty and unnamed.
     var removedSectionIDs: [IngredientSection.ID]
     /// Sections as they will exist after the save (for the original-snapshot capture).
     var snapshotSections: [IngredientSection]
@@ -39,7 +39,7 @@ enum RecipeEditorSectionReconcile {
   ) -> IngredientPlan {
     var sections: [IngredientSection] = []
     var linesBySectionID: [IngredientSection.ID: [IngredientLine]] = [:]
-    let existingLinesBySection = Dictionary(grouping: existingLines, by: \.sectionID)
+    let existingLinesByID = Dictionary(uniqueKeysWithValues: existingLines.map { ($0.id, $0) })
 
     for (index, draftSection) in draftSections.enumerated() {
       let parsedLines = IngredientParser.lines(
@@ -50,9 +50,10 @@ enum RecipeEditorSectionReconcile {
       )
       let reconciled = reconcileIngredientLines(
         parsedLines,
-        existing: existingLinesBySection[draftSection.id] ?? []
+        drafts: draftSection.lineDrafts,
+        existingByID: existingLinesByID
       )
-      guard !reconciled.isEmpty else { continue }
+      guard !reconciled.isEmpty || draftSection.name.nonEmptySectionName != nil else { continue }
       sections.append(
         IngredientSection(
           id: draftSection.id,

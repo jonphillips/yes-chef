@@ -7,7 +7,9 @@ struct RecipeEditorView: View {
   @State private var model: RecipeEditorModel
   @State private var selectedHeroPhotoItem: PhotosPickerItem?
   @State private var ingredientSelections: [IngredientSection.ID: TextSelection] = [:]
+  @State private var ingredientSelectionUTF16Offsets: [IngredientSection.ID: Int] = [:]
   @FocusState private var focusedIngredientSectionID: IngredientSection.ID?
+  @FocusState private var focusedIngredientSectionNameID: IngredientSection.ID?
   @Environment(\.dismiss) private var dismiss
 
   init(recipeID: Recipe.ID?) {
@@ -76,25 +78,39 @@ struct RecipeEditorView: View {
 
       ForEach($model.draft.ingredientSections) { $section in
         Section {
-          StackedTextField(title: "Section title", text: $section.name)
-            .onChange(of: section.name) { _, _ in
-              model.ingredientSectionNameChanged(sectionID: section.id)
-            }
+          StackedFormField(title: "Section title") {
+            TextField("Section title", text: $section.name)
+              .focused($focusedIngredientSectionNameID, equals: section.id)
+              .onSubmit {
+                model.ingredientSectionNameChanged(sectionID: section.id)
+                pruneIngredientSelections()
+              }
+          }
           StackedTextEditor(
             title: "Ingredients",
             text: $section.text,
-            selection: ingredientSelectionBinding(for: section.id),
+            selection: ingredientSelectionBinding(for: section.id, text: section.text),
             minHeight: 180,
             font: .body.monospacedDigit()
           )
           .focused($focusedIngredientSectionID, equals: section.id)
           .onChange(of: section.text) { _, _ in
-            model.ingredientTextChanged(sectionID: section.id)
+            if let newSectionID = model.ingredientTextChanged(sectionID: section.id) {
+              focusedIngredientSectionID = newSectionID
+            }
+            ingredientSelections[section.id] = nil
+            ingredientSelectionUTF16Offsets[section.id] = nil
+            pruneIngredientSelections()
           }
           .contextMenu {
             if let lineIndex = selectedIngredientLineIndex(in: section) {
               Button("Start a section here") {
-                model.startIngredientSection(sectionID: section.id, atLineIndex: lineIndex)
+                if let newSectionID = model.startIngredientSection(sectionID: section.id, atLineIndex: lineIndex) {
+                  focusedIngredientSectionID = newSectionID
+                }
+                ingredientSelections[section.id] = nil
+                ingredientSelectionUTF16Offsets[section.id] = nil
+                pruneIngredientSelections()
               }
             }
           }
@@ -181,6 +197,11 @@ struct RecipeEditorView: View {
       }
       ToolbarItem(placement: .confirmationAction) {
         Button {
+          if let focusedIngredientSectionNameID {
+            model.ingredientSectionNameChanged(sectionID: focusedIngredientSectionNameID)
+            self.focusedIngredientSectionNameID = nil
+            pruneIngredientSelections()
+          }
           Task {
             if await model.saveButtonTapped() {
               dismiss()
@@ -202,6 +223,11 @@ struct RecipeEditorView: View {
     .onChange(of: model.detail) { _, detail in
       model.detailChanged(detail)
     }
+    .onChange(of: focusedIngredientSectionNameID) { oldValue, newValue in
+      guard let oldValue, oldValue != newValue else { return }
+      model.ingredientSectionNameChanged(sectionID: oldValue)
+      pruneIngredientSelections()
+    }
     .alert("Could Not Save Recipe", isPresented: $model.isShowingError) {
       Button("OK") {}
     } message: {
@@ -209,22 +235,47 @@ struct RecipeEditorView: View {
     }
   }
 
-  private func ingredientSelectionBinding(for sectionID: IngredientSection.ID) -> Binding<TextSelection?> {
+  private func ingredientSelectionBinding(
+    for sectionID: IngredientSection.ID,
+    text: String
+  ) -> Binding<TextSelection?> {
     Binding(
       get: { ingredientSelections[sectionID] },
-      set: { selection in ingredientSelections[sectionID] = selection }
+      set: { selection in
+        ingredientSelections[sectionID] = selection
+        ingredientSelectionUTF16Offsets[sectionID] = selection
+          .flatMap { selectionUTF16Offset($0, in: text) }
+      }
     )
   }
 
   private func selectedIngredientLineIndex(
     in section: RecipeEditorIngredientSectionDraft
   ) -> Int? {
-    guard
-      let selection = ingredientSelections[section.id],
-      case let .selection(range) = selection.indices
+    guard let offset = ingredientSelectionUTF16Offsets[section.id],
+      (0...section.text.utf16.count).contains(offset)
     else { return nil }
 
-    return section.text[..<range.lowerBound].components(separatedBy: .newlines).count - 1
+    let startIndex = String.Index(utf16Offset: offset, in: section.text)
+    let endIndex = section.text[startIndex...].firstIndex(where: \.isNewline) ?? section.text.endIndex
+    guard !section.text[startIndex..<endIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      return nil
+    }
+
+    return section.text.utf16.prefix(offset).reduce(into: 0) { lineCount, codeUnit in
+      if codeUnit == 10 { lineCount += 1 }
+    }
+  }
+
+  private func selectionUTF16Offset(_ selection: TextSelection, in text: String) -> Int? {
+    guard case let .selection(range) = selection.indices else { return nil }
+    return range.lowerBound.utf16Offset(in: text)
+  }
+
+  private func pruneIngredientSelections() {
+    let sectionIDs = Set(model.draft.ingredientSections.map(\.id))
+    ingredientSelections = ingredientSelections.filter { sectionIDs.contains($0.key) }
+    ingredientSelectionUTF16Offsets = ingredientSelectionUTF16Offsets.filter { sectionIDs.contains($0.key) }
   }
 }
 

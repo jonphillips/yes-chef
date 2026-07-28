@@ -108,11 +108,14 @@ final class RecipeEditorModel {
       .joined(separator: ", ")
   }
 
-  func ingredientTextChanged(sectionID: IngredientSection.ID) {
+  func ingredientTextChanged(sectionID: IngredientSection.ID) -> IngredientSection.ID? {
     draft.ingredientTextChanged(sectionID: sectionID, uuid: { uuid() })
   }
 
-  func startIngredientSection(sectionID: IngredientSection.ID, atLineIndex lineIndex: Int) {
+  func startIngredientSection(
+    sectionID: IngredientSection.ID,
+    atLineIndex lineIndex: Int
+  ) -> IngredientSection.ID? {
     draft.startIngredientSection(sectionID: sectionID, atLineIndex: lineIndex, uuid: { uuid() })
   }
 

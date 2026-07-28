@@ -257,20 +257,22 @@ public extension RecipeEditorDraft {
   /// Reconciles a changed ingredient card's line drafts, splitting it wherever the author used the
   /// ingredient-header syntax. The draft owns section IDs, so the split happens before save while
   /// moved lines retain their IDs.
+  @discardableResult
   mutating func ingredientTextChanged(
     sectionID: IngredientSection.ID,
     uuid: () -> UUID
-  ) {
+  ) -> IngredientSection.ID? {
     transformIngredientSection(sectionID: sectionID, forcedHeaderLineIndexes: [], uuid: uuid)
   }
 
   /// Starts a section at a selected, colon-free ingredient line. This is the explicit companion to
   /// the colon shortcut: the selected line becomes the new card's name rather than a persisted line.
+  @discardableResult
   mutating func startIngredientSection(
     sectionID: IngredientSection.ID,
     atLineIndex lineIndex: Int,
     uuid: () -> UUID
-  ) {
+  ) -> IngredientSection.ID? {
     transformIngredientSection(sectionID: sectionID, forcedHeaderLineIndexes: [lineIndex], uuid: uuid)
   }
 
@@ -292,21 +294,27 @@ public extension RecipeEditorDraft {
         line.sortOrder = index
         return line
       }
-    ingredientSections[index - 1].text = ingredientSections[index - 1].lineDrafts
-      .map(\.originalText)
-      .joined(separator: "\n")
+    let precedingText = ingredientSections[index - 1].text
+    let removedText = removed.text
+    ingredientSections[index - 1].text = switch (precedingText.isEmpty, removedText.isEmpty) {
+    case (true, _): removedText
+    case (_, true): precedingText
+    case (false, false): precedingText + "\n" + removedText
+    }
   }
 
   private mutating func transformIngredientSection(
     sectionID: IngredientSection.ID,
     forcedHeaderLineIndexes: Set<Int>,
     uuid: () -> UUID
-  ) {
-    guard let sectionIndex = ingredientSections.firstIndex(where: { $0.id == sectionID }) else { return }
+  ) -> IngredientSection.ID? {
+    guard let sectionIndex = ingredientSections.firstIndex(where: { $0.id == sectionID }) else { return nil }
 
     let originalSection = ingredientSections[sectionIndex]
     var unmatchedDrafts = originalSection.lineDrafts.sorted { $0.sortOrder < $1.sortOrder }
     let sourceLines = originalSection.text.components(separatedBy: .newlines)
+    var parsedLineCount = 0
+    var didRestructure = false
     var groups: [(name: String, lines: [RecipeIngredientLineDraft])] = [
       (name: originalSection.name, lines: [])
     ]
@@ -316,6 +324,7 @@ public extension RecipeEditorDraft {
       guard !text.isEmpty else { continue }
 
       if forcedHeaderLineIndexes.contains(lineIndex) || IngredientSectionHeading.isColonTerminatedHeading(text) {
+        didRestructure = true
         // A header at the top renames the card already carrying identity. A later header creates
         // the genuinely new card promised by ADR-0014 Amd1-D2.
         if groups.count == 1, groups[0].lines.isEmpty {
@@ -327,12 +336,25 @@ public extension RecipeEditorDraft {
       }
 
       let line: RecipeIngredientLineDraft
-      if let matchIndex = unmatchedDrafts.firstIndex(where: { $0.originalText == text }) {
+      if let matchIndex = unmatchedDrafts.firstIndex(where: {
+        $0.originalText == text && $0.sortOrder == parsedLineCount
+      }) ?? unmatchedDrafts.firstIndex(where: { $0.originalText == text }) {
         line = unmatchedDrafts.remove(at: matchIndex)
       } else {
         line = RecipeIngredientLineDraft(id: uuid(), originalText: text, sortOrder: 0)
       }
       groups[groups.count - 1].lines.append(line)
+      parsedLineCount += 1
+    }
+
+    guard didRestructure else {
+      ingredientSections[sectionIndex].lineDrafts = groups[0].lines.enumerated().map { lineIndex, line in
+        var line = line
+        line.sortOrder = lineIndex
+        return line
+      }
+      // The text editor owns its raw whitespace while its card remains structurally unchanged.
+      return nil
     }
 
     let replacements = groups.enumerated().map { groupIndex, group in
@@ -349,6 +371,7 @@ public extension RecipeEditorDraft {
       )
     }
     ingredientSections.replaceSubrange(sectionIndex...sectionIndex, with: replacements)
+    return replacements.dropFirst().first?.id
   }
 }
 
