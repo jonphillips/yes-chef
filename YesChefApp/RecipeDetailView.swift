@@ -445,7 +445,7 @@ private struct RecipeReaderView: View {
           .foregroundStyle(.secondary)
       }
       if let summary = recipe.summary {
-        Text(summary)
+        RecipeMarkdownText(summary)
           .font(.callout)
           .lineLimit(2)
       }
@@ -499,7 +499,7 @@ private struct RecipeReaderView: View {
       }
 
       if let notes = model.detail?.source?.sourceNotes?.nonEmpty {
-        Text(notes)
+        RecipeMarkdownText(notes)
           .font(.caption)
           .foregroundStyle(.secondary)
           .lineLimit(2)
@@ -821,7 +821,7 @@ private struct IngredientLineRow: View {
       } else {
         Text("•")
           .foregroundStyle(.secondary)
-        Text(scaledText)
+        IngredientLineText(scaledText)
           .font(.body)
           .strikethrough(display.highlight == .removed)
       }

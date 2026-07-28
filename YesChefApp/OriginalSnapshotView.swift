@@ -27,7 +27,7 @@ struct OriginalSnapshotView: View {
                 .foregroundStyle(.secondary)
             }
             if let summary = snapshot.recipe.summary {
-              Text(summary)
+              RecipeMarkdownText(summary)
             }
           }
 
@@ -41,7 +41,7 @@ struct OriginalSnapshotView: View {
 
           SnapshotSection(title: "Ingredients", rows: snapshot.ingredients)
           SnapshotSection(title: "Instructions", rows: snapshot.instructions)
-          SnapshotSection(title: "Notes", rows: snapshot.notes)
+          SnapshotSection(title: "Notes", rows: snapshot.notes, rendersMarkdown: true)
           SnapshotSection(title: "Tags", rows: snapshot.tags)
           SnapshotSection(title: "Categories", rows: snapshot.categories)
         }
@@ -121,6 +121,7 @@ private struct OriginalImportDOMExport {
 private struct SnapshotSection: View {
   let title: String
   let rows: [String]
+  var rendersMarkdown = false
 
   var body: some View {
     if !rows.isEmpty {
@@ -128,7 +129,11 @@ private struct SnapshotSection: View {
         Text(title)
           .font(.title2.bold())
         ForEach(rows, id: \.self) { row in
-          Text(row)
+          if rendersMarkdown {
+            RecipeMarkdownText(row)
+          } else {
+            Text(row)
+          }
         }
       }
     }

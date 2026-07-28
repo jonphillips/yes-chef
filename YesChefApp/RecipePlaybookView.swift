@@ -216,9 +216,9 @@ struct RecipePlaybookView: View {
   private func enrichmentText(_ text: String) -> some View {
     let display = PlaybookEnrichmentText.displayText(for: text)
 
-    return Text(display.text)
-    .lineSpacing(display.hasBulletedLines ? 8 : 0)
-    .frame(maxWidth: .infinity, alignment: .leading)
+    return RecipeMarkdownText(display.text)
+      .lineSpacing(display.hasBulletedLines ? 8 : 0)
+      .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private func serveWithContent(_ items: [ServeWithItem]) -> some View {
@@ -339,7 +339,7 @@ struct RecipePlaybookView: View {
           Text(note.noteType.displayTitle)
             .font(.caption.bold())
             .foregroundStyle(.secondary)
-          Text(note.text)
+          RecipeMarkdownText(note.text)
         }
         .padding(.vertical, 4)
       }
@@ -381,7 +381,7 @@ struct RecipePlaybookView: View {
           }
           .padding(.vertical, 4)
         } else {
-          Text(note.text)
+          RecipeMarkdownText(note.text)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 4)
         }

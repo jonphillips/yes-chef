@@ -174,8 +174,9 @@ public enum IngredientParser {
           item: parsed.item,
           canonicalName: CanonicalIngredient.canonicalName(parsed.item ?? text),
           preparation: parsed.preparation,
-          isOptional: text.localizedCaseInsensitiveContains("optional"),
-          doNotShop: Self.doNotShop(text),
+          comment: parsed.comment,
+          isOptional: parsed.parsingText.localizedCaseInsensitiveContains("optional"),
+          doNotShop: Self.doNotShop(parsed.parsingText),
           isHeader: text.hasSuffix(":"),
           sortOrder: index,
           confidence: parsed.quantity == nil ? .low : .medium
@@ -185,40 +186,54 @@ public enum IngredientParser {
 
   public static func parse(
     _ text: String
-  ) -> (quantity: Double?, quantityText: String?, unit: String?, item: String?, preparation: String?) {
-    let parts = ingredientParts(text)
+  ) -> (
+    quantity: Double?,
+    quantityText: String?,
+    unit: String?,
+    item: String?,
+    preparation: String?,
+    comment: String?,
+    parsingText: String
+  ) {
+    let authorNotes = IngredientAuthorNote.segments(in: text)
+    let parsingText = IngredientAuthorNote.parsingText(from: authorNotes)
+    let comment = IngredientAuthorNote.comment(from: authorNotes)
+    let parts = ingredientParts(parsingText)
     let tokens = parts.ingredient.split(separator: " ").map(String.init)
-    guard let first = tokens.first else { return (nil, nil, nil, nil, nil) }
+    guard let first = tokens.first else { return (nil, nil, nil, nil, nil, comment, parsingText) }
 
     if tokens.count >= 2, let whole = Double(first), let fraction = QuantityParser.fractionValue(tokens[1]) {
       let quantityText = "\(first) \(tokens[1])"
-      return parsedQuantity(
+      let parsed = parsedQuantity(
         quantity: whole + fraction,
         quantityText: quantityText,
         remainingTokens: Array(tokens.dropFirst(2)),
         preparation: parts.preparation
       )
+      return (parsed.quantity, parsed.quantityText, parsed.unit, parsed.item, parsed.preparation, comment, parsingText)
     }
 
     if let quantity = QuantityParser.mixedNumberValue(first) {
-      return parsedQuantity(
+      let parsed = parsedQuantity(
         quantity: quantity,
         quantityText: first,
         remainingTokens: Array(tokens.dropFirst()),
         preparation: parts.preparation
       )
+      return (parsed.quantity, parsed.quantityText, parsed.unit, parsed.item, parsed.preparation, comment, parsingText)
     }
 
     if let quantity = QuantityParser.value(from: first) {
-      return parsedQuantity(
+      let parsed = parsedQuantity(
         quantity: quantity,
         quantityText: first,
         remainingTokens: Array(tokens.dropFirst()),
         preparation: parts.preparation
       )
+      return (parsed.quantity, parsed.quantityText, parsed.unit, parsed.item, parsed.preparation, comment, parsingText)
     }
 
-    return (nil, nil, nil, nonEmpty(parts.ingredient), parts.preparation)
+    return (nil, nil, nil, nonEmpty(parts.ingredient), parts.preparation, comment, parsingText)
   }
 
   private static func parsedQuantity(
