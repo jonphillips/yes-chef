@@ -71,13 +71,29 @@ struct RecipeTextMarkupTests {
     expectNoDifference(line.isOptional, true)
   }
 
+  /// `doNotShop` is an exact whole-string match, so it must read the bracket-stripped parsing text:
+  /// reverting it to the full `originalText` makes this line shoppable again. This is the pin — the
+  /// quantity-bearing case below passes either way and cannot catch that regression.
   @Test
-  func ingredientParserLeavesQuantityBearingSaltVariantsShoppable() {
+  func ingredientParserStopsShoppingBareSaltCarryingABrandAuthorNote() {
     let line = IngredientParser.lines(
-      from: "2 cups kosher salt [Diamond Crystal]",
+      from: "kosher salt [Diamond Crystal]",
       recipeID: SampleUUIDSequence.uuid(10),
       sectionID: SampleUUIDSequence.uuid(11),
       uuid: { SampleUUIDSequence.uuid(12) }
+    )[0]
+
+    expectNoDifference(line.comment, "Diamond Crystal")
+    expectNoDifference(line.doNotShop, true)
+  }
+
+  @Test
+  func ingredientParserKeepsQuantityBearingSaltShoppable() {
+    let line = IngredientParser.lines(
+      from: "2 cups kosher salt [Diamond Crystal]",
+      recipeID: SampleUUIDSequence.uuid(13),
+      sectionID: SampleUUIDSequence.uuid(14),
+      uuid: { SampleUUIDSequence.uuid(15) }
     )[0]
 
     expectNoDifference(line.doNotShop, false)
