@@ -13,6 +13,16 @@ import YesChefCore
 )
 struct RecipeTextMarkupTests {
   @Test
+  func inlineMarkdownPreservesProseLineBreaks() throws {
+    let rendered = try AttributedString(
+      markdown: "**Make the sauce.**\n• Chill before serving.",
+      options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+    )
+
+    expectNoDifference(String(rendered.characters), "Make the sauce.\n• Chill before serving.")
+  }
+
+  @Test
   func ingredientParserKeepsBracketedAuthorNotesOutOfParsedFields() {
     let recipeID = SampleUUIDSequence.uuid(1)
     let sectionID = SampleUUIDSequence.uuid(2)
