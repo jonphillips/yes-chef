@@ -57,6 +57,12 @@ public enum YesChefCloudSync {
     CloudSync.setManuallyEnabled(false, configuration: configuration, defaults: defaults)
   }
 
+  /// True only while a restore has deliberately held sync off. The Settings UI uses this to put
+  /// a final confirmation in front of the first CloudKit merge after a restore.
+  public static func isDisabledByRestore(defaults: UserDefaults = .standard) -> Bool {
+    defaults.bool(forKey: restoreRequiresManualEnablementKey)
+  }
+
   public static func persistManualEnablementFromLaunchEnvironment(
     defaults: UserDefaults = .standard,
     environment: [String: String] = ProcessInfo.processInfo.environment,

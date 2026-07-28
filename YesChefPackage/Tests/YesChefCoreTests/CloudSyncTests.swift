@@ -64,7 +64,9 @@ extension RecipeCoreTests {
         UserDefaults(suiteName: "YesChefCloudSyncRestoreTests-\(UUID().uuidString)")
       )
 
+      #expect(!YesChefCloudSync.isDisabledByRestore(defaults: defaults))
       YesChefCloudSync.disableForRestore(defaults: defaults)
+      #expect(YesChefCloudSync.isDisabledByRestore(defaults: defaults))
       #expect(
         !YesChefCloudSync.isManuallyEnabled(
           defaults: defaults,
@@ -87,6 +89,7 @@ extension RecipeCoreTests {
       )
 
       YesChefCloudSync.setManuallyEnabled(true, defaults: defaults)
+      #expect(!YesChefCloudSync.isDisabledByRestore(defaults: defaults))
       #expect(
         YesChefCloudSync.isManuallyEnabled(
           defaults: defaults,
