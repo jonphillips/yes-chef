@@ -48,12 +48,9 @@ enum RecipeEditorSectionReconcile {
         sectionID: draftSection.id,
         uuid: uuid
       )
-      let reconciled = applyIngredientLineDrafts(
-        draftSection.lineDrafts,
-        to: reconcileIngredientLines(
-          parsedLines,
-          existing: existingLinesBySection[draftSection.id] ?? []
-        )
+      let reconciled = reconcileIngredientLines(
+        parsedLines,
+        existing: existingLinesBySection[draftSection.id] ?? []
       )
       guard !reconciled.isEmpty else { continue }
       sections.append(

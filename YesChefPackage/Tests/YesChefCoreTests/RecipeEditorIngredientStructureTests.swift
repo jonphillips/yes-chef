@@ -8,7 +8,7 @@ extension RecipeCoreTests {
   @Suite
   struct RecipeEditorIngredientStructureTests {
     @Test
-    func editorSavePreservesIngredientStructureMetadata() throws {
+    func editorSavePreservesIngredientSectionStructure() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 824_000_000)
       let savedAt = now.addingTimeInterval(60)
@@ -56,7 +56,6 @@ extension RecipeCoreTests {
         let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
         var draft = RecipeEditorDraft(detail: detail)
         draft.ingredientSections[0].name = "Cake"
-        draft.ingredientSections[0].lineDrafts[0].isHeader = true
 
         try RecipeRepository.save(
           draft: draft,
@@ -71,7 +70,7 @@ extension RecipeCoreTests {
         let extraLine = try #require(updated.ingredientLines.first { $0.id == extraLineID })
 
         expectNoDifference(editableSection.name, "Cake")
-        expectNoDifference(editableLine.isHeader, true)
+        expectNoDifference(editableLine.isHeader, false)
         expectNoDifference(extraLine.originalText, "2 cups powdered sugar")
       }
     }

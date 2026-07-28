@@ -34,6 +34,7 @@ struct StackedTextField: View {
 struct StackedTextEditor: View {
   let title: LocalizedStringKey
   @Binding var text: String
+  var selection: Binding<TextSelection?>? = nil
   var minHeight: CGFloat
   var font: Font = .body
   @State private var measuredTextHeight: CGFloat = 0
@@ -41,7 +42,7 @@ struct StackedTextEditor: View {
   var body: some View {
     StackedFormField(title: title) {
       ZStack(alignment: .topLeading) {
-        TextEditor(text: $text)
+        textEditor
           .frame(minHeight: max(minHeight, measuredTextHeight))
           .font(font)
 
@@ -62,6 +63,15 @@ struct StackedTextEditor: View {
       .onPreferenceChange(StackedTextEditorHeightKey.self) { height in
         measuredTextHeight = height
       }
+    }
+  }
+
+  @ViewBuilder
+  private var textEditor: some View {
+    if let selection {
+      TextEditor(text: $text, selection: selection)
+    } else {
+      TextEditor(text: $text)
     }
   }
 }

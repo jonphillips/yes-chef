@@ -177,7 +177,6 @@ public enum IngredientParser {
           comment: parsed.comment,
           isOptional: text.localizedCaseInsensitiveContains("optional"),
           doNotShop: Self.doNotShop(parsed.parsingText),
-          isHeader: text.hasSuffix(":"),
           sortOrder: index,
           confidence: parsed.quantity == nil ? .low : .medium
         )

@@ -16,6 +16,18 @@ enum IngredientSectionHeading {
     isHeading(line, allowAllCaps: true)
   }
 
+  /// The editor's authoring syntax is narrower than import detection: only a trailing colon may
+  /// create a card, and a leading quantity keeps ingredient-looking text as an ingredient.
+  static func isColonTerminatedHeading(_ line: String) -> Bool {
+    let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.hasSuffix(":") && IngredientParser.parse(trimmed).quantity == nil
+  }
+
+  static func colonTerminatedName(_ line: String) -> String {
+    let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+    return String(trimmed.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
   static func name(_ line: String) -> String {
     line.trimmingCharacters(in: CharacterSet(charactersIn: ":").union(.whitespacesAndNewlines))
   }
@@ -59,8 +71,9 @@ enum IngredientSectionHeading {
 
   private static func isHeading(_ line: String, allowAllCaps: Bool) -> Bool {
     let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty, IngredientParser.parse(trimmed).quantity == nil else { return false }
-    if trimmed.hasSuffix(":") { return true }
+    guard !trimmed.isEmpty else { return false }
+    if isColonTerminatedHeading(trimmed) { return true }
+    guard IngredientParser.parse(trimmed).quantity == nil else { return false }
     guard allowAllCaps else { return false }
     let letters = trimmed.filter(\.isLetter)
     guard !letters.isEmpty else { return false }

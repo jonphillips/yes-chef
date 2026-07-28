@@ -966,24 +966,6 @@ private extension String {
   }
 }
 
-func applyIngredientLineDrafts(
-  _ drafts: [RecipeIngredientLineDraft],
-  to lines: [IngredientLine]
-) -> [IngredientLine] {
-  var unmatchedDrafts = drafts.sorted { $0.sortOrder < $1.sortOrder }
-  return lines.map { line in
-    var line = line
-    let matchIndex = unmatchedDrafts.firstIndex { draft in
-      draft.id == line.id
-        || (draft.originalText == line.originalText && draft.sortOrder == line.sortOrder)
-    }
-    guard let matchIndex else { return line }
-    let draft = unmatchedDrafts.remove(at: matchIndex)
-    line.isHeader = draft.isHeader
-    return line
-  }
-}
-
 func reconcileIngredientLines(
   _ parsedLines: [IngredientLine],
   existing existingLines: [IngredientLine]
@@ -1011,7 +993,9 @@ func reconcileIngredientLines(
       isOptional: parsedLine.isOptional,
       shoppingCategory: existingLine.shoppingCategory,
       doNotShop: parsedLine.doNotShop || existingLine.doNotShop,
-      isHeader: parsedLine.isHeader,
+      // Historical header rows remain readable until Jon repairs the small audited set by hand.
+      // New lines are produced with the model default (`false`); the editor no longer writes this flag.
+      isHeader: existingLine.isHeader,
       sortOrder: parsedLine.sortOrder,
       confidence: mergedConfidence(parsedLine.confidence, existingLine.confidence)
     )

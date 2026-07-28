@@ -6,6 +6,7 @@ import YesChefCore
 struct RecipeEditorView: View {
   @State private var model: RecipeEditorModel
   @State private var selectedHeroPhotoItem: PhotosPickerItem?
+  @State private var ingredientSelections: [IngredientSection.ID: TextSelection] = [:]
   @FocusState private var focusedIngredientSectionID: IngredientSection.ID?
   @Environment(\.dismiss) private var dismiss
 
@@ -76,9 +77,13 @@ struct RecipeEditorView: View {
       ForEach($model.draft.ingredientSections) { $section in
         Section {
           StackedTextField(title: "Section title", text: $section.name)
+            .onChange(of: section.name) { _, _ in
+              model.ingredientSectionNameChanged(sectionID: section.id)
+            }
           StackedTextEditor(
             title: "Ingredients",
             text: $section.text,
+            selection: ingredientSelectionBinding(for: section.id),
             minHeight: 180,
             font: .body.monospacedDigit()
           )
@@ -86,9 +91,12 @@ struct RecipeEditorView: View {
           .onChange(of: section.text) { _, _ in
             model.ingredientTextChanged(sectionID: section.id)
           }
-
-          ForEach($section.lineDrafts) { $line in
-            IngredientLineStructureEditor(line: $line)
+          .contextMenu {
+            if let lineIndex = selectedIngredientLineIndex(in: section) {
+              Button("Start a section here") {
+                model.startIngredientSection(sectionID: section.id, atLineIndex: lineIndex)
+              }
+            }
           }
 
           if model.draft.ingredientSections.count > 1 {
@@ -199,6 +207,24 @@ struct RecipeEditorView: View {
     } message: {
       Text(model.errorMessage ?? "")
     }
+  }
+
+  private func ingredientSelectionBinding(for sectionID: IngredientSection.ID) -> Binding<TextSelection?> {
+    Binding(
+      get: { ingredientSelections[sectionID] },
+      set: { selection in ingredientSelections[sectionID] = selection }
+    )
+  }
+
+  private func selectedIngredientLineIndex(
+    in section: RecipeEditorIngredientSectionDraft
+  ) -> Int? {
+    guard
+      let selection = ingredientSelections[section.id],
+      case let .selection(range) = selection.indices
+    else { return nil }
+
+    return section.text[..<range.lowerBound].components(separatedBy: .newlines).count - 1
   }
 }
 
@@ -362,19 +388,6 @@ private struct RecipeSourceEditorView: View {
     }
     .navigationTitle("Source")
     .navigationBarTitleDisplayMode(.inline)
-  }
-}
-
-private struct IngredientLineStructureEditor: View {
-  @Binding var line: RecipeIngredientLineDraft
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Text(line.originalText)
-        .font(.subheadline)
-      Toggle("Header", isOn: $line.isHeader)
-    }
-    .padding(.vertical, 4)
   }
 }
 
