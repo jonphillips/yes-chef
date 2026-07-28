@@ -8,9 +8,12 @@ struct SettingsView: View {
   private let selectedPane: Binding<SettingsPane?>?
   @State private var syncHealth = SyncHealthModel()
   @State private var backupExport = YesChefDatabaseBackupExportModel()
+  @State private var backupRestore = YesChefDatabaseBackupRestoreModel()
   @State private var backupExportDocument: BackupExportDocument?
   @State private var backupExportFilename = "YesChef-Backup.sqlite"
   @State private var isPresentingBackupExporter = false
+  @State private var isPresentingBackupImporter = false
+  @State private var isPresentingRestoreRestartNotice = false
   @Environment(\.scenePhase) private var scenePhase
 
   init(
@@ -51,6 +54,22 @@ struct SettingsView: View {
           Label("Export a Backup", systemImage: "externaldrive.badge.checkmark")
         }
         .disabled(backupExport.isPreparing)
+
+        Button {
+          isPresentingBackupImporter = true
+        } label: {
+          Label("Restore from a Backup", systemImage: "externaldrive.badge.plus")
+        }
+        .disabled(backupRestore.isPreparing || backupRestore.isRestoring)
+
+        if backupRestore.hasUndoableRestore {
+          Button {
+            Task { await backupRestore.prepareUndo() }
+          } label: {
+            Label("Undo Last Restore", systemImage: "arrow.uturn.backward")
+          }
+          .disabled(backupRestore.isPreparing || backupRestore.isRestoring)
+        }
 
         Button {
           model.importPaprikaExportButtonTapped()
@@ -100,12 +119,44 @@ struct SettingsView: View {
       onCompletion: backupExportCompleted,
       onCancellation: backupExportCancelled
     )
+    .fileImporter(
+      isPresented: $isPresentingBackupImporter,
+      allowedContentTypes: [.yesChefSQLiteBackup],
+      allowsMultipleSelection: false,
+      onCompletion: backupRestoreSelected
+    )
+    .alert("Restore This Backup?", isPresented: restoreConfirmationPresented) {
+      Button("Restore", role: .destructive) {
+        Task {
+          if await backupRestore.restorePreparedBackup() {
+            isPresentingRestoreRestartNotice = true
+          }
+        }
+      }
+      Button("Cancel", role: .cancel) {
+        backupRestore.discardPreparedRestore()
+      }
+    } message: {
+      Text("This replaces the library on this device. Yes Chef will first save an automatic undo backup, and iCloud sync will stay off until you turn it on again.")
+    }
+    .alert("Restart Yes Chef", isPresented: $isPresentingRestoreRestartNotice) {
+      Button("OK") {}
+    } message: {
+      Text("Your backup is restored. Close and reopen Yes Chef to use it. You can undo this restore from Settings after reopening.")
+    }
     .alert("Could Not Export Backup", isPresented: backupExportErrorPresented) {
       Button("OK") {
         backupExport.dismissError()
       }
     } message: {
       Text(backupExport.errorMessage ?? "")
+    }
+    .alert("Could Not Restore Backup", isPresented: backupRestoreErrorPresented) {
+      Button("OK") {
+        backupRestore.dismissError()
+      }
+    } message: {
+      Text(backupRestore.errorMessage ?? "")
     }
   }
 
@@ -117,6 +168,16 @@ struct SettingsView: View {
         backupExport.dismissError()
       }
     )
+  }
+
+  private var restoreConfirmationPresented: Binding<Bool> {
+    @Bindable var backupRestore = backupRestore
+    return $backupRestore.isPrepared
+  }
+
+  private var backupRestoreErrorPresented: Binding<Bool> {
+    @Bindable var backupRestore = backupRestore
+    return $backupRestore.isErrorPresented
   }
 
   private func backupExportCompleted(_ result: Result<URL, any Error>) {
@@ -134,6 +195,15 @@ struct SettingsView: View {
       backupExport.discard(backupExportDocument.snapshot)
     }
     backupExportDocument = nil
+  }
+
+  private func backupRestoreSelected(_ result: Result<URL, any Error>) {
+    switch result {
+    case let .success(url):
+      Task { await backupRestore.prepareRestore(from: url) }
+    case let .failure(error):
+      backupRestore.recordImportFailure(error)
+    }
   }
 
   @ViewBuilder private var categoryRow: some View {

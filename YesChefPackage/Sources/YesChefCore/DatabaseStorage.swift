@@ -26,6 +26,18 @@ public enum YesChefDatabaseStorage {
     applicationSupportDirectory.appendingPathComponent(databaseFileName, isDirectory: false)
   }
 
+  /// Mirrors SQLiteData's metadata naming so restore can discard the prior peer's local
+  /// CloudKit bookkeeping before the app creates a fresh, sync-disabled connection.
+  public static func syncMetadataURL(
+    for databaseURL: URL,
+    containerIdentifier: String
+  ) -> URL {
+    databaseURL
+      .deletingLastPathComponent()
+      .appendingPathComponent(".\(databaseURL.deletingPathExtension().lastPathComponent)")
+      .appendingPathExtension("metadata-\(containerIdentifier).sqlite")
+  }
+
   public static func liveSharedDatabaseURL(fileManager: FileManager = .default) throws -> URL {
     guard
       let appGroupContainerURL = fileManager.containerURL(
