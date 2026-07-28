@@ -111,6 +111,7 @@
 		BF6E63936FB6FA4E4CFDD8CA /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = E94FE1F285F6B338A789EE95 /* SQLiteData */; };
 		C4460AA94AC3679029FA4CBC /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C469ECE48285073F98E35D10 /* ShareViewController.swift */; };
 		C4D9F1DEA1A0CA728D2578D3 /* YesChefCore in Frameworks */ = {isa = PBXBuildFile; productRef = F8B7EFEDFB9B5499B0B98F9B /* YesChefCore */; };
+		C5A6E39ACB59937B1AA66FC6 /* RecipeTextViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EE9C07029923DFFFC06A977 /* RecipeTextViews.swift */; };
 		CB4F5CEA046A10EF5FDE0892 /* RecipeDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CCF32B5108C44892607FF3B /* RecipeDetailView.swift */; };
 		CCFC4DC9297E465E3E045AAA /* CookSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90AEA6C80CDEFF87884B65A7 /* CookSessionView.swift */; };
 		CD5717B4A411916DC9E7499F /* RecipeChatWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07C439846D3B6561F2CFE399 /* RecipeChatWorkspace.swift */; };
@@ -194,6 +195,7 @@
 		4A44F5DE22E861C4E705A6BB /* RecipeVariationPromotionPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeVariationPromotionPresentation.swift; sourceTree = "<group>"; };
 		4ADDB4E672F69BB9AD2EB58F /* WorkbenchCompareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchCompareView.swift; sourceTree = "<group>"; };
 		4E98DAAE2876452488D71CD0 /* WideLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WideLayout.swift; sourceTree = "<group>"; };
+		4EE9C07029923DFFFC06A977 /* RecipeTextViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeTextViews.swift; sourceTree = "<group>"; };
 		556B8CD9C6727F96C1BD4684 /* SeedCoverageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedCoverageView.swift; sourceTree = "<group>"; };
 		56E450B24DC7459A2108DDFF /* RecipeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeModels.swift; sourceTree = "<group>"; };
 		56F66618C21D85EE42AB4DEB /* PaprikaImportWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaprikaImportWorkspace.swift; sourceTree = "<group>"; };
@@ -470,6 +472,7 @@
 				492BC4D75288EEB6446263F7 /* RecipePlaybookColumnLayout.swift */,
 				34C3AE6422BC004DC084E05B /* RecipePlaybookView.swift */,
 				DD810D780BF1E28B4D82992D /* RecipeScaleFormatting.swift */,
+				4EE9C07029923DFFFC06A977 /* RecipeTextViews.swift */,
 				DE4284C2FB4F46CA20889B5B /* RecipeVariationBaseWriteGuard.swift */,
 				BD361DD70060E27578688E09 /* RecipeVariationDisplayModel.swift */,
 				9A5AE2D975575189A0B728A1 /* RecipeVariationEditor.swift */,
@@ -750,6 +753,7 @@
 				7C57B8AB73C6BE68948F80F7 /* RecipePlaybookColumnLayout.swift in Sources */,
 				143D0594FDEA8800409997C3 /* RecipePlaybookView.swift in Sources */,
 				3C511415F03094402001B7D2 /* RecipeScaleFormatting.swift in Sources */,
+				C5A6E39ACB59937B1AA66FC6 /* RecipeTextViews.swift in Sources */,
 				153B6C0EC04DBC8BE5EAD324 /* RecipeVariationBaseWriteGuard.swift in Sources */,
 				2949418F009AE77017F5D1CF /* RecipeVariationDisplayModel.swift in Sources */,
 				86E285EF8664CE66215DBDF0 /* RecipeVariationEditor.swift in Sources */,

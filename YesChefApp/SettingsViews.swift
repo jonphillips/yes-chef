@@ -128,7 +128,6 @@ struct SettingsView: View {
     .fileImporter(
       isPresented: $isPresentingBackupImporter,
       allowedContentTypes: [.yesChefSQLiteBackup],
-      allowsMultipleSelection: false,
       onCompletion: backupRestoreSelected
     )
     .alert("Restore This Backup?", isPresented: restoreConfirmationPresented) {
@@ -320,7 +319,7 @@ private struct RestoreRestartCover: View {
     ContentUnavailableView(
       "Restart Yes Chef",
       systemImage: "arrow.clockwise",
-      description: "Your backup is restored — close and reopen Yes Chef to use it. You can undo this restore from Settings after reopening.\n\niCloud sync is off. Turning it back on merges this device with iCloud, and iCloud's copy wins for anything it still has. If you restored because something in iCloud went wrong, leave sync off."
+      description: Text("Your backup is restored — close and reopen Yes Chef to use it. You can undo this restore from Settings after reopening.\n\niCloud sync is off. Turning it back on merges this device with iCloud, and iCloud's copy wins for anything it still has. If you restored because something in iCloud went wrong, leave sync off.")
     )
     .interactiveDismissDisabled()
   }
