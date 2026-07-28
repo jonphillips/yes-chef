@@ -90,8 +90,9 @@ not just show a label.
 
 ## Amendment 1 — the header is *syntax*, the section is *storage*, and the split happens at edit time (2026-07-28)
 
-**Status:** Accepted (direction) — 2026-07-28. Supersedes D1's **mechanism**; keeps its outcome.
-Implementation not yet dispatched.
+**Status:** **Ratified by Jon 2026-07-28** — Amd1-D1 (colon syntax) and Amd1-D1a (the explicit
+"Start a section here" action) are settled; the habit change is a conscious call, not a surprise.
+Supersedes D1's **mechanism**; keeps its outcome. **Dispatchable.**
 
 ### Why an amendment: D1's premise is obsolete
 
@@ -128,6 +129,41 @@ Storage does **not** change: `IngredientSection` / `InstructionSection` rows sta
 ownership (collapse / reorder / delete as a unit — Jon's D1 requirement), UUID PKs, and CloudKit safety.
 This is consistent with D2's already-accepted encoding philosophy: legible markup in the text beats an
 out-of-band attribute.
+
+#### Considered and rejected: Markdown heading syntax (`## For the sauce`)
+
+Raised 2026-07-28 — if D2 already puts Markdown in free-text fields, why invent a second convention? Settled
+against, on measurements from the live backup (26,932 ingredient lines):
+
+| Signal | Count |
+|---|---|
+| Non-header ingredient lines ending in `:` (i.e. false positives) | **0** |
+| Ingredient lines beginning with `#` | **0** |
+| Ingredient lines beginning with `*` or `-` | 18 |
+| Section names already ending in `:` or containing `#` | **0** |
+
+1. **The ambiguity that would justify an explicit sigil does not exist.** Zero false positives in the whole
+   corpus. The quantity guard in Amd1-D1 is belt-and-braces, not load-bearing.
+2. **Only the colon has recall on *imported* text.** Sources literally write `For the sauce:`; not one
+   captured line starts with `#`. Choosing `##` for authoring would mean the import parser keeps the colon
+   heuristic anyway — **two conventions instead of one**, which is the exact defect this amendment set out to
+   remove.
+3. **D2 scoped Markdown to free-text fields *the app does not parse*, explicitly excluding ingredient and
+   instruction rows.** Putting `##` into ingredient rows reverses that boundary rather than honoring it — and
+   would put the 18 `*`/`-` lines at risk of being read as emphasis or bullets.
+4. **`#` implies an outline with levels.** Sections are flat; `##` invites "so what does `###` do?"
+
+**The "magic" objection is real, but it is not about which character.** It is about *invisible* inference:
+today the colon rule fires silently and the toggle list is the only evidence it ran. Under Amd1-D2 the rule
+fires **visibly** — the card splits in front of you, a named section card appears, and deleting the colon
+merges it back. That is what removes the magic.
+
+#### Amd1-D1a — a second, explicit path to the same split
+
+Because 6 of Jon's 10 existing headers are colon-free (see the audit under Amd1-D3), the editor must **also**
+offer a per-line **"Start a section here"** action — a swipe or context-menu action *on the line*, not a
+persistent parallel list of controls. Same operation as typing the colon, same visible card split, no
+out-of-band attribute surface. Typing markup is then a shortcut, never the only door.
 
 ### Amd1-D2 — The split happens at **edit time**, never at save time
 
@@ -214,25 +250,50 @@ sections and re-parents.
 `originalSnapshot` keeps the pre-promotion shape and is **not** rewritten — it is passive provenance. This is
 safe for Compare, which is line-based and already filters `isHeader` on both sides.
 
-**Pre-flight audit before dispatching the slice** (run against a backup export, ADR-0030 S1) — sizes the job
-and catches anything anchored to a row that is about to disappear:
+#### ✅ Audited 2026-07-28 against a live backup export — **write no migration at all**
 
-```sql
-SELECT COUNT(*) AS header_lines FROM "ingredientLines" WHERE "isHeader" = 1;
-SELECT COUNT(*) AS grocery_sources_on_headers
-FROM "groceryItemSources" s JOIN "ingredientLines" l ON l."id" = s."ingredientLineID"
-WHERE l."isHeader" = 1;
-```
+Everything above is the *general* shape and stays on the record. It does not apply here, because the affected
+data turned out to be trivial:
 
-The second must be **0** — shopping already filters `!isHeader` ([`GroceryCore.swift`](../../YesChefPackage/Sources/YesChefCore/GroceryCore.swift)),
-so a non-zero count is a pre-existing bug to understand *before* the rows vanish. Stored variation ops
-anchored to a header line should likewise be impossible (ops target ingredients); worth an eyeball in the
-same pass.
+| | |
+|---|---|
+| `isHeader = 1` lines | **10** (of 26,932 ingredient lines) |
+| Recipes affected | **4** (of 2,179) |
+| `groceryItemSources` pointing at a header line | **0** ✅ |
+| Variation deltas anchoring a header line | **0** ✅ (all 5 variations checked by id) |
+| Duplicated `prepPlanSteps` (the companion finding) | **0** ✅ — 25 rows, `sortOrder` 0–24, all distinct |
 
-**Given step 3's one-shot nature, seriously consider splitting the slice:** promote additively (steps 1–2)
-and defer the header-line delete to a follow-up release once the sections have converged on both devices,
-per the additive-only guidance in `jon-platform/docs/ios/persistence-and-sync.md`. The interim cost is that
-every reader must filter the orphaned header lines — which the reader, Compare, and grocery already do.
+**Decision: fix the four recipes by hand in the app once the section-aware editor ships. No migration, no
+deterministic-UUID scheme, no post-engine pass, no delete of synced rows.** Ten rows do not justify a
+one-shot irreversible data migration against a live CloudKit zone, and hand-editing removes the *entire*
+hazard class rather than mitigating it. `isHeader` then stops being written, and the column is dropped
+later — a schema change, not a data migration.
+
+The four: *411 West's Rosemary Chicken* (2), *Beef Birria Taco Filling* (4), *Broccoli Spoon Salad* (2),
+*Sous Vide Indoor Pulled Pork* (2).
+
+#### ⚠️ What the audit revealed about the colon rule itself
+
+**Only 4 of the 10 existing headers end in a colon.** The other six — `Garlic Cream Sauce`,
+`Rosemary Butter`, `Warm Vinaigrette`, `Salad`, `Pork`, `Lexington Vinegar Barbecue Sauce` — are colon-free,
+and two of them were authored on **2026-07-20**, well after the colon inference existed. They were created
+with the `Toggle`. That is the affordance this amendment deletes.
+
+So the toggle is not pure chrome: it is what Jon has actually been using, because his natural header phrasing
+is a bare noun phrase. **Amd1-D1 asks him to type `Warm Vinaigrette:` where he now types `Warm Vinaigrette`
+and flips a switch.** The rendered result is identical (the reader already strips the colon), and one
+character beats a scroll-and-toggle — but this is a habit change against the majority of existing data, and
+it should be a conscious call rather than a surprise. **✅ RATIFIED by Jon 2026-07-28** — colon syntax stands,
+with Amd1-D1a as the door for anyone who does not want to type it.
+
+**The two 411 West headers are already fixed** (Jon, 2026-07-28): switches left **on**, colons **added** —
+`Garlic Cream Sauce:` and `Rosemary Butter:`. That is the ideal pre-slice state (colon *and* `isHeader = true`),
+so that recipe needs no hand-fixing after the slice; three remain. Verified unaffected: the recipe's
+*Modernized* variation anchors only real ingredient lines, never the headers.
+
+**Implementation trap this exposes:** the section `name` column stores the **colon-free** form
+(`Warm Vinaigrette`); the colon exists **only** in the flat-text projection the editor renders and re-parses.
+Storing the colon in `name` would append another on every round-trip (`Warm Vinaigrette::`).
 
 ### Amd1-D4 — ⚠️ Correction: this does **not** hand ADR-0021 Amd1-D5 a free ride
 
@@ -259,9 +320,10 @@ now precisely scoped: it needs a delta-vocabulary decision, not a text-editing-m
 
 ### Still open
 
-- **Escape hatch for a literal trailing colon.** The quantity guard covers the common case; a deliberate
-  `Reduce by half:` -style ingredient line still becomes a section. Accept it (the fix is to edit the text),
-  or add an escape (`\:`)? **Unresolved — decide before slicing.**
+- ~~**Escape hatch for a literal trailing colon.**~~ **CLOSED 2026-07-28 by measurement: accept it, build no
+  escape.** Zero of 26,932 ingredient lines are a non-header line ending in `:`. Adding `\:` would be
+  machinery for a case the corpus does not contain, and the repair is already trivial and visible — the card
+  split happens in front of you, so deleting the colon undoes it.
 - **Instruction sections.** Instruction step text is blank-line-joined and steps routinely contain colons
   mid-prose. The colon rule as written is **ingredient-only** until someone specifies the instruction variant;
   instruction sections keep explicit card names.

@@ -177,10 +177,16 @@ no-commit advisory or a per-day note, not a per-recipe write; respect [[llm-cura
 that we auto-number. **Unscoped**; parked in [`docs/open-questions.md`](open-questions.md). Interacts with
 ADR-0014, so sequence them.
 
-**Open design ADR (discussion, not yet Accepted)** —
-[ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md) recipe text editing (header toggles vs. rich
-text). Decide with Jon before any implementation — **it narrowed on 2026-07-21**: ADR-0021 Amd1-D5 needs it
-only for **section headers inside a variation**, the one edit the op vocabulary cannot express.
+**[ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md) recipe text editing — Amendment 1 RATIFIED
+2026-07-28, dispatchable.** A header is *syntax* (a line ending in `:`), a section is *storage*, and the split
+happens at **edit time** — typing or pasting a header line splits the editor card in place, with UUIDs in
+hand, so the save path is untouched. The `isHeader` toggle and `applyIngredientLineDrafts` both go away;
+Amd1-D1a adds a per-line "Start a section here" action so typing markup is never the only door. **No
+migration** — audited against a live backup: 10 header lines in 4 recipes (one already hand-fixed), 0 grocery
+sources and 0 variation deltas anchoring them. Read Amendment 1 before slicing D1; its original mechanism is
+superseded. **Amd1-D4 is NOT resolved:** a header inside a *variation* still hits
+`RecipeVariationUnrepresentableEdit.ingredientSectionAdded` — that is ADR-0021's delta-vocabulary call, and
+nothing is broken today (0 variations anchor a header).
 
 **Small nits — not urgent, fold into a passing dispatch:**
 - **The S4 brief extractor's prompt is framed for a conversation, but S4 hands it a decision** (silent-failure
