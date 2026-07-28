@@ -108,9 +108,10 @@ final class RecipeEditorModel {
       .joined(separator: ", ")
   }
 
-  func ingredientTextChanged() {
-    var unmatchedDrafts = draft.ingredientLineDrafts.sorted { $0.sortOrder < $1.sortOrder }
-    draft.ingredientLineDrafts = draft.ingredientText
+  func ingredientTextChanged(sectionID: IngredientSection.ID) {
+    guard let index = draft.ingredientSections.firstIndex(where: { $0.id == sectionID }) else { return }
+    var unmatchedDrafts = draft.ingredientSections[index].lineDrafts.sorted { $0.sortOrder < $1.sortOrder }
+    draft.ingredientSections[index].lineDrafts = draft.ingredientSections[index].text
       .split(whereSeparator: \.isNewline)
       .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
       .filter { !$0.isEmpty }
@@ -132,8 +133,28 @@ final class RecipeEditorModel {
       }
   }
 
-  func ingredientFractionTapped(_ fraction: ScaleFraction) {
-    draft.ingredientText = ScaleFraction.appending(fraction, to: draft.ingredientText)
+  func ingredientFractionTapped(_ fraction: ScaleFraction, sectionID: IngredientSection.ID) {
+    guard let index = draft.ingredientSections.firstIndex(where: { $0.id == sectionID }) else { return }
+    draft.ingredientSections[index].text = ScaleFraction.appending(
+      fraction,
+      to: draft.ingredientSections[index].text
+    )
+  }
+
+  func addIngredientSection() {
+    draft.ingredientSections.append(RecipeEditorIngredientSectionDraft(id: uuid()))
+  }
+
+  func deleteIngredientSection(id: IngredientSection.ID) {
+    draft.ingredientSections.removeAll { $0.id == id }
+  }
+
+  func addInstructionSection() {
+    draft.instructionSections.append(RecipeEditorInstructionSectionDraft(id: uuid()))
+  }
+
+  func deleteInstructionSection(id: InstructionSection.ID) {
+    draft.instructionSections.removeAll { $0.id == id }
   }
 
   func heroPhotoSelected(sourceData: Data, sourcePath: String) async {

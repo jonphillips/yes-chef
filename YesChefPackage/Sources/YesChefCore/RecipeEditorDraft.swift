@@ -23,10 +23,8 @@ public struct RecipeEditorDraft: Equatable, Sendable {
   public var course: String
   public var libraryPlacement: RecipeLibraryPlacement
   public var favorite: Bool
-  public var ingredientSectionName: String
-  public var ingredientText: String
-  public var ingredientLineDrafts: [RecipeIngredientLineDraft]
-  public var instructionText: String
+  public var ingredientSections: [RecipeEditorIngredientSectionDraft]
+  public var instructionSections: [RecipeEditorInstructionSectionDraft]
   public var noteText: String
   public var tagNames: String
   public var categoryNames: String
@@ -94,10 +92,18 @@ public struct RecipeEditorDraft: Equatable, Sendable {
     self.course = course
     self.libraryPlacement = libraryPlacement
     self.favorite = favorite
-    self.ingredientSectionName = ingredientSectionName
-    self.ingredientText = ingredientText
-    self.ingredientLineDrafts = ingredientLineDrafts
-    self.instructionText = instructionText
+    // Flat-text callers (a new recipe, `SampleData`, `WorkbenchDraftRecipe`) describe a single
+    // section; `init(detail:)` overwrites these with the recipe's real per-section shape.
+    self.ingredientSections = [
+      RecipeEditorIngredientSectionDraft(
+        name: ingredientSectionName,
+        text: ingredientText,
+        lineDrafts: ingredientLineDrafts
+      )
+    ]
+    self.instructionSections = [
+      RecipeEditorInstructionSectionDraft(text: instructionText)
+    ]
     self.noteText = noteText
     self.tagNames = tagNames
     self.categoryNames = categoryNames
@@ -109,15 +115,6 @@ public struct RecipeEditorDraft: Equatable, Sendable {
   }
 
   public init(detail: RecipeDetailData) {
-    let firstIngredientSectionID = detail.ingredientSections.sorted { $0.sortOrder < $1.sortOrder }.first?.id
-    let editableIngredientLines = firstIngredientSectionID.map { sectionID in
-      detail.ingredientLines.filter { $0.sectionID == sectionID }
-    } ?? detail.ingredientLines
-    let firstInstructionSectionID = detail.instructionSections.sorted { $0.sortOrder < $1.sortOrder }.first?.id
-    let editableInstructionSteps = firstInstructionSectionID.map { sectionID in
-      detail.instructionSteps.filter { $0.sectionID == sectionID }
-    } ?? detail.instructionSteps
-
     self.init(
       id: detail.recipe.id,
       title: detail.recipe.title,
@@ -141,19 +138,6 @@ public struct RecipeEditorDraft: Equatable, Sendable {
       course: detail.recipe.course ?? "",
       libraryPlacement: detail.recipe.libraryPlacement,
       favorite: detail.recipe.favorite,
-      ingredientSectionName: firstIngredientSectionID
-        .flatMap { sectionID in detail.ingredientSections.first { $0.id == sectionID }?.name } ?? "",
-      ingredientText: editableIngredientLines
-        .sorted { $0.sortOrder < $1.sortOrder }
-        .map(\.originalText)
-        .joined(separator: "\n"),
-      ingredientLineDrafts: editableIngredientLines
-        .sorted { $0.sortOrder < $1.sortOrder }
-        .map(RecipeIngredientLineDraft.init(line:)),
-      instructionText: editableInstructionSteps
-        .sorted { $0.sortOrder < $1.sortOrder }
-        .map(\.text)
-        .joined(separator: "\n\n"),
       noteText: detail.notes
         .filter { $0.noteType == .general }
         .sorted { $0.dateCreated < $1.dateCreated }
@@ -167,6 +151,82 @@ public struct RecipeEditorDraft: Equatable, Sendable {
       pendingPhotos: [],
       removesHeroPhoto: false
     )
+    self.ingredientSections = Self.ingredientSectionDrafts(from: detail)
+    self.instructionSections = Self.instructionSectionDrafts(from: detail)
+  }
+
+  /// Every ingredient section in persisted order, each carrying its own lines. Falls back to a single
+  /// empty section so the editor always presents at least one box (matching a brand-new recipe).
+  static func ingredientSectionDrafts(from detail: RecipeDetailData) -> [RecipeEditorIngredientSectionDraft] {
+    let drafts = detail.ingredientSections
+      .sorted { $0.sortOrder < $1.sortOrder }
+      .map { section -> RecipeEditorIngredientSectionDraft in
+        let lines = detail.ingredientLines
+          .filter { $0.sectionID == section.id }
+          .sorted { $0.sortOrder < $1.sortOrder }
+        return RecipeEditorIngredientSectionDraft(
+          id: section.id,
+          name: section.name ?? "",
+          text: lines.map(\.originalText).joined(separator: "\n"),
+          lineDrafts: lines.map(RecipeIngredientLineDraft.init(line:))
+        )
+      }
+    return drafts.isEmpty ? [RecipeEditorIngredientSectionDraft()] : drafts
+  }
+
+  /// Every instruction section in persisted order, each carrying its own steps as newline-joined text.
+  static func instructionSectionDrafts(from detail: RecipeDetailData) -> [RecipeEditorInstructionSectionDraft] {
+    let drafts = detail.instructionSections
+      .sorted { $0.sortOrder < $1.sortOrder }
+      .map { section -> RecipeEditorInstructionSectionDraft in
+        let steps = detail.instructionSteps
+          .filter { $0.sectionID == section.id }
+          .sorted { $0.sortOrder < $1.sortOrder }
+        return RecipeEditorInstructionSectionDraft(
+          id: section.id,
+          name: section.name ?? "",
+          text: steps.map(\.text).joined(separator: "\n\n")
+        )
+      }
+    return drafts.isEmpty ? [RecipeEditorInstructionSectionDraft()] : drafts
+  }
+}
+
+/// One editable ingredient section: its identity, name, newline-joined lines, and the per-line
+/// structure flags (`isHeader`) surfaced beneath the text box.
+public struct RecipeEditorIngredientSectionDraft: Identifiable, Equatable, Sendable {
+  public var id: IngredientSection.ID
+  public var name: String
+  public var text: String
+  public var lineDrafts: [RecipeIngredientLineDraft]
+
+  public init(
+    id: IngredientSection.ID = UUID(),
+    name: String = "",
+    text: String = "",
+    lineDrafts: [RecipeIngredientLineDraft] = []
+  ) {
+    self.id = id
+    self.name = name
+    self.text = text
+    self.lineDrafts = lineDrafts
+  }
+}
+
+/// One editable instruction section: its identity, name, and blank-line-joined steps.
+public struct RecipeEditorInstructionSectionDraft: Identifiable, Equatable, Sendable {
+  public var id: InstructionSection.ID
+  public var name: String
+  public var text: String
+
+  public init(
+    id: InstructionSection.ID = UUID(),
+    name: String = "",
+    text: String = ""
+  ) {
+    self.id = id
+    self.name = name
+    self.text = text
   }
 }
 
