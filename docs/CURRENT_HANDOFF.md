@@ -1,7 +1,8 @@
 # Current Handoff
 
-Last updated: July 28, 2026. (ADR-0014 D3+D2 shipped — recipe prose carries Markdown and bracket author
-notes; live target is now ADR-0014 **Amendment 1**, the colon/section rework.)
+Last updated: July 28, 2026. (ADR-0014 **Amendment 1** shipped — the colon is the ingredient section syntax,
+the split happens in the editor, and `isHeader` is retired as an authoring concept; live target is now the
+grocery **rapid add** effort.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -16,52 +17,67 @@ live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** re
 
 ## Next Up
 
-**ONE live dispatch target: [ADR-0014 Amendment 1](decisions/ADR-0014-recipe-text-editing-model.md#amendment-1--the-header-is-syntax-the-section-is-storage-and-the-split-happens-at-edit-time-2026-07-28)
-— the colon is the authoring syntax, the section is the storage, and the split happens at *edit* time.**
-Dispatch with *"Do **ADR-0014 Amd1** from `docs/CURRENT_HANDOFF.md`."* If this section is empty or missing,
-**STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch. This is the meaty one; D3
-and D2 shipped 2026-07-28 (PR #254).
+**ONE live dispatch target: [`efforts/grocery-rapid-add-2026-07-26.md`](efforts/grocery-rapid-add-2026-07-26.md)
+— a persistent grocery Add Item field, plus Accept All on the review sheet.** Dispatch with
+*"Do **grocery rapid add** from `docs/CURRENT_HANDOFF.md`."* If this section is empty or missing, **STOP and
+ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch. **One dispatch, five slices, no
+schema, no Core model change** — app layer plus one shared-component extraction. All three product confirms
+closed with Jon 2026-07-26; the effort doc is the spec and it is complete.
 
-**The scope.** Ratified by Jon 2026-07-28, all open questions closed in the amendment itself.
-- **Amd1-D1 — a line that reads as a header *is* a header.** Rule: **ends in `:` and parses no leading
-  quantity** (the quantity guard keeps `Salt:`-shaped ingredient lines out; today's bare `hasSuffix(":")` is
-  too loose). Its text minus the colon becomes the section `name`. **Storage does not change** —
-  `IngredientSection` / `InstructionSection` rows stay the grain.
-- **Amd1-D1a — a second, explicit door.** A per-line **"Start a section here"** swipe/context-menu action, on
-  the line, **not** a persistent parallel list of controls. Required, not optional: **6 of Jon's 10 existing
-  headers are colon-free**, so typing markup must be a shortcut and never the only path.
-- **Amd1-D2 — the split happens at edit time, never at save time.** Typing or pasting a header line mid-card
-  **splits that card in two**, minting the new section's UUID and moving line drafts across **with their own
-  IDs intact**; clearing a card's name **merges it back up**. **The save path is untouched** —
-  `RecipeEditorSectionReconcile` still receives explicit section IDs.
-- **Amd1-D3 — retire `isHeader` as an authoring concept.** `applyIngredientLineDrafts` collapses to nothing
-  and the `Toggle("Header")` list goes with it. **Write no migration** — see below.
+**The scope.** A/B the persistent field + fraction pills · C the debounce · D the stale-sheet fix · E the
+review-sheet Accept All (unrelated to groceries, rides along because it is small and touches none of the
+same files).
 
 **Read before scoping:**
 
-1. **⚠️ Write NO data migration, and mint no deterministic UUIDs.** The amendment works through the full
-   post-engine hazard analysis and then **discharges it by measurement**: only **10** `isHeader = 1` rows
-   exist, across **4** recipes, with **0** `groceryItemSources` and **0** variation deltas anchoring them.
-   **Decision: Jon fixes those four recipes by hand in the app after the slice ships.** Do not build the
-   migration the analysis describes — it is recorded as the general shape, not as this slice's work.
-2. **The section `name` column stores the COLON-FREE form.** The colon exists only in the flat-text
-   projection the editor renders and re-parses. Storing it in `name` appends another on every round-trip
-   (`Warm Vinaigrette::`). This is the implementation trap the amendment calls out by name.
-3. **Derivation-on-save is rejected, and the reason is silent data loss.** The line reconcile is scoped by
-   `existingLinesBySection[draftSection.id]`, so a rename that reads as delete+insert drops `canonicalName`,
-   `shoppingCategory`, `doNotShop` and merged parse confidence for the whole group. Manipulate identity where
-   identity exists — in the editor, with UUIDs in hand.
-4. **The colon rule is ingredient-only.** Instruction text routinely contains mid-prose colons; instruction
-   sections keep explicit card names.
-5. **This does NOT hand ADR-0021 Amd1-D5 a free ride** (Amd1-D4). `derivingVariation` diffs structures by
-   section ID, so a live split hits `.ingredientSectionAdded` → `variationNeedsReview`. That needs a
-   **delta-vocabulary** decision and it is **ADR-0021's** — do not extend the delta ops here.
+1. **⚠️ Slice C decides whether the feature is good, and it is the one that looks skippable.**
+   `categorizeUncachedItems()` already fires after **every** mutation and does **three whole-table `fetchAll`
+   scans + two write transactions + two full `$itemRows` reloads**. Fine at one add per sheet; at ten adds in
+   twenty seconds — which is the entire point of Slices A/B — it is
+   [ADR-0029](decisions/ADR-0029-main-thread-write-and-fetch-cost.md)'s writer convoy in a new place, and the
+   feature ships feeling *worse* than the sheet it replaces.
+   **There are FOUR post-mutation call sites, not one** — `GroceryModels.swift` lines **509, 542, 576, 706**
+   (the effort doc's Finding 3 names only 706). Debounce all four behind a single cancel-and-restart Task.
+   The `.task`-on-appear call (`GroceryViews.swift:181`) stays **undebounced** — it is once per appearance
+   and it is what catches items synced from another device.
+2. **Two scope cuts are already found — do not re-add either.** Deterministic area assignment is **already
+   wired** (`GroceryRepository.addCustomItem` falls back to `GroceryStoreArea.seed(for:)`), so the new field
+   passes `aisle: nil` and needs no area logic at all; the deferred model sweep is already wired too. Do not
+   add a second seeding path.
+3. **Slice D's bug has a third instance the effort doc does not name.** `GroceryListEditorView` seeds
+   `_title` / `_remindersListName` with the same `State(initialValue:)`-in-`init` pattern
+   (`GroceryViews.swift:750`) as `GroceryItemEditorView` (`:806`). Same view-identity/state-lifetime trap,
+   different view. Fix it in the same pass or exclude it by name — do not leave it undecided.
+4. **Slice B is an extraction, not a reimplementation.** `IngredientFractionPillRow` is `private` in
+   `RecipeEditorView.swift` (the effort doc's `:160` is stale). Lift it to its own file as a shared internal
+   component with **no behavior change to the recipe editor** — a second copy of the glyph row is exactly the
+   drift the fraction effort closed. ADR-0014 Amd1 left it in its simplest form (pills only), so the
+   extraction is clean.
+5. **Slice E fails silently if you pick one definition of "unedited".** The file holds *two* (`.sheet` →
+   `editableText ?? summary`; `.inline` → `summary`). Extract a single `unmodifiedApprovedText` that
+   `launchReview`, the sheet seed, and Accept All all read — this is
+   [[editable-summary-unchanged-commit-path]] in a new place. Always the **primary** commit
+   (`usingSecondaryCommit: false`); commit **sequentially** and leave a truthful list behind on a partial
+   failure.
+6. **A learned `canonicalName` → area cache is OUT OF SCOPE and must not ride in on this momentum.** It is a
+   real gap ([[grocery-area-no-learned-cache]]) and a synced table would be cheap
+   ([[synced-table-cost-calibration]]), but it needs its own decision about invalidation and about whether a
+   hand-edit is a correction or a one-off ([[withdraw-not-defer-orphaned-schema]]). Also out: multi-line
+   paste into the field (that is ADR-0036's territory), the deeper sweep rewrite (an ADR-0029-shaped
+   follow-up), and retiring the editor sheet (it stays the full-fidelity path).
 
-**Verification.** The colon rule and the split/merge logic belong in **Core** (`RecipeEditorDraft`,
-`RecipeEditorSectionReconcile`) where the package suite runs with no simulator; the editor affordances touch
-`YesChefApp/` and need the elevated `generic/platform=iOS` build as required evidence. **Pin the round-trip
-explicitly**: a header typed with a colon must not accumulate colons in `name` across save→reload→save. No
-simulator installs; Jon device-passes the editor.
+**Verification.** This is an **app-layer** dispatch: the elevated `generic/platform=iOS` build is the
+required evidence, plus the package suite for anything that lands in Core. **Slice C's acceptance is
+observable, so pin it**: ten items added in rapid succession must issue **one** classification pass,
+verifiable in the ADR-0043 model-call record. No simulator installs; Jon device-passes the field, the pills,
+and the review sheet.
+
+**⚠️ Jon's outstanding follow-through from ADR-0014 Amd1 (not a dispatch item):** three recipes still carry
+`isHeader = 1` rows to hand-repair in the app — *Beef Birria Taco Filling* (4), *Broccoli Spoon Salad* (2),
+*Sous Vide Indoor Pulled Pork* (2). *411 West's Rosemary Chicken* was pre-fixed 2026-07-28. Add a colon to
+each header line and the row is promoted to a section and deleted on save. (Amd1-D1a, the colon-free door, is
+**deferred** — the colon is the only path, which is the ratified primary anyway.) Dropping the `isHeader`
+**column** afterwards is a schema change, not a data migration, and is not queued.
 
 ⚠️ **`check-drift.sh` fails on clean `main` at `Ld … SQLiteData.framework`, and the cause is fully known —
 do not investigate it, do not try to fix it, and do not treat it as your regression.** sqlite-data's manifest
@@ -80,6 +96,11 @@ section is work.**
 - **ADR-0021 (variations) and ADR-0023 (recipe edit proposals) have nothing queued.** ADR-0023's *iterative
   refine loop* is **WITHDRAWN** (ADR-0042 D7 — refinement happens in the live external thread; **do not
   rebuild it**). Per D2 the in-app adjust verb stays the **only** path that writes a structured delta.
+  **Now live, not theoretical (ADR-0014 Amd1-D4):** the editor's split mints a genuinely new section, so
+  `derivingVariation` — which diffs structures matched by section ID — hits `.ingredientSectionAdded` →
+  `variationNeedsReview` whenever a header is added inside a recipe that has variations. **That is expected
+  behavior, not a bug to patch.** Fixing it needs a delta-vocabulary decision and it is **ADR-0021's** — do
+  not extend the delta ops on this momentum.
 - **ADR-0042 S3 (`workbenchDraft`) stays deferred and un-queued** — no concrete want. **Do not build it on
   ADR momentum.** There is no S5.
 - **`PlaybookSectionMeta` is not queued anywhere — do not resurrect it.** ADR-0041 closed at S2.6, S3
@@ -114,7 +135,8 @@ one key, so any of those recipes on a menu puts "Gather your ingredient" on the 
   uploads nothing and each device diverges, and **the 101 deletes are unrepeatable** — a delete that never
   uploads stays alive in CloudKit and any full-zone fetch resurrects it
   ([[migration-writes-bypass-sync-triggers]]). Back up first.
-- **P2 (Milk Street's all-caps) is DECLINED**; P3 parked behind P2 and Amd1-D1. Don't build either on momentum.
+- **P2 (Milk Street's all-caps) is DECLINED**; P3's Amd1-D1 dependency is now discharged (shipped 2026-07-28)
+  but it stays parked behind the declined P2. Don't build either on momentum.
 
 **[`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) — the prep plan
 knows things the model doesn't (scoped 2026-07-26).** Two slices, **no schema** — both use fields that
@@ -132,20 +154,6 @@ already exist and already sync.
 - **Sequence S1 → S2** (S1 changes the shape of `serves`), one dispatch. **Do not auto-relink without a human
   gate** and **do not add a date to `PrepPlanStepRecord`** (ADR-0034 D1) — exact match succeeds on
   `Korean Bavette` and fails on `…Salad (Korean)`, so half the chips would silently return.
-
-**[`efforts/grocery-rapid-add-2026-07-26.md`](efforts/grocery-rapid-add-2026-07-26.md) — persistent grocery
-Add Item field + Accept All on review. READY.** One dispatch, five slices, **no schema**; all three product
-confirms closed. A/B the field + fraction pills, C the debounce, D the stale-sheet fix, E the review-sheet
-Accept All (unrelated, rides along).
-- **Slice C decides whether the feature is good, and it is the one that looks skippable.**
-  `categorizeUncachedItems()` already fires after every add and does **three whole-table `fetchAll` scans +
-  two write transactions + two full `$itemRows` reloads** — fine at one add, an
-  [ADR-0029](decisions/ADR-0029-main-thread-write-and-fetch-cost.md) writer convoy at ten adds in twenty
-  seconds, which is exactly what A/B create.
-- **Two scope cuts already found:** deterministic area assignment is **already wired** (`addCustomItem` falls
-  back to `GroceryStoreArea.seed`), and so is the deferred model sweep. Do not add a second seeding path.
-- **Slice E's trap:** the file holds *two* definitions of "unedited" (`.sheet` → `editableText ?? summary`;
-  `.inline` → `summary`). Extract one `unmodifiedApprovedText` so they cannot drift.
 
 **[`efforts/playbook-edit-grain-2026-07-26.md`](efforts/playbook-edit-grain-2026-07-26.md) — Playbook edit
 affordances are a readout of storage grain. Dispatch 1 READY; Dispatch 2 behind it.** Ratified in
@@ -197,20 +205,6 @@ no-commit advisory or a per-day note, not a per-recipe write; respect [[llm-cura
 **Recipe text normalization** — de-cap old all-caps Milk Street imports, strip manual instruction numbers now
 that we auto-number. **Unscoped**; parked in [`docs/open-questions.md`](open-questions.md). Interacts with
 ADR-0014, so sequence them.
-
-**[ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md) **Amd1-D1** — the colon/section rework.
-RATIFIED 2026-07-28, dispatchable, and the meatiest slice of the ADR. Sequenced behind D3+D2 (now in Next
-Up), though it does not strictly depend on them.** A header is *syntax* (a line ending in `:`), a section is
-*storage*, and the split happens at **edit time** — typing or pasting a header line splits the editor card in
-place, with UUIDs in hand, so the save path is untouched. The `isHeader` toggle and `applyIngredientLineDrafts`
-both go away; Amd1-D1a adds a per-line "Start a section here" action so typing markup is never the only door.
-**No migration** — audited against a live backup: 10 header lines in 4 recipes (one already hand-fixed), 0
-grocery sources and 0 variation deltas anchoring them. Read Amendment 1 before slicing D1; its original
-mechanism is superseded. **Amd1-D4 is NOT resolved:** a header inside a *variation* still hits
-`RecipeVariationUnrepresentableEdit.ingredientSectionAdded` — that is ADR-0021's delta-vocabulary call, and
-nothing is broken today (0 variations anchor a header). **Instruction sections stay out of scope** — the colon
-rule is ingredient-only until someone specifies the instruction variant (steps routinely contain mid-prose
-colons), so instruction sections keep explicit card names.
 
 **[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) leftovers — one owed confirmation and S3.**
 - **The owed OQ1 confirmation (small, do it before trusting the net).** Amendment 1 is **Proposed**, not

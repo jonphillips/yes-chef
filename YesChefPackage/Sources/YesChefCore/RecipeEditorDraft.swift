@@ -192,8 +192,7 @@ public struct RecipeEditorDraft: Equatable, Sendable {
   }
 }
 
-/// One editable ingredient section: its identity, name, newline-joined lines, and the per-line
-/// structure flags (`isHeader`) surfaced beneath the text box.
+/// One editable ingredient section: its identity, name, and newline-joined lines.
 public struct RecipeEditorIngredientSectionDraft: Identifiable, Equatable, Sendable {
   public var id: IngredientSection.ID
   public var name: String
@@ -233,18 +232,15 @@ public struct RecipeEditorInstructionSectionDraft: Identifiable, Equatable, Send
 public struct RecipeIngredientLineDraft: Identifiable, Equatable, Sendable {
   public var id: UUID
   public var originalText: String
-  public var isHeader: Bool
   public var sortOrder: Int
 
   public init(
     id: UUID,
     originalText: String,
-    isHeader: Bool = false,
     sortOrder: Int
   ) {
     self.id = id
     self.originalText = originalText
-    self.isHeader = isHeader
     self.sortOrder = sortOrder
   }
 
@@ -252,9 +248,145 @@ public struct RecipeIngredientLineDraft: Identifiable, Equatable, Sendable {
     self.init(
       id: line.id,
       originalText: line.originalText,
-      isHeader: line.isHeader,
       sortOrder: line.sortOrder
     )
+  }
+}
+
+public extension RecipeEditorDraft {
+  /// Reconciles a changed ingredient card's line drafts, splitting it wherever the author used the
+  /// ingredient-header syntax. The draft owns section IDs, so the split happens before save while
+  /// moved lines retain their IDs.
+  @discardableResult
+  mutating func ingredientTextChanged(
+    sectionID: IngredientSection.ID,
+    uuid: () -> UUID
+  ) -> IngredientSection.ID? {
+    transformIngredientSection(sectionID: sectionID, forcedHeaderLineIndexes: [], uuid: uuid)
+  }
+
+  /// Starts a section at a chosen, colon-free ingredient line: that line becomes the new card's name
+  /// rather than a persisted line.
+  ///
+  /// **No live caller — this is a deliberately retained seam, not dead code left by accident.**
+  /// ADR-0014 Amd1-D1a (the editor affordance that would call it) is deferred: SwiftUI exposes no
+  /// sound way to ask a `TextEditor` which line the caret is on when the editor rewrites that text on
+  /// every keystroke — a `TextSelection`'s `String.Index` traps once the bound text has moved on. The
+  /// colon shortcut is the shipped path. Keep this and its test; wire it if the ingredients editor
+  /// ever owns its own text view.
+  @discardableResult
+  mutating func startIngredientSection(
+    sectionID: IngredientSection.ID,
+    atLineIndex lineIndex: Int,
+    uuid: () -> UUID
+  ) -> IngredientSection.ID? {
+    transformIngredientSection(sectionID: sectionID, forcedHeaderLineIndexes: [lineIndex], uuid: uuid)
+  }
+
+  /// An unnamed non-leading card has no independent storage meaning, so fold its drafts back into
+  /// the preceding card while their stable line IDs remain intact.
+  mutating func ingredientSectionNameChanged(sectionID: IngredientSection.ID) {
+    guard
+      let index = ingredientSections.firstIndex(where: { $0.id == sectionID }),
+      index > ingredientSections.startIndex,
+      ingredientSections[index].name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    else { return }
+
+    let removed = ingredientSections.remove(at: index)
+    ingredientSections[index - 1].lineDrafts.append(contentsOf: removed.lineDrafts)
+    ingredientSections[index - 1].lineDrafts = ingredientSections[index - 1].lineDrafts
+      .enumerated()
+      .map { index, line in
+        var line = line
+        line.sortOrder = index
+        return line
+      }
+    let precedingText = ingredientSections[index - 1].text
+    let removedText = removed.text
+    ingredientSections[index - 1].text = switch (precedingText.isEmpty, removedText.isEmpty) {
+    case (true, _): removedText
+    case (_, true): precedingText
+    case (false, false): precedingText + "\n" + removedText
+    }
+  }
+
+  private mutating func transformIngredientSection(
+    sectionID: IngredientSection.ID,
+    forcedHeaderLineIndexes: Set<Int>,
+    uuid: () -> UUID
+  ) -> IngredientSection.ID? {
+    guard let sectionIndex = ingredientSections.firstIndex(where: { $0.id == sectionID }) else { return nil }
+
+    let originalSection = ingredientSections[sectionIndex]
+    var unmatchedDrafts = originalSection.lineDrafts.sorted { $0.sortOrder < $1.sortOrder }
+    let sourceLines = originalSection.text.components(separatedBy: .newlines)
+    var parsedLineCount = 0
+    var didRestructure = false
+    var groups: [(name: String, lines: [RecipeIngredientLineDraft])] = [
+      (name: originalSection.name, lines: [])
+    ]
+
+    for (lineIndex, rawLine) in sourceLines.enumerated() {
+      let text = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !text.isEmpty else { continue }
+
+      if forcedHeaderLineIndexes.contains(lineIndex) || IngredientSectionHeading.isColonTerminatedHeading(text) {
+        didRestructure = true
+        // A header at the top renames the card already carrying identity. A later header creates
+        // the genuinely new card promised by ADR-0014 Amd1-D2.
+        if groups.count == 1, groups[0].lines.isEmpty {
+          groups[0].name = text.sectionNameAfterHeaderPromotion
+        } else {
+          groups.append((name: text.sectionNameAfterHeaderPromotion, lines: []))
+        }
+        continue
+      }
+
+      let line: RecipeIngredientLineDraft
+      if let matchIndex = unmatchedDrafts.firstIndex(where: {
+        $0.originalText == text && $0.sortOrder == parsedLineCount
+      }) ?? unmatchedDrafts.firstIndex(where: { $0.originalText == text }) {
+        line = unmatchedDrafts.remove(at: matchIndex)
+      } else {
+        line = RecipeIngredientLineDraft(id: uuid(), originalText: text, sortOrder: 0)
+      }
+      groups[groups.count - 1].lines.append(line)
+      parsedLineCount += 1
+    }
+
+    guard didRestructure else {
+      ingredientSections[sectionIndex].lineDrafts = groups[0].lines.enumerated().map { lineIndex, line in
+        var line = line
+        line.sortOrder = lineIndex
+        return line
+      }
+      // The text editor owns its raw whitespace while its card remains structurally unchanged.
+      return nil
+    }
+
+    let replacements = groups.enumerated().map { groupIndex, group in
+      let lineDrafts = group.lines.enumerated().map { lineIndex, line in
+        var line = line
+        line.sortOrder = lineIndex
+        return line
+      }
+      return RecipeEditorIngredientSectionDraft(
+        id: groupIndex == 0 ? originalSection.id : uuid(),
+        name: group.name,
+        text: lineDrafts.map(\.originalText).joined(separator: "\n"),
+        lineDrafts: lineDrafts
+      )
+    }
+    ingredientSections.replaceSubrange(sectionIndex...sectionIndex, with: replacements)
+    return replacements.dropFirst().first?.id
+  }
+}
+
+private extension String {
+  var sectionNameAfterHeaderPromotion: String {
+    IngredientSectionHeading.isColonTerminatedHeading(self)
+      ? IngredientSectionHeading.colonTerminatedName(self)
+      : self
   }
 }
 

@@ -627,7 +627,7 @@ public enum WorkbenchRepository {
     }
 
     let recipeID = try RecipeRepository.save(
-      draft: draftRecipe.editorDraft(libraryPlacement: .reference),
+      draft: draftRecipe.editorDraft(libraryPlacement: .reference, uuid: uuid),
       in: db,
       now: now,
       uuid: uuid

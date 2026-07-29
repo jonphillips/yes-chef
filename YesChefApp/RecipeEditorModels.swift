@@ -108,29 +108,12 @@ final class RecipeEditorModel {
       .joined(separator: ", ")
   }
 
-  func ingredientTextChanged(sectionID: IngredientSection.ID) {
-    guard let index = draft.ingredientSections.firstIndex(where: { $0.id == sectionID }) else { return }
-    var unmatchedDrafts = draft.ingredientSections[index].lineDrafts.sorted { $0.sortOrder < $1.sortOrder }
-    draft.ingredientSections[index].lineDrafts = draft.ingredientSections[index].text
-      .split(whereSeparator: \.isNewline)
-      .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-      .filter { !$0.isEmpty }
-      .enumerated()
-      .map { index, text in
-        if let matchIndex = unmatchedDrafts.firstIndex(where: { $0.originalText == text && $0.sortOrder == index })
-          ?? unmatchedDrafts.firstIndex(where: { $0.originalText == text })
-        {
-          var draft = unmatchedDrafts.remove(at: matchIndex)
-          draft.sortOrder = index
-          return draft
-        }
-        return RecipeIngredientLineDraft(
-          id: uuid(),
-          originalText: text,
-          isHeader: text.hasSuffix(":"),
-          sortOrder: index
-        )
-      }
+  func ingredientTextChanged(sectionID: IngredientSection.ID) -> IngredientSection.ID? {
+    draft.ingredientTextChanged(sectionID: sectionID, uuid: { uuid() })
+  }
+
+  func ingredientSectionNameChanged(sectionID: IngredientSection.ID) {
+    draft.ingredientSectionNameChanged(sectionID: sectionID)
   }
 
   func ingredientFractionTapped(_ fraction: ScaleFraction, sectionID: IngredientSection.ID) {

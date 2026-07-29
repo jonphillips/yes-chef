@@ -137,7 +137,7 @@ public struct WorkbenchDraftRecipe: Equatable, Sendable {
     return draft
   }
 
-  public func editorDraft(libraryPlacement: RecipeLibraryPlacement) -> RecipeEditorDraft {
+  private func editorDraft(libraryPlacement: RecipeLibraryPlacement) -> RecipeEditorDraft {
     let noteParagraphs = (["Draft rationale: \(rationale)"] + notes)
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
       .filter { !$0.isEmpty }
@@ -158,6 +158,17 @@ public struct WorkbenchDraftRecipe: Equatable, Sendable {
       instructionText: instructionLines.joined(separator: "\n\n"),
       noteText: noteParagraphs.joined(separator: "\n\n")
     )
+  }
+
+  /// LLM-authored draft recipes bypass the interactive editor, so promote any heading markup before
+  /// they reach the repository's identity-preserving save path.
+  public func editorDraft(
+    libraryPlacement: RecipeLibraryPlacement,
+    uuid: () -> UUID
+  ) -> RecipeEditorDraft {
+    var draft = editorDraft(libraryPlacement: libraryPlacement)
+    _ = draft.ingredientTextChanged(sectionID: draft.ingredientSections[0].id, uuid: uuid)
+    return draft
   }
 }
 

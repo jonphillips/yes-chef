@@ -326,6 +326,15 @@ extension RecipeRepository {
     now: Date,
     uuid: () -> UUID
   ) throws -> Recipe.ID {
+    var draft = draft
+    // Most callers pass through the live editor, which promotes heading syntax as it is typed.
+    // Normalize only flat, newly constructed cards here; persisted drafts already carry line identity,
+    // including the small audited set of historical colon-terminated ingredient rows.
+    for sectionID in draft.ingredientSections
+      .filter(\.lineDrafts.isEmpty)
+      .map(\.id) {
+      _ = draft.ingredientTextChanged(sectionID: sectionID, uuid: uuid)
+    }
     let recipeID = draft.id ?? uuid()
     let dateCreated = draft.dateCreated ?? now
     let existingDetail = try draft.id.flatMap { try fetchDetail(recipeID: $0, in: db) }
@@ -568,21 +577,21 @@ extension RecipeRepository {
     existingGeneralNotes: [RecipeNote],
     in db: Database
   ) throws {
-    let existingIngredientLinesBySection = Dictionary(grouping: existingIngredientLines, by: \.sectionID)
     for section in ingredientPlan.sections {
       try IngredientSection.upsert { section }.execute(db)
       let lines = ingredientPlan.linesBySectionID[section.id] ?? []
       for line in lines {
         try IngredientLine.upsert { line }.execute(db)
       }
-      try deleteMissingRows(
-        existingIngredientLinesBySection[section.id] ?? [],
-        keeping: Set(lines.map(\.id)),
-        in: db
-      )
     }
+    // A draft line may have moved to a newly minted section. Delete only after every upsert, and
+    // consider identity across the whole recipe rather than the line's former section.
+    try deleteMissingRows(
+      existingIngredientLines,
+      keeping: Set(ingredientPlan.snapshotLines.map(\.id)),
+      in: db
+    )
     for sectionID in ingredientPlan.removedSectionIDs {
-      try deleteMissingRows(existingIngredientLinesBySection[sectionID] ?? [], keeping: [], in: db)
       try #sql("DELETE FROM \"ingredientSections\" WHERE \"id\" = \(bind: sectionID)").execute(db)
     }
 
@@ -966,36 +975,42 @@ private extension String {
   }
 }
 
-func applyIngredientLineDrafts(
-  _ drafts: [RecipeIngredientLineDraft],
-  to lines: [IngredientLine]
-) -> [IngredientLine] {
-  var unmatchedDrafts = drafts.sorted { $0.sortOrder < $1.sortOrder }
-  return lines.map { line in
-    var line = line
-    let matchIndex = unmatchedDrafts.firstIndex { draft in
-      draft.id == line.id
-        || (draft.originalText == line.originalText && draft.sortOrder == line.sortOrder)
-    }
-    guard let matchIndex else { return line }
-    let draft = unmatchedDrafts.remove(at: matchIndex)
-    line.isHeader = draft.isHeader
-    return line
-  }
-}
-
 func reconcileIngredientLines(
   _ parsedLines: [IngredientLine],
-  existing existingLines: [IngredientLine]
+  drafts: [RecipeIngredientLineDraft],
+  existingByID: [IngredientLine.ID: IngredientLine]
 ) -> [IngredientLine] {
-  var unmatchedExistingLines = existingLines.sorted { $0.sortOrder < $1.sortOrder }
+  var unmatchedDrafts = drafts.sorted { $0.sortOrder < $1.sortOrder }
   return parsedLines.map { parsedLine in
-    guard let matchIndex = unmatchedExistingLines.firstIndex(where: { $0.originalText == parsedLine.originalText })
+    guard let matchIndex = unmatchedDrafts.firstIndex(where: {
+      $0.originalText == parsedLine.originalText && $0.sortOrder == parsedLine.sortOrder
+    }) ?? unmatchedDrafts.firstIndex(where: { $0.originalText == parsedLine.originalText })
     else { return parsedLine }
 
-    let existingLine = unmatchedExistingLines.remove(at: matchIndex)
+    let draft = unmatchedDrafts.remove(at: matchIndex)
+    guard let existingLine = existingByID[draft.id] else {
+      return IngredientLine(
+        id: draft.id,
+        recipeID: parsedLine.recipeID,
+        sectionID: parsedLine.sectionID,
+        originalText: parsedLine.originalText,
+        quantity: parsedLine.quantity,
+        quantityText: parsedLine.quantityText,
+        unit: parsedLine.unit,
+        item: parsedLine.item,
+        canonicalName: parsedLine.canonicalName,
+        preparation: parsedLine.preparation,
+        comment: parsedLine.comment,
+        isOptional: parsedLine.isOptional,
+        shoppingCategory: parsedLine.shoppingCategory,
+        doNotShop: parsedLine.doNotShop,
+        isHeader: parsedLine.isHeader,
+        sortOrder: parsedLine.sortOrder,
+        confidence: parsedLine.confidence
+      )
+    }
     return IngredientLine(
-      id: existingLine.id,
+      id: draft.id,
       recipeID: parsedLine.recipeID,
       sectionID: parsedLine.sectionID,
       originalText: parsedLine.originalText,
@@ -1003,15 +1018,19 @@ func reconcileIngredientLines(
       quantityText: parsedLine.quantityText ?? existingLine.quantityText,
       unit: parsedLine.unit ?? existingLine.unit,
       item: parsedLine.item ?? existingLine.item,
-      canonicalName: parsedLine.canonicalName
-        ?? existingLine.canonicalName
+      // The stored canonical name is the durable grocery key. Parsing may improve the readable
+      // ingredient fields, but cannot silently replace a classification a cook has already kept.
+      canonicalName: existingLine.canonicalName
+        ?? parsedLine.canonicalName
         ?? CanonicalIngredient.canonicalName((parsedLine.item ?? existingLine.item) ?? parsedLine.originalText),
       preparation: parsedLine.preparation ?? existingLine.preparation,
       comment: parsedLine.comment ?? existingLine.comment,
       isOptional: parsedLine.isOptional,
       shoppingCategory: existingLine.shoppingCategory,
       doNotShop: parsedLine.doNotShop || existingLine.doNotShop,
-      isHeader: parsedLine.isHeader,
+      // Historical header rows remain readable until Jon repairs the small audited set by hand.
+      // New lines are produced with the model default (`false`); the editor no longer writes this flag.
+      isHeader: existingLine.isHeader,
       sortOrder: parsedLine.sortOrder,
       confidence: mergedConfidence(parsedLine.confidence, existingLine.confidence)
     )

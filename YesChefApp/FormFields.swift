@@ -19,14 +19,43 @@ struct StackedTextField: View {
   @Binding var text: String
   var prompt: LocalizedStringKey?
   var axis: Axis = .horizontal
+  var focusedSectionID: FocusState<UUID?>.Binding? = nil
+  var focusedSectionValue: UUID? = nil
+  var onSubmit: (() -> Void)?
 
   var body: some View {
     StackedFormField(title: title) {
-      if let prompt {
-        TextField(title, text: $text, prompt: Text(prompt), axis: axis)
-      } else {
-        TextField(title, text: $text, axis: axis)
-      }
+      textField
+        .modifier(
+          OptionalTextFieldFocus(
+            focusedSectionID: focusedSectionID,
+            focusedSectionValue: focusedSectionValue
+          )
+        )
+        .onSubmit { onSubmit?() }
+    }
+  }
+
+  @ViewBuilder
+  private var textField: some View {
+    if let prompt {
+      TextField(title, text: $text, prompt: Text(prompt), axis: axis)
+    } else {
+      TextField(title, text: $text, axis: axis)
+    }
+  }
+}
+
+private struct OptionalTextFieldFocus: ViewModifier {
+  let focusedSectionID: FocusState<UUID?>.Binding?
+  let focusedSectionValue: UUID?
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if let focusedSectionID, let focusedSectionValue {
+      content.focused(focusedSectionID, equals: focusedSectionValue)
+    } else {
+      content
     }
   }
 }
@@ -34,6 +63,8 @@ struct StackedTextField: View {
 struct StackedTextEditor: View {
   let title: LocalizedStringKey
   @Binding var text: String
+  var focusedSectionID: FocusState<UUID?>.Binding? = nil
+  var focusedSectionValue: UUID? = nil
   var minHeight: CGFloat
   var font: Font = .body
   @State private var measuredTextHeight: CGFloat = 0
@@ -42,6 +73,12 @@ struct StackedTextEditor: View {
     StackedFormField(title: title) {
       ZStack(alignment: .topLeading) {
         TextEditor(text: $text)
+          .modifier(
+            OptionalTextFieldFocus(
+              focusedSectionID: focusedSectionID,
+              focusedSectionValue: focusedSectionValue
+            )
+          )
           .frame(minHeight: max(minHeight, measuredTextHeight))
           .font(font)
 
