@@ -90,7 +90,7 @@ struct RecipeEditorView: View {
           StackedTextEditor(
             title: "Ingredients",
             text: $section.text,
-            selection: ingredientSelectionBinding(for: section.id, text: section.text),
+            selection: ingredientSelectionBinding(for: section.id),
             minHeight: 180,
             font: .body.monospacedDigit()
           )
@@ -237,15 +237,17 @@ struct RecipeEditorView: View {
   }
 
   private func ingredientSelectionBinding(
-    for sectionID: IngredientSection.ID,
-    text: String
+    for sectionID: IngredientSection.ID
   ) -> Binding<TextSelection?> {
     Binding(
       get: { ingredientSelections[sectionID] },
       set: { selection in
         ingredientSelections[sectionID] = selection
+        let currentText = model.draft.ingredientSections
+          .first { $0.id == sectionID }?
+          .text ?? ""
         ingredientSelectionUTF16Offsets[sectionID] = selection
-          .flatMap { selectionUTF16Offset($0, in: text) }
+          .flatMap { selectionUTF16Offset($0, in: currentText) }
       }
     )
   }
@@ -257,7 +259,11 @@ struct RecipeEditorView: View {
       (0...section.text.utf16.count).contains(offset)
     else { return nil }
 
-    let startIndex = String.Index(utf16Offset: offset, in: section.text)
+    let utf16 = section.text.utf16
+    guard
+      let utf16Index = utf16.index(utf16.startIndex, offsetBy: offset, limitedBy: utf16.endIndex),
+      let startIndex = String.Index(utf16Index, within: section.text)
+    else { return nil }
     let endIndex = section.text[startIndex...].firstIndex(where: \.isNewline) ?? section.text.endIndex
     guard !section.text[startIndex..<endIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       return nil
@@ -270,7 +276,8 @@ struct RecipeEditorView: View {
 
   private func selectionUTF16Offset(_ selection: TextSelection, in text: String) -> Int? {
     guard case let .selection(range) = selection.indices else { return nil }
-    return range.lowerBound.utf16Offset(in: text)
+    guard let utf16Index = range.lowerBound.samePosition(in: text.utf16) else { return nil }
+    return text.utf16.distance(from: text.utf16.startIndex, to: utf16Index)
   }
 
   private func pruneIngredientSelections() {
