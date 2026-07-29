@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 import YesChefCore
 
 struct ServeWithRepairPresentation: Identifiable, Equatable {
@@ -55,9 +56,18 @@ struct ServeWithRepairSheet: View {
         }
 
         VStack(alignment: .leading, spacing: 6) {
-          Text("Raw Serve With Data")
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
+          HStack {
+            Text("Raw Serve With Data")
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(.secondary)
+            Spacer()
+            Button {
+              UIPasteboard.general.string = presentation.initialText
+            } label: {
+              Label("Copy", systemImage: "doc.on.doc")
+            }
+            .font(.caption)
+          }
           TextEditor(text: $draftText)
             .fontDesign(.monospaced)
             .textInputAutocapitalization(.never)

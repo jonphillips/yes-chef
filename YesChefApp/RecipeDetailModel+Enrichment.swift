@@ -3,9 +3,24 @@ import Foundation
 import YesChefCore
 
 extension RecipeDetailModel {
-  var serveWithRepairPresentation: ServeWithRepairPresentation? {
-    guard case let .failure(error) = serveWithItemsResult, let recipe else { return nil }
-    return ServeWithRepairPresentation(error: error, recipe: recipe)
+  func presentServeWithRepair(for error: ServeWithCodingError) -> Bool {
+    guard error.recipeID == recipeID,
+      let recipe,
+      let presentation = ServeWithRepairPresentation(error: error, recipe: recipe)
+    else { return false }
+
+    destination = .repairServeWith(presentation)
+    return true
+  }
+
+  func repairServeWithButtonTapped() {
+    guard case let .failure(error) = serveWithItemsResult,
+      presentServeWithRepair(for: error)
+    else {
+      errorMessage = "Serve With repair could not be opened."
+      isShowingError = true
+      return
+    }
   }
 
   func repairServeWith(_ text: String) throws {

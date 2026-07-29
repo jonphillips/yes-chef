@@ -16,7 +16,6 @@ struct RecipePlaybookView: View {
   @State private var readerFeedbackDrafts: [RecipeNote.ID: String] = [:]
   @State private var editingSection: PlaybookSectionKind?
   @State private var clearingSection: PlaybookSectionKind?
-  @State private var repairingServeWith: ServeWithRepairPresentation?
 
   var body: some View {
     let visibleNotes = model.visibleNotes
@@ -85,8 +84,7 @@ struct RecipePlaybookView: View {
     .sheet(item: $editingSection) { section in
       switch section {
       case .serveWith:
-        switch model.serveWithItemsResult {
-        case let .success(items):
+        if case let .success(items) = model.serveWithItemsResult {
           RecipePlaybookSectionEditorSheet(
             section: section,
             initialText: ServeWithPlan(
@@ -96,12 +94,6 @@ struct RecipePlaybookView: View {
             commit: { text in
               try commit(text, for: section)
             }
-          )
-        case let .failure(error):
-          ContentUnavailableView(
-            "Serve With is unreadable",
-            systemImage: "exclamationmark.triangle",
-            description: Text(error.localizedDescription)
           )
         }
       case .makeAhead:
@@ -122,15 +114,17 @@ struct RecipePlaybookView: View {
         )
       }
     }
-    .sheet(item: $repairingServeWith) { presentation in
-      ServeWithRepairSheet(presentation: presentation, save: model.repairServeWith)
-    }
     .confirmationDialog("Clear section?", item: $clearingSection) { section in
       Button("Clear \(section.title)", role: .destructive) {
         clear(section)
       }
     } message: { section in
-      Text("This permanently clears the \(section.title) section. This cannot be undone.")
+      switch section {
+      case .serveWith where model.serveWithItemsResult.isFailure:
+        Text("This destroys the unreadable Serve With data. This cannot be undone. Repair can recover it instead.")
+      case .makeAhead, .chefItUp, .serveWith:
+        Text("This permanently clears the \(section.title) section. This cannot be undone.")
+      }
     }
   }
 
@@ -290,7 +284,7 @@ struct RecipePlaybookView: View {
         Label(error.localizedDescription, systemImage: "exclamationmark.triangle")
           .foregroundStyle(.red)
         Button("Repair Serve With") {
-          repairServeWithButtonTapped()
+          model.repairServeWithButtonTapped()
         }
       }
     }
@@ -336,7 +330,7 @@ struct RecipePlaybookView: View {
 
       if isServeWithUnreadable {
         Button("Repair") {
-          repairServeWithButtonTapped()
+          model.repairServeWithButtonTapped()
         }
       }
 
@@ -365,10 +359,6 @@ struct RecipePlaybookView: View {
     case .serveWith:
       try model.commitServeWithText(text)
     }
-  }
-
-  private func repairServeWithButtonTapped() {
-    repairingServeWith = model.serveWithRepairPresentation
   }
 
   private func clear(_ section: PlaybookSectionKind) {
