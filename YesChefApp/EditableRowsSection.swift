@@ -64,19 +64,21 @@ struct EditableRowsSection<Item: Identifiable, EmptyState: View, ItemContent: Vi
     @ViewBuilder emptyState: @escaping () -> EmptyState,
     @ViewBuilder itemContent: @escaping (Item) -> ItemContent
   ) where Badge == EmptyView {
-    self.title = title
-    self.titleFont = titleFont
-    self.editorLabel = editorLabel
-    self.items = items
-    self.itemText = itemText
-    self.addItem = addItem
-    self.addButtonLabel = addButtonLabel
-    self.updateItem = updateItem
-    self.deleteItem = deleteItem
-    self.reorderItems = reorderItems
-    self.emptyState = emptyState
-    self.itemContent = itemContent
-    self.badge = nil
+    self.init(
+      title: title,
+      titleFont: titleFont,
+      editorLabel: editorLabel,
+      items: items,
+      itemText: itemText,
+      addItem: addItem,
+      addButtonLabel: addButtonLabel,
+      updateItem: updateItem,
+      deleteItem: deleteItem,
+      reorderItems: reorderItems,
+      emptyState: emptyState,
+      itemContent: itemContent,
+      badge: { _ in EmptyView() }
+    )
   }
 
   var body: some View {
@@ -229,7 +231,7 @@ private struct EditableRow<Item: Identifiable, Content: View, Badge: View>: View
           }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Edit \(editorLabel): \(itemText)")
+        .accessibilityLabel("Edit \(editorLabel.lowercased()): \(itemText)")
       }
     }
     .padding(.vertical, 12)
@@ -241,5 +243,4 @@ private struct EditableRow<Item: Identifiable, Content: View, Badge: View>: View
       }
     }
   }
-
 }
