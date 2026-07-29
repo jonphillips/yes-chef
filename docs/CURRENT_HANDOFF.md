@@ -47,17 +47,15 @@ and D2 shipped 2026-07-28 (PR #254).
 2. **The section `name` column stores the COLON-FREE form.** The colon exists only in the flat-text
    projection the editor renders and re-parses. Storing it in `name` appends another on every round-trip
    (`Warm Vinaigrette::`). This is the implementation trap the amendment calls out by name.
-3. **Derivation-on-save is the rejected alternative, and the reason is silent data loss.** Re-deriving a
-   section from bare text means matching a group back to a row; the line reconcile is scoped by
+3. **Derivation-on-save is rejected, and the reason is silent data loss.** The line reconcile is scoped by
    `existingLinesBySection[draftSection.id]`, so a rename that reads as delete+insert drops `canonicalName`,
    `shoppingCategory`, `doNotShop` and merged parse confidence for the whole group. Manipulate identity where
    identity exists — in the editor, with UUIDs in hand.
-4. **The colon rule is ingredient-only.** Instruction step text routinely contains mid-prose colons;
-   instruction sections keep explicit card names until someone specifies the variant.
-5. **This does NOT hand ADR-0021 Amd1-D5 a free ride** (Amd1-D4). `derivingVariation` diffs structures matched
-   by section ID, so a live split mints a new section and hits `.ingredientSectionAdded` →
-   `variationNeedsReview`. That needs a **delta-vocabulary** decision and it is **ADR-0021's, not this
-   slice's** — do not extend the delta ops here.
+4. **The colon rule is ingredient-only.** Instruction text routinely contains mid-prose colons; instruction
+   sections keep explicit card names.
+5. **This does NOT hand ADR-0021 Amd1-D5 a free ride** (Amd1-D4). `derivingVariation` diffs structures by
+   section ID, so a live split hits `.ingredientSectionAdded` → `variationNeedsReview`. That needs a
+   **delta-vocabulary** decision and it is **ADR-0021's** — do not extend the delta ops here.
 
 **Verification.** The colon rule and the split/merge logic belong in **Core** (`RecipeEditorDraft`,
 `RecipeEditorSectionReconcile`) where the package suite runs with no simulator; the editor affordances touch
@@ -65,10 +63,12 @@ and D2 shipped 2026-07-28 (PR #254).
 explicitly**: a header typed with a colon must not accumulate colons in `name` across save→reload→save. No
 simulator installs; Jon device-passes the editor.
 
-⚠️ **`check-drift.sh` currently fails on clean `main`** at a linker error inside the *sqlite-data*
-dependency's dynamic test-bundle build ([[exported-import-not-link-time]]). It is **not** caused by your
-change and is under separate investigation — report it as pre-existing and rely on the package suite plus the
-generic app build. Do not attempt to fix it inside this dispatch.
+⚠️ **`check-drift.sh` fails on clean `main` at `Ld … SQLiteData.framework`, and the cause is fully known —
+do not investigate it, do not try to fix it, and do not treat it as your regression.** sqlite-data's manifest
+omits `StructuredQueriesCore` while its source uses those symbols; a test bundle turns every package product
+into a dynamic framework and the link fails ([[exported-import-not-link-time]]). **Our two layers of the same
+defect are fixed** (`1a56994`); the remaining one is upstream's and needs their release. Report it as
+pre-existing; the package suite and the elevated `generic/platform=iOS` build are your evidence.
 
 ## Standing guards
 
@@ -105,21 +105,16 @@ Drawn into **Next Up** as needed; not itself a dispatch target. Completed effort
 [`docs/DONE-LOG.md`](DONE-LOG.md).
 
 **[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md) — ATK's "Gather Your
-Ingredients" is a latent grocery bug (scoped 2026-07-28). P1 only; **no schema**.** 101 ingredient lines +
-70 section names across **171 recipes** are page chrome captured as content — the lines are **shoppable**
-(`isHeader = 0`, `doNotShop = 0`) and all canonicalize to the single key `gather your ingredient`, so any of
-those recipes on a menu puts "Gather your ingredient" on the grocery list. Latent only because 0
-`groceryItemSources` point at them yet.
-- **Delete, do not de-cap** — a tidier meaningless section is still meaningless. Lines: delete the row.
-  Sections: **clear the name, keep the section** (`ingredientLines.sectionID` is `ON DELETE CASCADE`, so
-  dropping it takes every ingredient with it).
-- **⚠️ This one really does need the post-engine pass** that ADR-0014 Amd1-D3 described and then dodged at 10
-  rows. Migrations run before `makeSyncEngine`, both tables already exist and are already cached, so a repair
-  in the migrator uploads nothing and each device diverges silently. **The 101 deletes are the unrepeatable
-  part** — a delete that never uploads leaves the row alive in CloudKit, and any later full-zone fetch
-  resurrects it. See [[migration-writes-bypass-sync-triggers]]. Take a backup first.
-- **P2 (Milk Street's 2,597 all-caps lines) is DECLINED** by Jon 2026-07-28 — do not build a casing pass on
-  momentum. P3 (214 all-caps section names) is parked behind both P2 and Amd1-D1.
+Ingredients" is a latent grocery bug (scoped 2026-07-28). P1 only; **no schema**.** 101 shoppable ingredient
+lines + 70 section names across **171 recipes** are page chrome captured as content, all canonicalizing to
+one key, so any of those recipes on a menu puts "Gather your ingredient" on the grocery list.
+- **Delete, do not de-cap.** Lines: delete the row. Sections: **clear the name, keep the section**
+  (`sectionID` is `ON DELETE CASCADE` — dropping it takes every ingredient with it).
+- **⚠️ Needs the post-engine pass** ADR-0014 Amd1-D3 described and dodged at 10 rows: a repair in the migrator
+  uploads nothing and each device diverges, and **the 101 deletes are unrepeatable** — a delete that never
+  uploads stays alive in CloudKit and any full-zone fetch resurrects it
+  ([[migration-writes-bypass-sync-triggers]]). Back up first.
+- **P2 (Milk Street's all-caps) is DECLINED**; P3 parked behind P2 and Amd1-D1. Don't build either on momentum.
 
 **[`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) — the prep plan
 knows things the model doesn't (scoped 2026-07-26).** Two slices, **no schema** — both use fields that

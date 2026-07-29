@@ -30,6 +30,14 @@ packages:
   GRDB:
     url: https://github.com/groue/GRDB.swift
     from: 7.6.0
+  # StructuredQueriesCore is the third instance of the same defect, missed when
+  # SQLiteData and GRDB were added above. The `@Table` macro expands to
+  # `QueryExpression` / `QueryBindable` conformances on `Foundation.Data`, `Date`
+  # and `UUID` that live in StructuredQueriesCore, and app sources reference them
+  # directly — `GroceryModels.o` and `HandoffEntities.o` fail to link without it.
+  StructuredQueries:
+    url: https://github.com/pointfreeco/swift-structured-queries
+    from: 0.31.0
   CasePaths:
     url: https://github.com/pointfreeco/swift-case-paths
     from: 1.0.0
@@ -58,6 +66,20 @@ targets:
         UIApplicationSupportsIndirectInputEvents: true
         UIBackgroundModes:
           - remote-notification
+        # ADR-0030's backup file type. This MUST live here, not hand-added to
+        # YesChefApp/Info.plist: that file is generated from this block, so a
+        # hand edit survives only until the next `xcodegen generate` — which the
+        # Verification Pattern requires after adding any Swift source. It was
+        # hand-added once and silently deleted on the next regenerate; without it
+        # `.yesChefSQLiteBackup` has no declared UTI and export/restore breaks.
+        UTExportedTypeDeclarations:
+          - UTTypeConformsTo:
+              - public.data
+            UTTypeDescription: Yes Chef Backup
+            UTTypeIdentifier: com.jonphillips.yeschef.database-backup
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - sqlite
         UILaunchScreen: {}
     dependencies:
       - package: YesChefPackage
@@ -74,6 +96,8 @@ targets:
         product: SQLiteData
       - package: GRDB
         product: GRDB
+      - package: StructuredQueries
+        product: StructuredQueriesCore
       - package: CasePaths
         product: CasePaths
       - package: SwiftNavigation
@@ -108,6 +132,8 @@ targets:
         product: SQLiteData
       - package: GRDB
         product: GRDB
+      - package: StructuredQueries
+        product: StructuredQueriesCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jonphillips.yeschef.share-extension
@@ -149,6 +175,8 @@ targets:
         product: SQLiteData
       - package: GRDB
         product: GRDB
+      - package: StructuredQueries
+        product: StructuredQueriesCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jonphillips.yeschef.tests

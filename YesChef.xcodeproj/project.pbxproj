@@ -37,7 +37,7 @@
 		3846277BD575C412195ACF75 /* FocusToolbarButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF86C88A023D5D19CDE64102 /* FocusToolbarButton.swift */; };
 		38632A8F2F9B0F5C90683882 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = A8C5256090D9AFFD84E0AD32 /* Dependencies */; };
 		386D42C820E47D4CC0306130 /* RecipeAdjustmentReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D667D9221C270FF5442B4CC8 /* RecipeAdjustmentReviewView.swift */; };
-		39910D0EBA5752CE0EF217D8 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 09D0A75A465598EE79E0441F /* ZIPFoundation */; };
+		39910D0EBA5752CE0EF217D8 /* SwiftUINavigation in Frameworks */ = {isa = PBXBuildFile; productRef = AD2559042536058C97728A19 /* SwiftUINavigation */; };
 		3AF6F47B328D293D8DDEB2C5 /* RecipeDetailModel+Enrichment.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE43F12069919277037EDE55 /* RecipeDetailModel+Enrichment.swift */; };
 		3B43FC000CAA77FE2FCBAD93 /* HandoffIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75337F357939E23B8A594784 /* HandoffIntents.swift */; };
 		3C511415F03094402001B7D2 /* RecipeScaleFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD810D780BF1E28B4D82992D /* RecipeScaleFormatting.swift */; };
@@ -70,6 +70,7 @@
 		69B8E2AD921E41D8B38D14C7 /* YesChefShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 396029D84F6F6E49A17C47D2 /* YesChefShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		6B55B2CE20BB6B0E56896F50 /* HandoffReviewCoordinator+PrepPlanEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7765C9B42DCEFA4EAC3ED301 /* HandoffReviewCoordinator+PrepPlanEvidence.swift */; };
 		6BB951B199059B6F99196B26 /* AISettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64ABAAA0A5F20303F4C50314 /* AISettingsView.swift */; };
+		6DA879B39E3EDAD274830CFD /* StructuredQueriesCore in Frameworks */ = {isa = PBXBuildFile; productRef = AC99988BCD47F72E8D1E43A6 /* StructuredQueriesCore */; };
 		6E4C21A5E580147F1C8A1B94 /* AppExternalDatabaseChangeReload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D2AA2B9A5B2A2F4EFDE5A0C /* AppExternalDatabaseChangeReload.swift */; };
 		6EA932A0C074C0342AFD01E4 /* HandoffComplementReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB8E39BFB7BEB3E6A0DA515 /* HandoffComplementReview.swift */; };
 		70367DA49A5A79CABD32C9C4 /* RecipePhotoViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71BB04447CDD6B75A1CD330A /* RecipePhotoViews.swift */; };
@@ -79,7 +80,8 @@
 		76A09E387271E9757E7AA9B8 /* MenuViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26A031F93AA06D9ADCD5C36D /* MenuViews.swift */; };
 		79EB117D8A2F3B3945E31C03 /* RecipeChatPanelSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F5CC1002FE379723FA1363E /* RecipeChatPanelSupport.swift */; };
 		7C57B8AB73C6BE68948F80F7 /* RecipePlaybookColumnLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 492BC4D75288EEB6446263F7 /* RecipePlaybookColumnLayout.swift */; };
-		81D2D9D82209A65C59F7D435 /* SwiftUINavigation in Frameworks */ = {isa = PBXBuildFile; productRef = AD2559042536058C97728A19 /* SwiftUINavigation */; };
+		81D2D9D82209A65C59F7D435 /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = F6DB8F903598A87E2AA0443F /* CasePaths */; };
+		82F654FFC164D689EBCA4D94 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 09D0A75A465598EE79E0441F /* ZIPFoundation */; };
 		866C7FBB7E3079ECED997DEB /* MealCalendarModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B49D2E9B66A731DB272F063C /* MealCalendarModels.swift */; };
 		86E285EF8664CE66215DBDF0 /* RecipeVariationEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5AE2D975575189A0B728A1 /* RecipeVariationEditor.swift */; };
 		8E95908F8BEB4303046C257B /* WorkbenchCompletedSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 103972B7C1A0B400B648CB18 /* WorkbenchCompletedSearch.swift */; };
@@ -122,7 +124,7 @@
 		D8FB35A8C0D8195A104EE90D /* RecipeImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE2CEAA7C5D5836E123F474 /* RecipeImageLoader.swift */; };
 		E04A28BE098B255C0B136810 /* AIHandoffMenuPasteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 792C0EBCFF5BA678E266946D /* AIHandoffMenuPasteTests.swift */; };
 		E3281DDA81614C3985E3BB8E /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = 94BD562408492AC6E81B0035 /* Dependencies */; };
-		E8641F57EEFE217A67AD299E /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = F6DB8F903598A87E2AA0443F /* CasePaths */; };
+		E8641F57EEFE217A67AD299E /* StructuredQueriesCore in Frameworks */ = {isa = PBXBuildFile; productRef = C7BEE9F7CA89D087F20759A9 /* StructuredQueriesCore */; };
 		E9B700F7600DB2A95017E9B8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = BCD1FADF980D78977F069A1D /* AppIcon.icon */; };
 		EB63D8755383729654D000AC /* SeedCoverageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 556B8CD9C6727F96C1BD4684 /* SeedCoverageView.swift */; };
 		ECE0E06AEF0B9DCD549F077E /* LLMClientKit in Frameworks */ = {isa = PBXBuildFile; productRef = 2CA1F8E404895981FD32307C /* LLMClientKit */; };
@@ -131,6 +133,7 @@
 		F3F3ED67EB4980A43151000F /* MealCalendarViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76A768628F1345FDF66EDC49 /* MealCalendarViews.swift */; };
 		F476873699D33AE440049145 /* FormFields.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ECE090CEFE3F26041ED2617 /* FormFields.swift */; };
 		FA75D00279F60B62460CF10D /* RecipeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E450B24DC7459A2108DDFF /* RecipeModels.swift */; };
+		FD623AE7BBC0ADCF5DB42F53 /* StructuredQueriesCore in Frameworks */ = {isa = PBXBuildFile; productRef = 0C4317F96B028EC9DF03F6AC /* StructuredQueriesCore */; };
 		FD6F7881ECEA6DC437F9F32C /* PaprikaImportWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56F66618C21D85EE42AB4DEB /* PaprikaImportWorkspace.swift */; };
 /* End PBXBuildFile section */
 
@@ -294,6 +297,7 @@
 				D20B0260FC41D720A3A8DFAF /* Dependencies in Frameworks */,
 				64A2147BA244A92AD003A696 /* SQLiteData in Frameworks */,
 				6506971951AC784BCA68EFD5 /* GRDB in Frameworks */,
+				6DA879B39E3EDAD274830CFD /* StructuredQueriesCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -305,6 +309,7 @@
 				38632A8F2F9B0F5C90683882 /* Dependencies in Frameworks */,
 				BF6E63936FB6FA4E4CFDD8CA /* SQLiteData in Frameworks */,
 				410DE555132BA6ED513C55C6 /* GRDB in Frameworks */,
+				FD623AE7BBC0ADCF5DB42F53 /* StructuredQueriesCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -319,9 +324,10 @@
 				E3281DDA81614C3985E3BB8E /* Dependencies in Frameworks */,
 				5802E0EACFD7C085AB84EB77 /* SQLiteData in Frameworks */,
 				ADDF8E556B8570CC0D68D5A0 /* GRDB in Frameworks */,
-				E8641F57EEFE217A67AD299E /* CasePaths in Frameworks */,
-				81D2D9D82209A65C59F7D435 /* SwiftUINavigation in Frameworks */,
-				39910D0EBA5752CE0EF217D8 /* ZIPFoundation in Frameworks */,
+				E8641F57EEFE217A67AD299E /* StructuredQueriesCore in Frameworks */,
+				81D2D9D82209A65C59F7D435 /* CasePaths in Frameworks */,
+				39910D0EBA5752CE0EF217D8 /* SwiftUINavigation in Frameworks */,
+				82F654FFC164D689EBCA4D94 /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -520,6 +526,7 @@
 				E526F7B4800D1EBE4D8A2A3E /* Dependencies */,
 				86859006FF66FAFF04016AA2 /* SQLiteData */,
 				3576C349C92C3F1CA77B4BC5 /* GRDB */,
+				AC99988BCD47F72E8D1E43A6 /* StructuredQueriesCore */,
 			);
 			productName = YesChefTests;
 			productReference = 59E522447CE52337EC8C4546 /* YesChefTests.xctest */;
@@ -543,6 +550,7 @@
 				A8C5256090D9AFFD84E0AD32 /* Dependencies */,
 				E94FE1F285F6B338A789EE95 /* SQLiteData */,
 				23B55C4E25C2510FF2AB49D3 /* GRDB */,
+				0C4317F96B028EC9DF03F6AC /* StructuredQueriesCore */,
 			);
 			productName = YesChefShareExtension;
 			productReference = 396029D84F6F6E49A17C47D2 /* YesChefShareExtension.appex */;
@@ -571,6 +579,7 @@
 				94BD562408492AC6E81B0035 /* Dependencies */,
 				87DE389964638E7777ABB383 /* SQLiteData */,
 				517D768EFBEA670F5B8416DE /* GRDB */,
+				C7BEE9F7CA89D087F20759A9 /* StructuredQueriesCore */,
 				F6DB8F903598A87E2AA0443F /* CasePaths */,
 				AD2559042536058C97728A19 /* SwiftUINavigation */,
 				09D0A75A465598EE79E0441F /* ZIPFoundation */,
@@ -613,6 +622,7 @@
 				A927C2C338F67E8F2C611140 /* XCRemoteSwiftPackageReference "swift-dependencies" */,
 				A9A58BB4AFC674A75EA282BA /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				0FE2DAE45E5731FFCF8C21D2 /* XCRemoteSwiftPackageReference "sqlite-data" */,
+				0346D55682473A3511D799C7 /* XCRemoteSwiftPackageReference "swift-structured-queries" */,
 				8C626E2F21AE016D9E0C1DB5 /* XCRemoteSwiftPackageReference "swift-navigation" */,
 				8905B07D7FD63BCF3E395911 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 				31B99064C169F69BEBFDCDFC /* XCLocalSwiftPackageReference "../../jon-platform/packages/CloudSyncKit" */,
@@ -1102,6 +1112,14 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		0346D55682473A3511D799C7 /* XCRemoteSwiftPackageReference "swift-structured-queries" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-structured-queries";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.31.0;
+			};
+		};
 		0FE2DAE45E5731FFCF8C21D2 /* XCRemoteSwiftPackageReference "sqlite-data" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/pointfreeco/sqlite-data";
@@ -1157,6 +1175,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 8905B07D7FD63BCF3E395911 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
 			productName = ZIPFoundation;
+		};
+		0C4317F96B028EC9DF03F6AC /* StructuredQueriesCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0346D55682473A3511D799C7 /* XCRemoteSwiftPackageReference "swift-structured-queries" */;
+			productName = StructuredQueriesCore;
 		};
 		13643DFF3682EB50C6B096D2 /* YesChefCore */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1217,10 +1240,20 @@
 			package = A927C2C338F67E8F2C611140 /* XCRemoteSwiftPackageReference "swift-dependencies" */;
 			productName = Dependencies;
 		};
+		AC99988BCD47F72E8D1E43A6 /* StructuredQueriesCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0346D55682473A3511D799C7 /* XCRemoteSwiftPackageReference "swift-structured-queries" */;
+			productName = StructuredQueriesCore;
+		};
 		AD2559042536058C97728A19 /* SwiftUINavigation */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 8C626E2F21AE016D9E0C1DB5 /* XCRemoteSwiftPackageReference "swift-navigation" */;
 			productName = SwiftUINavigation;
+		};
+		C7BEE9F7CA89D087F20759A9 /* StructuredQueriesCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0346D55682473A3511D799C7 /* XCRemoteSwiftPackageReference "swift-structured-queries" */;
+			productName = StructuredQueriesCore;
 		};
 		E526F7B4800D1EBE4D8A2A3E /* Dependencies */ = {
 			isa = XCSwiftPackageProductDependency;
