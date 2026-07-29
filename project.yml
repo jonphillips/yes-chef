@@ -26,7 +26,7 @@ packages:
   # jon-platform/packages/CloudSyncKit/Package.swift.
   SQLiteData:
     url: https://github.com/pointfreeco/sqlite-data
-    from: 1.0.0
+    from: 1.8.0
   GRDB:
     url: https://github.com/groue/GRDB.swift
     from: 7.6.0
@@ -38,6 +38,15 @@ packages:
   StructuredQueries:
     url: https://github.com/pointfreeco/swift-structured-queries
     from: 0.31.0
+  # CustomDump is the same class of defect one layer out: YesChefAppTests calls
+  # `expectNoDifference`, which the type checker sees because SQLiteData and
+  # StructuredQueriesCore re-export CustomDump, and which the linker cannot find
+  # because neither product LINKS it into a consumer. YesChefPackage's own test
+  # target has carried this dependency all along; the app test bundle needed it
+  # too the moment a test there reached for the API.
+  CustomDump:
+    url: https://github.com/pointfreeco/swift-custom-dump
+    from: 1.0.0
   CasePaths:
     url: https://github.com/pointfreeco/swift-case-paths
     from: 1.0.0
@@ -177,6 +186,8 @@ targets:
         product: GRDB
       - package: StructuredQueries
         product: StructuredQueriesCore
+      - package: CustomDump
+        product: CustomDump
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jonphillips.yeschef.tests

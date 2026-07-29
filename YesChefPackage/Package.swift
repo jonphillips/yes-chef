@@ -12,7 +12,7 @@ let package = Package(
     .library(name: "YesChefCore", targets: ["YesChefCore"]),
   ],
   dependencies: [
-    .package(url: "https://github.com/pointfreeco/sqlite-data", from: "1.0.0"),
+    .package(url: "https://github.com/pointfreeco/sqlite-data", from: "1.8.0"),
     .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.0.0"),
     .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
     .package(url: "https://github.com/scinfu/SwiftSoup", from: "2.7.0"),
