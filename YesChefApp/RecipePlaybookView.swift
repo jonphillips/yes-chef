@@ -97,11 +97,15 @@ struct RecipePlaybookView: View {
             }
           )
         case let .failure(error):
-          ContentUnavailableView(
-            "Serve With is unreadable",
-            systemImage: "exclamationmark.triangle",
-            description: Text(error.localizedDescription)
-          )
+          ContentUnavailableView {
+            Label("Serve With is unreadable", systemImage: "exclamationmark.triangle")
+          } description: {
+            Text(error.localizedDescription)
+          } actions: {
+            Button("Repair Serve With") {
+              model.repairServeWithButtonTapped()
+            }
+          }
         }
       case .makeAhead:
         RecipePlaybookSectionEditorSheet(
@@ -126,7 +130,12 @@ struct RecipePlaybookView: View {
         clear(section)
       }
     } message: { section in
-      Text("This permanently clears the \(section.title) section. This cannot be undone.")
+      switch section {
+      case .serveWith where model.serveWithItemsResult.isFailure:
+        Text("This destroys the unreadable Serve With data. This cannot be undone. Repair can recover it instead.")
+      case .makeAhead, .chefItUp, .serveWith:
+        Text("This permanently clears the \(section.title) section. This cannot be undone.")
+      }
     }
   }
 
@@ -282,8 +291,13 @@ struct RecipePlaybookView: View {
         }
       }
     case let .failure(error):
-      Label(error.localizedDescription, systemImage: "exclamationmark.triangle")
-        .foregroundStyle(.red)
+      VStack(alignment: .leading, spacing: 8) {
+        Label(error.localizedDescription, systemImage: "exclamationmark.triangle")
+          .foregroundStyle(.red)
+        Button("Repair Serve With") {
+          model.repairServeWithButtonTapped()
+        }
+      }
     }
   }
 
@@ -324,6 +338,12 @@ struct RecipePlaybookView: View {
         editingSection = section
       }
       .disabled(isServeWithUnreadable)
+
+      if isServeWithUnreadable {
+        Button("Repair") {
+          model.repairServeWithButtonTapped()
+        }
+      }
 
       // No per-section "Ask" here — the playbook opens an unseeded panel, and its Discuss ▾ switcher
       // is the one home for section-scoped discussion (ADR-0045 Amd 3).

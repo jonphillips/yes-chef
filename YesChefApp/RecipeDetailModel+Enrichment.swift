@@ -3,6 +3,37 @@ import Foundation
 import YesChefCore
 
 extension RecipeDetailModel {
+  func presentServeWithRepair(for error: ServeWithCodingError) -> Bool {
+    guard error.recipeID == recipeID,
+      let recipe,
+      let presentation = ServeWithRepairPresentation(error: error, recipe: recipe)
+    else { return false }
+
+    destination = .repairServeWith(presentation)
+    return true
+  }
+
+  func repairServeWithButtonTapped() {
+    if case let .failure(error) = serveWithItemsResult,
+      presentServeWithRepair(for: error) {
+      return
+    }
+    errorMessage = "Serve With repair could not be opened."
+    isShowingError = true
+  }
+
+  func showError(_ error: Error) {
+    errorMessage = error.localizedDescription
+    isShowingError = true
+  }
+
+  func repairServeWith(_ text: String) throws {
+    let data = Data(text.utf8)
+    try database.write { db in
+      try RecipeRepository.repairServeWith(data, recipeID: recipeID, in: db, now: now)
+    }
+  }
+
   func applyActionCatalog(for chatModel: RecipeChatModel) -> [AnyChatApplyAction] {
     @Dependency(\.makeAheadPlanClient) var makeAheadPlanClient
     @Dependency(\.chefItUpPlanClient) var chefItUpPlanClient

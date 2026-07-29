@@ -781,6 +781,7 @@ final class RecipeDetailModel {
     case scaling
     case chat(RecipeChatModel)
     case workbench(WorkbenchPresentation)
+    case repairServeWith(ServeWithRepairPresentation)
     case adjustmentReview(RecipeAdjustmentReviewState)
     case variationEditor(RecipeVariation.ID)
   }
@@ -889,7 +890,7 @@ final class RecipeDetailModel {
 
   var serveWithItemsResult: Result<[ServeWithItem], ServeWithCodingError> {
     do {
-      return .success(try ServeWithCoding.decode(recipe?.serveWith))
+      return .success(try ServeWithCoding.decode(recipe?.serveWith, recipeID: recipeID))
     } catch {
       return .failure(error)
     }
@@ -942,8 +943,8 @@ final class RecipeDetailModel {
     do {
       destination = .chat(RecipeChatModel(context: .recipe(try RecipeChatRecipeContext(detail: detail))))
     } catch {
-      errorMessage = error.localizedDescription
-      isShowingError = true
+      if let error = error as? ServeWithCodingError, presentServeWithRepair(for: error) { return }
+      showError(error)
     }
   }
 
@@ -957,8 +958,8 @@ final class RecipeDetailModel {
     do {
       seed = try RecipeHandoffContext(detail: detail).discussAsk(for: section)
     } catch {
-      errorMessage = error.localizedDescription
-      isShowingError = true
+      if let error = error as? ServeWithCodingError, presentServeWithRepair(for: error) { return }
+      showError(error)
       return
     }
 
@@ -973,8 +974,8 @@ final class RecipeDetailModel {
       do {
         chatModel = RecipeChatModel(context: .recipe(try RecipeChatRecipeContext(detail: detail)))
       } catch {
-        errorMessage = error.localizedDescription
-        isShowingError = true
+        if let error = error as? ServeWithCodingError, presentServeWithRepair(for: error) { return }
+        showError(error)
         return
       }
       destination = .chat(chatModel)

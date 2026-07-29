@@ -9,19 +9,28 @@ public enum ServeWithCoding {
     return try JSONEncoder().encode(items)
   }
 
-  public static func decode(_ data: Data?) throws(ServeWithCodingError) -> [ServeWithItem] {
+  public static func decode(
+    _ data: Data?,
+    recipeID: Recipe.ID
+  ) throws(ServeWithCodingError) -> [ServeWithItem] {
     guard let data else { return [] }
     do {
       return try JSONDecoder().decode([ServeWithItem].self, from: data)
     } catch {
-      throw ServeWithCodingError.malformedData
+      throw ServeWithCodingError.malformedData(recipeID: recipeID)
     }
   }
 
 }
 
 public enum ServeWithCodingError: Error, Equatable, CustomStringConvertible, LocalizedError, Sendable {
-  case malformedData
+  case malformedData(recipeID: Recipe.ID)
+
+  public var recipeID: Recipe.ID {
+    switch self {
+    case let .malformedData(recipeID): recipeID
+    }
+  }
 
   public var errorDescription: String? {
     "Couldn't read Serve With. Its stored data was left unchanged."
@@ -356,7 +365,7 @@ extension RecipeRepository {
     uuid: () -> UUID
   ) throws {
     let recipe = try Recipe.find(recipeID).fetchOne(db)
-    var items = try ServeWithCoding.decode(recipe?.serveWith)
+    var items = try ServeWithCoding.decode(recipe?.serveWith, recipeID: recipeID)
     items.append(
       contentsOf: plan.items.map { item in
         ServeWithItem(id: uuid(), title: item.title, note: item.note)
@@ -373,7 +382,7 @@ extension RecipeRepository {
     uuid: () -> UUID
   ) throws {
     let recipe = try Recipe.find(recipeID).fetchOne(db)
-    let existingItems = try ServeWithCoding.decode(recipe?.serveWith)
+    let existingItems = try ServeWithCoding.decode(recipe?.serveWith, recipeID: recipeID)
     let items = reconciledServeWithItems(existingItems, with: plan.items, uuid: uuid)
     try updateServeWith(items, recipeID: recipeID, in: db, now: now)
   }
@@ -385,12 +394,24 @@ extension RecipeRepository {
     now: Date
   ) throws {
     let recipe = try Recipe.find(recipeID).fetchOne(db)
-    let items = try ServeWithCoding.decode(recipe?.serveWith).filter { $0.id != itemID }
+    let items = try ServeWithCoding.decode(recipe?.serveWith, recipeID: recipeID).filter { $0.id != itemID }
     try updateServeWith(items, recipeID: recipeID, in: db, now: now)
   }
 
   public static func clearServeWith(recipeID: Recipe.ID, in db: Database, now: Date) throws {
     try updateServeWith([], recipeID: recipeID, in: db, now: now)
+  }
+
+  /// Replaces an unreadable Serve With blob only after the cook's edited bytes decode as a complete list.
+  /// The data is stored exactly as supplied: this recovery path must not silently normalize or discard it.
+  public static func repairServeWith(
+    _ data: Data,
+    recipeID: Recipe.ID,
+    in db: Database,
+    now: Date
+  ) throws {
+    _ = try ServeWithCoding.decode(data, recipeID: recipeID)
+    try updateServeWithData(data, recipeID: recipeID, in: db, now: now)
   }
 
   private static func reconciledServeWithItems(
@@ -417,6 +438,15 @@ extension RecipeRepository {
     now: Date
   ) throws {
     let data = try ServeWithCoding.encode(items)
+    try updateServeWithData(data, recipeID: recipeID, in: db, now: now)
+  }
+
+  private static func updateServeWithData(
+    _ data: Data?,
+    recipeID: Recipe.ID,
+    in db: Database,
+    now: Date
+  ) throws {
     try Recipe.find(recipeID).update {
       $0.serveWith = data
       $0.dateModified = now

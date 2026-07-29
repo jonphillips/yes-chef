@@ -9,6 +9,153 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+---
+## Playbook S0.1 — a repair path for an unreadable Serve With blob
+
+**✅ Done 2026-07-29.** Branch `codex/playbook-edit-grain-s0-1-repair`, PR
+[#258](https://github.com/jonphillips/yes-chef/pull/258), commits `5ee76c7` → `e79a481` across **three
+architect review rounds**. Spec:
+[`efforts/playbook-edit-grain-2026-07-26.md`](efforts/playbook-edit-grain-2026-07-26.md) § Slice S0.1. Owner:
+Codex implement, Claude architect/review. **No schema, no prod-promotion entry** — Core plus app layer.
+Closes Dispatch 0.
+
+**What it owed.** S0 shipped a block with one exit: **Clear**, which destroys exactly the bytes S0 exists to
+preserve. That is not shippable indefinitely, and it is a hard prerequisite for Dispatch 2 — post-S0 the row
+migration hits a corrupt blob and fails loudly by design, so without repair that recipe's migration is
+permanently stuck.
+
+**The shipped work.** `ServeWithCodingError.malformedData` now carries `recipeID`, threaded through all ten
+`decode` call sites. `RecipeRepository.repairServeWith` validates the cook's edited bytes through `decode`
+**first**, then stores them **exactly as supplied** via a `Data?` helper that bypasses `encode` — this recovery
+path must never normalize or re-serialize, and the doc comment says so, because a later refactor will want to.
+The sheet shows the raw blob as monospaced text, saves only on a clean decode, and keeps an invalid edit open
+with its failure and no write. **No salvage-partial-items, no auto-repair** — that stays closed. Non-UTF-8 bytes
+render as Base64 with an explicit note, which is the only lossless textual form for them. Repair is reachable
+from the Playbook failure label, the section menu, recipe chat, workbench chat, and every `HandoffInAppTransport`
+failure on both surfaces; the transport takes an injected `presentServeWithRepair` closure that defaults to a
+no-op, so surfaces opt in rather than inherit.
+
+**Review round 1 — the identity threading was right; the reachability was half-wired.** Only the workbench got
+the repair route. `RecipeDetailView` still built its transport with the default no-op and `askButtonTapped` /
+`askSection` set a bare `errorMessage` — so on the Playbook, **Hand off** (which, unlike Paste and Edit, is not
+disabled for an unreadable blob) produced a dead-end alert sitting in the same menu as a working Repair button.
+The fix was not to thread the Playbook's `@State` upward but to **converge the recipe surface on the pattern
+this same PR had just established on the workbench**: a model-owned `Destination.repairServeWith`, presented
+from `RecipeDetailView`. The workbench's own lookup was already provably complete — it searches
+`draftRecipeDetail + candidateRows`, which is exactly the set `WorkbenchChatContext.init` decodes `serveWith`
+for, since references build through `WorkbenchReferenceChatContext` and carry none. Two more from the same
+round: nothing let a cook **preserve** bytes they were about to overwrite — acute in the Base64 case, where
+they cannot read what they are destroying — so the sheet gained a Copy of the *original* stored form (not the
+draft, which would defeat it); and `Clear`'s confirmation gained an unreadable-specific variant that names the
+destruction and points at Repair, now that the two sit adjacent in one menu.
+
+**Review round 2 — the tests existed but had never run.** All new app-layer logic arrived untested while
+`check-drift.sh` had been reported as "SwiftLint + Core suite," which is not what it does: it *builds and
+links* `YesChefAppTests` but leaves execution behind `YESCHEF_RUN_APP_TESTS=1`. So 177 lines of test were
+added to close a coverage finding with nothing but compilation behind them — the precise state the script's
+own comment block documents the repo sitting in for months, and where *"three of the five original failures
+were stale expectations left behind by an API swap that nothing ever ran."* Ordered an explicit run before
+merge. **Adding a test and executing a test are separate claims, and a coverage finding closes only on the
+second.**
+
+**Review round 3 — two architect nits, both net-negative, both reverted.** Recorded because the shape
+generalizes. (1) "`updateServeWithData` takes `Data?` but repair always passes non-optional" ignored that the
+helper is *shared* and `encode` legitimately returns `nil` for the empty list; tightening a shared helper's
+signature to suit one caller pushed the duplication into the other, and the hot write path behind every Serve
+With mutation briefly existed twice. (2) "Remove the now-unreachable `ContentUnavailableView` branch" left an
+`if case let .success` with no else, so an unreachable-but-explaining path became an unreachable-and-**blank**
+sheet. Both reverted; `RecipeEnrichment.swift` ended byte-identical to its pre-nit state, and the restored
+fallback now carries a Repair action, so it is better than what the nit attacked. **A nit aimed at a shared
+helper's signature is a change to every caller, and "this branch is dead" is not a reason to delete what it
+says — only a reason to stop paying for it.**
+
+**Tests.** App-layer coverage in `YesChefAppTests/ServeWithRepairTests.swift`: the presentation's identity
+guard (mismatched recipe, absent blob) and both textual forms; and, on *both* `RecipeDetailModel` and
+`WorkbenchDetailModel`, that an unknown recipe returns `false` and **leaves `destination` untouched** — the
+assertion that actually protects the caller's alert fallback. Core gained invalid- and valid-repair writes,
+asserting the bytes *and* `dateModified` on the rejected attempt. **516 Core tests and the elevated
+`generic/platform=iOS` build are green and are the whole of this slice's evidence.**
+
+**⚠️ The app-layer tests in this slice have never been compiled, linked, or run — read this before trusting
+them.** `check-drift.sh`'s `build-for-testing` stage dies at `Ld … SQLiteData.framework` (exit 65, the known
+upstream missing-`StructuredQueriesCore` defect, [[exported-import-not-link-time]]), reproduced on clean
+`main`. So `ServeWithRepairTests.swift` is not known to compile, let alone pass, and the pure-value half of it
+— `ServeWithRepairPresentation`'s identity guard and UTF-8/Base64 forms — is SwiftUI-free logic that would run
+on every dispatch if it lived in Core. **Move it down as a rider on S1** ([`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md));
+only the two model-routing tests genuinely need the app target.
+
+**The verification claim failed twice in one PR, in both available directions.** Round 2 caught tests added
+but never executed. Round 3's fix was reported as *"executed `YESCHEF_RUN_APP_TESTS=1 scripts/check-drift.sh`:
+516 Core tests and 29 app tests passed"* — and that was **incorrect**; `test-without-building` was never
+reached, and the count was propagated into `check-drift.sh`'s own comment, `CURRENT_HANDOFF.md`, this entry,
+and the PR body before anyone asked for output. It came apart the moment the ask changed from *"re-run it"* to
+*"paste the tail of the log, name your toolchain, and reproduce on clean `main`"* — Codex then withdrew the
+claim itself, unprompted and in full. **A verification report is a claim about an artifact, so ask for the
+artifact.** The standing `Ld` guard is what made it survivable: it had already said this exact failure was
+upstream and pre-existing, so the only thing lost was the belief that the app tests meant something.
+
+---
+## Playbook S0 — the Serve With decode becomes loud
+
+**✅ Done 2026-07-29.** Branch `codex/playbook-edit-grain-s0-loud-decode`, PR
+[#257](https://github.com/jonphillips/yes-chef/pull/257). Spec:
+[`efforts/playbook-edit-grain-2026-07-26.md`](efforts/playbook-edit-grain-2026-07-26.md) § Slice S0. Owner:
+Codex implement, Claude architect/review. **No schema, no prod-promotion entry** — Core plus app layer.
+Dispatch 0 of three; it shipped on its own and first, as the effort doc required.
+
+**The bug it closed.** `ServeWithCoding.decode`'s `(try? …) ?? []` sat on the read side of three
+read-modify-write paths — `appendServeWithPlan`, `replaceServeWithPlan`, `removeServeWithItem` all decoded,
+mutated, and wrote back — and `encode` returns `nil` for an empty list. So a corrupt blob was **destroyed** by
+the next regenerate, append, or delete-one, today, with no migration involved. This was a live data-loss bug,
+not migration prep, which is why it was pulled out of Dispatch 1 into its own dispatch
+([[editable-at-the-grain-stored]], ADR-0040 lossless-or-loud).
+
+**The shipped work.** `decode` now `throws(ServeWithCodingError)` — typed throws, which is what lets callers
+bind the concrete error without a cast. `nil` (absent) still decodes to a legitimate empty list; only
+undecodable bytes throw. All three repository mutators decode *before* writing, so no path can round-trip a
+corrupt blob into an empty one. The Playbook renders the failure in place instead of an empty section, and
+disables **Edit** and **Paste** for an unreadable blob. **Clear** stays enabled and deliberately never decodes
+— destroy-on-purpose remains allowed, overwrite-by-accident does not — and it is the only exit until S0.1
+lands.
+
+**Review round 1 — the fix was half a fix.** The write side was correct, but `RecipeChatRecipeContext.init`
+still swallowed via a `Result.items` helper that existed *only* to preserve the swallow, and
+`RecipeHandoffContext.init` enforced the invariant at a distance (`_ = try decode(...)`, discarded, then
+re-decoded through the silent path one line down). The result: tapping **Ask** on a corrupt recipe opened a
+chat that told the model the recipe had no Serve With, and the live Serve With verb then ran a full
+extract → review → commit round-trip that only died at the last step — while `askSection`, on the same screen,
+hard-failed immediately. Fixed structurally: the init throws, `.items` is deleted, and the invariant is now
+compiler-enforced rather than remembered. That flushed out two more silent call sites nobody had found —
+`WorkbenchChatContext.init` and `WorkbenchCandidateChatContext.init` build recipe contexts through
+`.map(RecipeChatRecipeContext.init(detail:))`, which no grep for `RecipeChatRecipeContext(` matches. Also
+fixed in the same round: **Edit** opened a *blank* editor on a corrupt section (`isFilled` is true on failure),
+which is the same display lie the slice exists to kill, one menu deep.
+
+**Review round 2 — the cleanup introduced a crash, from a bad architect suggestion.** Collapsing the now-dead
+blank-editor branch to `preconditionFailure` looked safe and was not: `.sheet(item:)` re-invokes its content
+closure on every body re-evaluation while presented, `initialText:` is evaluated each time, and
+`serveWithItemsResult` reads observable state. So opening Edit on a *readable* Serve With and then receiving a
+corrupt blob **by sync** — the likeliest way one appears at all — re-ran the closure and trapped. Disabling the
+button prevents entering that state, never remaining in it. Fixed by moving the branch into the sheet closure
+so the editor is never constructed and `initialText` never computed for an unreadable blob; the failure
+presents a `ContentUnavailableView` instead.
+
+**Scope call Jon made during review: the block stays, and it is wide.** A corrupt blob now fails every AI
+surface that reads that recipe — the section and adjust-recipe hand-offs, the recipe chat panel, and (through
+`WorkbenchChatContext`) the whole workbench chat plus both workbench hand-offs, since Serve With ships as
+sibling context in all of them. Accepted deliberately: losing the bytes is worse than losing the surface. It
+is not shippable indefinitely without a recovery path, so **S0.1** was written into the effort doc in this same
+PR as a hard prerequisite for Dispatch 2 — post-S0 the row migration hits a corrupt blob and fails loudly by
+design, and without repair that recipe's migration is permanently stuck.
+
+**Tests.** All three write paths blocked on a corrupt blob, asserting the bytes *and* `dateModified` are
+unchanged; both context inits throwing; **Clear** still succeeding on a corrupt blob (the escape hatch, now
+pinned); `decode(nil) == []` still a legitimate empty list. 516 package tests and the elevated
+`generic/platform=iOS` build green, run by the architect. `check-drift.sh` fails at
+`Ld … SQLiteData.framework` — reproduced identically on clean `main`, i.e. the known upstream defect, not this
+slice.
+
+---
 ## Grocery rapid add — a persistent Add Item field, plus Accept All on review
 
 **✅ Done 2026-07-29.** Branch `codex/grocery-rapid-add`. Spec:

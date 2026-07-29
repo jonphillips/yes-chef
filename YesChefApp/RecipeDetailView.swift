@@ -32,16 +32,21 @@ struct RecipeDetailView: View {
     focusButtonTapped: (() -> Void)? = nil,
     onRecipeSelected: @escaping (RecipeDetailPresentation) -> Void = { _ in }
   ) {
+    let model = RecipeDetailModel(
+      recipeID: recipeID,
+      scaleContext: scaleContext,
+      workbenchID: workbenchID
+    )
     _model = State(
-      wrappedValue: RecipeDetailModel(
-        recipeID: recipeID,
-        scaleContext: scaleContext,
-        workbenchID: workbenchID
-      )
+      wrappedValue: model
     )
     let toastCenter = AppToastCenter()
     _toastCenter = State(wrappedValue: toastCenter)
-    _handoffTransport = State(wrappedValue: HandoffInAppTransport(toastCenter: toastCenter))
+    _handoffTransport = State(
+      wrappedValue: HandoffInAppTransport(toastCenter: toastCenter) { [weak model] error in
+        model?.presentServeWithRepair(for: error) ?? false
+      }
+    )
     self.libraryModel = libraryModel
     self.mealCalendarModel = mealCalendarModel
     self.groceryModel = groceryModel
@@ -73,6 +78,9 @@ struct RecipeDetailView: View {
           onRecipeSelected: onRecipeSelected
         )
       }
+    }
+    .sheet(item: $model.destination.repairServeWith) { presentation in
+      ServeWithRepairSheet(presentation: presentation, save: model.repairServeWith)
     }
     .adjustmentReviewPresentation(
       item: $model.destination.adjustmentReview,
