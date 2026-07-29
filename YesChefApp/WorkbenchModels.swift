@@ -132,7 +132,6 @@ final class WorkbenchDetailModel {
     case moveCandidatesToReference
     case candidatePhotoPicker
     case chat(RecipeChatModel)
-    case repairServeWith(ServeWithRepairPresentation)
     case logEntryEditor(WorkbenchLogEntryEditorState)
     case referenceEditor(WorkbenchReferenceEditorState)
   }
@@ -255,32 +254,9 @@ final class WorkbenchDetailModel {
       chatContext = context
       return context
     } catch {
-      if let error = error as? ServeWithCodingError, presentServeWithRepair(for: error) {
-        return nil
-      }
       errorMessage = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
       isShowingError = true
       return nil
-    }
-  }
-
-  func presentServeWithRepair(for error: ServeWithCodingError) -> Bool {
-    guard let detail else { return false }
-    let recipeDetails = [detail.draftRecipeDetail] + detail.candidateRows.map(\.recipeDetail)
-    guard let recipe = recipeDetails
-      .compactMap({ $0?.recipe })
-      .first(where: { $0.id == error.recipeID }),
-      let presentation = ServeWithRepairPresentation(error: error, recipe: recipe)
-    else { return false }
-
-    destination = .repairServeWith(presentation)
-    return true
-  }
-
-  func repairServeWith(_ text: String, recipeID: Recipe.ID) throws {
-    let data = Data(text.utf8)
-    try database.write { db in
-      try RecipeRepository.repairServeWith(data, recipeID: recipeID, in: db, now: now)
     }
   }
 

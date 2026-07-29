@@ -41,3 +41,27 @@ public enum ServeWithProvenance: String, Codable, QueryBindable, QueryDecodable,
   case model
   case handAuthored
 }
+
+public enum RecipeServeWithBlob {
+  public static func decompose(
+    recipeID: Recipe.ID,
+    blob: Data?,
+    now: Date,
+    provenance: ServeWithProvenance
+  ) throws(ServeWithCodingError) -> [RecipeServeWith] {
+    try ServeWithCoding.decode(blob, recipeID: recipeID)
+      .enumerated()
+      .map { index, item in
+        RecipeServeWith(
+          id: item.id,
+          recipeID: recipeID,
+          title: item.title,
+          note: item.note,
+          sortOrder: LearningOrdering.rankStride * index,
+          provenance: provenance,
+          dateCreated: now,
+          dateModified: now
+        )
+      }
+  }
+}

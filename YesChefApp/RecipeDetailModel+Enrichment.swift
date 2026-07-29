@@ -3,6 +3,24 @@ import Foundation
 import YesChefCore
 
 extension RecipeDetailModel {
+  func serveWithDidLoadOrAppear() {
+    guard
+      let detail,
+      detail.serveWith.isEmpty,
+      let blob = detail.recipe.serveWith
+    else {
+      serveWithRepairError = nil
+      return
+    }
+
+    do {
+      _ = try ServeWithCoding.decode(blob, recipeID: recipeID)
+      serveWithRepairError = nil
+    } catch {
+      serveWithRepairError = error
+    }
+  }
+
   func presentServeWithRepair(for error: ServeWithCodingError) -> Bool {
     guard error.recipeID == recipeID,
       let recipe,
@@ -14,23 +32,13 @@ extension RecipeDetailModel {
   }
 
   func repairServeWithButtonTapped() {
-    guard let recipe else {
+    serveWithDidLoadOrAppear()
+    guard let serveWithRepairError else {
       errorMessage = "Serve With repair could not be opened."
       isShowingError = true
       return
     }
-    guard let data = recipe.serveWith else {
-      errorMessage = "Serve With repair could not be opened."
-      isShowingError = true
-      return
-    }
-    do {
-      _ = try ServeWithCoding.decode(data, recipeID: recipeID)
-      errorMessage = "Serve With repair could not be opened."
-      isShowingError = true
-    } catch {
-      _ = presentServeWithRepair(for: .malformedData(recipeID: recipeID))
-    }
+    _ = presentServeWithRepair(for: serveWithRepairError)
   }
 
   func showError(_ error: Error) {

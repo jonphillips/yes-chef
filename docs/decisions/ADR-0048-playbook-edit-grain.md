@@ -160,6 +160,13 @@ ranks**; it does not clear the group. New suggestions take fresh sparse ranks at
 is what makes this decidable at all — you cannot preserve the cook's items if you can't tell which ones are
 theirs, which is why these two answers are one design and not two.
 
+### Amendment — malformed legacy blobs remain repairable
+
+Loud decode is right for an interactive read, but it must never run fatally inside a migrator. The migration
+tolerates a per-recipe decode failure, preserves the original bytes, and reports the issue; detail loading then
+detects that precise decode failure and offers non-blocking repair. A validated repair writes deterministic rows
+and clears the legacy blob through the normal synced user-action path.
+
 ## Still open (implementation checks, folded into their slices — do not block dispatch)
 
 - ~~**OQ1** — does Reader Feedback keep multi-line bodies?~~ **Closed 2026-07-26 by reading the code, before

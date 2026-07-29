@@ -401,27 +401,26 @@ extension RecipeRepository {
     try RecipeServeWithRepository.deleteAll(for: recipeID, in: db, now: now)
   }
 
-  /// Replaces an unreadable Serve With blob only after the cook's edited bytes decode as a complete list.
-  /// The data is stored exactly as supplied: this recovery path must not silently normalize or discard it.
+  /// Replaces an unreadable legacy Serve With blob only after the cook's edited bytes decode as a complete list.
   public static func repairServeWith(
     _ data: Data,
     recipeID: Recipe.ID,
     in db: Database,
     now: Date
   ) throws {
-    _ = try ServeWithCoding.decode(data, recipeID: recipeID)
-    try updateServeWithData(data, recipeID: recipeID, in: db, now: now)
-  }
-
-  private static func updateServeWithData(
-    _ data: Data?,
-    recipeID: Recipe.ID,
-    in db: Database,
-    now: Date
-  ) throws {
+    let rows = try RecipeServeWithBlob.decompose(
+      recipeID: recipeID,
+      blob: data,
+      now: now,
+      provenance: .model
+    )
+    for row in rows {
+      try RecipeServeWith.insert { row }.execute(db)
+    }
+    let clearedBlob: Data? = nil
     try Recipe.find(recipeID).update {
-      $0.serveWith = data
-      $0.dateModified = now
+      $0.serveWith = #bind(clearedBlob)
+      $0.dateModified = #bind(now)
     }
     .execute(db)
   }

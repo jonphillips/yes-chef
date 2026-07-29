@@ -258,5 +258,96 @@ extension RecipeCoreTests {
     func absentServeWithDataIsAnEmptyList() throws {
       expectNoDifference(try ServeWithCoding.decode(nil, recipeID: SampleUUIDSequence.uuid(36_511)), [])
     }
+
+    @Test
+    func emptyServeWithBlobDecomposesToNoRows() throws {
+      let recipeID = SampleUUIDSequence.uuid(36_512)
+      let now = Date(timeIntervalSinceReferenceDate: 826_300_000)
+      let emptyBlob = try JSONEncoder().encode([ServeWithItem]())
+
+      expectNoDifference(
+        try RecipeServeWithBlob.decompose(
+          recipeID: recipeID,
+          blob: emptyBlob,
+          now: now,
+          provenance: .model
+        ),
+        []
+      )
+    }
+
+    @Test
+    func detailLoaderLeavesMalformedLegacyServeWithAvailableForRepair() throws {
+      @Dependency(\.defaultDatabase) var database
+      let recipeID = SampleUUIDSequence.uuid(36_513)
+      let malformedBlob = Data("not json".utf8)
+      let now = Date(timeIntervalSinceReferenceDate: 826_300_000)
+
+      try database.write { db in
+        try Recipe.insert {
+          Recipe(
+            id: recipeID,
+            title: "Repairable Serve With",
+            dateCreated: now,
+            dateModified: now,
+            serveWith: malformedBlob
+          )
+        }
+        .execute(db)
+      }
+
+      try database.read { db in
+        let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+        expectNoDifference(detail.serveWith, [])
+        #expect(detail.recipe.serveWith == malformedBlob)
+      }
+    }
+
+    @Test
+    func repairingServeWithWritesDeterministicRowsAndClearsLegacyBlob() throws {
+      @Dependency(\.defaultDatabase) var database
+      let recipeID = SampleUUIDSequence.uuid(36_514)
+      let firstID = SampleUUIDSequence.uuid(36_515)
+      let secondID = SampleUUIDSequence.uuid(36_516)
+      let createdAt = Date(timeIntervalSinceReferenceDate: 826_300_000)
+      let repairedAt = createdAt.addingTimeInterval(60)
+      let repairedBlob = try JSONEncoder().encode([
+        ServeWithItem(id: firstID, title: "Cornbread"),
+        ServeWithItem(id: secondID, title: "Pickled onions", note: "Brighten each bowl")
+      ])
+
+      try database.write { db in
+        try Recipe.insert {
+          Recipe(
+            id: recipeID,
+            title: "Repairable Serve With",
+            dateCreated: createdAt,
+            dateModified: createdAt,
+            serveWith: Data("not json".utf8)
+          )
+        }
+        .execute(db)
+        try RecipeRepository.repairServeWith(repairedBlob, recipeID: recipeID, in: db, now: repairedAt)
+      }
+
+      try database.read { db in
+        let repairedRecipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+        #expect(repairedRecipe.serveWith == nil)
+        expectNoDifference(
+          try RecipeServeWithRepository.serveWith(for: recipeID, in: db),
+          [
+            RecipeServeWith(
+              id: firstID, recipeID: recipeID, title: "Cornbread", sortOrder: 0,
+              provenance: .model, dateCreated: repairedAt, dateModified: repairedAt
+            ),
+            RecipeServeWith(
+              id: secondID, recipeID: recipeID, title: "Pickled onions", note: "Brighten each bowl",
+              sortOrder: LearningOrdering.rankStride, provenance: .model,
+              dateCreated: repairedAt, dateModified: repairedAt
+            ),
+          ]
+        )
+      }
+    }
   }
 }

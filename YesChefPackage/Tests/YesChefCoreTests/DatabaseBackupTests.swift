@@ -1,5 +1,6 @@
 import Dependencies
 import Foundation
+import IssueReporting
 import SQLiteData
 import Testing
 import YesChefCore
@@ -262,10 +263,12 @@ struct DatabaseBackupTests {
     let sourceDatabase = try pathBackedDatabase(at: sourceURL)
     let recipeID = SampleUUIDSequence.uuid(5)
     let serveWithID = SampleUUIDSequence.uuid(6)
+    let malformedRecipeID = SampleUUIDSequence.uuid(7)
     let migrationDate = Date(timeIntervalSinceReferenceDate: 811_000_000)
     let legacyServeWith = try ServeWithCoding.encode([
       ServeWithItem(id: serveWithID, title: "Warm flatbread", note: "For scooping")
     ])
+    let malformedServeWith = Data("not json".utf8)
 
     try await sourceDatabase.write { db in
       try Recipe.insert {
@@ -275,6 +278,16 @@ struct DatabaseBackupTests {
           dateCreated: migrationDate,
           dateModified: migrationDate,
           serveWith: legacyServeWith
+        )
+      }
+      .execute(db)
+      try Recipe.insert {
+        Recipe(
+          id: malformedRecipeID,
+          title: "Malformed Serve With",
+          dateCreated: migrationDate,
+          dateModified: migrationDate,
+          serveWith: malformedServeWith
         )
       }
       .execute(db)
@@ -300,6 +313,9 @@ struct DatabaseBackupTests {
     }
     try backupDatabase.close()
 
+    let issueReporters = IssueReporters.current
+    defer { IssueReporters.current = issueReporters }
+    IssueReporters.current = []
     let prepared = try await YesChefDatabaseBackup.prepareRestore(
       from: backupURL,
       to: stagingURL,
@@ -316,12 +332,20 @@ struct DatabaseBackupTests {
     let restoredServeWith = try await restoredDatabase.read { db in
       try RecipeServeWithRepository.serveWith(for: recipeID, in: db)
     }
+    let restoredMalformedRecipe = try await restoredDatabase.read { db in
+      try Recipe.find(malformedRecipeID).fetchOne(db)
+    }
+    let restoredMalformedServeWith = try await restoredDatabase.read { db in
+      try RecipeServeWithRepository.serveWith(for: malformedRecipeID, in: db)
+    }
     let restoredMarker = try await restoredDatabase.read { db in
       try Int.fetchOne(db, sql: "PRAGMA user_version")
     }
     try restoredDatabase.close()
 
     #expect(restoredRecipe?.title == "Forward Migrated Recipe")
+    #expect(restoredRecipe?.serveWith == legacyServeWith)
+    #expect(restoredMalformedRecipe?.serveWith == malformedServeWith)
     #expect(workbenchReferenceCount == 0)
     #expect(
       restoredServeWith == [
@@ -337,6 +361,7 @@ struct DatabaseBackupTests {
         )
       ]
     )
+    #expect(restoredMalformedServeWith.isEmpty)
     #expect(prepared.schemaVersion == backup.schemaVersion)
     #expect(restoredMarker == backup.schemaVersion)
   }

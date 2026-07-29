@@ -814,6 +814,7 @@ final class RecipeDetailModel {
   }
   var errorMessage: String?
   var isShowingError = false
+  var serveWithRepairError: ServeWithCodingError?
   var scaleFactor = 1.0
   var scaleWholePart = 1
   var scaleFraction = ScaleFraction.none
@@ -939,7 +940,6 @@ final class RecipeDetailModel {
     do {
       destination = .chat(RecipeChatModel(context: .recipe(try RecipeChatRecipeContext(detail: detail))))
     } catch {
-      if let error = error as? ServeWithCodingError, presentServeWithRepair(for: error) { return }
       showError(error)
     }
   }
@@ -954,7 +954,6 @@ final class RecipeDetailModel {
     do {
       seed = try RecipeHandoffContext(detail: detail).discussAsk(for: section)
     } catch {
-      if let error = error as? ServeWithCodingError, presentServeWithRepair(for: error) { return }
       showError(error)
       return
     }
@@ -970,7 +969,6 @@ final class RecipeDetailModel {
       do {
         chatModel = RecipeChatModel(context: .recipe(try RecipeChatRecipeContext(detail: detail)))
       } catch {
-        if let error = error as? ServeWithCodingError, presentServeWithRepair(for: error) { return }
         showError(error)
         return
       }

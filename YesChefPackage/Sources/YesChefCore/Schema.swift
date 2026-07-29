@@ -1,5 +1,6 @@
 import Dependencies
 import Foundation
+import IssueReporting
 import SQLiteData
 
 @Selection
@@ -1044,18 +1045,21 @@ extension DependencyValues {
       .fetchAll(db)
 
       for recipe in recipes {
-        for (index, item) in try ServeWithCoding.decode(recipe.serveWith, recipeID: recipe.id).enumerated() {
+        let rows: [RecipeServeWith]
+        do {
+          rows = try RecipeServeWithBlob.decompose(
+            recipeID: recipe.id,
+            blob: recipe.serveWith,
+            now: recipe.dateModified,
+            provenance: .model
+          )
+        } catch {
+          reportIssue("Could not migrate Serve With for recipeID=\(recipe.id.uuidString): \(error)")
+          continue
+        }
+        for row in rows {
           try RecipeServeWith.insert {
-            RecipeServeWith(
-              id: item.id,
-              recipeID: recipe.id,
-              title: item.title,
-              note: item.note,
-              sortOrder: LearningOrdering.rankStride * index,
-              provenance: .model,
-              dateCreated: recipe.dateModified,
-              dateModified: recipe.dateModified
-            )
+            row
           }
           .execute(db)
         }

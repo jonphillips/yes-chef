@@ -20,6 +20,7 @@ struct RecipePlaybookView: View {
     let readerFeedbackNotes = visibleNotes.filter { $0.noteType == .readerFeedback }
     let otherNotes = visibleNotes.filter { $0.noteType != .readerFeedback }
     let serveWith = model.serveWith
+    let serveWithNeedsRepair = model.serveWithRepairError != nil
 
     VStack(alignment: .leading, spacing: 18) {
       playbookHeader
@@ -54,7 +55,7 @@ struct RecipePlaybookView: View {
         isFilled: !serveWith.isEmpty,
         isExpanded: $isServeWithExpanded
       ) {
-        serveWithContent(serveWith)
+        serveWithContent(serveWith, needsRepair: serveWithNeedsRepair)
       }
       if !model.deliberationLogEntries.isEmpty {
         playbookSection(
@@ -236,42 +237,46 @@ struct RecipePlaybookView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  @ViewBuilder
-  private func serveWithContent(_ items: [RecipeServeWith]) -> some View {
-    EditableRowsSection(
-      title: "Serve With",
-      titleFont: .title3.bold(),
-      editorLabel: "Serve With",
-      items: items,
-      itemText: \.title,
-      addItem: model.createServeWith,
-      addButtonLabel: "Add Serve With",
-      updateItem: model.updateServeWith,
-      deleteItem: { model.deleteServeWith($0.id) },
-      reorderItems: { ids, destinationID in
-        model.reorderServeWith(ids, destination: destinationID.map(ServeWithReorderDestination.before) ?? .end)
+  private func serveWithContent(_ items: [RecipeServeWith], needsRepair: Bool) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      if needsRepair {
+        ServeWithRepairBanner(repair: model.repairServeWithButtonTapped)
       }
-    ) {
-      ContentUnavailableView(
-        "No Serve With Yet",
-        systemImage: "fork.knife",
-        description: Text("Add an accompaniment or save one from an AI handoff here.")
-      )
-    } itemContent: { item in
-      VStack(alignment: .leading, spacing: 3) {
-        Text(item.title)
-          .font(.headline)
-        if let note = item.note {
-          Text(note)
-            .font(.callout)
+      EditableRowsSection(
+        title: "Serve With",
+        titleFont: .title3.bold(),
+        editorLabel: "Serve With",
+        items: items,
+        itemText: \.title,
+        addItem: model.createServeWith,
+        addButtonLabel: "Add Serve With",
+        updateItem: model.updateServeWith,
+        deleteItem: { model.deleteServeWith($0.id) },
+        reorderItems: { ids, destinationID in
+          model.reorderServeWith(ids, destination: destinationID.map(ServeWithReorderDestination.before) ?? .end)
+        }
+      ) {
+        ContentUnavailableView(
+          "No Serve With Yet",
+          systemImage: "fork.knife",
+          description: Text("Add an accompaniment or save one from an AI handoff here.")
+        )
+      } itemContent: { item in
+        VStack(alignment: .leading, spacing: 3) {
+          Text(item.title)
+            .font(.headline)
+          if let note = item.note {
+            Text(note)
+              .font(.callout)
+              .foregroundStyle(.secondary)
+          }
+        }
+      } badge: { item in
+        if item.provenance == .handAuthored {
+          Label("Hand-authored", systemImage: "pencil")
+            .font(.caption)
             .foregroundStyle(.secondary)
         }
-      }
-    } badge: { item in
-      if item.provenance == .handAuthored {
-        Label("Hand-authored", systemImage: "pencil")
-          .font(.caption)
-          .foregroundStyle(.secondary)
       }
     }
   }
@@ -376,6 +381,22 @@ struct RecipePlaybookView: View {
     } itemContent: { note in
       RecipeMarkdownText(note.text)
     }
+  }
+}
+
+private struct ServeWithRepairBanner: View {
+  let repair: () -> Void
+
+  var body: some View {
+    HStack(spacing: 12) {
+      Label("Couldn't read Serve With", systemImage: "exclamationmark.triangle")
+        .foregroundStyle(.secondary)
+      Spacer(minLength: 8)
+      Button("Repair", action: repair)
+        .buttonStyle(.bordered)
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Couldn't read Serve With — Repair")
   }
 }
 
