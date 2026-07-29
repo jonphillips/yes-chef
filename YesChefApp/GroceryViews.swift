@@ -129,6 +129,16 @@ struct GroceryDetailView: View {
             )
           }
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+          GroceryRapidAddField(model: model)
+            .attentionCard()
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(.bar)
+            .overlay(alignment: .bottom) {
+              Divider()
+            }
+        }
         .navigationTitle(selectedList.list.title)
         .toolbar {
           ToolbarItemGroup(placement: .primaryAction) {
@@ -733,36 +743,69 @@ private struct GroceryListRowView: View {
   }
 }
 
-struct GroceryListEditorView: View {
-  @Environment(\.dismiss) private var dismiss
-  @State private var title = ""
-  @State private var remindersListName = ""
-
+private struct GroceryRapidAddField: View {
   let model: GroceryLibraryModel
-  let listID: CoreGroceryList.ID?
 
-  init(model: GroceryLibraryModel, listID: CoreGroceryList.ID? = nil) {
-    self.model = model
-    self.listID = listID
-    let list = listID.flatMap { id in
-      model.listRows.first { $0.id == id }?.list
-    }
-    _title = State(initialValue: list?.title ?? "")
-    _remindersListName = State(initialValue: list?.remindersListName ?? "")
-  }
+  @FocusState private var isFocused: Bool
+  @State private var text = ""
 
-  private var isSaveDisabled: Bool {
-    title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  private var isAddDisabled: Bool {
+    text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
   var body: some View {
-    Form {
-      Section("List") {
-        StackedTextField(title: "Title", text: $title, prompt: "Market run")
-        StackedTextField(title: "Reminders List", text: $remindersListName, prompt: "Groceries")
+    VStack(spacing: 8) {
+      HStack(spacing: 8) {
+        Image(systemName: "plus")
+          .foregroundStyle(.secondary)
+
+        TextField("Add Item", text: $text)
+          .focused($isFocused)
+          .submitLabel(.done)
+          .onSubmit(commit)
+          .textInputAutocapitalization(.never)
+          .autocorrectionDisabled()
+
+        Button(action: commit) {
+          Image(systemName: "plus.circle.fill")
+            .font(.title3)
+        }
+        .accessibilityLabel("Add Item")
+        .disabled(isAddDisabled)
+      }
+
+      if isFocused {
+        IngredientFractionPillRow { fraction in
+          text.append(fraction.label)
+          isFocused = true
+        }
       }
     }
-    .navigationTitle(listID == nil ? "Add Grocery List" : "Edit Grocery List")
+  }
+
+  private func commit() {
+    guard !isAddDisabled, model.addItemLine(text) else { return }
+    text = ""
+    isFocused = true
+  }
+}
+
+struct GroceryListEditorView: View {
+  @Environment(\.dismiss) private var dismiss
+
+  let model: GroceryLibraryModel
+  let draft: GroceryListEditorDraft
+
+  var body: some View {
+    @Bindable var draft = draft
+
+    Form {
+      Section("List") {
+        StackedTextField(title: "Title", text: $draft.title, prompt: "Market run")
+        StackedTextField(title: "Reminders List", text: $draft.remindersListName, prompt: "Groceries")
+      }
+    }
+    .navigationTitle(draft.listID == nil ? "Add Grocery List" : "Edit Grocery List")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {
@@ -773,14 +816,14 @@ struct GroceryListEditorView: View {
       ToolbarItem(placement: .confirmationAction) {
         Button("Save") {
           if model.saveListButtonTapped(
-            listID: listID,
-            title: title,
-            remindersListName: remindersListName
+            listID: draft.listID,
+            title: draft.title,
+            remindersListName: draft.remindersListName
           ) {
             dismiss()
           }
         }
-        .disabled(isSaveDisabled)
+        .disabled(draft.isSaveDisabled)
       }
     }
   }
@@ -788,40 +831,20 @@ struct GroceryListEditorView: View {
 
 struct GroceryItemEditorView: View {
   @Environment(\.dismiss) private var dismiss
-  @State private var title = ""
-  @State private var quantityText = ""
-  @State private var unit = ""
-  @State private var aisle = ""
-  @State private var notes = ""
 
   let model: GroceryLibraryModel
-  let itemID: GroceryItem.ID?
-
-  init(model: GroceryLibraryModel, itemID: GroceryItem.ID? = nil) {
-    self.model = model
-    self.itemID = itemID
-    let item = itemID.flatMap { id in
-      model.itemRows.first { $0.id == id }?.item
-    }
-    _title = State(initialValue: item?.title ?? "")
-    _quantityText = State(initialValue: item?.quantityText ?? "")
-    _unit = State(initialValue: item?.unit ?? "")
-    _aisle = State(initialValue: item?.aisle ?? "")
-    _notes = State(initialValue: item?.notes ?? "")
-  }
-
-  private var isSaveDisabled: Bool {
-    title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-  }
+  let draft: GroceryItemEditorDraft
 
   var body: some View {
+    @Bindable var draft = draft
+
     Form {
       Section("Item") {
-        StackedTextField(title: "Name", text: $title, prompt: "Milk")
-        StackedTextField(title: "Quantity", text: $quantityText, prompt: "2")
-        StackedTextField(title: "Unit", text: $unit, prompt: "cups")
+        StackedTextField(title: "Name", text: $draft.title, prompt: "Milk")
+        StackedTextField(title: "Quantity", text: $draft.quantityText, prompt: "2")
+        StackedTextField(title: "Unit", text: $draft.unit, prompt: "cups")
         StackedFormField(title: "Aisle") {
-          Picker("Aisle", selection: $aisle) {
+          Picker("Aisle", selection: $draft.aisle) {
             Text("Unassigned").tag("")
             if let customAisle {
               Text("Custom: \(customAisle)").tag(customAisle)
@@ -832,10 +855,10 @@ struct GroceryItemEditorView: View {
           }
           .labelsHidden()
         }
-        StackedTextEditor(title: "Notes", text: $notes, minHeight: 90)
+        StackedTextEditor(title: "Notes", text: $draft.notes, minHeight: 90)
       }
     }
-    .navigationTitle(itemID == nil ? "Add Grocery Item" : "Edit Grocery Item")
+    .navigationTitle(draft.itemID == nil ? "Add Grocery Item" : "Edit Grocery Item")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {
@@ -845,39 +868,39 @@ struct GroceryItemEditorView: View {
       }
       ToolbarItem(placement: .confirmationAction) {
         Button("Save") {
-          let didSave = if let itemID {
+          let didSave = if let itemID = draft.itemID {
             model.saveItemButtonTapped(
               itemID: itemID,
-              title: title,
-              quantityText: quantityText,
-              unit: unit,
-              aisle: aisle,
-              notes: notes
+              title: draft.title,
+              quantityText: draft.quantityText,
+              unit: draft.unit,
+              aisle: draft.aisle,
+              notes: draft.notes
             )
           } else {
             model.saveCustomItemButtonTapped(
-              title: title,
-              quantityText: quantityText,
-              unit: unit,
-              aisle: aisle,
-              notes: notes
+              title: draft.title,
+              quantityText: draft.quantityText,
+              unit: draft.unit,
+              aisle: draft.aisle,
+              notes: draft.notes
             )
           }
           if didSave {
             dismiss()
           }
         }
-        .disabled(isSaveDisabled)
+        .disabled(draft.isSaveDisabled)
       }
     }
   }
 
   private var customAisle: String? {
     guard
-      !aisle.isEmpty,
-      !GroceryStoreArea.canonicalAreas.map(\.title).contains(aisle)
+      !draft.aisle.isEmpty,
+      !GroceryStoreArea.canonicalAreas.map(\.title).contains(draft.aisle)
     else { return nil }
-    return aisle
+    return draft.aisle
   }
 }
 

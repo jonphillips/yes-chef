@@ -85,6 +85,17 @@ public struct ChatApplyReviewItem: Identifiable {
       try await commit(approvedText)
     }
   }
+
+  /// The text an untouched review submits for this presentation. Sheet reviews preserve their
+  /// editable source, while inline reviews have always committed their rendered summary.
+  public var unmodifiedApprovedText: String {
+    switch presentation {
+    case .inline:
+      summary
+    case .sheet:
+      editableText ?? summary
+    }
+  }
 }
 
 public struct ChatApplyReviewSecondaryCommit {

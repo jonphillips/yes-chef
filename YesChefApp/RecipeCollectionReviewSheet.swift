@@ -15,6 +15,7 @@ struct RecipeCollectionReviewSheet: View {
   @State private var localCommittingItemID: ChatApplyReviewItem.ID?
   @State private var isShowingDiscardAllConfirmation = false
   @State private var committedSummary: CollectionReviewCommitSummary?
+  @State private var isAcceptingAll = false
 
   var body: some View {
     NavigationStack {
@@ -24,9 +25,18 @@ struct RecipeCollectionReviewSheet: View {
             CollectionReviewCommitConfirmation(summary: committedSummary)
           }
 
-          Text(items.count == 1 ? "Review the assistant's proposal before saving it." : "Review each assistant proposal before saving it.")
+          HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(items.count == 1 ? "Review the assistant's proposal before saving it." : "Review each assistant proposal before saving it.")
+              .font(.subheadline)
+              .foregroundStyle(.secondary)
+
+            Button("Discard All", role: .destructive) {
+              isShowingDiscardAllConfirmation = true
+            }
+            .buttonStyle(.plain)
             .font(.subheadline)
-            .foregroundStyle(.secondary)
+            .disabled(items.isEmpty || activeCommittingItemID != nil || isAcceptingAll)
+          }
 
           ForEach(items) { item in
             switch item.presentation {
@@ -34,6 +44,7 @@ struct RecipeCollectionReviewSheet: View {
               CollectionReviewLaunchRow(
                 item: item,
                 isCommitting: activeCommittingItemID == item.id,
+                isBulkCommitting: isAcceptingAll,
                 review: { launchReview(for: item) },
                 discard: { discard(item) }
               )
@@ -41,6 +52,7 @@ struct RecipeCollectionReviewSheet: View {
               ChatApplyReviewRow(
                 item: item,
                 isCommitting: activeCommittingItemID == item.id,
+                isBulkCommitting: isAcceptingAll,
                 review: { presentedReviewItem = item },
                 discard: { discard(item) }
               )
@@ -58,10 +70,12 @@ struct RecipeCollectionReviewSheet: View {
           }
         }
         ToolbarItem(placement: .topBarTrailing) {
-          Button("Discard All", role: .destructive) {
-            isShowingDiscardAllConfirmation = true
+          Button("Accept All") {
+            Task {
+              await acceptAll()
+            }
           }
-          .disabled(items.isEmpty || activeCommittingItemID != nil)
+          .disabled(items.isEmpty || activeCommittingItemID != nil || isAcceptingAll)
         }
       }
     }
@@ -77,8 +91,8 @@ struct RecipeCollectionReviewSheet: View {
           )
           if didCommit {
             committedSummary = CollectionReviewCommitSummary(
-              title: item.committedTitle,
-              text: approvedText
+              item: item,
+              approvedText: approvedText
             )
             presentedReviewItem = nil
           }
@@ -128,7 +142,8 @@ struct RecipeCollectionReviewSheet: View {
       self.presentedReviewItem = nil
     }
 
-    guard items.count == 1,
+    guard !isAcceptingAll,
+          items.count == 1,
           let item = items.first,
           item.presentation == .sheet
     else { return }
@@ -138,13 +153,47 @@ struct RecipeCollectionReviewSheet: View {
 
   private func launchReview(for item: ChatApplyReviewItem) {
     Task {
-      let didCommit = await commitItem(item, approvedText: item.summary, usingSecondaryCommit: false)
+      let didCommit = await commitItem(
+        item,
+        approvedText: item.unmodifiedApprovedText,
+        usingSecondaryCommit: false
+      )
       if didCommit {
         committedSummary = CollectionReviewCommitSummary(
-          title: item.committedTitle,
-          text: item.summary
+          item: item,
+          approvedText: item.unmodifiedApprovedText
         )
       }
+    }
+  }
+
+  private func acceptAll() async {
+    isAcceptingAll = true
+    defer { isAcceptingAll = false }
+
+    // `items` is the snapshot captured when this Task was formed, and the failure count below
+    // depends on that: committing drains the caller's live list, so only the snapshot still knows
+    // how many proposals this pass set out to save.
+    var committedCount = 0
+    var didFail = false
+    for item in items {
+      let didCommit = await commitItem(
+        item,
+        approvedText: item.unmodifiedApprovedText,
+        usingSecondaryCommit: false
+      )
+      guard didCommit else {
+        didFail = true
+        break
+      }
+      committedCount += 1
+    }
+
+    if committedCount > 0 || didFail {
+      committedSummary = CollectionReviewCommitSummary(
+        committedCount: committedCount,
+        failedItemCount: didFail ? items.count - committedCount : 0
+      )
     }
   }
 
@@ -164,8 +213,24 @@ struct RecipeCollectionReviewSheet: View {
 }
 
 private struct CollectionReviewCommitSummary: Equatable {
-  let title: String
-  let text: String
+  let committedCount: Int
+  let failedItemCount: Int
+  var title: String?
+  var text: String?
+
+  init(item: ChatApplyReviewItem, approvedText: String) {
+    committedCount = 1
+    failedItemCount = 0
+    title = item.committedTitle
+    text = approvedText
+  }
+
+  init(committedCount: Int, failedItemCount: Int = 0) {
+    self.committedCount = committedCount
+    self.failedItemCount = failedItemCount
+    title = nil
+    text = nil
+  }
 }
 
 private struct CollectionReviewCommitConfirmation: View {
@@ -173,21 +238,51 @@ private struct CollectionReviewCommitConfirmation: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      Label(summary.title, systemImage: "checkmark.circle")
+      Label(confirmationTitle, systemImage: confirmationImage)
         .font(.caption.bold())
-        .foregroundStyle(.green)
-      Text(summary.text)
-        .font(.callout)
+        .foregroundStyle(confirmationTint)
+      if let text = summary.text {
+        Text(text)
+          .font(.callout)
+      } else if summary.failedItemCount > 0 {
+        Text("Could not save the remaining \(summary.failedItemCount) \(proposalNoun); they are still available to review.")
+          .font(.callout)
+      }
     }
     .padding(10)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+    .background(confirmationTint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+  }
+
+  private var confirmationTitle: String {
+    if summary.failedItemCount > 0, summary.committedCount == 0 {
+      return "Could Not Save Proposals"
+    }
+    guard summary.committedCount != 1 else {
+      return summary.title ?? "Saved proposal"
+    }
+    return "Saved \(summary.committedCount) proposals"
+  }
+
+  private var proposalNoun: String {
+    summary.failedItemCount == 1 ? "proposal" : "proposals"
+  }
+
+  private var confirmationImage: String {
+    summary.failedItemCount > 0 ? "exclamationmark.triangle" : "checkmark.circle"
+  }
+
+  private var confirmationTint: Color {
+    summary.failedItemCount > 0 ? .orange : .green
   }
 }
 
 private struct CollectionReviewLaunchRow: View {
   let item: ChatApplyReviewItem
   let isCommitting: Bool
+  /// Set while a bulk accept is walking the list, so rows this pass has not reached yet cannot be
+  /// discarded or reviewed out from under it.
+  var isBulkCommitting: Bool = false
   let review: () -> Void
   let discard: () -> Void
 
@@ -203,7 +298,7 @@ private struct CollectionReviewLaunchRow: View {
           Label("Discard", systemImage: "trash")
         }
         .buttonStyle(.bordered)
-        .disabled(isCommitting)
+        .disabled(isCommitting || isBulkCommitting)
 
         Spacer(minLength: 8)
 
@@ -214,7 +309,7 @@ private struct CollectionReviewLaunchRow: View {
           )
         }
         .buttonStyle(.borderedProminent)
-        .disabled(isCommitting)
+        .disabled(isCommitting || isBulkCommitting)
       }
     }
     .attentionCard()

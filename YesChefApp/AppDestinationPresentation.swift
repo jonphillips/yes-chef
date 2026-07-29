@@ -28,24 +28,24 @@ private struct GroceryDestinationsModifier: ViewModifier {
     @Bindable var groceryModel = groceryModel
 
     content
-      .sheet(isPresented: gatedBinding($groceryModel.destination.addList, enabled: isPresentationEnabled)) {
+      .sheet(item: gatedBinding($groceryModel.destination.addList, enabled: isPresentationEnabled), id: \.id) { draft in
         NavigationStack {
-          GroceryListEditorView(model: groceryModel)
+          GroceryListEditorView(model: groceryModel, draft: draft)
         }
       }
-      .sheet(item: gatedBinding($groceryModel.destination.editList, enabled: isPresentationEnabled), id: \.self) { listID in
+      .sheet(item: gatedBinding($groceryModel.destination.editList, enabled: isPresentationEnabled), id: \.id) { draft in
         NavigationStack {
-          GroceryListEditorView(model: groceryModel, listID: listID)
+          GroceryListEditorView(model: groceryModel, draft: draft)
         }
       }
-      .sheet(isPresented: gatedBinding($groceryModel.destination.addCustomItem, enabled: isPresentationEnabled)) {
+      .sheet(item: gatedBinding($groceryModel.destination.addCustomItem, enabled: isPresentationEnabled), id: \.id) { draft in
         NavigationStack {
-          GroceryItemEditorView(model: groceryModel)
+          GroceryItemEditorView(model: groceryModel, draft: draft)
         }
       }
-      .sheet(item: gatedBinding($groceryModel.destination.editItem, enabled: isPresentationEnabled), id: \.self) { itemID in
+      .sheet(item: gatedBinding($groceryModel.destination.editItem, enabled: isPresentationEnabled), id: \.id) { draft in
         NavigationStack {
-          GroceryItemEditorView(model: groceryModel, itemID: itemID)
+          GroceryItemEditorView(model: groceryModel, draft: draft)
         }
       }
       .sheet(isPresented: gatedBinding($groceryModel.destination.addPantryItem, enabled: isPresentationEnabled)) {

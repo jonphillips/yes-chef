@@ -921,6 +921,9 @@ private final class IntrinsicTextView: UITextView {
 struct ChatApplyReviewRow: View {
   let item: ChatApplyReviewItem
   let isCommitting: Bool
+  /// Set while a bulk accept is walking the list, so rows this pass has not reached yet cannot be
+  /// discarded or reviewed out from under it.
+  var isBulkCommitting: Bool = false
   let review: () -> Void
   let discard: () -> Void
 
@@ -937,7 +940,7 @@ struct ChatApplyReviewRow: View {
           Label("Discard", systemImage: "trash")
         }
         .buttonStyle(.bordered)
-        .disabled(isCommitting)
+        .disabled(isCommitting || isBulkCommitting)
 
         Spacer(minLength: 8)
 
@@ -945,7 +948,7 @@ struct ChatApplyReviewRow: View {
           Label("Review", systemImage: "doc.text.magnifyingglass")
         }
         .buttonStyle(.borderedProminent)
-        .disabled(isCommitting)
+        .disabled(isCommitting || isBulkCommitting)
       }
     }
     .attentionCard()
@@ -973,7 +976,7 @@ struct ChatApplyReviewSheet: View {
     self.isCommitting = isCommitting
     self.commit = commit
     self.discard = discard
-    _draftText = State(initialValue: item.editableText ?? item.summary)
+    _draftText = State(initialValue: item.unmodifiedApprovedText)
   }
 
   var body: some View {
@@ -1063,8 +1066,8 @@ struct ChatApplyReviewSheet: View {
   }
 
   private var hasUnsavedEdits: Bool {
-    guard let editableText = item.editableText else { return false }
-    return draftText != editableText
+    guard item.editableText != nil else { return false }
+    return draftText != item.unmodifiedApprovedText
   }
 
   private var approvedTextIsEmpty: Bool {
