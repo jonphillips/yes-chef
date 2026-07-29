@@ -8,6 +8,7 @@ struct RecipeEditorView: View {
   @State private var selectedHeroPhotoItem: PhotosPickerItem?
   @State private var ingredientSelections: [IngredientSection.ID: TextSelection] = [:]
   @State private var ingredientSelectionUTF16Offsets: [IngredientSection.ID: Int] = [:]
+  @State private var ingredientTextMutationSectionIDs: Set<IngredientSection.ID> = []
   @FocusState private var focusedIngredientSectionID: IngredientSection.ID?
   @FocusState private var focusedIngredientSectionNameID: IngredientSection.ID?
   @Environment(\.dismiss) private var dismiss
@@ -19,7 +20,8 @@ struct RecipeEditorView: View {
   var body: some View {
     @Bindable var model = model
 
-    Form {
+    ScrollViewReader { proxy in
+      Form {
       if let variationName = model.activeVariationName {
         Section {
           RecipeVariationBaseWriteNotice(variationName: variationName)
@@ -89,7 +91,7 @@ struct RecipeEditorView: View {
           }
           StackedTextEditor(
             title: "Ingredients",
-            text: $section.text,
+            text: ingredientTextBinding(for: section.id),
             selection: ingredientSelectionBinding(for: section.id),
             minHeight: 180,
             font: .body.monospacedDigit()
@@ -97,23 +99,11 @@ struct RecipeEditorView: View {
           .focused($focusedIngredientSectionID, equals: section.id)
           .onChange(of: section.text) { _, _ in
             if let newSectionID = model.ingredientTextChanged(sectionID: section.id) {
-              focusedIngredientSectionID = newSectionID
+              scrollToAndFocusIngredientSection(newSectionID, using: proxy)
             }
             ingredientSelections[section.id] = nil
             ingredientSelectionUTF16Offsets[section.id] = nil
             pruneIngredientSelections()
-          }
-          .contextMenu {
-            if let lineIndex = selectedIngredientLineIndex(in: section) {
-              Button("Start a section here") {
-                if let newSectionID = model.startIngredientSection(sectionID: section.id, atLineIndex: lineIndex) {
-                  focusedIngredientSectionID = newSectionID
-                }
-                ingredientSelections[section.id] = nil
-                ingredientSelectionUTF16Offsets[section.id] = nil
-                pruneIngredientSelections()
-              }
-            }
           }
 
           if model.draft.ingredientSections.count > 1 {
@@ -128,6 +118,7 @@ struct RecipeEditorView: View {
             Text("Ingredients")
           }
         }
+        .id(section.id)
       }
 
       Section {
@@ -176,22 +167,37 @@ struct RecipeEditorView: View {
           minHeight: 120
         )
       }
-    }
-    .safeAreaInset(edge: .bottom, spacing: 0) {
-      if let focusedIngredientSectionID {
-        IngredientFractionPillRow { fraction in
-          model.ingredientFractionTapped(fraction, sectionID: focusedIngredientSectionID)
-          self.focusedIngredientSectionID = focusedIngredientSectionID
-        }
-        .padding(.horizontal)
-        .background(.bar)
-        .overlay(alignment: .top) {
-          Divider()
+      }
+      .safeAreaInset(edge: .bottom, spacing: 0) {
+        if let focusedIngredientSectionID,
+          let section = model.draft.ingredientSections.first(where: { $0.id == focusedIngredientSectionID }) {
+          IngredientFractionPillRow(
+            canStartSection: selectedIngredientLineIndex(in: section) != nil,
+            onStartSection: {
+              guard let lineIndex = selectedIngredientLineIndex(in: section) else { return }
+              if let newSectionID = model.startIngredientSection(
+                sectionID: section.id,
+                atLineIndex: lineIndex
+              ) {
+                scrollToAndFocusIngredientSection(newSectionID, using: proxy)
+              }
+              ingredientSelections[section.id] = nil
+              ingredientSelectionUTF16Offsets[section.id] = nil
+              pruneIngredientSelections()
+            }
+          ) { fraction in
+            model.ingredientFractionTapped(fraction, sectionID: focusedIngredientSectionID)
+            self.focusedIngredientSectionID = focusedIngredientSectionID
+          }
+          .padding(.horizontal)
+          .background(.bar)
+          .overlay(alignment: .top) {
+            Divider()
+          }
         }
       }
-    }
-    .navigationTitle(model.recipeID == nil ? "New Recipe" : "Edit Recipe")
-    .toolbar {
+      .navigationTitle(model.recipeID == nil ? "New Recipe" : "Edit Recipe")
+      .toolbar {
       ToolbarItem(placement: .cancellationAction) {
         Button("Cancel") { dismiss() }
           .disabled(model.isSaving)
@@ -217,23 +223,43 @@ struct RecipeEditorView: View {
         }
         .disabled(model.isSavingDisabled)
       }
+      }
+      .onAppear {
+        model.detailChanged(model.detail)
+      }
+      .onChange(of: model.detail) { _, detail in
+        model.detailChanged(detail)
+      }
+      .onChange(of: focusedIngredientSectionNameID) { oldValue, newValue in
+        guard let oldValue, oldValue != newValue else { return }
+        model.ingredientSectionNameChanged(sectionID: oldValue)
+        pruneIngredientSelections()
+      }
+      .alert("Could Not Save Recipe", isPresented: $model.isShowingError) {
+        Button("OK") {}
+      } message: {
+        Text(model.errorMessage ?? "")
+      }
     }
-    .onAppear {
-      model.detailChanged(model.detail)
-    }
-    .onChange(of: model.detail) { _, detail in
-      model.detailChanged(detail)
-    }
-    .onChange(of: focusedIngredientSectionNameID) { oldValue, newValue in
-      guard let oldValue, oldValue != newValue else { return }
-      model.ingredientSectionNameChanged(sectionID: oldValue)
-      pruneIngredientSelections()
-    }
-    .alert("Could Not Save Recipe", isPresented: $model.isShowingError) {
-      Button("OK") {}
-    } message: {
-      Text(model.errorMessage ?? "")
-    }
+  }
+
+  private func ingredientTextBinding(for sectionID: IngredientSection.ID) -> Binding<String> {
+    Binding(
+      get: { model.draft.ingredientSections.first { $0.id == sectionID }?.text ?? "" },
+      set: { text in
+        guard let sectionIndex = model.draft.ingredientSections.firstIndex(where: { $0.id == sectionID }) else {
+          return
+        }
+        ingredientTextMutationSectionIDs.insert(sectionID)
+        ingredientSelections[sectionID] = nil
+        ingredientSelectionUTF16Offsets[sectionID] = nil
+        model.draft.ingredientSections[sectionIndex].text = text
+        Task { @MainActor in
+          await Task.yield()
+          ingredientTextMutationSectionIDs.remove(sectionID)
+        }
+      }
+    )
   }
 
   private func ingredientSelectionBinding(
@@ -243,6 +269,10 @@ struct RecipeEditorView: View {
       get: { ingredientSelections[sectionID] },
       set: { selection in
         ingredientSelections[sectionID] = selection
+        guard !ingredientTextMutationSectionIDs.contains(sectionID) else {
+          ingredientSelectionUTF16Offsets[sectionID] = nil
+          return
+        }
         let currentText = model.draft.ingredientSections
           .first { $0.id == sectionID }?
           .text ?? ""
@@ -276,9 +306,9 @@ struct RecipeEditorView: View {
 
   private func selectionUTF16Offset(_ selection: TextSelection, in text: String) -> Int? {
     guard case let .selection(range) = selection.indices else { return nil }
-    // A collapsed caret is transient while the editor applies a text mutation (notably Return at
-    // the end of a card). It cannot identify a line for the context-menu action anyway.
-    guard range.lowerBound != range.upperBound else { return nil }
+    // `samePosition(in:)` traps for an index from a stale text value. The selection binding filters
+    // those transaction-local updates above; a settled selection, including a collapsed caret,
+    // identifies the line used by the accessory action.
     guard let utf16Index = range.lowerBound.samePosition(in: text.utf16) else { return nil }
     return text.utf16.distance(from: text.utf16.startIndex, to: utf16Index)
   }
@@ -287,30 +317,52 @@ struct RecipeEditorView: View {
     let sectionIDs = Set(model.draft.ingredientSections.map(\.id))
     ingredientSelections = ingredientSelections.filter { sectionIDs.contains($0.key) }
     ingredientSelectionUTF16Offsets = ingredientSelectionUTF16Offsets.filter { sectionIDs.contains($0.key) }
+    ingredientTextMutationSectionIDs = ingredientTextMutationSectionIDs.filter { sectionIDs.contains($0) }
+  }
+
+  private func scrollToAndFocusIngredientSection(
+    _ sectionID: IngredientSection.ID,
+    using proxy: ScrollViewProxy
+  ) {
+    withAnimation {
+      proxy.scrollTo(sectionID, anchor: .center)
+    }
+    Task { @MainActor in
+      await Task.yield()
+      focusedIngredientSectionID = sectionID
+    }
   }
 }
 
 private struct IngredientFractionPillRow: View {
+  let canStartSection: Bool
+  let onStartSection: () -> Void
   let onSelect: (ScaleFraction) -> Void
 
   var body: some View {
-    ScrollView(.horizontal, showsIndicators: false) {
-      HStack(spacing: 8) {
-        ForEach(ScaleFraction.ingredientInputCases) { fraction in
-          Button {
-            onSelect(fraction)
-          } label: {
-            Text(verbatim: fraction.label)
-              .font(.title3)
-              .frame(minWidth: 44, minHeight: 36)
+    HStack(spacing: 8) {
+      Button("Start a section here", action: onStartSection)
+        .buttonStyle(.bordered)
+        .disabled(!canStartSection)
+
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 8) {
+          ForEach(ScaleFraction.ingredientInputCases) { fraction in
+            Button {
+              onSelect(fraction)
+            } label: {
+              Text(verbatim: fraction.label)
+                .font(.title3)
+                .frame(minWidth: 44, minHeight: 36)
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .accessibilityLabel(Text(verbatim: "Insert " + fraction.label))
+            .accessibilityHint(Text("Appends this fraction to the ingredient text."))
           }
-          .buttonStyle(.bordered)
-          .buttonBorderShape(.capsule)
-          .accessibilityLabel(Text(verbatim: "Insert " + fraction.label))
-          .accessibilityHint(Text("Appends this fraction to the ingredient text."))
         }
+        .padding(.horizontal, 2)
       }
-      .padding(.horizontal, 2)
     }
     .padding(.vertical, 2)
   }
