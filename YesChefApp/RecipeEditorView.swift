@@ -6,9 +6,7 @@ import YesChefCore
 struct RecipeEditorView: View {
   @State private var model: RecipeEditorModel
   @State private var selectedHeroPhotoItem: PhotosPickerItem?
-  @State private var ingredientSelections: [IngredientSection.ID: TextSelection] = [:]
   @State private var ingredientSelectionUTF16Offsets: [IngredientSection.ID: Int] = [:]
-  @State private var ingredientTextMutationSectionIDs: Set<IngredientSection.ID> = []
   @FocusState private var focusedIngredientSectionID: IngredientSection.ID?
   @FocusState private var focusedIngredientSectionNameID: IngredientSection.ID?
   @Environment(\.dismiss) private var dismiss
@@ -91,18 +89,17 @@ struct RecipeEditorView: View {
           }
           StackedTextEditor(
             title: "Ingredients",
-            text: ingredientTextBinding(for: section.id),
-            selection: ingredientSelectionBinding(for: section.id),
+            text: $section.text,
+            caretUTF16Offset: ingredientCaretUTF16OffsetBinding(for: section.id),
+            focusedSectionID: $focusedIngredientSectionID,
+            focusedSectionValue: section.id,
             minHeight: 180,
             font: .body.monospacedDigit()
           )
-          .focused($focusedIngredientSectionID, equals: section.id)
           .onChange(of: section.text) { _, _ in
             if let newSectionID = model.ingredientTextChanged(sectionID: section.id) {
               scrollToAndFocusIngredientSection(newSectionID, using: proxy)
             }
-            ingredientSelections[section.id] = nil
-            ingredientSelectionUTF16Offsets[section.id] = nil
             pruneIngredientSelections()
           }
 
@@ -181,7 +178,6 @@ struct RecipeEditorView: View {
               ) {
                 scrollToAndFocusIngredientSection(newSectionID, using: proxy)
               }
-              ingredientSelections[section.id] = nil
               ingredientSelectionUTF16Offsets[section.id] = nil
               pruneIngredientSelections()
             }
@@ -243,42 +239,12 @@ struct RecipeEditorView: View {
     }
   }
 
-  private func ingredientTextBinding(for sectionID: IngredientSection.ID) -> Binding<String> {
-    Binding(
-      get: { model.draft.ingredientSections.first { $0.id == sectionID }?.text ?? "" },
-      set: { text in
-        guard let sectionIndex = model.draft.ingredientSections.firstIndex(where: { $0.id == sectionID }) else {
-          return
-        }
-        ingredientTextMutationSectionIDs.insert(sectionID)
-        ingredientSelections[sectionID] = nil
-        ingredientSelectionUTF16Offsets[sectionID] = nil
-        model.draft.ingredientSections[sectionIndex].text = text
-        Task { @MainActor in
-          await Task.yield()
-          ingredientTextMutationSectionIDs.remove(sectionID)
-        }
-      }
-    )
-  }
-
-  private func ingredientSelectionBinding(
+  private func ingredientCaretUTF16OffsetBinding(
     for sectionID: IngredientSection.ID
-  ) -> Binding<TextSelection?> {
+  ) -> Binding<Int?> {
     Binding(
-      get: { ingredientSelections[sectionID] },
-      set: { selection in
-        ingredientSelections[sectionID] = selection
-        guard !ingredientTextMutationSectionIDs.contains(sectionID) else {
-          ingredientSelectionUTF16Offsets[sectionID] = nil
-          return
-        }
-        let currentText = model.draft.ingredientSections
-          .first { $0.id == sectionID }?
-          .text ?? ""
-        ingredientSelectionUTF16Offsets[sectionID] = selection
-          .flatMap { selectionUTF16Offset($0, in: currentText) }
-      }
+      get: { ingredientSelectionUTF16Offsets[sectionID] },
+      set: { ingredientSelectionUTF16Offsets[sectionID] = $0 }
     )
   }
 
@@ -304,20 +270,9 @@ struct RecipeEditorView: View {
     }
   }
 
-  private func selectionUTF16Offset(_ selection: TextSelection, in text: String) -> Int? {
-    guard case let .selection(range) = selection.indices else { return nil }
-    // `samePosition(in:)` traps for an index from a stale text value. The selection binding filters
-    // those transaction-local updates above; a settled selection, including a collapsed caret,
-    // identifies the line used by the accessory action.
-    guard let utf16Index = range.lowerBound.samePosition(in: text.utf16) else { return nil }
-    return text.utf16.distance(from: text.utf16.startIndex, to: utf16Index)
-  }
-
   private func pruneIngredientSelections() {
     let sectionIDs = Set(model.draft.ingredientSections.map(\.id))
-    ingredientSelections = ingredientSelections.filter { sectionIDs.contains($0.key) }
     ingredientSelectionUTF16Offsets = ingredientSelectionUTF16Offsets.filter { sectionIDs.contains($0.key) }
-    ingredientTextMutationSectionIDs = ingredientTextMutationSectionIDs.filter { sectionIDs.contains($0) }
   }
 
   private func scrollToAndFocusIngredientSection(
