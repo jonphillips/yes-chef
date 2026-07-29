@@ -120,6 +120,7 @@
 		CD5717B4A411916DC9E7499F /* RecipeChatWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07C439846D3B6561F2CFE399 /* RecipeChatWorkspace.swift */; };
 		CFBABC506840D72E020E663D /* RecipeScaleFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9095EE24ABAA5DC23259EDE9 /* RecipeScaleFormattingTests.swift */; };
 		D20B0260FC41D720A3A8DFAF /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = E526F7B4800D1EBE4D8A2A3E /* Dependencies */; };
+		D38F8BF6A2B76B48D4E9F6FF /* ServeWithRepairSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 071FE50DFC8E303A1C2F824E /* ServeWithRepairSheet.swift */; };
 		D4ECC1340963D28E217E0727 /* RecipeListPresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = E48B9ACFF26E71C15146E3E9 /* RecipeListPresets.swift */; };
 		D778483B6523AB97BDE06ED6 /* MenuModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7090DA55279458851517DD5A /* MenuModels.swift */; };
 		D8FB35A8C0D8195A104EE90D /* RecipeImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE2CEAA7C5D5836E123F474 /* RecipeImageLoader.swift */; };
@@ -172,6 +173,7 @@
 /* Begin PBXFileReference section */
 		03DFCF817329BEE674E95B72 /* YesChefApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YesChefApp.swift; sourceTree = "<group>"; };
 		0424EE313AB25F0AD46E963E /* HandoffInAppTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffInAppTransport.swift; sourceTree = "<group>"; };
+		071FE50DFC8E303A1C2F824E /* ServeWithRepairSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServeWithRepairSheet.swift; sourceTree = "<group>"; };
 		07C439846D3B6561F2CFE399 /* RecipeChatWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeChatWorkspace.swift; sourceTree = "<group>"; };
 		07FEC345E664B62E662EA479 /* YesChefPackage */ = {isa = PBXFileReference; lastKnownFileType = folder; name = YesChefPackage; path = YesChefPackage; sourceTree = SOURCE_ROOT; };
 		0BA4CA05A4077E714D63D297 /* CategoryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryModels.swift; sourceTree = "<group>"; };
@@ -488,6 +490,7 @@
 				4A44F5DE22E861C4E705A6BB /* RecipeVariationPromotionPresentation.swift */,
 				9EAAE31879D63DD62F7855F8 /* SeedCoverageModel.swift */,
 				556B8CD9C6727F96C1BD4684 /* SeedCoverageView.swift */,
+				071FE50DFC8E303A1C2F824E /* ServeWithRepairSheet.swift */,
 				8A4FCB37DBBA09D6123D7989 /* SettingsViews.swift */,
 				3EA663A481CAE11E140B6830 /* SyncHealthModel.swift */,
 				D9653CACD31CEA3DBF5F722E /* SyncStatusSection.swift */,
@@ -774,6 +777,7 @@
 				5D75D8F949C84F9809B50F78 /* RecipeVariationPromotionPresentation.swift in Sources */,
 				1B3549FAE4F58ED491148794 /* SeedCoverageModel.swift in Sources */,
 				EB63D8755383729654D000AC /* SeedCoverageView.swift in Sources */,
+				D38F8BF6A2B76B48D4E9F6FF /* ServeWithRepairSheet.swift in Sources */,
 				B25C46B6E82993FF7971FCE0 /* SettingsViews.swift in Sources */,
 				627BE832B346246A69355F57 /* SyncHealthModel.swift in Sources */,
 				33D3721651F83CF0864328C4 /* SyncStatusSection.swift in Sources */,

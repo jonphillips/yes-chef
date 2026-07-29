@@ -166,7 +166,7 @@ extension RecipeCoreTests {
       try database.read { db in
         let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
         expectNoDifference(
-          try ServeWithCoding.decode(recipe.serveWith),
+          try ServeWithCoding.decode(recipe.serveWith, recipeID: recipeID),
           [
             ServeWithItem(id: limeCremaID, title: "Lime crema", note: "Spoon over each bowl."),
             ServeWithItem(id: cornbreadID, title: "Skillet cornbread"),
@@ -220,7 +220,7 @@ extension RecipeCoreTests {
       try database.read { db in
         let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
         expectNoDifference(
-          try ServeWithCoding.decode(recipe.serveWith),
+          try ServeWithCoding.decode(recipe.serveWith, recipeID: recipeID),
           [
             ServeWithItem(id: unchangedItemID, title: "Lime crema", note: "Spoon over each bowl."),
             ServeWithItem(id: addedItemID, title: "Cabbage slaw"),
@@ -234,6 +234,7 @@ extension RecipeCoreTests {
     func corruptServeWithDataFailsLoudlyAndCannotBeOverwritten() throws {
       @Dependency(\.defaultDatabase) var database
       let createdAt = Date(timeIntervalSinceReferenceDate: 826_100_000)
+      let repairedAt = createdAt.addingTimeInterval(150)
       let clearedAt = createdAt.addingTimeInterval(180)
       let recipeID = SampleUUIDSequence.uuid(36_500)
       let itemID = SampleUUIDSequence.uuid(36_501)
@@ -251,10 +252,10 @@ extension RecipeCoreTests {
         }
         .execute(db)
 
-        #expect(throws: ServeWithCodingError.malformedData) {
-          _ = try ServeWithCoding.decode(corruptData)
+        #expect(throws: ServeWithCodingError.malformedData(recipeID: recipeID)) {
+          _ = try ServeWithCoding.decode(corruptData, recipeID: recipeID)
         }
-        #expect(throws: ServeWithCodingError.malformedData) {
+        #expect(throws: ServeWithCodingError.malformedData(recipeID: recipeID)) {
           try RecipeRepository.appendServeWithPlan(
             ServeWithPlan(items: [ServeWithSuggestion(title: "Cornbread")]),
             to: recipeID,
@@ -263,7 +264,7 @@ extension RecipeCoreTests {
             uuid: { itemID }
           )
         }
-        #expect(throws: ServeWithCodingError.malformedData) {
+        #expect(throws: ServeWithCodingError.malformedData(recipeID: recipeID)) {
           try RecipeRepository.replaceServeWithPlan(
             ServeWithPlan(items: [ServeWithSuggestion(title: "Cornbread")]),
             recipeID: recipeID,
@@ -272,7 +273,7 @@ extension RecipeCoreTests {
             uuid: { itemID }
           )
         }
-        #expect(throws: ServeWithCodingError.malformedData) {
+        #expect(throws: ServeWithCodingError.malformedData(recipeID: recipeID)) {
           try RecipeRepository.removeServeWithItem(
             itemID,
             recipeID: recipeID,
@@ -286,6 +287,31 @@ extension RecipeCoreTests {
         let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
         expectNoDifference(recipe.serveWith, corruptData)
         expectNoDifference(recipe.dateModified, createdAt)
+      }
+
+      _ = try database.write { db in
+        #expect(throws: ServeWithCodingError.malformedData(recipeID: recipeID)) {
+          try RecipeRepository.repairServeWith(corruptData, recipeID: recipeID, in: db, now: repairedAt)
+        }
+      }
+
+      try database.read { db in
+        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+        expectNoDifference(recipe.serveWith, corruptData)
+        expectNoDifference(recipe.dateModified, createdAt)
+      }
+
+      let repairedData = try #require(try ServeWithCoding.encode([
+        ServeWithItem(id: itemID, title: "Cornbread")
+      ]))
+      try database.write { db in
+        try RecipeRepository.repairServeWith(repairedData, recipeID: recipeID, in: db, now: repairedAt)
+      }
+
+      try database.read { db in
+        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+        expectNoDifference(recipe.serveWith, repairedData)
+        expectNoDifference(recipe.dateModified, repairedAt)
       }
 
       try database.write { db in
@@ -302,7 +328,7 @@ extension RecipeCoreTests {
     @Test
     func corruptServeWithDataPreventsRecipeChatAndHandoffContexts() throws {
       let now = Date(timeIntervalSinceReferenceDate: 826_200_000)
-      let detail = RecipeDetailData(
+      let recipeDetail = RecipeDetailData(
         recipe: Recipe(
           id: SampleUUIDSequence.uuid(36_510),
           title: "Chili",
@@ -312,17 +338,44 @@ extension RecipeCoreTests {
         )
       )
 
-      #expect(throws: ServeWithCodingError.malformedData) {
-        _ = try RecipeChatRecipeContext(detail: detail)
+      #expect(throws: ServeWithCodingError.malformedData(recipeID: recipeDetail.recipe.id)) {
+        _ = try RecipeChatRecipeContext(detail: recipeDetail)
       }
-      #expect(throws: ServeWithCodingError.malformedData) {
-        _ = try RecipeHandoffContext(detail: detail)
+      #expect(throws: ServeWithCodingError.malformedData(recipeID: recipeDetail.recipe.id)) {
+        _ = try RecipeHandoffContext(detail: recipeDetail)
+      }
+
+      let workbenchID = SampleUUIDSequence.uuid(36_520)
+      let workbenchDetail = WorkbenchDetailData(
+        workbench: Workbench(
+          id: workbenchID,
+          title: "Chili comparison",
+          sortOrder: 0,
+          dateCreated: now,
+          dateModified: now
+        ),
+        candidateRows: [
+          WorkbenchCandidateRowData(
+            candidate: WorkbenchCandidate(
+              id: SampleUUIDSequence.uuid(36_521),
+              workbenchID: workbenchID,
+              recipeID: recipeDetail.recipe.id,
+              recipeTitleSnapshot: recipeDetail.recipe.title,
+              sortOrder: 0,
+              dateCreated: now
+            ),
+            recipeDetail: recipeDetail
+          )
+        ]
+      )
+      #expect(throws: ServeWithCodingError.malformedData(recipeID: recipeDetail.recipe.id)) {
+        _ = try WorkbenchChatContext(detail: workbenchDetail, references: [])
       }
     }
 
     @Test
     func absentServeWithDataIsAnEmptyList() throws {
-      expectNoDifference(try ServeWithCoding.decode(nil), [])
+      expectNoDifference(try ServeWithCoding.decode(nil, recipeID: SampleUUIDSequence.uuid(36_511)), [])
     }
   }
 }

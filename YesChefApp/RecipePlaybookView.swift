@@ -16,6 +16,7 @@ struct RecipePlaybookView: View {
   @State private var readerFeedbackDrafts: [RecipeNote.ID: String] = [:]
   @State private var editingSection: PlaybookSectionKind?
   @State private var clearingSection: PlaybookSectionKind?
+  @State private var repairingServeWith: ServeWithRepairPresentation?
 
   var body: some View {
     let visibleNotes = model.visibleNotes
@@ -120,6 +121,9 @@ struct RecipePlaybookView: View {
           }
         )
       }
+    }
+    .sheet(item: $repairingServeWith) { presentation in
+      ServeWithRepairSheet(presentation: presentation, save: model.repairServeWith)
     }
     .confirmationDialog("Clear section?", item: $clearingSection) { section in
       Button("Clear \(section.title)", role: .destructive) {
@@ -282,8 +286,13 @@ struct RecipePlaybookView: View {
         }
       }
     case let .failure(error):
-      Label(error.localizedDescription, systemImage: "exclamationmark.triangle")
-        .foregroundStyle(.red)
+      VStack(alignment: .leading, spacing: 8) {
+        Label(error.localizedDescription, systemImage: "exclamationmark.triangle")
+          .foregroundStyle(.red)
+        Button("Repair Serve With") {
+          repairServeWithButtonTapped()
+        }
+      }
     }
   }
 
@@ -325,6 +334,12 @@ struct RecipePlaybookView: View {
       }
       .disabled(isServeWithUnreadable)
 
+      if isServeWithUnreadable {
+        Button("Repair") {
+          repairServeWithButtonTapped()
+        }
+      }
+
       // No per-section "Ask" here — the playbook opens an unseeded panel, and its Discuss ▾ switcher
       // is the one home for section-scoped discussion (ADR-0045 Amd 3).
 
@@ -350,6 +365,10 @@ struct RecipePlaybookView: View {
     case .serveWith:
       try model.commitServeWithText(text)
     }
+  }
+
+  private func repairServeWithButtonTapped() {
+    repairingServeWith = model.serveWithRepairPresentation
   }
 
   private func clear(_ section: PlaybookSectionKind) {
