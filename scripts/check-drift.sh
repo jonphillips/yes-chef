@@ -144,7 +144,7 @@ swift test --package-path YesChefPackage
 # So execution is opt-in via YESCHEF_RUN_APP_TESTS=1, and the block below always
 # prints where app-test execution stands so the gap is never silent again.
 #
-# All 26 pass as of 2026-07-27. Execution stays opt-in only because of the
+# All 29 pass as of 2026-07-29. Execution stays opt-in only because of the
 # teardown hang above, not because anything is known-red. If this stage ever
 # goes red, read docs/efforts/app-target-tests-to-core.md first: three of the
 # five original failures were stale expectations left behind by an API swap that
@@ -233,7 +233,7 @@ EOF
     cat <<'EOF'
 
 App test target: COMPILED AND LINKED, NOT RUN.
-Set YESCHEF_RUN_APP_TESTS=1 to execute it (boots a simulator; all 26 pass).
+Set YESCHEF_RUN_APP_TESTS=1 to execute it (boots a simulator; all 29 pass).
 
 EOF
   fi

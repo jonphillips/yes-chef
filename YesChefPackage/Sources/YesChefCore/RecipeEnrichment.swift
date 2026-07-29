@@ -438,22 +438,18 @@ extension RecipeRepository {
     now: Date
   ) throws {
     let data = try ServeWithCoding.encode(items)
-    try Recipe.find(recipeID).update {
-      $0.serveWith = #bind(data)
-      $0.dateModified = #bind(now)
-    }
-    .execute(db)
+    try updateServeWithData(data, recipeID: recipeID, in: db, now: now)
   }
 
   private static func updateServeWithData(
-    _ data: Data,
+    _ data: Data?,
     recipeID: Recipe.ID,
     in db: Database,
     now: Date
   ) throws {
     try Recipe.find(recipeID).update {
-      $0.serveWith = #bind(data)
-      $0.dateModified = #bind(now)
+      $0.serveWith = data
+      $0.dateModified = now
     }
     .execute(db)
   }

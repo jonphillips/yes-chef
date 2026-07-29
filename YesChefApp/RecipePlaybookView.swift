@@ -84,7 +84,8 @@ struct RecipePlaybookView: View {
     .sheet(item: $editingSection) { section in
       switch section {
       case .serveWith:
-        if case let .success(items) = model.serveWithItemsResult {
+        switch model.serveWithItemsResult {
+        case let .success(items):
           RecipePlaybookSectionEditorSheet(
             section: section,
             initialText: ServeWithPlan(
@@ -95,6 +96,16 @@ struct RecipePlaybookView: View {
               try commit(text, for: section)
             }
           )
+        case let .failure(error):
+          ContentUnavailableView {
+            Label("Serve With is unreadable", systemImage: "exclamationmark.triangle")
+          } description: {
+            Text(error.localizedDescription)
+          } actions: {
+            Button("Repair Serve With") {
+              model.repairServeWithButtonTapped()
+            }
+          }
         }
       case .makeAhead:
         RecipePlaybookSectionEditorSheet(

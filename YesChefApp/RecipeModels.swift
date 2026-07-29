@@ -944,8 +944,7 @@ final class RecipeDetailModel {
       destination = .chat(RecipeChatModel(context: .recipe(try RecipeChatRecipeContext(detail: detail))))
     } catch {
       if let error = error as? ServeWithCodingError, presentServeWithRepair(for: error) { return }
-      errorMessage = error.localizedDescription
-      isShowingError = true
+      showError(error)
     }
   }
 
@@ -960,8 +959,7 @@ final class RecipeDetailModel {
       seed = try RecipeHandoffContext(detail: detail).discussAsk(for: section)
     } catch {
       if let error = error as? ServeWithCodingError, presentServeWithRepair(for: error) { return }
-      errorMessage = error.localizedDescription
-      isShowingError = true
+      showError(error)
       return
     }
 
@@ -977,8 +975,7 @@ final class RecipeDetailModel {
         chatModel = RecipeChatModel(context: .recipe(try RecipeChatRecipeContext(detail: detail)))
       } catch {
         if let error = error as? ServeWithCodingError, presentServeWithRepair(for: error) { return }
-        errorMessage = error.localizedDescription
-        isShowingError = true
+        showError(error)
         return
       }
       destination = .chat(chatModel)
@@ -1004,7 +1001,8 @@ final class RecipeDetailModel {
   }
 
   private func isShowing(_ chatModel: RecipeChatModel) -> Bool {
-    destination.chat === chatModel
+    if case let .chat(current) = destination { return current === chatModel }
+    return false
   }
 
   func openWorkbenchButtonTapped() {

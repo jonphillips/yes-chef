@@ -14,13 +14,17 @@ extension RecipeDetailModel {
   }
 
   func repairServeWithButtonTapped() {
-    guard case let .failure(error) = serveWithItemsResult,
-      presentServeWithRepair(for: error)
-    else {
-      errorMessage = "Serve With repair could not be opened."
-      isShowingError = true
+    if case let .failure(error) = serveWithItemsResult,
+      presentServeWithRepair(for: error) {
       return
     }
+    errorMessage = "Serve With repair could not be opened."
+    isShowingError = true
+  }
+
+  func showError(_ error: Error) {
+    errorMessage = error.localizedDescription
+    isShowingError = true
   }
 
   func repairServeWith(_ text: String) throws {
