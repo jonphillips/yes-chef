@@ -78,13 +78,14 @@ struct RecipeEditorView: View {
 
       ForEach($model.draft.ingredientSections) { $section in
         Section {
-          StackedFormField(title: "Section title") {
-            TextField("Section title", text: $section.name)
-              .focused($focusedIngredientSectionNameID, equals: section.id)
-              .onSubmit {
-                model.ingredientSectionNameChanged(sectionID: section.id)
-                pruneIngredientSelections()
-              }
+          StackedTextField(
+            title: "Section title",
+            text: $section.name,
+            focusedSectionID: $focusedIngredientSectionNameID,
+            focusedSectionValue: section.id
+          ) {
+            model.ingredientSectionNameChanged(sectionID: section.id)
+            pruneIngredientSelections()
           }
           StackedTextEditor(
             title: "Ingredients",

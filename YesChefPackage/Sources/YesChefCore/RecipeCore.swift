@@ -326,6 +326,15 @@ extension RecipeRepository {
     now: Date,
     uuid: () -> UUID
   ) throws -> Recipe.ID {
+    var draft = draft
+    // Most callers pass through the live editor, which promotes heading syntax as it is typed.
+    // Normalize only flat, newly constructed cards here; persisted drafts already carry line identity,
+    // including the small audited set of historical colon-terminated ingredient rows.
+    for sectionID in draft.ingredientSections
+      .filter(\.lineDrafts.isEmpty)
+      .map(\.id) {
+      _ = draft.ingredientTextChanged(sectionID: sectionID, uuid: uuid)
+    }
     let recipeID = draft.id ?? uuid()
     let dateCreated = draft.dateCreated ?? now
     let existingDetail = try draft.id.flatMap { try fetchDetail(recipeID: $0, in: db) }
@@ -1009,6 +1018,8 @@ func reconcileIngredientLines(
       quantityText: parsedLine.quantityText ?? existingLine.quantityText,
       unit: parsedLine.unit ?? existingLine.unit,
       item: parsedLine.item ?? existingLine.item,
+      // The stored canonical name is the durable grocery key. Parsing may improve the readable
+      // ingredient fields, but cannot silently replace a classification a cook has already kept.
       canonicalName: existingLine.canonicalName
         ?? parsedLine.canonicalName
         ?? CanonicalIngredient.canonicalName((parsedLine.item ?? existingLine.item) ?? parsedLine.originalText),

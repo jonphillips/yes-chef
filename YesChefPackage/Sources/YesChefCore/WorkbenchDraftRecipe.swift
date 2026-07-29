@@ -137,7 +137,7 @@ public struct WorkbenchDraftRecipe: Equatable, Sendable {
     return draft
   }
 
-  public func editorDraft(libraryPlacement: RecipeLibraryPlacement) -> RecipeEditorDraft {
+  private func editorDraft(libraryPlacement: RecipeLibraryPlacement) -> RecipeEditorDraft {
     let noteParagraphs = (["Draft rationale: \(rationale)"] + notes)
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
       .filter { !$0.isEmpty }

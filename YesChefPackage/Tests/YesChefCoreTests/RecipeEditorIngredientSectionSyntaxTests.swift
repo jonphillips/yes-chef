@@ -96,11 +96,7 @@ extension RecipeCoreTests {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 831_000_000)
       var uuids = SampleUUIDSequence(start: 71_300)
-      var draft = RecipeEditorDraft(title: "Colon Cake", ingredientText: "For the batter:\n2 cups flour")
-      draft.ingredientTextChanged(
-        sectionID: draft.ingredientSections[0].id,
-        uuid: { uuids.next() }
-      )
+      let draft = RecipeEditorDraft(title: "Colon Cake", ingredientText: "For the batter:\n2 cups flour")
 
       try database.write { db in
         let recipeID = try RecipeRepository.save(draft: draft, in: db, now: now, uuid: { uuids.next() })
@@ -171,6 +167,15 @@ extension RecipeCoreTests {
         expectNoDifference(cream.shoppingCategory, "Dairy")
         expectNoDifference(cream.doNotShop, true)
         expectNoDifference(saved.ingredientLines.map(\.id).contains(creamID), true)
+
+        _ = try RecipeRepository.save(
+          draft: RecipeEditorDraft(detail: saved),
+          in: db,
+          now: now.addingTimeInterval(120),
+          uuid: { uuids.next() }
+        )
+        let noOpSaved = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+        expectNoDifference(noOpSaved.ingredientLines.first { $0.id == creamID }?.canonicalName, "heavy cream")
       }
     }
 

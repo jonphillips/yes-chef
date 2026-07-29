@@ -39,7 +39,10 @@ enum RecipeEditorSectionReconcile {
   ) -> IngredientPlan {
     var sections: [IngredientSection] = []
     var linesBySectionID: [IngredientSection.ID: [IngredientLine]] = [:]
-    let existingLinesByID = Dictionary(uniqueKeysWithValues: existingLines.map { ($0.id, $0) })
+    let existingLinesByID = Dictionary(
+      existingLines.map { ($0.id, $0) },
+      uniquingKeysWith: { first, _ in first }
+    )
 
     for (index, draftSection) in draftSections.enumerated() {
       let parsedLines = IngredientParser.lines(

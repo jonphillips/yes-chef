@@ -19,14 +19,43 @@ struct StackedTextField: View {
   @Binding var text: String
   var prompt: LocalizedStringKey?
   var axis: Axis = .horizontal
+  var focusedSectionID: FocusState<UUID?>.Binding? = nil
+  var focusedSectionValue: UUID? = nil
+  var onSubmit: (() -> Void)?
 
   var body: some View {
     StackedFormField(title: title) {
-      if let prompt {
-        TextField(title, text: $text, prompt: Text(prompt), axis: axis)
-      } else {
-        TextField(title, text: $text, axis: axis)
-      }
+      textField
+        .modifier(
+          OptionalTextFieldFocus(
+            focusedSectionID: focusedSectionID,
+            focusedSectionValue: focusedSectionValue
+          )
+        )
+        .onSubmit { onSubmit?() }
+    }
+  }
+
+  @ViewBuilder
+  private var textField: some View {
+    if let prompt {
+      TextField(title, text: $text, prompt: Text(prompt), axis: axis)
+    } else {
+      TextField(title, text: $text, axis: axis)
+    }
+  }
+}
+
+private struct OptionalTextFieldFocus: ViewModifier {
+  let focusedSectionID: FocusState<UUID?>.Binding?
+  let focusedSectionValue: UUID?
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if let focusedSectionID, let focusedSectionValue {
+      content.focused(focusedSectionID, equals: focusedSectionValue)
+    } else {
+      content
     }
   }
 }
