@@ -9,7 +9,7 @@ public enum ServeWithCoding {
     return try JSONEncoder().encode(items)
   }
 
-  public static func decode(_ data: Data?) throws -> [ServeWithItem] {
+  public static func decode(_ data: Data?) throws(ServeWithCodingError) -> [ServeWithItem] {
     guard let data else { return [] }
     do {
       return try JSONDecoder().decode([ServeWithItem].self, from: data)
@@ -18,34 +18,16 @@ public enum ServeWithCoding {
     }
   }
 
-  public static func decodingResult(
-    _ data: Data?
-  ) -> Result<[ServeWithItem], ServeWithCodingError> {
-    do {
-      return .success(try decode(data))
-    } catch let error as ServeWithCodingError {
-      return .failure(error)
-    } catch {
-      return .failure(.malformedData)
-    }
-  }
 }
 
-public enum ServeWithCodingError: Error, Equatable, LocalizedError, Sendable {
+public enum ServeWithCodingError: Error, Equatable, CustomStringConvertible, LocalizedError, Sendable {
   case malformedData
 
   public var errorDescription: String? {
     "Couldn't read Serve With. Its stored data was left unchanged."
   }
-}
 
-public extension Result where Success == [ServeWithItem], Failure == ServeWithCodingError {
-  var items: [ServeWithItem] {
-    switch self {
-    case let .success(items): items
-    case .failure: []
-    }
-  }
+  public var description: String { errorDescription ?? "Couldn't read Serve With." }
 }
 
 public struct ChefItUpPlan: Equatable, Sendable {

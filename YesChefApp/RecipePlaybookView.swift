@@ -257,7 +257,12 @@ struct RecipePlaybookView: View {
   }
 
   private func sectionMenu(for section: PlaybookSectionKind, isFilled: Bool) -> some View {
-    Menu {
+    let isServeWithUnreadable: Bool = switch section {
+    case .serveWith: model.serveWithItemsResult.isFailure
+    case .makeAhead, .chefItUp: false
+    }
+
+    return Menu {
       Button {
         Task {
           await handoffTransport.copyPrompt(for: .recipeSection(model.recipeID, section))
@@ -282,11 +287,12 @@ struct RecipePlaybookView: View {
       } label: {
         Label("Paste", systemImage: "doc.on.clipboard")
       }
-      .disabled(!UIPasteboard.general.hasStrings)
+      .disabled(isServeWithUnreadable || !UIPasteboard.general.hasStrings)
 
       Button(isFilled ? "Edit" : "Write manually") {
         editingSection = section
       }
+      .disabled(isServeWithUnreadable)
 
       // No per-section "Ask" here — the playbook opens an unseeded panel, and its Discuss ▾ switcher
       // is the one home for section-scoped discussion (ADR-0045 Amd 3).
@@ -424,6 +430,11 @@ private extension Result where Success == [ServeWithItem], Failure == ServeWithC
     case let .success(items): !items.isEmpty
     case .failure: true
     }
+  }
+
+  var isFailure: Bool {
+    if case .failure = self { return true }
+    return false
   }
 }
 

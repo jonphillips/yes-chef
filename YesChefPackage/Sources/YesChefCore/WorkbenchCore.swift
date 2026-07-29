@@ -383,7 +383,7 @@ public struct WorkbenchChatContextRequest: FetchKeyRequest {
   public func fetch(_ db: Database) throws -> WorkbenchChatContext? {
     guard let detail = try WorkbenchDetailRequest(workbenchID: workbenchID).fetch(db) else { return nil }
     let references = try WorkbenchReferenceRepository.references(for: workbenchID, in: db)
-    return WorkbenchChatContext(detail: detail, references: references)
+    return try WorkbenchChatContext(detail: detail, references: references)
   }
 }
 

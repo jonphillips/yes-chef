@@ -234,6 +234,7 @@ extension RecipeCoreTests {
     func corruptServeWithDataFailsLoudlyAndCannotBeOverwritten() throws {
       @Dependency(\.defaultDatabase) var database
       let createdAt = Date(timeIntervalSinceReferenceDate: 826_100_000)
+      let clearedAt = createdAt.addingTimeInterval(180)
       let recipeID = SampleUUIDSequence.uuid(36_500)
       let itemID = SampleUUIDSequence.uuid(36_501)
       let corruptData = Data("not Serve With JSON".utf8)
@@ -252,6 +253,15 @@ extension RecipeCoreTests {
 
         #expect(throws: ServeWithCodingError.malformedData) {
           _ = try ServeWithCoding.decode(corruptData)
+        }
+        #expect(throws: ServeWithCodingError.malformedData) {
+          try RecipeRepository.appendServeWithPlan(
+            ServeWithPlan(items: [ServeWithSuggestion(title: "Cornbread")]),
+            to: recipeID,
+            in: db,
+            now: createdAt.addingTimeInterval(30),
+            uuid: { itemID }
+          )
         }
         #expect(throws: ServeWithCodingError.malformedData) {
           try RecipeRepository.replaceServeWithPlan(
@@ -276,6 +286,37 @@ extension RecipeCoreTests {
         let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
         expectNoDifference(recipe.serveWith, corruptData)
         expectNoDifference(recipe.dateModified, createdAt)
+      }
+
+      try database.write { db in
+        try RecipeRepository.clearServeWith(recipeID: recipeID, in: db, now: clearedAt)
+      }
+
+      try database.read { db in
+        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+        expectNoDifference(recipe.serveWith, nil)
+        expectNoDifference(recipe.dateModified, clearedAt)
+      }
+    }
+
+    @Test
+    func corruptServeWithDataPreventsRecipeChatAndHandoffContexts() throws {
+      let now = Date(timeIntervalSinceReferenceDate: 826_200_000)
+      let detail = RecipeDetailData(
+        recipe: Recipe(
+          id: SampleUUIDSequence.uuid(36_510),
+          title: "Chili",
+          dateCreated: now,
+          dateModified: now,
+          serveWith: Data("not Serve With JSON".utf8)
+        )
+      )
+
+      #expect(throws: ServeWithCodingError.malformedData) {
+        _ = try RecipeChatRecipeContext(detail: detail)
+      }
+      #expect(throws: ServeWithCodingError.malformedData) {
+        _ = try RecipeHandoffContext(detail: detail)
       }
     }
 

@@ -364,7 +364,7 @@ extension RecipeCoreTests {
         ]
       )
 
-      let context = RecipeChatContext.recipe(RecipeChatRecipeContext(detail: detail))
+      let context = RecipeChatContext.recipe(try RecipeChatRecipeContext(detail: detail))
 
       expectNoDifference(
         context.serialized(),

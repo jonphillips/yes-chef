@@ -888,7 +888,11 @@ final class RecipeDetailModel {
   }
 
   var serveWithItemsResult: Result<[ServeWithItem], ServeWithCodingError> {
-    ServeWithCoding.decodingResult(recipe?.serveWith)
+    do {
+      return .success(try ServeWithCoding.decode(recipe?.serveWith))
+    } catch {
+      return .failure(error)
+    }
   }
 
   var learnings: [Learning] {
@@ -935,7 +939,12 @@ final class RecipeDetailModel {
       return
     }
     seededAskSection = nil
-    destination = .chat(RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail))))
+    do {
+      destination = .chat(RecipeChatModel(context: .recipe(try RecipeChatRecipeContext(detail: detail))))
+    } catch {
+      errorMessage = error.localizedDescription
+      isShowingError = true
+    }
   }
 
   /// Open the recipe chat scoped to `section`, or move an already-open chat to it, keeping the
@@ -961,7 +970,13 @@ final class RecipeDetailModel {
       guard seededAskSection != section else { return }  // already showing this section
       chatModel = existing
     } else {
-      chatModel = RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail)))
+      do {
+        chatModel = RecipeChatModel(context: .recipe(try RecipeChatRecipeContext(detail: detail)))
+      } catch {
+        errorMessage = error.localizedDescription
+        isShowingError = true
+        return
+      }
       destination = .chat(chatModel)
     }
 
