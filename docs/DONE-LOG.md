@@ -10,6 +10,44 @@ Newest first.
 
 ---
 ---
+## Playbook S1 — one shared row editor; Reader Feedback adopts it
+
+**✅ Done 2026-07-29.** Branch `codex/playbook-edit-grain-s1`, PR
+[#260](https://github.com/jonphillips/yes-chef/pull/260) (commit `615cb1c`, "Extract shared playbook row
+editor", plus the review follow-up commits). Spec:
+[`efforts/playbook-edit-grain-2026-07-26.md`](efforts/playbook-edit-grain-2026-07-26.md) § Slice S1. Owner:
+Codex implement, Claude architect/review. **No schema, no prod-promotion entry** — app layer only. Closes
+**Dispatch 1**; only Dispatch 2 (S3) remains on the effort.
+
+**What it does.** Extracts the `LearningsSection` / `LearningRow` interaction into one generic
+[`EditableRowsSection`](../../YesChefApp/EditableRowsSection.swift) — inline tap-to-edit (`TextField`,
+`axis: .vertical`), swipe-to-delete, and three **opt-in** capabilities: an add affordance, reorder, and a
+caller-supplied provenance badge. Learnings is rewired to it as a **pure refactor** (same title, empty state,
+divider logic, reorder mapping, add flow, and `.inApp` "Hand-authored" badge). Reader Feedback adopts it and
+**loses the bulk Edit/Done mode**: edit is now per row (no `TextEditor` box, no mode toggle), delete is a
+per-row swipe.
+
+**What it removes.** `LearningRow` and the four bulk-edit members Finding 3 named —
+`isEditingReaderFeedback`, `readerFeedbackDrafts`, `readerFeedbackDraftBinding(for:)`,
+`commitReaderFeedbackEdits(_:)` — with zero dangling references. The slice deletes more from the two call
+sites than the component adds, exactly as predicted.
+
+**The reframe held (Findings 2 & 4).** Reorder is opt-in, not assumed: `RecipeNote` has no `sortOrder`, so
+Reader Feedback passes a `nil` reorder handler — the component cleanly omits `.reorderable()` /
+`.reorderContainer` rather than degrading, and **no column was added to make the shape uniform**. The badge is
+injected by the caller, not inherited by the component.
+
+**Review + device caveat.** Approved with only minor non-blocking follow-ups (duplicate-initializer
+simplification, an `Edit learning:` → `Edit Learning:` VoiceOver-label capitalization, a trailing blank line),
+folded into the PR. The one thing flagged for Jon's device pass: Reader Feedback now renders
+`RecipeMarkdownText` inside a `.buttonStyle(.plain)` tap-to-edit button, so a row tap competes with any
+tappable markdown link in a feedback body — confirm the interaction on device.
+
+**Verification.** Elevated `generic/platform=iOS` build plus `scripts/check-drift.sh` (lint, package tests,
+app-test-bundle compilation).
+
+---
+---
 ## The `YesChefAppTests` link wall falls — SQLiteData 1.8.2 bump
 
 **✅ Done 2026-07-29.** Branch `codex/playbook-edit-grain-s0-1-repair`, PR
