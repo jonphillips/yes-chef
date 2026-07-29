@@ -19,14 +19,14 @@ struct GroceryIngredientSelectionPresentation: Identifiable, Sendable {
 final class GroceryLibraryModel {
   @CasePathable
   enum Destination {
-    case addCustomItem
-    case addList
+    case addCustomItem(GroceryItemEditorDraft)
+    case addList(GroceryListEditorDraft)
     case addPantryItem
     case clearAll(CoreGroceryList.ID)
     case clearPurchased(CoreGroceryList.ID)
     case deleteList(CoreGroceryList.ID)
-    case editItem(GroceryItem.ID)
-    case editList(CoreGroceryList.ID)
+    case editItem(GroceryItemEditorDraft)
+    case editList(GroceryListEditorDraft)
     case editPantryItem(PantryItem.ID)
     case selectIngredients(GroceryIngredientSelectionPresentation)
   }
@@ -37,6 +37,8 @@ final class GroceryLibraryModel {
   @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored
   @Dependency(\.uuid) private var uuid
+  @ObservationIgnored
+  @Dependency(\.continuousClock) private var continuousClock
   @ObservationIgnored
   @Fetch(GroceryListRequest(), animation: .default) var listRows: [GroceryListRowData] = []
   @ObservationIgnored
@@ -54,6 +56,14 @@ final class GroceryLibraryModel {
   var pantryAddBackItemIDsByListID: [CoreGroceryList.ID: Set<GroceryItem.ID>] = [:]
   @ObservationIgnored
   var groceryCategorizationAttemptCache = GroceryCategorizationAttemptCache()
+  @ObservationIgnored
+  private var categorizationDebounceTask: Task<Void, Never>?
+  @ObservationIgnored
+  private var categorizationSweepTask: Task<Void, Never>?
+
+  /// Two seconds is the top of the product-approved 1.5–2s quiet window: it keeps rapid
+  /// entry responsive while reliably batching a short run of adds into one classifier pass.
+  private static let categorizationDebounce = Duration.seconds(2)
 
   init(toastCenter: AppToastCenter? = nil) {
     self.toastCenter = toastCenter
@@ -506,7 +516,7 @@ final class GroceryLibraryModel {
           ingredientCount: selectedIngredientLineIDs.count
         ).message
       )
-      Task { await categorizeUncachedItems() }
+      scheduleCategorization()
       return true
     } catch {
       errorMessage = String(describing: error)
@@ -539,7 +549,7 @@ final class GroceryLibraryModel {
         return listID
       }
       self.selectedListID = listID
-      Task { await categorizeUncachedItems() }
+      scheduleCategorization()
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
@@ -573,7 +583,7 @@ final class GroceryLibraryModel {
         return listID
       }
       self.selectedListID = listID
-      Task { await categorizeUncachedItems() }
+      scheduleCategorization()
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
@@ -617,7 +627,7 @@ extension GroceryLibraryModel {
   }
 
   func addListButtonTapped() {
-    destination = .addList
+    destination = .addList(GroceryListEditorDraft())
   }
 
   func addPantryItemButtonTapped() {
@@ -625,15 +635,17 @@ extension GroceryLibraryModel {
   }
 
   func addCustomItemButtonTapped() {
-    destination = .addCustomItem
+    destination = .addCustomItem(GroceryItemEditorDraft())
   }
 
   func editItemButtonTapped(itemID: GroceryItem.ID) {
-    destination = .editItem(itemID)
+    guard let item = itemRows.first(where: { $0.id == itemID })?.item else { return }
+    destination = .editItem(GroceryItemEditorDraft(item: item))
   }
 
   func editListButtonTapped(listID: CoreGroceryList.ID) {
-    destination = .editList(listID)
+    guard let list = listRows.first(where: { $0.id == listID })?.list else { return }
+    destination = .editList(GroceryListEditorDraft(list: list))
   }
 
   func saveListButtonTapped(
@@ -679,37 +691,13 @@ extension GroceryLibraryModel {
     aisle: String,
     notes: String
   ) -> Bool {
-    do {
-      let selectedListID = selectedListID
-      let listID = try database.write { db in
-        let listID = try selectedOrDefaultGroceryListID(
-          selectedListID,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
-        try GroceryRepository.addCustomItem(
-          title: title,
-          quantityText: quantityText,
-          unit: unit,
-          aisle: aisle,
-          notes: notes,
-          groceryListID: listID,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
-        return listID
-      }
-      self.selectedListID = listID
-      destination = nil
-      Task { await categorizeUncachedItems() }
-      return true
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
-      return false
-    }
+    addCustomItem(
+      title: title,
+      quantityText: quantityText,
+      unit: unit,
+      aisle: aisle,
+      notes: notes
+    )
   }
 
   func saveItemButtonTapped(
@@ -754,11 +742,13 @@ extension GroceryLibraryModel {
     @Dependency(\.groceryCategorizationClient) var groceryCategorizationClient
 
     do {
+      try Task.checkCancellation()
       try await database.write { db in
         try GroceryStoreAreaCache.backfill(in: db)
       }
       try? await $itemRows.load()
 
+      try Task.checkCancellation()
       let uncategorizedNames = try await database.read { db in
         try GroceryStoreAreaCache.uncategorizedCanonicalNames(in: db)
       }
@@ -768,12 +758,94 @@ extension GroceryLibraryModel {
       let classified = try await groceryCategorizationClient(names: names, tier: .onDevice)
       guard !classified.isEmpty else { return }
 
+      // Deliberately no cancellation check here. `namesToClassify` above has already recorded
+      // these names as attempted, so a classification that made it back must be applied — the
+      // on-appear caller is cancelled on disappear, and bailing out would discard a paid-for
+      // result while leaving the names permanently unclassifiable for this model's lifetime.
       try await database.write { db in
         try GroceryStoreAreaCache.applyClassified(classified, in: db)
       }
       try? await $itemRows.load()
     } catch {
       return
+    }
+  }
+
+  func addItemLine(_ text: String) -> Bool {
+    guard let item = GroceryRapidAddItem(line: text) else { return false }
+    return addCustomItem(
+      title: item.title,
+      quantityText: item.quantityText ?? "",
+      unit: item.unit ?? "",
+      aisle: "",
+      notes: item.notes ?? ""
+    )
+  }
+
+  private func addCustomItem(
+    title: String,
+    quantityText: String,
+    unit: String,
+    aisle: String,
+    notes: String
+  ) -> Bool {
+    do {
+      let selectedListID = selectedListID
+      let listID = try database.write { db in
+        let listID = try selectedOrDefaultGroceryListID(
+          selectedListID,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+        try GroceryRepository.addCustomItem(
+          title: title,
+          quantityText: quantityText,
+          unit: unit,
+          aisle: aisle,
+          notes: notes,
+          groceryListID: listID,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+        return listID
+      }
+      self.selectedListID = listID
+      destination = nil
+      scheduleCategorization()
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
+  private func scheduleCategorization() {
+    categorizationDebounceTask?.cancel()
+    let clock = continuousClock
+    categorizationDebounceTask = Task { [weak self, clock] in
+      do {
+        try await clock.sleep(for: Self.categorizationDebounce)
+        try Task.checkCancellation()
+      } catch is CancellationError {
+        return
+      } catch {
+        return
+      }
+
+      self?.enqueueCategorizationSweep()
+    }
+  }
+
+  private func enqueueCategorizationSweep() {
+    // A sweep records attempted names before it calls the client, so it must never be cancelled
+    // after starting. Queue a subsequent burst behind it instead of discarding its result.
+    let previousSweepTask = categorizationSweepTask
+    categorizationSweepTask = Task { [weak self, previousSweepTask] in
+      await previousSweepTask?.value
+      await self?.categorizeUncachedItems()
     }
   }
 
@@ -784,6 +856,50 @@ extension GroceryLibraryModel {
         pantryAddBackItemIDsByListID[listID] = nil
       }
     }
+  }
+}
+
+@Observable
+@MainActor
+final class GroceryItemEditorDraft: Identifiable {
+  let id = UUID()
+  let itemID: GroceryItem.ID?
+  var title: String
+  var quantityText: String
+  var unit: String
+  var aisle: String
+  var notes: String
+
+  init(item: GroceryItem? = nil) {
+    itemID = item?.id
+    title = item?.title ?? ""
+    quantityText = item?.quantityText ?? ""
+    unit = item?.unit ?? ""
+    aisle = item?.aisle ?? ""
+    notes = item?.notes ?? ""
+  }
+
+  var isSaveDisabled: Bool {
+    title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+}
+
+@Observable
+@MainActor
+final class GroceryListEditorDraft: Identifiable {
+  let id = UUID()
+  let listID: CoreGroceryList.ID?
+  var title: String
+  var remindersListName: String
+
+  init(list: CoreGroceryList? = nil) {
+    listID = list?.id
+    title = list?.title ?? ""
+    remindersListName = list?.remindersListName ?? ""
+  }
+
+  var isSaveDisabled: Bool {
+    title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 }
 

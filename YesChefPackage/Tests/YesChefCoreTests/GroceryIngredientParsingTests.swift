@@ -9,6 +9,23 @@ extension RecipeCoreTests {
   @Suite
   struct GroceryIngredientParsingTests {
     @Test
+    func rapidAddPreservesPreparationAndAuthorComment() throws {
+      let item = try #require(
+        GroceryRapidAddItem(line: "2 cups chicken broth, chopped [low sodium]")
+      )
+
+      expectNoDifference(
+        item,
+        GroceryRapidAddItem(
+          title: "chicken broth",
+          quantityText: "2",
+          unit: "cups",
+          notes: "chopped; low sodium"
+        )
+      )
+    }
+
+    @Test
     func generatesGroceriesFromUnitlessIngredientItems() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 805_210_000)
