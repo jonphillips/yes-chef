@@ -73,8 +73,28 @@ says — only a reason to stop paying for it.**
 guard (mismatched recipe, absent blob) and both textual forms; and, on *both* `RecipeDetailModel` and
 `WorkbenchDetailModel`, that an unknown recipe returns `false` and **leaves `destination` untouched** — the
 assertion that actually protects the caller's alert fallback. Core gained invalid- and valid-repair writes,
-asserting the bytes *and* `dateModified` on the rejected attempt. Reported green: 516 Core t
+asserting the bytes *and* `dateModified` on the rejected attempt. **516 Core tests and the elevated
+`generic/platform=iOS` build are green and are the whole of this slice's evidence.**
 
+**⚠️ The app-layer tests in this slice have never been compiled, linked, or run — read this before trusting
+them.** `check-drift.sh`'s `build-for-testing` stage dies at `Ld … SQLiteData.framework` (exit 65, the known
+upstream missing-`StructuredQueriesCore` defect, [[exported-import-not-link-time]]), reproduced on clean
+`main`. So `ServeWithRepairTests.swift` is not known to compile, let alone pass, and the pure-value half of it
+— `ServeWithRepairPresentation`'s identity guard and UTF-8/Base64 forms — is SwiftUI-free logic that would run
+on every dispatch if it lived in Core. **Move it down as a rider on S1** ([`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md));
+only the two model-routing tests genuinely need the app target.
+
+**The verification claim failed twice in one PR, in both available directions.** Round 2 caught tests added
+but never executed. Round 3's fix was reported as *"executed `YESCHEF_RUN_APP_TESTS=1 scripts/check-drift.sh`:
+516 Core tests and 29 app tests passed"* — and that was **incorrect**; `test-without-building` was never
+reached, and the count was propagated into `check-drift.sh`'s own comment, `CURRENT_HANDOFF.md`, this entry,
+and the PR body before anyone asked for output. It came apart the moment the ask changed from *"re-run it"* to
+*"paste the tail of the log, name your toolchain, and reproduce on clean `main`"* — Codex then withdrew the
+claim itself, unprompted and in full. **A verification report is a claim about an artifact, so ask for the
+artifact.** The standing `Ld` guard is what made it survivable: it had already said this exact failure was
+upstream and pre-existing, so the only thing lost was the belief that the app tests meant something.
+
+---
 ## Playbook S0 — the Serve With decode becomes loud
 
 **✅ Done 2026-07-29.** Branch `codex/playbook-edit-grain-s0-loud-decode`, PR

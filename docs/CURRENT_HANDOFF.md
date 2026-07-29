@@ -145,11 +145,21 @@ already exist and already sync.
 **[`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) — the one optional follow-on
 left after the app test target was fixed. Small, unhurried, no decisions outstanding.** Move
 `WorkbenchCompareAlignmentModel` and `RecipeScaleFormatting` — SwiftUI-free logic sitting in `YesChefApp/` —
-down to Core. **Queue it on the "keep pure logic out of the App layer" corollary, not on testability:** the
-original "these tests execute nowhere" premise is gone, the target runs. Two riders — the yield-scaling fix
-already left two app-layer assertions redundant (flagged in place for this sweep rather than deleted
-drive-by), and adding a file to `YesChefAppTests` without re-running `xcodegen generate` silently excludes it
-from the bundle, so fewer files in that target is fewer chances to hit it.
+down to Core. **The testability premise is back, and that changes this entry's urgency.** It was retired
+because the target had started running; as of 2026-07-29 it does not — `build-for-testing` dies at the
+`Ld … SQLiteData.framework` defect (standing guard above), so "these tests execute nowhere" is literally true
+again for every test in `YesChefAppTests`. Keep the "keep pure logic out of the App layer" corollary as the
+reason to do it *well*; testability is once more a reason to do it *at all*.
+- **⚠️ Rider on S1 (do this one there, not here):** S0.1 left `ServeWithRepairPresentation` in `YesChefApp/`
+  with three tests that have **never compiled** — the identity guard and the UTF-8/Base64 forms are
+  SwiftUI-free value logic over `Recipe` and `ServeWithCodingError`, both Core types, so the type moves down
+  cleanly and its coverage starts running on every dispatch with no flag and no simulator. Only the two
+  model-routing tests (`RecipeDetailModel` / `WorkbenchDetailModel` `presentServeWithRepair`) genuinely need
+  the app target. S1 is already in these files; do not open a separate PR for it.
+- Two older riders — the yield-scaling fix
+  already left two app-layer assertions redundant (flagged in place for this sweep rather than deleted
+  drive-by), and adding a file to `YesChefAppTests` without re-running `xcodegen generate` silently excludes it
+  from the bundle, so fewer files in that target is fewer chances to hit it.
 
 **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell. Unblocked
 but unscheduled.** Its gate was satisfied 2026-07-25; nothing holds it except appetite. It moves all eight
@@ -294,8 +304,10 @@ regardless. So verify with **compiler + tests once**, then hand off:
   in `YesChefPackage` (which Codex *can* compile and test). #185's break was `HandoffIntents.swift` calling
   `date: .full` — logic that belonged in Core, where the package build would have caught it instantly.
 - **`YesChefAppTests` compiles and links on every `check-drift.sh` run, but only *executes* behind
-  `YESCHEF_RUN_APP_TESTS=1`** (it boots a simulator, and there is a teardown hang). All 29 pass as of
-  2026-07-29. So the old "a test there counts for nothing" rule is retired — but **Core is still the default
+  `YESCHEF_RUN_APP_TESTS=1`** (it boots a simulator, and there is a teardown hang). **26 verified as of
+  2026-07-27; the 3 added by S0.1 have never been compiled or run** — the `build-for-testing` stage is
+  currently blocked at the `Ld … SQLiteData.framework` defect below, so *nothing* in that target is being
+  checked today. So the old "a test there counts for nothing" rule is retired — but **Core is still the default
   home**, because `YesChefPackage/Tests/` runs on every dispatch with no flag and no simulator. Put a test in
   the app target only when it genuinely needs the app target, and say in the PR that you ran it with the flag.
 - **Note:** parts of the app target (`PantryViews.swift` / `GroceryViews.swift`) compile only in Jon's device
