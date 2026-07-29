@@ -887,8 +887,12 @@ final class RecipeDetailModel {
       : nil
   }
 
-  var serveWithItems: [ServeWithItem] {
-    ServeWithCoding.decode(recipe?.serveWith)
+  var serveWithItemsResult: Result<[ServeWithItem], ServeWithCodingError> {
+    do {
+      return .success(try ServeWithCoding.decode(recipe?.serveWith))
+    } catch {
+      return .failure(error)
+    }
   }
 
   var learnings: [Learning] {
@@ -935,7 +939,12 @@ final class RecipeDetailModel {
       return
     }
     seededAskSection = nil
-    destination = .chat(RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail))))
+    do {
+      destination = .chat(RecipeChatModel(context: .recipe(try RecipeChatRecipeContext(detail: detail))))
+    } catch {
+      errorMessage = error.localizedDescription
+      isShowingError = true
+    }
   }
 
   /// Open the recipe chat scoped to `section`, or move an already-open chat to it, keeping the
@@ -944,7 +953,14 @@ final class RecipeDetailModel {
   /// hides the playbook, so an in-panel switch is the only way to re-scope there.
   func askSection(_ section: PlaybookSectionKind) {
     guard let detail else { return }
-    let seed = RecipeHandoffContext(detail: detail).discussAsk(for: section)
+    let seed: String
+    do {
+      seed = try RecipeHandoffContext(detail: detail).discussAsk(for: section)
+    } catch {
+      errorMessage = error.localizedDescription
+      isShowingError = true
+      return
+    }
 
     // Ensure a panel. The recipe's chat thread persists *per recipe*, so a freshly-opened panel may
     // restore a warm thread from an earlier section — reopening for a different section must still
@@ -954,7 +970,13 @@ final class RecipeDetailModel {
       guard seededAskSection != section else { return }  // already showing this section
       chatModel = existing
     } else {
-      chatModel = RecipeChatModel(context: .recipe(RecipeChatRecipeContext(detail: detail)))
+      do {
+        chatModel = RecipeChatModel(context: .recipe(try RecipeChatRecipeContext(detail: detail)))
+      } catch {
+        errorMessage = error.localizedDescription
+        isShowingError = true
+        return
+      }
       destination = .chat(chatModel)
     }
 

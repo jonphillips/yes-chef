@@ -3,8 +3,8 @@
 **Type:** A standing data-loss fix (Dispatch 0) + app-layer component extraction (Dispatch 1) + a synced-table
 decomposition with migration (Dispatch 2). **Dispatches 0 and 1 have no schema; Dispatch 2 does.**
 **Owner:** Codex (implement) · Claude (architect/review) · Jon (product/device pass).
-**Status:** **Dispatch 0 ready and should ship on its own, first. Dispatch 1 ready. Dispatch 2 ready but
-sequenced behind both** — see Sequencing.
+**Status:** **Dispatch 0 ready and should ship on its own, first. S0.1 follows S0. Dispatch 1 ready. Dispatch
+2 ready but sequenced behind all three** — see Sequencing.
 
 > **Amended 2026-07-29 (architect review).** Three changes, all verified against the code: the loud decode was
 > pulled out of Dispatch 1 into its own **Dispatch 0** because it is a live data-loss bug and not merely
@@ -110,7 +110,34 @@ migration itself runs through, so it must be trustworthy *before* the migration,
 
 **Acceptance:** a corrupt blob surfaces as a reported failure, not an empty list; an absent blob (`nil`) is
 still a legitimate empty list, not an error; and neither `replaceServeWithPlan` nor `removeServeWithItem` can
-overwrite a blob it failed to read.
+overwrite a blob it failed to read, including through `appendServeWithPlan`.
+
+## SLICE S0.1 — repair sheet for an unreadable Serve With blob
+
+S0 deliberately blocks: a corrupt blob fails `RecipeChatRecipeContext.init`, taking down every AI surface that
+reads the recipe — `.makeAhead` / `.chefItUp` / adjust-recipe hand-offs, the recipe chat panel, and (via
+`WorkbenchChatContext`) the whole workbench chat and both workbench hand-offs, since Serve With ships as sibling
+context in all of them. That block is accepted: losing the bytes is worse than losing the surface. It is not
+shippable indefinitely without an exit, because today the only recovery is Clear, which destroys the very bytes
+S0 preserves.
+
+**Mechanism:** a sheet showing the raw undecodable blob as text, hand-editable, re-validated through
+`ServeWithCoding.decode` on save. It commits only on a clean decode; a still-invalid edit keeps the sheet open
+with the failure and never writes. No salvage-partial-items, no auto-repair — parsing “most of” a corrupt blob
+reopens the lossless-or-loud question that ADR-0040 closed, and the whole point of S0 is that the bytes survive
+for a human to look at.
+
+**Identity:** `ServeWithCodingError` must carry the recipe identity. From the Playbook that is implicit because
+the failure label sits on the offending recipe. From the workbench it is unactionable: a cook can be told
+“Couldn't read Serve With” with a draft and multiple candidates on screen, with no way to tell which one. The
+repair sheet must be reachable from the workbench failure, not only from the Playbook.
+
+This is a hard prerequisite for Dispatch 2, not a UX nicety. Post-S0 the row migration hits a corrupt blob and
+fails loudly by design; without a repair path that recipe's migration is permanently stuck.
+
+**Acceptance:** a cook can view and hand-edit the unreadable blob from both the Playbook and the relevant
+workbench failure; save writes only a cleanly decoded blob, while an invalid edit remains open with its failure
+and leaves the stored bytes unchanged.
 
 ---
 
@@ -133,15 +160,17 @@ with no mode toggle and no `TextEditor` box. The four bulk-edit members listed i
 
 ---
 
-# DISPATCH 2 — Serve With becomes rows (**schema**; sequenced after Dispatches 0 and 1)
+# DISPATCH 2 — Serve With becomes rows (**schema**; sequenced after S0, S0.1, and Dispatch 1)
 
 ## Sequencing (binding)
 
-**Dispatch 0 → Dispatch 1 → Dispatch 2.** S0 makes the migration's read path trustworthy; running the
-migration before it means a silently-empty decode migrates a recipe's Serve With into **nothing**, with no
-signal — the exact failure S0 exists to expose. S1 then produces the component Serve With adopts in step 5.
+**S0 → S0.1 → S1 → S3.** S0 makes the migration's read path trustworthy; running the migration before it
+means a silently-empty decode migrates a recipe's Serve With into **nothing**, with no signal — the exact
+failure S0 exists to expose. S0.1 then provides the repair path a loud migration requires for corrupt blobs.
+S1 produces the component Serve With adopts in step 5.
 
-S0 does **not** depend on S1, which is why it ships on its own and first.
+S0 does **not** depend on S1, which is why it ships on its own and first; S0.1 follows immediately as the
+required recovery path.
 
 ## SLICE S3 — `recipeServeWith`
 

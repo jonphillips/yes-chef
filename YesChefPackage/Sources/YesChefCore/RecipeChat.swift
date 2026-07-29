@@ -428,7 +428,7 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
     self.learnings = learnings
   }
 
-  public init(detail: RecipeDetailData) {
+  public init(detail: RecipeDetailData) throws {
     let ingredientLinesBySection = Dictionary(grouping: detail.ingredientLines) { $0.sectionID }
     self.init(
       recipeID: detail.recipe.id,
@@ -468,7 +468,7 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
         .map(\.text),
       makeAhead: detail.recipe.makeAhead,
       chefItUp: detail.recipe.chefItUp,
-      serveWith: ServeWithCoding.decode(detail.recipe.serveWith),
+      serveWith: try ServeWithCoding.decode(detail.recipe.serveWith),
       learnings: detail.learnings
         .sorted { $0.dateCreated < $1.dateCreated }
         .map(\.text)

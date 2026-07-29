@@ -4,8 +4,8 @@ import Foundation
 public struct RecipeHandoffContext: Equatable, Sendable {
   public let recipe: RecipeChatRecipeContext
 
-  public init(detail: RecipeDetailData) {
-    self.recipe = RecipeChatRecipeContext(detail: detail)
+  public init(detail: RecipeDetailData) throws {
+    self.recipe = try RecipeChatRecipeContext(detail: detail)
   }
 
   public init(recipe: RecipeChatRecipeContext) {

@@ -38,15 +38,15 @@ public struct WorkbenchChatContext: Equatable, Sendable {
     self.candidates = candidates
   }
 
-  public init(detail: WorkbenchDetailData, references: [WorkbenchReference]) {
+  public init(detail: WorkbenchDetailData, references: [WorkbenchReference]) throws {
     self.init(
       workbenchID: detail.workbench.id,
       title: detail.workbench.title,
       notes: detail.workbench.notes,
-      draftRecipe: detail.draftRecipeDetail.map(RecipeChatRecipeContext.init(detail:)),
+      draftRecipe: try detail.draftRecipeDetail.map(RecipeChatRecipeContext.init(detail:)),
       logEntries: detail.logEntries.map(WorkbenchLogEntryChatContext.init(entry:)),
       references: references.map(WorkbenchReferenceChatContext.init(reference:)),
-      candidates: detail.candidateRows.map(WorkbenchCandidateChatContext.init(row:))
+      candidates: try detail.candidateRows.map(WorkbenchCandidateChatContext.init(row:))
     )
   }
 
@@ -465,8 +465,8 @@ public struct WorkbenchCandidateChatContext: Equatable, Sendable {
     self.notes = notes
   }
 
-  public init(row: WorkbenchCandidateRowData) {
-    let recipeContext = row.recipeDetail.map(RecipeChatRecipeContext.init(detail:))
+  public init(row: WorkbenchCandidateRowData) throws {
+    let recipeContext = try row.recipeDetail.map(RecipeChatRecipeContext.init(detail:))
     self.init(
       id: row.candidate.id,
       recipeID: row.candidate.recipeID,

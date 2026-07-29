@@ -21,6 +21,7 @@ struct RecipePlaybookView: View {
     let visibleNotes = model.visibleNotes
     let readerFeedbackNotes = visibleNotes.filter { $0.noteType == .readerFeedback }
     let otherNotes = visibleNotes.filter { $0.noteType != .readerFeedback }
+    let serveWithItems = model.serveWithItemsResult
 
     VStack(alignment: .leading, spacing: 18) {
       playbookHeader
@@ -52,10 +53,10 @@ struct RecipePlaybookView: View {
       }
       playbookSection(
         .serveWith,
-        isFilled: !model.serveWithItems.isEmpty,
+        isFilled: serveWithItems.isFilled,
         isExpanded: $isServeWithExpanded
       ) {
-        serveWithContent(model.serveWithItems)
+        serveWithContent(serveWithItems)
       }
       if !model.deliberationLogEntries.isEmpty {
         playbookSection(
@@ -81,13 +82,44 @@ struct RecipePlaybookView: View {
       }
     }
     .sheet(item: $editingSection) { section in
-      RecipePlaybookSectionEditorSheet(
-        section: section,
-        initialText: editableText(for: section),
-        commit: { text in
-          try commit(text, for: section)
+      switch section {
+      case .serveWith:
+        switch model.serveWithItemsResult {
+        case let .success(items):
+          RecipePlaybookSectionEditorSheet(
+            section: section,
+            initialText: ServeWithPlan(
+              items: items.map { ServeWithSuggestion(title: $0.title, note: $0.note) }
+            )
+            .editableReviewText(),
+            commit: { text in
+              try commit(text, for: section)
+            }
+          )
+        case let .failure(error):
+          ContentUnavailableView(
+            "Serve With is unreadable",
+            systemImage: "exclamationmark.triangle",
+            description: Text(error.localizedDescription)
+          )
         }
-      )
+      case .makeAhead:
+        RecipePlaybookSectionEditorSheet(
+          section: section,
+          initialText: model.makeAhead ?? "",
+          commit: { text in
+            try commit(text, for: section)
+          }
+        )
+      case .chefItUp:
+        RecipePlaybookSectionEditorSheet(
+          section: section,
+          initialText: model.chefItUp ?? "",
+          commit: { text in
+            try commit(text, for: section)
+          }
+        )
+      }
     }
     .confirmationDialog("Clear section?", item: $clearingSection) { section in
       Button("Clear \(section.title)", role: .destructive) {
@@ -221,35 +253,47 @@ struct RecipePlaybookView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private func serveWithContent(_ items: [ServeWithItem]) -> some View {
-    VStack(alignment: .leading, spacing: 10) {
-      ForEach(items) { item in
-        HStack(alignment: .top, spacing: 10) {
-          VStack(alignment: .leading, spacing: 3) {
-            Text(item.title)
-              .font(.headline)
-            if let note = item.note {
-              Text(note)
-                .font(.callout)
-                .foregroundStyle(.secondary)
+  @ViewBuilder
+  private func serveWithContent(_ result: Result<[ServeWithItem], ServeWithCodingError>) -> some View {
+    switch result {
+    case let .success(items):
+      VStack(alignment: .leading, spacing: 10) {
+        ForEach(items) { item in
+          HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+              Text(item.title)
+                .font(.headline)
+              if let note = item.note {
+                Text(note)
+                  .font(.callout)
+                  .foregroundStyle(.secondary)
+              }
             }
+            Spacer(minLength: 8)
           }
-          Spacer(minLength: 8)
-        }
-        .swipeActions {
-          Button(role: .destructive) {
-            model.removeServeWithButtonTapped(item.id)
-          } label: {
-            Label("Remove \(item.title)", systemImage: "trash")
+          .swipeActions {
+            Button(role: .destructive) {
+              model.removeServeWithButtonTapped(item.id)
+            } label: {
+              Label("Remove \(item.title)", systemImage: "trash")
+            }
+            .accessibilityLabel(Text("Remove \(item.title)"))
           }
-          .accessibilityLabel(Text("Remove \(item.title)"))
         }
       }
+    case let .failure(error):
+      Label(error.localizedDescription, systemImage: "exclamationmark.triangle")
+        .foregroundStyle(.red)
     }
   }
 
   private func sectionMenu(for section: PlaybookSectionKind, isFilled: Bool) -> some View {
-    Menu {
+    let isServeWithUnreadable: Bool = switch section {
+    case .serveWith: model.serveWithItemsResult.isFailure
+    case .makeAhead, .chefItUp: false
+    }
+
+    return Menu {
       Button {
         Task {
           await handoffTransport.copyPrompt(for: .recipeSection(model.recipeID, section))
@@ -274,11 +318,12 @@ struct RecipePlaybookView: View {
       } label: {
         Label("Paste", systemImage: "doc.on.clipboard")
       }
-      .disabled(!UIPasteboard.general.hasStrings)
+      .disabled(isServeWithUnreadable || !UIPasteboard.general.hasStrings)
 
       Button(isFilled ? "Edit" : "Write manually") {
         editingSection = section
       }
+      .disabled(isServeWithUnreadable)
 
       // No per-section "Ask" here — the playbook opens an unseeded panel, and its Discuss ▾ switcher
       // is the one home for section-scoped discussion (ADR-0045 Amd 3).
@@ -294,20 +339,6 @@ struct RecipePlaybookView: View {
         .contentShape(.rect)
     }
     .accessibilityLabel("\(section.title) actions")
-  }
-
-  private func editableText(for section: PlaybookSectionKind) -> String {
-    switch section {
-    case .makeAhead:
-      model.makeAhead ?? ""
-    case .chefItUp:
-      model.chefItUp ?? ""
-    case .serveWith:
-      ServeWithPlan(
-        items: model.serveWithItems.map { ServeWithSuggestion(title: $0.title, note: $0.note) }
-      )
-      .editableReviewText()
-    }
   }
 
   private func commit(_ text: String, for section: PlaybookSectionKind) throws {
@@ -402,6 +433,20 @@ struct RecipePlaybookView: View {
       model.updateReaderFeedbackNote(note, text: draft)
     }
     readerFeedbackDrafts = [:]
+  }
+}
+
+private extension Result where Success == [ServeWithItem], Failure == ServeWithCodingError {
+  var isFilled: Bool {
+    switch self {
+    case let .success(items): !items.isEmpty
+    case .failure: true
+    }
+  }
+
+  var isFailure: Bool {
+    if case .failure = self { return true }
+    return false
   }
 }
 
