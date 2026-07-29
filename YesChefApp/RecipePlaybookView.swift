@@ -82,13 +82,44 @@ struct RecipePlaybookView: View {
       }
     }
     .sheet(item: $editingSection) { section in
-      RecipePlaybookSectionEditorSheet(
-        section: section,
-        initialText: editableText(for: section),
-        commit: { text in
-          try commit(text, for: section)
+      switch section {
+      case .serveWith:
+        switch model.serveWithItemsResult {
+        case let .success(items):
+          RecipePlaybookSectionEditorSheet(
+            section: section,
+            initialText: ServeWithPlan(
+              items: items.map { ServeWithSuggestion(title: $0.title, note: $0.note) }
+            )
+            .editableReviewText(),
+            commit: { text in
+              try commit(text, for: section)
+            }
+          )
+        case let .failure(error):
+          ContentUnavailableView(
+            "Serve With is unreadable",
+            systemImage: "exclamationmark.triangle",
+            description: Text(error.localizedDescription)
+          )
         }
-      )
+      case .makeAhead:
+        RecipePlaybookSectionEditorSheet(
+          section: section,
+          initialText: model.makeAhead ?? "",
+          commit: { text in
+            try commit(text, for: section)
+          }
+        )
+      case .chefItUp:
+        RecipePlaybookSectionEditorSheet(
+          section: section,
+          initialText: model.chefItUp ?? "",
+          commit: { text in
+            try commit(text, for: section)
+          }
+        )
+      }
     }
     .confirmationDialog("Clear section?", item: $clearingSection) { section in
       Button("Clear \(section.title)", role: .destructive) {
@@ -308,23 +339,6 @@ struct RecipePlaybookView: View {
         .contentShape(.rect)
     }
     .accessibilityLabel("\(section.title) actions")
-  }
-
-  private func editableText(for section: PlaybookSectionKind) -> String {
-    switch section {
-    case .makeAhead:
-      return model.makeAhead ?? ""
-    case .chefItUp:
-      return model.chefItUp ?? ""
-    case .serveWith:
-      guard case let .success(items) = model.serveWithItemsResult else {
-        preconditionFailure("Cannot edit unreadable Serve With")
-      }
-      return ServeWithPlan(
-        items: items.map { ServeWithSuggestion(title: $0.title, note: $0.note) }
-      )
-      .editableReviewText()
-    }
   }
 
   private func commit(_ text: String, for section: PlaybookSectionKind) throws {
