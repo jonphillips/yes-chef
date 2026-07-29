@@ -144,8 +144,21 @@ swift test --package-path YesChefPackage
 # So execution is opt-in via YESCHEF_RUN_APP_TESTS=1, and the block below always
 # prints where app-test execution stands so the gap is never silent again.
 #
-# All 29 pass as of 2026-07-29. Execution stays opt-in only because of the
-# teardown hang above, not because anything is known-red. If this stage ever
+# 26 of the current 29 were verified passing 2026-07-27. The 3 added by Playbook
+# S0.1 have NEVER been compiled or run: as of 2026-07-29 this stage does not
+# reach them, because build-for-testing dies at
+#   Ld .../PackageFrameworks/SQLiteData.framework/SQLiteData
+# with missing StructuredQueriesCore symbols (exit 65) — the upstream defect
+# described in CURRENT_HANDOFF's standing guard, reproduced on clean main. So
+# "26 pass" is a fact about 2026-07-27, not a statement about today's tree.
+#
+# Do NOT bump this count from a report. Bump it only from the tail of an actual
+# test-without-building run, because that is exactly how it went wrong: on
+# 2026-07-29 it was raised to 29 on the strength of a summary, while the stage
+# below had exited 65 and the tests had never been built.
+#
+# Execution stays opt-in because of the teardown hang above, not because
+# anything is known-red. If this stage ever
 # goes red, read docs/efforts/app-target-tests-to-core.md first: three of the
 # five original failures were stale expectations left behind by an API swap that
 # nothing ever ran, so "the test is wrong" and "the code is wrong" are both live
@@ -233,7 +246,8 @@ EOF
     cat <<'EOF'
 
 App test target: COMPILED AND LINKED, NOT RUN.
-Set YESCHEF_RUN_APP_TESTS=1 to execute it (boots a simulator; all 29 pass).
+Set YESCHEF_RUN_APP_TESTS=1 to execute it (boots a simulator; 26 of 29 last
+verified 2026-07-27 — the 3 from Playbook S0.1 have never been run).
 
 EOF
   fi

@@ -66,6 +66,7 @@
 		638EB65557B6EADDD89B33DD /* WebExtractorKit in Frameworks */ = {isa = PBXBuildFile; productRef = 161A231BCBA04E0D71C67DF2 /* WebExtractorKit */; };
 		64A2147BA244A92AD003A696 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = 86859006FF66FAFF04016AA2 /* SQLiteData */; };
 		6506971951AC784BCA68EFD5 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 3576C349C92C3F1CA77B4BC5 /* GRDB */; };
+		6545F06519BFDEA9F13357D9 /* CustomDump in Frameworks */ = {isa = PBXBuildFile; productRef = B7E40F24FD0304CCEA6A9777 /* CustomDump */; };
 		6588EBC345BB11E65929F52F /* MenuPlaybookColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A1F368F34241CAF035C9CA /* MenuPlaybookColumnView.swift */; };
 		68A79CAF1B3EDB56758F1CC1 /* MealCalendarHandoffSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EEED601CE748216744F3637 /* MealCalendarHandoffSource.swift */; };
 		69B8E2AD921E41D8B38D14C7 /* YesChefShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 396029D84F6F6E49A17C47D2 /* YesChefShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -304,6 +305,7 @@
 				64A2147BA244A92AD003A696 /* SQLiteData in Frameworks */,
 				6506971951AC784BCA68EFD5 /* GRDB in Frameworks */,
 				6DA879B39E3EDAD274830CFD /* StructuredQueriesCore in Frameworks */,
+				6545F06519BFDEA9F13357D9 /* CustomDump in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -536,6 +538,7 @@
 				86859006FF66FAFF04016AA2 /* SQLiteData */,
 				3576C349C92C3F1CA77B4BC5 /* GRDB */,
 				AC99988BCD47F72E8D1E43A6 /* StructuredQueriesCore */,
+				B7E40F24FD0304CCEA6A9777 /* CustomDump */,
 			);
 			productName = YesChefTests;
 			productReference = 59E522447CE52337EC8C4546 /* YesChefTests.xctest */;
@@ -628,6 +631,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				9E510FCDFD2C866AB4A61A46 /* XCRemoteSwiftPackageReference "swift-case-paths" */,
+				DE1542BD614FC83C36333FD0 /* XCRemoteSwiftPackageReference "swift-custom-dump" */,
 				A927C2C338F67E8F2C611140 /* XCRemoteSwiftPackageReference "swift-dependencies" */,
 				A9A58BB4AFC674A75EA282BA /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				0FE2DAE45E5731FFCF8C21D2 /* XCRemoteSwiftPackageReference "sqlite-data" */,
@@ -1137,7 +1141,7 @@
 			repositoryURL = "https://github.com/pointfreeco/sqlite-data";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.0.0;
+				minimumVersion = 1.8.0;
 			};
 		};
 		8905B07D7FD63BCF3E395911 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
@@ -1178,6 +1182,14 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 7.6.0;
+			};
+		};
+		DE1542BD614FC83C36333FD0 /* XCRemoteSwiftPackageReference "swift-custom-dump" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-custom-dump";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -1261,6 +1273,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 8C626E2F21AE016D9E0C1DB5 /* XCRemoteSwiftPackageReference "swift-navigation" */;
 			productName = SwiftUINavigation;
+		};
+		B7E40F24FD0304CCEA6A9777 /* CustomDump */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DE1542BD614FC83C36333FD0 /* XCRemoteSwiftPackageReference "swift-custom-dump" */;
+			productName = CustomDump;
 		};
 		C7BEE9F7CA89D087F20759A9 /* StructuredQueriesCore */ = {
 			isa = XCSwiftPackageProductDependency;

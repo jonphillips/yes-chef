@@ -80,7 +80,7 @@ struct ServeWithRepairTests {
       try $0.bootstrapDatabase()
     } operation: {
       @Dependency(\.defaultDatabase) var database
-      try database.write { db in
+      try await database.write { db in
         try Recipe.insert {
           Recipe(
             id: candidateRecipeID,
@@ -143,7 +143,7 @@ struct ServeWithRepairTests {
       try $0.bootstrapDatabase()
     } operation: {
       @Dependency(\.defaultDatabase) var database
-      try database.write { db in
+      try await database.write { db in
         try Recipe.insert {
           Recipe(
             id: recipeID,
