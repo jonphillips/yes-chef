@@ -107,104 +107,47 @@ struct LearningsSection: View {
   var updateLearning: (Learning, String) -> Void
   var deleteLearning: (Learning.ID) -> Void
   var reorderLearnings: ([Learning.ID], LearningReorderDestination) -> Void
-  @State private var isAdding = false
-  @State private var newLearningText = ""
-  @FocusState private var isNewLearningFocused: Bool
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      HStack {
-        Text("Learnings").font(.title2.weight(.semibold))
-        Spacer()
-        if addLearning != nil {
-          Button {
-            isAdding = true
-            isNewLearningFocused = true
-          } label: {
-            Label("Add Learning", systemImage: "plus")
+    EditableRowsSection(
+      title: "Learnings",
+      titleFont: .title2.weight(.semibold),
+      editorLabel: "Learning",
+      items: learnings,
+      itemText: \.text,
+      addItem: addLearning.map { addLearning in
+        { text in
+          switch addLearning(text) {
+          case .added, .duplicate:
+            true
+          case .failed:
+            false
           }
         }
+      },
+      addButtonLabel: "Add Learning",
+      updateItem: updateLearning,
+      deleteItem: { deleteLearning($0.id) },
+      reorderItems: { sourceIDs, destinationID in
+        reorderLearnings(
+          sourceIDs,
+          destinationID.map(LearningReorderDestination.before) ?? .end
+        )
       }
-      if isAdding {
-        VStack(alignment: .leading, spacing: 8) {
-          TextField("Learning", text: $newLearningText, axis: .vertical)
-            .lineLimit(2...6)
-            .focused($isNewLearningFocused)
-          HStack {
-            Button("Cancel") {
-              newLearningText = ""
-              isAdding = false
-            }
-            Spacer()
-            Button("Add") {
-              switch addLearning?(newLearningText) {
-              case .some(.added), .some(.duplicate):
-                newLearningText = ""
-                isAdding = false
-              case .some(.failed), .none:
-                break
-              }
-            }
-            .disabled(newLearningText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-          }
-        }
-        .attentionCard()
-      }
-      if learnings.isEmpty && !isAdding {
-        ContentUnavailableView("No Learnings Yet", systemImage: "lightbulb", description: Text("Add a cooking observation or keep useful ideas from an AI handoff here."))
-      } else if !learnings.isEmpty {
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(learnings, id: \.id) { learning in
-            VStack(spacing: 0) {
-              LearningRow(learning: learning, update: updateLearning, delete: deleteLearning)
-              if learning.id != learnings.last?.id { Divider() }
-            }
-          }
-          .reorderable()
-        }
-        .reorderContainer(for: Learning.self, itemID: \.id) { difference in
-          switch difference.destination.position {
-          case let .before(id):
-            reorderLearnings(difference.sources, .before(id))
-          case .end:
-            reorderLearnings(difference.sources, .end)
-          }
-        }
+    ) {
+      ContentUnavailableView(
+        "No Learnings Yet",
+        systemImage: "lightbulb",
+        description: Text("Add a cooking observation or keep useful ideas from an AI handoff here.")
+      )
+    } itemContent: { learning in
+      Text(learning.text)
+    } badge: { learning in
+      if learning.provenance == .inApp {
+        Label("Hand-authored", systemImage: "pencil")
+          .font(.caption)
+          .foregroundStyle(.secondary)
       }
     }
-    .onChange(of: isAdding) { _, isAdding in
-      isNewLearningFocused = isAdding
-    }
-  }
-}
-
-struct LearningRow: View {
-  let learning: Learning
-  var update: (Learning, String) -> Void
-  var delete: (Learning.ID) -> Void
-  @State private var isEditing = false
-  @State private var draft = ""
-  var body: some View {
-    Group {
-      if isEditing { VStack(alignment: .leading, spacing: 8) {
-        TextField("Learning", text: $draft, axis: .vertical).lineLimit(2...6)
-        HStack { Button("Cancel") { draft = learning.text; isEditing = false }; Spacer(); Button("Save") { update(learning, draft); isEditing = false }.disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
-      } } else {
-        Button { draft = learning.text; isEditing = true } label: {
-          VStack(alignment: .leading, spacing: 4) {
-            Text(learning.text).frame(maxWidth: .infinity, alignment: .leading)
-            if learning.provenance == .inApp {
-              Label("Hand-authored", systemImage: "pencil")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-          }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Edit learning: \(learning.text)")
-      }
-    }
-    .padding(.vertical, 12)
-    .swipeActions { Button(role: .destructive) { delete(learning.id) } label: { Label("Delete", systemImage: "trash") } }
   }
 }
