@@ -50,7 +50,13 @@ extension MenuDetailModel {
     do {
       try database.write { db in
         try PrepPlanStepRepository.update(
-          id: id, session: draft.session, task: draft.task, serves: draft.serves, in: db, now: now
+          id: id,
+          session: draft.session,
+          task: draft.task,
+          serves: draft.serves,
+          sourceDish: draft.sourceDish,
+          in: db,
+          now: now
         )
       }
       toastCenter?.postSuccess("Updated prep step.")

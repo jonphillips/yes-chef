@@ -477,7 +477,7 @@ struct MenuPrepPlanSection: View {
       }
     }
     .sheet(item: $editor) { draft in
-      PrepPlanStepEditorSheet(draft: draft) { savedDraft in
+      PrepPlanStepEditorSheet(draft: draft, itemRows: itemRows) { savedDraft in
         if let id = savedDraft.stepID {
           updateStep(savedDraft.step, id)
         } else {

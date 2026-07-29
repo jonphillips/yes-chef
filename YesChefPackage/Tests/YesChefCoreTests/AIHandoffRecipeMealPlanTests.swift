@@ -271,9 +271,13 @@ extension AIHandoffTests {
 
   @Test
   func dayScopedPrepPromptKeepsTheWholeCurrentPlanWhileScopingDishes() {
+    let calendar = Calendar.autoupdatingCurrent
+    let startDate = calendar.date(from: DateComponents(year: 2026, month: 8, day: 14, hour: 12))!
+    let dayTwoDate = calendar.date(byAdding: .day, value: 1, to: startDate)!
     let context = MenuChatContext(
       title: "Weekend Menu",
       dayCount: 2,
+      placementStartDate: startDate,
       prepPlan: [
         PrepPlanStepRecord(
           id: SampleUUIDSequence.uuid(38_046), menuID: SampleUUIDSequence.uuid(38_047), sortOrder: 0,
@@ -297,13 +301,18 @@ extension AIHandoffTests {
     )
 
     let scoped = context.scoped(toDayOffset: 1)
-    let prompt = "\(MenuDayHandoffScope.prepInstruction(dayOffset: 1))\n\n\(scoped.prepPrompt())"
+    let instruction = MenuDayHandoffScope.prepInstruction(
+      dayOffset: 1,
+      placementStartDate: scoped.placementStartDate
+    )
+    let prompt = "\(instruction)\n\n\(scoped.prepPrompt())"
 
     #expect(scoped.dayCount == 1)
     #expect(scoped.items.map(\.title) == ["Saturday Soup"])
     #expect(scoped.prepPlan.map(\.task) == ["Salt the pizza dough", "Soak the beans"])
     #expect(prompt.contains("Salt the pizza dough"))
     #expect(prompt.contains("preserve every existing step for other days verbatim and in place"))
+    #expect(prompt.contains("Day 2 (\(dayTwoDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())))"))
   }
 
   @Test

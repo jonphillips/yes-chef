@@ -60,27 +60,63 @@ struct PrepPlanStepEditorDraft: Identifiable {
   var customSession: String
   var task: String
   var serves: String
+  var sourceDish: MenuItem.ID?
   var id: String { stepID?.uuidString ?? "new" }
 
-  init() { stepID = nil; sessionBand = .flexible; customSession = ""; task = ""; serves = "" }
+  init() {
+    stepID = nil
+    sessionBand = .flexible
+    customSession = ""
+    task = ""
+    serves = ""
+    sourceDish = nil
+  }
+
   init(step: PrepPlanStepRecord) {
     stepID = step.id
     sessionBand = PrepPlanSessionBand.allCases.first(where: { $0.title == step.session }) ?? .other
-    customSession = step.session; task = step.task; serves = step.serves ?? ""
+    customSession = step.session
+    task = step.task
+    serves = step.serves ?? ""
+    sourceDish = step.sourceDish
   }
+
   var step: PrepPlanStep {
-    PrepPlanStep(session: sessionBand == .other ? customSession : sessionBand.title, task: task,
-      serves: serves.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : serves)
+    PrepPlanStep(
+      session: sessionBand == .other ? customSession : sessionBand.title,
+      task: task,
+      serves: serves.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : serves,
+      sourceDish: sourceDish
+    )
   }
 }
 
 struct PrepPlanStepEditorSheet: View {
   @Environment(\.dismiss) private var dismiss
   @State private var draft: PrepPlanStepEditorDraft
+  private let itemRows: [MenuItemRowData]
+  private let suggestedSourceDish: MenuItem.ID?
   let save: (PrepPlanStepEditorDraft) -> Void
-  init(draft: PrepPlanStepEditorDraft, save: @escaping (PrepPlanStepEditorDraft) -> Void) {
-    _draft = State(initialValue: draft); self.save = save
+
+  init(
+    draft: PrepPlanStepEditorDraft,
+    itemRows: [MenuItemRowData],
+    save: @escaping (PrepPlanStepEditorDraft) -> Void
+  ) {
+    let suggestion = draft.sourceDish == nil
+      ? PrepPlanDishMatcher.suggestedSourceDish(
+        serves: draft.serves,
+        among: itemRows.map { PrepPlanDishMatchCandidate(id: $0.id, title: $0.displayTitle) }
+      )
+      : nil
+    var initialDraft = draft
+    initialDraft.sourceDish = suggestion ?? initialDraft.sourceDish
+    _draft = State(initialValue: initialDraft)
+    self.itemRows = itemRows
+    suggestedSourceDish = suggestion
+    self.save = save
   }
+
   var body: some View {
     NavigationStack {
       Form {
@@ -90,6 +126,19 @@ struct PrepPlanStepEditorSheet: View {
         if draft.sessionBand == .other { VStack(alignment: .leading) { Text("Other session"); TextField("e.g. Wednesday evening", text: $draft.customSession) } }
         VStack(alignment: .leading) { Text("Task"); TextField("e.g. Salt the chicken", text: $draft.task, axis: .vertical).lineLimit(2...4) }
         VStack(alignment: .leading) { Text("Serves"); TextField("Optional meal or day", text: $draft.serves) }
+        VStack(alignment: .leading, spacing: 4) {
+          Picker("Dish", selection: $draft.sourceDish) {
+            Text("No dish").tag(MenuItem.ID?.none)
+            ForEach(itemRows) { row in
+              Text(row.displayTitle).tag(Optional(row.id))
+            }
+          }
+          if draft.sourceDish == suggestedSourceDish, suggestedSourceDish != nil {
+            Text("Matched from ‘Serves’. Save to link.")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          }
+        }
       }
       .navigationTitle(draft.stepID == nil ? "Add Prep Step" : "Edit Prep Step")
       .toolbar {
@@ -98,7 +147,12 @@ struct PrepPlanStepEditorSheet: View {
       }
     }
   }
-  private var canSave: Bool { !draft.task.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (draft.sessionBand != .other || !draft.customSession.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
+
+  private var canSave: Bool {
+    !draft.task.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      && (draft.sessionBand != .other
+        || !draft.customSession.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+  }
 }
 
 struct LearningsSection: View {

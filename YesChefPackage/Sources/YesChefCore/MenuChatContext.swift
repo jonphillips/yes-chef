@@ -12,6 +12,7 @@ public struct MenuChatContext: Equatable, Sendable {
   public var title: String
   public var notes: String?
   public var dayCount: Int
+  public var placementStartDate: Date?
   public var prepPlan: [PrepPlanStepRecord]
   public var items: [MenuChatItemContext]
   public var learnings: [Learning]
@@ -21,6 +22,7 @@ public struct MenuChatContext: Equatable, Sendable {
     title: String,
     notes: String? = nil,
     dayCount: Int,
+    placementStartDate: Date? = nil,
     prepPlan: [PrepPlanStepRecord] = [],
     items: [MenuChatItemContext] = [],
     learnings: [Learning] = []
@@ -29,6 +31,7 @@ public struct MenuChatContext: Equatable, Sendable {
     self.title = title
     self.notes = notes
     self.dayCount = dayCount
+    self.placementStartDate = placementStartDate
     self.prepPlan = prepPlan
     self.items = items
     self.learnings = learnings
@@ -40,6 +43,7 @@ public struct MenuChatContext: Equatable, Sendable {
       title: detail.menu.title,
       notes: detail.menu.notes,
       dayCount: detail.menu.dayCount,
+      placementStartDate: detail.placements.count == 1 ? detail.placements[0].startDate : nil,
       prepPlan: detail.prepPlanSteps,
       items: detail.itemRows.map(MenuChatItemContext.init(row:)),
       learnings: detail.learnings
@@ -61,7 +65,7 @@ public struct MenuChatContext: Equatable, Sendable {
   public func prepPrompt(destination: AIHandoffPromptDestination = .outboard) -> String {
     @Dependency(\.aiPromptPreferences) var preferences
     let settings = preferences.current()
-    return Self.prepPrompt(
+    return prepPrompt(
       context: serialized(for: .frontierPreferred),
       tasteProfile: settings.tasteProfile,
       makeAheadPreference: AISettingsRepository.preference(
@@ -189,12 +193,22 @@ public struct MenuChatContext: Equatable, Sendable {
     return items.map { $0.keyIngredients.count }.max() ?? 0
   }
 
-  private static func prepPrompt(
+  private func prepPrompt(
     context: String,
     tasteProfile: String,
     makeAheadPreference: String,
     destination: AIHandoffPromptDestination
   ) -> String {
+    let calendarInstruction: String
+    if placementStartDate != nil {
+      calendarInstruction = """
+      The calendar dates in the menu context are authoritative. Use day-anchored work-session labels such as "Thursday evening" or "Saturday · ~3 hrs out", not relative horizons. In each serves suffix, name the actual day and dish when useful, such as "Saturday's Korean Bavette".
+      """
+    } else {
+      calendarInstruction = """
+      This menu has no calendar dates. Keep work-session labels in relative-horizon wording such as "Two days ahead" or "Morning of"; do not invent a day. Use the same relative wording in serves when needed, such as "tomorrow's beef".
+      """
+    }
     let transportInstruction = switch destination {
     case .outboard:
       " This text will be pasted back into the recipe app, so do not include commentary, Markdown fences, menu item IDs, or JSON."
@@ -207,6 +221,8 @@ public struct MenuChatContext: Equatable, Sendable {
     }
     return """
     You weave a staged prep plan for one multi-day menu from the menu context below. Compose from stored per-recipe Make-Ahead notes when present, and invent grounded sequencing, work sessions, and new prep steps from the menu's dishes. Prefer the authored Make-Ahead notes when they are available.
+
+    \(calendarInstruction)
 
     Taste profile:
     \(tasteProfile)
@@ -265,6 +281,9 @@ public struct MenuChatContext: Equatable, Sendable {
     var lines = ["The user is looking at this menu:"]
     lines.append("- Title: \(title.isEmpty ? "(untitled)" : title)")
     lines.append("- Duration: \(dayCount == 1 ? "1 day" : "\(dayCount) days")")
+    if let placementStartDate {
+      lines.append("- Dates: \(menuDateSpan(startingAt: placementStartDate, dayCount: dayCount))")
+    }
     if let notes { lines.append("- Menu notes: \(notes.replacingOccurrences(of: "\n", with: " "))") }
     if !prepPlan.isEmpty {
       lines.append("Current prep plan:")
@@ -302,7 +321,15 @@ public struct MenuChatContext: Equatable, Sendable {
       lines.append("- \(item.title.isEmpty ? "(untitled)" : item.title)")
       lines.append("  - Menu item ID: \(item.id.uuidString)")
       lines.append("  - Kind: \(item.kind.title)")
-      lines.append("  - Day: \(item.dayOffset + 1) (dayOffset \(item.dayOffset))")
+      let date = placementStartDate.flatMap {
+        Calendar.autoupdatingCurrent.date(byAdding: .day, value: item.dayOffset, to: $0)
+      }
+      let dayDescription = if let date {
+        "\(item.dayOffset + 1) (dayOffset \(item.dayOffset), \(menuDateLabel(date)))"
+      } else {
+        "\(item.dayOffset + 1) (dayOffset \(item.dayOffset))"
+      }
+      lines.append("  - Day: \(dayDescription)")
       lines.append("  - Meal slot: \(item.mealSlot.title)")
       if let prepTimeMinutes = item.prepTimeMinutes {
         lines.append("  - Prep time: \(prepTimeMinutes) minutes")
@@ -339,9 +366,16 @@ public struct MenuChatContext: Equatable, Sendable {
 }
 
 public enum MenuDayHandoffScope {
-  public static func prepInstruction(dayOffset: Int) -> String {
-    """
-    This request focuses on Day \(dayOffset + 1) dishes. The context includes only that day's dishes, but it also includes the full current prep plan for the menu. Return the whole menu prep plan: preserve every existing step for other days verbatim and in place, and weave Day \(dayOffset + 1) changes into the existing horizon bands rather than adding a new appended section. Anything omitted from the reply will be deleted.
+  public static func prepInstruction(dayOffset: Int, placementStartDate: Date? = nil) -> String {
+    let dayTitle = if let placementStartDate,
+      let date = Calendar.autoupdatingCurrent.date(byAdding: .day, value: dayOffset, to: placementStartDate)
+    {
+      "Day \(dayOffset + 1) (\(menuDateLabel(date)))"
+    } else {
+      "Day \(dayOffset + 1)"
+    }
+    return """
+    This request focuses on \(dayTitle) dishes. The context includes only that day's dishes, but it also includes the full current prep plan for the menu. Return the whole menu prep plan: preserve every existing step for other days verbatim and in place, and weave \(dayTitle) changes into the existing horizon bands rather than adding a new appended section. Anything omitted from the reply will be deleted.
     """
   }
 
@@ -445,4 +479,17 @@ private func areMenuChatItemsInIncreasingOrder(
     return lhs.sortOrder < rhs.sortOrder
   }
   return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+}
+
+private func menuDateSpan(startingAt startDate: Date, dayCount: Int) -> String {
+  guard dayCount > 1,
+    let endDate = Calendar.autoupdatingCurrent.date(byAdding: .day, value: dayCount - 1, to: startDate)
+  else {
+    return menuDateLabel(startDate)
+  }
+  return "\(menuDateLabel(startDate))–\(menuDateLabel(endDate))"
+}
+
+private func menuDateLabel(_ date: Date) -> String {
+  date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
 }

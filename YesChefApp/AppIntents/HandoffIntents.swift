@@ -268,7 +268,14 @@ enum HandoffAppOperations {
     let prompt = AIHandoffToken.prompt(
       handoffID: handoffID,
       title: "\(metadata.taskType.title): \(detail.menu.title), Day \(dayOffset + 1)",
-      context: "\(MenuDayHandoffScope.prepInstruction(dayOffset: dayOffset))\n\n\(context.prepPrompt())",
+      context: """
+      \(MenuDayHandoffScope.prepInstruction(
+        dayOffset: dayOffset,
+        placementStartDate: context.placementStartDate
+      ))
+
+      \(context.prepPrompt())
+      """,
       mode: mode
     )
     return AIHandoff(
