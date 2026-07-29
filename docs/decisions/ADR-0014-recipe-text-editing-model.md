@@ -158,12 +158,37 @@ today the colon rule fires silently and the toggle list is the only evidence it 
 fires **visibly** — the card splits in front of you, a named section card appears, and deleting the colon
 merges it back. That is what removes the magic.
 
-#### Amd1-D1a — a second, explicit path to the same split
+#### Amd1-D1a — a second, explicit path to the same split — ⚠️ **DEFERRED 2026-07-28, after implementation**
 
 Because 6 of Jon's 10 existing headers are colon-free (see the audit under Amd1-D3), the editor must **also**
 offer a per-line **"Start a section here"** action — a swipe or context-menu action *on the line*, not a
 persistent parallel list of controls. Same operation as typing the colon, same visible card split, no
 out-of-band attribute surface. Typing markup is then a shortcut, never the only door.
+
+**⚠️ Deferred at the end of the slice — the platform does not support the affordance, and the ADR should say
+so rather than leave a requirement that reads as unbuilt.** Every version of this action needs the same
+input: *which line is the caret on*. Three were built and all three failed, each in a different place:
+
+1. **`.contextMenu` on the `TextEditor`** — device-confirmed never to appear. `UITextView`'s own edit menu
+   wins the long-press, so the item is unreachable where it is needed.
+2. **A bottom-accessory button driven by `TextSelection`** — reachable, but it **crashes**. A `TextSelection`
+   carries `String.Index` values into the text as it was when the selection was made, and the split rewrites
+   that text on the same keystroke. `samePosition(in:)` returns `nil` only for a non-boundary index; for an
+   index from a longer, older value it **traps**. There is no way to validate a `String.Index` against a
+   `String` it did not come from, so this is unsound by construction, not a race to be narrowed.
+3. **A `UIViewRepresentable` over `UITextView`** — solves the caret (`selectedRange.location` is an `Int` and
+   cannot trap) and loses the keyboard: `@FocusState` does not drive a representable, and three rounds of
+   hand-rolled `becomeFirstResponder` never reliably moved the caret into a newly split card.
+
+**The two halves are only available from different components** — a sound caret from UIKit, sound focus from
+SwiftUI — and the editor cannot have both without owning its text view outright, which is a much larger
+change than this affordance justifies.
+
+**Decision: ship Amd1 without D1a.** The colon is one character, Jon ratified it as the primary path, and
+D1a's own justification — the 6 colon-free headers — is discharged by adding a colon to those 6 lines once,
+the same hand-repair Amd1-D3 already asks for. `RecipeEditorDraft.startIngredientSection` and its test are
+**kept** as the seam (pure, proven, no storage, no UI); everything that read the caret is deleted. Revisit
+only if the ingredients editor comes to own its text view for some other reason — not on its own momentum.
 
 ### Amd1-D2 — The split happens at **edit time**, never at save time
 

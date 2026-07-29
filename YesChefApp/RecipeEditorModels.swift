@@ -112,13 +112,6 @@ final class RecipeEditorModel {
     draft.ingredientTextChanged(sectionID: sectionID, uuid: { uuid() })
   }
 
-  func startIngredientSection(
-    sectionID: IngredientSection.ID,
-    atLineIndex lineIndex: Int
-  ) -> IngredientSection.ID? {
-    draft.startIngredientSection(sectionID: sectionID, atLineIndex: lineIndex, uuid: { uuid() })
-  }
-
   func ingredientSectionNameChanged(sectionID: IngredientSection.ID) {
     draft.ingredientSectionNameChanged(sectionID: sectionID)
   }

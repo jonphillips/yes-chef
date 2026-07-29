@@ -63,7 +63,6 @@ private struct OptionalTextFieldFocus: ViewModifier {
 struct StackedTextEditor: View {
   let title: LocalizedStringKey
   @Binding var text: String
-  var selection: Binding<TextSelection?>? = nil
   var focusedSectionID: FocusState<UUID?>.Binding? = nil
   var focusedSectionValue: UUID? = nil
   var minHeight: CGFloat
@@ -73,7 +72,7 @@ struct StackedTextEditor: View {
   var body: some View {
     StackedFormField(title: title) {
       ZStack(alignment: .topLeading) {
-        textEditor
+        TextEditor(text: $text)
           .modifier(
             OptionalTextFieldFocus(
               focusedSectionID: focusedSectionID,
@@ -100,15 +99,6 @@ struct StackedTextEditor: View {
       .onPreferenceChange(StackedTextEditorHeightKey.self) { height in
         measuredTextHeight = height
       }
-    }
-  }
-
-  @ViewBuilder
-  private var textEditor: some View {
-    if let selection {
-      TextEditor(text: $text, selection: selection)
-    } else {
-      TextEditor(text: $text)
     }
   }
 }

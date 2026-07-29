@@ -265,8 +265,15 @@ public extension RecipeEditorDraft {
     transformIngredientSection(sectionID: sectionID, forcedHeaderLineIndexes: [], uuid: uuid)
   }
 
-  /// Starts a section at a selected, colon-free ingredient line. This is the explicit companion to
-  /// the colon shortcut: the selected line becomes the new card's name rather than a persisted line.
+  /// Starts a section at a chosen, colon-free ingredient line: that line becomes the new card's name
+  /// rather than a persisted line.
+  ///
+  /// **No live caller — this is a deliberately retained seam, not dead code left by accident.**
+  /// ADR-0014 Amd1-D1a (the editor affordance that would call it) is deferred: SwiftUI exposes no
+  /// sound way to ask a `TextEditor` which line the caret is on when the editor rewrites that text on
+  /// every keystroke — a `TextSelection`'s `String.Index` traps once the bound text has moved on. The
+  /// colon shortcut is the shipped path. Keep this and its test; wire it if the ingredients editor
+  /// ever owns its own text view.
   @discardableResult
   mutating func startIngredientSection(
     sectionID: IngredientSection.ID,
