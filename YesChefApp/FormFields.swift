@@ -150,6 +150,7 @@ private struct UTF16TrackingTextEditor: UIViewRepresentable {
 
   final class Coordinator: NSObject, UITextViewDelegate {
     var parent: UTF16TrackingTextEditor
+    private var isClaimingFirstResponder = false
 
     init(parent: UTF16TrackingTextEditor) {
       self.parent = parent
@@ -175,17 +176,31 @@ private struct UTF16TrackingTextEditor: UIViewRepresentable {
       parent.focusedSectionID?.wrappedValue = nil
     }
 
-    func claimFirstResponder(on textView: UITextView, attempt: Int = 0) {
-      guard attempt < 10 else { return }
-      DispatchQueue.main.async { [weak self, weak textView] in
-        guard let self, let textView,
+    func claimFirstResponder(on textView: UITextView) {
+      guard !isClaimingFirstResponder else { return }
+      isClaimingFirstResponder = true
+      attemptFirstResponderClaim(on: textView, attempt: 0)
+    }
+
+    private func attemptFirstResponderClaim(on textView: UITextView, attempt: Int) {
+      guard attempt < 20 else {
+        isClaimingFirstResponder = false
+        return
+      }
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self, weak textView] in
+        guard let self else { return }
+        guard let textView,
           self.parent.focusedSectionID?.wrappedValue == self.parent.focusedSectionValue,
           !textView.isFirstResponder
-        else { return }
-        guard textView.window != nil, textView.becomeFirstResponder() else {
-          self.claimFirstResponder(on: textView, attempt: attempt + 1)
+        else {
+          self.isClaimingFirstResponder = false
           return
         }
+        guard textView.window != nil, textView.becomeFirstResponder() else {
+          self.attemptFirstResponderClaim(on: textView, attempt: attempt + 1)
+          return
+        }
+        self.isClaimingFirstResponder = false
         textView.selectedRange = NSRange(location: 0, length: 0)
         self.textViewDidChangeSelection(textView)
       }
