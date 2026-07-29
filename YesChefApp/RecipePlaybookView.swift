@@ -313,19 +313,17 @@ struct RecipePlaybookView: View {
   private func editableText(for section: PlaybookSectionKind) -> String {
     switch section {
     case .makeAhead:
-      model.makeAhead ?? ""
+      return model.makeAhead ?? ""
     case .chefItUp:
-      model.chefItUp ?? ""
+      return model.chefItUp ?? ""
     case .serveWith:
-      switch model.serveWithItemsResult {
-      case let .success(items):
-        ServeWithPlan(
-          items: items.map { ServeWithSuggestion(title: $0.title, note: $0.note) }
-        )
-        .editableReviewText()
-      case .failure:
-        ""
+      guard case let .success(items) = model.serveWithItemsResult else {
+        preconditionFailure("Cannot edit unreadable Serve With")
       }
+      return ServeWithPlan(
+        items: items.map { ServeWithSuggestion(title: $0.title, note: $0.note) }
+      )
+      .editableReviewText()
     }
   }
 
