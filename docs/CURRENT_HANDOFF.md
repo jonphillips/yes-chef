@@ -1,8 +1,9 @@
 # Current Handoff
 
-Last updated: July 29, 2026. (**Grocery rapid add** shipped — a persistent Add Item field with fraction pills,
-a debounced classification sweep, the stale-editor fix, and Accept All on the review sheet; live target is now
-**playbook edit grain**, whose effort doc was amended the same day by architect review.)
+Last updated: July 29, 2026. (**Playbook edit grain Dispatch 0** is closed — `ServeWithCoding.decode` is loud
+and compiler-enforced, and S0.1 gave the block its exit: a repair sheet that validates before it writes and
+stores the cook's bytes verbatim, reachable from every surface the block takes down. Live target stays
+**playbook edit grain**, now at **Dispatch 1 (S1)**.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -22,26 +23,20 @@ live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** re
 *"Do **playbook edit grain** from `docs/CURRENT_HANDOFF.md`."* If this section is empty or missing, **STOP and
 ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch. Ratified in
 [ADR-0048](decisions/ADR-0048-playbook-edit-grain.md), all OQs closed; the effort doc is the spec and it was
-**amended 2026-07-29** by architect review (three changes, below).
+**amended 2026-07-29** by architect review, then again on S0's approval to add **S0.1**.
 
 **The core reframe the dispatch must not undo:** the three different edit interactions are an accurate readout
 of **three different storage grains**. Do not unify by making the chrome uniform over blob storage.
 
-**Three dispatches, and the first one is tiny and urgent.**
+**Dispatch 0 (S0 + S0.1) is closed. Two dispatches remain, and they are strictly sequenced.**
 
-1. **⚠️ DISPATCH 0 (S0) ships first, on its own, and is a live data-loss bug — not migration prep.**
-   `ServeWithCoding.decode`'s `?? []` is on the read side of two **read-modify-write** paths:
-   `replaceServeWithPlan` and `removeServeWithItem` both decode → `[]` → write back, and `encode` returns
-   `nil` for empty — so a corrupt blob is **destroyed** by the next regenerate or delete-one, today, with no
-   migration involved (effort doc Finding 5). A handful of lines; do not queue it behind the S1 refactor.
-   `nil` (absent) and undecodable (corrupt) are genuinely distinguishable, so the acceptance is achievable.
-2. **DISPATCH 1 (S1) — extract the Learnings row editor; Reader Feedback adopts it.** Schema-free. Reorder,
+1. **DISPATCH 1 (S1) — extract the Learnings row editor; Reader Feedback adopts it.** Schema-free. Reorder,
    add, and the provenance badge are **opt-in** capabilities of the shared component: `RecipeNote` has no
    `sortOrder`, so Reader Feedback edits and deletes per row but does **not** reorder — and does **not** gain
    a column to make the shape uniform. Learnings must be visually and behaviorally **unchanged**. Expect the
    slice to **delete more than it adds** (the four bulk-edit members die); a growing diff means something was
    misread.
-3. **DISPATCH 2 (S3) — `recipeServeWith`; the only one with schema.** Sequenced behind both.
+2. **DISPATCH 2 (S3) — `recipeServeWith`; the only one with schema.** Sequenced behind S1.
    - **⚠️ Every migrated column must be a deterministic function of the already-synced blob — no `UUID()`, no
      `now`** ([[migration-writes-bypass-sync-triggers]]). `recipeServeWith` is a **brand-new** table, so the
      `start()` sweep makes **each device upload its own copy** unless the rows are identical everywhere. The
@@ -60,7 +55,7 @@ of **three different storage grains**. Do not unify by making the chrome uniform
 D4 — they only *look* like lists because `PlaybookEnrichmentDisplayText` splits at render time); `sortOrder`
 on `RecipeNote`; fixing `LearningProvenance`'s transport/authorship conflation; the menu's Playbook sections.
 
-**Verification.** Dispatches 0 and 1 are app-layer: the elevated `generic/platform=iOS` build plus the package
+**Verification.** Dispatch 1 is app-layer: the elevated `generic/platform=iOS` build plus the package
 suite for anything landing in Core. **Dispatch 2 is schema + sync and does *not* close on a green build** —
 it wants Jon's two-device pass, and it adds to the prod-schema promotion list in the same PR.
 
@@ -299,8 +294,8 @@ regardless. So verify with **compiler + tests once**, then hand off:
   in `YesChefPackage` (which Codex *can* compile and test). #185's break was `HandoffIntents.swift` calling
   `date: .full` — logic that belonged in Core, where the package build would have caught it instantly.
 - **`YesChefAppTests` compiles and links on every `check-drift.sh` run, but only *executes* behind
-  `YESCHEF_RUN_APP_TESTS=1`** (it boots a simulator, and there is a teardown hang). All 26 pass as of
-  2026-07-27. So the old "a test there counts for nothing" rule is retired — but **Core is still the default
+  `YESCHEF_RUN_APP_TESTS=1`** (it boots a simulator, and there is a teardown hang). All 29 pass as of
+  2026-07-29. So the old "a test there counts for nothing" rule is retired — but **Core is still the default
   home**, because `YesChefPackage/Tests/` runs on every dispatch with no flag and no simulator. Put a test in
   the app target only when it genuinely needs the app target, and say in the PR that you ran it with the flag.
 - **Note:** parts of the app target (`PantryViews.swift` / `GroceryViews.swift`) compile only in Jon's device
