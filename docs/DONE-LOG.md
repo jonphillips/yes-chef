@@ -9,6 +9,71 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0014 Amendment 1 — the colon is the ingredient section syntax, and identity is manipulated where identity exists
+
+**✅ Done 2026-07-28.** PR [#255](https://github.com/jonphillips/yes-chef/pull/255), branch
+`codex/adr-0014-amendment-1-sections`, merge `[MERGE SHA]`, commits `0d69763` → `89bb1e2` across **two
+architect review rounds plus a device pass**. Spec:
+[ADR-0014 Amendment 1](decisions/ADR-0014-recipe-text-editing-model.md#amendment-1--the-header-is-syntax-the-section-is-storage-and-the-split-happens-at-edit-time-2026-07-28).
+Owner: Codex implement, Claude architect/review. **No schema, nothing added to the prod-promotion list** —
+the `isHeader` column stays in place and readable; only the *writing* of it stopped.
+
+**The shipped work.** `IngredientSectionHeading.isColonTerminatedHeading` pins the authoring rule — ends in
+`:` **and** parses no leading quantity — in the one place import and editor already shared, so there is a
+single convention rather than two. `RecipeEditorDraft.transformIngredientSection` runs it live: typing or
+pasting a header splits the card in front of you, minting the new section's UUID and carrying the line drafts
+across; clearing a non-leading card's name merges it back up. The colon-free form is what reaches the `name`
+column, so a header does not accumulate colons across save→reload→save (pinned by test). `Toggle("Header")`
+and `applyIngredientLineDrafts` are gone, and the parser no longer writes `isHeader`. **No migration was
+written** — the audit found 10 rows across 4 recipes, which Jon repairs by hand.
+
+**The review's central finding: preserving IDs in the draft is not preserving identity.** The first cut moved
+line drafts across the split with their IDs intact — and the save path never read `lineDrafts` at all. It
+re-parsed the card's text with fresh UUIDs and merged against `existingLinesBySection[draftSection.id]`,
+which is **empty for a section that was just minted**. Every line moved under a new header was therefore
+deleted and re-created: new row id, and `canonicalName` / `shoppingCategory` / `doNotShop` / merged parse
+confidence all dropped. **This is the exact loss the amendment predicted for derivation-on-save, relocated** —
+a *new* section id misses a section-scoped lookup just as surely as a renamed one does, so the hazard was
+never really about name-matching. The fix is the general lesson: **ingredient-line identity is global to the
+recipe, not to a section.** The reconcile now matches parsed lines to the draft's line IDs and looks the
+existing row up recipe-wide, and the delete pass runs once, after every upsert, against a plan-global kept
+set — so a line can move between cards without a delete+insert reaching CloudKit.
+
+**Two more the review caught, both invisible to the tests that shipped with the first cut.** The live split
+rewrote the text box from its parsed line drafts on *every* keystroke, which silently ate a trailing newline
+— you could not press Return to start a new ingredient line; it is now guarded behind an actual restructure,
+so the raw text stays the author's while the card's shape is unchanged. And because the parser stopped
+writing `isHeader`, the **flat-text direct-save paths** that never pass through the editor — the workbench
+draft recipe and the menu-note promotion, both LLM-authored, where `For the sauce:` is a likely line — began
+saving headings as ordinary **shoppable** ingredients; `RecipeRepository.save` now promotes headings for any
+draft section that carries no line identity, which closes the hole generically instead of per caller.
+
+**Amd1-D1a was built three times and is now deferred, with the evidence in the amendment.** "Start a section
+here" needs one input — *which line is the caret on* — and the platform will not answer soundly. The
+`.contextMenu` never appeared (`UITextView`'s edit menu wins the long-press); the `TextSelection` accessory
+**crashed**, because a `String.Index` from the pre-split text traps in `samePosition(in:)` the moment the
+split rewrites that text, and no amount of guarding fixes an index that cannot be validated against a string
+it did not come from; and a `UIViewRepresentable` fixed the caret but lost `@FocusState`, which three rounds
+of hand-rolled `becomeFirstResponder` never recovered. **A sound caret and sound focus were only available
+from different components**, and the editor cannot have both without owning its text view outright — a much
+larger change than the affordance justifies. So the colon shortcut is the only door, which is what Jon
+ratified anyway, and D1a's own justification — six colon-free headers — is discharged by adding a colon to
+those six lines once. `RecipeEditorDraft.startIngredientSection` and its test are kept as a documented seam;
+every caret reader is deleted (`89bb1e2`).
+
+**Method note.** Both review rounds were verified by running probe tests against the branch — a temp trigger
+auditing every `DELETE` on `ingredientLines`, a re-save asserting enrichment survives — rather than by
+reading the diff. The shipped suite was green through both, because it asserted at the draft level and never
+followed a moved line through a save.
+
+**Follow-through and what is deliberately NOT queued.** Three recipes still need hand repair (see
+`CURRENT_HANDOFF.md`). Dropping the `isHeader` column is a schema change for later. Instruction sections keep
+explicit card names — the colon rule is ingredient-only, because instruction prose routinely contains
+mid-sentence colons. Amd1-D4 stands: the split makes a header *expressible*, not *representable in a
+variation delta* — that stays ADR-0021's decision. **D1a is deferred, not queued** — revisit only if the
+ingredients editor comes to own its text view for some other reason, never on its own momentum.
+
+---
 ## ADR-0014 D3+D2 — Recipe text markup: bracket author notes and Markdown prose, both proven against the live library
 
 **✅ Done 2026-07-28.** PR [#254](https://github.com/jonphillips/yes-chef/pull/254), branch
