@@ -1,7 +1,7 @@
 # Current Handoff
 
-Last updated: July 29, 2026. (**Playbook edit grain Dispatch 0** is closed — see the DONE-LOG. Live target
-stays **playbook edit grain**, now at **Dispatch 1 (S1)**.)
+Last updated: July 29, 2026. (**Playbook edit grain Dispatch 0 and Dispatch 1 (S1)** are both closed — see the
+DONE-LOG. Live target stays **playbook edit grain**, now at its last dispatch, **Dispatch 2 (S3)**.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate is **crossed and holding**. We stay in
@@ -24,15 +24,11 @@ ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch. Ratif
 **The core reframe the dispatch must not undo:** the three different edit interactions are an accurate readout
 of **three different storage grains**. Do not unify by making the chrome uniform over blob storage.
 
-**Dispatch 0 (S0 + S0.1) is closed. Two dispatches remain, and they are strictly sequenced.**
+**Dispatch 0 (S0 + S0.1) and Dispatch 1 (S1) are closed. One dispatch remains — the only one with schema.**
+S1 shipped the shared [`EditableRowsSection`](../../YesChefApp/EditableRowsSection.swift) that Serve With adopts
+in step 5 below.
 
-1. **DISPATCH 1 (S1) — extract the Learnings row editor; Reader Feedback adopts it.** Schema-free. Reorder,
-   add, and the provenance badge are **opt-in** capabilities of the shared component: `RecipeNote` has no
-   `sortOrder`, so Reader Feedback edits and deletes per row but does **not** reorder — and does **not** gain
-   a column to make the shape uniform. Learnings must be visually and behaviorally **unchanged**. Expect the
-   slice to **delete more than it adds** (the four bulk-edit members die); a growing diff means something was
-   misread.
-2. **DISPATCH 2 (S3) — `recipeServeWith`; the only one with schema.** Sequenced behind S1.
+- **DISPATCH 2 (S3) — `recipeServeWith`; the only one with schema.** Sequenced behind S1 (now done).
    - **⚠️ Every migrated column must be a deterministic function of the already-synced blob — no `UUID()`, no
      `now`** ([[migration-writes-bypass-sync-triggers]]). `recipeServeWith` is a **brand-new** table, so the
      `start()` sweep makes **each device upload its own copy** unless the rows are identical everywhere. The
@@ -51,9 +47,8 @@ of **three different storage grains**. Do not unify by making the chrome uniform
 D4 — they only *look* like lists because `PlaybookEnrichmentDisplayText` splits at render time); `sortOrder`
 on `RecipeNote`; fixing `LearningProvenance`'s transport/authorship conflation; the menu's Playbook sections.
 
-**Verification.** Dispatch 1 is app-layer: the elevated `generic/platform=iOS` build plus the package
-suite for anything landing in Core. **Dispatch 2 is schema + sync and does *not* close on a green build** —
-it wants Jon's two-device pass, and it adds to the prod-schema promotion list in the same PR.
+**Verification.** **Dispatch 2 is schema + sync and does *not* close on a green build** — it wants Jon's
+two-device pass, and it adds to the prod-schema promotion list in the same PR.
 
 **⚠️ Jon's outstanding follow-through from ADR-0014 Amd1 (not a dispatch item):** three recipes still carry
 `isHeader = 1` rows to hand-repair in the app — *Beef Birria Taco Filling* (4), *Broccoli Spoon Salad* (2),

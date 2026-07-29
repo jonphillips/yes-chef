@@ -43,6 +43,7 @@
 		3B43FC000CAA77FE2FCBAD93 /* HandoffIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75337F357939E23B8A594784 /* HandoffIntents.swift */; };
 		3C511415F03094402001B7D2 /* RecipeScaleFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD810D780BF1E28B4D82992D /* RecipeScaleFormatting.swift */; };
 		3E8AE18096153006398A5FD8 /* WorkbenchCompareAlignmentModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A40B028294CBF15EA2F4F72 /* WorkbenchCompareAlignmentModelTests.swift */; };
+		405995E434055C9790D6B594 /* EditableRowsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C96B85DDE40C2676CFF7A14C /* EditableRowsSection.swift */; };
 		410DE555132BA6ED513C55C6 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 23B55C4E25C2510FF2AB49D3 /* GRDB */; };
 		44F69263795B85BC859E1591 /* PantryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 870CDB16B3140953C11EFDDC /* PantryViews.swift */; };
 		4530607B3DE651BAE0CC6641 /* RecipeListRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B9BCF538013B597BB0D401 /* RecipeListRow.swift */; };
@@ -266,6 +267,7 @@
 		C469ECE48285073F98E35D10 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		C53BF3A6DACBE4FF07F30717 /* AppNavigationHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNavigationHelpers.swift; sourceTree = "<group>"; };
 		C87478FA946EAC365096D2B2 /* RecipeCaptureReaderFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeCaptureReaderFeedback.swift; sourceTree = "<group>"; };
+		C96B85DDE40C2676CFF7A14C /* EditableRowsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditableRowsSection.swift; sourceTree = "<group>"; };
 		CA17898A1596E60044FEFE09 /* BrowserModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserModels.swift; sourceTree = "<group>"; };
 		CD89E4D3C6F5F5901942349A /* WebExtractorKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WebExtractorKit; path = "../../jon-platform/packages/WebExtractorKit"; sourceTree = SOURCE_ROOT; };
 		D2B809424555C42DEB0318A9 /* RecipeDeliberationLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeDeliberationLogView.swift; sourceTree = "<group>"; };
@@ -432,6 +434,7 @@
 				F23F8E8EAB36E54DADF23A71 /* ChatSurface.swift */,
 				471D8E1304E5EF631EB996C3 /* ChatWorkspaceDivider.swift */,
 				90AEA6C80CDEFF87884B65A7 /* CookSessionView.swift */,
+				C96B85DDE40C2676CFF7A14C /* EditableRowsSection.swift */,
 				FF86C88A023D5D19CDE64102 /* FocusToolbarButton.swift */,
 				5ECE090CEFE3F26041ED2617 /* FormFields.swift */,
 				21092B09A19EF04372E6A66D /* GroceryModels.swift */,
@@ -721,6 +724,7 @@
 				BE4BD3C03012A0A5F11A6852 /* ChatSurface.swift in Sources */,
 				B197F2566EB325113BC5D498 /* ChatWorkspaceDivider.swift in Sources */,
 				CCFC4DC9297E465E3E045AAA /* CookSessionView.swift in Sources */,
+				405995E434055C9790D6B594 /* EditableRowsSection.swift in Sources */,
 				3846277BD575C412195ACF75 /* FocusToolbarButton.swift in Sources */,
 				F476873699D33AE440049145 /* FormFields.swift in Sources */,
 				91DE45EFBB52B916289EEB1D /* GroceryModels.swift in Sources */,
