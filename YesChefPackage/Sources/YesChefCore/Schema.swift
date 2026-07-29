@@ -8,6 +8,13 @@ private struct LegacyMenuPrepPlanRow: Sendable {
   let prepPlan: Data?
 }
 
+@Selection
+private struct LegacyRecipeServeWithRow: Sendable {
+  let id: UUID
+  let serveWith: Data?
+  let dateModified: Date
+}
+
 extension DependencyValues {
   public mutating func bootstrapDatabase() throws {
     @Dependency(\.context) var context
@@ -1006,6 +1013,53 @@ extension DependencyValues {
         """)
         .execute(db)
       try db.execute(sql: #"CREATE INDEX "index_workbenchReferences_on_workbenchID" ON "workbenchReferences"("workbenchID")"#)
+    }
+
+    migrator.registerMigration("Move recipe Serve With into editable rows") { db in
+      try #sql("""
+        CREATE TABLE "recipeServeWith" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "recipeID" TEXT NOT NULL REFERENCES "recipes"("id") ON DELETE CASCADE,
+          "title" TEXT NOT NULL,
+          "note" TEXT,
+          "sortOrder" INTEGER NOT NULL,
+          "provenance" TEXT NOT NULL,
+          "dateCreated" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+      try #sql("""
+        CREATE INDEX "index_recipeServeWith_on_recipeID_sortOrder"
+        ON "recipeServeWith"("recipeID", "sortOrder")
+        """)
+        .execute(db)
+
+      let recipes = try #sql(
+        """
+        SELECT "id", "serveWith", "dateModified" FROM "recipes"
+        """,
+        as: LegacyRecipeServeWithRow.self
+      )
+      .fetchAll(db)
+
+      for recipe in recipes {
+        for (index, item) in try ServeWithCoding.decode(recipe.serveWith, recipeID: recipe.id).enumerated() {
+          try RecipeServeWith.insert {
+            RecipeServeWith(
+              id: item.id,
+              recipeID: recipe.id,
+              title: item.title,
+              note: item.note,
+              sortOrder: LearningOrdering.rankStride * index,
+              provenance: .model,
+              dateCreated: recipe.dateModified,
+              dateModified: recipe.dateModified
+            )
+          }
+          .execute(db)
+        }
+      }
     }
 
     try migrator.migrate(database)

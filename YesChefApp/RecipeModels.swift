@@ -888,12 +888,8 @@ final class RecipeDetailModel {
       : nil
   }
 
-  var serveWithItemsResult: Result<[ServeWithItem], ServeWithCodingError> {
-    do {
-      return .success(try ServeWithCoding.decode(recipe?.serveWith, recipeID: recipeID))
-    } catch {
-      return .failure(error)
-    }
+  var serveWith: [RecipeServeWith] {
+    detail?.serveWith ?? []
   }
 
   var learnings: [Learning] {

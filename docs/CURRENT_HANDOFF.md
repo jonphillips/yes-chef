@@ -243,6 +243,7 @@ prod/TestFlight cut. At that cut, deploy the following to the production schema:
 - The synced **`aiSettings`** table (ADR-0018, PR #96), **including** its additive `readerFeedbackPreference`
   (ADR-0025 D6) and `captureToNotePreference` (ADR-0027 S1, PR #141) columns
 - The synced **`recipeVariations`** table (ADR-0021 / recipe edit proposals S2)
+- The synced **`recipeServeWith`** table (ADR-0048 S3)
 - **`Menu.externalProjectName`** (ADR-0038 S2)
 - The synced **`learnings`** table, **including** its `sortOrder` column (ADR-0038 Amd 1 / Amd 5)
 - The synced **`prepPlanSteps`** table (ADR-0040 S2)

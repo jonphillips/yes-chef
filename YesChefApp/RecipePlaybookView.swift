@@ -19,7 +19,7 @@ struct RecipePlaybookView: View {
     let visibleNotes = model.visibleNotes
     let readerFeedbackNotes = visibleNotes.filter { $0.noteType == .readerFeedback }
     let otherNotes = visibleNotes.filter { $0.noteType != .readerFeedback }
-    let serveWithItems = model.serveWithItemsResult
+    let serveWith = model.serveWith
 
     VStack(alignment: .leading, spacing: 18) {
       playbookHeader
@@ -51,10 +51,10 @@ struct RecipePlaybookView: View {
       }
       playbookSection(
         .serveWith,
-        isFilled: serveWithItems.isFilled,
+        isFilled: !serveWith.isEmpty,
         isExpanded: $isServeWithExpanded
       ) {
-        serveWithContent(serveWithItems)
+        serveWithContent(serveWith)
       }
       if !model.deliberationLogEntries.isEmpty {
         playbookSection(
@@ -82,29 +82,7 @@ struct RecipePlaybookView: View {
     .sheet(item: $editingSection) { section in
       switch section {
       case .serveWith:
-        switch model.serveWithItemsResult {
-        case let .success(items):
-          RecipePlaybookSectionEditorSheet(
-            section: section,
-            initialText: ServeWithPlan(
-              items: items.map { ServeWithSuggestion(title: $0.title, note: $0.note) }
-            )
-            .editableReviewText(),
-            commit: { text in
-              try commit(text, for: section)
-            }
-          )
-        case let .failure(error):
-          ContentUnavailableView {
-            Label("Serve With is unreadable", systemImage: "exclamationmark.triangle")
-          } description: {
-            Text(error.localizedDescription)
-          } actions: {
-            Button("Repair Serve With") {
-              model.repairServeWithButtonTapped()
-            }
-          }
-        }
+        EmptyView()
       case .makeAhead:
         RecipePlaybookSectionEditorSheet(
           section: section,
@@ -129,8 +107,6 @@ struct RecipePlaybookView: View {
       }
     } message: { section in
       switch section {
-      case .serveWith where model.serveWithItemsResult.isFailure:
-        Text("This destroys the unreadable Serve With data. This cannot be undone. Repair can recover it instead.")
       case .makeAhead, .chefItUp, .serveWith:
         Text("This permanently clears the \(section.title) section. This cannot be undone.")
       }
@@ -261,50 +237,46 @@ struct RecipePlaybookView: View {
   }
 
   @ViewBuilder
-  private func serveWithContent(_ result: Result<[ServeWithItem], ServeWithCodingError>) -> some View {
-    switch result {
-    case let .success(items):
-      VStack(alignment: .leading, spacing: 10) {
-        ForEach(items) { item in
-          HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
-              Text(item.title)
-                .font(.headline)
-              if let note = item.note {
-                Text(note)
-                  .font(.callout)
-                  .foregroundStyle(.secondary)
-              }
-            }
-            Spacer(minLength: 8)
-          }
-          .swipeActions {
-            Button(role: .destructive) {
-              model.removeServeWithButtonTapped(item.id)
-            } label: {
-              Label("Remove \(item.title)", systemImage: "trash")
-            }
-            .accessibilityLabel(Text("Remove \(item.title)"))
-          }
+  private func serveWithContent(_ items: [RecipeServeWith]) -> some View {
+    EditableRowsSection(
+      title: "Serve With",
+      titleFont: .title3.bold(),
+      editorLabel: "Serve With",
+      items: items,
+      itemText: \.title,
+      addItem: model.createServeWith,
+      addButtonLabel: "Add Serve With",
+      updateItem: model.updateServeWith,
+      deleteItem: { model.deleteServeWith($0.id) },
+      reorderItems: { ids, destinationID in
+        model.reorderServeWith(ids, destination: destinationID.map(ServeWithReorderDestination.before) ?? .end)
+      }
+    ) {
+      ContentUnavailableView(
+        "No Serve With Yet",
+        systemImage: "fork.knife",
+        description: Text("Add an accompaniment or save one from an AI handoff here.")
+      )
+    } itemContent: { item in
+      VStack(alignment: .leading, spacing: 3) {
+        Text(item.title)
+          .font(.headline)
+        if let note = item.note {
+          Text(note)
+            .font(.callout)
+            .foregroundStyle(.secondary)
         }
       }
-    case let .failure(error):
-      VStack(alignment: .leading, spacing: 8) {
-        Label(error.localizedDescription, systemImage: "exclamationmark.triangle")
-          .foregroundStyle(.red)
-        Button("Repair Serve With") {
-          model.repairServeWithButtonTapped()
-        }
+    } badge: { item in
+      if item.provenance == .handAuthored {
+        Label("Hand-authored", systemImage: "pencil")
+          .font(.caption)
+          .foregroundStyle(.secondary)
       }
     }
   }
 
   private func sectionMenu(for section: PlaybookSectionKind, isFilled: Bool) -> some View {
-    let isServeWithUnreadable: Bool = switch section {
-    case .serveWith: model.serveWithItemsResult.isFailure
-    case .makeAhead, .chefItUp: false
-    }
-
     return Menu {
       Button {
         Task {
@@ -330,16 +302,11 @@ struct RecipePlaybookView: View {
       } label: {
         Label("Paste", systemImage: "doc.on.clipboard")
       }
-      .disabled(isServeWithUnreadable || !UIPasteboard.general.hasStrings)
+      .disabled(!UIPasteboard.general.hasStrings)
 
-      Button(isFilled ? "Edit" : "Write manually") {
-        editingSection = section
-      }
-      .disabled(isServeWithUnreadable)
-
-      if isServeWithUnreadable {
-        Button("Repair") {
-          model.repairServeWithButtonTapped()
+      if section != .serveWith {
+        Button(isFilled ? "Edit" : "Write manually") {
+          editingSection = section
         }
       }
 
@@ -409,20 +376,6 @@ struct RecipePlaybookView: View {
     } itemContent: { note in
       RecipeMarkdownText(note.text)
     }
-  }
-}
-
-private extension Result where Success == [ServeWithItem], Failure == ServeWithCodingError {
-  var isFilled: Bool {
-    switch self {
-    case let .success(items): !items.isEmpty
-    case .failure: true
-    }
-  }
-
-  var isFailure: Bool {
-    if case .failure = self { return true }
-    return false
   }
 }
 

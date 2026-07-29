@@ -155,7 +155,8 @@ public struct RecipeAdjustmentProposal: Codable, Equatable, Sendable {
       categories: detail.categories,
       categoryDisplayNames: detail.categoryDisplayNames,
       equipment: detail.equipment,
-      recipeEquipment: detail.recipeEquipment
+      recipeEquipment: detail.recipeEquipment,
+      serveWith: detail.serveWith
     )
   }
 }
@@ -887,11 +888,13 @@ extension RecipeRepository {
       originalImportText: detail.recipe.originalImportText,
       makeAhead: detail.recipe.makeAhead,
       chefItUp: detail.recipe.chefItUp,
-      serveWith: detail.recipe.serveWith,
+      serveWith: nil,
       viewScale: detail.recipe.viewScale,
       coverPhotoID: detail.recipe.coverPhotoID.flatMap { photoIDs[$0] }
     )
     try Recipe.insert { recipe }.execute(db)
+
+    try cloneServeWith(detail.serveWith, to: recipeID, in: db, now: now, uuid: uuid)
 
     if let source = detail.source {
       try RecipeSource.insert {
@@ -1016,6 +1019,24 @@ extension RecipeRepository {
     )
     try Recipe.find(recipeID).update { $0.originalSnapshot = #bind(snapshot) }.execute(db)
     return recipeID
+  }
+
+  private static func cloneServeWith(
+    _ rows: [RecipeServeWith],
+    to recipeID: Recipe.ID,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws {
+    for row in rows {
+      try RecipeServeWith.insert {
+        RecipeServeWith(
+          id: uuid(), recipeID: recipeID, title: row.title, note: row.note,
+          sortOrder: row.sortOrder, provenance: row.provenance, dateCreated: now, dateModified: now
+        )
+      }
+      .execute(db)
+    }
   }
 
   private static func nextVariationSortIndex(recipeID: Recipe.ID, in db: Database) throws -> Int {

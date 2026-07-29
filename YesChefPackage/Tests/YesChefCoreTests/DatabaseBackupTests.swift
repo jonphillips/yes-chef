@@ -261,14 +261,20 @@ struct DatabaseBackupTests {
     let stagingURL = directoryURL.appendingPathComponent("staging.sqlite", isDirectory: false)
     let sourceDatabase = try pathBackedDatabase(at: sourceURL)
     let recipeID = SampleUUIDSequence.uuid(5)
+    let serveWithID = SampleUUIDSequence.uuid(6)
+    let migrationDate = Date(timeIntervalSinceReferenceDate: 811_000_000)
+    let legacyServeWith = try ServeWithCoding.encode([
+      ServeWithItem(id: serveWithID, title: "Warm flatbread", note: "For scooping")
+    ])
 
     try await sourceDatabase.write { db in
       try Recipe.insert {
         Recipe(
           id: recipeID,
           title: "Forward Migrated Recipe",
-          dateCreated: Date(timeIntervalSinceReferenceDate: 811_000_000),
-          dateModified: Date(timeIntervalSinceReferenceDate: 811_000_000)
+          dateCreated: migrationDate,
+          dateModified: migrationDate,
+          serveWith: legacyServeWith
         )
       }
       .execute(db)
@@ -283,12 +289,12 @@ struct DatabaseBackupTests {
     }
     // This deliberately removes the current append-only tail migration. Update this assertion
     // when a later migration is appended so the fixture remains exactly one migration behind.
-    #expect(latestMigrationIdentifier == "Create workbench references")
+    #expect(latestMigrationIdentifier == "Move recipe Serve With into editable rows")
     try await backupDatabase.write { db in
-      try db.execute(sql: "DROP TABLE workbenchReferences")
+      try db.execute(sql: "DROP TABLE recipeServeWith")
       try db.execute(
         sql: "DELETE FROM grdb_migrations WHERE identifier = ?",
-        arguments: ["Create workbench references"]
+        arguments: ["Move recipe Serve With into editable rows"]
       )
       try db.execute(sql: "PRAGMA user_version = \(backup.schemaVersion - 1)")
     }
@@ -307,6 +313,9 @@ struct DatabaseBackupTests {
     let workbenchReferenceCount = try await restoredDatabase.read { db in
       try WorkbenchReference.fetchCount(db)
     }
+    let restoredServeWith = try await restoredDatabase.read { db in
+      try RecipeServeWithRepository.serveWith(for: recipeID, in: db)
+    }
     let restoredMarker = try await restoredDatabase.read { db in
       try Int.fetchOne(db, sql: "PRAGMA user_version")
     }
@@ -314,6 +323,20 @@ struct DatabaseBackupTests {
 
     #expect(restoredRecipe?.title == "Forward Migrated Recipe")
     #expect(workbenchReferenceCount == 0)
+    #expect(
+      restoredServeWith == [
+        RecipeServeWith(
+          id: serveWithID,
+          recipeID: recipeID,
+          title: "Warm flatbread",
+          note: "For scooping",
+          sortOrder: 0,
+          provenance: .model,
+          dateCreated: migrationDate,
+          dateModified: migrationDate
+        )
+      ]
+    )
     #expect(prepared.schemaVersion == backup.schemaVersion)
     #expect(restoredMarker == backup.schemaVersion)
   }

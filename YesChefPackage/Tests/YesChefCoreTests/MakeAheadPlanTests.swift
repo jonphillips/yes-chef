@@ -487,9 +487,9 @@ extension RecipeCoreTests {
         )
       }
 
-      let firstServeWithID: ServeWithItem.ID = try database.read { db in
+      let firstServeWithID: RecipeServeWith.ID = try database.read { db in
         let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
-        let serveWith = try ServeWithCoding.decode(recipe.serveWith, recipeID: recipeID)
+        let serveWith = try RecipeServeWithRepository.serveWith(for: recipeID, in: db)
         expectNoDifference(recipe.chefItUp, "Toast the spices in oil before adding the tomatoes.")
         expectNoDifference(
           serveWith.map { ServeWithSuggestion(title: $0.title, note: $0.note) },
@@ -510,7 +510,7 @@ extension RecipeCoreTests {
         let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
         expectNoDifference(recipe.chefItUp, nil)
         expectNoDifference(
-          try ServeWithCoding.decode(recipe.serveWith, recipeID: recipeID).map(\.title),
+          try RecipeServeWithRepository.serveWith(for: recipeID, in: db).map(\.title),
           ["Skillet cornbread"]
         )
         expectNoDifference(recipe.dateModified, removedAt)
