@@ -4,7 +4,8 @@ import Foundation
 public struct RecipeHandoffContext: Equatable, Sendable {
   public let recipe: RecipeChatRecipeContext
 
-  public init(detail: RecipeDetailData) {
+  public init(detail: RecipeDetailData) throws {
+    _ = try ServeWithCoding.decode(detail.recipe.serveWith)
     self.recipe = RecipeChatRecipeContext(detail: detail)
   }
 

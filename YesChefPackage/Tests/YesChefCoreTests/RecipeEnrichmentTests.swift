@@ -166,7 +166,7 @@ extension RecipeCoreTests {
       try database.read { db in
         let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
         expectNoDifference(
-          ServeWithCoding.decode(recipe.serveWith),
+          try ServeWithCoding.decode(recipe.serveWith),
           [
             ServeWithItem(id: limeCremaID, title: "Lime crema", note: "Spoon over each bowl."),
             ServeWithItem(id: cornbreadID, title: "Skillet cornbread"),
@@ -220,7 +220,7 @@ extension RecipeCoreTests {
       try database.read { db in
         let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
         expectNoDifference(
-          ServeWithCoding.decode(recipe.serveWith),
+          try ServeWithCoding.decode(recipe.serveWith),
           [
             ServeWithItem(id: unchangedItemID, title: "Lime crema", note: "Spoon over each bowl."),
             ServeWithItem(id: addedItemID, title: "Cabbage slaw"),
@@ -228,6 +228,60 @@ extension RecipeCoreTests {
         )
         expectNoDifference(recipe.dateModified, updatedAt)
       }
+    }
+
+    @Test
+    func corruptServeWithDataFailsLoudlyAndCannotBeOverwritten() throws {
+      @Dependency(\.defaultDatabase) var database
+      let createdAt = Date(timeIntervalSinceReferenceDate: 826_100_000)
+      let recipeID = SampleUUIDSequence.uuid(36_500)
+      let itemID = SampleUUIDSequence.uuid(36_501)
+      let corruptData = Data("not Serve With JSON".utf8)
+
+      try database.write { db in
+        try Recipe.insert {
+          Recipe(
+            id: recipeID,
+            title: "Chili",
+            dateCreated: createdAt,
+            dateModified: createdAt,
+            serveWith: corruptData
+          )
+        }
+        .execute(db)
+
+        #expect(throws: ServeWithCodingError.malformedData) {
+          _ = try ServeWithCoding.decode(corruptData)
+        }
+        #expect(throws: ServeWithCodingError.malformedData) {
+          try RecipeRepository.replaceServeWithPlan(
+            ServeWithPlan(items: [ServeWithSuggestion(title: "Cornbread")]),
+            recipeID: recipeID,
+            in: db,
+            now: createdAt.addingTimeInterval(60),
+            uuid: { itemID }
+          )
+        }
+        #expect(throws: ServeWithCodingError.malformedData) {
+          try RecipeRepository.removeServeWithItem(
+            itemID,
+            recipeID: recipeID,
+            in: db,
+            now: createdAt.addingTimeInterval(120)
+          )
+        }
+      }
+
+      try database.read { db in
+        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+        expectNoDifference(recipe.serveWith, corruptData)
+        expectNoDifference(recipe.dateModified, createdAt)
+      }
+    }
+
+    @Test
+    func absentServeWithDataIsAnEmptyList() throws {
+      expectNoDifference(try ServeWithCoding.decode(nil), [])
     }
   }
 }

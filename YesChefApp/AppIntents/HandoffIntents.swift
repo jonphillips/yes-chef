@@ -336,11 +336,11 @@ enum HandoffAppOperations {
     mode: AIHandoffToken.PromptMode,
     now: Date,
     handoffID: AIHandoff.ID
-  ) -> AIHandoff {
+  ) throws -> AIHandoff {
     let prompt = AIHandoffToken.prompt(
       handoffID: handoffID,
       title: "\(metadata.taskType.title): \(detail.recipe.title)",
-      context: RecipeHandoffContext(detail: detail).prompt(for: section),
+      context: try RecipeHandoffContext(detail: detail).prompt(for: section),
       mode: mode,
       deliverableFormat: section.deliverableFormat
     )
@@ -360,11 +360,11 @@ enum HandoffAppOperations {
     mode: AIHandoffToken.PromptMode,
     now: Date,
     handoffID: AIHandoff.ID
-  ) -> AIHandoff {
+  ) throws -> AIHandoff {
     let prompt = AIHandoffToken.prompt(
       handoffID: handoffID,
       title: "\(metadata.taskType.title): \(detail.recipe.title)",
-      context: RecipeHandoffContext(detail: detail).prompt(forTask: .adjustRecipe),
+      context: try RecipeHandoffContext(detail: detail).prompt(forTask: .adjustRecipe),
       mode: mode
     )
     return AIHandoff(
@@ -536,7 +536,7 @@ enum HandoffAppOperations {
       }) else {
         throw HandoffIntentSurfaceError.sourceNotFound
       }
-      handoff = recipeSectionHandoff(
+      handoff = try recipeSectionHandoff(
         detail: detail,
         section: section,
         metadata: metadata,
@@ -551,7 +551,7 @@ enum HandoffAppOperations {
       }) else {
         throw HandoffIntentSurfaceError.sourceNotFound
       }
-      handoff = recipeAdjustmentHandoff(
+      handoff = try recipeAdjustmentHandoff(
         detail: detail,
         metadata: metadata,
         mode: mode,

@@ -887,8 +887,8 @@ final class RecipeDetailModel {
       : nil
   }
 
-  var serveWithItems: [ServeWithItem] {
-    ServeWithCoding.decode(recipe?.serveWith)
+  var serveWithItemsResult: Result<[ServeWithItem], ServeWithCodingError> {
+    ServeWithCoding.decodingResult(recipe?.serveWith)
   }
 
   var learnings: [Learning] {
@@ -944,7 +944,14 @@ final class RecipeDetailModel {
   /// hides the playbook, so an in-panel switch is the only way to re-scope there.
   func askSection(_ section: PlaybookSectionKind) {
     guard let detail else { return }
-    let seed = RecipeHandoffContext(detail: detail).discussAsk(for: section)
+    let seed: String
+    do {
+      seed = try RecipeHandoffContext(detail: detail).discussAsk(for: section)
+    } catch {
+      errorMessage = error.localizedDescription
+      isShowingError = true
+      return
+    }
 
     // Ensure a panel. The recipe's chat thread persists *per recipe*, so a freshly-opened panel may
     // restore a warm thread from an earlier section — reopening for a different section must still

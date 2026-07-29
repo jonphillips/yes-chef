@@ -468,7 +468,7 @@ public struct RecipeChatRecipeContext: Equatable, Sendable {
         .map(\.text),
       makeAhead: detail.recipe.makeAhead,
       chefItUp: detail.recipe.chefItUp,
-      serveWith: ServeWithCoding.decode(detail.recipe.serveWith),
+      serveWith: ServeWithCoding.decodingResult(detail.recipe.serveWith).items,
       learnings: detail.learnings
         .sorted { $0.dateCreated < $1.dateCreated }
         .map(\.text)

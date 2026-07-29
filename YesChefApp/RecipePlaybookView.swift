@@ -21,6 +21,7 @@ struct RecipePlaybookView: View {
     let visibleNotes = model.visibleNotes
     let readerFeedbackNotes = visibleNotes.filter { $0.noteType == .readerFeedback }
     let otherNotes = visibleNotes.filter { $0.noteType != .readerFeedback }
+    let serveWithItems = model.serveWithItemsResult
 
     VStack(alignment: .leading, spacing: 18) {
       playbookHeader
@@ -52,10 +53,10 @@ struct RecipePlaybookView: View {
       }
       playbookSection(
         .serveWith,
-        isFilled: !model.serveWithItems.isEmpty,
+        isFilled: serveWithItems.isFilled,
         isExpanded: $isServeWithExpanded
       ) {
-        serveWithContent(model.serveWithItems)
+        serveWithContent(serveWithItems)
       }
       if !model.deliberationLogEntries.isEmpty {
         playbookSection(
@@ -221,30 +222,37 @@ struct RecipePlaybookView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private func serveWithContent(_ items: [ServeWithItem]) -> some View {
-    VStack(alignment: .leading, spacing: 10) {
-      ForEach(items) { item in
-        HStack(alignment: .top, spacing: 10) {
-          VStack(alignment: .leading, spacing: 3) {
-            Text(item.title)
-              .font(.headline)
-            if let note = item.note {
-              Text(note)
-                .font(.callout)
-                .foregroundStyle(.secondary)
+  @ViewBuilder
+  private func serveWithContent(_ result: Result<[ServeWithItem], ServeWithCodingError>) -> some View {
+    switch result {
+    case let .success(items):
+      VStack(alignment: .leading, spacing: 10) {
+        ForEach(items) { item in
+          HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+              Text(item.title)
+                .font(.headline)
+              if let note = item.note {
+                Text(note)
+                  .font(.callout)
+                  .foregroundStyle(.secondary)
+              }
             }
+            Spacer(minLength: 8)
           }
-          Spacer(minLength: 8)
-        }
-        .swipeActions {
-          Button(role: .destructive) {
-            model.removeServeWithButtonTapped(item.id)
-          } label: {
-            Label("Remove \(item.title)", systemImage: "trash")
+          .swipeActions {
+            Button(role: .destructive) {
+              model.removeServeWithButtonTapped(item.id)
+            } label: {
+              Label("Remove \(item.title)", systemImage: "trash")
+            }
+            .accessibilityLabel(Text("Remove \(item.title)"))
           }
-          .accessibilityLabel(Text("Remove \(item.title)"))
         }
       }
+    case let .failure(error):
+      Label(error.localizedDescription, systemImage: "exclamationmark.triangle")
+        .foregroundStyle(.red)
     }
   }
 
@@ -303,10 +311,15 @@ struct RecipePlaybookView: View {
     case .chefItUp:
       model.chefItUp ?? ""
     case .serveWith:
-      ServeWithPlan(
-        items: model.serveWithItems.map { ServeWithSuggestion(title: $0.title, note: $0.note) }
-      )
-      .editableReviewText()
+      switch model.serveWithItemsResult {
+      case let .success(items):
+        ServeWithPlan(
+          items: items.map { ServeWithSuggestion(title: $0.title, note: $0.note) }
+        )
+        .editableReviewText()
+      case .failure:
+        ""
+      }
     }
   }
 
@@ -402,6 +415,15 @@ struct RecipePlaybookView: View {
       model.updateReaderFeedbackNote(note, text: draft)
     }
     readerFeedbackDrafts = [:]
+  }
+}
+
+private extension Result where Success == [ServeWithItem], Failure == ServeWithCodingError {
+  var isFilled: Bool {
+    switch self {
+    case let .success(items): !items.isEmpty
+    case .failure: true
+    }
   }
 }
 

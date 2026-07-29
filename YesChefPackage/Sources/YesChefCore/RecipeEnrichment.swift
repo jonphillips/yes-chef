@@ -9,9 +9,42 @@ public enum ServeWithCoding {
     return try JSONEncoder().encode(items)
   }
 
-  public static func decode(_ data: Data?) -> [ServeWithItem] {
+  public static func decode(_ data: Data?) throws -> [ServeWithItem] {
     guard let data else { return [] }
-    return (try? JSONDecoder().decode([ServeWithItem].self, from: data)) ?? []
+    do {
+      return try JSONDecoder().decode([ServeWithItem].self, from: data)
+    } catch {
+      throw ServeWithCodingError.malformedData
+    }
+  }
+
+  public static func decodingResult(
+    _ data: Data?
+  ) -> Result<[ServeWithItem], ServeWithCodingError> {
+    do {
+      return .success(try decode(data))
+    } catch let error as ServeWithCodingError {
+      return .failure(error)
+    } catch {
+      return .failure(.malformedData)
+    }
+  }
+}
+
+public enum ServeWithCodingError: Error, Equatable, LocalizedError, Sendable {
+  case malformedData
+
+  public var errorDescription: String? {
+    "Couldn't read Serve With. Its stored data was left unchanged."
+  }
+}
+
+public extension Result where Success == [ServeWithItem], Failure == ServeWithCodingError {
+  var items: [ServeWithItem] {
+    switch self {
+    case let .success(items): items
+    case .failure: []
+    }
   }
 }
 
@@ -341,7 +374,7 @@ extension RecipeRepository {
     uuid: () -> UUID
   ) throws {
     let recipe = try Recipe.find(recipeID).fetchOne(db)
-    var items = ServeWithCoding.decode(recipe?.serveWith)
+    var items = try ServeWithCoding.decode(recipe?.serveWith)
     items.append(
       contentsOf: plan.items.map { item in
         ServeWithItem(id: uuid(), title: item.title, note: item.note)
@@ -358,7 +391,7 @@ extension RecipeRepository {
     uuid: () -> UUID
   ) throws {
     let recipe = try Recipe.find(recipeID).fetchOne(db)
-    let existingItems = ServeWithCoding.decode(recipe?.serveWith)
+    let existingItems = try ServeWithCoding.decode(recipe?.serveWith)
     let items = reconciledServeWithItems(existingItems, with: plan.items, uuid: uuid)
     try updateServeWith(items, recipeID: recipeID, in: db, now: now)
   }
@@ -370,7 +403,7 @@ extension RecipeRepository {
     now: Date
   ) throws {
     let recipe = try Recipe.find(recipeID).fetchOne(db)
-    let items = ServeWithCoding.decode(recipe?.serveWith).filter { $0.id != itemID }
+    let items = try ServeWithCoding.decode(recipe?.serveWith).filter { $0.id != itemID }
     try updateServeWith(items, recipeID: recipeID, in: db, now: now)
   }
 
