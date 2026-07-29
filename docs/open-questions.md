@@ -3,21 +3,6 @@
 Live ambiguities and recently-resolved decisions. Resolved items stay here briefly
 (dated) so the reasoning is durable, then graduate into the relevant doc or ADR.
 
-## Graduated — 2026-07-21, closed 2026-07-23: no inventory of model calls (what's onboard, what's outboard, what context is layered)
-
-**Graduated into [ADR-0043](decisions/ADR-0043-model-call-chokepoint.md)** (Accepted 2026-07-23), which
-adopts this entry's reasoning wholesale — the onboard/outboard asymmetry, the two-problems split (architect
-forensics vs. user opacity), and above all the **`ModelRequest`-chokepoint lean**, which became D1. The
-derive-or-test-enforce constraint became **D2** (Jon's call: a test, not a convention), and the "user
-opacity" half became **D4**, starting dev-only.
-
-**The staleness argument proved itself before the ADR was even written.** This entry measured *19 call sites
-across 14 Core files* on 2026-07-21; the same count on 2026-07-23 was *18 across 15*, with nothing
-deliberately restructured. Two days. That is now the ADR's own justification for D2, and it is why **no
-document — this one included — lists the call sites.**
-
-Kept here only as the trail; the live spec is the ADR.
-
 ## Resolved — 2026-07-04 (dogfood pass)
 
 - **Kill the ingredient-substitution feature entirely, column included.** The AI suggestion path was a
@@ -66,113 +51,12 @@ Kept here only as the trail; the live spec is the ADR.
   extractor does not reproduce the defect, so normalization is confirmed as a **one-time legacy pass** with
   no capture-boundary work attached.
 
-## Dogfooding — 2026-07-21 (ADR-0042 S4 pass): the "why" dies at the commit boundary
+## Dormant — variation ↔ Workbench overlap (watch)
 
-> **ANSWERED 2026-07-23 — [ADR-0021 Amendment 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23)
-> (Accepted).** Option **(d)** — a **recipe-scoped deliberation log**, one synced table, one row per commit
-> holding the brief **verbatim**, with its read surface shipping in the same slice. (a)/(b)/(c) were all
-> rejected on the asymmetry below: they answer the variation half and leave **overwrite** silent. (b) is
-> subsumed — (d) is (b) with a home overwrite can reach. Reverses
-> [ADR-0042 Amd1-OQ2](decisions/ADR-0042-workbench-handoff-and-the-return-block.md)'s "discarded" lean.
-> Split-off (Amd 2 / B1) carries the rows to the new recipe. Ships as **V3**, after V1 + V2. The text below
-> is kept for its reasoning; it is no longer an open fork.
-
-**Jon, after the first real S4 round-trip:** the model expresses *why* each change is being made
-"pretty succinctly," and none of it survives. Confirmed in code — the why has no home in any of three
-places at once:
-
-1. **The brief is transient by design** (Amd1-D5, "no new storage"). It is the only artifact carrying
-   the reasoning, and it is discarded on commit.
-2. **Learnings are explicitly forbidden from holding it.** The S4 ask says record *"only what was
-   considered and rejected, or established as a constraint — never restate a change that already
-   appears in the brief"* (Amd1-D7). So the why-of-changes-made is deliberately routed *away*.
-3. **The variation payload is ops-only** — `ingredientOps` + `methodStepReplacements`, no rationale.
-
-The one rationale deposit that exists (`RecipeDetailModel+Adjustment.swift`) is `guard let workbenchID
-else { return }` — workbench-only — and writes `proposal.reviewSummary()`, a restatement of the **ops**,
-not the model's prose. **This is [ADR-0042 D6](decisions/ADR-0042-workbench-handoff-and-the-return-block.md)
-with a hole in it:** D6 says an outboarded session that deposits nothing "is a conversation that never
-happened." Lower stakes than the workbench — you still get the changed recipe — but the why is the
-scarce output of an unmetered session and the one thing that cannot be reconstructed from the result.
-
-**The fork as it stood (decided 2026-07-23 — see the banner above; the options are kept because the
-rejections are the reasoning):**
-
-- **(a) Variation-level `note`.** Free — `RecipeVariation.note: String?` already exists. But the brief
-  carries **one why per change**, so squashing N rationales into one note makes them regenerate-only,
-  never repairable one at a time — the [[editable-at-the-grain-stored]] failure and the same shape as
-  the `Menu.prepPlan` blob. Also runs at [[decompose-notes-into-typed-homes]] (notes are being drained,
-  not filled).
-- **(b) Retain the brief verbatim as provenance** on the artifact the commit produced. *Architect's
-  lean.* Prose terminating in a text field a human reads → per D3 nothing to parse and nothing to lose,
-  no invented format, no new grain problem, and it preserves the model's phrasing exactly — which is
-  what Jon liked. `RecipeVariation.origin` already exists as a provenance seam. Note this reverses
-  Amd1-OQ2's *lean* ("discarded"), which was recorded before the first real round-trip.
-- **(c) Per-change rationale inside the payload.** Matches the brief's grain but is the heaviest, and
-  the payload is already a BLOB, so it would be regenerate-only anyway until Amd 1 lands.
-
-**The asymmetry that makes this feel fuzzy, and which any answer must address:** the *variation*
-destination has an obvious artifact to hang a why on. **Overwrite does not** — it mutates the recipe and
-leaves nothing behind. Overwrite's only existing home is the workbench `.rationale` log, which does not
-fire outside a workbench. An answer that only covers variations leaves half the flow silent.
-
-**Timing:** pre-prod, so per [ADR-0042 OQ2](decisions/ADR-0042-workbench-handoff-and-the-return-block.md)'s
-lesson this is the moment to fix the shape — and ADR-0021 Amd 2's *promote / split-off* makes it sharper,
-since a variation promoted to its own recipe really ought to carry why it exists.
-
-## Dogfooding — 2026-07-11 (two-device pass): variation ↔ Workbench overlap
-
-The mechanical fixes from this pass are sliced in `docs/efforts/` (chrome bundle, workbench polish, meal-planner
-affordances, fraction accessory). These three are the **design residue** — decide with Jon before any build.
-The through-line Jon named **twice** in this pass: *individual-recipe workspaces and the Workbench "secretly
-overlap."*
-
-- **[Design fork — the umbrella] Variation workspace vs. Workbench convergence.** Jon keeps hitting the seam
-  between "editing/evolving one recipe in place" (variations, adjust-proposals) and "the Workbench as a durable
-  design workspace over several recipes." Both the two items below are instances. **Open question:** is the
-  per-recipe variation/adjust surface a *lightweight Workbench-of-one*, and should they share machinery — or do
-  they stay distinct (Workbench = multi-candidate synthesis; variations = single-recipe deltas)? Likely a future
-  ADR crossing [ADR-0019](decisions/ADR-0019-recipe-design-studies.md) × [ADR-0021](decisions/ADR-0021-recipe-variations.md)
-  × [ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md). Don't unify prematurely — but stop treating the two
-  reports below as unrelated one-offs; they're evidence for this decision.
-  **NARROWED 2026-07-21:** both instances below are answered by ADR-0021 Amendments 1 + 2 **without sharing
-  Workbench machinery** — hand-editing is a derived diff, promotion is two destinations. **Position: distinct
-  surfaces, shared primitives** (the diff engine and the promote writer), not a "Workbench of one." The
-  umbrella stays open only if a *third* instance appears that neither amendment covers.
-
-- **[Design — feeds ADR-0014 × ADR-0021] Edit a variation, not just the original.** *(Already noted 2026-07-09
-  below; reaffirmed here.)* Looking at a variation, Jon wants to **edit the variation itself**. Variations are
-  LLM-created then shown **read-only** ([ADR-0021](decisions/ADR-0021-recipe-variations.md)), so hand-editing a
-  variation has no home. Jon explicitly flagged the **Workbench collision** — see the umbrella fork above. Needs
-  the header/text-editing model decision ([ADR-0014](decisions/ADR-0014-recipe-text-editing-model.md)) plus a
-  call on whether variation-editing reuses Workbench machinery.
-  **ANSWERED 2026-07-21 — [ADR-0021 Amendment 1](decisions/ADR-0021-recipe-variations.md#amendment-1--a-variation-is-hand-edited-through-the-resolved-view-the-ops-are-derived-never-authored-2026-07-21)
-  (Proposed):** the human edits the **resolved** recipe and the delta is **re-derived** on save, so editing
-  and the overlay were never in tension. Schema-free, no Workbench machinery. **The ADR-0014 dependency
-  survives** but narrows to section headers only — they are the one edit the op vocabulary cannot express.
-
-- **[Future — ADR-0021 territory] Promote a variation to a standalone recipe.** Jon (2026-07-11): eventually a
-  way to promote a variation into its own top-level recipe. Again flagged as **Workbench/recipe-workspace
-  overlap** — the Workbench already has a "promote working recipe to `main`" flip (`libraryPlacement`), so
-  variation-promotion and workbench-promotion may want the same primitive. Not scoped; part of the umbrella fork.
-  **ANSWERED 2026-07-21 — [ADR-0021 Amendment 2](decisions/ADR-0021-recipe-variations.md#amendment-2--promotion-is-the-release-valve-a-variation-can-become-the-base-or-its-own-recipe-2026-07-21)
-  (Proposed):** two promotions — **split off as its own recipe** (B1) and **promote to base**, with the old
-  base auto-derived into a variation (B2). **No probation machinery** (ratified: Jon — no cook counts, no
-  verdict prompts; you promote when ready). Schema-free, and no `derivedFromRecipeID` column until something
-  actually reads one.
-
-## Resolved — 2026-06-28
-
-- **Web recipe capture is its own milestone (M2), before sync.** A share extension is
-  another write path; it must be idempotent before the iCloud one-way gate. See
-  [milestones/M2-web-recipe-capture.md](milestones/M2-web-recipe-capture.md).
-- **Harvest Galavant's capture engine, don't reinvent.** Same-stack, proven (JSON-LD/
-  microdata votes, headless rendered-DOM). Re-target to schema.org/Recipe in YesChefCore.
-- **In-app browser capture → M3.** Perfect it in Galavant first, then harvest.
-- **App-group shared store now** (M2 Slice 3), coordinated with the sync CloudKit container.
-- **Fallback is OpenGraph/meta + preserve-raw for M2;** photo → LLM recipe capture is the
-  intended successor (its own later milestone) and the fallback for sites that resist
-  structured extraction.
+The 2026-07-11 two-device pass raised three variation/Workbench-overlap forks; all three were answered by
+[ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendments 1 + 2 (shipped, device-passed) — the
+position is **distinct surfaces, shared primitives** (the diff engine and the promote writer), *not* a
+"Workbench of one." Reopen only if a *third* instance appears that neither amendment covers.
 
 ## Live — web-capture engine convergence
 
@@ -180,28 +64,6 @@ overlap."*
   is already the second consumer; harvest-first only defers the abstraction until two working
   implementations exist. **Trigger: M2 close** (or Galavant's next capture-engine change).
   Tracked so it isn't forgotten — do not let the two engines drift permanently.
-
-## Resolved — 2026-06-27
-
-- **Rebaseline cleanly, don't retro-fit.** The roadmap §11 numbering is retired;
-  forward work is renumbered from current reality. See
-  [implementation-plan.md](implementation-plan.md).
-- **Audit before forward.** The first architect act is a re-baselining review of
-  current `main` for conformance to the now-codified house rules, before any new
-  build order. It gates the M1 build order.
-- **Order of the big three: stabilize → import → sync.** Architecture-debt paydown
-  first, then import hardening, then CloudKit sync. Sync is last by design: it is a
-  one-way gate, and enabling it before import is trustworthy would propagate
-  throwaway re-imports across all devices and the private iCloud zone.
-- **Menus are ratified product, not speculation.** Yes Chef is a next-gen Paprika:
-  reach recipe-app parity, then differentiate. Paprika is the source for many
-  baseline features (user files / formats: https://www.paprikaapp.com/help/ios/).
-  The Menus subsystem stays; it likely earns its own ADR for the
-  menu / meal-plan / grocery provenance model.
-- **jon-platform did not drift.** The Pass-1 alignment items (repository core,
-  persisted enums, observed-reads anti-pattern, identity-preserving saves,
-  snapshot-as-interchange-format) all landed in jon-platform's `docs/ios/`. The open
-  risk is whether Yes Chef's *code* conforms — which the audit settles.
 
 ## Foundation / audit
 
@@ -541,13 +403,6 @@ just this note? **Not decided.**
   (`GroceryModels`/repository); this may be a UX-surfacing gap rather than net-new. Scope after
   confirming what the current add-from-calendar-day flow already does.
 
-## Sync
-
-- What is the trigger that says "import is trustworthy enough to enable sync"? A
-  concrete data-quality checklist, or Jon's judgment call on a real library?
-- Can the private CloudKit zone be reset cheaply if a bad import does sync, or must
-  we treat first-sync as effectively irreversible?
-
 ## Recipe relationships — suppression vs. variation vs. collection
 
 Design discussion 2026-06-30. The thesis: these are **three distinct primitives that
@@ -599,30 +454,6 @@ premature-abstraction trap. This **challenges §22A `RecipeFamily`** in
   synthetic-header decision helps here: the variation parent isn't a recipe, so it can't
   perturb synced recipe records at all. **This is independent of the import-before-sync
   gate** — that gate is about import *trustworthiness*, not relationship modeling.
-
-## Sequencing — after the browser milestone (the "fun features vs. the gate" tension)
-
-Named 2026-06-30, as M3 (authenticated browser capture) approaches close and attention
-turns to "what next."
-
-- **The pull:** iCloud sync is a *risk* (a solvable one — see the sync-safety note above
-  and [ADR-0002](decisions/ADR-0002-cloudkit-sync-no-server.md)), and risk is less fun
-  than building. More features and more data-model build-out (variation grouping,
-  families, collections) are the tempting next move precisely *because* they're lower-
-  stakes and more gratifying.
-- **Why that's a trap:** sync is also **backup**, and in Jon's "new world" durability
-  matters *now*, not just multi-device convergence. Every feature built *before* sync is
-  more un-backed-up data riding on a single device, and more surface that first-sync has
-  to carry into an effectively-irreversible private zone. Deferring the gate to chase
-  features increases the cost and risk of the eventually-unavoidable crossing.
-- **The counter-discipline:** the modeling work is provably sync-safe and bolts on
-  cleanly *after* sync (above), so there's no technical reason to front-load it. The only
-  thing that should gate sync is **import trustworthiness** — and if backup is now a
-  first-order goal, the honest question is "is import good enough to back up?", not "what
-  else can we build first?" Treat post-M3 as a deliberate re-decision of the
-  stabilize → import → **sync** order, with eyes open about the fun-vs-gate pull, rather
-  than drifting into feature work by default. "Soon-ish done with browser" is the moment
-  to make that call on purpose.
 
 ## House layer
 

@@ -10,6 +10,40 @@ Newest first.
 
 ---
 ---
+## The `YesChefAppTests` link wall falls — SQLiteData 1.8.2 bump
+
+**✅ Done 2026-07-29.** Branch `codex/playbook-edit-grain-s0-1-repair`, PR
+[#259](https://github.com/jonphillips/yes-chef/pull/259) (commit `5ae16fa`, "update sqlite-data"), on top of
+the S0.1 work in PR [#258](https://github.com/jonphillips/yes-chef/pull/258). Owner: Codex implement, Claude
+architect/review. **No schema, no prod-promotion entry** — build tooling plus test dependencies. `project.pbxproj`
+was regenerated with `xcodegen generate`, not hand-edited.
+
+**What it closes.** For months `check-drift.sh`'s `build-for-testing` stage died at
+`Ld … SQLiteData.framework` with an undefined-symbols wall, and the standing guard in `CURRENT_HANDOFF.md`
+declared it upstream's problem — *"do not investigate it, do not try to fix it."* That guard is now
+**retired**: the app test target **compiles, links, and runs**. `check-drift.sh` is green and
+`YESCHEF_RUN_APP_TESTS=1` reports **29 tests in 9 suites passed**, including the three Playbook S0.1 tests in
+`YesChefAppTests/ServeWithRepairTests.swift` that had **never been built** — S0.1 shipped them behind a link
+failure, so their first real execution happened here.
+
+**What changed.**
+- **sqlite-data `1.6.6` → `1.8.2`** and **swift-structured-queries `0.31.3` → `0.34.0`** — floors raised in
+  both `YesChefPackage/Package.swift` and `project.yml`.
+- **CustomDump added** as a package and as a `YesChefTests` dependency in `project.yml`: the target called
+  `expectNoDifference` without ever linking the framework — the same class of defect as our
+  `StructuredQueriesCore` insurance, one layer out ([[exported-import-not-link-time]]).
+- **`try database.write` → `try await database.write`** at two sites in `ServeWithRepairTests.swift`: the async
+  GRDB overload now wins inside an async `withDependencies(operation:)`, so the sync call no longer type-checks.
+
+**Known and deliberately not fixed.** sqlite-data's manifest **still omits `StructuredQueriesCore` from its
+`SQLiteData` target on 1.8.2**. `SQLiteData.framework` links it anyway — via Swift **autolinking** against the
+`-F …/PackageFrameworks` search path, **not** a declared dependency — so the resolution is **build-order
+sensitive**. Our own `StructuredQueriesCore` declarations in `project.yml` stay as **insurance**. **If this
+failure ever returns, `xcodebuild clean` first** — a stale eager-linking TBD produces an identical-looking
+undefined-symbols wall.
+
+---
+---
 ## Playbook S0.1 — a repair path for an unreadable Serve With blob
 
 **✅ Done 2026-07-29.** Branch `codex/playbook-edit-grain-s0-1-repair`, PR

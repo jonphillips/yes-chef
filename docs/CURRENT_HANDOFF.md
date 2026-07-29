@@ -1,19 +1,15 @@
 # Current Handoff
 
-Last updated: July 29, 2026. (**Playbook edit grain Dispatch 0** is closed — `ServeWithCoding.decode` is loud
-and compiler-enforced, and S0.1 gave the block its exit: a repair sheet that validates before it writes and
-stores the cook's bytes verbatim, reachable from every surface the block takes down. Live target stays
-**playbook edit grain**, now at **Dispatch 1 (S1)**.)
+Last updated: July 29, 2026. (**Playbook edit grain Dispatch 0** is closed — see the DONE-LOG. Live target
+stays **playbook edit grain**, now at **Dispatch 1 (S1)**.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
-(`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
-holding**. We stay in CloudKit **Development** by design; prod-schema promotion is the held ops step in its
-own section below.
+(`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate is **crossed and holding**. We stay in
+CloudKit **Development** by design; prod-schema promotion is the held ops step in its own section below.
 
-The **short entry point** for a fresh Yes Chef conversation. It holds **Next Up** (the dispatch target), the
-**Standing guards**, the **Ready Efforts** queue, the **prod-schema promotion list**, and the **Verification
-Pattern** — nothing else. Completed-slice history and strategic background
-live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** read it on a dispatch).
+The **short entry point** for a fresh Yes Chef conversation — Next Up, Standing guards, Ready Efforts,
+prod-schema promotion list, Verification Pattern, nothing else. Completed-slice history and strategic
+background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** read it on a dispatch).
 `docs/AGENTS.md` remains the authoritative project/agent guide.
 
 ## Next Up
@@ -66,13 +62,6 @@ each header line and the row is promoted to a section and deleted on save. (Amd1
 **deferred** — the colon is the only path, which is the ratified primary anyway.) Dropping the `isHeader`
 **column** afterwards is a schema change, not a data migration, and is not queued.
 
-⚠️ **`check-drift.sh` fails on clean `main` at `Ld … SQLiteData.framework`, and the cause is fully known —
-do not investigate it, do not try to fix it, and do not treat it as your regression.** sqlite-data's manifest
-omits `StructuredQueriesCore` while its source uses those symbols; a test bundle turns every package product
-into a dynamic framework and the link fails ([[exported-import-not-link-time]]). **Our two layers of the same
-defect are fixed** (`1a56994`); the remaining one is upstream's and needs their release. Report it as
-pre-existing; the package suite and the elevated `generic/platform=iOS` build are your evidence.
-
 ## Standing guards
 
 Closed decisions that stay closed, here only so a dispatch does not re-queue them. **Nothing in this
@@ -81,31 +70,29 @@ section is work.**
 - **⚠️ The ADR-0042 return contract is v2** — re-copy the project instructions from AI Settings or every
   verb fails the marker gate. (Operational: it bites on any hand-off dogfooding session.)
 - **ADR-0021 (variations) and ADR-0023 (recipe edit proposals) have nothing queued.** ADR-0023's *iterative
-  refine loop* is **WITHDRAWN** (ADR-0042 D7 — refinement happens in the live external thread; **do not
-  rebuild it**). Per D2 the in-app adjust verb stays the **only** path that writes a structured delta.
-  **Now live, not theoretical (ADR-0014 Amd1-D4):** the editor's split mints a genuinely new section, so
-  `derivingVariation` — which diffs structures matched by section ID — hits `.ingredientSectionAdded` →
-  `variationNeedsReview` whenever a header is added inside a recipe that has variations. **That is expected
-  behavior, not a bug to patch.** Fixing it needs a delta-vocabulary decision and it is **ADR-0021's** — do
-  not extend the delta ops on this momentum.
+  refine loop* is **WITHDRAWN** (ADR-0042 D7 — it happens in the live external thread; **do not rebuild it**);
+  per D2 the in-app adjust verb is the **only** path that writes a structured delta. **Expected, not a bug to
+  patch (ADR-0014 Amd1-D4):** adding a header inside a recipe that has variations mints a new section, so
+  `derivingVariation` hits `.ingredientSectionAdded` → `variationNeedsReview`. Fixing it needs a
+  delta-vocabulary decision and it is **ADR-0021's** — do not extend the delta ops on this momentum.
 - **ADR-0042 S3 (`workbenchDraft`) stays deferred and un-queued** — no concrete want. **Do not build it on
   ADR momentum.** There is no S5.
 - **`PlaybookSectionMeta` is not queued anywhere — do not resurrect it.** ADR-0041 closed at S2.6, S3
   withdrawn ([Amd 3](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-3--s3-is-withdrawn-the-conversation-url-does-not-exist-2026-07-19)).
   If section provenance is ever wanted it designs its own storage against its own consumer
   ([[withdraw-not-defer-orphaned-schema]]).
-- **Both candidates Jon named 2026-07-21 are discharged** — variations (whole ADR-0021 arc shipped and
-  device-passed) and "Menu is under-served by hand-off verbs" (discharged by ADR-0043's load test). Parked
-  **ADR-0013** meal-planner verbs remain separate and unscoped — see Ready Efforts.
+- **Both candidates Jon named 2026-07-21 are discharged** — variations (ADR-0021, shipped + device-passed) and
+  "Menu is under-served by hand-off verbs" (ADR-0043's load test). Parked **ADR-0013** meal-planner verbs are
+  separate and unscoped — see Ready Efforts.
 - **The Recipe Workbench store/curate/compare arc (ADR-0019) is complete**, S1–S4 shipped. Parked follow-ons
   live in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md), not here.
 - **The workbench's experiment-outcome verb is NOT scoped** — only its *placement* is ratified (ADR-0042 D8's
   corollary: a conjecture suppresses learnings, a **cooked** experiment is findings, so learnings come back
   on). That amendment gets written when that half is scoped, **deliberately not now.**
 - **Chat entry points are unified and closed** ([`efforts/chat-ask-uniformity.md`](efforts/chat-ask-uniformity.md),
-  PR #244). Uniformity is **cross-surface, not cross-device**: modal sheets keep the iOS nav bar, embedded
-  and column presentations keep the in-panel header row. **That divergence is intended — do not "unify" it.**
-  The Calendar/Workbench detent split and the Recipe inspector belong to ADR-0046, not to a chat pass.
+  PR #244). Uniformity is **cross-surface, not cross-device**: modal sheets keep the iOS nav bar; embedded and
+  column presentations keep the in-panel header row. **That divergence is intended — do not "unify" it.** The
+  Calendar/Workbench detent split and the Recipe inspector belong to ADR-0046.
 
 ## Ready Efforts (queue)
 
@@ -142,24 +129,19 @@ already exist and already sync.
   gate** and **do not add a date to `PrepPlanStepRecord`** (ADR-0034 D1) — exact match succeeds on
   `Korean Bavette` and fails on `…Salad (Korean)`, so half the chips would silently return.
 
-**[`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) — the one optional follow-on
-left after the app test target was fixed. Small, unhurried, no decisions outstanding.** Move
-`WorkbenchCompareAlignmentModel` and `RecipeScaleFormatting` — SwiftUI-free logic sitting in `YesChefApp/` —
-down to Core. **The testability premise is back, and that changes this entry's urgency.** It was retired
-because the target had started running; as of 2026-07-29 it does not — `build-for-testing` dies at the
-`Ld … SQLiteData.framework` defect (standing guard above), so "these tests execute nowhere" is literally true
-again for every test in `YesChefAppTests`. Keep the "keep pure logic out of the App layer" corollary as the
-reason to do it *well*; testability is once more a reason to do it *at all*.
-- **⚠️ Rider on S1 (do this one there, not here):** S0.1 left `ServeWithRepairPresentation` in `YesChefApp/`
-  with three tests that have **never compiled** — the identity guard and the UTF-8/Base64 forms are
-  SwiftUI-free value logic over `Recipe` and `ServeWithCodingError`, both Core types, so the type moves down
-  cleanly and its coverage starts running on every dispatch with no flag and no simulator. Only the two
-  model-routing tests (`RecipeDetailModel` / `WorkbenchDetailModel` `presentServeWithRepair`) genuinely need
-  the app target. S1 is already in these files; do not open a separate PR for it.
-- Two older riders — the yield-scaling fix
-  already left two app-layer assertions redundant (flagged in place for this sweep rather than deleted
-  drive-by), and adding a file to `YesChefAppTests` without re-running `xcodegen generate` silently excludes it
-  from the bundle, so fewer files in that target is fewer chances to hit it.
+**[`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) — one optional follow-on.
+Small, unhurried, no decisions outstanding.** Move `WorkbenchCompareAlignmentModel` and
+`RecipeScaleFormatting` — SwiftUI-free logic sitting in `YesChefApp/` — down to Core. The app target runs
+again (2026-07-29), so these tests execute; the motive is the "keep pure logic out of the App layer" corollary
+plus that Core runs on every dispatch with **no flag and no simulator** (the app target still needs
+`YESCHEF_RUN_APP_TESTS=1`).
+- **Rider:** S0.1's `ServeWithRepairPresentation` is SwiftUI-free value logic over Core types (`Recipe`,
+  `ServeWithCodingError`), so it and its three tests move down cleanly and run with no flag. Only the two
+  model-routing tests (`RecipeDetailModel` / `WorkbenchDetailModel` `presentServeWithRepair`) need the app
+  target. Do not open a separate PR for it.
+- Two older riders — the yield-scaling fix already left two app-layer assertions redundant (flagged for this
+  sweep, not deleted drive-by), and a file added to `YesChefAppTests` without re-running `xcodegen generate` is
+  silently excluded from the bundle.
 
 **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell. Unblocked
 but unscheduled.** Its gate was satisfied 2026-07-25; nothing holds it except appetite. It moves all eight
@@ -175,19 +157,19 @@ answer rather than an omission — worth deciding before ADR-0046 rearranges the
 Playbook sections getting the same per-section toolbar, and section-selection checkboxes on the whole-recipe
 hand-off (the scoped per-section verbs make these *less* necessary, not more).
 
-**Drag recipes from Browse into a meal (BLOCKED on iPadOS Beta 4).** The pipeline is **already wired** —
-`MenuRecipeBrowserPanel` rows are `.draggable(MenuDraggedRecipe)`, `MenuDishDayList` has a matching
-`.dropDestination`, and the slide-over keeps the Dishes body interactive beneath it — but drag-and-drop is not
-firing reliably in the current betas. **Retry after Beta 4;** then it's confirm-E2E + polish, no schema.
+**Drag recipes from Browse into a meal (BLOCKED on iPadOS Beta 4).** The pipeline is **already wired**
+(`.draggable`/`.dropDestination` between `MenuRecipeBrowserPanel` and `MenuDishDayList`, slide-over stays
+interactive) but drag-and-drop is not firing reliably in the current betas. **Retry after Beta 4;** then it's
+confirm-E2E + polish, no schema.
 
 **Meal-Planner chat verbs** (ADR-0013 + `efforts/cooking-workspace.md`) — the one remaining named
 actionable-chat verb instance. Classify each verb's commit shape first ([[chat-verb-commit-shapes]]) — likely
 no-commit advisory or a per-day note, not a per-recipe write; respect [[llm-curation-not-synthesis]].
 **Confirm with Jon what verb scope remains.**
 
-**Recipe text normalization** — de-cap old all-caps Milk Street imports, strip manual instruction numbers now
-that we auto-number. **Unscoped**; parked in [`docs/open-questions.md`](open-questions.md). Interacts with
-ADR-0014, so sequence them.
+**Recipe text normalization** — strip manual instruction numbers now that we auto-number (Milk Street
+all-caps de-cap is the DECLINED P2 above). **Unscoped**; parked in
+[`docs/open-questions.md`](open-questions.md). Interacts with ADR-0014, so sequence them.
 
 **[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) leftovers — one owed confirmation and S3.**
 - **The owed OQ1 confirmation (small, do it before trusting the net).** Amendment 1 is **Proposed**, not
@@ -208,13 +190,12 @@ ADR-0014, so sequence them.
 
 **Small nits — not urgent, fold into a passing dispatch:**
 - **The S4 brief extractor's prompt is framed for a conversation, but S4 hands it a decision** (silent-failure
-  risk). `instructions` opens *"You extract a proposed edit … from a cooking **conversation**"* and closes
-  *"the user is asking to review"* — while `HandoffReviewCoordinator.draftRecipeAdjustment` wraps a finished
-  brief as one fake `.user` message with `selection: ""`. A **decided** revision is presented as an
-  **in-progress ask**, inviting the extractor to hedge where Amd1-D1's whole point is that the human already
-  decided; under-extraction is **silent** (a 3-change brief yielding 2 ops just looks shorter). *Fix:* a
-  task-specific framing for the brief path, **not** a second client. **Deliberately NOT part of this:** taste
-  profile or known-learnings into the *extractor* — those belong to the outbound ask, where judgment happens.
+  risk). `instructions` says *"extract … from a cooking conversation … the user is asking to review"* while
+  `HandoffReviewCoordinator.draftRecipeAdjustment` wraps a finished brief as one fake `.user` message
+  (`selection: ""`) — so a **decided** revision reads as an **in-progress ask** and the extractor hedges, and
+  under-extraction is silent (a 3-change brief yielding 2 ops just looks shorter). *Fix:* a task-specific
+  framing for the brief path, **not** a second client, and **not** taste profile / known-learnings into the
+  extractor (those belong to the outbound ask).
 - **Workbench log-editor** (ADR-0042 S2 review): the `canSave` / `normalizedLogEntryDraft` mismatch when a body
   is combined with partially-filled typed fields, the dead save spinner, the compare `.menuPrepPlan` mislabel.
 - **Workbench synthesis-shaped apply-action** — the draft verb's own action shape (no last-reply gate/chip);
@@ -223,11 +204,9 @@ ADR-0014, so sequence them.
 - **`stageReaderFeedback` defaults `unparsedLines` to `[]`**, so accepting a single tip through the *in-app*
   path clears the evidence banner (cosmetic).
 - **From the PR #244 review, all one-liners:** `MenuDetailModel.tool`'s `didSet` and
-  `recipeBrowserButtonTapped` both clear `activeChatStarterID` — say it once
-  (`didSet { if chatModel == nil { … } }`); `MenuDetailReader`'s `isAskActive`/`askButtonTapped`/
-  `regeneratePrepPlan` closure params are now pure passthroughs to a `detailModel` it already receives (fine
-  to leave for ADR-0046); `namesStarterContractsForEveryHost` asserts `.starters == .starters` and proves
-  nothing.
+  `recipeBrowserButtonTapped` both clear `activeChatStarterID` — say it once; `MenuDetailReader`'s
+  `isAskActive`/`askButtonTapped`/`regeneratePrepPlan` closure params are now pure passthroughs (fine to leave
+  for ADR-0046); `namesStarterContractsForEveryHost` asserts `.starters == .starters` and proves nothing.
 
 **Still-deferred, separate future efforts:** ADR-0027 **OQ4** (a note-worthiness taste preference);
 **ADR-0036 S3** — promote a `RecipeNote` deposited *on a recipe*; **ADR-0038 Amd 4 — smart Learning
@@ -304,12 +283,15 @@ regardless. So verify with **compiler + tests once**, then hand off:
   in `YesChefPackage` (which Codex *can* compile and test). #185's break was `HandoffIntents.swift` calling
   `date: .full` — logic that belonged in Core, where the package build would have caught it instantly.
 - **`YesChefAppTests` compiles and links on every `check-drift.sh` run, but only *executes* behind
-  `YESCHEF_RUN_APP_TESTS=1`** (it boots a simulator, and there is a teardown hang). **26 verified as of
-  2026-07-27; the 3 added by S0.1 have never been compiled or run** — the `build-for-testing` stage is
-  currently blocked at the `Ld … SQLiteData.framework` defect below, so *nothing* in that target is being
-  checked today. So the old "a test there counts for nothing" rule is retired — but **Core is still the default
-  home**, because `YesChefPackage/Tests/` runs on every dispatch with no flag and no simulator. Put a test in
-  the app target only when it genuinely needs the app target, and say in the PR that you ran it with the flag.
+  `YESCHEF_RUN_APP_TESTS=1`** (it boots a simulator, and there is a teardown hang). **29 tests in 9 suites
+  pass as of 2026-07-29** (the SQLiteData 1.8.2 bump fixed the link wall — see the DONE-LOG arc). So the old
+  "a test there counts for nothing" rule is retired — but **Core is still the default home**, because
+  `YesChefPackage/Tests/` runs on every dispatch with no flag and no simulator. Put a test in the app target
+  only when it genuinely needs the app target, and say in the PR that you ran it with the flag. **If the
+  `Ld … SQLiteData.framework` undefined-symbols wall ever returns, `xcodebuild clean` first** — SQLiteData
+  links `StructuredQueriesCore` via Swift autolinking against the `PackageFrameworks` search path, not a
+  declared dependency, so it is build-order sensitive and a stale eager-linking TBD looks identical
+  ([[exported-import-not-link-time]]).
 - **Note:** parts of the app target (`PantryViews.swift` / `GroceryViews.swift`) compile only in Jon's device
   pass, not in CI.
 - **Do not install/launch on simulators by default** — hand straight to Jon's UI pass. Only boot a simulator
