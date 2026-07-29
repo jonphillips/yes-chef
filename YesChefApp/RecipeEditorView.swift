@@ -276,6 +276,9 @@ struct RecipeEditorView: View {
 
   private func selectionUTF16Offset(_ selection: TextSelection, in text: String) -> Int? {
     guard case let .selection(range) = selection.indices else { return nil }
+    // A collapsed caret is transient while the editor applies a text mutation (notably Return at
+    // the end of a card). It cannot identify a line for the context-menu action anyway.
+    guard range.lowerBound != range.upperBound else { return nil }
     guard let utf16Index = range.lowerBound.samePosition(in: text.utf16) else { return nil }
     return text.utf16.distance(from: text.utf16.startIndex, to: utf16Index)
   }
