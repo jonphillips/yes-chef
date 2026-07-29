@@ -94,7 +94,8 @@ struct RecipeEditorView: View {
             focusedSectionID: $focusedIngredientSectionID,
             focusedSectionValue: section.id,
             minHeight: 180,
-            font: .body.monospacedDigit()
+            font: .body.monospacedDigit(),
+            textViewFont: ingredientTextViewFont
           )
           .onChange(of: section.text) { _, _ in
             if let newSectionID = model.ingredientTextChanged(sectionID: section.id) {
@@ -279,13 +280,21 @@ struct RecipeEditorView: View {
     _ sectionID: IngredientSection.ID,
     using proxy: ScrollViewProxy
   ) {
-    withAnimation {
-      proxy.scrollTo(sectionID, anchor: .center)
+    focusedIngredientSectionID = sectionID
+    DispatchQueue.main.async {
+      withAnimation {
+        proxy.scrollTo(sectionID, anchor: .center)
+      }
     }
-    Task { @MainActor in
-      await Task.yield()
-      focusedIngredientSectionID = sectionID
-    }
+  }
+
+  private var ingredientTextViewFont: UIFont {
+    UIFontMetrics(forTextStyle: .body).scaledFont(
+      for: .monospacedDigitSystemFont(
+        ofSize: UIFont.preferredFont(forTextStyle: .body).pointSize,
+        weight: .regular
+      )
+    )
   }
 }
 

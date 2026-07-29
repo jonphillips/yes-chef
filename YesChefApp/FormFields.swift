@@ -69,6 +69,8 @@ struct StackedTextEditor: View {
   var focusedSectionValue: UUID? = nil
   var minHeight: CGFloat
   var font: Font = .body
+  /// UIKit-backed editors require an explicit UIFont rather than silently ignoring `font`.
+  var textViewFont: UIFont? = nil
   @State private var measuredTextHeight: CGFloat = 0
 
   var body: some View {
@@ -78,7 +80,8 @@ struct StackedTextEditor: View {
           text: $text,
           caretUTF16Offset: caretUTF16Offset,
           focusedSectionID: focusedSectionID,
-          focusedSectionValue: focusedSectionValue
+          focusedSectionValue: focusedSectionValue,
+          font: textViewFont ?? UIFont.preferredFont(forTextStyle: .body)
         )
         .frame(minHeight: minHeight)
       } else {
@@ -114,17 +117,16 @@ private struct UTF16TrackingTextEditor: UIViewRepresentable {
   @Binding var caretUTF16Offset: Int?
   var focusedSectionID: FocusState<UUID?>.Binding?
   var focusedSectionValue: UUID?
+  var font: UIFont
 
   func makeUIView(context: Context) -> UITextView {
-    let textView = UITextView()
+    let textView = GrowingTextView()
     textView.delegate = context.coordinator
     textView.text = text
-    textView.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-      for: .monospacedDigitSystemFont(ofSize: UIFont.preferredFont(forTextStyle: .body).pointSize, weight: .regular)
-    )
+    textView.font = font
     textView.adjustsFontForContentSizeCategory = true
     textView.backgroundColor = .clear
-    textView.isScrollEnabled = true
+    textView.isScrollEnabled = false
     return textView
   }
 
@@ -132,12 +134,13 @@ private struct UTF16TrackingTextEditor: UIViewRepresentable {
     context.coordinator.parent = self
     if textView.text != text {
       textView.text = text
+      textView.invalidateIntrinsicContentSize()
     }
-    guard focusedSectionID?.wrappedValue == focusedSectionValue,
-      !textView.isFirstResponder
-    else { return }
-    DispatchQueue.main.async {
-      textView.becomeFirstResponder()
+    let shouldFocus = focusedSectionID?.wrappedValue == focusedSectionValue
+    if shouldFocus, !textView.isFirstResponder {
+      context.coordinator.claimFirstResponder(on: textView)
+    } else if !shouldFocus, textView.isFirstResponder {
+      textView.resignFirstResponder()
     }
   }
 
@@ -154,6 +157,7 @@ private struct UTF16TrackingTextEditor: UIViewRepresentable {
 
     func textViewDidChange(_ textView: UITextView) {
       parent.text = textView.text
+      textView.invalidateIntrinsicContentSize()
     }
 
     func textViewDidChangeSelection(_ textView: UITextView) {
@@ -170,6 +174,36 @@ private struct UTF16TrackingTextEditor: UIViewRepresentable {
       guard parent.focusedSectionID?.wrappedValue == parent.focusedSectionValue else { return }
       parent.focusedSectionID?.wrappedValue = nil
     }
+
+    func claimFirstResponder(on textView: UITextView, attempt: Int = 0) {
+      guard attempt < 10 else { return }
+      DispatchQueue.main.async { [weak self, weak textView] in
+        guard let self, let textView,
+          self.parent.focusedSectionID?.wrappedValue == self.parent.focusedSectionValue,
+          !textView.isFirstResponder
+        else { return }
+        guard textView.window != nil, textView.becomeFirstResponder() else {
+          self.claimFirstResponder(on: textView, attempt: attempt + 1)
+          return
+        }
+        textView.selectedRange = NSRange(location: 0, length: 0)
+        self.textViewDidChangeSelection(textView)
+      }
+    }
+  }
+}
+
+private final class GrowingTextView: UITextView {
+  override var intrinsicContentSize: CGSize {
+    let size = sizeThatFits(
+      CGSize(width: max(bounds.width, 1), height: .greatestFiniteMagnitude)
+    )
+    return CGSize(width: UIView.noIntrinsicMetric, height: size.height)
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    invalidateIntrinsicContentSize()
   }
 }
 
