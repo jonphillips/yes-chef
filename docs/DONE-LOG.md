@@ -9,6 +9,61 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## Grocery rapid add — a persistent Add Item field, plus Accept All on review
+
+**✅ Done 2026-07-29.** Branch `codex/grocery-rapid-add`. Spec:
+[`efforts/grocery-rapid-add-2026-07-26.md`](efforts/grocery-rapid-add-2026-07-26.md). Owner: Codex implement,
+Claude architect/review, Jon device pass. **No schema, no prod-promotion entry** — app layer plus one
+shared-component extraction and one small Core addition.
+
+**The shipped work.** A persistent Add Item field pins above the aisle sections (`safeAreaInset(edge: .top)`),
+matching the Paprika reference. Return and a trailing button are the *same* commit path, both clear the field
+and both keep focus, so items go in one after another without touching anything else. `IngredientFractionPillRow`
+was **extracted** from `RecipeEditorView` into its own shared file — not reimplemented — and appears under the
+field while it is focused. Lines run through `IngredientParser`, so `2 cups chicken broth` lands as a row
+titled "chicken broth", quantity `2`, unit `cups`, filed by the existing deterministic `GroceryStoreArea.seed`
+lookup with no model call. The stale-editor bug is fixed at the root: both editors' drafts moved out of
+`@State`-seeded-in-`init` and onto the destination payload, so a dismissed-and-reopened sheet can no longer
+hand back the previous view's text — and the same fix landed on `GroceryListEditorView`, the third instance
+the effort doc did not name. On the review sheet, **Accept All** takes the trailing toolbar slot and
+**Discard All** demotes to a text button beside the instruction line, keeping its confirmation dialog:
+prominent and destructive stop being the same button.
+
+**Review round 1 — two silent-failure bugs, both invisible to a device pass.** The debounce shipped as a
+single cancel-and-restart Task, which cancelled not just the pending sleep but a **sweep already in flight**.
+`GroceryCategorizationAttemptCache.namesToClassify` records names as attempted *at read time*, so a sweep
+killed mid-flight burned its names and no later pass — debounced or the undebounced on-appear one, which
+shares the cache — would ever retry them. The rapid-add burst was the trigger, meaning the feature's headline
+scenario was the thing that broke it, and only for items the deterministic seed misses, i.e. exactly the ones
+the classifier exists for. Fixed by splitting the debounce into a cancellable sleep task and a **never-cancelled
+sweep task** that queues behind its predecessor. Second: `addItemLine` silently dropped the parser's `comment`
+(the effort doc listed the tuple as five fields; it is seven), so `2 cups chicken broth (low sodium)` lost
+"low sodium" — the exact [ADR-0040](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md) lossless-or-loud
+violation the spec had gone out of its way to close for `preparation`. Fixed by lifting the parse→map into
+`GroceryRapidAddItem` in Core, joining both fields, with a test.
+
+**Review round 2 — the same disease on the other caller, and a test that could not fail.** The
+never-cancelled-sweep fix left a `Task.checkCancellation()` sitting *between* a completed classifier call and
+the write that applies it. Harmless for the debounced path, which is no longer cancelled — but the on-appear
+`.task` **is** cancelled on disappear, so navigating away at the wrong moment discarded a paid-for on-device
+inference while leaving its names permanently burned. Removed, with a comment recording why there deliberately
+is no check there. Separately, the test claiming to pin Slice E's riskiest acceptance called
+`item.commit(item.unmodifiedApprovedText, …)` **twice with byte-identical expressions** and asserted the two
+results matched — `f(x) == f(x)`, incapable of failing, while reading as coverage and so retiring the concern
+falsely. Rewritten to assert hardcoded expected text per presentation, renamed to what it actually tests, and
+documented as *not* covering individual-vs-bulk equivalence — that lives in the app layer, and what keeps the
+paths in step is the single `unmodifiedApprovedText` property all four call sites read. Also: rows stayed
+tappable during Accept All (only the committing row was disabled), so a mid-run Discard raced the bulk pass's
+snapshot; both row types now take `isBulkCommitting`.
+
+**The one that decided whether the feature was good was the one that looked skippable.** Slice C — the
+debounce — was the perf guard, not the ask, and both of its bugs lived there. `categorizeUncachedItems()` does
+three whole-table scans, two write transactions and two full reloads; fine at one add per sheet, an
+[ADR-0029](decisions/ADR-0029-main-thread-write-and-fetch-cost.md) writer convoy at ten adds in twenty seconds.
+Debouncing removed the multiplier this effort itself created. The deeper sweep rewrite stays a deliberate
+ADR-0029-shaped follow-up.
+
+---
 ## ADR-0014 Amendment 1 — the colon is the ingredient section syntax, and identity is manipulated where identity exists
 
 **✅ Done 2026-07-28.** PR [#255](https://github.com/jonphillips/yes-chef/pull/255), branch

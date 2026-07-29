@@ -1,8 +1,8 @@
 # Current Handoff
 
-Last updated: July 28, 2026. (ADR-0014 **Amendment 1** shipped — the colon is the ingredient section syntax,
-the split happens in the editor, and `isHeader` is retired as an authoring concept; live target is now the
-grocery **rapid add** effort.)
+Last updated: July 29, 2026. (**Grocery rapid add** shipped — a persistent Add Item field with fraction pills,
+a debounced classification sweep, the stale-editor fix, and Accept All on the review sheet; live target is now
+**playbook edit grain**, whose effort doc was amended the same day by architect review.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate everything preceded is **crossed and
@@ -17,60 +17,52 @@ live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** re
 
 ## Next Up
 
-**ONE live dispatch target: [`efforts/grocery-rapid-add-2026-07-26.md`](efforts/grocery-rapid-add-2026-07-26.md)
-— a persistent grocery Add Item field, plus Accept All on the review sheet.** Dispatch with
-*"Do **grocery rapid add** from `docs/CURRENT_HANDOFF.md`."* If this section is empty or missing, **STOP and
-ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch. **One dispatch, five slices, no
-schema, no Core model change** — app layer plus one shared-component extraction. All three product confirms
-closed with Jon 2026-07-26; the effort doc is the spec and it is complete.
+**ONE live dispatch target: [`efforts/playbook-edit-grain-2026-07-26.md`](efforts/playbook-edit-grain-2026-07-26.md)
+— Playbook edit affordances are a readout of storage grain.** Dispatch with
+*"Do **playbook edit grain** from `docs/CURRENT_HANDOFF.md`."* If this section is empty or missing, **STOP and
+ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch. Ratified in
+[ADR-0048](decisions/ADR-0048-playbook-edit-grain.md), all OQs closed; the effort doc is the spec and it was
+**amended 2026-07-29** by architect review (three changes, below).
 
-**The scope.** A/B the persistent field + fraction pills · C the debounce · D the stale-sheet fix · E the
-review-sheet Accept All (unrelated to groceries, rides along because it is small and touches none of the
-same files).
+**The core reframe the dispatch must not undo:** the three different edit interactions are an accurate readout
+of **three different storage grains**. Do not unify by making the chrome uniform over blob storage.
 
-**Read before scoping:**
+**Three dispatches, and the first one is tiny and urgent.**
 
-1. **⚠️ Slice C decides whether the feature is good, and it is the one that looks skippable.**
-   `categorizeUncachedItems()` already fires after **every** mutation and does **three whole-table `fetchAll`
-   scans + two write transactions + two full `$itemRows` reloads**. Fine at one add per sheet; at ten adds in
-   twenty seconds — which is the entire point of Slices A/B — it is
-   [ADR-0029](decisions/ADR-0029-main-thread-write-and-fetch-cost.md)'s writer convoy in a new place, and the
-   feature ships feeling *worse* than the sheet it replaces.
-   **There are FOUR post-mutation call sites, not one** — `GroceryModels.swift` lines **509, 542, 576, 706**
-   (the effort doc's Finding 3 names only 706). Debounce all four behind a single cancel-and-restart Task.
-   The `.task`-on-appear call (`GroceryViews.swift:181`) stays **undebounced** — it is once per appearance
-   and it is what catches items synced from another device.
-2. **Two scope cuts are already found — do not re-add either.** Deterministic area assignment is **already
-   wired** (`GroceryRepository.addCustomItem` falls back to `GroceryStoreArea.seed(for:)`), so the new field
-   passes `aisle: nil` and needs no area logic at all; the deferred model sweep is already wired too. Do not
-   add a second seeding path.
-3. **Slice D's bug has a third instance the effort doc does not name.** `GroceryListEditorView` seeds
-   `_title` / `_remindersListName` with the same `State(initialValue:)`-in-`init` pattern
-   (`GroceryViews.swift:750`) as `GroceryItemEditorView` (`:806`). Same view-identity/state-lifetime trap,
-   different view. Fix it in the same pass or exclude it by name — do not leave it undecided.
-4. **Slice B is an extraction, not a reimplementation.** `IngredientFractionPillRow` is `private` in
-   `RecipeEditorView.swift` (the effort doc's `:160` is stale). Lift it to its own file as a shared internal
-   component with **no behavior change to the recipe editor** — a second copy of the glyph row is exactly the
-   drift the fraction effort closed. ADR-0014 Amd1 left it in its simplest form (pills only), so the
-   extraction is clean.
-5. **Slice E fails silently if you pick one definition of "unedited".** The file holds *two* (`.sheet` →
-   `editableText ?? summary`; `.inline` → `summary`). Extract a single `unmodifiedApprovedText` that
-   `launchReview`, the sheet seed, and Accept All all read — this is
-   [[editable-summary-unchanged-commit-path]] in a new place. Always the **primary** commit
-   (`usingSecondaryCommit: false`); commit **sequentially** and leave a truthful list behind on a partial
-   failure.
-6. **A learned `canonicalName` → area cache is OUT OF SCOPE and must not ride in on this momentum.** It is a
-   real gap ([[grocery-area-no-learned-cache]]) and a synced table would be cheap
-   ([[synced-table-cost-calibration]]), but it needs its own decision about invalidation and about whether a
-   hand-edit is a correction or a one-off ([[withdraw-not-defer-orphaned-schema]]). Also out: multi-line
-   paste into the field (that is ADR-0036's territory), the deeper sweep rewrite (an ADR-0029-shaped
-   follow-up), and retiring the editor sheet (it stays the full-fidelity path).
+1. **⚠️ DISPATCH 0 (S0) ships first, on its own, and is a live data-loss bug — not migration prep.**
+   `ServeWithCoding.decode`'s `?? []` is on the read side of two **read-modify-write** paths:
+   `replaceServeWithPlan` and `removeServeWithItem` both decode → `[]` → write back, and `encode` returns
+   `nil` for empty — so a corrupt blob is **destroyed** by the next regenerate or delete-one, today, with no
+   migration involved (effort doc Finding 5). A handful of lines; do not queue it behind the S1 refactor.
+   `nil` (absent) and undecodable (corrupt) are genuinely distinguishable, so the acceptance is achievable.
+2. **DISPATCH 1 (S1) — extract the Learnings row editor; Reader Feedback adopts it.** Schema-free. Reorder,
+   add, and the provenance badge are **opt-in** capabilities of the shared component: `RecipeNote` has no
+   `sortOrder`, so Reader Feedback edits and deletes per row but does **not** reorder — and does **not** gain
+   a column to make the shape uniform. Learnings must be visually and behaviorally **unchanged**. Expect the
+   slice to **delete more than it adds** (the four bulk-edit members die); a growing diff means something was
+   misread.
+3. **DISPATCH 2 (S3) — `recipeServeWith`; the only one with schema.** Sequenced behind both.
+   - **⚠️ Every migrated column must be a deterministic function of the already-synced blob — no `UUID()`, no
+     `now`** ([[migration-writes-bypass-sync-triggers]]). `recipeServeWith` is a **brand-new** table, so the
+     `start()` sweep makes **each device upload its own copy** unless the rows are identical everywhere. The
+     data is already shaped for this: reuse the blob item's own `ServeWithItem.id` as the row `id` (which also
+     satisfies the "ids intact" acceptance), rank from array index × `rankStride`, dates from the recipe's
+     `dateModified`. Done that way it is safe to leave in the migrator with no post-engine pass.
+   - **The regeneration path is the primary test, not a detail:** it must **upsert by identity and preserve
+     hand-authored rows and their ranks**. Delete-and-reinsert reproduces the exact identity loss the slice
+     exists to remove.
+   - **`provenance` is its own enum** (model-suggested vs hand-authored). Do **not** reuse
+     `LearningProvenance` — it records *transport*, and both its cases are model paths.
+   - **Do not drop the `Recipe.serveWith` column in this PR.** Stop reading it; leave it a release. A stranded
+     DELETE gets one attempt and is unrecoverable.
 
-**Verification.** This is an **app-layer** dispatch: the elevated `generic/platform=iOS` build is the
-required evidence, plus the package suite for anything that lands in Core. **Slice C's acceptance is
-observable, so pin it**: ten items added in rapid succession must issue **one** classification pass,
-verifiable in the ADR-0043 model-call record. No simulator installs; Jon device-passes the field, the pills,
-and the review sheet.
+**Out of scope, named so it does not ride in on momentum:** Make Ahead and Chef It Up stay prose (ADR-0048
+D4 — they only *look* like lists because `PlaybookEnrichmentDisplayText` splits at render time); `sortOrder`
+on `RecipeNote`; fixing `LearningProvenance`'s transport/authorship conflation; the menu's Playbook sections.
+
+**Verification.** Dispatches 0 and 1 are app-layer: the elevated `generic/platform=iOS` build plus the package
+suite for anything landing in Core. **Dispatch 2 is schema + sync and does *not* close on a green build** —
+it wants Jon's two-device pass, and it adds to the prod-schema promotion list in the same PR.
 
 **⚠️ Jon's outstanding follow-through from ADR-0014 Amd1 (not a dispatch item):** three recipes still carry
 `isHeader = 1` rows to hand-repair in the app — *Beef Birria Taco Filling* (4), *Broccoli Spoon Salad* (2),
@@ -154,20 +146,6 @@ already exist and already sync.
 - **Sequence S1 → S2** (S1 changes the shape of `serves`), one dispatch. **Do not auto-relink without a human
   gate** and **do not add a date to `PrepPlanStepRecord`** (ADR-0034 D1) — exact match succeeds on
   `Korean Bavette` and fails on `…Salad (Korean)`, so half the chips would silently return.
-
-**[`efforts/playbook-edit-grain-2026-07-26.md`](efforts/playbook-edit-grain-2026-07-26.md) — Playbook edit
-affordances are a readout of storage grain. Dispatch 1 READY; Dispatch 2 behind it.** Ratified in
-[ADR-0048](decisions/ADR-0048-playbook-edit-grain.md), all OQs closed. **Dispatch 1 (S1+S2) is schema-free**:
-extract the Learnings row editor, Reader Feedback adopts it (already `recipeNotes` rows); S2 is the loud
-decode. S3 is the real one — `Recipe.serveWith` is a **JSON blob whose items are `Identifiable` with UUIDs**,
-identity without a row, with `reconciledServeWithItems` existing solely to carry those UUIDs across whole-blob
-rewrites by matching on content.
-- **S3's primary test, not a detail:** the regeneration path must **upsert by identity and preserve
-  hand-authored rows**. Delete-and-reinsert reproduces the exact identity loss the slice exists to remove.
-- **Make Ahead / Chef It Up stay prose (D4)** — they only *look* like lists because
-  `PlaybookEnrichmentDisplayText` splits multi-line strings at render time. Do not decompose them on momentum.
-- **Reorder is opt-in:** `RecipeNote` has no `sortOrder`, so Reader Feedback edits and deletes per row but does
-  **not** reorder, and does **not** gain a column to make the shape uniform.
 
 **[`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) — the one optional follow-on
 left after the app test target was fixed. Small, unhurried, no decisions outstanding.** Move
