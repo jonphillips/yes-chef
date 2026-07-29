@@ -12,7 +12,7 @@ Newest first.
 ## ADR-0014 Amendment 1 — the colon is the ingredient section syntax, and identity is manipulated where identity exists
 
 **✅ Done 2026-07-28.** PR [#255](https://github.com/jonphillips/yes-chef/pull/255), branch
-`codex/adr-0014-amendment-1-sections`, merge `[MERGE SHA]`, commits `0d69763` → `89bb1e2` across **two
+`codex/adr-0014-amendment-1-sections`, merge `d49a940`, commits `0d69763` → `89bb1e2` across **two
 architect review rounds plus a device pass**. Spec:
 [ADR-0014 Amendment 1](decisions/ADR-0014-recipe-text-editing-model.md#amendment-1--the-header-is-syntax-the-section-is-storage-and-the-split-happens-at-edit-time-2026-07-28).
 Owner: Codex implement, Claude architect/review. **No schema, nothing added to the prod-promotion list** —
