@@ -49,6 +49,35 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func starterCategoriesAreStableAndIdempotent() throws {
+      @Dependency(\.defaultDatabase) var database
+
+      try database.write { db in
+        try CategoryRepository.seedStarterCategories(in: db)
+        let afterFirstSeed = try Category.fetchAll(db).sorted { $0.id.uuidString < $1.id.uuidString }
+        try CategoryRepository.seedStarterCategories(in: db)
+        expectNoDifference(
+          try Category.fetchAll(db).sorted { $0.id.uuidString < $1.id.uuidString },
+          afterFirstSeed
+        )
+
+        let categoriesByID = Dictionary(uniqueKeysWithValues: afterFirstSeed.map { ($0.id, $0) })
+        let displayNames = Set(
+          afterFirstSeed.map { CategoryHierarchy.displayName(for: $0, categoriesByID: categoriesByID) }
+        )
+        let expectedSeedNames: Set<String> = [
+          "Cuisine", "Course",
+          "Cuisine > American", "Cuisine > Chinese", "Cuisine > French", "Cuisine > Indian",
+          "Cuisine > Italian", "Cuisine > Japanese", "Cuisine > Korean", "Cuisine > Mexican",
+          "Cuisine > Thai", "Cuisine > Vietnamese",
+          "Course > Breakfast", "Course > Lunch", "Course > Dinner", "Course > Appetizer",
+          "Course > Side Dish", "Course > Dessert", "Course > Snack", "Course > Drink",
+        ]
+        #expect(expectedSeedNames.isSubset(of: displayNames))
+      }
+    }
+
+    @Test
     func renamesMovesAndPreservesRecipeAssignments() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 802_500_000)

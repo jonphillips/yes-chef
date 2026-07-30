@@ -4,6 +4,7 @@ struct RecipeParseBuilder {
   var votes = RecipeAttributeVotes()
   private(set) var images: [URL] = []
   private(set) var schemaTypes: [String] = []
+  private(set) var tagNames: [String] = []
   private(set) var categoryNames: [String] = []
   private(set) var ingredients: [String] = []
   private(set) var instructionSections: [ParsedRecipeInstructionSection] = []
@@ -31,6 +32,21 @@ struct RecipeParseBuilder {
   mutating func addCategory(_ rawValue: String?) {
     for name in Self.listNames(rawValue) where !categoryNames.contains(name) {
       categoryNames.append(name)
+    }
+  }
+
+  mutating func addCuisine(_ rawValue: String?) {
+    for cuisine in Self.listNames(rawValue) {
+      let categoryName = "Cuisine > \(cuisine)"
+      if !categoryNames.contains(categoryName) {
+        categoryNames.append(categoryName)
+      }
+    }
+  }
+
+  mutating func addTag(_ rawValue: String?) {
+    for name in Self.listNames(rawValue) where !tagNames.contains(name) {
+      tagNames.append(name)
     }
   }
 
@@ -104,6 +120,7 @@ struct RecipeParseBuilder {
       cookTimeMinutes: cookTime,
       totalTimeMinutes: totalTime,
       rating: votes.winner(.rating).flatMap(Self.ratingValue),
+      tagNames: tagNames,
       categoryNames: categoryNames,
       ingredientSections: ingredientSections,
       instructionSections: instructionSections,

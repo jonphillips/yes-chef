@@ -1097,6 +1097,7 @@ extension DependencyValues {
       )
       try database.write { db in
         try CategoryRepository.foldDormantTagsIntoCategories(in: db)
+        try CategoryRepository.seedStarterCategories(in: db)
       }
     }
   }

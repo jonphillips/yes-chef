@@ -32,6 +32,10 @@ enum RecipeMicrodataExtractor {
         }
       } else if property == "recipeCategory" {
         builder.addCategory(value)
+      } else if property == "recipeCuisine" {
+        builder.addCuisine(value)
+      } else if property == "keywords" {
+        builder.addTag(value)
       } else if property == "image" {
         builder.addImage(value)
       } else if let attribute = RecipeSchemaOrg.scalarProperties[property] {

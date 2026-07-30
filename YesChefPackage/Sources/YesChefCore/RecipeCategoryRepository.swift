@@ -44,6 +44,53 @@ extension CategoryRepositoryError: LocalizedError {
 }
 
 public enum CategoryRepository {
+  /// Seeds the small, open-ended vocabulary that gives capture and later label suggestions a
+  /// useful cold-start anchor. Stable IDs and a fixed creation date let independently seeded
+  /// devices converge on the same synced rows instead of inventing duplicate namespaces.
+  public static func seedStarterCategories(in db: Database) throws {
+    var categories = try Category.fetchAll(db)
+    var resolvedCategoryIDBySeedID: [Category.ID: Category.ID] = [:]
+
+    for seed in starterCategories {
+      let parentCategoryID = seed.parentSeedID.flatMap { resolvedCategoryIDBySeedID[$0] }
+      let matchingCategories = categories
+        .filter {
+          $0.parentCategoryID == parentCategoryID
+            && $0.name.caseInsensitiveCompare(seed.name) == .orderedSame
+        }
+        .sorted(by: areCategoriesInFoldOrder)
+
+      if let seededCategory = categories.first(where: { $0.id == seed.id }),
+         seededCategory.parentCategoryID != parentCategoryID
+          || seededCategory.name.caseInsensitiveCompare(seed.name) != .orderedSame {
+        // A previously seeded category is now user-authored. Its UUID remains its durable
+        // identity, so do not recreate or relocate it on a later launch.
+        resolvedCategoryIDBySeedID[seed.id] = seededCategory.id
+        continue
+      }
+
+      if var canonicalCategory = matchingCategories.first {
+        for duplicate in matchingCategories.dropFirst() {
+          canonicalCategory = try mergeCategory(duplicate, into: canonicalCategory, in: db)
+        }
+        categories = try Category.fetchAll(db)
+        resolvedCategoryIDBySeedID[seed.id] = canonicalCategory.id
+        continue
+      }
+
+      let category = Category(
+        id: seed.id,
+        name: seed.name,
+        parentCategoryID: parentCategoryID,
+        sortOrder: seed.sortOrder,
+        dateCreated: starterCategoryDate
+      )
+      try Category.insert { category }.execute(db)
+      categories.append(category)
+      resolvedCategoryIDBySeedID[seed.id] = category.id
+    }
+  }
+
   /// Moves the still-synced, now-dormant tag graph into the category tree. This deliberately
   /// runs outside `DatabaseMigrator`, after CloudSync has installed its triggers, so every
   /// resulting category and recipe-category write participates in normal sync.
@@ -315,6 +362,42 @@ public enum CategoryRepository {
 private struct RecipeCategoryPair: Hashable {
   var recipeID: Recipe.ID
   var categoryID: Category.ID
+}
+
+private struct StarterCategory {
+  var id: Category.ID
+  var name: String
+  var parentSeedID: Category.ID?
+  var sortOrder: Int
+}
+
+private let starterCategoryDate = Date(timeIntervalSinceReferenceDate: 0)
+
+private let starterCategories: [StarterCategory] = [
+  .init(id: starterCategoryID(1), name: "Cuisine", parentSeedID: nil, sortOrder: 0),
+  .init(id: starterCategoryID(2), name: "Course", parentSeedID: nil, sortOrder: 1),
+  .init(id: starterCategoryID(3), name: "American", parentSeedID: starterCategoryID(1), sortOrder: 0),
+  .init(id: starterCategoryID(4), name: "Chinese", parentSeedID: starterCategoryID(1), sortOrder: 1),
+  .init(id: starterCategoryID(5), name: "French", parentSeedID: starterCategoryID(1), sortOrder: 2),
+  .init(id: starterCategoryID(6), name: "Indian", parentSeedID: starterCategoryID(1), sortOrder: 3),
+  .init(id: starterCategoryID(7), name: "Italian", parentSeedID: starterCategoryID(1), sortOrder: 4),
+  .init(id: starterCategoryID(8), name: "Japanese", parentSeedID: starterCategoryID(1), sortOrder: 5),
+  .init(id: starterCategoryID(9), name: "Korean", parentSeedID: starterCategoryID(1), sortOrder: 6),
+  .init(id: starterCategoryID(10), name: "Mexican", parentSeedID: starterCategoryID(1), sortOrder: 7),
+  .init(id: starterCategoryID(11), name: "Thai", parentSeedID: starterCategoryID(1), sortOrder: 8),
+  .init(id: starterCategoryID(12), name: "Vietnamese", parentSeedID: starterCategoryID(1), sortOrder: 9),
+  .init(id: starterCategoryID(13), name: "Breakfast", parentSeedID: starterCategoryID(2), sortOrder: 0),
+  .init(id: starterCategoryID(14), name: "Lunch", parentSeedID: starterCategoryID(2), sortOrder: 1),
+  .init(id: starterCategoryID(15), name: "Dinner", parentSeedID: starterCategoryID(2), sortOrder: 2),
+  .init(id: starterCategoryID(16), name: "Appetizer", parentSeedID: starterCategoryID(2), sortOrder: 3),
+  .init(id: starterCategoryID(17), name: "Side Dish", parentSeedID: starterCategoryID(2), sortOrder: 4),
+  .init(id: starterCategoryID(18), name: "Dessert", parentSeedID: starterCategoryID(2), sortOrder: 5),
+  .init(id: starterCategoryID(19), name: "Snack", parentSeedID: starterCategoryID(2), sortOrder: 6),
+  .init(id: starterCategoryID(20), name: "Drink", parentSeedID: starterCategoryID(2), sortOrder: 7),
+]
+
+private func starterCategoryID(_ ordinal: UInt8) -> UUID {
+  UUID(uuid: (0xA4, 0xD9, 0x00, 0x02, 0x00, 0x00, 0x40, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, ordinal))
 }
 
 extension RecipeRepository {

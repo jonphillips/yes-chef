@@ -73,6 +73,8 @@ enum RecipeJSONLDExtractor {
       }
     }
     for category in flatStrings(node["recipeCategory"]) { builder.addCategory(category) }
+    for cuisine in flatStrings(node["recipeCuisine"]) { builder.addCuisine(cuisine) }
+    for keyword in flatStrings(node["keywords"]) { builder.addTag(keyword) }
     for image in imageStrings(node["image"]) { builder.addImage(image) }
     for ingredient in flatStrings(node["recipeIngredient"]) { builder.addIngredient(ingredient) }
     mineInstructions(node["recipeInstructions"], into: &builder)
