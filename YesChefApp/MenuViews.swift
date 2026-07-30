@@ -317,7 +317,10 @@ struct MenuDetailView: View {
         surface: .menuTool(
           content: .init(
             applyActions: detailModel.applyActionCatalog(for: chatModel),
-            finalization: .menu(menuID: detailModel.menuID),
+            finalization: .menu(
+              menuID: detailModel.menuID,
+              prepPlanIntent: detailModel.prepPlanHandoffIntent
+            ),
             focusesInputOnAppear: detailModel.activeChatStarterID == nil
           ),
           starters: detailModel.chatStarters,
@@ -369,6 +372,7 @@ struct MenuPrepPlanSection: View {
   let steps: [PrepPlanStepRecord]
   let itemRows: [MenuItemRowData]
   let handoffSource: HandoffExportSource
+  let regenerateHandoffSource: HandoffExportSource
   let handoffTransport: HandoffInAppTransport
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var clearPrepPlan: () -> Void
@@ -413,6 +417,9 @@ struct MenuPrepPlanSection: View {
         Menu {
           Button("Handoff Prep") {
             Task { await handoffTransport.copyPrompt(for: handoffSource) }
+          }
+          Button("Handoff to Regenerate") {
+            Task { await handoffTransport.copyPrompt(for: regenerateHandoffSource) }
           }
           Button("Paste Prep") {
             Task {

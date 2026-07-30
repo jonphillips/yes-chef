@@ -133,7 +133,7 @@ struct HandoffAppShortcuts: AppShortcutsProvider {
 enum HandoffExportSource: Sendable {
   case recipeSection(Recipe.ID, PlaybookSectionKind)
   case recipeAdjustment(Recipe.ID)
-  case menu(Menu.ID)
+  case menu(Menu.ID, prepPlanIntent: AIHandoffPrepPlanIntent = .refine)
   case menuComplement(Menu.ID)
   case menuDay(Menu.ID, dayOffset: Int)
   case menuDayComplement(Menu.ID, dayOffset: Int)
@@ -166,7 +166,7 @@ extension HandoffExportSource {
       Metadata(sourceType: .recipe, sourceID: recipeID, taskType: section.handoffTaskType, dayOffset: nil)
     case let .recipeAdjustment(recipeID):
       Metadata(sourceType: .recipe, sourceID: recipeID, taskType: .adjustRecipe, dayOffset: nil)
-    case let .menu(menuID):
+    case let .menu(menuID, _):
       Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan, dayOffset: nil)
     case let .menuComplement(menuID):
       Metadata(sourceType: .menu, sourceID: menuID, taskType: .menuComplement, dayOffset: nil)
@@ -214,6 +214,15 @@ extension HandoffExportSource {
         taskType: metadata.taskType,
         dayOffset: metadata.dayOffset
       )
+    }
+  }
+
+  var prepPlanIntent: AIHandoffPrepPlanIntent {
+    switch self {
+    case let .menu(_, prepPlanIntent): prepPlanIntent
+    case .recipeSection, .recipeAdjustment, .menuComplement, .menuDay, .menuDayComplement,
+      .mealPlan, .mealPlanComplement, .readerFeedback, .workbench:
+      .refine
     }
   }
 
@@ -294,7 +303,8 @@ enum HandoffAppOperations {
     metadata: HandoffExportSource.Metadata,
     mode: AIHandoffToken.PromptMode,
     now: Date,
-    handoffID: AIHandoff.ID
+    handoffID: AIHandoff.ID,
+    prepPlanIntent: AIHandoffPrepPlanIntent
   ) -> AIHandoff {
     let prompt = AIHandoffToken.prompt(
       handoffID: handoffID,
@@ -308,6 +318,7 @@ enum HandoffAppOperations {
       sourceID: metadata.sourceID,
       taskType: metadata.taskType,
       createdAt: now,
+      regenerates: prepPlanIntent == .regenerate,
       exportedPrompt: prompt
     )
   }
@@ -475,7 +486,7 @@ enum HandoffAppOperations {
     let metadata = source.metadata(handoffID: handoffID)
 
     switch source {
-    case let .menu(menuID):
+    case let .menu(menuID, prepPlanIntent):
       guard let detail = try await database.read({ db in
         try MenuDetailRequest(menuID: menuID).fetch(db)
       }) else {
@@ -486,7 +497,8 @@ enum HandoffAppOperations {
         metadata: metadata,
         mode: mode,
         now: now,
-        handoffID: handoffID
+        handoffID: handoffID,
+        prepPlanIntent: prepPlanIntent
       )
       externalProjectName = detail.menu.externalProjectName
 
@@ -685,6 +697,7 @@ enum HandoffAppOperations {
       taskType: metadata.taskType,
       dayOffset: metadata.dayOffset,
       createdAt: now,
+      regenerates: source.prepPlanIntent == .regenerate,
       exportedPrompt: ""
     )
     return try await database.write { db in
@@ -712,6 +725,7 @@ enum HandoffAppOperations {
       sourceID: metadata.sourceID,
       taskType: metadata.taskType,
       createdAt: now,
+      regenerates: source.prepPlanIntent == .regenerate,
       exportedPrompt: ""
     )
     return try await database.read { db in

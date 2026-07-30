@@ -136,4 +136,21 @@ struct AIHandoffMenuPasteTests {
       )
     }
   }
+
+  @Test
+  func regenerationReviewDeclaresTheReplacementWithoutAnOmissionWarning() throws {
+    let review = AIHandoffMenuPrepPlanReview(
+      handoffID: UUID(uuidString: "00000000-0000-0000-0000-000000003807")!,
+      menuID: UUID(uuidString: "00000000-0000-0000-0000-000000003808")!,
+      plan: MenuPrepPlan(steps: [PrepPlanStep(session: "Sunday", task: "Make the salsa")]),
+      learnings: [],
+      prepPlanIntent: .regenerate,
+      replacementStepCount: 4
+    )
+
+    let item = try #require(HandoffReviewCoordinator().reviewItems(for: .menuPrepPlan(review)).first)
+
+    #expect(item.supportingEvidenceTitle == "This replaces your 4-step prep plan")
+    #expect(item.supportingEvidenceRows.isEmpty)
+  }
 }

@@ -21,10 +21,13 @@ struct ChatFinalizeConfiguration {
     )
   }
 
-  static func menu(menuID: YesChefCore.Menu.ID) -> Self {
+  static func menu(
+    menuID: YesChefCore.Menu.ID,
+    prepPlanIntent: AIHandoffPrepPlanIntent = .refine
+  ) -> Self {
     Self(
       title: "Finalize Prep Plan",
-      source: .menu(menuID),
+      source: .menu(menuID, prepPlanIntent: prepPlanIntent),
       actionID: "Build prep plan -> Prep Plan section"
     )
   }

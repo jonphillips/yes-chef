@@ -30,6 +30,7 @@ extension MenuDetailModel {
       dismissTool()
       return
     }
+    prepPlanHandoffIntent = .refine
     activeChatStarterID = nil
     tool = .chat(RecipeChatModel(context: .menu(MenuChatContext(detail: detail))))
   }
@@ -56,6 +57,7 @@ extension MenuDetailModel {
 
     switch starter {
     case .prepPlan:
+      prepPlanHandoffIntent = .refine
       prompt = context.discussAsk()
       summary = "Started Prep Plan discussion."
     case .complement:
@@ -90,6 +92,7 @@ extension MenuDetailModel {
     guard let detail else { return }
     // Regeneration creates a new deliverable; it is not a guided discussion-starter selection.
     // Keep Discuss unselected rather than presenting a regeneration as a Prep Plan conversation.
+    prepPlanHandoffIntent = .regenerate
     activeChatStarterID = nil
     let context = MenuChatContext(detail: detail)
     let chatModel = chatModel(for: context)
