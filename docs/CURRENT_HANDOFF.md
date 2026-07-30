@@ -166,32 +166,34 @@ no-commit advisory or a per-day note, not a per-recipe write; respect [[llm-cura
 all-caps de-cap is the DECLINED P2 above). **Unscoped**; parked in
 [`docs/open-questions.md`](open-questions.md). Interacts with ADR-0014, so sequence them.
 
-**[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) leftovers — one open defect and S3.**
-- **⚠️ OQ6 + OQ7 — they gate the real-device pass. Architect-owned, not a Codex dispatch. Full protocol,
-  runnable cold, in [`efforts/adr-0030-oq6-oq7-measurement.md`](efforts/adr-0030-oq6-oq7-measurement.md)** —
-  rig, read-only status script, both experiments, and the result tables. The two evidence simulators are still
-  standing in the isolated test container.
-  - **OQ6 — the tombstone contradiction (open defect).** After a restore converges, the peer that performed
-    the original delete keeps `_isDeleted = 1` on rows that are now alive locally *and* carry a
-    `lastKnownServerRecord`; a later full re-push (what a restore triggers) could act on those flags and
-    **silently re-delete restored data**. The state looks converged and is not stable. May be an **upstream
-    SQLiteData** issue rather than ours — in which case the deliverable is a bug report, not a patch.
-  - **OQ7 — images through the re-push are unverified.** The OQ1 run had **zero photos**. Every BLOB syncs as
-    a CKAsset unconditionally ([[sqlitedata-blob-cloudkit-asset]]), so Amendment 2's full re-push re-uploads
-    **every image asset in the library** — ~2,163 recipes' worth on the real library, materially bigger than
-    the ~44k-*record* figure, which ignored assets. Local restore of images is sound and now byte-asserted in
-    the S1 snapshot test; only the sync half is open.
-  - **Method: measurement-first.** Attach photos, then force a controlled re-push on the tombstone-holding
-    peer and observe. **Reading `SyncEngine.swift` is what produced two wrong answers** (D2, and the withdrawn
-    Amendment 1) — a code reading may *explain* a measured result here, never predict one. Read the sims with
-    `sqlite3 -readonly`; do not mutate them outside the designed experiment.
-- **OQ1 is CLOSED (2026-07-29, measured) and it went the *opposite* way to the prediction.** Restore is
-  **authoritative**: re-enabling sync re-pushes the whole restored library, the restored values win every
-  collision, and rows deleted since the backup are **resurrected** on every peer. Accepted as the design —
-  see ADR Amendment 2, which supersedes the withdrawn Amendment 1. **Do not re-derive this from the code**;
-  the code reading got it wrong and the measurement is the record.
+**[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) leftovers — one new slice (enforce restore
+procedure) and S3.**
+- **OQ6 + OQ7 are CLOSED (2026-07-29, measured; ADR Amendment 3).** Do **not** re-run the measurement effort.
+  - **OQ7 — CLOSED clean.** Images survive the re-push **byte-intact on the peer**; asset- and record-level
+    resurrection both work. Caveat: a photo *replaced* since the backup resurrects as a **duplicate**
+    (delete-row + insert-row). **Volume** (~2,163 assets at once → CKError 429 shape) stays a **real-device
+    unknown** — keep it in the device pass.
+  - **OQ6 — CONFIRMED data-loss path, mitigated by protocol.** A peer's **unsent/held** delete that syncs
+    *after* a restore **wins and silently re-deletes the restored record on every peer** (measured E2E). So
+    restore is authoritative **only against settled peer state** — this **bounds Amendment 2**, does not
+    reverse it. Root cause is upstream SQLiteData tombstone handling (`upsertFromServerRecord` never clears
+    `_isDeleted`; `syncChanges` sends before it fetches) → **file a point-free bug report**. The resting
+    tombstone self-heals on the next relaunch in the ordinary flow; the loss needs a concurrent restore.
+- **⚠️ NEW SLICE — the app must enforce the restore procedure (Jon's call).** Naive restore is unsafe:
+  *quiesce every peer (delete the app → drops its unsent CKSyncEngine queue) → restore + re-enable on one
+  device → reinstall the peers so they rebuild from the restored cloud.* Restore must gate on / walk the user
+  through quiescing the other devices before it re-enables sync. **Verify once (throwaway install, NOT the
+  measurement sims) that deleting the app clears the app-group container** — the store + pending ops live
+  there, and the whole mitigation rests on that. Not-yet-scoped into slices; scope with Jon.
+- **OQ1 is CLOSED (2026-07-29, measured).** Restore re-pushes the whole restored library and restored values
+  win collisions **with already-settled peer state** (see Amendment 2, as bounded by Amendment 3). **Do not
+  re-derive from the code.**
 - **OQ5 is CLOSED — nothing to build.** "Restore-authoritative" was parked as a future slice; it turned out to
   be the shipped behaviour, with no zone reset involved.
+- **The database export is also a durable archive, not just a restore artifact** (design constraint, parked to
+  `open-questions.md`): the backup is a self-describing SQLite file with standard-encoded image BLOBs, so the
+  library is re-extractable without the app. The "drain blobs into typed rows" direction keeps it legible;
+  don't reintroduce opaque app-specific blobs. Not a build item — a constraint on future ones.
 - **S3 — automatic snapshots.** Cadence/trigger + retention (keep N), local-only. **Build the pre-migration
   snapshot first** (D4): a rolling local snapshot taken right before `migrator.migrate` runs, so a
   bad/erasing migration is always recoverable from the step before it — the single cheapest catch for the
@@ -248,10 +250,10 @@ and persists, and a compound `serves` proposes no dish.
 
 **[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) S2** — the export →
 restore → re-enable-sync round-trip **passed on two simulators 2026-07-29** (isolated test container), which
-also closed OQ1. Still owed on **real devices**: the restore path itself is now proven, so this is a
-confidence pass rather than a discovery — and **hold it until OQ6 (the tombstone contradiction) is diagnosed**,
-because a real-device restore now rewrites the live zone and every peer by design. **Undo Last Restore** is
-untested at all and rode the same broken binding as restore, so exercise it whenever this runs.
+also closed OQ1. OQ6 is now diagnosed (Amendment 3): a naive real-device restore can be **silently clobbered by
+any peer's in-flight delete**, so **hold the real-device pass until the enforced restore procedure gates it**
+(quiesce peers → restore on one → reinstall peers). When it runs, follow that procedure and **Undo Last
+Restore** is untested at all and rode the same broken binding as restore, so exercise it too.
 **Recipe section grain S1** (PR [#246](https://github.com/jonphillips/yes-chef/pull/246))
 owes the Samin capture showing its three instruction sections with subheads, and — the canary — a
 single-section recipe looking and spacing exactly as it did before; the reader and Compare restart numbering

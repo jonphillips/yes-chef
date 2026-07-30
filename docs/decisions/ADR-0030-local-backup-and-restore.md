@@ -212,6 +212,93 @@ triggers — could act on them and silently re-delete resurrected data. **This s
 stable.** Tracked as its own investigation; it is a latent data-loss path, not a documented behaviour, and it
 is the one thing standing between this design and full confidence in restore.
 
+## Amendment 3 — OQ6 + OQ7 resolved by measurement; restore authority is bounded, and the app must enforce a restore procedure (2026-07-29)
+
+Status: **Accepted** — 2026-07-29, two-simulator measurement in the isolated container
+(`iCloud.com.jonphillips.yescheftest`), protocol in
+[`efforts/adr-0030-oq6-oq7-measurement.md`](../efforts/adr-0030-oq6-oq7-measurement.md). Closes OQ6 and OQ7 and
+**bounds Amendment 2's "restored values win every collision."**
+
+### OQ7 — CLOSED clean: images survive the re-push byte-intact on the peer
+
+Re-ran the OQ1 flow **with photos attached** (the OQ1 run had none). Backup froze P1; the cloud/peer held a
+different P2 for the same recipe, plus an asset-level deletion (a photo removed, recipe kept) and a
+record-level deletion (a whole recipe + children). After restore + re-enable + peer relaunch, **all four
+photos were byte-identical on both devices** — the restored P1 came back on the peer at its exact
+`displayData`/`thumbnailData` lengths and JPEG header, no truncation, no empty asset. The
+asymmetric-asset-failure mode the OQ was hunting **did not occur**; asset- and record-level resurrection both
+succeeded. **Caveat to record:** a photo *replaced* since the backup produces a **duplicate** after restore —
+the swap is delete-row + insert-row (distinct primary keys), so restore resurrects the old photo row *alongside*
+the surviving new one rather than overwriting it. Not data loss; a duplication artifact. **Still unmeasured:**
+volume — one asset says nothing about ~2,163 recipes' assets re-uploading at once (the CKError 429 shape). That
+stays a real-device unknown for the device pass.
+
+### OQ6 — CONFIRMED as a real data-loss path; restore is authoritative only against *settled* peer state
+
+The original OQ6 framing (a lingering `_isDeleted = 1` flag silently re-deleting on a *later* re-push) is one
+face of a larger issue. What the measurement established:
+
+1. **The resting tombstone is real.** Captured 7 records (`recipes/…` + 6 children) at `_isDeleted = 1` with
+   `lastKnownServerRecord` present, by reading the database while the app was crashed mid-delete (before the
+   reconciling relaunch that had been destroying it).
+2. **In the ordinary flow it self-heals.** On the next relaunch the engine **sends the delete before it
+   fetches** (`syncChanges` order), the server confirms, and the metadata row is **hard-removed** — a clean
+   deletion, no lingering flag. Measured: 7 tombstones → 0 after one relaunch.
+3. **The data loss (measured end-to-end).** Arm a peer with an **unsent** delete (crash-held: on this app every
+   delete crashes the UI until relaunch, so held deletes are routine), then restore + re-enable on the *other*
+   device **while the peer is still holding it**. The restore re-pushes the record alive; on the peer's next
+   relaunch its held delete **sends and wins the collision**, silently re-deleting the restored record **on
+   every peer**. Confirmed: `EDIT v1-BACKUP` was authoritatively restored on A, then re-deleted everywhere by
+   B's held tombstone — A, B, and the zone all converged with the recipe **gone** (verified by B cleanly
+   fetching back the *other* restored recipes but never `EDIT`).
+
+**This bounds Amendment 2, it does not reverse it.** Both outcomes are last-writer-wins. Amendment 2's run had
+the peer's delete **already settled** (A had fetched it) before the restore, so the restore was the newest
+write and won — that result stands. The loss happens only when a peer carries an **unsettled** change
+(pending / held / offline) that syncs *after* the restore. So: **restore wins against settled peer state;
+it loses to a concurrent unsettled delete.** "Restored values win every collision" is corrected to "…win every
+collision with state that was already settled at the moment of restore."
+
+**Root cause (code, reading only to *explain* the measured result — SQLiteData 1.8.2):** two upstream
+behaviours in `SyncEngine.swift` / `Triggers.swift`, both in tombstone handling:
+- `syncChanges` sends pending changes before fetching, so a held delete is pushed and wins before any
+  resurrection can arrive — this is the measured data-loss path.
+- `upsertFromServerRecord` (conflict-update path) writes a resurrected row back **without clearing
+  `_isDeleted`**, so where a resurrection *does* land over a still-present tombstone you get the alive-row +
+  `_isDeleted = 1` contradiction the prior run saw. The reset the original OQ6 suspected "simply absent" is
+  confirmed absent.
+Both are **upstream SQLiteData**, not Yes Chef code. Deliverable is a **bug report to point-free** (restore /
+resurrection should reconcile the peer's tombstone), not a local patch — a migrator-side fix would violate
+[[migration-writes-bypass-sync-triggers]] anyway.
+
+### The resolution: the app enforces a restore procedure (do not depend on understanding CloudKit)
+
+CloudKit's conflict internals stay opaque; the honest posture is to **define a restore procedure that cannot
+collide**, rather than trust an "authoritative" guarantee that only holds against settled state. Restore must
+become *one authoritative source, every other peer rebuilds from the cloud*:
+
+1. **Quiesce every other peer first — delete the app on each.** That discards the peer's local store and its
+   unsent CKSyncEngine queue, so it has nothing that can override the restore.
+2. **Restore + re-enable sync on the one device.** It becomes the source of truth for the zone.
+3. **Reinstall the app on the other peers.** Each starts empty and fetches the restored cloud state.
+
+**The app should enforce this**, not leave it to a documented manual procedure (Jon's call, 2026-07-29) — e.g.
+restore gates on / instructs the user through quiescing the other devices before it re-enables sync. Scoped as
+a follow-on slice; see the effort doc and CURRENT_HANDOFF.
+
+**One assumption to verify before trusting the procedure:** that deleting the app actually clears the
+**app-group** container (the store and pending ops live there, not in the app sandbox). iOS should clear a
+group container when its last owning app/extension is removed, and Yes Chef's group is only the app + its share
+extension — but verify once on a throwaway install. **Not** on the two measurement simulators: reinstalling
+them repoints the binary at the *real* container ([[simulator-run-needs-signing]] / the effort doc's reinstall
+warning). And the procedure only holds if **all** peers are reachable — a powered-off device with a pending
+delete will still override the restore when it wakes.
+
+**OQ6 status: resolved.** Real data-loss path under naive restore; mitigated to safe by the enforced procedure;
+underlying defect reported upstream. The real-device restore pass is unblocked **once the procedure gates it**
+(a naive real-device restore now rewrites the live zone and can be silently clobbered by any peer's in-flight
+delete).
+
 ## Open questions
 
 - **OQ1 — Restore ↔ CloudKit reconciliation semantics. CLOSED 2026-07-29 by measurement; see Amendment 2.**
@@ -231,21 +318,17 @@ is the one thing standing between this design and full confidence in restore.
   authoritative *without* any zone reset: wiping the metadatabase makes every table look new, the whole
   library re-pushes, and local wins. **Nothing to build.** OQ4 (merge vs replace) remains the *local* version
   of the question and stays open.
-- **OQ6 — The tombstone contradiction (open defect, 2026-07-29).** After a restore converges, the peer that
-  performed the original delete retains `_isDeleted = 1` for rows that are now alive locally and carry a
-  `lastKnownServerRecord`. Nothing is queued, but a later full re-push could act on those flags and silently
-  re-delete resurrected data. **The state looks converged and is not stable.** This is a latent data-loss
-  path, not a documented behaviour, and it is the one thing between this design and full confidence in
-  restore. Own investigation, architect-owned, and **measurement-first**: force a controlled re-push on the
-  peer that still holds the tombstones and observe whether the rows disappear. Reading
-  `SyncEngine.swift` is what produced two wrong answers (D2 and the withdrawn Amendment 1) — a code reading
-  may *explain* a measured result here, never predict one.
-- **OQ7 — Images through a restore's re-push are unverified (2026-07-29).** The **local** half is sound and
-  tested: `displayData`/`thumbnailData` are in-row BLOBs, `VACUUM INTO` copies them byte-for-byte, and the S1
-  snapshot test now asserts the bytes rather than just the row count. The **sync** half is untested — the OQ1
-  measurement ran with **zero photos**. Because every BLOB syncs as a CKAsset unconditionally
-  ([[sqlitedata-blob-cloudkit-asset]]), Amendment 2's full re-push re-uploads **every image asset in the
-  library**: on the real library that is ~2,163 recipes' worth of assets in one burst, materially larger than
-  the ~44k-record figure this ADR has been quoting, which counted rows and ignored assets. Whether a CKAsset
-  collision resolves toward local the way a scalar field did is unproven. **Re-run the isolated-container
-  measurement with photos attached before any real-device pass.**
+- **OQ6 — The tombstone contradiction. CLOSED 2026-07-29 by measurement; see Amendment 3.** Resolved as a
+  **real data-loss path**, broader than the original "lingering flag" framing: a peer's **unsent/held** delete
+  that syncs *after* a restore's re-push **wins the collision and silently re-deletes the restored record on
+  every peer** (measured end-to-end). Restore is authoritative only against peer state that was **settled** at
+  the moment of restore. Underlying cause is upstream SQLiteData tombstone handling (`upsertFromServerRecord`
+  never clears `_isDeleted`; `syncChanges` sends before it fetches). Mitigated by the **enforced restore
+  procedure** (quiesce peers → restore on one → reinstall peers); underlying defect goes to point-free as a bug
+  report.
+- **OQ7 — Images through a restore's re-push. CLOSED 2026-07-29 by measurement; see Amendment 3.** Re-ran with
+  photos attached: images survive the re-push **byte-intact on the peer** (all four photos byte-identical on
+  both devices, no truncated/empty asset), and asset- and record-level resurrection both succeed. One caveat: a
+  photo *replaced* since the backup resurrects as a **duplicate** (old row + surviving new row), not an
+  overwrite. **Volume remains a real-device unknown** — one asset says nothing about ~2,163 recipes' assets
+  re-uploading at once (the CKError 429 shape); that belongs in the device pass.

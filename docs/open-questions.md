@@ -460,3 +460,21 @@ premature-abstraction trap. This **challenges §22A `RecipeFamily`** in
 - Any of these resolutions that generalize beyond Yes Chef (e.g. the
   "import-before-sync gate") — do they belong as a jon-platform note rather than an
   app-only one?
+
+## The backup export as a durable archive (not just a restore artifact)
+
+The local backup is a self-describing SQLite file (`VACUUM INTO`, ADR-0030 OQ2) with image
+BLOBs in standard encodings (JPEG/PNG). That makes the whole library **re-extractable
+without the app** — SQLite is archival-grade (self-describing schema, universally readable),
+and it's strictly richer than a CSV, which would flatten the recipe↔ingredients↔steps↔
+sections↔photos relationships and drop the images. You can always generate CSV/JSON/Markdown
+*from* the `.sqlite`; not the other way. So the DB serves double duty: app restore **and**
+a durable, app-independent store of Jon's recipes.
+
+**Treat "the export must stay re-extractable without the app" as a standing design
+constraint, not a build item.** It reinforces the direction already in motion — draining
+opaque BLOBs into typed rows ([[decompose-notes-into-typed-homes]],
+[[editable-at-the-grain-stored]]) makes each successive backup *more* legible, not less. The
+only thing that would erode the property is reintroducing app-specific opaque blobs. ADR-0030
+S3's automatic snapshots would turn this from a manual artifact into a real rolling archive.
+Raised 2026-07-29 (Jon), acknowledged as sound; no slice.

@@ -7,8 +7,26 @@
 > [ADR-0030](../decisions/ADR-0030-local-backup-and-restore.md) Amendment 2 means a restore re-pushes
 > *every* row — do images survive that, on **both** devices?
 
-Status: **open, architect-owned.** Written 2026-07-29 so a cold session can run it without the originating
-conversation. Spec: ADR-0030 Amendments 1–2, OQ6, OQ7.
+Status: **CLOSED 2026-07-29 by measurement — do not re-run.** Results written into
+[ADR-0030 Amendment 3](../decisions/ADR-0030-local-backup-and-restore.md#amendment-3--oq6--oq7-resolved-by-measurement-restore-authority-is-bounded-and-the-app-must-enforce-a-restore-procedure-2026-07-29).
+Spec: ADR-0030 Amendments 1–2, OQ6, OQ7.
+
+> **Results (2026-07-29, two-sim isolated container):**
+> - **OQ7 — CLOSED clean.** Re-ran with photos: all photos byte-identical on both devices after the re-push;
+>   no asymmetric asset failure; asset- and record-level resurrection both work. Caveat: a photo *replaced*
+>   since the backup resurrects as a **duplicate** (delete-row + insert-row → distinct PKs). Volume (~2,163
+>   assets at once) stays a real-device unknown.
+> - **OQ6 — CONFIRMED data-loss path, then mitigated by protocol.** The resting tombstone is real (7 records
+>   captured mid-crash) but **self-heals** on the next relaunch (send-then-fetch → clean delete). The loss:
+>   a peer's **unsent/held** delete that syncs *after* a restore **wins and silently re-deletes the restored
+>   record on every peer** (measured E2E — `EDIT v1-BACKUP` restored on A, re-deleted everywhere by B's held
+>   tombstone). So restore is authoritative **only against settled peer state**, bounding Amendment 2. Root
+>   cause is upstream SQLiteData (`upsertFromServerRecord` never clears `_isDeleted`; `syncChanges` sends before
+>   fetching) → **point-free bug report**. Product fix = the app **enforces a restore procedure**: quiesce every
+>   peer (delete the app → drops its unsent queue) → restore on one → reinstall peers to rebuild from the cloud.
+>   Verify once that app-delete clears the **app-group** container.
+>
+> Everything below is the run protocol, kept for the record.
 
 ## The one rule for this work
 
