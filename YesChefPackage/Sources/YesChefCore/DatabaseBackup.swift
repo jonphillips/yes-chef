@@ -330,13 +330,12 @@ public final class YesChefDatabaseBackupRestoreModel {
     hasUndoableRestore = Self.lastPreRestoreURL != nil
   }
 
-  public var isPrepared: Bool {
-    get { preparedRestore != nil }
-    set {
-      guard !newValue else { return }
-      discardPreparedRestore()
-    }
-  }
+  /// Read-only on purpose. This must **never** be an alert's `isPresented` binding: SwiftUI writes
+  /// `false` on *every* dismissal — including the one where the user tapped Restore — so a setter
+  /// that discarded the staged candidate here ran before the button's action and left
+  /// `restorePreparedBackup()` nothing to do. Restore then failed silently. The presenting view owns
+  /// its own presentation flag and calls `discardPreparedRestore()` from Cancel only.
+  public var isPrepared: Bool { preparedRestore != nil }
 
   public var isErrorPresented: Bool {
     get { errorMessage != nil }

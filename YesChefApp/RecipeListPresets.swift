@@ -264,27 +264,30 @@ struct RecipeListPresetManagementView: View {
   @Environment(\.dismiss) private var dismiss
 
   var body: some View {
+    // Empty state as an `.overlay`, never a branch inside the List — deleting the last preset would
+    // otherwise swap the List's single child and raise an invalid-batch-update exception.
     List {
-      if presets.isEmpty {
-        ContentUnavailableView("No Saved Views", systemImage: "bookmark")
-      } else {
-        ForEach(presets) { preset in
-          RecipeListPresetManagementRow(
-            preset: preset,
-            isActive: preset.id == activePresetID,
-            recipeCount: recipeCount(preset)
-          ) {
-            applyPreset(preset)
-            dismiss()
-          }
-          .swipeActions {
-            Button(role: .destructive) {
-              deletePreset(preset)
-            } label: {
-              Label("Delete", systemImage: "trash")
-            }
+      ForEach(presets) { preset in
+        RecipeListPresetManagementRow(
+          preset: preset,
+          isActive: preset.id == activePresetID,
+          recipeCount: recipeCount(preset)
+        ) {
+          applyPreset(preset)
+          dismiss()
+        }
+        .swipeActions {
+          Button(role: .destructive) {
+            deletePreset(preset)
+          } label: {
+            Label("Delete", systemImage: "trash")
           }
         }
+      }
+    }
+    .overlay {
+      if presets.isEmpty {
+        ContentUnavailableView("No Saved Views", systemImage: "bookmark")
       }
     }
     .navigationTitle("Saved Views")

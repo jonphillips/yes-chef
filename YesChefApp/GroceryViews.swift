@@ -591,26 +591,28 @@ struct PantrySettingsView: View {
   let model: GroceryLibraryModel
 
   var body: some View {
-    List {
+    // Branch around the whole List, never inside it: deleting the last row while the empty state is
+    // a *child* of the List swaps its single child in one update and SwiftUI raises an
+    // invalid-batch-update exception (see ArchivedRecipesView, which crashed this way).
+    Group {
       if model.pantryItems.isEmpty {
-        Section {
-          ContentUnavailableView("No Pantry Items", systemImage: "archivebox")
-            .frame(maxWidth: .infinity, minHeight: 220)
-        }
+        ContentUnavailableView("No Pantry Items", systemImage: "archivebox")
       } else {
-        Section("Pantry Items") {
-          ForEach(model.pantryItems) { item in
-            Button {
-              model.editPantryItemButtonTapped(itemID: item.id)
-            } label: {
-              PantryItemRowView(item: item)
-            }
-            .buttonStyle(.plain)
-            .swipeActions {
-              Button(role: .destructive) {
-                model.deletePantryItemButtonTapped(itemID: item.id)
+        List {
+          Section("Pantry Items") {
+            ForEach(model.pantryItems) { item in
+              Button {
+                model.editPantryItemButtonTapped(itemID: item.id)
               } label: {
-                Label("Delete", systemImage: "trash")
+                PantryItemRowView(item: item)
+              }
+              .buttonStyle(.plain)
+              .swipeActions {
+                Button(role: .destructive) {
+                  model.deletePantryItemButtonTapped(itemID: item.id)
+                } label: {
+                  Label("Delete", systemImage: "trash")
+                }
               }
             }
           }
@@ -940,31 +942,32 @@ struct GroceryIngredientSelectionView: View {
   }
 
   var body: some View {
-    List {
+    // Empty state branches around the List, not inside it — an in-List swap raises an
+    // invalid-batch-update exception when the last row goes away.
+    Group {
       if choices.isEmpty {
-        Section {
-          ContentUnavailableView("No Shoppable Ingredients", systemImage: "cart")
-            .frame(maxWidth: .infinity, minHeight: 220)
-        }
+        ContentUnavailableView("No Shoppable Ingredients", systemImage: "cart")
       } else {
-        if !regularChoices.isEmpty {
-          GroceryIngredientChoiceSection(
-            title: "Ingredients",
-            choices: regularChoices,
-            selectedIngredientLineIDs: $selectedIngredientLineIDs,
-            showsRecipeTitle: showsRecipeTitle,
-            scale: context.displayScale
-          )
-        }
+        List {
+          if !regularChoices.isEmpty {
+            GroceryIngredientChoiceSection(
+              title: "Ingredients",
+              choices: regularChoices,
+              selectedIngredientLineIDs: $selectedIngredientLineIDs,
+              showsRecipeTitle: showsRecipeTitle,
+              scale: context.displayScale
+            )
+          }
 
-        if !pantryStapleChoices.isEmpty {
-          GroceryIngredientChoiceSection(
-            title: "Skipped Pantry Staples",
-            choices: pantryStapleChoices,
-            selectedIngredientLineIDs: $selectedIngredientLineIDs,
-            showsRecipeTitle: showsRecipeTitle,
-            scale: context.displayScale
-          )
+          if !pantryStapleChoices.isEmpty {
+            GroceryIngredientChoiceSection(
+              title: "Skipped Pantry Staples",
+              choices: pantryStapleChoices,
+              selectedIngredientLineIDs: $selectedIngredientLineIDs,
+              showsRecipeTitle: showsRecipeTitle,
+              scale: context.displayScale
+            )
+          }
         }
       }
     }

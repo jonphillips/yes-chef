@@ -13,6 +13,10 @@ struct SettingsView: View {
   @State private var backupExportFilename = "YesChef-Backup.sqlite"
   @State private var isPresentingBackupExporter = false
   @State private var isPresentingBackupImporter = false
+  /// The view owns this rather than deriving it from `backupRestore.isPrepared` — see the note on
+  /// `isPrepared`. Binding an alert to the model's payload made SwiftUI discard the staged restore
+  /// on dismissal, before the Restore button's action could use it.
+  @State private var isConfirmingRestore = false
   @State private var isPresentingRestoreRestartCover = false
   @Environment(\.scenePhase) private var scenePhase
 
@@ -70,7 +74,10 @@ struct SettingsView: View {
 
         if backupRestore.hasUndoableRestore {
           Button {
-            Task { await backupRestore.prepareUndo() }
+            Task {
+              await backupRestore.prepareUndo()
+              isConfirmingRestore = backupRestore.isPrepared
+            }
           } label: {
             Label("Undo Last Restore", systemImage: "arrow.uturn.backward")
           }
@@ -130,7 +137,7 @@ struct SettingsView: View {
       allowedContentTypes: [.yesChefSQLiteBackup],
       onCompletion: backupRestoreSelected
     )
-    .alert("Restore This Backup?", isPresented: restoreConfirmationPresented) {
+    .alert("Restore This Backup?", isPresented: $isConfirmingRestore) {
       Button("Restore", role: .destructive) {
         Task {
           if await backupRestore.restorePreparedBackup() {
@@ -142,7 +149,7 @@ struct SettingsView: View {
         backupRestore.discardPreparedRestore()
       }
     } message: {
-      Text("This replaces the library on this device. Yes Chef saves an automatic undo backup first.\n\niCloud sync stays off until you turn it back on. When you do, anything still in iCloud will overwrite the restored version.")
+      Text("This replaces the library on this device. Yes Chef saves an automatic undo backup first.\n\niCloud sync stays off until you turn it back on. When you do, this restored library becomes the version everywhere — it overwrites iCloud and your other devices, and recipes you deleted since the backup will come back.")
     }
     .fullScreenCover(isPresented: $isPresentingRestoreRestartCover) {
       RestoreRestartCover()
@@ -173,11 +180,6 @@ struct SettingsView: View {
     )
   }
 
-  private var restoreConfirmationPresented: Binding<Bool> {
-    @Bindable var backupRestore = backupRestore
-    return $backupRestore.isPrepared
-  }
-
   private var backupRestoreErrorPresented: Binding<Bool> {
     @Bindable var backupRestore = backupRestore
     return $backupRestore.isErrorPresented
@@ -203,7 +205,11 @@ struct SettingsView: View {
   private func backupRestoreSelected(_ result: Result<URL, any Error>) {
     switch result {
     case let .success(url):
-      Task { await backupRestore.prepareRestore(from: url) }
+      Task {
+        await backupRestore.prepareRestore(from: url)
+        // Only confirm if a candidate actually staged; a failed prepare surfaces its own error.
+        isConfirmingRestore = backupRestore.isPrepared
+      }
     case let .failure(error):
       backupRestore.recordImportFailure(error)
     }
@@ -319,7 +325,7 @@ private struct RestoreRestartCover: View {
     ContentUnavailableView(
       "Restart Yes Chef",
       systemImage: "arrow.clockwise",
-      description: Text("Your backup is restored — close and reopen Yes Chef to use it. You can undo this restore from Settings after reopening.\n\niCloud sync is off. Turning it back on merges this device with iCloud, and iCloud's copy wins for anything it still has. If you restored because something in iCloud went wrong, leave sync off.")
+      description: Text("Your backup is restored — close and reopen Yes Chef to use it. You can undo this restore from Settings after reopening.\n\niCloud sync is off. Turning it back on makes this restored library the version everywhere: it overwrites iCloud and your other devices, and anything you deleted since the backup comes back. Leave sync off if you only wanted this device restored.")
     )
     .interactiveDismissDisabled()
   }

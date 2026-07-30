@@ -39,23 +39,28 @@ private struct CategoryBrowserView: View {
   let parentCategoryID: YesChefCore.Category.ID?
 
   var body: some View {
-    List {
+    // Branch around the whole List, never inside it: deleting the last category while the empty
+    // state is a *child* of the List swaps its single child in one update and SwiftUI raises an
+    // invalid-batch-update exception (see ArchivedRecipesView, which crashed exactly this way).
+    Group {
       if categories.isEmpty {
         CategoryEmptyListContent(model: model, parentCategoryID: parentCategoryID)
       } else {
-        Section {
-          ForEach(categories) { category in
-            CategoryBrowserRow(
-              model: model,
-              category: category,
-              childCount: model.childCount(for: category.id),
-              isRootLevel: parentCategoryID == nil
-            )
+        List {
+          Section {
+            ForEach(categories) { category in
+              CategoryBrowserRow(
+                model: model,
+                category: category,
+                childCount: model.childCount(for: category.id),
+                isRootLevel: parentCategoryID == nil
+              )
+            }
           }
         }
+        .listStyle(.insetGrouped)
       }
     }
-    .listStyle(.insetGrouped)
     .navigationTitle(title)
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
@@ -349,18 +354,23 @@ private struct RecipeCategorySelectionView: View {
   let model: RecipeEditorModel
 
   var body: some View {
+    // Empty state as an `.overlay`, never a branch inside the List — the in-List form raises an
+    // invalid-batch-update exception if the rows ever empty while this is on screen. Lowest-risk of
+    // the eight sites (a selection list with no delete), converted for consistency so the pattern
+    // does not get copied back in.
     List {
+      ForEach(model.categoryRows) { row in
+        RecipeCategorySelectionRow(
+          row: row,
+          isSelected: model.selectedCategoryIDs.contains(row.category.id)
+        ) {
+          model.categorySelectionButtonTapped(row.category.id)
+        }
+      }
+    }
+    .overlay {
       if model.categoryRows.isEmpty {
         ContentUnavailableView("No Categories", systemImage: "folder")
-      } else {
-        ForEach(model.categoryRows) { row in
-          RecipeCategorySelectionRow(
-            row: row,
-            isSelected: model.selectedCategoryIDs.contains(row.category.id)
-          ) {
-            model.categorySelectionButtonTapped(row.category.id)
-          }
-        }
       }
     }
     .navigationTitle("Categories")

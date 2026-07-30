@@ -166,22 +166,39 @@ no-commit advisory or a per-day note, not a per-recipe write; respect [[llm-cura
 all-caps de-cap is the DECLINED P2 above). **Unscoped**; parked in
 [`docs/open-questions.md`](open-questions.md). Interacts with ADR-0014, so sequence them.
 
-**[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) leftovers — one owed confirmation and S3.**
-- **The owed OQ1 confirmation (small, do it before trusting the net).** Amendment 1 is **Proposed**, not
-  Accepted: its four-step mechanism is a code reading. Confirm it in an **isolated CloudKit container** — one
-  line in `YesChefCloudSync.configuration.containerIdentifier` plus a new container in the dashboard — against
-  a small seeded library on two simulators: export → mutate → restore → re-enable → observe. **Explicitly not
-  against the live zone**, where the same experiment costs a ~44k-record push and can resurrect deleted rows
-  on both devices with no undo. The one thing to watch is whether a missing `_lastKnownServerRecordAllFields`
-  really collapses the merge into a whole-record overwrite; if SQLiteData backfills a baseline first, the
-  amendment softens considerably.
+**[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) leftovers — one open defect and S3.**
+- **⚠️ OQ6 + OQ7 — they gate the real-device pass. Architect-owned, not a Codex dispatch. Full protocol,
+  runnable cold, in [`efforts/adr-0030-oq6-oq7-measurement.md`](efforts/adr-0030-oq6-oq7-measurement.md)** —
+  rig, read-only status script, both experiments, and the result tables. The two evidence simulators are still
+  standing in the isolated test container.
+  - **OQ6 — the tombstone contradiction (open defect).** After a restore converges, the peer that performed
+    the original delete keeps `_isDeleted = 1` on rows that are now alive locally *and* carry a
+    `lastKnownServerRecord`; a later full re-push (what a restore triggers) could act on those flags and
+    **silently re-delete restored data**. The state looks converged and is not stable. May be an **upstream
+    SQLiteData** issue rather than ours — in which case the deliverable is a bug report, not a patch.
+  - **OQ7 — images through the re-push are unverified.** The OQ1 run had **zero photos**. Every BLOB syncs as
+    a CKAsset unconditionally ([[sqlitedata-blob-cloudkit-asset]]), so Amendment 2's full re-push re-uploads
+    **every image asset in the library** — ~2,163 recipes' worth on the real library, materially bigger than
+    the ~44k-*record* figure, which ignored assets. Local restore of images is sound and now byte-asserted in
+    the S1 snapshot test; only the sync half is open.
+  - **Method: measurement-first.** Attach photos, then force a controlled re-push on the tombstone-holding
+    peer and observe. **Reading `SyncEngine.swift` is what produced two wrong answers** (D2, and the withdrawn
+    Amendment 1) — a code reading may *explain* a measured result here, never predict one. Read the sims with
+    `sqlite3 -readonly`; do not mutate them outside the designed experiment.
+- **OQ1 is CLOSED (2026-07-29, measured) and it went the *opposite* way to the prediction.** Restore is
+  **authoritative**: re-enabling sync re-pushes the whole restored library, the restored values win every
+  collision, and rows deleted since the backup are **resurrected** on every peer. Accepted as the design —
+  see ADR Amendment 2, which supersedes the withdrawn Amendment 1. **Do not re-derive this from the code**;
+  the code reading got it wrong and the measurement is the record.
+- **OQ5 is CLOSED — nothing to build.** "Restore-authoritative" was parked as a future slice; it turned out to
+  be the shipped behaviour, with no zone reset involved.
 - **S3 — automatic snapshots.** Cadence/trigger + retention (keep N), local-only. **Build the pre-migration
   snapshot first** (D4): a rolling local snapshot taken right before `migrator.migrate` runs, so a
   bad/erasing migration is always recoverable from the step before it — the single cheapest catch for the
   [[debug-erase-vs-sync-triggers]] class of bug. App-update-boundary and periodic snapshots follow.
-- **OQ5 (restore-authoritative — reset the zone and re-upload) is parked, not queued.** It is the only true
-  cure for a poisoned zone and it is irreversible; **do not build it on ADR momentum**
-  ([[withdraw-not-defer-orphaned-schema]]). It gets its own slice and its own justification, or none at all.
+- **Temporary, in Jon's tree, not to be committed:** the test container `iCloud.com.jonphillips.yescheftest` is
+  swapped into `YesChefCloudSync.configuration` and **both** entitlements files for the measurement. Revert
+  before any real build; leaving it in either entitlements file is a bad thing to ship.
 
 **Small nits — not urgent, fold into a passing dispatch:**
 - **The S4 brief extractor's prompt is framed for a conversation, but S4 hands it a decision** (silent-failure
@@ -214,11 +231,12 @@ selection (per-bubble `UITextView` caps the payload).
 
 ## Device passes owed
 
-Not work, a checklist. **[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) S2**
-(PR [#252](https://github.com/jonphillips/yes-chef/pull/252)) owes the **local** round-trip on device — pick a
-backup through the Files importer, confirm, relaunch, and land on the restored library, then Undo Last Restore
-back. **Keep sync off for this pass**; the sync-reconciliation half is the separate isolated-container job in
-Ready Efforts, deliberately not run against the live zone. *(Delete this if you already ran it.)*
+Not work, a checklist. **[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) S2** — the export →
+restore → re-enable-sync round-trip **passed on two simulators 2026-07-29** (isolated test container), which
+also closed OQ1. Still owed on **real devices**: the restore path itself is now proven, so this is a
+confidence pass rather than a discovery — and **hold it until OQ6 (the tombstone contradiction) is diagnosed**,
+because a real-device restore now rewrites the live zone and every peer by design. **Undo Last Restore** is
+untested at all and rode the same broken binding as restore, so exercise it whenever this runs.
 **Recipe section grain S1** (PR [#246](https://github.com/jonphillips/yes-chef/pull/246))
 owes the Samin capture showing its three instruction sections with subheads, and — the canary — a
 single-section recipe looking and spacing exactly as it did before; the reader and Compare restart numbering

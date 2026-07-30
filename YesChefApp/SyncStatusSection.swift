@@ -122,7 +122,7 @@ struct SyncStatusDetailView: View {
         Button("Cancel", role: .cancel) {}
       } message: {
         Text(
-          "This device will merge with iCloud. Anything still in iCloud will overwrite the restored version, and recipes the backup has that iCloud doesn't will be uploaded to it.\n\nIf you restored because something in iCloud went wrong, keep sync off."
+          "This device was restored from a backup. Turning sync on uploads that restored library to iCloud and every other device, overwriting what is there — and recipes you deleted since the backup will come back.\n\nIf you only wanted this device restored, keep sync off."
         )
       }
     }
