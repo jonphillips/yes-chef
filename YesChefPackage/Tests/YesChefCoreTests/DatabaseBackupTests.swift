@@ -272,6 +272,7 @@ struct DatabaseBackupTests {
     let recipeID = SampleUUIDSequence.uuid(5)
     let serveWithID = SampleUUIDSequence.uuid(6)
     let malformedRecipeID = SampleUUIDSequence.uuid(7)
+    let handoffID = SampleUUIDSequence.uuid(8)
     let migrationDate = Date(timeIntervalSinceReferenceDate: 811_000_000)
     let legacyServeWith = try ServeWithCoding.encode([
       ServeWithItem(id: serveWithID, title: "Warm flatbread", note: "For scooping")
@@ -289,6 +290,17 @@ struct DatabaseBackupTests {
         )
       }
       .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .recipe,
+          sourceID: recipeID,
+          taskType: .adjustRecipe,
+          createdAt: migrationDate,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
       try Recipe.insert {
         Recipe(
           id: malformedRecipeID,
@@ -308,16 +320,22 @@ struct DatabaseBackupTests {
         sql: "SELECT identifier FROM grdb_migrations ORDER BY rowid DESC LIMIT 1"
       )
     }
-    // This deliberately removes the current append-only tail migration. Update this assertion
-    // when a later migration is appended so the fixture remains exactly one migration behind.
-    #expect(latestMigrationIdentifier == "Move recipe Serve With into editable rows")
+    // Keep this fixture exactly the migrations listed here behind the current schema; update this tail when it changes.
+    let migrationsToReplay = [
+      "Move recipe Serve With into editable rows",
+      "Add regenerate intent to local AI handoffs",
+    ]
+    #expect(latestMigrationIdentifier == migrationsToReplay.last)
     try await backupDatabase.write { db in
+      try db.execute(sql: "ALTER TABLE aiHandoffs DROP COLUMN regenerates")
       try db.execute(sql: "DROP TABLE recipeServeWith")
       try db.execute(
-        sql: "DELETE FROM grdb_migrations WHERE identifier = ?",
-        arguments: ["Move recipe Serve With into editable rows"]
+        sql: """
+        DELETE FROM grdb_migrations
+        WHERE identifier IN ('Move recipe Serve With into editable rows', 'Add regenerate intent to local AI handoffs')
+        """
       )
-      try db.execute(sql: "PRAGMA user_version = \(backup.schemaVersion - 1)")
+      try db.execute(sql: "PRAGMA user_version = \(backup.schemaVersion - migrationsToReplay.count)")
     }
     try backupDatabase.close()
 
@@ -349,6 +367,9 @@ struct DatabaseBackupTests {
     let restoredMarker = try await restoredDatabase.read { db in
       try Int.fetchOne(db, sql: "PRAGMA user_version")
     }
+    let restoredHandoff = try await restoredDatabase.read { db in
+      try AIHandoffRepository.handoff(id: handoffID, in: db)
+    }
     try restoredDatabase.close()
 
     #expect(restoredRecipe?.title == "Forward Migrated Recipe")
@@ -370,6 +391,7 @@ struct DatabaseBackupTests {
       ]
     )
     #expect(restoredMalformedServeWith.isEmpty)
+    #expect(restoredHandoff?.prepPlanIntent == .refine)
     #expect(prepared.schemaVersion == backup.schemaVersion)
     #expect(restoredMarker == backup.schemaVersion)
   }

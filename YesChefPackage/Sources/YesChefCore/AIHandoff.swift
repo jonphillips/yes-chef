@@ -16,6 +16,7 @@ public struct AIHandoff: Codable, Identifiable, Equatable, Sendable {
   public var importedAt: Date?
   public var status: AIHandoffStatus
   public var schemaVersion: Int
+  public var regenerates: Bool
   public var exportedPrompt: String
 
   public init(
@@ -28,6 +29,7 @@ public struct AIHandoff: Codable, Identifiable, Equatable, Sendable {
     importedAt: Date? = nil,
     status: AIHandoffStatus = .awaitingReturn,
     schemaVersion: Int = Self.initialSchemaVersion,
+    regenerates: Bool = false,
     exportedPrompt: String
   ) {
     self.id = id
@@ -39,8 +41,18 @@ public struct AIHandoff: Codable, Identifiable, Equatable, Sendable {
     self.importedAt = importedAt
     self.status = status
     self.schemaVersion = schemaVersion
+    self.regenerates = regenerates
     self.exportedPrompt = exportedPrompt
   }
+
+  public var prepPlanIntent: AIHandoffPrepPlanIntent {
+    regenerates ? .regenerate : .refine
+  }
+}
+
+public enum AIHandoffPrepPlanIntent: Equatable, Sendable {
+  case refine
+  case regenerate
 }
 
 public enum AIHandoffSourceType: String, Codable, QueryBindable, QueryDecodable, Sendable {
@@ -605,31 +617,6 @@ public enum AIHandoffReturnContract {
 
   private static func isContractMarker(_ line: String) -> Bool {
     line.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("YC-CONTRACT:")
-  }
-}
-
-public struct AIHandoffMenuPrepPlanReview: Equatable, Sendable {
-  public let handoffID: AIHandoff.ID
-  public let menuID: Menu.ID
-  public let plan: MenuPrepPlan
-  public let learnings: [String]
-  public let unparsedPlanLines: [String]
-  public let advisoryNotes: [String]
-
-  public init(
-    handoffID: AIHandoff.ID,
-    menuID: Menu.ID,
-    plan: MenuPrepPlan,
-    learnings: [String],
-    unparsedPlanLines: [String] = [],
-    advisoryNotes: [String] = []
-  ) {
-    self.handoffID = handoffID
-    self.menuID = menuID
-    self.plan = plan
-    self.learnings = learnings
-    self.unparsedPlanLines = unparsedPlanLines
-    self.advisoryNotes = advisoryNotes
   }
 }
 

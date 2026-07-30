@@ -95,6 +95,113 @@ struct AIHandoffAdvisoryTests {
   }
 
   @Test
+  func regeneratingPrepPlanStagesACleanReplacementInsteadOfOmissionEvidence() throws {
+    @Dependency(\.defaultDatabase) var database
+    let menuID = SampleUUIDSequence.uuid(38_054)
+    let handoffID = SampleUUIDSequence.uuid(38_055)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Menu.insert {
+        Menu(id: menuID, title: "Beach Menu", dayCount: 2, dateCreated: now, dateModified: now)
+      }
+      .execute(db)
+      try PrepPlanStepRecord.insert {
+        PrepPlanStepRecord(
+          id: SampleUUIDSequence.uuid(38_056),
+          menuID: menuID,
+          sortOrder: 0,
+          session: "Friday",
+          task: "Salt the chicken",
+          sourceDish: SampleUUIDSequence.uuid(38_057)
+        )
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .menu,
+          sourceID: menuID,
+          taskType: .prepPlan,
+          createdAt: now,
+          regenerates: true,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      let review = try AIHandoffIntentImport.stageMenuPrepPlanReview(
+        handoffID: handoffID,
+        result: """
+        YC-HANDOFF: \(handoffID.uuidString)
+        Sunday morning:
+        - Make the salsa → Sunday dinner
+        """,
+        in: db,
+        now: now
+      )
+
+      expectNoDifference(review.advisoryNotes, [])
+      expectNoDifference(review.prepPlanIntent, .regenerate)
+      expectNoDifference(review.replacementStepCount, 1)
+      #expect(try AIHandoffRepository.handoff(id: handoffID, in: db)?.prepPlanIntent == .regenerate)
+    }
+  }
+
+  @Test
+  func refiningPrepPlanStillSurfacesDroppedSteps() throws {
+    @Dependency(\.defaultDatabase) var database
+    let menuID = SampleUUIDSequence.uuid(38_058)
+    let handoffID = SampleUUIDSequence.uuid(38_059)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Menu.insert {
+        Menu(id: menuID, title: "Beach Menu", dayCount: 2, dateCreated: now, dateModified: now)
+      }
+      .execute(db)
+      try PrepPlanStepRecord.insert {
+        PrepPlanStepRecord(
+          id: SampleUUIDSequence.uuid(38_060),
+          menuID: menuID,
+          sortOrder: 0,
+          session: "Friday",
+          task: "Salt the chicken"
+        )
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .menu,
+          sourceID: menuID,
+          taskType: .prepPlan,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      let review = try AIHandoffIntentImport.stageMenuPrepPlanReview(
+        handoffID: handoffID,
+        result: """
+        YC-HANDOFF: \(handoffID.uuidString)
+        Sunday morning:
+        - Make the salsa → Sunday dinner
+        """,
+        in: db,
+        now: now
+      )
+
+      expectNoDifference(
+        review.advisoryNotes,
+        ["Existing prep step missing from returned plan: Friday: Salt the chicken"]
+      )
+      expectNoDifference(review.prepPlanIntent, .refine)
+    }
+  }
+
+  @Test
   func readerFeedbackCaptureHandoffStagesTipsBackToTheDraftWithoutALearning() throws {
     @Dependency(\.defaultDatabase) var database
     let handoffID = SampleUUIDSequence.uuid(38_052)

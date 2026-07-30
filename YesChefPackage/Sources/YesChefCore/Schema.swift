@@ -1066,6 +1066,14 @@ extension DependencyValues {
       }
     }
 
+    migrator.registerMigration("Add regenerate intent to local AI handoffs") { db in
+      try #sql("""
+        ALTER TABLE "aiHandoffs"
+        ADD COLUMN "regenerates" INTEGER NOT NULL DEFAULT 0
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

@@ -188,6 +188,7 @@ struct MenuDetailReader: View {
         steps: detail.prepPlanSteps,
         itemRows: detail.itemRows,
         handoffSource: .menu(detailModel.menuID),
+        regenerateHandoffSource: .menu(detailModel.menuID, prepPlanIntent: .regenerate),
         handoffTransport: handoffTransport,
         onRecipeSelected: onRecipeSelected,
         clearPrepPlan: {
