@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A row-grain editor for sections whose items can be addressed independently.
-struct EditableRowsSection<Item: Identifiable, EmptyState: View, ItemContent: View, Badge: View>: View {
+struct EditableRowsSection<Item: Identifiable, EmptyState: View, ItemContent: View, Badge: View>: View where Item.ID: Sendable {
   let title: String
   let titleFont: Font
   let editorLabel: String
