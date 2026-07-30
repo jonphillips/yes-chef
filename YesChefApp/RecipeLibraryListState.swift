@@ -301,7 +301,7 @@ extension RecipeLibraryModel {
     libraryScope = state.libraryScope
     showsFavoritesOnly = state.showsFavoritesOnly
     showsPhotosOnly = state.showsPhotosOnly
-    selectedCategoryNames = Set(state.selectedCategoryNames)
+    selectedCategoryNames = canonicalCategoryNames(for: state.selectedCategoryNames)
     selectedCuisine = state.selectedCuisine
     selectedCourse = state.selectedCourse
     selectedSourceNames = Set(state.selectedSourceNames)
@@ -380,7 +380,11 @@ extension RecipeLibraryModel {
     if showsFavoritesOnly && !recipe.favorite { return false }
     if showsPhotosOnly && !row.hasPhoto { return false }
     if !categoryNames.isEmpty,
-       !categoryNames.isSubset(of: Set(row.categoryFilterNames)) {
+       !categoryNames.allSatisfy({ selectedName in
+         row.categoryFilterNames.contains {
+           $0.caseInsensitiveCompare(selectedName) == .orderedSame
+         }
+       }) {
       return false
     }
     if let selectedCuisine, recipe.cuisine != selectedCuisine {
@@ -398,6 +402,16 @@ extension RecipeLibraryModel {
       return false
     }
     return true
+  }
+
+  private func canonicalCategoryNames(for names: [String]) -> Set<String> {
+    Set(
+      names.map { selectedName in
+        categoryFilterOptions.first {
+          $0.caseInsensitiveCompare(selectedName) == .orderedSame
+        } ?? selectedName
+      }
+    )
   }
 
   private func areInIncreasingOrder(_ lhs: RecipeListRowData, _ rhs: RecipeListRowData) -> Bool {

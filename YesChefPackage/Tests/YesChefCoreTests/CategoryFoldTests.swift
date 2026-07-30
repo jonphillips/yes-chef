@@ -85,6 +85,7 @@ extension RecipeCoreTests {
       try database.read { db in
         let snapshot = try categoryFoldSnapshot(in: db)
         expectNoDifference(snapshot.categories.map(\.id), [nativeCategoryID])
+        expectNoDifference(snapshot.categories.map(\.color), ["green"])
         expectNoDifference(snapshot.recipeCategories.map(\.categoryID), [nativeCategoryID])
         expectNoDifference(snapshot.recipeCategories.count, 1)
       }
@@ -104,7 +105,7 @@ extension RecipeCoreTests {
         }
         .execute(db)
         try Tag.insert {
-          Tag(id: tagID, name: "Veg", sortOrder: 0, dateCreated: now)
+          Tag(id: tagID, name: "Veg", color: "green", sortOrder: 0, dateCreated: now)
         }
         .execute(db)
         try RecipeTag.insert {
@@ -124,6 +125,7 @@ extension RecipeCoreTests {
       try database.read { db in
         let snapshot = try categoryFoldSnapshot(in: db)
         expectNoDifference(snapshot.categories.map(\.id), [nativeCategoryID])
+        expectNoDifference(snapshot.categories.map(\.color), ["green"])
         expectNoDifference(Set(snapshot.recipeCategories.map(\.categoryID)), [nativeCategoryID])
       }
     }

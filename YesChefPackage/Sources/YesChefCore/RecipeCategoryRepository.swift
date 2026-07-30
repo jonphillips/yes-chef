@@ -60,9 +60,16 @@ public enum CategoryRepository {
         }
         .sorted(by: areCategoriesInFoldOrder)
 
-      if let canonicalCategory = matchingRoots.first {
+      if var canonicalCategory = matchingRoots.first {
         for duplicate in matchingRoots.dropFirst() {
-          try mergeCategory(duplicate, into: canonicalCategory, in: db)
+          canonicalCategory = try mergeCategory(duplicate, into: canonicalCategory, in: db)
+        }
+        if canonicalCategory.color == nil, let color = tag.color {
+          canonicalCategory.color = color
+          try Category.find(canonicalCategory.id).update {
+            $0.color = #bind(color)
+          }
+          .execute(db)
         }
         categories = try Category.fetchAll(db)
         categoryIDByTagID[tag.id] = canonicalCategory.id
@@ -243,8 +250,17 @@ public enum CategoryRepository {
     _ duplicate: Category,
     into canonical: Category,
     in db: Database
-  ) throws {
-    guard duplicate.id != canonical.id else { return }
+  ) throws -> Category {
+    guard duplicate.id != canonical.id else { return canonical }
+
+    var canonical = canonical
+    if canonical.color == nil, let color = duplicate.color {
+      canonical.color = color
+      try Category.find(canonical.id).update {
+        $0.color = #bind(color)
+      }
+      .execute(db)
+    }
 
     for var child in try Category.fetchAll(db) where child.parentCategoryID == duplicate.id {
       child.parentCategoryID = canonical.id
@@ -256,6 +272,7 @@ public enum CategoryRepository {
     }
     try deduplicateRecipeCategoryPairs(in: db)
     try Category.find(duplicate.id).delete().execute(db)
+    return canonical
   }
 
   private static func deduplicateRecipeCategoryPairs(in db: Database) throws {
