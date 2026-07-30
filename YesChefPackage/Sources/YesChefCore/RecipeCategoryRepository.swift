@@ -44,6 +44,70 @@ extension CategoryRepositoryError: LocalizedError {
 }
 
 public enum CategoryRepository {
+  /// Moves the still-synced, now-dormant tag graph into the category tree. This deliberately
+  /// runs outside `DatabaseMigrator`, after CloudSync has installed its triggers, so every
+  /// resulting category and recipe-category write participates in normal sync.
+  public static func foldDormantTagsIntoCategories(in db: Database) throws {
+    let tags = try Tag.fetchAll(db).sorted(by: areTagsInFoldOrder)
+    var categories = try Category.fetchAll(db)
+    var categoryIDByTagID: [Tag.ID: Category.ID] = [:]
+
+    for tag in tags {
+      let matchingRoots = categories
+        .filter {
+          $0.parentCategoryID == nil
+            && $0.name.caseInsensitiveCompare(tag.name) == .orderedSame
+        }
+        .sorted(by: areCategoriesInFoldOrder)
+
+      if let canonicalCategory = matchingRoots.first {
+        for duplicate in matchingRoots.dropFirst() {
+          try mergeCategory(duplicate, into: canonicalCategory, in: db)
+        }
+        categories = try Category.fetchAll(db)
+        categoryIDByTagID[tag.id] = canonicalCategory.id
+        continue
+      }
+
+      if let priorFold = categories.first(where: { $0.id == tag.id }) {
+        // A user may have renamed or re-parented a category after an earlier fold. Its UUID is
+        // still the durable bridge to this dormant tag, so preserve that user-authored shape.
+        categoryIDByTagID[tag.id] = priorFold.id
+        continue
+      }
+
+      let category = Category(
+        id: tag.id,
+        name: tag.name,
+        color: tag.color,
+        sortOrder: tag.sortOrder,
+        dateCreated: tag.dateCreated
+      )
+      try Category.insert { category }.execute(db)
+      categories.append(category)
+      categoryIDByTagID[tag.id] = category.id
+    }
+
+    var recipeCategories = try RecipeCategory.fetchAll(db)
+    for recipeTag in try RecipeTag.fetchAll(db).sorted(by: areRecipeTagsInFoldOrder) {
+      guard let categoryID = categoryIDByTagID[recipeTag.tagID] else { continue }
+      guard !recipeCategories.contains(where: {
+        $0.recipeID == recipeTag.recipeID && $0.categoryID == categoryID
+      }) else { continue }
+      guard !recipeCategories.contains(where: { $0.id == recipeTag.id }) else { continue }
+
+      let recipeCategory = RecipeCategory(
+        id: recipeTag.id,
+        recipeID: recipeTag.recipeID,
+        categoryID: categoryID
+      )
+      try RecipeCategory.insert { recipeCategory }.execute(db)
+      recipeCategories.append(recipeCategory)
+    }
+
+    try deduplicateRecipeCategoryPairs(in: db)
+  }
+
   public static func sortedCategories(_ categories: [Category]) -> [Category] {
     CategoryHierarchy.displayRows(from: categories).map(\.category)
   }
@@ -174,6 +238,66 @@ public enum CategoryRepository {
       .map(\.sortOrder)
       .max() ?? -1) + 1
   }
+
+  private static func mergeCategory(
+    _ duplicate: Category,
+    into canonical: Category,
+    in db: Database
+  ) throws {
+    guard duplicate.id != canonical.id else { return }
+
+    for var child in try Category.fetchAll(db) where child.parentCategoryID == duplicate.id {
+      child.parentCategoryID = canonical.id
+      try Category.upsert { child }.execute(db)
+    }
+    for var recipeCategory in try RecipeCategory.fetchAll(db) where recipeCategory.categoryID == duplicate.id {
+      recipeCategory.categoryID = canonical.id
+      try RecipeCategory.upsert { recipeCategory }.execute(db)
+    }
+    try deduplicateRecipeCategoryPairs(in: db)
+    try Category.find(duplicate.id).delete().execute(db)
+  }
+
+  private static func deduplicateRecipeCategoryPairs(in db: Database) throws {
+    let groups = Dictionary(grouping: try RecipeCategory.fetchAll(db)) {
+      RecipeCategoryPair(recipeID: $0.recipeID, categoryID: $0.categoryID)
+    }
+    for rows in groups.values where rows.count > 1 {
+      for duplicate in rows.sorted(by: areRecipeCategoriesInFoldOrder).dropFirst() {
+        try RecipeCategory.find(duplicate.id).delete().execute(db)
+      }
+    }
+  }
+
+  private static func areCategoriesInFoldOrder(_ lhs: Category, _ rhs: Category) -> Bool {
+    if lhs.dateCreated != rhs.dateCreated { return lhs.dateCreated < rhs.dateCreated }
+    if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
+    return lhs.id.uuidString < rhs.id.uuidString
+  }
+
+  private static func areTagsInFoldOrder(_ lhs: Tag, _ rhs: Tag) -> Bool {
+    if lhs.dateCreated != rhs.dateCreated { return lhs.dateCreated < rhs.dateCreated }
+    if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
+    return lhs.id.uuidString < rhs.id.uuidString
+  }
+
+  private static func areRecipeTagsInFoldOrder(_ lhs: RecipeTag, _ rhs: RecipeTag) -> Bool {
+    if lhs.recipeID != rhs.recipeID { return lhs.recipeID.uuidString < rhs.recipeID.uuidString }
+    if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
+    return lhs.id.uuidString < rhs.id.uuidString
+  }
+
+  private static func areRecipeCategoriesInFoldOrder(
+    _ lhs: RecipeCategory,
+    _ rhs: RecipeCategory
+  ) -> Bool {
+    lhs.id.uuidString < rhs.id.uuidString
+  }
+}
+
+private struct RecipeCategoryPair: Hashable {
+  var recipeID: Recipe.ID
+  var categoryID: Category.ID
 }
 
 extension RecipeRepository {

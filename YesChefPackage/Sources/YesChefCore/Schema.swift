@@ -1066,6 +1066,14 @@ extension DependencyValues {
       }
     }
 
+    migrator.registerMigration("Add color to categories") { db in
+      try #sql("""
+        ALTER TABLE "categories"
+        ADD COLUMN "color" TEXT
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)
@@ -1079,6 +1087,9 @@ extension DependencyValues {
         for: database,
         startImmediately: startImmediately
       )
+      try database.write { db in
+        try CategoryRepository.foldDormantTagsIntoCategories(in: db)
+      }
     }
   }
 

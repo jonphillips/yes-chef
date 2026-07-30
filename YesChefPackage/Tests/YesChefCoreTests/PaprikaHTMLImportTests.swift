@@ -324,7 +324,6 @@ extension RecipeCoreTests {
       // evidence recipe has no other photo, so its card shows no image.
       expectNoDifference(row.thumbnailData, nil)
       expectNoDifference(row.categoryNames, ["Import Fixture"])
-      expectNoDifference(row.tagNames, [])
     }
 
     @Test

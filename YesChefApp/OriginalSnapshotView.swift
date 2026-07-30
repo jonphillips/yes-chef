@@ -42,8 +42,12 @@ struct OriginalSnapshotView: View {
           SnapshotSection(title: "Ingredients", rows: snapshot.ingredients)
           SnapshotSection(title: "Instructions", rows: snapshot.instructions)
           SnapshotSection(title: "Notes", rows: snapshot.notes, rendersMarkdown: true)
-          SnapshotSection(title: "Tags", rows: snapshot.tags)
-          SnapshotSection(title: "Categories", rows: snapshot.categories)
+          SnapshotSection(
+            title: "Categories",
+            rows: Array(Set(snapshot.tags + snapshot.categories)).sorted {
+              $0.localizedStandardCompare($1) == .orderedAscending
+            }
+          )
         }
         .padding()
         .frame(maxWidth: 860, alignment: .leading)

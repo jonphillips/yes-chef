@@ -16,7 +16,6 @@ struct RecipeListPresetState: Codable, Equatable {
   var showsFavoritesOnly: Bool
   var showsPhotosOnly: Bool
   var selectedCategoryNames: [String]
-  var selectedTagNames: [String]
   var selectedCuisine: String?
   var selectedCourse: String?
   var selectedSourceNames: [String]
@@ -29,7 +28,6 @@ struct RecipeListPresetState: Codable, Equatable {
       && !showsFavoritesOnly
       && !showsPhotosOnly
       && selectedCategoryNames.isEmpty
-      && selectedTagNames.isEmpty
       && selectedCuisine == nil
       && selectedCourse == nil
       && selectedSourceNames.isEmpty
@@ -58,15 +56,6 @@ struct RecipeListPresetState: Codable, Equatable {
           title: "Categories",
           detail: selectedCategoryNames.formattedForPresetSummary(),
           systemImage: "folder"
-        )
-      )
-    }
-    if !selectedTagNames.isEmpty {
-      lines.append(
-        RecipeListPresetSummaryLine(
-          title: "Tags",
-          detail: selectedTagNames.formattedForPresetSummary(),
-          systemImage: "tag"
         )
       )
     }
@@ -109,7 +98,6 @@ struct RecipeListPresetState: Codable, Equatable {
       showsFavoritesOnly,
       showsPhotosOnly,
       !selectedCategoryNames.isEmpty,
-      !selectedTagNames.isEmpty,
       selectedCuisine != nil,
       selectedCourse != nil,
       !selectedSourceNames.isEmpty,
@@ -122,6 +110,79 @@ struct RecipeListPresetState: Codable, Equatable {
 
     let filterText = filterCount == 1 ? "1 filter" : "\(filterCount) filters"
     return "\(filterText) · \(sortOrder.title)"
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case searchText
+    case sortOrder
+    case libraryScope
+    case showsFavoritesOnly
+    case showsPhotosOnly
+    case selectedCategoryNames
+    case selectedTagNames
+    case selectedCuisine
+    case selectedCourse
+    case selectedSourceNames
+    case selectedAuthorNames
+  }
+
+  init(
+    searchText: String,
+    sortOrder: RecipeListSort,
+    libraryScope: RecipeLibraryScope,
+    showsFavoritesOnly: Bool,
+    showsPhotosOnly: Bool,
+    selectedCategoryNames: [String],
+    selectedCuisine: String?,
+    selectedCourse: String?,
+    selectedSourceNames: [String],
+    selectedAuthorNames: [String]
+  ) {
+    self.searchText = searchText
+    self.sortOrder = sortOrder
+    self.libraryScope = libraryScope
+    self.showsFavoritesOnly = showsFavoritesOnly
+    self.showsPhotosOnly = showsPhotosOnly
+    self.selectedCategoryNames = selectedCategoryNames
+    self.selectedCuisine = selectedCuisine
+    self.selectedCourse = selectedCourse
+    self.selectedSourceNames = selectedSourceNames
+    self.selectedAuthorNames = selectedAuthorNames
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      searchText: try container.decode(String.self, forKey: .searchText),
+      sortOrder: try container.decode(RecipeListSort.self, forKey: .sortOrder),
+      libraryScope: try container.decode(RecipeLibraryScope.self, forKey: .libraryScope),
+      showsFavoritesOnly: try container.decode(Bool.self, forKey: .showsFavoritesOnly),
+      showsPhotosOnly: try container.decode(Bool.self, forKey: .showsPhotosOnly),
+      selectedCategoryNames: Array(
+        Set(
+          (try container.decodeIfPresent([String].self, forKey: .selectedCategoryNames) ?? [])
+            + (try container.decodeIfPresent([String].self, forKey: .selectedTagNames) ?? [])
+        )
+      ).sorted { $0.localizedStandardCompare($1) == .orderedAscending },
+      selectedCuisine: try container.decodeIfPresent(String.self, forKey: .selectedCuisine),
+      selectedCourse: try container.decodeIfPresent(String.self, forKey: .selectedCourse),
+      selectedSourceNames: try container.decodeIfPresent([String].self, forKey: .selectedSourceNames) ?? [],
+      selectedAuthorNames: try container.decodeIfPresent([String].self, forKey: .selectedAuthorNames) ?? []
+    )
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(searchText, forKey: .searchText)
+    try container.encode(sortOrder, forKey: .sortOrder)
+    try container.encode(libraryScope, forKey: .libraryScope)
+    try container.encode(showsFavoritesOnly, forKey: .showsFavoritesOnly)
+    try container.encode(showsPhotosOnly, forKey: .showsPhotosOnly)
+    try container.encode(selectedCategoryNames, forKey: .selectedCategoryNames)
+    try container.encodeIfPresent(selectedCuisine, forKey: .selectedCuisine)
+    try container.encodeIfPresent(selectedCourse, forKey: .selectedCourse)
+    try container.encode(selectedSourceNames, forKey: .selectedSourceNames)
+    try container.encode(selectedAuthorNames, forKey: .selectedAuthorNames)
   }
 }
 

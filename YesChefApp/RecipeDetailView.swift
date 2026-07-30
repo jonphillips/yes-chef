@@ -520,9 +520,6 @@ private struct RecipeReaderView: View {
           .recipeChip()
       }
 
-      if let tags = model.detail?.tags, !tags.isEmpty {
-        WrappingLabels(labels: tags.map(\.name), systemImage: "tag")
-      }
       if let categoryDisplayNames = model.detail?.categoryDisplayNames, !categoryDisplayNames.isEmpty {
         WrappingLabels(labels: categoryDisplayNames, systemImage: "folder")
       }

@@ -98,7 +98,6 @@ public struct RecipeDetailData: Equatable, Sendable {
   public var instructionSteps: [InstructionStep]
   public var notes: [RecipeNote]
   public var photos: [RecipeDetailPhoto]
-  public var tags: [Tag]
   public var categories: [Category]
   public var categoryDisplayNames: [String]
   public var equipment: [Equipment]
@@ -118,7 +117,6 @@ public struct RecipeDetailData: Equatable, Sendable {
     instructionSteps: [InstructionStep] = [],
     notes: [RecipeNote] = [],
     photos: [RecipeDetailPhoto] = [],
-    tags: [Tag] = [],
     categories: [Category] = [],
     categoryDisplayNames: [String] = [],
     equipment: [Equipment] = [],
@@ -137,7 +135,6 @@ public struct RecipeDetailData: Equatable, Sendable {
     self.instructionSteps = instructionSteps
     self.notes = notes
     self.photos = photos
-    self.tags = tags
     self.categories = categories
     self.categoryDisplayNames = categoryDisplayNames
     self.equipment = equipment
@@ -254,9 +251,6 @@ public enum RecipeRepository {
       .map(\.detailPhoto)
     let source = try (RecipeSource.where { $0.recipeID.eq(recipeID) })
       .fetchOne(db)
-    let recipeTags = try (RecipeTag.where { $0.recipeID.eq(recipeID) })
-      .order { $0.sortOrder }
-      .fetchAll(db)
     let recipeCategories = try (RecipeCategory.where { $0.recipeID.eq(recipeID) })
       .fetchAll(db)
     let recipeEquipment = try (RecipeEquipment.where { $0.recipeID.eq(recipeID) })
@@ -272,13 +266,6 @@ public enum RecipeRepository {
       .fetchAll(db)
       .sorted(by: areServeWithInDisplayOrder)
     let activeVariationID = try activeVariationID(recipeID: recipeID, variations: variations, in: db)
-    let tags = try Tag.fetchAll(db)
-      .filter { tag in recipeTags.contains { $0.tagID == tag.id } }
-      .sorted { lhs, rhs in
-        let lhsOrder = recipeTags.first { $0.tagID == lhs.id }?.sortOrder ?? 0
-        let rhsOrder = recipeTags.first { $0.tagID == rhs.id }?.sortOrder ?? 0
-        return lhsOrder < rhsOrder
-      }
     let allCategories = try Category.fetchAll(db)
     let categoriesByID = Dictionary(uniqueKeysWithValues: allCategories.map { ($0.id, $0) })
     let categories = allCategories
@@ -312,7 +299,6 @@ public enum RecipeRepository {
       instructionSteps: instructionSteps,
       notes: notes,
       photos: photos,
-      tags: tags,
       categories: categories,
       categoryDisplayNames: categoryDisplayNames,
       equipment: equipment,
@@ -431,7 +417,7 @@ extension RecipeRepository {
         instructionSections: snapshotInstructionSections,
         instructionSteps: snapshotInstructionSteps,
         notes: snapshotNotes,
-        tagNames: draft.tagNames.listNames,
+        tagNames: [],
         categoryNames: categoryNames,
         photos: photos,
         equipment: existingDetail?.equipment ?? [],
@@ -451,7 +437,6 @@ extension RecipeRepository {
       existingGeneralNotes: existingDetail?.notes.filter { $0.noteType == .general } ?? [],
       in: db
     )
-    try reconcileTags(draft.tagNames.listNames, recipeID: recipeID, in: db, now: now, uuid: uuid)
     try reconcileCategories(from: draft, recipeID: recipeID, in: db, now: now, uuid: uuid)
     try reconcilePhotos(photos, existingPhotos: existingPhotos, in: db)
 
@@ -510,7 +495,7 @@ extension RecipeRepository {
 
   private static func categoryNames(from draft: RecipeEditorDraft, in db: Database) throws -> [String] {
     guard let selectedCategoryIDs = draft.selectedCategoryIDs else {
-      return draft.categoryNames.listNames
+      return distinctCategoryNames(draft.categoryNames.listNames + draft.tagNames.listNames)
     }
     let categories = CategoryRepository.sortedCategories(try Category.fetchAll(db))
     let categoriesByID = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0) })
@@ -529,7 +514,20 @@ extension RecipeRepository {
     if let selectedCategoryIDs = draft.selectedCategoryIDs {
       try reconcileCategoryIDs(Array(selectedCategoryIDs), recipeID: recipeID, in: db, uuid: uuid)
     } else {
-      try reconcileCategories(draft.categoryNames.listNames, recipeID: recipeID, in: db, now: now, uuid: uuid)
+      try reconcileCategories(
+        distinctCategoryNames(draft.categoryNames.listNames + draft.tagNames.listNames),
+        recipeID: recipeID,
+        in: db,
+        now: now,
+        uuid: uuid
+      )
+    }
+  }
+
+  private static func distinctCategoryNames(_ names: [String]) -> [String] {
+    var seen: Set<String> = []
+    return names.filter { name in
+      seen.insert(name.normalizedLogicalName).inserted
     }
   }
 
@@ -633,38 +631,6 @@ extension RecipeRepository {
     try RecipeNote.upsert { note }.execute(db)
   }
 
-  static func reconcileTags(
-    _ names: [String],
-    recipeID: Recipe.ID,
-    in db: Database,
-    now: Date,
-    uuid: () -> UUID
-  ) throws {
-    var existingTags = try Tag.fetchAll(db)
-    try reconcileDuplicateTags(in: db, tags: &existingTags)
-    let existingRecipeTags = try RecipeTag.where { $0.recipeID.eq(recipeID) }.fetchAll(db)
-    var keptRecipeTagIDs: Set<RecipeTag.ID> = []
-
-    for (index, name) in names.enumerated() {
-      let tag = existingTags.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
-        ?? Tag(id: uuid(), name: name, color: nil, sortOrder: existingTags.count, dateCreated: now)
-      if !existingTags.contains(where: { $0.id == tag.id }) {
-        try Tag.insert { tag }.execute(db)
-        existingTags.append(tag)
-      }
-      let recipeTag = RecipeTag(
-        id: existingRecipeTags.first { $0.tagID == tag.id }?.id ?? uuid(),
-        recipeID: recipeID,
-        tagID: tag.id,
-        sortOrder: index
-      )
-      keptRecipeTagIDs.insert(recipeTag.id)
-      try RecipeTag.upsert { recipeTag }.execute(db)
-    }
-
-    try deleteMissingRows(existingRecipeTags, keeping: keptRecipeTagIDs, in: db)
-  }
-
   static func reconcileInstructionSteps(
     _ parsedSteps: [InstructionStep],
     existing existingSteps: [InstructionStep]
@@ -744,57 +710,6 @@ extension RecipeRepository {
     for row in rows where !keptIDs.contains(row.id) {
       try #sql("DELETE FROM \"recipeNotes\" WHERE \"id\" = \(bind: row.id)").execute(db)
     }
-  }
-
-  private static func deleteMissingRows(
-    _ rows: [RecipeTag],
-    keeping keptIDs: Set<RecipeTag.ID>,
-    in db: Database
-  ) throws {
-    for row in rows where !keptIDs.contains(row.id) {
-      try #sql("DELETE FROM \"recipeTags\" WHERE \"id\" = \(bind: row.id)").execute(db)
-    }
-  }
-
-  private static func reconcileDuplicateTags(
-    in db: Database,
-    tags: inout [Tag]
-  ) throws {
-    let groups = Dictionary(grouping: tags, by: { $0.name.normalizedLogicalName })
-    for group in groups.values where group.count > 1 {
-      let sortedGroup = group.sorted(by: areTagsInCanonicalOrder)
-      guard let canonicalTag = sortedGroup.first else { continue }
-      let duplicateTags = sortedGroup.dropFirst()
-      let duplicateTagIDs = Set(duplicateTags.map(\.id))
-
-      for var recipeTag in try RecipeTag.fetchAll(db) where duplicateTagIDs.contains(recipeTag.tagID) {
-        let hasCanonicalRecipeTag = try RecipeTag.fetchAll(db).contains {
-          $0.recipeID == recipeTag.recipeID && $0.tagID == canonicalTag.id
-        }
-        if hasCanonicalRecipeTag {
-          try RecipeTag.find(recipeTag.id).delete().execute(db)
-        } else {
-          recipeTag.tagID = canonicalTag.id
-          try RecipeTag.upsert { recipeTag }.execute(db)
-        }
-      }
-
-      for tag in duplicateTags {
-        try Tag.find(tag.id).delete().execute(db)
-      }
-    }
-
-    tags = try Tag.fetchAll(db)
-  }
-
-  private static func areTagsInCanonicalOrder(_ lhs: Tag, _ rhs: Tag) -> Bool {
-    if lhs.dateCreated != rhs.dateCreated {
-      return lhs.dateCreated < rhs.dateCreated
-    }
-    if lhs.sortOrder != rhs.sortOrder {
-      return lhs.sortOrder < rhs.sortOrder
-    }
-    return lhs.id.uuidString < rhs.id.uuidString
   }
 
   private static func totalTime(prep: Int?, cook: Int?) -> Int? {

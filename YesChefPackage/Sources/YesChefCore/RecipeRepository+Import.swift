@@ -278,27 +278,15 @@ extension RecipeRepository {
       .filter { existingRecipeIDs.contains($0.recipeID) }
     let recipePhotos = try RecipePhoto.fetchAll(db)
       .filter { existingRecipeIDs.contains($0.recipeID) }
-    let recipeTags = try RecipeTag.fetchAll(db)
-      .filter { existingRecipeIDs.contains($0.recipeID) }
     let recipeCategories = try RecipeCategory.fetchAll(db)
       .filter { existingRecipeIDs.contains($0.recipeID) }
     let recipeEquipment = try RecipeEquipment.fetchAll(db)
       .filter { existingRecipeIDs.contains($0.recipeID) }
-    let tagIDs = Set(recipeTags.map(\.tagID))
     let categoryIDs = Set(recipeCategories.map(\.categoryID))
-    let linkedTags = try Tag.fetchAll(db).filter { tagIDs.contains($0.id) }
     let linkedCategories = try Category.fetchAll(db).filter { categoryIDs.contains($0.id) }
 
     for recipeID in existingRecipeIDs {
       try Recipe.find(recipeID).delete().execute(db)
-    }
-
-    var deletedTagCount = 0
-    for tag in linkedTags where importDates.contains(tag.dateCreated) {
-      let remainingLinks = try RecipeTag.fetchAll(db).filter { $0.tagID == tag.id }
-      guard remainingLinks.isEmpty else { continue }
-      try Tag.find(tag.id).delete().execute(db)
-      deletedTagCount += 1
     }
 
     var deletedCategoryCount = 0
@@ -319,12 +307,12 @@ extension RecipeRepository {
       instructionSteps: instructionSteps.count,
       recipeNotes: recipeNotes.count,
       recipePhotos: recipePhotos.count,
-      tags: deletedTagCount,
+      tags: 0,
       categories: deletedCategoryCount,
       // Equipment has no batch-provenance column. Preserve orphaned equipment until an
       // importer actually creates it and can prove which rows belong to an undo batch.
       equipment: 0,
-      recipeTags: recipeTags.count,
+      recipeTags: 0,
       recipeCategories: recipeCategories.count,
       recipeEquipment: recipeEquipment.count
     )
@@ -465,8 +453,15 @@ extension RecipeRepository {
       try RecipeEquipment.upsert { recipeEquipment }.execute(db)
     }
 
-    try reconcileTags(bundle.tagNames, recipeID: recipe.id, in: db, now: now, uuid: uuid)
-    try reconcileCategories(bundle.categoryNames, recipeID: recipe.id, in: db, now: now, uuid: uuid)
+    try reconcileCategories(
+      Array(Set(bundle.categoryNames + bundle.tagNames)).sorted {
+        $0.localizedStandardCompare($1) == .orderedAscending
+      },
+      recipeID: recipe.id,
+      in: db,
+      now: now,
+      uuid: uuid
+    )
 
     let importRef = RecipeImportRef(
       id: uuid(),

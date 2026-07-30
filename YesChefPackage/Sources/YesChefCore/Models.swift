@@ -989,6 +989,7 @@ public struct Tag: Codable, Identifiable, Equatable, Sendable {
 public struct Category: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID
   public var name: String
+  public var color: String?
   public var parentCategoryID: Category.ID?
   public var sortOrder: Int
   public var dateCreated: Date
@@ -996,12 +997,14 @@ public struct Category: Codable, Identifiable, Equatable, Sendable {
   public init(
     id: UUID,
     name: String,
+    color: String? = nil,
     parentCategoryID: Category.ID? = nil,
     sortOrder: Int,
     dateCreated: Date
   ) {
     self.id = id
     self.name = name
+    self.color = color
     self.parentCategoryID = parentCategoryID
     self.sortOrder = sortOrder
     self.dateCreated = dateCreated

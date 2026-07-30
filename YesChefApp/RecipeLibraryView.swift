@@ -694,13 +694,6 @@ private struct RecipeSortMenu: View {
 
 private struct RecipeFilterView: View {
   let model: RecipeLibraryModel
-  @State private var tagSearchText = ""
-
-  private var filteredTagOptions: [String] {
-    let query = tagSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !query.isEmpty else { return model.tagFilterOptions }
-    return model.tagFilterOptions.filter { $0.localizedCaseInsensitiveContains(query) }
-  }
 
   var body: some View {
     @Bindable var model = model
@@ -738,36 +731,6 @@ private struct RecipeFilterView: View {
       } footer: {
         if !model.selectedCategoryNames.isEmpty {
           Text("Recipes must match all selected categories. Parent categories include descendants.")
-        }
-      }
-
-      Section {
-        if model.tagFilterOptions.isEmpty {
-          Text("No tags yet")
-            .foregroundStyle(.secondary)
-        } else {
-          StackedTextField(title: "Find tags", text: $tagSearchText)
-            .textInputAutocapitalization(.never)
-          if filteredTagOptions.isEmpty {
-            Text("No matching tags")
-              .foregroundStyle(.secondary)
-          } else {
-            ForEach(filteredTagOptions, id: \.self) { tagName in
-              RecipeFilterSelectionRow(
-                title: tagName,
-                systemImage: "tag",
-                isSelected: model.selectedTagNames.contains(tagName)
-              ) {
-                model.tagFilterButtonTapped(tagName)
-              }
-            }
-          }
-        }
-      } header: {
-        Text("Tags")
-      } footer: {
-        if model.selectedTagNames.count > 1 {
-          Text("Recipes must match all selected tags.")
         }
       }
 

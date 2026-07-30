@@ -308,16 +308,17 @@ struct DatabaseBackupTests {
         sql: "SELECT identifier FROM grdb_migrations ORDER BY rowid DESC LIMIT 1"
       )
     }
-    // This deliberately removes the current append-only tail migration. Update this assertion
-    // when a later migration is appended so the fixture remains exactly one migration behind.
-    #expect(latestMigrationIdentifier == "Move recipe Serve With into editable rows")
+    // This deliberately removes the current append-only tail plus the Serve With migration under
+    // test. Update this assertion when a later migration is appended.
+    #expect(latestMigrationIdentifier == "Add color to categories")
     try await backupDatabase.write { db in
       try db.execute(sql: "DROP TABLE recipeServeWith")
+      try db.execute(sql: "ALTER TABLE categories DROP COLUMN color")
       try db.execute(
-        sql: "DELETE FROM grdb_migrations WHERE identifier = ?",
-        arguments: ["Move recipe Serve With into editable rows"]
+        sql: "DELETE FROM grdb_migrations WHERE identifier IN (?, ?)",
+        arguments: ["Move recipe Serve With into editable rows", "Add color to categories"]
       )
-      try db.execute(sql: "PRAGMA user_version = \(backup.schemaVersion - 1)")
+      try db.execute(sql: "PRAGMA user_version = \(backup.schemaVersion - 2)")
     }
     try backupDatabase.close()
 
