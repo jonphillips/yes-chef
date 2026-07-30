@@ -1,8 +1,7 @@
 import Foundation
 import SQLiteData
 
-/// Synced installation and deletion state for a fixed starter category. This intentionally has no
-/// foreign key so a deletion tombstone can outlive the category it prevents from being re-seeded.
+/// Synced mapping from a fixed starter seed to the category that currently represents it.
 @Table("categorySeedStates")
 public struct CategorySeedState: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID

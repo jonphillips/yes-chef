@@ -52,20 +52,34 @@ public enum CategoryRepository {
     var seedStates = Dictionary(
       uniqueKeysWithValues: try CategorySeedState.fetchAll(db).map { ($0.id, $0) }
     )
+    let tombstonedSeedIDs = Set(try CategorySeedTombstone.fetchAll(db).map(\.id))
     var resolvedCategoryIDBySeedID: [Category.ID: Category.ID] = [:]
 
     for seed in starterCategories {
-      let parentCategoryID = seed.parentSeedID.flatMap { resolvedCategoryIDBySeedID[$0] }
-      if let state = seedStates[seed.id] {
-        guard !state.isDeleted,
-          let categoryID = state.categoryID,
-          let category = categories.first(where: { $0.id == categoryID })
-        else {
+      let parentCategoryID: Category.ID?
+      if let parentSeedID = seed.parentSeedID {
+        guard let resolvedParentCategoryID = resolvedCategoryIDBySeedID[parentSeedID] else {
           continue
         }
+        parentCategoryID = resolvedParentCategoryID
+      } else {
+        parentCategoryID = nil
+      }
+
+      if tombstonedSeedIDs.contains(seed.id) {
+        try removeTombstonedSeedCategory(seed, categories: &categories, in: db)
+        continue
+      }
+
+      if let state = seedStates[seed.id],
+        let categoryID = state.categoryID,
+        let category = categories.first(where: { $0.id == categoryID }),
+        (category.parentCategoryID != parentCategoryID
+          || category.name.caseInsensitiveCompare(seed.name) != .orderedSame) {
         resolvedCategoryIDBySeedID[seed.id] = category.id
         continue
       }
+
       let matchingCategories = categories
         .filter {
           $0.parentCategoryID == parentCategoryID
@@ -79,13 +93,12 @@ public enum CategoryRepository {
         // A previously seeded category is now user-authored. Its UUID remains its durable
         // identity, so do not recreate or relocate it on a later launch.
         resolvedCategoryIDBySeedID[seed.id] = seededCategory.id
-        let state = CategorySeedState(
-          id: seed.id,
+        try updateSeedState(
+          seedID: seed.id,
           categoryID: seededCategory.id,
-          dateModified: starterCategoryDate
+          seedStates: &seedStates,
+          in: db
         )
-        try CategorySeedState.upsert { state }.execute(db)
-        seedStates[seed.id] = state
         continue
       }
 
@@ -95,13 +108,12 @@ public enum CategoryRepository {
         }
         categories = try Category.fetchAll(db)
         resolvedCategoryIDBySeedID[seed.id] = canonicalCategory.id
-        let state = CategorySeedState(
-          id: seed.id,
+        try updateSeedState(
+          seedID: seed.id,
           categoryID: canonicalCategory.id,
-          dateModified: starterCategoryDate
+          seedStates: &seedStates,
+          in: db
         )
-        try CategorySeedState.upsert { state }.execute(db)
-        seedStates[seed.id] = state
         continue
       }
 
@@ -115,13 +127,12 @@ public enum CategoryRepository {
       try Category.insert { category }.execute(db)
       categories.append(category)
       resolvedCategoryIDBySeedID[seed.id] = category.id
-      let state = CategorySeedState(
-        id: seed.id,
+      try updateSeedState(
+        seedID: seed.id,
         categoryID: category.id,
-        dateModified: starterCategoryDate
+        seedStates: &seedStates,
+        in: db
       )
-      try CategorySeedState.upsert { state }.execute(db)
-      seedStates[seed.id] = state
     }
   }
 
@@ -266,12 +277,54 @@ public enum CategoryRepository {
       throw CategoryRepositoryError.cannotDeleteCategoryUsedByRecipes
     }
 
-    for var seedState in try CategorySeedState.fetchAll(db) where seedState.categoryID == categoryID {
-      seedState.isDeleted = true
-      seedState.dateModified = now
-      try CategorySeedState.upsert { seedState }.execute(db)
+    let seedIDs = Set(
+      starterCategories
+        .filter { $0.id == categoryID }
+        .map(\.id)
+        + (try CategorySeedState.fetchAll(db))
+        .filter { $0.categoryID == categoryID }
+        .map(\.id)
+    )
+    let existingTombstoneIDs = Set(try CategorySeedTombstone.fetchAll(db).map(\.id))
+    for seedID in seedIDs where !existingTombstoneIDs.contains(seedID) {
+      let tombstone = CategorySeedTombstone(id: seedID, dateDeleted: now)
+      try CategorySeedTombstone.insert { tombstone }.execute(db)
     }
     try #sql("DELETE FROM \"categories\" WHERE \"id\" = \(bind: categoryID)").execute(db)
+  }
+
+  private static func updateSeedState(
+    seedID: Category.ID,
+    categoryID: Category.ID,
+    seedStates: inout [Category.ID: CategorySeedState],
+    in db: Database
+  ) throws {
+    guard var state = seedStates[seedID] else {
+      let state = CategorySeedState(
+        id: seedID,
+        categoryID: categoryID,
+        dateModified: starterCategoryDate
+      )
+      try CategorySeedState.insert { state }.execute(db)
+      seedStates[seedID] = state
+      return
+    }
+    guard state.categoryID != categoryID else { return }
+    state.categoryID = categoryID
+    try CategorySeedState.upsert { state }.execute(db)
+    seedStates[seedID] = state
+  }
+
+  private static func removeTombstonedSeedCategory(
+    _ seed: StarterCategory,
+    categories: inout [Category],
+    in db: Database
+  ) throws {
+    guard let category = categories.first(where: { $0.id == seed.id }) else { return }
+    guard !categories.contains(where: { $0.parentCategoryID == category.id }) else { return }
+    guard (try RecipeCategory.where { $0.categoryID.eq(category.id) }.fetchAll(db)).isEmpty else { return }
+    try Category.find(category.id).delete().execute(db)
+    categories.removeAll { $0.id == category.id }
   }
 
   private static func category(_ categoryID: Category.ID, in categories: [Category]) throws -> Category {
@@ -480,6 +533,12 @@ extension RecipeRepository {
     var existingCategories = try Category.fetchAll(db)
     try reconcileDuplicateCategories(in: db, categories: &existingCategories)
     let existingRecipeCategories = try RecipeCategory.where { $0.recipeID.eq(recipeID) }.fetchAll(db)
+    var recipeCategoryIDByCategoryID: [Category.ID: RecipeCategory.ID] = [:]
+    for recipeCategory in existingRecipeCategories.sorted(by: { $0.id.uuidString < $1.id.uuidString }) {
+      recipeCategoryIDByCategoryID[recipeCategory.categoryID] = recipeCategoryIDByCategoryID[
+        recipeCategory.categoryID
+      ] ?? recipeCategory.id
+    }
     var keptRecipeCategoryIDs: Set<RecipeCategory.ID> = []
 
     for path in CategoryHierarchy.paths(from: names) {
@@ -491,15 +550,16 @@ extension RecipeRepository {
         uuid: uuid
       )
       let recipeCategory = RecipeCategory(
-        id: existingRecipeCategories.first { $0.categoryID == category.id }?.id ?? uuid(),
+        id: recipeCategoryIDByCategoryID[category.id] ?? uuid(),
         recipeID: recipeID,
         categoryID: category.id
       )
+      recipeCategoryIDByCategoryID[category.id] = recipeCategory.id
       keptRecipeCategoryIDs.insert(recipeCategory.id)
       try RecipeCategory.upsert { recipeCategory }.execute(db)
     }
 
-    for name in looseNames {
+    for name in normalizedLooseCategoryNames(looseNames) {
       let category = try findOrCreateCategory(
         path: CategoryHierarchy.Path(components: [name]),
         existingCategories: &existingCategories,
@@ -508,15 +568,30 @@ extension RecipeRepository {
         uuid: uuid
       )
       let recipeCategory = RecipeCategory(
-        id: existingRecipeCategories.first { $0.categoryID == category.id }?.id ?? uuid(),
+        id: recipeCategoryIDByCategoryID[category.id] ?? uuid(),
         recipeID: recipeID,
         categoryID: category.id
       )
+      recipeCategoryIDByCategoryID[category.id] = recipeCategory.id
       keptRecipeCategoryIDs.insert(recipeCategory.id)
       try RecipeCategory.upsert { recipeCategory }.execute(db)
     }
 
     try deleteMissingRecipeCategories(existingRecipeCategories, keeping: keptRecipeCategoryIDs, in: db)
+  }
+
+  private static func normalizedLooseCategoryNames(_ names: [String]) -> [String] {
+    var seenNormalizedNames: Set<String> = []
+    return names.compactMap { name in
+      let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !trimmedName.isEmpty else { return nil }
+      let normalizedName = trimmedName.folding(
+        options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+        locale: .current
+      )
+      guard seenNormalizedNames.insert(normalizedName).inserted else { return nil }
+      return trimmedName
+    }
   }
 
   private static func findOrCreateCategory(

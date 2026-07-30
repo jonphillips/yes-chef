@@ -1103,6 +1103,22 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Create synced category seed tombstones") { db in
+      try #sql("""
+        CREATE TABLE "categorySeedTombstones" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "dateDeleted" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+      try #sql("""
+        INSERT INTO "categorySeedTombstones" ("id", "dateDeleted")
+        SELECT "id", "dateModified" FROM "categorySeedStates"
+        WHERE "isDeleted" = 1
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

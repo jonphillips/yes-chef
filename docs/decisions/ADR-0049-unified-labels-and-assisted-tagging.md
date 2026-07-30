@@ -128,6 +128,36 @@ flows to `categoryNames`. `recipeCuisine` attaches under the seeded `Cuisine` na
 labels; the publisher's own labels are high-precision and cost nothing. This ships independent of the proposer
 and is pure win regardless of how the model tiers land.
 
+### D7 — The S2 starter vocabulary is durable synced data, with monotonic deletion suppression
+
+The exact starter vocabulary is user-visible durable data, not a display-only convenience. S2 uses fixed UUIDs
+and the following canonical 20-row tree:
+
+| Namespace | Starter children |
+| --- | --- |
+| `Cuisine` | American, Chinese, French, Indian, Italian, Japanese, Korean, Mexican, Thai, Vietnamese |
+| `Course` | Breakfast, Lunch, Dinner, Appetizer, Side Dish, Dessert, Snack, Drink |
+
+The persisted model is additive: `categorySeedStates` maps each fixed seed UUID to the category row that
+currently represents it, and `categorySeedTombstones` is a presence-only, fixed-ID record for an intentionally
+deleted seed. Both tables have a loose UUID relationship rather than a foreign key: the state mapping may point
+at a user-authored category, and a deletion tombstone must outlive the category it suppresses. The migration adds
+the tombstone table and backfills one from any earlier `categorySeedStates.isDeleted` row, without modifying a
+recipe or category row.
+
+Seeder convergence is deliberately monotonic. It checks a tombstone before it creates or maps a seed, and never
+writes a non-deleted tombstone counterpart; therefore a later fresh/offline peer cannot clear a prior deletion by
+writing a newer `false` field. When a tombstone arrives, the main-app seeder removes an otherwise-unreferenced
+deterministic local row and never re-creates it. Child seeds wait for their parent seed to resolve; an absent or
+tombstoned parent is never interpreted as a root. Installed states still run the same-name, same-parent total-order
+merge and are repointed to the survivor, so concurrent existing-category adoption and deterministic seeding
+converge. These write passes run only in the main app after CloudSync installs its triggers; the short-lived Share
+Extension constructs its stopped engine but performs no seed/fold data writes.
+
+The rejected simpler alternative was an `isDeleted` boolean on the same synced state row used for normal
+installation. SQLiteData resolves fields by database-edit timestamp, so a later fresh-device `false` write could
+overwrite an earlier `true` deletion. A presence-only tombstone has no non-deleted write to win that conflict.
+
 ## Resolved
 
 - **OQ1 — Name of the unified concept → "Categories."** The surfaced concept stays **Categories**; storage stays

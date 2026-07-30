@@ -326,15 +326,25 @@ struct DatabaseBackupTests {
       "Move recipe Serve With into editable rows",
       "Add regenerate intent to local AI handoffs",
       "Add color to categories",
+      "Create synced category seed state",
+      "Create synced category seed tombstones",
     ]
     #expect(latestMigrationIdentifier == migrationsToReplay.last)
     try await backupDatabase.write { db in
       try db.execute(sql: "ALTER TABLE aiHandoffs DROP COLUMN regenerates")
       try db.execute(sql: "DROP TABLE recipeServeWith")
       try db.execute(sql: "ALTER TABLE categories DROP COLUMN color")
+      try db.execute(sql: "DROP TABLE categorySeedTombstones")
+      try db.execute(sql: "DROP TABLE categorySeedStates")
       try db.execute(
-        sql: "DELETE FROM grdb_migrations WHERE identifier IN (?, ?, ?)",
-        arguments: [migrationsToReplay[0], migrationsToReplay[1], migrationsToReplay[2]]
+        sql: "DELETE FROM grdb_migrations WHERE identifier IN (?, ?, ?, ?, ?)",
+        arguments: [
+          migrationsToReplay[0],
+          migrationsToReplay[1],
+          migrationsToReplay[2],
+          migrationsToReplay[3],
+          migrationsToReplay[4],
+        ]
       )
       try db.execute(sql: "PRAGMA user_version = \(backup.schemaVersion - migrationsToReplay.count)")
     }

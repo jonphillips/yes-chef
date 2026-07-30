@@ -24,7 +24,7 @@ extension RecipeCoreTests {
       expectNoDifference(page.cookTimeMinutes, 40)
       expectNoDifference(page.totalTimeMinutes, 55)
       expectNoDifference(page.rating, 5)
-      expectNoDifference(page.tagNames, ["quick", "weeknight", "Quick > Supper"])
+      expectNoDifference(page.tagNames, ["quick", "weeknight", "Quick > Supper", "Quick"])
       expectNoDifference(page.categoryNames, ["Dinner", "Chicken", "Cuisine > Mexican"])
       expectNoDifference(
         page.ingredientSections,
@@ -98,7 +98,7 @@ extension RecipeCoreTests {
       expectNoDifference(bundle.photos.map(\.kind), [.hero])
       expectNoDifference(bundle.photos.map(\.source), [.extracted])
       expectNoDifference(bundle.recipeNotes, [])
-      expectNoDifference(bundle.tagNames, ["quick", "weeknight", "Quick > Supper"])
+      expectNoDifference(bundle.tagNames, ["quick", "weeknight", "Quick > Supper", "Quick"])
 
       let snapshotData = try #require(bundle.recipe.originalSnapshot)
       let snapshot = try RecipeBundleCoding.decodeSnapshot(snapshotData)
@@ -190,15 +190,17 @@ extension RecipeCoreTests {
         renderHTML: { _ in nil }
       )
 
-      let draft = try await client.capture(url: sourceURL, capturedAt: capturedAt)
+      var draft = try await client.capture(url: sourceURL, capturedAt: capturedAt)
 
       expectNoDifference(draft.page.title, "Lemon Chicken")
       expectNoDifference(draft.usedRenderedFallback, false)
+      draft.page.tagNames.append(contentsOf: [" quick ", "   "])
+      let importedDraft = draft
 
       let uuids = LockedSampleUUIDSequence(start: 23_000)
       let importResult = try await database.write { db in
         try RecipeRepository.importCapturedRecipe(
-          draft,
+          importedDraft,
           in: db,
           now: capturedAt,
           uuid: { uuids.next() }
@@ -212,9 +214,8 @@ extension RecipeCoreTests {
         let source = try #require(try RecipeSource.fetchAll(db).first { $0.recipeID == recipe.id })
         let categories = try Category.fetchAll(db)
         let categoriesByID = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0) })
-        let recipeCategoryIDs = Set(
-          try RecipeCategory.where { $0.recipeID.eq(recipe.id) }.fetchAll(db).map(\.categoryID)
-        )
+        let recipeCategories = try RecipeCategory.where { $0.recipeID.eq(recipe.id) }.fetchAll(db)
+        let recipeCategoryIDs = Set(recipeCategories.map(\.categoryID))
         expectNoDifference(recipe.title, "Lemon Chicken")
         expectOriginalImportTextForCurrentBuild(
           recipe.originalImportText,
@@ -229,6 +230,7 @@ extension RecipeCoreTests {
         )
         let literalKeyword = try #require(categories.first { $0.name == "Quick > Supper" })
         expectNoDifference(literalKeyword.parentCategoryID, nil)
+        expectNoDifference(recipeCategories.count, recipeCategoryIDs.count)
       }
     }
 
@@ -817,7 +819,7 @@ private enum Fixtures {
       "totalTime": "PT55M",
       "recipeCategory": ["Dinner", "Chicken"],
       "recipeCuisine": "Mexican",
-      "keywords": "quick, weeknight, Quick > Supper",
+      "keywords": "quick, weeknight, Quick > Supper, Quick",
       "aggregateRating": { "@type": "AggregateRating", "ratingValue": "4.6" },
       "recipeIngredient": [
         "For the chicken:",

@@ -142,6 +142,7 @@ public enum YesChefCloudSync {
         Tag.self,
         Category.self,
         CategorySeedState.self,
+        CategorySeedTombstone.self,
         Equipment.self,
         RecipeTag.self,
         RecipeCategory.self,

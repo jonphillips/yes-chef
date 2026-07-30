@@ -78,7 +78,7 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func deletingStarterCategoryPreventsItFromReturning() throws {
+    func latePeerSeedCannotClearStarterDeletionTombstone() throws {
       @Dependency(\.defaultDatabase) var database
       let deletedAt = Date(timeIntervalSinceReferenceDate: 802_300_000)
 
@@ -87,14 +87,92 @@ extension RecipeCoreTests {
         let thai = try #require((try Category.fetchAll(db)).first { $0.name == "Thai" })
 
         try CategoryRepository.deleteCategory(categoryID: thai.id, in: db, now: deletedAt)
+        var latePeerState = try #require(
+          (try CategorySeedState.fetchAll(db)).first { $0.categoryID == thai.id }
+        )
+        latePeerState.isDeleted = false
+        latePeerState.dateModified = deletedAt.addingTimeInterval(60)
+        try CategorySeedState.upsert { latePeerState }.execute(db)
+        try Category.insert {
+          Category(
+            id: thai.id,
+            name: thai.name,
+            parentCategoryID: thai.parentCategoryID,
+            sortOrder: thai.sortOrder,
+            dateCreated: thai.dateCreated
+          )
+        }
+        .execute(db)
         try CategoryRepository.seedStarterCategories(in: db)
 
         #expect(!(try Category.fetchAll(db)).contains { $0.id == thai.id })
-        let seedState = try #require(
-          (try CategorySeedState.fetchAll(db)).first { $0.categoryID == thai.id }
+        let tombstone = try #require(
+          (try CategorySeedTombstone.fetchAll(db)).first { $0.id == latePeerState.id }
         )
-        expectNoDifference(seedState.isDeleted, true)
-        expectNoDifference(seedState.dateModified, deletedAt)
+        expectNoDifference(tombstone.dateDeleted, deletedAt)
+
+        try CategorySeedTombstone.find(tombstone.id).delete().execute(db)
+        try CategoryRepository.seedStarterCategories(in: db)
+      }
+    }
+
+    @Test
+    func unresolvedStarterParentDoesNotCreateChildAtRoot() throws {
+      @Dependency(\.defaultDatabase) var database
+      let deletedAt = Date(timeIntervalSinceReferenceDate: 802_350_000)
+
+      try database.write { db in
+        try CategoryRepository.seedStarterCategories(in: db)
+        let cuisine = try #require((try Category.fetchAll(db)).first { $0.name == "Cuisine" })
+        let american = try #require(
+          (try Category.fetchAll(db)).first { $0.name == "American" && $0.parentCategoryID == cuisine.id }
+        )
+        let tombstone = CategorySeedTombstone(id: cuisine.id, dateDeleted: deletedAt)
+        try CategorySeedTombstone.insert { tombstone }.execute(db)
+        try Category.find(cuisine.id).delete().execute(db)
+        try Category.find(american.id).delete().execute(db)
+
+        try CategoryRepository.seedStarterCategories(in: db)
+
+        #expect(!(try Category.fetchAll(db)).contains { $0.name == "American" && $0.parentCategoryID == nil })
+
+        try CategorySeedTombstone.find(tombstone.id).delete().execute(db)
+        try CategoryRepository.seedStarterCategories(in: db)
+      }
+    }
+
+    @Test
+    func seedStateStillConvergesConcurrentSameNamedCategory() throws {
+      @Dependency(\.defaultDatabase) var database
+      let earlier = Date(timeIntervalSinceReferenceDate: -1)
+      let peerCategoryID = SampleUUIDSequence.uuid(799)
+
+      try database.write { db in
+        try CategoryRepository.seedStarterCategories(in: db)
+        let cuisine = try #require((try Category.fetchAll(db)).first { $0.name == "Cuisine" })
+        let peerCuisine = Category(
+          id: peerCategoryID,
+          name: "Cuisine",
+          sortOrder: 0,
+          dateCreated: earlier
+        )
+        try Category.insert { peerCuisine }.execute(db)
+        var seedState = try #require(
+          (try CategorySeedState.fetchAll(db)).first { $0.categoryID == cuisine.id }
+        )
+        seedState.categoryID = peerCuisine.id
+        try CategorySeedState.upsert { seedState }.execute(db)
+
+        try CategoryRepository.seedStarterCategories(in: db)
+
+        let cuisineRoots = try Category.fetchAll(db).filter {
+          $0.name == "Cuisine" && $0.parentCategoryID == nil
+        }
+        expectNoDifference(cuisineRoots.map(\.id), [peerCategoryID])
+        expectNoDifference(
+          try CategorySeedState.fetchAll(db).first { $0.id == seedState.id }?.categoryID,
+          peerCategoryID
+        )
       }
     }
 
