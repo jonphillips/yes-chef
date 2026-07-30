@@ -320,6 +320,7 @@ struct DatabaseBackupTests {
         sql: "SELECT identifier FROM grdb_migrations ORDER BY rowid DESC LIMIT 1"
       )
     }
+    // Keep this fixture exactly the migrations listed here behind the current schema; update this tail when it changes.
     let migrationsToReplay = [
       "Move recipe Serve With into editable rows",
       "Add regenerate intent to local AI handoffs",

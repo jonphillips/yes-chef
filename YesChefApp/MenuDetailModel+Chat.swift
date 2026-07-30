@@ -101,6 +101,10 @@ extension MenuDetailModel {
     }
   }
 
+  func onboardPrepPlanFinalized() {
+    prepPlanHandoffIntent = .refine
+  }
+
   private func chatModel(for context: MenuChatContext) -> RecipeChatModel {
     if let chatModel {
       chatModel.updateContext(.menu(context))

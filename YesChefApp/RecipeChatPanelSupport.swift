@@ -6,6 +6,7 @@ struct ChatFinalizeConfiguration {
   let title: String
   let source: HandoffExportSource
   let actionID: AnyChatApplyAction.ID
+  var onFinalized: @MainActor () -> Void = {}
 
   static func recipe(recipeID: Recipe.ID, section: PlaybookSectionKind) -> Self {
     let actionID: AnyChatApplyAction.ID
@@ -23,12 +24,14 @@ struct ChatFinalizeConfiguration {
 
   static func menu(
     menuID: YesChefCore.Menu.ID,
-    prepPlanIntent: AIHandoffPrepPlanIntent = .refine
+    prepPlanIntent: AIHandoffPrepPlanIntent = .refine,
+    onFinalized: @escaping @MainActor () -> Void = {}
   ) -> Self {
     Self(
       title: "Finalize Prep Plan",
       source: .menu(menuID, prepPlanIntent: prepPlanIntent),
-      actionID: "Build prep plan -> Prep Plan section"
+      actionID: "Build prep plan -> Prep Plan section",
+      onFinalized: onFinalized
     )
   }
 }
@@ -39,7 +42,8 @@ struct ChatFinalizeConfiguration {
 enum OnboardChatFinalizer {
   static func finalize(
     using chatModel: RecipeChatModel,
-    stage: @escaping @MainActor (String) async throws -> Void
+    stage: @escaping @MainActor (String) async throws -> Void,
+    onFinalized: @escaping @MainActor () -> Void = {}
   ) async -> String? {
     let priorReplyID = chatModel.messages.last(where: { $0.role == .assistant })?.id
     guard await chatModel.send("Finalize.") else { return nil }
@@ -55,6 +59,7 @@ enum OnboardChatFinalizer {
 
     do {
       try await stage(reply.text)
+      onFinalized()
       return nil
     } catch {
       return RecipeChatErrorText.describe(error)

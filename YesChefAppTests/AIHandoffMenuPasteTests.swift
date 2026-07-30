@@ -1,5 +1,6 @@
 import Dependencies
 import Foundation
+import LLMClientKit
 import Testing
 import YesChefCore
 @testable import YesChef
@@ -87,6 +88,12 @@ struct AIHandoffMenuPasteTests {
       try $0.bootstrapDatabase()
       $0.date.now = now
       $0.uuid = .incrementing
+      $0.modelClient = StubModelClient { request in
+        if request.messages.last?.text == "Finalize." {
+          return ModelResponse(text: "Sunday morning:\n- Make the salsa → Sunday dinner")
+        }
+        return ModelResponse(text: "Let's make a fresh plan.")
+      }
     } operation: {
       @Dependency(\.defaultDatabase) var database
       try await database.write { db in
@@ -152,5 +159,84 @@ struct AIHandoffMenuPasteTests {
 
     #expect(item.supportingEvidenceTitle == "This replaces your 4-step prep plan")
     #expect(item.supportingEvidenceRows.isEmpty)
+  }
+
+  @Test
+  func secondOnboardFinalizeAfterRegenerationSurfacesDroppedSteps() async throws {
+    let menuID = UUID(uuidString: "00000000-0000-0000-0000-000000003809")!
+    let stepID = UUID(uuidString: "00000000-0000-0000-0000-000000003810")!
+    let now = Date(timeIntervalSinceReferenceDate: 840_100_000)
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+      $0.uuid = .incrementing
+      $0.modelClient = StubModelClient { request in
+        if request.messages.last?.text == "Finalize." {
+          return ModelResponse(text: "Sunday morning:\n- Make the salsa → Sunday dinner")
+        }
+        return ModelResponse(text: "Let's make a fresh plan.")
+      }
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try await database.write { db in
+        try Menu.insert {
+          Menu(id: menuID, title: "Beach Menu", dayCount: 2, dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+        try PrepPlanStepRecord.insert {
+          PrepPlanStepRecord(
+            id: stepID,
+            menuID: menuID,
+            sortOrder: 0,
+            session: "Friday",
+            task: "Salt the chicken"
+          )
+        }
+        .execute(db)
+      }
+
+      let model = MenuDetailModel(menuID: menuID)
+      model.prepPlanHandoffIntent = .regenerate
+      let firstFinalization = ChatFinalizeConfiguration.menu(
+        menuID: menuID,
+        prepPlanIntent: model.prepPlanHandoffIntent,
+        onFinalized: model.onboardPrepPlanFinalized
+      )
+      let chatModel = RecipeChatModel(context: .menu(MenuChatContext(title: "Beach Menu", dayCount: 2)))
+      let seeded = await chatModel.send("Make a fresh prep plan.")
+      #expect(seeded)
+      let finalizationError = await OnboardChatFinalizer.finalize(
+        using: chatModel,
+        stage: { _ in },
+        onFinalized: firstFinalization.onFinalized
+      )
+      #expect(finalizationError == nil)
+
+      let secondFinalization = ChatFinalizeConfiguration.menu(
+        menuID: menuID,
+        prepPlanIntent: model.prepPlanHandoffIntent
+      )
+      let review = try await HandoffAppOperations.stageOnboardReview(
+        source: secondFinalization.source,
+        result: """
+        Sunday morning:
+        - Make the salsa → Sunday dinner
+        """,
+        in: database,
+        now: now,
+        handoffID: UUID(uuidString: "00000000-0000-0000-0000-000000003811")!
+      )
+
+      guard case let .menuPrepPlan(prepPlanReview) = review else {
+        Issue.record("Expected a menu prep-plan review.")
+        return
+      }
+      expectNoDifference(prepPlanReview.prepPlanIntent, .refine)
+      expectNoDifference(
+        prepPlanReview.advisoryNotes,
+        ["Existing prep step missing from returned plan: Friday: Salt the chicken"]
+      )
+    }
   }
 }

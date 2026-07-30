@@ -9,7 +9,7 @@ extension HandoffReviewCoordinator {
     {
       return "This replaces your \(review.replacementStepCount)-step prep plan"
     }
-    switch (review.unparsedPlanLines.isEmpty, review.advisoryNotes.isEmpty) {
+    return switch (review.unparsedPlanLines.isEmpty, review.advisoryNotes.isEmpty) {
     case (true, true): nil
     case (false, true): "Couldn't parse — fix or remove these lines before saving"
     case (true, false): "Review omitted steps before saving"

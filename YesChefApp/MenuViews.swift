@@ -319,7 +319,8 @@ struct MenuDetailView: View {
             applyActions: detailModel.applyActionCatalog(for: chatModel),
             finalization: .menu(
               menuID: detailModel.menuID,
-              prepPlanIntent: detailModel.prepPlanHandoffIntent
+              prepPlanIntent: detailModel.prepPlanHandoffIntent,
+              onFinalized: detailModel.onboardPrepPlanFinalized
             ),
             focusesInputOnAppear: detailModel.activeChatStarterID == nil
           ),
