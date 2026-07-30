@@ -49,10 +49,23 @@ public enum CategoryRepository {
   /// devices converge on the same synced rows instead of inventing duplicate namespaces.
   public static func seedStarterCategories(in db: Database) throws {
     var categories = try Category.fetchAll(db)
+    var seedStates = Dictionary(
+      uniqueKeysWithValues: try CategorySeedState.fetchAll(db).map { ($0.id, $0) }
+    )
     var resolvedCategoryIDBySeedID: [Category.ID: Category.ID] = [:]
 
     for seed in starterCategories {
       let parentCategoryID = seed.parentSeedID.flatMap { resolvedCategoryIDBySeedID[$0] }
+      if let state = seedStates[seed.id] {
+        guard !state.isDeleted,
+          let categoryID = state.categoryID,
+          let category = categories.first(where: { $0.id == categoryID })
+        else {
+          continue
+        }
+        resolvedCategoryIDBySeedID[seed.id] = category.id
+        continue
+      }
       let matchingCategories = categories
         .filter {
           $0.parentCategoryID == parentCategoryID
@@ -66,6 +79,13 @@ public enum CategoryRepository {
         // A previously seeded category is now user-authored. Its UUID remains its durable
         // identity, so do not recreate or relocate it on a later launch.
         resolvedCategoryIDBySeedID[seed.id] = seededCategory.id
+        let state = CategorySeedState(
+          id: seed.id,
+          categoryID: seededCategory.id,
+          dateModified: starterCategoryDate
+        )
+        try CategorySeedState.upsert { state }.execute(db)
+        seedStates[seed.id] = state
         continue
       }
 
@@ -75,6 +95,13 @@ public enum CategoryRepository {
         }
         categories = try Category.fetchAll(db)
         resolvedCategoryIDBySeedID[seed.id] = canonicalCategory.id
+        let state = CategorySeedState(
+          id: seed.id,
+          categoryID: canonicalCategory.id,
+          dateModified: starterCategoryDate
+        )
+        try CategorySeedState.upsert { state }.execute(db)
+        seedStates[seed.id] = state
         continue
       }
 
@@ -88,6 +115,13 @@ public enum CategoryRepository {
       try Category.insert { category }.execute(db)
       categories.append(category)
       resolvedCategoryIDBySeedID[seed.id] = category.id
+      let state = CategorySeedState(
+        id: seed.id,
+        categoryID: category.id,
+        dateModified: starterCategoryDate
+      )
+      try CategorySeedState.upsert { state }.execute(db)
+      seedStates[seed.id] = state
     }
   }
 
@@ -218,7 +252,7 @@ public enum CategoryRepository {
     .execute(db)
   }
 
-  public static func deleteCategory(categoryID: Category.ID, in db: Database) throws {
+  public static func deleteCategory(categoryID: Category.ID, in db: Database, now: Date) throws {
     let categories = try Category.fetchAll(db)
     _ = try category(categoryID, in: categories)
     guard !categories.contains(where: { $0.parentCategoryID == categoryID }) else {
@@ -232,6 +266,11 @@ public enum CategoryRepository {
       throw CategoryRepositoryError.cannotDeleteCategoryUsedByRecipes
     }
 
+    for var seedState in try CategorySeedState.fetchAll(db) where seedState.categoryID == categoryID {
+      seedState.isDeleted = true
+      seedState.dateModified = now
+      try CategorySeedState.upsert { seedState }.execute(db)
+    }
     try #sql("DELETE FROM \"categories\" WHERE \"id\" = \(bind: categoryID)").execute(db)
   }
 
@@ -316,6 +355,10 @@ public enum CategoryRepository {
     for var recipeCategory in try RecipeCategory.fetchAll(db) where recipeCategory.categoryID == duplicate.id {
       recipeCategory.categoryID = canonical.id
       try RecipeCategory.upsert { recipeCategory }.execute(db)
+    }
+    for var seedState in try CategorySeedState.fetchAll(db) where seedState.categoryID == duplicate.id {
+      seedState.categoryID = canonical.id
+      try CategorySeedState.upsert { seedState }.execute(db)
     }
     try deduplicateRecipeCategoryPairs(in: db)
     try Category.find(duplicate.id).delete().execute(db)
@@ -428,6 +471,7 @@ extension RecipeRepository {
 
   static func reconcileCategories(
     _ names: [String],
+    looseNames: [String] = [],
     recipeID: Recipe.ID,
     in db: Database,
     now: Date,
@@ -441,6 +485,23 @@ extension RecipeRepository {
     for path in CategoryHierarchy.paths(from: names) {
       let category = try findOrCreateCategory(
         path: path,
+        existingCategories: &existingCategories,
+        in: db,
+        now: now,
+        uuid: uuid
+      )
+      let recipeCategory = RecipeCategory(
+        id: existingRecipeCategories.first { $0.categoryID == category.id }?.id ?? uuid(),
+        recipeID: recipeID,
+        categoryID: category.id
+      )
+      keptRecipeCategoryIDs.insert(recipeCategory.id)
+      try RecipeCategory.upsert { recipeCategory }.execute(db)
+    }
+
+    for name in looseNames {
+      let category = try findOrCreateCategory(
+        path: CategoryHierarchy.Path(components: [name]),
         existingCategories: &existingCategories,
         in: db,
         now: now,

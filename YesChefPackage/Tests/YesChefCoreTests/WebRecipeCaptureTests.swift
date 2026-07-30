@@ -24,7 +24,7 @@ extension RecipeCoreTests {
       expectNoDifference(page.cookTimeMinutes, 40)
       expectNoDifference(page.totalTimeMinutes, 55)
       expectNoDifference(page.rating, 5)
-      expectNoDifference(page.tagNames, ["quick", "weeknight"])
+      expectNoDifference(page.tagNames, ["quick", "weeknight", "Quick > Supper"])
       expectNoDifference(page.categoryNames, ["Dinner", "Chicken", "Cuisine > Mexican"])
       expectNoDifference(
         page.ingredientSections,
@@ -98,7 +98,7 @@ extension RecipeCoreTests {
       expectNoDifference(bundle.photos.map(\.kind), [.hero])
       expectNoDifference(bundle.photos.map(\.source), [.extracted])
       expectNoDifference(bundle.recipeNotes, [])
-      expectNoDifference(bundle.tagNames, ["quick", "weeknight"])
+      expectNoDifference(bundle.tagNames, ["quick", "weeknight", "Quick > Supper"])
 
       let snapshotData = try #require(bundle.recipe.originalSnapshot)
       let snapshot = try RecipeBundleCoding.decodeSnapshot(snapshotData)
@@ -225,8 +225,10 @@ extension RecipeCoreTests {
           recipeCategoryIDs.compactMap { categoriesByID[$0] }
             .map { CategoryHierarchy.displayName(for: $0, categoriesByID: categoriesByID) }
             .sorted(),
-          ["Chicken", "Cuisine > Mexican", "Dinner", "quick", "weeknight"]
+          ["Chicken", "Cuisine > Mexican", "Dinner", "Quick > Supper", "quick", "weeknight"]
         )
+        let literalKeyword = try #require(categories.first { $0.name == "Quick > Supper" })
+        expectNoDifference(literalKeyword.parentCategoryID, nil)
       }
     }
 
@@ -815,7 +817,7 @@ private enum Fixtures {
       "totalTime": "PT55M",
       "recipeCategory": ["Dinner", "Chicken"],
       "recipeCuisine": "Mexican",
-      "keywords": "quick, weeknight",
+      "keywords": "quick, weeknight, Quick > Supper",
       "aggregateRating": { "@type": "AggregateRating", "ratingValue": "4.6" },
       "recipeIngredient": [
         "For the chicken:",

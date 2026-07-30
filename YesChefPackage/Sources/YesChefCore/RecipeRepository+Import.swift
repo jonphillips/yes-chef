@@ -454,9 +454,10 @@ extension RecipeRepository {
     }
 
     try reconcileCategories(
-      Array(Set(bundle.categoryNames + bundle.tagNames)).sorted {
+      Array(Set(bundle.categoryNames)).sorted {
         $0.localizedStandardCompare($1) == .orderedAscending
       },
+      looseNames: bundle.tagNames,
       recipeID: recipe.id,
       in: db,
       now: now,

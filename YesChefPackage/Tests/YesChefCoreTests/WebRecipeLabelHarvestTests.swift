@@ -17,6 +17,7 @@ extension RecipeCoreTests {
           <li itemprop="recipeIngredient">1 pound dried beans</li>
           <li itemprop="recipeInstructions">Simmer until tender.</li>
         </article>
+        <aside><meta itemprop="keywords" content="site-wide marketing"></aside>
         """)
 
       expectNoDifference(page.categoryNames, ["Beans", "Dinner", "Cuisine > Italian"])

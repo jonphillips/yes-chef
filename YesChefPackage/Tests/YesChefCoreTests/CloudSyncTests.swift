@@ -191,6 +191,18 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func shareExtensionBootstrapSkipsPostEngineCategoryWrites() throws {
+      let extensionBootstrap = try cloudSyncTestShareExtensionBootstrap(
+        at: temporaryCloudSyncDatabaseURL()
+      )
+
+      try extensionBootstrap.database.read { db in
+        expectNoDifference(try Category.fetchAll(db), [])
+        expectNoDifference(try CategorySeedState.fetchAll(db), [])
+      }
+    }
+
+    @Test
     func shareExtensionConnectionEnqueuesStoppedEnginePendingChanges() async throws {
       let databaseURL = try temporaryCloudSyncDatabaseURL()
       let recipeID = SampleUUIDSequence.uuid(602)

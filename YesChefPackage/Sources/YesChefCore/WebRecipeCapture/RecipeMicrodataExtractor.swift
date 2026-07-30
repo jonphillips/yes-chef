@@ -9,8 +9,13 @@ enum RecipeMicrodataExtractor {
       }
     }
 
+    let recipeLabelElementIDs = Set(recipeLabelElements(in: document).map(ObjectIdentifier.init))
     for element in (try? document.select("[itemprop]").array()) ?? [] {
       guard let property = try? element.attr("itemprop"), !property.isEmpty else { continue }
+      if ["recipeCategory", "recipeCuisine", "keywords"].contains(property),
+        !recipeLabelElementIDs.contains(ObjectIdentifier(element)) {
+        continue
+      }
       let value = propertyValue(of: element)
 
       if property == "aggregateRating" {
@@ -41,6 +46,18 @@ enum RecipeMicrodataExtractor {
       } else if let attribute = RecipeSchemaOrg.scalarProperties[property] {
         builder.votes.add(attribute, value, priority: RecipeAttributeVotes.microdataPriority)
       }
+    }
+  }
+
+  private static func recipeLabelElements(in document: Document) -> [Element] {
+    let recipeScopes = ((try? document.select("[itemscope][itemtype]").array()) ?? []).filter { scope in
+      let itemTypes = ((try? scope.attr("itemtype")) ?? "").split(separator: " ")
+      return itemTypes.contains { type in
+        type.split(whereSeparator: { $0 == "/" || $0 == "#" }).last.map(String.init) == "Recipe"
+      }
+    }
+    return recipeScopes.flatMap { scope in
+      (try? scope.select("[itemprop=recipeCategory], [itemprop=recipeCuisine], [itemprop=keywords]").array()) ?? []
     }
   }
 

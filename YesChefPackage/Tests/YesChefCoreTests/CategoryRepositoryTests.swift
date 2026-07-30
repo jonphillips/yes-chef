@@ -78,6 +78,27 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func deletingStarterCategoryPreventsItFromReturning() throws {
+      @Dependency(\.defaultDatabase) var database
+      let deletedAt = Date(timeIntervalSinceReferenceDate: 802_300_000)
+
+      try database.write { db in
+        try CategoryRepository.seedStarterCategories(in: db)
+        let thai = try #require((try Category.fetchAll(db)).first { $0.name == "Thai" })
+
+        try CategoryRepository.deleteCategory(categoryID: thai.id, in: db, now: deletedAt)
+        try CategoryRepository.seedStarterCategories(in: db)
+
+        #expect(!(try Category.fetchAll(db)).contains { $0.id == thai.id })
+        let seedState = try #require(
+          (try CategorySeedState.fetchAll(db)).first { $0.categoryID == thai.id }
+        )
+        expectNoDifference(seedState.isDeleted, true)
+        expectNoDifference(seedState.dateModified, deletedAt)
+      }
+    }
+
+    @Test
     func renamesMovesAndPreservesRecipeAssignments() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 802_500_000)
@@ -174,7 +195,7 @@ extension RecipeCoreTests {
         }
 
         do {
-          try CategoryRepository.deleteCategory(categoryID: mealType.id, in: db)
+          try CategoryRepository.deleteCategory(categoryID: mealType.id, in: db, now: now)
           #expect(Bool(false), "Expected deleting a category with children to be rejected.")
         } catch let error as CategoryRepositoryError {
           expectNoDifference(error, .cannotDeleteCategoryWithChildren)

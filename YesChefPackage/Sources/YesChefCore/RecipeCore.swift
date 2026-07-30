@@ -515,7 +515,8 @@ extension RecipeRepository {
       try reconcileCategoryIDs(Array(selectedCategoryIDs), recipeID: recipeID, in: db, uuid: uuid)
     } else {
       try reconcileCategories(
-        distinctCategoryNames(draft.categoryNames.listNames + draft.tagNames.listNames),
+        distinctCategoryNames(draft.categoryNames.listNames),
+        looseNames: distinctCategoryNames(draft.tagNames.listNames),
         recipeID: recipeID,
         in: db,
         now: now,
