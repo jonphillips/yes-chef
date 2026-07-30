@@ -42,6 +42,12 @@ struct DatabaseBackupTests {
     let snapshotDatabase = try DatabaseQueue(path: snapshotURL.path)
     let recipeCount = try await snapshotDatabase.read { db in try Recipe.fetchCount(db) }
     let photoCount = try await snapshotDatabase.read { db in try RecipePhoto.fetchCount(db) }
+    // Assert the image *bytes*, not just that a photo row survived. Images are the one payload with
+    // no textual fallback — a silently truncated BLOB restores a recipe with a broken photo and
+    // nothing else would notice. (ADR-0030 D1: images ride along as in-row BLOBs.)
+    let restoredPhoto = try await snapshotDatabase.read { db in
+      try RecipePhoto.find(SampleUUIDSequence.uuid(2)).fetchOne(db)
+    }
     let stampedSchemaVersion = try await snapshotDatabase.read { db in
       try Int.fetchOne(db, sql: "PRAGMA user_version")
     }
@@ -50,6 +56,8 @@ struct DatabaseBackupTests {
     #expect(snapshot.schemaVersion > 0)
     #expect(recipeCount == 1)
     #expect(photoCount == 1)
+    #expect(restoredPhoto?.displayData == Data([0x01, 0x02, 0x03]))
+    #expect(restoredPhoto?.thumbnailData == Data([0x04, 0x05]))
     #expect(stampedSchemaVersion == snapshot.schemaVersion)
     #expect(!FileManager.default.fileExists(atPath: "\(snapshotURL.path)-wal"))
     #expect(!FileManager.default.fileExists(atPath: "\(snapshotURL.path)-shm"))

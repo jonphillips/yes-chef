@@ -599,29 +599,34 @@ struct ArchivedRecipesView: View {
   let model: RecipeLibraryModel
 
   var body: some View {
+    // The empty state is an `.overlay`, never a branch *inside* the List. Deleting the last row
+    // would otherwise swap the List's single child from a ForEach to a ContentUnavailableView in one
+    // update, and SwiftUI's collection-view coordinator raises an invalid-batch-update exception —
+    // a hard crash *after* the delete already committed. Keep the ForEach unconditional so the List
+    // only ever goes from 1 row to 0.
     List {
+      ForEach(model.archivedRecipeRows) { row in
+        ArchivedRecipeRow(model: model, row: row)
+          .swipeActions(edge: .leading) {
+            Button {
+              model.restoreArchivedRecipeButtonTapped(recipeID: row.recipe.id)
+            } label: {
+              Label("Restore", systemImage: "arrow.uturn.backward")
+            }
+            .tint(.green)
+          }
+          .swipeActions {
+            Button(role: .destructive) {
+              model.deleteArchivedRecipeButtonTapped(recipeID: row.recipe.id)
+            } label: {
+              Label("Delete Permanently", systemImage: "trash")
+            }
+          }
+      }
+    }
+    .overlay {
       if model.archivedRecipeRows.isEmpty {
         ContentUnavailableView("No Archived Recipes", systemImage: "archivebox")
-          .frame(maxWidth: .infinity, minHeight: 280)
-      } else {
-        ForEach(model.archivedRecipeRows) { row in
-          ArchivedRecipeRow(model: model, row: row)
-            .swipeActions(edge: .leading) {
-              Button {
-                model.restoreArchivedRecipeButtonTapped(recipeID: row.recipe.id)
-              } label: {
-                Label("Restore", systemImage: "arrow.uturn.backward")
-              }
-              .tint(.green)
-            }
-            .swipeActions {
-              Button(role: .destructive) {
-                model.deleteArchivedRecipeButtonTapped(recipeID: row.recipe.id)
-              } label: {
-                Label("Delete Permanently", systemImage: "trash")
-              }
-            }
-        }
       }
     }
     .navigationTitle("Archived Recipes")

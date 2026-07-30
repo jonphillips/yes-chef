@@ -31,22 +31,26 @@ struct RecipeCategoryFilterPickerView: View {
           availabilityByName: availabilityByName
         )
       } else {
+        // Search-driven empty state as an `.overlay`, never a branch inside the List — narrowing the
+        // query to zero matches would otherwise swap the List's single child and raise an
+        // invalid-batch-update exception.
         List {
+          ForEach(matchingNodes) { node in
+            let availability = availabilityByName[node.path] ?? .empty(categoryName: node.path)
+            RecipeFilterSelectionRow(
+              title: node.path,
+              systemImage: "folder",
+              detail: availability.countText,
+              isSelected: availability.isSelected,
+              isEnabled: availability.isEnabled
+            ) {
+              model.categoryFilterButtonTapped(node.path)
+            }
+          }
+        }
+        .overlay {
           if matchingNodes.isEmpty {
             ContentUnavailableView("No Matching Categories", systemImage: "folder")
-          } else {
-            ForEach(matchingNodes) { node in
-              let availability = availabilityByName[node.path] ?? .empty(categoryName: node.path)
-              RecipeFilterSelectionRow(
-                title: node.path,
-                systemImage: "folder",
-                detail: availability.countText,
-                isSelected: availability.isSelected,
-                isEnabled: availability.isEnabled
-              ) {
-                model.categoryFilterButtonTapped(node.path)
-              }
-            }
           }
         }
         .navigationTitle("Categories")

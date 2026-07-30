@@ -39,29 +39,33 @@ struct MenuRecipeBrowserPanel: View {
 
       RecipeListStatusBar(model: recipeModel)
 
+      // Search-driven empty state as an `.overlay`, never a branch inside the List: typing a query
+      // that matches nothing swaps the List's single child in one update, which raises an
+      // invalid-batch-update exception.
       List {
-        if recipeModel.visibleRecipeRows.isEmpty {
-          ContentUnavailableView.search(text: recipeModel.searchText)
-        } else {
-          ForEach(recipeModel.visibleRecipeRows) { row in
-            Button {
-              onRecipeSelected?(RecipeDetailPresentation(recipeID: row.recipe.id))
-            } label: {
-              RecipeListRow(
-                row: row,
-                options: RecipeListViewOptions(
-                  density: .compact,
-                  showsSourceMetadata: true,
-                  showsCategoryMetadata: true
-                )
+        ForEach(recipeModel.visibleRecipeRows) { row in
+          Button {
+            onRecipeSelected?(RecipeDetailPresentation(recipeID: row.recipe.id))
+          } label: {
+            RecipeListRow(
+              row: row,
+              options: RecipeListViewOptions(
+                density: .compact,
+                showsSourceMetadata: true,
+                showsCategoryMetadata: true
               )
-            }
-            .buttonStyle(.plain)
-            .draggable(MenuDraggedRecipe(recipeID: row.recipe.id))
+            )
           }
+          .buttonStyle(.plain)
+          .draggable(MenuDraggedRecipe(recipeID: row.recipe.id))
         }
       }
       .listStyle(.plain)
+      .overlay {
+        if recipeModel.visibleRecipeRows.isEmpty {
+          ContentUnavailableView.search(text: recipeModel.searchText)
+        }
+      }
     }
     .background(.background)
   }

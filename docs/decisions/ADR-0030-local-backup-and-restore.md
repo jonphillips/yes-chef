@@ -15,13 +15,14 @@ server). Depends on the images-in-DB model from **[ADR-0005](ADR-0005-image-stor
 Motivated by [[post-browser-sync-vs-features-tension]] (the solvable sync/**backup** gate) now that
 sync itself round-trips E2E (M4). De-risks the held **prod-schema promotion** ops step in
 `docs/CURRENT_HANDOFF.md`. Related cautionary context: **[[debug-erase-vs-sync-triggers]]**,
-**[[llm-vs-determinism-surface-boundary]]**. **Amendment 1 (2026-07-28, proposed): re-enabling sync on a
-restored store resolves *in the cloud's favour*, not the restore's. D2's "the user re-enables sync, which
-reconciles the restored rows through the normal path" is true in direction and wrong in outcome — the normal
-path overwrites the restored rows with the server's, because restore deletes the very `lastKnownServerRecord`
-baselines the field-level merge depends on. The net therefore covers a **lost or blank** zone, not a
-**poisoned** one. OQ1 is answered by code reading and awaits confirmation in an isolated container.**
-See Amendment 1.
+**[[llm-vs-determinism-surface-boundary]]**. **Amendment 1 (2026-07-28) is WITHDRAWN — refuted by
+measurement. Amendment 2 (2026-07-29, accepted): restore is *authoritative*. Re-enabling sync on a restored
+store re-pushes the entire restored library and the restored values win every collision, so the restored
+device becomes the source of truth for iCloud and every peer — including resurrecting rows deleted since the
+backup. This corrects D2, whose "never risks a restore stomping the cloud" was wrong; it stomps the cloud by
+design, which is what makes the net cover a *poisoned* zone and not merely a lost one. Accepted as Jon's
+explicit call. OQ1 is answered by measurement; OQ5 is closed as already-shipped behaviour. One open defect
+came out of the same run — a tombstone contradiction on the peer.** See Amendments 1 and 2.
 
 ## Context
 
@@ -64,10 +65,12 @@ the `PendingRecordZoneChange` bookkeeping (the tables ADR-0028 and
 [[extension-sync-construct-not-run]] revolve around) in a sibling attached metadatabase. A `VACUUM INTO`
 snapshot copies only the main store, so it does not contain that peer state. A restored main file must still
 **not** inherit the old local peer: after the main file is atomically replaced, restore removes the actual
-attached metadatabase and its SQLite sidecars, then reopens with sync disabled. The user re-enables sync —
-but **that reconciliation is not neutral, and Amendment 1 documents which way it falls.** Restore never
-stomps the cloud; the cloud stomps the restore. Re-enable is therefore a **second, separately-consequential
-decision**, not a formality, and the UI must say so.
+attached metadatabase and its SQLite sidecars, then reopens with sync disabled. **Corrected by Amendment 2:**
+this clause originally claimed the reconciliation "never risks a restore stomping the cloud." It does stomp
+the cloud — wiping the metadatabase makes every table look new, so re-enabling re-pushes the whole restored
+library and the restored values win. That is the accepted design (it is what lets a restore beat a *poisoned*
+zone), but it makes **re-enabling sync the consequential act, not the restore** — a second, separate decision
+behind its own gate and confirmation, and the UI must say that the restored library wins.
 
 **3. Restore = import one snapshot, deliberately and reversibly.** Restore is a destructive,
 explicitly-confirmed action (it replaces the current local library). Before swapping, the app takes
@@ -118,13 +121,13 @@ backup does not block it and vice-versa.
   much-older app is refused, not corrupted.
 - **No new sync schema, no zone rebuild.** This is orthogonal to the sync pipeline; it reads the same
   store everything else uses. Explicitly **not** [[debug-erase-vs-sync-triggers]] territory.
-- **The net covers a lost zone, not a poisoned one (Amendment 1).** The opening framing — "a corruption or
-  an erroneous erase can propagate rather than protect" — describes a scenario this ADR as built does **not**
-  recover from: if the bad state reached CloudKit, restoring a good backup and re-enabling sync re-imports
-  the bad state. What the net *does* cover is total loss of the zone (Development reset, account loss, new
-  device) and any period the user is willing to stay local-only. That is still the majority of the risk it
-  was built for, and it is worth having — but the guarantee is narrower than the Context section implies,
-  and the UI must not imply otherwise.
+- **The net covers a poisoned zone, and the cost is that restore rewrites every peer (Amendment 2).** The
+  opening framing — "a corruption or an erroneous erase can propagate rather than protect" — is recovered
+  from: restore, re-enable, and the good data overwrites the bad in iCloud and on every device. Measured, not
+  assumed. The price is that a restore is **never** confined to one device once sync comes back on, and it
+  **resurrects rows deleted since the backup**. Accepted deliberately — a durability net that loses to the
+  thing it is recovering from is not a net — which is why the enablement gate, its confirmation, and the copy
+  all treat *re-enabling sync* as the destructive step rather than the restore.
 - **Accepted share-extension coordination risk.** Restore replaces the app-group store without an
   `NSFileCoordinator` or a lock that waits for the share extension's connection. An in-flight extension save
   can therefore write to the unlinked prior inode and lose that write when its WAL is discarded. This is an
@@ -134,82 +137,87 @@ backup does not block it and vice-versa.
   (+ images) wherever the user puts it. For a personal recipe app in the user's own iCloud Drive this
   is acceptable; called out in OQ3 rather than assumed.
 
-## Amendment 1 — Re-enabling sync resolves in the cloud's favour (2026-07-28)
+## Amendment 1 — WITHDRAWN: refuted by measurement (2026-07-28, withdrawn 2026-07-29)
 
-Status: **Proposed** — accepted only after the isolated-container confirmation below. Raised in review of
-PR [#252](https://github.com/jonphillips/yes-chef/pull/252) (S2). Interacts with the same SyncEngine
-internals as [ADR-0028](ADR-0028-multi-foreign-key-sync-loss.md) and [[sqlitedata-single-fk-sync-limit]].
+Status: **Withdrawn.** Superseded by Amendment 2. Raised in review of
+PR [#252](https://github.com/jonphillips/yes-chef/pull/252); it predicted that re-enabling sync on a restored
+store would resolve **in the cloud's favour**, silently undoing the restore. **Two-simulator measurement in an
+isolated CloudKit container disproved that.** Kept as a record rather than deleted, because half of its
+mechanism is correct and load-bearing, and because the way it was wrong is instructive.
 
-**OQ1 asked the wrong half of the question.** It asked whether CloudKit would treat restored UUID-PK rows as
-*updates to existing records* or need *a fresh association*. The answer is "updates" — but the consequential
-part is not the association, it is **who wins**, and the answer is: the server, essentially always.
+**What held — and it is the engine of everything in Amendment 2.** Restore deletes the attached metadatabase,
+so `sqlitedata_icloud_recordTypes` comes back **empty**; `start()` therefore evaluates `newTableNames` to
+*every* synced table (`SyncEngine.swift:633`) and runs `UPDATE <table> SET pk = pk` on **every row**
+(`:676`), queueing the entire restored library at the live zone. Observed exactly: `recordTypes` 0 → 33,
+metadata 0 → 39, all 39 gaining server records in one `start()`.
 
-**The mechanism, in four steps.** All references are to SQLiteData's `CloudKit/SyncEngine.swift` at the
-pinned revision.
+**What was refuted.** The claim that a missing `_lastKnownServerRecordAllFields` baseline collapses
+`upsertFromServerRecord` (`:1958`) into a whole-record overwrite **in the server's favour**. It does not. Every
+collision resolved toward the **local, restored** value. The reasoning traced a real code path and drew the
+wrong conclusion about which side wins; the falsifier written into this amendment ("if SQLiteData backfills a
+baseline before the first push, the amendment softens") pointed near the right place for the wrong reason.
 
-1. Restore deletes the attached metadatabase file (D2). That file holds `sqlitedata_icloud_recordTypes` and
-   every row's `lastKnownServerRecord`. After a restore both are **gone**.
-2. On `start()`, `previousRecordTypes` is read from that metadatabase — now empty — so `newTableNames`
-   evaluates to **every synced table** (`:633`). For each, SQLiteData runs `UPDATE <table> SET pk = pk`
-   (`:676`), a no-op self-update that fires the after-update trigger on **every row**, creating a
-   `SyncMetadata` row and enqueueing a `saveRecord`. **The entire restored library — all 31 tables — is
-   queued at the live zone.**
-3. Each pushed record collides with the zone's existing record of the same `recordName` (it is derived from
-   the UUID primary key) and comes back `.serverRecordChanged` → `upsertFromServerRecord(serverRecord)`
-   (`:1686`).
-4. That function only performs a **field-level merge** inside
-   `if !force, let allFields = metadata._lastKnownServerRecordAllFields, …` (`:1958`). After a restore there
-   is no baseline, so the branch is skipped, `columnNames` remains *all writable columns*, and the server
-   record is written over the local row **wholesale**.
+**The process worked.** This shipped as **Proposed**, with a named falsifier and a hard gate that the
+confirmation run happen in a scratch container and explicitly **not** against the live zone. That gate is why
+being wrong cost one evening on two simulators instead of a ~44k-record push and resurrected rows across
+Jon's real devices.
 
-**So restore + re-enable yields the cloud's library, not the backup's** — plus resurrection of anything the
-backup holds that the cloud has since deleted (those come back `.unknownItem` → clear server record →
-re-save, i.e. **recreated in the zone** and propagated to every peer, `:1698`).
+## Amendment 2 — Restore is **authoritative**: the restored library wins everywhere (2026-07-29)
 
-**What survives a restore, precisely.** Only rows that are **absent from the zone**. Which yields:
+Status: **Accepted** — 2026-07-29, on two-simulator measurement in an isolated CloudKit container
+(`iCloud.com.jonphillips.yescheftest`, fresh Apple ID, fresh installs). Supersedes Amendment 1 and **corrects
+D2**. Jon's explicit call: *"If I'm restoring from backup, it means something went wrong and I need to return
+fully to the previous state."* Interacts with the same SyncEngine internals as
+[ADR-0028](ADR-0028-multi-foreign-key-sync-loss.md).
 
-| Zone state | Outcome of restore + re-enable |
-| --- | --- |
-| Gone / blank (Development reset, account loss, new device) | **Full recovery.** Exactly as designed. |
-| Live and healthy | Restore is silently overwritten. Rows the backup has and the zone lacks are **created** — including resurrections of deliberate deletions. |
-| Live and **poisoned** | The poison wins. The restore is undone by the thing it was meant to undo. |
+**The measured answer to OQ1.** Re-enabling sync on a restored store re-pushes the **entire** restored library
+at the zone, and the restored values **win every collision**. The restored device becomes the source of truth
+for iCloud and for every other peer.
 
-**Why this is not a device test.** The obvious next step — restore on the iPhone and turn sync on — costs a
-~44k-record push at the live zone (the shape of the 2026-07-10 CKError 429 incident, deliberately
-triggered), can resurrect deleted rows on both devices, and has **no undo**: "Undo Last Restore" swaps the
-local file back, it cannot retract records already pushed. The confirmation belongs in a **scratch CloudKit
-container** — one line in `YesChefCloudSync.configuration.containerIdentifier` plus a new container in the
-dashboard — against a small seeded library on two simulators. Minutes, zero blast radius, and it confirms or
-refutes the reading above before anything real is touched.
+**The experiment.** Two simulators, converged, 3 recipes, 39 metadata rows each. Backup taken on A. Then on B:
+one recipe renamed (`EDIT v1-BACKUP` → `EDIT v2-CLOUD`) and one recipe **hard-deleted** (archived, then
+*Delete Permanently* from the Archive — the library "delete" is only an `archived = true` update, so the purge
+is a deliberate second step). A fetched both changes, so the backup was genuinely stale. A then restored, and
+re-enabled sync with a single `start()` and no relaunch.
 
-**What this amendment changes, and what it deliberately does not.**
+| | Before re-enable | After convergence |
+| --- | --- | --- |
+| Sim A (restored) | 3 recipes, `recordTypes` **0**, all-fields baselines **0** | 3 recipes, 39/39 baselines |
+| Sim B (authoritative peer) | 2 recipes, 39/39 baselines | **3 recipes — matches A** |
+| `EDIT` conflict | A held the stale `v1-BACKUP` | **`v1-BACKUP` won**, on B and in the zone |
+| Purged `DELETE-target` | absent from zone and from B | **resurrected on both**, server record accepted |
 
-- **It narrows the claim, it does not stop S2.** Restore is correct and useful for the lost-zone case, which
-  is the bulk of what the ADR was built for. S2 ships.
-- **It makes re-enable a decision, not a formality (D2).** The restore confirm alert and the restart cover
-  must state plainly that turning sync back on will reconcile against iCloud and that **iCloud's copy will
-  win** where both have a row. Two sentences of copy; the only product change this amendment demands of S2.
-- **It does not build the cure.** Restore-authoritative (reset the zone, re-upload) is parked as OQ5, not
-  designed here. Per [[withdraw-not-defer-orphaned-schema]] the failure mode to avoid is building it on this
-  ADR's momentum: it is irreversible, it stomps every peer, and it deserves its own slice and its own
-  justification — or none at all.
-- **It stays honest about provenance.** The four steps above are a **code reading, not an observed run.**
-  The isolated-container pass is what promotes this amendment from Proposed to Accepted.
+**Two consequences, and the second is the one to design around.**
 
-**Confidence and the one thing that would change it.** The decisive claim is step 4 — that a missing
-`_lastKnownServerRecordAllFields` collapses the merge into a whole-record overwrite. If SQLiteData in fact
-backfills a baseline before the first push (it does not, as far as the read goes:
-`enqueueUnknownRecordsForCloudKit` touches only rows *without* a server record and does not fetch one), the
-outcome would be a genuine field-level merge and this amendment softens considerably. That is the single
-thing the scratch-container pass should watch.
+1. **The durability net covers a poisoned zone after all.** This reverses Amendment 1 and restores the
+   Context section's original promise: if bad state reached CloudKit, restoring a good backup and re-enabling
+   sync *does* recover — the good data overwrites the bad. This is what makes staying in CloudKit
+   **Development** safe.
+2. **Restore is not a local operation, and D2's "never risks a restore stomping the cloud" was wrong.** It
+   stomps the cloud by design. One device's restore silently rewrites the shared library and **undoes
+   deliberate deletions on every peer**. Accepted as the design — a durability net that loses to the thing it
+   is recovering from is not a net — but it makes re-enabling sync the genuinely consequential act, not the
+   restore. Hence the enablement gate (`isDisabledByRestore()`) and its confirmation, and hence the UI copy
+   must say that the restored library wins. **The copy shipped in S2 said the opposite and was inverted on
+   2026-07-29.**
+
+**OQ5 is closed, not parked.** "Should restore be able to assert itself over the zone?" — it already does,
+without a zone reset. No slice needed; nothing to build.
+
+**Open defect found by the same run — the tombstone contradiction.** After convergence, Sim B holds
+`_isDeleted = 1` for `recipes/63a6f904` **and its five child rows** while those rows exist locally *and* carry
+`lastKnownServerRecord`. B simultaneously believes the record is deleted, holds it, and thinks the server has
+it. Nothing is queued (`pending = 0`), but the flags persist, so a later full re-push — exactly what a restore
+triggers — could act on them and silently re-delete resurrected data. **This state looks converged and is not
+stable.** Tracked as its own investigation; it is a latent data-loss path, not a documented behaviour, and it
+is the one thing standing between this design and full confidence in restore.
 
 ## Open questions
 
-- **OQ1 — Restore ↔ CloudKit reconciliation semantics. ANSWERED (2026-07-28) by code reading; see
-  Amendment 1.** Re-enabling sync onto a restored store re-pushes the *entire* restored library at the zone
-  and then loses every collision to the server record. Confirmation in an isolated CloudKit container is
-  still owed; it must **not** be discovered against the live zone (Amendment 1, "Why this is not a device
-  test").
+- **OQ1 — Restore ↔ CloudKit reconciliation semantics. CLOSED 2026-07-29 by measurement; see Amendment 2.**
+  Re-enabling sync onto a restored store re-pushes the *entire* restored library and the **restored values win
+  every collision**, so the restored device becomes the source of truth for the zone and every peer. Confirmed
+  on two simulators in an isolated CloudKit container with a fresh Apple ID — never against the live zone.
 - **OQ2 — Snapshot mechanism.** `VACUUM INTO` (simplest, one file, defragments) vs. GRDB
   `DatabaseWriter.backup` (online backup API). Pick in S1; both give a consistent copy. Confirm WAL
   checkpoint behavior so the snapshot needs no sidecar files.
@@ -218,9 +226,26 @@ thing the scratch-container pass should watch.
 - **OQ4 — Should restore be able to *merge* rather than *replace*?** v1 is replace-only (simplest,
   matches "recover from disaster"). Selective/merge restore is a later, harder question and stays out
   of S1/S2.
-- **OQ5 — Should restore be able to assert itself over the zone?** The only true cure for a poisoned zone
-  is *restore-authoritative*: reset the CloudKit zone and re-upload the restored library. That is precisely
-  what D2 forbids, for good reason — it is irreversible and it stomps every peer. Deliberately **not** built
-  in S1/S2. If it is ever built it is its own slice with its own confirmation, and it is the one place in
-  this ADR where "never risk stomping the cloud" is knowingly traded away. Related: OQ4 (merge vs replace)
-  is the *local* version of the same question.
+- **OQ5 — Should restore be able to assert itself over the zone? CLOSED 2026-07-29 — it already does.**
+  Asked as a future slice ("reset the CloudKit zone and re-upload"). Measurement showed restore is
+  authoritative *without* any zone reset: wiping the metadatabase makes every table look new, the whole
+  library re-pushes, and local wins. **Nothing to build.** OQ4 (merge vs replace) remains the *local* version
+  of the question and stays open.
+- **OQ6 — The tombstone contradiction (open defect, 2026-07-29).** After a restore converges, the peer that
+  performed the original delete retains `_isDeleted = 1` for rows that are now alive locally and carry a
+  `lastKnownServerRecord`. Nothing is queued, but a later full re-push could act on those flags and silently
+  re-delete resurrected data. **The state looks converged and is not stable.** This is a latent data-loss
+  path, not a documented behaviour, and it is the one thing between this design and full confidence in
+  restore. Own investigation, architect-owned, and **measurement-first**: force a controlled re-push on the
+  peer that still holds the tombstones and observe whether the rows disappear. Reading
+  `SyncEngine.swift` is what produced two wrong answers (D2 and the withdrawn Amendment 1) — a code reading
+  may *explain* a measured result here, never predict one.
+- **OQ7 — Images through a restore's re-push are unverified (2026-07-29).** The **local** half is sound and
+  tested: `displayData`/`thumbnailData` are in-row BLOBs, `VACUUM INTO` copies them byte-for-byte, and the S1
+  snapshot test now asserts the bytes rather than just the row count. The **sync** half is untested — the OQ1
+  measurement ran with **zero photos**. Because every BLOB syncs as a CKAsset unconditionally
+  ([[sqlitedata-blob-cloudkit-asset]]), Amendment 2's full re-push re-uploads **every image asset in the
+  library**: on the real library that is ~2,163 recipes' worth of assets in one burst, materially larger than
+  the ~44k-record figure this ADR has been quoting, which counted rows and ignored assets. Whether a CKAsset
+  collision resolves toward local the way a scalar field did is unproven. **Re-run the isolated-container
+  measurement with photos attached before any real-device pass.**
