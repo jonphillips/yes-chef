@@ -505,6 +505,7 @@ final class MenuDetailModel {
     }
   }
   var activeChatStarterID: ChatSurface.ChatStarter.ID?
+  var prepPlanHandoffIntent: AIHandoffPrepPlanIntent = .refine
   @ObservationIgnored var toastCenter: AppToastCenter?
 
   init(menuID: CoreMenu.ID, toastCenter: AppToastCenter? = nil) {
