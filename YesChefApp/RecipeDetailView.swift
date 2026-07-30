@@ -42,11 +42,7 @@ struct RecipeDetailView: View {
     )
     let toastCenter = AppToastCenter()
     _toastCenter = State(wrappedValue: toastCenter)
-    _handoffTransport = State(
-      wrappedValue: HandoffInAppTransport(toastCenter: toastCenter) { [weak model] error in
-        model?.presentServeWithRepair(for: error) ?? false
-      }
-    )
+    _handoffTransport = State(wrappedValue: HandoffInAppTransport(toastCenter: toastCenter))
     self.libraryModel = libraryModel
     self.mealCalendarModel = mealCalendarModel
     self.groceryModel = groceryModel
@@ -63,9 +59,13 @@ struct RecipeDetailView: View {
     .navigationBarTitleDisplayMode(.inline)
     .onAppear {
       model.persistedScaleChanged(model.persistedScale)
+      model.serveWithDidLoadOrAppear()
     }
     .onChange(of: model.persistedScale) { _, persistedScale in
       model.persistedScaleChanged(persistedScale)
+    }
+    .onChange(of: model.detail) { _, _ in
+      model.serveWithDidLoadOrAppear()
     }
     .toolbar {
       recipeToolbar

@@ -128,8 +128,6 @@ public struct ServeWithPlan: Equatable, Sendable {
   }
 
   /// Keeps every existing suggestion at the top of a handoff review while adding only genuinely new returns.
-  /// The exact title-and-note match mirrors `RecipeRepository.reconciledServeWithItems`, which preserves the
-  /// stored UUIDs when this review is committed.
   public func unioning(_ returnedPlan: ServeWithPlan) -> ServeWithPlan {
     var seen = Set<ServeWithSuggestion>()
     let items = (items + returnedPlan.items).filter { seen.insert($0).inserted }
@@ -364,14 +362,14 @@ extension RecipeRepository {
     now: Date,
     uuid: () -> UUID
   ) throws {
-    let recipe = try Recipe.find(recipeID).fetchOne(db)
-    var items = try ServeWithCoding.decode(recipe?.serveWith, recipeID: recipeID)
-    items.append(
-      contentsOf: plan.items.map { item in
-        ServeWithItem(id: uuid(), title: item.title, note: item.note)
-      }
+    try RecipeServeWithRepository.append(
+      plan.items,
+      to: recipeID,
+      provenance: .model,
+      in: db,
+      now: now,
+      uuid: uuid
     )
-    try updateServeWith(items, recipeID: recipeID, in: db, now: now)
   }
 
   public static func replaceServeWithPlan(
@@ -381,10 +379,13 @@ extension RecipeRepository {
     now: Date,
     uuid: () -> UUID
   ) throws {
-    let recipe = try Recipe.find(recipeID).fetchOne(db)
-    let existingItems = try ServeWithCoding.decode(recipe?.serveWith, recipeID: recipeID)
-    let items = reconciledServeWithItems(existingItems, with: plan.items, uuid: uuid)
-    try updateServeWith(items, recipeID: recipeID, in: db, now: now)
+    try RecipeServeWithRepository.replaceModelSuggestions(
+      plan.items,
+      for: recipeID,
+      in: db,
+      now: now,
+      uuid: uuid
+    )
   }
 
   public static func removeServeWithItem(
@@ -393,66 +394,227 @@ extension RecipeRepository {
     in db: Database,
     now: Date
   ) throws {
-    let recipe = try Recipe.find(recipeID).fetchOne(db)
-    let items = try ServeWithCoding.decode(recipe?.serveWith, recipeID: recipeID).filter { $0.id != itemID }
-    try updateServeWith(items, recipeID: recipeID, in: db, now: now)
+    try RecipeServeWithRepository.delete(id: itemID, in: db, now: now)
   }
 
   public static func clearServeWith(recipeID: Recipe.ID, in db: Database, now: Date) throws {
-    try updateServeWith([], recipeID: recipeID, in: db, now: now)
+    try RecipeServeWithRepository.deleteAll(for: recipeID, in: db, now: now)
   }
 
-  /// Replaces an unreadable Serve With blob only after the cook's edited bytes decode as a complete list.
-  /// The data is stored exactly as supplied: this recovery path must not silently normalize or discard it.
+  /// Replaces an unreadable legacy Serve With blob only after the cook's edited bytes decode as a complete list.
   public static func repairServeWith(
     _ data: Data,
     recipeID: Recipe.ID,
     in db: Database,
     now: Date
   ) throws {
-    _ = try ServeWithCoding.decode(data, recipeID: recipeID)
-    try updateServeWithData(data, recipeID: recipeID, in: db, now: now)
-  }
-
-  private static func reconciledServeWithItems(
-    _ existingItems: [ServeWithItem],
-    with suggestions: [ServeWithSuggestion],
-    uuid: () -> UUID
-  ) -> [ServeWithItem] {
-    var unmatchedItems = existingItems
-
-    return suggestions.map { suggestion in
-      if let index = unmatchedItems.firstIndex(where: {
-        $0.title == suggestion.title && $0.note == suggestion.note
-      }) {
-        return unmatchedItems.remove(at: index)
-      }
-      return ServeWithItem(id: uuid(), title: suggestion.title, note: suggestion.note)
+    let rows = try RecipeServeWithBlob.decompose(
+      recipeID: recipeID,
+      blob: data,
+      now: now,
+      provenance: .model
+    )
+    for row in rows {
+      try RecipeServeWith.insert { row }.execute(db)
     }
-  }
-
-  private static func updateServeWith(
-    _ items: [ServeWithItem],
-    recipeID: Recipe.ID,
-    in db: Database,
-    now: Date
-  ) throws {
-    let data = try ServeWithCoding.encode(items)
-    try updateServeWithData(data, recipeID: recipeID, in: db, now: now)
-  }
-
-  private static func updateServeWithData(
-    _ data: Data?,
-    recipeID: Recipe.ID,
-    in db: Database,
-    now: Date
-  ) throws {
+    let clearedBlob: Data? = nil
     try Recipe.find(recipeID).update {
-      $0.serveWith = data
-      $0.dateModified = now
+      $0.serveWith = #bind(clearedBlob)
+      $0.dateModified = #bind(now)
     }
     .execute(db)
   }
+}
+
+public enum ServeWithReorderDestination: Equatable, Sendable {
+  case before(RecipeServeWith.ID)
+  case end
+}
+
+public enum RecipeServeWithRepository {
+  public static func serveWith(for recipeID: Recipe.ID, in db: Database) throws -> [RecipeServeWith] {
+    try RecipeServeWith
+      .where { $0.recipeID.eq(recipeID) }
+      .fetchAll(db)
+      .sorted(by: areServeWithInDisplayOrder)
+  }
+
+  public static func append(
+    _ suggestions: [ServeWithSuggestion],
+    to recipeID: Recipe.ID,
+    provenance: ServeWithProvenance,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws {
+    let existing = try serveWith(for: recipeID, in: db)
+    let firstSortOrder = (existing.last?.sortOrder ?? -LearningOrdering.rankStride) + LearningOrdering.rankStride
+    for (index, suggestion) in suggestions.enumerated() {
+      try RecipeServeWith.insert {
+        RecipeServeWith(
+          id: uuid(),
+          recipeID: recipeID,
+          title: suggestion.title,
+          note: suggestion.note,
+          sortOrder: firstSortOrder + LearningOrdering.rankStride * index,
+          provenance: provenance,
+          dateCreated: now,
+          dateModified: now
+        )
+      }
+      .execute(db)
+    }
+    try touchRecipe(recipeID, in: db, now: now)
+  }
+
+  /// Replaces model output by retained row identity while preserving every hand-authored row and its rank.
+  public static func replaceModelSuggestions(
+    _ suggestions: [ServeWithSuggestion],
+    for recipeID: Recipe.ID,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws {
+    let existing = try serveWith(for: recipeID, in: db)
+    var unmatchedModelRows = Dictionary(grouping: existing.filter { $0.provenance == .model }) {
+      ServeWithSuggestion(title: $0.title, note: $0.note)
+    }
+    var retainedIDs = Set<RecipeServeWith.ID>()
+    let nextSortOrder = (existing.map(\.sortOrder).max() ?? -LearningOrdering.rankStride) + LearningOrdering.rankStride
+    var newItemOffset = 0
+
+    for suggestion in suggestions {
+      var candidates = unmatchedModelRows[suggestion] ?? []
+      if let existing = candidates.first {
+        candidates.removeFirst()
+        unmatchedModelRows[suggestion] = candidates
+        retainedIDs.insert(existing.id)
+        continue
+      }
+      let row = RecipeServeWith(
+        id: uuid(),
+        recipeID: recipeID,
+        title: suggestion.title,
+        note: suggestion.note,
+        sortOrder: nextSortOrder + LearningOrdering.rankStride * newItemOffset,
+        provenance: .model,
+        dateCreated: now,
+        dateModified: now
+      )
+      newItemOffset += 1
+      retainedIDs.insert(row.id)
+      try RecipeServeWith.insert { row }.execute(db)
+    }
+
+    for row in existing where row.provenance == .model && !retainedIDs.contains(row.id) {
+      try RecipeServeWith.find(row.id).delete().execute(db)
+    }
+    try touchRecipe(recipeID, in: db, now: now)
+  }
+
+  public static func update(
+    id: RecipeServeWith.ID,
+    title: String,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard let existing = try RecipeServeWith.find(id).fetchOne(db) else { return }
+    try RecipeServeWith.find(id).update {
+      $0.title = #bind(title)
+      $0.dateModified = #bind(now)
+    }
+    .execute(db)
+    try touchRecipe(existing.recipeID, in: db, now: now)
+  }
+
+  public static func delete(id: RecipeServeWith.ID, in db: Database, now: Date) throws {
+    guard let existing = try RecipeServeWith.find(id).fetchOne(db) else { return }
+    try RecipeServeWith.find(id).delete().execute(db)
+    try touchRecipe(existing.recipeID, in: db, now: now)
+  }
+
+  public static func deleteAll(for recipeID: Recipe.ID, in db: Database, now: Date) throws {
+    try RecipeServeWith.where { $0.recipeID.eq(recipeID) }.delete().execute(db)
+    try touchRecipe(recipeID, in: db, now: now)
+  }
+
+  @discardableResult
+  public static func reorder(
+    movingIDs: [RecipeServeWith.ID],
+    destination: ServeWithReorderDestination,
+    for recipeID: Recipe.ID,
+    in db: Database,
+    now: Date
+  ) throws -> Bool {
+    let rows = try serveWith(for: recipeID, in: db)
+    let movingIDSet = Set(movingIDs)
+    let moving = rows.filter { movingIDSet.contains($0.id) }
+    guard !moving.isEmpty else { return false }
+    var reordered = rows.filter { !movingIDSet.contains($0.id) }
+    switch destination {
+    case let .before(id):
+      reordered.insert(contentsOf: moving, at: reordered.firstIndex { $0.id == id } ?? reordered.endIndex)
+    case .end:
+      reordered.append(contentsOf: moving)
+    }
+    guard reordered != rows else { return false }
+
+    let movingIndexes = reordered.indices.filter { movingIDSet.contains(reordered[$0].id) }
+    let changedOrders = sparseReorderOrders(rows: reordered, movingIndexes: movingIndexes)
+    for row in rows {
+      guard let sortOrder = changedOrders[row.id], sortOrder != row.sortOrder else { continue }
+      try RecipeServeWith.find(row.id).update {
+        $0.sortOrder = #bind(sortOrder)
+        $0.dateModified = #bind(now)
+      }
+      .execute(db)
+    }
+    try touchRecipe(recipeID, in: db, now: now)
+    return true
+  }
+
+  private static func touchRecipe(_ recipeID: Recipe.ID, in db: Database, now: Date) throws {
+    try Recipe.find(recipeID).update { $0.dateModified = #bind(now) }.execute(db)
+  }
+
+  private static func sparseReorderOrders(
+    rows: [RecipeServeWith],
+    movingIndexes: [Int]
+  ) -> [RecipeServeWith.ID: Int] {
+    guard let first = movingIndexes.first, let last = movingIndexes.last else { return [:] }
+    let movingCount = movingIndexes.count
+    let precedingOrder = rows[..<first].last?.sortOrder
+    let followingOrder = rows[(last + 1)...].first?.sortOrder
+
+    if let precedingOrder, let followingOrder {
+      let step = (followingOrder - precedingOrder) / (movingCount + 1)
+      if step > 0 {
+        return Dictionary(uniqueKeysWithValues: movingIndexes.enumerated().map { offset, index in
+          (rows[index].id, precedingOrder + step * (offset + 1))
+        })
+      }
+    } else if let precedingOrder {
+      return Dictionary(uniqueKeysWithValues: movingIndexes.enumerated().map { offset, index in
+        (rows[index].id, precedingOrder + LearningOrdering.rankStride * (offset + 1))
+      })
+    } else if let followingOrder {
+      return Dictionary(uniqueKeysWithValues: movingIndexes.enumerated().map { offset, index in
+        (rows[index].id, followingOrder - LearningOrdering.rankStride * (movingCount - offset))
+      })
+    } else {
+      return Dictionary(uniqueKeysWithValues: movingIndexes.enumerated().map { offset, index in
+        (rows[index].id, LearningOrdering.rankStride * offset)
+      })
+    }
+
+    return Dictionary(uniqueKeysWithValues: rows.enumerated().map { index, row in
+      (row.id, LearningOrdering.rankStride * index)
+    })
+  }
+}
+
+func areServeWithInDisplayOrder(_ lhs: RecipeServeWith, _ rhs: RecipeServeWith) -> Bool {
+  lhs.sortOrder == rhs.sortOrder ? lhs.id.uuidString < rhs.id.uuidString : lhs.sortOrder < rhs.sortOrder
 }
 
 private func enrichmentPrompt(

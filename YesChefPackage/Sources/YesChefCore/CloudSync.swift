@@ -137,6 +137,7 @@ public enum YesChefCloudSync {
         InstructionSection.self,
         InstructionStep.self,
         RecipeNote.self,
+        RecipeServeWith.self,
         RecipePhoto.self,
         Tag.self,
         Category.self,

@@ -104,6 +104,7 @@ public struct RecipeDetailData: Equatable, Sendable {
   public var equipment: [Equipment]
   public var recipeEquipment: [RecipeEquipment]
   public var learnings: [Learning]
+  public var serveWith: [RecipeServeWith]
   public var variations: [RecipeVariation]
   public var deliberationLogEntries: [RecipeDeliberationLogEntry]
   public var activeVariationID: RecipeVariation.ID?
@@ -123,6 +124,7 @@ public struct RecipeDetailData: Equatable, Sendable {
     equipment: [Equipment] = [],
     recipeEquipment: [RecipeEquipment] = [],
     learnings: [Learning] = [],
+    serveWith: [RecipeServeWith] = [],
     variations: [RecipeVariation] = [],
     deliberationLogEntries: [RecipeDeliberationLogEntry] = [],
     activeVariationID: RecipeVariation.ID? = nil
@@ -141,6 +143,7 @@ public struct RecipeDetailData: Equatable, Sendable {
     self.equipment = equipment
     self.recipeEquipment = recipeEquipment
     self.learnings = learnings
+    self.serveWith = serveWith
     self.variations = variations
     self.deliberationLogEntries = deliberationLogEntries
     self.activeVariationID = activeVariationID
@@ -264,6 +267,10 @@ public enum RecipeRepository {
     let deliberationLogEntries = try (RecipeDeliberationLogEntry.where { $0.recipeID.eq(recipeID) })
       .order { $0.dateCreated.desc() }
       .fetchAll(db)
+    let serveWith = try RecipeServeWith
+      .where { $0.recipeID.eq(recipeID) }
+      .fetchAll(db)
+      .sorted(by: areServeWithInDisplayOrder)
     let activeVariationID = try activeVariationID(recipeID: recipeID, variations: variations, in: db)
     let tags = try Tag.fetchAll(db)
       .filter { tag in recipeTags.contains { $0.tagID == tag.id } }
@@ -311,6 +318,7 @@ public enum RecipeRepository {
       equipment: equipment,
       recipeEquipment: recipeEquipment,
       learnings: try LearningRepository.learnings(sourceType: .recipe, sourceID: recipeID, in: db),
+      serveWith: serveWith,
       variations: variations,
       deliberationLogEntries: deliberationLogEntries,
       activeVariationID: activeVariationID

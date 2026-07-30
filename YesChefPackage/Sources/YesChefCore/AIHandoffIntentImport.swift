@@ -167,7 +167,8 @@ private enum AIHandoffReviewStager {
     case .serveWith:
       return .recipeServeWith(AIHandoffRecipeSectionReview(
         handoffID: handoff.id, recipeID: recipe.id, section: .serveWith,
-        text: returned.deliverable, currentServeWith: try ServeWithCoding.decode(recipe.serveWith, recipeID: recipe.id),
+        text: returned.deliverable,
+        currentServeWith: try RecipeServeWithRepository.serveWith(for: recipe.id, in: db).map(\.item),
         learnings: returned.learnings
       ))
     case .adjustRecipe:

@@ -1,11 +1,19 @@
 import Dependencies
 import Foundation
+import IssueReporting
 import SQLiteData
 
 @Selection
 private struct LegacyMenuPrepPlanRow: Sendable {
   let id: UUID
   let prepPlan: Data?
+}
+
+@Selection
+private struct LegacyRecipeServeWithRow: Sendable {
+  let id: UUID
+  let serveWith: Data?
+  let dateModified: Date
 }
 
 extension DependencyValues {
@@ -1006,6 +1014,56 @@ extension DependencyValues {
         """)
         .execute(db)
       try db.execute(sql: #"CREATE INDEX "index_workbenchReferences_on_workbenchID" ON "workbenchReferences"("workbenchID")"#)
+    }
+
+    migrator.registerMigration("Move recipe Serve With into editable rows") { db in
+      try #sql("""
+        CREATE TABLE "recipeServeWith" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "recipeID" TEXT NOT NULL REFERENCES "recipes"("id") ON DELETE CASCADE,
+          "title" TEXT NOT NULL,
+          "note" TEXT,
+          "sortOrder" INTEGER NOT NULL,
+          "provenance" TEXT NOT NULL,
+          "dateCreated" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+      try #sql("""
+        CREATE INDEX "index_recipeServeWith_on_recipeID_sortOrder"
+        ON "recipeServeWith"("recipeID", "sortOrder")
+        """)
+        .execute(db)
+
+      let recipes = try #sql(
+        """
+        SELECT "id", "serveWith", "dateModified" FROM "recipes"
+        """,
+        as: LegacyRecipeServeWithRow.self
+      )
+      .fetchAll(db)
+
+      for recipe in recipes {
+        let rows: [RecipeServeWith]
+        do {
+          rows = try RecipeServeWithBlob.decompose(
+            recipeID: recipe.id,
+            blob: recipe.serveWith,
+            now: recipe.dateModified,
+            provenance: .model
+          )
+        } catch {
+          reportIssue("Could not migrate Serve With for recipeID=\(recipe.id.uuidString): \(error)")
+          continue
+        }
+        for row in rows {
+          try RecipeServeWith.insert {
+            row
+          }
+          .execute(db)
+        }
+      }
     }
 
     try migrator.migrate(database)

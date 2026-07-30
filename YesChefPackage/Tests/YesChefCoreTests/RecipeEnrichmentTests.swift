@@ -106,41 +106,14 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func serveWithUnionPrefillPreservesExistingRowsAndDeduplicatesExactReturn() throws {
+    func replacingServeWithPlanPreservesModelIdentityAndHandAuthoredRows() throws {
       @Dependency(\.defaultDatabase) var database
       let createdAt = Date(timeIntervalSinceReferenceDate: 826_000_000)
       let updatedAt = createdAt.addingTimeInterval(60)
       let recipeID = SampleUUIDSequence.uuid(36_410)
       let limeCremaID = SampleUUIDSequence.uuid(36_411)
-      let cornbreadID = SampleUUIDSequence.uuid(36_412)
+      let handAuthoredID = SampleUUIDSequence.uuid(36_412)
       let cabbageSlawID = SampleUUIDSequence.uuid(36_413)
-      let existingItems = [
-        ServeWithItem(id: limeCremaID, title: "Lime crema", note: "Spoon over each bowl."),
-        ServeWithItem(id: cornbreadID, title: "Skillet cornbread"),
-      ]
-      let existingPlan = ServeWithPlan(
-        items: existingItems.map { ServeWithSuggestion(title: $0.title, note: $0.note) }
-      )
-      let existingData = try ServeWithCoding.encode(existingItems)
-      let prefilledPlan = existingPlan.unioning(
-        ServeWithPlan(
-          items: [
-            ServeWithSuggestion(title: "Lime crema", note: "Spoon over each bowl."),
-            ServeWithSuggestion(title: "Cabbage slaw"),
-          ]
-        )
-      )
-
-      expectNoDifference(
-        prefilledPlan,
-        ServeWithPlan(
-          items: [
-            ServeWithSuggestion(title: "Lime crema", note: "Spoon over each bowl."),
-            ServeWithSuggestion(title: "Skillet cornbread"),
-            ServeWithSuggestion(title: "Cabbage slaw"),
-          ]
-        )
-      )
 
       try database.write { db in
         try Recipe.insert {
@@ -148,14 +121,29 @@ extension RecipeCoreTests {
             id: recipeID,
             title: "Chili",
             dateCreated: createdAt,
-            dateModified: createdAt,
-            serveWith: existingData
+            dateModified: createdAt
           )
         }
         .execute(db)
+        for row in [
+          RecipeServeWith(
+            id: limeCremaID, recipeID: recipeID, title: "Lime crema", note: "Spoon over each bowl.",
+            sortOrder: 0, provenance: .model, dateCreated: createdAt, dateModified: createdAt
+          ),
+          RecipeServeWith(
+            id: handAuthoredID, recipeID: recipeID, title: "Pickled onions",
+            sortOrder: LearningOrdering.rankStride, provenance: .handAuthored,
+            dateCreated: createdAt, dateModified: createdAt
+          ),
+        ] {
+          try RecipeServeWith.insert { row }.execute(db)
+        }
 
         try RecipeRepository.replaceServeWithPlan(
-          prefilledPlan,
+          ServeWithPlan(items: [
+            ServeWithSuggestion(title: "Lime crema", note: "Spoon over each bowl."),
+            ServeWithSuggestion(title: "Cabbage slaw"),
+          ]),
           recipeID: recipeID,
           in: db,
           now: updatedAt,
@@ -164,218 +152,202 @@ extension RecipeCoreTests {
       }
 
       try database.read { db in
-        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
         expectNoDifference(
-          try ServeWithCoding.decode(recipe.serveWith, recipeID: recipeID),
+          try RecipeServeWithRepository.serveWith(for: recipeID, in: db),
           [
-            ServeWithItem(id: limeCremaID, title: "Lime crema", note: "Spoon over each bowl."),
-            ServeWithItem(id: cornbreadID, title: "Skillet cornbread"),
-            ServeWithItem(id: cabbageSlawID, title: "Cabbage slaw"),
+            RecipeServeWith(
+              id: limeCremaID, recipeID: recipeID, title: "Lime crema", note: "Spoon over each bowl.",
+              sortOrder: 0, provenance: .model, dateCreated: createdAt, dateModified: createdAt
+            ),
+            RecipeServeWith(
+              id: handAuthoredID, recipeID: recipeID, title: "Pickled onions",
+              sortOrder: LearningOrdering.rankStride, provenance: .handAuthored,
+              dateCreated: createdAt, dateModified: createdAt
+            ),
+            RecipeServeWith(
+              id: cabbageSlawID, recipeID: recipeID, title: "Cabbage slaw",
+              sortOrder: LearningOrdering.rankStride * 2, provenance: .model,
+              dateCreated: updatedAt, dateModified: updatedAt
+            ),
           ]
         )
       }
     }
 
     @Test
-    func replacingServeWithPlanPreservesUnchangedItemIDs() throws {
+    func editingAndReorderingServeWithPreservesRowIdentity() throws {
       @Dependency(\.defaultDatabase) var database
       let createdAt = Date(timeIntervalSinceReferenceDate: 826_000_000)
       let updatedAt = createdAt.addingTimeInterval(60)
       let recipeID = SampleUUIDSequence.uuid(36_400)
-      let unchangedItemID = SampleUUIDSequence.uuid(36_401)
-      let removedItemID = SampleUUIDSequence.uuid(36_402)
-      let addedItemID = SampleUUIDSequence.uuid(36_403)
+      let firstID = SampleUUIDSequence.uuid(36_401)
+      let secondID = SampleUUIDSequence.uuid(36_402)
+      let thirdID = SampleUUIDSequence.uuid(36_403)
 
       try database.write { db in
-        let existingItems = [
-          ServeWithItem(id: unchangedItemID, title: "Lime crema", note: "Spoon over each bowl."),
-          ServeWithItem(id: removedItemID, title: "Skillet cornbread"),
-        ]
-        let existingData = try ServeWithCoding.encode(existingItems)
         try Recipe.insert {
           Recipe(
             id: recipeID,
             title: "Chili",
             dateCreated: createdAt,
-            dateModified: createdAt,
-            serveWith: existingData
+            dateModified: createdAt
           )
         }
         .execute(db)
-
-        try RecipeRepository.replaceServeWithPlan(
-          ServeWithPlan(
-            items: [
-              ServeWithSuggestion(title: "Lime crema", note: "Spoon over each bowl."),
-              ServeWithSuggestion(title: "Cabbage slaw"),
-            ]
-          ),
-          recipeID: recipeID,
-          in: db,
-          now: updatedAt,
-          uuid: { addedItemID }
+        for (id, title, sortOrder) in [
+          (firstID, "Lime crema", 0),
+          (secondID, "Cornbread", LearningOrdering.rankStride),
+          (thirdID, "Cabbage slaw", LearningOrdering.rankStride * 2),
+        ] {
+          try RecipeServeWith.insert {
+            RecipeServeWith(
+              id: id, recipeID: recipeID, title: title, sortOrder: sortOrder,
+              provenance: .model, dateCreated: createdAt, dateModified: createdAt
+            )
+          }
+          .execute(db)
+        }
+        try RecipeServeWithRepository.update(id: firstID, title: "Charred lime crema", in: db, now: updatedAt)
+        _ = try RecipeServeWithRepository.reorder(
+          movingIDs: [thirdID], destination: .before(secondID), for: recipeID, in: db, now: updatedAt
         )
       }
 
       try database.read { db in
-        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
         expectNoDifference(
-          try ServeWithCoding.decode(recipe.serveWith, recipeID: recipeID),
+          try RecipeServeWithRepository.serveWith(for: recipeID, in: db),
           [
-            ServeWithItem(id: unchangedItemID, title: "Lime crema", note: "Spoon over each bowl."),
-            ServeWithItem(id: addedItemID, title: "Cabbage slaw"),
+            RecipeServeWith(
+              id: firstID, recipeID: recipeID, title: "Charred lime crema", sortOrder: 0,
+              provenance: .model, dateCreated: createdAt, dateModified: updatedAt
+            ),
+            RecipeServeWith(
+              id: thirdID, recipeID: recipeID, title: "Cabbage slaw", sortOrder: LearningOrdering.rankStride / 2,
+              provenance: .model, dateCreated: createdAt, dateModified: updatedAt
+            ),
+            RecipeServeWith(
+              id: secondID, recipeID: recipeID, title: "Cornbread", sortOrder: LearningOrdering.rankStride,
+              provenance: .model, dateCreated: createdAt, dateModified: createdAt
+            ),
           ]
         )
-        expectNoDifference(recipe.dateModified, updatedAt)
       }
     }
 
     @Test
-    func corruptServeWithDataFailsLoudlyAndCannotBeOverwritten() throws {
-      @Dependency(\.defaultDatabase) var database
-      let createdAt = Date(timeIntervalSinceReferenceDate: 826_100_000)
-      let repairedAt = createdAt.addingTimeInterval(150)
-      let clearedAt = createdAt.addingTimeInterval(180)
-      let recipeID = SampleUUIDSequence.uuid(36_500)
-      let itemID = SampleUUIDSequence.uuid(36_501)
-      let corruptData = Data("not Serve With JSON".utf8)
-
-      try database.write { db in
-        try Recipe.insert {
-          Recipe(
-            id: recipeID,
-            title: "Chili",
-            dateCreated: createdAt,
-            dateModified: createdAt,
-            serveWith: corruptData
-          )
-        }
-        .execute(db)
-
-        #expect(throws: ServeWithCodingError.malformedData(recipeID: recipeID)) {
-          _ = try ServeWithCoding.decode(corruptData, recipeID: recipeID)
-        }
-        #expect(throws: ServeWithCodingError.malformedData(recipeID: recipeID)) {
-          try RecipeRepository.appendServeWithPlan(
-            ServeWithPlan(items: [ServeWithSuggestion(title: "Cornbread")]),
-            to: recipeID,
-            in: db,
-            now: createdAt.addingTimeInterval(30),
-            uuid: { itemID }
-          )
-        }
-        #expect(throws: ServeWithCodingError.malformedData(recipeID: recipeID)) {
-          try RecipeRepository.replaceServeWithPlan(
-            ServeWithPlan(items: [ServeWithSuggestion(title: "Cornbread")]),
-            recipeID: recipeID,
-            in: db,
-            now: createdAt.addingTimeInterval(60),
-            uuid: { itemID }
-          )
-        }
-        #expect(throws: ServeWithCodingError.malformedData(recipeID: recipeID)) {
-          try RecipeRepository.removeServeWithItem(
-            itemID,
-            recipeID: recipeID,
-            in: db,
-            now: createdAt.addingTimeInterval(120)
-          )
-        }
-      }
-
-      try database.read { db in
-        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
-        expectNoDifference(recipe.serveWith, corruptData)
-        expectNoDifference(recipe.dateModified, createdAt)
-      }
-
-      _ = try database.write { db in
-        #expect(throws: ServeWithCodingError.malformedData(recipeID: recipeID)) {
-          try RecipeRepository.repairServeWith(corruptData, recipeID: recipeID, in: db, now: repairedAt)
-        }
-      }
-
-      try database.read { db in
-        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
-        expectNoDifference(recipe.serveWith, corruptData)
-        expectNoDifference(recipe.dateModified, createdAt)
-      }
-
-      let repairedData = try #require(try ServeWithCoding.encode([
-        ServeWithItem(id: itemID, title: "Cornbread")
-      ]))
-      try database.write { db in
-        try RecipeRepository.repairServeWith(repairedData, recipeID: recipeID, in: db, now: repairedAt)
-      }
-
-      try database.read { db in
-        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
-        expectNoDifference(recipe.serveWith, repairedData)
-        expectNoDifference(recipe.dateModified, repairedAt)
-      }
-
-      try database.write { db in
-        try RecipeRepository.clearServeWith(recipeID: recipeID, in: db, now: clearedAt)
-      }
-
-      try database.read { db in
-        let recipe = try #require(try Recipe.find(recipeID).fetchOne(db))
-        expectNoDifference(recipe.serveWith, nil)
-        expectNoDifference(recipe.dateModified, clearedAt)
-      }
-    }
-
-    @Test
-    func corruptServeWithDataPreventsRecipeChatAndHandoffContexts() throws {
+    func recipeChatContextUsesServeWithRows() throws {
       let now = Date(timeIntervalSinceReferenceDate: 826_200_000)
       let recipeDetail = RecipeDetailData(
         recipe: Recipe(
           id: SampleUUIDSequence.uuid(36_510),
           title: "Chili",
           dateCreated: now,
-          dateModified: now,
-          serveWith: Data("not Serve With JSON".utf8)
-        )
-      )
-
-      #expect(throws: ServeWithCodingError.malformedData(recipeID: recipeDetail.recipe.id)) {
-        _ = try RecipeChatRecipeContext(detail: recipeDetail)
-      }
-      #expect(throws: ServeWithCodingError.malformedData(recipeID: recipeDetail.recipe.id)) {
-        _ = try RecipeHandoffContext(detail: recipeDetail)
-      }
-
-      let workbenchID = SampleUUIDSequence.uuid(36_520)
-      let workbenchDetail = WorkbenchDetailData(
-        workbench: Workbench(
-          id: workbenchID,
-          title: "Chili comparison",
-          sortOrder: 0,
-          dateCreated: now,
           dateModified: now
         ),
-        candidateRows: [
-          WorkbenchCandidateRowData(
-            candidate: WorkbenchCandidate(
-              id: SampleUUIDSequence.uuid(36_521),
-              workbenchID: workbenchID,
-              recipeID: recipeDetail.recipe.id,
-              recipeTitleSnapshot: recipeDetail.recipe.title,
-              sortOrder: 0,
-              dateCreated: now
-            ),
-            recipeDetail: recipeDetail
+        serveWith: [
+          RecipeServeWith(
+            id: SampleUUIDSequence.uuid(36_511), recipeID: SampleUUIDSequence.uuid(36_510), title: "Cornbread",
+            sortOrder: 0, provenance: .model, dateCreated: now, dateModified: now
           )
         ]
       )
-      #expect(throws: ServeWithCodingError.malformedData(recipeID: recipeDetail.recipe.id)) {
-        _ = try WorkbenchChatContext(detail: workbenchDetail, references: [])
-      }
+      expectNoDifference(try RecipeChatRecipeContext(detail: recipeDetail).serveWith.map(\.title), ["Cornbread"])
     }
 
     @Test
     func absentServeWithDataIsAnEmptyList() throws {
       expectNoDifference(try ServeWithCoding.decode(nil, recipeID: SampleUUIDSequence.uuid(36_511)), [])
+    }
+
+    @Test
+    func emptyServeWithBlobDecomposesToNoRows() throws {
+      let recipeID = SampleUUIDSequence.uuid(36_512)
+      let now = Date(timeIntervalSinceReferenceDate: 826_300_000)
+      let emptyBlob = try JSONEncoder().encode([ServeWithItem]())
+
+      expectNoDifference(
+        try RecipeServeWithBlob.decompose(
+          recipeID: recipeID,
+          blob: emptyBlob,
+          now: now,
+          provenance: .model
+        ),
+        []
+      )
+    }
+
+    @Test
+    func detailLoaderLeavesMalformedLegacyServeWithAvailableForRepair() throws {
+      @Dependency(\.defaultDatabase) var database
+      let recipeID = SampleUUIDSequence.uuid(36_513)
+      let malformedBlob = Data("not json".utf8)
+      let now = Date(timeIntervalSinceReferenceDate: 826_300_000)
+
+      try database.write { db in
+        try Recipe.insert {
+          Recipe(
+            id: recipeID,
+            title: "Repairable Serve With",
+            dateCreated: now,
+            dateModified: now,
+            serveWith: malformedBlob
+          )
+        }
+        .execute(db)
+      }
+
+      try database.read { db in
+        let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+        expectNoDifference(detail.serveWith, [])
+        #expect(detail.recipe.serveWith == malformedBlob)
+      }
+    }
+
+    @Test
+    func repairingServeWithWritesDeterministicRowsAndClearsLegacyBlob() throws {
+      @Dependency(\.defaultDatabase) var database
+      let recipeID = SampleUUIDSequence.uuid(36_514)
+      let firstID = SampleUUIDSequence.uuid(36_515)
+      let secondID = SampleUUIDSequence.uuid(36_516)
+      let createdAt = Date(timeIntervalSinceReferenceDate: 826_300_000)
+      let repairedAt = createdAt.addingTimeInterval(60)
+      let repairedBlob = try JSONEncoder().encode([
+        ServeWithItem(id: firstID, title: "Cornbread"),
+        ServeWithItem(id: secondID, title: "Pickled onions", note: "Brighten each bowl")
+      ])
+
+      try database.write { db in
+        try Recipe.insert {
+          Recipe(
+            id: recipeID,
+            title: "Repairable Serve With",
+            dateCreated: createdAt,
+            dateModified: createdAt,
+            serveWith: Data("not json".utf8)
+          )
+        }
+        .execute(db)
+        try RecipeRepository.repairServeWith(repairedBlob, recipeID: recipeID, in: db, now: repairedAt)
+      }
+
+      try database.read { db in
+        let repairedRecipe = try #require(try Recipe.find(recipeID).fetchOne(db))
+        #expect(repairedRecipe.serveWith == nil)
+        expectNoDifference(
+          try RecipeServeWithRepository.serveWith(for: recipeID, in: db),
+          [
+            RecipeServeWith(
+              id: firstID, recipeID: recipeID, title: "Cornbread", sortOrder: 0,
+              provenance: .model, dateCreated: repairedAt, dateModified: repairedAt
+            ),
+            RecipeServeWith(
+              id: secondID, recipeID: recipeID, title: "Pickled onions", note: "Brighten each bowl",
+              sortOrder: LearningOrdering.rankStride, provenance: .model,
+              dateCreated: repairedAt, dateModified: repairedAt
+            ),
+          ]
+        )
+      }
     }
   }
 }

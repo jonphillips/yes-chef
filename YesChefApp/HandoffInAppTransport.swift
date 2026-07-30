@@ -22,14 +22,9 @@ final class HandoffInAppTransport {
   /// silent copy gives the cook no signal that anything happened. Settable so surfaces without a
   /// custom `init` (which cannot seed one `@State` from another) can assign it on appear.
   @ObservationIgnored var toastCenter: AppToastCenter?
-  @ObservationIgnored private let presentServeWithRepair: (ServeWithCodingError) -> Bool
 
-  init(
-    toastCenter: AppToastCenter? = nil,
-    presentServeWithRepair: @escaping (ServeWithCodingError) -> Bool = { _ in false }
-  ) {
+  init(toastCenter: AppToastCenter? = nil) {
     self.toastCenter = toastCenter
-    self.presentServeWithRepair = presentServeWithRepair
   }
 
   func copyPrompt(for source: HandoffExportSource) async {
@@ -141,9 +136,6 @@ final class HandoffInAppTransport {
   }
 
   private func present(_ error: Error) {
-    if let error = error as? ServeWithCodingError, presentServeWithRepair(error) {
-      return
-    }
     errorMessage = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
     isShowingError = true
   }

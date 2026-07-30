@@ -3,6 +3,24 @@ import Foundation
 import YesChefCore
 
 extension RecipeDetailModel {
+  func serveWithDidLoadOrAppear() {
+    guard
+      let detail,
+      detail.serveWith.isEmpty,
+      let blob = detail.recipe.serveWith
+    else {
+      serveWithRepairError = nil
+      return
+    }
+
+    do {
+      _ = try ServeWithCoding.decode(blob, recipeID: recipeID)
+      serveWithRepairError = nil
+    } catch {
+      serveWithRepairError = error
+    }
+  }
+
   func presentServeWithRepair(for error: ServeWithCodingError) -> Bool {
     guard error.recipeID == recipeID,
       let recipe,
@@ -14,12 +32,13 @@ extension RecipeDetailModel {
   }
 
   func repairServeWithButtonTapped() {
-    if case let .failure(error) = serveWithItemsResult,
-      presentServeWithRepair(for: error) {
+    serveWithDidLoadOrAppear()
+    guard let serveWithRepairError else {
+      errorMessage = "Serve With repair could not be opened."
+      isShowingError = true
       return
     }
-    errorMessage = "Serve With repair could not be opened."
-    isShowingError = true
+    _ = presentServeWithRepair(for: serveWithRepairError)
   }
 
   func showError(_ error: Error) {
@@ -198,13 +217,66 @@ extension RecipeDetailModel {
     }
   }
 
-  func removeServeWithButtonTapped(_ itemID: ServeWithItem.ID) {
-    @Dependency(\.date.now) var now
-    @Dependency(\.defaultDatabase) var database
-
+  func createServeWith(_ text: String) -> Bool {
+    let title = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !title.isEmpty else { return false }
     do {
       try database.write { db in
-        try RecipeRepository.removeServeWithItem(itemID, recipeID: recipeID, in: db, now: now)
+        try RecipeServeWithRepository.append(
+          [ServeWithSuggestion(title: title)],
+          to: recipeID,
+          provenance: .handAuthored,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
+  func updateServeWith(_ item: RecipeServeWith, text: String) {
+    let title = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !title.isEmpty else {
+      errorMessage = "A Serve With item can't be blank."
+      isShowingError = true
+      return
+    }
+    do {
+      try database.write { db in
+        try RecipeServeWithRepository.update(id: item.id, title: title, in: db, now: now)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func deleteServeWith(_ id: RecipeServeWith.ID) {
+    do {
+      try database.write { db in
+        try RecipeServeWithRepository.delete(id: id, in: db, now: now)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func reorderServeWith(_ ids: [RecipeServeWith.ID], destination: ServeWithReorderDestination) {
+    do {
+      _ = try database.write { db in
+        try RecipeServeWithRepository.reorder(
+          movingIDs: ids,
+          destination: destination,
+          for: recipeID,
+          in: db,
+          now: now
+        )
       }
     } catch {
       errorMessage = String(describing: error)

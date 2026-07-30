@@ -185,9 +185,9 @@ public enum LearningReorderDestination: Equatable, Sendable {
   case end
 }
 
-private enum LearningOrdering {
+public enum LearningOrdering {
   /// Leaves room for ordinary inserts and moves without rewriting every synced row in a Learning group.
-  static let rankStride = 1_024
+  public static let rankStride = 1_024
 
   static func prependOrders(count: Int, before leadingOrder: Int?) -> [Int] {
     guard count > 0 else { return [] }

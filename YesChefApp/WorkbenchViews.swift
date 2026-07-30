@@ -168,11 +168,7 @@ struct WorkbenchDetailView: View {
     )
     _toastCenter = State(wrappedValue: toastCenter)
     _model = State(wrappedValue: model)
-    _handoffTransport = State(
-      wrappedValue: HandoffInAppTransport(toastCenter: toastCenter) { [weak model] error in
-        model?.presentServeWithRepair(for: error) ?? false
-      }
-    )
+    _handoffTransport = State(wrappedValue: HandoffInAppTransport(toastCenter: toastCenter))
     self.isFocusActive = isFocusActive
     self.focusButtonTapped = focusButtonTapped
   }
@@ -267,11 +263,6 @@ struct WorkbenchDetailView: View {
             onDismiss: { model.destination = nil }
           )
         )
-      }
-    }
-    .sheet(item: $model.destination.repairServeWith) { presentation in
-      ServeWithRepairSheet(presentation: presentation) { text in
-        try model.repairServeWith(text, recipeID: presentation.recipeID)
       }
     }
     .sheet(item: $model.destination.logEntryEditor) { editorState in
