@@ -231,7 +231,22 @@ selection (per-bubble `UITextView` caps the payload).
 
 ## Device passes owed
 
-Not work, a checklist. **[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) S2** — the export →
+Not work, a checklist.
+
+**⚠️ [PR #261](https://github.com/jonphillips/yes-chef/pull/261) — ADR-0048 S3 `recipeServeWith`. Draft, and
+the only open item with schema. Must NOT merge on a green build.** Two-device pass: migrated rows converge
+**without duplicates**; add/edit/delete/reorder and model regeneration on iPad *and* iPhone; a malformed legacy
+blob shows the repair banner then syncs its repaired rows without duplicates. It also adds to the prod-schema
+promotion list in the same PR. **New reason the determinism rule is load-bearing:** #261 extended the ADR-0030
+N−1 restore test, so a pre-S3 backup gets forward-migrated on the restore candidate and then re-pushed whole
+(ADR-0030 Amendment 2) — non-deterministic rows would diverge through *restore*, not just across devices.
+
+**[PR #262](https://github.com/jonphillips/yes-chef/pull/262) — prep plan dish links and dates. Draft, no
+schema.** Slice 1: on a **placed** menu, confirm prep sessions come back day-anchored. Slice 2: on iPhone
+compact width, confirm an inert chip relinks in two taps, a hand-authored step can be linked, *No dish* clears
+and persists, and a compound `serves` proposes no dish.
+
+**[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) S2** — the export →
 restore → re-enable-sync round-trip **passed on two simulators 2026-07-29** (isolated test container), which
 also closed OQ1. Still owed on **real devices**: the restore path itself is now proven, so this is a
 confidence pass rather than a discovery — and **hold it until OQ6 (the tombstone contradiction) is diagnosed**,

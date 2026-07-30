@@ -41,10 +41,23 @@ is the only fetch trigger** — force-quit and relaunch wherever a step says "le
 signing left **on** (`CODE_SIGNING_ALLOWED=NO` strips the app-group entitlement and the app dies instantly),
 per [[simulator-run-needs-signing]].
 
-**Temporary and not to be committed:** the test container is swapped into `YesChefCloudSync.configuration`
-and **both** `YesChefApp/YesChef.entitlements` and `YesChefShareExtension/YesChefShareExtension.entitlements`.
-The extension constructs an engine too, so a missing container entitlement **crashes** it
-([[extension-sync-construct-not-run]]). Revert all three before any real build.
+### ⚠️⚠️ Do NOT reinstall the app on these two simulators
+
+**They run a binary with the *test* container compiled in. Source has been reverted to the real container.**
+Rebuilding and reinstalling onto these sims points them at the **real** container — and because the
+metadatabase filename is keyed by the container identifier, the app starts with a fresh empty one:
+`recordTypes` = 0, every table looks new, **full re-push**. That is Amendment 2's exact mechanism, and it would
+upload this experiment's junk (`EDIT v1-BACKUP`, `DELETE-target`, `Rice Krispie treats`) **into the real
+library**.
+
+Before any reinstall on these devices, do one of: **erase the simulator** (drops the app-group store), or
+re-apply the test container to source *and both entitlements files* first, or leave sync off. To run the
+experiments below **no reinstall is needed** — the installed binaries are already correct.
+
+**Re-applying the test container is three edits, not one:** `YesChefCloudSync.configuration` plus **both**
+`YesChefApp/YesChef.entitlements` and `YesChefShareExtension/YesChefShareExtension.entitlements`. The share
+extension constructs an engine too, so a missing container entitlement **crashes** it
+([[extension-sync-construct-not-run]]). Never commit any of the three.
 
 ## The status script
 
