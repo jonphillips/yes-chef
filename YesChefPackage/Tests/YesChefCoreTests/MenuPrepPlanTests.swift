@@ -503,6 +503,7 @@ extension RecipeCoreTests {
           session: "The day before",
           task: "Salt the chicken overnight",
           serves: "Saturday dinner",
+          sourceDish: sourceDishID,
           in: db,
           now: now
         )

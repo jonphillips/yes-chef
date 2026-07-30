@@ -105,6 +105,8 @@ prod/TestFlight cut. That deadline, not aesthetics, is what makes this urgent.
 - **Text imports cannot carry hidden row links.** An inbound text plan has no `sourceDish` identity, so replacing
   a linked row from text intentionally drops its recipe chip rather than guessing from task wording.
 
+**Amendment — 2026-07-29.** This intentional text-import loss is now recoverable by hand in the prep-step editor; the decision against silently re-deriving the chip is unchanged.
+
 ## Rejected
 
 - **"Just add an edit button."** There is nothing to edit. The blob is the disease; a button is a symptom

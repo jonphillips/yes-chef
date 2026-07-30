@@ -430,6 +430,7 @@ public enum PrepPlanStepRepository {
     session: String,
     task: String,
     serves: String?,
+    sourceDish: MenuItem.ID?,
     in db: Database,
     now: Date
   ) throws {
@@ -438,6 +439,7 @@ public enum PrepPlanStepRepository {
       $0.session = #bind(session)
       $0.task = #bind(task)
       $0.serves = #bind(serves?.cleanedPrepPlanText)
+      $0.sourceDish = #bind(sourceDish)
     }
     .execute(db)
     try Menu.find(existing.menuID).update { $0.dateModified = #bind(now) }.execute(db)
@@ -560,6 +562,84 @@ public enum PrepPlanStepRepository {
       self.serves = serves
       self.sourceDish = sourceDish
     }
+  }
+}
+
+public struct PrepPlanDishMatchCandidate: Equatable, Sendable {
+  public var id: MenuItem.ID
+  public var title: String
+
+  public init(id: MenuItem.ID, title: String) {
+    self.id = id
+    self.title = title
+  }
+}
+
+/// Suggests one dish for a human to confirm; it never writes a prep-plan row.
+public enum PrepPlanDishMatcher {
+  public static func suggestedSourceDish(
+    serves: String?,
+    among candidates: [PrepPlanDishMatchCandidate]
+  ) -> MenuItem.ID? {
+    guard let serves = serves?.cleanedPrepPlanText else { return nil }
+
+    let comparableServes = [serves, strippingDayAnchor(from: serves)]
+      .filter { !$0.isEmpty }
+    for candidateServes in comparableServes {
+      let matches = matchingIDs(
+        for: collapsedComparison(candidateServes),
+        among: candidates,
+        transform: collapsedComparison
+      )
+      if matches.count == 1 { return matches[0] }
+      if !matches.isEmpty { return nil }
+    }
+
+    for candidateServes in comparableServes {
+      let matches = matchingIDs(
+        for: parentheticalComparison(candidateServes),
+        among: candidates,
+        transform: parentheticalComparison
+      )
+      if matches.count == 1 { return matches[0] }
+      if !matches.isEmpty { return nil }
+    }
+
+    // A menu-item title may legitimately contain commas. Only treat a comma as compound after
+    // trying the entire serves string against every title above.
+    guard !serves.contains(",") else { return nil }
+    return nil
+  }
+
+  private static func matchingIDs(
+    for value: String,
+    among candidates: [PrepPlanDishMatchCandidate],
+    transform: (String) -> String
+  ) -> [MenuItem.ID] {
+    candidates.compactMap { candidate in
+      transform(candidate.title) == value ? candidate.id : nil
+    }
+  }
+
+  private static func collapsedComparison(_ value: String) -> String {
+    value
+      .split(whereSeparator: \.isWhitespace)
+      .joined(separator: " ")
+      .lowercased()
+  }
+
+  private static func parentheticalComparison(_ value: String) -> String {
+    let collapsed = collapsedComparison(value)
+    guard let range = collapsed.range(of: #"\s*\([^()]*\)\s*$"#, options: .regularExpression) else {
+      return collapsed
+    }
+    return String(collapsed[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
+  }
+
+  private static func strippingDayAnchor(from serves: String) -> String {
+    let pattern = #"^(?i:monday|tuesday|wednesday|thursday|friday|saturday|sunday)[’']s\s+"#
+    guard let range = serves.range(of: pattern, options: .regularExpression) else { return serves }
+    return String(serves[range.upperBound...])
   }
 }
 
