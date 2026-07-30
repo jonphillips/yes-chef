@@ -7,22 +7,19 @@ public struct RecipeListRowData: Identifiable, Equatable, Sendable {
   public var thumbnailData: Data?
   public var categoryNames: [String]
   public var categoryFilterNames: [String]
-  public var tagNames: [String]
 
   public init(
     recipe: Recipe,
     source: RecipeSource? = nil,
     thumbnailData: Data? = nil,
     categoryNames: [String] = [],
-    categoryFilterNames: [String]? = nil,
-    tagNames: [String] = []
+    categoryFilterNames: [String]? = nil
   ) {
     self.recipe = recipe
     self.source = source
     self.thumbnailData = thumbnailData
     self.categoryNames = categoryNames
     self.categoryFilterNames = categoryFilterNames ?? categoryNames
-    self.tagNames = tagNames
   }
 
   public var id: Recipe.ID { recipe.id }
@@ -39,9 +36,6 @@ public struct RecipeListRequest: FetchKeyRequest {
     let recipes = try Recipe.fetchAll(db)
     let categoriesByID = Dictionary(
       uniqueKeysWithValues: try Category.fetchAll(db).map { ($0.id, $0) }
-    )
-    let tagsByID = Dictionary(
-      uniqueKeysWithValues: try Tag.fetchAll(db).map { ($0.id, $0) }
     )
     let sourcesByRecipeID = Dictionary(
       grouping: try RecipeSource.fetchAll(db),
@@ -62,12 +56,6 @@ public struct RecipeListRequest: FetchKeyRequest {
             }
           )
         )
-      }
-    let tagNamesByRecipeID = Dictionary(grouping: try RecipeTag.fetchAll(db), by: \.recipeID)
-      .mapValues { recipeTags in
-        recipeTags
-          .sorted { $0.sortOrder < $1.sortOrder }
-          .compactMap { tagsByID[$0.tagID]?.name }
       }
     let photoRows = try RecipePhoto
       .select {
@@ -99,8 +87,7 @@ public struct RecipeListRequest: FetchKeyRequest {
         source: sourcesByRecipeID[recipe.id]?.first,
         thumbnailData: thumbnailsByRecipeID[recipe.id]?.listImageData,
         categoryNames: categorySummariesByRecipeID[recipe.id]?.displayNames ?? [],
-        categoryFilterNames: categorySummariesByRecipeID[recipe.id]?.filterNames ?? [],
-        tagNames: tagNamesByRecipeID[recipe.id] ?? []
+        categoryFilterNames: categorySummariesByRecipeID[recipe.id]?.filterNames ?? []
       )
     }
   }

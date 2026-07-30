@@ -10,7 +10,6 @@ extension RecipeLibraryModel {
       showsFavoritesOnly: showsFavoritesOnly,
       showsPhotosOnly: showsPhotosOnly,
       selectedCategoryNames: selectedCategoryNames.sortedForPresetState(),
-      selectedTagNames: selectedTagNames.sortedForPresetState(),
       selectedCuisine: selectedCuisine,
       selectedCourse: selectedCourse,
       selectedSourceNames: selectedSourceNames.sortedForPresetState(),
@@ -41,7 +40,6 @@ extension RecipeLibraryModel {
       || showsPhotosOnly
       || libraryScope != .main
       || !selectedCategoryNames.isEmpty
-      || !selectedTagNames.isEmpty
       || selectedCuisine != nil
       || selectedCourse != nil
       || !selectedSourceNames.isEmpty
@@ -71,15 +69,6 @@ extension RecipeLibraryModel {
           kind: .categories,
           detail: selectedFilterDetail(selectedCategoryNames),
           selectionCount: selectedCategoryNames.count
-        )
-      )
-    }
-    if !selectedTagNames.isEmpty {
-      facets.append(
-        RecipeActiveFilterFacet(
-          kind: .tags,
-          detail: selectedFilterDetail(selectedTagNames),
-          selectionCount: selectedTagNames.count
         )
       )
     }
@@ -162,10 +151,6 @@ extension RecipeLibraryModel {
     )
   }
 
-  var tagFilterOptions: [String] {
-    distinctOptions(unarchivedRecipeRows.flatMap(\.tagNames))
-  }
-
   var cuisineFilterOptions: [String] {
     distinctOptions(unarchivedRecipeRows.compactMap(\.recipe.cuisine))
   }
@@ -234,7 +219,6 @@ extension RecipeLibraryModel {
     showsPhotosOnly = false
     libraryScope = .main
     selectedCategoryNames = []
-    selectedTagNames = []
     selectedCuisine = nil
     selectedCourse = nil
     selectedSourceNames = []
@@ -251,8 +235,6 @@ extension RecipeLibraryModel {
       showsPhotosOnly = false
     case .categories:
       selectedCategoryNames = []
-    case .tags:
-      selectedTagNames = []
     case .cuisine:
       selectedCuisine = nil
     case .course:
@@ -283,14 +265,6 @@ extension RecipeLibraryModel {
           && matchesFilters(row, state: state)
       }
       .count
-  }
-
-  func tagFilterButtonTapped(_ tagName: String) {
-    if selectedTagNames.contains(tagName) {
-      selectedTagNames.remove(tagName)
-    } else {
-      selectedTagNames.insert(tagName)
-    }
   }
 
   func categoryFilterButtonTapped(_ categoryName: String) {
@@ -327,8 +301,7 @@ extension RecipeLibraryModel {
     libraryScope = state.libraryScope
     showsFavoritesOnly = state.showsFavoritesOnly
     showsPhotosOnly = state.showsPhotosOnly
-    selectedCategoryNames = Set(state.selectedCategoryNames)
-    selectedTagNames = Set(state.selectedTagNames)
+    selectedCategoryNames = canonicalCategoryNames(for: state.selectedCategoryNames)
     selectedCuisine = state.selectedCuisine
     selectedCourse = state.selectedCourse
     selectedSourceNames = Set(state.selectedSourceNames)
@@ -350,7 +323,6 @@ extension RecipeLibraryModel {
       || (recipe.course?.localizedCaseInsensitiveContains(query) ?? false)
       || row.sourceSearchValues.contains { $0.localizedCaseInsensitiveContains(query) }
       || row.categoryNames.contains { $0.localizedCaseInsensitiveContains(query) }
-      || row.tagNames.contains { $0.localizedCaseInsensitiveContains(query) }
   }
 
   private func matchesFilters(_ row: RecipeListRowData) -> Bool {
@@ -364,7 +336,6 @@ extension RecipeLibraryModel {
       showsFavoritesOnly: showsFavoritesOnly,
       showsPhotosOnly: showsPhotosOnly,
       categoryNames: categoryNames,
-      tagNames: selectedTagNames,
       selectedCuisine: selectedCuisine,
       selectedCourse: selectedCourse,
       sourceNames: selectedSourceNames,
@@ -379,7 +350,6 @@ extension RecipeLibraryModel {
       showsFavoritesOnly: state.showsFavoritesOnly,
       showsPhotosOnly: state.showsPhotosOnly,
       categoryNames: Set(state.selectedCategoryNames),
-      tagNames: Set(state.selectedTagNames),
       selectedCuisine: state.selectedCuisine,
       selectedCourse: state.selectedCourse,
       sourceNames: Set(state.selectedSourceNames),
@@ -393,7 +363,6 @@ extension RecipeLibraryModel {
     showsFavoritesOnly: Bool,
     showsPhotosOnly: Bool,
     categoryNames: Set<String>,
-    tagNames: Set<String>,
     selectedCuisine: String?,
     selectedCourse: String?,
     sourceNames: Set<String>,
@@ -411,10 +380,11 @@ extension RecipeLibraryModel {
     if showsFavoritesOnly && !recipe.favorite { return false }
     if showsPhotosOnly && !row.hasPhoto { return false }
     if !categoryNames.isEmpty,
-       !categoryNames.isSubset(of: Set(row.categoryFilterNames)) {
-      return false
-    }
-    if !tagNames.isEmpty, !tagNames.isSubset(of: Set(row.tagNames)) {
+       !categoryNames.allSatisfy({ selectedName in
+         row.categoryFilterNames.contains {
+           $0.caseInsensitiveCompare(selectedName) == .orderedSame
+         }
+       }) {
       return false
     }
     if let selectedCuisine, recipe.cuisine != selectedCuisine {
@@ -432,6 +402,16 @@ extension RecipeLibraryModel {
       return false
     }
     return true
+  }
+
+  private func canonicalCategoryNames(for names: [String]) -> Set<String> {
+    Set(
+      names.map { selectedName in
+        categoryFilterOptions.first {
+          $0.caseInsensitiveCompare(selectedName) == .orderedSame
+        } ?? selectedName
+      }
+    )
   }
 
   private func areInIncreasingOrder(_ lhs: RecipeListRowData, _ rhs: RecipeListRowData) -> Bool {

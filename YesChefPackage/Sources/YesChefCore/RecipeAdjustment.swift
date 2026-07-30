@@ -151,7 +151,6 @@ public struct RecipeAdjustmentProposal: Codable, Equatable, Sendable {
       instructionSteps: instructionSteps,
       notes: notes,
       photos: detail.photos,
-      tags: detail.tags,
       categories: detail.categories,
       categoryDisplayNames: detail.categoryDisplayNames,
       equipment: detail.equipment,
@@ -806,7 +805,7 @@ extension RecipeRepository {
       instructionSections: detail.instructionSections,
       instructionSteps: detail.instructionSteps,
       notes: detail.notes,
-      tagNames: detail.tags.map(\.name),
+      tagNames: [],
       categoryNames: detail.categoryDisplayNames,
       // Snapshots strip image bytes anyway (leanSnapshotPhotos); the restore path
       // never re-writes photo rows, so a metadata-only conversion is faithful.
@@ -971,12 +970,6 @@ extension RecipeRepository {
       }
       .execute(db)
     }
-    for (sortOrder, tag) in detail.tags.enumerated() {
-      try RecipeTag.insert {
-        RecipeTag(id: uuid(), recipeID: recipeID, tagID: tag.id, sortOrder: sortOrder)
-      }
-      .execute(db)
-    }
     for category in detail.categories {
       try RecipeCategory.insert {
         RecipeCategory(id: uuid(), recipeID: recipeID, categoryID: category.id)
@@ -1001,7 +994,7 @@ extension RecipeRepository {
       instructionSections: savedDetail.instructionSections,
       instructionSteps: savedDetail.instructionSteps,
       notes: savedDetail.notes,
-      tagNames: savedDetail.tags.map(\.name),
+      tagNames: [],
       categoryNames: savedDetail.categoryDisplayNames,
       photos: fullPhotos.map { photo in
         let id = photoIDs[photo.id]!

@@ -50,7 +50,6 @@ final class RecipeLibraryModel {
   var showsFavoritesOnly = false
   var showsPhotosOnly = false
   var selectedCategoryNames: Set<String> = []
-  var selectedTagNames: Set<String> = []
   var selectedCuisine: String?
   var selectedCourse: String?
   var selectedSourceNames: Set<String> = []

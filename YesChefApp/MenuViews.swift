@@ -753,7 +753,7 @@ struct MenuItemEditorView: View {
       RecipeSearchMatcher.matches(
         query: query,
         in: [row.recipe.title, row.recipe.subtitle, row.recipe.summary]
-          .compactMap(\.self) + row.tagNames + row.categoryNames
+          .compactMap(\.self) + row.categoryNames
       )
     }
   }

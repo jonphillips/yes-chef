@@ -143,7 +143,7 @@ public struct RecipeEditorDraft: Equatable, Sendable {
         .sorted { $0.dateCreated < $1.dateCreated }
         .map(\.text)
         .joined(separator: "\n\n"),
-      tagNames: detail.tags.map(\.name).joined(separator: ", "),
+      tagNames: "",
       categoryNames: detail.categoryDisplayNames.joined(separator: ", "),
       selectedCategoryIDs: Set(detail.categories.map(\.id)),
       originalSnapshot: detail.recipe.originalSnapshot,

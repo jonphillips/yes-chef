@@ -229,7 +229,7 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func tagAndCategoryReconciliationConvergesDuplicateNamesAndReferences() throws {
+    func legacyTagDraftInputReconcilesIntoCategoriesWithoutTouchingDormantTagRows() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 814_300_000)
       let recipeID = SampleUUIDSequence.uuid(34_001)
@@ -290,10 +290,10 @@ extension RecipeCoreTests {
           recipeCategoryIDs: try RecipeCategory.fetchAll(db).map(\.categoryID)
         )
       }
-      expectNoDifference(snapshot.tags.map(\.id), [tagID])
-      expectNoDifference(Set(snapshot.recipeTagIDs), [tagID])
-      expectNoDifference(snapshot.categories.map(\.id), [categoryID])
-      expectNoDifference(Set(snapshot.recipeCategoryIDs), [categoryID])
+      expectNoDifference(Set(snapshot.tags.map(\.id)), [tagID, duplicateTagID])
+      expectNoDifference(Set(snapshot.recipeTagIDs), [duplicateTagID])
+      expectNoDifference(Set(snapshot.categories.map(\.id)), [categoryID, SampleUUIDSequence.uuid(34_100)])
+      expectNoDifference(Set(snapshot.recipeCategoryIDs), [categoryID, SampleUUIDSequence.uuid(34_100)])
     }
   }
 }

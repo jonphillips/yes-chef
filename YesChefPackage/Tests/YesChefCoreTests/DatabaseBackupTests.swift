@@ -320,20 +320,21 @@ struct DatabaseBackupTests {
         sql: "SELECT identifier FROM grdb_migrations ORDER BY rowid DESC LIMIT 1"
       )
     }
-    // Keep this fixture exactly the migrations listed here behind the current schema; update this tail when it changes.
+    // Keep this fixture exactly the migrations listed here behind the current schema.
+    // Update this tail when it changes.
     let migrationsToReplay = [
       "Move recipe Serve With into editable rows",
       "Add regenerate intent to local AI handoffs",
+      "Add color to categories",
     ]
     #expect(latestMigrationIdentifier == migrationsToReplay.last)
     try await backupDatabase.write { db in
       try db.execute(sql: "ALTER TABLE aiHandoffs DROP COLUMN regenerates")
       try db.execute(sql: "DROP TABLE recipeServeWith")
+      try db.execute(sql: "ALTER TABLE categories DROP COLUMN color")
       try db.execute(
-        sql: """
-        DELETE FROM grdb_migrations
-        WHERE identifier IN ('Move recipe Serve With into editable rows', 'Add regenerate intent to local AI handoffs')
-        """
+        sql: "DELETE FROM grdb_migrations WHERE identifier IN (?, ?, ?)",
+        arguments: [migrationsToReplay[0], migrationsToReplay[1], migrationsToReplay[2]]
       )
       try db.execute(sql: "PRAGMA user_version = \(backup.schemaVersion - migrationsToReplay.count)")
     }
