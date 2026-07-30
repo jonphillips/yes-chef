@@ -96,9 +96,30 @@ generic one ([[decompose-notes-into-typed-homes]]).
 They have no per-item identity, no per-item consumer, and nothing anchored to their lines — decomposing them
 would be schema built on a display-time newline split. So: single-panel editor stays, and it is **correct**.
 What changes is Finding 2's mismatch — either the section reads as prose, or, if the list rendering is worth
-keeping, it is understood as formatting rather than as a promise of row editing. Revisit only when a real
-per-item consumer appears (a Make Ahead line becoming a prep-plan step is the plausible one, and that is
-ADR-0034 territory).
+keeping, it is understood as formatting rather than as a promise of row editing.
+
+**The two sections flip on different triggers, and neither has fired.** They are deferred together in S4, but
+for unrelated reasons — collapsing them into one "revisit later" hides that Make Ahead is the near case and
+Chef It Up is the speculative one:
+
+- **Make Ahead → rows when [ADR-0034](ADR-0034-prep-plan-work-session-timeline.md) composes the menu prep
+  plan *structurally*.** This is the near case, and it is the ADR's own named graduation path, not a fresh
+  idea: the design *already* asserts the menu prep plan "compose[s] from stored Make-Ahead"
+  ([[menu-planner-dogfood-2026-07-09]]), and a Make Ahead line **is** a prep task with a horizon — "make the
+  dough 2 days ahead" is `{step, when: 2day}` in [[prep-plan-horizon-redesign]]'s bands. What holds the flip
+  today is that the composition is currently **LLM prose** (`AIHandoffContext`, *"Compose a short sequence
+  of…"*), not a structured read of item identity — so decomposing now would be orphaned schema
+  ([[withdraw-not-defer-orphaned-schema]]). When ADR-0034 makes that read structural, Make Ahead decomposes
+  **in that effort** (carrying a `when`/horizon field from day one, so it is *not* a plain `recipeServeWith`
+  clone), never as a 0048 backfill.
+- **Chef It Up → rows only if dogfooding shows per-item *curation*.** Weaker, and it flips on a different
+  argument than Make Ahead: it has no downstream consumer and plausibly never will (it is terminal advice,
+  not an input to another surface). Its only path to rows is the *Serve With* argument — keep/dismiss/reorder
+  of regenerated suggestions. But unlike Serve With it arrives here as a bare `String?` with **no identity
+  being minted and dropped**, so it pays no ADR-0040 tax while it waits; there is nothing bleeding to justify
+  building on spec. The firing condition is observed behaviour — Jon pruning the model's Chef It Up list item
+  by item the way he does Serve With — not a downstream consumer. Until then it is a product question, and
+  the answer is "prose."
 
 ### D5 — `ServeWithCoding.decode` becomes loud, independent of D3
 
@@ -130,7 +151,10 @@ the ADR-0040 tax.
   the `SyncEngine`. **The regeneration path upserts by identity and preserves hand-authored rows** — a
   delete-and-reinsert reproduces the very identity loss this slice exists to remove, so that is the slice's
   primary test, not a detail.
-- **S4 — deferred**: Make Ahead / Chef It Up. Not scheduled; D4 says revisit on a real per-item consumer.
+- **S4 — deferred**: Make Ahead / Chef It Up. Not scheduled, and *not one slice* — D4 gives them separate
+  firing conditions: Make Ahead decomposes inside the [ADR-0034](ADR-0034-prep-plan-work-session-timeline.md)
+  structural-compose effort (with a `when`/horizon field); Chef It Up only if dogfooding shows per-item
+  curation. Neither has fired.
 
 ## Resolved (Jon, 2026-07-26) — both schema questions closed; S3 is specifiable
 
