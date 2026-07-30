@@ -1,7 +1,9 @@
 # Current Handoff
 
-Last updated: July 29, 2026. (**Playbook edit grain Dispatch 0 and Dispatch 1 (S1)** are both closed — see the
-DONE-LOG. Live target stays **playbook edit grain**, now at its last dispatch, **Dispatch 2 (S3)**.)
+Last updated: July 30, 2026. (**Playbook edit grain is fully closed** — Dispatch 2 (S3) shipped as PR
+[#261](https://github.com/jonphillips/yes-chef/pull/261), device-checked. See the DONE-LOG. **Prep-plan
+Slices 1–2** are in PR [#262](https://github.com/jonphillips/yes-chef/pull/262) — day-anchored labels
+device-confirmed, **merging**. New live target: **prep-plan Slice 3** (gated on #262 merging).)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate is **crossed and holding**. We stay in
@@ -14,41 +16,44 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**ONE live dispatch target: [`efforts/playbook-edit-grain-2026-07-26.md`](efforts/playbook-edit-grain-2026-07-26.md)
-— Playbook edit affordances are a readout of storage grain.** Dispatch with
-*"Do **playbook edit grain** from `docs/CURRENT_HANDOFF.md`."* If this section is empty or missing, **STOP and
-ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch. Ratified in
-[ADR-0048](decisions/ADR-0048-playbook-edit-grain.md), all OQs closed; the effort doc is the spec and it was
-**amended 2026-07-29** by architect review, then again on S0's approval to add **S0.1**.
+**ONE live dispatch target: [`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md)
+§ Slice 3 — the omission guard is for accidental drops, not for a regenerate.** Dispatch with
+*"Do **prep-plan Slice 3** from `docs/CURRENT_HANDOFF.md`."* If this section is empty or missing, **STOP and
+ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch. **Gated on PR #262 merging first**
+(Slices 1–2); Slice 3 is only *reachable* because Slice 1 makes a regenerate rewrite every session label.
 
-**The core reframe the dispatch must not undo:** the three different edit interactions are an accurate readout
-of **three different storage grains**. Do not unify by making the chrome uniform over blob storage.
+**The finding (from the #262 device pass).** Regenerating a prep plan flags ~every existing step under "Review
+omitted steps before saving." [`omittedCurrentPrepStepEvidence`](../../YesChefPackage/Sources/YesChefCore/AIHandoff.swift)
+diffs current-vs-returned on exact visible content (`session` + `task` + `serves`); a regenerate rewrites the
+labels (Slice 1's purpose) *and* rephrases the tasks, so 100% read as "missing." The guard is ADR-0040
+lossless-or-loud doing its job — but answering the wrong question. Its question is *"did the model silently
+drop work I meant to keep?"*, which is only meaningful for an **incremental refine**. A regenerate is
+**intended wholesale replacement**.
 
-**Dispatch 0 (S0 + S0.1) and Dispatch 1 (S1) are closed. One dispatch remains — the only one with schema.**
-S1 shipped the shared [`EditableRowsSection`](../../YesChefApp/EditableRowsSection.swift) that Serve With adopts
-in step 5 below.
+**The core reframe the dispatch must not undo:** the variable is **refine vs regenerate intent**, not the
+transport. Refine → baseline = current plan, guard fires loud (unchanged). Regenerate → baseline = **empty**,
+no omission/dropped-link list, a light "replaces your N-step plan" confirmation instead — the loss is
+*declared*, not silent. **Do not** infer intent from how many steps happen to match (that heuristic *is* the
+bug); **do not** add fuzzy matching to the refine diff (fights ADR-0040 and wouldn't help a reworded plan
+anyway); **do not** touch Slice 1's storage or grouping.
 
-- **DISPATCH 2 (S3) — `recipeServeWith`; the only one with schema.** Sequenced behind S1 (now done).
-   - **⚠️ Every migrated column must be a deterministic function of the already-synced blob — no `UUID()`, no
-     `now`** ([[migration-writes-bypass-sync-triggers]]). `recipeServeWith` is a **brand-new** table, so the
-     `start()` sweep makes **each device upload its own copy** unless the rows are identical everywhere. The
-     data is already shaped for this: reuse the blob item's own `ServeWithItem.id` as the row `id` (which also
-     satisfies the "ids intact" acceptance), rank from array index × `rankStride`, dates from the recipe's
-     `dateModified`. Done that way it is safe to leave in the migrator with no post-engine pass.
-   - **The regeneration path is the primary test, not a detail:** it must **upsert by identity and preserve
-     hand-authored rows and their ranks**. Delete-and-reinsert reproduces the exact identity loss the slice
-     exists to remove.
-   - **`provenance` is its own enum** (model-suggested vs hand-authored). Do **not** reuse
-     `LearningProvenance` — it records *transport*, and both its cases are model paths.
-   - **Do not drop the `Recipe.serveWith` column in this PR.** Stop reading it; leave it a release. A stranded
-     DELETE gets one attempt and is unrecoverable.
+- **The onboard fix needs no schema.** `regeneratePrepPlan()` sets `.regenerate`, chat "Apply…" stays
+  `.refine`, passed in-memory — onboard staging builds a *transient* `AIHandoff` (never written). This alone
+  fixes the banner Jon hit.
+- **The one column is for the outboard round-trip only.** A "Handoff to Regenerate" action must survive the
+  copy→paste gap, so intent persists on the `aiHandoffs` row (add e.g. `regenerates: Bool` default `false` →
+  existing rows read `.refine`). **`aiHandoffs` is NOT in `CloudSync` — it is local-only**, so this is a plain
+  local migration: **no prod-promotion entry, and the deterministic-UUID / post-engine sync rules do NOT
+  apply** ([[migration-writes-bypass-sync-triggers]] is about *synced* tables). Keep it local — do not add it
+  to the sync list on momentum.
+- **Both transports converge in Core** at [`AIHandoffReviewStager.menuReview`](../../YesChefPackage/Sources/YesChefCore/AIHandoffIntentImport.swift):
+  the intent chooses the baseline. Outboard "Handoff Prep" stays refine; the new "Handoff to Regenerate" is a
+  sibling action in the prep-plan `…` menu.
 
-**Out of scope, named so it does not ride in on momentum:** Make Ahead and Chef It Up stay prose (ADR-0048
-D4 — they only *look* like lists because `PlaybookEnrichmentDisplayText` splits at render time); `sortOrder`
-on `RecipeNote`; fixing `LearningProvenance`'s transport/authorship conflation; the menu's Playbook sections.
-
-**Verification.** **Dispatch 2 is schema + sync and does *not* close on a green build** — it wants Jon's
-two-device pass, and it adds to the prod-schema promotion list in the same PR.
+**Verification.** Package build + Core tests + the **generic app build** (App-layer: new menu action + review
+reframe). **Local migration → does *not* need a two-device sync pass.** Jon's device look confirms: (a)
+onboard regenerate no longer floods omissions, (b) outboard "Handoff to Regenerate" → paste returns a clean
+replacement, (c) a genuine refine still surfaces a real dropped step. No prod-promotion entry.
 
 **⚠️ Jon's outstanding follow-through from ADR-0014 Amd1 (not a dispatch item):** three recipes still carry
 `isHeader = 1` rows to hand-repair in the app — *Beef Birria Taco Filling* (4), *Broccoli Spoon Salad* (2),
@@ -106,23 +111,6 @@ one key, so any of those recipes on a menu puts "Gather your ingredient" on the 
   ([[migration-writes-bypass-sync-triggers]]). Back up first.
 - **P2 (Milk Street's all-caps) is DECLINED**; P3's Amd1-D1 dependency is now discharged (shipped 2026-07-28)
   but it stays parked behind the declined P2. Don't build either on momentum.
-
-**[`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) — the prep plan
-knows things the model doesn't (scoped 2026-07-26).** Two slices, **no schema** — both use fields that
-already exist and already sync.
-- **S1 (Core only) — the menu's placement dates reach `MenuChatContext`.**
-  [ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md) D2 retired the fixed horizon enum
-  *because* real session labels are concrete ("Saturday · ~3 hrs out") — but the context carries **no date of
-  any kind**, so a placed menu and an unplaced one send byte-identical context and the model falls back to
-  "One day ahead" — ahead of *which* day? Serialize the per-day dates; ask for day-anchored sessions **only
-  when the menu is placed**. **No app build needed.**
-- **S2 — the dish picker; `sourceDish` becomes human-settable for the first time.** It is write-only from the
-  LLM today, while every outboard text return drops it by design (ADR-0040 D3), so links only decay. A picker
-  defaulting to a `serves` → menu-item match, **suggestion visibly marked as a suggestion**, nothing written
-  until save.
-- **Sequence S1 → S2** (S1 changes the shape of `serves`), one dispatch. **Do not auto-relink without a human
-  gate** and **do not add a date to `PrepPlanStepRecord`** (ADR-0034 D1) — exact match succeeds on
-  `Korean Bavette` and fails on `…Salad (Korean)`, so half the chips would silently return.
 
 **[`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) — one optional follow-on.
 Small, unhurried, no decisions outstanding.** Move `WorkbenchCompareAlignmentModel` and
@@ -235,18 +223,10 @@ selection (per-bubble `UITextView` caps the payload).
 
 Not work, a checklist.
 
-**⚠️ [PR #261](https://github.com/jonphillips/yes-chef/pull/261) — ADR-0048 S3 `recipeServeWith`. Draft, and
-the only open item with schema. Must NOT merge on a green build.** Two-device pass: migrated rows converge
-**without duplicates**; add/edit/delete/reorder and model regeneration on iPad *and* iPhone; a malformed legacy
-blob shows the repair banner then syncs its repaired rows without duplicates. It also adds to the prod-schema
-promotion list in the same PR. **New reason the determinism rule is load-bearing:** #261 extended the ADR-0030
-N−1 restore test, so a pre-S3 backup gets forward-migrated on the restore candidate and then re-pushed whole
-(ADR-0030 Amendment 2) — non-deterministic rows would diverge through *restore*, not just across devices.
-
-**[PR #262](https://github.com/jonphillips/yes-chef/pull/262) — prep plan dish links and dates. Draft, no
-schema.** Slice 1: on a **placed** menu, confirm prep sessions come back day-anchored. Slice 2: on iPhone
-compact width, confirm an inert chip relinks in two taps, a hand-authored step can be linked, *No dish* clears
-and persists, and a compound `serves` proposes no dish.
+**[PR #262](https://github.com/jonphillips/yes-chef/pull/262) — prep plan dish links and dates. Merging, no
+schema.** Slice 1 (day-anchored sessions on a placed menu) is **device-confirmed 2026-07-30**. **Slice 2 pass
+still owed:** on iPhone compact width, confirm an inert chip relinks in two taps, a hand-authored step can be
+linked, *No dish* clears and persists, and a compound `serves` proposes no dish.
 
 **[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) S2** — the export →
 restore → re-enable-sync round-trip **passed on two simulators 2026-07-29** (isolated test container), which

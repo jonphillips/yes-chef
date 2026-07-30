@@ -9,6 +9,56 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## Prep-plan Slices 1–2 — the menu's dates reach the model; `sourceDish` becomes human-settable
+
+**Device-confirmed 2026-07-30 (day-anchored labels); PR [#262](https://github.com/jonphillips/yes-chef/pull/262),
+branch `codex/prep-plan-dish-links-and-dates`.** Spec:
+[`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) §§ Slice 1–2.
+*(Finalize this entry's verification record on merge.)* **No schema** — both slices use fields that already
+exist and already sync.
+
+**Slice 1 (Core only).** `MenuChatContext` now carries the placement start date and serializes concrete per-day
+dates; the prompt asks for **day-anchored** session labels only when the menu is placed, and keeps the
+relative-horizon wording when it is not. Confirmed on the placed NJ-Avalon menu: bands came back as
+"Previous Saturday afternoon" / "Previous Sunday" instead of the ambiguous "One day ahead / Two days ahead"
+that motivated the effort ([ADR-0034](decisions/ADR-0034-prep-plan-work-session-timeline.md) D2). No app build
+needed for this half.
+
+**Slice 2.** `sourceDish` is human-settable for the first time — `PrepPlanStepRepository.update` gained a
+`sourceDish` parameter, the editor sheet gained a Dish picker with an explicit "No dish", and a Core matcher
+proposes one default from the `serves` string (exact, then trailing-parenthetical-normalized; ambiguous and
+compound `serves` → no suggestion). **The matcher only proposes — nothing writes until the human saves**, which
+keeps it on the right side of ADR-0040 D3. ADR-0040 amended: the corollary's accepted cost ("text imports drop
+the chip") is now **recoverable by hand**.
+
+**One thing the device pass surfaced → spun out as Slice 3.** Regenerating a plan flags ~every existing step
+under "Review omitted steps before saving": the omission diff keys on exact `session`+`task`+`serves`, and a
+regenerate rewrites the labels (Slice 1's purpose) *and* rephrases the tasks, so 100% read as "missing." The
+guard is ADR-0040 lossless-or-loud answering the wrong question — it is for an incremental *refine*, not an
+intended wholesale *regenerate*. Fix is scoped as Slice 3 (refine-vs-regenerate intent; local `aiHandoffs`
+column for the outboard round-trip only); it is the live Next Up target and does **not** reopen this PR.
+
+## Playbook edit grain Dispatch 2 (S3) — Serve With is synced rows, not a blob
+
+**✅ Merged 2026-07-30, device pass owed to Jon.** PR [#261](https://github.com/jonphillips/yes-chef/pull/261),
+branch `codex/playbook-serve-with-rows`, merge `f1517f7`. Spec:
+[`efforts/playbook-edit-grain-2026-07-26.md`](efforts/playbook-edit-grain-2026-07-26.md) § Slice S3;
+[ADR-0048](decisions/ADR-0048-playbook-edit-grain.md). **This closes the playbook-edit-grain effort — all three
+dispatches (S0/S0.1, S1, S3) are done.** Verified in-PR: `scripts/check-drift.sh` green, `swift test` **518
+tests / 97 suites**, elevated `generic/platform=iOS` build green.
+
+**What it does.** Adds the synced `recipeServeWith` table with a provenance enum (model-suggested vs
+hand-authored — its *own* enum, deliberately not `LearningProvenance`, which records transport) and sparse
+ordering. Legacy blob data is migrated **deterministically** — reusing each `ServeWithItem.id` as the row id,
+ranks from array index × stride, dates from the recipe's `dateModified` — so a brand-new synced table does not
+have each device upload its own copy ([[migration-writes-bypass-sync-triggers]]). Playbook, chat, handoff
+review, and regeneration all route through row-grain storage; **regeneration upserts by identity and preserves
+hand-authored rows and their ranks** (the primary test — delete-and-reinsert would reproduce the identity loss
+the slice removes). A malformed legacy blob is preserved, reported with its recipe id, and yields no rows,
+surfacing an inline repair affordance rather than aborting migration. `Recipe.serveWith` is left readable one
+release, not dropped. **Schema: `recipeServeWith` IS synced** — registered in `CloudSync` and added to the
+prod-schema promotion list in this same PR.
+
 ## Archived Recipes crash — an empty-state branch *inside* a List, in eight places
 
 **✅ Device-verified by Jon 2026-07-29** — deleting the single archived recipe now shows the empty state with no crash. Found the same day by accident: Jon needed a genuine hard delete to set up the ADR-0030 OQ1 measurement, opened Settings → Archived Recipes for the first time ever, and the app died on **both** attempts. **No schema, view layer only.** Verified: package suite **518 tests / 97 suites**, elevated `generic/platform=iOS` build `** BUILD SUCCEEDED **` with no new warnings in the seven changed files — and, decisively, **the tap**, because neither automated check can observe a UIKit batch update.

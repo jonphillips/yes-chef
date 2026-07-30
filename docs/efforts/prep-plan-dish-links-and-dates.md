@@ -1,8 +1,10 @@
 # Effort — the prep plan knows things the model doesn't
 
-**Status:** scoped 2026-07-26 from the PR [#237](https://github.com/jonphillips/yes-chef/pull/237) architect
-review and Jon's device pass. Dispatch-ready. **No schema** — both slices use fields that already exist and
-already sync.
+**Status:** Slices 1–2 scoped 2026-07-26 from the PR [#237](https://github.com/jonphillips/yes-chef/pull/237)
+architect review and Jon's device pass; **shipped in PR [#262](https://github.com/jonphillips/yes-chef/pull/262)**
+(day-anchored labels device-confirmed). **Slice 3 scoped 2026-07-30** from the #262 device pass — dispatch-ready,
+its own PR. Slices 1–2 have **no schema**; Slice 3 adds **one column to a local-only table** (no sync, no
+prod-promotion entry — see the slice).
 
 **Owner:** Codex (implement) · Claude (architect/review) · Jon (product/device pass).
 
@@ -122,6 +124,81 @@ pass on iPhone — the editor sheet is a compact-width surface.
 
 ---
 
+## SLICE 3 — the omission guard is for accidental drops, not for a regenerate
+
+**Scoped 2026-07-30 from the #262 device pass.** Slice 1 works: on the placed NJ-Avalon menu the bands came
+back day-anchored ("Previous Saturday afternoon", "Previous Sunday"). But regenerating the plan lit up the
+"Review omitted steps before saving" banner on **nearly every existing step**.
+
+**The finding.** [`omittedCurrentPrepStepEvidence`](../../YesChefPackage/Sources/YesChefCore/AIHandoff.swift)
+diffs the current plan against the returned plan on **exact visible content** — `PrepPlanStepVisibleContent` =
+`session` + `task` + `serves`. A *refinement* that keeps most steps produces a short, meaningful list ("you
+dropped the broccoli step"). A *regenerate* rewrites the `session` labels — which is Slice 1's whole purpose —
+**and** rephrases the `task` prose, so 100% of prior steps read as "missing." The guard is doing exactly what
+it was built for (ADR-0040 lossless-or-loud: never silently drop a step), but it is answering the wrong
+question. Its question — *"did the model silently drop work I meant to keep?"* — only makes sense against an
+edit that was meant to be **incremental**. A regenerate is intended **wholesale replacement**. Slice 1
+therefore *guarantees* this banner fires on the first post-Slice-1 regenerate of any pre-Slice-1 plan.
+
+**The reframe.** The variable is **refine vs regenerate intent**, not the transport (onboard button vs outboard
+paste). Both today funnel through the same [`AIHandoffReviewStager.menuReview`](../../YesChefPackage/Sources/YesChefCore/AIHandoffIntentImport.swift),
+so the outboard "Paste Prep" path would blow up identically. Fix the *intent*, in one place, for both
+transports:
+
+- **Refine** → baseline = the current plan; the omission guard fires loud. Unchanged. This is the
+  accidental-drop protection ADR-0040 exists for.
+- **Regenerate** → baseline = **empty**; no omission list and no dropped-link list, because nothing was meant
+  to be preserved. Surface a single light confirmation instead ("This replaces your 24-step prep plan"). The
+  loss is **declared**, not silent — still on the right side of ADR-0040.
+
+**Core.**
+
+1. **An intent value (`.refine` / `.regenerate`) drives the advisory diff.** On `.regenerate`, both
+   `omittedCurrentPrepStepEvidence` *and* `droppedSourceDishEvidence` run against an empty baseline (→ empty),
+   so `advisoryNotes` is empty and the review presents as a clean replacement. On `.refine`, behavior is
+   byte-for-byte what it is today. Thread the intent into `menuReview` — do **not** infer it from how many
+   steps happen to match, which is the exact fragile heuristic that produced the false positives.
+2. **Persist intent on the `AIHandoff` row for the outboard round-trip only.** The intent must survive the
+   copy→paste gap, and the persistent handle is the `aiHandoffs` row (`status == .awaitingReturn` between copy
+   and paste). Add a column (e.g. `regenerates: Bool`, default `false` so every existing row reads as
+   `.refine`). **`aiHandoffs` is not registered in `CloudSync` — it is a local-only table**, so this is a
+   plain local migration: **no prod-schema-promotion entry, and none of the deterministic-UUID
+   sync-migration rules apply** ([[migration-writes-bypass-sync-triggers]] is about *synced* tables and does
+   not bite here). Read the column in `menuReview` and map it to the intent. Keep `aiHandoffs` local — a
+   regenerate flag is transient workflow state, not a synced record; do not add it to the sync list on
+   momentum ([[withdraw-not-defer-orphaned-schema]]).
+3. **The onboard path needs no schema at all.** Onboard staging builds a *transient* `AIHandoff`
+   (`stageOnboardReview`, [HandoffReviewCoordinator.swift](../../YesChefApp/HandoffReviewCoordinator.swift),
+   `handoffID: uuid()`, never written), so onboard intent is a plain in-memory parameter. The column exists
+   **solely** to ferry intent across the outboard paste door — say so, so it is not mistaken for the onboard
+   fix.
+
+**App.**
+
+4. **Onboard: `regeneratePrepPlan()` sets `.regenerate`;** the chat "Apply…" / Finalize path stays `.refine`.
+   This alone fixes the banner Jon hit — and needs no migration.
+5. **Outboard: a new "Handoff to Regenerate" action** in the prep-plan `…` menu, beside the existing
+   ["Handoff Prep"](../../YesChefApp/MenuViews.swift) (which stays `.refine`). It stamps `.regenerate` on the
+   persisted handoff row at copy time; "Paste Prep" then reads it and reframes instead of flooding omissions.
+   Keep the two actions visibly distinct — "Handoff Prep" refines the plan you have, "Handoff to Regenerate"
+   asks for a fresh one.
+6. **Reframe the review header for regenerate.** With `advisoryNotes` empty, `prepPlanEvidenceTitle` already
+   falls through to no error banner — but add a positive, non-alarming "replaces your N-step plan"
+   confirmation so a full replacement is never a surprise. Do **not** reuse the "Review omitted steps"
+   language.
+
+**Tests (Core):** `.regenerate` → `omittedCurrentPrepStepEvidence` and `droppedSourceDishEvidence` both return
+`[]` even when zero steps match; `.refine` → the existing evidence tests are unchanged; intent round-trips on
+the `aiHandoffs` row through stage; the migration adds the column and existing rows read as `.refine`.
+
+**Verification:** package build + those tests + `scripts/check-drift.sh`, then the **generic app build**
+(App-layer: the new menu action and the review reframe). **This is a local migration, so it does *not* need a
+two-device sync pass** — Jon's device look confirms three things: (a) onboard regenerate no longer floods
+omissions, (b) outboard "Handoff to Regenerate" → paste returns a clean replacement, (c) a genuine refine
+still surfaces a real dropped step. No prod-promotion entry.
+
+---
+
 ## Sequencing
 
 **Slice 1 first, then Slice 2**, though they are independent and can ship in one dispatch. Two reasons: Slice 1
@@ -129,6 +206,11 @@ is Core-only and its result is visible to the cook immediately, and it **changes
 placed menu should start producing "Saturday's Korean Bavette" — so Slice 2's matcher wants writing against
 the post-dates output rather than being retrofitted to it. If they do ship together, write the matcher tests
 to cover both shapes.
+
+**Slice 3 ships after Slices 1–2 (PR #262) merge, in its own PR.** It is independent of the S1/S2 *data* but
+only *reachable* because Slice 1 makes a regenerate rewrite every label. Keep it out of #262: those slices are
+already device-passed and green, and Slice 3 brings a new outboard action, a review reframe, and a local
+migration that each want their own focused pass rather than reopening tested work.
 
 ## Explicitly out of scope
 
@@ -140,6 +222,12 @@ to cover both shapes.
 - **A date on `PrepPlanStepRecord`.** ADR-0034 D1; see also PR #237's round 1, where scoping the *ask* rather
   than the *storage* was the fix.
 - **Changing the outboard wire format to carry ids.** Closed by ADR-0042 Amd 1.
+- **(Slice 3) Fuzzy / similarity matching of reworded steps in the refine diff.** It fights ADR-0040's
+  exact-match-or-loud rule, and on a regenerate — where the prose genuinely changed — it would not help
+  anyway. The fix is intent, not a smarter diff.
+- **(Slice 3) Any change to Slice 1's storage or grouping.** The one-plan-per-menu, banded-by-session shape
+  (ADR-0034 D1) is untouched; Slice 3 only changes which *baseline* the advisory diff compares against.
+- **(Slice 3) Making `aiHandoffs` synced.** It stays local; the regenerate flag is transient workflow state.
 
 ## Handoff note
 
@@ -147,3 +235,8 @@ Slice 2 makes `sourceDish` human-settable for the first time. Worth a one-line a
 [ADR-0040](../decisions/ADR-0040-editable-at-the-grain-it-is-stored.md) recording that the corollary's accepted
 cost ("text imports intentionally drop the chip") is now **recoverable by hand** rather than permanent — the
 decision is unchanged, its consequence is softened.
+
+Slice 3 does not touch a synced table, so it adds nothing to the prod-schema promotion list. It is worth a
+one-line note in ADR-0040 (or wherever the omission guard is recorded) that lossless-or-loud is scoped to
+**refinements**: a user-declared **regenerate** is intended wholesale replacement, so suppressing the omission
+list there is not a silence the rule forbids.
