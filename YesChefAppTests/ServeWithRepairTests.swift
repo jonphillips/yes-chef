@@ -68,70 +68,10 @@ struct ServeWithRepairTests {
     expectNoDifference(nonUTF8Presentation.initialText, nonUTF8Data.base64EncodedString())
   }
 
-  @Test
-  func workbenchPresentsCandidateRepairAndLeavesDestinationUntouchedForAnAbsentRecipe() async throws {
-    let workbenchID = UUID(uuidString: "00000000-0000-0000-0000-000000005811")!
-    let candidateID = UUID(uuidString: "00000000-0000-0000-0000-000000005812")!
-    let candidateRecipeID = UUID(uuidString: "00000000-0000-0000-0000-000000005813")!
-    let absentRecipeID = UUID(uuidString: "00000000-0000-0000-0000-000000005814")!
-    let now = Date(timeIntervalSinceReferenceDate: 840_300_000)
-
-    try await withDependencies {
-      try $0.bootstrapDatabase()
-    } operation: {
-      @Dependency(\.defaultDatabase) var database
-      try await database.write { db in
-        try Recipe.insert {
-          Recipe(
-            id: candidateRecipeID,
-            title: "Candidate Soup",
-            dateCreated: now,
-            dateModified: now,
-            serveWith: Data("not a list".utf8)
-          )
-        }
-        .execute(db)
-        try Workbench.insert {
-          Workbench(
-            id: workbenchID,
-            title: "Soup Trials",
-            sortOrder: 0,
-            dateCreated: now,
-            dateModified: now
-          )
-        }
-        .execute(db)
-        try WorkbenchCandidate.insert {
-          WorkbenchCandidate(
-            id: candidateID,
-            workbenchID: workbenchID,
-            recipeID: candidateRecipeID,
-            recipeTitleSnapshot: "Candidate Soup",
-            sortOrder: 0,
-            dateCreated: now
-          )
-        }
-        .execute(db)
-      }
-
-      let model = WorkbenchDetailModel(workbenchID: workbenchID)
-      try await model.$detail.load()
-
-      #expect(model.presentServeWithRepair(for: .malformedData(recipeID: candidateRecipeID)))
-      guard case let .repairServeWith(presentation)? = model.destination else {
-        Issue.record("Expected candidate repair presentation.")
-        return
-      }
-      expectNoDifference(presentation.recipeID, candidateRecipeID)
-
-      model.destination = .addCandidates
-      #expect(model.presentServeWithRepair(for: .malformedData(recipeID: absentRecipeID)) == false)
-      guard case .addCandidates? = model.destination else {
-        Issue.record("An absent recipe should leave the existing destination intact.")
-        return
-      }
-    }
-  }
+  // NOTE: The Workbench ServeWith-repair surface (`WorkbenchDetailModel.presentServeWithRepair`
+  // and the `.repairServeWith` destination case) was intentionally removed in b2cf8a1 "Harden
+  // Serve With migration repair" — repair is now a recipe-detail concern surfaced via
+  // `serveWithRepairError` on load (ADR-0048 amendment). Its test was dropped with it.
 
   @Test
   func recipeDetailPresentsOwnRepairAndLeavesDestinationUntouchedForAnotherRecipe() async throws {
