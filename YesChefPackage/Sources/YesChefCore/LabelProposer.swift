@@ -178,11 +178,18 @@ extension LabelProposer: DependencyKey {
 
     let orderedCategories = CategoryRepository.sortedCategories(categories)
     let categoriesByID = Dictionary(uniqueKeysWithValues: orderedCategories.map { ($0.id, $0) })
-    let existingPaths = Set(orderedCategories.map {
-      normalizedPath(CategoryHierarchy.displayName(for: $0, categoriesByID: categoriesByID))
-    })
+    // Map each existing path to the canonical stored components so accepted suggestions carry the
+    // tree's exact spelling. The reconciler (`findOrCreateCategory`) matches diacritic-sensitively,
+    // so returning `["Cuisine", "Cafe"]` when the tree stores `["Cuisine", "Café"]` would make Save
+    // create a duplicate child. Canonicalizing here keeps the proposer's diacritic-insensitive
+    // matching from diverging from the writer.
+    let canonicalComponentsByNormalizedPath: [String: [String]] = orderedCategories.reduce(into: [:]) { result, category in
+      let components = CategoryHierarchy.pathComponents(for: category, categoriesByID: categoriesByID)
+      result[normalizedPath(components.joined(separator: " > "))] = components
+    }
+    let existingPaths = Set(canonicalComponentsByNormalizedPath.keys)
 
-    let suggestions = try response.suggestions.map { raw in
+    let suggestions = try response.suggestions.map { raw -> SuggestedLabel in
       let path = raw.path.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
       guard !path.isEmpty, path.allSatisfy({ !$0.isEmpty }) else {
         throw LabelProposerError.invalidSuggestion("a category path was empty")
@@ -194,20 +201,23 @@ extension LabelProposer: DependencyKey {
 
       switch raw.kind {
       case .existingCategory:
-        guard existingPaths.contains(normalized) else {
+        guard let canonical = canonicalComponentsByNormalizedPath[normalized] else {
           throw LabelProposerError.invalidSuggestion("\(path.joined(separator: " > ")) is not in the existing tree")
         }
+        return SuggestedLabel(kind: .existingCategory, path: canonical)
       case .newChild:
         guard path.count > 1 else {
           throw LabelProposerError.invalidSuggestion("a new child did not name its existing parent")
         }
         let parentPath = normalizedPath(path.dropLast().joined(separator: " > "))
-        guard existingPaths.contains(parentPath) else {
+        guard let canonicalParent = canonicalComponentsByNormalizedPath[parentPath] else {
           throw LabelProposerError.invalidSuggestion("\(path.dropLast().joined(separator: " > ")) is not an existing parent")
         }
         guard !existingPaths.contains(normalized) else {
           throw LabelProposerError.invalidSuggestion("\(path.joined(separator: " > ")) already exists")
         }
+        // Canonicalize the existing-parent prefix; keep the model's new child name verbatim.
+        return SuggestedLabel(kind: .newChild, path: canonicalParent + [path[path.count - 1]])
       case .loose, .namespace:
         guard path.count == 1 else {
           throw LabelProposerError.invalidSuggestion("\(raw.kind.rawValue) must be a single root name")
@@ -215,8 +225,8 @@ extension LabelProposer: DependencyKey {
         guard !existingPaths.contains(normalized) else {
           throw LabelProposerError.invalidSuggestion("\(path[0]) is already in the existing tree")
         }
+        return SuggestedLabel(kind: raw.kind, path: path)
       }
-      return SuggestedLabel(kind: raw.kind, path: path)
     }
 
     guard Set(suggestions.map(\.id)).count == suggestions.count else {

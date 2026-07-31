@@ -66,6 +66,60 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func canonicalizesAccentedExistingPathSoReconcileFindsItWithoutDuplicating() throws {
+      @Dependency(\.defaultDatabase) var database
+      let cuisineID = SampleUUIDSequence.uuid(70_201)
+      let cafeID = SampleUUIDSequence.uuid(70_202)
+      let categories = [
+        Category(id: cuisineID, name: "Cuisine", sortOrder: 0, dateCreated: .distantPast),
+        Category(id: cafeID, name: "Café", parentCategoryID: cuisineID, sortOrder: 0, dateCreated: .distantPast),
+      ]
+
+      // The model echoes the path without the diacritic; the proposer must hand back the tree's
+      // stored spelling so the diacritic-sensitive reconciler reuses `Café` instead of creating `Cafe`.
+      let suggestions = try LabelProposer.parse(
+        #"{"suggestions":[{"kind":"existingCategory","path":["Cuisine","Cafe"]}]}"#,
+        categories: categories
+      )
+      expectNoDifference(suggestions, [SuggestedLabel(kind: .existingCategory, path: ["Cuisine", "Café"])])
+
+      let now = Date(timeIntervalSinceReferenceDate: 802_360_000)
+      var uuids = SampleUUIDSequence(start: 70_210)
+      try database.write { db in
+        try Category.insert { categories[0] }.execute(db)
+        try Category.insert { categories[1] }.execute(db)
+
+        let recipeID = try RecipeRepository.save(
+          draft: RecipeEditorDraft(title: "Espresso Tart", categoryNames: suggestions[0].categoryName),
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+
+        let recipeCategory = try #require(
+          (try RecipeCategory.fetchAll(db)).first { $0.recipeID == recipeID }
+        )
+        #expect(recipeCategory.categoryID == cafeID)
+        let cafeChildren = try Category.fetchAll(db).filter { $0.parentCategoryID == cuisineID }
+        #expect(cafeChildren.map(\.id) == [cafeID])
+      }
+    }
+
+    @Test
+    func canonicalizesExistingParentOfANewChild() throws {
+      let cafeID = SampleUUIDSequence.uuid(70_301)
+      let categories = [
+        Category(id: cafeID, name: "Café", sortOrder: 0, dateCreated: .distantPast),
+      ]
+
+      let suggestions = try LabelProposer.parse(
+        #"{"suggestions":[{"kind":"newChild","path":["Cafe","Espresso"]}]}"#,
+        categories: categories
+      )
+      expectNoDifference(suggestions, [SuggestedLabel(kind: .newChild, path: ["Café", "Espresso"])])
+    }
+
+    @Test
     func rejectsConflictingKindsAtTheSameCategoryDestination() {
       #expect(throws: LabelProposerError.invalidSuggestion("the response repeated a category destination")) {
         try LabelProposer.parse(

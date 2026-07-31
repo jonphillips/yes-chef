@@ -555,7 +555,12 @@ private struct SuggestedCategoryChip: View {
     }
     .buttonStyle(.plain)
     .tint(isAccepted ? .green : .accentColor)
-    .accessibilityHint("Adds this category when you save the recipe")
+    .accessibilityAddTraits(isAccepted ? .isSelected : [])
+    .accessibilityHint(
+      isAccepted
+        ? "Removes this category so it is not added when you save the recipe"
+        : "Adds this category when you save the recipe"
+    )
   }
 }
 
