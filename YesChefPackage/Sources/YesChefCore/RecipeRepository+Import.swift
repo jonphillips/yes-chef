@@ -283,7 +283,8 @@ extension RecipeRepository {
     let recipeEquipment = try RecipeEquipment.fetchAll(db)
       .filter { existingRecipeIDs.contains($0.recipeID) }
     let categoryIDs = Set(recipeCategories.map(\.categoryID))
-    let linkedCategories = try Category.fetchAll(db).filter { categoryIDs.contains($0.id) }
+    let linkedCategories = try CategoryRepository.effectiveCategorySet(in: db).categories
+      .filter { categoryIDs.contains($0.id) }
 
     for recipeID in existingRecipeIDs {
       try Recipe.find(recipeID).delete().execute(db)
@@ -454,9 +455,10 @@ extension RecipeRepository {
     }
 
     try reconcileCategories(
-      Array(Set(bundle.categoryNames + bundle.tagNames)).sorted {
+      Array(Set(bundle.categoryNames)).sorted {
         $0.localizedStandardCompare($1) == .orderedAscending
       },
+      looseNames: bundle.tagNames,
       recipeID: recipe.id,
       in: db,
       now: now,

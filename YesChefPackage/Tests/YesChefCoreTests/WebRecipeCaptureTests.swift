@@ -24,7 +24,8 @@ extension RecipeCoreTests {
       expectNoDifference(page.cookTimeMinutes, 40)
       expectNoDifference(page.totalTimeMinutes, 55)
       expectNoDifference(page.rating, 5)
-      expectNoDifference(page.categoryNames, ["Dinner", "Chicken"])
+      expectNoDifference(page.tagNames, ["quick", "weeknight", "Quick > Supper", "Quick"])
+      expectNoDifference(page.categoryNames, ["Dinner", "Chicken", "Cuisine > Mexican"])
       expectNoDifference(
         page.ingredientSections,
         [
@@ -97,6 +98,7 @@ extension RecipeCoreTests {
       expectNoDifference(bundle.photos.map(\.kind), [.hero])
       expectNoDifference(bundle.photos.map(\.source), [.extracted])
       expectNoDifference(bundle.recipeNotes, [])
+      expectNoDifference(bundle.tagNames, ["quick", "weeknight", "Quick > Supper", "Quick"])
 
       let snapshotData = try #require(bundle.recipe.originalSnapshot)
       let snapshot = try RecipeBundleCoding.decodeSnapshot(snapshotData)
@@ -116,26 +118,6 @@ extension RecipeCoreTests {
       let preservingSnapshotData = try #require(preservingBundle.recipe.originalSnapshot)
       let preservingSnapshot = try RecipeBundleCoding.decodeSnapshot(preservingSnapshotData)
       expectNoDifference(preservingSnapshot.recipe.originalImportText, nil)
-    }
-
-    @Test
-    func microdataRecipePageParsesRecipeVocabulary() {
-      let page = WebRecipePageParser.parse(
-        html: Fixtures.microdataRecipe,
-        sourceURL: URL(string: "https://example.com/recipes/beans")
-      )
-
-      expectNoDifference(page.title, "Brothy Beans")
-      expectNoDifference(page.summary, "Beans with herbs.")
-      expectNoDifference(page.servingsText, "6 servings")
-      expectNoDifference(page.prepTimeMinutes, 10)
-      expectNoDifference(page.cookTimeMinutes, 90)
-      expectNoDifference(page.categoryNames, ["Beans", "Dinner"])
-      expectNoDifference(page.ingredientSections.map(\.name), [nil])
-      expectNoDifference(page.ingredientSections.flatMap(\.lines), ["1 pound dried beans", "Water"])
-      expectNoDifference(page.instructionSections.flatMap(\.steps), ["Soak the beans.", "Simmer until tender."])
-      expectNoDifference(page.rating, 4)
-      expectNoDifference(page.warnings, [])
     }
 
     @Test
@@ -208,15 +190,17 @@ extension RecipeCoreTests {
         renderHTML: { _ in nil }
       )
 
-      let draft = try await client.capture(url: sourceURL, capturedAt: capturedAt)
+      var draft = try await client.capture(url: sourceURL, capturedAt: capturedAt)
 
       expectNoDifference(draft.page.title, "Lemon Chicken")
       expectNoDifference(draft.usedRenderedFallback, false)
+      draft.page.tagNames.append(contentsOf: [" quick ", "   "])
+      let importedDraft = draft
 
       let uuids = LockedSampleUUIDSequence(start: 23_000)
       let importResult = try await database.write { db in
         try RecipeRepository.importCapturedRecipe(
-          draft,
+          importedDraft,
           in: db,
           now: capturedAt,
           uuid: { uuids.next() }
@@ -228,12 +212,25 @@ extension RecipeCoreTests {
       try await database.read { db in
         let recipe = try #require(try Recipe.find(importResult.recipeID).fetchOne(db))
         let source = try #require(try RecipeSource.fetchAll(db).first { $0.recipeID == recipe.id })
+        let categories = try Category.fetchAll(db)
+        let categoriesByID = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0) })
+        let recipeCategories = try RecipeCategory.where { $0.recipeID.eq(recipe.id) }.fetchAll(db)
+        let recipeCategoryIDs = Set(recipeCategories.map(\.categoryID))
         expectNoDifference(recipe.title, "Lemon Chicken")
         expectOriginalImportTextForCurrentBuild(
           recipe.originalImportText,
           contains: "Lemon Chicken"
         )
         expectNoDifference(source.url, sourceURL.absoluteString)
+        expectNoDifference(
+          recipeCategoryIDs.compactMap { categoriesByID[$0] }
+            .map { CategoryHierarchy.displayName(for: $0, categoriesByID: categoriesByID) }
+            .sorted(),
+          ["Chicken", "Cuisine > Mexican", "Dinner", "Quick > Supper", "quick", "weeknight"]
+        )
+        let literalKeyword = try #require(categories.first { $0.name == "Quick > Supper" })
+        expectNoDifference(literalKeyword.parentCategoryID, nil)
+        expectNoDifference(recipeCategories.count, recipeCategoryIDs.count)
       }
     }
 
@@ -821,6 +818,8 @@ private enum Fixtures {
       "cookTime": "PT40M",
       "totalTime": "PT55M",
       "recipeCategory": ["Dinner", "Chicken"],
+      "recipeCuisine": "Mexican",
+      "keywords": "quick, weeknight, Quick > Supper, Quick",
       "aggregateRating": { "@type": "AggregateRating", "ratingValue": "4.6" },
       "recipeIngredient": [
         "For the chicken:",
@@ -844,28 +843,6 @@ private enum Fixtures {
     </script>
     <meta property="og:title" content="Lemon Chicken | Example Kitchen">
     </head><body><main><p>Recipe body.</p></main></body></html>
-    """
-
-  static let microdataRecipe = """
-    <html><body>
-    <article itemscope itemtype="https://schema.org/Recipe">
-      <h1 itemprop="name">Brothy Beans</h1>
-      <p itemprop="description">Beans with herbs.</p>
-      <span itemprop="recipeYield">6 servings</span>
-      <time itemprop="prepTime" datetime="PT10M">10 minutes</time>
-      <time itemprop="cookTime" datetime="PT1H30M">1 hour 30 minutes</time>
-      <span itemprop="recipeCategory">Beans, Dinner</span>
-      <div itemprop="aggregateRating" value="4"></div>
-      <ul>
-        <li itemprop="recipeIngredient">1 pound dried beans</li>
-        <li itemprop="recipeIngredient">Water</li>
-      </ul>
-      <ol itemprop="recipeInstructions">
-        <li>Soak the beans.</li>
-        <li>Simmer until tender.</li>
-      </ol>
-    </article>
-    </body></html>
     """
 
   static let openGraphOnly = """

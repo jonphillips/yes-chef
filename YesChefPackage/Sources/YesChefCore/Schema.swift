@@ -44,11 +44,19 @@ extension DependencyValues {
       databasePath = nil
       syncMode = .disabled
     }
-    try bootstrapDatabase(path: databasePath, syncMode: syncMode)
+    try bootstrapDatabase(
+      path: databasePath,
+      syncMode: syncMode,
+      runsPostEngineDataPasses: false
+    )
   }
 
   public mutating func bootstrapDatabaseForShareExtension(path: String?) throws {
-    try bootstrapDatabase(path: path, syncMode: .configured(startImmediately: false))
+    try bootstrapDatabase(
+      path: path,
+      syncMode: .configured(startImmediately: false),
+      runsPostEngineDataPasses: false
+    )
   }
 
   public mutating func bootstrapDatabase(path: String?) throws {
@@ -58,6 +66,7 @@ extension DependencyValues {
   public mutating func bootstrapDatabase(
     path: String?,
     syncMode: YesChefCloudSync.BootstrapMode,
+    runsPostEngineDataPasses: Bool = true,
     eraseDatabaseOnSchemaChange: Bool? = nil
   ) throws {
     var configuration = Configuration()
@@ -1082,6 +1091,34 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Create synced category seed state") { db in
+      try #sql("""
+        CREATE TABLE "categorySeedStates" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "categoryID" TEXT,
+          "isDeleted" INTEGER NOT NULL DEFAULT 0,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+    }
+
+    migrator.registerMigration("Create synced category seed tombstones") { db in
+      try #sql("""
+        CREATE TABLE "categorySeedTombstones" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "dateDeleted" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+      try #sql("""
+        INSERT INTO "categorySeedTombstones" ("id", "dateDeleted")
+        SELECT "id", "dateModified" FROM "categorySeedStates"
+        WHERE "isDeleted" = 1
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)
@@ -1095,8 +1132,11 @@ extension DependencyValues {
         for: database,
         startImmediately: startImmediately
       )
-      try database.write { db in
-        try CategoryRepository.foldDormantTagsIntoCategories(in: db)
+      if runsPostEngineDataPasses {
+        try database.write { db in
+          try CategoryRepository.foldDormantTagsIntoCategories(in: db)
+          try CategoryRepository.seedStarterCategories(in: db)
+        }
       }
     }
   }

@@ -266,7 +266,7 @@ public enum RecipeRepository {
       .fetchAll(db)
       .sorted(by: areServeWithInDisplayOrder)
     let activeVariationID = try activeVariationID(recipeID: recipeID, variations: variations, in: db)
-    let allCategories = try Category.fetchAll(db)
+    let allCategories = try CategoryRepository.effectiveCategorySet(in: db).categories
     let categoriesByID = Dictionary(uniqueKeysWithValues: allCategories.map { ($0.id, $0) })
     let categories = allCategories
       .filter { category in recipeCategories.contains { $0.categoryID == category.id } }
@@ -497,7 +497,9 @@ extension RecipeRepository {
     guard let selectedCategoryIDs = draft.selectedCategoryIDs else {
       return distinctCategoryNames(draft.categoryNames.listNames + draft.tagNames.listNames)
     }
-    let categories = CategoryRepository.sortedCategories(try Category.fetchAll(db))
+    let categories = CategoryRepository.sortedCategories(
+      try CategoryRepository.effectiveCategorySet(in: db).categories
+    )
     let categoriesByID = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0) })
     return categories
       .filter { selectedCategoryIDs.contains($0.id) }
@@ -515,7 +517,8 @@ extension RecipeRepository {
       try reconcileCategoryIDs(Array(selectedCategoryIDs), recipeID: recipeID, in: db, uuid: uuid)
     } else {
       try reconcileCategories(
-        distinctCategoryNames(draft.categoryNames.listNames + draft.tagNames.listNames),
+        distinctCategoryNames(draft.categoryNames.listNames),
+        looseNames: distinctCategoryNames(draft.tagNames.listNames),
         recipeID: recipeID,
         in: db,
         now: now,

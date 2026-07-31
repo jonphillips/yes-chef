@@ -62,6 +62,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
   public var cookTimeMinutes: Int?
   public var totalTimeMinutes: Int?
   public var rating: Int?
+  public var tagNames: [String]
   public var categoryNames: [String]
   public var ingredientSections: [ParsedRecipeIngredientSection]
   public var instructionSections: [ParsedRecipeInstructionSection]
@@ -92,6 +93,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
     cookTimeMinutes: Int? = nil,
     totalTimeMinutes: Int? = nil,
     rating: Int? = nil,
+    tagNames: [String] = [],
     categoryNames: [String] = [],
     ingredientSections: [ParsedRecipeIngredientSection] = [],
     instructionSections: [ParsedRecipeInstructionSection] = [],
@@ -119,6 +121,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
     self.cookTimeMinutes = cookTimeMinutes
     self.totalTimeMinutes = totalTimeMinutes
     self.rating = rating
+    self.tagNames = tagNames
     self.categoryNames = categoryNames
     self.ingredientSections = ingredientSections
     self.instructionSections = instructionSections
@@ -146,6 +149,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
       && cookTimeMinutes == nil
       && totalTimeMinutes == nil
       && rating == nil
+      && tagNames.isEmpty
       && categoryNames.isEmpty
       && ingredientSections.allSatisfy(\.lines.isEmpty)
       && instructionSections.allSatisfy(\.steps.isEmpty)
@@ -207,7 +211,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
       instructionSections: instructionSections,
       instructionSteps: instructionSteps,
       notes: recipeNotes,
-      tagNames: [],
+      tagNames: tagNames,
       categoryNames: categoryNames,
       photos: photos
     )
@@ -221,7 +225,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
       instructionSteps: instructionSteps,
       recipeNotes: recipeNotes,
       photos: photos,
-      tagNames: [],
+      tagNames: tagNames,
       categoryNames: categoryNames
     )
   }

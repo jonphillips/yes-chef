@@ -267,6 +267,8 @@ prod/TestFlight cut. At that cut, deploy the following to the production schema:
 - Phase E Slice 3 **pantry-policy + `canonicalName`** fields
 - **`Recipe.coverPhotoID`** (reader photo affordances, PR #87)
 - **`Category.color`** (ADR-0049 S1 unified categories)
+- The synced **`categorySeedStates`** and **`categorySeedTombstones`** tables (ADR-0049 S2 starter seed state
+  and deletion tombstones)
 - The synced **`aiSettings`** table (ADR-0018, PR #96), **including** its additive `readerFeedbackPreference`
   (ADR-0025 D6) and `captureToNotePreference` (ADR-0027 S1, PR #141) columns
 - The synced **`recipeVariations`** table (ADR-0021 / recipe edit proposals S2)

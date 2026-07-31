@@ -128,6 +128,59 @@ flows to `categoryNames`. `recipeCuisine` attaches under the seeded `Cuisine` na
 labels; the publisher's own labels are high-precision and cost nothing. This ships independent of the proposer
 and is pure win regardless of how the model tiers land.
 
+### D7 — The S2 starter vocabulary is durable synced data, with monotonic deletion suppression
+
+The exact starter vocabulary is user-visible durable data, not a display-only convenience. S2 uses fixed UUIDs
+and the following canonical 20-row tree:
+
+| Namespace | Starter children |
+| --- | --- |
+| `Cuisine` | American, Chinese, French, Indian, Italian, Japanese, Korean, Mexican, Thai, Vietnamese |
+| `Course` | Breakfast, Lunch, Dinner, Appetizer, Side Dish, Dessert, Snack, Drink |
+
+The persisted model is additive: `categorySeedStates` maps each fixed seed UUID to the category row that
+currently represents it, and `categorySeedTombstones` is a presence-only, fixed-ID record for an intentionally
+deleted seed. Both tables have a loose UUID relationship rather than a foreign key: the state mapping may point
+at a user-authored category, and a deletion tombstone must outlive the category it suppresses. The migration adds
+the tombstone table and backfills one from any earlier `categorySeedStates.isDeleted` row, without modifying a
+recipe or category row. `isDeleted` and `dateModified` remain in the state schema only as compatibility fields:
+we cannot safely assume an early S2/dogfood build was never opened against a live library. Current logic never
+uses them to decide deletion; once the compatibility window can be retired in a deliberately versioned migration,
+the mapping's final shape is just `id` and `categoryID`.
+
+Seeder convergence is deliberately monotonic. It checks a tombstone before it creates or maps a seed, and never
+writes a non-deleted tombstone counterpart; therefore a later fresh/offline peer cannot clear a prior deletion by
+writing a newer `false` field. Tombstones are reconciled independently of parent resolution and deleted leaf-first,
+retaining the recipe-reference guard, so a fully deleted namespace converges even on a late peer. Category reads
+exclude tombstoned deterministic rows immediately when a CloudKit tombstone arrives; physical cleanup also runs at
+the next owned category write and every main-app bootstrap. Child seeds wait for their parent seed to resolve; an
+absent or tombstoned parent is never interpreted as a root. Installed states still run the same-name, same-parent
+total-order merge and are repointed to the survivor, so concurrent existing-category adoption and deterministic
+seeding converge. These write passes run only in the main app after CloudSync installs its triggers; the short-lived
+Share Extension constructs its stopped engine but performs no seed/fold data writes.
+
+**Logical deletion is a state constraint, not a cleanup event.** Every product reader, tree validation, and
+recipe-category assignment derives one **effective category set** from raw rows plus tombstones. The set excludes
+each tombstoned starter identity **and its current `categorySeedStates` representative**, then repeatedly excludes
+rows whose *current* parent points into that excluded set; this remains true if a parent row is physically retained
+or has already disappeared. A starter row that the user actually moved outside the deleted namespace remains
+eligible because this is based on the stored parent chain, not its original seed relationship. Physical reclamation
+uses the same resolved roots but is deliberately separate: it removes only eligible leaf rows with no recipe
+reference, and is an optimization rather than a condition for correct product behavior. The only raw-category
+access is inside the effective-set source and physical seed/reclamation/merge convergence code, which must see
+retained rows to repair or repoint them before deletion. A dormant tag with the UUID of an unavailable mapped
+representative is skipped by the fold. A distinct-ID dormant tag that previously merged by name into a tombstoned
+root starter is also skipped by that starter's canonical name, so neither fold path can recreate the logically
+deleted namespace or restore its retired recipe-tag joins.
+
+An imported publisher label only matches an effective category. If it textually reintroduces a tombstoned starter
+label, reconciliation creates a fresh user-category UUID rather than attaching a recipe to the tombstoned identity.
+That preserves incoming recipe metadata without resurrecting or making the deleted starter row eligible.
+
+The rejected simpler alternative was an `isDeleted` boolean on the same synced state row used for normal
+installation. SQLiteData resolves fields by database-edit timestamp, so a later fresh-device `false` write could
+overwrite an earlier `true` deletion. A presence-only tombstone has no non-deleted write to win that conflict.
+
 ## Resolved
 
 - **OQ1 — Name of the unified concept → "Categories."** The surfaced concept stays **Categories**; storage stays
