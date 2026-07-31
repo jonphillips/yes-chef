@@ -157,6 +157,17 @@ public struct ParsedRecipePage: Equatable, Sendable {
       && schemaTypes.isEmpty
   }
 
+  /// Capture has no persisted recipe yet, but its parsed content is enough to ask for advisory
+  /// labels. This stays separate from the page's accepted category names.
+  public var labelProposalRecipe: LabelProposalRecipe {
+    LabelProposalRecipe(
+      title: title ?? "Untitled Recipe",
+      summary: summary,
+      publisherName: publisherName,
+      ingredientLines: ingredientSections.flatMap(\.lines)
+    )
+  }
+
   public func makeRecipeBundle(
     now: Date,
     uuid: () -> UUID,

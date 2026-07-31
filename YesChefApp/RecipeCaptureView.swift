@@ -292,6 +292,39 @@ private struct RecipeCaptureReviewSections: View {
         }
       }
 
+      if model.isSuggestingLabels || model.hasLabelSuggestions || model.labelProposalError != nil {
+        Section("Suggested Categories") {
+          if model.isSuggestingLabels {
+            ProgressView("Suggesting categories")
+          }
+          if let labelProposalError = model.labelProposalError {
+            Label("Couldn’t suggest categories", systemImage: "exclamationmark.triangle")
+              .foregroundStyle(.orange)
+            Text(labelProposalError)
+              .foregroundStyle(.secondary)
+          }
+          if model.hasLabelSuggestions {
+            Text("Tap a suggestion to include it when you save this recipe.")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+            LazyVGrid(
+              columns: [GridItem(.adaptive(minimum: 132), alignment: .leading)],
+              alignment: .leading,
+              spacing: 8
+            ) {
+              ForEach(model.suggestedLabels) { suggestion in
+                SuggestedCategoryChip(
+                  suggestion: suggestion,
+                  isAccepted: model.isSuggestedLabelAccepted(suggestion)
+                ) {
+                  model.suggestedLabelTapped(suggestion)
+                }
+              }
+            }
+          }
+        }
+      }
+
       if !model.editorialBlocks.isEmpty {
         Section("Notes") {
           ForEach(model.editorialBlocks.indices, id: \.self) { index in
@@ -459,6 +492,30 @@ private struct RecipeCaptureReviewSections: View {
     let ingredientNames = page.modelExtractedIngredientSections.map { $0.name ?? "Ingredients" }
     let instructionNames = page.modelExtractedInstructionSections.map { $0.name ?? "Instructions" }
     return (ingredientNames + instructionNames).joined(separator: " • ")
+  }
+}
+
+private struct SuggestedCategoryChip: View {
+  let suggestion: SuggestedLabel
+  let isAccepted: Bool
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      Label(
+        suggestion.reviewTitle,
+        systemImage: isAccepted ? "checkmark.circle.fill" : "plus.circle"
+      )
+      .font(.subheadline)
+      .lineLimit(2)
+      .padding(.horizontal, 10)
+      .padding(.vertical, 7)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(isAccepted ? Color.green.opacity(0.16) : Color.accentColor.opacity(0.12), in: Capsule())
+    }
+    .buttonStyle(.plain)
+    .tint(isAccepted ? .green : .accentColor)
+    .accessibilityHint("Adds this category when you save the recipe")
   }
 }
 
