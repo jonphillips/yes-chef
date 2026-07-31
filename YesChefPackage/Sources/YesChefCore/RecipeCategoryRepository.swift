@@ -15,8 +15,8 @@ public struct EffectiveCategorySet: Sendable {
   public let categories: [Category]
   public let unavailableCategoryIDs: Set<Category.ID>
 
-  init(categories: [Category], tombstonedSeedIDs: Set<Category.ID>) {
-    var unavailableCategoryIDs = tombstonedSeedIDs
+  init(categories: [Category], tombstonedRootCategoryIDs: Set<Category.ID>) {
+    var unavailableCategoryIDs = tombstonedRootCategoryIDs
     var addedDescendant = true
     while addedDescendant {
       addedDescendant = false
@@ -76,12 +76,14 @@ public enum CategoryRepository {
     // Raw rows are intentional here: seeding is the physical convergence pass, which must see
     // retained tombstoned rows in order to reclaim them safely before resolving the live tree.
     var categories = try Category.fetchAll(db)
-    var seedStates = Dictionary(
-      uniqueKeysWithValues: try CategorySeedState.fetchAll(db).map { ($0.id, $0) }
-    )
+    let allSeedStates = try CategorySeedState.fetchAll(db)
+    var seedStates = Dictionary(uniqueKeysWithValues: allSeedStates.map { ($0.id, $0) })
     let tombstonedSeedIDs = Set(try CategorySeedTombstone.fetchAll(db).map(\.id))
-    try reconcileTombstonedSeedCategories(
-      tombstonedSeedIDs,
+    try reconcileTombstonedCategoryRoots(
+      tombstonedCategoryRootIDs(
+        tombstonedSeedIDs: tombstonedSeedIDs,
+        seedStates: allSeedStates
+      ),
       categories: &categories,
       in: db
     )
@@ -171,7 +173,12 @@ public enum CategoryRepository {
     // Raw rows are intentional here: this is physical reclamation, not a product read or writer.
     var categories = try Category.fetchAll(db)
     let tombstonedSeedIDs = Set(try CategorySeedTombstone.fetchAll(db).map(\.id))
-    try reconcileTombstonedSeedCategories(tombstonedSeedIDs, categories: &categories, in: db)
+    let seedStates = try CategorySeedState.fetchAll(db)
+    try reconcileTombstonedCategoryRoots(
+      tombstonedCategoryRootIDs(tombstonedSeedIDs: tombstonedSeedIDs, seedStates: seedStates),
+      categories: &categories,
+      in: db
+    )
   }
 
   /// The sole logical eligibility projection for category readers and writers. A child stays
@@ -179,9 +186,13 @@ public enum CategoryRepository {
   /// derived from the current stored parent chain, not the starter taxonomy's original shape.
   public static func effectiveCategorySet(in db: Database) throws -> EffectiveCategorySet {
     let tombstonedSeedIDs = Set(try CategorySeedTombstone.fetchAll(db).map(\.id))
+    let seedStates = try CategorySeedState.fetchAll(db)
     return EffectiveCategorySet(
       categories: try Category.fetchAll(db),
-      tombstonedSeedIDs: tombstonedSeedIDs
+      tombstonedRootCategoryIDs: tombstonedCategoryRootIDs(
+        tombstonedSeedIDs: tombstonedSeedIDs,
+        seedStates: seedStates
+      )
     )
   }
 
@@ -196,6 +207,9 @@ public enum CategoryRepository {
     var categoryIDByTagID: [Tag.ID: Category.ID] = [:]
 
     for tag in tags {
+      // A dormant tag can share the UUID of a seed's mapped representative. It is not eligible
+      // to recreate that logically deleted category while its tombstone is present.
+      guard !effectiveCategories.unavailableCategoryIDs.contains(tag.id) else { continue }
       let matchingRoots = categories
         .filter {
           $0.parentCategoryID == nil
@@ -377,8 +391,8 @@ public enum CategoryRepository {
   /// A namespace is deleted leaf-first. This pass intentionally runs before seed parent
   /// resolution: otherwise a tombstoned parent prevents its children from reaching their own
   /// tombstones, which leaves a late peer's stale namespace intact.
-  private static func reconcileTombstonedSeedCategories(
-    _ tombstonedSeedIDs: Set<Category.ID>,
+  private static func reconcileTombstonedCategoryRoots(
+    _ tombstonedCategoryRootIDs: Set<Category.ID>,
     categories: inout [Category],
     in db: Database
   ) throws {
@@ -387,7 +401,7 @@ public enum CategoryRepository {
       didDelete = false
       let eligibleLeaves = categories
         .filter { category in
-          tombstonedSeedIDs.contains(category.id)
+          tombstonedCategoryRootIDs.contains(category.id)
             && !categories.contains(where: { $0.parentCategoryID == category.id })
         }
         .sorted(by: areCategoriesInFoldOrder)
@@ -402,6 +416,19 @@ public enum CategoryRepository {
         break
       }
     }
+  }
+
+  /// A tombstone names a starter seed, while a state row can map that seed onto an older or
+  /// user-authored category UUID. Both are logical roots of deletion until the tombstone clears.
+  private static func tombstonedCategoryRootIDs(
+    tombstonedSeedIDs: Set<Category.ID>,
+    seedStates: [CategorySeedState]
+  ) -> Set<Category.ID> {
+    tombstonedSeedIDs.union(
+      seedStates
+        .filter { tombstonedSeedIDs.contains($0.id) }
+        .compactMap(\.categoryID)
+    )
   }
 
   private static func category(_ categoryID: Category.ID, in categories: [Category]) throws -> Category {

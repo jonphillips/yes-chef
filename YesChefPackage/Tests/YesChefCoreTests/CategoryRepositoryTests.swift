@@ -472,5 +472,83 @@ extension RecipeCoreTests {
         }
       }
     }
+
+    @Test
+    func tombstoneSuppressesMappedRepresentativeAndDormantTagSource() throws {
+      @Dependency(\.defaultDatabase) var database
+      let deletedAt = Date(timeIntervalSinceReferenceDate: 802_650_000)
+      let now = Date(timeIntervalSinceReferenceDate: 802_650_100)
+      let mappedCategoryID = SampleUUIDSequence.uuid(980)
+      var uuids = SampleUUIDSequence(start: 981)
+
+      try database.write { db in
+        try CategoryRepository.seedStarterCategories(in: db)
+        let seededCuisine = try #require((try Category.fetchAll(db)).first { $0.name == "Cuisine" })
+        let seedState = try #require(
+          (try CategorySeedState.fetchAll(db)).first { $0.categoryID == seededCuisine.id }
+        )
+        let mappedCategory = Category(
+          id: mappedCategoryID,
+          name: "Legacy Cuisine",
+          sortOrder: 99,
+          dateCreated: now
+        )
+        try Category.insert { mappedCategory }.execute(db)
+        var mappedState = seedState
+        mappedState.categoryID = mappedCategory.id
+        try CategorySeedState.upsert { mappedState }.execute(db)
+        try Tag.insert {
+          Tag(
+            id: mappedCategory.id,
+            name: mappedCategory.name,
+            sortOrder: mappedCategory.sortOrder,
+            dateCreated: mappedCategory.dateCreated
+          )
+        }
+        .execute(db)
+
+        let existingRecipeID = try RecipeRepository.save(
+          draft: RecipeEditorDraft(title: "Mapped Seed Recipe", selectedCategoryIDs: [mappedCategory.id]),
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let tombstone = CategorySeedTombstone(id: seedState.id, dateDeleted: deletedAt)
+        try CategorySeedTombstone.insert { tombstone }.execute(db)
+
+        // The mapped row is deliberately linked, so reclamation cannot remove it. The tombstone
+        // still makes both the seed and its current representative immediately unavailable.
+        #expect((try Category.fetchAll(db)).contains { $0.id == mappedCategory.id })
+        #expect(!(try CategoryListRequest().fetch(db)).contains { $0.id == mappedCategory.id })
+        let existingDetail = try #require(try RecipeRepository.fetchDetail(recipeID: existingRecipeID, in: db))
+        expectNoDifference(existingDetail.categories, [])
+
+        let laterRecipeID = try RecipeRepository.save(
+          draft: RecipeEditorDraft(title: "Later Mapped Seed Recipe", selectedCategoryIDs: [mappedCategory.id]),
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        #expect(!(try RecipeCategory.fetchAll(db)).contains { $0.recipeID == laterRecipeID })
+
+        try CategoryRepository.foldDormantTagsIntoCategories(in: db)
+        try CategoryRepository.seedStarterCategories(in: db)
+        #expect((try Category.fetchAll(db)).filter { $0.id == mappedCategory.id }.count == 1)
+        #expect(!(try CategoryListRequest().fetch(db)).contains { $0.id == mappedCategory.id })
+
+        for recipeCategory in try RecipeCategory.fetchAll(db) where [existingRecipeID, laterRecipeID]
+          .contains(recipeCategory.recipeID) {
+          try RecipeCategory.find(recipeCategory.id).delete().execute(db)
+        }
+        try Recipe.find(existingRecipeID).delete().execute(db)
+        try Recipe.find(laterRecipeID).delete().execute(db)
+        try Tag.find(mappedCategory.id).delete().execute(db)
+        try CategorySeedTombstone.find(tombstone.id).delete().execute(db)
+        mappedState.categoryID = seededCuisine.id
+        try CategorySeedState.upsert { mappedState }.execute(db)
+        try Category.find(mappedCategory.id).delete().execute(db)
+        try CategoryRepository.seedStarterCategories(in: db)
+      }
+    }
   }
 }

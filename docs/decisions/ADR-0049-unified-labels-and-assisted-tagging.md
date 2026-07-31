@@ -161,13 +161,15 @@ Share Extension constructs its stopped engine but performs no seed/fold data wri
 
 **Logical deletion is a state constraint, not a cleanup event.** Every product reader, tree validation, and
 recipe-category assignment derives one **effective category set** from raw rows plus tombstones. The set excludes
-each tombstoned starter identity and repeatedly excludes rows whose *current* parent points into that excluded set;
-this remains true if a parent row is physically retained or has already disappeared. A starter row that the user
-actually moved outside the deleted namespace remains eligible because this is based on the stored parent chain, not
-its original seed relationship. Physical reclamation is deliberately separate: it removes only eligible leaf rows
-with no recipe reference, and is an optimization rather than a condition for correct product behavior. The only
-raw-category access is inside physical seed/reclamation/merge convergence code, which must see retained rows to
-repair or repoint them before deletion.
+each tombstoned starter identity **and its current `categorySeedStates` representative**, then repeatedly excludes
+rows whose *current* parent points into that excluded set; this remains true if a parent row is physically retained
+or has already disappeared. A starter row that the user actually moved outside the deleted namespace remains
+eligible because this is based on the stored parent chain, not its original seed relationship. Physical reclamation
+uses the same resolved roots but is deliberately separate: it removes only eligible leaf rows with no recipe
+reference, and is an optimization rather than a condition for correct product behavior. The only raw-category
+access is inside the effective-set source and physical seed/reclamation/merge convergence code, which must see
+retained rows to repair or repoint them before deletion. A dormant tag with the UUID of an unavailable mapped
+representative is skipped by the fold; it cannot recreate the logically deleted row.
 
 An imported publisher label only matches an effective category. If it textually reintroduces a tombstoned starter
 label, reconciliation creates a fresh user-category UUID rather than attaching a recipe to the tombstoned identity.
