@@ -145,7 +145,7 @@ public enum CategoryHierarchy {
     }
   }
 
-  private static func pathComponents(
+  public static func pathComponents(
     for category: Category,
     categoriesByID: [Category.ID: Category]
   ) -> [String] {

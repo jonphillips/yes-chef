@@ -380,14 +380,21 @@ struct RecipeImportCommitResult {
 @Observable
 @MainActor
 final class RecipeCaptureModel {
+  @CasePathable
+  enum Destination {
+    case confirmNamespace(SuggestedLabel)
+  }
+
   @ObservationIgnored
   @Dependency(\.date.now) private var now
   @ObservationIgnored
-  @Dependency(\.defaultDatabase) private var database
+  @Dependency(\.defaultDatabase) var database
   @ObservationIgnored
   @Dependency(\.uuid) private var uuid
   @ObservationIgnored
   @Dependency(\.webRecipeCaptureClient) private var captureClient
+  @ObservationIgnored
+  @Dependency(\.labelProposer) var labelProposer
 
   var urlText = ""
   var draft: WebRecipeCaptureDraft?
@@ -399,6 +406,12 @@ final class RecipeCaptureModel {
   var isExtracting = false
   var isCommitting = false
   var modelExtractionError: String?
+  var labelProposalError: String?
+  var suggestedLabels: [SuggestedLabel] = []
+  var acceptedSuggestedLabelIDs: Set<SuggestedLabel.ID> = []
+  var isSuggestingLabels = false
+  var labelSuggestionGeneration = 0
+  var destination: Destination?
   var readerFeedbackProposals: [ReaderFeedbackTip] = []
   var readerFeedbackComments: [RawComment] = []
   var readerFeedbackHandoffEvidence: [String] = []
@@ -413,6 +426,10 @@ final class RecipeCaptureModel {
 
   var hasUnsavedReviewChanges: Bool {
     draft != nil
+  }
+
+  var hasLabelSuggestions: Bool {
+    !suggestedLabels.isEmpty
   }
 
   var editorialBlocks: [ParsedRecipeEditorialBlock] {
@@ -459,6 +476,12 @@ final class RecipeCaptureModel {
     isExtracting = false
     isCommitting = false
     modelExtractionError = nil
+    labelProposalError = nil
+    suggestedLabels = []
+    acceptedSuggestedLabelIDs = []
+    isSuggestingLabels = false
+    labelSuggestionGeneration += 1
+    destination = nil
     readerFeedbackProposals = []
     readerFeedbackComments = []
     readerFeedbackHandoffEvidence = []
@@ -490,7 +513,9 @@ final class RecipeCaptureModel {
     do {
       let capturedDraft = try await captureClient.capture(url: url, capturedAt: now)
       let escalatedDraft = await escalating(capturedDraft)
-      draft = await captureClient.hydrateHeroImage(in: escalatedDraft)
+      let hydratedDraft = await captureClient.hydrateHeroImage(in: escalatedDraft)
+      draft = hydratedDraft
+      suggestLabelsAfterCapture(for: hydratedDraft)
     } catch is CancellationError {
     } catch {
       showError(String(describing: error))
@@ -511,7 +536,9 @@ final class RecipeCaptureModel {
       }
       return .notFound(message: "No recipe found on this page - sign in or open the recipe, then try again.")
     }
-    draft = await captureClient.hydrateHeroImage(in: escalatedDraft)
+    let hydratedDraft = await captureClient.hydrateHeroImage(in: escalatedDraft)
+    draft = hydratedDraft
+    suggestLabelsAfterCapture(for: hydratedDraft)
     return .extracted
   }
 
@@ -522,7 +549,9 @@ final class RecipeCaptureModel {
     do {
       modelExtractionError = nil
       let reextractedDraft = try await captureClient.reextract(draft: draft)
-      self.draft = await captureClient.hydrateHeroImage(in: reextractedDraft)
+      let hydratedDraft = await captureClient.hydrateHeroImage(in: reextractedDraft)
+      self.draft = hydratedDraft
+      suggestLabelsAfterCapture(for: hydratedDraft)
     } catch is CancellationError {
     } catch {
       modelExtractionError = RecipeChatErrorText.describe(error)
@@ -623,33 +652,6 @@ final class RecipeCaptureModel {
   private func showError(_ message: String) {
     errorMessage = message
     isShowingError = true
-  }
-}
-
-struct WebRecipeCaptureSummary: Identifiable, Equatable, Sendable {
-  let id = UUID()
-  var title: String
-  var outcome: RecipeImportOutcome
-  var warningCount: Int
-
-  init(result: RecipeImportBundleResult) {
-    self.title = result.title
-    self.outcome = result.outcome
-    self.warningCount = result.warnings.count
-  }
-
-  var message: String {
-    var lines: [String]
-    switch outcome {
-    case .imported:
-      lines = ["Saved \(title)."]
-    case .alreadyImported:
-      lines = ["Skipped \(title) because it is already in your library."]
-    }
-    if warningCount > 0 {
-      lines.append("\(warningCount) identity \(warningCount == 1 ? "warning" : "warnings").")
-    }
-    return lines.joined(separator: "\n")
   }
 }
 

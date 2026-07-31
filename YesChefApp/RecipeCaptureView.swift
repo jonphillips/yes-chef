@@ -138,6 +138,26 @@ struct RecipeCaptureView: View {
       Text("Your review edits have not been saved.")
     }
     .interactiveDismissDisabled(model.hasUnsavedReviewChanges)
+    .confirmationDialog(
+      model.namespaceConfirmationTitle,
+      isPresented: Binding(
+        get: { model.pendingNamespaceSuggestion != nil },
+        set: { isPresented in
+          if !isPresented {
+            model.cancelNamespaceConfirmation()
+          }
+        }
+      )
+    ) {
+      Button("Add Category Group") {
+        model.confirmNamespaceSuggestion()
+      }
+      Button("Cancel", role: .cancel) {
+        model.cancelNamespaceConfirmation()
+      }
+    } message: {
+      Text("A category group is a durable new labeling dimension. You can add children beneath it after saving.")
+    }
     .fullScreenCover(isPresented: $model.isPresentingBrowser) {
       WebExtractorBrowser(
         startURL: model.browserStartURL,
@@ -289,6 +309,59 @@ private struct RecipeCaptureReviewSections: View {
             Label("Run Extraction Again", systemImage: "arrow.clockwise")
           }
           .disabled(model.isExtracting || model.isCommitting)
+        }
+      }
+
+      if model.isSuggestingLabels || model.hasLabelSuggestions || model.labelProposalError != nil {
+        Section("Suggested Categories") {
+          if model.isSuggestingLabels {
+            ProgressView("Suggesting categories")
+          }
+          if let labelProposalError = model.labelProposalError {
+            Label("Couldn’t suggest categories", systemImage: "exclamationmark.triangle")
+              .foregroundStyle(.orange)
+            Text(labelProposalError)
+              .foregroundStyle(.secondary)
+          }
+          if !model.chipSuggestions.isEmpty {
+            Text("Tap a suggestion to include it when you save this recipe.")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+            LazyVGrid(
+              columns: [GridItem(.adaptive(minimum: 132), alignment: .leading)],
+              alignment: .leading,
+              spacing: 8
+            ) {
+              ForEach(model.chipSuggestions) { suggestion in
+                SuggestedCategoryChip(
+                  suggestion: suggestion,
+                  isAccepted: model.isSuggestedLabelAccepted(suggestion)
+                ) {
+                  model.suggestedLabelTapped(suggestion)
+                }
+              }
+            }
+          }
+          if !model.namespaceSuggestions.isEmpty {
+            Text("New category groups create a durable labeling dimension and need separate confirmation.")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+            ForEach(model.namespaceSuggestions) { suggestion in
+              Button {
+                model.namespaceSuggestionTapped(suggestion)
+              } label: {
+                Label(
+                  model.isSuggestedLabelAccepted(suggestion)
+                    ? "Added category group: \(suggestion.categoryName)"
+                    : "Review new category group: \(suggestion.categoryName)",
+                  systemImage: model.isSuggestedLabelAccepted(suggestion)
+                    ? "checkmark.circle.fill"
+                    : "folder.badge.plus"
+                )
+              }
+              .tint(model.isSuggestedLabelAccepted(suggestion) ? .green : .accentColor)
+            }
+          }
         }
       }
 
@@ -459,6 +532,35 @@ private struct RecipeCaptureReviewSections: View {
     let ingredientNames = page.modelExtractedIngredientSections.map { $0.name ?? "Ingredients" }
     let instructionNames = page.modelExtractedInstructionSections.map { $0.name ?? "Instructions" }
     return (ingredientNames + instructionNames).joined(separator: " • ")
+  }
+}
+
+private struct SuggestedCategoryChip: View {
+  let suggestion: SuggestedLabel
+  let isAccepted: Bool
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      Label(
+        suggestion.reviewTitle,
+        systemImage: isAccepted ? "checkmark.circle.fill" : "plus.circle"
+      )
+      .font(.subheadline)
+      .lineLimit(2)
+      .padding(.horizontal, 10)
+      .padding(.vertical, 7)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(isAccepted ? Color.green.opacity(0.16) : Color.accentColor.opacity(0.12), in: Capsule())
+    }
+    .buttonStyle(.plain)
+    .tint(isAccepted ? .green : .accentColor)
+    .accessibilityAddTraits(isAccepted ? .isSelected : [])
+    .accessibilityHint(
+      isAccepted
+        ? "Removes this category so it is not added when you save the recipe"
+        : "Adds this category when you save the recipe"
+    )
   }
 }
 

@@ -116,6 +116,8 @@ final class ShareCaptureModel {
 
     do {
       let payload = try await ShareCaptureExtraction.payload(from: extensionContext)
+      // LabelProposer is deliberately main-app-only: the share extension must not make model or
+      // network calls. This unlabeled capture will be eligible for the later library queue.
       let capturedDraft = try await captureClient.capture(sharePayload: payload, capturedAt: now)
       draft = await captureClient.hydrateHeroImage(in: capturedDraft)
     } catch is CancellationError {
