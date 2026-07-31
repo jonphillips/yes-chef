@@ -550,5 +550,75 @@ extension RecipeCoreTests {
         try CategoryRepository.seedStarterCategories(in: db)
       }
     }
+
+    @Test
+    func tombstoneSuppressesDistinctDormantTagMergedIntoStarterRepresentative() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 802_660_000)
+      let recipeID = SampleUUIDSequence.uuid(990)
+      let tagID = SampleUUIDSequence.uuid(991)
+      let recipeTagID = SampleUUIDSequence.uuid(992)
+      let nativeCategoryID = SampleUUIDSequence.uuid(993)
+
+      try database.write { db in
+        let priorTombstoneIDs = Set(try CategorySeedTombstone.fetchAll(db).map(\.id))
+        try Recipe.insert {
+          Recipe(id: recipeID, title: "Merged Cuisine Tag", dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+        try Tag.insert {
+          Tag(id: tagID, name: "Cuisine", sortOrder: 0, dateCreated: now)
+        }
+        .execute(db)
+        try RecipeTag.insert {
+          RecipeTag(id: recipeTagID, recipeID: recipeID, tagID: tagID, sortOrder: 0)
+        }
+        .execute(db)
+        try Category.insert {
+          Category(
+            id: nativeCategoryID,
+            name: "Cuisine",
+            sortOrder: 0,
+            dateCreated: now.addingTimeInterval(-1)
+          )
+        }
+        .execute(db)
+
+        try CategoryRepository.foldDormantTagsIntoCategories(in: db)
+        try CategoryRepository.seedStarterCategories(in: db)
+        let cuisineState = try #require(
+          (try CategorySeedState.fetchAll(db)).first { $0.categoryID == nativeCategoryID }
+        )
+        #expect(!(try Category.fetchAll(db)).contains { $0.id == tagID })
+        #expect(
+          (try RecipeCategory.fetchAll(db)).contains {
+            $0.id == recipeTagID && $0.categoryID == nativeCategoryID
+          }
+        )
+
+        for child in try Category.fetchAll(db) where child.parentCategoryID == nativeCategoryID {
+          try CategoryRepository.deleteCategory(categoryID: child.id, in: db, now: now)
+        }
+        try RecipeCategory.find(recipeTagID).delete().execute(db)
+        try CategoryRepository.deleteCategory(categoryID: nativeCategoryID, in: db, now: now)
+        #expect((try CategorySeedTombstone.fetchAll(db)).contains { $0.id == cuisineState.id })
+
+        try CategoryRepository.foldDormantTagsIntoCategories(in: db)
+        try CategoryRepository.seedStarterCategories(in: db)
+
+        #expect(!(try Category.fetchAll(db)).contains { $0.id == tagID })
+        #expect(!(try RecipeCategory.fetchAll(db)).contains { $0.id == recipeTagID })
+        #expect(!(try CategoryListRequest().fetch(db)).contains { $0.name == "Cuisine" })
+
+        try RecipeTag.find(recipeTagID).delete().execute(db)
+        try Tag.find(tagID).delete().execute(db)
+        try Recipe.find(recipeID).delete().execute(db)
+        for tombstone in try CategorySeedTombstone.fetchAll(db)
+        where !priorTombstoneIDs.contains(tombstone.id) {
+          try CategorySeedTombstone.find(tombstone.id).delete().execute(db)
+        }
+        try CategoryRepository.seedStarterCategories(in: db)
+      }
+    }
   }
 }

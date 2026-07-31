@@ -169,7 +169,9 @@ uses the same resolved roots but is deliberately separate: it removes only eligi
 reference, and is an optimization rather than a condition for correct product behavior. The only raw-category
 access is inside the effective-set source and physical seed/reclamation/merge convergence code, which must see
 retained rows to repair or repoint them before deletion. A dormant tag with the UUID of an unavailable mapped
-representative is skipped by the fold; it cannot recreate the logically deleted row.
+representative is skipped by the fold. A distinct-ID dormant tag that previously merged by name into a tombstoned
+root starter is also skipped by that starter's canonical name, so neither fold path can recreate the logically
+deleted namespace or restore its retired recipe-tag joins.
 
 An imported publisher label only matches an effective category. If it textually reintroduces a tombstoned starter
 label, reconciliation creates a fresh user-category UUID rather than attaching a recipe to the tombstoned identity.

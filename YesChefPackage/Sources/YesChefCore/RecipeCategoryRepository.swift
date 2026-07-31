@@ -202,14 +202,22 @@ public enum CategoryRepository {
   public static func foldDormantTagsIntoCategories(in db: Database) throws {
     try reconcileStarterCategoryTombstones(in: db)
     let tags = try Tag.fetchAll(db).sorted(by: areTagsInFoldOrder)
+    let tombstonedSeedIDs = Set(try CategorySeedTombstone.fetchAll(db).map(\.id))
+    let tombstonedFoldedRootNames = starterCategories.compactMap { seed in
+      seed.parentSeedID == nil && tombstonedSeedIDs.contains(seed.id) ? seed.name : nil
+    }
     var effectiveCategories = try effectiveCategorySet(in: db)
     var categories = effectiveCategories.categories
     var categoryIDByTagID: [Tag.ID: Category.ID] = [:]
 
     for tag in tags {
-      // A dormant tag can share the UUID of a seed's mapped representative. It is not eligible
-      // to recreate that logically deleted category while its tombstone is present.
-      guard !effectiveCategories.unavailableCategoryIDs.contains(tag.id) else { continue }
+      // A folded tag may either share its category UUID or have merged by name into an older
+      // native root. Neither source may recreate a tombstoned starter namespace.
+      guard !effectiveCategories.unavailableCategoryIDs.contains(tag.id),
+            !tombstonedFoldedRootNames.contains(where: {
+              $0.caseInsensitiveCompare(tag.name) == .orderedSame
+            })
+      else { continue }
       let matchingRoots = categories
         .filter {
           $0.parentCategoryID == nil
