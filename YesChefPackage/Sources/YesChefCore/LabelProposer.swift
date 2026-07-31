@@ -67,10 +67,36 @@ public struct SuggestedLabel: Codable, Equatable, Identifiable, Sendable {
   }
 }
 
+/// A suggestion the proposer could not map to a safe destination. It is surfaced, never silently
+/// dropped (ADR-0049 D2). On the on-device tier a small model emitting one sloppy path among several
+/// is the expected case, so a single bad entry must not discard the good ones — see
+/// [[loud-decode-not-in-migrator]] for the same tolerate-preserve-report correction.
+public struct RejectedLabelSuggestion: Codable, Equatable, Identifiable, Sendable {
+  public var raw: String
+  public var reason: String
+
+  public init(raw: String, reason: String) {
+    self.raw = raw
+    self.reason = reason
+  }
+
+  public var id: String { "\(raw)|\(reason)" }
+}
+
+/// The outcome of a label proposal: the mappable suggestions plus the ones that couldn't be mapped.
+public struct LabelProposal: Equatable, Sendable {
+  public var accepted: [SuggestedLabel]
+  public var rejected: [RejectedLabelSuggestion]
+
+  public init(accepted: [SuggestedLabel] = [], rejected: [RejectedLabelSuggestion] = []) {
+    self.accepted = accepted
+    self.rejected = rejected
+  }
+}
+
 public enum LabelProposerError: Error, Equatable, LocalizedError, Sendable {
   case responseTruncated
   case responseUnreadable
-  case invalidSuggestion(String)
 
   public var errorDescription: String? {
     switch self {
@@ -78,8 +104,6 @@ public enum LabelProposerError: Error, Equatable, LocalizedError, Sendable {
       "The label suggestions ran out of room before they finished. Try again."
     case .responseUnreadable:
       "The label suggestions could not be read. Try again."
-    case let .invalidSuggestion(reason):
-      "The label suggestions could not be safely mapped: \(reason)"
     }
   }
 }
@@ -87,34 +111,37 @@ public enum LabelProposerError: Error, Equatable, LocalizedError, Sendable {
 /// A model-backed, advisory classifier anchored to the category tree already owned by the cook.
 /// It never writes categories or recipe-category joins.
 public struct LabelProposer: Sendable {
-  public var propose: @Sendable (_ recipe: LabelProposalRecipe, _ categories: [Category]) async throws -> [SuggestedLabel]
+  public var propose: @Sendable (_ recipe: LabelProposalRecipe, _ categories: [Category], _ tier: ModelTier) async throws -> LabelProposal
 
   public init(
-    propose: @escaping @Sendable (_ recipe: LabelProposalRecipe, _ categories: [Category]) async throws -> [SuggestedLabel]
+    propose: @escaping @Sendable (_ recipe: LabelProposalRecipe, _ categories: [Category], _ tier: ModelTier) async throws -> LabelProposal
   ) {
     self.propose = propose
   }
 
+  /// Defaults to the on-device tier (ADR-0049), but the tier is a parameter so the S5 detail labeler
+  /// and S6 queue can escalate a weak on-device pass without touching a shared constant.
   public func callAsFunction(
     recipe: LabelProposalRecipe,
-    existingTree categories: [Category]
-  ) async throws -> [SuggestedLabel] {
-    try await propose(recipe, categories)
+    existingTree categories: [Category],
+    tier: ModelTier = .onDevice
+  ) async throws -> LabelProposal {
+    try await propose(recipe, categories, tier)
   }
 }
 
 extension LabelProposer: DependencyKey {
   public static var liveValue: Self {
-    Self { recipe, categories in
+    Self { recipe, categories, tier in
       @Dependency(\.modelClient) var modelClient
-      let response = try await call(recipe: recipe, categories: categories)
+      let response = try await call(recipe: recipe, categories: categories, tier: tier)
         .complete(using: modelClient)
       guard !response.wasTruncated else { throw LabelProposerError.responseTruncated }
       return try parse(response.text, categories: categories)
     }
   }
 
-  public static let testValue = Self { _, _ in [] }
+  public static let testValue = Self { _, _, _ in LabelProposal() }
 
   static let maxTokens = 1_024
 
@@ -126,7 +153,8 @@ extension LabelProposer: DependencyKey {
     - existingCategory: path is an exact existing category path from the supplied tree.
     - newChild: path ends in a new child and every preceding path component is an exact existing category path.
     - loose: path has one new, parentless category name.
-    - namespace: path has one new parent category name. Use this rarely and only for a genuinely useful new dimension.
+    - namespace: path has exactly two new names — a brand-new parent dimension and its first child value,
+      e.g. ["Season","Summer"]. Both are new. Use this rarely and only for a genuinely useful new dimension.
 
     Prefer exact existing paths over new labels. A new child under an existing category is cheaper than a new
     loose label; a new namespace is the most expensive and should be exceptional. Do not duplicate suggestions,
@@ -155,13 +183,13 @@ extension LabelProposer: DependencyKey {
       """
   }
 
-  static func call(recipe: LabelProposalRecipe, categories: [Category]) -> ModelCall {
+  static func call(recipe: LabelProposalRecipe, categories: [Category], tier: ModelTier = .onDevice) -> ModelCall {
     ModelCall(
       surface: .capture,
       task: .categorization,
       tierResolution: .callerProvided,
       contextLayers: [.recipe, .candidates],
-      tier: .onDevice,
+      tier: tier,
       system: instructions,
       prompt: prompt(recipe: recipe, categories: categories),
       maxTokens: maxTokens,
@@ -169,7 +197,7 @@ extension LabelProposer: DependencyKey {
     )
   }
 
-  public static func parse(_ text: String, categories: [Category]) throws -> [SuggestedLabel] {
+  public static func parse(_ text: String, categories: [Category]) throws -> LabelProposal {
     guard
       let json = jsonObjectSlice(text),
       let data = json.data(using: .utf8),
@@ -189,50 +217,97 @@ extension LabelProposer: DependencyKey {
     }
     let existingPaths = Set(canonicalComponentsByNormalizedPath.keys)
 
-    let suggestions = try response.suggestions.map { raw -> SuggestedLabel in
-      let path = raw.path.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-      guard !path.isEmpty, path.allSatisfy({ !$0.isEmpty }) else {
-        throw LabelProposerError.invalidSuggestion("a category path was empty")
-      }
-      let normalized = normalizedPath(path.joined(separator: " > "))
-      guard !normalized.isEmpty else {
-        throw LabelProposerError.invalidSuggestion("a category path was empty")
-      }
+    // Tolerate-preserve-report: one unmappable path must not sink the whole batch (ADR-0049 D2).
+    var accepted: [SuggestedLabel] = []
+    var rejected: [RejectedLabelSuggestion] = []
+    var seenIDs: Set<SuggestedLabel.ID> = []
 
-      switch raw.kind {
-      case .existingCategory:
-        guard let canonical = canonicalComponentsByNormalizedPath[normalized] else {
-          throw LabelProposerError.invalidSuggestion("\(path.joined(separator: " > ")) is not in the existing tree")
+    for raw in response.suggestions {
+      do {
+        let suggestion = try mapSuggestion(
+          raw,
+          canonicalComponentsByNormalizedPath: canonicalComponentsByNormalizedPath,
+          existingPaths: existingPaths
+        )
+        guard seenIDs.insert(suggestion.id).inserted else {
+          rejected.append(
+            RejectedLabelSuggestion(raw: suggestion.categoryName, reason: "duplicates an earlier suggestion")
+          )
+          continue
         }
-        return SuggestedLabel(kind: .existingCategory, path: canonical)
-      case .newChild:
-        guard path.count > 1 else {
-          throw LabelProposerError.invalidSuggestion("a new child did not name its existing parent")
-        }
-        let parentPath = normalizedPath(path.dropLast().joined(separator: " > "))
-        guard let canonicalParent = canonicalComponentsByNormalizedPath[parentPath] else {
-          throw LabelProposerError.invalidSuggestion("\(path.dropLast().joined(separator: " > ")) is not an existing parent")
-        }
-        guard !existingPaths.contains(normalized) else {
-          throw LabelProposerError.invalidSuggestion("\(path.joined(separator: " > ")) already exists")
-        }
-        // Canonicalize the existing-parent prefix; keep the model's new child name verbatim.
-        return SuggestedLabel(kind: .newChild, path: canonicalParent + [path[path.count - 1]])
-      case .loose, .namespace:
-        guard path.count == 1 else {
-          throw LabelProposerError.invalidSuggestion("\(raw.kind.rawValue) must be a single root name")
-        }
-        guard !existingPaths.contains(normalized) else {
-          throw LabelProposerError.invalidSuggestion("\(path[0]) is already in the existing tree")
-        }
-        return SuggestedLabel(kind: raw.kind, path: path)
+        accepted.append(suggestion)
+      } catch let failure as MappingFailure {
+        rejected.append(RejectedLabelSuggestion(raw: failure.raw, reason: failure.reason))
       }
     }
 
-    guard Set(suggestions.map(\.id)).count == suggestions.count else {
-      throw LabelProposerError.invalidSuggestion("the response repeated a category destination")
+    return LabelProposal(accepted: accepted, rejected: rejected)
+  }
+
+  /// Thrown per suggestion so `parse` can collect it into `rejected` instead of failing the batch.
+  private struct MappingFailure: Error {
+    var raw: String
+    var reason: String
+  }
+
+  private static func mapSuggestion(
+    _ raw: RawSuggestion,
+    canonicalComponentsByNormalizedPath: [String: [String]],
+    existingPaths: Set<String>
+  ) throws -> SuggestedLabel {
+    let path = raw.path.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+    let rawLabel = path.joined(separator: " > ")
+    let surfaced = rawLabel.isEmpty ? "(empty)" : rawLabel
+    guard !path.isEmpty, path.allSatisfy({ !$0.isEmpty }) else {
+      throw MappingFailure(raw: surfaced, reason: "a category path was empty")
     }
-    return suggestions
+    let normalized = normalizedPath(path.joined(separator: " > "))
+    guard !normalized.isEmpty else {
+      throw MappingFailure(raw: surfaced, reason: "a category path was empty")
+    }
+
+    switch raw.kind {
+    case .existingCategory:
+      guard let canonical = canonicalComponentsByNormalizedPath[normalized] else {
+        throw MappingFailure(raw: surfaced, reason: "\(rawLabel) is not in the existing tree")
+      }
+      return SuggestedLabel(kind: .existingCategory, path: canonical)
+    case .newChild:
+      guard path.count > 1 else {
+        throw MappingFailure(raw: surfaced, reason: "a new child did not name its existing parent")
+      }
+      let parentPath = normalizedPath(path.dropLast().joined(separator: " > "))
+      guard let canonicalParent = canonicalComponentsByNormalizedPath[parentPath] else {
+        throw MappingFailure(raw: surfaced, reason: "\(path.dropLast().joined(separator: " > ")) is not an existing parent")
+      }
+      guard !existingPaths.contains(normalized) else {
+        throw MappingFailure(raw: surfaced, reason: "\(rawLabel) already exists")
+      }
+      // Canonicalize the existing-parent prefix; keep the model's new child name verbatim.
+      return SuggestedLabel(kind: .newChild, path: canonicalParent + [path[path.count - 1]])
+    case .loose:
+      guard path.count == 1 else {
+        throw MappingFailure(raw: surfaced, reason: "a loose category must be a single new name")
+      }
+      guard !existingPaths.contains(normalized) else {
+        throw MappingFailure(raw: surfaced, reason: "\(path[0]) is already in the existing tree")
+      }
+      return SuggestedLabel(kind: .loose, path: path)
+    case .namespace:
+      // Finding 3: a namespace carries the new dimension AND its first value, so accepting it files the
+      // recipe under a real child (`Season > Summer`) instead of a bare root that is indistinguishable
+      // from a loose label at the storage layer (D1).
+      guard path.count == 2 else {
+        throw MappingFailure(raw: surfaced, reason: "a new category group must name a new dimension and its first value")
+      }
+      guard !existingPaths.contains(normalizedPath(path[0])) else {
+        throw MappingFailure(raw: surfaced, reason: "\(path[0]) is already a category, so it is not a new dimension")
+      }
+      guard !existingPaths.contains(normalized) else {
+        throw MappingFailure(raw: surfaced, reason: "\(rawLabel) already exists")
+      }
+      return SuggestedLabel(kind: .namespace, path: path)
+    }
   }
 
   private struct Response: Decodable {

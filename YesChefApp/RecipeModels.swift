@@ -408,6 +408,7 @@ final class RecipeCaptureModel {
   var modelExtractionError: String?
   var labelProposalError: String?
   var suggestedLabels: [SuggestedLabel] = []
+  var rejectedLabelSuggestions: [RejectedLabelSuggestion] = []
   var acceptedSuggestedLabelIDs: Set<SuggestedLabel.ID> = []
   var isSuggestingLabels = false
   var labelSuggestionGeneration = 0
@@ -478,6 +479,7 @@ final class RecipeCaptureModel {
     modelExtractionError = nil
     labelProposalError = nil
     suggestedLabels = []
+    rejectedLabelSuggestions = []
     acceptedSuggestedLabelIDs = []
     isSuggestingLabels = false
     labelSuggestionGeneration += 1
@@ -624,6 +626,10 @@ final class RecipeCaptureModel {
       .map { ParsedRecipeReaderFeedbackBlock(text: $0.text) }
       .filter { !$0.text.isEmpty }
     self.draft = draft
+    // Merge accepted suggestions only into the committed copy — never back into `self.draft`. Accepted
+    // state stays pure selection, so re-extraction (which merges into the existing page) can't turn a
+    // previously accepted chip into a sticky harvested-looking label with no chip to un-accept.
+    mergingAcceptedSuggestions(into: &draft.page)
     return draft
   }
 
