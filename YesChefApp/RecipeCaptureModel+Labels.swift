@@ -3,6 +3,50 @@ import YesChefCore
 
 extension RecipeCaptureModel {
   func suggestedLabelTapped(_ suggestion: SuggestedLabel) {
+    guard suggestion.kind != .namespace else {
+      namespaceSuggestionTapped(suggestion)
+      return
+    }
+    toggleSuggestedLabel(suggestion)
+  }
+
+  var chipSuggestions: [SuggestedLabel] {
+    suggestedLabels.filter { $0.kind != .namespace }
+  }
+
+  var namespaceSuggestions: [SuggestedLabel] {
+    suggestedLabels.filter { $0.kind == .namespace }
+  }
+
+  var pendingNamespaceSuggestion: SuggestedLabel? {
+    guard case let .confirmNamespace(suggestion) = destination else { return nil }
+    return suggestion
+  }
+
+  var namespaceConfirmationTitle: String {
+    guard let suggestion = pendingNamespaceSuggestion else { return "Add a New Category Group?" }
+    return "Add \(suggestion.categoryName) as a New Category Group?"
+  }
+
+  func namespaceSuggestionTapped(_ suggestion: SuggestedLabel) {
+    if isSuggestedLabelAccepted(suggestion) {
+      toggleSuggestedLabel(suggestion)
+    } else {
+      destination = .confirmNamespace(suggestion)
+    }
+  }
+
+  func confirmNamespaceSuggestion() {
+    guard let suggestion = pendingNamespaceSuggestion else { return }
+    toggleSuggestedLabel(suggestion)
+    destination = nil
+  }
+
+  func cancelNamespaceConfirmation() {
+    destination = nil
+  }
+
+  private func toggleSuggestedLabel(_ suggestion: SuggestedLabel) {
     guard var draft else { return }
     if acceptedSuggestedLabelIDs.contains(suggestion.id) {
       acceptedSuggestedLabelIDs.remove(suggestion.id)

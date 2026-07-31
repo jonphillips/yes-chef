@@ -138,6 +138,26 @@ struct RecipeCaptureView: View {
       Text("Your review edits have not been saved.")
     }
     .interactiveDismissDisabled(model.hasUnsavedReviewChanges)
+    .confirmationDialog(
+      model.namespaceConfirmationTitle,
+      isPresented: Binding(
+        get: { model.pendingNamespaceSuggestion != nil },
+        set: { isPresented in
+          if !isPresented {
+            model.cancelNamespaceConfirmation()
+          }
+        }
+      )
+    ) {
+      Button("Add Category Group") {
+        model.confirmNamespaceSuggestion()
+      }
+      Button("Cancel", role: .cancel) {
+        model.cancelNamespaceConfirmation()
+      }
+    } message: {
+      Text("A category group is a durable new labeling dimension. You can add children beneath it after saving.")
+    }
     .fullScreenCover(isPresented: $model.isPresentingBrowser) {
       WebExtractorBrowser(
         startURL: model.browserStartURL,
@@ -303,7 +323,7 @@ private struct RecipeCaptureReviewSections: View {
             Text(labelProposalError)
               .foregroundStyle(.secondary)
           }
-          if model.hasLabelSuggestions {
+          if !model.chipSuggestions.isEmpty {
             Text("Tap a suggestion to include it when you save this recipe.")
               .font(.footnote)
               .foregroundStyle(.secondary)
@@ -312,7 +332,7 @@ private struct RecipeCaptureReviewSections: View {
               alignment: .leading,
               spacing: 8
             ) {
-              ForEach(model.suggestedLabels) { suggestion in
+              ForEach(model.chipSuggestions) { suggestion in
                 SuggestedCategoryChip(
                   suggestion: suggestion,
                   isAccepted: model.isSuggestedLabelAccepted(suggestion)
@@ -320,6 +340,26 @@ private struct RecipeCaptureReviewSections: View {
                   model.suggestedLabelTapped(suggestion)
                 }
               }
+            }
+          }
+          if !model.namespaceSuggestions.isEmpty {
+            Text("New category groups create a durable labeling dimension and need separate confirmation.")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+            ForEach(model.namespaceSuggestions) { suggestion in
+              Button {
+                model.namespaceSuggestionTapped(suggestion)
+              } label: {
+                Label(
+                  model.isSuggestedLabelAccepted(suggestion)
+                    ? "Added category group: \(suggestion.categoryName)"
+                    : "Review new category group: \(suggestion.categoryName)",
+                  systemImage: model.isSuggestedLabelAccepted(suggestion)
+                    ? "checkmark.circle.fill"
+                    : "folder.badge.plus"
+                )
+              }
+              .tint(model.isSuggestedLabelAccepted(suggestion) ? .green : .accentColor)
             }
           }
         }

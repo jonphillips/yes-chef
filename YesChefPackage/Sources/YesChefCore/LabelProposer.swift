@@ -44,7 +44,8 @@ public struct SuggestedLabel: Codable, Equatable, Identifiable, Sendable {
   }
 
   public var id: String {
-    "\(kind.rawValue):\(path.map { $0.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current) }.joined(separator: ">"))"
+    path.map { $0.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current) }
+      .joined(separator: ">")
   }
 
   /// The form the existing deterministic category reconciler accepts.
@@ -219,7 +220,7 @@ extension LabelProposer: DependencyKey {
     }
 
     guard Set(suggestions.map(\.id)).count == suggestions.count else {
-      throw LabelProposerError.invalidSuggestion("the response repeated a category")
+      throw LabelProposerError.invalidSuggestion("the response repeated a category destination")
     }
     return suggestions
   }

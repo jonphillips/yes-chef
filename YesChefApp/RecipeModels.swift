@@ -380,6 +380,11 @@ struct RecipeImportCommitResult {
 @Observable
 @MainActor
 final class RecipeCaptureModel {
+  @CasePathable
+  enum Destination {
+    case confirmNamespace(SuggestedLabel)
+  }
+
   @ObservationIgnored
   @Dependency(\.date.now) private var now
   @ObservationIgnored
@@ -406,6 +411,7 @@ final class RecipeCaptureModel {
   var acceptedSuggestedLabelIDs: Set<SuggestedLabel.ID> = []
   var isSuggestingLabels = false
   var labelSuggestionGeneration = 0
+  var destination: Destination?
   var readerFeedbackProposals: [ReaderFeedbackTip] = []
   var readerFeedbackComments: [RawComment] = []
   var readerFeedbackHandoffEvidence: [String] = []
@@ -475,6 +481,7 @@ final class RecipeCaptureModel {
     acceptedSuggestedLabelIDs = []
     isSuggestingLabels = false
     labelSuggestionGeneration += 1
+    destination = nil
     readerFeedbackProposals = []
     readerFeedbackComments = []
     readerFeedbackHandoffEvidence = []

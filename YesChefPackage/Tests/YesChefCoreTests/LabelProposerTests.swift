@@ -66,6 +66,16 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func rejectsConflictingKindsAtTheSameCategoryDestination() {
+      #expect(throws: LabelProposerError.invalidSuggestion("the response repeated a category destination")) {
+        try LabelProposer.parse(
+          #"{"suggestions":[{"kind":"loose","path":["weeknight"]},{"kind":"namespace","path":["weeknight"]}]}"#,
+          categories: []
+        )
+      }
+    }
+
+    @Test
     func truncatedResponseFailsLoudly() async {
       await #expect(throws: LabelProposerError.responseTruncated) {
         try await withDependencies {
