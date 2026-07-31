@@ -5,7 +5,7 @@ public struct CategoryListRequest: FetchKeyRequest {
   public init() {}
 
   public func fetch(_ db: Database) throws -> [Category] {
-    CategoryRepository.sortedCategories(try Category.fetchAll(db))
+    CategoryRepository.sortedCategories(try CategoryRepository.visibleCategories(in: db))
   }
 }
 
@@ -53,9 +53,15 @@ public enum CategoryRepository {
       uniqueKeysWithValues: try CategorySeedState.fetchAll(db).map { ($0.id, $0) }
     )
     let tombstonedSeedIDs = Set(try CategorySeedTombstone.fetchAll(db).map(\.id))
+    try reconcileTombstonedSeedCategories(
+      tombstonedSeedIDs,
+      categories: &categories,
+      in: db
+    )
     var resolvedCategoryIDBySeedID: [Category.ID: Category.ID] = [:]
 
     for seed in starterCategories {
+      guard !tombstonedSeedIDs.contains(seed.id) else { continue }
       let parentCategoryID: Category.ID?
       if let parentSeedID = seed.parentSeedID {
         guard let resolvedParentCategoryID = resolvedCategoryIDBySeedID[parentSeedID] else {
@@ -64,11 +70,6 @@ public enum CategoryRepository {
         parentCategoryID = resolvedParentCategoryID
       } else {
         parentCategoryID = nil
-      }
-
-      if tombstonedSeedIDs.contains(seed.id) {
-        try removeTombstonedSeedCategory(seed, categories: &categories, in: db)
-        continue
       }
 
       if let state = seedStates[seed.id],
@@ -134,6 +135,22 @@ public enum CategoryRepository {
         in: db
       )
     }
+  }
+
+  /// Reclaims locally seeded rows after a synced deletion tombstone arrives. Callers that own a
+  /// category write use this before changing the tree; category reads suppress tombstoned rows
+  /// immediately, so a late CloudKit arrival is never surfaced while physical cleanup waits.
+  public static func reconcileStarterCategoryTombstones(in db: Database) throws {
+    var categories = try Category.fetchAll(db)
+    let tombstonedSeedIDs = Set(try CategorySeedTombstone.fetchAll(db).map(\.id))
+    try reconcileTombstonedSeedCategories(tombstonedSeedIDs, categories: &categories, in: db)
+  }
+
+  /// The user-visible category tree excludes starter rows already deleted on another device,
+  /// even before this process gets a later opportunity to physically reclaim those rows.
+  public static func visibleCategories(in db: Database) throws -> [Category] {
+    let tombstonedSeedIDs = Set(try CategorySeedTombstone.fetchAll(db).map(\.id))
+    return try Category.fetchAll(db).filter { !tombstonedSeedIDs.contains($0.id) }
   }
 
   /// Moves the still-synced, now-dormant tag graph into the category tree. This deliberately
@@ -218,6 +235,7 @@ public enum CategoryRepository {
     now: Date,
     uuid: () -> UUID
   ) throws -> Category {
+    try reconcileStarterCategoryTombstones(in: db)
     let categories = try Category.fetchAll(db)
     let name = try normalizedName(name)
     try validateParent(parentCategoryID, categories: categories)
@@ -245,6 +263,7 @@ public enum CategoryRepository {
     parentCategoryID: Category.ID?,
     in db: Database
   ) throws {
+    try reconcileStarterCategoryTombstones(in: db)
     let categories = try Category.fetchAll(db)
     let category = try category(categoryID, in: categories)
     let name = try normalizedName(name)
@@ -264,6 +283,7 @@ public enum CategoryRepository {
   }
 
   public static func deleteCategory(categoryID: Category.ID, in db: Database, now: Date) throws {
+    try reconcileStarterCategoryTombstones(in: db)
     let categories = try Category.fetchAll(db)
     _ = try category(categoryID, in: categories)
     guard !categories.contains(where: { $0.parentCategoryID == categoryID }) else {
@@ -315,16 +335,34 @@ public enum CategoryRepository {
     seedStates[seedID] = state
   }
 
-  private static func removeTombstonedSeedCategory(
-    _ seed: StarterCategory,
+  /// A namespace is deleted leaf-first. This pass intentionally runs before seed parent
+  /// resolution: otherwise a tombstoned parent prevents its children from reaching their own
+  /// tombstones, which leaves a late peer's stale namespace intact.
+  private static func reconcileTombstonedSeedCategories(
+    _ tombstonedSeedIDs: Set<Category.ID>,
     categories: inout [Category],
     in db: Database
   ) throws {
-    guard let category = categories.first(where: { $0.id == seed.id }) else { return }
-    guard !categories.contains(where: { $0.parentCategoryID == category.id }) else { return }
-    guard (try RecipeCategory.where { $0.categoryID.eq(category.id) }.fetchAll(db)).isEmpty else { return }
-    try Category.find(category.id).delete().execute(db)
-    categories.removeAll { $0.id == category.id }
+    var didDelete = true
+    while didDelete {
+      didDelete = false
+      let eligibleLeaves = categories
+        .filter { category in
+          tombstonedSeedIDs.contains(category.id)
+            && !categories.contains(where: { $0.parentCategoryID == category.id })
+        }
+        .sorted(by: areCategoriesInFoldOrder)
+
+      for category in eligibleLeaves {
+        guard (try RecipeCategory.where { $0.categoryID.eq(category.id) }.fetchAll(db)).isEmpty else {
+          continue
+        }
+        try Category.find(category.id).delete().execute(db)
+        categories.removeAll { $0.id == category.id }
+        didDelete = true
+        break
+      }
+    }
   }
 
   private static func category(_ categoryID: Category.ID, in categories: [Category]) throws -> Category {

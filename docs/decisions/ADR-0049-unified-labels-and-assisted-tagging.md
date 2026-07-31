@@ -143,16 +143,21 @@ currently represents it, and `categorySeedTombstones` is a presence-only, fixed-
 deleted seed. Both tables have a loose UUID relationship rather than a foreign key: the state mapping may point
 at a user-authored category, and a deletion tombstone must outlive the category it suppresses. The migration adds
 the tombstone table and backfills one from any earlier `categorySeedStates.isDeleted` row, without modifying a
-recipe or category row.
+recipe or category row. `isDeleted` and `dateModified` remain in the state schema only as compatibility fields:
+we cannot safely assume an early S2/dogfood build was never opened against a live library. Current logic never
+uses them to decide deletion; once the compatibility window can be retired in a deliberately versioned migration,
+the mapping's final shape is just `id` and `categoryID`.
 
 Seeder convergence is deliberately monotonic. It checks a tombstone before it creates or maps a seed, and never
 writes a non-deleted tombstone counterpart; therefore a later fresh/offline peer cannot clear a prior deletion by
-writing a newer `false` field. When a tombstone arrives, the main-app seeder removes an otherwise-unreferenced
-deterministic local row and never re-creates it. Child seeds wait for their parent seed to resolve; an absent or
-tombstoned parent is never interpreted as a root. Installed states still run the same-name, same-parent total-order
-merge and are repointed to the survivor, so concurrent existing-category adoption and deterministic seeding
-converge. These write passes run only in the main app after CloudSync installs its triggers; the short-lived Share
-Extension constructs its stopped engine but performs no seed/fold data writes.
+writing a newer `false` field. Tombstones are reconciled independently of parent resolution and deleted leaf-first,
+retaining the recipe-reference guard, so a fully deleted namespace converges even on a late peer. Category reads
+exclude tombstoned deterministic rows immediately when a CloudKit tombstone arrives; physical cleanup also runs at
+the next owned category write and every main-app bootstrap. Child seeds wait for their parent seed to resolve; an
+absent or tombstoned parent is never interpreted as a root. Installed states still run the same-name, same-parent
+total-order merge and are repointed to the survivor, so concurrent existing-category adoption and deterministic
+seeding converge. These write passes run only in the main app after CloudSync installs its triggers; the short-lived
+Share Extension constructs its stopped engine but performs no seed/fold data writes.
 
 The rejected simpler alternative was an `isDeleted` boolean on the same synced state row used for normal
 installation. SQLiteData resolves fields by database-edit timestamp, so a later fresh-device `false` write could

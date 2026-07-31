@@ -117,6 +117,70 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func latePeerReclaimsTombstonedNamespaceLeafFirst() throws {
+      @Dependency(\.defaultDatabase) var database
+      let deletedAt = Date(timeIntervalSinceReferenceDate: 802_325_000)
+
+      try database.write { db in
+        try CategoryRepository.seedStarterCategories(in: db)
+        let cuisine = try #require((try Category.fetchAll(db)).first { $0.name == "Cuisine" })
+        let cuisineChildren = try Category.fetchAll(db).filter { $0.parentCategoryID == cuisine.id }
+        #expect(cuisineChildren.count == 10)
+
+        // These rows model a late peer: its full seeded namespace is still present when the
+        // deletions performed on another device arrive through CloudKit.
+        let tombstonedCategoryIDs = [cuisine.id] + cuisineChildren.map(\.id)
+        for categoryID in tombstonedCategoryIDs {
+          let tombstone = CategorySeedTombstone(id: categoryID, dateDeleted: deletedAt)
+          try CategorySeedTombstone.insert { tombstone }.execute(db)
+        }
+
+        try CategoryRepository.seedStarterCategories(in: db)
+
+        let remainingCategoryIDs = Set(try Category.fetchAll(db).map(\.id))
+        #expect(tombstonedCategoryIDs.allSatisfy { !remainingCategoryIDs.contains($0) })
+
+        for categoryID in tombstonedCategoryIDs {
+          try CategorySeedTombstone.find(categoryID).delete().execute(db)
+        }
+        try CategoryRepository.seedStarterCategories(in: db)
+      }
+    }
+
+    @Test
+    func laterTombstoneImmediatelyHidesSeedAndNextCategoryWriteReclaimsIt() throws {
+      @Dependency(\.defaultDatabase) var database
+      let deletedAt = Date(timeIntervalSinceReferenceDate: 802_340_000)
+      let now = Date(timeIntervalSinceReferenceDate: 802_340_100)
+      var uuids = SampleUUIDSequence(start: 750)
+
+      try database.write { db in
+        try CategoryRepository.seedStarterCategories(in: db)
+        let thai = try #require((try Category.fetchAll(db)).first { $0.name == "Thai" })
+        let tombstone = CategorySeedTombstone(id: thai.id, dateDeleted: deletedAt)
+        try CategorySeedTombstone.insert { tombstone }.execute(db)
+
+        // No bootstrap/reseed is simulated here: this is the same process receiving a later
+        // CloudKit tombstone. Reads must hide the stale deterministic row immediately.
+        #expect((try Category.fetchAll(db)).contains { $0.id == thai.id })
+        #expect(!(try CategoryListRequest().fetch(db)).contains { $0.id == thai.id })
+
+        let transientCategory = try CategoryRepository.createCategory(
+          name: "Tombstone Reconciliation Test",
+          parentCategoryID: nil,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        #expect(!(try Category.fetchAll(db)).contains { $0.id == thai.id })
+
+        try Category.find(transientCategory.id).delete().execute(db)
+        try CategorySeedTombstone.find(tombstone.id).delete().execute(db)
+        try CategoryRepository.seedStarterCategories(in: db)
+      }
+    }
+
+    @Test
     func unresolvedStarterParentDoesNotCreateChildAtRoot() throws {
       @Dependency(\.defaultDatabase) var database
       let deletedAt = Date(timeIntervalSinceReferenceDate: 802_350_000)
