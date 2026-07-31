@@ -33,10 +33,11 @@ extension RecipeCoreTests {
         )
       }
 
-      expectNoDifference(suggestions, [
+      expectNoDifference(suggestions.accepted, [
         SuggestedLabel(kind: .existingCategory, path: ["Cuisine", "Italian"]),
         SuggestedLabel(kind: .loose, path: ["weeknight"]),
       ])
+      #expect(suggestions.rejected.isEmpty)
 
       let request = await recorder.first()
       expectNoDifference(request?.tier, .onDevice)
@@ -53,16 +54,82 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func rejectsAnUnmappableSuggestionLoudly() {
+    func surfacesAnUnmappableSuggestionWithoutDiscardingTheGoodOnes() throws {
       let cuisineID = SampleUUIDSequence.uuid(70_101)
+      let italianID = SampleUUIDSequence.uuid(70_102)
+      let categories = [
+        Category(id: cuisineID, name: "Cuisine", sortOrder: 0, dateCreated: .distantPast),
+        Category(id: italianID, name: "Italian", parentCategoryID: cuisineID, sortOrder: 0, dateCreated: .distantPast),
+      ]
+
+      // One sloppy path out of two is the expected on-device case: the good suggestion must survive and
+      // the bad one must be surfaced, never dropped (ADR-0049 D2).
+      let proposal = try LabelProposer.parse(
+        #"""
+        {"suggestions":[
+          {"kind":"existingCategory","path":["Cuisine","Italian"]},
+          {"kind":"newChild","path":["Unknown","Korean"]}
+        ]}
+        """#,
+        categories: categories
+      )
+
+      expectNoDifference(proposal.accepted, [SuggestedLabel(kind: .existingCategory, path: ["Cuisine", "Italian"])])
+      expectNoDifference(
+        proposal.rejected,
+        [RejectedLabelSuggestion(raw: "Unknown > Korean", reason: "Unknown is not an existing parent")]
+      )
+    }
+
+    @Test
+    func acceptsANamespaceAsANewDimensionAndItsFirstValue() throws {
+      let cuisineID = SampleUUIDSequence.uuid(70_121)
       let categories = [Category(id: cuisineID, name: "Cuisine", sortOrder: 0, dateCreated: .distantPast)]
 
-      #expect(throws: LabelProposerError.invalidSuggestion("Unknown is not an existing parent")) {
-        try LabelProposer.parse(
-          #"{"suggestions":[{"kind":"newChild","path":["Unknown","Korean"]}]}"#,
-          categories: categories
+      let proposal = try LabelProposer.parse(
+        #"{"suggestions":[{"kind":"namespace","path":["Season","Summer"]}]}"#,
+        categories: categories
+      )
+      expectNoDifference(proposal.accepted, [SuggestedLabel(kind: .namespace, path: ["Season", "Summer"])])
+      #expect(proposal.rejected.isEmpty)
+      // The join written on accept files the recipe under the child, not a bare dimension root.
+      expectNoDifference(proposal.accepted.first?.categoryName, "Season > Summer")
+    }
+
+    @Test
+    func rejectsABareNamespaceRootThatWouldReadAsALooseLabel() throws {
+      let proposal = try LabelProposer.parse(
+        #"{"suggestions":[{"kind":"namespace","path":["Season"]}]}"#,
+        categories: []
+      )
+      #expect(proposal.accepted.isEmpty)
+      expectNoDifference(
+        proposal.rejected,
+        [RejectedLabelSuggestion(raw: "Season", reason: "a new category group must name a new dimension and its first value")]
+      )
+    }
+
+    @Test
+    func threadsAnEscalatedTierThroughToTheModelCall() async throws {
+      let recorder = LabelProposalRequestRecorder()
+
+      _ = try await withDependencies {
+        $0.modelClient = StubModelClient { request in
+          await recorder.append(request)
+          return ModelResponse(text: #"{"suggestions":[]}"#)
+        }
+        $0.modelCallRecordSink = .liveValue
+        $0.labelProposer = .liveValue
+      } operation: {
+        try await LabelProposer.liveValue(
+          recipe: .init(title: "Soup"),
+          existingTree: [],
+          tier: .frontierPreferred
         )
       }
+
+      let request = await recorder.first()
+      expectNoDifference(request?.tier, .frontierPreferred)
     }
 
     @Test
@@ -77,11 +144,11 @@ extension RecipeCoreTests {
 
       // The model echoes the path without the diacritic; the proposer must hand back the tree's
       // stored spelling so the diacritic-sensitive reconciler reuses `Café` instead of creating `Cafe`.
-      let suggestions = try LabelProposer.parse(
+      let proposal = try LabelProposer.parse(
         #"{"suggestions":[{"kind":"existingCategory","path":["Cuisine","Cafe"]}]}"#,
         categories: categories
       )
-      expectNoDifference(suggestions, [SuggestedLabel(kind: .existingCategory, path: ["Cuisine", "Café"])])
+      expectNoDifference(proposal.accepted, [SuggestedLabel(kind: .existingCategory, path: ["Cuisine", "Café"])])
 
       let now = Date(timeIntervalSinceReferenceDate: 802_360_000)
       var uuids = SampleUUIDSequence(start: 70_210)
@@ -90,7 +157,7 @@ extension RecipeCoreTests {
         try Category.insert { categories[1] }.execute(db)
 
         let recipeID = try RecipeRepository.save(
-          draft: RecipeEditorDraft(title: "Espresso Tart", categoryNames: suggestions[0].categoryName),
+          draft: RecipeEditorDraft(title: "Espresso Tart", categoryNames: proposal.accepted[0].categoryName),
           in: db,
           now: now,
           uuid: { uuids.next() }
@@ -112,21 +179,24 @@ extension RecipeCoreTests {
         Category(id: cafeID, name: "Café", sortOrder: 0, dateCreated: .distantPast),
       ]
 
-      let suggestions = try LabelProposer.parse(
+      let proposal = try LabelProposer.parse(
         #"{"suggestions":[{"kind":"newChild","path":["Cafe","Espresso"]}]}"#,
         categories: categories
       )
-      expectNoDifference(suggestions, [SuggestedLabel(kind: .newChild, path: ["Café", "Espresso"])])
+      expectNoDifference(proposal.accepted, [SuggestedLabel(kind: .newChild, path: ["Café", "Espresso"])])
     }
 
     @Test
-    func rejectsConflictingKindsAtTheSameCategoryDestination() {
-      #expect(throws: LabelProposerError.invalidSuggestion("the response repeated a category destination")) {
-        try LabelProposer.parse(
-          #"{"suggestions":[{"kind":"loose","path":["weeknight"]},{"kind":"namespace","path":["weeknight"]}]}"#,
-          categories: []
-        )
-      }
+    func keepsTheFirstOfADuplicatedDestinationAndSurfacesTheRepeat() throws {
+      let proposal = try LabelProposer.parse(
+        #"{"suggestions":[{"kind":"loose","path":["weeknight"]},{"kind":"loose","path":["Weeknight"]}]}"#,
+        categories: []
+      )
+      expectNoDifference(proposal.accepted, [SuggestedLabel(kind: .loose, path: ["weeknight"])])
+      expectNoDifference(
+        proposal.rejected,
+        [RejectedLabelSuggestion(raw: "Weeknight", reason: "duplicates an earlier suggestion")]
+      )
     }
 
     @Test

@@ -139,24 +139,16 @@ struct RecipeCaptureView: View {
     }
     .interactiveDismissDisabled(model.hasUnsavedReviewChanges)
     .confirmationDialog(
-      model.namespaceConfirmationTitle,
-      isPresented: Binding(
-        get: { model.pendingNamespaceSuggestion != nil },
-        set: { isPresented in
-          if !isPresented {
-            model.cancelNamespaceConfirmation()
-          }
-        }
-      )
-    ) {
+      "Add a New Category Group?",
+      item: $model.destination.confirmNamespace,
+      titleVisibility: .visible
+    ) { suggestion in
       Button("Add Category Group") {
-        model.confirmNamespaceSuggestion()
+        model.confirmNamespaceSuggestion(suggestion)
       }
-      Button("Cancel", role: .cancel) {
-        model.cancelNamespaceConfirmation()
-      }
-    } message: {
-      Text("A category group is a durable new labeling dimension. You can add children beneath it after saving.")
+      Button("Cancel", role: .cancel) {}
+    } message: { suggestion in
+      Text(namespaceConfirmationMessage(for: suggestion))
     }
     .fullScreenCover(isPresented: $model.isPresentingBrowser) {
       WebExtractorBrowser(
@@ -214,6 +206,13 @@ struct RecipeCaptureView: View {
         model.acceptReaderFeedbackTip(tip, approvedText: approvedText)
       }
     )
+  }
+
+  private func namespaceConfirmationMessage(for suggestion: SuggestedLabel) -> String {
+    guard let root = suggestion.path.first, suggestion.path.count > 1 else {
+      return "A category group is a durable new labeling dimension."
+    }
+    return "“\(root)” is a durable new labeling dimension. This recipe will be filed under \(suggestion.categoryName)."
   }
 }
 
@@ -312,7 +311,26 @@ private struct RecipeCaptureReviewSections: View {
         }
       }
 
-      if model.isSuggestingLabels || model.hasLabelSuggestions || model.labelProposalError != nil {
+      if !page.categoryNames.isEmpty || !page.tagNames.isEmpty {
+        Section("Categories & Tags") {
+          if !page.categoryNames.isEmpty {
+            LabeledContent("Categories") {
+              Text(page.categoryNames.joined(separator: ", "))
+            }
+          }
+          if !page.tagNames.isEmpty {
+            LabeledContent("Tags") {
+              Text(page.tagNames.joined(separator: ", "))
+            }
+          }
+        }
+      }
+
+      if model.isSuggestingLabels
+        || model.hasLabelSuggestions
+        || !model.rejectedLabelSuggestions.isEmpty
+        || model.labelProposalError != nil
+      {
         Section("Suggested Categories") {
           if model.isSuggestingLabels {
             ProgressView("Suggesting categories")
@@ -322,6 +340,12 @@ private struct RecipeCaptureReviewSections: View {
               .foregroundStyle(.orange)
             Text(labelProposalError)
               .foregroundStyle(.secondary)
+            Button {
+              model.suggestLabelsAfterCapture(for: draft)
+            } label: {
+              Label("Suggest Again", systemImage: "arrow.clockwise")
+            }
+            .disabled(model.isSuggestingLabels)
           }
           if !model.chipSuggestions.isEmpty {
             Text("Tap a suggestion to include it when you save this recipe.")
@@ -360,6 +384,24 @@ private struct RecipeCaptureReviewSections: View {
                 )
               }
               .tint(model.isSuggestedLabelAccepted(suggestion) ? .green : .accentColor)
+            }
+          }
+          if !model.rejectedLabelSuggestions.isEmpty {
+            Text("Couldn’t map these suggestions")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+            ForEach(model.rejectedLabelSuggestions) { rejected in
+              Label {
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(rejected.raw)
+                  Text(rejected.reason)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+              } icon: {
+                Image(systemName: "questionmark.circle")
+              }
+              .foregroundStyle(.secondary)
             }
           }
         }
