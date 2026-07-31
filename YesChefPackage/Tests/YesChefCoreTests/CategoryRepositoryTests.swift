@@ -181,6 +181,122 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func partialNamespaceTombstoneHidesDescendantsFromAllRecipeProjections() throws {
+      @Dependency(\.defaultDatabase) var database
+      let deletedAt = Date(timeIntervalSinceReferenceDate: 802_345_000)
+      let now = Date(timeIntervalSinceReferenceDate: 802_345_100)
+      var uuids = SampleUUIDSequence(start: 760)
+
+      try database.write { db in
+        try CategoryRepository.seedStarterCategories(in: db)
+        let cuisine = try #require((try Category.fetchAll(db)).first { $0.name == "Cuisine" })
+        let thai = try #require(
+          (try Category.fetchAll(db)).first { $0.name == "Thai" && $0.parentCategoryID == cuisine.id }
+        )
+        let recipeID = try RecipeRepository.save(
+          draft: RecipeEditorDraft(title: "Partial Tombstone Curry", selectedCategoryIDs: [thai.id]),
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let recipeCategory = try #require(
+          (try RecipeCategory.fetchAll(db)).first { $0.recipeID == recipeID && $0.categoryID == thai.id }
+        )
+        let tombstone = CategorySeedTombstone(id: cuisine.id, dateDeleted: deletedAt)
+        try CategorySeedTombstone.insert { tombstone }.execute(db)
+
+        // CloudKit has delivered the namespace tombstone but none of its child tombstones. The
+        // linked Thai row cannot be reclaimed, so every logical reader must still hide it.
+        #expect((try Category.fetchAll(db)).contains { $0.id == thai.id })
+        #expect(!(try CategoryListRequest().fetch(db)).contains { $0.id == thai.id })
+        let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+        expectNoDifference(detail.categories, [])
+        expectNoDifference(detail.categoryDisplayNames, [])
+        let row = try #require(try RecipeListRequest().fetch(db).first { $0.recipe.id == recipeID })
+        expectNoDifference(row.categoryNames, [])
+        expectNoDifference(row.categoryFilterNames, [])
+
+        try RecipeCategory.find(recipeCategory.id).delete().execute(db)
+        try Recipe.find(recipeID).delete().execute(db)
+        try CategorySeedTombstone.find(tombstone.id).delete().execute(db)
+        try CategoryRepository.seedStarterCategories(in: db)
+      }
+    }
+
+    @Test
+    func movedSeedOutsideTombstonedNamespaceRemainsEffective() throws {
+      @Dependency(\.defaultDatabase) var database
+      let deletedAt = Date(timeIntervalSinceReferenceDate: 802_347_000)
+
+      try database.write { db in
+        try CategoryRepository.seedStarterCategories(in: db)
+        let cuisine = try #require((try Category.fetchAll(db)).first { $0.name == "Cuisine" })
+        let thai = try #require(
+          (try Category.fetchAll(db)).first { $0.name == "Thai" && $0.parentCategoryID == cuisine.id }
+        )
+        try CategoryRepository.updateCategory(
+          categoryID: thai.id,
+          name: thai.name,
+          parentCategoryID: nil,
+          in: db
+        )
+        let tombstone = CategorySeedTombstone(id: cuisine.id, dateDeleted: deletedAt)
+        try CategorySeedTombstone.insert { tombstone }.execute(db)
+
+        let rows = try CategoryListRequest().fetch(db)
+        #expect(rows.contains { $0.id == thai.id && $0.parentCategoryID == nil })
+
+        try CategorySeedTombstone.find(tombstone.id).delete().execute(db)
+        try CategoryRepository.updateCategory(
+          categoryID: thai.id,
+          name: thai.name,
+          parentCategoryID: cuisine.id,
+          in: db
+        )
+        try CategoryRepository.seedStarterCategories(in: db)
+      }
+    }
+
+    @Test
+    func recipeSaveCreatesFreshCategoryInsteadOfAssigningTombstonedSeed() throws {
+      @Dependency(\.defaultDatabase) var database
+      let deletedAt = Date(timeIntervalSinceReferenceDate: 802_348_000)
+      let now = Date(timeIntervalSinceReferenceDate: 802_348_100)
+      var uuids = SampleUUIDSequence(start: 770)
+
+      try database.write { db in
+        try CategoryRepository.seedStarterCategories(in: db)
+        let cuisine = try #require((try Category.fetchAll(db)).first { $0.name == "Cuisine" })
+        let thai = try #require(
+          (try Category.fetchAll(db)).first { $0.name == "Thai" && $0.parentCategoryID == cuisine.id }
+        )
+        let tombstone = CategorySeedTombstone(id: thai.id, dateDeleted: deletedAt)
+        try CategorySeedTombstone.insert { tombstone }.execute(db)
+
+        let recipeID = try RecipeRepository.save(
+          draft: RecipeEditorDraft(title: "Imported Thai Curry", categoryNames: "Cuisine > Thai"),
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
+        let recipeCategory = try #require(
+          (try RecipeCategory.fetchAll(db)).first { $0.recipeID == recipeID }
+        )
+        #expect(recipeCategory.categoryID != thai.id)
+        let freshThai = try #require(
+          (try Category.fetchAll(db)).first { $0.id == recipeCategory.categoryID && $0.name == "Thai" }
+        )
+        #expect(freshThai.id != thai.id)
+
+        try RecipeCategory.find(recipeCategory.id).delete().execute(db)
+        try Recipe.find(recipeID).delete().execute(db)
+        try Category.find(freshThai.id).delete().execute(db)
+        try CategorySeedTombstone.find(tombstone.id).delete().execute(db)
+        try CategoryRepository.seedStarterCategories(in: db)
+      }
+    }
+
+    @Test
     func unresolvedStarterParentDoesNotCreateChildAtRoot() throws {
       @Dependency(\.defaultDatabase) var database
       let deletedAt = Date(timeIntervalSinceReferenceDate: 802_350_000)

@@ -5,7 +5,29 @@ public struct CategoryListRequest: FetchKeyRequest {
   public init() {}
 
   public func fetch(_ db: Database) throws -> [Category] {
-    CategoryRepository.sortedCategories(try CategoryRepository.visibleCategories(in: db))
+    CategoryRepository.sortedCategories(try CategoryRepository.effectiveCategorySet(in: db).categories)
+  }
+}
+
+/// The logical category tree. A tombstone removes its starter identity and every row that is
+/// still physically nested under it, whether or not reclamation can delete those rows yet.
+public struct EffectiveCategorySet: Sendable {
+  public let categories: [Category]
+  public let unavailableCategoryIDs: Set<Category.ID>
+
+  init(categories: [Category], tombstonedSeedIDs: Set<Category.ID>) {
+    var unavailableCategoryIDs = tombstonedSeedIDs
+    var addedDescendant = true
+    while addedDescendant {
+      addedDescendant = false
+      for category in categories where category.parentCategoryID.map(unavailableCategoryIDs.contains) == true {
+        if unavailableCategoryIDs.insert(category.id).inserted {
+          addedDescendant = true
+        }
+      }
+    }
+    self.categories = categories.filter { !unavailableCategoryIDs.contains($0.id) }
+    self.unavailableCategoryIDs = unavailableCategoryIDs
   }
 }
 
@@ -13,6 +35,7 @@ public enum CategoryRepositoryError: Error, Equatable {
   case emptyName
   case duplicateSibling(name: String)
   case categoryNotFound
+  case categoryUnavailable
   case parentNotFound
   case cannotParentCategoryUnderItself
   case cannotParentCategoryUnderDescendant
@@ -29,6 +52,8 @@ extension CategoryRepositoryError: LocalizedError {
       "A category named \(name) already exists at that level."
     case .categoryNotFound:
       "Category not found."
+    case .categoryUnavailable:
+      "Category is no longer available."
     case .parentNotFound:
       "Parent category not found."
     case .cannotParentCategoryUnderItself:
@@ -48,6 +73,8 @@ public enum CategoryRepository {
   /// useful cold-start anchor. Stable IDs and a fixed creation date let independently seeded
   /// devices converge on the same synced rows instead of inventing duplicate namespaces.
   public static func seedStarterCategories(in db: Database) throws {
+    // Raw rows are intentional here: seeding is the physical convergence pass, which must see
+    // retained tombstoned rows in order to reclaim them safely before resolving the live tree.
     var categories = try Category.fetchAll(db)
     var seedStates = Dictionary(
       uniqueKeysWithValues: try CategorySeedState.fetchAll(db).map { ($0.id, $0) }
@@ -141,24 +168,31 @@ public enum CategoryRepository {
   /// category write use this before changing the tree; category reads suppress tombstoned rows
   /// immediately, so a late CloudKit arrival is never surfaced while physical cleanup waits.
   public static func reconcileStarterCategoryTombstones(in db: Database) throws {
+    // Raw rows are intentional here: this is physical reclamation, not a product read or writer.
     var categories = try Category.fetchAll(db)
     let tombstonedSeedIDs = Set(try CategorySeedTombstone.fetchAll(db).map(\.id))
     try reconcileTombstonedSeedCategories(tombstonedSeedIDs, categories: &categories, in: db)
   }
 
-  /// The user-visible category tree excludes starter rows already deleted on another device,
-  /// even before this process gets a later opportunity to physically reclaim those rows.
-  public static func visibleCategories(in db: Database) throws -> [Category] {
+  /// The sole logical eligibility projection for category readers and writers. A child stays
+  /// eligible when it was genuinely moved outside a tombstoned ancestor because availability is
+  /// derived from the current stored parent chain, not the starter taxonomy's original shape.
+  public static func effectiveCategorySet(in db: Database) throws -> EffectiveCategorySet {
     let tombstonedSeedIDs = Set(try CategorySeedTombstone.fetchAll(db).map(\.id))
-    return try Category.fetchAll(db).filter { !tombstonedSeedIDs.contains($0.id) }
+    return EffectiveCategorySet(
+      categories: try Category.fetchAll(db),
+      tombstonedSeedIDs: tombstonedSeedIDs
+    )
   }
 
   /// Moves the still-synced, now-dormant tag graph into the category tree. This deliberately
   /// runs outside `DatabaseMigrator`, after CloudSync has installed its triggers, so every
   /// resulting category and recipe-category write participates in normal sync.
   public static func foldDormantTagsIntoCategories(in db: Database) throws {
+    try reconcileStarterCategoryTombstones(in: db)
     let tags = try Tag.fetchAll(db).sorted(by: areTagsInFoldOrder)
-    var categories = try Category.fetchAll(db)
+    var effectiveCategories = try effectiveCategorySet(in: db)
+    var categories = effectiveCategories.categories
     var categoryIDByTagID: [Tag.ID: Category.ID] = [:]
 
     for tag in tags {
@@ -180,7 +214,8 @@ public enum CategoryRepository {
           }
           .execute(db)
         }
-        categories = try Category.fetchAll(db)
+        effectiveCategories = try effectiveCategorySet(in: db)
+        categories = effectiveCategories.categories
         categoryIDByTagID[tag.id] = canonicalCategory.id
         continue
       }
@@ -193,7 +228,10 @@ public enum CategoryRepository {
       }
 
       let category = Category(
-        id: tag.id,
+        id: try freshCategoryID(
+          using: { tag.id },
+          unavailableCategoryIDs: effectiveCategories.unavailableCategoryIDs
+        ),
         name: tag.name,
         color: tag.color,
         sortOrder: tag.sortOrder,
@@ -236,7 +274,8 @@ public enum CategoryRepository {
     uuid: () -> UUID
   ) throws -> Category {
     try reconcileStarterCategoryTombstones(in: db)
-    let categories = try Category.fetchAll(db)
+    let effectiveCategories = try effectiveCategorySet(in: db)
+    let categories = effectiveCategories.categories
     let name = try normalizedName(name)
     try validateParent(parentCategoryID, categories: categories)
     try validateUniqueSiblingName(
@@ -247,7 +286,7 @@ public enum CategoryRepository {
     )
 
     let category = Category(
-      id: uuid(),
+      id: try freshCategoryID(using: uuid, unavailableCategoryIDs: effectiveCategories.unavailableCategoryIDs),
       name: name,
       parentCategoryID: parentCategoryID,
       sortOrder: nextSortOrder(parentCategoryID: parentCategoryID, categories: categories),
@@ -264,7 +303,7 @@ public enum CategoryRepository {
     in db: Database
   ) throws {
     try reconcileStarterCategoryTombstones(in: db)
-    let categories = try Category.fetchAll(db)
+    let categories = try effectiveCategorySet(in: db).categories
     let category = try category(categoryID, in: categories)
     let name = try normalizedName(name)
     try validateMove(categoryID: categoryID, parentCategoryID: parentCategoryID, categories: categories)
@@ -284,7 +323,7 @@ public enum CategoryRepository {
 
   public static func deleteCategory(categoryID: Category.ID, in db: Database, now: Date) throws {
     try reconcileStarterCategoryTombstones(in: db)
-    let categories = try Category.fetchAll(db)
+    let categories = try effectiveCategorySet(in: db).categories
     _ = try category(categoryID, in: categories)
     guard !categories.contains(where: { $0.parentCategoryID == categoryID }) else {
       throw CategoryRepositoryError.cannotDeleteCategoryWithChildren
@@ -378,6 +417,17 @@ public enum CategoryRepository {
     return name
   }
 
+  static func freshCategoryID(
+    using uuid: () -> UUID,
+    unavailableCategoryIDs: Set<Category.ID>
+  ) throws -> Category.ID {
+    let id = uuid()
+    guard !unavailableCategoryIDs.contains(id) else {
+      throw CategoryRepositoryError.categoryUnavailable
+    }
+    return id
+  }
+
   private static func validateParent(_ parentCategoryID: Category.ID?, categories: [Category]) throws {
     guard let parentCategoryID else { return }
     guard categories.contains(where: { $0.id == parentCategoryID }) else {
@@ -439,6 +489,8 @@ public enum CategoryRepository {
       .execute(db)
     }
 
+    // Raw rows are intentional: a physical convergence merge must repoint every child and join
+    // before deleting a duplicate, including rows currently hidden by a tombstone.
     for var child in try Category.fetchAll(db) where child.parentCategoryID == duplicate.id {
       child.parentCategoryID = canonical.id
       try Category.upsert { child }.execute(db)
@@ -541,8 +593,9 @@ extension RecipeRepository {
     in db: Database,
     uuid: () -> UUID
   ) throws {
+    try CategoryRepository.reconcileStarterCategoryTombstones(in: db)
     let existingRecipeCategories = try RecipeCategory.where { $0.recipeID.eq(recipeID) }.fetchAll(db)
-    let validCategoryIDs = Set(try Category.fetchAll(db).map(\.id))
+    let validCategoryIDs = Set(try CategoryRepository.effectiveCategorySet(in: db).categories.map(\.id))
     var keptRecipeCategoryIDs: Set<RecipeCategory.ID> = []
     var seenCategoryIDs: Set<Category.ID> = []
 
@@ -568,8 +621,12 @@ extension RecipeRepository {
     now: Date,
     uuid: () -> UUID
   ) throws {
-    var existingCategories = try Category.fetchAll(db)
+    try CategoryRepository.reconcileStarterCategoryTombstones(in: db)
+    var effectiveCategories = try CategoryRepository.effectiveCategorySet(in: db)
+    var existingCategories = effectiveCategories.categories
     try reconcileDuplicateCategories(in: db, categories: &existingCategories)
+    effectiveCategories = try CategoryRepository.effectiveCategorySet(in: db)
+    existingCategories = effectiveCategories.categories
     let existingRecipeCategories = try RecipeCategory.where { $0.recipeID.eq(recipeID) }.fetchAll(db)
     var recipeCategoryIDByCategoryID: [Category.ID: RecipeCategory.ID] = [:]
     for recipeCategory in existingRecipeCategories.sorted(by: { $0.id.uuidString < $1.id.uuidString }) {
@@ -583,6 +640,7 @@ extension RecipeRepository {
       let category = try findOrCreateCategory(
         path: path,
         existingCategories: &existingCategories,
+        unavailableCategoryIDs: effectiveCategories.unavailableCategoryIDs,
         in: db,
         now: now,
         uuid: uuid
@@ -601,6 +659,7 @@ extension RecipeRepository {
       let category = try findOrCreateCategory(
         path: CategoryHierarchy.Path(components: [name]),
         existingCategories: &existingCategories,
+        unavailableCategoryIDs: effectiveCategories.unavailableCategoryIDs,
         in: db,
         now: now,
         uuid: uuid
@@ -635,6 +694,7 @@ extension RecipeRepository {
   private static func findOrCreateCategory(
     path: CategoryHierarchy.Path,
     existingCategories: inout [Category],
+    unavailableCategoryIDs: Set<Category.ID>,
     in db: Database,
     now: Date,
     uuid: () -> UUID
@@ -643,17 +703,27 @@ extension RecipeRepository {
     var currentCategory: Category?
 
     for component in path.components {
-      let category = existingCategories.first {
+      let existingCategory = existingCategories.first {
         $0.parentCategoryID == parentCategoryID
           && $0.name.caseInsensitiveCompare(component) == .orderedSame
       }
-      ?? Category(
-        id: uuid(),
-        name: component,
-        parentCategoryID: parentCategoryID,
-        sortOrder: existingCategories.count,
-        dateCreated: now
-      )
+      let category: Category
+      if let existingCategory {
+        category = existingCategory
+      } else {
+        // Imported text that matches a deleted starter label gets a new user-category identity.
+        // The tombstoned starter UUID is never eligible for reuse or assignment.
+        category = Category(
+          id: try CategoryRepository.freshCategoryID(
+            using: uuid,
+            unavailableCategoryIDs: unavailableCategoryIDs
+          ),
+          name: component,
+          parentCategoryID: parentCategoryID,
+          sortOrder: existingCategories.count,
+          dateCreated: now
+        )
+      }
 
       if !existingCategories.contains(where: { $0.id == category.id }) {
         try Category.insert { category }.execute(db)
@@ -713,7 +783,7 @@ extension RecipeRepository {
           try Category.find(category.id).delete().execute(db)
         }
 
-        categories = try Category.fetchAll(db)
+        categories = try CategoryRepository.effectiveCategorySet(in: db).categories
         didMerge = true
         break
       }
