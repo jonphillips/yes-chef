@@ -5,6 +5,9 @@ autosuggest tags, at capture and at edit, smart LLM vs determinism?"; **ratified
 open questions answered** (see Resolved). S1 is dispatchable. The design converged in that session:
 tags and categories **merge into one thing**, the label proposer is **one engine surfaced in three places**,
 and capture-vs-share is forced by the extension networking gate. Supersedes the two-entity tag/category split.
+**Amendment 1 (2026-07-30, accepted): D7's persisted deletion model is retired — seed starter categories in
+place by fixed id, make them non-deletable, and drop `categorySeedStates` + `categorySeedTombstones`. See
+Amendment 1.**
 Extends [ADR-0026](ADR-0026-review-collection-sheet.md) (the review-collection sheet is the proposer's UI),
 [ADR-0023](ADR-0023-recipe-edit-proposals.md) (propose-to-preview, commit deterministically) and
 [ADR-0025](ADR-0025-reader-comment-ingestion.md) (the one-by-one curation queue). Governed by
@@ -226,3 +229,65 @@ overwrite an earlier `true` deletion. A presence-only tombstone has no non-delet
 Deterministic-first ordering: **S1 → S2 ship value with zero model risk**; S3 is the only new model surface;
 S4–S6 are the three consumers that make S3 worth building (they decisively pass the "does a real consumer ship
 with this?" test — [[synced-table-cost-calibration]]).
+
+## Amendment 1 — D7 over-built for the audience: seed in place, starters non-deletable, retire the seed-state + tombstone tables (2026-07-30)
+
+Status: **Accepted** — 2026-07-30, pre-production. **Supersedes D7's persisted model** (`categorySeedStates`
+and `categorySeedTombstones`). Keeps D7's *starter vocabulary* and its fixed-UUID cross-device convergence;
+retires the machinery around deletion.
+
+**Why.** D7 is correctly engineered — for a robustness bar it doesn't have. The tombstone + monotonic-deletion
+reconciliation exists to survive offline peers racing to clear each other's deletions and late-peer leaf-first
+convergence; that bar is far beyond ~10 friendly users on one or two devices each. Two tells confirm the drift:
+`categorySeedStates.isDeleted`/`dateModified` are already **vestigial** (the struct's own comment says so), and a
+table whose entire job is to record the *absence* of default rows is a recurring confidence tax every time the
+schema is read — schema you re-read and distrust is a liability even when it works. We are pre-prod with an
+erasable DB and a known, tiny install base, so this is the cheapest it will ever be to fix; deferring is how it
+reaches production and locks forever ([[withdraw-not-defer-orphaned-schema]]).
+
+**New model.**
+- **Seed the `Category` rows directly with their fixed seed UUID** (`category.id == seed.id`), insert-if-absent,
+  idempotent, run post-`SyncEngine` with deterministic IDs so convergence is preserved
+  ([[migration-writes-bypass-sync-triggers]]). The mapping table becomes an identity function and disappears.
+- **Rename is in place:** edit `category.name`; the id is unchanged, so the re-seed pass skips it. No state row.
+- **Starter categories are not deletable.** Renaming covers "I don't want *Thai*" (rename or repurpose the row);
+  user-authored categories (non-seed ids) delete **freely**, with zero seed bookkeeping and no tombstone.
+- **Retire `categorySeedStates` and `categorySeedTombstones` entirely** — tables, reconciliation, and CloudSync
+  registration.
+- **Defer, don't build, "hide a starter outright":** if a user ever wants a starter *gone* rather than renamed,
+  add a synced `hidden: Bool` **column** on `Category` at that point — strictly cheaper than a table, and only
+  if the need is real.
+
+**What we give up.** Cross-device "delete a starter and it stays deleted." Accepted: rename covers the real
+need, and a future `hidden` column is a far cheaper way to buy back removal than two synced tables and ~800
+lines of convergence logic. The D7 "leave the physical table dormant" caution (S1) was about the **production**
+tag tables with real rows; it does not apply to pre-prod seed tables no user data depends on.
+
+**Do the clean teardown; do not let a disposable test library dictate the schema.** Jon's ~2000-recipe device
+library is a *rebuildable test database* (ADR-0030 backup/restore + CloudKit resync), and preserving it is not
+worth carrying compatibility scaffolding we dislike on sight. Crucially, this change's blast radius is only the
+~24 seed rows and their two bookkeeping tables — **recipes and every recipe→category join ride through
+untouched** — so "keep my 2000 recipes" and "clean code" are not in tension here; the scary row count is a red
+herring for this change.
+
+**New model.**
+- Seed `Category(id: seed.id, …)`, **insert-if-absent, every boot**. Deterministic ids already give cross-device
+  convergence (CloudKit dedupes by record id), so no mapping table is needed. Runs post-`SyncEngine`,
+  deterministic ([[migration-writes-bypass-sync-triggers]]).
+- **Physically drop `categorySeedStates` and `categorySeedTombstones`** — delete the structs, the migration
+  drops the tables, remove both from `CloudSync` registration. No dormant-table theater.
+- Starters are **non-deletable** (multi-device + no tombstone forces this: a plain-deletable starter resurrects
+  on any fresh reinstall-after-delete, which is exactly what the tombstone existed to stop). The humane escape
+  is a **synced `hidden: Bool` column on `Category`** — folded into this slice, because "remove a default I
+  never use" is a real, stated want and one additive column completes the "hideable not deletable" design
+  rather than forcing a second trip.
+- `RecipeCategoryRepository` collapses from ~849 lines to seed + normal CRUD.
+
+**Migration on the live device.** A normal forward migration (add `categories.hidden`; drop the two seed tables;
+reseed by id) is safe for recipes and needs no erase — `eraseDatabaseOnSchemaChange` stays opt-in/off
+([[debug-erase-vs-sync-triggers]]). Worst case is two *cosmetic* artifacts on starter categories only: a
+duplicate root if a seed had been adopted onto a same-named user category, and the reappearance of a
+previously-deleted starter. Both are fixed by hand in the UI in minutes; neither touches a recipe. If a
+zero-artifact result is wanted, the alternative is a deliberate restart — but it MUST follow the enforced
+restore procedure ([[restore-is-authoritative]]): quiesce **both** devices, restore on one, reinstall the other
+fresh, or a peer's queued delete can silently re-delete restored rows.
