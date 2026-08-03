@@ -250,5 +250,50 @@ extension RecipeCoreTests {
         }
       }
     }
+
+    @Test
+    func categoryGroupsCanBeCreatedRenamedAndHiddenWithoutChangingTheirValues() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 816_350_000)
+      var ids = SampleUUIDSequence(start: 93_000)
+
+      try database.write { db in
+        let facet = try CategoryRepository.createFacet(
+          name: "Dish Type", in: db, now: now, uuid: { ids.next() }
+        )
+        let value = try CategoryRepository.createCategory(
+          name: "Taco", facetID: facet.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+
+        try CategoryRepository.renameFacet(facetID: facet.id, name: "Format", in: db)
+        try CategoryRepository.setFacetHidden(facetID: facet.id, hidden: true, in: db)
+        try CategoryRepository.setCategoryHidden(categoryID: value.id, hidden: true, in: db)
+
+        expectNoDifference(try Facet.find(facet.id).fetchOne(db)?.name, "Format")
+        expectNoDifference(try Facet.find(facet.id).fetchOne(db)?.hidden, true)
+        expectNoDifference(try Category.find(value.id).fetchOne(db)?.facetID, facet.id)
+        expectNoDifference(try Category.find(value.id).fetchOne(db)?.hidden, true)
+        #expect(try FacetListRequest().fetch(db).isEmpty)
+        expectNoDifference(try FacetManagementListRequest().fetch(db).map(\.id), [facet.id])
+      }
+    }
+
+    @Test
+    func categoryGroupsRejectDuplicateNames() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 816_400_000)
+      var ids = SampleUUIDSequence(start: 94_000)
+
+      try database.write { db in
+        _ = try CategoryRepository.createFacet(
+          name: "Dish Type", in: db, now: now, uuid: { ids.next() }
+        )
+        #expect(throws: CategoryRepositoryError.duplicateFacetName(name: "dish type")) {
+          _ = try CategoryRepository.createFacet(
+            name: "dish type", in: db, now: now, uuid: { ids.next() }
+          )
+        }
+      }
+    }
   }
 }

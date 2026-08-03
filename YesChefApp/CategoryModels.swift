@@ -18,27 +18,32 @@ final class CategoryManagementModel {
   @ObservationIgnored
   @Dependency(\.uuid) private var uuid
   @ObservationIgnored
-  @Fetch(CategoryListRequest(), animation: .default) var categories: [YesChefCore.Category] = []
+  @Fetch(CategoryManagementListRequest(), animation: .default) var categories: [YesChefCore.Category] = []
+  @ObservationIgnored
+  @Fetch(FacetManagementListRequest(), animation: .default) var facets: [Facet] = []
 
   var destination: Destination?
-  var editor: CategoryEditorModel?
+  var categoryEditor: CategoryEditorModel?
+  var facetEditor: FacetEditorModel?
   var errorMessage: String?
   var isShowingError = false
 
-  var categoryRows: [CategoryHierarchy.DisplayRow] {
-    CategoryHierarchy.displayRows(from: categories)
+  var looseCategories: [YesChefCore.Category] {
+    categories.filter { $0.facetID == nil }
   }
 
-  func addRootCategoryButtonTapped() {
-    let editor = CategoryEditorModel()
-    editor.parentCategoryID = nil
-    self.editor = editor
+  func addCategoryGroupButtonTapped() {
+    facetEditor = FacetEditorModel()
   }
 
-  func addChildCategoryButtonTapped(parentCategoryID: YesChefCore.Category.ID) {
+  func addLooseCategoryButtonTapped() {
+    categoryEditor = CategoryEditorModel()
+  }
+
+  func addCategoryButtonTapped(facetID: Facet.ID) {
     let editor = CategoryEditorModel()
-    editor.parentCategoryID = parentCategoryID
-    self.editor = editor
+    editor.facetID = facetID
+    categoryEditor = editor
   }
 
   func editCategoryButtonTapped(categoryID: YesChefCore.Category.ID) {
@@ -46,20 +51,55 @@ final class CategoryManagementModel {
     let editor = CategoryEditorModel()
     editor.categoryID = category.id
     editor.name = category.name
+    editor.facetID = category.facetID
     editor.parentCategoryID = category.parentCategoryID
-    self.editor = editor
+    categoryEditor = editor
+  }
+
+  func editCategoryGroupButtonTapped(facetID: Facet.ID) {
+    guard let facet = facets.first(where: { $0.id == facetID }) else { return }
+    let editor = FacetEditorModel()
+    editor.facetID = facet.id
+    editor.name = facet.name
+    facetEditor = editor
   }
 
   func deleteCategoryButtonTapped(categoryID: YesChefCore.Category.ID) {
     destination = .deleteCategory(categoryID)
   }
 
-  var isSaveDisabled: Bool {
-    editor?.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+  func toggleCategoryVisibilityButtonTapped(categoryID: YesChefCore.Category.ID) {
+    guard let category = categories.first(where: { $0.id == categoryID }) else { return }
+    do {
+      try database.write { db in
+        try CategoryRepository.setCategoryHidden(categoryID: categoryID, hidden: !category.hidden, in: db)
+      }
+    } catch {
+      showError(error)
+    }
+  }
+
+  func toggleCategoryGroupVisibilityButtonTapped(facetID: Facet.ID) {
+    guard let facet = facets.first(where: { $0.id == facetID }) else { return }
+    do {
+      try database.write { db in
+        try CategoryRepository.setFacetHidden(facetID: facetID, hidden: !facet.hidden, in: db)
+      }
+    } catch {
+      showError(error)
+    }
+  }
+
+  var isCategorySaveDisabled: Bool {
+    categoryEditor?.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+  }
+
+  var isCategoryGroupSaveDisabled: Bool {
+    facetEditor?.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
   }
 
   func saveCategoryButtonTapped() -> Bool {
-    guard let editor else { return false }
+    guard let editor = categoryEditor else { return false }
 
     do {
       if let categoryID = editor.categoryID {
@@ -75,6 +115,7 @@ final class CategoryManagementModel {
         _ = try database.write { db in
           try CategoryRepository.createCategory(
             name: editor.name,
+            facetID: editor.facetID,
             parentCategoryID: editor.parentCategoryID,
             in: db,
             now: now,
@@ -82,11 +123,31 @@ final class CategoryManagementModel {
           )
         }
       }
-      self.editor = nil
+      categoryEditor = nil
       return true
     } catch {
-      errorMessage = error.localizedDescription
-      isShowingError = true
+      showError(error)
+      return false
+    }
+  }
+
+  func saveCategoryGroupButtonTapped() -> Bool {
+    guard let editor = facetEditor else { return false }
+
+    do {
+      if let facetID = editor.facetID {
+        try database.write { db in
+          try CategoryRepository.renameFacet(facetID: facetID, name: editor.name, in: db)
+        }
+      } else {
+        _ = try database.write { db in
+          try CategoryRepository.createFacet(name: editor.name, in: db, now: now, uuid: { uuid() })
+        }
+      }
+      facetEditor = nil
+      return true
+    } catch {
+      showError(error)
       return false
     }
   }
@@ -96,13 +157,12 @@ final class CategoryManagementModel {
       try database.write { db in
         try CategoryRepository.deleteCategory(categoryID: categoryID, in: db)
       }
-      if editor?.categoryID == categoryID {
-        editor = nil
+      if categoryEditor?.categoryID == categoryID {
+        categoryEditor = nil
       }
       destination = nil
     } catch {
-      errorMessage = error.localizedDescription
-      isShowingError = true
+      showError(error)
     }
   }
 
@@ -110,70 +170,55 @@ final class CategoryManagementModel {
     categories.first { $0.id == categoryID }?.name ?? "this category"
   }
 
-  func cancelEditingButtonTapped() {
-    editor = nil
+  func categoryGroupTitle(for facetID: Facet.ID) -> String {
+    facets.first { $0.id == facetID }?.name ?? "this category group"
   }
 
-  func children(of parentCategoryID: YesChefCore.Category.ID?) -> [YesChefCore.Category] {
-    CategoryHierarchy.children(of: parentCategoryID, in: categories)
+  func cancelCategoryEditingButtonTapped() {
+    categoryEditor = nil
+  }
+
+  func cancelCategoryGroupEditingButtonTapped() {
+    facetEditor = nil
+  }
+
+  func categories(in facetID: Facet.ID) -> [YesChefCore.Category] {
+    CategoryHierarchy.children(of: nil, in: categories.filter { $0.facetID == facetID })
+  }
+
+  func children(of parentCategoryID: YesChefCore.Category.ID?, in facetID: Facet.ID) -> [YesChefCore.Category] {
+    CategoryHierarchy.children(of: parentCategoryID, in: categories.filter { $0.facetID == facetID })
   }
 
   func childCount(for categoryID: YesChefCore.Category.ID) -> Int {
-    children(of: categoryID).count
+    categories.count { $0.parentCategoryID == categoryID }
   }
 
   func parentTitle(for categoryID: YesChefCore.Category.ID?) -> String {
     categoryID.map { title(for: $0) } ?? "None"
   }
 
-  @discardableResult
-  func categoryItemsDropped(
-    _ categoryIDs: [YesChefCore.Category.ID],
-    onParentCategoryID parentCategoryID: YesChefCore.Category.ID?
-  ) -> Bool {
-    var didMoveCategory = false
-    for categoryID in categoryIDs {
-      didMoveCategory = moveCategory(categoryID: categoryID, parentCategoryID: parentCategoryID) || didMoveCategory
-    }
-    return didMoveCategory
+  func canDelete(categoryID: YesChefCore.Category.ID) -> Bool {
+    !CategoryRepository.isStarterCategory(categoryID)
   }
 
-  @discardableResult
-  private func moveCategory(
-    categoryID: YesChefCore.Category.ID,
-    parentCategoryID: YesChefCore.Category.ID?
-  ) -> Bool {
-    guard categoryID != parentCategoryID,
-          let category = categories.first(where: { $0.id == categoryID }),
-          category.parentCategoryID != parentCategoryID else { return false }
-
-    do {
-      try database.write { db in
-        try CategoryRepository.updateCategory(
-          categoryID: categoryID,
-          name: category.name,
-          parentCategoryID: parentCategoryID,
-          in: db
-        )
-      }
-      if editor?.categoryID == categoryID {
-        editor?.parentCategoryID = parentCategoryID
-      }
-      return true
-    } catch {
-      errorMessage = error.localizedDescription
-      isShowingError = true
-      return false
-    }
-  }
-
-  func parentOptions(excluding categoryID: YesChefCore.Category.ID?) -> [CategoryParentOption] {
+  func parentOptions(
+    in facetID: Facet.ID?,
+    excluding categoryID: YesChefCore.Category.ID?
+  ) -> [CategoryParentOption] {
+    guard let facetID else { return [] }
+    let facetCategories = categories.filter { $0.facetID == facetID }
     let excludedIDs = categoryID
-      .map { CategoryHierarchy.descendantIDs(of: $0, in: categories).union([$0]) }
+      .map { CategoryHierarchy.descendantIDs(of: $0, in: facetCategories).union([$0]) }
       ?? Set<YesChefCore.Category.ID>()
-    return categoryRows
+    return CategoryHierarchy.displayRows(from: facetCategories)
       .filter { !excludedIDs.contains($0.category.id) }
       .map { CategoryParentOption(categoryID: $0.category.id, title: $0.displayName) }
+  }
+
+  private func showError(_ error: any Error) {
+    errorMessage = error.localizedDescription
+    isShowingError = true
   }
 }
 
@@ -182,7 +227,15 @@ final class CategoryManagementModel {
 final class CategoryEditorModel: Identifiable {
   var categoryID: YesChefCore.Category.ID?
   var name = ""
+  var facetID: Facet.ID?
   var parentCategoryID: YesChefCore.Category.ID?
+}
+
+@Observable
+@MainActor
+final class FacetEditorModel: Identifiable {
+  var facetID: Facet.ID?
+  var name = ""
 }
 
 struct CategoryParentOption: Identifiable, Equatable {

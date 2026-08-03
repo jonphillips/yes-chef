@@ -9,12 +9,37 @@ public struct CategoryListRequest: FetchKeyRequest {
   }
 }
 
+public struct CategoryManagementListRequest: FetchKeyRequest {
+  public init() {}
+
+  public func fetch(_ db: Database) throws -> [Category] {
+    CategoryRepository.sortedCategories(try Category.fetchAll(db))
+  }
+}
+
+public struct FacetListRequest: FetchKeyRequest {
+  public init() {}
+
+  public func fetch(_ db: Database) throws -> [Facet] {
+    CategoryRepository.sortedFacets(try Facet.fetchAll(db).filter { !$0.hidden })
+  }
+}
+
+public struct FacetManagementListRequest: FetchKeyRequest {
+  public init() {}
+
+  public func fetch(_ db: Database) throws -> [Facet] {
+    CategoryRepository.sortedFacets(try Facet.fetchAll(db))
+  }
+}
+
 public enum CategoryRepositoryError: Error, Equatable {
   case emptyName
   case duplicateSibling(name: String)
   case categoryNotFound
   case parentNotFound
   case facetNotFound
+  case duplicateFacetName(name: String)
   case parentFacetMismatch
   case looseLabelsCannotHaveChildren
   case cannotParentCategoryUnderItself
@@ -37,6 +62,8 @@ extension CategoryRepositoryError: LocalizedError {
       "Parent category not found."
     case .facetNotFound:
       "Category group not found."
+    case let .duplicateFacetName(name):
+      "A category group named \(name) already exists."
     case .parentFacetMismatch:
       "A category can only be nested inside the same category group."
     case .looseLabelsCannotHaveChildren:
@@ -312,6 +339,66 @@ public enum CategoryRepository {
     CategoryHierarchy.displayRows(from: categories).map(\.category)
   }
 
+  public static func sortedFacets(_ facets: [Facet]) -> [Facet] {
+    facets.sorted {
+      if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
+      let nameComparison = $0.name.localizedStandardCompare($1.name)
+      if nameComparison != .orderedSame { return nameComparison == .orderedAscending }
+      return $0.id.uuidString < $1.id.uuidString
+    }
+  }
+
+  public static func isStarterFacet(_ facetID: Facet.ID) -> Bool {
+    starterFacets.contains { $0.facet.id == facetID }
+  }
+
+  public static func isStarterCategory(_ categoryID: Category.ID) -> Bool {
+    starterFacetValues.contains { $0.id == categoryID }
+  }
+
+  public static func createFacet(
+    name: String,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> Facet {
+    let facets = try Facet.fetchAll(db)
+    let name = try normalizedName(name)
+    try validateUniqueFacetName(name, excluding: nil, facets: facets)
+    let facet = Facet(
+      id: uuid(),
+      name: name,
+      sortOrder: (facets.map(\.sortOrder).max() ?? -1) + 1,
+      dateCreated: now
+    )
+    try Facet.insert { facet }.execute(db)
+    return facet
+  }
+
+  public static func renameFacet(facetID: Facet.ID, name: String, in db: Database) throws {
+    let facets = try Facet.fetchAll(db)
+    guard facets.contains(where: { $0.id == facetID }) else {
+      throw CategoryRepositoryError.facetNotFound
+    }
+    let name = try normalizedName(name)
+    try validateUniqueFacetName(name, excluding: facetID, facets: facets)
+    try Facet.find(facetID).update { $0.name = name }.execute(db)
+  }
+
+  public static func setFacetHidden(facetID: Facet.ID, hidden: Bool, in db: Database) throws {
+    guard try Facet.find(facetID).fetchOne(db) != nil else {
+      throw CategoryRepositoryError.facetNotFound
+    }
+    try Facet.find(facetID).update { $0.hidden = hidden }.execute(db)
+  }
+
+  public static func setCategoryHidden(categoryID: Category.ID, hidden: Bool, in db: Database) throws {
+    guard try Category.find(categoryID).fetchOne(db) != nil else {
+      throw CategoryRepositoryError.categoryNotFound
+    }
+    try Category.find(categoryID).update { $0.hidden = hidden }.execute(db)
+  }
+
   public static func createCategory(
     name: String,
     facetID: Facet.ID? = nil,
@@ -407,6 +494,18 @@ public enum CategoryRepository {
     let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !name.isEmpty else { throw CategoryRepositoryError.emptyName }
     return name
+  }
+
+  private static func validateUniqueFacetName(
+    _ name: String,
+    excluding facetID: Facet.ID?,
+    facets: [Facet]
+  ) throws {
+    guard !facets.contains(where: {
+      $0.id != facetID && $0.name.caseInsensitiveCompare(name) == .orderedSame
+    }) else {
+      throw CategoryRepositoryError.duplicateFacetName(name: name)
+    }
   }
 
   private static func resolvedFacetID(
