@@ -103,6 +103,17 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func handoffPromptExplainsThatJSONFollowsTheTransportHeaders() {
+      let prompt = ReaderFeedbackCurationClient.handoffPrompt(
+        comments: [RawComment(text: "A lower rack browned the bottom well.", helpfulCount: 9)],
+        sourceURL: URL(string: "https://cooking.nytimes.com/recipes/example"),
+        preference: "Prefer concise tips."
+      )
+
+      #expect(prompt.contains("strict JSON deliverable after the required `YC-HANDOFF:`"))
+    }
+
+    @Test
     func legacyTipLinesRemainAvailableWithSingleCommentFallback() {
       let returned = AIHandoffReturn.readerFeedbackReturn(
         from: """

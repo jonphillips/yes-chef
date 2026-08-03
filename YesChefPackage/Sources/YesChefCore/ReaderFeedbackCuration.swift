@@ -186,6 +186,9 @@ extension ReaderFeedbackCurationClient: DependencyKey {
     \(preference)
 
     \(prompt(comments: comments, sourceURL: sourceURL))
+
+    For a Yes Chef handoff return, put the strict JSON deliverable after the required `YC-HANDOFF:`
+    and `YC-CONTRACT:` routing lines. Apart from those transport lines, return only the JSON.
     """
   }
 

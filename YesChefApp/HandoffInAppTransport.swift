@@ -17,6 +17,7 @@ final class HandoffInAppTransport {
   var unmatchedResult: String?
   var unmatchedSource: HandoffExportSource?
   var isShowingUnmatchedConfirmation = false
+  private var readerFeedbackHandoffID: AIHandoff.ID?
 
   /// Optional: surfaces a confirmation toast when a prompt lands on the pasteboard, since a
   /// silent copy gives the cook no signal that anything happened. Settable so surfaces without a
@@ -37,6 +38,9 @@ final class HandoffInAppTransport {
         handoffID: uuid()
       )
       UIPasteboard.general.string = handoff.prompt
+      if case .readerFeedback = source {
+        readerFeedbackHandoffID = handoff.id
+      }
       toastCenter?.postSuccess("Prompt copied.")
     } catch {
       present(error)
@@ -88,11 +92,21 @@ final class HandoffInAppTransport {
     }
 
     do {
-      guard let routedText = AIHandoffToken.stripping(from: result),
-        let handoff = try await database.read({ db in
+      let handoffID: AIHandoff.ID
+      if let routedText = AIHandoffToken.stripping(from: result) {
+        guard let handoff = try await database.read({ db in
           try AIHandoffRepository.handoff(id: routedText.handoffID, in: db)
-        }), source.matches(handoff)
-      else {
+        }), source.matches(handoff) else {
+          presentUnmatched(result: result, source: source)
+          return
+        }
+        handoffID = handoff.id
+      } else if let readerFeedbackHandoffID {
+        // The curation prompt asks the chat to return strict JSON. Accept that direct return for
+        // the capture whose prompt this transport just copied; the importer still validates and
+        // marks the matching durable handoff row before the draft is updated.
+        handoffID = readerFeedbackHandoffID
+      } else {
         presentUnmatched(result: result, source: source)
         return
       }
@@ -100,12 +114,15 @@ final class HandoffInAppTransport {
       let comments = readerFeedbackComments(in: source)
       let review = try await database.write { db in
         try AIHandoffIntentImport.stageReaderFeedbackReview(
-          handoffID: handoff.id,
+          handoffID: handoffID,
           result: result,
           comments: comments,
           in: db,
           now: importDate
         )
+      }
+      if handoffID == readerFeedbackHandoffID {
+        readerFeedbackHandoffID = nil
       }
       receive(review)
     } catch {

@@ -11,11 +11,26 @@ public extension AIHandoffIntentImport {
     in db: Database,
     now: Date
   ) throws -> AIHandoffReaderFeedbackReview {
-    guard let markedResult = AIHandoffReturnContract.strippingMarker(from: result) else {
-      throw AIHandoffReturnContractError.instructionsOutOfDate
+    let payload: String
+    if let markedResult = AIHandoffReturnContract.strippingMarker(from: result) {
+      guard let routedText = AIHandoffToken.stripping(from: markedResult), routedText.handoffID == handoffID else {
+        throw AIHandoffIntentImportError.wrongTask
+      }
+      payload = routedText.payload
+    } else {
+      // Reader-feedback curation is the one copied prompt whose deliverable is strict JSON.
+      // Its capture-local transport can therefore accept the JSON directly after it has selected
+      // this durable handoff by the prompt it just copied. Keep ordinary handoff returns on the
+      // contract-marker route, and keep legacy `Tip:` returns there as well.
+      guard AIHandoffToken.stripping(from: result) == nil,
+        ReaderFeedbackCurationClient.parseJSONReturn(
+          result,
+          comments: ReaderFeedbackCurationClient.preparedComments(comments)
+        ) != nil
+      else { throw AIHandoffReturnContractError.instructionsOutOfDate }
+      payload = result
     }
-    let routedText = AIHandoffToken.stripping(from: markedResult)
-    guard let routedText, routedText.handoffID == handoffID,
+    guard
       let handoff = try AIHandoffRepository.handoff(id: handoffID, in: db),
       handoff.sourceType == .capture,
       handoff.sourceID == handoffID,
@@ -24,7 +39,7 @@ public extension AIHandoffIntentImport {
       handoff.importedAt == nil
     else { throw AIHandoffIntentImportError.wrongTask }
 
-    let returned = AIHandoffReturn.readerFeedbackReturn(from: routedText.payload, comments: comments)
+    let returned = AIHandoffReturn.readerFeedbackReturn(from: payload, comments: comments)
     guard !returned.tips.isEmpty else {
       if !returned.unparsedLines.isEmpty {
         throw AIHandoffIntentImportError.unparsedReaderFeedbackLines(returned.unparsedLines)

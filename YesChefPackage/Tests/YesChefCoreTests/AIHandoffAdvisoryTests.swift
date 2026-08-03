@@ -246,6 +246,72 @@ struct AIHandoffAdvisoryTests {
   }
 
   @Test
+  func readerFeedbackCaptureHandoffAcceptsTheCopiedPromptJSONReturn() throws {
+    @Dependency(\.defaultDatabase) var database
+    let handoffID = SampleUUIDSequence.uuid(38_070)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+    let comments = [
+      RawComment(text: "A lower rack browned the bottom well.", helpfulCount: 9),
+      RawComment(text: "Another vote for the lower rack.", helpfulCount: 4),
+    ]
+
+    try database.write { db in
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .capture,
+          sourceID: handoffID,
+          taskType: .readerFeedbackCuration,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      let review = try AIHandoffIntentImport.stageReaderFeedbackReview(
+        handoffID: handoffID,
+        result: """
+        [
+          {
+            "text": "Bake on the lower rack for a well-browned bottom.",
+            "kind": "consensusDistilled",
+            "supportCount": 2,
+            "commentNumbers": [1, 2]
+          }
+        ]
+        """,
+        comments: comments,
+        in: db,
+        now: now
+      )
+
+      expectNoDifference(
+        review.tips,
+        [
+          ReaderFeedbackTip(
+            text: "Bake on the lower rack for a well-browned bottom.",
+            provenanceKind: .consensusDistilled,
+            supportCount: 2,
+            backingComments: [
+              ReaderFeedbackBackingComment(
+                commentNumber: 1,
+                text: "A lower rack browned the bottom well.",
+                helpfulCount: 9
+              ),
+              ReaderFeedbackBackingComment(
+                commentNumber: 2,
+                text: "Another vote for the lower rack.",
+                helpfulCount: 4
+              ),
+            ]
+          )
+        ]
+      )
+      #expect(try AIHandoffRepository.handoff(id: handoffID, in: db)?.status == .imported)
+    }
+  }
+
+  @Test
   func readerFeedbackCaptureHandoffExplainsUnlabeledReturns() throws {
     @Dependency(\.defaultDatabase) var database
     let handoffID = SampleUUIDSequence.uuid(38_053)
