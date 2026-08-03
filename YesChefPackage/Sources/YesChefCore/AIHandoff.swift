@@ -587,7 +587,7 @@ public enum AIHandoffToken {
 /// The single, pasteable return contract for the external Yes Chef project. It deliberately lives outside
 /// each hand-off payload: the payload carries only a title, routing token, context, and the verb's ask.
 public enum AIHandoffReturnContract {
-  public static let version = 2
+  public static let version = "2.1"
   public static let marker = "YC-CONTRACT: v\(version)"
 
   public static let projectInstructions = """
@@ -600,6 +600,8 @@ public enum AIHandoffReturnContract {
     When the user asks to finalize, or a hand-off asks for an immediate result, stop conversing and return the requested deliverable as a terminal response. Its first line must be the exact `YC-HANDOFF:` token from the prompt. Its second line must be `\(marker)`. Then return the requested deliverable. Include a `YC-LEARNINGS:` section with distinct durable learnings unless the hand-off expressly asks you to omit it.
 
     For an Experiments hand-off, return each experiment as exactly three lines, in this order: `Hypothesis: <one sentence>`, `Change: <one sentence>`, and `Rationale: <one sentence>`. Repeat that labeled cycle for each distinct experiment. Do not include `YC-LEARNINGS:` for Experiments; an experiment is untested until its outcome is recorded. Some other hand-offs may also expressly suppress learnings when they return untested suggestions or curated source evidence; follow that task-specific instruction.
+
+    Whenever a hand-off asks for strict JSON, use straight ASCII double-quote characters (`"`) for every JSON key and string delimiter. Never substitute typographic/smart quotes (`“` or `”`).
 
     Return no preamble, sign-off, headings, or nesting. Do not assess what is already good. Keep distinct requested items distinct rather than merging them into a summary. If a requested field cannot be filled confidently, omit that item rather than inventing it. Do not use a Markdown code fence.
     """

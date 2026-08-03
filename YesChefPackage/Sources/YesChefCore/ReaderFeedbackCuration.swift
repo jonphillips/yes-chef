@@ -146,6 +146,9 @@ extension ReaderFeedbackCurationClient: DependencyKey {
         "commentNumbers": [1, 7]
       }
     ]
+
+    Use straight ASCII double-quote characters (`"`) for every JSON key and string delimiter. Never use
+    typographic/smart quotes (`“` or `”`).
     """
 
   static func prompt(comments: [RawComment], sourceURL: URL?) -> String {

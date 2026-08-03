@@ -107,7 +107,7 @@ extension RecipeCoreTests {
       let returned = AIHandoffReturn.readerFeedbackReturn(
         from: """
         YC-HANDOFF: 5D7A4A74-D38B-4CFB-94DE-8E97763E8B49
-        YC-CONTRACT: v2
+        YC-CONTRACT: v2.1
         [
           {
             “text”: “Brown the tofu, then return it only to coat and warm through.”,
@@ -157,6 +157,7 @@ extension RecipeCoreTests {
       )
 
       #expect(prompt.contains("strict JSON deliverable after the required `YC-HANDOFF:`"))
+      #expect(prompt.contains("straight ASCII double-quote characters"))
     }
 
     @Test

@@ -43,7 +43,7 @@ struct HandoffSectionRoutingTests {
     let handoffID = UUID(uuidString: "00000000-0000-0000-0000-000000003903")!
     let result = """
     YC-HANDOFF: \(handoffID.uuidString)
-    YC-CONTRACT: v2
+    YC-CONTRACT: v2.1
     Brown the butter before creaming it so the cookies have more nutty depth.
     YC-LEARNINGS:
     - Bacon was rejected because it would overpower the cookie.
