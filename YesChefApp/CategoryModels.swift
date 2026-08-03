@@ -9,6 +9,7 @@ final class CategoryManagementModel {
   @CasePathable
   enum Destination {
     case deleteCategory(YesChefCore.Category.ID)
+    case deleteCategoryGroup(Facet.ID)
   }
 
   @ObservationIgnored
@@ -66,6 +67,10 @@ final class CategoryManagementModel {
 
   func deleteCategoryButtonTapped(categoryID: YesChefCore.Category.ID) {
     destination = .deleteCategory(categoryID)
+  }
+
+  func deleteCategoryGroupButtonTapped(facetID: Facet.ID) {
+    destination = .deleteCategoryGroup(facetID)
   }
 
   func toggleCategoryVisibilityButtonTapped(categoryID: YesChefCore.Category.ID) {
@@ -166,6 +171,20 @@ final class CategoryManagementModel {
     }
   }
 
+  func confirmDeleteCategoryGroupButtonTapped(facetID: Facet.ID) {
+    do {
+      try database.write { db in
+        try CategoryRepository.deleteFacet(facetID: facetID, in: db)
+      }
+      if facetEditor?.facetID == facetID {
+        facetEditor = nil
+      }
+      destination = nil
+    } catch {
+      showError(error)
+    }
+  }
+
   func title(for categoryID: YesChefCore.Category.ID) -> String {
     categories.first { $0.id == categoryID }?.name ?? "this category"
   }
@@ -200,6 +219,10 @@ final class CategoryManagementModel {
 
   func canDelete(categoryID: YesChefCore.Category.ID) -> Bool {
     !CategoryRepository.isStarterCategory(categoryID)
+  }
+
+  func canDeleteCategoryGroup(facetID: Facet.ID) -> Bool {
+    !CategoryRepository.isStarterFacet(facetID)
   }
 
   func parentOptions(

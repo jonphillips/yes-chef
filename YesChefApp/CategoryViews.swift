@@ -32,6 +32,18 @@ struct CategoryManagementView: View {
       } message: { categoryID in
         Text("Delete \(model.title(for: categoryID))?")
       }
+      .confirmationDialog(
+        "Delete Category Group?",
+        item: $model.destination.deleteCategoryGroup,
+        titleVisibility: .visible
+      ) { facetID in
+        Button("Delete Category Group", role: .destructive) {
+          model.confirmDeleteCategoryGroupButtonTapped(facetID: facetID)
+        }
+        Button("Cancel", role: .cancel) {}
+      } message: { facetID in
+        Text("Delete \(model.categoryGroupTitle(for: facetID))?")
+      }
       .alert("Could Not Save Category", isPresented: $model.isShowingError) {
         Button("OK") {}
       } message: {
@@ -127,6 +139,13 @@ private struct CategoryGroupRow: View {
           model.toggleCategoryGroupVisibilityButtonTapped(facetID: facet.id)
         } label: {
           Label(facet.hidden ? "Show Category Group" : "Hide Category Group", systemImage: facet.hidden ? "eye" : "eye.slash")
+        }
+        if model.canDeleteCategoryGroup(facetID: facet.id) {
+          Button(role: .destructive) {
+            model.deleteCategoryGroupButtonTapped(facetID: facet.id)
+          } label: {
+            Label("Delete", systemImage: "trash")
+          }
         }
       } label: {
         Label("Category Group Actions", systemImage: "ellipsis.circle")
@@ -347,6 +366,17 @@ private struct CategoryGroupEditorSheet: View {
     Form {
       Section("Category Group") {
         StackedTextField(title: "Name", text: $editor.name)
+      }
+
+      if let facetID = editor.facetID, model.canDeleteCategoryGroup(facetID: facetID) {
+        Section {
+          Button(role: .destructive) {
+            model.deleteCategoryGroupButtonTapped(facetID: facetID)
+            dismiss()
+          } label: {
+            Label("Delete Category Group", systemImage: "trash")
+          }
+        }
       }
     }
     .navigationTitle(editorTitle)
