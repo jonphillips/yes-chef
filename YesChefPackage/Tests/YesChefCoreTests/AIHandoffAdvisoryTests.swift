@@ -205,6 +205,7 @@ struct AIHandoffAdvisoryTests {
   func readerFeedbackCaptureHandoffStagesTipsBackToTheDraftWithoutALearning() throws {
     @Dependency(\.defaultDatabase) var database
     let handoffID = SampleUUIDSequence.uuid(38_052)
+    let captureID = SampleUUIDSequence.uuid(38_152)
     let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
 
     try database.write { db in
@@ -212,7 +213,7 @@ struct AIHandoffAdvisoryTests {
         AIHandoff(
           id: handoffID,
           sourceType: .capture,
-          sourceID: handoffID,
+          sourceID: captureID,
           taskType: .readerFeedbackCuration,
           createdAt: now,
           exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
@@ -228,6 +229,7 @@ struct AIHandoffAdvisoryTests {
         These were the strongest returns:
         Tip: Use two garlic cloves for a more pronounced flavor.
         """,
+        captureID: captureID,
         in: db,
         now: now
       )
@@ -246,9 +248,135 @@ struct AIHandoffAdvisoryTests {
   }
 
   @Test
+  func readerFeedbackCaptureHandoffAcceptsTheCopiedPromptJSONReturn() throws {
+    @Dependency(\.defaultDatabase) var database
+    let handoffID = SampleUUIDSequence.uuid(38_070)
+    let captureID = SampleUUIDSequence.uuid(38_170)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+    let comments = [
+      RawComment(text: "A lower rack browned the bottom well.", helpfulCount: 9),
+      RawComment(text: "Another vote for the lower rack.", helpfulCount: 4),
+    ]
+
+    try database.write { db in
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .capture,
+          sourceID: captureID,
+          taskType: .readerFeedbackCuration,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      let review = try AIHandoffIntentImport.stageReaderFeedbackReview(
+        handoffID: handoffID,
+        result: """
+        [
+          {
+            "text": "Bake on the lower rack for a well-browned bottom.",
+            "kind": "consensusDistilled",
+            "supportCount": 2,
+            "commentNumbers": [1, 2]
+          }
+        ]
+        """,
+        captureID: captureID,
+        comments: comments,
+        in: db,
+        now: now
+      )
+
+      expectNoDifference(
+        review.tips,
+        [
+          ReaderFeedbackTip(
+            text: "Bake on the lower rack for a well-browned bottom.",
+            provenanceKind: .consensusDistilled,
+            supportCount: 2,
+            backingComments: [
+              ReaderFeedbackBackingComment(
+                commentNumber: 1,
+                text: "A lower rack browned the bottom well.",
+                helpfulCount: 9
+              ),
+              ReaderFeedbackBackingComment(
+                commentNumber: 2,
+                text: "Another vote for the lower rack.",
+                helpfulCount: 4
+              ),
+            ]
+          )
+        ]
+      )
+      #expect(try AIHandoffRepository.handoff(id: handoffID, in: db)?.status == .imported)
+    }
+  }
+
+  @Test
+  func readerFeedbackExplicitOverrideRehomesAForeignTokenToTheCurrentCapture() throws {
+    @Dependency(\.defaultDatabase) var database
+    let currentHandoffID = SampleUUIDSequence.uuid(38_071)
+    let foreignHandoffID = SampleUUIDSequence.uuid(38_072)
+    let captureID = SampleUUIDSequence.uuid(38_171)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+    let comments = [RawComment(text: "A lower rack browned the bottom well.", helpfulCount: 9)]
+
+    try database.write { db in
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: currentHandoffID,
+          sourceType: .capture,
+          sourceID: captureID,
+          taskType: .readerFeedbackCuration,
+          createdAt: now,
+          exportedPrompt: ""
+        ),
+        in: db
+      )
+
+      let review = try AIHandoffIntentImport.stageReaderFeedbackReview(
+        handoffID: currentHandoffID,
+        result: """
+        YC-HANDOFF: \(foreignHandoffID.uuidString)
+        \(AIHandoffReturnContract.marker)
+        [
+          {
+            "text": "Bake on the lower rack for a well-browned bottom.",
+            "kind": "singularPreserved",
+            "supportCount": 1,
+            "commentNumbers": [1]
+          }
+        ]
+        """,
+        captureID: captureID,
+        comments: comments,
+        allowUnmatchedToken: true,
+        in: db,
+        now: now
+      )
+
+      expectNoDifference(
+        review.tips.first?.backingComments,
+        [
+          ReaderFeedbackBackingComment(
+            commentNumber: 1,
+            text: "A lower rack browned the bottom well.",
+            helpfulCount: 9
+          )
+        ]
+      )
+      #expect(try AIHandoffRepository.handoff(id: currentHandoffID, in: db)?.status == .imported)
+    }
+  }
+
+  @Test
   func readerFeedbackCaptureHandoffExplainsUnlabeledReturns() throws {
     @Dependency(\.defaultDatabase) var database
     let handoffID = SampleUUIDSequence.uuid(38_053)
+    let captureID = SampleUUIDSequence.uuid(38_153)
     let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
 
     try database.write { db in
@@ -256,7 +384,7 @@ struct AIHandoffAdvisoryTests {
         AIHandoff(
           id: handoffID,
           sourceType: .capture,
-          sourceID: handoffID,
+          sourceID: captureID,
           taskType: .readerFeedbackCuration,
           createdAt: now,
           exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
@@ -274,6 +402,7 @@ struct AIHandoffAdvisoryTests {
           \(AIHandoffReturnContract.marker)
           Salt and drain the cucumbers before dressing them.
           """,
+          captureID: captureID,
           in: db,
           now: now
         )

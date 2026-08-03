@@ -69,6 +69,117 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func pastedJSONUsesTheSameTipContractAsConfiguredModelCuration() {
+      let comments = [
+        RawComment(text: "Same-day dough spread; overnight rest fixed it.", helpfulCount: 7),
+        RawComment(text: "Lower rack gave me a browned bottom.", helpfulCount: 12),
+        RawComment(text: "Another vote for the lower rack.", helpfulCount: 3),
+      ]
+      let result = """
+      [
+        {
+          "text": "Bake it on the lower rack so the bottom browns before the topping burns.",
+          "kind": "consensusDistilled",
+          "supportCount": 2,
+          "commentNumbers": [1, 3]
+        },
+        {
+          "text": "Rest the dough overnight; same-day dough spread too much.",
+          "kind": "singularPreserved",
+          "supportCount": 1,
+          "commentNumbers": [2]
+        }
+      ]
+      """
+
+      let onboard = ReaderFeedbackCurationClient.parse(
+        result,
+        comments: ReaderFeedbackCurationClient.preparedComments(comments)
+      )
+      let pasted = AIHandoffReturn.readerFeedbackReturn(from: result, comments: comments)
+
+      expectNoDifference(pasted.tips, onboard)
+      expectNoDifference(pasted.unparsedLines, [])
+    }
+
+    @Test
+    func pastedHandoffWithTypographicJSONQuotesPreservesCurationProvenance() {
+      let returned = AIHandoffReturn.readerFeedbackReturn(
+        from: """
+        YC-HANDOFF: 5D7A4A74-D38B-4CFB-94DE-8E97763E8B49
+        YC-CONTRACT: v2.1
+        [
+          {
+            “text”: “Brown the tofu, then return it only to coat and warm through.”,
+            “kind”: “consensusDistilled”,
+            “supportCount”: 2,
+            “commentNumbers”: [1, 2]
+          }
+        ]
+        """,
+        comments: [
+          RawComment(text: "Browned tofu stays intact.", helpfulCount: 9),
+          RawComment(text: "Reduce the sauce before returning tofu.", helpfulCount: 4),
+        ]
+      )
+
+      expectNoDifference(
+        returned.tips,
+        [
+          ReaderFeedbackTip(
+            text: "Brown the tofu, then return it only to coat and warm through.",
+            provenanceKind: .consensusDistilled,
+            supportCount: 2,
+            backingComments: [
+              ReaderFeedbackBackingComment(
+                commentNumber: 1,
+                text: "Browned tofu stays intact.",
+                helpfulCount: 9
+              ),
+              ReaderFeedbackBackingComment(
+                commentNumber: 2,
+                text: "Reduce the sauce before returning tofu.",
+                helpfulCount: 4
+              ),
+            ]
+          )
+        ]
+      )
+      expectNoDifference(returned.unparsedLines, [])
+    }
+
+    @Test
+    func handoffPromptExplainsThatJSONFollowsTheTransportHeaders() {
+      let prompt = ReaderFeedbackCurationClient.handoffPrompt(
+        comments: [RawComment(text: "A lower rack browned the bottom well.", helpfulCount: 9)],
+        sourceURL: URL(string: "https://cooking.nytimes.com/recipes/example"),
+        preference: "Prefer concise tips."
+      )
+
+      #expect(prompt.contains("strict JSON deliverable after the required `YC-HANDOFF:`"))
+      #expect(prompt.contains("straight ASCII double-quote characters"))
+    }
+
+    @Test
+    func legacyTipLinesRemainAvailableWithSingleCommentFallback() {
+      let returned = AIHandoffReturn.readerFeedbackReturn(
+        from: """
+        Tip: Salt and drain the cucumbers before dressing them.
+        Tip: Use two garlic cloves for a more pronounced flavor.
+        """
+      )
+
+      expectNoDifference(
+        returned.tips,
+        [
+          ReaderFeedbackTip(text: "Salt and drain the cucumbers before dressing them."),
+          ReaderFeedbackTip(text: "Use two garlic cloves for a more pronounced flavor."),
+        ]
+      )
+      expectNoDifference(returned.unparsedLines, [])
+    }
+
+    @Test
     func liveClientUsesConfiguredFrontierProviderAndHighEffort() async throws {
       let recorder = ReaderFeedbackModelRequestRecorder()
       let callRecords = ModelCallRecordCollector()

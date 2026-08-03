@@ -397,6 +397,8 @@ final class RecipeCaptureModel {
   @Dependency(\.webRecipeCaptureClient) private var captureClient
   @ObservationIgnored
   @Dependency(\.labelProposer) var labelProposer
+  @ObservationIgnored
+  @Dependency(\.readerFeedbackCurationClient) var readerFeedbackCurationClient
 
   var urlText = ""
   var draft: WebRecipeCaptureDraft?
@@ -418,6 +420,13 @@ final class RecipeCaptureModel {
   var readerFeedbackProposals: [ReaderFeedbackTip] = []
   var readerFeedbackComments: [RawComment] = []
   var readerFeedbackHandoffEvidence: [String] = []
+  var isCuratingReaderFeedback = false
+  @ObservationIgnored private(set) var readerFeedbackCaptureID: UUID
+
+  init() {
+    @Dependency(\.uuid) var captureUUID
+    readerFeedbackCaptureID = captureUUID()
+  }
 
   var canFetch: Bool {
     normalizedURL != nil && !isFetching && !isExtracting && !isCommitting
@@ -489,6 +498,8 @@ final class RecipeCaptureModel {
     readerFeedbackProposals = []
     readerFeedbackComments = []
     readerFeedbackHandoffEvidence = []
+    isCuratingReaderFeedback = false
+    readerFeedbackCaptureID = uuid()
   }
 
   func cancelButtonTapped() -> Bool {
@@ -597,19 +608,6 @@ final class RecipeCaptureModel {
     var blocks = editorialBlocks
     blocks.remove(atOffsets: offsets)
     editorialBlocks = blocks
-  }
-
-  func updateReaderFeedbackBlockText(_ text: String, at index: Int) {
-    guard readerFeedbackBlocks.indices.contains(index) else { return }
-    var blocks = readerFeedbackBlocks
-    blocks[index].text = text
-    readerFeedbackBlocks = blocks
-  }
-
-  func removeReaderFeedbackBlocks(atOffsets offsets: IndexSet) {
-    var blocks = readerFeedbackBlocks
-    blocks.remove(atOffsets: offsets)
-    readerFeedbackBlocks = blocks
   }
 
   var browserStartURL: URL {

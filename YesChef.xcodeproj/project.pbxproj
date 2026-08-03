@@ -32,6 +32,7 @@
 		2949418F009AE77017F5D1CF /* RecipeVariationDisplayModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD361DD70060E27578688E09 /* RecipeVariationDisplayModel.swift */; };
 		2B97B82EC2543ECE9D3F325F /* RecipeDeliberationLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2B809424555C42DEB0318A9 /* RecipeDeliberationLogView.swift */; };
 		2BF3F98B2662E5DD4617B6DF /* ModelCallInventoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C507E80F42B4348BC5E3472 /* ModelCallInventoryView.swift */; };
+		2E34817DD5653BC61AFF9BB1 /* BrowserReaderFeedbackRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4E2858E5F7AA38D95511ACB /* BrowserReaderFeedbackRoutingTests.swift */; };
 		2F07342A5ED8AB64EFA742F1 /* HandoffReviewCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF6D7AE0E516607E7C801612 /* HandoffReviewCoordinator.swift */; };
 		33D3721651F83CF0864328C4 /* SyncStatusSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9653CACD31CEA3DBF5F722E /* SyncStatusSection.swift */; };
 		33DD122054891894F173D788 /* YesChefApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03DFCF817329BEE674E95B72 /* YesChefApp.swift */; };
@@ -292,6 +293,7 @@
 		DE4284C2FB4F46CA20889B5B /* RecipeVariationBaseWriteGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeVariationBaseWriteGuard.swift; sourceTree = "<group>"; };
 		E29F682A3093D37071F5A924 /* PaprikaImportReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaprikaImportReviewView.swift; sourceTree = "<group>"; };
 		E48B9ACFF26E71C15146E3E9 /* RecipeListPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeListPresets.swift; sourceTree = "<group>"; };
+		E4E2858E5F7AA38D95511ACB /* BrowserReaderFeedbackRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserReaderFeedbackRoutingTests.swift; sourceTree = "<group>"; };
 		E8DD44679AA1444215DC743E /* RecipeFilterPickerViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeFilterPickerViews.swift; sourceTree = "<group>"; };
 		EA3742E4519F6D798F171F80 /* MealCalendarRowHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCalendarRowHelpers.swift; sourceTree = "<group>"; };
 		ED3C57E4D25E07B0D4161163 /* CategoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryViews.swift; sourceTree = "<group>"; };
@@ -367,6 +369,7 @@
 			isa = PBXGroup;
 			children = (
 				792C0EBCFF5BA678E266946D /* AIHandoffMenuPasteTests.swift */,
+				E4E2858E5F7AA38D95511ACB /* BrowserReaderFeedbackRoutingTests.swift */,
 				842FC32385274C6E7D875B4D /* ChatAssistantSelectionTests.swift */,
 				4802BA56B714BCEF8679A289 /* ChatSurfaceTests.swift */,
 				17E669665E13FA2090694CB0 /* HandoffSectionRoutingTests.swift */,
@@ -696,6 +699,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E04A28BE098B255C0B136810 /* AIHandoffMenuPasteTests.swift in Sources */,
+				2E34817DD5653BC61AFF9BB1 /* BrowserReaderFeedbackRoutingTests.swift in Sources */,
 				0CC37A24661F09BC79B0D2DD /* ChatAssistantSelectionTests.swift in Sources */,
 				B1A4B0832475BA500093C538 /* ChatSurfaceTests.swift in Sources */,
 				36753CBE212E39908AA91B4E /* HandoffSectionRoutingTests.swift in Sources */,

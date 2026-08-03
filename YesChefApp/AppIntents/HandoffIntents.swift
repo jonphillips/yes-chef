@@ -178,8 +178,13 @@ extension HandoffExportSource {
       Metadata(sourceType: .mealPlan, sourceID: mealPlanID, taskType: .mealPlanMakeAheadStrategy, dayOffset: nil)
     case let .mealPlanComplement(mealPlanID):
       Metadata(sourceType: .mealPlan, sourceID: mealPlanID, taskType: .mealPlanComplement, dayOffset: nil)
-    case .readerFeedback:
-      Metadata(sourceType: .capture, sourceID: handoffID, taskType: .readerFeedbackCuration, dayOffset: nil)
+    case let .readerFeedback(context):
+      Metadata(
+        sourceType: .capture,
+        sourceID: context.captureID,
+        taskType: .readerFeedbackCuration,
+        dayOffset: nil
+      )
     case let .workbench(workbenchID, task):
       Metadata(sourceType: .workbench, sourceID: workbenchID, taskType: task.handoffTaskType, dayOffset: nil)
     }
@@ -202,9 +207,9 @@ extension HandoffExportSource {
 
   func matches(_ handoff: AIHandoff) -> Bool {
     switch self {
-    case .readerFeedback:
+    case let .readerFeedback(context):
       return handoff.sourceType == .capture
-        && handoff.sourceID == handoff.id
+        && handoff.sourceID == context.captureID
         && handoff.taskType == .readerFeedbackCuration
     default:
       let metadata = metadata(handoffID: handoff.id)
@@ -705,6 +710,40 @@ enum HandoffAppOperations {
       return try AIHandoffIntentImport.stageReview(
         handoffID: handoff.id,
         result: result,
+        in: db,
+        now: now
+      )
+    }
+  }
+
+  static func stageReaderFeedbackReviewForKnownSource(
+    source: HandoffExportSource,
+    result: String,
+    in database: any DatabaseWriter,
+    now: Date,
+    handoffID: AIHandoff.ID
+  ) async throws -> AIHandoffReaderFeedbackReview {
+    guard case let .readerFeedback(context) = source else {
+      throw AIHandoffIntentImportError.wrongTask
+    }
+    let metadata = source.metadata(handoffID: handoffID)
+    let handoff = AIHandoff(
+      id: handoffID,
+      sourceType: metadata.sourceType,
+      sourceID: metadata.sourceID,
+      taskType: metadata.taskType,
+      dayOffset: metadata.dayOffset,
+      createdAt: now,
+      exportedPrompt: ""
+    )
+    return try await database.write { db in
+      try AIHandoffRepository.create(handoff, in: db)
+      return try AIHandoffIntentImport.stageReaderFeedbackReview(
+        handoffID: handoff.id,
+        result: result,
+        captureID: context.captureID,
+        comments: context.comments,
+        allowUnmatchedToken: true,
         in: db,
         now: now
       )

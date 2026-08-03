@@ -17,6 +17,14 @@ final class HandoffInAppTransport {
   var unmatchedResult: String?
   var unmatchedSource: HandoffExportSource?
   var isShowingUnmatchedConfirmation = false
+  @ObservationIgnored private var readerFeedbackReceive: ((AIHandoffReaderFeedbackReview) -> Void)?
+
+  var unmatchedMessage: String {
+    if case .readerFeedback? = unmatchedSource {
+      return "This Reader Feedback response is missing its tag or does not match this capture. Import it anyway? Backing-comment numbering assumes it was curated against these comments."
+    }
+    return "The handoff ID is missing or doesn't match this \(unmatchedSource?.unmatchedSubject ?? "item"). Review the pasted result against it anyway — check it carefully before committing."
+  }
 
   /// Optional: surfaces a confirmation toast when a prompt lands on the pasteboard, since a
   /// silent copy gives the cook no signal that anything happened. Settable so surfaces without a
@@ -79,7 +87,7 @@ final class HandoffInAppTransport {
   func pastedReaderFeedbackResults(
     _ results: [String],
     source: HandoffExportSource,
-    receive: (AIHandoffReaderFeedbackReview) -> Void
+    receive: @escaping (AIHandoffReaderFeedbackReview) -> Void
   ) async {
     guard let result = results.first, !result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       errorMessage = "No handoff result was pasted."
@@ -93,14 +101,20 @@ final class HandoffInAppTransport {
           try AIHandoffRepository.handoff(id: routedText.handoffID, in: db)
         }), source.matches(handoff)
       else {
-        presentUnmatched(result: result, source: source)
+        presentUnmatched(result: result, source: source, readerFeedbackReceive: receive)
         return
       }
       let importDate = now
+      guard case let .readerFeedback(context) = source else {
+        presentUnmatched(result: result, source: source, readerFeedbackReceive: receive)
+        return
+      }
       let review = try await database.write { db in
         try AIHandoffIntentImport.stageReaderFeedbackReview(
           handoffID: handoff.id,
           result: result,
+          captureID: context.captureID,
+          comments: context.comments,
           in: db,
           now: importDate
         )
@@ -113,17 +127,33 @@ final class HandoffInAppTransport {
 
   func reviewUnmatchedResult() async {
     guard let unmatchedResult, let unmatchedSource else { return }
+    let readerFeedbackReceive = readerFeedbackReceive
     dismissUnmatchedConfirmation()
 
     do {
-      let review = try await HandoffAppOperations.stageReviewForKnownSource(
-        source: unmatchedSource,
-        result: unmatchedResult,
-        in: database,
-        now: now,
-        handoffID: uuid()
-      )
-      handoffReviewCoordinator.present(unmatchedSource.applyingScope(to: review))
+      switch unmatchedSource {
+      case .readerFeedback:
+        guard let readerFeedbackReceive else {
+          throw AIHandoffIntentImportError.wrongTask
+        }
+        let review = try await HandoffAppOperations.stageReaderFeedbackReviewForKnownSource(
+          source: unmatchedSource,
+          result: unmatchedResult,
+          in: database,
+          now: now,
+          handoffID: uuid()
+        )
+        readerFeedbackReceive(review)
+      default:
+        let review = try await HandoffAppOperations.stageReviewForKnownSource(
+          source: unmatchedSource,
+          result: unmatchedResult,
+          in: database,
+          now: now,
+          handoffID: uuid()
+        )
+        handoffReviewCoordinator.present(unmatchedSource.applyingScope(to: review))
+      }
     } catch {
       present(error)
     }
@@ -132,6 +162,7 @@ final class HandoffInAppTransport {
   func dismissUnmatchedConfirmation() {
     unmatchedResult = nil
     unmatchedSource = nil
+    readerFeedbackReceive = nil
     isShowingUnmatchedConfirmation = false
   }
 
@@ -140,9 +171,14 @@ final class HandoffInAppTransport {
     isShowingError = true
   }
 
-  private func presentUnmatched(result: String, source: HandoffExportSource) {
+  private func presentUnmatched(
+    result: String,
+    source: HandoffExportSource,
+    readerFeedbackReceive: ((AIHandoffReaderFeedbackReview) -> Void)? = nil
+  ) {
     unmatchedResult = result
     unmatchedSource = source
+    self.readerFeedbackReceive = readerFeedbackReceive
     isShowingUnmatchedConfirmation = true
   }
 }
@@ -265,9 +301,7 @@ private struct HandoffTransportAlert: ViewModifier {
         transport.dismissUnmatchedConfirmation()
       }
     } message: {
-      Text(
-        "The handoff ID is missing or doesn't match this \(transport.unmatchedSource?.unmatchedSubject ?? "item"). Review the pasted result against it anyway — check it carefully before committing."
-      )
+      Text(transport.unmatchedMessage)
     }
   }
 }

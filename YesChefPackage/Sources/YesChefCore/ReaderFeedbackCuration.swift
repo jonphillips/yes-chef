@@ -71,16 +71,7 @@ extension ReaderFeedbackCurationClient: DependencyKey {
     // overruns the frontier context window (input + max_output_tokens). Keep the most
     // helpful `maxComments`, stably (helpful desc, then original order) so the numbering
     // handed to `prompt` and `parse` stays aligned.
-    let comments = comments
-      .compactMap(\.cleanedForReaderFeedbackCuration)
-      .enumerated()
-      .sorted { lhs, rhs in
-        lhs.element.helpfulCount != rhs.element.helpfulCount
-          ? lhs.element.helpfulCount > rhs.element.helpfulCount
-          : lhs.offset < rhs.offset
-      }
-      .prefix(maxComments)
-      .map(\.element)
+    let comments = preparedComments(comments)
     guard !comments.isEmpty else { return [] }
     @Dependency(\.modelClient) var modelClient
     @Dependency(\.apiKeyStore) var apiKeyStore
@@ -144,6 +135,8 @@ extension ReaderFeedbackCurationClient: DependencyKey {
     Bias toward precision over recall. Returning a few strong points is correct. Returning an empty array is correct
     when nothing clears the bar.
 
+    Do not include `YC-LEARNINGS:`. This is curated source evidence awaiting the cook's review, not a new finding.
+
     Return ONLY strict JSON:
     [
       {
@@ -153,6 +146,9 @@ extension ReaderFeedbackCurationClient: DependencyKey {
         "commentNumbers": [1, 7]
       }
     ]
+
+    Use straight ASCII double-quote characters (`"`) for every JSON key and string delimiter. Never use
+    typographic/smart quotes (`“` or `”`).
     """
 
   static func prompt(comments: [RawComment], sourceURL: URL?) -> String {
@@ -177,12 +173,56 @@ extension ReaderFeedbackCurationClient: DependencyKey {
       """
   }
 
+  /// The outboard hand-off carries the same guardrails and strict JSON return shape as the
+  /// configured-model call. The only extra layer is the cook's saved preference, which the
+  /// configured-model boundary supplies separately through `promptPreferenceKey`.
+  public static func handoffPrompt(
+    comments: [RawComment],
+    sourceURL: URL?,
+    preference: String
+  ) -> String {
+    let comments = preparedComments(comments)
+    return """
+    \(instructions)
+
+    Reader-feedback preferences:
+    \(preference)
+
+    \(prompt(comments: comments, sourceURL: sourceURL))
+
+    For a Yes Chef handoff return, put the strict JSON deliverable after the required `YC-HANDOFF:`
+    and `YC-CONTRACT:` routing lines. Apart from those transport lines, return only the JSON.
+    """
+  }
+
+  /// Applies the same selection, order, and prompt bound for both curation routes so that
+  /// `commentNumbers` have the same meaning when a copied prompt is pasted back into the capture.
+  public static func preparedComments(_ comments: [RawComment]) -> [RawComment] {
+    comments
+      .compactMap(\.cleanedForReaderFeedbackCuration)
+      .enumerated()
+      .sorted { lhs, rhs in
+        lhs.element.helpfulCount != rhs.element.helpfulCount
+          ? lhs.element.helpfulCount > rhs.element.helpfulCount
+          : lhs.offset < rhs.offset
+      }
+      .prefix(maxComments)
+      .map(\.element)
+  }
+
   public static func parse(_ text: String, comments: [RawComment] = []) -> [ReaderFeedbackTip] {
+    parseJSONReturn(text, comments: comments) ?? []
+  }
+
+  /// Parses the strict JSON return shared by configured-model and copied-prompt curation.
+  /// `nil` means the text was not a JSON curation return, letting the hand-off importer retain
+  /// compatibility with its older `Tip:` line contract.
+  public static func parseJSONReturn(_ text: String, comments: [RawComment] = []) -> [ReaderFeedbackTip]? {
     guard
       let json = jsonSlice(text),
-      let data = json.data(using: .utf8),
+      let data = normalizingTypographicJSONQuotes(in: json).data(using: .utf8),
       let raw = try? JSONSerialization.jsonObject(with: data)
-    else { return [] }
+    else { return nil }
 
     let elements: [[String: Any]]
     if let object = raw as? [String: Any] {
@@ -276,6 +316,14 @@ extension ReaderFeedbackCurationClient: DependencyKey {
       return jsonArraySlice(trimmed)
     }
     return jsonObjectSlice(trimmed) ?? jsonArraySlice(trimmed)
+  }
+
+  /// Chat clients can turn JSON's ASCII delimiters into typographic quotes while copying.
+  /// Normalize only those delimiters before validating the otherwise unchanged JSON contract.
+  private static func normalizingTypographicJSONQuotes(in text: String) -> String {
+    text
+      .replacingOccurrences(of: "\u{201C}", with: "\"")
+      .replacingOccurrences(of: "\u{201D}", with: "\"")
   }
 }
 

@@ -2,6 +2,27 @@ import Foundation
 import YesChefCore
 
 extension RecipeCaptureModel {
+  func curateReaderFeedbackButtonTapped(sourceURL: URL?) async -> Bool {
+    guard !readerFeedbackComments.isEmpty, !isCuratingReaderFeedback else { return false }
+    isCuratingReaderFeedback = true
+    defer { isCuratingReaderFeedback = false }
+
+    do {
+      let tips = try await readerFeedbackCurationClient(
+        comments: readerFeedbackComments,
+        sourceURL: sourceURL
+      )
+      stageReaderFeedback(tips: tips, comments: readerFeedbackComments)
+      return !tips.isEmpty
+    } catch is CancellationError {
+      return false
+    } catch {
+      errorMessage = RecipeChatErrorText.describe(error)
+      isShowingError = true
+      return false
+    }
+  }
+
   func stageReaderFeedback(
     tips: [ReaderFeedbackTip],
     comments: [RawComment],
@@ -48,5 +69,18 @@ extension RecipeCaptureModel {
 
   func discardReaderFeedbackTip(_ tip: ReaderFeedbackTip) {
     readerFeedbackProposals.removeAll { $0.id == tip.id }
+  }
+
+  func updateReaderFeedbackBlockText(_ text: String, at index: Int) {
+    guard readerFeedbackBlocks.indices.contains(index) else { return }
+    var blocks = readerFeedbackBlocks
+    blocks[index].text = text
+    readerFeedbackBlocks = blocks
+  }
+
+  func removeReaderFeedbackBlocks(atOffsets offsets: IndexSet) {
+    var blocks = readerFeedbackBlocks
+    blocks.remove(atOffsets: offsets)
+    readerFeedbackBlocks = blocks
   }
 }

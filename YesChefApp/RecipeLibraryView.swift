@@ -307,8 +307,8 @@ struct AppContainer: View {
       await recipeModel.captureModel.ingestBrowserCapture(html: html, sourceURL: url)
     }
     if outcome == .extracted {
-      let readerFeedback = browserModel.takeReaderFeedbackDraft()
-      recipeModel.captureModel.stageReaderFeedback(tips: readerFeedback.tips, comments: readerFeedback.comments)
+      let readerFeedbackComments = browserModel.takeReaderFeedbackDraft()
+      recipeModel.captureModel.stageReaderFeedback(tips: [], comments: readerFeedbackComments)
       recipeModel.destination = .captureRecipe
     }
   }
