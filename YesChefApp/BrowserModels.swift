@@ -94,7 +94,7 @@ final class BrowserModel {
     } catch let error as ModelTierResolutionError {
       notice = error.localizedDescription
     } catch {
-      notice = "Couldn't load comments - try again once the page settles."
+      notice = "Couldn't load comments: \(error.localizedDescription)"
     }
   }
 

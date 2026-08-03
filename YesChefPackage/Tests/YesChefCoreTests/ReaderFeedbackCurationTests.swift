@@ -132,7 +132,7 @@ extension RecipeCoreTests {
       let request = try #require(await recorder.first())
       expectNoDifference(request.tier, .frontier(.openai))
       expectNoDifference(request.reasoningEffort, .high)
-      expectNoDifference(request.maxTokens, 16_384)
+      expectNoDifference(request.maxTokens, 32_768)
       expectNoDifference(request.promptPreferenceKey, AIPromptPreferenceKind.readerFeedback.rawValue)
       #expect(request.messages.first?.text.contains("helpful count: 18") == true)
       #expect(request.messages.first?.text.contains("helpful count: 9") == true)
@@ -144,6 +144,38 @@ extension RecipeCoreTests {
         recordedCalls.first?.contextLayers,
         ModelCallContextLayers(included: [.readerComments], omitted: [.tasteProfile])
       )
+    }
+
+    @Test
+    func liveClientCapsPromptToMostHelpfulComments() async throws {
+      let recorder = ReaderFeedbackModelRequestRecorder()
+
+      try await withDependencies {
+        $0.apiKeyStore = readerFeedbackAPIKeyStore([.openai: "sk-openai"])
+        $0.recipeChatProviderPreference = RecipeChatProviderPreference(
+          current: { .openai },
+          set: { _ in }
+        )
+        $0.modelClient = StubModelClient { request in
+          await recorder.append(request)
+          return ModelResponse(text: "[]")
+        }
+      } operation: {
+        let comments = (1...45).map {
+          RawComment(text: "Reader tip number \($0).", helpfulCount: $0)
+        }
+        _ = try await ReaderFeedbackCurationClient.liveValue(
+          comments: comments,
+          sourceURL: URL(string: "https://cooking.nytimes.com/recipes/example")
+        )
+      }
+
+      let prompt = try #require(await recorder.first()).messages.first?.text ?? ""
+      // Only the 40 most-helpful (helpfulCount 6...45) survive; the five weakest drop.
+      let renderedCount = prompt.components(separatedBy: "helpful count:").count - 1
+      expectNoDifference(renderedCount, 40)
+      #expect(prompt.contains("Reader tip number 45."))
+      #expect(prompt.contains("Reader tip number 1.") == false)
     }
 
     @Test

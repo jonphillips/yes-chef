@@ -67,7 +67,20 @@ public struct ReaderFeedbackCurationClient: Sendable {
 
 extension ReaderFeedbackCurationClient: DependencyKey {
   public static let liveValue = ReaderFeedbackCurationClient { comments, sourceURL in
-    let comments = comments.compactMap(\.cleanedForReaderFeedbackCuration)
+    // Bound the prompt: a full NYT "Most Helpful" load can be dozens of notes, which
+    // overruns the frontier context window (input + max_output_tokens). Keep the most
+    // helpful `maxComments`, stably (helpful desc, then original order) so the numbering
+    // handed to `prompt` and `parse` stays aligned.
+    let comments = comments
+      .compactMap(\.cleanedForReaderFeedbackCuration)
+      .enumerated()
+      .sorted { lhs, rhs in
+        lhs.element.helpfulCount != rhs.element.helpfulCount
+          ? lhs.element.helpfulCount > rhs.element.helpfulCount
+          : lhs.offset < rhs.offset
+      }
+      .prefix(maxComments)
+      .map(\.element)
     guard !comments.isEmpty else { return [] }
     @Dependency(\.modelClient) var modelClient
     @Dependency(\.apiKeyStore) var apiKeyStore
@@ -106,7 +119,13 @@ extension ReaderFeedbackCurationClient: DependencyKey {
 
   public static let testValue = ReaderFeedbackCurationClient { _, _ in [] }
 
-  static let maxTokens = 16_384
+  /// The most-helpful reader comments to curate in one pass. Bounds prompt input so a
+  /// large "Show more" load can't overrun the frontier context window.
+  static let maxComments = 40
+
+  /// Output budget. On a high-effort reasoning model this also funds reasoning tokens,
+  /// so it is deliberately generous — a single-user personal call, not a server path.
+  static let maxTokens = 32_768
 
   static let instructions = """
     You curate reader comments for a recipe app. Your primary job is ruthless selectivity.
