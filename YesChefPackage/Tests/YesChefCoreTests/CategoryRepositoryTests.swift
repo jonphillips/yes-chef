@@ -12,7 +12,7 @@ extension RecipeCoreTests {
       @Dependency(\.defaultDatabase) var database
 
       try database.write { db in
-        _ = try CategoryRepository.seedStarterFacets(in: db)
+        let secondAudit = try CategoryRepository.seedStarterFacets(in: db)
         let firstFacets = try Facet.fetchAll(db).sorted { $0.id.uuidString < $1.id.uuidString }
         let firstCategories = try Category.fetchAll(db).sorted { $0.id.uuidString < $1.id.uuidString }
         _ = try CategoryRepository.seedStarterFacets(in: db)
@@ -20,6 +20,7 @@ extension RecipeCoreTests {
         expectNoDifference(try Category.fetchAll(db).sorted { $0.id.uuidString < $1.id.uuidString }, firstCategories)
         #expect(firstFacets.map(\.name) == ["Cuisine", "Course"])
         #expect(firstCategories.allSatisfy { $0.facetID != nil && $0.parentCategoryID == nil })
+        #expect(!secondAudit.requiresReview)
       }
     }
 
@@ -50,6 +51,9 @@ extension RecipeCoreTests {
 
         let audit = try CategoryRepository.seedStarterFacets(in: db)
         #expect(audit.promotedRoots.count == 1)
+        #expect(audit.requiresReview)
+        #expect(audit.deletedCategoryIDs.contains(cuisineID))
+        #expect(audit.parentChanges == [.init(categoryID: koreanID, fromParentCategoryID: cuisineID, toParentCategoryID: nil)])
         expectNoDifference(try Category.find(koreanID).fetchOne(db)?.facetID, try Facet.fetchAll(db).first?.id)
         expectNoDifference(try Category.find(koreanID).fetchOne(db)?.parentCategoryID, nil)
         expectNoDifference(try Category.find(thaiID).fetchOne(db)?.facetID, try Facet.fetchAll(db).first?.id)
@@ -80,8 +84,9 @@ extension RecipeCoreTests {
         #expect(remap.recipeCount == 1)
         #expect(try Category.find(remap.destinationCategoryID).fetchOne(db)?.facetID == nil)
         #expect(try Category.find(remap.destinationCategoryID).fetchOne(db)?.name == "Legacy Cuisine")
-        _ = try CategoryRepository.seedStarterFacets(in: db)
+        let secondAudit = try CategoryRepository.seedStarterFacets(in: db)
         #expect(try Category.find(remap.destinationCategoryID).fetchOne(db) != nil)
+        #expect(!secondAudit.requiresReview)
       }
     }
 
@@ -136,10 +141,12 @@ extension RecipeCoreTests {
         try RecipeCategory.insert { RecipeCategory(id: SampleUUIDSequence.uuid(35), recipeID: secondRecipeID, categoryID: existingID) }
           .execute(db)
 
-        _ = try CategoryRepository.seedStarterFacets(in: db)
+        let audit = try CategoryRepository.seedStarterFacets(in: db)
         let regional = try Category.fetchAll(db).filter { $0.facetID == cuisineID && $0.name == "Regional" }
         #expect(regional.count == 1)
         let canonical = try #require(regional.first)
+        #expect(audit.categoryMerges.count == 1)
+        #expect(audit.deletedCategoryIDs.contains(nestedID) || audit.deletedCategoryIDs.contains(existingID))
         let joinedCategoryIDs = Set(try RecipeCategory.fetchAll(db).map(\.categoryID))
         #expect(joinedCategoryIDs.contains(canonical.id))
       }

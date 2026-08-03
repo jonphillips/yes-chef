@@ -1159,7 +1159,10 @@ extension DependencyValues {
       )
       if runsPostEngineDataPasses {
         try database.write { db in
-          _ = try CategoryRepository.seedStarterFacets(in: db)
+          let facetMigrationAudit = try CategoryRepository.seedStarterFacets(in: db)
+          if facetMigrationAudit.requiresReview {
+            AppLog.dataIntegrity.warning("\(facetMigrationAudit.logSummary, privacy: .public)")
+          }
           try CategoryRepository.foldDormantTagsIntoCategories(in: db)
         }
       }

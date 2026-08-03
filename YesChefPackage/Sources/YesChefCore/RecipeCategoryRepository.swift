@@ -73,6 +73,28 @@ public struct FacetMigrationAudit: Equatable, Sendable {
     public var recipeCount: Int
   }
 
+  public struct ParentChange: Equatable, Sendable {
+    public var categoryID: Category.ID
+    public var fromParentCategoryID: Category.ID?
+    public var toParentCategoryID: Category.ID?
+
+    public init(categoryID: Category.ID, fromParentCategoryID: Category.ID?, toParentCategoryID: Category.ID?) {
+      self.categoryID = categoryID
+      self.fromParentCategoryID = fromParentCategoryID
+      self.toParentCategoryID = toParentCategoryID
+    }
+  }
+
+  public struct CategoryMerge: Equatable, Sendable {
+    public var duplicateCategoryID: Category.ID
+    public var canonicalCategoryID: Category.ID
+
+    public init(duplicateCategoryID: Category.ID, canonicalCategoryID: Category.ID) {
+      self.duplicateCategoryID = duplicateCategoryID
+      self.canonicalCategoryID = canonicalCategoryID
+    }
+  }
+
   public var seededFacetIDs: [Facet.ID] = []
   public var seededCategoryIDs: [Category.ID] = []
   public var promotedRoots: [PromotedRoot] = []
@@ -80,8 +102,53 @@ public struct FacetMigrationAudit: Equatable, Sendable {
   public var looseRoots: [LooseRoot] = []
   public var unresolvedRoots: [Category.ID] = []
   public var remappedRootAssignments: [RootAssignmentRemap] = []
+  public var parentChanges: [ParentChange] = []
+  public var categoryMerges: [CategoryMerge] = []
+  public var deletedCategoryIDs: [Category.ID] = []
 
   public init() {}
+
+  public var requiresReview: Bool {
+    !promotedRoots.isEmpty
+      || !fallbackMatchedRootCategoryIDs.isEmpty
+      || !unresolvedRoots.isEmpty
+      || !remappedRootAssignments.isEmpty
+      || !parentChanges.isEmpty
+      || !categoryMerges.isEmpty
+      || !deletedCategoryIDs.isEmpty
+  }
+
+  public var logSummary: String {
+    let promoted = promotedRoots.map {
+      "id=\($0.category.id.uuidString),name=\($0.category.name),facetID=\($0.facetID.uuidString),children=\($0.childCount)"
+    }
+    let remaps = remappedRootAssignments.map {
+      "\($0.rootCategoryID.uuidString)->\($0.destinationCategoryID.uuidString):recipes=\($0.recipeCount)"
+    }
+    let parentChanges = parentChanges.map {
+      let fromParentID = $0.fromParentCategoryID?.uuidString ?? "nil"
+      let toParentID = $0.toParentCategoryID?.uuidString ?? "nil"
+      return "\($0.categoryID.uuidString):\(fromParentID)->\(toParentID)"
+    }
+    let merges = categoryMerges.map {
+      "\($0.duplicateCategoryID.uuidString)->\($0.canonicalCategoryID.uuidString)"
+    }
+    let unresolved = unresolvedRoots.compactMap { unresolvedRootID in
+      looseRoots.first(where: { $0.category.id == unresolvedRootID }).map {
+        "id=\($0.category.id.uuidString),name=\($0.category.name),children=\($0.childCount)"
+      }
+    }
+    let fields = [
+      "promotedRoots=[\(promoted.joined(separator: ","))]",
+      "fallbackRoots=[\(fallbackMatchedRootCategoryIDs.map(\.uuidString).joined(separator: ","))]",
+      "remaps=[\(remaps.joined(separator: ","))]",
+      "unresolvedRoots=[\(unresolved.joined(separator: ","))]",
+      "parentChanges=[\(parentChanges.joined(separator: ","))]",
+      "merges=[\(merges.joined(separator: ","))]",
+      "deletedCategories=[\(deletedCategoryIDs.map(\.uuidString).joined(separator: ","))]",
+    ]
+    return (["facet-migration-audit"] + fields).joined(separator: " ")
+  }
 }
 
 public enum CategoryRepository {
@@ -101,7 +168,7 @@ public enum CategoryRepository {
       categories.append(seed.category)
       audit.seededCategoryIDs.append(seed.id)
     }
-    try deduplicateFacetSiblings(in: db)
+    try deduplicateFacetSiblings(in: db, audit: &audit)
     return audit
   }
 
@@ -130,6 +197,9 @@ public enum CategoryRepository {
       for var descendant in categories where descendantIDs.contains(descendant.id) {
         descendant.facetID = seed.facet.id
         if descendant.parentCategoryID == root.id {
+          audit.parentChanges.append(
+            .init(categoryID: descendant.id, fromParentCategoryID: root.id, toParentCategoryID: nil)
+          )
           descendant.parentCategoryID = nil
         }
         try Category.upsert { descendant }.execute(db)
@@ -148,6 +218,7 @@ public enum CategoryRepository {
       }
 
       try Category.find(root.id).delete().execute(db)
+      audit.deletedCategoryIDs.append(root.id)
       audit.promotedRoots.append(.init(category: root, facetID: seed.facet.id, childCount: children.count))
       categories = try Category.fetchAll(db)
     }
@@ -159,7 +230,9 @@ public enum CategoryRepository {
         audit.unresolvedRoots.append(category.id)
       }
     }
-    try deduplicateRecipeCategoryPairs(in: db)
+    if !audit.remappedRootAssignments.isEmpty {
+      try deduplicateRecipeCategoryPairs(in: db)
+    }
     return audit
   }
 
@@ -169,6 +242,7 @@ public enum CategoryRepository {
     let tags = try Tag.fetchAll(db).sorted(by: areTagsInFoldOrder)
     var categories = try Category.fetchAll(db)
     var categoryIDByTagID: [Tag.ID: Category.ID] = [:]
+    var mergedCategories = false
 
     for tag in tags {
       let matchingRoots = categories
@@ -182,6 +256,7 @@ public enum CategoryRepository {
       if var canonical = matchingRoots.first {
         for duplicate in matchingRoots.dropFirst() {
           canonical = try mergeCategory(duplicate, into: canonical, in: db)
+          mergedCategories = true
         }
         if canonical.color == nil, let color = tag.color {
           canonical.color = color
@@ -205,8 +280,19 @@ public enum CategoryRepository {
       }
     }
 
+    let pendingRecipeTags = try RecipeTag.fetchAll(db)
+      .sorted(by: areRecipeTagsInFoldOrder)
+      .filter { try RecipeCategory.find($0.id).fetchOne(db) == nil }
+    guard !pendingRecipeTags.isEmpty else {
+      if mergedCategories {
+        try deduplicateRecipeCategoryPairs(in: db)
+      }
+      return
+    }
+
     var recipeCategories = try RecipeCategory.fetchAll(db)
-    for tag in try RecipeTag.fetchAll(db).sorted(by: areRecipeTagsInFoldOrder) {
+    var insertedRecipeCategories = false
+    for tag in pendingRecipeTags {
       guard let categoryID = categoryIDByTagID[tag.tagID] else { continue }
       guard !recipeCategories.contains(where: { $0.recipeID == tag.recipeID && $0.categoryID == categoryID }) else {
         continue
@@ -215,8 +301,11 @@ public enum CategoryRepository {
       let category = RecipeCategory(id: tag.id, recipeID: tag.recipeID, categoryID: categoryID)
       try RecipeCategory.insert { category }.execute(db)
       recipeCategories.append(category)
+      insertedRecipeCategories = true
     }
-    try deduplicateRecipeCategoryPairs(in: db)
+    if mergedCategories || insertedRecipeCategories {
+      try deduplicateRecipeCategoryPairs(in: db)
+    }
   }
 
   public static func sortedCategories(_ categories: [Category]) -> [Category] {
@@ -397,7 +486,8 @@ public enum CategoryRepository {
     return canonical
   }
 
-  private static func deduplicateFacetSiblings(in db: Database) throws {
+  private static func deduplicateFacetSiblings(in db: Database, audit: inout FacetMigrationAudit) throws {
+    var mergedCategories = false
     while true {
       let categories = try Category.fetchAll(db)
       let grouped = Dictionary(grouping: categories.filter { $0.facetID != nil }) {
@@ -411,9 +501,14 @@ public enum CategoryRepository {
       let canonical = canonicalFacetCategory(from: duplicates)
       for duplicate in duplicates where duplicate.id != canonical.id {
         _ = try mergeCategory(duplicate, into: canonical, in: db)
+        audit.categoryMerges.append(.init(duplicateCategoryID: duplicate.id, canonicalCategoryID: canonical.id))
+        audit.deletedCategoryIDs.append(duplicate.id)
+        mergedCategories = true
       }
     }
-    try deduplicateRecipeCategoryPairs(in: db)
+    if mergedCategories {
+      try deduplicateRecipeCategoryPairs(in: db)
+    }
   }
 
   private static func canonicalFacetCategory(from categories: [Category]) -> Category {
