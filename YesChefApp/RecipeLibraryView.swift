@@ -138,7 +138,13 @@ struct AppContainer: View {
         WorkbenchEditorView(model: workbenchModel)
       }
     }
-    .sheet(item: $handoffReviewCoordinator.review, id: \.handoffID) { review in
+    .sheet(
+      item: $handoffReviewCoordinator.review,
+      id: \.handoffID,
+      onDismiss: {
+        handoffReviewCoordinator.presentPendingAdjustmentReviewAfterReviewDismissal()
+      }
+    ) { review in
       HandoffReviewSheet(coordinator: handoffReviewCoordinator, review: review)
     }
     .sheet(item: $handoffReviewCoordinator.adjustmentReview) { review in

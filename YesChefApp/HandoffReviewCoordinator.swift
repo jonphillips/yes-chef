@@ -15,11 +15,13 @@ final class HandoffReviewCoordinator {
 
   var review: AIHandoffReview?
   var adjustmentReview: RecipeAdjustmentReviewState?
+  private var pendingAdjustmentReview: RecipeAdjustmentReviewState?
   var errorMessage: String?
   var errorTitle = "Could Not Save Handoff"
   var isShowingError = false
 
   func present(_ review: AIHandoffReview) {
+    clearError()
     self.review = review
   }
 
@@ -531,10 +533,6 @@ final class HandoffReviewCoordinator {
     return adjustmentReview
   }
 
-  func presentAdjustmentReview(_ adjustmentReview: RecipeAdjustmentReviewState) {
-    self.adjustmentReview = adjustmentReview
-  }
-
   func overwriteAdjustmentButtonTapped(_ review: RecipeAdjustmentReviewState) -> Bool {
     do {
       try database.write { db in
@@ -593,15 +591,37 @@ final class HandoffReviewCoordinator {
 
   func discard(_ review: AIHandoffReview) {
     guard self.review?.handoffID == review.handoffID else { return }
+    clearError()
     self.review = nil
   }
 
   func discardAll() {
+    clearError()
     review = nil
   }
 }
 
 extension HandoffReviewCoordinator {
+  func presentAdjustmentReview(_ adjustmentReview: RecipeAdjustmentReviewState) {
+    clearError()
+    self.adjustmentReview = adjustmentReview
+  }
+
+  func finishDraftingRecipeAdjustment(
+    from originalReview: AIHandoffReview,
+    adjustmentReview: RecipeAdjustmentReviewState
+  ) {
+    guard self.review?.handoffID == originalReview.handoffID else { return }
+    pendingAdjustmentReview = adjustmentReview
+    review = nil
+  }
+
+  func presentPendingAdjustmentReviewAfterReviewDismissal() {
+    guard let pendingAdjustmentReview else { return }
+    self.pendingAdjustmentReview = nil
+    presentAdjustmentReview(pendingAdjustmentReview)
+  }
+
   /// Brings an in-app terminal discussion response into the existing handoff review surface.
   /// Unlike an external handoff, this does not create an exported prompt or consume a routed
   /// handoff row; it only uses the shared return parsing and review presentation.
@@ -614,6 +634,12 @@ extension HandoffReviewCoordinator {
       handoffID: uuid()
     )
     present(review)
+  }
+
+  private func clearError() {
+    errorMessage = nil
+    errorTitle = "Could Not Save Handoff"
+    isShowingError = false
   }
 }
 
@@ -707,6 +733,8 @@ private struct RecipeAdjustmentBriefReviewSheet: View {
   }
 
   var body: some View {
+    @Bindable var coordinator = coordinator
+
     NavigationStack {
       Form {
         Section {
@@ -739,12 +767,23 @@ private struct RecipeAdjustmentBriefReviewSheet: View {
           .disabled(isDrafting)
         }
         ToolbarItem(placement: .confirmationAction) {
-          Button("Draft the Revision") {
+          Button {
             Task { await draftRevision() }
+          } label: {
+            if isDrafting {
+              ProgressView()
+            } else {
+              Text("Draft the Revision")
+            }
           }
           .disabled(isDrafting || brief.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
       }
+    }
+    .alert(coordinator.errorTitle, isPresented: $coordinator.isShowingError) {
+      Button("OK") {}
+    } message: {
+      Text(coordinator.errorMessage ?? "")
     }
   }
 
@@ -755,10 +794,10 @@ private struct RecipeAdjustmentBriefReviewSheet: View {
     do {
       let adjustmentReview = try await coordinator.draftRecipeAdjustment(review, brief: brief)
       try coordinator.commitRecipeAdjustmentLearnings(review, approvedText: learnings)
-      coordinator.discard(originalReview)
-      dismiss()
-      await Task.yield()
-      coordinator.presentAdjustmentReview(adjustmentReview)
+      coordinator.finishDraftingRecipeAdjustment(
+        from: originalReview,
+        adjustmentReview: adjustmentReview
+      )
     } catch {
       coordinator.errorTitle = "Could Not Draft Revision"
       coordinator.errorMessage = error.localizedDescription
