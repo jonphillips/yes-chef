@@ -1119,6 +1119,31 @@ extension DependencyValues {
         .execute(db)
     }
 
+    migrator.registerMigration("Promote category namespaces to facets") { db in
+      try #sql("""
+        CREATE TABLE "facets" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "name" TEXT NOT NULL,
+          "sortOrder" INTEGER NOT NULL,
+          "hidden" INTEGER NOT NULL DEFAULT 0,
+          "dateCreated" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+      try #sql("""
+        ALTER TABLE "categories"
+        ADD COLUMN "facetID" TEXT
+        """)
+        .execute(db)
+      try #sql("""
+        ALTER TABLE "categories"
+        ADD COLUMN "hidden" INTEGER NOT NULL DEFAULT 0
+        """)
+        .execute(db)
+      try #sql("DROP TABLE \"categorySeedStates\"").execute(db)
+      try #sql("DROP TABLE \"categorySeedTombstones\"").execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)
@@ -1134,8 +1159,11 @@ extension DependencyValues {
       )
       if runsPostEngineDataPasses {
         try database.write { db in
+          let facetMigrationAudit = try CategoryRepository.seedStarterFacets(in: db)
+          if facetMigrationAudit.requiresReview {
+            AppLog.dataIntegrity.warning("\(facetMigrationAudit.logSummary, privacy: .public)")
+          }
           try CategoryRepository.foldDormantTagsIntoCategories(in: db)
-          try CategoryRepository.seedStarterCategories(in: db)
         }
       }
     }

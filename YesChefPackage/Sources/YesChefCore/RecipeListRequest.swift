@@ -35,7 +35,7 @@ public struct RecipeListRequest: FetchKeyRequest {
   public func fetch(_ db: Database) throws -> [RecipeListRowData] {
     let recipes = try Recipe.fetchAll(db)
     let categoriesByID = Dictionary(
-      uniqueKeysWithValues: try CategoryRepository.effectiveCategorySet(in: db).categories.map { ($0.id, $0) }
+      uniqueKeysWithValues: try Category.fetchAll(db).map { ($0.id, $0) }
     )
     let sourcesByRecipeID = Dictionary(
       grouping: try RecipeSource.fetchAll(db),

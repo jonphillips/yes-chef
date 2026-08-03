@@ -8,616 +8,246 @@ extension RecipeCoreTests {
   @Suite
   struct CategoryRepositoryTests {
     @Test
-    func sortsSiblingCategoriesAlphabetically() {
-      let now = Date(timeIntervalSinceReferenceDate: 802_700_000)
-      let course = Category(
-        id: SampleUUIDSequence.uuid(1),
-        name: "Course",
-        sortOrder: 0,
-        dateCreated: now
-      )
-      let dessert = Category(
-        id: SampleUUIDSequence.uuid(2),
-        name: "Dessert",
-        parentCategoryID: course.id,
-        sortOrder: 0,
-        dateCreated: now
-      )
-      let breakfast = Category(
-        id: SampleUUIDSequence.uuid(3),
-        name: "Breakfast",
-        parentCategoryID: course.id,
-        sortOrder: 1,
-        dateCreated: now
-      )
-      let cuisine = Category(
-        id: SampleUUIDSequence.uuid(4),
-        name: "Cuisine",
-        sortOrder: 1,
-        dateCreated: now
-      )
-
-      expectNoDifference(
-        CategoryHierarchy.displayRows(from: [course, dessert, breakfast, cuisine]).map(\.displayName),
-        [
-          "Course",
-          "Course > Breakfast",
-          "Course > Dessert",
-          "Cuisine",
-        ]
-      )
-    }
-
-    @Test
-    func starterCategoriesAreStableAndIdempotent() throws {
+    func starterFacetsAreStableAndIdempotent() throws {
       @Dependency(\.defaultDatabase) var database
 
       try database.write { db in
-        try CategoryRepository.seedStarterCategories(in: db)
-        let afterFirstSeed = try Category.fetchAll(db).sorted { $0.id.uuidString < $1.id.uuidString }
-        try CategoryRepository.seedStarterCategories(in: db)
-        expectNoDifference(
-          try Category.fetchAll(db).sorted { $0.id.uuidString < $1.id.uuidString },
-          afterFirstSeed
-        )
-
-        let categoriesByID = Dictionary(uniqueKeysWithValues: afterFirstSeed.map { ($0.id, $0) })
-        let displayNames = Set(
-          afterFirstSeed.map { CategoryHierarchy.displayName(for: $0, categoriesByID: categoriesByID) }
-        )
-        let expectedSeedNames: Set<String> = [
-          "Cuisine", "Course",
-          "Cuisine > American", "Cuisine > Chinese", "Cuisine > French", "Cuisine > Indian",
-          "Cuisine > Italian", "Cuisine > Japanese", "Cuisine > Korean", "Cuisine > Mexican",
-          "Cuisine > Thai", "Cuisine > Vietnamese",
-          "Course > Breakfast", "Course > Lunch", "Course > Dinner", "Course > Appetizer",
-          "Course > Side Dish", "Course > Dessert", "Course > Snack", "Course > Drink",
-        ]
-        #expect(expectedSeedNames.isSubset(of: displayNames))
+        let secondAudit = try CategoryRepository.seedStarterFacets(in: db)
+        let firstFacets = try Facet.fetchAll(db).sorted { $0.id.uuidString < $1.id.uuidString }
+        let firstCategories = try Category.fetchAll(db).sorted { $0.id.uuidString < $1.id.uuidString }
+        _ = try CategoryRepository.seedStarterFacets(in: db)
+        expectNoDifference(try Facet.fetchAll(db).sorted { $0.id.uuidString < $1.id.uuidString }, firstFacets)
+        expectNoDifference(try Category.fetchAll(db).sorted { $0.id.uuidString < $1.id.uuidString }, firstCategories)
+        #expect(firstFacets.map(\.name) == ["Cuisine", "Course"])
+        #expect(firstCategories.allSatisfy { $0.facetID != nil && $0.parentCategoryID == nil })
+        #expect(!secondAudit.requiresReview)
       }
     }
 
     @Test
-    func latePeerSeedCannotClearStarterDeletionTombstone() throws {
+    func promotesNamespaceWithoutChangingAChildOrRecipeJoinIdentity() throws {
       @Dependency(\.defaultDatabase) var database
-      let deletedAt = Date(timeIntervalSinceReferenceDate: 802_300_000)
+      let now = Date(timeIntervalSinceReferenceDate: 816_000_000)
+      let cuisineID = try #require(UUID(uuidString: "A4D90002-0000-4000-8000-000000000001"))
+      let koreanID = SampleUUIDSequence.uuid(2)
+      let thaiID = SampleUUIDSequence.uuid(5)
+      let recipeID = SampleUUIDSequence.uuid(3)
+      let assignmentID = SampleUUIDSequence.uuid(4)
 
       try database.write { db in
-        try CategoryRepository.seedStarterCategories(in: db)
-        let thai = try #require((try Category.fetchAll(db)).first { $0.name == "Thai" })
-
-        try CategoryRepository.deleteCategory(categoryID: thai.id, in: db, now: deletedAt)
-        var latePeerState = try #require(
-          (try CategorySeedState.fetchAll(db)).first { $0.categoryID == thai.id }
-        )
-        latePeerState.isDeleted = false
-        latePeerState.dateModified = deletedAt.addingTimeInterval(60)
-        try CategorySeedState.upsert { latePeerState }.execute(db)
+        try Category.insert { Category(id: cuisineID, name: "Cuisine", sortOrder: 0, dateCreated: now) }.execute(db)
         try Category.insert {
-          Category(
-            id: thai.id,
-            name: thai.name,
-            parentCategoryID: thai.parentCategoryID,
-            sortOrder: thai.sortOrder,
-            dateCreated: thai.dateCreated
-          )
+          Category(id: koreanID, name: "Regional", parentCategoryID: cuisineID, sortOrder: 0, dateCreated: now)
         }
         .execute(db)
-        try CategoryRepository.seedStarterCategories(in: db)
-
-        #expect(!(try Category.fetchAll(db)).contains { $0.id == thai.id })
-        let tombstone = try #require(
-          (try CategorySeedTombstone.fetchAll(db)).first { $0.id == latePeerState.id }
-        )
-        expectNoDifference(tombstone.dateDeleted, deletedAt)
-
-        try CategorySeedTombstone.find(tombstone.id).delete().execute(db)
-        try CategoryRepository.seedStarterCategories(in: db)
-      }
-    }
-
-    @Test
-    func latePeerReclaimsTombstonedNamespaceLeafFirst() throws {
-      @Dependency(\.defaultDatabase) var database
-      let deletedAt = Date(timeIntervalSinceReferenceDate: 802_325_000)
-
-      try database.write { db in
-        try CategoryRepository.seedStarterCategories(in: db)
-        let cuisine = try #require((try Category.fetchAll(db)).first { $0.name == "Cuisine" })
-        let cuisineChildren = try Category.fetchAll(db).filter { $0.parentCategoryID == cuisine.id }
-        #expect(cuisineChildren.count == 10)
-
-        // These rows model a late peer: its full seeded namespace is still present when the
-        // deletions performed on another device arrive through CloudKit.
-        let tombstonedCategoryIDs = [cuisine.id] + cuisineChildren.map(\.id)
-        for categoryID in tombstonedCategoryIDs {
-          let tombstone = CategorySeedTombstone(id: categoryID, dateDeleted: deletedAt)
-          try CategorySeedTombstone.insert { tombstone }.execute(db)
+        try Category.insert {
+          Category(id: thaiID, name: "Thai", parentCategoryID: koreanID, sortOrder: 0, dateCreated: now)
         }
+        .execute(db)
+        try Recipe.insert { Recipe(id: recipeID, title: "Korean Noodles", dateCreated: now, dateModified: now) }
+          .execute(db)
+        try RecipeCategory.insert { RecipeCategory(id: assignmentID, recipeID: recipeID, categoryID: koreanID) }
+          .execute(db)
 
-        try CategoryRepository.seedStarterCategories(in: db)
+        let audit = try CategoryRepository.seedStarterFacets(in: db)
+        #expect(audit.promotedRoots.count == 1)
+        #expect(audit.requiresReview)
+        #expect(audit.deletedCategoryIDs.contains(cuisineID))
+        #expect(audit.parentChanges == [.init(categoryID: koreanID, fromParentCategoryID: cuisineID, toParentCategoryID: nil)])
+        expectNoDifference(try Category.find(koreanID).fetchOne(db)?.facetID, try Facet.fetchAll(db).first?.id)
+        expectNoDifference(try Category.find(koreanID).fetchOne(db)?.parentCategoryID, nil)
+        expectNoDifference(try Category.find(thaiID).fetchOne(db)?.facetID, try Facet.fetchAll(db).first?.id)
+        expectNoDifference(try Category.find(thaiID).fetchOne(db)?.parentCategoryID, koreanID)
+        expectNoDifference(try RecipeCategory.find(assignmentID).fetchOne(db)?.categoryID, koreanID)
+        #expect(try Category.find(cuisineID).fetchOne(db) == nil)
+      }
+    }
 
-        let remainingCategoryIDs = Set(try Category.fetchAll(db).map(\.id))
-        #expect(tombstonedCategoryIDs.allSatisfy { !remainingCategoryIDs.contains($0) })
+    @Test
+    func remapsDirectNamespaceAssignmentAndReportsIt() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 816_100_000)
+      let cuisineID = try #require(UUID(uuidString: "A4D90002-0000-4000-8000-000000000001"))
+      let recipeID = SampleUUIDSequence.uuid(12)
 
-        for categoryID in tombstonedCategoryIDs {
-          try CategorySeedTombstone.find(categoryID).delete().execute(db)
+      try database.write { db in
+        try Category.insert { Category(id: cuisineID, name: "Cuisine", sortOrder: 0, dateCreated: now) }.execute(db)
+        try Recipe.insert { Recipe(id: recipeID, title: "Unfiled", dateCreated: now, dateModified: now) }.execute(db)
+        try RecipeCategory.insert {
+          RecipeCategory(id: SampleUUIDSequence.uuid(13), recipeID: recipeID, categoryID: cuisineID)
         }
-        try CategoryRepository.seedStarterCategories(in: db)
+        .execute(db)
+
+        let audit = try CategoryRepository.seedStarterFacets(in: db)
+        let remap = try #require(audit.remappedRootAssignments.first)
+        #expect(remap.rootCategoryID == cuisineID)
+        #expect(remap.recipeCount == 1)
+        #expect(try Category.find(remap.destinationCategoryID).fetchOne(db)?.facetID == nil)
+        #expect(try Category.find(remap.destinationCategoryID).fetchOne(db)?.name == "Legacy Cuisine")
+        let secondAudit = try CategoryRepository.seedStarterFacets(in: db)
+        #expect(try Category.find(remap.destinationCategoryID).fetchOne(db) != nil)
+        #expect(!secondAudit.requiresReview)
       }
     }
 
     @Test
-    func laterTombstoneImmediatelyHidesSeedAndNextCategoryWriteReclaimsIt() throws {
+    func nameFallbackIsAuditedButUserLooseNamespaceIsNotPromoted() throws {
       @Dependency(\.defaultDatabase) var database
-      let deletedAt = Date(timeIntervalSinceReferenceDate: 802_340_000)
-      let now = Date(timeIntervalSinceReferenceDate: 802_340_100)
-      var uuids = SampleUUIDSequence(start: 750)
+      let now = Date(timeIntervalSinceReferenceDate: 816_150_000)
+      let fallbackRootID = SampleUUIDSequence.uuid(20)
+      let userLooseID = SampleUUIDSequence.uuid(21)
+      let legacyValueID = try #require(UUID(uuidString: "A4D90002-0000-4000-8000-000000000004"))
 
       try database.write { db in
-        try CategoryRepository.seedStarterCategories(in: db)
-        let thai = try #require((try Category.fetchAll(db)).first { $0.name == "Thai" })
-        let tombstone = CategorySeedTombstone(id: thai.id, dateDeleted: deletedAt)
-        try CategorySeedTombstone.insert { tombstone }.execute(db)
-
-        // No bootstrap/reseed is simulated here: this is the same process receiving a later
-        // CloudKit tombstone. Reads must hide the stale deterministic row immediately.
-        #expect((try Category.fetchAll(db)).contains { $0.id == thai.id })
-        #expect(!(try CategoryListRequest().fetch(db)).contains { $0.id == thai.id })
-
-        let transientCategory = try CategoryRepository.createCategory(
-          name: "Tombstone Reconciliation Test",
-          parentCategoryID: nil,
-          in: db,
-          now: now,
-          uuid: { uuids.next() }
-        )
-        #expect(!(try Category.fetchAll(db)).contains { $0.id == thai.id })
-
-        try Category.find(transientCategory.id).delete().execute(db)
-        try CategorySeedTombstone.find(tombstone.id).delete().execute(db)
-        try CategoryRepository.seedStarterCategories(in: db)
-      }
-    }
-
-    @Test
-    func partialNamespaceTombstoneHidesDescendantsFromAllRecipeProjections() throws {
-      @Dependency(\.defaultDatabase) var database
-      let deletedAt = Date(timeIntervalSinceReferenceDate: 802_345_000)
-      let now = Date(timeIntervalSinceReferenceDate: 802_345_100)
-      var uuids = SampleUUIDSequence(start: 760)
-
-      try database.write { db in
-        try CategoryRepository.seedStarterCategories(in: db)
-        let cuisine = try #require((try Category.fetchAll(db)).first { $0.name == "Cuisine" })
-        let thai = try #require(
-          (try Category.fetchAll(db)).first { $0.name == "Thai" && $0.parentCategoryID == cuisine.id }
-        )
-        let recipeID = try RecipeRepository.save(
-          draft: RecipeEditorDraft(title: "Partial Tombstone Curry", selectedCategoryIDs: [thai.id]),
-          in: db,
-          now: now,
-          uuid: { uuids.next() }
-        )
-        let recipeCategory = try #require(
-          (try RecipeCategory.fetchAll(db)).first { $0.recipeID == recipeID && $0.categoryID == thai.id }
-        )
-        let tombstone = CategorySeedTombstone(id: cuisine.id, dateDeleted: deletedAt)
-        try CategorySeedTombstone.insert { tombstone }.execute(db)
-
-        // CloudKit has delivered the namespace tombstone but none of its child tombstones. The
-        // linked Thai row cannot be reclaimed, so every logical reader must still hide it.
-        #expect((try Category.fetchAll(db)).contains { $0.id == thai.id })
-        #expect(!(try CategoryListRequest().fetch(db)).contains { $0.id == thai.id })
-        let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
-        expectNoDifference(detail.categories, [])
-        expectNoDifference(detail.categoryDisplayNames, [])
-        let row = try #require(try RecipeListRequest().fetch(db).first { $0.recipe.id == recipeID })
-        expectNoDifference(row.categoryNames, [])
-        expectNoDifference(row.categoryFilterNames, [])
-
-        try RecipeCategory.find(recipeCategory.id).delete().execute(db)
-        try Recipe.find(recipeID).delete().execute(db)
-        try CategorySeedTombstone.find(tombstone.id).delete().execute(db)
-        try CategoryRepository.seedStarterCategories(in: db)
-      }
-    }
-
-    @Test
-    func movedSeedOutsideTombstonedNamespaceRemainsEffective() throws {
-      @Dependency(\.defaultDatabase) var database
-      let deletedAt = Date(timeIntervalSinceReferenceDate: 802_347_000)
-
-      try database.write { db in
-        try CategoryRepository.seedStarterCategories(in: db)
-        let cuisine = try #require((try Category.fetchAll(db)).first { $0.name == "Cuisine" })
-        let thai = try #require(
-          (try Category.fetchAll(db)).first { $0.name == "Thai" && $0.parentCategoryID == cuisine.id }
-        )
-        try CategoryRepository.updateCategory(
-          categoryID: thai.id,
-          name: thai.name,
-          parentCategoryID: nil,
-          in: db
-        )
-        let tombstone = CategorySeedTombstone(id: cuisine.id, dateDeleted: deletedAt)
-        try CategorySeedTombstone.insert { tombstone }.execute(db)
-
-        let rows = try CategoryListRequest().fetch(db)
-        #expect(rows.contains { $0.id == thai.id && $0.parentCategoryID == nil })
-
-        try CategorySeedTombstone.find(tombstone.id).delete().execute(db)
-        try CategoryRepository.updateCategory(
-          categoryID: thai.id,
-          name: thai.name,
-          parentCategoryID: cuisine.id,
-          in: db
-        )
-        try CategoryRepository.seedStarterCategories(in: db)
-      }
-    }
-
-    @Test
-    func recipeSaveCreatesFreshCategoryInsteadOfAssigningTombstonedSeed() throws {
-      @Dependency(\.defaultDatabase) var database
-      let deletedAt = Date(timeIntervalSinceReferenceDate: 802_348_000)
-      let now = Date(timeIntervalSinceReferenceDate: 802_348_100)
-      var uuids = SampleUUIDSequence(start: 770)
-
-      try database.write { db in
-        try CategoryRepository.seedStarterCategories(in: db)
-        let cuisine = try #require((try Category.fetchAll(db)).first { $0.name == "Cuisine" })
-        let thai = try #require(
-          (try Category.fetchAll(db)).first { $0.name == "Thai" && $0.parentCategoryID == cuisine.id }
-        )
-        let tombstone = CategorySeedTombstone(id: thai.id, dateDeleted: deletedAt)
-        try CategorySeedTombstone.insert { tombstone }.execute(db)
-
-        let recipeID = try RecipeRepository.save(
-          draft: RecipeEditorDraft(title: "Imported Thai Curry", categoryNames: "Cuisine > Thai"),
-          in: db,
-          now: now,
-          uuid: { uuids.next() }
-        )
-        let recipeCategory = try #require(
-          (try RecipeCategory.fetchAll(db)).first { $0.recipeID == recipeID }
-        )
-        #expect(recipeCategory.categoryID != thai.id)
-        let freshThai = try #require(
-          (try Category.fetchAll(db)).first { $0.id == recipeCategory.categoryID && $0.name == "Thai" }
-        )
-        #expect(freshThai.id != thai.id)
-
-        try RecipeCategory.find(recipeCategory.id).delete().execute(db)
-        try Recipe.find(recipeID).delete().execute(db)
-        try Category.find(freshThai.id).delete().execute(db)
-        try CategorySeedTombstone.find(tombstone.id).delete().execute(db)
-        try CategoryRepository.seedStarterCategories(in: db)
-      }
-    }
-
-    @Test
-    func unresolvedStarterParentDoesNotCreateChildAtRoot() throws {
-      @Dependency(\.defaultDatabase) var database
-      let deletedAt = Date(timeIntervalSinceReferenceDate: 802_350_000)
-
-      try database.write { db in
-        try CategoryRepository.seedStarterCategories(in: db)
-        let cuisine = try #require((try Category.fetchAll(db)).first { $0.name == "Cuisine" })
-        let american = try #require(
-          (try Category.fetchAll(db)).first { $0.name == "American" && $0.parentCategoryID == cuisine.id }
-        )
-        let tombstone = CategorySeedTombstone(id: cuisine.id, dateDeleted: deletedAt)
-        try CategorySeedTombstone.insert { tombstone }.execute(db)
-        try Category.find(cuisine.id).delete().execute(db)
-        try Category.find(american.id).delete().execute(db)
-
-        try CategoryRepository.seedStarterCategories(in: db)
-
-        #expect(!(try Category.fetchAll(db)).contains { $0.name == "American" && $0.parentCategoryID == nil })
-
-        try CategorySeedTombstone.find(tombstone.id).delete().execute(db)
-        try CategoryRepository.seedStarterCategories(in: db)
-      }
-    }
-
-    @Test
-    func seedStateStillConvergesConcurrentSameNamedCategory() throws {
-      @Dependency(\.defaultDatabase) var database
-      let earlier = Date(timeIntervalSinceReferenceDate: -1)
-      let peerCategoryID = SampleUUIDSequence.uuid(799)
-
-      try database.write { db in
-        try CategoryRepository.seedStarterCategories(in: db)
-        let cuisine = try #require((try Category.fetchAll(db)).first { $0.name == "Cuisine" })
-        let peerCuisine = Category(
-          id: peerCategoryID,
-          name: "Cuisine",
-          sortOrder: 0,
-          dateCreated: earlier
-        )
-        try Category.insert { peerCuisine }.execute(db)
-        var seedState = try #require(
-          (try CategorySeedState.fetchAll(db)).first { $0.categoryID == cuisine.id }
-        )
-        seedState.categoryID = peerCuisine.id
-        try CategorySeedState.upsert { seedState }.execute(db)
-
-        try CategoryRepository.seedStarterCategories(in: db)
-
-        let cuisineRoots = try Category.fetchAll(db).filter {
-          $0.name == "Cuisine" && $0.parentCategoryID == nil
+        try Category.insert { Category(id: fallbackRootID, name: "Cuisine", sortOrder: 0, dateCreated: now) }.execute(db)
+        try Category.insert {
+          Category(id: legacyValueID, name: "Chinese", parentCategoryID: fallbackRootID, sortOrder: 0, dateCreated: now)
         }
-        expectNoDifference(cuisineRoots.map(\.id), [peerCategoryID])
-        expectNoDifference(
-          try CategorySeedState.fetchAll(db).first { $0.id == seedState.id }?.categoryID,
-          peerCategoryID
-        )
+        .execute(db)
+        try Category.insert { Category(id: userLooseID, name: "Cuisine", sortOrder: 1, dateCreated: now) }.execute(db)
+
+        let audit = try CategoryRepository.seedStarterFacets(in: db)
+        #expect(audit.fallbackMatchedRootCategoryIDs == [fallbackRootID])
+        #expect(try Category.find(userLooseID).fetchOne(db) != nil)
       }
     }
 
     @Test
-    func renamesMovesAndPreservesRecipeAssignments() throws {
+    func promotionDeduplicatesFlattenedFacetValuesAndRecipeJoins() throws {
       @Dependency(\.defaultDatabase) var database
-      let now = Date(timeIntervalSinceReferenceDate: 802_500_000)
-      var uuids = SampleUUIDSequence(start: 800)
+      let now = Date(timeIntervalSinceReferenceDate: 816_175_000)
+      let cuisineID = try #require(UUID(uuidString: "A4D90002-0000-4000-8000-000000000001"))
+      let nestedID = SampleUUIDSequence.uuid(30)
+      let existingID = SampleUUIDSequence.uuid(31)
+      let firstRecipeID = SampleUUIDSequence.uuid(32)
+      let secondRecipeID = SampleUUIDSequence.uuid(33)
 
       try database.write { db in
-        let eventType = try CategoryRepository.createCategory(
-          name: "Editor Test Event",
-          parentCategoryID: nil,
-          in: db,
-          now: now,
-          uuid: { uuids.next() }
-        )
-        let dinner = try CategoryRepository.createCategory(
-          name: "Dinner",
-          parentCategoryID: eventType.id,
-          in: db,
-          now: now,
-          uuid: { uuids.next() }
-        )
-        let occasion = try CategoryRepository.createCategory(
-          name: "Editor Test Occasion",
-          parentCategoryID: nil,
-          in: db,
-          now: now,
-          uuid: { uuids.next() }
-        )
+        try Category.insert { Category(id: cuisineID, name: "Cuisine", sortOrder: 0, dateCreated: now) }.execute(db)
+        try Category.insert {
+          Category(id: nestedID, name: "Regional", parentCategoryID: cuisineID, sortOrder: 0, dateCreated: now)
+        }
+        .execute(db)
+        try Category.insert {
+          Category(id: existingID, name: "Regional", facetID: cuisineID, sortOrder: 1, dateCreated: now)
+        }
+        .execute(db)
+        for recipeID in [firstRecipeID, secondRecipeID] {
+          try Recipe.insert { Recipe(id: recipeID, title: recipeID.uuidString, dateCreated: now, dateModified: now) }
+            .execute(db)
+        }
+        try RecipeCategory.insert { RecipeCategory(id: SampleUUIDSequence.uuid(34), recipeID: firstRecipeID, categoryID: nestedID) }
+          .execute(db)
+        try RecipeCategory.insert { RecipeCategory(id: SampleUUIDSequence.uuid(35), recipeID: secondRecipeID, categoryID: existingID) }
+          .execute(db)
 
-        let recipeID = try RecipeRepository.save(
-          draft: RecipeEditorDraft(
-            title: "Dinner Party Chicken",
-            ingredientText: "1 chicken",
-            instructionText: "Roast.",
-            selectedCategoryIDs: [dinner.id]
-          ),
-          in: db,
-          now: now,
-          uuid: { uuids.next() }
-        )
-
-        try CategoryRepository.updateCategory(
-          categoryID: dinner.id,
-          name: "Dinner Party",
-          parentCategoryID: occasion.id,
-          in: db
-        )
-
-        let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
-        expectNoDifference(detail.categories.map(\.id), [dinner.id])
-        expectNoDifference(detail.categoryDisplayNames, ["Editor Test Occasion > Dinner Party"])
-
-        let row = try #require(try RecipeListRequest().fetch(db).first { $0.recipe.id == recipeID })
-        expectNoDifference(row.categoryNames, ["Editor Test Occasion > Dinner Party"])
-        expectNoDifference(
-          row.categoryFilterNames,
-          ["Editor Test Occasion", "Editor Test Occasion > Dinner Party"]
-        )
+        let audit = try CategoryRepository.seedStarterFacets(in: db)
+        let regional = try Category.fetchAll(db).filter { $0.facetID == cuisineID && $0.name == "Regional" }
+        #expect(regional.count == 1)
+        let canonical = try #require(regional.first)
+        #expect(audit.categoryMerges.count == 1)
+        #expect(audit.deletedCategoryIDs.contains(nestedID) || audit.deletedCategoryIDs.contains(existingID))
+        let joinedCategoryIDs = Set(try RecipeCategory.fetchAll(db).map(\.categoryID))
+        #expect(joinedCategoryIDs.contains(canonical.id))
       }
     }
 
     @Test
-    func rejectsDuplicateSiblingAndUnsafeDelete() throws {
+    func rejectsLooseParentsAndCrossFacetMoves() throws {
       @Dependency(\.defaultDatabase) var database
-      let now = Date(timeIntervalSinceReferenceDate: 802_600_000)
-      var uuids = SampleUUIDSequence(start: 900)
+      let now = Date(timeIntervalSinceReferenceDate: 816_200_000)
+      var ids = SampleUUIDSequence(start: 90_000)
 
       try database.write { db in
-        let mealType = try CategoryRepository.createCategory(
-          name: "Guardrail Test Meal Type",
-          parentCategoryID: nil,
-          in: db,
-          now: now,
-          uuid: { uuids.next() }
+        _ = try CategoryRepository.seedStarterFacets(in: db)
+        let loose = try CategoryRepository.createCategory(
+          name: "Weeknight", parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
         )
-        let dinner = try CategoryRepository.createCategory(
-          name: "Dinner",
-          parentCategoryID: mealType.id,
-          in: db,
-          now: now,
-          uuid: { uuids.next() }
-        )
-
-        do {
+        #expect(throws: CategoryRepositoryError.looseLabelsCannotHaveChildren) {
           _ = try CategoryRepository.createCategory(
-            name: "dinner",
-            parentCategoryID: mealType.id,
-            in: db,
-            now: now,
-            uuid: { uuids.next() }
+            name: "Quick", parentCategoryID: loose.id, in: db, now: now, uuid: { ids.next() }
           )
-          #expect(Bool(false), "Expected duplicate sibling category to be rejected.")
-        } catch let error as CategoryRepositoryError {
-          expectNoDifference(error, .duplicateSibling(name: "dinner"))
         }
-
-        do {
-          try CategoryRepository.deleteCategory(categoryID: mealType.id, in: db, now: now)
-          #expect(Bool(false), "Expected deleting a category with children to be rejected.")
-        } catch let error as CategoryRepositoryError {
-          expectNoDifference(error, .cannotDeleteCategoryWithChildren)
-        }
-
-        do {
+        let facets = try Facet.fetchAll(db)
+        let cuisine = try #require(facets.first { $0.name == "Cuisine" })
+        let course = try #require(facets.first { $0.name == "Course" })
+        let cuisineValue = try CategoryRepository.createCategory(
+          name: "Test Cuisine", facetID: cuisine.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+        let courseValue = try CategoryRepository.createCategory(
+          name: "Test Course", facetID: course.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+        #expect(throws: CategoryRepositoryError.parentFacetMismatch) {
           try CategoryRepository.updateCategory(
-            categoryID: mealType.id,
-            name: "Guardrail Test Meal Type",
-            parentCategoryID: dinner.id,
-            in: db
+            categoryID: cuisineValue.id, name: cuisineValue.name, parentCategoryID: courseValue.id, in: db
           )
-          #expect(Bool(false), "Expected moving a category under its child to be rejected.")
-        } catch let error as CategoryRepositoryError {
-          expectNoDifference(error, .cannotParentCategoryUnderDescendant)
         }
       }
     }
 
     @Test
-    func tombstoneSuppressesMappedRepresentativeAndDormantTagSource() throws {
+    func movingLooseCategoryUnderFacetWritesFacetAndPreservesRecipeAssignment() throws {
       @Dependency(\.defaultDatabase) var database
-      let deletedAt = Date(timeIntervalSinceReferenceDate: 802_650_000)
-      let now = Date(timeIntervalSinceReferenceDate: 802_650_100)
-      let mappedCategoryID = SampleUUIDSequence.uuid(980)
-      var uuids = SampleUUIDSequence(start: 981)
+      let now = Date(timeIntervalSinceReferenceDate: 816_250_000)
+      var ids = SampleUUIDSequence(start: 91_000)
 
       try database.write { db in
-        try CategoryRepository.seedStarterCategories(in: db)
-        let seededCuisine = try #require((try Category.fetchAll(db)).first { $0.name == "Cuisine" })
-        let seedState = try #require(
-          (try CategorySeedState.fetchAll(db)).first { $0.categoryID == seededCuisine.id }
+        _ = try CategoryRepository.seedStarterFacets(in: db)
+        let cuisine = try #require(try Facet.fetchAll(db).first { $0.name == "Cuisine" })
+        let parent = try CategoryRepository.createCategory(
+          name: "Regional", facetID: cuisine.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
         )
-        let mappedCategory = Category(
-          id: mappedCategoryID,
-          name: "Legacy Cuisine",
-          sortOrder: 99,
-          dateCreated: now
+        let loose = try CategoryRepository.createCategory(
+          name: "Weeknight", parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
         )
-        try Category.insert { mappedCategory }.execute(db)
-        var mappedState = seedState
-        mappedState.categoryID = mappedCategory.id
-        try CategorySeedState.upsert { mappedState }.execute(db)
-        try Tag.insert {
-          Tag(
-            id: mappedCategory.id,
-            name: mappedCategory.name,
-            sortOrder: mappedCategory.sortOrder,
-            dateCreated: mappedCategory.dateCreated
-          )
-        }
-        .execute(db)
+        let recipe = Recipe(id: ids.next(), title: "Noodles", dateCreated: now, dateModified: now)
+        try Recipe.insert { recipe }.execute(db)
+        let join = RecipeCategory(id: ids.next(), recipeID: recipe.id, categoryID: loose.id)
+        try RecipeCategory.insert { join }.execute(db)
 
-        let existingRecipeID = try RecipeRepository.save(
-          draft: RecipeEditorDraft(title: "Mapped Seed Recipe", selectedCategoryIDs: [mappedCategory.id]),
-          in: db,
-          now: now,
-          uuid: { uuids.next() }
-        )
-        let tombstone = CategorySeedTombstone(id: seedState.id, dateDeleted: deletedAt)
-        try CategorySeedTombstone.insert { tombstone }.execute(db)
-
-        // The mapped row is deliberately linked, so reclamation cannot remove it. The tombstone
-        // still makes both the seed and its current representative immediately unavailable.
-        #expect((try Category.fetchAll(db)).contains { $0.id == mappedCategory.id })
-        #expect(!(try CategoryListRequest().fetch(db)).contains { $0.id == mappedCategory.id })
-        let existingDetail = try #require(try RecipeRepository.fetchDetail(recipeID: existingRecipeID, in: db))
-        expectNoDifference(existingDetail.categories, [])
-
-        let laterRecipeID = try RecipeRepository.save(
-          draft: RecipeEditorDraft(title: "Later Mapped Seed Recipe", selectedCategoryIDs: [mappedCategory.id]),
-          in: db,
-          now: now,
-          uuid: { uuids.next() }
-        )
-        #expect(!(try RecipeCategory.fetchAll(db)).contains { $0.recipeID == laterRecipeID })
-
-        try CategoryRepository.foldDormantTagsIntoCategories(in: db)
-        try CategoryRepository.seedStarterCategories(in: db)
-        #expect((try Category.fetchAll(db)).filter { $0.id == mappedCategory.id }.count == 1)
-        #expect(!(try CategoryListRequest().fetch(db)).contains { $0.id == mappedCategory.id })
-
-        for recipeCategory in try RecipeCategory.fetchAll(db) where [existingRecipeID, laterRecipeID]
-          .contains(recipeCategory.recipeID) {
-          try RecipeCategory.find(recipeCategory.id).delete().execute(db)
-        }
-        try Recipe.find(existingRecipeID).delete().execute(db)
-        try Recipe.find(laterRecipeID).delete().execute(db)
-        try Tag.find(mappedCategory.id).delete().execute(db)
-        try CategorySeedTombstone.find(tombstone.id).delete().execute(db)
-        mappedState.categoryID = seededCuisine.id
-        try CategorySeedState.upsert { mappedState }.execute(db)
-        try Category.find(mappedCategory.id).delete().execute(db)
-        try CategoryRepository.seedStarterCategories(in: db)
+        try CategoryRepository.updateCategory(categoryID: loose.id, name: "Fast", parentCategoryID: parent.id, in: db)
+        expectNoDifference(try Category.find(loose.id).fetchOne(db)?.facetID, cuisine.id)
+        expectNoDifference(try Category.find(loose.id).fetchOne(db)?.parentCategoryID, parent.id)
+        expectNoDifference(try RecipeCategory.find(join.id).fetchOne(db)?.categoryID, loose.id)
       }
     }
 
     @Test
-    func tombstoneSuppressesDistinctDormantTagMergedIntoStarterRepresentative() throws {
+    func sortingDuplicatesAndUnsafeDeletesRemainGuarded() throws {
       @Dependency(\.defaultDatabase) var database
-      let now = Date(timeIntervalSinceReferenceDate: 802_660_000)
-      let recipeID = SampleUUIDSequence.uuid(990)
-      let tagID = SampleUUIDSequence.uuid(991)
-      let recipeTagID = SampleUUIDSequence.uuid(992)
-      let nativeCategoryID = SampleUUIDSequence.uuid(993)
+      let now = Date(timeIntervalSinceReferenceDate: 816_300_000)
+      var ids = SampleUUIDSequence(start: 92_000)
 
       try database.write { db in
-        let priorTombstoneIDs = Set(try CategorySeedTombstone.fetchAll(db).map(\.id))
-        try Recipe.insert {
-          Recipe(id: recipeID, title: "Merged Cuisine Tag", dateCreated: now, dateModified: now)
-        }
-        .execute(db)
-        try Tag.insert {
-          Tag(id: tagID, name: "Cuisine", sortOrder: 0, dateCreated: now)
-        }
-        .execute(db)
-        try RecipeTag.insert {
-          RecipeTag(id: recipeTagID, recipeID: recipeID, tagID: tagID, sortOrder: 0)
-        }
-        .execute(db)
-        try Category.insert {
-          Category(
-            id: nativeCategoryID,
-            name: "Cuisine",
-            sortOrder: 0,
-            dateCreated: now.addingTimeInterval(-1)
+        _ = try CategoryRepository.createCategory(
+          name: "Zebra", parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+        let apple = try CategoryRepository.createCategory(
+          name: "Apple", parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+        #expect(CategoryRepository.sortedCategories(try Category.fetchAll(db)).map(\.name) == ["Apple", "Zebra"])
+        #expect(throws: CategoryRepositoryError.duplicateSibling(name: "apple")) {
+          _ = try CategoryRepository.createCategory(
+            name: "apple", parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
           )
         }
-        .execute(db)
-
-        try CategoryRepository.foldDormantTagsIntoCategories(in: db)
-        try CategoryRepository.seedStarterCategories(in: db)
-        let cuisineState = try #require(
-          (try CategorySeedState.fetchAll(db)).first { $0.categoryID == nativeCategoryID }
-        )
-        #expect(!(try Category.fetchAll(db)).contains { $0.id == tagID })
-        #expect(
-          (try RecipeCategory.fetchAll(db)).contains {
-            $0.id == recipeTagID && $0.categoryID == nativeCategoryID
-          }
-        )
-
-        for child in try Category.fetchAll(db) where child.parentCategoryID == nativeCategoryID {
-          try CategoryRepository.deleteCategory(categoryID: child.id, in: db, now: now)
+        let recipe = Recipe(id: ids.next(), title: "Apple Pie", dateCreated: now, dateModified: now)
+        try Recipe.insert { recipe }.execute(db)
+        try RecipeCategory.insert { RecipeCategory(id: ids.next(), recipeID: recipe.id, categoryID: apple.id) }.execute(db)
+        #expect(throws: CategoryRepositoryError.cannotDeleteCategoryUsedByRecipes) {
+          try CategoryRepository.deleteCategory(categoryID: apple.id, in: db)
         }
-        try RecipeCategory.find(recipeTagID).delete().execute(db)
-        try CategoryRepository.deleteCategory(categoryID: nativeCategoryID, in: db, now: now)
-        #expect((try CategorySeedTombstone.fetchAll(db)).contains { $0.id == cuisineState.id })
-
-        try CategoryRepository.foldDormantTagsIntoCategories(in: db)
-        try CategoryRepository.seedStarterCategories(in: db)
-
-        #expect(!(try Category.fetchAll(db)).contains { $0.id == tagID })
-        #expect(!(try RecipeCategory.fetchAll(db)).contains { $0.id == recipeTagID })
-        #expect(!(try CategoryListRequest().fetch(db)).contains { $0.name == "Cuisine" })
-
-        try RecipeTag.find(recipeTagID).delete().execute(db)
-        try Tag.find(tagID).delete().execute(db)
-        try Recipe.find(recipeID).delete().execute(db)
-        for tombstone in try CategorySeedTombstone.fetchAll(db)
-        where !priorTombstoneIDs.contains(tombstone.id) {
-          try CategorySeedTombstone.find(tombstone.id).delete().execute(db)
+        _ = try CategoryRepository.seedStarterFacets(in: db)
+        let cuisine = try #require(try Facet.fetchAll(db).first { $0.name == "Cuisine" })
+        let parent = try CategoryRepository.createCategory(
+          name: "Parent", facetID: cuisine.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+        _ = try CategoryRepository.createCategory(
+          name: "Child", parentCategoryID: parent.id, in: db, now: now, uuid: { ids.next() }
+        )
+        #expect(throws: CategoryRepositoryError.cannotDeleteCategoryWithChildren) {
+          try CategoryRepository.deleteCategory(categoryID: parent.id, in: db)
         }
-        try CategoryRepository.seedStarterCategories(in: db)
       }
     }
   }

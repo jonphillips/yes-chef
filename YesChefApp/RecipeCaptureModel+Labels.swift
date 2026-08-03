@@ -79,7 +79,7 @@ extension RecipeCaptureModel {
       guard let self else { return }
       do {
         let categories = try await database.read { db in
-          try CategoryRepository.effectiveCategorySet(in: db).categories
+          try Category.fetchAll(db)
         }
         let proposal = try await labelProposer(
           recipe: proposedForPage.labelProposalRecipe,

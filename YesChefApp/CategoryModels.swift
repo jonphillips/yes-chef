@@ -94,7 +94,7 @@ final class CategoryManagementModel {
   func confirmDeleteCategoryButtonTapped(categoryID: YesChefCore.Category.ID) {
     do {
       try database.write { db in
-        try CategoryRepository.deleteCategory(categoryID: categoryID, in: db, now: now)
+        try CategoryRepository.deleteCategory(categoryID: categoryID, in: db)
       }
       if editor?.categoryID == categoryID {
         editor = nil
