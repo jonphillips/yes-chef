@@ -1,9 +1,11 @@
 # Current Handoff
 
-Last updated: July 30, 2026. (**Playbook edit grain is fully closed** — Dispatch 2 (S3) shipped as PR
-[#261](https://github.com/jonphillips/yes-chef/pull/261), device-checked. See the DONE-LOG. **Prep-plan
-Slices 1–2** are in PR [#262](https://github.com/jonphillips/yes-chef/pull/262) — day-anchored labels
-device-confirmed, **merging**. New live target: **prep-plan Slice 3** (gated on #262 merging).)
+Last updated: August 3, 2026. (**ADR-0049 Amendment 2 D1 — facets** is approved (architect review) and
+in-flight as PR [#270](https://github.com/jonphillips/yes-chef/pull/270): it promotes `Cuisine`/`Course` to
+synced `facets` rows and absorbs Amendment 1's seed-table teardown. **Prep-plan Slices 1–2** (PR
+[#262](https://github.com/jonphillips/yes-chef/pull/262), merged 2026-07-30) and **Amendment 1 follow-ups** (PR
+[#269](https://github.com/jonphillips/yes-chef/pull/269), merged 2026-07-31) are in. New live target: **ADR-0049
+Amd 2 Slice 2 — category management UI**; prep-plan Slice 3 is demoted to a Ready Effort, not dropped.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate is **crossed and holding**. We stay in
@@ -16,44 +18,37 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**ONE live dispatch target: [`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md)
-§ Slice 3 — the omission guard is for accidental drops, not for a regenerate.** Dispatch with
-*"Do **prep-plan Slice 3** from `docs/CURRENT_HANDOFF.md`."* If this section is empty or missing, **STOP and
-ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch. **Gated on PR #262 merging first**
-(Slices 1–2); Slice 3 is only *reachable* because Slice 1 makes a regenerate rewrite every session label.
+**ONE live dispatch target: [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 2 — category
+management UI.** Dispatch with *"Do **ADR-0049 Amd 2 Dispatch 2** (category management UI) from
+`docs/CURRENT_HANDOFF.md`."* If this section is empty or missing, **STOP and ask Jon — never infer.** See
+`docs/AGENTS.md` § Work Intake & Dispatch. **Reads D1's schema — dispatch after PR #270 merges** (or from its
+branch if Jon says so). D1 already built `Facet`, `Category.facetID`/`hidden`, the four invariants, the
+migration, and `createCategory`/`updateCategory`/`deleteCategory` for **values and loose labels**. D2 is mostly
+UI, **plus the thin Core facet-CRUD D1 did not need**: create-facet, rename-facet, and set-`hidden` at **both**
+grains have no user-facing method yet (D1 only *seeds* facet rows), so D2 adds them to `CategoryRepository` —
+they do **not** get jammed through `createCategory`, which mints a category, not a facet.
 
-**The finding (from the #262 device pass).** Regenerating a prep plan flags ~every existing step under "Review
-omitted steps before saving." [`omittedCurrentPrepStepEvidence`](../../YesChefPackage/Sources/YesChefCore/AIHandoff.swift)
-diffs current-vs-returned on exact visible content (`session` + `task` + `serves`); a regenerate rewrites the
-labels (Slice 1's purpose) *and* rephrases the tasks, so 100% read as "missing." The guard is ADR-0040
-lossless-or-loud doing its job — but answering the wrong question. Its question is *"did the model silently
-drop work I meant to keep?"*, which is only meaningful for an **incremental refine**. A regenerate is
-**intended wholesale replacement**.
+**What it is.** The management surface (`CategoryViews.swift` / `CategoryModels.swift` /
+`RecipeCategoryFilterView.swift`) presents facets and loose labels as **structurally different things**, and
+**creating a facet is a distinct, deliberate act** from adding a value inside an existing facet or minting a
+loose label. Adding a value inside a facet stays lightweight. `hidden` is exposed at **both grains** (facet and
+category) — Amendment 1's escape hatch; D1 built the column and honors it on read, the UI to flip it is here.
 
-**The core reframe the dispatch must not undo:** the variable is **refine vs regenerate intent**, not the
-transport. Refine → baseline = current plan, guard fires loud (unchanged). Regenerate → baseline = **empty**,
-no omission/dropped-link list, a light "replaces your N-step plan" confirmation instead — the loss is
-*declared*, not silent. **Do not** infer intent from how many steps happen to match (that heuristic *is* the
-bug); **do not** add fuzzy matching to the refine diff (fights ADR-0040 and wouldn't help a reworded plan
-anyway); **do not** touch Slice 1's storage or grouping.
+**The core shape the dispatch must not undo (ADR-0049 Amd 2 D8/D9/OQ1):**
+- **The umbrella copy stays "Categories."** A facet surfaces as a **category group**; `Facet` / facet value /
+  loose label are internal architecture terms, not UI copy (OQ1). Reuse `SuggestedLabel.reviewTitle`'s existing
+  wording — do not invent new copy.
+- **The four invariants live in Core, not the view** (D9). The UI offers create-facet / create-value /
+  create-loose as distinct acts but routes every write through `CategoryRepository`'s validated
+  create/update/move; it must not re-implement or relax facet membership, same-facet parenting, or leaf-only
+  loose labels. A validation error surfaces as a message, never a bypass.
+- **Starters are non-deletable and hideable** at both grains — the delete guard is already Core
+  (`cannotDeleteStarterCategory`); the UI hides rather than offering a dead Delete.
 
-- **The onboard fix needs no schema.** `regeneratePrepPlan()` sets `.regenerate`, chat "Apply…" stays
-  `.refine`, passed in-memory — onboard staging builds a *transient* `AIHandoff` (never written). This alone
-  fixes the banner Jon hit.
-- **The one column is for the outboard round-trip only.** A "Handoff to Regenerate" action must survive the
-  copy→paste gap, so intent persists on the `aiHandoffs` row (add e.g. `regenerates: Bool` default `false` →
-  existing rows read `.refine`). **`aiHandoffs` is NOT in `CloudSync` — it is local-only**, so this is a plain
-  local migration: **no prod-promotion entry, and the deterministic-UUID / post-engine sync rules do NOT
-  apply** ([[migration-writes-bypass-sync-triggers]] is about *synced* tables). Keep it local — do not add it
-  to the sync list on momentum.
-- **Both transports converge in Core** at [`AIHandoffReviewStager.menuReview`](../../YesChefPackage/Sources/YesChefCore/AIHandoffIntentImport.swift):
-  the intent chooses the baseline. Outboard "Handoff Prep" stays refine; the new "Handoff to Regenerate" is a
-  sibling action in the prep-plan `…` menu.
-
-**Verification.** Package build + Core tests + the **generic app build** (App-layer: new menu action + review
-reframe). **Local migration → does *not* need a two-device sync pass.** Jon's device look confirms: (a)
-onboard regenerate no longer floods omissions, (b) outboard "Handoff to Regenerate" → paste returns a clean
-replacement, (c) a genuine refine still surfaces a real dropped step. No prod-promotion entry.
+**Verification.** Package build + Core tests + the **required generic app build** (this is an App-layer
+dispatch). **Not a synced-migration pass** — D2 writes through the create/reconcile paths D1 already
+sync-tested, so it owes Jon's device UI look but **no separate two-device migration pass** (that debt is D1's,
+below). No new prod-schema entry — D1 added `facets`/`facetID`/`hidden`.
 
 **⚠️ Jon's outstanding follow-through from ADR-0014 Amd1 (not a dispatch item):** three recipes still carry
 `isHeader = 1` rows to hand-repair in the app — *Beef Birria Taco Filling* (4), *Broccoli Spoon Salad* (2),
@@ -100,14 +95,25 @@ Drawn into **Next Up** as needed; not itself a dispatch target. Completed effort
 [`docs/DONE-LOG.md`](DONE-LOG.md).
 
 **[`efforts/recipe-facets.md`](efforts/recipe-facets.md) — [ADR-0049](decisions/ADR-0049-unified-labels-and-assisted-tagging.md)
-**Amendment 2**: promote the namespace to an explicit `Facet`. Proposed 2026-08-01 — not dispatchable until
-ratified.** Four dispatches, D1 first. One synced `facets` table + `Category.facetID` + `Category.hidden`;
-`Cuisine` / `Course` stop being category rows and become facet rows; their children keep their UUIDs and
-every `recipeCategories` join rides through untouched. **Absorbs unbuilt Amendment 1** — the seed-state and
-tombstone teardown happens inside this pass, not before it, or the same ~24 rows get two synced data passes.
-**Synced-table data pass → owes a two-device sync pass**, and owes an audit report (§ Migration). Adds
-`facets`, `categories.facetID`, `categories.hidden` to the prod-promotion list **and removes the two seed
-tables from it** in its own PR.
+**Amendment 2** (accepted): the namespace is an explicit `Facet`.** Four dispatches. **D1 (schema + migration +
+Core invariants + audit) is approved and in-flight as PR
+[#270](https://github.com/jonphillips/yes-chef/pull/270)** — owes the migration audit review + two-device
+convergence pass (see § Device passes owed). **D2 (category management UI) is the live Next Up.** Still remaining:
+**D3 — proposer re-point** (`LabelProposer.swift` + `RecipeCaptureModel+Labels.swift`: typed facet vocabulary in
+the prompt, `.namespace` literally proposes a `Facet` row, PR #269's Findings 1 & 3 re-pointed **not** deleted);
+and **D4 — Jon's hand pass** (not a dispatch: review the audit, file ambiguous roots, merge/delete poor starter
+values, then re-run the S5/S6 labeling backfill — ADR-0050's D6 coverage gate).
+
+**[`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) § Slice 3 — refine
+vs regenerate intent (scoped 2026-07-30, dispatch-ready; full brief in the effort doc).** Regenerating a prep
+plan floods "Review omitted steps" because the omission diff keys on exact `session`+`task`+`serves` and a
+regenerate legitimately rewrites both. Fix: the baseline follows **intent**, not the transport — refine keeps
+the current-plan baseline and the loud guard; regenerate uses an **empty** baseline and a light "replaces your
+N-step plan" confirmation. **One column on the local-only `aiHandoffs` table** (`regenerates: Bool`, for the
+outboard copy→paste round-trip only — **not synced, no prod entry**, deterministic-UUID/post-engine rules do
+not apply). Do **not** infer intent from how many steps match (that heuristic *is* the bug), don't add fuzzy
+matching to the refine diff, don't touch Slice 1's storage. Local migration → **no two-device pass**. *(Was the
+live Next Up target before the facets pivot — preserved here, not dropped; sequence with Jon.)*
 
 **[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md) — ATK's "Gather Your
 Ingredients" is a latent grocery bug (scoped 2026-07-28). P1 only; **no schema**.** 101 shoppable ingredient
@@ -233,10 +239,18 @@ selection (per-bubble `UITextView` caps the payload).
 
 Not work, a checklist.
 
-**[PR #262](https://github.com/jonphillips/yes-chef/pull/262) — prep plan dish links and dates. Merging, no
-schema.** Slice 1 (day-anchored sessions on a placed menu) is **device-confirmed 2026-07-30**. **Slice 2 pass
-still owed:** on iPhone compact width, confirm an inert chip relinks in two taps, a hand-authored step can be
-linked, *No dish* clears and persists, and a compound `serves` proposes no dish.
+**[PR #270](https://github.com/jonphillips/yes-chef/pull/270) — ADR-0049 Amd 2 D1, facets. Synced data pass →
+owes a two-device pass; back up first.** Approved (architect review) 2026-08-03. **Before the second device
+converges, read the `facet-migration-audit` log line** (`AppLog.dataIntegrity`, emitted on the first upgraded
+launch whenever anything was promoted / remapped / merged / left unresolved). Then confirm on device: (a)
+Cuisine/Course appear as facets with their values intact, (b) every recipe's category assignments are
+unchanged, (c) former tags appear as loose labels, (d) both devices converge with **no duplicate facet or
+category rows**, (e) the library filter still finds a recipe by its cuisine.
+
+**[PR #262](https://github.com/jonphillips/yes-chef/pull/262) — prep plan dish links and dates. Merged
+2026-07-30, no schema.** Slice 1 (day-anchored sessions on a placed menu) is **device-confirmed 2026-07-30**.
+**Slice 2 pass still owed:** on iPhone compact width, confirm an inert chip relinks in two taps, a hand-authored
+step can be linked, *No dish* clears and persists, and a compound `serves` proposes no dish.
 
 **[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) S2** — the export →
 restore → re-enable-sync round-trip **passed on two simulators 2026-07-29** (isolated test container), which

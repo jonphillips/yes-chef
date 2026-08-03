@@ -9,6 +9,74 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0049 Amendment 2 · Dispatch 1 — namespaces become synced `facets`
+
+**Approved (architect review) 2026-08-03; PR [#270](https://github.com/jonphillips/yes-chef/pull/270) OPEN,
+branch `codex/adr-0049-amendment-2-facets` — device audit-review + two-device convergence pass + merge still
+owed** (see [`CURRENT_HANDOFF.md`](CURRENT_HANDOFF.md) § Device passes owed; *finalize this entry's verification
+record on merge*). Spec: [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 1;
+[ADR-0049 Amendment 2](decisions/ADR-0049-unified-labels-and-assisted-tagging.md). Verified in-session:
+`swift build` clean, `CategoryRepositoryTests` **8/8** green. **Absorbs Amendment 1's teardown** — the
+seed-state and tombstone tables are dropped *inside* this migration, not in a separate synced pass.
+
+**What it does.** A `facets` table becomes an explicit synced entity; `Category` gains `facetID` (non-nil = a
+structured facet value, nil = a loose label) and `hidden`. `Cuisine` and `Course` stop being category rows and
+become facet rows with fixed ids. The post-`makeSyncEngine`, deterministic, idempotent data pass promotes both
+namespace roots — setting each child's `facetID`, nulling its `parentCategoryID`, deleting the old root
+category — while **preserving every child UUID so all `recipeCategories` joins ride through untouched**. Recipes
+joined directly to a bare namespace root are **remapped to a "Legacy &lt;name&gt;" loose label, never dropped**,
+and reported. The four D9 invariants (facet membership, same-facet parenting, leaf-only loose labels, facets
+unassignable) are enforced in `CategoryRepository` alongside `reconcileCategories`, which stays the sole writer.
+Import maps `recipeCuisine`→Cuisine and confidently-interpretable `recipeCategory`→a facet, otherwise loose — a
+delimiter is not a hierarchy signal (D12). Dormant tags fold into loose categories.
+
+**The review found one blocking gap, fixed in `fe20abe`.** The `FacetMigrationAudit` — the slice's required
+Pass D deliverable ("Jon reads it before the second device converges") — was computed and then discarded at the
+call site, so the merge gate could not actually be satisfied. It is now logged via `AppLog.dataIntegrity` when
+`requiresReview`, and the struct was widened to capture parent changes, merges, and deletions (the full Pass D
+spec). The same commit gated the dedup passes on rows actually changing, so a steady-state launch no longer does
+full-library dedup grouping. Cross-table UUID reuse (`facet.id == old category.id`, `category.id == tag.id`) was
+verified sync-safe: SQLiteData namespaces CloudKit record identity as `<uuid>:<recordType>`, so the shared zone
+never collides.
+
+**Schema: `facets` IS synced** — registered in `CloudSync`, and `facets` + `Category.facetID` + `Category.hidden`
+added to the prod-schema promotion list in this same PR; the two retired seed tables stay off it.
+
+## ADR-0049 S3/S4 label-proposer review fixes + app-test target repair; Amendment 1 recorded
+
+**✅ Merged 2026-07-31.** PR [#269](https://github.com/jonphillips/yes-chef/pull/269), branch
+`codex/adr-0049-pr268-review-followups`, merge `a59263f`. Follow-up to PR
+[#268](https://github.com/jonphillips/yes-chef/pull/268): the S3/S4 label-proposer review fixes were never
+committed before #268 merged, so **#268 shipped the pre-review proposer** and this PR lands the fixes on top of
+main. Verified in-PR: Core `LabelProposerTests` **9/9**; the app-test target builds and
+`RecipeCaptureLabelSuggestionTests` **2/2** + `ServeWithRepairTests` **2/2** run.
+
+**The four #268 findings (ADR-0049 S3/S4, unified label proposer):**
+- **Finding 1 (blocking).** Namespace confirmation used an `isPresented:`-with-payload-nilling setter — SwiftUI
+  writes `false` before the button action, so the confirm no-op'd. This is the ADR-0030 destructive-setter
+  defect recurring ([[alert-ispresented-destructive-setter]]); fixed by moving to the `item:`-binding house
+  pattern, with `confirmNamespaceSuggestion(_:)` taking the payload.
+- **Finding 2 (blocking).** `LabelProposer.parse` was all-or-nothing; now returns
+  `LabelProposal(accepted:rejected:)` and maps per row, so one unmappable suggestion is surfaced, not fatal (D2).
+- **Finding 3.** `.namespace` carries `[dimension, firstChild]` and files the recipe under the **child**, never
+  a bare root — the hand-enforced precursor to Amendment 2's "a facet is not assignable" (D9 rule 4).
+- **Finding 4.** Model tier is threaded through the proposer (defaults `.onDevice`) for the S5/S6 consumers.
+- **Smaller:** a "Suggest Again" retry, accepted suggestions merge only at commit (no re-extract stickiness), a
+  "Categories & Tags" row, and app-layer regression tests.
+
+**App-test target repair (rode in the same PR).** `ServeWithRepairTests` called a
+`WorkbenchDetailModel.presentServeWithRepair` surface that never existed, breaking the app-test compile; the new
+test file had also never been wired into `project.pbxproj`, so it was silently excluded from the bundle. Both
+fixed, so the app-test target — and the new tests — actually run.
+
+**ADR-0049 Amendment 1 recorded here (doc only).** The decision to retire the category seed-state + tombstone
+machinery — seed the ~24 starter categories in place by fixed id, make them non-deletable + hideable, drop
+`categorySeedStates` / `categorySeedTombstones` — because the deletion-suppression apparatus is over-built for
+~10 friendly users ([[category-seed-retire-tombstone]], [[withdraw-not-defer-orphaned-schema]]). **Not
+implemented in this PR.** Amendment 2 then **absorbed** it: the teardown ships inside D1's facet migration (PR
+[#270](https://github.com/jonphillips/yes-chef/pull/270)), not as a separate synced data pass — see the entry
+above.
+
 ## Prep-plan Slices 1–2 — the menu's dates reach the model; `sourceDish` becomes human-settable
 
 **Device-confirmed 2026-07-30 (day-anchored labels); PR [#262](https://github.com/jonphillips/yes-chef/pull/262),
