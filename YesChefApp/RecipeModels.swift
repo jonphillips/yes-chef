@@ -421,6 +421,12 @@ final class RecipeCaptureModel {
   var readerFeedbackComments: [RawComment] = []
   var readerFeedbackHandoffEvidence: [String] = []
   var isCuratingReaderFeedback = false
+  @ObservationIgnored private(set) var readerFeedbackCaptureID: UUID
+
+  init() {
+    @Dependency(\.uuid) var captureUUID
+    readerFeedbackCaptureID = captureUUID()
+  }
 
   var canFetch: Bool {
     normalizedURL != nil && !isFetching && !isExtracting && !isCommitting
@@ -493,6 +499,7 @@ final class RecipeCaptureModel {
     readerFeedbackComments = []
     readerFeedbackHandoffEvidence = []
     isCuratingReaderFeedback = false
+    readerFeedbackCaptureID = uuid()
   }
 
   func cancelButtonTapped() -> Bool {

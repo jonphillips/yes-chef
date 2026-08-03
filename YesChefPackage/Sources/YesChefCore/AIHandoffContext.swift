@@ -402,10 +402,12 @@ public extension MenuChatContext {
 }
 
 public struct ReaderFeedbackHandoffContext: Equatable, Sendable {
+  public let captureID: UUID
   public let comments: [RawComment]
   public let sourceURL: URL?
 
-  public init(comments: [RawComment], sourceURL: URL?) {
+  public init(captureID: UUID, comments: [RawComment], sourceURL: URL?) {
+    self.captureID = captureID
     self.comments = comments
     self.sourceURL = sourceURL
   }

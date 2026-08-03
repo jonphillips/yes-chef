@@ -460,6 +460,7 @@ private struct RecipeCaptureReviewSections: View {
             ReaderFeedbackHandoffControls(
               source: .readerFeedback(
                 ReaderFeedbackHandoffContext(
+                  captureID: model.readerFeedbackCaptureID,
                   comments: model.readerFeedbackComments,
                   sourceURL: page.sourceURL
                 )

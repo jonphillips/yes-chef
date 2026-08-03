@@ -7,13 +7,17 @@ public extension AIHandoffIntentImport {
   static func stageReaderFeedbackReview(
     handoffID: AIHandoff.ID,
     result: String,
+    captureID: UUID,
     comments: [RawComment] = [],
+    allowUnmatchedToken: Bool = false,
     in db: Database,
     now: Date
   ) throws -> AIHandoffReaderFeedbackReview {
     let payload: String
     if let markedResult = AIHandoffReturnContract.strippingMarker(from: result) {
-      guard let routedText = AIHandoffToken.stripping(from: markedResult), routedText.handoffID == handoffID else {
+      guard let routedText = AIHandoffToken.stripping(from: markedResult),
+        routedText.handoffID == handoffID || allowUnmatchedToken
+      else {
         throw AIHandoffIntentImportError.wrongTask
       }
       payload = routedText.payload
@@ -33,7 +37,7 @@ public extension AIHandoffIntentImport {
     guard
       let handoff = try AIHandoffRepository.handoff(id: handoffID, in: db),
       handoff.sourceType == .capture,
-      handoff.sourceID == handoffID,
+      handoff.sourceID == captureID,
       handoff.taskType == .readerFeedbackCuration,
       handoff.status == .awaitingReturn,
       handoff.importedAt == nil
