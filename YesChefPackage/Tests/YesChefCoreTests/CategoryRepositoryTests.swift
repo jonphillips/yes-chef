@@ -250,5 +250,112 @@ extension RecipeCoreTests {
         }
       }
     }
+
+    @Test
+    func categoryGroupsCanBeCreatedRenamedAndHiddenWithoutChangingTheirValues() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 816_350_000)
+      var ids = SampleUUIDSequence(start: 93_000)
+
+      try database.write { db in
+        let facet = try CategoryRepository.createFacet(
+          name: "Dish Type", in: db, now: now, uuid: { ids.next() }
+        )
+        let value = try CategoryRepository.createCategory(
+          name: "Taco", facetID: facet.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+
+        try CategoryRepository.setFacetHidden(facetID: facet.id, hidden: true, in: db)
+        #expect(try CategoryListRequest().fetch(db).isEmpty)
+        try CategoryRepository.setFacetHidden(facetID: facet.id, hidden: false, in: db)
+        try CategoryRepository.setCategoryHidden(categoryID: value.id, hidden: true, in: db)
+
+        try CategoryRepository.renameFacet(facetID: facet.id, name: "Format", in: db)
+
+        expectNoDifference(try Facet.find(facet.id).fetchOne(db)?.name, "Format")
+        expectNoDifference(try Facet.find(facet.id).fetchOne(db)?.hidden, false)
+        expectNoDifference(try Category.find(value.id).fetchOne(db)?.facetID, facet.id)
+        expectNoDifference(try Category.find(value.id).fetchOne(db)?.hidden, true)
+        expectNoDifference(try FacetListRequest().fetch(db).map(\.id), [facet.id])
+        expectNoDifference(try FacetManagementListRequest().fetch(db).map(\.id), [facet.id])
+      }
+    }
+
+    @Test
+    func categoryGroupsRejectDuplicateNames() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 816_400_000)
+      var ids = SampleUUIDSequence(start: 94_000)
+
+      try database.write { db in
+        _ = try CategoryRepository.createFacet(
+          name: "Dish Type", in: db, now: now, uuid: { ids.next() }
+        )
+        #expect(throws: CategoryRepositoryError.duplicateFacetName(name: "dish type")) {
+          _ = try CategoryRepository.createFacet(
+            name: "dish type", in: db, now: now, uuid: { ids.next() }
+          )
+        }
+      }
+    }
+
+    @Test
+    func categoryNamesAreUniqueWithinTheirFacetAndParentOnly() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 816_450_000)
+      var ids = SampleUUIDSequence(start: 95_000)
+
+      try database.write { db in
+        _ = try CategoryRepository.seedStarterFacets(in: db)
+        let facets = try Facet.fetchAll(db)
+        let cuisine = try #require(facets.first { $0.name == "Cuisine" })
+        let mealType = try CategoryRepository.createFacet(
+          name: "Meal Type", in: db, now: now, uuid: { ids.next() }
+        )
+
+        let looseItalian = try CategoryRepository.createCategory(
+          name: "Italian", parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+        let cuisineDinner = try CategoryRepository.createCategory(
+          name: "Dinner", facetID: cuisine.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+        let mealTypeDinner = try CategoryRepository.createCategory(
+          name: "Dinner", facetID: mealType.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+
+        expectNoDifference(looseItalian.facetID, nil)
+        expectNoDifference(cuisineDinner.facetID, cuisine.id)
+        expectNoDifference(mealTypeDinner.facetID, mealType.id)
+      }
+    }
+
+    @Test
+    func userCategoryGroupsCanBeDeletedOnlyAfterTheirValuesAreRemoved() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 816_500_000)
+      var ids = SampleUUIDSequence(start: 96_000)
+
+      try database.write { db in
+        let facet = try CategoryRepository.createFacet(
+          name: "Dish Type", in: db, now: now, uuid: { ids.next() }
+        )
+        let value = try CategoryRepository.createCategory(
+          name: "Taco", facetID: facet.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+
+        #expect(throws: CategoryRepositoryError.cannotDeleteFacetWithCategories) {
+          try CategoryRepository.deleteFacet(facetID: facet.id, in: db)
+        }
+        try CategoryRepository.deleteCategory(categoryID: value.id, in: db)
+        try CategoryRepository.deleteFacet(facetID: facet.id, in: db)
+        #expect(try Facet.find(facet.id).fetchOne(db) == nil)
+
+        _ = try CategoryRepository.seedStarterFacets(in: db)
+        let cuisine = try #require(try Facet.fetchAll(db).first { $0.name == "Cuisine" })
+        #expect(throws: CategoryRepositoryError.cannotDeleteStarterFacet) {
+          try CategoryRepository.deleteFacet(facetID: cuisine.id, in: db)
+        }
+      }
+    }
   }
 }

@@ -7,112 +7,225 @@ struct CategoryManagementView: View {
   var body: some View {
     @Bindable var model = model
 
-    CategoryBrowserView(model: model, parentCategoryID: nil)
-    .sheet(item: $model.editor) { editor in
-      NavigationStack {
-        CategoryEditorSheet(model: model, editor: editor)
+    CategoryManagementListView(model: model)
+      .sheet(item: $model.categoryEditor) { editor in
+        NavigationStack {
+          CategoryEditorSheet(model: model, editor: editor)
+        }
+        .presentationDetents([.medium, .large])
       }
-      .presentationDetents([.medium, .large])
-    }
-    .confirmationDialog(
-      "Delete Category?",
-      item: $model.destination.deleteCategory,
-      titleVisibility: .visible
-    ) { categoryID in
-      Button("Delete Category", role: .destructive) {
-        model.confirmDeleteCategoryButtonTapped(categoryID: categoryID)
+      .sheet(item: $model.facetEditor) { editor in
+        NavigationStack {
+          CategoryGroupEditorSheet(model: model, editor: editor)
+        }
+        .presentationDetents([.medium])
       }
-      Button("Cancel", role: .cancel) {}
-    } message: { categoryID in
-      Text("Delete \(model.title(for: categoryID))?")
+      .confirmationDialog(
+        "Delete Category?",
+        item: $model.destination.deleteCategory,
+        titleVisibility: .visible
+      ) { categoryID in
+        Button("Delete Category", role: .destructive) {
+          model.confirmDeleteCategoryButtonTapped(categoryID: categoryID)
+        }
+        Button("Cancel", role: .cancel) {}
+      } message: { categoryID in
+        Text("Delete \(model.title(for: categoryID))?")
+      }
+      .confirmationDialog(
+        "Delete Category Group?",
+        item: $model.destination.deleteCategoryGroup,
+        titleVisibility: .visible
+      ) { facetID in
+        Button("Delete Category Group", role: .destructive) {
+          model.confirmDeleteCategoryGroupButtonTapped(facetID: facetID)
+        }
+        Button("Cancel", role: .cancel) {}
+      } message: { facetID in
+        Text("Delete \(model.categoryGroupTitle(for: facetID))?")
+      }
+      .alert("Could Not Save Category", isPresented: $model.isShowingError) {
+        Button("OK") {}
+      } message: {
+        Text(model.errorMessage ?? "")
+      }
+  }
+}
+
+private struct CategoryManagementListView: View {
+  let model: CategoryManagementModel
+
+  var body: some View {
+    List {
+      Section("Category Groups") {
+        ForEach(model.facets) { facet in
+          CategoryGroupRow(model: model, facet: facet)
+        }
+      }
+
+      Section("Other Categories") {
+        ForEach(model.looseCategories) { category in
+          CategoryRow(model: model, category: category, facetID: nil)
+        }
+      }
     }
-    .alert("Could Not Save Category", isPresented: $model.isShowingError) {
-      Button("OK") {}
-    } message: {
-      Text(model.errorMessage ?? "")
+    .overlay {
+      if model.facets.isEmpty && model.looseCategories.isEmpty {
+        ContentUnavailableView {
+          Label("No Categories", systemImage: "folder")
+        } actions: {
+          Button {
+            model.addCategoryGroupButtonTapped()
+          } label: {
+            Label("New Category Group", systemImage: "folder.badge.plus")
+          }
+        }
+      }
+    }
+    .navigationTitle("Categories")
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Menu {
+          Button {
+            model.addCategoryGroupButtonTapped()
+          } label: {
+            Label("New Category Group", systemImage: "folder.badge.plus")
+          }
+          Button {
+            model.addLooseCategoryButtonTapped()
+          } label: {
+            Label("New Category", systemImage: "tag")
+          }
+        } label: {
+          Label("Add Category", systemImage: "plus")
+        }
+      }
     }
   }
 }
 
-private struct CategoryBrowserView: View {
+private struct CategoryGroupRow: View {
   let model: CategoryManagementModel
-  let parentCategoryID: YesChefCore.Category.ID?
+  let facet: Facet
 
   var body: some View {
-    // Branch around the whole List, never inside it: deleting the last category while the empty
-    // state is a *child* of the List swaps its single child in one update and SwiftUI raises an
-    // invalid-batch-update exception (see ArchivedRecipesView, which crashed exactly this way).
-    Group {
+    HStack(spacing: 8) {
+      NavigationLink {
+        CategoryGroupBrowserView(model: model, facetID: facet.id)
+      } label: {
+        HStack(spacing: 12) {
+          Image(systemName: "folder.fill")
+            .foregroundStyle(.secondary)
+            .frame(width: 22)
+          Text(facet.name)
+          Spacer()
+          if facet.hidden {
+            Image(systemName: "eye.slash")
+              .foregroundStyle(.secondary)
+          }
+          Text(model.categories(in: facet.id).count, format: .number)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        }
+      }
+
+      Menu {
+        Button {
+          model.editCategoryGroupButtonTapped(facetID: facet.id)
+        } label: {
+          Label("Edit", systemImage: "pencil")
+        }
+        Button {
+          model.toggleCategoryGroupVisibilityButtonTapped(facetID: facet.id)
+        } label: {
+          Label(facet.hidden ? "Show Category Group" : "Hide Category Group", systemImage: facet.hidden ? "eye" : "eye.slash")
+        }
+        if model.canDeleteCategoryGroup(facetID: facet.id) {
+          Button(role: .destructive) {
+            model.deleteCategoryGroupButtonTapped(facetID: facet.id)
+          } label: {
+            Label("Delete", systemImage: "trash")
+          }
+        }
+      } label: {
+        Label("Category Group Actions", systemImage: "ellipsis.circle")
+      }
+      .labelStyle(.iconOnly)
+      .font(.title3)
+      .frame(width: 44, height: 44)
+    }
+  }
+}
+
+private struct CategoryGroupBrowserView: View {
+  let model: CategoryManagementModel
+  let facetID: Facet.ID
+  let parentCategoryID: YesChefCore.Category.ID?
+
+  init(model: CategoryManagementModel, facetID: Facet.ID, parentCategoryID: YesChefCore.Category.ID? = nil) {
+    self.model = model
+    self.facetID = facetID
+    self.parentCategoryID = parentCategoryID
+  }
+
+  var body: some View {
+    let categories = model.children(of: parentCategoryID, in: facetID)
+
+    List {
+      ForEach(categories) { category in
+        CategoryRow(model: model, category: category, facetID: facetID)
+      }
+    }
+    .overlay {
       if categories.isEmpty {
-        CategoryEmptyListContent(model: model, parentCategoryID: parentCategoryID)
-      } else {
-        List {
-          Section {
-            ForEach(categories) { category in
-              CategoryBrowserRow(
-                model: model,
-                category: category,
-                childCount: model.childCount(for: category.id),
-                isRootLevel: parentCategoryID == nil
-              )
+        ContentUnavailableView {
+          Label("No Categories", systemImage: "folder")
+        } actions: {
+          if parentCategoryID == nil {
+            Button {
+              model.addCategoryButtonTapped(facetID: facetID)
+            } label: {
+              Label("New Category", systemImage: "plus")
             }
           }
         }
-        .listStyle(.insetGrouped)
       }
     }
     .navigationTitle(title)
     .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button {
-          if let parentCategoryID {
-            model.addChildCategoryButtonTapped(parentCategoryID: parentCategoryID)
-          } else {
-            model.addRootCategoryButtonTapped()
+      if parentCategoryID == nil {
+        ToolbarItem(placement: .primaryAction) {
+          Button {
+            model.addCategoryButtonTapped(facetID: facetID)
+          } label: {
+            Label("New Category", systemImage: "plus")
           }
-        } label: {
-          Label(parentCategoryID == nil ? "Add Category" : "Add Child Category", systemImage: "plus")
         }
       }
     }
-  }
-
-  private var categories: [YesChefCore.Category] {
-    model.children(of: parentCategoryID)
   }
 
   private var title: String {
-    parentCategoryID.map { model.title(for: $0) } ?? "Categories"
+    parentCategoryID.map { model.title(for: $0) } ?? model.categoryGroupTitle(for: facetID)
   }
 }
 
-private struct CategoryBrowserRow: View {
+private struct CategoryRow: View {
   let model: CategoryManagementModel
   let category: YesChefCore.Category
-  let childCount: Int
-  let isRootLevel: Bool
+  let facetID: Facet.ID?
 
   var body: some View {
     HStack(spacing: 8) {
-      if isRootLevel {
+      if let facetID, model.childCount(for: category.id) > 0 {
         NavigationLink {
-          CategoryBrowserView(model: model, parentCategoryID: category.id)
+          CategoryGroupBrowserView(model: model, facetID: facetID, parentCategoryID: category.id)
         } label: {
-          rowContent(showsFolder: true)
+          label
         }
       } else {
-        rowContent(showsFolder: false)
+        label
       }
-    }
-  }
-
-  private func rowContent(showsFolder: Bool) -> some View {
-    HStack(spacing: 8) {
-      CategoryBrowserRowLabel(
-        name: category.name,
-        childCount: childCount,
-        showsFolder: showsFolder
-      )
 
       Menu {
         Button {
@@ -120,17 +233,17 @@ private struct CategoryBrowserRow: View {
         } label: {
           Label("Edit", systemImage: "pencil")
         }
-        if isRootLevel {
-          Button {
-            model.addChildCategoryButtonTapped(parentCategoryID: category.id)
-          } label: {
-            Label("Add Child", systemImage: "plus")
-          }
-        }
-        Button(role: .destructive) {
-          model.deleteCategoryButtonTapped(categoryID: category.id)
+        Button {
+          model.toggleCategoryVisibilityButtonTapped(categoryID: category.id)
         } label: {
-          Label("Delete", systemImage: "trash")
+          Label(category.hidden ? "Show Category" : "Hide Category", systemImage: category.hidden ? "eye" : "eye.slash")
+        }
+        if model.canDelete(categoryID: category.id) {
+          Button(role: .destructive) {
+            model.deleteCategoryButtonTapped(categoryID: category.id)
+          } label: {
+            Label("Delete", systemImage: "trash")
+          }
         }
       } label: {
         Label("Category Actions", systemImage: "ellipsis.circle")
@@ -138,57 +251,25 @@ private struct CategoryBrowserRow: View {
       .labelStyle(.iconOnly)
       .font(.title3)
       .frame(width: 44, height: 44)
-      .contentShape(.rect)
     }
   }
-}
 
-private struct CategoryBrowserRowLabel: View {
-  let name: String
-  let childCount: Int
-  let showsFolder: Bool
-
-  var body: some View {
+  private var label: some View {
     HStack(spacing: 12) {
-      Image(systemName: iconName)
+      Image(systemName: model.childCount(for: category.id) > 0 ? "folder.fill" : "tag")
         .foregroundStyle(.secondary)
         .frame(width: 22)
-      Text(name)
+      Text(category.name)
         .lineLimit(1)
       Spacer()
-      if childCount > 0 {
-        Text(childCount, format: .number)
-          .font(.subheadline)
+      if category.hidden {
+        Image(systemName: "eye.slash")
           .foregroundStyle(.secondary)
       }
-    }
-    .contentShape(Rectangle())
-  }
-
-  private var iconName: String {
-    if !showsFolder {
-      return "tag"
-    }
-    return childCount > 0 ? "folder.fill" : "folder"
-  }
-}
-
-private struct CategoryEmptyListContent: View {
-  let model: CategoryManagementModel
-  let parentCategoryID: YesChefCore.Category.ID?
-
-  var body: some View {
-    ContentUnavailableView {
-      Label(parentCategoryID == nil ? "No Categories" : "No Child Categories", systemImage: "folder")
-    } actions: {
-      Button {
-        if let parentCategoryID {
-          model.addChildCategoryButtonTapped(parentCategoryID: parentCategoryID)
-        } else {
-          model.addRootCategoryButtonTapped()
-        }
-      } label: {
-        Label(parentCategoryID == nil ? "Add Category" : "Add Child Category", systemImage: "plus")
+      if model.childCount(for: category.id) > 0 {
+        Text(model.childCount(for: category.id), format: .number)
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
       }
     }
   }
@@ -209,25 +290,27 @@ private struct CategoryEditorSheet: View {
         StackedTextField(title: "Name", text: $editor.name)
       }
 
-      Section("Parent") {
-        Button {
-          isShowingParentPicker = true
-        } label: {
-          StackedFormField(title: "Parent") {
-            HStack {
-              Text(model.parentTitle(for: editor.parentCategoryID))
-                .foregroundStyle(.primary)
-              Spacer()
-              Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.tertiary)
+      if editor.facetID != nil {
+        Section("Parent") {
+          Button {
+            isShowingParentPicker = true
+          } label: {
+            StackedFormField(title: "Parent") {
+              HStack {
+                Text(model.parentTitle(for: editor.parentCategoryID))
+                  .foregroundStyle(.primary)
+                Spacer()
+                Image(systemName: "chevron.right")
+                  .font(.footnote.weight(.semibold))
+                  .foregroundStyle(.tertiary)
+              }
             }
           }
+          .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
       }
 
-      if let categoryID = editor.categoryID {
+      if let categoryID = editor.categoryID, model.canDelete(categoryID: categoryID) {
         Section {
           Button(role: .destructive) {
             model.deleteCategoryButtonTapped(categoryID: categoryID)
@@ -243,7 +326,7 @@ private struct CategoryEditorSheet: View {
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {
         Button("Cancel") {
-          model.cancelEditingButtonTapped()
+          model.cancelCategoryEditingButtonTapped()
           dismiss()
         }
       }
@@ -253,7 +336,7 @@ private struct CategoryEditorSheet: View {
             dismiss()
           }
         }
-        .disabled(model.isSaveDisabled)
+        .disabled(model.isCategorySaveDisabled)
       }
     }
     .sheet(isPresented: $isShowingParentPicker) {
@@ -266,10 +349,60 @@ private struct CategoryEditorSheet: View {
 
   private var editorTitle: String {
     let name = editor.name.trimmingCharacters(in: .whitespacesAndNewlines)
-    if !name.isEmpty {
-      return name
-    }
+    if !name.isEmpty { return name }
     return editor.categoryID == nil ? "New Category" : "Category"
+  }
+}
+
+private struct CategoryGroupEditorSheet: View {
+  @Environment(\.dismiss) private var dismiss
+
+  let model: CategoryManagementModel
+  let editor: FacetEditorModel
+
+  var body: some View {
+    @Bindable var editor = editor
+
+    Form {
+      Section("Category Group") {
+        StackedTextField(title: "Name", text: $editor.name)
+      }
+
+      if let facetID = editor.facetID, model.canDeleteCategoryGroup(facetID: facetID) {
+        Section {
+          Button(role: .destructive) {
+            model.deleteCategoryGroupButtonTapped(facetID: facetID)
+            dismiss()
+          } label: {
+            Label("Delete Category Group", systemImage: "trash")
+          }
+        }
+      }
+    }
+    .navigationTitle(editorTitle)
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .cancellationAction) {
+        Button("Cancel") {
+          model.cancelCategoryGroupEditingButtonTapped()
+          dismiss()
+        }
+      }
+      ToolbarItem(placement: .confirmationAction) {
+        Button("Save") {
+          if model.saveCategoryGroupButtonTapped() {
+            dismiss()
+          }
+        }
+        .disabled(model.isCategoryGroupSaveDisabled)
+      }
+    }
+  }
+
+  private var editorTitle: String {
+    let name = editor.name.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !name.isEmpty { return name }
+    return editor.facetID == nil ? "New Category Group" : "Category Group"
   }
 }
 
@@ -281,15 +414,12 @@ private struct CategoryParentPickerSheet: View {
 
   var body: some View {
     List {
-      CategoryParentPickerRow(
-        title: "None",
-        isSelected: editor.parentCategoryID == nil
-      ) {
+      CategoryParentPickerRow(title: "None", isSelected: editor.parentCategoryID == nil) {
         editor.parentCategoryID = nil
         dismiss()
       }
 
-      ForEach(model.parentOptions(excluding: editor.categoryID)) { option in
+      ForEach(model.parentOptions(in: editor.facetID, excluding: editor.categoryID)) { option in
         CategoryParentPickerRow(
           title: option.title,
           isSelected: editor.parentCategoryID == option.categoryID
@@ -328,7 +458,6 @@ private struct CategoryParentPickerRow: View {
             .foregroundStyle(.tint)
         }
       }
-      .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
   }
@@ -354,10 +483,6 @@ private struct RecipeCategorySelectionView: View {
   let model: RecipeEditorModel
 
   var body: some View {
-    // Empty state as an `.overlay`, never a branch inside the List — the in-List form raises an
-    // invalid-batch-update exception if the rows ever empty while this is on screen. Lowest-risk of
-    // the eight sites (a selection list with no delete), converted for consistency so the pattern
-    // does not get copied back in.
     List {
       ForEach(model.categoryRows) { row in
         RecipeCategorySelectionRow(
@@ -398,7 +523,6 @@ private struct RecipeCategorySelectionRow: View {
         }
       }
       .padding(.leading, CGFloat(row.depth) * 18)
-      .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
   }

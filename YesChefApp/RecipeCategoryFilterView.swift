@@ -6,16 +6,43 @@ struct RecipeCategoryFilterPickerView: View {
   let model: RecipeLibraryModel
   @State private var searchText = ""
 
-  private var rootNodes: [RecipeCategoryFilterNode] {
-    RecipeCategoryFilterNode.tree(from: model.categoryFilterOptions)
+  private var categoryGroups: [RecipeCategoryFilterGroup] {
+    let categoriesByID = Dictionary(uniqueKeysWithValues: model.categoryFilterCategories.map { ($0.id, $0) })
+    return model.categoryFilterFacets.compactMap { facet in
+      let categoryPaths = filterPaths(
+        for: model.categoryFilterCategories.filter { $0.facetID == facet.id },
+        categoriesByID: categoriesByID
+      )
+      guard !categoryPaths.isEmpty else { return nil }
+      return RecipeCategoryFilterGroup(title: facet.name, categoryPaths: categoryPaths)
+    }
   }
 
-  private var matchingNodes: [RecipeCategoryFilterNode] {
+  private var looseCategoryNodes: [RecipeCategoryFilterNode] {
+    let categoriesByID = Dictionary(uniqueKeysWithValues: model.categoryFilterCategories.map { ($0.id, $0) })
+    return RecipeCategoryFilterNode.tree(
+      from: filterPaths(
+        for: model.categoryFilterCategories.filter { $0.facetID == nil },
+        categoriesByID: categoriesByID
+      )
+    )
+  }
+
+  private var matchingNodes: [RecipeCategoryFilterSearchNode] {
     let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !query.isEmpty else { return [] }
-    return rootNodes
-      .flatMap(\.flattened)
-      .filter { $0.path.localizedCaseInsensitiveContains(query) }
+
+    let grouped = categoryGroups.flatMap { group in
+      group.nodes.compactMap { node in
+        let result = RecipeCategoryFilterSearchNode(title: "\(group.title) > \(node.path)", node: node)
+        return result.title.localizedCaseInsensitiveContains(query) ? result : nil
+      }
+    }
+    let loose = looseCategoryNodes.flatMap(\.flattened).compactMap { node in
+      let result = RecipeCategoryFilterSearchNode(title: node.path, node: node)
+      return result.title.localizedCaseInsensitiveContains(query) ? result : nil
+    }
+    return grouped + loose
   }
 
   var body: some View {
@@ -23,28 +50,51 @@ struct RecipeCategoryFilterPickerView: View {
 
     Group {
       if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-        RecipeCategoryFilterLevelView(
-          model: model,
-          title: "Categories",
-          parentNode: nil,
-          nodes: rootNodes,
-          availabilityByName: availabilityByName
-        )
-      } else {
-        // Search-driven empty state as an `.overlay`, never a branch inside the List — narrowing the
-        // query to zero matches would otherwise swap the List's single child and raise an
-        // invalid-batch-update exception.
         List {
-          ForEach(matchingNodes) { node in
-            let availability = availabilityByName[node.path] ?? .empty(categoryName: node.path)
+          Section("Category Groups") {
+            ForEach(categoryGroups) { group in
+              NavigationLink {
+                RecipeCategoryFilterLevelView(
+                  model: model,
+                  title: group.title,
+                  parentNode: nil,
+                  nodes: group.nodes,
+                  availabilityByName: availabilityByName
+                )
+              } label: {
+                Label(group.title, systemImage: "folder.fill")
+              }
+            }
+          }
+
+          Section("Other Categories") {
+            ForEach(looseCategoryNodes) { node in
+              RecipeCategoryFilterNodeRow(
+                model: model,
+                node: node,
+                availabilityByName: availabilityByName
+              )
+            }
+          }
+        }
+        .overlay {
+          if categoryGroups.isEmpty && looseCategoryNodes.isEmpty {
+            ContentUnavailableView("No Categories", systemImage: "folder")
+          }
+        }
+        .navigationTitle("Categories")
+      } else {
+        List {
+          ForEach(matchingNodes) { result in
+            let availability = availabilityByName[result.node.path] ?? .empty(categoryName: result.node.path)
             RecipeFilterSelectionRow(
-              title: node.path,
+              title: result.title,
               systemImage: "folder",
               detail: availability.countText,
               isSelected: availability.isSelected,
               isEnabled: availability.isEnabled
             ) {
-              model.categoryFilterButtonTapped(node.path)
+              model.categoryFilterButtonTapped(result.node.path)
             }
           }
         }
@@ -57,6 +107,16 @@ struct RecipeCategoryFilterPickerView: View {
       }
     }
     .searchable(text: $searchText, prompt: "Search categories")
+  }
+
+  private func filterPaths(
+    for categories: [YesChefCore.Category],
+    categoriesByID: [YesChefCore.Category.ID: YesChefCore.Category]
+  ) -> [String] {
+    let availablePaths = Set(model.categoryFilterOptions)
+    return categories
+      .flatMap { CategoryHierarchy.filterDisplayNames(for: $0, categoriesByID: categoriesByID) }
+      .filter { availablePaths.contains($0) }
   }
 }
 
@@ -86,7 +146,7 @@ private struct RecipeCategoryFilterLevelView: View {
         }
       }
 
-      Section(parentNode == nil ? "Top Level" : "Subcategories") {
+      Section(parentNode == nil ? "Categories" : "Subcategories") {
         ForEach(nodes) { node in
           RecipeCategoryFilterNodeRow(
             model: model,
@@ -178,6 +238,25 @@ private struct RecipeCategoryFilterNodeRow: View {
       "\(selected) selected · \(possible) possible"
     }
   }
+}
+
+private struct RecipeCategoryFilterGroup: Identifiable, Equatable {
+  let title: String
+  let nodes: [RecipeCategoryFilterNode]
+
+  init(title: String, categoryPaths: [String]) {
+    self.title = title
+    nodes = RecipeCategoryFilterNode.tree(from: categoryPaths)
+  }
+
+  var id: String { title }
+}
+
+private struct RecipeCategoryFilterSearchNode: Identifiable, Equatable {
+  let title: String
+  let node: RecipeCategoryFilterNode
+
+  var id: String { title }
 }
 
 private struct RecipeCategoryFilterNode: Identifiable, Equatable {

@@ -5,7 +5,37 @@ public struct CategoryListRequest: FetchKeyRequest {
   public init() {}
 
   public func fetch(_ db: Database) throws -> [Category] {
-    CategoryRepository.sortedCategories(try Category.fetchAll(db).filter { !$0.hidden })
+    let facets = try Facet.fetchAll(db)
+    let visibleFacetIDs = Set(facets.filter { !$0.hidden }.map(\.id))
+    return CategoryRepository.sortedCategories(
+      try Category.fetchAll(db).filter { category in
+        !category.hidden && (category.facetID.map { visibleFacetIDs.contains($0) } ?? true)
+      }
+    )
+  }
+}
+
+public struct CategoryManagementListRequest: FetchKeyRequest {
+  public init() {}
+
+  public func fetch(_ db: Database) throws -> [Category] {
+    CategoryRepository.sortedCategories(try Category.fetchAll(db))
+  }
+}
+
+public struct FacetListRequest: FetchKeyRequest {
+  public init() {}
+
+  public func fetch(_ db: Database) throws -> [Facet] {
+    CategoryRepository.sortedFacets(try Facet.fetchAll(db).filter { !$0.hidden })
+  }
+}
+
+public struct FacetManagementListRequest: FetchKeyRequest {
+  public init() {}
+
+  public func fetch(_ db: Database) throws -> [Facet] {
+    CategoryRepository.sortedFacets(try Facet.fetchAll(db))
   }
 }
 
@@ -15,6 +45,7 @@ public enum CategoryRepositoryError: Error, Equatable {
   case categoryNotFound
   case parentNotFound
   case facetNotFound
+  case duplicateFacetName(name: String)
   case parentFacetMismatch
   case looseLabelsCannotHaveChildren
   case cannotParentCategoryUnderItself
@@ -22,6 +53,8 @@ public enum CategoryRepositoryError: Error, Equatable {
   case cannotDeleteCategoryWithChildren
   case cannotDeleteCategoryUsedByRecipes
   case cannotDeleteStarterCategory
+  case cannotDeleteFacetWithCategories
+  case cannotDeleteStarterFacet
 }
 
 extension CategoryRepositoryError: LocalizedError {
@@ -37,6 +70,8 @@ extension CategoryRepositoryError: LocalizedError {
       "Parent category not found."
     case .facetNotFound:
       "Category group not found."
+    case let .duplicateFacetName(name):
+      "A category group named \(name) already exists."
     case .parentFacetMismatch:
       "A category can only be nested inside the same category group."
     case .looseLabelsCannotHaveChildren:
@@ -51,6 +86,10 @@ extension CategoryRepositoryError: LocalizedError {
       "Remove this category from recipes before deleting it."
     case .cannotDeleteStarterCategory:
       "Starter categories cannot be deleted."
+    case .cannotDeleteFacetWithCategories:
+      "Delete or move this category group's categories before deleting it."
+    case .cannotDeleteStarterFacet:
+      "Starter category groups cannot be deleted."
     }
   }
 }
@@ -312,6 +351,79 @@ public enum CategoryRepository {
     CategoryHierarchy.displayRows(from: categories).map(\.category)
   }
 
+  public static func sortedFacets(_ facets: [Facet]) -> [Facet] {
+    facets.sorted {
+      if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
+      let nameComparison = $0.name.localizedStandardCompare($1.name)
+      if nameComparison != .orderedSame { return nameComparison == .orderedAscending }
+      return $0.id.uuidString < $1.id.uuidString
+    }
+  }
+
+  public static func isStarterFacet(_ facetID: Facet.ID) -> Bool {
+    starterFacets.contains { $0.facet.id == facetID }
+  }
+
+  public static func isStarterCategory(_ categoryID: Category.ID) -> Bool {
+    starterFacetValues.contains { $0.id == categoryID }
+  }
+
+  public static func createFacet(
+    name: String,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> Facet {
+    let facets = try Facet.fetchAll(db)
+    let name = try normalizedName(name)
+    try validateUniqueFacetName(name, excluding: nil, facets: facets)
+    let facet = Facet(
+      id: uuid(),
+      name: name,
+      sortOrder: (facets.map(\.sortOrder).max() ?? -1) + 1,
+      dateCreated: now
+    )
+    try Facet.insert { facet }.execute(db)
+    return facet
+  }
+
+  public static func renameFacet(facetID: Facet.ID, name: String, in db: Database) throws {
+    let facets = try Facet.fetchAll(db)
+    guard facets.contains(where: { $0.id == facetID }) else {
+      throw CategoryRepositoryError.facetNotFound
+    }
+    let name = try normalizedName(name)
+    try validateUniqueFacetName(name, excluding: facetID, facets: facets)
+    try Facet.find(facetID).update { $0.name = name }.execute(db)
+  }
+
+  public static func setFacetHidden(facetID: Facet.ID, hidden: Bool, in db: Database) throws {
+    guard try Facet.find(facetID).fetchOne(db) != nil else {
+      throw CategoryRepositoryError.facetNotFound
+    }
+    try Facet.find(facetID).update { $0.hidden = hidden }.execute(db)
+  }
+
+  public static func setCategoryHidden(categoryID: Category.ID, hidden: Bool, in db: Database) throws {
+    guard try Category.find(categoryID).fetchOne(db) != nil else {
+      throw CategoryRepositoryError.categoryNotFound
+    }
+    try Category.find(categoryID).update { $0.hidden = hidden }.execute(db)
+  }
+
+  public static func deleteFacet(facetID: Facet.ID, in db: Database) throws {
+    guard try Facet.find(facetID).fetchOne(db) != nil else {
+      throw CategoryRepositoryError.facetNotFound
+    }
+    guard !isStarterFacet(facetID) else {
+      throw CategoryRepositoryError.cannotDeleteStarterFacet
+    }
+    guard !(try Category.fetchAll(db)).contains(where: { $0.facetID == facetID }) else {
+      throw CategoryRepositoryError.cannotDeleteFacetWithCategories
+    }
+    try Facet.find(facetID).delete().execute(db)
+  }
+
   public static func createCategory(
     name: String,
     facetID: Facet.ID? = nil,
@@ -328,7 +440,13 @@ public enum CategoryRepository {
       categories: categories,
       facets: try Facet.fetchAll(db)
     )
-    try validateUniqueSiblingName(name, parentCategoryID: parentCategoryID, excluding: nil, categories: categories)
+    try validateUniqueSiblingName(
+      name,
+      facetID: resolvedFacetID,
+      parentCategoryID: parentCategoryID,
+      excluding: nil,
+      categories: categories
+    )
     let category = Category(
       id: uuid(),
       name: name,
@@ -358,7 +476,13 @@ public enum CategoryRepository {
       facets: facets
     )
     try validateMove(categoryID: categoryID, parentCategoryID: parentCategoryID, categories: categories)
-    try validateUniqueSiblingName(name, parentCategoryID: parentCategoryID, excluding: categoryID, categories: categories)
+    try validateUniqueSiblingName(
+      name,
+      facetID: resolvedFacetID,
+      parentCategoryID: parentCategoryID,
+      excluding: categoryID,
+      categories: categories
+    )
     try Category.find(category.id).update {
       $0.name = name
       $0.facetID = resolvedFacetID
@@ -409,6 +533,18 @@ public enum CategoryRepository {
     return name
   }
 
+  private static func validateUniqueFacetName(
+    _ name: String,
+    excluding facetID: Facet.ID?,
+    facets: [Facet]
+  ) throws {
+    guard !facets.contains(where: {
+      $0.id != facetID && $0.name.caseInsensitiveCompare(name) == .orderedSame
+    }) else {
+      throw CategoryRepositoryError.duplicateFacetName(name: name)
+    }
+  }
+
   private static func resolvedFacetID(
     facetID: Facet.ID?,
     parentCategoryID: Category.ID?,
@@ -449,12 +585,14 @@ public enum CategoryRepository {
 
   private static func validateUniqueSiblingName(
     _ name: String,
+    facetID: Facet.ID?,
     parentCategoryID: Category.ID?,
     excluding categoryID: Category.ID?,
     categories: [Category]
   ) throws {
     guard !categories.contains(where: {
       $0.id != categoryID
+        && $0.facetID == facetID
         && $0.parentCategoryID == parentCategoryID
         && $0.name.caseInsensitiveCompare(name) == .orderedSame
     }) else {
