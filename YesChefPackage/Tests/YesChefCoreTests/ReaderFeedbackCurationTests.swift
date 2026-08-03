@@ -69,6 +69,59 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func pastedJSONUsesTheSameTipContractAsConfiguredModelCuration() {
+      let comments = [
+        RawComment(text: "Same-day dough spread; overnight rest fixed it.", helpfulCount: 7),
+        RawComment(text: "Lower rack gave me a browned bottom.", helpfulCount: 12),
+        RawComment(text: "Another vote for the lower rack.", helpfulCount: 3),
+      ]
+      let result = """
+      [
+        {
+          "text": "Bake it on the lower rack so the bottom browns before the topping burns.",
+          "kind": "consensusDistilled",
+          "supportCount": 2,
+          "commentNumbers": [1, 3]
+        },
+        {
+          "text": "Rest the dough overnight; same-day dough spread too much.",
+          "kind": "singularPreserved",
+          "supportCount": 1,
+          "commentNumbers": [2]
+        }
+      ]
+      """
+
+      let onboard = ReaderFeedbackCurationClient.parse(
+        result,
+        comments: ReaderFeedbackCurationClient.preparedComments(comments)
+      )
+      let pasted = AIHandoffReturn.readerFeedbackReturn(from: result, comments: comments)
+
+      expectNoDifference(pasted.tips, onboard)
+      expectNoDifference(pasted.unparsedLines, [])
+    }
+
+    @Test
+    func legacyTipLinesRemainAvailableWithSingleCommentFallback() {
+      let returned = AIHandoffReturn.readerFeedbackReturn(
+        from: """
+        Tip: Salt and drain the cucumbers before dressing them.
+        Tip: Use two garlic cloves for a more pronounced flavor.
+        """
+      )
+
+      expectNoDifference(
+        returned.tips,
+        [
+          ReaderFeedbackTip(text: "Salt and drain the cucumbers before dressing them."),
+          ReaderFeedbackTip(text: "Use two garlic cloves for a more pronounced flavor."),
+        ]
+      )
+      expectNoDifference(returned.unparsedLines, [])
+    }
+
+    @Test
     func liveClientUsesConfiguredFrontierProviderAndHighEffort() async throws {
       let recorder = ReaderFeedbackModelRequestRecorder()
       let callRecords = ModelCallRecordCollector()

@@ -903,16 +903,27 @@ public enum AIHandoffReturn {
     MealPlanComplementPlan.parsingHandoffText(splitting(text).deliverable)
   }
 
-  public static func readerFeedback(from text: String) -> [ReaderFeedbackTip] {
-    readerFeedbackReturn(from: text).tips
+  public static func readerFeedback(from text: String, comments: [RawComment] = []) -> [ReaderFeedbackTip] {
+    readerFeedbackReturn(from: text, comments: comments).tips
   }
 
-  public static func readerFeedbackReturn(from text: String) -> ReaderFeedbackReturn {
+  public static func readerFeedbackReturn(
+    from text: String,
+    comments: [RawComment] = []
+  ) -> ReaderFeedbackReturn {
+    let deliverable = splitting(text).deliverable
+    if let tips = ReaderFeedbackCurationClient.parseJSONReturn(
+      deliverable,
+      comments: ReaderFeedbackCurationClient.preparedComments(comments)
+    ) {
+      return ReaderFeedbackReturn(tips: tips, unparsedLines: [])
+    }
+
     var seen = Set<String>()
     var tips: [ReaderFeedbackTip] = []
     var unparsedLines: [String] = []
 
-    for rawLine in splitting(text).deliverable.components(separatedBy: .newlines) {
+    for rawLine in deliverable.components(separatedBy: .newlines) {
       let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !line.isEmpty else { continue }
       guard line.lowercased().hasPrefix("tip:") else {

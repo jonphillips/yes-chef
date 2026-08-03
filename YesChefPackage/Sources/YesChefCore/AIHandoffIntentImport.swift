@@ -7,6 +7,7 @@ public extension AIHandoffIntentImport {
   static func stageReaderFeedbackReview(
     handoffID: AIHandoff.ID,
     result: String,
+    comments: [RawComment] = [],
     in db: Database,
     now: Date
   ) throws -> AIHandoffReaderFeedbackReview {
@@ -23,7 +24,7 @@ public extension AIHandoffIntentImport {
       handoff.importedAt == nil
     else { throw AIHandoffIntentImportError.wrongTask }
 
-    let returned = AIHandoffReturn.readerFeedbackReturn(from: routedText.payload)
+    let returned = AIHandoffReturn.readerFeedbackReturn(from: routedText.payload, comments: comments)
     guard !returned.tips.isEmpty else {
       if !returned.unparsedLines.isEmpty {
         throw AIHandoffIntentImportError.unparsedReaderFeedbackLines(returned.unparsedLines)

@@ -1,4 +1,3 @@
-import Dependencies
 import WebKit
 import Foundation
 import Observation
@@ -8,20 +7,15 @@ import YesChefCore
 @Observable
 @MainActor
 final class BrowserModel {
-  @ObservationIgnored
-  @Dependency(\.readerFeedbackCurationClient) private var readerFeedbackCurationClient
-
   let page = WebPage.browser()
   var recents: [URL] = []
   var notice: String?
   var isCapturing = false
   var isLoadingComments = false
-  private var readerFeedbackTips: [ReaderFeedbackTip] = []
   private var readerFeedbackComments: [RawComment] = []
 
   func recordRecent(_ url: URL) {
     if recents.first?.absoluteString != url.absoluteString {
-      readerFeedbackTips = []
       readerFeedbackComments = []
     }
     recents.removeAll { $0.absoluteString == url.absoluteString }
@@ -78,21 +72,11 @@ final class BrowserModel {
           notice = "Loaded comments, but couldn't extract reader feedback."
           return
         }
-        let tips = try await readerFeedbackCurationClient(comments: comments, sourceURL: page.url)
-        readerFeedbackComments = comments
-        readerFeedbackTips = tips
-        if tips.isEmpty {
-          notice = "Loaded \(comments.count) comments. No useful reader tips found. Capture to promote one manually."
-        } else {
-          notice = "Loaded \(comments.count) comments and found \(tips.count) reader tips. Capture to review them."
-        }
+        stageLoadedReaderFeedbackComments(comments)
+        notice = "Loaded \(comments.count) comments. Capture to curate, copy a prompt, or promote one manually."
       case .notFound:
         notice = "Couldn't find NYT comments on this page."
       }
-    } catch ReaderFeedbackCurationError.responseTruncated {
-      notice = "Loaded comments, but couldn't finish curating them. Try again."
-    } catch let error as ModelTierResolutionError {
-      notice = error.localizedDescription
     } catch {
       notice = "Couldn't load comments: \(error.localizedDescription)"
     }
@@ -102,12 +86,17 @@ final class BrowserModel {
     notice = nil
   }
 
-  func takeReaderFeedbackDraft() -> (tips: [ReaderFeedbackTip], comments: [RawComment]) {
+  /// Reader comments are carried, transiently, into the capture draft. Curation is an explicit
+  /// later choice in the capture review, so loading here never depends on a model configuration.
+  func stageLoadedReaderFeedbackComments(_ comments: [RawComment]) {
+    readerFeedbackComments = comments
+  }
+
+  func takeReaderFeedbackDraft() -> [RawComment] {
     defer {
-      readerFeedbackTips = []
       readerFeedbackComments = []
     }
-    return (readerFeedbackTips, readerFeedbackComments)
+    return readerFeedbackComments
   }
 
   func reloadAfterExternalChange() async {

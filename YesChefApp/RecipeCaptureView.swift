@@ -442,6 +442,21 @@ private struct RecipeCaptureReviewSections: View {
           }
 
           if !model.readerFeedbackComments.isEmpty {
+            Button {
+              Task {
+                if await model.curateReaderFeedbackButtonTapped(sourceURL: page.sourceURL) {
+                  readerFeedbackSheet = .review
+                }
+              }
+            } label: {
+              if model.isCuratingReaderFeedback {
+                ProgressView("Curating in Yes Chef")
+              } else {
+                Label("Curate in Yes Chef", systemImage: "sparkles")
+              }
+            }
+            .disabled(model.isCuratingReaderFeedback || model.isCommitting)
+
             ReaderFeedbackHandoffControls(
               source: .readerFeedback(
                 ReaderFeedbackHandoffContext(

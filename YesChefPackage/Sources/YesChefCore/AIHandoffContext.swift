@@ -413,27 +413,11 @@ public struct ReaderFeedbackHandoffContext: Equatable, Sendable {
   public func prompt() -> String {
     @Dependency(\.aiPromptPreferences) var preferences
     let settings = preferences.current()
-    let renderedComments = comments.enumerated().map { index, comment in
-      "Comment \(index + 1) (helpful count: \(comment.helpfulCount)):\n\(comment.text)"
-    }
-    .joined(separator: "\n\n")
-    return """
-    Curate these reader comments into a small set of distinct, non-obvious, durable cooking tips. Preserve separate
-    changes as separate lines; consensus may be distilled within one line, but never blend unrelated changes.
-
-    Return format: one atomic reader-feedback point per line, each beginning `Tip:`. No bullets, headings, numbering,
-    JSON, prose preamble, source-comment quotations, or Markdown. Return no lines when nothing clears the bar.
-
-    Do not include `YC-LEARNINGS:`. This is curated source evidence awaiting the cook's review, not a new finding.
-
-    Reader-feedback preferences:
-    \(AISettingsRepository.preference(in: settings, for: .readerFeedback))
-
-    Source URL: \(sourceURL?.absoluteString ?? "(unknown)")
-
-    Reader comments:
-    \(renderedComments)
-    """
+    return ReaderFeedbackCurationClient.handoffPrompt(
+      comments: comments,
+      sourceURL: sourceURL,
+      preference: AISettingsRepository.preference(in: settings, for: .readerFeedback)
+    )
   }
 }
 

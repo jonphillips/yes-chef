@@ -97,10 +97,12 @@ final class HandoffInAppTransport {
         return
       }
       let importDate = now
+      let comments = readerFeedbackComments(in: source)
       let review = try await database.write { db in
         try AIHandoffIntentImport.stageReaderFeedbackReview(
           handoffID: handoff.id,
           result: result,
+          comments: comments,
           in: db,
           now: importDate
         )
@@ -144,6 +146,11 @@ final class HandoffInAppTransport {
     unmatchedResult = result
     unmatchedSource = source
     isShowingUnmatchedConfirmation = true
+  }
+
+  private func readerFeedbackComments(in source: HandoffExportSource) -> [RawComment] {
+    guard case let .readerFeedback(context) = source else { return [] }
+    return context.comments
   }
 }
 
