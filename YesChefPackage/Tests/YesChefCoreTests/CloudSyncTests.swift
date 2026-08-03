@@ -198,8 +198,7 @@ extension RecipeCoreTests {
 
       try extensionBootstrap.database.read { db in
         expectNoDifference(try Category.fetchAll(db), [])
-        expectNoDifference(try CategorySeedState.fetchAll(db), [])
-        expectNoDifference(try CategorySeedTombstone.fetchAll(db), [])
+        expectNoDifference(try Facet.fetchAll(db), [])
       }
     }
 

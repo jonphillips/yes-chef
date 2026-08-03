@@ -9,6 +9,27 @@ extension RecipeCoreTests {
   @Suite
   struct CategoryFoldTests {
     @Test
+    func foldedTagNamedLikeAFacetStaysLoose() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 815_050_000)
+      let tagID = SampleUUIDSequence.uuid(49_050)
+
+      try database.write { db in
+        _ = try CategoryRepository.seedStarterFacets(in: db)
+        try Tag.insert {
+          Tag(id: tagID, name: "Cuisine", sortOrder: 0, dateCreated: now)
+        }
+        .execute(db)
+
+        try CategoryRepository.foldDormantTagsIntoCategories(in: db)
+
+        let category = try #require(try Category.find(tagID).fetchOne(db))
+        expectNoDifference(category.facetID, nil)
+        expectNoDifference(category.parentCategoryID, nil)
+      }
+    }
+
+    @Test
     func foldReusesTagAndJoinIdentifiersAndIsIdempotent() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 815_000_000)

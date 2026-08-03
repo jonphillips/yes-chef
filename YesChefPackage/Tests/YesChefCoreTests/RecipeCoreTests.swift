@@ -418,7 +418,7 @@ struct RecipeCoreTests {
   }
 
   @Test
-  func saveCreatesHierarchicalCategoryPathsForDisplayAndFiltering() throws {
+  func saveKeepsUnknownImportedHierarchyAsLooseLabels() throws {
     @Dependency(\.defaultDatabase) var database
     let now = Date(timeIntervalSinceReferenceDate: 802_400_000)
     var uuids = SampleUUIDSequence(start: 700)
@@ -437,13 +437,13 @@ struct RecipeCoreTests {
       )
 
       let categories = try Category.fetchAll(db)
-      let mealType = try #require(categories.first { $0.name == "Meal Type" })
-      let dinnerParty = try #require(categories.first { $0.name == "Dinner Party" })
-      let protein = try #require(categories.first { $0.name == "Protein" })
-      let chicken = try #require(categories.first { $0.name == "Chicken" })
+      let dinnerParty = try #require(categories.first { $0.name == "Meal Type > Dinner Party" })
+      let chicken = try #require(categories.first { $0.name == "Protein > Chicken" })
 
-      expectNoDifference(dinnerParty.parentCategoryID, mealType.id)
-      expectNoDifference(chicken.parentCategoryID, protein.id)
+      expectNoDifference(dinnerParty.parentCategoryID, nil)
+      expectNoDifference(dinnerParty.facetID, nil)
+      expectNoDifference(chicken.parentCategoryID, nil)
+      expectNoDifference(chicken.facetID, nil)
 
       let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
       expectNoDifference(
@@ -465,9 +465,7 @@ struct RecipeCoreTests {
       expectNoDifference(
         row.categoryFilterNames,
         [
-          "Meal Type",
           "Meal Type > Dinner Party",
-          "Protein",
           "Protein > Chicken",
         ]
       )

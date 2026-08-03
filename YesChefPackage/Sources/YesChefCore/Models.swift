@@ -962,12 +962,6 @@ public enum RecipePhotoKind: String, Codable, QueryBindable, QueryDecodable, Sen
   case referenceDocument
 }
 
-public enum PhotoSource: String, Codable, QueryBindable, QueryDecodable, Sendable {
-  case user
-  case imported
-  case extracted
-}
-
 @Table("tags")
 public struct Tag: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID
@@ -990,6 +984,8 @@ public struct Category: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID
   public var name: String
   public var color: String?
+  public var facetID: Facet.ID?
+  public var hidden: Bool
   public var parentCategoryID: Category.ID?
   public var sortOrder: Int
   public var dateCreated: Date
@@ -998,6 +994,8 @@ public struct Category: Codable, Identifiable, Equatable, Sendable {
     id: UUID,
     name: String,
     color: String? = nil,
+    facetID: Facet.ID? = nil,
+    hidden: Bool = false,
     parentCategoryID: Category.ID? = nil,
     sortOrder: Int,
     dateCreated: Date
@@ -1005,6 +1003,8 @@ public struct Category: Codable, Identifiable, Equatable, Sendable {
     self.id = id
     self.name = name
     self.color = color
+    self.facetID = facetID
+    self.hidden = hidden
     self.parentCategoryID = parentCategoryID
     self.sortOrder = sortOrder
     self.dateCreated = dateCreated
