@@ -209,10 +209,10 @@ struct RecipeCaptureView: View {
   }
 
   private func namespaceConfirmationMessage(for suggestion: SuggestedLabel) -> String {
-    guard let root = suggestion.path.first, suggestion.path.count > 1 else {
+    guard case let .namespace(namespace) = suggestion else {
       return "A category group is a durable new labeling dimension."
     }
-    return "“\(root)” is a durable new labeling dimension. This recipe will be filed under \(suggestion.categoryName)."
+    return "“\(namespace.facetName)” is a durable new labeling dimension. This recipe will be filed under \(suggestion.categoryName)."
   }
 }
 

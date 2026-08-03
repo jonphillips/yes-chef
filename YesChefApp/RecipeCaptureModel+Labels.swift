@@ -49,20 +49,26 @@ extension RecipeCaptureModel {
     acceptedSuggestedLabelIDs.contains(suggestion.id)
   }
 
-  /// The category names accepted from suggestions. For a `.namespace` this is the full `Dimension > Value`
-  /// path, so accepting files the recipe under the new child rather than a bare dimension root.
-  var acceptedSuggestionCategoryNames: [String] {
-    suggestedLabels
-      .filter { acceptedSuggestedLabelIDs.contains($0.id) }
-      .map(\.categoryName)
+  func curatedDraftForCommit() -> (draft: WebRecipeCaptureDraft, acceptedLabelSuggestions: [SuggestedLabel])? {
+    guard var draft else { return nil }
+    draft.page.editorialBlocks = draft.page.editorialBlocks
+      .map { ParsedRecipeEditorialBlock(label: $0.label, text: $0.text) }
+      .filter { !$0.text.isEmpty }
+    draft.page.readerFeedbackBlocks = draft.page.readerFeedbackBlocks
+      .map { ParsedRecipeReaderFeedbackBlock(text: $0.text) }
+      .filter { !$0.text.isEmpty }
+    self.draft = draft
+    // Selection stays pure until commit, so re-extraction cannot turn an accepted chip into a
+    // harvested-looking label. The repository receives typed suggestions alongside the imported
+    // page and remains the sole writer of categories, facets, and joins.
+    return (draft, acceptedLabelSuggestions)
   }
 
-  /// Merges accepted suggestions into a page at commit time, de-duplicating against harvested labels.
-  func mergingAcceptedSuggestions(into page: inout ParsedRecipePage) {
-    for name in acceptedSuggestionCategoryNames
-    where !page.categoryNames.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
-      page.categoryNames.append(name)
-    }
+  /// Accepted suggestions stay typed through commit. Strings remain only in the model-response
+  /// boundary; the repository receives facet and category identities where they already exist.
+  var acceptedLabelSuggestions: [SuggestedLabel] {
+    suggestedLabels
+      .filter { acceptedSuggestedLabelIDs.contains($0.id) }
   }
 
   func suggestLabelsAfterCapture(for draft: WebRecipeCaptureDraft) {
@@ -78,23 +84,23 @@ extension RecipeCaptureModel {
     Task { [weak self] in
       guard let self else { return }
       do {
-        let categories = try await database.read { db in
-          try Category.fetchAll(db)
+        let vocabulary = try await database.read { db in
+          LabelVocabulary(
+            facets: try Facet.fetchAll(db),
+            categories: try Category.fetchAll(db)
+          )
         }
         let proposal = try await labelProposer(
           recipe: proposedForPage.labelProposalRecipe,
-          existingTree: categories
+          vocabulary: vocabulary
         )
         guard self.labelSuggestionGeneration == generation else { return }
         // Publisher-harvested labels are already part of this draft. They are not a model proposal to
         // approve or remove, even when the model correctly recognizes the same category.
         suggestedLabels = proposal.accepted.filter { suggestion in
-          !proposedForPage.categoryNames.contains {
+          !proposedForPage.tagNames.contains {
             $0.caseInsensitiveCompare(suggestion.categoryName) == .orderedSame
           }
-            && !proposedForPage.tagNames.contains {
-              $0.caseInsensitiveCompare(suggestion.categoryName) == .orderedSame
-            }
         }
         rejectedLabelSuggestions = proposal.rejected
       } catch is CancellationError {

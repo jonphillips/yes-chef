@@ -27,19 +27,13 @@ management UI, PR #272) are done** — D3 re-points `LabelProposer.swift` + `Rec
 typed facet vocabulary in the prompt, `.namespace` literally proposes a `Facet` row, PR #269's Findings 1 & 3
 re-pointed **not** deleted (D11). D2's boundary is unchanged: model **proposes**, determinism **writes**.
 
-**⚠️ Open question to settle before dispatching D3 — hidden vocabulary (handed up by D2).** D2 made `hidden`
-**cascade** on product reads: hiding a facet now hides its values from the recipe editor and the filter, so
-"hidden" means *tucked away from browse/assignment*, not merely "off the group list." D3's typed vocabulary
-must decide what the model sees and can propose into:
-- **Recommended:** the proposer's vocabulary mirrors the cascade — **visible facets/values only**. A deliberately
-  hidden dimension should not get fresh AI suggestions.
-- **But the trap ([[editable-at-the-grain-stored]]-adjacent):** hidden rows still exist in the store, and
-  `reconcileCategories` matches by `facetID` + name. So a "new value" the model proposes can **silently re-match a
-  hidden row** and resurrect it invisibly. So the decision is two-part: (a) hide hidden rows from the model's
-  vocabulary, **and** (b) decide reconcile's behavior when an accepted label collides with a hidden row — either
-  **un-hide on deliberate re-assignment** (recommended: the user re-chose it) or skip. Pin both before D3; do not
-  let D3 infer it. **D4 — Jon's hand pass** (review the audit, file ambiguous roots, merge/delete poor starter
-  values, then re-run S5/S6 labeling backfill) is unchanged and still gated on the #270 device convergence pass.
+**Decision settled for D3 — hidden vocabulary (2026-08-03).** D2 made `hidden` **cascade** on product reads:
+hiding a facet hides its values from the recipe editor and filter, so the proposer receives **visible
+facets/values only**. If an accepted new-value suggestion case-insensitively collides with a hidden row in its
+identified facet, reconciliation reuses and **unhides** it — a user deliberately re-chose the value. Ordinary
+imported text does not reactivate hidden vocabulary. **D4 — Jon's hand pass** (review the audit, file ambiguous
+roots, merge/delete poor starter values, then re-run S5/S6 labeling backfill) is unchanged and still gated on
+the #270 device convergence pass.
 
 **⚠️ Jon's outstanding follow-through from ADR-0014 Amd1 (not a dispatch item):** three recipes still carry
 `isHeader = 1` rows to hand-repair in the app — *Beef Birria Taco Filling* (4), *Broccoli Spoon Salad* (2),

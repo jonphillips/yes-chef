@@ -418,6 +418,11 @@ boundary in each direction.
 - **A model-generated path may never implicitly create a facet.** Under D1 it structurally could — a two-component
   path where the root didn't exist minted a root, and only the proposer's own tiering stopped it. Now the facet
   must already exist or be confirmed as a facet.
+- **Hidden vocabulary follows the product cascade.** The proposer receives visible facets and visible values
+  only. A hidden category group is deliberately out of scope for fresh model suggestions. If a user accepts a
+  new-value suggestion that case-insensitively collides with a hidden row in the identified facet, reconciliation
+  reuses **and unhides** that row: the user deliberately chose it again. This is limited to an accepted
+  suggestion; ordinary imported text does not reactivate hidden vocabulary.
 
 ### D12 — Import maps into facets; unknown vocabulary stays loose
 

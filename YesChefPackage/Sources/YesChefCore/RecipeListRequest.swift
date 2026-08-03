@@ -33,7 +33,11 @@ public struct RecipeListRequest: FetchKeyRequest {
   public init() {}
 
   public func fetch(_ db: Database) throws -> [RecipeListRowData] {
-    let recipes = try Recipe.fetchAll(db)
+    // Deterministic order by primary key. `Recipe.fetchAll` leaves ordering to SQLite, so the same
+    // library could come back in a different row order across republishes; the view-model sorts on
+    // top of this, but a stable base order keeps identical DB state from producing shuffled arrays
+    // that an animated List diffs into an invalid batch update.
+    let recipes = try Recipe.all.order { $0.id }.fetchAll(db)
     let categoriesByID = Dictionary(
       uniqueKeysWithValues: try Category.fetchAll(db).map { ($0.id, $0) }
     )

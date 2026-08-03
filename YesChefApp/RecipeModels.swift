@@ -224,7 +224,16 @@ final class RecipeLibraryModel {
         if $0.recipe.dateModified != $1.recipe.dateModified {
           return $0.recipe.dateModified > $1.recipe.dateModified
         }
-        return $0.recipe.title.localizedStandardCompare($1.recipe.title) == .orderedAscending
+        let titleOrder = $0.recipe.title.localizedStandardCompare($1.recipe.title)
+        if titleOrder != .orderedSame {
+          return titleOrder == .orderedAscending
+        }
+        // Final tiebreak on the stable id so rows with an identical date *and* title (e.g. a
+        // duplicate import) always land in the same position. Without it the comparator reports
+        // them as equal, Swift's non-stable `sort` can swap them between otherwise-identical
+        // republishes, and the animated List diffs those phantom moves into an invalid batch
+        // update — the NSInternalInconsistencyException seen when deleting archived recipes.
+        return $0.recipe.id.uuidString < $1.recipe.id.uuidString
       }
   }
 
@@ -574,7 +583,7 @@ final class RecipeCaptureModel {
   }
 
   func commitButtonTapped() async -> RecipeImportBundleResult? {
-    guard let draft = curatedDraftForCommit() else { return nil }
+    guard let commit = curatedDraftForCommit() else { return nil }
     isCommitting = true
     defer { isCommitting = false }
 
@@ -583,7 +592,8 @@ final class RecipeCaptureModel {
       let makeUUID = uuid
       return try await database.write { db in
         try RecipeRepository.importCapturedRecipe(
-          draft,
+          commit.draft,
+          acceptedLabelSuggestions: commit.acceptedLabelSuggestions,
           in: db,
           now: importDate,
           uuid: { makeUUID() }
@@ -615,22 +625,6 @@ final class RecipeCaptureModel {
       return normalizedURL
     }
     return WebAddress.duckDuckGo("recipe") ?? URL(string: "https://duckduckgo.com")!
-  }
-
-  private func curatedDraftForCommit() -> WebRecipeCaptureDraft? {
-    guard var draft else { return nil }
-    draft.page.editorialBlocks = draft.page.editorialBlocks
-      .map { ParsedRecipeEditorialBlock(label: $0.label, text: $0.text) }
-      .filter { !$0.text.isEmpty }
-    draft.page.readerFeedbackBlocks = draft.page.readerFeedbackBlocks
-      .map { ParsedRecipeReaderFeedbackBlock(text: $0.text) }
-      .filter { !$0.text.isEmpty }
-    self.draft = draft
-    // Merge accepted suggestions only into the committed copy — never back into `self.draft`. Accepted
-    // state stays pure selection, so re-extraction (which merges into the existing page) can't turn a
-    // previously accepted chip into a sticky harvested-looking label with no chip to un-accept.
-    mergingAcceptedSuggestions(into: &draft.page)
-    return draft
   }
 
   private var normalizedURL: URL? {

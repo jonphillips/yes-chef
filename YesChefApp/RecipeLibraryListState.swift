@@ -430,7 +430,15 @@ extension RecipeLibraryModel {
   }
 
   private func titleSort(_ lhs: Recipe, _ rhs: Recipe) -> Bool {
-    lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+    let titleOrder = lhs.title.localizedStandardCompare(rhs.title)
+    if titleOrder != .orderedSame {
+      return titleOrder == .orderedAscending
+    }
+    // Every sort mode falls through to `titleSort` as its final tiebreak, so making it a total
+    // order on the stable id keeps rows with an identical sort key (e.g. a duplicate import) from
+    // swapping between otherwise-identical republishes. Swift's `sort` is not stable, and an
+    // animated List diffs those phantom moves into an invalid batch update (crash).
+    return lhs.id.uuidString < rhs.id.uuidString
   }
 
   private func descendingDateSort(_ lhsDate: Date, _ rhsDate: Date, _ lhs: Recipe, _ rhs: Recipe) -> Bool {

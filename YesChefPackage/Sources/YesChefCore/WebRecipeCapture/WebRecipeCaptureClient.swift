@@ -318,6 +318,7 @@ extension RecipeRepository {
   @discardableResult
   public static func importCapturedRecipe(
     _ draft: WebRecipeCaptureDraft,
+    acceptedLabelSuggestions: [SuggestedLabel] = [],
     in db: Database,
     now: Date,
     uuid: () -> UUID
@@ -332,6 +333,14 @@ extension RecipeRepository {
       uuid: uuid,
       preserveRawImportHTML: preserveRawImportHTML
     )
-    return try importBundle(bundle, in: db, now: now, uuid: uuid)
+    let result = try importBundle(bundle, in: db, now: now, uuid: uuid)
+    try reconcileSuggestedLabels(
+      acceptedLabelSuggestions,
+      recipeID: result.recipeID,
+      in: db,
+      now: now,
+      uuid: uuid
+    )
+    return result
   }
 }
