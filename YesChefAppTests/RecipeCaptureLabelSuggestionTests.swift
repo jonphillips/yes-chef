@@ -61,4 +61,16 @@ struct RecipeCaptureLabelSuggestionTests {
     model.suggestedLabelTapped(loose)
     #expect(model.acceptedLabelSuggestions.isEmpty)
   }
+
+  @Test
+  func doesNotSurfaceSuggestionsAlreadyHarvestedAsCategoriesOrTags() {
+    let model = draftedModel(page: ParsedRecipePage(title: "Pasta"))
+
+    let visible = model.filteringHarvestedLabels(
+      from: [.loose("Italian"), .loose("weeknight"), .loose("party")],
+      in: ParsedRecipePage(title: "Pasta", categoryNames: ["italian"], tagNames: ["Weeknight"])
+    )
+
+    expectNoDifference(visible, [.loose("party")])
+  }
 }

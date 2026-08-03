@@ -97,11 +97,7 @@ extension RecipeCaptureModel {
         guard self.labelSuggestionGeneration == generation else { return }
         // Publisher-harvested labels are already part of this draft. They are not a model proposal to
         // approve or remove, even when the model correctly recognizes the same category.
-        suggestedLabels = proposal.accepted.filter { suggestion in
-          !proposedForPage.tagNames.contains {
-            $0.caseInsensitiveCompare(suggestion.categoryName) == .orderedSame
-          }
-        }
+        suggestedLabels = filteringHarvestedLabels(from: proposal.accepted, in: proposedForPage)
         rejectedLabelSuggestions = proposal.rejected
       } catch is CancellationError {
       } catch {
@@ -111,6 +107,20 @@ extension RecipeCaptureModel {
       if self.labelSuggestionGeneration == generation {
         isSuggestingLabels = false
       }
+    }
+  }
+
+  func filteringHarvestedLabels(
+    from suggestions: [SuggestedLabel],
+    in page: ParsedRecipePage
+  ) -> [SuggestedLabel] {
+    suggestions.filter { suggestion in
+      !page.categoryNames.contains {
+        $0.caseInsensitiveCompare(suggestion.categoryName) == .orderedSame
+      }
+        && !page.tagNames.contains {
+          $0.caseInsensitiveCompare(suggestion.categoryName) == .orderedSame
+        }
     }
   }
 }
