@@ -452,6 +452,44 @@ manually reorderable on recipe Playbook, menu Playbook, and menu prep-plan editi
   `ForEach`, and `.reorderContainer(for: Learning.self)` to the enclosing `VStack`. It is already the drag
   container; no standalone `.draggable` is involved.
 
+## Amendment 6 — return **format keys off task shape**; one-shot curation returns JSON (2026-08-03)
+
+**Status: Accepted.** Origin: Jon, reviewing the reader-feedback curation routing cleanup (PR #273). Amends **D2**.
+
+**What changed.** D2 rejected JSON as a blanket rule on three grounds: JSON is (1) brittle through
+copy/paste, (2) less hand-editable, (3) fights [ADR-0024](ADR-0024-editable-proposal-preview.md)'s "human
+is the final author." Reader-feedback curation ([ADR-0025](ADR-0025-reader-comment-ingestion.md)) showed
+the rule's real axis is **task shape**, not format:
+
+- **Multi-turn "discuss freely, then finalize"** (prep plan, adjust-recipe, learnings) — D2 stands
+  unchanged. The value is the model returning natural, tolerantly-parsed structured prose (validated live
+  2026-07-13: unprompted `":"`-headers + `→` bullets), which the human edits before commit. Plain text wins.
+- **One-shot structured curation/extraction** (reader feedback) — returns **strict JSON**. The output is
+  inherently typed records with provenance (`commentNumbers`, `kind`, `supportCount`) that the lossy
+  `Tip:`-line format cannot carry. D2's three grounds are already neutralized here: (1) `jsonSlice`/
+  `parseJSONReturn` strip fences and extract JSON from surrounding prose; (2)/(3) the human never authors
+  the JSON — they review and edit **tips at the row grain** in the review sheet, which *is* the ADR-0024
+  authorship guarantee plain text stood in for. Offboard and onboard curation now share one JSON contract,
+  so an offboard tip carries the same provenance as an onboard one. Legacy `Tip:` lines remain accepted.
+
+**Standing condition — lossless-or-loud.** The JSON path must fail *audibly*, never silently misparse:
+`parseJSONReturn` returns `nil` (not `[]`) on non-JSON, the importer throws `instructionsOutOfDate`, and the
+`Tip:` parser catches total-format failures. Strict-JSON's intolerance is a feature — a malformed return
+stops loudly rather than importing garbage.
+
+**Routing — explicit override replaces ambient guess.** A return carrying its `YC-HANDOFF:` token that
+matches the current source imports seamlessly. A return that is token-less **or** carries a stale/foreign
+token routes through the existing **warn-but-allow** confirmation ("Unmatched Handoff → Review Anyway"),
+re-homed onto the current source and resolved against the *current* capture's comments. This restores the
+self-identifying-return integrity the routing token was built for — no return is filed by ambient "last
+prompt I copied" state — and gives a deliberately cheap path to re-paste a known-good response without
+regenerating it (the dogfooding-ergonomics motivation). Caveat surfaced in the warning: backing-comment
+numbering assumes the response was curated against these comments; a foreign response may mis-resolve
+`commentNumbers`. Acceptable because it is an explicit, human-confirmed override. **Supersedes** the interim
+ambient `readerFeedbackHandoffID` fallback introduced in PR #273; that state is removed, and the
+reader-feedback warn-but-allow path is wired to `stageReaderFeedbackReview` (it currently misroutes to the
+generic `stageReviewForKnownSource`).
+
 ## Deferred (on the record, explicitly not built here)
 
 - **Widened share-extension "Import into Yes Chef."** A polished entry point for when you're already
