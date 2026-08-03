@@ -99,16 +99,15 @@ section is work.**
 Drawn into **Next Up** as needed; not itself a dispatch target. Completed efforts live in
 [`docs/DONE-LOG.md`](DONE-LOG.md).
 
-**[`efforts/unified-categories.md`](efforts/unified-categories.md) — [ADR-0049](decisions/ADR-0049-unified-labels-and-assisted-tagging.md)
-S1: fold `tags` into the category tree. Accepted 2026-07-30, dispatchable.** One labeling store — a former tag
-becomes a **loose (parentless) category**; tags/categories stop being two entities. Foundational: S2 (Tier-0
-harvest) and S3 (the `LabelProposer`) both target the unified store, so nothing downstream dispatches until S1
-device-confirms. **Larger-than-usual slice — Core fold + App read-migration land together** (splitting them
-blanks tags from the UI in the gap). Two passes: schema DDL (add `categories.color`, pre-engine) + a
-**post-engine deterministic idempotent fold** (`category.id = tag.id` for cross-device convergence,
-merge-on-name, dedupe the unindexed `(recipeID, categoryID)` pair). **Dormant, not dropped** — `Tag`/`RecipeTag`
-stay registered in `CloudSync`. **Synced-table data pass → owes a two-device sync pass** and adds
-`categories.color` to the prod-schema promotion list in its own PR. S1 is pure determinism — no model call.
+**[`efforts/recipe-facets.md`](efforts/recipe-facets.md) — [ADR-0049](decisions/ADR-0049-unified-labels-and-assisted-tagging.md)
+**Amendment 2**: promote the namespace to an explicit `Facet`. Proposed 2026-08-01 — not dispatchable until
+ratified.** Four dispatches, D1 first. One synced `facets` table + `Category.facetID` + `Category.hidden`;
+`Cuisine` / `Course` stop being category rows and become facet rows; their children keep their UUIDs and
+every `recipeCategories` join rides through untouched. **Absorbs unbuilt Amendment 1** — the seed-state and
+tombstone teardown happens inside this pass, not before it, or the same ~24 rows get two synced data passes.
+**Synced-table data pass → owes a two-device sync pass**, and owes an audit report (§ Migration). Adds
+`facets`, `categories.facetID`, `categories.hidden` to the prod-promotion list **and removes the two seed
+tables from it** in its own PR.
 
 **[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md) — ATK's "Gather Your
 Ingredients" is a latent grocery bug (scoped 2026-07-28). P1 only; **no schema**.** 101 shoppable ingredient
@@ -267,8 +266,6 @@ prod/TestFlight cut. At that cut, deploy the following to the production schema:
 - Phase E Slice 3 **pantry-policy + `canonicalName`** fields
 - **`Recipe.coverPhotoID`** (reader photo affordances, PR #87)
 - **`Category.color`** (ADR-0049 S1 unified categories)
-- The synced **`categorySeedStates`** and **`categorySeedTombstones`** tables (ADR-0049 S2 starter seed state
-  and deletion tombstones)
 - The synced **`aiSettings`** table (ADR-0018, PR #96), **including** its additive `readerFeedbackPreference`
   (ADR-0025 D6) and `captureToNotePreference` (ADR-0027 S1, PR #141) columns
 - The synced **`recipeVariations`** table (ADR-0021 / recipe edit proposals S2)

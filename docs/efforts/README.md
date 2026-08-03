@@ -24,6 +24,12 @@ it's touched.
 
 ## Active / recent
 
+- [variation-anchor-repair.md](variation-anchor-repair.md) — **Designed, Dispatch 0 ships immediately** ·
+  Defects in [ADR-0021](../decisions/ADR-0021-recipe-variations.md)'s anchor handling · A variation's
+  anchors are taken from **model output** and never normalized to base IDs, so a base text edit orphans the
+  variation permanently; `resolved(applying:)` **throws**, so one dead anchor takes out the editor, the
+  reader fold and the grocery list; and two silent-failure paths in the adjust surface show nothing at all.
+  Four dispatches, no schema.
 - [dogfood-ferry-2026-07-25.md](dogfood-ferry-2026-07-25.md) — **Designed** (not dispatched) · Jon's
   2026-07-25 ferry pass · **Three dispatches, three PRs.** D1: one shared full-screen expand control replaces
   four drifted copies + the Menu gains the Recipe's pinned-Ask onboard treatment (view layer only). D2:

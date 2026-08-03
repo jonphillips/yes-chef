@@ -8,6 +8,9 @@ and capture-vs-share is forced by the extension networking gate. Supersedes the 
 **Amendment 1 (2026-07-30, accepted): D7's persisted deletion model is retired — seed starter categories in
 place by fixed id, make them non-deletable, and drop `categorySeedStates` + `categorySeedTombstones`. See
 Amendment 1.**
+**Amendment 2 (2026-08-01, proposed): D1's "the parent is the dimension" is superseded — a **facet** becomes
+an explicit synced entity and structured values carry `facetID`; loose labels are `facetID == nil`. Amendment 2
+**absorbs unbuilt Amendment 1** — do not implement Amd 1 separately. Supersedes OQ2. See Amendment 2.**
 Extends [ADR-0026](ADR-0026-review-collection-sheet.md) (the review-collection sheet is the proposer's UI),
 [ADR-0023](ADR-0023-recipe-edit-proposals.md) (propose-to-preview, commit deterministically) and
 [ADR-0025](ADR-0025-reader-comment-ingestion.md) (the one-by-one curation queue). Governed by
@@ -291,3 +294,258 @@ previously-deleted starter. Both are fixed by hand in the UI in minutes; neither
 zero-artifact result is wanted, the alternative is a deliberate restart — but it MUST follow the enforced
 restore procedure ([[restore-is-authoritative]]): quiesce **both** devices, restore on one, reinstall the other
 fresh, or a peer's queued delete can silently re-delete restored rows.
+
+## Amendment 2 — the namespace is a **facet**, and a facet is a row, not a tree position (2026-08-01)
+
+Status: **Proposed** — 2026-08-01, pre-production. **Supersedes D1's "no `kind` column — the parent *is* the
+dimension"** and **OQ2**. **Absorbs Amendment 1**, which is accepted but unbuilt: its teardown ships inside this
+migration, not ahead of it. Keeps everything else D1 bought — one assignment store, one reconciler, open-ended
+user-authored dimensions, loose labels, `color` on `categories`, the retired tag tables, D2's propose-review-commit
+boundary, D3's anchoring, D6's harvest. Triggered by [ADR-0050](ADR-0050-recipe-power-browser.md), which is the
+first consumer that has to ask a question tree position cannot answer.
+
+### Why the D1 mechanism fails now, and why its *goal* survives
+
+D1's argument was about **open-endedness**: don't hardcode a Cuisine/Course enum, because Jon wants Cookbook,
+Author, Season, Occasion and dimensions nobody has thought of yet. That argument was correct and is untouched —
+a `facets` **table** is as open-ended as a parent node, since a user-authored dimension is just a row. What D1
+picked was a *mechanism*, and the mechanism has one defect: **a parentless category row is six things at once.**
+
+`Cuisine` (a dimension), `Taco` (a value that hasn't been filed yet), `Milk Street` (a harvested publisher
+keyword), `Beach Week` (a loose label), a structural grouping node, and a folded former tag are **the same shape
+in the same table**, distinguishable only by convention. Nothing reads the convention, so nothing enforces it.
+
+**The proposer already had to invent the distinction to do its job, and the schema is the only layer that still
+refuses it.** [`SuggestedLabel.Kind`](../../YesChefPackage/Sources/YesChefCore/LabelProposer.swift) has four
+cases — `existingCategory`, `newChild`, `loose`, `namespace` — and `.namespace` exists *because creating a
+dimension is a different act with a different confirmation*. PR #269's Finding 3 then had to teach it to carry
+`[dimension, firstChild]` and file the recipe under the **child**, because filing under a bare dimension root is
+meaningless — which is the schema-level truth "a facet is not assignable" being enforced by hand, in the
+proposer, one call site at a time. **Every layer above storage already knows facets are a different kind of
+thing.** Amendment 2 stops making each of them re-derive it.
+
+**Accidental promotion is the concrete failure.** `Taco` arrives as a loose root. A month later the user adds
+`Taco > Birria`. Under D1 the app now believes Taco is a classification dimension, because that is all
+"has children" can mean. It isn't; it is a value inside Dish Type that acquired a specialization. There is no
+edit the user could have made to express the difference, and no query that can recover it afterward.
+
+### D8 — A facet is an explicit synced entity
+
+```swift
+@Table("facets")
+public struct Facet: Codable, Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public var name: String
+  public var sortOrder: Int
+  public var hidden: Bool          // Amd 1's escape hatch, at the dimension grain
+  public var dateCreated: Date
+}
+```
+
+`Category` gains exactly two columns:
+
+```swift
+public var facetID: Facet.ID?      // non-nil = structured facet value; nil = loose label
+public var hidden: Bool            // Amd 1, folded in here
+```
+
+- **`facetID != nil` → a facet value. `facetID == nil` → a loose label.** That single field replaces the
+  convention D1 asked readers to hold in their heads.
+- **A `Facet` is not a `Category` and has no row in `categories`.** `Cuisine` and `Course` stop existing as
+  category rows; they become facet rows. This is the migration's one structurally interesting move (§ Migration).
+- **Open-endedness is preserved literally.** A user-authored facet is an insert. Nothing is hardcoded, and the
+  seeded facets are ordinary rows with fixed ids.
+
+**What is deliberately *not* in that record**, and what would put it there:
+
+| Deferred | Why not now | Trigger that earns it |
+| --- | --- | --- |
+| `selectionMode` (single vs multi) | D1 already decided we do not enforce single-valued dimensions in the schema; a recipe is legitimately Korean **and** Mexican. Nothing today wants the constraint. | A picker that must *prevent* a second value — not one that merely looks single-ish. |
+| `maximumValueDepth` | No consumer. Depth is emergent; a cap is a rule with no rule-breaker. | A real two-level-deep vocabulary that someone actually over-nests. |
+| `isAssignable` on a value | ADR-0050 D3's descendant matching means an intermediate value is *findable* whether or not it is *assignable*, so the column would only gate a picker. | A facet where assigning the parent is genuinely wrong, demonstrated on real data. |
+| `isSystemProvided` | **Derivable** — the starter ids are fixed constants in Core. A stored copy is a second source of truth that can disagree with the first. | Never; use the id set. |
+| per-facet coverage thresholds | ADR-0050's ranking is deterministic and works off measured coverage. | Measured coverage proving a global rule is wrong for one facet. |
+
+This table is the amendment doing to itself what Amendment 1 did to D7. The draft this amendment was written
+from carried all six fields plus the sentence *"the initial implementation may support a limited subset of this
+metadata, but the architecture must permit it"* — which is precisely the shape of the tombstone machinery: schema
+justified by a robustness bar we do not have, for an audience of ~10 friendly users
+([[withdraw-not-defer-orphaned-schema]], [[synced-table-cost-calibration]]). **One table and two columns is the
+whole cost of this amendment.** If it grows past that in implementation, the growth is the defect.
+
+### D9 — Four invariants, enforced in Core, not in convention
+
+1. **Facet membership.** A structured value belongs to exactly one facet.
+2. **Parent consistency.** If a value has a `parentCategoryID`, both rows carry the **same** `facetID`. A value
+   may not have a parent from another facet, and may not have a loose-label parent.
+3. **Loose labels are leaves.** `facetID == nil` implies no children. Nesting under a loose label is not a
+   parent edit; it is an explicit *convert-to-facet* or *file-under-facet* operation, which is exactly the
+   accidental-promotion failure made deliberate.
+4. **Facets are not assignable.** `recipeCategories` may reference a facet value or a loose label, never a
+   facet — which is now enforceable by construction, since a facet has no category row to reference.
+
+These live with `reconcileCategories`, which stays **the sole writer and sole creator of nodes** (D2 unchanged),
+and are unit-tested there. An invariant that only the UI upholds is a convention wearing a costume.
+
+### D10 — Assignment is most-specific; ancestor matching is **derived**
+
+A recipe classified `Protein = Beef > Tenderloin` stores **one** join, to `Tenderloin`. Filtering on `Beef`
+matches it, because the query layer walks descendants ([ADR-0050](ADR-0050-recipe-power-browser.md) D3). We do
+**not** additionally store the ancestor join.
+
+The alternative — materializing ancestor joins on write — was rejected: it doubles the join rows, makes a
+re-parent a multi-row rewrite that must converge across devices, and creates a state where the derived rows can
+disagree with the tree. `descendantIDs(of:in:)` already exists in
+[`CategoryHierarchy`](../../YesChefPackage/Sources/YesChefCore/CategoryHierarchy.swift).
+
+Corollary the migration owes: a recipe that ends up joined to **both** `Beef` and `Beef > Tenderloin` is not
+wrong, just redundant. Report it in the audit; do not silently collapse it, since the parent assignment may be a
+second, real classification the user made before the child existed.
+
+### D11 — The proposer gets typed facets, and a path string stops being the interface
+
+D2's boundary is unchanged: the model **proposes**, determinism **writes**. What changes is what crosses the
+boundary in each direction.
+
+- **In:** the prompt carries facets and their values as **structured** vocabulary, not an undifferentiated tree.
+- **Out:** `SuggestedLabel` resolves against facet identity before it reaches reconcile. Its four `Kind` cases
+  survive nearly unchanged — `.namespace` is renamed and **means something now**: a proposal to create a `Facet`
+  row, which keeps PR #269's elevated `item:`-binding confirmation.
+- **Path strings stay legal exactly where they are unavoidable** — model output and import — and are **resolved
+  and validated at that boundary**, never persisted as the canonical interface. A `String` that means
+  `"Protein > Beef > Tenderloin"` is a serialization ([ADR-0040](ADR-0040-editable-at-the-grain-it-is-stored.md):
+  the human never authors the serialization format, and neither does the repository API).
+- **A model-generated path may never implicitly create a facet.** Under D1 it structurally could — a two-component
+  path where the root didn't exist minted a root, and only the proposer's own tiering stopped it. Now the facet
+  must already exist or be confirmed as a facet.
+
+### D12 — Import maps into facets; unknown vocabulary stays loose
+
+D6's harvest is unchanged in what it collects and stricter in where it files:
+
+- `recipeCuisine` → the **Cuisine** facet.
+- `recipeCategory` → a known facet **only when confidently interpretable**; otherwise loose.
+- publisher `keywords` → **loose labels**, as today.
+- **A delimiter in an imported string is not a hierarchy signal.** `"Dinner > Weeknight"` from a publisher does
+  not create a facet, a value, or a parent link; it is one loose label until a human files it. Import is the
+  highest-volume, lowest-intent writer in the app, and D1's convention gave it the power to define dimensions.
+
+### D13 — OQ2 is superseded
+
+OQ2 resolved: *`taco` is a loose label that co-occurs with `Cuisine: Mexican` / `Cuisine: Korean`.* That was the
+right answer **given no facets** — it dodged the sub-cuisine trap by refusing to file `taco` anywhere. With an
+explicit Dish Type facet the dodge is unnecessary and now actively wrong: `taco` is
+`Dish Type > Handheld > Taco`, a Korean beef taco carries `Cuisine = Korean` **and** `Cuisine = Mexican`
+alongside it, and the OQ2 note that Jon "may later author a `Form Factor` namespace" is exactly this decision,
+arrived at from the other side.
+
+The rest of OQ2 stands: cuisine multiplicity is not enforced (D8), and the user re-files freely.
+
+**OQ1 stands, and the copy already exists.** The surfaced umbrella stays **Categories**. A facet surfaces as a
+**category group** — which is not new copy, it is what `SuggestedLabel.reviewTitle` already says for
+`.namespace`. `Facet` / facet value / loose label are internal architecture terms.
+
+### Migration — one pass, absorbing Amendment 1
+
+**Amendment 1 must not ship first.** Its plan (seed the ~24 starter *categories* in place by fixed id, drop the
+two seed tables, add `hidden`) and this one both rewrite the same rows, and Amd 2 changes what two of those rows
+*are*. Sequenced separately that is two synced data passes and two two-device verification passes over ~24 rows
+for one outcome. Absorbed, the teardown is free: the seed pass being written is the facet-aware one.
+
+Schema DDL, pre-engine, in `registerMigration` — structure only, no data movement
+([[migration-writes-bypass-sync-triggers]]):
+
+- create `facets`; add `categories.facetID`, `categories.hidden`;
+- **drop `categorySeedStates` and `categorySeedTombstones`** (Amd 1), remove both structs and both `CloudSync`
+  registrations, and take them **off** the prod-promotion list.
+
+Data pass, post-`makeSyncEngine`, deterministic ids, idempotent, insert-if-absent:
+
+1. **Seed the facets** with fixed ids. Initial set is deliberately **Cuisine and Course only** — the ones that
+   exist and carry real assignments. The larger editorial taxonomy (Dish Type, Protein, Technique, …) is a
+   *content* decision and does not ride a schema migration; see § Open.
+2. **Promote the two namespace roots.** For `Cuisine` and `Course`: create the facet row, set every child's
+   `facetID`, set every child's `parentCategoryID` to `nil`, then delete the old root **category** row.
+   **Child UUIDs are preserved, so every `recipeCategories` join rides through untouched** — the same
+   blast-radius argument Amd 1 made, and the reason "keep my ~2000 recipes" and "clean model" are not in
+   tension here either.
+3. **Recipes joined directly to a namespace root** — possible via harvest or a hand-file under D1 — are the one
+   genuinely lossy case. **Remap, never drop**: re-point to a designated child if one is unambiguous, otherwise
+   re-point to a loose label carrying the root's name and **list every one in the audit**. A dimension
+   assignment is not information we are entitled to discard because the model got tidier.
+4. **Every other parentless category becomes a loose label** (`facetID = nil`) — including all folded former
+   tags, which is where S1 already put them and where they belong.
+5. **A parentless category *with* children** is the ambiguous case and is **not auto-promoted**. Report it; Jon
+   files it by hand. Auto-promotion here would enshrine the exact accidental-facet inference this amendment
+   exists to remove.
+
+**The audit report is a deliverable of the slice, not a nicety.** Per original category: new classification,
+affected recipe count, parent changes, merges, deletions, unresolved rows, and every remapped root assignment.
+Jon reviews it before the second device is allowed to converge.
+
+**Starters stay non-deletable and hideable** (Amd 1, unchanged) — now at both grains, since `hidden` lands on
+`Facet` and `Category` in the same pass. Cleanup of poor starter values is a **hand pass in the UI**, not
+migration logic.
+
+### Consequences
+
+**Positive.** Facets are a fact, not an inference. ADR-0050 gets stable dimensions to query. The proposer's
+existing four-case shape gets a storage counterpart instead of a convention it enforces alone. Import can no
+longer define dimensions. Loose labels stay unstructured without polluting the taxonomy. One assignment store,
+one reconciler, all recipe joins preserved.
+
+**Negative, honestly.** One new synced table and two columns, on a model that was unified eight PRs ago —
+churn on recent work, and this amendment reverses a mechanism D1 argued for explicitly, which is a real cost to
+the decision log's credibility and is why the argument above is about *why the mechanism failed*, not why the
+new one is nicer. The repository API and proposer schema both move. The management UI must now present two
+structurally different creation acts. Some existing category trees need a hand pass. And the invariants are
+new validation code that did not exist.
+
+**Accepted because pre-production is the whole reason.** ~2000 recipes on one erasable, restorable test library
+([ADR-0030](ADR-0030-local-backup-and-restore.md)), ~10 friendly users, no production CloudKit schema. The
+alternative is that every subsequent labeling run, AI backfill and taxonomy expansion deepens the dependency on
+the ambiguous model — which is the same reasoning that carried Amendment 1 six days ago, applied to a defect one
+layer up.
+
+### Rejected alternatives
+
+- **Keep D1's parent-as-dimension.** Rejected on the accidental-promotion failure above: tree position cannot
+  distinguish a dimension from a value that grew a child, and no user edit can express the difference.
+- **A `kind` enum on `Category`.** The cheapest fix, and genuinely close. Rejected because it answers "what is
+  this row" but not "what does this dimension do" — every facet-level property (`sortOrder` among dimensions,
+  `hidden`, later `selectionMode`) would live on a row that is *also* pretending to be assignable, and the
+  invariant "a facet has no recipe joins" would stay unenforceable rather than becoming structural. **A separate
+  table makes rule 4 impossible to violate instead of merely illegal.**
+- **Materialized ancestor joins.** Rejected in D10.
+- **Restore separate tag and category tables.** Rejected — reintroduces two assignment stores and two
+  reconcilers, which is the disease D1 cured.
+- **A closed, hardcoded facet enum.** Rejected — this is D1's original open-endedness argument, and it still
+  wins.
+- **Defer until ADR-0050 needs it.** Rejected: the backfill that makes the browser worth building is the thing
+  that would encode thousands of assignments against the ambiguous model first.
+
+### Resolved
+
+- **OQ5 — source metadata stays typed; `Cookbook:` and `Author:` are NOT facets (closed 2026-08-01).** D1
+  invited `Cookbook: Milk Street 365` and `Author: Samin Nosrat` as namespaces, which was reasonable when a
+  namespace cost nothing but a parent row. It is now a **contradiction with
+  [ADR-0006](ADR-0006-taxonomy-source-and-library-placement.md)**, which already gave source, author and
+  publication typed homes — and D1's invitation would have made them *both*, so a Milk Street recipe could be
+  filed twice, in two stores, with two spellings, and no reconciler between them. **The facet vocabulary is for
+  things a cook classifies; source is something a recipe already carries.** ADR-0050 filters source from the
+  typed fields (its D7). Practical consequences for the slice: **do not seed a Cookbook, Author, Publication or
+  Website facet**, and D12's import mapping sends publisher identity to the typed source fields, never to a
+  facet.
+
+  What we give up: a user who *wants* `Cookbook` as a browsing dimension has to get it from source filters
+  rather than the taxonomy. Accepted — source filters give the same browsing power without a second store, and
+  ADR-0006's typed fields are the ones capture already populates.
+
+### Open
+
+- **OQ4 — the editorial taxonomy is not decided here.** Dish Type, Protein, Technique, Featured Ingredient,
+  Dietary, Occasion, Season, Practical are *plausible* facets, not ratified ones, and choosing them is content
+  work with a real cost of error (a bad dimension is re-filed by hand across the library). It gets its own
+  session and does not gate the schema slice, which seeds only Cuisine and Course.
+- **OQ6 — primary vs secondary value within a facet** (`Cuisine` primary Korean, secondary Mexican) affects
+  card display and grouping, not matching. Deferred; no column until a surface wants it.
