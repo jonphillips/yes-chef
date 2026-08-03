@@ -622,11 +622,12 @@ struct ArchivedRecipesView: View {
             .tint(.green)
           }
           .swipeActions {
-            Button(role: .destructive) {
+            Button {
               model.deleteArchivedRecipeButtonTapped(recipeID: row.recipe.id)
             } label: {
               Label("Delete Permanently", systemImage: "trash")
             }
+            .tint(.red)
           }
       }
     }
