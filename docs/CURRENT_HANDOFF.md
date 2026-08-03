@@ -1,11 +1,12 @@
 # Current Handoff
 
-Last updated: August 3, 2026. (**ADR-0049 Amendment 2 D1 — facets** is approved (architect review) and
-in-flight as PR [#270](https://github.com/jonphillips/yes-chef/pull/270): it promotes `Cuisine`/`Course` to
-synced `facets` rows and absorbs Amendment 1's seed-table teardown. **Prep-plan Slices 1–2** (PR
-[#262](https://github.com/jonphillips/yes-chef/pull/262), merged 2026-07-30) and **Amendment 1 follow-ups** (PR
-[#269](https://github.com/jonphillips/yes-chef/pull/269), merged 2026-07-31) are in. New live target: **ADR-0049
-Amd 2 Slice 2 — category management UI**; prep-plan Slice 3 is demoted to a Ready Effort, not dropped.)
+Last updated: August 3, 2026. (**ADR-0049 Amendment 2 D1 — facets** is MERGED (PRs
+[#270](https://github.com/jonphillips/yes-chef/pull/270) + [#271](https://github.com/jonphillips/yes-chef/pull/271),
+2026-08-03) — promotes `Cuisine`/`Course` to synced `facets` rows and absorbs Amendment 1's seed-table teardown;
+**owes a two-device convergence + audit-review pass** (§ Device passes owed). **D2 — category management UI** is
+approved (architect review) and open as PR [#272](https://github.com/jonphillips/yes-chef/pull/272), owing only
+Jon's device UI look. New live target: **ADR-0049 Amd 2 D3 — proposer re-point** — but settle the
+hidden-vocabulary open question first (see Next Up). Prep-plan Slice 3 remains a Ready Effort, not dropped.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate is **crossed and holding**. We stay in
@@ -18,37 +19,27 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**ONE live dispatch target: [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 2 — category
-management UI.** Dispatch with *"Do **ADR-0049 Amd 2 Dispatch 2** (category management UI) from
+**ONE live dispatch target: [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 3 — proposer
+re-point.** Dispatch with *"Do **ADR-0049 Amd 2 Dispatch 3** (proposer re-point) from
 `docs/CURRENT_HANDOFF.md`."* If this section is empty or missing, **STOP and ask Jon — never infer.** See
-`docs/AGENTS.md` § Work Intake & Dispatch. **Reads D1's schema — dispatch after PR #270 merges** (or from its
-branch if Jon says so). D1 already built `Facet`, `Category.facetID`/`hidden`, the four invariants, the
-migration, and `createCategory`/`updateCategory`/`deleteCategory` for **values and loose labels**. D2 is mostly
-UI, **plus the thin Core facet-CRUD D1 did not need**: create-facet, rename-facet, and set-`hidden` at **both**
-grains have no user-facing method yet (D1 only *seeds* facet rows), so D2 adds them to `CategoryRepository` —
-they do **not** get jammed through `createCategory`, which mints a category, not a facet.
+`docs/AGENTS.md` § Work Intake & Dispatch. **D1 (schema/migration/invariants, PRs #270+#271) and D2 (category
+management UI, PR #272) are done** — D3 re-points `LabelProposer.swift` + `RecipeCaptureModel+Labels.swift`:
+typed facet vocabulary in the prompt, `.namespace` literally proposes a `Facet` row, PR #269's Findings 1 & 3
+re-pointed **not** deleted (D11). D2's boundary is unchanged: model **proposes**, determinism **writes**.
 
-**What it is.** The management surface (`CategoryViews.swift` / `CategoryModels.swift` /
-`RecipeCategoryFilterView.swift`) presents facets and loose labels as **structurally different things**, and
-**creating a facet is a distinct, deliberate act** from adding a value inside an existing facet or minting a
-loose label. Adding a value inside a facet stays lightweight. `hidden` is exposed at **both grains** (facet and
-category) — Amendment 1's escape hatch; D1 built the column and honors it on read, the UI to flip it is here.
-
-**The core shape the dispatch must not undo (ADR-0049 Amd 2 D8/D9/OQ1):**
-- **The umbrella copy stays "Categories."** A facet surfaces as a **category group**; `Facet` / facet value /
-  loose label are internal architecture terms, not UI copy (OQ1). Reuse `SuggestedLabel.reviewTitle`'s existing
-  wording — do not invent new copy.
-- **The four invariants live in Core, not the view** (D9). The UI offers create-facet / create-value /
-  create-loose as distinct acts but routes every write through `CategoryRepository`'s validated
-  create/update/move; it must not re-implement or relax facet membership, same-facet parenting, or leaf-only
-  loose labels. A validation error surfaces as a message, never a bypass.
-- **Starters are non-deletable and hideable** at both grains — the delete guard is already Core
-  (`cannotDeleteStarterCategory`); the UI hides rather than offering a dead Delete.
-
-**Verification.** Package build + Core tests + the **required generic app build** (this is an App-layer
-dispatch). **Not a synced-migration pass** — D2 writes through the create/reconcile paths D1 already
-sync-tested, so it owes Jon's device UI look but **no separate two-device migration pass** (that debt is D1's,
-below). No new prod-schema entry — D1 added `facets`/`facetID`/`hidden`.
+**⚠️ Open question to settle before dispatching D3 — hidden vocabulary (handed up by D2).** D2 made `hidden`
+**cascade** on product reads: hiding a facet now hides its values from the recipe editor and the filter, so
+"hidden" means *tucked away from browse/assignment*, not merely "off the group list." D3's typed vocabulary
+must decide what the model sees and can propose into:
+- **Recommended:** the proposer's vocabulary mirrors the cascade — **visible facets/values only**. A deliberately
+  hidden dimension should not get fresh AI suggestions.
+- **But the trap ([[editable-at-the-grain-stored]]-adjacent):** hidden rows still exist in the store, and
+  `reconcileCategories` matches by `facetID` + name. So a "new value" the model proposes can **silently re-match a
+  hidden row** and resurrect it invisibly. So the decision is two-part: (a) hide hidden rows from the model's
+  vocabulary, **and** (b) decide reconcile's behavior when an accepted label collides with a hidden row — either
+  **un-hide on deliberate re-assignment** (recommended: the user re-chose it) or skip. Pin both before D3; do not
+  let D3 infer it. **D4 — Jon's hand pass** (review the audit, file ambiguous roots, merge/delete poor starter
+  values, then re-run S5/S6 labeling backfill) is unchanged and still gated on the #270 device convergence pass.
 
 **⚠️ Jon's outstanding follow-through from ADR-0014 Amd1 (not a dispatch item):** three recipes still carry
 `isHeader = 1` rows to hand-repair in the app — *Beef Birria Taco Filling* (4), *Broccoli Spoon Salad* (2),
@@ -96,13 +87,15 @@ Drawn into **Next Up** as needed; not itself a dispatch target. Completed effort
 
 **[`efforts/recipe-facets.md`](efforts/recipe-facets.md) — [ADR-0049](decisions/ADR-0049-unified-labels-and-assisted-tagging.md)
 **Amendment 2** (accepted): the namespace is an explicit `Facet`.** Four dispatches. **D1 (schema + migration +
-Core invariants + audit) is approved and in-flight as PR
-[#270](https://github.com/jonphillips/yes-chef/pull/270)** — owes the migration audit review + two-device
-convergence pass (see § Device passes owed). **D2 (category management UI) is the live Next Up.** Still remaining:
-**D3 — proposer re-point** (`LabelProposer.swift` + `RecipeCaptureModel+Labels.swift`: typed facet vocabulary in
-the prompt, `.namespace` literally proposes a `Facet` row, PR #269's Findings 1 & 3 re-pointed **not** deleted);
-and **D4 — Jon's hand pass** (not a dispatch: review the audit, file ambiguous roots, merge/delete poor starter
-values, then re-run the S5/S6 labeling backfill — ADR-0050's D6 coverage gate).
+Core invariants + audit) MERGED** (PRs [#270](https://github.com/jonphillips/yes-chef/pull/270) +
+[#271](https://github.com/jonphillips/yes-chef/pull/271), 2026-08-03) — owes the migration audit review +
+two-device convergence pass (see § Device passes owed). **D2 (category management UI) approved, open as PR
+[#272](https://github.com/jonphillips/yes-chef/pull/272)** — owes only Jon's device UI look. **D3 — proposer
+re-point is the live Next Up** (`LabelProposer.swift` + `RecipeCaptureModel+Labels.swift`: typed facet
+vocabulary in the prompt, `.namespace` literally proposes a `Facet` row, PR #269's Findings 1 & 3 re-pointed
+**not** deleted) — **settle the hidden-vocabulary open question first** (see Next Up). **D4 — Jon's hand pass**
+(not a dispatch: review the audit, file ambiguous roots, merge/delete poor starter values, then re-run the
+S5/S6 labeling backfill — ADR-0050's D6 coverage gate).
 
 **[`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) § Slice 3 — refine
 vs regenerate intent (scoped 2026-07-30, dispatch-ready; full brief in the effort doc).** Regenerating a prep
@@ -246,6 +239,14 @@ launch whenever anything was promoted / remapped / merged / left unresolved). Th
 Cuisine/Course appear as facets with their values intact, (b) every recipe's category assignments are
 unchanged, (c) former tags appear as loose labels, (d) both devices converge with **no duplicate facet or
 category rows**, (e) the library filter still finds a recipe by its cuisine.
+
+**[PR #272](https://github.com/jonphillips/yes-chef/pull/272) — ADR-0049 Amd 2 D2, category management UI.
+App-layer, no schema, no two-device pass** (writes through D1's sync-tested paths). Approved (architect review)
+2026-08-03. **UI look only:** confirm (a) Category Groups vs Other Categories browse as distinct sections, (b)
+creating a group vs a value vs a loose label are three distinct acts, (c) a loose label whose name matches a
+facet value (e.g. loose `Italian` alongside `Cuisine: Italian`) is now accepted, (d) hiding a group removes its
+values from the recipe editor and the filter, (e) starter groups/values offer no Delete but user-created ones
+do, and delete is blocked while a group still has values or a value is used by recipes.
 
 **[PR #262](https://github.com/jonphillips/yes-chef/pull/262) — prep plan dish links and dates. Merged
 2026-07-30, no schema.** Slice 1 (day-anchored sessions on a placed menu) is **device-confirmed 2026-07-30**.

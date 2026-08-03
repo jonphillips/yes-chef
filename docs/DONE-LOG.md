@@ -9,12 +9,51 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0049 Amendment 2 · Dispatch 2 — category management UI
+
+**Approved (architect review) 2026-08-03; PR [#272](https://github.com/jonphillips/yes-chef/pull/272) OPEN,
+branch `codex/adr-0049-amendment-2-category-management` — Jon's device UI look + merge still owed** (see
+[`CURRENT_HANDOFF.md`](CURRENT_HANDOFF.md) § Device passes owed; *finalize this entry's verification record on
+merge*). Reads D1's schema (#270/#271, merged 2026-08-03). Spec:
+[`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 2. Verified in-session: `check-drift.sh`
+green (SwiftLint + 546 Core tests), generic-iOS app build green. **App-layer dispatch — not a synced-migration
+pass** (writes through D1's already-sync-tested create/reconcile paths); no new prod-schema entry.
+
+**What it does.** The management surface (`CategoryViews.swift` / `CategoryModels.swift`) presents **category
+groups** (facets) and **loose categories** as structurally different things, each with its own deliberate
+creation act; the old drag-to-move root/child browser is retired. New thin Core facet-CRUD on
+`CategoryRepository` that D1 did not need — `createFacet`, `renameFacet`, `setFacetHidden`/`setCategoryHidden`
+(hidden at **both** grains, Amd 1's escape hatch), duplicate-facet-name protection, and `Facet`/management
+`FetchKeyRequest`s (product reads filter hidden, management reads show everything with an eye-slash marker). The
+library filter (`RecipeCategoryFilterView.swift`) browses groups separately from loose labels. Starter facets
+and values stay non-deletable (`isStarterFacet`/`isStarterCategory` guards); the UI hides Delete rather than
+offering a dead control.
+
+**The review found one blocking bug + two gaps, all fixed in `d4baa6f`.**
+- **Blocking — value-name uniqueness ignored the facet.** `validateUniqueSiblingName` keyed only on
+  `parentCategoryID` + name, and every top-level facet value and loose label shares `parentCategoryID == nil`,
+  so creating a loose `Italian` was rejected by the `Cuisine` starter value `Italian`, and `Dinner` could not
+  exist in two facets. This contradicted the store, `deduplicateFacetSiblings` (facet-scoped), and the import
+  path, which all treat each facet as its own namespace — the validator enforced an invariant the rest of the
+  system violates. Fixed by scoping the check to `facetID` too; regression-tested.
+- **Cascade — hiding a group now hides its values on product reads.** `CategoryListRequest` excludes categories
+  whose `facetID` points to a hidden facet, so hiding a group removes its values from the recipe editor and the
+  filter, not just the group list. This is an implementation refinement of D8's `hidden` semantics (the ADR
+  specified the column at both grains but not the cascade); **it hands D3 an open question — see the effort doc /
+  handoff Next Up.**
+- **Gap — user facets had no delete.** Added `deleteFacet` (non-starter, empty-of-values guard, symmetric with
+  `deleteCategory`) plus a confirmation dialog and menu/editor Delete. Beyond D8's hidden-only escape hatch but
+  the obvious CRUD completion; starters remain non-deletable.
+
+**Schema: no change** — D1 already added `facets` / `Category.facetID` / `Category.hidden` and put them on the
+prod-schema promotion list. This slice adds only behavior and UI.
+
 ## ADR-0049 Amendment 2 · Dispatch 1 — namespaces become synced `facets`
 
-**Approved (architect review) 2026-08-03; PR [#270](https://github.com/jonphillips/yes-chef/pull/270) OPEN,
-branch `codex/adr-0049-amendment-2-facets` — device audit-review + two-device convergence pass + merge still
-owed** (see [`CURRENT_HANDOFF.md`](CURRENT_HANDOFF.md) § Device passes owed; *finalize this entry's verification
-record on merge*). Spec: [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 1;
+**Approved (architect review) 2026-08-03; PRs [#270](https://github.com/jonphillips/yes-chef/pull/270) +
+[#271](https://github.com/jonphillips/yes-chef/pull/271) MERGED 2026-08-03 (`24f50d4`, `54a7021`),
+branch `codex/adr-0049-amendment-2-facets` — device audit-review + two-device convergence pass still owed**
+(see [`CURRENT_HANDOFF.md`](CURRENT_HANDOFF.md) § Device passes owed). Spec: [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 1;
 [ADR-0049 Amendment 2](decisions/ADR-0049-unified-labels-and-assisted-tagging.md). Verified in-session:
 `swift build` clean, `CategoryRepositoryTests` **8/8** green. **Absorbs Amendment 1's teardown** — the
 seed-state and tombstone tables are dropped *inside* this migration, not in a separate synced pass.
