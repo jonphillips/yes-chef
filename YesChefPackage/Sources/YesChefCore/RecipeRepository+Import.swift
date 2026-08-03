@@ -283,7 +283,7 @@ extension RecipeRepository {
     let recipeEquipment = try RecipeEquipment.fetchAll(db)
       .filter { existingRecipeIDs.contains($0.recipeID) }
     let categoryIDs = Set(recipeCategories.map(\.categoryID))
-    let linkedCategories = try CategoryRepository.effectiveCategorySet(in: db).categories
+    let linkedCategories = try Category.fetchAll(db)
       .filter { categoryIDs.contains($0.id) }
 
     for recipeID in existingRecipeIDs {

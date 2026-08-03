@@ -9,13 +9,6 @@ public struct CategoryListRequest: FetchKeyRequest {
   }
 }
 
-/// Category visibility is now a simple per-row concern. The type remains the shared reader
-/// projection while the old seed-tombstone convergence machinery is retired.
-public struct EffectiveCategorySet: Sendable {
-  public let categories: [Category]
-  public let unavailableCategoryIDs: Set<Category.ID>
-}
-
 public enum CategoryRepositoryError: Error, Equatable {
   case emptyName
   case duplicateSibling(name: String)
@@ -57,7 +50,7 @@ extension CategoryRepositoryError: LocalizedError {
     case .cannotDeleteCategoryUsedByRecipes:
       "Remove this category from recipes before deleting it."
     case .cannotDeleteStarterCategory:
-      "Starter categories can be hidden or renamed, but not deleted."
+      "Starter categories cannot be deleted."
     }
   }
 }
@@ -83,6 +76,7 @@ public struct FacetMigrationAudit: Equatable, Sendable {
   public var seededFacetIDs: [Facet.ID] = []
   public var seededCategoryIDs: [Category.ID] = []
   public var promotedRoots: [PromotedRoot] = []
+  public var fallbackMatchedRootCategoryIDs: [Category.ID] = []
   public var looseRoots: [LooseRoot] = []
   public var unresolvedRoots: [Category.ID] = []
   public var remappedRootAssignments: [RootAssignmentRemap] = []
@@ -91,10 +85,6 @@ public struct FacetMigrationAudit: Equatable, Sendable {
 }
 
 public enum CategoryRepository {
-  public static func effectiveCategorySet(in db: Database) throws -> EffectiveCategorySet {
-    EffectiveCategorySet(categories: try Category.fetchAll(db), unavailableCategoryIDs: [])
-  }
-
   /// This post-engine pass is deliberately both deterministic and idempotent. It is safe to run
   /// on every main-app bootstrap because all created rows use fixed identities.
   public static func seedStarterFacets(in db: Database) throws -> FacetMigrationAudit {
@@ -111,6 +101,7 @@ public enum CategoryRepository {
       categories.append(seed.category)
       audit.seededCategoryIDs.append(seed.id)
     }
+    try deduplicateFacetSiblings(in: db)
     return audit
   }
 
@@ -122,14 +113,11 @@ public enum CategoryRepository {
     var facets = try Facet.fetchAll(db)
 
     for seed in starterFacets {
-      let roots = categories
-        .filter {
-          $0.parentCategoryID == nil
-            && $0.facetID == nil
-            && $0.name.caseInsensitiveCompare(seed.facet.name) == .orderedSame
-        }
-        .sorted(by: areCategoriesInFoldOrder)
-      guard let root = roots.first else { continue }
+      guard let match = legacyNamespaceRoot(for: seed, in: categories) else { continue }
+      let root = match.category
+      if match.usedNameFallback {
+        audit.fallbackMatchedRootCategoryIDs.append(root.id)
+      }
 
       if !facets.contains(where: { $0.id == seed.facet.id }) {
         try Facet.insert { seed.facet }.execute(db)
@@ -138,20 +126,18 @@ public enum CategoryRepository {
       }
 
       let children = categories.filter { $0.parentCategoryID == root.id }
-      for var child in children {
-        child.facetID = seed.facet.id
-        child.parentCategoryID = nil
-        try Category.upsert { child }.execute(db)
+      let descendantIDs = CategoryHierarchy.descendantIDs(of: root.id, in: categories)
+      for var descendant in categories where descendantIDs.contains(descendant.id) {
+        descendant.facetID = seed.facet.id
+        if descendant.parentCategoryID == root.id {
+          descendant.parentCategoryID = nil
+        }
+        try Category.upsert { descendant }.execute(db)
       }
 
       let assignments = try RecipeCategory.where { $0.categoryID.eq(root.id) }.fetchAll(db)
       if !assignments.isEmpty {
-        let destination: Category
-        if children.count == 1, let child = children.first {
-          destination = child
-        } else {
-          destination = try looseNamespaceAssignment(for: seed, in: db)
-        }
+        let destination = try looseNamespaceAssignment(for: seed, in: db)
         for var assignment in assignments {
           assignment.categoryID = destination.id
           try RecipeCategory.upsert { assignment }.execute(db)
@@ -275,21 +261,24 @@ public enum CategoryRepository {
     let categories = try Category.fetchAll(db)
     let category = try category(categoryID, in: categories)
     let name = try normalizedName(name)
-    try validateMove(
-      categoryID: categoryID,
-      parentCategoryID: parentCategoryID,
+    let facets = try Facet.fetchAll(db)
+    let resolvedFacetID = try resolvedFacetID(
       facetID: category.facetID,
-      categories: categories
+      parentCategoryID: parentCategoryID,
+      categories: categories,
+      facets: facets
     )
+    try validateMove(categoryID: categoryID, parentCategoryID: parentCategoryID, categories: categories)
     try validateUniqueSiblingName(name, parentCategoryID: parentCategoryID, excluding: categoryID, categories: categories)
     try Category.find(category.id).update {
       $0.name = name
+      $0.facetID = resolvedFacetID
       $0.parentCategoryID = parentCategoryID
     }
     .execute(db)
   }
 
-  public static func deleteCategory(categoryID: Category.ID, in db: Database, now _: Date) throws {
+  public static func deleteCategory(categoryID: Category.ID, in db: Database) throws {
     let categories = try Category.fetchAll(db)
     _ = try category(categoryID, in: categories)
     guard !starterFacetValues.contains(where: { $0.id == categoryID }) else {
@@ -310,7 +299,7 @@ public enum CategoryRepository {
     }
     let category = Category(
       id: seed.looseAssignmentCategoryID,
-      name: seed.facet.name,
+      name: "Legacy \(seed.facet.name)",
       sortOrder: seed.facet.sortOrder,
       dateCreated: starterCategoryDate
     )
@@ -358,10 +347,8 @@ public enum CategoryRepository {
   private static func validateMove(
     categoryID: Category.ID,
     parentCategoryID: Category.ID?,
-    facetID: Facet.ID?,
     categories: [Category]
   ) throws {
-    _ = try resolvedFacetID(facetID: facetID, parentCategoryID: parentCategoryID, categories: categories, facets: [])
     guard parentCategoryID != categoryID else {
       throw CategoryRepositoryError.cannotParentCategoryUnderItself
     }
@@ -390,7 +377,7 @@ public enum CategoryRepository {
     (categories.filter { $0.parentCategoryID == parentCategoryID }.map(\.sortOrder).max() ?? -1) + 1
   }
 
-  private static func mergeCategory(_ duplicate: Category, into canonical: Category, in db: Database) throws -> Category {
+  fileprivate static func mergeCategory(_ duplicate: Category, into canonical: Category, in db: Database) throws -> Category {
     guard duplicate.id != canonical.id else { return canonical }
     var canonical = canonical
     if canonical.color == nil, let color = duplicate.color {
@@ -408,6 +395,62 @@ public enum CategoryRepository {
     try deduplicateRecipeCategoryPairs(in: db)
     try Category.find(duplicate.id).delete().execute(db)
     return canonical
+  }
+
+  private static func deduplicateFacetSiblings(in db: Database) throws {
+    while true {
+      let categories = try Category.fetchAll(db)
+      let grouped = Dictionary(grouping: categories.filter { $0.facetID != nil }) {
+        FacetSiblingKey(
+          facetID: $0.facetID!,
+          parentCategoryID: $0.parentCategoryID,
+          normalizedName: normalizedNameKey($0.name)
+        )
+      }
+      guard let duplicates = grouped.values.first(where: { $0.count > 1 }) else { break }
+      let canonical = canonicalFacetCategory(from: duplicates)
+      for duplicate in duplicates where duplicate.id != canonical.id {
+        _ = try mergeCategory(duplicate, into: canonical, in: db)
+      }
+    }
+    try deduplicateRecipeCategoryPairs(in: db)
+  }
+
+  private static func canonicalFacetCategory(from categories: [Category]) -> Category {
+    let starterIDs = Set(starterFacetValues.map(\.id))
+    return categories.sorted {
+      let lhsIsStarter = starterIDs.contains($0.id)
+      let rhsIsStarter = starterIDs.contains($1.id)
+      if lhsIsStarter != rhsIsStarter { return lhsIsStarter }
+      return areCategoriesInFoldOrder($0, $1)
+    }.first!
+  }
+
+  private static func legacyNamespaceRoot(for seed: StarterFacet, in categories: [Category]) -> LegacyNamespaceRoot? {
+    if let category = categories.first(where: {
+      $0.id == seed.legacyRootCategoryID && $0.parentCategoryID == nil && $0.facetID == nil
+    }) {
+      return .init(category: category, usedNameFallback: false)
+    }
+    let recognizedValueIDs = Set(starterFacetValues
+      .filter { $0.category.facetID == seed.facet.id }
+      .map(\.id))
+    let fallbackMatches = categories
+      .filter { root in
+        root.parentCategoryID == nil
+          && root.facetID == nil
+          && root.name.caseInsensitiveCompare(seed.facet.name) == .orderedSame
+          && categories.contains { child in
+            child.parentCategoryID == root.id && recognizedValueIDs.contains(child.id)
+          }
+      }
+      .sorted(by: areCategoriesInFoldOrder)
+    guard let category = fallbackMatches.first else { return nil }
+    return .init(category: category, usedNameFallback: true)
+  }
+
+  private static func normalizedNameKey(_ name: String) -> String {
+    name.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
   }
 
   private static func deduplicateRecipeCategoryPairs(in db: Database) throws {
@@ -445,8 +488,20 @@ private struct RecipeCategoryPair: Hashable {
   var categoryID: Category.ID
 }
 
+private struct FacetSiblingKey: Hashable {
+  var facetID: Facet.ID
+  var parentCategoryID: Category.ID?
+  var normalizedName: String
+}
+
+private struct LegacyNamespaceRoot {
+  var category: Category
+  var usedNameFallback: Bool
+}
+
 private struct StarterFacet {
   var facet: Facet
+  var legacyRootCategoryID: Category.ID
   var looseAssignmentCategoryID: Category.ID
 }
 
@@ -458,8 +513,16 @@ private struct StarterFacetValue {
 private let starterCategoryDate = Date(timeIntervalSinceReferenceDate: 0)
 
 private let starterFacets: [StarterFacet] = [
-  .init(facet: Facet(id: starterCategoryID(1), name: "Cuisine", sortOrder: 0, dateCreated: starterCategoryDate), looseAssignmentCategoryID: starterCategoryID(101)),
-  .init(facet: Facet(id: starterCategoryID(2), name: "Course", sortOrder: 1, dateCreated: starterCategoryDate), looseAssignmentCategoryID: starterCategoryID(102)),
+  .init(
+    facet: Facet(id: starterCategoryID(1), name: "Cuisine", sortOrder: 0, dateCreated: starterCategoryDate),
+    legacyRootCategoryID: starterCategoryID(1),
+    looseAssignmentCategoryID: starterCategoryID(101)
+  ),
+  .init(
+    facet: Facet(id: starterCategoryID(2), name: "Course", sortOrder: 1, dateCreated: starterCategoryDate),
+    legacyRootCategoryID: starterCategoryID(2),
+    looseAssignmentCategoryID: starterCategoryID(102)
+  ),
 ]
 
 private let starterFacetValues: [StarterFacetValue] = [
@@ -557,6 +620,9 @@ extension RecipeRepository {
     now: Date,
     uuid: () -> UUID
   ) throws -> Category {
+    if path.components.count == 1, let name = path.components.first {
+      return try findOrCreateLooseCategory(name: name, categories: &categories, in: db, now: now, uuid: uuid)
+    }
     var legacyParentID: Category.ID?
     var legacyCurrent: Category?
     for component in path.components {
@@ -604,10 +670,19 @@ extension RecipeRepository {
   private static func findOrCreateLooseCategory(
     name: String, categories: inout [Category], in db: Database, now: Date, uuid: () -> UUID
   ) throws -> Category {
-    if let category = categories.first(where: {
+    let matches = categories.filter {
       $0.facetID == nil && $0.parentCategoryID == nil && $0.name.caseInsensitiveCompare(name) == .orderedSame
-    }) {
-      return category
+    }.sorted {
+      if $0.dateCreated != $1.dateCreated { return $0.dateCreated < $1.dateCreated }
+      if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
+      return $0.id.uuidString < $1.id.uuidString
+    }
+    if var canonical = matches.first {
+      for duplicate in matches.dropFirst() {
+        canonical = try CategoryRepository.mergeCategory(duplicate, into: canonical, in: db)
+      }
+      categories = try Category.fetchAll(db)
+      return canonical
     }
     let category = Category(id: uuid(), name: name, sortOrder: categories.filter { $0.facetID == nil && $0.parentCategoryID == nil }.count, dateCreated: now)
     try Category.insert { category }.execute(db)
