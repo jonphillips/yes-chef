@@ -217,7 +217,7 @@ extension ReaderFeedbackCurationClient: DependencyKey {
   public static func parseJSONReturn(_ text: String, comments: [RawComment] = []) -> [ReaderFeedbackTip]? {
     guard
       let json = jsonSlice(text),
-      let data = json.data(using: .utf8),
+      let data = normalizingTypographicJSONQuotes(in: json).data(using: .utf8),
       let raw = try? JSONSerialization.jsonObject(with: data)
     else { return nil }
 
@@ -313,6 +313,14 @@ extension ReaderFeedbackCurationClient: DependencyKey {
       return jsonArraySlice(trimmed)
     }
     return jsonObjectSlice(trimmed) ?? jsonArraySlice(trimmed)
+  }
+
+  /// Chat clients can turn JSON's ASCII delimiters into typographic quotes while copying.
+  /// Normalize only those delimiters before validating the otherwise unchanged JSON contract.
+  private static func normalizingTypographicJSONQuotes(in text: String) -> String {
+    text
+      .replacingOccurrences(of: "\u{201C}", with: "\"")
+      .replacingOccurrences(of: "\u{201D}", with: "\"")
   }
 }
 

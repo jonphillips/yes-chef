@@ -103,6 +103,52 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func pastedHandoffWithTypographicJSONQuotesPreservesCurationProvenance() {
+      let returned = AIHandoffReturn.readerFeedbackReturn(
+        from: """
+        YC-HANDOFF: 5D7A4A74-D38B-4CFB-94DE-8E97763E8B49
+        YC-CONTRACT: v2
+        [
+          {
+            “text”: “Brown the tofu, then return it only to coat and warm through.”,
+            “kind”: “consensusDistilled”,
+            “supportCount”: 2,
+            “commentNumbers”: [1, 2]
+          }
+        ]
+        """,
+        comments: [
+          RawComment(text: "Browned tofu stays intact.", helpfulCount: 9),
+          RawComment(text: "Reduce the sauce before returning tofu.", helpfulCount: 4),
+        ]
+      )
+
+      expectNoDifference(
+        returned.tips,
+        [
+          ReaderFeedbackTip(
+            text: "Brown the tofu, then return it only to coat and warm through.",
+            provenanceKind: .consensusDistilled,
+            supportCount: 2,
+            backingComments: [
+              ReaderFeedbackBackingComment(
+                commentNumber: 1,
+                text: "Browned tofu stays intact.",
+                helpfulCount: 9
+              ),
+              ReaderFeedbackBackingComment(
+                commentNumber: 2,
+                text: "Reduce the sauce before returning tofu.",
+                helpfulCount: 4
+              ),
+            ]
+          )
+        ]
+      )
+      expectNoDifference(returned.unparsedLines, [])
+    }
+
+    @Test
     func handoffPromptExplainsThatJSONFollowsTheTransportHeaders() {
       let prompt = ReaderFeedbackCurationClient.handoffPrompt(
         comments: [RawComment(text: "A lower rack browned the bottom well.", helpfulCount: 9)],
