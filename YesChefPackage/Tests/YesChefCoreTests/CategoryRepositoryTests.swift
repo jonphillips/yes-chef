@@ -2,7 +2,7 @@ import CustomDump
 import Dependencies
 import Foundation
 import Testing
-import YesChefCore
+@testable import YesChefCore
 
 extension RecipeCoreTests {
   @Suite
@@ -278,6 +278,36 @@ extension RecipeCoreTests {
         expectNoDifference(try Category.find(value.id).fetchOne(db)?.hidden, true)
         expectNoDifference(try FacetListRequest().fetch(db).map(\.id), [facet.id])
         expectNoDifference(try FacetManagementListRequest().fetch(db).map(\.id), [facet.id])
+      }
+    }
+
+    @Test
+    func acceptingAProposedValueUnhidesAnExactHiddenFacetMatch() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 816_375_000)
+      var ids = SampleUUIDSequence(start: 93_500)
+
+      try database.write { db in
+        let facet = try CategoryRepository.createFacet(
+          name: "Dish Type", in: db, now: now, uuid: { ids.next() }
+        )
+        let hiddenValue = try CategoryRepository.createCategory(
+          name: "Taco", facetID: facet.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+        try CategoryRepository.setCategoryHidden(categoryID: hiddenValue.id, hidden: true, in: db)
+        let recipe = Recipe(id: ids.next(), title: "Fish Tacos", dateCreated: now, dateModified: now)
+        try Recipe.insert { recipe }.execute(db)
+
+        try RecipeRepository.reconcileSuggestedLabels(
+          [.newChild(.init(facet: facet, parentCategory: nil, name: "Taco"))],
+          recipeID: recipe.id,
+          in: db,
+          now: now,
+          uuid: { ids.next() }
+        )
+
+        expectNoDifference(try Category.find(hiddenValue.id).fetchOne(db)?.hidden, false)
+        expectNoDifference(try RecipeCategory.fetchAll(db).map(\.categoryID), [hiddenValue.id])
       }
     }
 

@@ -3,10 +3,11 @@
 Last updated: August 3, 2026. (**ADR-0049 Amendment 2 D1 — facets** is MERGED (PRs
 [#270](https://github.com/jonphillips/yes-chef/pull/270) + [#271](https://github.com/jonphillips/yes-chef/pull/271),
 2026-08-03) — promotes `Cuisine`/`Course` to synced `facets` rows and absorbs Amendment 1's seed-table teardown;
-**owes a two-device convergence + audit-review pass** (§ Device passes owed). **D2 — category management UI** is
-approved (architect review) and open as PR [#272](https://github.com/jonphillips/yes-chef/pull/272), owing only
-Jon's device UI look. New live target: **ADR-0049 Amd 2 D3 — proposer re-point** — but settle the
-hidden-vocabulary open question first (see Next Up). Prep-plan Slice 3 remains a Ready Effort, not dropped.)
+**owes a two-device convergence + audit-review pass** (§ Device passes owed). **D2 — category management UI** (PR
+[#272](https://github.com/jonphillips/yes-chef/pull/272)) and **D3 — proposer re-point** (PR
+[#274](https://github.com/jonphillips/yes-chef/pull/274)) are both **approved (architect review) and open**, each
+owing only Jon's device UI look. **D4** is Jon's hand pass, gated on the #270 device convergence. **New live
+target: Prep-plan Slice 3 — refine vs regenerate intent** (see Next Up).)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate is **crossed and holding**. We stay in
@@ -19,27 +20,24 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**ONE live dispatch target: [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 3 — proposer
-re-point.** Dispatch with *"Do **ADR-0049 Amd 2 Dispatch 3** (proposer re-point) from
-`docs/CURRENT_HANDOFF.md`."* If this section is empty or missing, **STOP and ask Jon — never infer.** See
-`docs/AGENTS.md` § Work Intake & Dispatch. **D1 (schema/migration/invariants, PRs #270+#271) and D2 (category
-management UI, PR #272) are done** — D3 re-points `LabelProposer.swift` + `RecipeCaptureModel+Labels.swift`:
-typed facet vocabulary in the prompt, `.namespace` literally proposes a `Facet` row, PR #269's Findings 1 & 3
-re-pointed **not** deleted (D11). D2's boundary is unchanged: model **proposes**, determinism **writes**.
+**ONE live dispatch target:
+[`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) § Slice 3 — refine vs
+regenerate intent** (scoped 2026-07-30, dispatch-ready; full brief in the effort doc). Dispatch with *"Do
+**Prep-plan Slice 3** (refine vs regenerate intent) from `docs/CURRENT_HANDOFF.md`."* If this section is empty
+or missing, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-**⚠️ Open question to settle before dispatching D3 — hidden vocabulary (handed up by D2).** D2 made `hidden`
-**cascade** on product reads: hiding a facet now hides its values from the recipe editor and the filter, so
-"hidden" means *tucked away from browse/assignment*, not merely "off the group list." D3's typed vocabulary
-must decide what the model sees and can propose into:
-- **Recommended:** the proposer's vocabulary mirrors the cascade — **visible facets/values only**. A deliberately
-  hidden dimension should not get fresh AI suggestions.
-- **But the trap ([[editable-at-the-grain-stored]]-adjacent):** hidden rows still exist in the store, and
-  `reconcileCategories` matches by `facetID` + name. So a "new value" the model proposes can **silently re-match a
-  hidden row** and resurrect it invisibly. So the decision is two-part: (a) hide hidden rows from the model's
-  vocabulary, **and** (b) decide reconcile's behavior when an accepted label collides with a hidden row — either
-  **un-hide on deliberate re-assignment** (recommended: the user re-chose it) or skip. Pin both before D3; do not
-  let D3 infer it. **D4 — Jon's hand pass** (review the audit, file ambiguous roots, merge/delete poor starter
-  values, then re-run S5/S6 labeling backfill) is unchanged and still gated on the #270 device convergence pass.
+Regenerating a prep plan floods "Review omitted steps" because the omission diff keys on exact
+`session`+`task`+`serves` and a regenerate legitimately rewrites both. Fix: the baseline follows **intent**, not
+the transport — refine keeps the current-plan baseline and the loud guard; regenerate uses an **empty** baseline
+and a light "replaces your N-step plan" confirmation. **One column on the local-only `aiHandoffs` table**
+(`regenerates: Bool`, for the outboard copy→paste round-trip only — **not synced, no prod entry**). Do **not**
+infer intent from how many steps match (that heuristic *is* the bug), don't add fuzzy matching to the refine
+diff, don't touch Slice 1's storage. Local migration → **no two-device pass**.
+
+**ADR-0049 Amendment 2 is D1–D3 shipped-or-approved** (D1 merged #270+#271; D2 #272 and D3 #274 approved +
+open, owing only Jon's device look). **D4 — Jon's hand pass** (not a dispatch: review the audit, file ambiguous
+roots, merge/delete poor starter values, then re-run the S5/S6 labeling backfill — ADR-0050's D6 coverage gate)
+is gated on the #270 two-device convergence pass. D3's settled hidden-vocabulary rule now lives in ADR-0049 D11.
 
 **⚠️ Jon's outstanding follow-through from ADR-0014 Amd1 (not a dispatch item):** three recipes still carry
 `isHeader = 1` rows to hand-repair in the app — *Beef Birria Taco Filling* (4), *Broccoli Spoon Salad* (2),
@@ -90,12 +88,12 @@ Drawn into **Next Up** as needed; not itself a dispatch target. Completed effort
 Core invariants + audit) MERGED** (PRs [#270](https://github.com/jonphillips/yes-chef/pull/270) +
 [#271](https://github.com/jonphillips/yes-chef/pull/271), 2026-08-03) — owes the migration audit review +
 two-device convergence pass (see § Device passes owed). **D2 (category management UI) approved, open as PR
-[#272](https://github.com/jonphillips/yes-chef/pull/272)** — owes only Jon's device UI look. **D3 — proposer
-re-point is the live Next Up** (`LabelProposer.swift` + `RecipeCaptureModel+Labels.swift`: typed facet
+[#272](https://github.com/jonphillips/yes-chef/pull/272)** — owes only Jon's device UI look. **D3 (proposer
+re-point) approved + open as PR [#274](https://github.com/jonphillips/yes-chef/pull/274)** — typed facet
 vocabulary in the prompt, `.namespace` literally proposes a `Facet` row, PR #269's Findings 1 & 3 re-pointed
-**not** deleted) — **settle the hidden-vocabulary open question first** (see Next Up). **D4 — Jon's hand pass**
-(not a dispatch: review the audit, file ambiguous roots, merge/delete poor starter values, then re-run the
-S5/S6 labeling backfill — ADR-0050's D6 coverage gate).
+**not** deleted; the settled hidden-vocabulary rule is now ADR-0049 D11; owes only Jon's device look. **D4 —
+Jon's hand pass** (not a dispatch: review the audit, file ambiguous roots, merge/delete poor starter values,
+then re-run the S5/S6 labeling backfill — ADR-0050's D6 coverage gate).
 
 **[`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) § Slice 3 — refine
 vs regenerate intent (scoped 2026-07-30, dispatch-ready; full brief in the effort doc).** Regenerating a prep
@@ -105,8 +103,8 @@ the current-plan baseline and the loud guard; regenerate uses an **empty** basel
 N-step plan" confirmation. **One column on the local-only `aiHandoffs` table** (`regenerates: Bool`, for the
 outboard copy→paste round-trip only — **not synced, no prod entry**, deterministic-UUID/post-engine rules do
 not apply). Do **not** infer intent from how many steps match (that heuristic *is* the bug), don't add fuzzy
-matching to the refine diff, don't touch Slice 1's storage. Local migration → **no two-device pass**. *(Was the
-live Next Up target before the facets pivot — preserved here, not dropped; sequence with Jon.)*
+matching to the refine diff, don't touch Slice 1's storage. Local migration → **no two-device pass**. *(Now the
+live Next Up target — see § Next Up.)*
 
 **[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md) — ATK's "Gather Your
 Ingredients" is a latent grocery bug (scoped 2026-07-28). P1 only; **no schema**.** 101 shoppable ingredient
@@ -163,41 +161,22 @@ no-commit advisory or a per-day note, not a per-recipe write; respect [[llm-cura
 all-caps de-cap is the DECLINED P2 above). **Unscoped**; parked in
 [`docs/open-questions.md`](open-questions.md). Interacts with ADR-0014, so sequence them.
 
-**[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) leftovers — one new slice (enforce restore
-procedure) and S3.**
-- **OQ6 + OQ7 are CLOSED (2026-07-29, measured; ADR Amendment 3).** Do **not** re-run the measurement effort.
-  - **OQ7 — CLOSED clean.** Images survive the re-push **byte-intact on the peer**; asset- and record-level
-    resurrection both work. Caveat: a photo *replaced* since the backup resurrects as a **duplicate**
-    (delete-row + insert-row). **Volume** (~2,163 assets at once → CKError 429 shape) stays a **real-device
-    unknown** — keep it in the device pass.
-  - **OQ6 — CONFIRMED data-loss path, mitigated by protocol.** A peer's **unsent/held** delete that syncs
-    *after* a restore **wins and silently re-deletes the restored record on every peer** (measured E2E). So
-    restore is authoritative **only against settled peer state** — this **bounds Amendment 2**, does not
-    reverse it. Root cause is upstream SQLiteData tombstone handling (`upsertFromServerRecord` never clears
-    `_isDeleted`; `syncChanges` sends before it fetches) → **file a point-free bug report**. The resting
-    tombstone self-heals on the next relaunch in the ordinary flow; the loss needs a concurrent restore.
-- **⚠️ NEW SLICE — the app must enforce the restore procedure (Jon's call).** Naive restore is unsafe:
-  *quiesce every peer (delete the app → drops its unsent CKSyncEngine queue) → restore + re-enable on one
-  device → reinstall the peers so they rebuild from the restored cloud.* Restore must gate on / walk the user
-  through quiescing the other devices before it re-enables sync. **Verify once (throwaway install, NOT the
-  measurement sims) that deleting the app clears the app-group container** — the store + pending ops live
-  there, and the whole mitigation rests on that. Not-yet-scoped into slices; scope with Jon.
-- **OQ1 is CLOSED (2026-07-29, measured).** Restore re-pushes the whole restored library and restored values
-  win collisions **with already-settled peer state** (see Amendment 2, as bounded by Amendment 3). **Do not
-  re-derive from the code.**
-- **OQ5 is CLOSED — nothing to build.** "Restore-authoritative" was parked as a future slice; it turned out to
-  be the shipped behaviour, with no zone reset involved.
-- **The database export is also a durable archive, not just a restore artifact** (design constraint, parked to
-  `open-questions.md`): the backup is a self-describing SQLite file with standard-encoded image BLOBs, so the
-  library is re-extractable without the app. The "drain blobs into typed rows" direction keeps it legible;
-  don't reintroduce opaque app-specific blobs. Not a build item — a constraint on future ones.
+**[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) leftovers — two unbuilt slices.** The measurement
+arc is closed (OQ1/5/6/7 → DONE-LOG + [[restore-is-authoritative]]); the net covers a lost/blank zone and
+restore is authoritative **only against settled peer state**. Do **not** re-run the measurement. Two things
+remain to build, plus one upstream loose end:
+- **⚠️ NEW SLICE — enforce the restore procedure (scope with Jon).** Naive restore is unsafe: a peer's
+  unsent/held delete that syncs *after* a restore silently re-deletes the restored record on every peer (OQ6,
+  measured E2E). Restore must gate on / walk the user through *quiesce every peer (delete the app → drops its
+  unsent CKSyncEngine queue) → restore + re-enable on one device → reinstall the peers.* Verify once (throwaway
+  install) that deleting the app clears the app-group container — the whole mitigation rests on it.
 - **S3 — automatic snapshots.** Cadence/trigger + retention (keep N), local-only. **Build the pre-migration
-  snapshot first** (D4): a rolling local snapshot taken right before `migrator.migrate` runs, so a
-  bad/erasing migration is always recoverable from the step before it — the single cheapest catch for the
+  snapshot first** (D4): a rolling local snapshot taken right before `migrator.migrate` runs, so a bad/erasing
+  migration is always recoverable from the step before it — the single cheapest catch for the
   [[debug-erase-vs-sync-triggers]] class of bug. App-update-boundary and periodic snapshots follow.
-- **Temporary, in Jon's tree, not to be committed:** the test container `iCloud.com.jonphillips.yescheftest` is
-  swapped into `YesChefCloudSync.configuration` and **both** entitlements files for the measurement. Revert
-  before any real build; leaving it in either entitlements file is a bad thing to ship.
+- **Loose end — file a point-free bug report:** upstream SQLiteData tombstone handling never clears
+  `_isDeleted` in `upsertFromServerRecord` (and `syncChanges` sends before it fetches), which is the root of the
+  OQ6 data-loss path above.
 
 **Small nits — not urgent, fold into a passing dispatch:**
 - **The S4 brief extractor's prompt is framed for a conversation, but S4 hands it a decision** (silent-failure
@@ -247,6 +226,14 @@ creating a group vs a value vs a loose label are three distinct acts, (c) a loos
 facet value (e.g. loose `Italian` alongside `Cuisine: Italian`) is now accepted, (d) hiding a group removes its
 values from the recipe editor and the filter, (e) starter groups/values offer no Delete but user-created ones
 do, and delete is blocked while a group still has values or a value is used by recipes.
+
+**[PR #274](https://github.com/jonphillips/yes-chef/pull/274) — ADR-0049 Amd 2 D3, proposer re-point.
+App-layer + Core, no schema, no two-device pass** (writes through D1's sync-tested reconcile paths). Approved
+(architect review) 2026-08-03. **Capture-flow look only:** on a fresh capture confirm (a) suggested labels
+propose only against **visible** facets/values, (b) accepting a namespace suggestion files the recipe under a
+new `Facet` + its first value on save (not a bare loose label), (c) a suggestion that re-matches a hidden value
+in its facet reuses **and unhides** it, and (d) a label already harvested from the page is not also offered as a
+suggestion chip.
 
 **[PR #262](https://github.com/jonphillips/yes-chef/pull/262) — prep plan dish links and dates. Merged
 2026-07-30, no schema.** Slice 1 (day-anchored sessions on a placed menu) is **device-confirmed 2026-07-30**.

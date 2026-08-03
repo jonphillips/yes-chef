@@ -9,6 +9,49 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0049 Amendment 2 · Dispatch 3 — proposer re-point
+
+**Approved (architect review) 2026-08-03; PR [#274](https://github.com/jonphillips/yes-chef/pull/274) OPEN,
+branch `codex/adr-0049-d3-proposer-repoint` — Jon's device capture-flow look + merge still owed** (see
+[`CURRENT_HANDOFF.md`](CURRENT_HANDOFF.md) § Device passes owed; *finalize this entry's verification record on
+merge*). Spec: [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 3. **App-layer + Core, no
+schema** (writes through D1's already-sync-tested reconcile paths); no new prod-schema entry. Verification per
+the PR: `check-drift.sh` green, elevated `generic/platform=iOS` app build green, `git diff --check` green.
+
+**What it does.** Re-points the label proposer from the untyped category *tree* to a **typed, visible facet
+vocabulary** and makes accepted suggestions carry stored **identity** through commit instead of path strings.
+`SuggestedLabel` becomes an enum (`.existingCategory(Category)` / `.newChild(NewChild)` / `.loose(String)` /
+`.namespace(Namespace)`); the model proposes against `LabelVocabulary` (visible facets + visible values only —
+hidden rows are deliberately out of scope), and `RecipeRepository.reconcileSuggestedLabels` resolves each to a
+row id and remains the **sole writer** of categories, facets, and joins. `.namespace` literally proposes a new
+`Facet` + its first value. Carrying identity subsumes the old Café/Cafe path-canonicalization (an
+`existingCategory` now holds the real row id). An accepted suggestion that case-insensitively re-matches a
+**hidden** row in its identified facet reuses **and unhides** it — a deliberate re-assignment, not a background
+import resurrecting vocabulary; ordinary imported text does not reactivate hidden rows. Model **proposes**,
+determinism **writes** (D2's boundary, unchanged). PR #269's Findings 1 & 3 were re-pointed, **not** deleted
+(D11). The settled hidden-vocabulary rule was written into **ADR-0049 D11**.
+
+**The review found one regression, fixed in `392618c0`.** The refactor collapsed the harvested-label dedup
+filter and kept only the `tagNames` clause, dropping `categoryNames` — so a suggestion whose display name
+matched a publisher-harvested *category* (both lists become joins at import,
+[RecipeRepository+Import.swift](../YesChefPackage/Sources/YesChefCore/RecipeRepository+Import.swift)) would
+surface a redundant chip for a label the recipe already receives. Not data-corrupting (reconcile dedups by id),
+but it contradicted the retained comment and was *more* likely under the new bare-leaf display name. Codex
+restored the `categoryNames` clause, extracted it into a testable `filteringHarvestedLabels(from:in:)` helper,
+and added the regression test `doesNotSurfaceSuggestionsAlreadyHarvestedAsCategoriesOrTags`. Two narrow
+non-blocking notes left on the record: a hidden diacritic-variant sibling/facet could still slip the
+proposer's diacritic-insensitive guard past reconcile's diacritic-sensitive lookup (single-user, D4 hand-pass
+catches it), and `RecipeListRequest`'s new base order is UUID-arbitrary for any non-re-sorting consumer
+(determinism was the goal).
+
+**Rode along — three Claude-authored recipe-list ordering fixes** (Jon folded them into this PR): a total-order
+final tiebreak on the stable `id` in `RecipeLibraryListState.titleSort` and `RecipeModels`'
+`archivedRecipeRows`, and a deterministic `.order { $0.id }` base fetch in `RecipeListRequest`. All sort modes
+funnel through `titleSort`, so promoting it to a total order closes the non-total-order gap that let Swift's
+non-stable `sort` swap identical-key rows between republishes — the phantom moves an animated `List` diffed
+into an invalid batch update (the `NSInternalInconsistencyException` on deleting archived recipes).
+
+---
 ## ADR-0049 Amendment 2 · Dispatch 2 — category management UI
 
 **Approved (architect review) 2026-08-03; PR [#272](https://github.com/jonphillips/yes-chef/pull/272) OPEN,
@@ -626,6 +669,12 @@ build that PR #249 flagged and deferred. Not caused by this change; **now under 
 **Process note worth keeping.** Amendment 1 shipped as **Proposed**, with a named falsifier and a hard gate that its confirmation happen in a scratch container and explicitly **not** against the live zone. Being wrong therefore cost one evening on two simulators instead of a ~44k-record push and resurrected rows across two real devices. **The gate, not the reasoning, is what made the error cheap** — and the reasoning was a careful read of the right code path that still drew the wrong conclusion about which side wins. Saved as [[restore-is-authoritative]].
 
 **Left open as OQ6, and it is the one thing between this and trusting restore:** after convergence the peer that performed the delete retains `_isDeleted = 1` for six records that are alive locally and carry `lastKnownServerRecord`. Nothing is queued, but a later full re-push could act on those flags and silently re-delete restored data. Own investigation; the two evidence simulators still hold the state. **The real-device pass is held until it is diagnosed**, because a restore now rewrites the live zone and every peer by design.
+
+### OQ6 + OQ7 CLOSED 2026-07-29 (measured; ADR-0030 Amendment 3)
+
+**OQ6 — CONFIRMED data-loss path, mitigated by protocol.** The held tombstone does fire: a peer's **unsent/held** delete that syncs *after* a restore **wins and silently re-deletes the restored record on every peer** (measured E2E). So restore is authoritative **only against settled peer state** — this **bounds** Amendment 2, it does not reverse it. Root cause is upstream SQLiteData tombstone handling — `upsertFromServerRecord` never clears `_isDeleted`, and `syncChanges` sends before it fetches — so **a point-free bug report is owed** (carried as the one loose end in CURRENT_HANDOFF § Ready Efforts). The resting tombstone self-heals on the next relaunch in the ordinary flow; the loss needs a *concurrent* restore. The mitigation is the **enforced restore procedure** (quiesce every peer → restore + re-enable on one device → reinstall the peers), now a NEW SLICE to build; deleting the app drops its unsent CKSyncEngine queue, and the whole mitigation rests on the app-group container clearing on delete (verify once on a throwaway install). The real-device S2 pass stays **held until that slice gates it**.
+
+**OQ7 — CLOSED clean.** Images survive the re-push **byte-intact on the peer**; both asset- and record-level resurrection work. Caveat: a photo *replaced* since the backup resurrects as a **duplicate** (delete-row + insert-row). **Volume** (~2,163 assets at once → CKError 429 shape) stays a **real-device unknown** — keep it in the device pass. Durable takeaway saved as [[restore-is-authoritative]].
 
 ## ADR-0030 S1 — Local backup export: a CloudKit-independent durability net, export half
 

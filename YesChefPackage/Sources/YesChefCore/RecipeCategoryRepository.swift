@@ -781,6 +781,126 @@ private func starterCategoryID(_ ordinal: UInt8) -> UUID {
 }
 
 extension RecipeRepository {
+  /// Applies model suggestions after the ordinary import labels have been reconciled. Suggestions
+  /// carry stored ids where a destination already exists, so a model path is never the writer's
+  /// interface. Reusing a hidden row deliberately makes it visible again: acceptance is an
+  /// explicit re-assignment, not a background import resurrecting vocabulary.
+  static func reconcileSuggestedLabels(
+    _ suggestions: [SuggestedLabel],
+    recipeID: Recipe.ID,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws {
+    guard !suggestions.isEmpty else { return }
+    let existingIDs = try RecipeCategory.where { $0.recipeID.eq(recipeID) }.fetchAll(db).map(\.categoryID)
+    var categoryIDs = existingIDs
+    for suggestion in suggestions {
+      let category = try category(for: suggestion, in: db, now: now, uuid: uuid)
+      categoryIDs.append(category.id)
+    }
+    try reconcileCategoryIDs(categoryIDs, recipeID: recipeID, in: db, uuid: uuid)
+  }
+
+  private static func category(
+    for suggestion: SuggestedLabel,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> Category {
+    switch suggestion {
+    case let .existingCategory(category):
+      guard var stored = try Category.find(category.id).fetchOne(db) else {
+        throw CategoryRepositoryError.categoryNotFound
+      }
+      if let facetID = stored.facetID, var facet = try Facet.find(facetID).fetchOne(db), facet.hidden {
+        facet.hidden = false
+        try Facet.upsert { facet }.execute(db)
+      }
+      if stored.hidden {
+        stored.hidden = false
+        try Category.upsert { stored }.execute(db)
+      }
+      return stored
+
+    case let .newChild(child):
+      guard var facet = try Facet.find(child.facet.id).fetchOne(db) else {
+        throw CategoryRepositoryError.facetNotFound
+      }
+      if facet.hidden {
+        facet.hidden = false
+        try Facet.upsert { facet }.execute(db)
+      }
+      if let parent = child.parentCategory {
+        guard let storedParent = try Category.find(parent.id).fetchOne(db) else {
+          throw CategoryRepositoryError.parentNotFound
+        }
+        guard storedParent.facetID == facet.id else {
+          throw CategoryRepositoryError.parentFacetMismatch
+        }
+      }
+      if var existing = try Category.fetchAll(db).first(where: {
+        $0.facetID == facet.id
+          && $0.parentCategoryID == child.parentCategory?.id
+          && $0.name.caseInsensitiveCompare(child.name) == .orderedSame
+      }) {
+        if existing.hidden {
+          existing.hidden = false
+          try Category.upsert { existing }.execute(db)
+        }
+        return existing
+      }
+      return try CategoryRepository.createCategory(
+        name: child.name,
+        facetID: facet.id,
+        parentCategoryID: child.parentCategory?.id,
+        in: db,
+        now: now,
+        uuid: uuid
+      )
+
+    case let .loose(name):
+      if var existing = try Category.fetchAll(db).first(where: {
+        $0.facetID == nil
+          && $0.parentCategoryID == nil
+          && $0.name.caseInsensitiveCompare(name) == .orderedSame
+      }) {
+        if existing.hidden {
+          existing.hidden = false
+          try Category.upsert { existing }.execute(db)
+        }
+        return existing
+      }
+      return try CategoryRepository.createCategory(
+        name: name,
+        parentCategoryID: nil,
+        in: db,
+        now: now,
+        uuid: uuid
+      )
+
+    case let .namespace(namespace):
+      var facet = try Facet.fetchAll(db).first {
+        $0.name.caseInsensitiveCompare(namespace.facetName) == .orderedSame
+      }
+      if facet == nil {
+        facet = try CategoryRepository.createFacet(
+          name: namespace.facetName,
+          in: db,
+          now: now,
+          uuid: uuid
+        )
+      } else if var existingFacet = facet, existingFacet.hidden {
+        existingFacet.hidden = false
+        try Facet.upsert { existingFacet }.execute(db)
+        facet = existingFacet
+      }
+      guard let facet else { throw CategoryRepositoryError.facetNotFound }
+      let child = SuggestedLabel.NewChild(facet: facet, parentCategory: nil, name: namespace.firstValueName)
+      return try category(for: .newChild(child), in: db, now: now, uuid: uuid)
+    }
+  }
+
   static func reconcileCategoryIDs(
     _ categoryIDs: [Category.ID],
     recipeID: Recipe.ID,
