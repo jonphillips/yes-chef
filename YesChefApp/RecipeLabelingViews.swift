@@ -41,44 +41,39 @@ private struct RecipeTagEditorView: View {
   var body: some View {
     @Bindable var model = model
     let assignedIDs = Set(model.detail?.categories.map(\.id) ?? [])
-    let availableGroupsByID = Dictionary(uniqueKeysWithValues: availableGroups.map { ($0.id, $0) })
 
-    Form {
-      ForEach(groups) { group in
-        Section(group.title) {
-          if group.categories.isEmpty {
-            Text("None")
-              .foregroundStyle(.secondary)
-          } else {
-            WrappingCategoryChips(categories: group.categories) { category in
+    ScrollView {
+      LazyVGrid(
+        columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2),
+        alignment: .leading,
+        spacing: 16
+      ) {
+        ForEach(groups) { group in
+          RecipeTagFacetCard(
+            group: group,
+            availableCategories: availableCategories(for: group),
+            assignedIDs: assignedIDs,
+            onToggle: { category in
+              Task {
+                if assignedIDs.contains(category.id) {
+                  _ = await model.deleteTagButtonTapped(category.id)
+                } else {
+                  _ = await model.addTagButtonTapped(category.id)
+                }
+              }
+            },
+            onRemove: { category in
               Task { _ = await model.deleteTagButtonTapped(category.id) }
             }
-          }
-
-          Menu {
-            ForEach(availableGroupsByID[group.id]?.categories ?? []) { category in
-              Button {
-                Task {
-                  if assignedIDs.contains(category.id) {
-                    _ = await model.deleteTagButtonTapped(category.id)
-                  } else {
-                    _ = await model.addTagButtonTapped(category.id)
-                  }
-                }
-              } label: {
-                Label(
-                  category.name,
-                  systemImage: assignedIDs.contains(category.id) ? "checkmark" : "circle"
-                )
-              }
-            }
-          } label: {
-            Label("Add / Change", systemImage: "plus.circle")
-          }
+          )
         }
       }
+      .padding()
 
-      Section("Suggestions") {
+      VStack(alignment: .leading, spacing: 12) {
+        Text("Suggestions")
+          .font(.headline)
+
         Button {
           model.suggestLabelsButtonTapped()
         } label: {
@@ -117,7 +112,12 @@ private struct RecipeTagEditorView: View {
           .disabled(model.labelState.isSuggesting)
         }
       }
+      .padding()
     }
+  }
+
+  private func availableCategories(for group: RecipeTagGroup) -> [YesChefCore.Category] {
+    availableGroups.first { $0.id == group.id }?.categories ?? []
   }
 
   private var groups: [RecipeTagGroup] {
@@ -179,20 +179,55 @@ private struct RecipeTagGroup: Identifiable {
   var id: String { facetID?.uuidString ?? "loose" }
 }
 
-private struct WrappingCategoryChips: View {
+private struct RecipeTagFacetCard: View {
+  let group: RecipeTagGroup
+  let availableCategories: [YesChefCore.Category]
+  let assignedIDs: Set<YesChefCore.Category.ID>
+  let onToggle: (YesChefCore.Category) -> Void
+  let onRemove: (YesChefCore.Category) -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text(group.title)
+        .font(.headline)
+
+      if group.categories.isEmpty {
+        Text("None")
+          .foregroundStyle(.secondary)
+      } else {
+        VerticalCategoryChips(categories: group.categories, onRemove: onRemove)
+      }
+
+      Divider()
+
+      Menu {
+        ForEach(availableCategories) { category in
+          Button {
+            onToggle(category)
+          } label: {
+            Label(
+              category.name,
+              systemImage: assignedIDs.contains(category.id) ? "checkmark" : "circle"
+            )
+          }
+        }
+      } label: {
+        Label("Add / Change", systemImage: "plus.circle")
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding()
+    .background(.background, in: .rect(cornerRadius: 16))
+  }
+}
+
+private struct VerticalCategoryChips: View {
   let categories: [YesChefCore.Category]
   let onRemove: (YesChefCore.Category) -> Void
 
   var body: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: 8) {
-        chips
-      }
-      .fixedSize(horizontal: true, vertical: false)
-
-      VStack(alignment: .leading, spacing: 8) {
-        chips
-      }
+    VStack(alignment: .leading, spacing: 8) {
+      chips
     }
   }
 
