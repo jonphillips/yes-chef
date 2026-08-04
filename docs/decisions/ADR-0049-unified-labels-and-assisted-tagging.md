@@ -585,3 +585,48 @@ layer up.
 
 - **OQ6 — primary vs secondary value within a facet** (`Cuisine` primary Korean, secondary Mexican) affects
   card display and grouping, not matching. Deferred; no column until a surface wants it.
+
+## Amendment 3 — the labeling surface is a per-recipe **tag editor**, not a batch march; discovery is a **D8 cleanup entry** (2026-08-04)
+
+Status: **Accepted** — 2026-08-04, pre-production, from Jon's device pass on the built S5/S6/D8 tooling
+(commits `012dc1d`/`86d8d44`). **Supersedes D5.3** (the "needs labels" batch queue as the couch tool) and
+**reshapes D5.2** (the suggest-only mini-labeler). The proposer engine (S3), `reconcileSuggestedLabels` (the sole
+writer), the three coverage predicates, and D8 `FacetCoverage` all stay — only the *surfaces* change. No schema.
+
+**Why.** D5.3 scoped the backfill as a guided march reusing the main library filter bar. Built, it (a) clogged
+the compact filter — the coverage filter is always-on with no "None", so the list is never unfiltered — and
+(b) put a tedious "Label Recipes" march in the list toolbar. The march is choreography, and near this kind of
+work the tool beats the choreography ([[automation-decays-near-the-stove]]): Jon wants to *find* under-labeled
+recipes and *edit their tags*, not be marched through a queue.
+
+- **A3-D1 — Retire the batch march and un-clog the main list.** Delete `RecipeLabelBackfillModel` /
+  `RecipeLabelBackfillSheet` and its list-toolbar entry, and **remove the coverage filter from the main
+  `RecipeActiveFilterBar`.** The compact filter bar returns to its pre-backfill shape.
+- **A3-D2 — One labeling surface: a dedicated Tag Editor off recipe detail.** An **"Edit Tags"** action on the
+  recipe detail opens a lightweight editor **separate from Edit Recipe** — honoring D5.2's "not the heavy editor"
+  intent and discharging the latent `REQUIREMENTS_MVP_ROADMAP` "Edit tags/categories" requirement. It shows
+  current assignments **grouped by facet**, adds/deletes inline, and carries a **Suggest** button that runs the
+  proposer and offers accept chips (re-runnable as "suggest more"). This reshapes D5.2's suggest-only
+  `RecipeSuggestedLabelsSheet` into a full manage-tags surface and is the **only** labeling surface — there is no
+  second per-recipe review step.
+- **A3-D3 — Discovery is a D8 cleanup entry point, not a main-list filter.** `FacetCoverage`'s per-facet
+  "N unclassified" becomes tappable → a filtered list of under-labeled recipes → tap a recipe → Edit Tags. The
+  three coverage views (Missing Protein / Missing a primary facet / No editorial labels) live **here** as the
+  list's filter, each a query-time absence predicate — never a persisted `Unclassified`/`Other` row (ADR-0050
+  D7). This is available now, cross-platform, and **graduates into the Power Browser's Unclassified cleanup view
+  later** (ADR-0050 S6, "cleanup entry points promoted out of D8 scaffolding") — same predicate, new host. It
+  resolves the coverage chicken-and-egg: Power-Browser-only discovery would be gated on the very coverage it
+  exists to create.
+- **A3-D4 — The proposer's effort is threaded and raised.** `LabelProposer.call()` hardcodes
+  `reasoningEffort: .low`, which is too weak for the on-device Apple model — it returns an empty suggestion set
+  (valid JSON, so the loud parser stays silent; a chicken recipe yielding nothing is the tell). This is **not**
+  the budget-starves-thinking trap ([[reasoning-budget-starves-output]] is the opposite — high effort under a
+  tight cap). The code already threads `tier` for escalation but not effort; thread effort the same way and run
+  the labeling surfaces at **high** effort (latency is fine — [[personal-app-latency-tolerance]]). User-configurable
+  effort/tier in AI Settings is the eventual home, not a hardcoded constant.
+
+**Consequences.** One labeling surface instead of two; the compact list toolbar and filter stay clean; discovery
+works today without the browser; ADR-0050 S6 inherits the predicate and the entry point rather than reinventing
+them. The couch-scale "few hundred in a sitting" ergonomics D5.3 optimized for are given up deliberately — the
+per-recipe editor is slower per recipe but is the surface Jon will actually use, and the discovery list still
+makes the backlog walkable.

@@ -283,39 +283,46 @@ unbuilt. The engine seams are directly reusable: `LabelProposer.callAsFunction` 
 six facets), and the **sole writer** `RecipeCategoryRepository.reconcileSuggestedLabels(_:recipeID:in:now:uuid:)`
 already takes a `recipeID`, so S5/S6 wire straight into it (capture is currently its only caller).
 
-### The dispatch — S6 + S5 + D8 as one Codex build *(scoped with Jon 2026-08-04; the live target)*
+### The dispatch — REVISED per device pass (ADR-0049 Amendment 3, 2026-08-04)
 
-Jon chose a **single combined dispatch** (all three slices) so everything the run needs lands at once. The three
-share the proposer call, the reconcile write path, and the review-sheet shape (`RecipeCollectionReviewSheet`),
-so they are cohesive, not three PRs' worth of surface.
+**The first build (commits `012dc1d`/`86d8d44`) shipped the D5.3 batch march + a main-filter-bar coverage
+filter. Jon's device pass rejected that shape** — see [ADR-0049 Amendment 3](../decisions/ADR-0049-unified-labels-and-assisted-tagging.md#amendment-3--the-labeling-surface-is-a-per-recipe-tag-editor-not-a-batch-march-discovery-is-a-d8-cleanup-entry-2026-08-04).
+This is now a **revision** dispatch, not a fresh build. What stays: the proposer engine, `reconcileSuggestedLabels`
+(sole writer), the three coverage predicates, `FacetCoverage`. What changes is the *surfaces*. No schema.
 
-- **S6 — the batch queue** *(the substantive half).* One-by-one ADR-0025/0026 curation review over a filtered
-  library set + prefetch of the next recipe's suggestions; on-device tier, no network; reuses `LabelProposer` +
-  `reconcileSuggestedLabels` (the sole writer). This is the couch tool that does the actual backfilling.
-  - **Queue membership is a *selectable* derived coverage filter, not one hardcoded predicate (Jon, 2026-08-04).**
-    Expose the coverage views as options in the reused `RecipeActiveFilterBar`, so Jon picks which gap to work
-    and can tighten the view as coverage climbs. The three ratified views:
-    1. **Missing Protein** — no Protein value (highest-signal, empties cleanly; the sensible default).
-    2. **Missing a primary facet** — missing Protein **OR** Dish Type **OR** Technique (drives all three browse
-       dimensions; never fully empties because Missing ≠ Other).
-    3. **No editorial labels** — zero assignments across the four editorial facets (only truly-untouched recipes).
-  - **All three are query-time absence predicates** over the existing `RecipeCategory`/`facetID` joins — the one
-    genuinely new query capability S6 adds is an **"unclassified-in-facet F"** derived predicate (ADR-0050 D7's
-    "`Cuisine = Unclassified` is a derived query predicate, never a persisted value"). **No schema, no persisted
-    `reviewed`/`Unclassified`/`Other` row.** Consequence Jon accepted: a recipe that legitimately has no value
-    in the active view (a dessert under *Missing Protein*) reappears each run — acceptable for a
-    clear-the-library-once session, and the reviewer just skips it.
-- **S5 — the detail mini-labeler** *(smaller).* Standalone lightweight sheet off the recipe **detail** view
-  (not the editor — D5.2), empty-state "Suggest labels" CTA, re-runnable as "suggest more" on an already-labeled
-  recipe. Same proposer + reconcile seam as S6.
-- **D8 — coverage diagnostics** *(ADR-0050's, dev-only).* Facet coverage, value distribution, the per-facet
-  "unclassified" counts. It is both the labeling work list and the D6 gate's measure, and it also feeds the
-  numeric answer to ADR-0050 **OQ3** (the coverage threshold) once the run is underway.
+- **A3-D1 — un-clog the main list.** Delete `RecipeLabelBackfillModel` / `RecipeLabelBackfillSheet` and the
+  "Label Recipes" list-toolbar entry; **remove the coverage filter from `RecipeActiveFilterBar`.** The compact
+  filter bar returns to its pre-backfill shape.
+- **A3-D2 — the one labeling surface: an "Edit Tags" editor off recipe detail.** Reshape the suggest-only
+  `RecipeSuggestedLabelsSheet` into a lightweight tag editor **separate from Edit Recipe**: current assignments
+  **grouped by facet**, add/delete inline, a **Suggest** button that runs `LabelProposer` and offers accept chips
+  (re-runnable). Commits through `reconcileSuggestedLabels`. This is the *only* labeling surface — no second
+  review step.
+- **A3-D3 — discovery is a D8 cleanup entry.** Make `FacetCoverage`'s per-facet "N unclassified" tappable → a
+  filtered list of under-labeled recipes → tap → Edit Tags. The three coverage views live **here** as the list's
+  filter, each a query-time absence predicate over `RecipeCategory`/`facetID` — never a persisted
+  `Unclassified`/`Other` row (ADR-0050 D7):
+    1. **Missing Protein** — no Protein value (the sensible default).
+    2. **Missing a primary facet** — missing Protein OR Dish Type OR Technique.
+    3. **No editorial labels** — zero assignments across the four editorial facets.
+  Factor one shared "unclassified-in-facet F" predicate that both this list and `FacetCoverage`'s counts call.
+  Consequence Jon accepted: a recipe legitimately empty in the active view (a dessert under *Missing Protein*)
+  reappears each run — fine for a clear-once session; skip it.
+- **A3-D4 — thread and raise proposer effort.** `LabelProposer.call()` hardcodes `reasoningEffort: .low`, too
+  weak for the on-device model (empty suggestions, silent because the array is valid-empty). Thread `effort`
+  through `call`/`callAsFunction` the way `tier` already is, and run the labeling surfaces at **high** effort
+  (latency is fine — [[personal-app-latency-tolerance]]). Verify `filteringHarvestedLabels` isn't eating a valid
+  suggestion. **Not** the budget-starves-thinking case ([[reasoning-budget-starves-output]] is the opposite).
 
-**Then the run** *(Jon, couch work — like Dispatch 4).* Clear the backlog with S6 → coverage rises → the
-[ADR-0050](../decisions/ADR-0050-recipe-power-browser.md) **D6** gate opens → the Power Browser's **S1** (the
-headless query engine) becomes dispatchable.
+**Guardrails unchanged from the first build:** proposer vocabulary + coverage counts see only **visible**
+facets/values (F2 helper, ADR-0049 D11); `reconcileCategories`/`reconcileSuggestedLabels` stay the sole writers;
+coverage predicates work over facet **identity**, not `selectedCategoryNames` strings (don't deepen the OQ2
+stringly path); pure predicate/coverage logic lives in Core, App layer is UI only.
+
+**Then the run** *(Jon, couch work).* Walk the discovery list → Edit Tags per recipe → coverage rises → the
+[ADR-0050](../decisions/ADR-0050-recipe-power-browser.md) **D6** gate opens → the Power Browser's **S1** becomes
+dispatchable, and the discovery list graduates into its Unclassified cleanup view (ADR-0050 S6).
 
 **Verification:** app-layer + Core change → `swift build` the package, **generic app build is required
-evidence**, `scripts/check-drift.sh`. **No schema → no prod-promotion entry and no two-device pass** (every
-write goes through the already-sync-tested `reconcileSuggestedLabels`; reads are derived predicates).
+evidence**, `scripts/check-drift.sh`. **No schema → no prod-promotion entry and no two-device pass** (writes go
+through the already-sync-tested `reconcileSuggestedLabels`; reads are derived predicates).
