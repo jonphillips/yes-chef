@@ -773,17 +773,14 @@ private struct StarterFacetValue {
 
 private let starterCategoryDate = Date(timeIntervalSinceReferenceDate: 0)
 
+// Stable `starterCategoryID` allocation: facets 1–2, 21–24; loose assignments 101–106; values 3–20, 25–73; next value 74.
 private let starterFacets: [StarterFacet] = [
-  .init(
-    facet: Facet(id: starterCategoryID(1), name: "Cuisine", sortOrder: 0, dateCreated: starterCategoryDate),
-    legacyRootCategoryID: starterCategoryID(1),
-    looseAssignmentCategoryID: starterCategoryID(101)
-  ),
-  .init(
-    facet: Facet(id: starterCategoryID(2), name: "Course", sortOrder: 1, dateCreated: starterCategoryDate),
-    legacyRootCategoryID: starterCategoryID(2),
-    looseAssignmentCategoryID: starterCategoryID(102)
-  ),
+  .init(facet: Facet(id: starterCategoryID(1), name: "Cuisine", sortOrder: 0, dateCreated: starterCategoryDate), legacyRootCategoryID: starterCategoryID(1), looseAssignmentCategoryID: starterCategoryID(101)),
+  .init(facet: Facet(id: starterCategoryID(2), name: "Course", sortOrder: 1, dateCreated: starterCategoryDate), legacyRootCategoryID: starterCategoryID(2), looseAssignmentCategoryID: starterCategoryID(102)),
+  .init(facet: Facet(id: starterCategoryID(21), name: "Protein", sortOrder: 2, dateCreated: starterCategoryDate), legacyRootCategoryID: starterCategoryID(21), looseAssignmentCategoryID: starterCategoryID(103)),
+  .init(facet: Facet(id: starterCategoryID(22), name: "Dietary", sortOrder: 3, dateCreated: starterCategoryDate), legacyRootCategoryID: starterCategoryID(22), looseAssignmentCategoryID: starterCategoryID(104)),
+  .init(facet: Facet(id: starterCategoryID(23), name: "Dish Type", sortOrder: 4, dateCreated: starterCategoryDate), legacyRootCategoryID: starterCategoryID(23), looseAssignmentCategoryID: starterCategoryID(105)),
+  .init(facet: Facet(id: starterCategoryID(24), name: "Technique", sortOrder: 5, dateCreated: starterCategoryDate), legacyRootCategoryID: starterCategoryID(24), looseAssignmentCategoryID: starterCategoryID(106)),
 ]
 
 private let starterFacetValues: [StarterFacetValue] = [
@@ -791,7 +788,19 @@ private let starterFacetValues: [StarterFacetValue] = [
   (7, "Italian", 1, 4), (8, "Japanese", 1, 5), (9, "Korean", 1, 6), (10, "Mexican", 1, 7),
   (11, "Thai", 1, 8), (12, "Vietnamese", 1, 9), (13, "Breakfast", 2, 0), (14, "Lunch", 2, 1),
   (15, "Dinner", 2, 2), (16, "Appetizer", 2, 3), (17, "Side Dish", 2, 4), (18, "Dessert", 2, 5),
-  (19, "Snack", 2, 6), (20, "Drink", 2, 7),
+  (19, "Snack", 2, 6), (20, "Drink", 2, 7), (25, "Chicken", 21, 0), (26, "Beef", 21, 1), (27, "Pork", 21, 2), (28, "Lamb", 21, 3),
+  (29, "Fish", 21, 4), (30, "Shellfish", 21, 5), (31, "Turkey", 21, 6), (32, "Duck", 21, 7),
+  (33, "Sausage", 21, 8), (34, "Eggs", 21, 9), (35, "Tofu", 21, 10), (36, "Beans & Legumes", 21, 11),
+  (37, "Vegetarian", 22, 0), (38, "Vegan", 22, 1), (39, "Gluten-Free", 22, 2), (40, "Dairy-Free", 22, 3),
+  (41, "Nut-Free", 22, 4), (42, "Low-Carb", 22, 5), (43, "Paleo", 22, 6), (44, "Pescatarian", 22, 7),
+  (45, "Soup", 23, 0), (46, "Stew", 23, 1), (47, "Salad", 23, 2), (48, "Sandwich", 23, 3),
+  (49, "Pasta", 23, 4), (50, "Pizza", 23, 5), (51, "Taco", 23, 6), (52, "Curry", 23, 7),
+  (53, "Casserole", 23, 8), (54, "Bowl", 23, 9), (55, "Bread", 23, 10), (56, "Dumpling", 23, 11),
+  (57, "Pie", 23, 12), (58, "Cake", 23, 13), (59, "Cookie", 23, 14),
+  (60, "Grill", 24, 0), (61, "Roast", 24, 1), (62, "Braise", 24, 2), (63, "Sear/Sauté", 24, 3),
+  (64, "Fry", 24, 4), (65, "Stir-Fry", 24, 5), (66, "Sous Vide", 24, 6), (67, "Slow Cooker", 24, 7),
+  (68, "Pressure Cooker", 24, 8), (69, "Air Fryer", 24, 9), (70, "Bake", 24, 10), (71, "Smoke", 24, 11),
+  (72, "Steam", 24, 12), (73, "No-Cook", 24, 13),
 ].map { ordinal, name, facetOrdinal, sortOrder in
   StarterFacetValue(
     category: Category(

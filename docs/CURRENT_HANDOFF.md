@@ -6,8 +6,11 @@ Last updated: August 4, 2026. (**ADR-0049 Amendment 2 — the facet model — is
 **owing only its device look on merge** (§ Device passes owed). The only remaining facet work is the **S5/S6
 labeling backfill** = ADR-0050's D6 coverage gate, tracked under ADR-0050. **Prep-plan Slice 3 — refine vs regenerate
 intent** shipped in PR [#265](https://github.com/jonphillips/yes-chef/pull/265) (merged 2026-07-30; the
-handoff bump was missed in-PR and reconciled here) — its record is in [`DONE-LOG.md`](DONE-LOG.md). **Next Up is
-now the editorial-facet seed slice** (OQ4 decided 2026-08-04: Protein/Dietary/Dish Type/Technique) — see § Next Up.)
+handoff bump was missed in-PR and reconciled here) — its record is in [`DONE-LOG.md`](DONE-LOG.md). **The
+editorial-facet seed slice shipped** (OQ4, PR [#277](https://github.com/jonphillips/yes-chef/pull/277), approved
+2026-08-04; light two-device pass owed on merge). **The S5/S6 labeling backfill is now scoped** (with Jon,
+2026-08-04) into **one combined Codex dispatch — S6 batch queue + S5 mini-labeler + ADR-0050 D8 diagnostics** —
+which is **Next Up**. See § Next Up and [`efforts/recipe-facets.md`](efforts/recipe-facets.md) for the brief.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate is **crossed and holding**. We stay in
@@ -20,22 +23,32 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**Live target: seed the editorial facets** (step 1 of the facet labeling backfill — ADR-0050's D6 coverage gate).
-**OQ4 is decided** (2026-08-04): seed **Protein, Dietary, Dish Type, Technique** alongside the existing
-Cuisine/Course — full decision, shapes, and starter values in
-[ADR-0049 Amd 2 § Resolved OQ4](decisions/ADR-0049-unified-labels-and-assisted-tagging.md); scoping/arc in
-[`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Labeling backfill — scoping. **The seed slice is a
-Codex dispatch:** extend the existing `starterFacets` seed (Cuisine/Course) with the four new facets + starter
-values, fixed ids, post-engine, insert-if-absent/idempotent — **no schema change** (`facets` +
-`Category.facetID`/`hidden` already exist); synced-data pass, owes a light two-device pass. Arc after it: **S6
-batch queue → S5 mini-labeler → ADR-0050 D8 diagnostics → Jon's backfill run → Power Browser S1 unblocks.** (Note:
-S5/S6 are **unbuilt** — only the S3 proposer engine + S4 capture exist.) If you need a target beyond the seed
-slice, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
+**The editorial-facet seed shipped** (OQ4, PR [#277](https://github.com/jonphillips/yes-chef/pull/277), approved
+2026-08-04; branch `codex/adr-0049-amd2-o4-editorial-facets`) — **Protein, Dietary, Dish Type, Technique** + all
+49 values now seed alongside Cuisine/Course, fixed ids, post-engine, idempotent, **no schema**. Full record in
+[`DONE-LOG.md`](DONE-LOG.md); **a light two-device convergence pass is owed on merge** (§ Device passes owed).
+
+**Next live target — the labeling-backfill tooling, scoped with Jon 2026-08-04: one combined Codex dispatch of
+S6 + S5 + ADR-0050 D8.** The backfill's two gating prerequisites are **done** — OQ4 decided the editorial
+taxonomy and the seed slice shipped (PR [#277](https://github.com/jonphillips/yes-chef/pull/277)), so all six
+facets exist to label against. What remains is the tooling, then the run. **The full dispatch brief is
+[`efforts/recipe-facets.md`](efforts/recipe-facets.md) § "The dispatch — S6 + S5 + D8".** In short:
+- **S6 batch queue** (the substantive half) — couch review reusing `LabelProposer` +
+  `RecipeCategoryRepository.reconcileSuggestedLabels` (the sole writer, already takes a `recipeID`) +
+  `RecipeCollectionReviewSheet`. **Queue membership is a *selectable* derived coverage filter** in the reused
+  `RecipeActiveFilterBar` — three views (Missing Protein / Missing a primary facet / No editorial labels), all
+  query-time absence predicates, **no persisted `reviewed`/`Unclassified` row** (ADR-0050 D7). The one new query
+  capability is an "unclassified-in-facet" predicate.
+- **S5 mini-labeler** — standalone "Suggest labels" sheet off recipe **detail** (D5.2), same proposer/reconcile seam.
+- **ADR-0050 D8 diagnostics** — dev-only coverage measure; feeds the D6 gate and the OQ3 threshold.
+
+**No schema → no prod-promotion entry, no two-device pass** (writes go through the sync-tested reconcile path).
+Arc after this dispatch: **Jon's backfill run → ADR-0050 D6 gate opens → Power Browser S1 unblocks.**
 
 **ADR-0049 Amendment 2 (the facet model) is complete** — D1–D5 shipped + device-passed, D4 hand pass done, F1/F2
 approved (PR [#276](https://github.com/jonphillips/yes-chef/pull/276), device look owed on merge); full record in
 [`DONE-LOG.md`](DONE-LOG.md). The only remaining facet work is the **S5/S6 labeling backfill** (ADR-0050's D6
-coverage gate), tracked under ADR-0050 — **not** a set target here. D3's settled hidden-vocabulary rule lives in
+coverage gate), now **scoped and Next Up** (see above). D3's settled hidden-vocabulary rule lives in
 ADR-0049 D11.
 
 **⚠️ Jon's outstanding follow-through from ADR-0014 Amd1 (not a dispatch item):** three recipes still carry
@@ -84,9 +97,10 @@ Drawn into **Next Up** as needed; not itself a dispatch target. Completed effort
 
 **[`efforts/recipe-facets.md`](efforts/recipe-facets.md) — ADR-0049 Amendment 2 (the facet model): COMPLETE.**
 D1–D5 + F1/F2 shipped-or-approved, D4 hand pass done — full record in [`DONE-LOG.md`](DONE-LOG.md). **The one
-remaining facet dispatch is the S5/S6 labeling backfill** — re-run the proposer/labeling queue against the real
-facets — which is **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md)'s D6 coverage gate** and the real
-prerequisite for the Power Browser. Scope it under ADR-0050 when it becomes the live target. **F3/OQ5** (retire
+remaining facet dispatch is the S5/S6 labeling-backfill tooling** — now **scoped** (with Jon 2026-08-04) into one
+combined S6 + S5 + ADR-0050 D8 dispatch (brief in this effort doc's § "The dispatch"), which is
+**[ADR-0050](decisions/ADR-0050-recipe-power-browser.md)'s D6 coverage gate** and the real prerequisite for the
+Power Browser. **It is Next Up — no longer needs scoping.** **F3/OQ5** (retire
 the typed freeform Cuisine/Course editor fields, **preserving** the per-facet single-select picker affordance —
 rebind, don't delete) is deferred to ADR-0050 S3.5, do not fold in.
 
@@ -197,6 +211,11 @@ Not work, a checklist.
 
 *(ADR-0049 Amd 2 D1/D2/D3 device passes — PRs #270, #272, #274 — approved 2026-08-04 and removed. D4 hand pass
 done.)*
+
+**[PR #277](https://github.com/jonphillips/yes-chef/pull/277) — ADR-0049 Amd 2 OQ4, editorial facet seed. Core
+only, no schema.** Approved (architect review) 2026-08-04; **light two-device convergence pass owed on merge:**
+back up first, then confirm the four new facets (Protein / Dietary / Dish Type / Technique) and their 49 values
+each appear **once** — not duplicated — on a second device after sync.
 
 **[PR #276](https://github.com/jonphillips/yes-chef/pull/276) — ADR-0049 Amd 2 F1/F2, recipe-facing facet
 surfaces. App + Core, no schema, no two-device pass** (writes/reads only). Approved (architect review)

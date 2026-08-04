@@ -267,43 +267,55 @@ still-multi-capable model is pure UI and does **not** earn the deferred `selecti
 schedule risk": **explicit facets → proposer re-pointed → a real backfill run over the library → the browser.**
 The first two are done (D1 + D3). This section scopes the backfill.
 
-**Build state — the "re-run the S5/S6 queue" framing is inaccurate; there is no queue yet.** Only the S3
+**Prerequisites cleared.** The two gating steps are done: **OQ4** decided the editorial taxonomy
+(**Protein, Dietary, Dish Type, Technique**; Occasion/Season/Featured Ingredient/Practical declined — full
+decision, shapes, the Technique↔Dish Type boundary, and starter values in
+[ADR-0049 Amd 2 § Resolved OQ4](../decisions/ADR-0049-unified-labels-and-assisted-tagging.md)), and the
+**seed slice shipped** (PR [#277](https://github.com/jonphillips/yes-chef/pull/277), approved 2026-08-04): all
+four facets + their 49 values now seed alongside Cuisine/Course, fixed ids, post-`makeSyncEngine`, idempotent,
+no schema. So all six facets exist to label against; **what remains is the tooling, then the run.**
+
+**Build state — the "re-run the S5/S6 queue" framing was always inaccurate; there is no queue yet.** Only the S3
 proposer **engine** (`LabelProposer`) and its S4 **capture** integration are built. **S5 (detail mini-labeler)
-and S6 ("needs labels" batch queue) are NOT built** — confirmed in the app: `LabelProposer` is invoked only from
-the capture flow, there is no detail-view "Suggest labels" CTA and no batch/"needs labels" queue. ADR-0050's D8
-coverage **diagnostics** are also unbuilt (they belong to ADR-0050). So the backfill first needs its *tooling*
-built, then *run*.
+and S6 ("needs labels" batch queue) are NOT built** — `LabelProposer` is invoked only from the capture flow,
+there is no detail-view "Suggest labels" CTA and no batch queue. ADR-0050's D8 coverage **diagnostics** are also
+unbuilt. The engine seams are directly reusable: `LabelProposer.callAsFunction` takes a `LabelVocabulary` (all
+six facets), and the **sole writer** `RecipeCategoryRepository.reconcileSuggestedLabels(_:recipeID:in:now:uuid:)`
+already takes a `recipeID`, so S5/S6 wire straight into it (capture is currently its only caller).
 
-**The gating prerequisite is the editorial taxonomy (Amd 2 OQ4), not the tooling.** The browser's value is
-coverage on **Protein / Dish Type / Technique** — but those facets **do not exist**; D1 seeded only Cuisine and
-Course. You cannot backfill Protein coverage before Protein is a facet. And post-Dispatch-4, Cuisine/Course are
-already largely covered, so a batch queue built today would have almost nothing to chew on. **OQ4 is therefore
-both the gate on the backfill's value and the thing that gives S6 a backlog to clear.** It is a *content* session
-(cost-of-error is real — a bad dimension is hand-re-filed across the library), decided with Jon, seeding the
-chosen facets by fixed id with starter values. Candidates (ADR-0049 Amd 2 OQ4, none ratified): Dish Type,
-Protein, Technique, Featured Ingredient, Dietary, Occasion, Season, Practical.
+### The dispatch — S6 + S5 + D8 as one Codex build *(scoped with Jon 2026-08-04; the live target)*
 
-**The arc, in order:**
+Jon chose a **single combined dispatch** (all three slices) so everything the run needs lands at once. The three
+share the proposer call, the reconcile write path, and the review-sheet shape (`RecipeCollectionReviewSheet`),
+so they are cohesive, not three PRs' worth of surface.
 
-0. **OQ4 — editorial-taxonomy session — ✅ DONE 2026-08-04.** Decided: seed **Protein, Dietary, Dish Type,
-   Technique** (Occasion/Season/Featured Ingredient/Practical declined). Full decision, shapes, the Technique↔Dish
-   Type boundary, and starter values are in [ADR-0049 Amd 2 § Resolved OQ4](../decisions/ADR-0049-unified-labels-and-assisted-tagging.md).
-1. **Seed the editorial facets** *(Codex build — the live target).* One small deterministic slice: extend the
-   existing `starterFacets` seed (Cuisine/Course) with the four new facets + their starter values, fixed ids,
-   post-`makeSyncEngine`, insert-if-absent/idempotent — **no schema change** (`facets` + `Category.facetID`/
-   `hidden` already exist). Same shape and machinery as D1's Cuisine/Course seed. Synced-data pass → owes a light
-   two-device pass (deterministic ids converge; back up first).
-2. **S6 — "needs labels" batch queue** *(Codex build).* Library filter (`RecipeActiveFilterBar`) + one-by-one
-   ADR-0025 curation review + prefetch of the next recipe's suggestions; on-device tier, no network; reuses
-   `LabelProposer` + reconcile (the sole writer). "Needs labels" is a **derived** predicate — a recipe missing a
-   value a primary facet would want — never a persisted `Unclassified`/`Other` row (ADR-0050 D7, "Missing ≠
-   Other"). This is the couch tool that does the actual backfilling.
-3. **S5 — detail mini-labeler** *(Codex build, smaller).* Standalone sheet off the recipe detail, empty-state
-   "Suggest labels" CTA, re-runnable ("suggest more"). Batchable with S6 or a fast-follow.
-4. **ADR-0050 D8 coverage diagnostics** *(Codex build, ADR-0050's).* The labeling work list and the D6 gate's
-   measure; ADR-0050 says ship it early, so it can precede the run to size the job and set the OQ3 threshold.
-5. **The run** *(Jon, couch work — like Dispatch 4).* Clear the backlog with S6 → coverage rises → ADR-0050 D6
-   gate opens → the Power Browser's S1 becomes dispatchable.
+- **S6 — the batch queue** *(the substantive half).* One-by-one ADR-0025/0026 curation review over a filtered
+  library set + prefetch of the next recipe's suggestions; on-device tier, no network; reuses `LabelProposer` +
+  `reconcileSuggestedLabels` (the sole writer). This is the couch tool that does the actual backfilling.
+  - **Queue membership is a *selectable* derived coverage filter, not one hardcoded predicate (Jon, 2026-08-04).**
+    Expose the coverage views as options in the reused `RecipeActiveFilterBar`, so Jon picks which gap to work
+    and can tighten the view as coverage climbs. The three ratified views:
+    1. **Missing Protein** — no Protein value (highest-signal, empties cleanly; the sensible default).
+    2. **Missing a primary facet** — missing Protein **OR** Dish Type **OR** Technique (drives all three browse
+       dimensions; never fully empties because Missing ≠ Other).
+    3. **No editorial labels** — zero assignments across the four editorial facets (only truly-untouched recipes).
+  - **All three are query-time absence predicates** over the existing `RecipeCategory`/`facetID` joins — the one
+    genuinely new query capability S6 adds is an **"unclassified-in-facet F"** derived predicate (ADR-0050 D7's
+    "`Cuisine = Unclassified` is a derived query predicate, never a persisted value"). **No schema, no persisted
+    `reviewed`/`Unclassified`/`Other` row.** Consequence Jon accepted: a recipe that legitimately has no value
+    in the active view (a dessert under *Missing Protein*) reappears each run — acceptable for a
+    clear-the-library-once session, and the reviewer just skips it.
+- **S5 — the detail mini-labeler** *(smaller).* Standalone lightweight sheet off the recipe **detail** view
+  (not the editor — D5.2), empty-state "Suggest labels" CTA, re-runnable as "suggest more" on an already-labeled
+  recipe. Same proposer + reconcile seam as S6.
+- **D8 — coverage diagnostics** *(ADR-0050's, dev-only).* Facet coverage, value distribution, the per-facet
+  "unclassified" counts. It is both the labeling work list and the D6 gate's measure, and it also feeds the
+  numeric answer to ADR-0050 **OQ3** (the coverage threshold) once the run is underway.
 
-**Live target is now step 1 — the seed slice** (OQ4 is decided, so it is dispatchable to Codex). S6 follows,
-because a batch queue is only worth running once the four new facets exist to label against.
+**Then the run** *(Jon, couch work — like Dispatch 4).* Clear the backlog with S6 → coverage rises → the
+[ADR-0050](../decisions/ADR-0050-recipe-power-browser.md) **D6** gate opens → the Power Browser's **S1** (the
+headless query engine) becomes dispatchable.
+
+**Verification:** app-layer + Core change → `swift build` the package, **generic app build is required
+evidence**, `scripts/check-drift.sh`. **No schema → no prod-promotion entry and no two-device pass** (every
+write goes through the already-sync-tested `reconcileSuggestedLabels`; reads are derived predicates).

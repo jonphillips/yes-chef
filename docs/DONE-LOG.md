@@ -9,6 +9,31 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0049 Amendment 2 · OQ4 — editorial facet seed (Protein / Dietary / Dish Type / Technique)
+
+**Approved (architect review) 2026-08-04; PR [#277](https://github.com/jonphillips/yes-chef/pull/277) OPEN,
+branch `codex/adr-0049-amd2-o4-editorial-facets` — light two-device convergence pass owed on merge.** Spec:
+[ADR-0049 Amd 2 § Resolved OQ4](decisions/ADR-0049-unified-labels-and-assisted-tagging.md);
+[`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Labeling backfill. **Core only, no schema, no new
+prod-schema entry** — `facets` + `Category.facetID`/`hidden` are already registered and already on the
+promotion list. Verified per the PR: `swift build` + `CategoryRepositoryTests` (23 tests / 3 suites) green,
+`check-drift.sh` (SwiftLint + 566 Core tests) green; the unskipped run hits the documented pre-existing
+`SQLiteData` dynamic-product linker wall in `YesChefAppTests`, untouched by this Core-only slice
+([[exported-import-not-link-time]]).
+
+**What it does.** Extends the existing `starterFacets`/`starterFacetValues` seed (Cuisine/Course) with the
+four ratified editorial facets and all 49 values, each with a fixed, non-colliding `starterCategoryID`
+ordinal — facets `21–24`, loose-assignment `103–106`, values `25–73`. The seed runs in the **post-engine data
+pass** (`seedStarterFacets`, after `makeSyncEngine`), so its inserts carry `SyncMetadata` and upload, and the
+deterministic ids mean two devices seed identical PKs and CloudKit dedups — the correct pattern per
+[[migration-writes-bypass-sync-triggers]]. Insert-if-absent, so existing libraries gain the four facets
+additively on next launch; non-deletable via `isStarterFacet`. Tests cover stable ids, idempotency (rerun
+seeds nothing, row counts unchanged), non-deletability, and the name-fallback boundary — a user's own
+"Protein" root with a non-starter child is **not** promoted. On review, Codex added an id-allocation-range
+comment above the seed (`… values 3–20, 25–73; next value 74`) so a future value edit can't silently reuse a
+facet ordinal and mint a permanent cross-fleet PK collision.
+
+---
 ## ADR-0049 Amendment 2 · F1 + F2 — recipe-facing facet surfaces (hidden leak + editor grouping)
 
 **Approved (architect review) 2026-08-04; PR [#276](https://github.com/jonphillips/yes-chef/pull/276) OPEN,
