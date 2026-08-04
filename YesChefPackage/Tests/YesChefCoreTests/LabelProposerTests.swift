@@ -38,7 +38,7 @@ extension RecipeCoreTests {
 
       let request = await recorder.first()
       expectNoDifference(request?.tier, .onDevice)
-      expectNoDifference(request?.reasoningEffort, .low)
+      expectNoDifference(request?.reasoningEffort, .high)
       expectNoDifference(request?.maxTokens, LabelProposer.maxTokens)
       #expect(request?.messages.first?.text.contains("Cuisine:\n  - Italian") == true)
       #expect(request?.messages.first?.text.contains("Italian Weeknight Pasta") == true)

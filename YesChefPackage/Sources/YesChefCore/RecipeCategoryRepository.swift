@@ -822,7 +822,7 @@ extension RecipeRepository {
   /// carry stored ids where a destination already exists, so a model path is never the writer's
   /// interface. Reusing a hidden row deliberately makes it visible again: acceptance is an
   /// explicit re-assignment, not a background import resurrecting vocabulary.
-  static func reconcileSuggestedLabels(
+  public static func reconcileSuggestedLabels(
     _ suggestions: [SuggestedLabel],
     recipeID: Recipe.ID,
     in db: Database,
@@ -938,7 +938,7 @@ extension RecipeRepository {
     }
   }
 
-  static func reconcileCategoryIDs(
+  public static func reconcileCategoryIDs(
     _ categoryIDs: [Category.ID],
     recipeID: Recipe.ID,
     in db: Database,

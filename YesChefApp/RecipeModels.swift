@@ -109,6 +109,7 @@ final class RecipeLibraryModel {
     destination = .captureRecipe
   }
 
+
   func webCaptureCompleted(_ result: RecipeImportBundleResult) {
     selectedRecipeID = result.recipeID
     destination = .captureSummary(WebRecipeCaptureSummary(result: result))
@@ -782,6 +783,7 @@ final class RecipeDetailModel {
     case scaling
     case chat(RecipeChatModel)
     case workbench(WorkbenchPresentation)
+    case labelSuggestions
     case repairServeWith(ServeWithRepairPresentation)
     case adjustmentReview(RecipeAdjustmentReviewState)
     case variationEditor(RecipeVariation.ID)
@@ -799,6 +801,8 @@ final class RecipeDetailModel {
   @Dependency(\.defaultSyncEngine) var syncEngine
   @ObservationIgnored
   @Dependency(\.uuid) var uuid
+  @ObservationIgnored
+  @Dependency(\.labelProposer) var labelProposer
   @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
   @ObservationIgnored
@@ -820,6 +824,7 @@ final class RecipeDetailModel {
   var scaleWholePart = 1
   var scaleFraction = ScaleFraction.none
   var adjustmentRestorePoint: RecipeAdjustmentRestorePoint?
+  var labelState = RecipeLabelState()
   @ObservationIgnored let detailFetchAnimationDescription: String
   private var lastAppliedPersistedScale: Double?
   private(set) var seededAskSection: PlaybookSectionKind?

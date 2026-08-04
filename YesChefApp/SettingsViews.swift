@@ -103,6 +103,7 @@ struct SettingsView: View {
         seedCoverageRow
 #if DEBUG
         modelCallInventoryRow
+        facetCoverageRow
 #endif
       }
     }
@@ -317,6 +318,23 @@ struct SettingsView: View {
       }
     }
   }
+
+  @ViewBuilder private var facetCoverageRow: some View {
+    if let selectedPane {
+      Button {
+        selectedPane.wrappedValue = .facetCoverage
+      } label: {
+        SettingsPane.facetCoverage.label
+      }
+      .foregroundStyle(.primary)
+    } else {
+      NavigationLink {
+        FacetCoverageView()
+      } label: {
+        SettingsPane.facetCoverage.label
+      }
+    }
+  }
 #endif
 }
 
@@ -400,6 +418,10 @@ struct SettingsDetailPane: View {
     case .modelCallInventory:
       NavigationStack {
         ModelCallInventoryView()
+      }
+    case .facetCoverage:
+      NavigationStack {
+        FacetCoverageView()
       }
 #endif
     case nil:

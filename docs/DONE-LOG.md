@@ -9,6 +9,60 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0049 Amendment 3 — labeling surfaces revised to Edit Tags + D8 discovery
+
+**Approved (architect review) 2026-08-04; PR [#278](https://github.com/jonphillips/yes-chef/pull/278), branch
+`codex/adr-0049-labeling-backfill`.** Spec: [ADR-0049 Amendment 3](decisions/ADR-0049-unified-labels-and-assisted-tagging.md#amendment-3--the-labeling-surface-is-a-per-recipe-tag-editor-not-a-batch-march-discovery-is-a-d8-cleanup-entry-2026-08-04).
+**App + Core, no schema, prod-schema entry, or two-device pass.**
+
+**What it does.** Retires the batch march and its main-library coverage filter. Recipe detail now owns the one
+labeling surface, **Edit Tags**: it groups current assignments by visible facet, adds/removes assignments inline
+through the existing reconcile path, and keeps accepted high-effort on-device suggestions in the editor. DEBUG
+Facet Coverage turns every facet's unclassified total into a cleanup list; that list also exposes the three D8
+coverage views and opens the same tag editor. The Core predicate is shared by the per-facet counts and discovery;
+hidden vocabulary remains excluded.
+
+**Verification.** `swift build --package-path YesChefPackage`, focused proposer/coverage Core tests, the elevated
+generic iOS build, `scripts/check-drift.sh`, and `git diff --check` are green. Existing unrelated compiler warnings
+remain.
+
+---
+## ADR-0049 S5 + S6 + ADR-0050 D8 — labeling-backfill tooling
+
+**✅ Approved (architect review) 2026-08-04; PR [#278](https://github.com/jonphillips/yes-chef/pull/278)
+OPEN, branch `codex/adr-0049-labeling-backfill` — device look owed on merge (below).** Spec:
+[`efforts/recipe-facets.md`](efforts/recipe-facets.md) § "The dispatch — S6 + S5 + D8". **Core + app, no
+schema, no prod-schema entry, no two-device pass.** The existing `LabelProposer` remains on-device and
+`RecipeRepository.reconcileSuggestedLabels` remains the sole category/join writer.
+
+**What it does.** Adds one Core-derived coverage source shared by all consumers: Missing Protein, Missing a
+Primary Facet, and No Editorial Labels inspect visible `RecipeCategory → Category.facetID` joins at query time;
+hidden facets/values contribute neither vocabulary nor counts. The library exposes those views for a one-at-a-time
+prefetched review queue, while recipe detail gets a re-runnable Suggest Labels sheet. Both retain accepted chips
+as transient selection and commit only accepted typed `SuggestedLabel`s. DEBUG Settings adds facet coverage,
+per-facet unclassified counts, and used-value distribution for the D6 gate/OQ3 measurement.
+
+**Review round — the app target did not compile on first submission.** `swift build --package-path
+YesChefPackage` is green because `reconcileSuggestedLabels` is exercised *inside* Core (`WebRecipeCaptureClient`),
+but the two new callers live in `YesChefApp` — a separate module — so the package build is not App-target
+evidence. The elevated `generic/platform=iOS` build (the required evidence for `YesChefApp/` changes) surfaced
+three errors: `reconcileSuggestedLabels` was `internal`; `RecipeDetailModel` never declared its `labelProposer`
+dependency; and `RecipeLabelBackfillSheet` declared `@Environment(\.dismiss)` as a local **inside** `body`,
+which reads the default no-op `DismissAction` and left the queue's "Done" button dead. Fixed in commit
+`86d8d44` — reconcile made `public`, the dependency added, `dismiss` moved to a stored view property. Architect
+re-ran the elevated build locally → **BUILD SUCCEEDED, 0 errors**; `check-drift.sh` green (retaining the
+pre-existing `RecipeCoreTests.swift` non-optional-`Data`-to-`nil` warning). **Restated lesson: a green package
+build and `swiftc -parse` are not App-target evidence — the generic app build is** (the Verification Pattern's
+own corollary; [[verify-local-fix-reached-merge]]).
+
+**Device look owed on merge** (transient state, so no two-device pass): (a) the detail Suggest Labels sheet and
+the library batch queue present, accept typed suggestions, write them through `reconcileSuggestedLabels`, and
+the queue's **Done** button dismisses (the fixed binding); and (b) **backfill latency** —
+`RecipeFacetCoverageRequest` is an always-on whole-library `@Fetch` in `RecipeLibraryModel`, so every accepted
+label re-runs the full coverage recompute; confirm Save & Next stays snappy across a real run, since this is the
+[[sqlitedata-fetch-writer-convoy]] shape.
+
+---
 ## ADR-0049 Amendment 2 · OQ4 — editorial facet seed (Protein / Dietary / Dish Type / Technique)
 
 **Approved (architect review) 2026-08-04; PR [#277](https://github.com/jonphillips/yes-chef/pull/277) OPEN,
