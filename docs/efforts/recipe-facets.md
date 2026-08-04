@@ -21,8 +21,9 @@ work, not a sign the work went wrong.
 
 ## Dispatches
 
-Four, in order. **D1 is one PR and is unavoidably large** — same reason S1 was: split it and the app's category
-surfaces read a model that no longer exists.
+Five. **D1 is one PR and is unavoidably large** — same reason S1 was: split it and the app's category surfaces
+read a model that no longer exists. D1–D3 are shipped-or-merged. **D5 is a code slice that must land before D4**
+— it is what makes D4's hand pass performable at all (see D5).
 
 ### Dispatch 1 — schema, migration, Core invariants, audit *(the big one)*
 
@@ -74,7 +75,62 @@ resolved against facet identity before reconcile; `.namespace` now literally pro
 
 Review the audit, file the reported ambiguous roots, merge/delete poor starter values, then re-run the S5/S6
 labeling queue against real facets. That backfill is [ADR-0050](../decisions/ADR-0050-recipe-power-browser.md)'s
-D6 gate.
+D6 gate. **Gated on Dispatch 5** — the edit path cannot file a loose label into a facet until D5 ships.
+
+### Dispatch 5 — make facet membership editable *(unblocks D4)*
+
+**Why it exists.** D1 plumbed an explicit `facetID` onto `createCategory` but not `updateCategory`, which derives
+`facetID` from the parent — so a parentless loose label can never be filed into a facet by editing. That is not a
+new decision: **D9 rule 3 already ratifies the "file-under-facet" operation** ("*Nesting under a loose label …
+is an explicit convert-to-facet or file-under-facet operation*"); D1's dispatch simply never plumbed it onto the
+edit path. This is that plumbing. **No schema, no migration, no new synced table, no new invariant.**
+
+**The concrete need this unblocks.** On the real library the D1 migration was a no-op — no `Cuisine`/`Course`
+parent existed to promote, so `promoteNamespaceRootsToFacets` matched nothing and only seeded the starters. The
+result is **15 loose labels shadowing empty starter values**, and each shadow (loose `Chinese`, 66 recipes) is an
+**exact name-collision** with a non-deletable empty starter value (`Cuisine: Chinese`, 0 recipes). The
+consolidation is therefore a **merge on collision**, not a plain move — which is the deterministic reconcile-by-name
+contract the whole subsystem already runs (`reconcileCategories`, `foldDormantTags`, `deduplicateFacetSiblings`),
+applied at the edit boundary. It exposes **no** general "combine two arbitrary categories" verb.
+
+**Core — `RecipeCategoryRepository.updateCategory`:**
+- Add `facetID: Facet.ID?`, replacing the derive-from-existing behaviour. Semantics via the existing
+  `resolvedFacetID`: `parentCategoryID` non-nil → `facetID` must equal the parent's `facetID`; `parentCategoryID`
+  nil → `facetID` is taken as given, `nil` meaning loose label.
+- **Cascade the new `facetID` to all descendants** (the `CategoryHierarchy.descendantIDs(of:in:)` walk
+  `promoteNamespaceRootsToFacets` already uses) whenever it changes, so D9 rule 2 (parent consistency) holds.
+- **Reject a move to `facetID == nil` when the category has children** — loose labels are leaves (D9 rule 3).
+  Reuse `looseLabelsCannotHaveChildren`.
+- **Merge on name-collision in the destination — but only when membership `(facetID, parentCategoryID)` actually
+  changes.** If the move lands on an existing same-name sibling in the destination facet/parent, re-point this
+  category's recipe joins and children into that sibling and delete this row, via the existing **private**
+  `mergeCategory(duplicate: self, into: existing)` — the existing sibling survives, so a non-deletable starter
+  value stays canonical. **A pure in-place rename that collides still throws `duplicateSibling`** (typo guard —
+  the user didn't ask to move). No new error case, no public merge API, `mergeCategory` stays `fileprivate`.
+- Keep all four D9 invariants. `reconcileCategories` stays the sole node creator. The repository must not grow
+  materially — this is a signature change plus a branch, not new machinery.
+
+**App — `CategoryModels.swift` / `CategoryViews.swift`:**
+- `saveCategoryButtonTapped` passes `facetID: editor.facetID` into `updateCategory`.
+- Add a **Group picker** to `CategoryEditorSheet`: the visible facets plus **"No group"** (loose), writing
+  `editor.facetID`. Changing the group **clears** `editor.parentCategoryID`. The Parent section already renders
+  only when `facetID != nil`, so "No group" hides the parent picker — leaf-ness enforced in the UI too. **Moving
+  is allowed for starter categories**; delete guards are unchanged.
+- Surface the thrown error inline (existing `showError`) so a rename-collision explains itself rather than
+  silently no-opping.
+
+**Tests — `RecipeCategoryRepositoryTests`:** loose → facet value; facet value → loose; facet A → facet B; each of
+those with children present (the new `facetID` cascades to descendants; a move-to-loose **with** children is
+rejected); **a move onto an existing same-named value merges** — recipe joins re-pointed, source row deleted, the
+existing (starter) value survives, covering the empty-starter case that is Jon's 15; an **in-place rename** onto
+an existing sibling still throws `duplicateSibling`; a move of a **starter** category is allowed.
+
+**Out of scope:** a general merge-two-arbitrary-categories verb or UI, or exposing `mergeCategory`; anything
+touching the proposer or the D1 migration.
+
+**Verification:** `swift build` the package, **the generic app build is required evidence** (App-layer change —
+see the handoff Verification Pattern), `scripts/check-drift.sh`. **No schema → no prod-promotion entry and no
+two-device pass** — every write goes through D1's already-sync-tested reconcile/merge paths.
 
 ## Guardrails a dispatch must not undo
 
