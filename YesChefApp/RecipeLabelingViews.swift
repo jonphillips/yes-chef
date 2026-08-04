@@ -43,6 +43,13 @@ private struct RecipeTagEditorView: View {
     let assignedIDs = Set(model.detail?.categories.map(\.id) ?? [])
 
     ScrollView {
+      if let title = model.detail?.recipe.title {
+        Text(title)
+          .font(.title2.weight(.semibold))
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding([.horizontal, .top])
+      }
+
       LazyVGrid(
         columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2),
         alignment: .leading,
@@ -74,45 +81,49 @@ private struct RecipeTagEditorView: View {
         Text("Suggestions")
           .font(.headline)
 
-        Button {
-          model.suggestLabelsButtonTapped()
-        } label: {
-          Label(model.labelState.suggestions.isEmpty ? "Suggest" : "Suggest More", systemImage: "sparkles")
-        }
-        .disabled(model.labelState.isSuggesting)
-
         if model.labelState.isSuggesting {
           ProgressView("Suggesting tags")
-        }
-        ForEach(model.labelState.suggestions) { suggestion in
-          if case let .existingCategory(category) = suggestion, assignedIDs.contains(category.id) {
-            HStack {
-              Text(suggestion.reviewTitle)
-              Spacer()
-              Label("Added", systemImage: "checkmark.circle.fill")
-            }
+        } else if model.labelState.suggestions.isEmpty {
+          Text("No tag suggestions")
             .foregroundStyle(.secondary)
-            .accessibilityLabel("\(suggestion.reviewTitle), Added")
-          } else {
-            Button {
-              model.suggestedLabelTapped(suggestion)
-            } label: {
-              Label(
-                suggestion.reviewTitle,
-                systemImage: model.isSuggestedLabelAccepted(suggestion) ? "checkmark.circle.fill" : "circle"
-              )
+        } else {
+          ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+              ForEach(model.labelState.suggestions) { suggestion in
+                if case let .existingCategory(category) = suggestion, assignedIDs.contains(category.id) {
+                  Label(suggestion.reviewTitle, systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.quaternary, in: Capsule())
+                    .accessibilityLabel("\(suggestion.reviewTitle), Added")
+                } else if model.isSuggestedLabelAccepted(suggestion) {
+                  Label(suggestion.reviewTitle, systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.green, in: Capsule())
+                    .accessibilityLabel("\(suggestion.reviewTitle), Added")
+                } else {
+                  Button {
+                    Task { _ = await model.acceptSuggestedLabelButtonTapped(suggestion) }
+                  } label: {
+                    Label(suggestion.reviewTitle, systemImage: "plus.circle")
+                  }
+                  .buttonStyle(.bordered)
+                  .tint(.accentColor)
+                  .controlSize(.small)
+                }
+              }
             }
-            .tint(model.isSuggestedLabelAccepted(suggestion) ? .green : .accentColor)
           }
-        }
-        if model.hasAcceptedSuggestedLabels {
-          Button("Add Selected") {
-            Task { _ = await model.saveSuggestedLabelsButtonTapped() }
-          }
-          .disabled(model.labelState.isSuggesting)
+          .scrollIndicators(.hidden)
         }
       }
       .padding()
+    }
+    .task(id: model.detail?.recipe.id) {
+      model.tagEditorAppeared()
     }
   }
 
