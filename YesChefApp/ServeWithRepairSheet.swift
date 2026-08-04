@@ -1,30 +1,6 @@
-import Foundation
 import SwiftUI
 import UIKit
 import YesChefCore
-
-struct ServeWithRepairPresentation: Identifiable, Equatable {
-  let recipeID: Recipe.ID
-  let recipeTitle: String
-  private let rawData: Data
-
-  var id: Recipe.ID { recipeID }
-
-  var initialText: String {
-    String(data: rawData, encoding: .utf8) ?? rawData.base64EncodedString()
-  }
-
-  var showsBase64Fallback: Bool {
-    String(data: rawData, encoding: .utf8) == nil
-  }
-
-  init?(error: ServeWithCodingError, recipe: Recipe) {
-    guard error.recipeID == recipe.id, let rawData = recipe.serveWith else { return nil }
-    self.recipeID = recipe.id
-    self.recipeTitle = recipe.title
-    self.rawData = rawData
-  }
-}
 
 struct ServeWithRepairSheet: View {
   let presentation: ServeWithRepairPresentation

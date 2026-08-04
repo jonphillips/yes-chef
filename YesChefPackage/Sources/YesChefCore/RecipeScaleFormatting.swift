@@ -1,8 +1,8 @@
 import Foundation
 
-enum ScaleFraction: String, CaseIterable, Identifiable {
+public enum ScaleFraction: String, CaseIterable, Identifiable, Sendable {
   /// Jon's dogfood maximum for a single-serving cocktail batch.
-  static let maximumWholeMultiplier = 30
+  public static let maximumWholeMultiplier = 30
 
   case none
   case oneHalf
@@ -16,9 +16,9 @@ enum ScaleFraction: String, CaseIterable, Identifiable {
   case twoThirds
   case threeFourths
 
-  var id: Self { self }
+  public var id: Self { self }
 
-  var label: String {
+  public var label: String {
     switch self {
     case .none: "-"
     case .oneHalf: "½"
@@ -34,7 +34,7 @@ enum ScaleFraction: String, CaseIterable, Identifiable {
     }
   }
 
-  var value: Double {
+  public var value: Double {
     switch self {
     case .none: 0
     case .oneHalf: 1.0 / 2.0
@@ -51,7 +51,7 @@ enum ScaleFraction: String, CaseIterable, Identifiable {
   }
 
   /// The nine glyphs shared by multiplier rendering and ingredient authoring.
-  static let ingredientInputCases: [Self] = [
+  public static let ingredientInputCases: [Self] = [
     .oneFourth,
     .oneHalf,
     .threeFourths,
@@ -63,11 +63,11 @@ enum ScaleFraction: String, CaseIterable, Identifiable {
     .sevenEighths,
   ]
 
-  static func appending(_ fraction: Self, to ingredientText: String) -> String {
+  public static func appending(_ fraction: Self, to ingredientText: String) -> String {
     ingredientText + fraction.label
   }
 
-  static func nearestSelection(to value: Double) -> (whole: Int, fraction: ScaleFraction) {
+  public static func nearestSelection(to value: Double) -> (whole: Int, fraction: ScaleFraction) {
     var bestWhole = 1
     var bestFraction = ScaleFraction.none
     var bestDistance = Double.greatestFiniteMagnitude
@@ -88,11 +88,11 @@ enum ScaleFraction: String, CaseIterable, Identifiable {
     return (bestWhole, bestFraction)
   }
 
-  static var minimumScale: Double { oneThird.value }
+  public static var minimumScale: Double { oneThird.value }
 }
 
-enum ScaleText {
-  static func factor(_ factor: Double) -> String {
+public enum ScaleText {
+  public static func factor(_ factor: Double) -> String {
     "×\(mixedNumber(factor))"
   }
 
@@ -103,7 +103,7 @@ enum ScaleText {
     return value.formatted(.number.precision(.fractionLength(0...2)))
   }
 
-  static func mixedNumber(_ value: Double) -> String {
+  public static func mixedNumber(_ value: Double) -> String {
     let whole = Int(value.rounded(.down))
     let fractionValue = value - Double(whole)
     let fraction = ScaleFraction.allCases
@@ -121,8 +121,7 @@ enum ScaleText {
     return "\(whole) \(fraction.label)"
   }
 
-  static func servingUnit(_ value: Double) -> String {
+  public static func servingUnit(_ value: Double) -> String {
     value == 1 ? "serving" : "servings"
   }
-
 }

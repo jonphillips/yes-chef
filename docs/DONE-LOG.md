@@ -72,6 +72,23 @@ the queue's **Done** button dismisses (the fixed binding); and (b) **backfill la
 `RecipeFacetCoverageRequest` is an always-on whole-library `@Fetch` in `RecipeLibraryModel`, so every accepted
 label re-runs the full coverage recompute; confirm Save & Next stays snappy across a real run, since this is the
 [[sqlitedata-fetch-writer-convoy]] shape.
+=======
+## App-layer pure logic moved to Core
+
+**✅ Approved (architect review) 2026-08-04; PR [#279](https://github.com/jonphillips/yes-chef/pull/279) OPEN,
+branch `codex/app-tests-to-core-final` — no device pass owed (pure relocation, no behavior change).** Spec:
+[`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md). **Core + app, no schema, no
+prod-schema entry, no device pass.** `RecipeScaleFormatting` and the `@MainActor @Observable`
+`WorkbenchCompareAlignmentModel` now compile in `YesChefCore`, with every app-facing type, initializer,
+property, and method exported `public`. `ServeWithRepairPresentation` was extracted from its SwiftUI sheet into
+Core while the sheet remains in `YesChefApp`.
+
+The associated pure tests moved to `YesChefCoreTests`, so they run in ordinary `swift test`; the remaining
+app-model repair-routing test remains in `YesChefAppTests`. The two redundant app-layer yield-scaling assertions
+were deleted because `RecipeYieldScalingTests` already owns that behavior in Core. `xcodegen generate` was run
+so the Xcode project drops the removed app-target sources and test files. Verification: package build and Core
+tests green (**576 tests**), elevated generic-iOS app build green, `check-drift.sh` green, and `git diff --check`
+green.
 
 ---
 ## ADR-0049 Amendment 2 · OQ4 — editorial facet seed (Protein / Dietary / Dish Type / Technique)
