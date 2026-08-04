@@ -2,9 +2,10 @@
 
 **Status:** Slices 1–2 scoped 2026-07-26 from the PR [#237](https://github.com/jonphillips/yes-chef/pull/237)
 architect review and Jon's device pass; **shipped in PR [#262](https://github.com/jonphillips/yes-chef/pull/262)**
-(day-anchored labels device-confirmed). **Slice 3 scoped 2026-07-30** from the #262 device pass — dispatch-ready,
-its own PR. Slices 1–2 have **no schema**; Slice 3 adds **one column to a local-only table** (no sync, no
-prod-promotion entry — see the slice).
+(day-anchored labels device-confirmed). **Slice 3 scoped 2026-07-30** from the #262 device pass, **shipped in
+PR [#265](https://github.com/jonphillips/yes-chef/pull/265) (merged 2026-07-30).** Slices 1–2 have **no
+schema**; Slice 3 added **one column to a local-only table** (no sync, no prod-promotion entry — see the
+slice). **This effort is fully shipped; see [`DONE-LOG.md`](../DONE-LOG.md) for the S3 record.**
 
 **Owner:** Codex (implement) · Claude (architect/review) · Jon (product/device pass).
 
@@ -125,6 +126,9 @@ pass on iPhone — the editor sheet is a compact-width surface.
 ---
 
 ## SLICE 3 — the omission guard is for accidental drops, not for a regenerate
+
+**✅ SHIPPED — PR [#265](https://github.com/jonphillips/yes-chef/pull/265), merged 2026-07-30.** Record in
+[`DONE-LOG.md`](../DONE-LOG.md). The scoped brief below is retained as-built.
 
 **Scoped 2026-07-30 from the #262 device pass.** Slice 1 works: on the placed NJ-Avalon menu the bands came
 back day-anchored ("Previous Saturday afternoon", "Previous Sunday"). But regenerating the plan lit up the

@@ -290,6 +290,15 @@ private struct CategoryEditorSheet: View {
         StackedTextField(title: "Name", text: $editor.name)
       }
 
+      Section("Group") {
+        Picker("Group", selection: $editor.facetID) {
+          Text("No Group").tag(Facet.ID?.none)
+          ForEach(model.visibleFacets) { facet in
+            Text(facet.name).tag(Optional(facet.id))
+          }
+        }
+      }
+
       if editor.facetID != nil {
         Section("Parent") {
           Button {
@@ -323,6 +332,10 @@ private struct CategoryEditorSheet: View {
     }
     .navigationTitle(editorTitle)
     .navigationBarTitleDisplayMode(.inline)
+    .onChange(of: editor.facetID) { oldFacetID, newFacetID in
+      guard oldFacetID != newFacetID else { return }
+      editor.parentCategoryID = nil
+    }
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {
         Button("Cancel") {

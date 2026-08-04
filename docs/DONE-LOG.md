@@ -159,6 +159,44 @@ implemented in this PR.** Amendment 2 then **absorbed** it: the teardown ships i
 [#270](https://github.com/jonphillips/yes-chef/pull/270)), not as a separate synced data pass — see the entry
 above.
 
+## Prep-plan Slice 3 — the omission guard follows refine vs regenerate intent
+
+**✅ Merged 2026-07-30.** PR [#265](https://github.com/jonphillips/yes-chef/pull/265) "Prep plan · S3 —
+Regenerate intent", branch `codex/prep-plan-regenerate-intent`. Spec:
+[`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) § Slice 3. **One
+column on the local-only `aiHandoffs` table, no sync, no prod-schema-promotion entry** — a plain local
+migration ([[migration-writes-bypass-sync-triggers]] is about synced tables and does not bite here); **no
+two-device pass**. Verification per the PR: `check-drift.sh` green, elevated `generic/platform=iOS` app build
+green, `git diff --check` green.
+
+**The problem it closed.** Slice 1's day-anchored session labels *guaranteed* the "Review omitted steps before
+saving" banner would fire on the first post-Slice-1 regenerate of any pre-Slice-1 plan:
+`omittedCurrentPrepStepEvidence` diffs on exact `PrepPlanStepVisibleContent` (`session` + `task` + `serves`),
+and a regenerate legitimately rewrites both the `session` labels (Slice 1's whole purpose) and the `task`
+prose — so 100% of prior steps read as "missing." The guard was answering the wrong question: its
+accidental-drop protection only makes sense against an edit meant to be **incremental**, and a regenerate is
+wholesale replacement.
+
+**The fix — intent, not transport, drives the baseline.** A `.refine` / `.regenerate` intent threads into
+`AIHandoffReviewStager.menuReview` for both the onboard button and the outboard paste door. **Refine** keeps
+the current-plan baseline and the loud omission + dropped-link guards (byte-for-byte unchanged — this is the
+ADR-0040 lossless-or-loud protection). **Regenerate** uses an **empty** baseline, so `omittedCurrentPrepStepEvidence`
+and `droppedSourceDishEvidence` both return `[]`, `advisoryNotes` is empty, and the review presents as a clean
+replacement with a positive "replaces your N-step plan" confirmation instead of the alarming omission
+language. Intent is **threaded, never inferred** from how many steps happen to match — that heuristic *is* the
+bug. New `aiHandoffs.regenerates: Bool` (default `false` → every existing row reads as `.refine`) ferries
+intent across the copy→paste gap for the outboard round-trip **only**; the onboard transient handoff carries it
+as a plain in-memory parameter. App layer: `regeneratePrepPlan()` stamps `.regenerate`; the chat Apply/Finalize
+path stays `.refine`; a new **"Handoff to Regenerate"** action sits beside "Handoff Prep" in the prep-plan `…`
+menu. Tests cover refine/regenerate staging, the intent round-trip on the row, the migration default, and the
+positive review wording (across `AIHandoffMenuPasteTests`, `AIHandoffAdvisoryTests`, `DatabaseBackupTests`, new
+`AIHandoffMenuPrepPlanReview.swift`).
+
+**Doc-hygiene note:** the CURRENT_HANDOFF bump did not ride in PR #265 as convention expects
+([[handoff-bump-rides-in-slice-pr]]) — this entry and the handoff/effort-doc removals were reconciled
+2026-08-03 once the omission was caught.
+
+---
 ## Prep-plan Slices 1–2 — the menu's dates reach the model; `sourceDish` becomes human-settable
 
 **Device-confirmed 2026-07-30 (day-anchored labels); PR [#262](https://github.com/jonphillips/yes-chef/pull/262),

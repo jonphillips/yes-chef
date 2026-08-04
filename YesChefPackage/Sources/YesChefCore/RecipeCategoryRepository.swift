@@ -462,6 +462,7 @@ public enum CategoryRepository {
   public static func updateCategory(
     categoryID: Category.ID,
     name: String,
+    facetID: Facet.ID?,
     parentCategoryID: Category.ID?,
     in db: Database
   ) throws {
@@ -470,19 +471,40 @@ public enum CategoryRepository {
     let name = try normalizedName(name)
     let facets = try Facet.fetchAll(db)
     let resolvedFacetID = try resolvedFacetID(
-      facetID: category.facetID,
+      facetID: facetID,
       parentCategoryID: parentCategoryID,
       categories: categories,
       facets: facets
     )
+    guard parentCategoryID == nil || facetID == resolvedFacetID else {
+      throw CategoryRepositoryError.parentFacetMismatch
+    }
     try validateMove(categoryID: categoryID, parentCategoryID: parentCategoryID, categories: categories)
-    try validateUniqueSiblingName(
-      name,
-      facetID: resolvedFacetID,
-      parentCategoryID: parentCategoryID,
-      excluding: categoryID,
-      categories: categories
-    )
+    let descendantIDs = CategoryHierarchy.descendantIDs(of: categoryID, in: categories)
+    guard resolvedFacetID != nil || descendantIDs.isEmpty else {
+      throw CategoryRepositoryError.looseLabelsCannotHaveChildren
+    }
+    let membershipChanged = category.facetID != resolvedFacetID || category.parentCategoryID != parentCategoryID
+    if category.facetID != resolvedFacetID {
+      for descendant in categories where descendantIDs.contains(descendant.id) {
+        try Category.find(descendant.id).update { $0.facetID = resolvedFacetID }.execute(db)
+      }
+    }
+    let existingSibling = categories.first {
+      $0.id != categoryID
+        && $0.facetID == resolvedFacetID
+        && $0.parentCategoryID == parentCategoryID
+        && $0.name.caseInsensitiveCompare(name) == .orderedSame
+    }
+
+    if let existingSibling {
+      guard membershipChanged else {
+        throw CategoryRepositoryError.duplicateSibling(name: name)
+      }
+      _ = try mergeCategory(category, into: existingSibling, in: db)
+      return
+    }
+
     try Category.find(category.id).update {
       $0.name = name
       $0.facetID = resolvedFacetID

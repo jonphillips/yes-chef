@@ -6,8 +6,10 @@ Last updated: August 3, 2026. (**ADR-0049 Amendment 2 D1 — facets** is MERGED 
 **owes a two-device convergence + audit-review pass** (§ Device passes owed). **D2 — category management UI** (PR
 [#272](https://github.com/jonphillips/yes-chef/pull/272)) and **D3 — proposer re-point** (PR
 [#274](https://github.com/jonphillips/yes-chef/pull/274)) are both **approved (architect review) and open**, each
-owing only Jon's device UI look. **D4** is Jon's hand pass, gated on the #270 device convergence. **New live
-target: Prep-plan Slice 3 — refine vs regenerate intent** (see Next Up).)
+owing only Jon's device UI look. **D4** is Jon's hand pass, gated on the #270 device convergence. **Prep-plan Slice 3 — refine vs regenerate
+intent** shipped in PR [#265](https://github.com/jonphillips/yes-chef/pull/265) (merged 2026-07-30; the
+handoff bump was missed in-PR and reconciled here) — its record is in [`DONE-LOG.md`](DONE-LOG.md). **Next Up
+is intentionally not re-set here** — another session is choosing the next dispatch target.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate is **crossed and holding**. We stay in
@@ -20,19 +22,11 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**ONE live dispatch target:
-[`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) § Slice 3 — refine vs
-regenerate intent** (scoped 2026-07-30, dispatch-ready; full brief in the effort doc). Dispatch with *"Do
-**Prep-plan Slice 3** (refine vs regenerate intent) from `docs/CURRENT_HANDOFF.md`."* If this section is empty
-or missing, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
-
-Regenerating a prep plan floods "Review omitted steps" because the omission diff keys on exact
-`session`+`task`+`serves` and a regenerate legitimately rewrites both. Fix: the baseline follows **intent**, not
-the transport — refine keeps the current-plan baseline and the loud guard; regenerate uses an **empty** baseline
-and a light "replaces your N-step plan" confirmation. **One column on the local-only `aiHandoffs` table**
-(`regenerates: Bool`, for the outboard copy→paste round-trip only — **not synced, no prod entry**). Do **not**
-infer intent from how many steps match (that heuristic *is* the bug), don't add fuzzy matching to the refine
-diff, don't touch Slice 1's storage. Local migration → **no two-device pass**.
+**No live dispatch target is set here** — Prep-plan Slice 3 (the previous target) shipped in PR
+[#265](https://github.com/jonphillips/yes-chef/pull/265) (merged 2026-07-30, record in
+[`DONE-LOG.md`](DONE-LOG.md)), and **another session is choosing the next target** — do not infer or claim one
+from this file. If you have arrived here for a fresh dispatch and this section still names no target, **STOP
+and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
 **ADR-0049 Amendment 2 is D1–D3 shipped-or-approved** (D1 merged #270+#271; D2 #272 and D3 #274 approved +
 open, owing only Jon's device look). **D4 — Jon's hand pass** (not a dispatch: review the audit, file ambiguous
@@ -94,17 +88,6 @@ vocabulary in the prompt, `.namespace` literally proposes a `Facet` row, PR #269
 **not** deleted; the settled hidden-vocabulary rule is now ADR-0049 D11; owes only Jon's device look. **D4 —
 Jon's hand pass** (not a dispatch: review the audit, file ambiguous roots, merge/delete poor starter values,
 then re-run the S5/S6 labeling backfill — ADR-0050's D6 coverage gate).
-
-**[`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) § Slice 3 — refine
-vs regenerate intent (scoped 2026-07-30, dispatch-ready; full brief in the effort doc).** Regenerating a prep
-plan floods "Review omitted steps" because the omission diff keys on exact `session`+`task`+`serves` and a
-regenerate legitimately rewrites both. Fix: the baseline follows **intent**, not the transport — refine keeps
-the current-plan baseline and the loud guard; regenerate uses an **empty** baseline and a light "replaces your
-N-step plan" confirmation. **One column on the local-only `aiHandoffs` table** (`regenerates: Bool`, for the
-outboard copy→paste round-trip only — **not synced, no prod entry**, deterministic-UUID/post-engine rules do
-not apply). Do **not** infer intent from how many steps match (that heuristic *is* the bug), don't add fuzzy
-matching to the refine diff, don't touch Slice 1's storage. Local migration → **no two-device pass**. *(Now the
-live Next Up target — see § Next Up.)*
 
 **[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md) — ATK's "Gather Your
 Ingredients" is a latent grocery bug (scoped 2026-07-28). P1 only; **no schema**.** 101 shoppable ingredient
