@@ -231,6 +231,84 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func deterministicFloorFindsOnlySurfaceEvidentKFCLabels() {
+      let protein = Facet(id: SampleUUIDSequence.uuid(70_301), name: "Protein", sortOrder: 0, dateCreated: .distantPast)
+      let technique = Facet(id: SampleUUIDSequence.uuid(70_302), name: "Technique", sortOrder: 1, dateCreated: .distantPast)
+      let dishType = Facet(id: SampleUUIDSequence.uuid(70_303), name: "Dish Type", sortOrder: 2, dateCreated: .distantPast)
+      let cuisine = Facet(id: SampleUUIDSequence.uuid(70_304), name: "Cuisine", sortOrder: 3, dateCreated: .distantPast)
+      let chicken = Category(id: SampleUUIDSequence.uuid(70_305), name: "Chicken", facetID: protein.id, sortOrder: 0, dateCreated: .distantPast)
+      let eggs = Category(id: SampleUUIDSequence.uuid(70_306), name: "Eggs", facetID: protein.id, sortOrder: 1, dateCreated: .distantPast)
+      let fry = Category(id: SampleUUIDSequence.uuid(70_307), name: "Fry", facetID: technique.id, sortOrder: 0, dateCreated: .distantPast)
+      let salad = Category(id: SampleUUIDSequence.uuid(70_308), name: "Salad", facetID: dishType.id, sortOrder: 0, dateCreated: .distantPast)
+      let american = Category(id: SampleUUIDSequence.uuid(70_309), name: "American", facetID: cuisine.id, sortOrder: 0, dateCreated: .distantPast)
+      let favorite = Category(id: SampleUUIDSequence.uuid(70_310), name: "Favorite", sortOrder: 0, dateCreated: .distantPast)
+
+      let suggestions = LabelProposer.floor(
+        recipe: .init(
+          title: "KFC Fried Chicken",
+          ingredientLines: ["1 whole chicken", "2 eggs, beaten for the breading"]
+        ),
+        vocabulary: .init(
+          facets: [protein, technique, dishType, cuisine],
+          categories: [chicken, eggs, fry, salad, american, favorite]
+        )
+      )
+
+      expectNoDifference(suggestions, [.existingCategory(chicken), .existingCategory(fry)])
+    }
+
+    @Test
+    func deterministicFloorPrefersStirFriedOverFry() {
+      let technique = Facet(id: SampleUUIDSequence.uuid(70_321), name: "Technique", sortOrder: 0, dateCreated: .distantPast)
+      let fry = Category(id: SampleUUIDSequence.uuid(70_322), name: "Fry", facetID: technique.id, sortOrder: 0, dateCreated: .distantPast)
+      let stirFry = Category(id: SampleUUIDSequence.uuid(70_323), name: "Stir-Fry", facetID: technique.id, sortOrder: 1, dateCreated: .distantPast)
+
+      let suggestions = LabelProposer.floor(
+        recipe: .init(title: "Stir-Fried Chicken"),
+        vocabulary: .init(facets: [technique], categories: [fry, stirFry])
+      )
+
+      expectNoDifference(suggestions, [.existingCategory(stirFry)])
+    }
+
+    @Test
+    func liveProposalUnionsTheFloorWithTheModelAndRecordsSources() async throws {
+      let protein = Facet(id: SampleUUIDSequence.uuid(70_341), name: "Protein", sortOrder: 0, dateCreated: .distantPast)
+      let technique = Facet(id: SampleUUIDSequence.uuid(70_342), name: "Technique", sortOrder: 1, dateCreated: .distantPast)
+      let cuisine = Facet(id: SampleUUIDSequence.uuid(70_343), name: "Cuisine", sortOrder: 2, dateCreated: .distantPast)
+      let chicken = Category(id: SampleUUIDSequence.uuid(70_344), name: "Chicken", facetID: protein.id, sortOrder: 0, dateCreated: .distantPast)
+      let fry = Category(id: SampleUUIDSequence.uuid(70_345), name: "Fry", facetID: technique.id, sortOrder: 0, dateCreated: .distantPast)
+      let american = Category(id: SampleUUIDSequence.uuid(70_346), name: "American", facetID: cuisine.id, sortOrder: 0, dateCreated: .distantPast)
+      let vocabulary = LabelVocabulary(facets: [protein, technique, cuisine], categories: [chicken, fry, american])
+
+      let proposal = try await withDependencies {
+        $0.modelClient = StubModelClient { _ in
+          ModelResponse(
+            text: #"{"suggestions":[{"kind":"existingCategory","path":["Protein","Chicken"]},{"kind":"existingCategory","path":["Cuisine","American"]}]}"#,
+            responseFormatStatus: .structured
+          )
+        }
+        $0.labelProposer = .liveValue
+      } operation: {
+        try await LabelProposer.liveValue(
+          recipe: .init(title: "KFC Fried Chicken", ingredientLines: ["1 whole chicken"]),
+          vocabulary: vocabulary
+        )
+      }
+
+      expectNoDifference(proposal.accepted, [
+        .existingCategory(chicken),
+        .existingCategory(fry),
+        .existingCategory(american),
+      ])
+      expectNoDifference(proposal.sources, [
+        SuggestedLabel.existingCategory(chicken).id: .deterministic,
+        SuggestedLabel.existingCategory(fry).id: .deterministic,
+        SuggestedLabel.existingCategory(american).id: .model,
+      ])
+    }
+
+    @Test
     func truncatedResponseFailsLoudly() async {
       let callRecords = ModelCallRecordCollector()
 
