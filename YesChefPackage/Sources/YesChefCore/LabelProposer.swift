@@ -353,11 +353,11 @@ extension LabelProposer: DependencyKey {
       }
     }
 
+    // These are English starter-facet names. A user rename deliberately opts that facet out of
+    // this best-effort floor; the model proposal remains available for it.
     if let protein = categories(inFacetNamed: "Protein", vocabulary: vocabulary) {
       let primaryIngredient = recipe.ingredientLines.first ?? ""
-      append(protein.filter {
-        containsWholeWords($0.name, in: recipe.title) || containsWholeWords($0.name, in: primaryIngredient)
-      })
+      append(protein.filter { containsWholeWords($0.name, in: primaryIngredient) })
     }
 
     if let technique = categories(inFacetNamed: "Technique", vocabulary: vocabulary) {

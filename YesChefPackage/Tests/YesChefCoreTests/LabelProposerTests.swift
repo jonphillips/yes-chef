@@ -258,6 +258,22 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func deterministicFloorDoesNotInferChickenFromChickenFriedSteakTitle() {
+      let protein = Facet(id: SampleUUIDSequence.uuid(70_311), name: "Protein", sortOrder: 0, dateCreated: .distantPast)
+      let chicken = Category(id: SampleUUIDSequence.uuid(70_312), name: "Chicken", facetID: protein.id, sortOrder: 0, dateCreated: .distantPast)
+
+      let suggestions = LabelProposer.floor(
+        recipe: .init(
+          title: "Chicken-Fried Steak",
+          ingredientLines: ["2 pounds beef cube steak"]
+        ),
+        vocabulary: .init(facets: [protein], categories: [chicken])
+      )
+
+      expectNoDifference(suggestions, [])
+    }
+
+    @Test
     func deterministicFloorPrefersStirFriedOverFry() {
       let technique = Facet(id: SampleUUIDSequence.uuid(70_321), name: "Technique", sortOrder: 0, dateCreated: .distantPast)
       let fry = Category(id: SampleUUIDSequence.uuid(70_322), name: "Fry", facetID: technique.id, sortOrder: 0, dateCreated: .distantPast)
