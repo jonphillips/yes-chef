@@ -773,6 +773,7 @@ private struct StarterFacetValue {
 
 private let starterCategoryDate = Date(timeIntervalSinceReferenceDate: 0)
 
+// Stable `starterCategoryID` allocation: facets 1–2, 21–24; loose assignments 101–106; values 3–20, 25–73; next value 74.
 private let starterFacets: [StarterFacet] = [
   .init(facet: Facet(id: starterCategoryID(1), name: "Cuisine", sortOrder: 0, dateCreated: starterCategoryDate), legacyRootCategoryID: starterCategoryID(1), looseAssignmentCategoryID: starterCategoryID(101)),
   .init(facet: Facet(id: starterCategoryID(2), name: "Course", sortOrder: 1, dateCreated: starterCategoryDate), legacyRootCategoryID: starterCategoryID(2), looseAssignmentCategoryID: starterCategoryID(102)),
