@@ -184,6 +184,7 @@ final class RecipeLabelBackfillModel {
 }
 
 struct RecipeLabelBackfillSheet: View {
+  @Environment(\.dismiss) private var dismiss
   @State private var model: RecipeLabelBackfillModel
   let coverageView: RecipeFacetCoverageView
 
@@ -193,8 +194,6 @@ struct RecipeLabelBackfillSheet: View {
   }
 
   var body: some View {
-    @Environment(\.dismiss) var dismiss
-
     NavigationStack {
       Group {
         if model.isLoading {

@@ -808,6 +808,8 @@ final class RecipeDetailModel {
   @ObservationIgnored
   @Dependency(\.uuid) var uuid
   @ObservationIgnored
+  @Dependency(\.labelProposer) var labelProposer
+  @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
   @ObservationIgnored
   @Fetch var workbenchCandidateLinks: [WorkbenchCandidateLink] = []
