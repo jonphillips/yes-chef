@@ -77,6 +77,20 @@ private extension ModelCallInventory.Entry {
     Self.layersDescription(record.contextLayers.omitted)
   }
 
+  var responseFormatDescription: String {
+    guard record.responseFormatAttached else { return "Not requested" }
+    switch record.responseFormatOutcome {
+    case .structuredHit:
+      return "Structured hit"
+    case .fellBack:
+      return "Readable fallback"
+    case .unreadable:
+      return "Unreadable"
+    case nil:
+      return "Pending"
+    }
+  }
+
   private static func layersDescription(_ layers: Set<ModelCallContextLayer>) -> String {
     guard !layers.isEmpty else { return "None" }
     return layers.map(\.rawValue).sorted().joined(separator: ", ")
@@ -99,6 +113,7 @@ private struct ModelCallInventoryRow: View {
       LabeledContent("Input", value: "\(entry.record.inputCharacterCount) characters")
       LabeledContent("Budget", value: "\(entry.record.maxTokens) tokens")
       LabeledContent("Effort", value: entry.record.reasoningEffort?.rawValue ?? "default")
+      LabeledContent("Structured output", value: entry.responseFormatDescription)
     }
     .padding(.vertical, 4)
   }

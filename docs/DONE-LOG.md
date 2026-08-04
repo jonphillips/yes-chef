@@ -9,6 +9,17 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0004 S4 — LabelProposer structured-output opt-in
+
+**Implemented on the ADR-0004 S4 follow-up PR, pending review, 2026-08-04.**
+`LabelProposer` now attaches the portable `label_suggestions` JSON Schema to its `ModelCall`, while retaining the
+English JSON instruction as the fallback floor. The proposal's `ModelCallRecord` records both structured intent and
+the parser-verified result: structured hit, readable fallback, or unreadable. DEBUG Model Calls renders that state
+for reliability measurement. Verified before handoff: `swift build --package-path YesChefPackage`, `swift test
+--package-path YesChefPackage`, and the elevated generic-iOS app build are green; `scripts/check-drift.sh` and
+`git diff --check` remain required final PR evidence.
+
+---
 ## ADR-0049 Amendment 3 — labeling surfaces revised to Edit Tags + D8 discovery
 
 **Approved (architect review) 2026-08-04; PR [#278](https://github.com/jonphillips/yes-chef/pull/278), branch

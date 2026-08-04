@@ -15,6 +15,10 @@ public struct ModelCallRecord: Equatable, Sendable {
   public let inputCharacterCount: Int
   public let maxTokens: Int
   public let reasoningEffort: ReasoningEffort?
+  /// Whether this call asked the provider-neutral seam for structured output.
+  public let responseFormatAttached: Bool
+  /// The parser-verified outcome for a structured-output call, when it has completed.
+  public let responseFormatOutcome: ModelCallResponseFormatOutcome?
 
   public init(
     surface: ModelCallSurface,
@@ -25,7 +29,9 @@ public struct ModelCallRecord: Equatable, Sendable {
     contextLayers: ModelCallContextLayers,
     inputCharacterCount: Int,
     maxTokens: Int,
-    reasoningEffort: ReasoningEffort?
+    reasoningEffort: ReasoningEffort?,
+    responseFormatAttached: Bool = false,
+    responseFormatOutcome: ModelCallResponseFormatOutcome? = nil
   ) {
     self.surface = surface
     self.task = task
@@ -36,7 +42,16 @@ public struct ModelCallRecord: Equatable, Sendable {
     self.inputCharacterCount = inputCharacterCount
     self.maxTokens = maxTokens
     self.reasoningEffort = reasoningEffort
+    self.responseFormatAttached = responseFormatAttached
+    self.responseFormatOutcome = responseFormatOutcome
   }
+}
+
+/// The app-level, parser-verified result of a structured-output request.
+public enum ModelCallResponseFormatOutcome: String, Equatable, Sendable {
+  case structuredHit
+  case fellBack
+  case unreadable
 }
 
 public enum ModelCallSurface: String, Equatable, Sendable {
@@ -227,7 +242,8 @@ public struct ModelCall: Sendable {
     webSearchMaxUses: Int? = nil,
     reasoningEffort: ReasoningEffort? = nil,
     promptPreferenceKey: String? = nil,
-    continuationToken: ModelContinuationToken? = nil
+    continuationToken: ModelContinuationToken? = nil,
+    responseFormat: ModelResponseFormat = .text
   ) {
     let request = ModelRequest(
       tier: tier,
@@ -238,7 +254,8 @@ public struct ModelCall: Sendable {
       webSearchMaxUses: webSearchMaxUses,
       reasoningEffort: reasoningEffort,
       promptPreferenceKey: promptPreferenceKey,
-      continuationToken: continuationToken
+      continuationToken: continuationToken,
+      responseFormat: responseFormat
     )
     self.request = request
     self.record = ModelCallRecord(
@@ -250,7 +267,8 @@ public struct ModelCall: Sendable {
       contextLayers: contextLayers,
       inputCharacterCount: Self.inputCharacterCount(of: request),
       maxTokens: maxTokens,
-      reasoningEffort: reasoningEffort
+      reasoningEffort: reasoningEffort,
+      responseFormatAttached: responseFormat != .text
     )
   }
 
@@ -267,7 +285,8 @@ public struct ModelCall: Sendable {
     webSearchMaxUses: Int? = nil,
     reasoningEffort: ReasoningEffort? = nil,
     promptPreferenceKey: String? = nil,
-    continuationToken: ModelContinuationToken? = nil
+    continuationToken: ModelContinuationToken? = nil,
+    responseFormat: ModelResponseFormat = .text
   ) {
     self.init(
       surface: surface,
@@ -282,7 +301,8 @@ public struct ModelCall: Sendable {
       webSearchMaxUses: webSearchMaxUses,
       reasoningEffort: reasoningEffort,
       promptPreferenceKey: promptPreferenceKey,
-      continuationToken: continuationToken
+      continuationToken: continuationToken,
+      responseFormat: responseFormat
     )
   }
 
@@ -290,6 +310,29 @@ public struct ModelCall: Sendable {
     @Dependency(\.modelCallRecordSink) var recordSink
     await recordSink.record(record)
     return try await modelClient.complete(request)
+  }
+
+  /// Completes a structured-output call and records the parser-verified result.
+  /// A backend fallback that remains readable is distinguished from an unreadable
+  /// response, which keeps on-device reliability measurable.
+  public func complete<Result: Sendable>(
+    using modelClient: any ModelClient,
+    decodingResponseFormat decode: @escaping @Sendable (ModelResponse) throws -> Result
+  ) async throws -> Result {
+    @Dependency(\.modelCallRecordSink) var recordSink
+    do {
+      let response = try await modelClient.complete(request)
+      let result = try decode(response)
+      await recordSink.record(
+        record.recording(
+          responseFormatOutcome: response.responseFormatStatus == .structured ? .structuredHit : .fellBack
+        )
+      )
+      return result
+    } catch {
+      await recordSink.record(record.recording(responseFormatOutcome: .unreadable))
+      throw error
+    }
   }
 
   public func stream(using modelClient: any ModelClient) async -> AsyncThrowingStream<ModelChunk, any Error> {
@@ -307,5 +350,23 @@ public struct ModelCall: Sendable {
   private static func requestedModel(for tier: ModelTier) -> String? {
     guard case let .frontier(provider) = tier else { return nil }
     return YesChefAIPromptPreferences.model(for: provider)
+  }
+}
+
+private extension ModelCallRecord {
+  func recording(responseFormatOutcome: ModelCallResponseFormatOutcome) -> Self {
+    Self(
+      surface: surface,
+      task: task,
+      tierResolution: tierResolution,
+      tier: tier,
+      requestedModel: requestedModel,
+      contextLayers: contextLayers,
+      inputCharacterCount: inputCharacterCount,
+      maxTokens: maxTokens,
+      reasoningEffort: reasoningEffort,
+      responseFormatAttached: responseFormatAttached,
+      responseFormatOutcome: responseFormatOutcome
+    )
   }
 }

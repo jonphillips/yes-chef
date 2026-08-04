@@ -9,8 +9,9 @@ intent** shipped in PR [#265](https://github.com/jonphillips/yes-chef/pull/265) 
 handoff bump was missed in-PR and reconciled here) — its record is in [`DONE-LOG.md`](DONE-LOG.md). **The
 editorial-facet seed slice shipped** (OQ4, PR [#277](https://github.com/jonphillips/yes-chef/pull/277), approved
 2026-08-04; light two-device pass owed on merge). **The S5/S6 + D8 labeling-backfill tooling and its Amendment 3
-surface revision are approved** (PR [#278](https://github.com/jonphillips/yes-chef/pull/278)); the record is in
-[`DONE-LOG.md`](DONE-LOG.md). **Next Up is Jon's editorial-label backfill run**.)
+surface revision are approved** (PR [#278](https://github.com/jonphillips/yes-chef/pull/278)); its ADR-0004 S4
+structured-output correction is a follow-up PR awaiting review. The record is in
+[`DONE-LOG.md`](DONE-LOG.md). **Next Up is Jon's editorial-label backfill run after that follow-up merges**.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate is **crossed and holding**. We stay in
@@ -23,12 +24,14 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**Next live target — Jon's editorial-label backfill run.** Open DEBUG **Facet Coverage**, use its unclassified
+**Next live target — Jon's editorial-label backfill run (after the ADR-0004 S4 follow-up merges).** Open DEBUG **Facet Coverage**, use its unclassified
 counts or one of the three D8 coverage views (Missing Protein first, then Missing a Primary Facet / No Editorial
 Labels), and open **Edit Tags** for each recipe. Tags are assigned or removed in place; Suggest uses the on-device
 proposer at high effort and adds only accepted chips. The library toolbar and compact filter remain unmodified.
 
-**No schema → no prod-promotion entry, no two-device pass.** The run supplies the D6 coverage measure and numeric
+**The on-device proposer now requests runtime-guided structured output through ADR-0004's portable JSON-Schema
+seam; its English return-format instruction remains the fallback floor.** No schema → no prod-promotion entry,
+no two-device pass. The run supplies the D6 coverage measure and numeric
 evidence for ADR-0050 OQ3; once primary facets classify a majority of the library, Power Browser S1 becomes
 dispatchable.
 
