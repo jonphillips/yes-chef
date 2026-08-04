@@ -18,6 +18,8 @@ final class RecipeEditorModel {
   @Fetch var detail: RecipeDetailData?
   @ObservationIgnored
   @Fetch(CategoryListRequest(), animation: .default) var categories: [YesChefCore.Category] = []
+  @ObservationIgnored
+  @Fetch(FacetListRequest(), animation: .default) var facets: [Facet] = []
 
   var draft = RecipeEditorDraft()
   var errorMessage: String?
@@ -52,14 +54,24 @@ final class RecipeEditorModel {
     CategoryHierarchy.displayRows(from: categories)
   }
 
+  var categorySections: [RecipeCategorySelectionSection] {
+    RecipeCategorySelectionSection.sections(categories: categories, facets: facets)
+  }
+
   var selectedCategoryIDs: Set<YesChefCore.Category.ID> {
     draft.selectedCategoryIDs ?? []
   }
 
   var selectedCategorySummary: String {
-    let selectedRows = categoryRows.filter { selectedCategoryIDs.contains($0.category.id) }
-    guard !selectedRows.isEmpty else { return "No categories" }
-    return selectedRows.map(\.displayName).joined(separator: ", ")
+    let selectedNames: [String] = categorySections
+      .flatMap { section in
+        section.rows.compactMap { row -> String? in
+          guard selectedCategoryIDs.contains(row.category.id) else { return nil }
+          return section.facetName.map { "\($0) > \(row.displayName)" } ?? row.displayName
+        }
+      }
+    guard !selectedNames.isEmpty else { return "No categories" }
+    return selectedNames.joined(separator: ", ")
   }
 
   var pendingHeroPhoto: RecipeEditorPhotoDraft? {
@@ -197,5 +209,36 @@ final class RecipeEditorModel {
       isShowingError = true
       return false
     }
+  }
+}
+
+struct RecipeCategorySelectionSection: Identifiable, Equatable {
+  enum ID: Hashable {
+    case facet(Facet.ID)
+    case otherCategories
+  }
+
+  let id: ID
+  let title: String
+  let facetName: String?
+  let rows: [CategoryHierarchy.DisplayRow]
+
+  static func sections(
+    categories: [YesChefCore.Category],
+    facets: [Facet]
+  ) -> [Self] {
+    let facetSections = facets.map { facet in
+      Self(
+        id: .facet(facet.id),
+        title: facet.name,
+        facetName: facet.name,
+        rows: CategoryHierarchy.displayRows(from: categories.filter { $0.facetID == facet.id })
+      )
+    }
+    let looseRows = CategoryHierarchy.displayRows(from: categories.filter { $0.facetID == nil })
+    guard !looseRows.isEmpty else { return facetSections }
+    return facetSections + [
+      Self(id: .otherCategories, title: "Other Categories", facetName: nil, rows: looseRows)
+    ]
   }
 }

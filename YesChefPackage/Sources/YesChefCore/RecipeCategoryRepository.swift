@@ -6,11 +6,8 @@ public struct CategoryListRequest: FetchKeyRequest {
 
   public func fetch(_ db: Database) throws -> [Category] {
     let facets = try Facet.fetchAll(db)
-    let visibleFacetIDs = Set(facets.filter { !$0.hidden }.map(\.id))
     return CategoryRepository.sortedCategories(
-      try Category.fetchAll(db).filter { category in
-        !category.hidden && (category.facetID.map { visibleFacetIDs.contains($0) } ?? true)
-      }
+      CategoryRepository.visibleCategories(try Category.fetchAll(db), facets: facets)
     )
   }
 }
@@ -349,6 +346,15 @@ public enum CategoryRepository {
 
   public static func sortedCategories(_ categories: [Category]) -> [Category] {
     CategoryHierarchy.displayRows(from: categories).map(\.category)
+  }
+
+  /// The effective category set exposed by recipe-facing and catalog reads. Hidden assignments
+  /// remain stored in `RecipeCategory` so restoring visibility restores the assignment.
+  public static func visibleCategories(_ categories: [Category], facets: [Facet]) -> [Category] {
+    let visibleFacetIDs = Set(facets.filter { !$0.hidden }.map(\.id))
+    return categories.filter { category in
+      !category.hidden && (category.facetID.map { visibleFacetIDs.contains($0) } ?? true)
+    }
   }
 
   public static func sortedFacets(_ facets: [Facet]) -> [Facet] {

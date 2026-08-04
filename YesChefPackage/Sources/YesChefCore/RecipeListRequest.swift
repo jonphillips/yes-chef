@@ -38,8 +38,13 @@ public struct RecipeListRequest: FetchKeyRequest {
     // top of this, but a stable base order keeps identical DB state from producing shuffled arrays
     // that an animated List diffs into an invalid batch update.
     let recipes = try Recipe.all.order { $0.id }.fetchAll(db)
+    let facets = try Facet.fetchAll(db)
     let categoriesByID = Dictionary(
-      uniqueKeysWithValues: try Category.fetchAll(db).map { ($0.id, $0) }
+      uniqueKeysWithValues: CategoryRepository.visibleCategories(
+        try Category.fetchAll(db),
+        facets: facets
+      )
+      .map { ($0.id, $0) }
     )
     let sourcesByRecipeID = Dictionary(
       grouping: try RecipeSource.fetchAll(db),

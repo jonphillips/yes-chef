@@ -497,17 +497,21 @@ private struct RecipeCategorySelectionView: View {
 
   var body: some View {
     List {
-      ForEach(model.categoryRows) { row in
-        RecipeCategorySelectionRow(
-          row: row,
-          isSelected: model.selectedCategoryIDs.contains(row.category.id)
-        ) {
-          model.categorySelectionButtonTapped(row.category.id)
+      ForEach(model.categorySections) { section in
+        Section(section.title) {
+          ForEach(section.rows) { row in
+            RecipeCategorySelectionRow(
+              row: row,
+              isSelected: model.selectedCategoryIDs.contains(row.category.id)
+            ) {
+              model.categorySelectionButtonTapped(row.category.id)
+            }
+          }
         }
       }
     }
     .overlay {
-      if model.categoryRows.isEmpty {
+      if model.categorySections.allSatisfy({ $0.rows.isEmpty }) {
         ContentUnavailableView("No Categories", systemImage: "folder")
       }
     }
