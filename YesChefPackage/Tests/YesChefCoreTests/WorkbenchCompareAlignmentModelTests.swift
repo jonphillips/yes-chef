@@ -3,7 +3,6 @@ import LLMClientKit
 import Foundation
 import Testing
 import YesChefCore
-@testable import YesChef
 
 @Suite
 struct WorkbenchCompareAlignmentModelTests {

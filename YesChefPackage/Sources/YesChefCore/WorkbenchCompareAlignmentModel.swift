@@ -2,11 +2,10 @@ import Dependencies
 import Foundation
 import LLMClientKit
 import Observation
-import YesChefCore
 
 @Observable
 @MainActor
-final class WorkbenchCompareAlignmentModel {
+public final class WorkbenchCompareAlignmentModel {
   @ObservationIgnored @Dependency(\.workbenchCompareAligner) private var aligner
   @ObservationIgnored @Dependency(\.compareAlignmentCache) private var cacheClient
 
@@ -15,19 +14,21 @@ final class WorkbenchCompareAlignmentModel {
   private var cache: [String: CachedCompareAlignment] = [:]
   private var loadToken = 0
 
-  var currentKey: CompareAlignmentKey?
-  var currentOutcome: WorkbenchAlignedComparison?
-  var isAligning = false
-  var showsBasicViewAffordance = false
+  public var currentKey: CompareAlignmentKey?
+  public var currentOutcome: WorkbenchAlignedComparison?
+  public var isAligning = false
+  public var showsBasicViewAffordance = false
   /// The displayed alignment was computed against older ingredient text. We keep showing it and offer a
   /// manual **Refresh** rather than silently spending an LLM call on every edit (ADR-0022 open-Q4).
-  var isStale = false
+  public var isStale = false
 
-  func cachedOutcome(for key: CompareAlignmentKey) -> WorkbenchAlignedComparison? {
+  public init() {}
+
+  public func cachedOutcome(for key: CompareAlignmentKey) -> WorkbenchAlignedComparison? {
     cache[key.identity]?.outcome
   }
 
-  func prefetchDiskIfNeeded(
+  public func prefetchDiskIfNeeded(
     working: RecipeDetailData?,
     candidates: [RecipeDetailData]
   ) async {
@@ -38,7 +39,7 @@ final class WorkbenchCompareAlignmentModel {
     }
   }
 
-  func ingredientsSegmentAppeared(
+  public func ingredientsSegmentAppeared(
     working: RecipeDetailData?,
     candidates: [RecipeDetailData],
     tier: ModelTier
@@ -46,7 +47,7 @@ final class WorkbenchCompareAlignmentModel {
     await load(working: working, candidates: candidates, tier: tier, refresh: false)
   }
 
-  func refreshButtonTapped(
+  public func refreshButtonTapped(
     working: RecipeDetailData?,
     candidates: [RecipeDetailData],
     tier: ModelTier

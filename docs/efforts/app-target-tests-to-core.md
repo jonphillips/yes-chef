@@ -1,8 +1,8 @@
 # Effort: The app test target runs — 26 of 26 pass
 
-**Type:** Test-coverage recovery. **Complete** apart from one optional follow-on.
-**Status:** **Done 2026-07-27.** Supersedes the 2026-07-26 version, whose central claim ("the target
-is broken and fixing it is not this effort") was wrong.
+**Type:** Test-coverage recovery and Core placement. **Complete.**
+**Status:** **Done 2026-08-04.** Supersedes the 2026-07-26 version, whose central claim ("the target
+is broken and fixing it is not this effort") was wrong. The optional Core-placement follow-on is now complete.
 **Summary:** `YesChefAppTests` went from *compiled and executed by nothing* to **26/26 green**, gated
 in `scripts/check-drift.sh`. Three defects were behind it: undeclared GRDB/SQLiteData dependencies
 (the target could not link), a duplicated `Dependencies` runtime in the test bundle (every
@@ -188,10 +188,13 @@ gone: the target runs. Its second argument, that app-layer models holding `@Fetc
 awkward to test in place, is gone too; that was the duplicated `Dependencies` runtime wearing a
 costume, and those suites now pass untouched.
 
-**One argument survives, on its own merits and unhurried:** `WorkbenchCompareAlignmentModel` and
-`RecipeScaleFormatting` are SwiftUI-free logic sitting in the app layer, which the standing "keep pure
-logic out of the App layer" corollary says they should not be. Worth doing for that reason, not for
-testability. Two small pieces of evidence for whoever picks it up:
+**Completed 2026-08-04:** `WorkbenchCompareAlignmentModel` and `RecipeScaleFormatting` now live in
+`YesChefCore`, alongside the SwiftUI-free `ServeWithRepairPresentation` rider. The public surface required
+by the app remains exported; behavior is unchanged. Their pure-value tests now run in `swift test` without
+a simulator, while the remaining `RecipeDetailModel` routing test remains in `YesChefAppTests`. The two redundant
+yield-scaling assertions were deleted because `RecipeYieldScalingTests` already covers them in Core.
+
+The placement rationale was:
 
 - The scaling fix landed its real coverage in `YesChefCoreTests` because that is where the code lives,
   which left the two app-layer assertions redundant. That is the sweep making its own case.
