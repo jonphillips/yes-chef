@@ -84,10 +84,12 @@ private extension ModelCallInventory.Entry {
       return "Structured hit"
     case .fellBack:
       return "Readable fallback"
+    case .truncated:
+      return "Truncated"
     case .unreadable:
       return "Unreadable"
     case nil:
-      return "Pending"
+      return "Not recorded"
     }
   }
 

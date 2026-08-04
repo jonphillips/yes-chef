@@ -169,7 +169,7 @@ public struct LabelProposal: Equatable, Sendable {
   }
 }
 
-public enum LabelProposerError: Error, Equatable, LocalizedError, Sendable {
+public enum LabelProposerError: Error, Equatable, LocalizedError, ModelCallResponseFormatFailure, Sendable {
   case responseTruncated
   case responseUnreadable
 
@@ -179,6 +179,15 @@ public enum LabelProposerError: Error, Equatable, LocalizedError, Sendable {
       "The label suggestions ran out of room before they finished. Try again."
     case .responseUnreadable:
       "The label suggestions could not be read. Try again."
+    }
+  }
+
+  public var responseFormatOutcome: ModelCallResponseFormatOutcome {
+    switch self {
+    case .responseTruncated:
+      .truncated
+    case .responseUnreadable:
+      .unreadable
     }
   }
 }

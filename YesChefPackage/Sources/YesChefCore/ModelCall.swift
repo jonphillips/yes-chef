@@ -51,7 +51,14 @@ public struct ModelCallRecord: Equatable, Sendable {
 public enum ModelCallResponseFormatOutcome: String, Equatable, Sendable {
   case structuredHit
   case fellBack
+  case truncated
   case unreadable
+}
+
+/// An application decoding error with a reliability outcome distinct from an
+/// unreadable structured response.
+public protocol ModelCallResponseFormatFailure: Error, Sendable {
+  var responseFormatOutcome: ModelCallResponseFormatOutcome { get }
 }
 
 public enum ModelCallSurface: String, Equatable, Sendable {
@@ -330,7 +337,9 @@ public struct ModelCall: Sendable {
       )
       return result
     } catch {
-      await recordSink.record(record.recording(responseFormatOutcome: .unreadable))
+      let outcome = (error as? any ModelCallResponseFormatFailure)?.responseFormatOutcome
+        ?? .unreadable
+      await recordSink.record(record.recording(responseFormatOutcome: outcome))
       throw error
     }
   }

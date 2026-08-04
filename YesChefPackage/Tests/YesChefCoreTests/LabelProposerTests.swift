@@ -232,9 +232,12 @@ extension RecipeCoreTests {
 
     @Test
     func truncatedResponseFailsLoudly() async {
+      let callRecords = ModelCallRecordCollector()
+
       await #expect(throws: LabelProposerError.responseTruncated) {
         try await withDependencies {
           $0.modelClient = StubModelClient { _ in ModelResponse(text: "{", stopReason: "max_tokens") }
+          $0.modelCallRecordSink = .inMemory(callRecords)
           $0.labelProposer = .liveValue
         } operation: {
           try await LabelProposer.liveValue(
@@ -243,6 +246,10 @@ extension RecipeCoreTests {
           )
         }
       }
+
+      let record = await callRecords.records().first
+      expectNoDifference(record?.responseFormatAttached, true)
+      expectNoDifference(record?.responseFormatOutcome, .truncated)
     }
   }
 }
