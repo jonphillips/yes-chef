@@ -530,10 +530,7 @@ private struct RecipeReaderView: View {
       Button {
         model.suggestLabelsButtonTapped()
       } label: {
-        Label(
-          model.detail?.categoryDisplayNames.isEmpty == false ? "Suggest More Labels" : "Suggest Labels",
-          systemImage: "tag.badge.plus"
-        )
+        Label("Edit Tags", systemImage: "tag")
       }
       .buttonStyle(.bordered)
 

@@ -186,37 +186,37 @@ public enum LabelProposerError: Error, Equatable, LocalizedError, Sendable {
 /// A model-backed, advisory classifier anchored to the category tree already owned by the cook.
 /// It never writes categories or recipe-category joins.
 public struct LabelProposer: Sendable {
-  public var propose: @Sendable (_ recipe: LabelProposalRecipe, _ vocabulary: LabelVocabulary, _ tier: ModelTier) async throws -> LabelProposal
+  public var propose: @Sendable (_ recipe: LabelProposalRecipe, _ vocabulary: LabelVocabulary, _ tier: ModelTier, _ effort: ReasoningEffort) async throws -> LabelProposal
 
   public init(
-    propose: @escaping @Sendable (_ recipe: LabelProposalRecipe, _ vocabulary: LabelVocabulary, _ tier: ModelTier) async throws -> LabelProposal
+    propose: @escaping @Sendable (_ recipe: LabelProposalRecipe, _ vocabulary: LabelVocabulary, _ tier: ModelTier, _ effort: ReasoningEffort) async throws -> LabelProposal
   ) {
     self.propose = propose
   }
 
-  /// Defaults to the on-device tier (ADR-0049), but the tier is a parameter so the S5 detail labeler
-  /// and S6 queue can escalate a weak on-device pass without touching a shared constant.
+  /// The labeling surfaces tolerate a little extra latency in exchange for a useful proposal.
   public func callAsFunction(
     recipe: LabelProposalRecipe,
     vocabulary: LabelVocabulary,
-    tier: ModelTier = .onDevice
+    tier: ModelTier = .onDevice,
+    effort: ReasoningEffort = .high
   ) async throws -> LabelProposal {
-    try await propose(recipe, vocabulary, tier)
+    try await propose(recipe, vocabulary, tier, effort)
   }
 }
 
 extension LabelProposer: DependencyKey {
   public static var liveValue: Self {
-    Self { recipe, vocabulary, tier in
+    Self { recipe, vocabulary, tier, effort in
       @Dependency(\.modelClient) var modelClient
-      let response = try await call(recipe: recipe, vocabulary: vocabulary, tier: tier)
+      let response = try await call(recipe: recipe, vocabulary: vocabulary, tier: tier, effort: effort)
         .complete(using: modelClient)
       guard !response.wasTruncated else { throw LabelProposerError.responseTruncated }
       return try parse(response.text, vocabulary: vocabulary)
     }
   }
 
-  public static let testValue = Self { _, _, _ in LabelProposal() }
+  public static let testValue = Self { _, _, _, _ in LabelProposal() }
 
   static let maxTokens = 1_024
 
@@ -268,7 +268,12 @@ extension LabelProposer: DependencyKey {
       """
   }
 
-  static func call(recipe: LabelProposalRecipe, vocabulary: LabelVocabulary, tier: ModelTier = .onDevice) -> ModelCall {
+  static func call(
+    recipe: LabelProposalRecipe,
+    vocabulary: LabelVocabulary,
+    tier: ModelTier = .onDevice,
+    effort: ReasoningEffort = .high
+  ) -> ModelCall {
     ModelCall(
       surface: .capture,
       task: .categorization,
@@ -278,7 +283,7 @@ extension LabelProposer: DependencyKey {
       system: instructions,
       prompt: prompt(recipe: recipe, vocabulary: vocabulary),
       maxTokens: maxTokens,
-      reasoningEffort: .low
+      reasoningEffort: effort
     )
   }
 

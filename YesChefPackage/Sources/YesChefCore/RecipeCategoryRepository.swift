@@ -938,7 +938,7 @@ extension RecipeRepository {
     }
   }
 
-  static func reconcileCategoryIDs(
+  public static func reconcileCategoryIDs(
     _ categoryIDs: [Category.ID],
     recipeID: Recipe.ID,
     in db: Database,

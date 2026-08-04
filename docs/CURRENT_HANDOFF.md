@@ -8,8 +8,9 @@ labeling backfill** = ADR-0050's D6 coverage gate, tracked under ADR-0050. **Pre
 intent** shipped in PR [#265](https://github.com/jonphillips/yes-chef/pull/265) (merged 2026-07-30; the
 handoff bump was missed in-PR and reconciled here) — its record is in [`DONE-LOG.md`](DONE-LOG.md). **The
 editorial-facet seed slice shipped** (OQ4, PR [#277](https://github.com/jonphillips/yes-chef/pull/277), approved
-2026-08-04; light two-device pass owed on merge). **Next Up is Jon's editorial-label backfill run**; its tooling
-record is in [`DONE-LOG.md`](DONE-LOG.md).)
+2026-08-04; light two-device pass owed on merge). **The S5/S6 + D8 labeling-backfill tooling and its Amendment 3
+surface revision are approved** (PR [#278](https://github.com/jonphillips/yes-chef/pull/278)); the record is in
+[`DONE-LOG.md`](DONE-LOG.md). **Next Up is Jon's editorial-label backfill run**.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate is **crossed and holding**. We stay in
@@ -22,15 +23,20 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**Next live target — Jon's editorial-label backfill run.** The S6 batch queue, S5 detail mini-labeler, and
-ADR-0050 D8 coverage diagnostics are built in the labeling-backfill tooling PR (record in
-[`DONE-LOG.md`](DONE-LOG.md)). Start with **Missing Protein**, then use **Missing a Primary Facet** and
-**No Editorial Labels** as coverage rises. The app writes only accepted suggestions through
-`reconcileSuggestedLabels`; missing is still a derived state, not an `Other` value.
+**Next live target — Jon's editorial-label backfill run.** Open DEBUG **Facet Coverage**, use its unclassified
+counts or one of the three D8 coverage views (Missing Protein first, then Missing a Primary Facet / No Editorial
+Labels), and open **Edit Tags** for each recipe. Tags are assigned or removed in place; Suggest uses the on-device
+proposer at high effort and adds only accepted chips. The library toolbar and compact filter remain unmodified.
 
-**No schema → no prod-promotion entry, no two-device pass.** The run supplies the D6 coverage measure and
-the numeric evidence for ADR-0050 OQ3; once primary facets classify a majority of the library, Power Browser S1
-becomes dispatchable.
+**No schema → no prod-promotion entry, no two-device pass.** The run supplies the D6 coverage measure and numeric
+evidence for ADR-0050 OQ3; once primary facets classify a majority of the library, Power Browser S1 becomes
+dispatchable.
+
+**Also Codex-dispatchable now (device-pass-free), if a parallel remote slice is wanted:**
+[`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) — move `WorkbenchCompareAlignmentModel`
++ `RecipeScaleFormatting` (plus the S0.1 `ServeWithRepairPresentation` rider) down to Core; `swift build` + Core
+tests only, no simulator. The ATK grocery-bug slice ([`efforts/import-text-normalization.md`](efforts/import-text-normalization.md))
+is a **data migration wanting backup-first + a device pass** — hold it until Jon is local.
 
 **ADR-0049 Amendment 2 (the facet model) is complete** — D1–D5 shipped + device-passed, D4 hand pass done, F1/F2
 approved (PR [#276](https://github.com/jonphillips/yes-chef/pull/276), device look owed on merge); full record in
@@ -198,6 +204,12 @@ Not work, a checklist.
 
 *(ADR-0049 Amd 2 D1/D2/D3 device passes — PRs #270, #272, #274 — approved 2026-08-04 and removed. D4 hand pass
 done.)*
+
+**[PR #278](https://github.com/jonphillips/yes-chef/pull/278) — S5/S6 + D8 labeling-backfill tooling. App +
+Core, no schema, no two-device pass.** Approved (architect review) 2026-08-04; app build re-verified green after
+the Amendment 3 surface revision. **Device look owed on merge:** detail **Edit Tags** groups assignments by facet,
+inline add/delete preserves assignments, Suggest produces useful high-effort on-device proposals, and DEBUG Facet
+Coverage discovers under-labeled recipes through the three absence views.
 
 **[PR #277](https://github.com/jonphillips/yes-chef/pull/277) — ADR-0049 Amd 2 OQ4, editorial facet seed. Core
 only, no schema.** Approved (architect review) 2026-08-04; **light two-device convergence pass owed on merge:**

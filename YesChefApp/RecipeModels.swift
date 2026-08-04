@@ -20,7 +20,6 @@ final class RecipeLibraryModel {
     case filterRecipes
     case importReview
     case captureSummary(WebRecipeCaptureSummary)
-    case labelingBackfill
     case importSummary(RecipeImportSummary)
     case backupSupplementSummary(RecipeBackupSupplementSummary)
     case workbench(WorkbenchPresentation)
@@ -36,7 +35,6 @@ final class RecipeLibraryModel {
   @Fetch(RecipeListRequest(), animation: .default) var recipeRows: [RecipeListRowData] = []
   @ObservationIgnored @Fetch(CategoryListRequest(), animation: .default) var categoryFilterCategories: [YesChefCore.Category] = []
   @ObservationIgnored @Fetch(FacetListRequest(), animation: .default) var categoryFilterFacets: [Facet] = []
-  @ObservationIgnored @Fetch(RecipeFacetCoverageRequest(), animation: .default) var facetCoverage: RecipeFacetCoverage = .init(recipes: [], recipeCategories: [], categories: [], facets: [])
 
   var destination: Destination?
   var errorMessage: String?
@@ -58,7 +56,6 @@ final class RecipeLibraryModel {
   var selectedCourse: String?
   var selectedSourceNames: Set<String> = []
   var selectedAuthorNames: Set<String> = []
-  var selectedLabelCoverageView: RecipeFacetCoverageView = .missingProtein
   var isSelectingWorkbenchRecipes = false
   var selectedWorkbenchRecipeIDs: Set<Recipe.ID> = []
 
@@ -112,9 +109,6 @@ final class RecipeLibraryModel {
     destination = .captureRecipe
   }
 
-  func labelBackfillButtonTapped() {
-    destination = .labelingBackfill
-  }
 
   func webCaptureCompleted(_ result: RecipeImportBundleResult) {
     selectedRecipeID = result.recipeID

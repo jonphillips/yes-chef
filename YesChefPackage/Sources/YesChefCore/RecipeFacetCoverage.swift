@@ -45,6 +45,7 @@ public struct RecipeFacetCoverage: Equatable, Sendable {
   }
 
   public var recipeIDsByView: [RecipeFacetCoverageView: Set<Recipe.ID>]
+  public var unclassifiedRecipeIDsByFacetID: [Facet.ID: Set<Recipe.ID>]
   public var facetSummaries: [FacetSummary]
 
   public init(
@@ -65,7 +66,6 @@ public struct RecipeFacetCoverage: Equatable, Sendable {
     let primaryFacetIDs = Set(["Protein", "Dish Type", "Technique"].compactMap {
       facetIDsByName[$0.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)]
     })
-    let proteinFacetID = facetIDsByName["protein"]
     let assignedCategoryIDsByRecipeID = Dictionary(grouping: recipeCategories, by: \.recipeID)
       .mapValues { Set($0.map(\.categoryID)) }
     let assignedFacetIDsByRecipeID = Dictionary(
@@ -77,15 +77,21 @@ public struct RecipeFacetCoverage: Equatable, Sendable {
       }
     )
 
+    let unclassifiedByFacetID = Dictionary(
+      uniqueKeysWithValues: visibleFacets.map { facet in
+        (facet.id, Self.unclassifiedRecipeIDs(
+          inFacetID: facet.id,
+          recipeIDs: recipes.map(\.id),
+          assignedFacetIDsByRecipeID: assignedFacetIDsByRecipeID
+        ))
+      }
+    )
+    unclassifiedRecipeIDsByFacetID = unclassifiedByFacetID
     recipeIDsByView = [
-      .missingProtein: Set(recipes.compactMap { recipe in
-        guard let proteinFacetID, !(assignedFacetIDsByRecipeID[recipe.id] ?? []).contains(proteinFacetID) else { return nil }
-        return recipe.id
-      }),
-      .missingPrimaryFacet: Set(recipes.compactMap { recipe in
-        let assignments = assignedFacetIDsByRecipeID[recipe.id] ?? []
-        return primaryFacetIDs.isSubset(of: assignments) ? nil : recipe.id
-      }),
+      .missingProtein: facetIDsByName["protein"].flatMap { unclassifiedByFacetID[$0] } ?? [],
+      .missingPrimaryFacet: primaryFacetIDs.reduce(into: Set<Recipe.ID>()) { result, facetID in
+        result.formUnion(unclassifiedByFacetID[facetID] ?? [])
+      },
       .noEditorialLabels: Set(recipes.compactMap { recipe in
         let assignments = assignedFacetIDsByRecipeID[recipe.id] ?? []
         return assignments.isDisjoint(with: editorialFacetIDs) ? recipe.id : nil
@@ -102,13 +108,11 @@ public struct RecipeFacetCoverage: Equatable, Sendable {
           }
         )
       }
-      let classifiedRecipeCount = recipes.reduce(into: 0) { count, recipe in
-        if (assignedFacetIDsByRecipeID[recipe.id] ?? []).contains(facet.id) { count += 1 }
-      }
+      let unclassifiedRecipeCount = unclassifiedByFacetID[facet.id]?.count ?? recipes.count
       return FacetSummary(
         facet: facet,
-        classifiedRecipeCount: classifiedRecipeCount,
-        unclassifiedRecipeCount: recipes.count - classifiedRecipeCount,
+        classifiedRecipeCount: recipes.count - unclassifiedRecipeCount,
+        unclassifiedRecipeCount: unclassifiedRecipeCount,
         valueCounts: valueCounts
       )
     }
@@ -116,6 +120,40 @@ public struct RecipeFacetCoverage: Equatable, Sendable {
 
   public func recipeIDs(matching view: RecipeFacetCoverageView) -> Set<Recipe.ID> {
     recipeIDsByView[view] ?? []
+  }
+
+  public func recipeIDs(unclassifiedInFacetID facetID: Facet.ID) -> Set<Recipe.ID> {
+    unclassifiedRecipeIDsByFacetID[facetID] ?? []
+  }
+
+  /// The single absence predicate behind both the D8 facet counts and discovery lists.
+  public static func unclassifiedRecipeIDs(
+    inFacetID facetID: Facet.ID,
+    recipes: [Recipe],
+    recipeCategories: [RecipeCategory],
+    categories: [Category],
+    facets: [Facet]
+  ) -> Set<Recipe.ID> {
+    let visibleCategoriesByID = Dictionary(
+      uniqueKeysWithValues: CategoryRepository.visibleCategories(categories, facets: facets).map { ($0.id, $0) }
+    )
+    let assignedFacetIDsByRecipeID = Dictionary(grouping: recipeCategories, by: \.recipeID)
+      .mapValues { recipeCategories in
+        Set(recipeCategories.compactMap { visibleCategoriesByID[$0.categoryID]?.facetID })
+      }
+    return unclassifiedRecipeIDs(
+      inFacetID: facetID,
+      recipeIDs: recipes.map(\.id),
+      assignedFacetIDsByRecipeID: assignedFacetIDsByRecipeID
+    )
+  }
+
+  private static func unclassifiedRecipeIDs(
+    inFacetID facetID: Facet.ID,
+    recipeIDs: [Recipe.ID],
+    assignedFacetIDsByRecipeID: [Recipe.ID: Set<Facet.ID>]
+  ) -> Set<Recipe.ID> {
+    Set(recipeIDs.filter { !(assignedFacetIDsByRecipeID[$0] ?? []).contains(facetID) })
   }
 }
 

@@ -39,6 +39,7 @@ extension RecipeCoreTests {
       )
 
       expectNoDifference(coverage.recipeIDs(matching: .missingProtein), [noProtein.id, untouched.id, hiddenOnly.id])
+      expectNoDifference(coverage.recipeIDs(unclassifiedInFacetID: protein.id), [noProtein.id, untouched.id, hiddenOnly.id])
       expectNoDifference(coverage.recipeIDs(matching: .missingPrimaryFacet), [noProtein.id, untouched.id, hiddenOnly.id])
       expectNoDifference(coverage.recipeIDs(matching: .noEditorialLabels), [untouched.id, hiddenOnly.id])
       expectNoDifference(coverage.facetSummaries.first { $0.facet.id == protein.id }?.unclassifiedRecipeCount, 3)

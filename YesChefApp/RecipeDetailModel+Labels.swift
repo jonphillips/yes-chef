@@ -68,7 +68,47 @@ extension RecipeDetailModel {
           uuid: { makeUUID() }
         )
       }
-      destination = nil
+      labelState.suggestions = []
+      labelState.acceptedIDs = []
+      return true
+    } catch {
+      errorMessage = error.localizedDescription
+      isShowingError = true
+      return false
+    }
+  }
+
+  func addTagButtonTapped(_ categoryID: Category.ID) async -> Bool {
+    await updatingAssignedCategoryIDs(adding: categoryID)
+  }
+
+  func deleteTagButtonTapped(_ categoryID: Category.ID) async -> Bool {
+    await updatingAssignedCategoryIDs(removing: categoryID)
+  }
+
+  private func updatingAssignedCategoryIDs(
+    adding categoryIDToAdd: Category.ID? = nil,
+    removing categoryIDToRemove: Category.ID? = nil
+  ) async -> Bool {
+    do {
+      let makeUUID = uuid
+      try await database.write { db in
+        var categoryIDs = Set(
+          try RecipeCategory.where { $0.recipeID.eq(recipeID) }.fetchAll(db).map(\.categoryID)
+        )
+        if let categoryIDToAdd {
+          categoryIDs.insert(categoryIDToAdd)
+        }
+        if let categoryIDToRemove {
+          categoryIDs.remove(categoryIDToRemove)
+        }
+        try RecipeRepository.reconcileCategoryIDs(
+          Array(categoryIDs),
+          recipeID: recipeID,
+          in: db,
+          uuid: { makeUUID() }
+        )
+      }
       return true
     } catch {
       errorMessage = error.localizedDescription
