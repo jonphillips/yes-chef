@@ -92,6 +92,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
   case seedCoverage
 #if DEBUG
   case modelCallInventory
+  case facetCoverage
 #endif
 
   var id: Self { self }
@@ -105,6 +106,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case .seedCoverage: "Seed Coverage"
 #if DEBUG
     case .modelCallInventory: "Model Calls"
+    case .facetCoverage: "Facet Coverage"
 #endif
     }
   }
@@ -118,6 +120,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case .seedCoverage: "checklist"
 #if DEBUG
     case .modelCallInventory: "sparkles"
+    case .facetCoverage: "chart.bar"
 #endif
     }
   }

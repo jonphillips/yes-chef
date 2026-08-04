@@ -9,6 +9,25 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0049 S5 + S6 + ADR-0050 D8 — labeling-backfill tooling
+
+**Built 2026-08-04; branch `codex/adr-0049-labeling-backfill`, awaiting architect review.** Spec:
+[`efforts/recipe-facets.md`](efforts/recipe-facets.md) § "The dispatch — S6 + S5 + D8". **Core + app, no
+schema, no prod-schema entry, no two-device pass.** The existing `LabelProposer` remains on-device and
+`RecipeRepository.reconcileSuggestedLabels` remains the sole category/join writer.
+
+**What it does.** Adds one Core-derived coverage source shared by all consumers: Missing Protein, Missing a
+Primary Facet, and No Editorial Labels inspect visible `RecipeCategory → Category.facetID` joins at query time;
+hidden facets/values contribute neither vocabulary nor counts. The library exposes those views for a one-at-a-time
+prefetched review queue, while recipe detail gets a re-runnable Suggest Labels sheet. Both retain accepted chips
+as transient selection and commit only accepted typed `SuggestedLabel`s. DEBUG Settings adds facet coverage,
+per-facet unclassified counts, and used-value distribution for the D6 gate/OQ3 measurement.
+
+**Verification.** `xcodegen generate`, `swift build --package-path YesChefPackage`, the elevated generic iOS
+build, and `scripts/check-drift.sh` are green; the latter retains the pre-existing test warning in
+`RecipeCoreTests.swift` about comparing non-optional `Data` to `nil`.
+
+---
 ## ADR-0049 Amendment 2 · OQ4 — editorial facet seed (Protein / Dietary / Dish Type / Technique)
 
 **Approved (architect review) 2026-08-04; PR [#277](https://github.com/jonphillips/yes-chef/pull/277) OPEN,

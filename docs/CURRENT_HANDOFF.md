@@ -8,9 +8,8 @@ labeling backfill** = ADR-0050's D6 coverage gate, tracked under ADR-0050. **Pre
 intent** shipped in PR [#265](https://github.com/jonphillips/yes-chef/pull/265) (merged 2026-07-30; the
 handoff bump was missed in-PR and reconciled here) — its record is in [`DONE-LOG.md`](DONE-LOG.md). **The
 editorial-facet seed slice shipped** (OQ4, PR [#277](https://github.com/jonphillips/yes-chef/pull/277), approved
-2026-08-04; light two-device pass owed on merge). **The S5/S6 labeling backfill is now scoped** (with Jon,
-2026-08-04) into **one combined Codex dispatch — S6 batch queue + S5 mini-labeler + ADR-0050 D8 diagnostics** —
-which is **Next Up**. See § Next Up and [`efforts/recipe-facets.md`](efforts/recipe-facets.md) for the brief.)
+2026-08-04; light two-device pass owed on merge). **Next Up is Jon's editorial-label backfill run**; its tooling
+record is in [`DONE-LOG.md`](DONE-LOG.md).)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate is **crossed and holding**. We stay in
@@ -23,27 +22,15 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**The editorial-facet seed shipped** (OQ4, PR [#277](https://github.com/jonphillips/yes-chef/pull/277), approved
-2026-08-04; branch `codex/adr-0049-amd2-o4-editorial-facets`) — **Protein, Dietary, Dish Type, Technique** + all
-49 values now seed alongside Cuisine/Course, fixed ids, post-engine, idempotent, **no schema**. Full record in
-[`DONE-LOG.md`](DONE-LOG.md); **a light two-device convergence pass is owed on merge** (§ Device passes owed).
+**Next live target — Jon's editorial-label backfill run.** The S6 batch queue, S5 detail mini-labeler, and
+ADR-0050 D8 coverage diagnostics are built in the labeling-backfill tooling PR (record in
+[`DONE-LOG.md`](DONE-LOG.md)). Start with **Missing Protein**, then use **Missing a Primary Facet** and
+**No Editorial Labels** as coverage rises. The app writes only accepted suggestions through
+`reconcileSuggestedLabels`; missing is still a derived state, not an `Other` value.
 
-**Next live target — the labeling-backfill tooling, scoped with Jon 2026-08-04: one combined Codex dispatch of
-S6 + S5 + ADR-0050 D8.** The backfill's two gating prerequisites are **done** — OQ4 decided the editorial
-taxonomy and the seed slice shipped (PR [#277](https://github.com/jonphillips/yes-chef/pull/277)), so all six
-facets exist to label against. What remains is the tooling, then the run. **The full dispatch brief is
-[`efforts/recipe-facets.md`](efforts/recipe-facets.md) § "The dispatch — S6 + S5 + D8".** In short:
-- **S6 batch queue** (the substantive half) — couch review reusing `LabelProposer` +
-  `RecipeCategoryRepository.reconcileSuggestedLabels` (the sole writer, already takes a `recipeID`) +
-  `RecipeCollectionReviewSheet`. **Queue membership is a *selectable* derived coverage filter** in the reused
-  `RecipeActiveFilterBar` — three views (Missing Protein / Missing a primary facet / No editorial labels), all
-  query-time absence predicates, **no persisted `reviewed`/`Unclassified` row** (ADR-0050 D7). The one new query
-  capability is an "unclassified-in-facet" predicate.
-- **S5 mini-labeler** — standalone "Suggest labels" sheet off recipe **detail** (D5.2), same proposer/reconcile seam.
-- **ADR-0050 D8 diagnostics** — dev-only coverage measure; feeds the D6 gate and the OQ3 threshold.
-
-**No schema → no prod-promotion entry, no two-device pass** (writes go through the sync-tested reconcile path).
-Arc after this dispatch: **Jon's backfill run → ADR-0050 D6 gate opens → Power Browser S1 unblocks.**
+**No schema → no prod-promotion entry, no two-device pass.** The run supplies the D6 coverage measure and
+the numeric evidence for ADR-0050 OQ3; once primary facets classify a majority of the library, Power Browser S1
+becomes dispatchable.
 
 **ADR-0049 Amendment 2 (the facet model) is complete** — D1–D5 shipped + device-passed, D4 hand pass done, F1/F2
 approved (PR [#276](https://github.com/jonphillips/yes-chef/pull/276), device look owed on merge); full record in

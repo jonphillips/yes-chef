@@ -475,6 +475,12 @@ struct RecipeListView: View {
     .safeAreaInset(edge: .top, spacing: 0) {
       RecipeListStatusBar(model: model)
     }
+    .sheet(isPresented: $model.destination.labelingBackfill) {
+      RecipeLabelBackfillSheet(
+        recipeIDs: model.labelingQueueRecipeIDs,
+        coverageView: model.selectedLabelCoverageView
+      )
+    }
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {
         if model.isSelectingWorkbenchRecipes {
@@ -514,6 +520,12 @@ struct RecipeListView: View {
           showsSourceMetadata: $showsSourceMetadata,
           showsCategoryMetadata: $showsCategoryMetadata
         )
+        Button {
+          model.labelBackfillButtonTapped()
+        } label: {
+          Label("Label Recipes", systemImage: "tag.badge.plus")
+        }
+        .disabled(model.labelingQueueRecipeIDs.isEmpty)
         Button {
           model.filterButtonTapped()
         } label: {
@@ -739,6 +751,17 @@ private struct RecipeFilterView: View {
         if !model.selectedCategoryNames.isEmpty {
           Text("Recipes must match all selected categories. Parent categories include descendants.")
         }
+      }
+
+      Section("Labeling") {
+        Picker("Coverage view", selection: $model.selectedLabelCoverageView) {
+          ForEach(RecipeFacetCoverageView.allCases) { view in
+            Text(view.title).tag(view)
+          }
+        }
+        Text(model.selectedLabelCoverageView.detail)
+          .font(.footnote)
+          .foregroundStyle(.secondary)
       }
 
       Section("Fields") {

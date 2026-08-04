@@ -35,6 +35,11 @@ extension RecipeLibraryModel {
       .count
   }
 
+  var labelingQueueRecipeIDs: [Recipe.ID] {
+    let coverageIDs = facetCoverage.recipeIDs(matching: selectedLabelCoverageView)
+    return visibleRecipeRows.map(\.recipe.id).filter { coverageIDs.contains($0) }
+  }
+
   var hasActiveFilters: Bool {
     showsFavoritesOnly
       || showsPhotosOnly

@@ -71,6 +71,9 @@ struct RecipeDetailView: View {
       recipeToolbar
     }
     .recipeAskPresentation(model: model, isSplitEnabled: isSplitEnabled)
+    .sheet(isPresented: $model.destination.labelSuggestions) {
+      RecipeSuggestedLabelsSheet(model: model)
+    }
     .sheet(item: $model.destination.workbench) { presentation in
       NavigationStack {
         WorkbenchDetailView(
@@ -523,6 +526,16 @@ private struct RecipeReaderView: View {
       if let categoryDisplayNames = model.detail?.categoryDisplayNames, !categoryDisplayNames.isEmpty {
         WrappingLabels(labels: categoryDisplayNames, systemImage: "folder")
       }
+
+      Button {
+        model.suggestLabelsButtonTapped()
+      } label: {
+        Label(
+          model.detail?.categoryDisplayNames.isEmpty == false ? "Suggest More Labels" : "Suggest Labels",
+          systemImage: "tag.badge.plus"
+        )
+      }
+      .buttonStyle(.bordered)
 
       if let detail = model.detail, !detail.variations.isEmpty {
         RecipeVariationPicker(
