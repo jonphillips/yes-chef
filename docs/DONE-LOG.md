@@ -65,7 +65,8 @@ label re-runs the full coverage recompute; confirm Save & Next stays snappy acro
 =======
 ## App-layer pure logic moved to Core
 
-**Built 2026-08-04; branch `codex/app-tests-to-core-final`, awaiting architect review.** Spec:
+**✅ Approved (architect review) 2026-08-04; PR [#279](https://github.com/jonphillips/yes-chef/pull/279) OPEN,
+branch `codex/app-tests-to-core-final` — no device pass owed (pure relocation, no behavior change).** Spec:
 [`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md). **Core + app, no schema, no
 prod-schema entry, no device pass.** `RecipeScaleFormatting` and the `@MainActor @Observable`
 `WorkbenchCompareAlignmentModel` now compile in `YesChefCore`, with every app-facing type, initializer,
