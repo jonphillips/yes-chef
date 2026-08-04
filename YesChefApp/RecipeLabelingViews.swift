@@ -41,37 +41,40 @@ private struct RecipeTagEditorView: View {
   var body: some View {
     @Bindable var model = model
     let assignedIDs = Set(model.detail?.categories.map(\.id) ?? [])
+    let availableGroupsByID = Dictionary(uniqueKeysWithValues: availableGroups.map { ($0.id, $0) })
 
     Form {
       ForEach(groups) { group in
         Section(group.title) {
           if group.categories.isEmpty {
-            Text("No tags in this group.")
+            Text("None")
               .foregroundStyle(.secondary)
-          }
-          ForEach(group.categories) { category in
-            Button(role: .destructive) {
+          } else {
+            WrappingCategoryChips(categories: group.categories) { category in
               Task { _ = await model.deleteTagButtonTapped(category.id) }
-            } label: {
-              Label(category.name, systemImage: "minus.circle")
             }
           }
-        }
-      }
 
-      Section {
-        Menu {
-          ForEach(availableGroups) { group in
-            Menu(group.title) {
-              ForEach(group.categories) { category in
-                Button(category.name) {
-                  Task { _ = await model.addTagButtonTapped(category.id) }
+          Menu {
+            ForEach(availableGroupsByID[group.id]?.categories ?? []) { category in
+              Button {
+                Task {
+                  if assignedIDs.contains(category.id) {
+                    _ = await model.deleteTagButtonTapped(category.id)
+                  } else {
+                    _ = await model.addTagButtonTapped(category.id)
+                  }
                 }
+              } label: {
+                Label(
+                  category.name,
+                  systemImage: assignedIDs.contains(category.id) ? "checkmark" : "circle"
+                )
               }
             }
+          } label: {
+            Label("Add / Change", systemImage: "plus.circle")
           }
-        } label: {
-          Label("Add Tag", systemImage: "plus.circle")
         }
       }
 
@@ -87,15 +90,25 @@ private struct RecipeTagEditorView: View {
           ProgressView("Suggesting tags")
         }
         ForEach(model.labelState.suggestions) { suggestion in
-          Button {
-            model.suggestedLabelTapped(suggestion)
-          } label: {
-            Label(
-              suggestion.reviewTitle,
-              systemImage: model.isSuggestedLabelAccepted(suggestion) ? "checkmark.circle.fill" : "circle"
-            )
+          if case let .existingCategory(category) = suggestion, assignedIDs.contains(category.id) {
+            HStack {
+              Text(suggestion.reviewTitle)
+              Spacer()
+              Label("Added", systemImage: "checkmark.circle.fill")
+            }
+            .foregroundStyle(.secondary)
+            .accessibilityLabel("\(suggestion.reviewTitle), Added")
+          } else {
+            Button {
+              model.suggestedLabelTapped(suggestion)
+            } label: {
+              Label(
+                suggestion.reviewTitle,
+                systemImage: model.isSuggestedLabelAccepted(suggestion) ? "checkmark.circle.fill" : "circle"
+              )
+            }
+            .tint(model.isSuggestedLabelAccepted(suggestion) ? .green : .accentColor)
           }
-          .tint(model.isSuggestedLabelAccepted(suggestion) ? .green : .accentColor)
         }
         if model.hasAcceptedSuggestedLabels {
           Button("Add Selected") {
@@ -111,25 +124,40 @@ private struct RecipeTagEditorView: View {
     let categoriesByID = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0) })
     let assigned = model.detail?.categories ?? []
     let byFacetID = Dictionary(grouping: assigned, by: \.facetID)
-    let facetGroups = facets.compactMap { facet -> RecipeTagGroup? in
-      guard let categories = byFacetID[facet.id] else { return nil }
-      return RecipeTagGroup(title: facet.name, categories: sorted(categories, categoriesByID: categoriesByID))
+    let facetGroups = facets.map { facet in
+      RecipeTagGroup(
+        facetID: facet.id,
+        title: facet.name,
+        categories: sorted(byFacetID[facet.id] ?? [], categoriesByID: categoriesByID)
+      )
     }
     let loose = byFacetID[nil] ?? []
-    return facetGroups + (loose.isEmpty ? [] : [RecipeTagGroup(title: "Other Tags", categories: sorted(loose, categoriesByID: categoriesByID))])
+    return facetGroups + [
+      RecipeTagGroup(
+        facetID: nil,
+        title: "Other Tags",
+        categories: sorted(loose, categoriesByID: categoriesByID)
+      )
+    ]
   }
 
   private var availableGroups: [RecipeTagGroup] {
-    let assignedIDs = Set(model.detail?.categories.map(\.id) ?? [])
     let categoriesByID = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0) })
-    let available = categories.filter { !assignedIDs.contains($0.id) }
-    let facetGroups = facets.compactMap { facet -> RecipeTagGroup? in
-      let values = available.filter { $0.facetID == facet.id }
-      guard !values.isEmpty else { return nil }
-      return RecipeTagGroup(title: facet.name, categories: sorted(values, categoriesByID: categoriesByID))
+    let facetGroups = facets.map { facet in
+      RecipeTagGroup(
+        facetID: facet.id,
+        title: facet.name,
+        categories: sorted(categories.filter { $0.facetID == facet.id }, categoriesByID: categoriesByID)
+      )
     }
-    let loose = available.filter { $0.facetID == nil }
-    return facetGroups + (loose.isEmpty ? [] : [RecipeTagGroup(title: "Other Tags", categories: sorted(loose, categoriesByID: categoriesByID))])
+    let loose = categories.filter { $0.facetID == nil }
+    return facetGroups + [
+      RecipeTagGroup(
+        facetID: nil,
+        title: "Other Tags",
+        categories: sorted(loose, categoriesByID: categoriesByID)
+      )
+    ]
   }
 
   private func sorted(
@@ -144,8 +172,41 @@ private struct RecipeTagEditorView: View {
 }
 
 private struct RecipeTagGroup: Identifiable {
+  let facetID: Facet.ID?
   let title: String
   let categories: [YesChefCore.Category]
 
-  var id: String { title }
+  var id: String { facetID?.uuidString ?? "loose" }
+}
+
+private struct WrappingCategoryChips: View {
+  let categories: [YesChefCore.Category]
+  let onRemove: (YesChefCore.Category) -> Void
+
+  var body: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 8) {
+        chips
+      }
+      .fixedSize(horizontal: true, vertical: false)
+
+      VStack(alignment: .leading, spacing: 8) {
+        chips
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var chips: some View {
+    ForEach(categories) { category in
+      Button {
+        onRemove(category)
+      } label: {
+        Label(category.name, systemImage: "xmark")
+          .recipeChip()
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel("Remove \(category.name)")
+    }
+  }
 }
