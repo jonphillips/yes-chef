@@ -658,9 +658,10 @@ nowhere in the recipe). That split is the design.
 - **A4-D2 — Precision is the whole value; the floor is typed and narrow, never a substring sweep.** A
   false-firing floor trains the cook to distrust chips, which is worse than a quiet model — so it fires only
   where a false positive is near-impossible, via a declared per-facet rule table (in code, not synced config):
-  - **Protein** — whole-word match of a Protein value name against the **title or first ingredient line only.**
+  - **Protein** — whole-word match of a Protein value name against the **first ingredient line only.**
     (Matching every line fires `Protein → Eggs` on the KFC recipe, where eggs are breading, not the protein;
-    title-or-primary gives `Chicken` and not `Eggs`. This is the one recall/precision tunable.)
+    title matching creates additive false positives such as `Chicken-Fried Steak` → `Chicken`. Primary-only
+    gives `Chicken` for the KFC recipe without either failure. This is the one recall/precision tunable.)
   - **Technique** — whole-word match against the **title**, through a small hand-maintained past-tense alias map
     (`fried→Fry`, `grilled→Grill`, `roasted→Roast`, `braised→Braise`, `seared/sautéed→Sear/Sauté`,
     `smoked→Smoke`, `steamed→Steam`, `stir-fried→Stir-Fry`), longest alias first so "stir-fried" never resolves

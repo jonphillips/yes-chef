@@ -158,14 +158,28 @@ public struct RejectedLabelSuggestion: Codable, Equatable, Identifiable, Sendabl
   public var id: String { "\(raw)|\(reason)" }
 }
 
+/// Where a transient suggestion originated. This deliberately does not live on `SuggestedLabel`:
+/// source stops mattering after a cook accepts a chip and the repository reconciles it into a
+/// category assignment (ADR-0049 A4-D3).
+public enum SuggestionSource: Equatable, Sendable {
+  case deterministic
+  case model
+}
+
 /// The outcome of a label proposal: the mappable suggestions plus the ones that couldn't be mapped.
 public struct LabelProposal: Equatable, Sendable {
   public var accepted: [SuggestedLabel]
   public var rejected: [RejectedLabelSuggestion]
+  public var sources: [SuggestedLabel.ID: SuggestionSource]
 
-  public init(accepted: [SuggestedLabel] = [], rejected: [RejectedLabelSuggestion] = []) {
+  public init(
+    accepted: [SuggestedLabel] = [],
+    rejected: [RejectedLabelSuggestion] = [],
+    sources: [SuggestedLabel.ID: SuggestionSource] = [:]
+  ) {
     self.accepted = accepted
     self.rejected = rejected
+    self.sources = sources
   }
 }
 
@@ -218,11 +232,13 @@ extension LabelProposer: DependencyKey {
   public static var liveValue: Self {
     Self { recipe, vocabulary, tier, effort in
       @Dependency(\.modelClient) var modelClient
-      return try await call(recipe: recipe, vocabulary: vocabulary, tier: tier, effort: effort)
+      let deterministic = floor(recipe: recipe, vocabulary: vocabulary)
+      let model = try await call(recipe: recipe, vocabulary: vocabulary, tier: tier, effort: effort)
         .complete(using: modelClient) { response in
           guard !response.wasTruncated else { throw LabelProposerError.responseTruncated }
           return try parse(response.text, vocabulary: vocabulary)
         }
+      return union(deterministic: deterministic, model: model)
     }
   }
 
@@ -321,6 +337,59 @@ extension LabelProposer: DependencyKey {
     "additionalProperties": .bool(false),
   ]
 
+  /// Proposes labels whose evidence is stated directly in a narrow, typed part of a recipe. The
+  /// rules intentionally privilege precision over recall: a floor false positive is more harmful
+  /// than leaving an inferred label for the model and the cook to review (ADR-0049 A4-D2).
+  public static func floor(recipe: LabelProposalRecipe, vocabulary: LabelVocabulary) -> [SuggestedLabel] {
+    var suggestions: [SuggestedLabel] = []
+    var seenIDs: Set<SuggestedLabel.ID> = []
+
+    func append(_ categories: [Category]) {
+      for category in categories {
+        let suggestion = SuggestedLabel.existingCategory(category)
+        if seenIDs.insert(suggestion.id).inserted {
+          suggestions.append(suggestion)
+        }
+      }
+    }
+
+    // These are English starter-facet names. A user rename deliberately opts that facet out of
+    // this best-effort floor; the model proposal remains available for it.
+    if let protein = categories(inFacetNamed: "Protein", vocabulary: vocabulary) {
+      let primaryIngredient = recipe.ingredientLines.first ?? ""
+      append(protein.filter { containsWholeWords($0.name, in: primaryIngredient) })
+    }
+
+    if let technique = categories(inFacetNamed: "Technique", vocabulary: vocabulary) {
+      append(technique.filter { containsWholeWords($0.name, in: recipe.title) })
+      append(techniqueCategoriesMatchedByAlias(in: recipe.title, categories: technique))
+    }
+
+    if let dishType = categories(inFacetNamed: "Dish Type", vocabulary: vocabulary) {
+      append(dishType.filter { containsWholeWords($0.name, in: recipe.title) })
+    }
+
+    return suggestions
+  }
+
+  /// The floor is authoritative wherever it overlaps the model. Keep the model's rejected
+  /// suggestions so malformed model output remains visible to callers.
+  static func union(deterministic: [SuggestedLabel], model: LabelProposal) -> LabelProposal {
+    var accepted: [SuggestedLabel] = []
+    var sources: [SuggestedLabel.ID: SuggestionSource] = [:]
+    var seenIDs: Set<SuggestedLabel.ID> = []
+
+    for suggestion in deterministic where seenIDs.insert(suggestion.id).inserted {
+      accepted.append(suggestion)
+      sources[suggestion.id] = .deterministic
+    }
+    for suggestion in model.accepted where seenIDs.insert(suggestion.id).inserted {
+      accepted.append(suggestion)
+      sources[suggestion.id] = model.sources[suggestion.id] ?? .model
+    }
+    return LabelProposal(accepted: accepted, rejected: model.rejected, sources: sources)
+  }
+
   public static func parse(_ text: String, vocabulary: LabelVocabulary) throws -> LabelProposal {
     guard
       let json = jsonObjectSlice(text),
@@ -331,6 +400,7 @@ extension LabelProposer: DependencyKey {
     // Tolerate-preserve-report: one unmappable path must not sink the whole batch (ADR-0049 D2).
     var accepted: [SuggestedLabel] = []
     var rejected: [RejectedLabelSuggestion] = []
+    var sources: [SuggestedLabel.ID: SuggestionSource] = [:]
     var seenIDs: Set<SuggestedLabel.ID> = []
 
     for raw in response.suggestions {
@@ -346,12 +416,13 @@ extension LabelProposer: DependencyKey {
           continue
         }
         accepted.append(suggestion)
+        sources[suggestion.id] = .model
       } catch let failure as MappingFailure {
         rejected.append(RejectedLabelSuggestion(raw: failure.raw, reason: failure.reason))
       }
     }
 
-    return LabelProposal(accepted: accepted, rejected: rejected)
+    return LabelProposal(accepted: accepted, rejected: rejected, sources: sources)
   }
 
   /// Thrown per suggestion so `parse` can collect it into `rejected` instead of failing the batch.
@@ -449,9 +520,78 @@ extension LabelProposer: DependencyKey {
   }
 
   private static func namesMatch(_ lhs: String, _ rhs: String) -> Bool {
-    lhs.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-      == rhs.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    foldedText(lhs) == foldedText(rhs)
   }
+
+  private static func categories(inFacetNamed name: String, vocabulary: LabelVocabulary) -> [Category]? {
+    guard let facet = vocabulary.facets.first(where: { namesMatch($0.name, name) }) else { return nil }
+    return vocabulary.categories.filter { $0.facetID == facet.id }
+  }
+
+  private static func containsWholeWords(_ candidate: String, in text: String) -> Bool {
+    let candidateWords = foldedWords(in: candidate)
+    let textWords = foldedWords(in: text)
+    guard !candidateWords.isEmpty, candidateWords.count <= textWords.count else { return false }
+    return textWords.indices.contains { start in
+      let end = textWords.index(start, offsetBy: candidateWords.count, limitedBy: textWords.endIndex) ?? textWords.endIndex
+      return Array(textWords[start..<end]) == candidateWords
+    }
+  }
+
+  /// The aliases are the complete A4-D2 past-tense map. Scan left-to-right and consume the
+  /// longest match so `stir-fried` cannot also be read as the shorter `fried` alias.
+  private static func techniqueCategoriesMatchedByAlias(
+    in title: String,
+    categories: [Category]
+  ) -> [Category] {
+    let aliases = techniqueAliases.sorted { lhs, rhs in
+      let lhsWords = foldedWords(in: lhs.source)
+      let rhsWords = foldedWords(in: rhs.source)
+      if lhsWords.count != rhsWords.count { return lhsWords.count > rhsWords.count }
+      return lhsWords.joined().count > rhsWords.joined().count
+    }
+    let titleWords = foldedWords(in: title)
+    var matches: [Category] = []
+    var index = titleWords.startIndex
+
+    while index < titleWords.endIndex {
+      guard let alias = aliases.first(where: { alias in
+        let aliasWords = foldedWords(in: alias.source)
+        let end = titleWords.index(index, offsetBy: aliasWords.count, limitedBy: titleWords.endIndex) ?? titleWords.endIndex
+        return Array(titleWords[index..<end]) == aliasWords
+      }) else {
+        index = titleWords.index(after: index)
+        continue
+      }
+      if let category = categories.first(where: { foldedWords(in: $0.name) == foldedWords(in: alias.target) }) {
+        matches.append(category)
+      }
+      index = titleWords.index(index, offsetBy: foldedWords(in: alias.source).count)
+    }
+    return matches
+  }
+
+  private static func foldedWords(in text: String) -> [String] {
+    foldedText(text)
+      .split { !$0.isLetter && !$0.isNumber }
+      .map(String.init)
+  }
+
+  private static func foldedText(_ text: String) -> String {
+    text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+  }
+
+  private static let techniqueAliases: [(source: String, target: String)] = [
+    ("stir-fried", "Stir-Fry"),
+    ("sautéed", "Sear/Sauté"),
+    ("braised", "Braise"),
+    ("grilled", "Grill"),
+    ("roasted", "Roast"),
+    ("seared", "Sear/Sauté"),
+    ("smoked", "Smoke"),
+    ("steamed", "Steam"),
+    ("fried", "Fry"),
+  ]
 
   private struct Response: Decodable {
     var suggestions: [RawSuggestion]
