@@ -630,3 +630,66 @@ works today without the browser; ADR-0050 S6 inherits the predicate and the entr
 them. The couch-scale "few hundred in a sitting" ergonomics D5.3 optimized for are given up deliberately — the
 per-recipe editor is slower per recipe but is the surface Jon will actually use, and the discovery list still
 makes the backlog walkable.
+
+## Amendment 4 — the proposer's **surface-evident** labels come from a deterministic floor, not the model (2026-08-04)
+
+Status: **Accepted** — 2026-08-04, pre-production, from Jon's device pass on the merged **ADR-0004 S4**
+structured-output opt-in. Follows A3-D4 (raise effort) and ADR-0004 S4 (guided structured output) as the third
+and final correction to on-device proposer quality. **No schema** — the floor and its provenance live only on
+the transient `LabelProposal`.
+
+**Why.** With structured output landed, the on-device model now returns clean, well-formed JSON — the *format*
+failure ADR-0004 chased is gone. What remains is **recall**. On *'Original Recipe' Fried Chicken Tenders* (LA
+Times), at high effort with a guided schema, the model returned a single suggestion: `Cuisine → American`. It
+missed `Protein → Chicken` (ingredient line 1) and `Technique → Fry` (the title says "Fried") — both **exact
+existing vocabulary values, present verbatim in the recipe text.** The prompt is tuned to *suppress*
+over-generation ("small set," "cheaper," "exceptional," "rarely") and a small model takes the hint literally,
+but the deeper error is ours: **we are asking a weak stochastic model to do a substring match's job.** The one
+tag it *did* get — `American` — is the one requiring **inference** (KFC-style ⇒ American; the word appears
+nowhere in the recipe). That split is the design.
+
+- **A4-D1 — The floor owns the surface-evident; the model owns the inferred.** A deterministic pre-pass matches
+  recipe text against exact existing vocabulary values and emits `existingCategory` suggestions for confident
+  hits; the model keeps only the calls where the label is *inferred* rather than *stated* (cuisine,
+  course, dietary, judgment-level dish type). This is squarely the ADR-0022 boundary
+  ([[llm-vs-determinism-surface-boundary]]): the floor is not a write, it is an advisory suggestion the cook
+  still reviews — so it is safe — but it is deterministic **where determinism is available**, and reserves the
+  model for where it is not.
+- **A4-D2 — Precision is the whole value; the floor is typed and narrow, never a substring sweep.** A
+  false-firing floor trains the cook to distrust chips, which is worse than a quiet model — so it fires only
+  where a false positive is near-impossible, via a declared per-facet rule table (in code, not synced config):
+  - **Protein** — whole-word match of a Protein value name against the **title or first ingredient line only.**
+    (Matching every line fires `Protein → Eggs` on the KFC recipe, where eggs are breading, not the protein;
+    title-or-primary gives `Chicken` and not `Eggs`. This is the one recall/precision tunable.)
+  - **Technique** — whole-word match against the **title**, through a small hand-maintained past-tense alias map
+    (`fried→Fry`, `grilled→Grill`, `roasted→Roast`, `braised→Braise`, `seared/sautéed→Sear/Sauté`,
+    `smoked→Smoke`, `steamed→Steam`, `stir-fried→Stir-Fry`), longest alias first so "stir-fried" never resolves
+    to `Fry`.
+  - **Dish Type** — **title-only** whole-word match (so "salad dressing" in the ingredients does not tag `Salad`).
+  - **Excluded entirely:** Cuisine, Course, Dietary (inferred — the model's job) and **all loose labels** (that
+    namespace is authors and workflow tags — "Favorite," "Barbuto By Jonathan Waxman" — pure noise for token
+    matching). Matching reuses the existing `namesMatch` folding, widened to whole-word.
+- **A4-D3 — Source is a sidecar on the transient proposal; the accepted-chip shape is untouched.**
+  `LabelProposal` gains `sources: [SuggestedLabel.ID: SuggestionSource]` where `SuggestionSource` is
+  `.deterministic | .model`. It is **not** a field on `SuggestedLabel` — source is meaningless once a chip is
+  accepted and reconciled into a real category join, so the persisted `Codable` value stays clean and nothing
+  new syncs. The two suggestion sets **merge deduped on the existing `SuggestedLabel.id`, deterministic-wins:**
+  a tag both found is shown once and attributed `.deterministic` (the floor is authoritative for the
+  surface-evident dimensions).
+- **A4-D4 — Source keeps the D6 coverage measure honest.** ADR-0050 D6's coverage number must measure the
+  *model* on the calls only it can make, or the floor's recall masquerades as model recall and the number lies
+  about whether the on-device tier is good enough. DEBUG Model Calls / Facet Coverage read the source split;
+  the chip UI may badge deterministic suggestions but need not. Same "the record is derived, never authored"
+  discipline as ADR-0043.
+
+**Scope note — what this is not.** Two sibling quality levers stay **out of this amendment**, each wanting its
+own eval: (1) de-suppressing the prompt and trimming the giant loose-label dump from the on-device context, and
+(2) escalate-on-miss / running the backfill at a frontier tier — a deliberate knob, not a fallback, since a
+clean structured hit triggers no retry. The floor is deterministic-only, ships first because it fixes recall
+without a prompt eval, and **must precede Jon's backfill run** for the D6 number to mean anything.
+
+**Consequences.** The proposer stops asking a weak model to recognize words already in front of it; the KFC
+recipe yields three good tags (`Chicken` + `Fry` from the floor, `American` from the model) instead of one. The
+floor is pure Core logic, schema-free and sync-free, fully unit-testable, with the KFC recipe as the
+precision-anchor fixture: it fires `Chicken` + `Fry`, and does **not** fire `Eggs`, any loose label, or an
+inferred cuisine.
