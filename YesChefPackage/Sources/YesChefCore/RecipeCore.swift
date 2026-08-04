@@ -266,10 +266,13 @@ public enum RecipeRepository {
       .fetchAll(db)
       .sorted(by: areServeWithInDisplayOrder)
     let activeVariationID = try activeVariationID(recipeID: recipeID, variations: variations, in: db)
-    let allCategories = try Category.fetchAll(db)
+    let allCategories = CategoryRepository.visibleCategories(
+      try Category.fetchAll(db),
+      facets: try Facet.fetchAll(db)
+    )
     let categoriesByID = Dictionary(uniqueKeysWithValues: allCategories.map { ($0.id, $0) })
-    let categories = allCategories
-      .filter { category in recipeCategories.contains { $0.categoryID == category.id } }
+    let categories = recipeCategories
+      .compactMap { categoriesByID[$0.categoryID] }
       .sorted { $0.sortOrder < $1.sortOrder }
     let categoryDisplayNames = categories.map {
       CategoryHierarchy.displayName(for: $0, categoriesByID: categoriesByID)

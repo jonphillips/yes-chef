@@ -470,6 +470,60 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func hiddenCategoryAssignmentsAreSuppressedFromRecipeReadsAndRestoreWhenUnhidden() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 816_360_000)
+      var ids = SampleUUIDSequence(start: 93_100)
+
+      try database.write { db in
+        let cuisine = try CategoryRepository.createFacet(
+          name: "Cuisine", in: db, now: now, uuid: { ids.next() }
+        )
+        let course = try CategoryRepository.createFacet(
+          name: "Course", in: db, now: now, uuid: { ids.next() }
+        )
+        let visibleValue = try CategoryRepository.createCategory(
+          name: "Thai", facetID: cuisine.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+        let hiddenValue = try CategoryRepository.createCategory(
+          name: "Korean", facetID: cuisine.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+        let hiddenFacetValue = try CategoryRepository.createCategory(
+          name: "Dinner", facetID: course.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+        let recipe = Recipe(id: ids.next(), title: "Hidden Labels", dateCreated: now, dateModified: now)
+        try Recipe.insert { recipe }.execute(db)
+        for categoryID in [visibleValue.id, hiddenValue.id, hiddenFacetValue.id] {
+          try RecipeCategory.insert {
+            RecipeCategory(id: ids.next(), recipeID: recipe.id, categoryID: categoryID)
+          }
+          .execute(db)
+        }
+
+        try CategoryRepository.setCategoryHidden(categoryID: hiddenValue.id, hidden: true, in: db)
+        try CategoryRepository.setFacetHidden(facetID: course.id, hidden: true, in: db)
+
+        let hiddenListRow = try #require(try RecipeListRequest().fetch(db).first { $0.recipe.id == recipe.id })
+        let hiddenDetail = try #require(try RecipeDetailRequest(recipeID: recipe.id).fetch(db))
+        expectNoDifference(hiddenListRow.categoryNames, ["Thai"])
+        expectNoDifference(hiddenListRow.categoryFilterNames, ["Thai"])
+        expectNoDifference(hiddenDetail.categoryDisplayNames, ["Thai"])
+        #expect(Set(try RecipeCategory.where { $0.recipeID.eq(recipe.id) }.fetchAll(db).map(\.categoryID)) == [
+          visibleValue.id, hiddenValue.id, hiddenFacetValue.id,
+        ])
+
+        try CategoryRepository.setCategoryHidden(categoryID: hiddenValue.id, hidden: false, in: db)
+        try CategoryRepository.setFacetHidden(facetID: course.id, hidden: false, in: db)
+
+        let restoredListRow = try #require(try RecipeListRequest().fetch(db).first { $0.recipe.id == recipe.id })
+        let restoredDetail = try #require(try RecipeDetailRequest(recipeID: recipe.id).fetch(db))
+        #expect(Set(restoredListRow.categoryNames) == ["Thai", "Korean", "Dinner"])
+        #expect(Set(restoredListRow.categoryFilterNames) == ["Thai", "Korean", "Dinner"])
+        #expect(Set(restoredDetail.categoryDisplayNames) == ["Thai", "Korean", "Dinner"])
+      }
+    }
+
+    @Test
     func acceptingAProposedValueUnhidesAnExactHiddenFacetMatch() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 816_375_000)
