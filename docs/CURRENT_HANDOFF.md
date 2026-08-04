@@ -110,20 +110,6 @@ one key, so any of those recipes on a menu puts "Gather your ingredient" on the 
 - **P2 (Milk Street's all-caps) is DECLINED**; P3's Amd1-D1 dependency is now discharged (shipped 2026-07-28)
   but it stays parked behind the declined P2. Don't build either on momentum.
 
-**[`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) — one optional follow-on.
-Small, unhurried, no decisions outstanding.** Move `WorkbenchCompareAlignmentModel` and
-`RecipeScaleFormatting` — SwiftUI-free logic sitting in `YesChefApp/` — down to Core. The app target runs
-again (2026-07-29), so these tests execute; the motive is the "keep pure logic out of the App layer" corollary
-plus that Core runs on every dispatch with **no flag and no simulator** (the app target still needs
-`YESCHEF_RUN_APP_TESTS=1`).
-- **Rider:** S0.1's `ServeWithRepairPresentation` is SwiftUI-free value logic over Core types (`Recipe`,
-  `ServeWithCodingError`), so it and its three tests move down cleanly and run with no flag. Only the two
-  model-routing tests (`RecipeDetailModel` / `WorkbenchDetailModel` `presentServeWithRepair`) need the app
-  target. Do not open a separate PR for it.
-- Two older riders — the yield-scaling fix already left two app-layer assertions redundant (flagged for this
-  sweep, not deleted drive-by), and a file added to `YesChefAppTests` without re-running `xcodegen generate` is
-  silently excluded from the bundle.
-
 **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell. Unblocked
 but unscheduled.** Its gate was satisfied 2026-07-25; nothing holds it except appetite. It moves all eight
 chat call sites, which now inherit **one** Ask rather than six.
