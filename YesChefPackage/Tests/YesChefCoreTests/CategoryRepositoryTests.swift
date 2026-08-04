@@ -179,7 +179,20 @@ extension RecipeCoreTests {
         )
         #expect(throws: CategoryRepositoryError.parentFacetMismatch) {
           try CategoryRepository.updateCategory(
-            categoryID: cuisineValue.id, name: cuisineValue.name, parentCategoryID: courseValue.id, in: db
+            categoryID: cuisineValue.id,
+            name: cuisineValue.name,
+            facetID: nil,
+            parentCategoryID: courseValue.id,
+            in: db
+          )
+        }
+        #expect(throws: CategoryRepositoryError.parentFacetMismatch) {
+          try CategoryRepository.updateCategory(
+            categoryID: cuisineValue.id,
+            name: cuisineValue.name,
+            facetID: cuisine.id,
+            parentCategoryID: courseValue.id,
+            in: db
           )
         }
       }
@@ -205,10 +218,185 @@ extension RecipeCoreTests {
         let join = RecipeCategory(id: ids.next(), recipeID: recipe.id, categoryID: loose.id)
         try RecipeCategory.insert { join }.execute(db)
 
-        try CategoryRepository.updateCategory(categoryID: loose.id, name: "Fast", parentCategoryID: parent.id, in: db)
+        try CategoryRepository.updateCategory(
+          categoryID: loose.id,
+          name: "Fast",
+          facetID: cuisine.id,
+          parentCategoryID: parent.id,
+          in: db
+        )
         expectNoDifference(try Category.find(loose.id).fetchOne(db)?.facetID, cuisine.id)
         expectNoDifference(try Category.find(loose.id).fetchOne(db)?.parentCategoryID, parent.id)
         expectNoDifference(try RecipeCategory.find(join.id).fetchOne(db)?.categoryID, loose.id)
+      }
+    }
+
+    @Test
+    func movingLegacyLooseHierarchyIntoAGroupCascadesToItsDescendants() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 816_260_000)
+      var ids = SampleUUIDSequence(start: 91_500)
+
+      try database.write { db in
+        let facet = try CategoryRepository.createFacet(
+          name: "Dish Type", in: db, now: now, uuid: { ids.next() }
+        )
+        let root = Category(id: ids.next(), name: "Weeknight", sortOrder: 0, dateCreated: now)
+        let child = Category(
+          id: ids.next(), name: "Fast", parentCategoryID: root.id, sortOrder: 0, dateCreated: now
+        )
+        try Category.insert { root }.execute(db)
+        try Category.insert { child }.execute(db)
+
+        try CategoryRepository.updateCategory(
+          categoryID: root.id, name: root.name, facetID: facet.id, parentCategoryID: nil, in: db
+        )
+
+        expectNoDifference(try Category.find(root.id).fetchOne(db)?.facetID, facet.id)
+        expectNoDifference(try Category.find(child.id).fetchOne(db)?.facetID, facet.id)
+      }
+    }
+
+    @Test
+    func movingAValueToLooseRejectsChildrenButAllowsALeaf() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 816_270_000)
+      var ids = SampleUUIDSequence(start: 91_750)
+
+      try database.write { db in
+        let facet = try CategoryRepository.createFacet(
+          name: "Dish Type", in: db, now: now, uuid: { ids.next() }
+        )
+        let root = try CategoryRepository.createCategory(
+          name: "Dinner", facetID: facet.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+        _ = try CategoryRepository.createCategory(
+          name: "Quick", facetID: facet.id, parentCategoryID: root.id, in: db, now: now, uuid: { ids.next() }
+        )
+        let leaf = try CategoryRepository.createCategory(
+          name: "Weeknight", facetID: facet.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+
+        #expect(throws: CategoryRepositoryError.looseLabelsCannotHaveChildren) {
+          try CategoryRepository.updateCategory(
+            categoryID: root.id, name: root.name, facetID: nil, parentCategoryID: nil, in: db
+          )
+        }
+        try CategoryRepository.updateCategory(
+          categoryID: leaf.id, name: leaf.name, facetID: nil, parentCategoryID: nil, in: db
+        )
+        expectNoDifference(try Category.find(leaf.id).fetchOne(db)?.facetID, nil)
+      }
+    }
+
+    @Test
+    func movingAGroupValueToAnotherGroupCascadesToItsDescendants() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 816_280_000)
+      var ids = SampleUUIDSequence(start: 92_000)
+
+      try database.write { db in
+        let firstFacet = try CategoryRepository.createFacet(
+          name: "Cuisine", in: db, now: now, uuid: { ids.next() }
+        )
+        let secondFacet = try CategoryRepository.createFacet(
+          name: "Course", in: db, now: now, uuid: { ids.next() }
+        )
+        let root = try CategoryRepository.createCategory(
+          name: "Regional", facetID: firstFacet.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+        let child = try CategoryRepository.createCategory(
+          name: "Italian", facetID: firstFacet.id, parentCategoryID: root.id, in: db, now: now, uuid: { ids.next() }
+        )
+
+        try CategoryRepository.updateCategory(
+          categoryID: root.id, name: root.name, facetID: secondFacet.id, parentCategoryID: nil, in: db
+        )
+
+        expectNoDifference(try Category.find(root.id).fetchOne(db)?.facetID, secondFacet.id)
+        expectNoDifference(try Category.find(child.id).fetchOne(db)?.facetID, secondFacet.id)
+      }
+    }
+
+    @Test
+    func movingOntoAnExistingValueMergesIntoThatValue() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 816_290_000)
+      var ids = SampleUUIDSequence(start: 92_250)
+
+      try database.write { db in
+        _ = try CategoryRepository.seedStarterFacets(in: db)
+        let cuisine = try #require(try Facet.fetchAll(db).first { $0.name == "Cuisine" })
+        let existing = try #require(try Category.fetchAll(db).first {
+          $0.facetID == cuisine.id && $0.parentCategoryID == nil && $0.name == "Chinese"
+        })
+        let source = try CategoryRepository.createCategory(
+          name: "Chinese", parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+        let child = Category(
+          id: ids.next(), name: "Regional", parentCategoryID: source.id, sortOrder: 0, dateCreated: now
+        )
+        try Category.insert { child }.execute(db)
+        let recipe = Recipe(id: ids.next(), title: "Noodles", dateCreated: now, dateModified: now)
+        let assignment = RecipeCategory(id: ids.next(), recipeID: recipe.id, categoryID: source.id)
+        try Recipe.insert { recipe }.execute(db)
+        try RecipeCategory.insert { assignment }.execute(db)
+
+        try CategoryRepository.updateCategory(
+          categoryID: source.id, name: source.name, facetID: cuisine.id, parentCategoryID: nil, in: db
+        )
+
+        #expect(try Category.find(source.id).fetchOne(db) == nil)
+        #expect(try Category.find(existing.id).fetchOne(db) != nil)
+        expectNoDifference(try RecipeCategory.find(assignment.id).fetchOne(db)?.categoryID, existing.id)
+        expectNoDifference(try Category.find(child.id).fetchOne(db)?.facetID, cuisine.id)
+        expectNoDifference(try Category.find(child.id).fetchOne(db)?.parentCategoryID, existing.id)
+      }
+    }
+
+    @Test
+    func renamingInPlaceOntoAnExistingSiblingStillFails() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 816_300_000)
+      var ids = SampleUUIDSequence(start: 92_500)
+
+      try database.write { db in
+        let facet = try CategoryRepository.createFacet(
+          name: "Dish Type", in: db, now: now, uuid: { ids.next() }
+        )
+        _ = try CategoryRepository.createCategory(
+          name: "Dinner", facetID: facet.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+        let lunch = try CategoryRepository.createCategory(
+          name: "Lunch", facetID: facet.id, parentCategoryID: nil, in: db, now: now, uuid: { ids.next() }
+        )
+
+        #expect(throws: CategoryRepositoryError.duplicateSibling(name: "Dinner")) {
+          try CategoryRepository.updateCategory(
+            categoryID: lunch.id, name: "Dinner", facetID: facet.id, parentCategoryID: nil, in: db
+          )
+        }
+      }
+    }
+
+    @Test
+    func movingAStarterCategoryIsAllowed() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 816_310_000)
+      var ids = SampleUUIDSequence(start: 92_750)
+
+      try database.write { db in
+        _ = try CategoryRepository.seedStarterFacets(in: db)
+        let starter = try #require(try Category.fetchAll(db).first { $0.name == "Chinese" })
+        let destination = try CategoryRepository.createFacet(
+          name: "Regional", in: db, now: now, uuid: { ids.next() }
+        )
+
+        try CategoryRepository.updateCategory(
+          categoryID: starter.id, name: starter.name, facetID: destination.id, parentCategoryID: nil, in: db
+        )
+
+        expectNoDifference(try Category.find(starter.id).fetchOne(db)?.facetID, destination.id)
       }
     }
 

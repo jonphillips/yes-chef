@@ -33,6 +33,10 @@ final class CategoryManagementModel {
     categories.filter { $0.facetID == nil }
   }
 
+  var visibleFacets: [Facet] {
+    facets.filter { !$0.hidden }
+  }
+
   func addCategoryGroupButtonTapped() {
     facetEditor = FacetEditorModel()
   }
@@ -112,6 +116,7 @@ final class CategoryManagementModel {
           try CategoryRepository.updateCategory(
             categoryID: categoryID,
             name: editor.name,
+            facetID: editor.facetID,
             parentCategoryID: editor.parentCategoryID,
             in: db
           )
