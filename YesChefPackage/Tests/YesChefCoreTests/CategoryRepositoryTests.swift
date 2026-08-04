@@ -18,7 +18,7 @@ extension RecipeCoreTests {
         _ = try CategoryRepository.seedStarterFacets(in: db)
         expectNoDifference(try Facet.fetchAll(db).sorted { $0.id.uuidString < $1.id.uuidString }, firstFacets)
         expectNoDifference(try Category.fetchAll(db).sorted { $0.id.uuidString < $1.id.uuidString }, firstCategories)
-        #expect(firstFacets.map(\.name) == ["Cuisine", "Course"])
+        #expect(firstFacets.map(\.name) == ["Cuisine", "Course", "Protein", "Dietary", "Dish Type", "Technique"])
         #expect(firstCategories.allSatisfy { $0.facetID != nil && $0.parentCategoryID == nil })
         #expect(!secondAudit.requiresReview)
       }
@@ -630,4 +630,93 @@ extension RecipeCoreTests {
       }
     }
   }
+
+  @Suite
+  struct StarterFacetSeedTests {
+    @Test
+    func editorialStarterFacetsSeedWithStableIDsAndAreIdempotent() throws {
+      @Dependency(\.defaultDatabase) var database
+      let expectedFacets: [(ordinal: UInt8, name: String)] = [
+        (21, "Protein"), (22, "Dietary"), (23, "Dish Type"), (24, "Technique"),
+      ]
+      let expectedValues: [(ordinal: UInt8, name: String, facetOrdinal: UInt8)] = [
+        (25, "Chicken", 21), (26, "Beef", 21), (27, "Pork", 21), (28, "Lamb", 21),
+        (29, "Fish", 21), (30, "Shellfish", 21), (31, "Turkey", 21), (32, "Duck", 21),
+        (33, "Sausage", 21), (34, "Eggs", 21), (35, "Tofu", 21), (36, "Beans & Legumes", 21),
+        (37, "Vegetarian", 22), (38, "Vegan", 22), (39, "Gluten-Free", 22), (40, "Dairy-Free", 22),
+        (41, "Nut-Free", 22), (42, "Low-Carb", 22), (43, "Paleo", 22), (44, "Pescatarian", 22),
+        (45, "Soup", 23), (46, "Stew", 23), (47, "Salad", 23), (48, "Sandwich", 23),
+        (49, "Pasta", 23), (50, "Pizza", 23), (51, "Taco", 23), (52, "Curry", 23),
+        (53, "Casserole", 23), (54, "Bowl", 23), (55, "Bread", 23), (56, "Dumpling", 23),
+        (57, "Pie", 23), (58, "Cake", 23), (59, "Cookie", 23),
+        (60, "Grill", 24), (61, "Roast", 24), (62, "Braise", 24), (63, "Sear/Sauté", 24),
+        (64, "Fry", 24), (65, "Stir-Fry", 24), (66, "Sous Vide", 24), (67, "Slow Cooker", 24),
+        (68, "Pressure Cooker", 24), (69, "Air Fryer", 24), (70, "Bake", 24), (71, "Smoke", 24),
+        (72, "Steam", 24), (73, "No-Cook", 24),
+      ]
+
+      try database.write { db in
+        _ = try CategoryRepository.seedStarterFacets(in: db)
+        let firstFacets = try Facet.fetchAll(db).sorted { $0.id.uuidString < $1.id.uuidString }
+        let firstCategories = try Category.fetchAll(db).sorted { $0.id.uuidString < $1.id.uuidString }
+        let secondAudit = try CategoryRepository.seedStarterFacets(in: db)
+
+        for expectedFacet in expectedFacets {
+          let facet = try #require(firstFacets.first { $0.id == starterFacetSeedID(expectedFacet.ordinal) })
+          #expect(facet.name == expectedFacet.name)
+          #expect(CategoryRepository.isStarterFacet(facet.id))
+        }
+        for expectedValue in expectedValues {
+          let category = try #require(firstCategories.first { $0.id == starterFacetSeedID(expectedValue.ordinal) })
+          #expect(category.name == expectedValue.name)
+          #expect(category.facetID == starterFacetSeedID(expectedValue.facetOrdinal))
+        }
+        #expect(secondAudit.seededFacetIDs.isEmpty)
+        #expect(secondAudit.seededCategoryIDs.isEmpty)
+        #expect(try Facet.fetchAll(db).count == firstFacets.count)
+        #expect(try Category.fetchAll(db).count == firstCategories.count)
+      }
+    }
+
+    @Test
+    func editorialStarterFacetsAreNonDeletable() throws {
+      @Dependency(\.defaultDatabase) var database
+
+      try database.write { db in
+        _ = try CategoryRepository.seedStarterFacets(in: db)
+        for name in ["Protein", "Dietary", "Dish Type", "Technique"] {
+          let facet = try #require(try Facet.fetchAll(db).first { $0.name == name })
+          #expect(throws: CategoryRepositoryError.cannotDeleteStarterFacet) {
+            try CategoryRepository.deleteFacet(facetID: facet.id, in: db)
+          }
+        }
+      }
+    }
+
+    @Test
+    func proteinLooseLabelWithNonStarterChildIsNotPromotedByNameFallback() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 816_160_000)
+      let proteinID = SampleUUIDSequence.uuid(22)
+      let customChildID = SampleUUIDSequence.uuid(23)
+
+      try database.write { db in
+        try Category.insert { Category(id: proteinID, name: "Protein", sortOrder: 0, dateCreated: now) }.execute(db)
+        try Category.insert {
+          Category(id: customChildID, name: "Custom Cut", parentCategoryID: proteinID, sortOrder: 0, dateCreated: now)
+        }
+        .execute(db)
+
+        let audit = try CategoryRepository.seedStarterFacets(in: db)
+        #expect(!audit.fallbackMatchedRootCategoryIDs.contains(proteinID))
+        #expect(!audit.promotedRoots.contains(where: { $0.category.id == proteinID }))
+        expectNoDifference(try Category.find(proteinID).fetchOne(db)?.facetID, nil)
+        expectNoDifference(try Category.find(customChildID).fetchOne(db)?.parentCategoryID, proteinID)
+      }
+    }
+  }
+}
+
+private func starterFacetSeedID(_ ordinal: UInt8) -> UUID {
+  UUID(uuid: (0xA4, 0xD9, 0x00, 0x02, 0x00, 0x00, 0x40, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, ordinal))
 }
