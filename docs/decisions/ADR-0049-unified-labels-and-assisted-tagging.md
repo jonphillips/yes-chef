@@ -546,11 +546,42 @@ layer up.
   rather than the taxonomy. Accepted — source filters give the same browsing power without a second store, and
   ADR-0006's typed fields are the ones capture already populates.
 
+- **OQ4 — editorial taxonomy decided (closed 2026-08-04, Jon).** Four editorial facets earn a seat alongside
+  `Cuisine` and `Course`: **Protein, Dietary, Dish Type, Technique** — seeded flat with fixed ids and starter
+  values (below), the same deterministic post-`makeSyncEngine` seed shape D1 used for Cuisine/Course.
+
+  **Declined, with reason** (the anti-sprawl bar is "will I browse by this," not "is this a plausible axis"):
+  **Featured Ingredient** — an unbounded vocabulary (every ingredient); this is ingredient full-text search, not
+  a curated facet, and the publisher `keywords` harvest already lands the long tail as loose labels.
+  **Practical** (Quick / Make-Ahead / Freezer-Friendly / One-Pot) — these are
+  [ADR-0050](ADR-0050-recipe-power-browser.md) D7 typed/derived *attributes*, not taxonomy; a "Under 60 min"
+  facet value lies the moment a time changes. **Occasion** — fuzzy, and "Weeknight" collides with the declined
+  Practical bucket, so it becomes a catch-all. **Season** — low classification rate, weak browse signal.
+
+  **Shapes.** Protein / Dietary / Technique are **multi-value**; Dish Type is **single-ish** (a soft picker
+  convention, *no* `selectionMode` column — D8). All **flat**; nesting (`Protein > Beef > Tenderloin`) is
+  deferred until real over-nesting earns it (D8).
+
+  **The Technique ↔ Dish Type boundary.** Dish Type is the plated **form** (a noun); Technique is the **method**
+  (a verb). A word that is both lives in **Technique** — `Grill`, `Roast`, `Braise`, `Stir-Fry`, `Fry` are
+  methods, not forms — and Dish Type carries only non-method forms. A dish may carry a Technique and **no** Dish
+  Type (a pot roast is `Braise` with no form); Missing ≠ Other, so this is fine. **Protein carries no
+  "Vegetarian/None" value** — a meatless dish simply has no Protein assignment; "Vegetarian" lives in Dietary.
+
+  **Starter values** (the proposer's anchoring prior for the backfill — the grocery-`seedAreas` role):
+  - **Protein** (multi): Chicken, Beef, Pork, Lamb, Fish, Shellfish, Turkey, Duck, Sausage, Eggs, Tofu,
+    Beans & Legumes.
+  - **Dietary** (multi): Vegetarian, Vegan, Gluten-Free, Dairy-Free, Nut-Free, Low-Carb, Paleo, Pescatarian.
+  - **Dish Type** (single-ish): Soup, Stew, Salad, Sandwich, Pasta, Pizza, Taco, Curry, Casserole, Bowl, Bread,
+    Dumpling, Pie, Cake, Cookie.
+  - **Technique** (multi): Grill, Roast, Braise, Sear/Sauté, Fry, Stir-Fry, Sous Vide, Slow Cooker, Pressure
+    Cooker, Air Fryer, Bake, Smoke, Steam, No-Cook.
+
+  This closes the gate on the labeling backfill: seed these four → build the S6 batch queue → run it → the
+  [ADR-0050](ADR-0050-recipe-power-browser.md) D6 coverage gate opens. The seed itself is one small deterministic
+  slice, not a schema change (the `facets` table + `Category.facetID`/`hidden` already exist).
+
 ### Open
 
-- **OQ4 — the editorial taxonomy is not decided here.** Dish Type, Protein, Technique, Featured Ingredient,
-  Dietary, Occasion, Season, Practical are *plausible* facets, not ratified ones, and choosing them is content
-  work with a real cost of error (a bad dimension is re-filed by hand across the library). It gets its own
-  session and does not gate the schema slice, which seeds only Cuisine and Course.
 - **OQ6 — primary vs secondary value within a facet** (`Cuisine` primary Korean, secondary Mexican) affects
   card display and grouping, not matching. Deferred; no column until a surface wants it.

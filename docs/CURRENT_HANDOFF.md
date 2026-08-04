@@ -1,15 +1,13 @@
 # Current Handoff
 
-Last updated: August 3, 2026. (**ADR-0049 Amendment 2 D1 — facets** is MERGED (PRs
-[#270](https://github.com/jonphillips/yes-chef/pull/270) + [#271](https://github.com/jonphillips/yes-chef/pull/271),
-2026-08-03) — promotes `Cuisine`/`Course` to synced `facets` rows and absorbs Amendment 1's seed-table teardown;
-**owes a two-device convergence + audit-review pass** (§ Device passes owed). **D2 — category management UI** (PR
-[#272](https://github.com/jonphillips/yes-chef/pull/272)) and **D3 — proposer re-point** (PR
-[#274](https://github.com/jonphillips/yes-chef/pull/274)) are both **approved (architect review) and open**, each
-owing only Jon's device UI look. **D4** is Jon's hand pass, gated on the #270 device convergence. **Prep-plan Slice 3 — refine vs regenerate
+Last updated: August 4, 2026. (**ADR-0049 Amendment 2 — the facet model — is complete and archived**
+([`DONE-LOG.md`](DONE-LOG.md)): D1–D5 shipped + device-passed, D4 hand pass done, and **F1/F2** (recipe-facing
+`hidden` leak + editor facet-grouping) approved as PR [#276](https://github.com/jonphillips/yes-chef/pull/276),
+**owing only its device look on merge** (§ Device passes owed). The only remaining facet work is the **S5/S6
+labeling backfill** = ADR-0050's D6 coverage gate, tracked under ADR-0050. **Prep-plan Slice 3 — refine vs regenerate
 intent** shipped in PR [#265](https://github.com/jonphillips/yes-chef/pull/265) (merged 2026-07-30; the
-handoff bump was missed in-PR and reconciled here) — its record is in [`DONE-LOG.md`](DONE-LOG.md). **Next Up
-is intentionally not re-set here** — another session is choosing the next dispatch target.)
+handoff bump was missed in-PR and reconciled here) — its record is in [`DONE-LOG.md`](DONE-LOG.md). **Next Up is
+now the editorial-facet seed slice** (OQ4 decided 2026-08-04: Protein/Dietary/Dish Type/Technique) — see § Next Up.)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate is **crossed and holding**. We stay in
@@ -22,16 +20,23 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**No live dispatch target is set here** — Prep-plan Slice 3 (the previous target) shipped in PR
-[#265](https://github.com/jonphillips/yes-chef/pull/265) (merged 2026-07-30, record in
-[`DONE-LOG.md`](DONE-LOG.md)), and **another session is choosing the next target** — do not infer or claim one
-from this file. If you have arrived here for a fresh dispatch and this section still names no target, **STOP
-and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
+**Live target: seed the editorial facets** (step 1 of the facet labeling backfill — ADR-0050's D6 coverage gate).
+**OQ4 is decided** (2026-08-04): seed **Protein, Dietary, Dish Type, Technique** alongside the existing
+Cuisine/Course — full decision, shapes, and starter values in
+[ADR-0049 Amd 2 § Resolved OQ4](decisions/ADR-0049-unified-labels-and-assisted-tagging.md); scoping/arc in
+[`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Labeling backfill — scoping. **The seed slice is a
+Codex dispatch:** extend the existing `starterFacets` seed (Cuisine/Course) with the four new facets + starter
+values, fixed ids, post-engine, insert-if-absent/idempotent — **no schema change** (`facets` +
+`Category.facetID`/`hidden` already exist); synced-data pass, owes a light two-device pass. Arc after it: **S6
+batch queue → S5 mini-labeler → ADR-0050 D8 diagnostics → Jon's backfill run → Power Browser S1 unblocks.** (Note:
+S5/S6 are **unbuilt** — only the S3 proposer engine + S4 capture exist.) If you need a target beyond the seed
+slice, **STOP and ask Jon — never infer.** See `docs/AGENTS.md` § Work Intake & Dispatch.
 
-**ADR-0049 Amendment 2 is D1–D3 shipped-or-approved** (D1 merged #270+#271; D2 #272 and D3 #274 approved +
-open, owing only Jon's device look). **D4 — Jon's hand pass** (not a dispatch: review the audit, file ambiguous
-roots, merge/delete poor starter values, then re-run the S5/S6 labeling backfill — ADR-0050's D6 coverage gate)
-is gated on the #270 two-device convergence pass. D3's settled hidden-vocabulary rule now lives in ADR-0049 D11.
+**ADR-0049 Amendment 2 (the facet model) is complete** — D1–D5 shipped + device-passed, D4 hand pass done, F1/F2
+approved (PR [#276](https://github.com/jonphillips/yes-chef/pull/276), device look owed on merge); full record in
+[`DONE-LOG.md`](DONE-LOG.md). The only remaining facet work is the **S5/S6 labeling backfill** (ADR-0050's D6
+coverage gate), tracked under ADR-0050 — **not** a set target here. D3's settled hidden-vocabulary rule lives in
+ADR-0049 D11.
 
 **⚠️ Jon's outstanding follow-through from ADR-0014 Amd1 (not a dispatch item):** three recipes still carry
 `isHeader = 1` rows to hand-repair in the app — *Beef Birria Taco Filling* (4), *Broccoli Spoon Salad* (2),
@@ -77,17 +82,13 @@ section is work.**
 Drawn into **Next Up** as needed; not itself a dispatch target. Completed efforts live in
 [`docs/DONE-LOG.md`](DONE-LOG.md).
 
-**[`efforts/recipe-facets.md`](efforts/recipe-facets.md) — [ADR-0049](decisions/ADR-0049-unified-labels-and-assisted-tagging.md)
-**Amendment 2** (accepted): the namespace is an explicit `Facet`.** Four dispatches. **D1 (schema + migration +
-Core invariants + audit) MERGED** (PRs [#270](https://github.com/jonphillips/yes-chef/pull/270) +
-[#271](https://github.com/jonphillips/yes-chef/pull/271), 2026-08-03) — owes the migration audit review +
-two-device convergence pass (see § Device passes owed). **D2 (category management UI) approved, open as PR
-[#272](https://github.com/jonphillips/yes-chef/pull/272)** — owes only Jon's device UI look. **D3 (proposer
-re-point) approved + open as PR [#274](https://github.com/jonphillips/yes-chef/pull/274)** — typed facet
-vocabulary in the prompt, `.namespace` literally proposes a `Facet` row, PR #269's Findings 1 & 3 re-pointed
-**not** deleted; the settled hidden-vocabulary rule is now ADR-0049 D11; owes only Jon's device look. **D4 —
-Jon's hand pass** (not a dispatch: review the audit, file ambiguous roots, merge/delete poor starter values,
-then re-run the S5/S6 labeling backfill — ADR-0050's D6 coverage gate).
+**[`efforts/recipe-facets.md`](efforts/recipe-facets.md) — ADR-0049 Amendment 2 (the facet model): COMPLETE.**
+D1–D5 + F1/F2 shipped-or-approved, D4 hand pass done — full record in [`DONE-LOG.md`](DONE-LOG.md). **The one
+remaining facet dispatch is the S5/S6 labeling backfill** — re-run the proposer/labeling queue against the real
+facets — which is **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md)'s D6 coverage gate** and the real
+prerequisite for the Power Browser. Scope it under ADR-0050 when it becomes the live target. **F3/OQ5** (retire
+the typed freeform Cuisine/Course editor fields, **preserving** the per-facet single-select picker affordance —
+rebind, don't delete) is deferred to ADR-0050 S3.5, do not fold in.
 
 **[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md) — ATK's "Gather Your
 Ingredients" is a latent grocery bug (scoped 2026-07-28). P1 only; **no schema**.** 101 shoppable ingredient
@@ -194,29 +195,14 @@ selection (per-bubble `UITextView` caps the payload).
 
 Not work, a checklist.
 
-**[PR #270](https://github.com/jonphillips/yes-chef/pull/270) — ADR-0049 Amd 2 D1, facets. Synced data pass →
-owes a two-device pass; back up first.** Approved (architect review) 2026-08-03. **Before the second device
-converges, read the `facet-migration-audit` log line** (`AppLog.dataIntegrity`, emitted on the first upgraded
-launch whenever anything was promoted / remapped / merged / left unresolved). Then confirm on device: (a)
-Cuisine/Course appear as facets with their values intact, (b) every recipe's category assignments are
-unchanged, (c) former tags appear as loose labels, (d) both devices converge with **no duplicate facet or
-category rows**, (e) the library filter still finds a recipe by its cuisine.
+*(ADR-0049 Amd 2 D1/D2/D3 device passes — PRs #270, #272, #274 — approved 2026-08-04 and removed. D4 hand pass
+done.)*
 
-**[PR #272](https://github.com/jonphillips/yes-chef/pull/272) — ADR-0049 Amd 2 D2, category management UI.
-App-layer, no schema, no two-device pass** (writes through D1's sync-tested paths). Approved (architect review)
-2026-08-03. **UI look only:** confirm (a) Category Groups vs Other Categories browse as distinct sections, (b)
-creating a group vs a value vs a loose label are three distinct acts, (c) a loose label whose name matches a
-facet value (e.g. loose `Italian` alongside `Cuisine: Italian`) is now accepted, (d) hiding a group removes its
-values from the recipe editor and the filter, (e) starter groups/values offer no Delete but user-created ones
-do, and delete is blocked while a group still has values or a value is used by recipes.
-
-**[PR #274](https://github.com/jonphillips/yes-chef/pull/274) — ADR-0049 Amd 2 D3, proposer re-point.
-App-layer + Core, no schema, no two-device pass** (writes through D1's sync-tested reconcile paths). Approved
-(architect review) 2026-08-03. **Capture-flow look only:** on a fresh capture confirm (a) suggested labels
-propose only against **visible** facets/values, (b) accepting a namespace suggestion files the recipe under a
-new `Facet` + its first value on save (not a bare loose label), (c) a suggestion that re-matches a hidden value
-in its facet reuses **and unhides** it, and (d) a label already harvested from the page is not also offered as a
-suggestion chip.
+**[PR #276](https://github.com/jonphillips/yes-chef/pull/276) — ADR-0049 Amd 2 F1/F2, recipe-facing facet
+surfaces. App + Core, no schema, no two-device pass** (writes/reads only). Approved (architect review)
+2026-08-04; **device look owed on merge:** confirm (a) hiding a category value removes it from recipe rows,
+detail, and the filter, and unhiding restores it; and (b) the recipe editor's category picker now groups values
+under their facet header (Cuisine/Course sections), loose labels under "Other Categories".
 
 **[PR #262](https://github.com/jonphillips/yes-chef/pull/262) — prep plan dish links and dates. Merged
 2026-07-30, no schema.** Slice 1 (day-anchored sessions on a placed menu) is **device-confirmed 2026-07-30**.

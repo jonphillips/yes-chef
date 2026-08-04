@@ -201,8 +201,109 @@ it grows, something has gone wrong.
   **remove `categorySeedStates` and `categorySeedTombstones`** from the list — Amendment 1 dropped them and
   leaving them there is how a dead record type enters the production schema and locks forever.
 
-## After this effort
+## Post-D5 device-pass findings (recipe-facing surfaces the facet work didn't reach)
 
-Jon's hand pass (Dispatch 4), then the editorial-taxonomy session (Amd 2 OQ4), then the S5/S6 labeling backfill
-— which is [ADR-0050](../decisions/ADR-0050-recipe-power-browser.md) D6's coverage gate and the real
-prerequisite for the Power Browser. **The browser's S1 is not dispatchable until coverage is real.**
+Found on Jon's device pass 2026-08-04, after the D1–D5 merges + the Dispatch 4 hand pass. All three are that the
+facet/`hidden` model is enforced in the **catalog** (`CategoryListRequest` / `FacetListRequest` filter hidden;
+D2's management browser groups by facet) but **not** in the recipe-facing product reads. F1 and F2 are
+dispatchable app/Core slices and should land **before** the S5/S6 labeling backfill — that is exactly when
+hand-assignment volume spikes and these surfaces are worst. F3 is a cross-reference to a deferred ADR-0050
+question, not a slice here.
+
+### F1 — the recipe editor's category selector is not facet-aware *(D2 gap; app-only)*
+
+`RecipeCategorySelectionView` renders `RecipeEditorModel.categoryRows`, which is
+`CategoryHierarchy.displayRows(from: categories)` — a **flat `parentCategoryID` tree**
+([`RecipeEditorModels.swift`](../../YesChefApp/RecipeEditorModels.swift) `categoryRows`,
+[`CategoryViews.swift`](../../YesChefApp/CategoryViews.swift) `RecipeCategorySelectionView`). Facets are not
+category rows, so a facet **value** (`Chinese`, `Dinner`) has `parentCategoryID == nil` and renders at depth 0 —
+visually identical to a loose label, with the facet title (`Cuisine`, `Course`) nowhere on screen. A legacy
+nested category (`Chef` → children) still nests, because it *is* a category with category children. Assignment
+still works; only the presentation is facet-blind. **Fix:** give this view the same facet-sectioned shape D2 gave
+the management browser (a section per visible facet with its values nested; loose labels under their own "Other
+Categories" section). Also fix `selectedCategorySummary`, which filters the same flat rows and so drops facet
+context. **No schema, no Core.** Once real two-level facets exist (`Protein > Beef > Tenderloin`) a flat list
+also can't disambiguate same-named values, so this is not merely cosmetic.
+
+### F2 — `hidden` leaks onto recipe rows/detail and into filter availability *(D2 defect; Core + app)*
+
+`CategoryListRequest` / `FacetListRequest` correctly exclude hidden ([`RecipeCategoryRepository.swift`](../../YesChefPackage/Sources/YesChefCore/RecipeCategoryRepository.swift)
+lines 4–32), so the editor picker and the filter **catalog** hide correctly. But
+[`RecipeListRequest.swift`](../../YesChefPackage/Sources/YesChefCore/RecipeListRequest.swift) builds
+`categoriesByID` from an **unfiltered** `Category.fetchAll` (line ~42) and derives each recipe's `displayNames`
+(shown on list rows + detail) and `filterNames` (the source of `categoryFilterAvailabilityByName`) straight from
+the raw `RecipeCategory` joins through that map — with **no `hidden` filter**. Result exactly as observed: hiding
+a category still shows it on recipes and leaves it filterable. **Fix:** apply the same visibility predicate
+(`!category.hidden && facet-not-hidden`) when building `displayNames` / `filterNames`, **keeping the join intact**
+so unhide restores it (hidden = suppressed in product reads, assignment preserved — the ADR-0049 D7
+"effective set" intent). Cover every product read path (list row, detail, filter availability). **The class of
+bug is "one surface filters hidden, another doesn't"** — factor a single shared visible-category-ID helper both
+`CategoryListRequest` and `RecipeListRequest` call, rather than a second copy of the predicate. **No schema.**
+
+### F3 — retire the typed freeform `Cuisine` / `Course` editor fields *(→ ADR-0050 OQ5, deferred — not a slice here)*
+
+[`RecipeEditorView.swift:72`](../../YesChefApp/RecipeEditorView.swift) still carries
+`StackedTextField("Cuisine", …draft.cuisine)` and `…course` — the legacy ADR-0006-era typed `Recipe.cuisine` /
+`Recipe.course` columns, sitting directly above the working category selector. They are redundant with the
+Cuisine/Course facets, and unlike source metadata (kept typed on purpose — Amd 2 Resolved OQ5 / ADR-0006), D6
+routes `recipeCuisine` **into** the Cuisine facet, so these two fields are on a **retirement** path. The
+retirement — migrate existing typed values into facet assignments (synced, deterministic-UUID/post-engine,
+[[migration-writes-bypass-sync-triggers]]); drop the two inputs; delete the redundant Fields → Cuisine/Course
+filters — is [**ADR-0050 OQ5**](../decisions/ADR-0050-recipe-power-browser.md) and is sequenced with that ADR's
+S3.5 filter-bar re-point, gated behind the same coverage backfill. **Do not fold it into F1/F2 or into D5.**
+Interim if the redundancy bites during dogfooding: hide the two inputs (app-only) — but partial, since import
+still populates the column and the Fields filter still reads it, so prefer doing the retirement whole.
+
+**Preserve the per-facet picker affordance — rebind, don't delete (Jon, 2026-08-04).** The retirement must keep
+the fast **single-select dropdown per facet** (pick one `Cuisine`, pick one `Course`) — it beats drilling the F1
+tree for a flat, single-ish facet — and just bind it to the facet's *values* instead of a free-text string. No
+schema: single-Cuisine is a soft picker convention (ADR-0049 OQ2/D8), so a single-select dropdown over a
+still-multi-capable model is pure UI and does **not** earn the deferred `selectionMode` column. Full rationale in
+[ADR-0050 OQ5](../decisions/ADR-0050-recipe-power-browser.md).
+
+## Labeling backfill — scoping (the ADR-0050 D6 coverage gate)
+
+*Scoped 2026-08-04 as the next facet target.* ADR-0050 D6 fixes the sequence and calls coverage "the real
+schedule risk": **explicit facets → proposer re-pointed → a real backfill run over the library → the browser.**
+The first two are done (D1 + D3). This section scopes the backfill.
+
+**Build state — the "re-run the S5/S6 queue" framing is inaccurate; there is no queue yet.** Only the S3
+proposer **engine** (`LabelProposer`) and its S4 **capture** integration are built. **S5 (detail mini-labeler)
+and S6 ("needs labels" batch queue) are NOT built** — confirmed in the app: `LabelProposer` is invoked only from
+the capture flow, there is no detail-view "Suggest labels" CTA and no batch/"needs labels" queue. ADR-0050's D8
+coverage **diagnostics** are also unbuilt (they belong to ADR-0050). So the backfill first needs its *tooling*
+built, then *run*.
+
+**The gating prerequisite is the editorial taxonomy (Amd 2 OQ4), not the tooling.** The browser's value is
+coverage on **Protein / Dish Type / Technique** — but those facets **do not exist**; D1 seeded only Cuisine and
+Course. You cannot backfill Protein coverage before Protein is a facet. And post-Dispatch-4, Cuisine/Course are
+already largely covered, so a batch queue built today would have almost nothing to chew on. **OQ4 is therefore
+both the gate on the backfill's value and the thing that gives S6 a backlog to clear.** It is a *content* session
+(cost-of-error is real — a bad dimension is hand-re-filed across the library), decided with Jon, seeding the
+chosen facets by fixed id with starter values. Candidates (ADR-0049 Amd 2 OQ4, none ratified): Dish Type,
+Protein, Technique, Featured Ingredient, Dietary, Occasion, Season, Practical.
+
+**The arc, in order:**
+
+0. **OQ4 — editorial-taxonomy session — ✅ DONE 2026-08-04.** Decided: seed **Protein, Dietary, Dish Type,
+   Technique** (Occasion/Season/Featured Ingredient/Practical declined). Full decision, shapes, the Technique↔Dish
+   Type boundary, and starter values are in [ADR-0049 Amd 2 § Resolved OQ4](../decisions/ADR-0049-unified-labels-and-assisted-tagging.md).
+1. **Seed the editorial facets** *(Codex build — the live target).* One small deterministic slice: extend the
+   existing `starterFacets` seed (Cuisine/Course) with the four new facets + their starter values, fixed ids,
+   post-`makeSyncEngine`, insert-if-absent/idempotent — **no schema change** (`facets` + `Category.facetID`/
+   `hidden` already exist). Same shape and machinery as D1's Cuisine/Course seed. Synced-data pass → owes a light
+   two-device pass (deterministic ids converge; back up first).
+2. **S6 — "needs labels" batch queue** *(Codex build).* Library filter (`RecipeActiveFilterBar`) + one-by-one
+   ADR-0025 curation review + prefetch of the next recipe's suggestions; on-device tier, no network; reuses
+   `LabelProposer` + reconcile (the sole writer). "Needs labels" is a **derived** predicate — a recipe missing a
+   value a primary facet would want — never a persisted `Unclassified`/`Other` row (ADR-0050 D7, "Missing ≠
+   Other"). This is the couch tool that does the actual backfilling.
+3. **S5 — detail mini-labeler** *(Codex build, smaller).* Standalone sheet off the recipe detail, empty-state
+   "Suggest labels" CTA, re-runnable ("suggest more"). Batchable with S6 or a fast-follow.
+4. **ADR-0050 D8 coverage diagnostics** *(Codex build, ADR-0050's).* The labeling work list and the D6 gate's
+   measure; ADR-0050 says ship it early, so it can precede the run to size the job and set the OQ3 threshold.
+5. **The run** *(Jon, couch work — like Dispatch 4).* Clear the backlog with S6 → coverage rises → ADR-0050 D6
+   gate opens → the Power Browser's S1 becomes dispatchable.
+
+**Live target is now step 1 — the seed slice** (OQ4 is decided, so it is dispatchable to Codex). S6 follows,
+because a batch queue is only worth running once the four new facets exist to label against.

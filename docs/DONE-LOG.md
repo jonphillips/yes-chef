@@ -9,12 +9,66 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0049 Amendment 2 · F1 + F2 — recipe-facing facet surfaces (hidden leak + editor grouping)
+
+**Approved (architect review) 2026-08-04; PR [#276](https://github.com/jonphillips/yes-chef/pull/276) OPEN,
+branch `codex/adr-0049-amd2-f1-f2` — Jon's device look + merge owed** (*finalize this entry's verification record
+on merge*). Both found on Jon's D1–D5 device pass. Spec:
+[`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Post-D5 device-pass findings. **Core + app, no schema,
+no prod-schema entry, no two-device pass.** Verified per the PR: `swift build` + a new Core hidden-suppression
+test green, generic-iOS app build green, `check-drift.sh` green.
+
+**F2 — the correctness fix.** `hidden` was honored in the catalog requests (`CategoryListRequest` /
+`FacetListRequest`) but leaked through the per-recipe read paths, which built their category map from an
+**unfiltered** `Category.fetchAll` — so hiding a category still showed it on recipe rows/detail and left it
+filterable. The fix centralizes the effective-visibility rule in `CategoryRepository.visibleCategories(_:facets:)`
+(one definition, factored out of `CategoryListRequest`) and routes `RecipeListRequest` (list display +
+filter-availability names) and `RecipeDetailRequest` (detail display) through it: a hidden category — or a value
+under a hidden facet — `compactMap`s away while its `RecipeCategory` join is **preserved**, so unhiding restores
+it. Core test covers both grains + the restore. Residual (logged, not fixed): other denormalized surfaces (menu
+cards, workbench, calendar, grocery) weren't audited, but `visibleCategories` now makes any straggler a
+one-liner.
+
+**F1 — presentation.** The recipe editor's category selector rendered a flat `parentCategoryID` tree, so facet
+values sat at depth 0 with no group header and the facet title was invisible. It now renders one `Section` per
+visible facet with values nested, loose labels under an "Other Categories" section, via a pure
+`RecipeCategorySelectionSection.sections(categories:facets:)` helper; the selected-summary facet-qualifies values
+(`Cuisine > Thai`). **F3/OQ5** (retire the typed freeform Cuisine/Course editor fields) stays deferred to
+ADR-0050 — and its retirement must **preserve the per-facet single-select picker affordance** (Jon, 2026-08-04),
+rebinding it to facet values rather than deleting it; pure UI, no `selectionMode` column.
+
+---
+## ADR-0049 Amendment 2 · Dispatch 5 — facet membership becomes editable
+
+**Merged 2026-08-04; PR [#275](https://github.com/jonphillips/yes-chef/pull/275), branch
+`codex/adr-0049-amd2-d5-editable-facets`. Architect-approved 2026-08-04.** Spec:
+[`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 5. **App + Core, no schema, no prod-schema
+entry, no two-device pass** (writes through D1's already-sync-tested reconcile/merge paths). Verified: `swift
+build` + `CategoryRepositoryTests` (19 tests) green, generic-iOS app build green, `check-drift.sh` green.
+
+**What it does.** Closes the create/update asymmetry: `createCategory` took an explicit `facetID` but
+`updateCategory` derived it from the parent, so a parentless loose label could never be filed into a facet by
+editing — which blocked the Dispatch 4 hand pass. `updateCategory` now takes `facetID: Facet.ID?`, cascades a
+membership change to descendants (D9 rule 2), rejects moving a non-leaf to loose (D9 rule 3), and — the
+load-bearing choice — **merges on a destination name-collision when membership actually changes** (re-points
+recipe joins + children into the existing value and deletes the source row via the private `mergeCategory`),
+while a pure in-place rename onto an existing sibling still throws `duplicateSibling`. This is what makes
+shadow-consolidation work on the real library: every one of Jon's 15 loose labels (`Chinese` 66, `Thai` 37, …)
+name-collided with an empty, non-deletable starter value, so the operation that clears each shadow *is* a merge,
+not a plain move. `mergeCategory` stays `fileprivate`; no general merge verb is exposed. The editor gains a Group
+picker (visible facets + "No Group") that clears the parent on change.
+
+**Dispatch 4 (Jon's hand pass) done 2026-08-04.** With D5 shipped, Jon merged the 15 loose-label shadows into
+their facet values by hand in the app — nothing dropped, joins preserved, and the #270 two-device convergence
+held. Remaining facet work after this: F1/F2 (above), F3/OQ5 (deferred to ADR-0050), and the S5/S6 labeling
+backfill (ADR-0050 D6 coverage gate).
+
+---
 ## ADR-0049 Amendment 2 · Dispatch 3 — proposer re-point
 
-**Approved (architect review) 2026-08-03; PR [#274](https://github.com/jonphillips/yes-chef/pull/274) OPEN,
-branch `codex/adr-0049-d3-proposer-repoint` — Jon's device capture-flow look + merge still owed** (see
-[`CURRENT_HANDOFF.md`](CURRENT_HANDOFF.md) § Device passes owed; *finalize this entry's verification record on
-merge*). Spec: [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 3. **App-layer + Core, no
+**Merged 2026-08-04; PR [#274](https://github.com/jonphillips/yes-chef/pull/274), branch
+`codex/adr-0049-d3-proposer-repoint`. Architect-approved 2026-08-03; device capture-flow look done 2026-08-04.**
+Spec: [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 3. **App-layer + Core, no
 schema** (writes through D1's already-sync-tested reconcile paths); no new prod-schema entry. Verification per
 the PR: `check-drift.sh` green, elevated `generic/platform=iOS` app build green, `git diff --check` green.
 
@@ -54,10 +108,9 @@ into an invalid batch update (the `NSInternalInconsistencyException` on deleting
 ---
 ## ADR-0049 Amendment 2 · Dispatch 2 — category management UI
 
-**Approved (architect review) 2026-08-03; PR [#272](https://github.com/jonphillips/yes-chef/pull/272) OPEN,
-branch `codex/adr-0049-amendment-2-category-management` — Jon's device UI look + merge still owed** (see
-[`CURRENT_HANDOFF.md`](CURRENT_HANDOFF.md) § Device passes owed; *finalize this entry's verification record on
-merge*). Reads D1's schema (#270/#271, merged 2026-08-03). Spec:
+**Merged 2026-08-04; PR [#272](https://github.com/jonphillips/yes-chef/pull/272), branch
+`codex/adr-0049-amendment-2-category-management`. Architect-approved 2026-08-03; device UI look done 2026-08-04.**
+Reads D1's schema (#270/#271, merged 2026-08-03). Spec:
 [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 2. Verified in-session: `check-drift.sh`
 green (SwiftLint + 546 Core tests), generic-iOS app build green. **App-layer dispatch — not a synced-migration
 pass** (writes through D1's already-sync-tested create/reconcile paths); no new prod-schema entry.
@@ -95,8 +148,10 @@ prod-schema promotion list. This slice adds only behavior and UI.
 
 **Approved (architect review) 2026-08-03; PRs [#270](https://github.com/jonphillips/yes-chef/pull/270) +
 [#271](https://github.com/jonphillips/yes-chef/pull/271) MERGED 2026-08-03 (`24f50d4`, `54a7021`),
-branch `codex/adr-0049-amendment-2-facets` — device audit-review + two-device convergence pass still owed**
-(see [`CURRENT_HANDOFF.md`](CURRENT_HANDOFF.md) § Device passes owed). Spec: [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 1;
+branch `codex/adr-0049-amendment-2-facets` — device audit-review + two-device convergence pass done 2026-08-04**
+(migration was a no-op on the real library — no `Cuisine`/`Course` parent to promote — so real categories stayed
+loose labels; the resulting 15 loose-label shadows of empty starter values were consolidated in the D5/D4 hand
+pass, both devices converged with no duplicate rows). Spec: [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 1;
 [ADR-0049 Amendment 2](decisions/ADR-0049-unified-labels-and-assisted-tagging.md). Verified in-session:
 `swift build` clean, `CategoryRepositoryTests` **8/8** green. **Absorbs Amendment 1's teardown** — the
 seed-state and tombstone tables are dropped *inside* this migration, not in a separate synced pass.

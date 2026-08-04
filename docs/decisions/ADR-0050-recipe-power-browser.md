@@ -271,3 +271,35 @@ Nothing here is dispatchable until ADR-0049 Amd 2 is ratified and its data pass 
   library. Interacts with ADR-0046 and should be decided with it, not before it.
 - **OQ3 — what is the coverage threshold in D6's gate, numerically?** Cannot be answered until D8's diagnostics
   measure the library. Deliberately left open rather than guessed.
+- **OQ5 — the typed `Recipe.cuisine` / `Recipe.course` fields are redundant with the Cuisine/Course facets, and
+  their fate is unscoped.** Observed on device 2026-08-03: the library filter's **Fields → Cuisine** control
+  reads the typed `Recipe.cuisine` free-text column (`RecipeLibraryListState.cuisineFilterOptions` →
+  `distinctOptions(…\.recipe.cuisine)`), while **Categories → Cuisine** reads the ADR-0049 Amd 2 facet. They
+  disagree — a recipe filed under the `Cuisine: Thai` facet value does not appear under Fields → Cuisine unless
+  it *also* carries the string "Thai" in the typed column, which is sparsely populated (schema.org
+  `recipeCuisine` at import, or hand-entry in the editor's Fields section). This is a fourth stringly parallel to
+  the three OQ2 lists.
+
+  **This is NOT the same as OQ4.** OQ4 keeps source/author/cookbook/publication typed *on purpose* — there is no
+  source facet and should not be one. Cuisine and Course are the opposite: ADR-0049 **D6 routes `recipeCuisine`
+  into the Cuisine facet**, so these two typed fields are on a *retirement* path, not a keep path. The open
+  question is the retirement itself — (a) migrate existing typed `cuisine`/`course` values into facet assignments
+  (a synced data pass, deterministic-UUID/post-engine, [[migration-writes-bypass-sync-triggers]]); (b) drop the
+  editor's Fields cuisine/course inputs; (c) delete the Fields → Cuisine/Course filters, which S3.5's re-point
+  makes redundant rather than re-points. Sequenced with S3.5 (the filter-bar re-point) and gated behind the same
+  Dispatch 4 coverage backfill; do not fold it into the D5 editing slice. Whether the typed columns are then
+  physically dropped is a separate schema call, deferred like every other column retirement.
+
+  **Design constraint the retirement must honor (Jon, 2026-08-04): preserve the per-facet picker affordance —
+  rebind it, don't delete it.** What is worth keeping about the typed fields is not the free-text column but the
+  *interaction*: a fast single-select **dropdown per facet** (pick one `Cuisine`, pick one `Course`) is
+  meaningfully quicker than drilling the sectioned Categories tree (F1) for a flat, single-ish facet. So step (b)
+  is **replace the free-text input with a facet-value picker**, not "delete the field and send the user to the
+  tree." You lose only the free-text divergence (a typo can't happen when choosing an existing value); you keep
+  the speed. Likely end state is **per-facet single-select pickers for the common single-ish facets +
+  tree/mini-labeler for multi-value and nested facets** — the two are complementary, F1's tree is not wasted.
+  Crucially this needs **no schema**: "one Cuisine per recipe" is already a *soft picker convention, not a
+  constraint* (D8 / ADR-0049 OQ2), so a dropdown that presents single-select while the model still permits multi
+  is pure UI. It touches the deferred `selectionMode` column (ADR-0049 D8) **only** if the schema must actively
+  *prevent* a second value — which the soft convention says it must not. Ship the picker as an affordance, not a
+  data-model change.
