@@ -19,7 +19,10 @@ extension RecipeCoreTests {
       let suggestions = try await withDependencies {
         $0.modelClient = StubModelClient { request in
           await recorder.append(request)
-          return ModelResponse(text: #"{"suggestions":[{"kind":"existingCategory","path":["Cuisine","Italian"]},{"kind":"loose","path":["weeknight"]}]}"#)
+          return ModelResponse(
+            text: #"{"suggestions":[{"kind":"existingCategory","path":["Cuisine","Italian"]},{"kind":"loose","path":["weeknight"]}]}"#,
+            responseFormatStatus: .structured
+          )
         }
         $0.modelCallRecordSink = .inMemory(callRecords)
         $0.labelProposer = .liveValue
@@ -40,6 +43,10 @@ extension RecipeCoreTests {
       expectNoDifference(request?.tier, .onDevice)
       expectNoDifference(request?.reasoningEffort, .high)
       expectNoDifference(request?.maxTokens, LabelProposer.maxTokens)
+      expectNoDifference(
+        request?.responseFormat,
+        .jsonSchema(name: "label_suggestions", schema: LabelProposer.responseSchema)
+      )
       #expect(request?.messages.first?.text.contains("Cuisine:\n  - Italian") == true)
       #expect(request?.messages.first?.text.contains("Italian Weeknight Pasta") == true)
 
@@ -48,6 +55,48 @@ extension RecipeCoreTests {
       expectNoDifference(record?.task, .categorization)
       expectNoDifference(record?.tier, .onDevice)
       expectNoDifference(record?.contextLayers, ModelCallContextLayers(included: [.recipe, .candidates]))
+      expectNoDifference(record?.responseFormatAttached, true)
+      expectNoDifference(record?.responseFormatOutcome, .structuredHit)
+    }
+
+    @Test
+    func recordsAReadableFreeTextFallback() async throws {
+      let callRecords = ModelCallRecordCollector()
+
+      _ = try await withDependencies {
+        $0.modelClient = StubModelClient { _ in ModelResponse(text: #"{"suggestions":[]}"#) }
+        $0.modelCallRecordSink = .inMemory(callRecords)
+        $0.labelProposer = .liveValue
+      } operation: {
+        try await LabelProposer.liveValue(
+          recipe: .init(title: "Soup"), vocabulary: .init(facets: [], categories: [])
+        )
+      }
+
+      let record = await callRecords.records().first
+      expectNoDifference(record?.responseFormatAttached, true)
+      expectNoDifference(record?.responseFormatOutcome, .fellBack)
+    }
+
+    @Test
+    func recordsAnUnreadableStructuredResponse() async {
+      let callRecords = ModelCallRecordCollector()
+
+      await #expect(throws: LabelProposerError.responseUnreadable) {
+        try await withDependencies {
+          $0.modelClient = StubModelClient { _ in ModelResponse(text: "not JSON") }
+          $0.modelCallRecordSink = .inMemory(callRecords)
+          $0.labelProposer = .liveValue
+        } operation: {
+          try await LabelProposer.liveValue(
+            recipe: .init(title: "Soup"), vocabulary: .init(facets: [], categories: [])
+          )
+        }
+      }
+
+      let record = await callRecords.records().first
+      expectNoDifference(record?.responseFormatAttached, true)
+      expectNoDifference(record?.responseFormatOutcome, .unreadable)
     }
 
     @Test
@@ -183,9 +232,12 @@ extension RecipeCoreTests {
 
     @Test
     func truncatedResponseFailsLoudly() async {
+      let callRecords = ModelCallRecordCollector()
+
       await #expect(throws: LabelProposerError.responseTruncated) {
         try await withDependencies {
           $0.modelClient = StubModelClient { _ in ModelResponse(text: "{", stopReason: "max_tokens") }
+          $0.modelCallRecordSink = .inMemory(callRecords)
           $0.labelProposer = .liveValue
         } operation: {
           try await LabelProposer.liveValue(
@@ -194,6 +246,10 @@ extension RecipeCoreTests {
           )
         }
       }
+
+      let record = await callRecords.records().first
+      expectNoDifference(record?.responseFormatAttached, true)
+      expectNoDifference(record?.responseFormatOutcome, .truncated)
     }
   }
 }

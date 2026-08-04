@@ -169,7 +169,7 @@ public struct LabelProposal: Equatable, Sendable {
   }
 }
 
-public enum LabelProposerError: Error, Equatable, LocalizedError, Sendable {
+public enum LabelProposerError: Error, Equatable, LocalizedError, ModelCallResponseFormatFailure, Sendable {
   case responseTruncated
   case responseUnreadable
 
@@ -179,6 +179,15 @@ public enum LabelProposerError: Error, Equatable, LocalizedError, Sendable {
       "The label suggestions ran out of room before they finished. Try again."
     case .responseUnreadable:
       "The label suggestions could not be read. Try again."
+    }
+  }
+
+  public var responseFormatOutcome: ModelCallResponseFormatOutcome {
+    switch self {
+    case .responseTruncated:
+      .truncated
+    case .responseUnreadable:
+      .unreadable
     }
   }
 }
@@ -209,10 +218,11 @@ extension LabelProposer: DependencyKey {
   public static var liveValue: Self {
     Self { recipe, vocabulary, tier, effort in
       @Dependency(\.modelClient) var modelClient
-      let response = try await call(recipe: recipe, vocabulary: vocabulary, tier: tier, effort: effort)
-        .complete(using: modelClient)
-      guard !response.wasTruncated else { throw LabelProposerError.responseTruncated }
-      return try parse(response.text, vocabulary: vocabulary)
+      return try await call(recipe: recipe, vocabulary: vocabulary, tier: tier, effort: effort)
+        .complete(using: modelClient) { response in
+          guard !response.wasTruncated else { throw LabelProposerError.responseTruncated }
+          return try parse(response.text, vocabulary: vocabulary)
+        }
     }
   }
 
@@ -283,9 +293,33 @@ extension LabelProposer: DependencyKey {
       system: instructions,
       prompt: prompt(recipe: recipe, vocabulary: vocabulary),
       maxTokens: maxTokens,
-      reasoningEffort: effort
+      reasoningEffort: effort,
+      responseFormat: .jsonSchema(name: "label_suggestions", schema: responseSchema)
     )
   }
+
+  static let responseSchema: JSONValue = [
+    "type": "object",
+    "properties": [
+      "suggestions": [
+        "type": "array",
+        "items": [
+          "type": "object",
+          "properties": [
+            "kind": [
+              "type": "string",
+              "enum": ["existingCategory", "newChild", "loose", "namespace"],
+            ],
+            "path": ["type": "array", "items": ["type": "string"]],
+          ],
+          "required": ["kind", "path"],
+          "additionalProperties": .bool(false),
+        ],
+      ],
+    ],
+    "required": ["suggestions"],
+    "additionalProperties": .bool(false),
+  ]
 
   public static func parse(_ text: String, vocabulary: LabelVocabulary) throws -> LabelProposal {
     guard
