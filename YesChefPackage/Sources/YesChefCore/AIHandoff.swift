@@ -12,6 +12,8 @@ public struct AIHandoff: Codable, Identifiable, Equatable, Sendable {
   public var taskType: AIHandoffTaskType
   /// Present only for a menu handoff initiated from one specific day.
   public var dayOffset: Int?
+  /// Present only for a recipe-adjustment handoff initiated from one variation.
+  public var variationID: RecipeVariation.ID?
   public var createdAt: Date
   public var importedAt: Date?
   public var status: AIHandoffStatus
@@ -25,6 +27,7 @@ public struct AIHandoff: Codable, Identifiable, Equatable, Sendable {
     sourceID: UUID,
     taskType: AIHandoffTaskType,
     dayOffset: Int? = nil,
+    variationID: RecipeVariation.ID? = nil,
     createdAt: Date,
     importedAt: Date? = nil,
     status: AIHandoffStatus = .awaitingReturn,
@@ -37,6 +40,7 @@ public struct AIHandoff: Codable, Identifiable, Equatable, Sendable {
     self.sourceID = sourceID
     self.taskType = taskType
     self.dayOffset = dayOffset
+    self.variationID = variationID
     self.createdAt = createdAt
     self.importedAt = importedAt
     self.status = status
@@ -130,12 +134,14 @@ public extension AIHandoff {
     sourceType: AIHandoffSourceType,
     sourceID: UUID,
     taskType: AIHandoffTaskType,
-    dayOffset: Int? = nil
+    dayOffset: Int? = nil,
+    variationID: RecipeVariation.ID? = nil
   ) -> Bool {
     self.sourceType == sourceType
       && self.sourceID == sourceID
       && self.taskType == taskType
       && self.dayOffset == dayOffset
+      && self.variationID == variationID
   }
 }
 
@@ -687,25 +693,6 @@ public struct AIHandoffRecipeSectionReview: Equatable, Sendable {
     self.text = text
     self.currentText = currentText
     self.currentServeWith = currentServeWith
-    self.learnings = learnings
-  }
-}
-
-public struct AIHandoffRecipeAdjustmentBriefReview: Equatable, Sendable {
-  public let handoffID: AIHandoff.ID
-  public let recipeID: Recipe.ID
-  public let brief: String
-  public let learnings: [String]
-
-  public init(
-    handoffID: AIHandoff.ID,
-    recipeID: Recipe.ID,
-    brief: String,
-    learnings: [String]
-  ) {
-    self.handoffID = handoffID
-    self.recipeID = recipeID
-    self.brief = brief
     self.learnings = learnings
   }
 }

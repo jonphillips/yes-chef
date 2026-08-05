@@ -5,6 +5,7 @@ struct RecipeAdjustmentReviewView: View {
   let review: RecipeAdjustmentReviewState
   let overwrite: (RecipeAdjustmentReviewState) -> Bool
   let keepAsVariation: (RecipeAdjustmentReviewState, String) -> Bool
+  let saveVariation: ((RecipeAdjustmentReviewState) -> Bool)?
 
   @Environment(\.dismiss) private var dismiss
   @State private var segment = Segment.ingredients
@@ -15,11 +16,13 @@ struct RecipeAdjustmentReviewView: View {
   init(
     review: RecipeAdjustmentReviewState,
     overwrite: @escaping (RecipeAdjustmentReviewState) -> Bool,
-    keepAsVariation: @escaping (RecipeAdjustmentReviewState, String) -> Bool
+    keepAsVariation: @escaping (RecipeAdjustmentReviewState, String) -> Bool,
+    saveVariation: ((RecipeAdjustmentReviewState) -> Bool)? = nil
   ) {
     self.review = review
     self.overwrite = overwrite
     self.keepAsVariation = keepAsVariation
+    self.saveVariation = saveVariation
     _variationName = State(initialValue: review.defaultVariationName)
   }
 
@@ -43,13 +46,17 @@ struct RecipeAdjustmentReviewView: View {
         switch segment {
         case .ingredients:
           VStack(spacing: 0) {
-            variationNameField
+            if review.variationID == nil {
+              variationNameField
+            }
             Divider()
             IngredientMatrixView(comparison: comparison)
           }
         case .method:
           VStack(spacing: 0) {
-            variationNameField
+            if review.variationID == nil {
+              variationNameField
+            }
             Divider()
             MethodBeforeAfterView(
               current: review.currentDetail,
@@ -59,7 +66,7 @@ struct RecipeAdjustmentReviewView: View {
           }
         }
       }
-      .navigationTitle("Adjust Recipe")
+      .navigationTitle(review.variationID == nil ? "Adjust Recipe" : "Adjust Variation")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .principal) {
@@ -78,27 +85,40 @@ struct RecipeAdjustmentReviewView: View {
           .disabled(isBusy)
         }
         ToolbarItemGroup(placement: .confirmationAction) {
-          Button {
-            keepAsVariationButtonTapped()
-          } label: {
-            if isKeepingVariation {
-              Label("Keeping", systemImage: "hourglass")
-            } else {
-              Label("Keep as Variation", systemImage: "square.stack.3d.up")
+          if let saveVariation {
+            Button {
+              saveVariationButtonTapped(saveVariation)
+            } label: {
+              if isKeepingVariation {
+                Label("Saving", systemImage: "hourglass")
+              } else {
+                Label("Save Variation", systemImage: "checkmark.circle")
+              }
             }
-          }
-          .disabled(isBusy || variationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(isBusy)
+          } else {
+            Button {
+              keepAsVariationButtonTapped()
+            } label: {
+              if isKeepingVariation {
+                Label("Keeping", systemImage: "hourglass")
+              } else {
+                Label("Keep as Variation", systemImage: "square.stack.3d.up")
+              }
+            }
+            .disabled(isBusy || variationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-          Button {
-            overwriteButtonTapped()
-          } label: {
-            if isOverwriting {
-              Label("Overwriting", systemImage: "hourglass")
-            } else {
-              Label("Overwrite", systemImage: "checkmark.circle")
+            Button {
+              overwriteButtonTapped()
+            } label: {
+              if isOverwriting {
+                Label("Overwriting", systemImage: "hourglass")
+              } else {
+                Label("Overwrite", systemImage: "checkmark.circle")
+              }
             }
+            .disabled(isBusy)
           }
-          .disabled(isBusy)
         }
       }
     }
@@ -124,6 +144,15 @@ struct RecipeAdjustmentReviewView: View {
   private func keepAsVariationButtonTapped() {
     isKeepingVariation = true
     if keepAsVariation(review, variationName) {
+      dismiss()
+    } else {
+      isKeepingVariation = false
+    }
+  }
+
+  private func saveVariationButtonTapped(_ saveVariation: (RecipeAdjustmentReviewState) -> Bool) {
+    isKeepingVariation = true
+    if saveVariation(review) {
       dismiss()
     } else {
       isKeepingVariation = false

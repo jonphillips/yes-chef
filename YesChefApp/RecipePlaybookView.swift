@@ -8,12 +8,16 @@ struct RecipePlaybookView: View {
   let ask: () -> Void
 
   @State private var isMakeAheadExpanded = true
+  @State private var isChoicesExpanded = true
   @State private var isNotesExpanded = true
   @State private var isChefItUpExpanded = true
   @State private var isServeWithExpanded = true
   @State private var isDeliberationLogExpanded = false
   @State private var editingSection: PlaybookSectionKind?
   @State private var clearingSection: PlaybookSectionKind?
+  @Binding var promotingVariation: RecipeVariation?
+  @Binding var splittingOffVariation: RecipeVariation?
+  @Binding var splitOffTitleDraft: String
 
   var body: some View {
     let visibleNotes = model.visibleNotes
@@ -30,6 +34,25 @@ struct RecipePlaybookView: View {
         isExpanded: $isMakeAheadExpanded
       ) {
         makeAheadContent(model.makeAhead)
+      }
+      if !model.variations.isEmpty {
+        playbookSection(
+          "Choices",
+          isFilled: true,
+          isExpanded: $isChoicesExpanded,
+          showsActions: false,
+          actions: { EmptyView() }
+        ) {
+          RecipeVariationChoices(
+            variations: model.variations,
+            activeVariationID: model.detail?.activeVariationID,
+            model: model,
+            handoffTransport: handoffTransport,
+            promotingVariation: $promotingVariation,
+            splittingOffVariation: $splittingOffVariation,
+            splitOffTitleDraft: $splitOffTitleDraft
+          )
+        }
       }
       notesSection(
         "Notes",

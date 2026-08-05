@@ -203,7 +203,11 @@ private enum AIHandoffReviewStager {
     case .adjustRecipe:
       guard !returned.deliverable.isEmpty else { throw AIHandoffIntentImportError.emptyPlan }
       return .recipeAdjustmentBrief(AIHandoffRecipeAdjustmentBriefReview(
-        handoffID: handoff.id, recipeID: recipe.id, brief: returned.deliverable, learnings: returned.learnings
+        handoffID: handoff.id,
+        recipeID: recipe.id,
+        variationID: handoff.variationID,
+        brief: returned.deliverable,
+        learnings: returned.learnings
       ))
     case .prepPlan, .mealPlanMakeAheadStrategy, .mealPlanComplement, .menuComplement,
       .readerFeedbackCuration, .workbenchCompare, .workbenchExperiments:

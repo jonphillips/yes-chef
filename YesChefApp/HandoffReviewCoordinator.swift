@@ -492,47 +492,6 @@ final class HandoffReviewCoordinator {
     }
   }
 
-  func draftRecipeAdjustment(
-    _ review: AIHandoffRecipeAdjustmentBriefReview,
-    brief: String
-  ) async throws -> RecipeAdjustmentReviewState {
-    @Dependency(\.recipeAdjustmentClient) var recipeAdjustmentClient
-    @Dependency(\.apiKeyStore) var apiKeyStore
-    @Dependency(\.recipeChatProviderPreference) var providerPreference
-    @Dependency(\.recipeChatTierPreference) var tierPreference
-
-    let trimmedBrief = brief.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmedBrief.isEmpty else { throw HandoffReviewError.emptyDeliverable }
-    guard let detail = try await database.read({ db in
-      try RecipeDetailRequest(recipeID: review.recipeID).fetch(db)
-    }) else {
-      throw RecipeAdjustmentError.missingRecipe(review.recipeID)
-    }
-
-    let availableProviders = FrontierProvider.allCases.filter { apiKeyStore.key($0) != nil }
-    let resolvedTier = try resolveTier(
-      useFrontier: tierPreference.current(),
-      preferredProvider: providerPreference.current(),
-      availableProviders: availableProviders,
-      requirement: .frontierRequired
-    )
-
-    let proposal = try await recipeAdjustmentClient(
-      selection: "",
-      messages: [RecipeChatMessage(role: .user, text: trimmedBrief)],
-      detail: detail,
-      tier: resolvedTier.tier,
-      tierResolution: resolvedTier.resolution
-    )
-    let adjustmentReview = RecipeAdjustmentReviewState(
-      currentDetail: detail,
-      proposedDetail: try proposal.proposedDetail(applyingTo: detail, now: now, uuid: { uuid() }),
-      proposal: proposal,
-      deliberationBody: brief
-    )
-    return adjustmentReview
-  }
-
   func overwriteAdjustmentButtonTapped(_ review: RecipeAdjustmentReviewState) -> Bool {
     do {
       try database.write { db in
@@ -739,7 +698,11 @@ private struct RecipeAdjustmentBriefReviewSheet: View {
     NavigationStack {
       Form {
         Section {
-          Text("This brief is based on the base recipe. It does not revise an active variation.")
+          Text(
+            review.variationID == nil
+              ? "This brief is based on the base recipe. It does not revise an active variation."
+              : "This brief is based on a variation and will revise that variation."
+          )
             .font(.subheadline)
             .foregroundStyle(.secondary)
         }

@@ -39,6 +39,26 @@ struct HandoffSectionRoutingTests {
   }
 
   @Test
+  func variationAdjustmentReturnOnlyMatchesItsOriginalVariation() {
+    let recipeID = UUID(uuidString: "00000000-0000-0000-0000-000000003906")!
+    let variationID = UUID(uuidString: "00000000-0000-0000-0000-000000003907")!
+    let otherVariationID = UUID(uuidString: "00000000-0000-0000-0000-000000003908")!
+    let variationHandoff = AIHandoff(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000003909")!,
+      sourceType: .recipe,
+      sourceID: recipeID,
+      taskType: .adjustRecipe,
+      variationID: variationID,
+      createdAt: .distantPast,
+      exportedPrompt: ""
+    )
+
+    #expect(HandoffExportSource.recipeAdjustment(recipeID, variationID: variationID).matches(variationHandoff))
+    #expect(!HandoffExportSource.recipeAdjustment(recipeID).matches(variationHandoff))
+    #expect(!HandoffExportSource.recipeAdjustment(recipeID, variationID: otherVariationID).matches(variationHandoff))
+  }
+
+  @Test
   func recipeAdjustmentRoundTripKeepsTheTokenContractMarkerProseAndLearnings() throws {
     let handoffID = UUID(uuidString: "00000000-0000-0000-0000-000000003903")!
     let result = """
