@@ -15,11 +15,44 @@ extension RecipeDetailModel {
   }
 
   func suggestLabelsButtonTapped() {
-    guard let detail else { return }
+    destination = .labelSuggestions
+    refreshLabelSuggestions()
+  }
+
+  func tagEditorAppeared() {
+    guard labelState.suggestions.isEmpty else { return }
+    refreshLabelSuggestions()
+  }
+
+  func acceptSuggestedLabelButtonTapped(_ suggestion: SuggestedLabel) async -> Bool {
+    guard !labelState.acceptedIDs.contains(suggestion.id) else { return false }
+    labelState.acceptedIDs.insert(suggestion.id)
+    do {
+      let currentNow = now
+      let makeUUID = uuid
+      try await database.write { db in
+        try RecipeRepository.reconcileSuggestedLabels(
+          [suggestion],
+          recipeID: recipeID,
+          in: db,
+          now: currentNow,
+          uuid: { makeUUID() }
+        )
+      }
+      return true
+    } catch {
+      labelState.acceptedIDs.remove(suggestion.id)
+      errorMessage = error.localizedDescription
+      isShowingError = true
+      return false
+    }
+  }
+
+  private func refreshLabelSuggestions() {
+    guard let detail, !labelState.isSuggesting else { return }
     labelState.suggestions = []
     labelState.acceptedIDs = []
     labelState.isSuggesting = true
-    destination = .labelSuggestions
 
     Task { [weak self] in
       guard let self else { return }
