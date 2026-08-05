@@ -22,26 +22,34 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**The facet/labeling gate is cleared and the variation-anchor data-loss defect is fixed at the write path — no
-hard-gated dispatch is queued.** Amendment 4's deterministic floor shipped (PR
-[#281](https://github.com/jonphillips/yes-chef/pull/281)) and variation-anchor-repair **Dispatch 0 (+3) shipped**
-(PR [#284](https://github.com/jonphillips/yes-chef/pull/284), device gate owed); filling in per-recipe coverage is
-Jon's ongoing hand work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**. Live candidates:
+**The facet/labeling gate is cleared, the variation-anchor data-loss defect is fixed at the write path, and
+ADR-0021 V4a (Choices section) is code-approved — no hard-gated dispatch is queued.** Amendment 4's
+deterministic floor shipped (PR [#281](https://github.com/jonphillips/yes-chef/pull/281)),
+variation-anchor-repair **Dispatch 0 (+3) shipped** (PR [#284](https://github.com/jonphillips/yes-chef/pull/284),
+device gate owed), and **V4a shipped to PR [#285](https://github.com/jonphillips/yes-chef/pull/285)**
+(architect-approved 2026-08-05, device gate owed); filling in per-recipe coverage is Jon's ongoing hand work
+(Edit Tags + DEBUG Facet Coverage) that **gates nothing**.
 
-- **Variations → the Playbook = [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4, V4a.
-  Amd 4 is RATIFIED (Jon, 2026-08-05); V4a is dispatchable.** *(This is the idea Jon recalled — the record was
-  the never-applied APPLY file, folded into ADR-0021 2026-08-05.)* **V4a** relocates the variation picker from
-  the Body to a Playbook **Choices** section (Amd4-D5, correcting an ADR-0039 D1 drift), renders variations as a
-  proper list, and inherits ADR-0041 S2's section-scoped hand-off — **app-only, schema-free**, the whole of
-  complaint (1); ships alone and first. V4b (related-recipe edge table — **OQ2 resolved: order by name, no
-  ordering column**; the schema slice, two-device pass owed) and V4c (the two new step ops — **gated behind
-  anchor-repair Dispatch 1**) follow.
-- **anchor-repair Dispatch 1 — make `resolved(applying:)` degrade, not throw**
+**Recommended next dispatch: anchor-repair Dispatch 1** — pure logic, no schema, runs on the cheap package
+build (dispatchable now, no device pass), it **gates V4c**, and the V4a review confirmed fresh motivation: V4a's
+own hand-off export/draft paths call `resolved(applying:)`, which today still **throws** on an unresolvable
+anchor, so Dispatch 1 hardens exactly the surface V4a widened. Hold **V4b** (schema slice) until Jon is local
+for its two-device sync pass. Live candidates:
+
+- **anchor-repair Dispatch 1 — make `resolved(applying:)` degrade, not throw** *(recommended next)*
   ([`efforts/variation-anchor-repair.md`](efforts/variation-anchor-repair.md)). Dispatch 0 stopped *new* dead
   anchors and repaired the resolvable legacy ones, but a single unresolvable anchor still **throws** and takes out
-  that recipe's editor + reader fold + grocery. Dispatch 1 applies every op that resolves and banners the dead one
-  — and it **gates ADR-0021 Amd4 V4c** (the two new `stepInsert`/`stepRemove` ops). Dispatch 2 (the repair UI)
-  follows. No schema.
+  that recipe's editor + reader fold + grocery — **and now the V4a variation hand-off export/draft paths too**.
+  Dispatch 1 applies every op that resolves and banners the dead one — and it **gates ADR-0021 Amd4 V4c** (the two
+  new `stepInsert`/`stepRemove` ops). Dispatch 2 (the repair UI) follows. No schema.
+- **Variations → the Playbook = [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4. V4a shipped
+  (PR [#285](https://github.com/jonphillips/yes-chef/pull/285)); V4b/V4c remain.** V4a relocated the variation
+  picker from the Body to a Playbook **Choices** section (Amd4-D5), rendered variations as a proper list with
+  descriptions + full action set, and scoped the hand-off via the local `aiHandoffs.variationID` discriminator
+  ([[aihandoffs-local-scope-discriminator]]) — app-only, schema-free. **V4b** (related-recipe edge table — the
+  Choices section's second half; **OQ2 resolved: order by name, no ordering column**; the schema slice,
+  **two-device pass owed, back up first**) and **V4c** (the two new step ops — **gated behind anchor-repair
+  Dispatch 1**) follow.
 - **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser S1.** All the facet infrastructure it
   needs is shipped (facets, editable membership, the deterministic floor, the three coverage views). Its old
   "wait until primary facets classify a majority of the library" gate is **retired** — the manual backfill no
@@ -212,6 +220,15 @@ data pass, no schema.** **Export a backup first.** Cold-launch with Console stre
 backfill repaired the Crean→Cream variation, and the line should **vanish on the next launch** (idempotent). Any
 `unresolved=[…]` is the repair queue (report-don't-guess) awaiting Dispatch 2. Then the two-device pass.
 
+**[PR #285](https://github.com/jonphillips/yes-chef/pull/285) — ADR-0021 V4a Choices section. App-only, no
+schema.** Confirm the relocated **Choices** section renders above Notes with each variation's name +
+description + radio selection; selecting a variation folds it in Directions and the **Return to Base Recipe**
+control appears there (the only deselect affordance — there is no Base row in Choices, by design). Then exercise
+the variation-scoped hand-off round-trip: **Hand Off** from a variation's Choices menu, bring back a revision,
+and confirm **Save Variation** re-derives that variation (not the base) — and that a **Paste** whose token no
+longer resolves still lands scoped to the right variation (the unmatched-fallback fix). Base-recipe adjust is
+unchanged.
+
 **[PR #262](https://github.com/jonphillips/yes-chef/pull/262) — prep plan dish links and dates. Merged
 2026-07-30, no schema.** Slice 1 (day-anchored sessions on a placed menu) is **device-confirmed 2026-07-30**.
 **Slice 2 pass still owed:** on iPhone compact width, confirm an inert chip relinks in two taps, a hand-authored
@@ -271,7 +288,13 @@ mistakes have been made — verify against `CloudSync.swift`, not against intuit
 Lean by default — the cost center is the build/simulator loop, not the code, and Jon does the device pass
 regardless. So verify with **compiler + tests once**, then hand off:
 
-- Run `xcodegen generate` after adding Swift source files.
+- Run `xcodegen generate` after adding Swift source files — `project.yml` globs the source dirs, so a new
+  `.swift` file is invisible to the **app target** until the `pbxproj` is regenerated (hand-editing the
+  `pbxproj` is a fragile workaround, not the pattern). **This is a build-claim tripwire:** ADR-0021 V4a's
+  first push added two `YesChefApp/` extension files without regenerating, so the app target could not have
+  compiled (their symbols would be undefined) — yet the PR claimed a green generic build. A "passing" app
+  build that omits newly-added files is proof the build was never actually run ([[codex-build-excuse-reproduce]]);
+  the architect re-runs it locally before approving (PR #285, fixed in `5388e31`).
 - For package/logic-only changes, `swift build` the package (cheaper than a full app build).
 - Otherwise run the app build with **elevated/unsandboxed permissions**, no simulator, no signing identity:
   `scripts/xcodebuild-summary.sh -scheme YesChef -destination 'generic/platform=iOS' -skipMacroValidation CODE_SIGNING_ALLOWED=NO build`.
