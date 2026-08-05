@@ -35,11 +35,16 @@ no longer takes out a recipe's editor/reader/grocery, and the two variation-scop
 rather than feed an LLM a partial recipe — which **cleared the V4c gate**. Live candidates:
 
 - **Variations → the Playbook = [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4 — V4b + V4c
-  remain** (V4a done, DONE-LOG). **V4b** — the related-recipe edge table, the Choices section's second half
-  (**OQ2 resolved: order by name, no ordering column**); it is the **schema slice**, so **hold until Jon is
-  local for its two-device sync pass, back up first**. **V4c** — the two new `stepInsert`/`stepRemove` step ops;
-  **gate cleared by anchor-repair Dispatch 1, now dispatchable** (Amd4-D4 is the sanctioned delta-op widening —
-  do not extend the ops ad hoc elsewhere).
+  remain** (V4a done, DONE-LOG). **V4c is DISPATCHED**, bundled with a **variation Delete affordance** (a
+  gap-fill, not in the ADR — Amd2-D4 already sanctions delete; the Choices menu never got the button). Spec:
+  [`efforts/adr-0021-v4c-and-variation-delete.md`](efforts/adr-0021-v4c-and-variation-delete.md) — one dispatch,
+  Delete (app + thin Core, schema-free) landable first, then V4c's two `stepInsert`/`stepRemove` ops (gate
+  cleared by anchor-repair Dispatch 1; Amd4-D4 is the sanctioned delta-op widening — do not extend the ops ad
+  hoc elsewhere). The one non-obvious edge is baked into the spec: Delete syncs the row but the active-selection
+  highlight is per-cook, so the resolve path must degrade to base when the active variation is wholly missing.
+  **V4b** — the related-recipe edge table, the Choices section's second half (**OQ2 resolved: order by name, no
+  ordering column**); it is the **schema slice**, so **hold until Jon is local for its two-device sync pass,
+  back up first**. This is where reordering lands (linked split-off, not a variation).
 - **anchor-repair Dispatch 2 — the repair UI, no schema.** The read path already surfaces the orphaned-anchor
   repair queue (reader/editor notice, grocery `(needs repair)` subtitle, blocked Save + blocked hand-offs);
   Dispatch 2 makes it **directly actionable** (re-anchor or drop an orphaned op). Spec:
