@@ -378,6 +378,9 @@ private struct RecipeReaderView: View {
               VStack(alignment: .leading, spacing: 16) {
                 header(recipe)
                 metadata(recipe)
+                if !model.activeVariationUnresolvedAnchors.isEmpty {
+                  RecipeVariationRepairNotice(anchors: model.activeVariationUnresolvedAnchors, blocksSaving: false)
+                }
                 compactRecipeBody
               }
               .padding()
@@ -727,6 +730,12 @@ private struct RecipeReaderView: View {
   @ViewBuilder
   private var directionsColumn: some View {
     VStack(alignment: .leading, spacing: 18) {
+      if !model.activeVariationUnresolvedAnchors.isEmpty {
+        RecipeVariationRepairNotice(
+          anchors: model.activeVariationUnresolvedAnchors,
+          blocksSaving: false
+        )
+      }
       if let note = model.activeVariationNote {
         variationMethodNote(note)
       }

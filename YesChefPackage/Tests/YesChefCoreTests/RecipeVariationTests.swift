@@ -63,12 +63,12 @@ extension RecipeCoreTests {
         expectNoDifference(baseDetail.activeVariationID, variation.id)
         expectNoDifference(baseDetail.activeVariation?.note, "Taste before serving.")
 
-        let resolved = try baseDetail.resolved(applying: variation)
+        let resolved = try baseDetail.resolved(applying: variation).detail
         expectNoDifference(resolved.ingredientLines.map(\.originalText), [
           "2 tablespoons lime juice",
           "1 teaspoon lime zest",
         ])
-        let highlights = try baseDetail.variationIngredientHighlights(for: variation)
+        let highlights = try baseDetail.variationIngredientHighlights(for: variation).highlights
         expectNoDifference(highlights[lemonID], .changed)
         #expect(highlights.values.contains(.added))
       }
@@ -186,9 +186,9 @@ extension RecipeCoreTests {
         dateModified: now
       )
 
-      let resolved = try detail.resolved(applying: variation)
+      let resolved = try detail.resolved(applying: variation).detail
       let addedLine = try #require(resolved.ingredientLines.first)
-      let highlights = try detail.variationIngredientHighlights(for: variation)
+      let highlights = try detail.variationIngredientHighlights(for: variation).highlights
 
       expectNoDifference(resolved.ingredientSections.count, 1)
       expectNoDifference(addedLine.originalText, "1 teaspoon lime zest")
@@ -219,9 +219,9 @@ extension RecipeCoreTests {
         dateModified: now
       )
 
-      let resolved = try detail.resolved(applying: variation)
+      let resolved = try detail.resolved(applying: variation).detail
       let addedLine = try #require(resolved.ingredientLines.first)
-      let highlights = try detail.variationIngredientHighlights(for: variation)
+      let highlights = try detail.variationIngredientHighlights(for: variation).highlights
 
       expectNoDifference(resolved.ingredientSections.count, 1)
       expectNoDifference(addedLine.originalText, "1 teaspoon lime zest")
@@ -399,7 +399,7 @@ extension RecipeCoreTests {
         dateModified: now
       )
 
-      var edited = try base.resolved(applying: variation)
+      var edited = try base.resolved(applying: variation).detail
       edited.ingredientLines[edited.ingredientLines.firstIndex { $0.id == lemonID }!].originalText = "3 tablespoons lime juice"
       let addedLineID = try #require(edited.ingredientLines.first { $0.id != lemonID }?.id)
       edited.ingredientLines[edited.ingredientLines.firstIndex { $0.id == addedLineID }!].originalText = "2 teaspoons lime zest"
@@ -419,7 +419,7 @@ extension RecipeCoreTests {
         dateCreated: now,
         dateModified: now
       )
-      let roundTrip = try base.resolved(applying: rederived)
+      let roundTrip = try base.resolved(applying: rederived).detail
       expectNoDifference(roundTrip.ingredientLines.map(\.originalText), edited.ingredientLines.map(\.originalText))
       expectNoDifference(roundTrip.instructionSteps.map(\.text), edited.instructionSteps.map(\.text))
     }
@@ -495,7 +495,7 @@ extension RecipeCoreTests {
 
       let standaloneID = try database.write { db in
         let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
-        let resolved = try detail.resolved(applying: variation)
+        let resolved = try detail.resolved(applying: variation).detail
         return try RecipeRepository.splitVariationOff(
           variation.id, resolvedDetail: resolved, name: "Weeknight Lime Pasta",
           in: db, now: now.addingTimeInterval(60), uuid: { uuids.next() }
@@ -560,8 +560,8 @@ extension RecipeCoreTests {
         expectNoDifference(detail.activeVariationID, nil)
         let previousBase = try #require(detail.variations.first { $0.name == "Pasta" })
         let lime = try #require(detail.variations.first { $0.name == "Lime" })
-        expectNoDifference(try detail.resolved(applying: previousBase).ingredientLines.map(\.originalText), ["1 tablespoon lemon juice"])
-        expectNoDifference(try detail.resolved(applying: lime).ingredientLines.map(\.originalText), ["2 tablespoons lime juice"])
+        expectNoDifference(try detail.resolved(applying: previousBase).detail.ingredientLines.map(\.originalText), ["1 tablespoon lemon juice"])
+        expectNoDifference(try detail.resolved(applying: lime).detail.ingredientLines.map(\.originalText), ["2 tablespoons lime juice"])
       }
     }
 

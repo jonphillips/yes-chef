@@ -23,7 +23,12 @@ extension RecipeDetailModel {
   var displayDetail: RecipeDetailData? {
     guard let detail else { return nil }
     guard let variation = detail.activeVariation else { return detail }
-    return (try? detail.resolved(applying: variation)) ?? detail
+    return (try? detail.resolved(applying: variation).detail) ?? detail
+  }
+
+  var activeVariationUnresolvedAnchors: [RecipeVariationUnresolvedAnchor] {
+    guard let detail, let variation = detail.activeVariation else { return [] }
+    return (try? detail.resolved(applying: variation).unresolvedAnchors) ?? []
   }
 
   var activeVariation: RecipeVariation? {
@@ -76,7 +81,7 @@ extension RecipeDetailModel {
     guard
       let baseDetail = detail,
       let variation = baseDetail.activeVariation,
-      let highlights = try? baseDetail.variationIngredientHighlights(for: variation)
+      let highlights = try? baseDetail.variationIngredientHighlights(for: variation).highlights
     else {
       return foldedLines.map { IngredientLineDisplay(line: $0, highlight: nil) }
     }

@@ -436,7 +436,11 @@ enum HandoffAppOperations {
       guard let variation = detail.variations.first(where: { $0.id == variationID }) else {
         throw HandoffIntentSurfaceError.sourceNotFound
       }
-      scopedDetail = try detail.resolved(applying: variation)
+      let resolution = try detail.resolved(applying: variation)
+      guard !resolution.requiresRepair else {
+        throw HandoffIntentSurfaceError.variationNeedsRepair
+      }
+      scopedDetail = resolution.detail
     } else {
       scopedDetail = detail
     }
@@ -840,6 +844,7 @@ struct OpenHandoffReviewIntent: AppIntent {
 private enum HandoffIntentSurfaceError: Error, LocalizedError {
   case sourceNotFound
   case invalidHandoffID
+  case variationNeedsRepair
 
   var errorDescription: String? {
     switch self {
@@ -847,6 +852,8 @@ private enum HandoffIntentSurfaceError: Error, LocalizedError {
       "Yes Chef could not find that source."
     case .invalidHandoffID:
       "The handoff ID must be a UUID."
+    case .variationNeedsRepair:
+      "This variation has changes that need repair. Open it in Yes Chef before handing it off."
     }
   }
 }

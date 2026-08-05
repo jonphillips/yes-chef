@@ -32,7 +32,7 @@ extension RecipeCoreTests {
         dateCreated: now,
         dateModified: now
       )
-      var edited = try base.resolved(applying: variation)
+      var edited = try base.resolved(applying: variation).detail
       edited.ingredientLines[0].originalText = "1 cup rice"
 
       let derivation = base.derivingVariation(from: edited)
@@ -93,7 +93,7 @@ extension RecipeCoreTests {
 
       let standaloneID = try database.write { db in
         let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
-        let resolved = try detail.resolved(applying: variation)
+        let resolved = try detail.resolved(applying: variation).detail
         return try RecipeRepository.splitVariationOff(
           variation.id, resolvedDetail: resolved, name: "   ",
           in: db, now: now.addingTimeInterval(60), uuid: { uuids.next() }
@@ -168,7 +168,7 @@ extension RecipeCoreTests {
         expectNoDifference(promoted.variations.map(\.name), ["Pasta"])
         let restoredBase = try #require(promoted.variations.first)
         expectNoDifference(
-          try promoted.resolved(applying: restoredBase).ingredientLines.map(\.originalText),
+          try promoted.resolved(applying: restoredBase).detail.ingredientLines.map(\.originalText),
           ["1 tablespoon lemon juice"]
         )
       }

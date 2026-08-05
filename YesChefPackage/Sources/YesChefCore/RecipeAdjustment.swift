@@ -89,8 +89,21 @@ public struct RecipeAdjustmentProposal: Codable, Equatable, Sendable {
     now: Date,
     uuid: () -> UUID
   ) throws -> RecipeDetailData {
+    let resolution = try applyingResolvedOperations(to: detail, now: now, uuid: uuid)
+    guard let unresolvedAnchor = resolution.unresolvedAnchors.first else {
+      return resolution.detail
+    }
+    throw unresolvedAnchor.adjustmentError
+  }
+
+  fileprivate func applyingResolvedOperations(
+    to detail: RecipeDetailData,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> RecipeVariationResolution {
     var ingredientSections = detail.ingredientSections
     var ingredientLines = sortedIngredientLines(detail.ingredientLines, sections: ingredientSections)
+    var unresolvedAnchors: [RecipeVariationUnresolvedAnchor] = []
     for op in ingredientOps {
       switch op {
       case let .add(line, sectionName):
@@ -112,13 +125,15 @@ public struct RecipeAdjustmentProposal: Codable, Equatable, Sendable {
 
       case let .remove(reference):
         guard let index = reference.index(in: ingredientLines) else {
-          throw RecipeAdjustmentError.unresolvedIngredient(reference.displayText)
+          unresolvedAnchors.append(.ingredient(reference.displayText))
+          continue
         }
         ingredientLines.remove(at: index)
 
       case let .substitute(reference, line), let .scale(reference, line):
         guard let index = reference.index(in: ingredientLines) else {
-          throw RecipeAdjustmentError.unresolvedIngredient(reference.displayText)
+          unresolvedAnchors.append(.ingredient(reference.displayText))
+          continue
         }
         ingredientLines[index] = ingredientLines[index].replacingOriginalText(with: line)
       }
@@ -128,7 +143,8 @@ public struct RecipeAdjustmentProposal: Codable, Equatable, Sendable {
     var instructionSteps = detail.instructionGroups.flatMap(\.steps)
     for replacement in methodStepReplacements {
       guard let index = replacement.index(in: instructionSteps) else {
-        throw RecipeAdjustmentError.unresolvedInstructionStep(replacement.displayText)
+        unresolvedAnchors.append(.instructionStep(replacement.displayText))
+        continue
       }
       instructionSteps[index].text = replacement.replacementText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -142,7 +158,7 @@ public struct RecipeAdjustmentProposal: Codable, Equatable, Sendable {
     )
     var recipe = detail.recipe
     recipe.dateModified = now
-    return RecipeDetailData(
+    let resolvedDetail = RecipeDetailData(
       recipe: recipe,
       source: detail.source,
       ingredientSections: ingredientSections.sorted { $0.sortOrder < $1.sortOrder },
@@ -157,6 +173,7 @@ public struct RecipeAdjustmentProposal: Codable, Equatable, Sendable {
       recipeEquipment: detail.recipeEquipment,
       serveWith: detail.serveWith
     )
+    return RecipeVariationResolution(detail: resolvedDetail, unresolvedAnchors: unresolvedAnchors)
   }
 }
 
@@ -363,6 +380,46 @@ public struct RecipeVariationDerivation: Equatable, Sendable {
   }
 
   public var isRepresentable: Bool { unrepresentableEdits.isEmpty }
+}
+
+/// A stored variation can outlive one of its base anchors. Reading it still applies every
+/// operation that remains exact and carries the repair queue to the UI; writing remains strict.
+public struct RecipeVariationResolution: Equatable, Sendable {
+  public var detail: RecipeDetailData
+  public var unresolvedAnchors: [RecipeVariationUnresolvedAnchor]
+
+  public init(
+    detail: RecipeDetailData,
+    unresolvedAnchors: [RecipeVariationUnresolvedAnchor] = []
+  ) {
+    self.detail = detail
+    self.unresolvedAnchors = unresolvedAnchors
+  }
+
+  public var requiresRepair: Bool { !unresolvedAnchors.isEmpty }
+
+  public func requiringAllAnchorsResolved() throws -> RecipeDetailData {
+    guard let unresolvedAnchor = unresolvedAnchors.first else { return detail }
+    throw unresolvedAnchor.adjustmentError
+  }
+}
+
+public enum RecipeVariationUnresolvedAnchor: Equatable, Sendable {
+  case ingredient(String)
+  case instructionStep(String)
+
+  public var displayText: String {
+    switch self {
+    case let .ingredient(text), let .instructionStep(text): text
+    }
+  }
+
+  fileprivate var adjustmentError: RecipeAdjustmentError {
+    switch self {
+    case let .ingredient(text): .unresolvedIngredient(text)
+    case let .instructionStep(text): .unresolvedInstructionStep(text)
+    }
+  }
 }
 
 public enum RecipeVariationPromotionResult: Equatable, Sendable {
@@ -733,7 +790,7 @@ extension RecipeRepository {
       dateCreated: now,
       dateModified: now
     )
-    _ = try detail.resolved(applying: variation)
+    _ = try detail.resolved(applying: variation).requiringAllAnchorsResolved()
     try RecipeVariation.insert { variation }.execute(db)
     try addDeliberationLogEntry(
       body: deliberationBody,
@@ -883,10 +940,10 @@ extension RecipeRepository {
     guard let oldBase = try fetchDetail(recipeID: variation.recipeID, in: db) else {
       throw RecipeAdjustmentError.missingRecipe(variation.recipeID)
     }
-    let newBase = try oldBase.resolved(applying: variation)
+    let newBase = try oldBase.resolved(applying: variation).requiringAllAnchorsResolved()
     var rederived: [(RecipeVariation, RecipeVariationDerivation)] = []
     for sibling in oldBase.variations where sibling.id != variationID {
-      let siblingResolved = try oldBase.resolved(applying: sibling)
+      let siblingResolved = try oldBase.resolved(applying: sibling).requiringAllAnchorsResolved()
       var derivation = newBase.derivingVariation(from: siblingResolved)
       derivation.unrepresentableEdits.append(
         contentsOf: try unavailableIngredientAnchors(in: sibling, against: newBase)
@@ -1007,7 +1064,7 @@ extension RecipeRepository {
   ) throws {
     for variation in variations {
       do {
-        _ = try proposedDetail.resolved(applying: variation)
+        _ = try proposedDetail.resolved(applying: variation).requiringAllAnchorsResolved()
       } catch {
         throw RecipeAdjustmentError.variationNeedsReview(
           variation.name,
@@ -1352,7 +1409,7 @@ public extension RecipeDetailData {
     )
   }
 
-  func resolved(applying variation: RecipeVariation) throws -> RecipeDetailData {
+  func resolved(applying variation: RecipeVariation) throws -> RecipeVariationResolution {
     #if DEBUG
       let clock = ContinuousClock()
       let start = clock.now
@@ -1365,20 +1422,20 @@ public extension RecipeDetailData {
     #endif
     let payload = try RecipeVariationPayload.decode(variation.deltas, variationID: variation.id)
     var uuids = VariationUUIDSequence(variationID: variation.id)
-    var detail = try RecipeAdjustmentProposal(
+    var resolution = try RecipeAdjustmentProposal(
       summary: variation.name,
       ingredientOps: payload.ingredientOps,
       methodStepReplacements: payload.methodStepReplacements
     )
-    .proposedDetail(applyingTo: self, now: recipe.dateModified, uuid: { uuids.next() })
-    detail.variations = variations
-    detail.activeVariationID = variation.id
-    return detail
+    .applyingResolvedOperations(to: self, now: recipe.dateModified, uuid: { uuids.next() })
+    resolution.detail.variations = variations
+    resolution.detail.activeVariationID = variation.id
+    return resolution
   }
 
   func variationIngredientHighlights(
     for variation: RecipeVariation
-  ) throws -> [IngredientLine.ID: RecipeVariationIngredientHighlight] {
+  ) throws -> RecipeVariationIngredientHighlightResolution {
     #if DEBUG
       let clock = ContinuousClock()
       let start = clock.now
@@ -1390,10 +1447,10 @@ public extension RecipeDetailData {
       }
     #endif
     let payload = try RecipeVariationPayload.decode(variation.deltas, variationID: variation.id)
-    let resolvedDetail = try resolved(applying: variation)
+    let resolution = try resolved(applying: variation)
     let baseLineIDs = Set(ingredientLines.map(\.id))
     var highlights = Dictionary(
-      uniqueKeysWithValues: resolvedDetail.ingredientLines
+      uniqueKeysWithValues: resolution.detail.ingredientLines
         .filter { !baseLineIDs.contains($0.id) }
         .map { ($0.id, RecipeVariationIngredientHighlight.added) }
     )
@@ -1412,7 +1469,23 @@ public extension RecipeDetailData {
         }
       }
     }
-    return highlights
+    return RecipeVariationIngredientHighlightResolution(
+      highlights: highlights,
+      unresolvedAnchors: resolution.unresolvedAnchors
+    )
+  }
+}
+
+public struct RecipeVariationIngredientHighlightResolution: Equatable, Sendable {
+  public var highlights: [IngredientLine.ID: RecipeVariationIngredientHighlight]
+  public var unresolvedAnchors: [RecipeVariationUnresolvedAnchor]
+
+  public init(
+    highlights: [IngredientLine.ID: RecipeVariationIngredientHighlight],
+    unresolvedAnchors: [RecipeVariationUnresolvedAnchor]
+  ) {
+    self.highlights = highlights
+    self.unresolvedAnchors = unresolvedAnchors
   }
 }
 
