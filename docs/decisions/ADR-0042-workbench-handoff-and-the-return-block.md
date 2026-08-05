@@ -16,7 +16,16 @@ prose *revision brief* returns and feeds the shipped in-app extractor — schema
 D2 held by keeping identity off the paste door. **Its prompt is hand-validated end-to-end (2026-07-21):
 shape, terminal turn and the `YC-CONTRACT: v2` echo all held, and Amd1-OQ1 resolved to keep learnings with
 a re-aimed ask (Amd1-D7).** S0/S1 shipped in [#212](https://github.com/jonphillips/yes-chef/pull/212), S2
-in [#214](https://github.com/jonphillips/yes-chef/pull/214) (device-passed 2026-07-21). **Extends
+in [#214](https://github.com/jonphillips/yes-chef/pull/214) (device-passed 2026-07-21).
+**[Amendment 2](#amendment-2--workbenchdraft-outboards-the-concrete-want-is-cost-and-creation-carries-no-identity-to-protect-2026-08-05)
+— Accepted 2026-08-05 (Jon ratified; S3 is the dispatch target, gated on the S3a hand-run).** Un-defers S3
+(`workbenchDraft`) on a concrete *cost* want (draft against a flat-rate subscription, not the metered onboard
+synthesis). Allowed under the durable form of D2 because **creation
+carries no identity** (Amd1-D2). The return is **extraction, not synthesis**, so it routes through the
+capture pipeline's existing text→recipe seam rather than a new parser: the outboard emits schema.org **JSON-LD**,
+parsed for free by the deterministic `RecipeJSONLDExtractor`, into the pre-canonical `WorkbenchDraftRecipe`
+and the existing review + promote path. Names paste and photo-OCR as the same seam's future consumers.
+Schema-free, no contract bump; gated on a hand-run. **Extends
 [ADR-0038](ADR-0038-external-llm-handoff.md)** (the hand-off core, its
 in-app Copy/Paste door in Amd 2, and the `Learning` typed home in Amd 1) by adding the **workbench** as a
 hand-off source and by writing down the return-payload contract that ADR-0038 left implicit. **Governed by
@@ -494,6 +503,194 @@ are shipped writers.
   **v1 must export the base recipe and say so in the sheet, or refuse to export while a variation is
   active.** The general fix belongs to the variation-grain question (`docs/open-questions.md` — the
   variation ↔ Workbench umbrella fork), not here.
+
+## Amendment 2 — `workbenchDraft` outboards: the concrete want is *cost*, and creation carries no identity to protect (2026-08-05)
+
+**S3 (`workbenchDraft`) was deferred "deliberately last… revisit only with a concrete want" (D5). The want
+arrived.** Jon, playing in the workbench: *he wants to draft the working recipe by talking to his flat-rate
+ChatGPT/Claude subscription "for free," rather than paying the metered per-call API cost of the in-app
+synthesis.* That is not a quality argument — the onboard frontier tier already reasons well
+([[personal-app-latency-tolerance]]) — it is an **economics** argument, and it names the single most
+expensive operation in the workbench: multi-turn, high-effort synthesis of a recipe from several candidates
+plus references plus the experiment log. Today `WorkbenchDraftRecipeClient` runs that at
+`reasoningEffort: .high`, `maxTokens: 16_384`, metered ([WorkbenchDraftRecipe.swift:305](../../YesChefPackage/Sources/YesChefCore/WorkbenchDraftRecipe.swift)).
+Deliberation is exactly what an unmetered thread is best at. This amendment un-defers S3.
+
+### Amd2-D1 — Un-defer S3, and take the cost want at face value
+
+D5 pinned three reasons `workbenchDraft` was last: it is structured canonical data (D2), it "designs its own
+review surface," and it is the sharp edge. Two of the three have since dissolved:
+
+- **The review surface already exists.** The onboard draft verb already lands in a reviewable,
+  **pre-canonical** `WorkbenchDraftRecipe`, edited before it is ever promoted to the library via
+  `editorDraft(libraryPlacement:uuid:)` ([WorkbenchDraftRecipe.swift:165](../../YesChefPackage/Sources/YesChefCore/WorkbenchDraftRecipe.swift)).
+  An outboarded draft lands in that same sheet. Nothing new is designed — which is the Amd1-D6 "no new
+  stanza" test passing again: *if a return needs no new surface, it sits on the advisory side.*
+- **The D2 prohibition is about identity, and creation has none.** Amd1-D2 already generalized the invariant
+  to **"the paste door never carries identity,"** not "recipe data never outboards." A *created* draft has no
+  `id`/`sectionID`/`sortOrder` to corrupt and no ADR-0021 variation anchor to orphan — the precise harm D2
+  guards ([D2](#d2--outboard-deliberation-structured-canonical-writes-stay-in-app-ratified)). D5/S3 conceded
+  this in its own words: *"less severe than adjust-recipe… creating has no IDs to preserve and no variation
+  anchors to orphan, and the existing capture parser could take it."* A bad drafted line is a **visible junk
+  line one delete removes**, not silent corruption — the exact carve-out D2's own text draws.
+
+### Amd2-D2 — The return is *extraction, not synthesis* — so it belongs on the capture seam, not a new parser
+
+**The first draft of this amendment proposed a bespoke label-cycle body parser. That was the exact
+duplication Jon flagged: a third text→recipe path.** Correcting it turns on a distinction the codebase
+already draws but the amendment had blurred — **extraction versus synthesis:**
+
+| Operation | Task | Rule | Existing client |
+| --- | --- | --- | --- |
+| **Extraction** | text that *is* a recipe → structure | **faithful, never invent** | `RecipeExtractionClient` ([RecipeExtractionClient.swift:22](../../YesChefPackage/Sources/YesChefCore/WebRecipeCapture/RecipeExtractionClient.swift)) |
+| **Synthesis** | candidates + log + chat → an editorial *choice* | deliberately **combines and rejects** | `WorkbenchDraftRecipeClient` ([WorkbenchDraftRecipe.swift:305](../../YesChefPackage/Sources/YesChefCore/WorkbenchDraftRecipe.swift)) |
+
+These are correctly separate and must stay so: synthesis's job *is* to invent; extraction's job is to never
+invent. **The workbenchDraft *return path* is extraction, not synthesis** — the editorial choice already
+happened outboard, for free, and what comes back is text that *is* a recipe. So it must not route through
+`WorkbenchDraftRecipeClient` (that would re-run synthesis and re-invent), and it must not grow a private
+parser (that duplicates extraction). **It routes through the capture pipeline's existing text→recipe seam.**
+
+That seam is real and mature. When a page's metadata is absent or broken — Jon's "not used properly" case —
+[WebRecipeCaptureClient.swift:147](../../YesChefPackage/Sources/YesChefCore/WebRecipeCapture/WebRecipeCaptureClient.swift)
+serializes the page to plain text and calls `RecipeExtractionClient`, which fills only the halves the
+deterministic extractors missed (`suppressingHalvesAlreadyExtracted`). The engine is **two-tier**:
+deterministic extractors (JSON-LD, microdata, meta, MilkStreet) first, a model fallback second, both yielding
+one typed core — `RecipeExtraction` (title, times, `ingredientSections[{name, lines}]`,
+`instructionSections[{name, steps}]`). **That two-tier pattern is what the return path reuses, and it is what
+paste and photo-OCR reuse later** (Amd2-D6).
+
+### Amd2-D3 — The free path: the outboard emits schema.org JSON-LD, parsed deterministically (Jon's call, 2026-08-05)
+
+Reusing the *model* extractor would still bill a metered onboard call, which softens the cost want. Reusing
+the *deterministic* tier costs nothing — and the app already has a battle-tested deterministic schema.org
+reader, `RecipeJSONLDExtractor`
+([RecipeJSONLDExtractor.swift](../../YesChefPackage/Sources/YesChefCore/WebRecipeCapture/RecipeJSONLDExtractor.swift)),
+the same code that parses a well-marked-up page for free.
+
+**Decision (Jon, 2026-08-05): the workbenchDraft finalize returns the recipe body as a schema.org `Recipe`
+JSON-LD block; the return path parses it with the existing deterministic extractor. Zero metered calls, zero
+new parser.** Why this is the right shape and not over-cleverness:
+
+- **It is genuinely free** — the deterministic path, not the model fallback. Exactly the cost want.
+- **JSON survives the paste path better than the shape that failed OQ6.** OQ6's blank-line block separators
+  were mangled by copy-paste; JSON is `{}`-delimited, not whitespace-delimited, so structure survives. The
+  extractor even carries a smart-quote salvage for curly-quote mangling
+  ([RecipeJSONLDExtractor.swift:35](../../YesChefPackage/Sources/YesChefCore/WebRecipeCapture/RecipeJSONLDExtractor.swift)).
+- **The human gate is the review sheet, not editing wire JSON.** This mirrors capture, where the cook reviews
+  the *parsed result*, never raw HTML. The parsed `WorkbenchDraftRecipe` lands in the existing draft sheet;
+  the JSON-LD is never shown. This is why asking for structured output here is not the S2.5 failure: D1's
+  "emit a value and nothing else" is *exactly* a JSON-LD recipe, and the recipe **is** the deliverable —
+  unlike the deliberation verbs, whose product is prose a human reads and edits.
+- **The rationale returns as a separate prose block, never inside the JSON-LD** — D5/S3's own instruction,
+  and it maps onto the existing two-part return (deliverable + a prose block), landing in the draft's
+  `rationale` and the workbench log (Amd2-D6).
+- **The model fallback is the safety net.** If the JSON-LD is malformed past salvage, the return degrades —
+  either to a loud "couldn't read the draft" or (open, Amd2-OQ3) to a one-shot `RecipeExtractionClient` pass
+  on the raw text. It never silently produces an empty recipe.
+
+### Amd2-D4 — No contract bump, no version bump, no schema; a new task type and one ask
+
+A JSON-LD recipe body **needs no stanza in `AIHandoffReturnContract`** and **no `YC-CONTRACT` version bump** —
+it is the verb's own deliverable shape, stated in the verb's ask, exactly as the section prompts carry their
+own shapes. Apply the Amd1-D6 test: needing nothing but the base contract is the evidence it fits. What is
+new is scoped and cheap:
+
+- `AIHandoffTaskType` gains `.workbenchDraft` ([AIHandoff.swift:72](../../YesChefPackage/Sources/YesChefCore/AIHandoff.swift)).
+  `AIHandoff` is device-local (not in `makeSyncEngine`'s table list), so **no CloudKit prod-schema cost and
+  nothing on the promotion list** — identical to how `.workbenchCompare`/`.workbenchExperiments` landed.
+- The **ask lives in the workbench hand-off context, not a `DeliverableFormat` case** — same lesson as
+  Amd1-D7: `.discuss` mode's `discussInstruction` is one clause with no example
+  ([AIHandoff.swift:466](../../YesChefPackage/Sources/YesChefCore/AIHandoff.swift)), so the shape must come
+  from the verb's own ask, which names schema.org `Recipe` JSON-LD for the body and a separate prose block for
+  the rationale. `.discuss` is the default — arguing out the editorial choice is the entire point;
+  `.immediate` stays available.
+- The D9 title line is derived: **`Draft: <workbench title>`**.
+
+### Amd2-D5 — The extraction seam: one text→recipe capability, four input surfaces (record, do not lift here)
+
+The return path makes `RecipeExtractionClient` a **second consumer** of what has been, until now, a
+single-consumer capture engine — and it clarifies what the shared capability actually is: **`text/markup →
+RecipeExtraction`, deterministic-first with a model fallback.** The input surfaces stack up behind it:
+
+```
+web HTML ──────────────→ deterministic extractors + RecipeExtractionClient
+outboard draft return ─→ RecipeJSONLDExtractor (deterministic), model fallback
+pasted recipe text ────→ (same engine, skip the HTML serializer)          ← future
+photo → OCR ───────────→ (same engine; only the Vision front-end is new)  ← future
+```
+
+`RecipeExtractionClient`'s `structuredPageText` parameter name is already vestigial — its input is just text.
+**This amendment does not lift or rename it** ([[seam-ledger-append-on-sight]]: record the seam, do not design
+it): S3 wires the return through the existing deterministic extractor and leaves the generalization to the
+slice that grows the *third* consumer (paste). The one thing S3 must not do is add a fourth path — that is the
+whole point of this correction. **A cross-app note:** the capture engine was harvested from Galavant
+([[galavant-capture-engine-reuse]]), so a later lift of the extraction core to LLMClientKit is plausible on
+the ADR-0044 model — but that is a convergence question with its own trigger, not this slice's business.
+
+### Amd2-D6 — Learnings: run the D8 test; the workbench log is the residue's home
+
+A draft is a **synthesis producing genuine findings** — which candidate won on which axis, what was
+considered and **rejected** — so the two-part return provisionally holds, and unlike adjust-recipe the
+workbench has a **durable home for the residue already**: `workbenchLog`, where D6 lands committed-adjustment
+rationale and where compare deposits its named differences. A draft's own `rationale` field already "names the
+candidate choices this draft borrows from or rejects"
+([WorkbenchDraftRecipe.swift:349](../../YesChefPackage/Sources/YesChefCore/WorkbenchDraftRecipe.swift)), so
+the rejected-candidate residue is native to this surface, not smuggled.
+
+**But gate on a hand-run before wiring the import, exactly as Amd1-D7 did** — the D8 restatement pattern (the
+model returning the draft's own choices as "learnings") is plausible here. *Lean:* keep the two-part return,
+aim the learnings ask at **candidates considered and rejected, or constraints on the dish** — never the
+choices already in the draft's rationale — and deposit as a `workbenchLog` `.observation`/`.rationale` row.
+**Pinned fallback:** if a second hand-run still returns mostly restatement, suppress learnings for this verb
+per D8 and keep only the draft.
+
+### Amd2 — storage and slice (S3, un-deferred; schema-free)
+
+- **S3a — the door out.** `.workbenchDraft` on `AIHandoffTaskType`; the workbench-draft ask (schema.org
+  `Recipe` JSON-LD for the body + a separate prose rationale block, `.discuss` default); export wired through
+  the workbench hand-off metadata + the ADR-0038 Amd 2 Copy door; the `Draft: <workbench title>` title line.
+  **Gate first:** a real multi-turn hand-run (the OQ3/OQ6 method) — draft a recipe from live candidates, argue
+  it, `finalize`, confirm the **JSON-LD block survives the paste path** and the rationale returns separately —
+  *before* wiring the import.
+- **S3b — the door back.** `.workbench × .workbenchDraft` import route (beside the shipped
+  `.workbenchCompare`/`.workbenchExperiments` routes, [AIHandoffIntentImport.swift:252](../../YesChefPackage/Sources/YesChefCore/AIHandoffIntentImport.swift))
+  → the **existing deterministic `RecipeJSONLDExtractor`** → `RecipeExtraction` core → `WorkbenchDraftRecipe`
+  (+ the separately-returned rationale) → the **existing** draft review sheet → the **existing**
+  promote-to-library path. Deposit the learnings/residue per Amd2-D6. **The only genuinely new code is the
+  route + the JSON-LD→`WorkbenchDraftRecipe` mapping and the driver that feeds a raw JSON-LD block to the
+  extractor** (it currently reads `<script type="application/ld+json">` off a `Document`, so either wrap the
+  block in a minimal doc or expose its inner JSON path — Amd2-OQ4, an implementation detail).
+- **Watch — the declined-draft contract.** The onboard verb encodes "no recipe yet" as valid JSON with an
+  empty title ([WorkbenchDraftRecipe.swift:330](../../YesChefPackage/Sources/YesChefCore/WorkbenchDraftRecipe.swift)).
+  The return path needs the analogue: an outboard turn that declines to draft, or a JSON-LD block that yields
+  no ingredients *and* no instructions, must degrade to a **loud "no draft returned,"** never a silent empty
+  recipe promoted into review (`RecipeExtractionError.emptyRecipe` already models exactly this).
+- **Verify** per [[lean-verification-default]]: `swift build` + Core tests (the routing case; a JSON-LD
+  round-trip through the extractor including a body with named ingredient *and* instruction sections; a
+  malformed-JSON-LD case; the declined-draft loud path), one elevated `generic/platform=iOS` build,
+  `scripts/check-drift.sh`. **Jon device-passes** the real round-trip: outboard a draft, argue it, finalize,
+  paste, review, promote.
+
+### Amd2 open questions
+
+- **Amd2-OQ1 — the learnings hand-run (Amd2-D6).** Same gate as Amd1-OQ1; resolve before S3b wires the
+  deposit.
+- **Amd2-OQ2 — is `workbenchDraft` workbench-only, or does recipe *creation* want the same door?** v1 is
+  workbench-only: the candidates/references/log are what make the synthesis worth outboarding. A blank-slate
+  "draft me a recipe from scratch" hand-off is a different surface with no in-app home yet — do not build it
+  from inside this slice. **This is the same seam as pasted-text import** (Amd2-D5): when that surface is
+  built, revisit whether the two share one entry point.
+- **Amd2-OQ3 — RESOLVED (Jon, 2026-08-05): the free deterministic path (Amd2-D3).** The earlier
+  direct-parse-vs-middle-term question dissolved once the return was recognized as *extraction*: JSON-LD +
+  the deterministic `RecipeJSONLDExtractor` is free and reuses the capture tier. **The remaining fallback
+  question** — on malformed JSON-LD past salvage, error loud vs. a one-shot `RecipeExtractionClient` pass on
+  the raw text — is settled at S3b by the hand-run: prefer *loud* unless the hand-run shows the paste path
+  mangles clean JSON-LD often enough to justify the metered rescue.
+- **Amd2-OQ4 — the extractor-driver shape (implementation detail).** `RecipeJSONLDExtractor.extract` reads
+  `<script type="application/ld+json">` off a SwiftSoup `Document`; feeding a raw returned block means either
+  wrapping it in a minimal HTML doc or surfacing the inner `jsonObject → recipeNodes → mine` path. S3b's
+  call, not the ADR's — flagged so it is chosen deliberately, not by wrapping-in-HTML reflex.
 
 ## Storage sketch — S1 is schema-free; S2 adds three synced columns
 

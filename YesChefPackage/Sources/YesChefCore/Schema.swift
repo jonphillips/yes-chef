@@ -1152,6 +1152,84 @@ extension DependencyValues {
         .execute(db)
     }
 
+    // The original "Create workbench references" migration was later edited in place to
+    // add `captureKind`, so devices that had already run it kept the pre-`captureKind`
+    // table and every workbench read failed with "no such column". Add the column here
+    // instead. The presence check reads the *real* on-disk schema via pragma_table_info
+    // (not the declared table type), so it is an accurate no-op on installs that already
+    // have the column from the edited CREATE. New name: the first attempt at this repair
+    // may already be recorded as applied on a device, so it must not be reused.
+    migrator.registerMigration("Backfill captureKind column on workbench references") { db in
+      let existingColumns = try #sql(
+        "SELECT name FROM pragma_table_info('workbenchReferences')",
+        as: String.self
+      )
+      .fetchAll(db)
+      guard !existingColumns.contains("captureKind") else { return }
+      try #sql("""
+        ALTER TABLE "workbenchReferences"
+        ADD COLUMN "captureKind" TEXT NOT NULL DEFAULT 'pastedText'
+        """)
+        .execute(db)
+    }
+
+    // The "Create workbench references" CREATE was edited in place more than once, adding
+    // both `captureKind` and `reductionStatus` after early devices had built the table.
+    // captureKind is handled above; reconcile the remaining late-added columns in one pass
+    // so we don't chase them one crash at a time. Every add is guarded against the real
+    // on-disk schema, so this is an exact no-op on installs that already have the columns.
+    migrator.registerMigration("Reconcile late-added workbench references columns") { db in
+      let existingColumns = try #sql(
+        "SELECT name FROM pragma_table_info('workbenchReferences')",
+        as: String.self
+      )
+      .fetchAll(db)
+      func addColumnIfMissing(_ name: String, definition: String) throws {
+        guard !existingColumns.contains(name) else { return }
+        try db.execute(sql: #"ALTER TABLE "workbenchReferences" ADD COLUMN \#(definition)"#)
+      }
+      // Defaults exist only to satisfy NOT NULL for any pre-existing rows on old devices;
+      // fresh rows always carry real values written by the model.
+      try addColumnIfMissing("captureKind", definition: #""captureKind" TEXT NOT NULL DEFAULT 'pastedText'"#)
+      try addColumnIfMissing("reducedText", definition: #""reducedText" TEXT NOT NULL DEFAULT ''"#)
+      try addColumnIfMissing("reductionStatus", definition: #""reductionStatus" TEXT NOT NULL DEFAULT 'complete'"#)
+    }
+
+    // Early devices ran a pre-rename version of "Create workbench references" that had a
+    // `kind` column (later renamed to `captureKind`). The rename never reached those
+    // devices, so the orphaned NOT NULL `kind` column remains and breaks every insert
+    // (the model no longer supplies it). Drop it when present; no-op on installs whose
+    // table already matches the model.
+    migrator.registerMigration("Drop orphaned kind column from workbench references") { db in
+      let existingColumns = try #sql(
+        "SELECT name FROM pragma_table_info('workbenchReferences')",
+        as: String.self
+      )
+      .fetchAll(db)
+      guard existingColumns.contains("kind") else { return }
+      try db.execute(sql: #"ALTER TABLE "workbenchReferences" DROP COLUMN "kind""#)
+    }
+
+    // The pre-rename table carried more than one now-dead NOT NULL column (`kind`,
+    // `provenance`, …), each of which breaks inserts the model no longer supplies. Rather
+    // than chase them individually, drop every on-disk column that isn't part of the
+    // current model so the table matches exactly. No-op where the table is already clean.
+    migrator.registerMigration("Drop all non-model columns from workbench references") { db in
+      let modelColumns: Set<String> = [
+        "id", "workbenchID", "sourceURL", "label",
+        "captureKind", "reducedText", "reductionStatus",
+        "dateCreated", "dateModified",
+      ]
+      let existingColumns = try #sql(
+        "SELECT name FROM pragma_table_info('workbenchReferences')",
+        as: String.self
+      )
+      .fetchAll(db)
+      for column in existingColumns where !modelColumns.contains(column) {
+        try db.execute(sql: #"ALTER TABLE "workbenchReferences" DROP COLUMN "\#(column)""#)
+      }
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

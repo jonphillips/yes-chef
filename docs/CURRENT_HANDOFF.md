@@ -22,35 +22,42 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**The facet/labeling gate is cleared, the variation-anchor data-loss arc is fixed through the read path, and
-ADR-0021 V4a (Choices section) is shipped — no hard-gated dispatch is queued.** Amendment 4's
-deterministic floor shipped (PR [#281](https://github.com/jonphillips/yes-chef/pull/281)),
-variation-anchor-repair **Dispatch 0 (+3) and Dispatch 1 both shipped** (PRs
-[#284](https://github.com/jonphillips/yes-chef/pull/284) + `codex/variation-anchor-repair-dispatch-1`, both device
-gates owed), and **V4a shipped to PR [#285](https://github.com/jonphillips/yes-chef/pull/285)**
-(architect-approved 2026-08-05, device gate owed); filling in per-recipe coverage is Jon's ongoing hand work
-(Edit Tags + DEBUG Facet Coverage) that **gates nothing**.
+**The facet/labeling gate is cleared and the variation-anchor data-loss arc is fixed and device-passed;
+ADR-0021 V4a (Choices section) is shipped, merged, and device-passed — no hard-gated dispatch is queued.**
+Amendment 4's deterministic floor, V4a, and variation-anchor-repair **Dispatch 0 (+3) and Dispatch 1** all
+shipped, merged, and device-passed 2026-08-05, now archived to [`DONE-LOG.md`](DONE-LOG.md). Filling in
+per-recipe facet/tag coverage is Jon's ongoing hand work (Edit Tags + DEBUG Facet Coverage) that **gates
+nothing**.
 
-**Dispatch 1 cleared the V4c gate.** `resolved(applying:)` now degrades instead of throwing (read-lenient /
-write-strict), so an orphaned anchor no longer takes out a recipe's editor/reader/grocery, and the two
-variation-scoped hand-off reads block loudly rather than feeding an LLM a partial recipe. **V4c** (the two new
-`stepInsert`/`stepRemove` step ops) is therefore **unblocked**; **Dispatch 2** (the in-app repair UI that makes
-the surfaced repair queue directly actionable) and **V4b** (schema slice, hold until Jon is local for its
-two-device sync pass) remain. Live candidates:
+**The remaining ADR-0021 Amendment 4 work is V4b + V4c** (V4a done), plus **anchor-repair Dispatch 2** (the
+in-app repair UI). Dispatch 1 left `resolved(applying:)` **read-lenient / write-strict** — an orphaned anchor
+no longer takes out a recipe's editor/reader/grocery, and the two variation-scoped hand-off reads block loudly
+rather than feed an LLM a partial recipe — which **cleared the V4c gate**. Live candidates:
 
-- **Variations → the Playbook = [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4. V4a shipped
-  (PR [#285](https://github.com/jonphillips/yes-chef/pull/285)); V4b/V4c remain.** V4a relocated the variation
-  picker from the Body to a Playbook **Choices** section (Amd4-D5), rendered variations as a proper list with
-  descriptions + full action set, and scoped the hand-off via the local `aiHandoffs.variationID` discriminator
-  ([[aihandoffs-local-scope-discriminator]]) — app-only, schema-free. **V4b** (related-recipe edge table — the
-  Choices section's second half; **OQ2 resolved: order by name, no ordering column**; the schema slice,
-  **two-device pass owed, back up first**) and **V4c** (the two new step ops — **gate cleared by anchor-repair
-  Dispatch 1, now dispatchable**) follow.
+- **Variations → the Playbook = [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4 — V4b + V4c
+  remain** (V4a done, DONE-LOG). **V4b** — the related-recipe edge table, the Choices section's second half
+  (**OQ2 resolved: order by name, no ordering column**); it is the **schema slice**, so **hold until Jon is
+  local for its two-device sync pass, back up first**. **V4c** — the two new `stepInsert`/`stepRemove` step ops;
+  **gate cleared by anchor-repair Dispatch 1, now dispatchable** (Amd4-D4 is the sanctioned delta-op widening —
+  do not extend the ops ad hoc elsewhere).
+- **anchor-repair Dispatch 2 — the repair UI, no schema.** The read path already surfaces the orphaned-anchor
+  repair queue (reader/editor notice, grocery `(needs repair)` subtitle, blocked Save + blocked hand-offs);
+  Dispatch 2 makes it **directly actionable** (re-anchor or drop an orphaned op). Spec:
+  [`efforts/variation-anchor-repair.md`](efforts/variation-anchor-repair.md); Dispatch 0/1 in DONE-LOG.
 - **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser S1.** All the facet infrastructure it
   needs is shipped (facets, editable membership, the deterministic floor, the three coverage views). Its old
   "wait until primary facets classify a majority of the library" gate is **retired** — the manual backfill no
   longer gates anything (Jon, 2026-08-05). Needs its own scoping pass. (Amd4-OQ1 wants variation/related-recipe
   indexing answered while `RecipeBrowserQuery` is still being designed.)
+- **[ADR-0042](decisions/ADR-0042-workbench-handoff-and-the-return-block.md) Amendment 2 — `workbenchDraft`
+  outboards (RATIFIED 2026-08-05).** Un-defers S3: draft the working recipe in a flat-rate subscription thread
+  instead of the metered onboard synthesis. The return is **extraction, not synthesis** — outboard emits
+  schema.org JSON-LD, parsed **free** by the existing deterministic `RecipeJSONLDExtractor` into
+  `WorkbenchDraftRecipe`, landing in the existing draft review + promote path. Schema-free, no contract bump,
+  `.workbenchDraft` is device-local. **Gate: S3a (the door out + the ask) ships first, then Jon hand-runs a
+  real finalize to confirm the JSON-LD block survives the paste path, *before* S3b wires the import.** Do not
+  add a new recipe-text parser and do not route through `WorkbenchDraftRecipeClient` (that re-invents). The
+  paste-text / photo-OCR surfaces are the *same* extraction seam (Amd2-D5) — out of scope here, do not build.
 - **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell.** Unblocked
   since 2026-07-25; moves all eight chat call sites onto one Ask. Ready but larger.
 
@@ -66,8 +73,8 @@ section is work.**
 - **⚠️ The ADR-0042 return contract is v2.1** (`AIHandoffReturnContract.version`) — re-copy the project
   instructions from AI Settings or every verb fails the marker gate. (Operational: it bites on any hand-off
   dogfooding session.)
-- **ADR-0021 (variations) V1–V3 are shipped; Amendment 4 is RATIFIED (2026-08-05) and queued in Next Up (V4a
-  dispatchable, app-only) — see there.** ADR-0023 (recipe edit proposals) has nothing queued: its
+- **ADR-0021 (variations) V1–V3 are shipped; Amendment 4 is RATIFIED (2026-08-05); V4a done + device-passed
+  (DONE-LOG), V4b/V4c queued in Next Up — see there.** ADR-0023 (recipe edit proposals) has nothing queued: its
   *iterative refine loop* is **WITHDRAWN** (ADR-0042 D7 — it happens in the live external thread; **do not
   rebuild it**); per D2 the in-app adjust verb is the **only** path that writes a structured delta. **Expected,
   not a bug to patch (ADR-0014 Amd1-D4):** adding a header inside a recipe that has variations mints a new
@@ -75,8 +82,11 @@ section is work.**
   delta-vocabulary decision and it is **ADR-0021's** — do not extend the delta ops on this momentum. **Note:
   Amd4-D4's two new step ops (`stepInsert`/`stepRemove`) are the sanctioned widening, and V4c's anchor-repair
   Dispatch 1 gate is now cleared — that is the disciplined path, not an ad-hoc extension here.**
-- **ADR-0042 S3 (`workbenchDraft`) stays deferred and un-queued** — no concrete want. **Do not build it on
-  ADR momentum.** There is no S5.
+- **ADR-0042 S3 (`workbenchDraft`) is RATIFIED (Amendment 2, 2026-08-05) and queued in Next Up** — the
+  concrete want is *cost* (draft against a flat-rate subscription, not the metered onboard synthesis). The
+  return is **extraction, not synthesis**: the outboard emits schema.org JSON-LD, parsed for free by the
+  existing deterministic `RecipeJSONLDExtractor` — **do not build a new recipe-text parser** (Amd2-D2/D5).
+  There is no S5.
 - **`PlaybookSectionMeta` is not queued anywhere — do not resurrect it.** ADR-0041 closed at S2.6, S3
   withdrawn ([Amd 3](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-3--s3-is-withdrawn-the-conversation-url-does-not-exist-2026-07-19)).
   If section provenance is ever wanted it designs its own storage against its own consumer
@@ -101,13 +111,9 @@ Drawn into **Next Up** as needed; not itself a dispatch target. Completed effort
 [`docs/DONE-LOG.md`](DONE-LOG.md).
 
 **[`efforts/variation-anchor-repair.md`](efforts/variation-anchor-repair.md) — Dispatch 0 (+3) and Dispatch 1
-SHIPPED** (PRs [#284](https://github.com/jonphillips/yes-chef/pull/284) +
-`codex/variation-anchor-repair-dispatch-1`, architect-approved 2026-08-05; **both device gates owed**). The write
-path no longer mints dead anchors (normalized to base IDs, loud-at-save) with a post-engine idempotent backfill,
-and `resolved(applying:)` now **degrades instead of throwing** (read-lenient / write-strict, loud repair queue at
-every read incl. the two hand-off surfaces). **Only Dispatch 2 remains, no schema:** the in-app repair UI that
-makes the surfaced repair queue directly actionable (re-anchor or drop an orphaned op). Full record in
-[`DONE-LOG.md`](DONE-LOG.md).
+SHIPPED, merged, and device-passed 2026-08-05 (→ [`DONE-LOG.md`](DONE-LOG.md)).** Only **Dispatch 2** remains
+(the in-app repair UI that makes the already-surfaced orphan repair queue directly actionable, no schema) —
+surfaced as a live candidate in **Next Up**.
 
 **[`efforts/recipe-facets.md`](efforts/recipe-facets.md) — ADR-0049 (the facet model + labeling): COMPLETE and
 archived.** D1–D5, F1/F2, OQ4 seed, the S5/S6+D8 backfill tooling, and the Amd-4 deterministic floor all shipped
@@ -210,52 +216,17 @@ Not work, a checklist.
 #278 (S5/S6+D8 backfill tooling), #281 (Amd-4 floor), #282 (Edit Tags refine) — is device-passed 2026-08-05 and
 removed. D4 hand pass done.)*
 
-**[PR #284](https://github.com/jonphillips/yes-chef/pull/284) — variation-anchor-repair Dispatch 0 (+3). Backfill
-data pass, no schema.** **Export a backup first.** Cold-launch with Console streaming the iPhone
-(`subsystem == "com.jonphillips.yeschef"`, category `dataIntegrity`) to catch the first-run
-`variation-anchor-backfill` line — a populated `updatedVariationIDs` with an empty `unresolved` confirms the
-backfill repaired the Crean→Cream variation, and the line should **vanish on the next launch** (idempotent). Any
-`unresolved=[…]` is the repair queue (report-don't-guess) awaiting Dispatch 2. Then the two-device pass.
+*(All other owed passes are **device-passed 2026-08-05 and removed** (Jon): variation-anchor-repair Dispatch 0
+(PR #284) + Dispatch 1, ADR-0021 V4a (PR #285), prep-plan Slice 2 (PR #262), Recipe section grain S1 (PR #246),
+ADR-0032 S3, and the combined PRs #243+#244 four-chat-surface pass. They had been bundled — strangely — into one
+paragraph with ADR-0030 S2, which is why they are cleared together.)*
 
-**variation-anchor-repair Dispatch 1 (`codex/variation-anchor-repair-dispatch-1`) — degrade-not-throw read path.
-App + Core, no schema.** Orphan a variation (open one, then edit the base ingredient/step it anchors to; or reuse
-a recipe Dispatch 0's backfill reported `unresolved`). Confirm it **no longer breaks**: reader and editor show the
-orange **Variation Needs Repair** notice with the dead anchors while resolvable changes still fold, the editor's
-**Save is disabled**, and that variation's grocery list carries a **"(needs repair)"** subtitle. Then confirm both
-hand-off paths **block** — variation **Hand Off** and the Adjust draft scoped to it should refuse with "repair the
-variation first" rather than export/adjust a partial recipe. A healthy variation is unchanged.
-
-**[PR #285](https://github.com/jonphillips/yes-chef/pull/285) — ADR-0021 V4a Choices section. App-only, no
-schema.** Confirm the relocated **Choices** section renders above Notes with each variation's name +
-description + radio selection; selecting a variation folds it in Directions and the **Return to Base Recipe**
-control appears there (the only deselect affordance — there is no Base row in Choices, by design). Then exercise
-the variation-scoped hand-off round-trip: **Hand Off** from a variation's Choices menu, bring back a revision,
-and confirm **Save Variation** re-derives that variation (not the base) — and that a **Paste** whose token no
-longer resolves still lands scoped to the right variation (the unmatched-fallback fix). Base-recipe adjust is
-unchanged.
-
-**[PR #262](https://github.com/jonphillips/yes-chef/pull/262) — prep plan dish links and dates. Merged
-2026-07-30, no schema.** Slice 1 (day-anchored sessions on a placed menu) is **device-confirmed 2026-07-30**.
-**Slice 2 pass still owed:** on iPhone compact width, confirm an inert chip relinks in two taps, a hand-authored
-step can be linked, *No dish* clears and persists, and a compound `serves` proposes no dish.
-
-**[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) S2** — the export →
-restore → re-enable-sync round-trip **passed on two simulators 2026-07-29** (isolated test container), which
-also closed OQ1. OQ6 is now diagnosed (Amendment 3): a naive real-device restore can be **silently clobbered by
-any peer's in-flight delete**, so **hold the real-device pass until the enforced restore procedure gates it**
-(quiesce peers → restore on one → reinstall peers). When it runs, follow that procedure and **Undo Last
-Restore** is untested at all and rode the same broken binding as restore, so exercise it too.
-**Recipe section grain S1** (PR [#246](https://github.com/jonphillips/yes-chef/pull/246))
-owes the Samin capture showing its three instruction sections with subheads, and — the canary — a
-single-section recipe looking and spacing exactly as it did before; the reader and Compare restart numbering
-per section while the adjustment review stays continuous, which is deliberate.
-**[ADR-0032](decisions/ADR-0032-workbench-reference-material-fetch.md) S3** (complete,
-nothing queued) carries two live caveats into its pass: `pastedText` is a new raw value in a synced enum
-column, so **update both devices before saving a pasted-text reference**, and the `isThin` 1,500-character
-threshold is still a guess against real pages. **PRs #243 + #244** owe one combined pass over all four chat
-surfaces — Menu, Recipe (the canary, must be unchanged), Calendar, Workbench — plus the new
-rotation behaviour: the Menu panel now migrates between overlay and sheet in both directions instead of being
-torn down.
+**[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) S2 — the only outstanding pass, and deliberately
+held.** The export → restore → re-enable-sync round-trip **passed on two simulators 2026-07-29** (isolated test
+container), which also closed OQ1. OQ6 is now diagnosed (Amendment 3): a naive real-device restore can be
+**silently clobbered by any peer's in-flight delete**, so **hold the real-device pass until the enforced restore
+procedure gates it** (quiesce peers → restore on one → reinstall peers). When it runs, follow that procedure —
+and **Undo Last Restore** is untested at all and rode the same broken binding as restore, so exercise it too.
 
 ## Prod-schema promotion list
 

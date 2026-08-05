@@ -9,6 +9,32 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0021 Amendment 4 V4a — variations relocate to a Playbook "Choices" section
+
+**Approved (architect review) and merged 2026-08-05; PR [#285](https://github.com/jonphillips/yes-chef/pull/285).**
+Decision: [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4 (V4a). **App-only, schema-free**
+(scoped via the local `aiHandoffs.variationID` discriminator — [[aihandoffs-local-scope-discriminator]] — no
+prod-schema entry). Device-passed 2026-08-05.
+
+**What it does.** Relocates the variation picker out of the recipe Body and into a proper Playbook **Choices**
+section (Amd4-D5), rendering variations as a list with name + description + the full action set, above Notes.
+Selecting a variation folds it into Directions and surfaces a **Return to Base Recipe** control there (the only
+deselect affordance — there is no Base row in Choices, by design). The variation-scoped hand-off round-trips:
+**Hand Off** from a variation's Choices menu, bring a revision back, and **Save Variation** re-derives *that
+variation* (not the base); a **Paste** whose token no longer resolves still lands scoped to the right variation
+(the unmatched-fallback fix). Base-recipe adjust is unchanged.
+
+**Verified.** Core `swift build` + variation suites; the elevated generic-iOS app build green after
+`xcodegen generate` (the first push added two `YesChefApp/` extension files without regenerating, so the app
+target could not have compiled — architect caught it and re-ran locally, fixed in `5388e31`; a build-claim
+tripwire now recorded in the Verification Pattern, [[codex-build-excuse-reproduce]]); `scripts/check-drift.sh`
+green. **Device gate: PASSED 2026-08-05.**
+
+**Remaining in ADR-0021 Amd 4 (Next Up):** V4b (related-recipe edge table — the Choices section's second half,
+the schema slice, two-device pass owed) and V4c (the `stepInsert`/`stepRemove` step ops, gate cleared by
+anchor-repair Dispatch 1).
+
+---
 ## variation-anchor-repair Dispatch 1 — `resolved(applying:)` degrades instead of throwing
 
 **Approved (architect review) 2026-08-05; branch `codex/variation-anchor-repair-dispatch-1`** (Codex ran out of
@@ -47,7 +73,7 @@ arc (PRs #275–#282), which the SQLiteData `Ld` wall had been masking by short-
 build-for-testing before it reached the test compile. One-line reorder to match Core; flagged so the masking
 pattern is on the record ([[exported-import-not-link-time]]).
 
-**Device gate owed** (see Device passes).
+**Device gate: PASSED 2026-08-05.**
 
 ---
 ## variation-anchor-repair Dispatch 0 (+3) — anchors normalized to base IDs, backfill, loud-at-save
@@ -56,7 +82,7 @@ pattern is on the record ([[exported-import-not-link-time]]).
 `codex/variation-anchor-repair-dispatch-0`.** Spec:
 [`efforts/variation-anchor-repair.md`](../efforts/variation-anchor-repair.md). **Core-heavy + a small app-layer
 touch, no schema, no prod-schema entry** (`recipeVariations` was already on the promotion list); a backfill data
-pass with a **device gate owed**.
+pass, **device-passed 2026-08-05**.
 
 **What it does.** Closes the standing ADR-0021 data-loss defect (found on device 2026-08-01). A variation's
 ingredient/method anchors were copied verbatim from model output and never normalized to base row IDs, so
@@ -77,12 +103,10 @@ adjustment-review sheet hand-off.
 locally — architect ran both suites 2026-08-05; the idempotency + convergence + reorder-safety asserts are the
 spine. Codex's PR run added `scripts/check-drift.sh` and the elevated generic-iOS app build.
 
-**Device gate owed** (see Device passes): export a backup, cold-launch with Console streaming the iPhone to read
-the first-run `variation-anchor-backfill` line, then the two-device pass.
+**Device gate: PASSED 2026-08-05.**
 
-**Remaining in the effort (still Ready, no schema):** Dispatch 1 — make `resolved(applying:)` **degrade, not
-throw** (apply every op that resolves, banner the dead one); it **gates ADR-0021 Amd4 V4c**. Dispatch 2 — the
-repair UI.
+**Remaining in the effort (still Ready, no schema):** Dispatch 2 — the repair UI (Dispatch 1 shipped + archived
+above).
 
 ---
 ## ADR-0014 Amendment 1 — header follow-through complete
