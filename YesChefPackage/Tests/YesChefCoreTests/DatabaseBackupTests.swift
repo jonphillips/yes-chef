@@ -329,12 +329,14 @@ struct DatabaseBackupTests {
       "Create synced category seed state",
       "Create synced category seed tombstones",
       "Promote category namespaces to facets",
+      "Add variation scope to local AI handoffs",
     ]
     #expect(latestMigrationIdentifier == migrationsToReplay.last)
     try await backupDatabase.write { db in
       try db.execute(sql: "DROP TABLE facets")
       try db.execute(sql: "ALTER TABLE categories DROP COLUMN facetID")
       try db.execute(sql: "ALTER TABLE categories DROP COLUMN hidden")
+      try db.execute(sql: "ALTER TABLE aiHandoffs DROP COLUMN variationID")
       try db.execute(sql: "ALTER TABLE aiHandoffs DROP COLUMN regenerates")
       try db.execute(sql: "DROP TABLE recipeServeWith")
       try db.execute(sql: "ALTER TABLE categories DROP COLUMN color")

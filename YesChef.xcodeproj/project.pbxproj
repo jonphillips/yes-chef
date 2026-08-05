@@ -17,6 +17,7 @@
 		0E82B1425855BBD9736BDFD7 /* RecipeFilterPickerViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8DD44679AA1444215DC743E /* RecipeFilterPickerViews.swift */; };
 		107B90CD03C25B8D40433561 /* WorkbenchReferenceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7D5D51E71889140798985EB /* WorkbenchReferenceViews.swift */; };
 		143D0594FDEA8800409997C3 /* RecipePlaybookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C3AE6422BC004DC084E05B /* RecipePlaybookView.swift */; };
+		14E37061E039F075AE64FE31 /* HandoffReviewCoordinator+AdjustmentDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2595BD656B447EC9519CE389 /* HandoffReviewCoordinator+AdjustmentDraft.swift */; };
 		153B6C0EC04DBC8BE5EAD324 /* RecipeVariationBaseWriteGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE4284C2FB4F46CA20889B5B /* RecipeVariationBaseWriteGuard.swift */; };
 		15A3B11099759D157C41626E /* MenuDetailModel+PrepPlanEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8FDE8F827374CA795E7D125 /* MenuDetailModel+PrepPlanEditing.swift */; };
 		15FC79679962B0C395487A81 /* RecipeListViewOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8281916C17EA01F6099FA119 /* RecipeListViewOptions.swift */; };
@@ -130,6 +131,7 @@
 		D778483B6523AB97BDE06ED6 /* MenuModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7090DA55279458851517DD5A /* MenuModels.swift */; };
 		D8FB35A8C0D8195A104EE90D /* RecipeImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE2CEAA7C5D5836E123F474 /* RecipeImageLoader.swift */; };
 		DB71ABBE3820C219FEACAEB4 /* RecipeCaptureModel+Labels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9916E601292DD101C2943916 /* RecipeCaptureModel+Labels.swift */; };
+		DDDFAA0F691253337D66DE0B /* HandoffReviewCoordinator+Variation.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD955FEF5EBA92A06FCE62C /* HandoffReviewCoordinator+Variation.swift */; };
 		E04A28BE098B255C0B136810 /* AIHandoffMenuPasteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 792C0EBCFF5BA678E266946D /* AIHandoffMenuPasteTests.swift */; };
 		E3281DDA81614C3985E3BB8E /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = 94BD562408492AC6E81B0035 /* Dependencies */; };
 		E8641F57EEFE217A67AD299E /* StructuredQueriesCore in Frameworks */ = {isa = PBXBuildFile; productRef = C7BEE9F7CA89D087F20759A9 /* StructuredQueriesCore */; };
@@ -194,6 +196,7 @@
 		1F15D49623F313B0DFD76178 /* ServeWithRepairTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServeWithRepairTests.swift; sourceTree = "<group>"; };
 		20C2EE75870C5C9AAD099505 /* GroceryPantryReviewViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryPantryReviewViews.swift; sourceTree = "<group>"; };
 		21092B09A19EF04372E6A66D /* GroceryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryModels.swift; sourceTree = "<group>"; };
+		2595BD656B447EC9519CE389 /* HandoffReviewCoordinator+AdjustmentDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HandoffReviewCoordinator+AdjustmentDraft.swift"; sourceTree = "<group>"; };
 		26A031F93AA06D9ADCD5C36D /* MenuViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuViews.swift; sourceTree = "<group>"; };
 		27FA69A8957E5DC8A49A9E3F /* GroceryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryViews.swift; sourceTree = "<group>"; };
 		2CBD5500A3AAE5279A9F007F /* YesChef.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = YesChef.entitlements; sourceTree = "<group>"; };
@@ -265,6 +268,7 @@
 		A5B6A9C5B5B1B8A7AA3C2136 /* IngredientFractionPillRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IngredientFractionPillRow.swift; sourceTree = "<group>"; };
 		A809D8DA30A2274B2B0E1982 /* WorkbenchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchViews.swift; sourceTree = "<group>"; };
 		A8FDE8F827374CA795E7D125 /* MenuDetailModel+PrepPlanEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuDetailModel+PrepPlanEditing.swift"; sourceTree = "<group>"; };
+		ABD955FEF5EBA92A06FCE62C /* HandoffReviewCoordinator+Variation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HandoffReviewCoordinator+Variation.swift"; sourceTree = "<group>"; };
 		B49D2E9B66A731DB272F063C /* MealCalendarModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCalendarModels.swift; sourceTree = "<group>"; };
 		B7D5D51E71889140798985EB /* WorkbenchReferenceViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchReferenceViews.swift; sourceTree = "<group>"; };
 		B9CC26315C4C3E333C66F625 /* SharePreprocessor.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = SharePreprocessor.js; sourceTree = "<group>"; };
@@ -456,7 +460,9 @@
 				8CB8E39BFB7BEB3E6A0DA515 /* HandoffComplementReview.swift */,
 				0424EE313AB25F0AD46E963E /* HandoffInAppTransport.swift */,
 				BF6D7AE0E516607E7C801612 /* HandoffReviewCoordinator.swift */,
+				2595BD656B447EC9519CE389 /* HandoffReviewCoordinator+AdjustmentDraft.swift */,
 				7765C9B42DCEFA4EAC3ED301 /* HandoffReviewCoordinator+PrepPlanEvidence.swift */,
+				ABD955FEF5EBA92A06FCE62C /* HandoffReviewCoordinator+Variation.swift */,
 				18FECD94C6F2E120A02EE0A6 /* IdleTimerDisabledModifier.swift */,
 				7ED8C4BF9300184ABE4E59A5 /* Info.plist */,
 				A5B6A9C5B5B1B8A7AA3C2136 /* IngredientFractionPillRow.swift */,
@@ -752,7 +758,9 @@
 				A988E3254E3FCB7C8001B787 /* HandoffEntities.swift in Sources */,
 				A649C9165C7E76B9D2868241 /* HandoffInAppTransport.swift in Sources */,
 				3B43FC000CAA77FE2FCBAD93 /* HandoffIntents.swift in Sources */,
+				14E37061E039F075AE64FE31 /* HandoffReviewCoordinator+AdjustmentDraft.swift in Sources */,
 				6B55B2CE20BB6B0E56896F50 /* HandoffReviewCoordinator+PrepPlanEvidence.swift in Sources */,
+				DDDFAA0F691253337D66DE0B /* HandoffReviewCoordinator+Variation.swift in Sources */,
 				2F07342A5ED8AB64EFA742F1 /* HandoffReviewCoordinator.swift in Sources */,
 				26A54D34845DADD8C9E1493D /* IdleTimerDisabledModifier.swift in Sources */,
 				195F4BE15DAFE5DF10414E83 /* IngredientFractionPillRow.swift in Sources */,

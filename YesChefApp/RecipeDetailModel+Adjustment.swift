@@ -9,6 +9,9 @@ struct RecipeAdjustmentReviewState: Identifiable, Equatable {
   var proposedDetail: RecipeDetailData
   var proposal: RecipeAdjustmentProposal
   var deliberationBody: String?
+  var variationID: RecipeVariation.ID? = nil
+  var variationName: String? = nil
+  var variationNote: String? = nil
 }
 
 struct RecipeAdjustmentRestorePoint: Equatable {

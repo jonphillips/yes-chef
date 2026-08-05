@@ -1,41 +1,12 @@
 import SwiftUI
+import UIKit
 import YesChefCore
 
-struct RecipeVariationActions: View {
-  let variation: RecipeVariation
-  let model: RecipeDetailModel
-  @Binding var promotingVariation: RecipeVariation?
-  @Binding var splittingOffVariation: RecipeVariation?
-  @Binding var splitOffTitleDraft: String
-
-  var body: some View {
-    Button {
-      model.editVariationButtonTapped(variation.id)
-    } label: {
-      Label("Edit Variation", systemImage: "square.and.pencil")
-        .labelStyle(.iconOnly)
-    }
-    .buttonStyle(.bordered)
-    .accessibilityLabel(Text("Edit Variation"))
-
-    Menu {
-      Button("Split Off as Recipe") {
-        splitOffTitleDraft = variation.name
-        splittingOffVariation = variation
-      }
-      Button("Promote to Base") { promotingVariation = variation }
-    } label: {
-      Label("Variation Actions", systemImage: "ellipsis.circle")
-        .labelStyle(.iconOnly)
-    }
-    .accessibilityLabel(Text("Variation Actions"))
-  }
-}
-
-struct RecipeVariationPicker: View {
+struct RecipeVariationChoices: View {
   let variations: [RecipeVariation]
   let activeVariationID: RecipeVariation.ID?
   let model: RecipeDetailModel
+  let handoffTransport: HandoffInAppTransport
   @Binding var promotingVariation: RecipeVariation?
   @Binding var splittingOffVariation: RecipeVariation?
   @Binding var splitOffTitleDraft: String
@@ -43,60 +14,10 @@ struct RecipeVariationPicker: View {
   @State private var renamingVariation: RecipeVariation?
   @State private var variationNameDraft = ""
 
-  private var activeVariation: RecipeVariation? {
-    activeVariationID.flatMap { id in variations.first { $0.id == id } }
-  }
-
   var body: some View {
-    HStack(spacing: 8) {
-      Menu {
-        Button {
-          model.activeVariationSelectionChanged(nil)
-        } label: {
-          variationMenuLabel(
-            "Base Recipe",
-            systemImage: "book.closed",
-            isSelected: activeVariationID == nil
-          )
-        }
-        Divider()
-        ForEach(variations) { variation in
-          Button {
-            model.activeVariationSelectionChanged(variation.id)
-          } label: {
-            variationMenuLabel(
-              variation.name,
-              systemImage: "checkmark",
-              isSelected: variation.id == activeVariationID
-            )
-          }
-        }
-      } label: {
-        Label(activeVariation == nil ? "Base Recipe" : "Version", systemImage: "square.stack.3d.up")
-      }
-      .fixedSize(horizontal: true, vertical: false)
-      .accessibilityLabel(
-        Text(activeVariation.map { "Version: \($0.name)" } ?? "Version: Base Recipe")
-      )
-
-      if let activeVariation {
-        Button {
-          variationNameDraft = activeVariation.name
-          renamingVariation = activeVariation
-        } label: {
-          Label("Rename Variation", systemImage: "pencil")
-            .labelStyle(.iconOnly)
-        }
-        .buttonStyle(.bordered)
-        .accessibilityLabel(Text("Rename Variation"))
-
-        RecipeVariationActions(
-          variation: activeVariation,
-          model: model,
-          promotingVariation: $promotingVariation,
-          splittingOffVariation: $splittingOffVariation,
-          splitOffTitleDraft: $splitOffTitleDraft
-        )
+    VStack(alignment: .leading, spacing: 8) {
+      ForEach(variations) { variation in
+        variationRow(variation)
       }
     }
     .alert(
@@ -141,17 +62,77 @@ struct RecipeVariationPicker: View {
     }
   }
 
-  @ViewBuilder
-  private func variationMenuLabel(
-    _ title: String,
-    systemImage: String,
-    isSelected: Bool
-  ) -> some View {
-    if isSelected {
-      Label(title, systemImage: systemImage)
-    } else {
-      Text(title)
+  private func variationRow(_ variation: RecipeVariation) -> some View {
+    HStack(alignment: .top, spacing: 8) {
+      Button {
+        model.activeVariationSelectionChanged(variation.id)
+      } label: {
+        HStack(alignment: .top, spacing: 10) {
+          Image(systemName: variation.id == activeVariationID ? "checkmark.circle.fill" : "circle")
+            .foregroundStyle(
+              variation.id == activeVariationID ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary)
+            )
+            .frame(minWidth: 20)
+            .padding(.top, 2)
+          VStack(alignment: .leading, spacing: 3) {
+            Text(variation.name)
+              .font(.headline)
+              .foregroundStyle(.primary)
+            if let note = variation.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+              Text(note)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+          }
+        }
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(variation.name)
+      .accessibilityValue(variation.id == activeVariationID ? "Selected" : "Not selected")
+
+      Menu {
+        Button("Hand Off") {
+          Task {
+            await handoffTransport.copyPrompt(
+              for: .recipeAdjustment(model.recipeID, variationID: variation.id)
+            )
+          }
+        }
+        Button("Paste") {
+          let results = UIPasteboard.general.string.map { [$0] } ?? []
+          Task {
+            await handoffTransport.pastedResultsReceived(
+              results,
+              source: .recipeAdjustment(model.recipeID, variationID: variation.id)
+            )
+          }
+        }
+        .disabled(!UIPasteboard.general.hasStrings)
+        Divider()
+        Button("Rename") {
+          variationNameDraft = variation.name
+          renamingVariation = variation
+        }
+        Button("Edit Variation") {
+          model.editVariationButtonTapped(variation.id)
+        }
+        Button("Split Off as Recipe") {
+          splitOffTitleDraft = variation.name
+          splittingOffVariation = variation
+        }
+        Button("Promote to Base") {
+          promotingVariation = variation
+        }
+      } label: {
+        Label("\(variation.name) actions", systemImage: "ellipsis.circle")
+          .labelStyle(.iconOnly)
+          .frame(width: 44, height: 44)
+      }
+      .accessibilityLabel("\(variation.name) actions")
     }
+    .padding(.vertical, 6)
+    .accessibilityElement(children: .contain)
   }
 }
 

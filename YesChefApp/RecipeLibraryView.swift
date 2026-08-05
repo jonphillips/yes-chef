@@ -151,7 +151,8 @@ struct AppContainer: View {
       RecipeAdjustmentReviewView(
         review: review,
         overwrite: { handoffReviewCoordinator.overwriteAdjustmentButtonTapped($0) },
-        keepAsVariation: { handoffReviewCoordinator.keepAdjustmentAsVariationButtonTapped($0, name: $1) }
+        keepAsVariation: { handoffReviewCoordinator.keepAdjustmentAsVariationButtonTapped($0, name: $1) },
+        saveVariation: { handoffReviewCoordinator.saveScopedVariationButtonTapped($0) }
       )
     }
     .confirmationDialog(

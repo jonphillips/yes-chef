@@ -534,16 +534,6 @@ private struct RecipeReaderView: View {
       }
       .buttonStyle(.bordered)
 
-      if let detail = model.detail, !detail.variations.isEmpty {
-        RecipeVariationPicker(
-          variations: detail.variations,
-          activeVariationID: detail.activeVariationID,
-          model: model,
-          promotingVariation: $promotingVariation,
-          splittingOffVariation: $splittingOffVariation,
-          splitOffTitleDraft: $splitOffTitleDraft
-        )
-      }
       if model.adjustmentRestorePoint != nil {
         Button {
           model.undoLastAdjustmentButtonTapped()
@@ -644,7 +634,10 @@ private struct RecipeReaderView: View {
       RecipePlaybookView(
         model: model,
         handoffTransport: handoffTransport,
-        ask: model.askButtonTapped
+        ask: model.askButtonTapped,
+        promotingVariation: $promotingVariation,
+        splittingOffVariation: $splittingOffVariation,
+        splitOffTitleDraft: $splitOffTitleDraft
       )
     }
   }
@@ -704,7 +697,10 @@ private struct RecipeReaderView: View {
           RecipePlaybookView(
             model: model,
             handoffTransport: handoffTransport,
-            ask: model.askButtonTapped
+            ask: model.askButtonTapped,
+            promotingVariation: $promotingVariation,
+            splittingOffVariation: $splittingOffVariation,
+            splitOffTitleDraft: $splitOffTitleDraft
           )
           .padding()
           .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -733,6 +729,14 @@ private struct RecipeReaderView: View {
     VStack(alignment: .leading, spacing: 18) {
       if let note = model.activeVariationNote {
         variationMethodNote(note)
+      }
+      if model.activeVariation != nil {
+        Button {
+          model.activeVariationSelectionChanged(nil)
+        } label: {
+          Label("Return to Base Recipe", systemImage: "arrow.uturn.backward")
+        }
+        .buttonStyle(.bordered)
       }
       if !model.instructionGroups.isEmpty {
         instructions

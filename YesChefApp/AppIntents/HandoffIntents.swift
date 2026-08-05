@@ -132,7 +132,7 @@ struct HandoffAppShortcuts: AppShortcutsProvider {
 
 enum HandoffExportSource: Sendable {
   case recipeSection(Recipe.ID, PlaybookSectionKind)
-  case recipeAdjustment(Recipe.ID)
+  case recipeAdjustment(Recipe.ID, variationID: RecipeVariation.ID? = nil)
   case menu(Menu.ID, prepPlanIntent: AIHandoffPrepPlanIntent = .refine)
   case menuComplement(Menu.ID)
   case menuDay(Menu.ID, dayOffset: Int)
@@ -158,35 +158,49 @@ extension HandoffExportSource {
     let sourceID: UUID
     let taskType: AIHandoffTaskType
     let dayOffset: Int?
+    let variationID: RecipeVariation.ID?
   }
 
   func metadata(handoffID: AIHandoff.ID) -> Metadata {
     switch self {
     case let .recipeSection(recipeID, section):
-      Metadata(sourceType: .recipe, sourceID: recipeID, taskType: section.handoffTaskType, dayOffset: nil)
-    case let .recipeAdjustment(recipeID):
-      Metadata(sourceType: .recipe, sourceID: recipeID, taskType: .adjustRecipe, dayOffset: nil)
+      Metadata(
+        sourceType: .recipe,
+        sourceID: recipeID,
+        taskType: section.handoffTaskType,
+        dayOffset: nil,
+        variationID: nil
+      )
+    case let .recipeAdjustment(recipeID, variationID):
+      Metadata(
+        sourceType: .recipe,
+        sourceID: recipeID,
+        taskType: .adjustRecipe,
+        dayOffset: nil,
+        variationID: variationID
+      )
     case let .menu(menuID, _):
-      Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan, dayOffset: nil)
+      Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan, dayOffset: nil, variationID: nil)
     case let .menuComplement(menuID):
-      Metadata(sourceType: .menu, sourceID: menuID, taskType: .menuComplement, dayOffset: nil)
+      Metadata(sourceType: .menu, sourceID: menuID, taskType: .menuComplement, dayOffset: nil, variationID: nil)
     case let .menuDay(menuID, dayOffset):
-      Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan, dayOffset: dayOffset)
+      Metadata(sourceType: .menu, sourceID: menuID, taskType: .prepPlan, dayOffset: dayOffset, variationID: nil)
     case let .menuDayComplement(menuID, dayOffset):
-      Metadata(sourceType: .menu, sourceID: menuID, taskType: .menuComplement, dayOffset: dayOffset)
+      Metadata(sourceType: .menu, sourceID: menuID, taskType: .menuComplement, dayOffset: dayOffset, variationID: nil)
     case let .mealPlan(mealPlanID):
-      Metadata(sourceType: .mealPlan, sourceID: mealPlanID, taskType: .mealPlanMakeAheadStrategy, dayOffset: nil)
+      Metadata(sourceType: .mealPlan, sourceID: mealPlanID, taskType: .mealPlanMakeAheadStrategy, dayOffset: nil, variationID: nil)
     case let .mealPlanComplement(mealPlanID):
-      Metadata(sourceType: .mealPlan, sourceID: mealPlanID, taskType: .mealPlanComplement, dayOffset: nil)
+      Metadata(sourceType: .mealPlan, sourceID: mealPlanID, taskType: .mealPlanComplement, dayOffset: nil, variationID: nil)
     case let .readerFeedback(context):
       Metadata(
         sourceType: .capture,
         sourceID: context.captureID,
         taskType: .readerFeedbackCuration,
-        dayOffset: nil
+        dayOffset: nil,
+        variationID: nil
       )
     case let .workbench(workbenchID, task):
-      Metadata(sourceType: .workbench, sourceID: workbenchID, taskType: task.handoffTaskType, dayOffset: nil)
+      Metadata(sourceType: .workbench, sourceID: workbenchID, taskType: task.handoffTaskType, dayOffset: nil, variationID: nil)
     }
   }
 
@@ -217,7 +231,8 @@ extension HandoffExportSource {
         sourceType: metadata.sourceType,
         sourceID: metadata.sourceID,
         taskType: metadata.taskType,
-        dayOffset: metadata.dayOffset
+        dayOffset: metadata.dayOffset,
+        variationID: metadata.variationID
       )
     }
   }
@@ -379,6 +394,7 @@ enum HandoffAppOperations {
 
   private static func recipeAdjustmentHandoff(
     detail: RecipeDetailData,
+    variationID: RecipeVariation.ID?,
     metadata: HandoffExportSource.Metadata,
     mode: AIHandoffToken.PromptMode,
     now: Date,
@@ -395,8 +411,42 @@ enum HandoffAppOperations {
       sourceType: metadata.sourceType,
       sourceID: metadata.sourceID,
       taskType: metadata.taskType,
+      variationID: variationID,
       createdAt: now,
       exportedPrompt: prompt
+    )
+  }
+
+  private static func exportedRecipeAdjustmentHandoff(
+    recipeID: Recipe.ID,
+    variationID: RecipeVariation.ID?,
+    metadata: HandoffExportSource.Metadata,
+    mode: AIHandoffToken.PromptMode,
+    in database: any DatabaseWriter,
+    now: Date,
+    handoffID: AIHandoff.ID
+  ) async throws -> AIHandoff {
+    guard let detail = try await database.read({ db in
+      try RecipeDetailRequest(recipeID: recipeID).fetch(db)
+    }) else {
+      throw HandoffIntentSurfaceError.sourceNotFound
+    }
+    let scopedDetail: RecipeDetailData
+    if let variationID {
+      guard let variation = detail.variations.first(where: { $0.id == variationID }) else {
+        throw HandoffIntentSurfaceError.sourceNotFound
+      }
+      scopedDetail = try detail.resolved(applying: variation)
+    } else {
+      scopedDetail = detail
+    }
+    return try recipeAdjustmentHandoff(
+      detail: scopedDetail,
+      variationID: variationID,
+      metadata: metadata,
+      mode: mode,
+      now: now,
+      handoffID: handoffID
     )
   }
 
@@ -569,16 +619,13 @@ enum HandoffAppOperations {
         handoffID: handoffID
       )
 
-    case let .recipeAdjustment(recipeID):
-      guard let detail = try await database.read({ db in
-        try RecipeDetailRequest(recipeID: recipeID).fetch(db)
-      }) else {
-        throw HandoffIntentSurfaceError.sourceNotFound
-      }
-      handoff = try recipeAdjustmentHandoff(
-        detail: detail,
+    case let .recipeAdjustment(recipeID, variationID):
+      handoff = try await exportedRecipeAdjustmentHandoff(
+        recipeID: recipeID,
+        variationID: variationID,
         metadata: metadata,
         mode: mode,
+        in: database,
         now: now,
         handoffID: handoffID
       )
@@ -701,6 +748,7 @@ enum HandoffAppOperations {
       sourceID: metadata.sourceID,
       taskType: metadata.taskType,
       dayOffset: metadata.dayOffset,
+      variationID: metadata.variationID,
       createdAt: now,
       regenerates: source.prepPlanIntent == .regenerate,
       exportedPrompt: ""
