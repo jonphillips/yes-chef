@@ -42,6 +42,14 @@ struct SettingsView: View {
         archivedRecipesRow
       }
 
+      Section("Developer") {
+        seedCoverageRow
+#if DEBUG
+        modelCallInventoryRow
+        facetCoverageRow
+#endif
+      }
+
       Section("AI") {
         aiRow
       }
@@ -97,14 +105,6 @@ struct SettingsView: View {
           Label("Supplement Paprika Backup", systemImage: "calendar.badge.clock")
         }
         .disabled(model.isImporting)
-      }
-
-      Section("Developer") {
-        seedCoverageRow
-#if DEBUG
-        modelCallInventoryRow
-        facetCoverageRow
-#endif
       }
     }
     .navigationTitle("Settings")

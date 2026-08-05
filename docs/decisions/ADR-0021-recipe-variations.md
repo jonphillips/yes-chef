@@ -27,6 +27,11 @@ Binds **[ADR-0016](ADR-0016-multi-recipe-cook-session.md)** (whole-picture cooki
 and **[ADR-0015](ADR-0015-chat-persistence.md)** (the local-only, sync-excluded store precedent). A new
 consumer of the ADR-0011/0012 actionable-chat commit-shape axis ([[chat-verb-commit-shapes]]).
 Sync-safe by construction (ADR-0002).
+**[Amendment 4](#amendment-4--variations-and-related-recipes-are-two-relations-behind-one-surface-2026-08-01)
+(related recipes as symmetric peer edges; one Choices surface over both relations; two new step ops; the
+picker relocates to the Playbook) is **ACCEPTED — ratified by Jon 2026-08-05.** OQ2 resolved (order by name,
+no ordering column); OQ1 belongs to [ADR-0050](ADR-0050-recipe-power-browser.md); OQ3 presumed **no**. It is the
+second part of this ADR that adds schema (one synced join table), and its consumer ships with it.**
 
 ## Context
 
@@ -538,6 +543,191 @@ that line is corrected in place.)*
 **Sequencing:** V1 + V2 stay schema-free and are one dispatch; **V3 is a second dispatch** and is
 independently reviewable. V3 wants V2 to exist first so the split-off carry rule (Amd3-D5) has something to
 carry to.
+
+## Amendment 4 — variations and related recipes are **two relations behind one surface** (2026-08-01)
+
+*(Jon's 2026-08-01 pass, remote; **ratified 2026-08-05**. Ratifies nothing about the delta model itself; it adds a second relation,
+widens the op vocabulary by exactly two cases, and corrects a placement drift from
+[ADR-0039](ADR-0039-playbook-column-thinking-vs-doing.md) D1. Governed by
+[ADR-0040](ADR-0040-editable-at-the-grain-it-is-stored.md); the new table's consumer ships with it, per
+Amd3-D4's discipline. Feeds [ADR-0050](ADR-0050-recipe-power-browser.md) — see OQ1.)*
+
+### The pressure that produced it
+
+Three complaints arrived together, and they looked like one complaint about variations:
+
+1. *"I can't edit a variation"* — **false, and instructive.** V1 shipped the resolved-detail editor in
+   PR #221. The pencil in `RecipeVariationActions` opens it. Jon had conflated it with the rename
+   affordance sitting two taps away in the picker menu. **The feature was invisible, not absent** — which
+   is the whole argument for the relocation in Amd4-D5.
+2. *"Am I forever locked into the delta vocabulary?"* — **partly true, and specifically about method.**
+   Ingredients carry `add`/`remove`/`substitute`/`scale`. Method carries `methodStepReplacements` and
+   nothing else: you may rewrite an existing step's text, and you may not add, remove or reorder one.
+   Amd4-D4 widens this by two cases and no more.
+3. *"Three treatments for fried Brussels — variations or separate recipes?"* — **neither, as posed.** The
+   question has no taste-based answer, and Amd4-D6 replaces the taste judgment with a mechanical test.
+
+The unifying observation: **the cook's question is always "what are my choices with this dish?", and it does
+not care how the answer is stored.** One surface, two relations underneath.
+
+### Amd4-D1 — One **Choices** surface, two typed relations underneath
+
+A single Playbook section lists, together:
+
+- the recipe's **variations** (selectable — selecting folds per D3), and
+- its **related recipes** (tappable — navigation, no fold).
+
+They render as peers because they answer the same question, and they stay **separately typed** in storage
+because an overlay and a link have nothing in common mechanically. This is the same discipline
+[ADR-0050](ADR-0050-recipe-power-browser.md) D1 applies to the query model: *a facet selection is not an
+attribute filter is not a loose label.* Collapsing variations and links into one polymorphic "relation"
+record to make one list render is that mistake, one layer down.
+
+**Rejected: a `kind` column on `recipeVariations`.** It would put a nullable `relatedRecipeID` and a
+nullable `deltas` BLOB on the same row, and every read path would branch on which half is populated. Two
+relations, two homes.
+
+### Amd4-D2 — Related recipes are **symmetric peer edges**, not a group entity
+
+One synced join table. An edge, both directions, no hub, no ordering, no membership semantics, no name.
+
+**This is smaller than the design we started toward, and the reason is worth recording.** The original
+framing carried a "don't clog the library list" requirement, which wants a *group* — a named set that
+collapses to one row. Jon **withdrew that requirement** in the same conversation (*"the list view is not the
+problem"*), and withdrawing it removes the entire justification for a group entity: no name to curate, no
+membership to maintain, no primary member to designate, **and no change to the library list at all.** What
+is left is a weak, symmetric, uncurated claim — *these are related, check these out too* — which is exactly
+one edge table.
+
+**Rejected: a directional `derivedFromRecipeID` column** (the shape Amd2-D2 declined). Direction is a fact
+about how a recipe was *created*, and the consumer that actually appeared wants a fact about how recipes are
+*used together*. Three treatments for Brussels sprouts have no ancestor among them; a derivation column
+would leave them unlinkable while answering a question nobody asked. **Amd2-D2 is not reversed** — its
+reasoning (no consumer, therefore no column) was correct, and the column it declined is still declined. A
+different relation, with a real consumer, is being added instead.
+
+**Rejected: edge labels** ("sauce for", "technique for", "lighter version of"). No consumer, and a
+free-text edge label is a curation chore that decays the moment it stops being fun
+([[automation-decays-near-the-stove]] applied to metadata). Revisit only if the Choices section grows an
+ordering or grouping requirement from use.
+
+### Amd4-D3 — The consumer **ships with the table**
+
+The Choices section (Amd4-D1) and the link/unlink affordance land in the same slice as the schema. This is
+Amd3-D4's rule and [[withdraw-not-defer-orphaned-schema]]: a synced table whose reader arrives later is the
+trap, and it carries a prod-schema promotion cost that locks.
+
+**Consequence for split-off:** `splitVariationOff` writes the edge in the same transaction, so the new
+recipe leaves the variation model **linked rather than orphaned**. That is the second consumer, and it
+closes the specific complaint that promotion severs the relationship. The deliberation-log ancestry copy
+(Amd3-D5) is unchanged and unrelated — it records *why*, not *what it sits beside*.
+
+### Amd4-D4 — The op vocabulary widens by **exactly two cases**
+
+Add to `RecipeVariationPayload`:
+
+- `stepInsert(after: RecipeStepReference, text: String)` — an insertion anchored to a base step, plus a
+  head position for "before everything."
+- `stepRemove(RecipeStepReference)`.
+
+Remove the corresponding `instructionStepAdded` / `instructionStepRemoved` cases from
+`RecipeVariationUnrepresentableEdit`.
+
+**Still unrepresentable, deliberately:** `instructionStepMoved`, and every instruction- and
+ingredient-**section** case. Those are where a merged executable procedure becomes necessary, and
+[ADR-0016](ADR-0016-multi-recipe-cook-session.md) declined that surface.
+
+**Why this is not a reversal of D2.** D2's line is *no structured, mergeable, per-step instruction edits*,
+and its stated fear is the step-by-step resolver. An insertion **anchored to a named base step** is not a
+merge — it is the same annotation the reader already performs for ingredient `add`s, rendered in place with
+the base legible underneath (D3). It requires an insertion point, not an ordering. The ADR-0016 refusal is
+untouched, and the test for any future widening is the same: *does this require deciding where something
+goes relative to things it was not anchored to?* If yes, it stays out.
+
+**Cost:** schema-free — the `deltas` BLOB (Amd1-D3). `RecipeStepReference` reuses
+`RecipeMethodStepReplacement`'s anchoring, which the
+[variation-anchor-repair](../efforts/variation-anchor-repair.md) effort is repairing first — see the
+sequencing note in Amd4-V4a.
+
+**Why these two and not more.** They are what Jon's own motivating example needs. Cook's Illustrated's shape
+— one properly-executed technique, three sauces, a different finishing herb each — is a handful of
+ingredient `add`s plus roughly one added step per treatment. Under today's vocabulary that case is forced
+out of the variation model for a reason that has nothing to do with how a cook thinks about it. Under this
+one it fits.
+
+### Amd4-D5 — The variation picker relocates to the Playbook; the fold stays in the Body
+
+**This corrects a drift, not a decision.** [ADR-0039](ADR-0039-playbook-column-thinking-vs-doing.md) D1
+already lists variations among the Playbook's contents; Amendment 1's contents-cut table moved only the
+**active variation method note**, which "stays in **Directions** (modifies how you cook now)." The picker
+was never assigned to `wideColumnHeader`; it ended up there.
+
+The split, stated once so it stops re-deciding itself:
+
+- **Playbook — Choices section, above Notes.** Browse variations and related recipes, read their
+  descriptions, select the active variation, rename, edit, split off, promote, link/unlink, and hand off.
+- **Body — Directions.** The active fold, the highlights, the method callout, and a small
+  **return-to-base** control so the escape from a lens is where the lens is visible.
+
+Section grammar, collapse behaviour and the filled/empty indicator follow the existing Playbook conventions
+([ADR-0041](ADR-0041-playbook-section-toolbar-and-scoped-handoff.md);
+[ADR-0048](ADR-0048-playbook-edit-grain.md) D2's shared row component is the natural host for the list).
+
+**A variation hand-off becomes ordinary.** With the section in the Playbook it inherits ADR-0041 S2's
+section-scoped hand-off for free, which retires the standing awkwardness that the adjustment brief sheet
+announces *"This brief is based on the base recipe. It does not revise an active variation."* Scoping the
+hand-off to a variation is a routing change, not a new mechanism.
+
+### Amd4-D6 — Storage is decided by **expressibility**, never by taste
+
+When it is unclear whether something is a variation of a recipe or a recipe of its own: **express it as a
+variation and let the derivation answer.** If the ops carry it, it is a variation. If the derivation returns
+unrepresentable edits, it is a sibling — take the split-off (Amd2-D2), which now links (Amd4-D3).
+
+This is not a convenience rule; it is what makes the distinction *stable*. A taste-based rule ("is it really
+the same dish?") is re-litigated every time and gives different answers on different days, and it is the
+rule that produced this amendment's motivating confusion. The vocabulary is a **classifier that is already
+implemented**, and Amd1-D7 already puts its verdict in front of the human at exactly the right moment, by
+name.
+
+**Corollary, and the reason Amd4-D4 matters more than it looks:** widening the vocabulary moves the line the
+classifier draws. Two ops is a deliberate, small move. It is not a licence to widen further whenever a case
+falls on the wrong side — the D4 test governs.
+
+### Slice — V4, one synced table (sequenced after the anchor repair)
+
+**V4a — Choices section, app layer, schema-free.** Relocate the picker per Amd4-D5, render variations as a
+proper list with descriptions, wire rename/edit/split-off/promote and the return-to-base control, and scope
+the hand-off. **Ships alone and first**, because it is the whole of complaint (1) and needs nothing new.
+
+**V4b — related-recipe edges, the schema slice.** One synced join table + the Choices section's second half
++ link/unlink + `splitVariationOff` writing the edge. Consumer ships with schema (Amd4-D3). Prod-schema
+promotion list entry in this slice's own PR. **Two-device sync pass owed; back up first**
+([ADR-0030](ADR-0030-local-backup-and-restore.md)).
+
+**V4c — the two new ops.** `stepInsert` / `stepRemove` in Core with the derivation's minimality and
+round-trip tests extended, the two `UnrepresentableEdit` cases removed, and the reader rendering an inserted
+step as an addition in the same visual grammar as an added ingredient. **Gated behind
+[variation-anchor-repair](../efforts/variation-anchor-repair.md) Dispatch 1** — adding two more anchored op
+kinds while anchors are still unrepairable multiplies the defect rather than the feature.
+
+### Open questions
+
+**OQ1 — does the browser see variation names and related recipes?** Today `RecipeListRequest` and
+`RecipeListRow` have **zero** variation awareness: a recipe cannot be found by its variation's name, and the
+row gives no sign that choices exist. Jon's "show me enough to be intrigued" is an **indexing** requirement,
+not a row-density one, and it belongs to [ADR-0050](ADR-0050-recipe-power-browser.md) rather than here —
+but it should be answered while `RecipeBrowserQuery` is still being designed, not bolted on after. *No
+recommendation offered; this is a real scoping question with a coverage cost.*
+
+**OQ2 — does the edge table carry an ordering column? RESOLVED (Jon, 2026-08-05): no — order by name.**
+Symmetric edges have no natural order, and an ordering column implies a curated list, which Amd4-D2 declined.
+The Choices section renders **sorted by recipe title**, which is deterministic and costs nothing. The edge
+table adds **no ordering column** ([[withdraw-not-defer-orphaned-schema]] applies to columns as much as tables:
+no consumer wants a manual order, so none is stored). Revisit only if use produces a real curation want.
+
+**OQ3 — do linked recipes appear in the grocery and menu surfaces at all?** Presumed **no** — a link is a
+navigational hint, not a composition. Recorded so the answer is deliberate rather than emergent.
 
 ## Proposed schema (sync-safe by construction, per ADR-0002 — recommendation, not ratified)
 
