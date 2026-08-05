@@ -49,7 +49,6 @@ final class RecipeVariationEditorModel {
       note = variation.note ?? ""
       hasLoaded = true
     } catch {
-      errorTitle = "Could Not Load Variation"
       errorMessage = error.localizedDescription
       isShowingError = true
     }

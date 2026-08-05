@@ -194,6 +194,7 @@ public struct RecipeVariationPayload: Codable, Equatable, Sendable {
 
   fileprivate func normalizingAnchors(in detail: RecipeDetailData) throws -> Self {
     var payload = self
+    let steps = detail.instructionGroups.flatMap(\.steps)
     payload.ingredientOps = try ingredientOps.map { operation in
       switch operation {
       case .add:
@@ -208,10 +209,10 @@ public struct RecipeVariationPayload: Codable, Equatable, Sendable {
     }
     payload.methodStepReplacements = try methodStepReplacements.map { replacement in
       var replacement = replacement
-      guard let index = replacement.index(in: detail.instructionGroups.flatMap(\.steps)) else {
+      guard let index = replacement.index(in: steps) else {
         throw RecipeAdjustmentError.unresolvedInstructionStep(replacement.displayText)
       }
-      replacement.id = detail.instructionGroups.flatMap(\.steps)[index].id
+      replacement.id = steps[index].id
       return replacement
     }
     return payload
