@@ -63,8 +63,8 @@ section is work.**
 - **⚠️ The ADR-0042 return contract is v2.1** (`AIHandoffReturnContract.version`) — re-copy the project
   instructions from AI Settings or every verb fails the marker gate. (Operational: it bites on any hand-off
   dogfooding session.)
-- **ADR-0021 (variations) V1–V3 are shipped; Amendment 4 is now Proposed (2026-08-01, restored into the ADR
-  2026-08-05) and queued in Next Up — see there.** ADR-0023 (recipe edit proposals) has nothing queued: its
+- **ADR-0021 (variations) V1–V3 are shipped; Amendment 4 is RATIFIED (2026-08-05) and queued in Next Up (V4a
+  dispatchable, app-only) — see there.** ADR-0023 (recipe edit proposals) has nothing queued: its
   *iterative refine loop* is **WITHDRAWN** (ADR-0042 D7 — it happens in the live external thread; **do not
   rebuild it**); per D2 the in-app adjust verb is the **only** path that writes a structured delta. **Expected,
   not a bug to patch (ADR-0014 Amd1-D4):** adding a header inside a recipe that has variations mints a new
