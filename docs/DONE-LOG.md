@@ -9,9 +9,43 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0014 Amendment 1 — header follow-through complete
+
+**Jon's hand-repair done 2026-08-05.** The three recipes still carrying `isHeader = 1` rows — *Beef Birria Taco
+Filling*, *Broccoli Spoon Salad*, *Sous Vide Indoor Pulled Pork* (411 West's Rosemary Chicken was pre-fixed
+2026-07-28) — were repaired in the app by adding a colon to each header line, which promotes the row to a section
+and deletes it on save. Amd1-D1a (the colon-free door) stays **deferred** — the colon is the ratified primary
+path. Dropping the `isHeader` **column** is a schema change, not a data migration, and remains un-queued.
+
+---
+## ADR-0049 Amendment 4 — deterministic exact-match label floor
+
+**Merged 2026-08-04; PR [#281](https://github.com/jonphillips/yes-chef/pull/281), branch
+`codex/adr-0049-amd4-deterministic-label-floor`. Architect-approved 2026-08-04.** Spec:
+[ADR-0049 Amendment 4](decisions/ADR-0049-unified-labels-and-assisted-tagging.md). **Core + app, no schema, no
+prod-schema entry, no two-device pass.**
+
+**What it does.** Structured output (S4 / PR #280) fixed the format failure but the on-device model's *recall* on
+surface-evident labels was weak — a fried-chicken recipe yielded only the inferred `Cuisine → American`, missing
+the verbatim `Protein → Chicken` and `Technique → Fry`. A pure, model-free `LabelProposer.floor(recipe:vocabulary:)`
+in Core now owns the surface-evident dimensions (whole-word Protein / Technique / Dish Type, precision-first,
+typed, never a substring sweep; excludes Cuisine/Course/Dietary and loose labels) and is unioned with the model
+proposal, deduped on `SuggestedLabel.id`, deterministic-wins. Provenance rides a sidecar
+`LabelProposal.sources: [SuggestedLabel.ID: SuggestionSource]`, so the accepted-chip `Codable` shape is untouched
+and nothing new syncs. Tests are the spine (the KFC precision anchor: floor yields Chicken + Fry, not Eggs, not a
+loose or inferred-cuisine label; `stir-fried → Stir-Fry`; union dedups; sources map correct). Out of scope and
+deliberately un-queued: prompt de-suppression / loose-label context trim, and escalate-on-miss.
+
+**With this the ADR-0049 facet/labeling arc is closed as a gate.** Filling in per-recipe coverage is Jon's
+ongoing hand work (Edit Tags + DEBUG Facet Coverage) and gates nothing downstream — Power Browser (ADR-0050) and
+everything after it move forward without waiting on it (Jon, 2026-08-05). The two-column Edit Tags facet layout
+was refined in PR [#282](https://github.com/jonphillips/yes-chef/pull/282) (merged 2026-08-05).
+
+---
 ## ADR-0004 S4 — LabelProposer structured-output opt-in
 
-**Implemented on the ADR-0004 S4 follow-up PR, pending review, 2026-08-04.**
+**Merged 2026-08-04; PR [#280](https://github.com/jonphillips/yes-chef/pull/280) + jon-platform
+[#36](https://github.com/jonphillips/jon-platform/pull/36).**
 `LabelProposer` now attaches the portable `label_suggestions` JSON Schema to its `ModelCall`, while retaining the
 English JSON instruction as the fallback floor. The proposal's `ModelCallRecord` records both structured intent and
 the parser-verified result: structured hit, readable fallback, truncated, or unreadable. DEBUG Model Calls renders that state
@@ -40,8 +74,8 @@ remain.
 ---
 ## ADR-0049 S5 + S6 + ADR-0050 D8 — labeling-backfill tooling
 
-**✅ Approved (architect review) 2026-08-04; PR [#278](https://github.com/jonphillips/yes-chef/pull/278)
-OPEN, branch `codex/adr-0049-labeling-backfill` — device look owed on merge (below).** Spec:
+**Merged 2026-08-04; PR [#278](https://github.com/jonphillips/yes-chef/pull/278),
+branch `codex/adr-0049-labeling-backfill`. Architect-approved 2026-08-04; device look done 2026-08-05 (Jon).** Spec:
 [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § "The dispatch — S6 + S5 + D8". **Core + app, no
 schema, no prod-schema entry, no two-device pass.** The existing `LabelProposer` remains on-device and
 `RecipeRepository.reconcileSuggestedLabels` remains the sole category/join writer.
@@ -66,16 +100,17 @@ pre-existing `RecipeCoreTests.swift` non-optional-`Data`-to-`nil` warning). **Re
 build and `swiftc -parse` are not App-target evidence — the generic app build is** (the Verification Pattern's
 own corollary; [[verify-local-fix-reached-merge]]).
 
-**Device look owed on merge** (transient state, so no two-device pass): (a) the detail Suggest Labels sheet and
+**Device look done 2026-08-05 (Jon)** (transient state, so no two-device pass): (a) the detail Suggest Labels sheet and
 the library batch queue present, accept typed suggestions, write them through `reconcileSuggestedLabels`, and
 the queue's **Done** button dismisses (the fixed binding); and (b) **backfill latency** —
 `RecipeFacetCoverageRequest` is an always-on whole-library `@Fetch` in `RecipeLibraryModel`, so every accepted
 label re-runs the full coverage recompute; confirm Save & Next stays snappy across a real run, since this is the
 [[sqlitedata-fetch-writer-convoy]] shape.
-=======
+
+---
 ## App-layer pure logic moved to Core
 
-**✅ Approved (architect review) 2026-08-04; PR [#279](https://github.com/jonphillips/yes-chef/pull/279) OPEN,
+**Merged 2026-08-04; PR [#279](https://github.com/jonphillips/yes-chef/pull/279),
 branch `codex/app-tests-to-core-final` — no device pass owed (pure relocation, no behavior change).** Spec:
 [`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md). **Core + app, no schema, no
 prod-schema entry, no device pass.** `RecipeScaleFormatting` and the `@MainActor @Observable`
@@ -93,8 +128,8 @@ green.
 ---
 ## ADR-0049 Amendment 2 · OQ4 — editorial facet seed (Protein / Dietary / Dish Type / Technique)
 
-**Approved (architect review) 2026-08-04; PR [#277](https://github.com/jonphillips/yes-chef/pull/277) OPEN,
-branch `codex/adr-0049-amd2-o4-editorial-facets` — light two-device convergence pass owed on merge.** Spec:
+**Merged 2026-08-04; PR [#277](https://github.com/jonphillips/yes-chef/pull/277),
+branch `codex/adr-0049-amd2-o4-editorial-facets`. Architect-approved 2026-08-04; two-device convergence pass done 2026-08-05 (Jon).** Spec:
 [ADR-0049 Amd 2 § Resolved OQ4](decisions/ADR-0049-unified-labels-and-assisted-tagging.md);
 [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Labeling backfill. **Core only, no schema, no new
 prod-schema entry** — `facets` + `Category.facetID`/`hidden` are already registered and already on the
@@ -118,9 +153,9 @@ facet ordinal and mint a permanent cross-fleet PK collision.
 ---
 ## ADR-0049 Amendment 2 · F1 + F2 — recipe-facing facet surfaces (hidden leak + editor grouping)
 
-**Approved (architect review) 2026-08-04; PR [#276](https://github.com/jonphillips/yes-chef/pull/276) OPEN,
-branch `codex/adr-0049-amd2-f1-f2` — Jon's device look + merge owed** (*finalize this entry's verification record
-on merge*). Both found on Jon's D1–D5 device pass. Spec:
+**Merged 2026-08-04; PR [#276](https://github.com/jonphillips/yes-chef/pull/276),
+branch `codex/adr-0049-amd2-f1-f2`. Architect-approved 2026-08-04; device look done 2026-08-05 (Jon).**
+Both found on Jon's D1–D5 device pass. Spec:
 [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Post-D5 device-pass findings. **Core + app, no schema,
 no prod-schema entry, no two-device pass.** Verified per the PR: `swift build` + a new Core hidden-suppression
 test green, generic-iOS app build green, `check-drift.sh` green.

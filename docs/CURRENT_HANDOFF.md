@@ -1,21 +1,15 @@
 # Current Handoff
 
-Last updated: August 4, 2026. (**ADR-0049 Amendment 2 — the facet model — is complete and archived**
-([`DONE-LOG.md`](DONE-LOG.md)): D1–D5 shipped + device-passed, D4 hand pass done, and **F1/F2** (recipe-facing
-`hidden` leak + editor facet-grouping) approved as PR [#276](https://github.com/jonphillips/yes-chef/pull/276),
-**owing only its device look on merge** (§ Device passes owed). The only remaining facet work is the **S5/S6
-labeling backfill** = ADR-0050's D6 coverage gate, tracked under ADR-0050. **Prep-plan Slice 3 — refine vs regenerate
-intent** shipped in PR [#265](https://github.com/jonphillips/yes-chef/pull/265) (merged 2026-07-30; the
-handoff bump was missed in-PR and reconciled here) — its record is in [`DONE-LOG.md`](DONE-LOG.md). **The
-editorial-facet seed slice shipped** (OQ4, PR [#277](https://github.com/jonphillips/yes-chef/pull/277), approved
-2026-08-04; light two-device pass owed on merge). **The S5/S6 + D8 labeling-backfill tooling and its Amendment 3
-surface revision are approved** (PR [#278](https://github.com/jonphillips/yes-chef/pull/278)) and its **ADR-0004 S4
-structured-output correction is merged** (PR [#280](https://github.com/jonphillips/yes-chef/pull/280) + jon-platform
-[#36](https://github.com/jonphillips/jon-platform/pull/36)). Structured output landed cleanly — the format failure
-is gone, but the on-device model's **recall** on surface-evident labels is weak (a fried-chicken recipe yielded only
-the *inferred* `Cuisine → American`, missing `Protein → Chicken` and `Technique → Fry` that are verbatim in the
-text). **ADR-0049 Amendment 4** scopes the fix: a deterministic exact-match floor. The record is in
-[`DONE-LOG.md`](DONE-LOG.md). **Next Up is the Amd-4 floor slice, then Jon's editorial-label backfill run.**)
+Last updated: August 5, 2026. (**The entire ADR-0049 facet/labeling arc is closed as a gate.** Amendment 2 (the
+facet model) is complete and archived ([`DONE-LOG.md`](DONE-LOG.md)): D1–D5, F1/F2, and the OQ4 editorial-facet
+seed all shipped and device-passed (PRs [#275](https://github.com/jonphillips/yes-chef/pull/275)–[#277](https://github.com/jonphillips/yes-chef/pull/277)),
+D4 hand pass done. The S5/S6 + D8 labeling-backfill **tooling** shipped (PR [#278](https://github.com/jonphillips/yes-chef/pull/278)),
+the ADR-0004 S4 structured-output correction merged (PR [#280](https://github.com/jonphillips/yes-chef/pull/280) +
+jon-platform [#36](https://github.com/jonphillips/jon-platform/pull/36)), and **Amendment 4's deterministic
+exact-match label floor shipped** (PR [#281](https://github.com/jonphillips/yes-chef/pull/281); Edit Tags
+two-column refinement in PR [#282](https://github.com/jonphillips/yes-chef/pull/282)). **Filling in per-recipe
+facet/tag coverage is Jon's ongoing hand work and gates nothing** — Power Browser (ADR-0050) and everything
+downstream move forward without waiting on it. Records in [`DONE-LOG.md`](DONE-LOG.md).)
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate is **crossed and holding**. We stay in
@@ -28,76 +22,66 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**Next dispatch — ADR-0049 Amendment 4, the deterministic label floor (Codex, device-pass-free).** Structured
-output landed (PR #280) but the on-device model's recall on *surface-evident* labels is weak — it misses
-`Protein → Chicken` and `Technique → Fry` when both are verbatim in the recipe, while correctly *inferring*
-`Cuisine → American`. Add a deterministic exact-match pre-pass that owns the surface-evident dimensions and
-leaves inference to the model (**Amendment 4** in [`ADR-0049`](decisions/ADR-0049-unified-labels-and-assisted-tagging.md)
-carries the full design; A4-D1…D4). Shape:
-- A pure, model-free `LabelProposer.floor(recipe:vocabulary:) -> [SuggestedLabel]` in `YesChefCore`, run inside
-  `liveValue` and **unioned with the model proposal, deduped on `SuggestedLabel.id`, deterministic-wins.**
-- **Precision-first, typed, never a substring sweep** (A4-D2): Protein = whole-word match against title/first
-  ingredient line; Technique = title + a tiny past-tense alias map (longest-first); Dish Type = title-only.
-  **Excludes Cuisine/Course/Dietary and all loose labels.** Reuse `namesMatch` folding, widened to whole-word.
-- **Sidecar provenance** (A4-D3): `LabelProposal.sources: [SuggestedLabel.ID: SuggestionSource]` (`.deterministic |
-  .model`) — **not** a field on `SuggestedLabel`; the accepted-chip `Codable` shape is untouched, nothing new syncs.
-- **Tests are the deliverable's spine:** the KFC recipe is the precision anchor — floor yields `Chicken` + `Fry`,
-  does **not** yield `Eggs`, any loose label, or an inferred cuisine; `stir-fried → Stir-Fry` not `Fry`; union
-  dedups and the sources map is correct. Pure Core → runs on every dispatch, no simulator.
-- **No schema, no two-device pass.** App touch is only the `liveValue` wiring + an optional DEBUG source badge, so
-  the elevated generic-iOS build is still required evidence. **Out of scope:** prompt de-suppression / loose-label
-  context trim, and escalate-on-miss — both are separate slices with their own evals (A4 scope note).
+**The facet/labeling gate is cleared — no hard-gated dispatch is queued.** Amendment 4's deterministic floor
+shipped (PR [#281](https://github.com/jonphillips/yes-chef/pull/281)) and filling in per-recipe coverage is Jon's
+ongoing hand work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**. Live candidates:
 
-**Then — Jon's editorial-label backfill run.** Open DEBUG **Facet Coverage**, use its unclassified
-counts or one of the three D8 coverage views (Missing Protein first, then Missing a Primary Facet / No Editorial
-Labels), and open **Edit Tags** for each recipe. Tags are assigned or removed in place; Suggest uses the on-device
-proposer at high effort and adds only accepted chips. The library toolbar and compact filter remain unmodified.
-**Run this after the floor merges** so D6 measures *model* recall on the calls only it can make, not the floor's.
-No schema → no prod-promotion entry, no two-device pass. The run supplies the D6 coverage measure and numeric
-evidence for ADR-0050 OQ3; once primary facets classify a majority of the library, Power Browser S1 becomes
-dispatchable.
+- **⚠️ Dispatch now — [`efforts/variation-anchor-repair.md`](efforts/variation-anchor-repair.md) Dispatch 0
+  (+ Dispatch 3, one PR).** A **standing data-loss defect**: a variation's anchors are copied from model output
+  and never normalized to base row IDs (`keepAdjustmentProposalAsVariation` at
+  [`RecipeAdjustment.swift:560/565`](../YesChefPackage/Sources/YesChefCore/RecipeAdjustment.swift) resolves the
+  anchors against the live base and *throws the result away*), so correcting a typo in a base step orphans the
+  variation permanently and `resolved(applying:)` **throws** — taking out the editor, the reader fold, and the
+  grocery contribution. **Every base edit Jon makes before this lands is another chance to lose a variation.**
+  Core-heavy (tests carry it), no schema; Pass B is a backup-first data pass over the `deltas` BLOB owing a
+  convergence check. Dispatch 3 rides along (missing `.alert` + progress + sheet-handoff fixes).
+- **Then — Variations → the Playbook = [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4, V4a.
+  Amd 4 is RATIFIED (Jon, 2026-08-05); V4a is dispatchable.** *(This is the idea Jon recalled — the record was
+  the never-applied APPLY file, folded into ADR-0021 2026-08-05.)* **V4a** relocates the variation picker from
+  the Body to a Playbook **Choices** section (Amd4-D5, correcting an ADR-0039 D1 drift), renders variations as a
+  proper list, and inherits ADR-0041 S2's section-scoped hand-off — **app-only, schema-free**, the whole of
+  complaint (1); ships alone and first. V4b (related-recipe edge table — **OQ2 resolved: order by name, no
+  ordering column**; the schema slice, two-device pass owed) and V4c (the two new step ops — **gated behind
+  anchor-repair Dispatch 1**) follow.
+- **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser S1.** All the facet infrastructure it
+  needs is shipped (facets, editable membership, the deterministic floor, the three coverage views). Its old
+  "wait until primary facets classify a majority of the library" gate is **retired** — the manual backfill no
+  longer gates anything (Jon, 2026-08-05). Needs its own scoping pass. (Amd4-OQ1 wants variation/related-recipe
+  indexing answered while `RecipeBrowserQuery` is still being designed.)
+- **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell.** Unblocked
+  since 2026-07-25; moves all eight chat call sites onto one Ask. Ready but larger.
 
-**Also Codex-dispatchable now (device-pass-free), if a parallel remote slice is wanted:**
-[`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) — move `WorkbenchCompareAlignmentModel`
-+ `RecipeScaleFormatting` (plus the S0.1 `ServeWithRepairPresentation` rider) down to Core; `swift build` + Core
-tests only, no simulator. The ATK grocery-bug slice ([`efforts/import-text-normalization.md`](efforts/import-text-normalization.md))
-is a **data migration wanting backup-first + a device pass** — hold it until Jon is local.
-
-**ADR-0049 Amendment 2 (the facet model) is complete** — D1–D5 shipped + device-passed, D4 hand pass done, F1/F2
-approved (PR [#276](https://github.com/jonphillips/yes-chef/pull/276), device look owed on merge); full record in
-[`DONE-LOG.md`](DONE-LOG.md). The only remaining facet work is the **S5/S6 labeling backfill** (ADR-0050's D6
-coverage gate), now **scoped and Next Up** (see above). D3's settled hidden-vocabulary rule lives in
-ADR-0049 D11.
-
-**⚠️ Jon's outstanding follow-through from ADR-0014 Amd1 (not a dispatch item):** three recipes still carry
-`isHeader = 1` rows to hand-repair in the app — *Beef Birria Taco Filling* (4), *Broccoli Spoon Salad* (2),
-*Sous Vide Indoor Pulled Pork* (2). *411 West's Rosemary Chicken* was pre-fixed 2026-07-28. Add a colon to
-each header line and the row is promoted to a section and deleted on save. (Amd1-D1a, the colon-free door, is
-**deferred** — the colon is the only path, which is the ratified primary anyway.) Dropping the `isHeader`
-**column** afterwards is a schema change, not a data migration, and is not queued.
+The ATK grocery-bug slice ([`efforts/import-text-normalization.md`](efforts/import-text-normalization.md)) is a
+**data migration wanting backup-first + a device pass** — hold it until Jon is local. D3's settled
+hidden-vocabulary rule lives in ADR-0049 D11.
 
 ## Standing guards
 
 Closed decisions that stay closed, here only so a dispatch does not re-queue them. **Nothing in this
 section is work.**
 
-- **⚠️ The ADR-0042 return contract is v2** — re-copy the project instructions from AI Settings or every
-  verb fails the marker gate. (Operational: it bites on any hand-off dogfooding session.)
-- **ADR-0021 (variations) and ADR-0023 (recipe edit proposals) have nothing queued.** ADR-0023's *iterative
-  refine loop* is **WITHDRAWN** (ADR-0042 D7 — it happens in the live external thread; **do not rebuild it**);
-  per D2 the in-app adjust verb is the **only** path that writes a structured delta. **Expected, not a bug to
-  patch (ADR-0014 Amd1-D4):** adding a header inside a recipe that has variations mints a new section, so
-  `derivingVariation` hits `.ingredientSectionAdded` → `variationNeedsReview`. Fixing it needs a
-  delta-vocabulary decision and it is **ADR-0021's** — do not extend the delta ops on this momentum.
+- **⚠️ The ADR-0042 return contract is v2.1** (`AIHandoffReturnContract.version`) — re-copy the project
+  instructions from AI Settings or every verb fails the marker gate. (Operational: it bites on any hand-off
+  dogfooding session.)
+- **ADR-0021 (variations) V1–V3 are shipped; Amendment 4 is RATIFIED (2026-08-05) and queued in Next Up (V4a
+  dispatchable, app-only) — see there.** ADR-0023 (recipe edit proposals) has nothing queued: its
+  *iterative refine loop* is **WITHDRAWN** (ADR-0042 D7 — it happens in the live external thread; **do not
+  rebuild it**); per D2 the in-app adjust verb is the **only** path that writes a structured delta. **Expected,
+  not a bug to patch (ADR-0014 Amd1-D4):** adding a header inside a recipe that has variations mints a new
+  section, so `derivingVariation` hits `.ingredientSectionAdded` → `variationNeedsReview`. Fixing it needs a
+  delta-vocabulary decision and it is **ADR-0021's** — do not extend the delta ops on this momentum. **Note:
+  Amd4-D4's two new step ops (`stepInsert`/`stepRemove`) are the sanctioned widening, and V4c is gated behind
+  anchor-repair Dispatch 1 — that is the disciplined path, not an ad-hoc extension here.**
 - **ADR-0042 S3 (`workbenchDraft`) stays deferred and un-queued** — no concrete want. **Do not build it on
   ADR momentum.** There is no S5.
 - **`PlaybookSectionMeta` is not queued anywhere — do not resurrect it.** ADR-0041 closed at S2.6, S3
   withdrawn ([Amd 3](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-3--s3-is-withdrawn-the-conversation-url-does-not-exist-2026-07-19)).
   If section provenance is ever wanted it designs its own storage against its own consumer
   ([[withdraw-not-defer-orphaned-schema]]).
-- **Both candidates Jon named 2026-07-21 are discharged** — variations (ADR-0021, shipped + device-passed) and
-  "Menu is under-served by hand-off verbs" (ADR-0043's load test). Parked **ADR-0013** meal-planner verbs are
-  separate and unscoped — see Ready Efforts.
+- **Both candidates Jon named 2026-07-21 are discharged** — variations (ADR-0021 V1–V3, shipped + device-passed;
+  Amd 4 is a *later* 2026-08-01 reopening, queued separately in Next Up) and "Menu is under-served by hand-off
+  verbs" (ADR-0043's load test). Parked **ADR-0013** meal-planner verbs are separate and unscoped — see Ready
+  Efforts.
 - **The Recipe Workbench store/curate/compare arc (ADR-0019) is complete**, S1–S4 shipped. Parked follow-ons
   live in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md), not here.
 - **The workbench's experiment-outcome verb is NOT scoped** — only its *placement* is ratified (ADR-0042 D8's
@@ -113,14 +97,18 @@ section is work.**
 Drawn into **Next Up** as needed; not itself a dispatch target. Completed efforts live in
 [`docs/DONE-LOG.md`](DONE-LOG.md).
 
-**[`efforts/recipe-facets.md`](efforts/recipe-facets.md) — ADR-0049 Amendment 2 (the facet model): COMPLETE.**
-D1–D5 + F1/F2 shipped-or-approved, D4 hand pass done — full record in [`DONE-LOG.md`](DONE-LOG.md). **The one
-remaining facet dispatch is the S5/S6 labeling-backfill tooling** — now **scoped** (with Jon 2026-08-04) into one
-combined S6 + S5 + ADR-0050 D8 dispatch (brief in this effort doc's § "The dispatch"), which is
-**[ADR-0050](decisions/ADR-0050-recipe-power-browser.md)'s D6 coverage gate** and the real prerequisite for the
-Power Browser. **It is Next Up — no longer needs scoping.** **F3/OQ5** (retire
-the typed freeform Cuisine/Course editor fields, **preserving** the per-facet single-select picker affordance —
-rebind, don't delete) is deferred to ADR-0050 S3.5, do not fold in.
+**⚠️ [`efforts/variation-anchor-repair.md`](efforts/variation-anchor-repair.md) — variation anchors are
+unrepairable; the adjust surface fails silently (2026-08-01). Designed, nothing shipped.** A standing
+**data-loss** defect (model-supplied anchors are never normalized to base IDs; `resolved(applying:)` throws on
+one dead anchor, taking out editor + reader fold + grocery). Four dispatches, **no schema**. **Dispatch 0 (+3)
+should ship immediately** and is drawn into Next Up above; Dispatch 1 (degrade-don't-throw) then gates ADR-0021
+Amd4 V4c. Pass B is a backup-first data pass over `recipeVariations.deltas` owing a convergence check.
+
+**[`efforts/recipe-facets.md`](efforts/recipe-facets.md) — ADR-0049 (the facet model + labeling): COMPLETE and
+archived.** D1–D5, F1/F2, OQ4 seed, the S5/S6+D8 backfill tooling, and the Amd-4 deterministic floor all shipped
+and device-passed (PRs #275–#282); full record in [`DONE-LOG.md`](DONE-LOG.md). The **only** live thread it hands
+off is **F3/OQ5** (retire the typed freeform Cuisine/Course editor fields, **preserving** the per-facet
+single-select picker affordance — rebind, don't delete), deferred to **ADR-0050 S3.5**, do not fold in elsewhere.
 
 **[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md) — ATK's "Gather Your
 Ingredients" is a latent grocery bug (scoped 2026-07-28). P1 only; **no schema**.** 101 shoppable ingredient
@@ -213,25 +201,9 @@ selection (per-bubble `UITextView` caps the payload).
 
 Not work, a checklist.
 
-*(ADR-0049 Amd 2 D1/D2/D3 device passes — PRs #270, #272, #274 — approved 2026-08-04 and removed. D4 hand pass
-done.)*
-
-**[PR #278](https://github.com/jonphillips/yes-chef/pull/278) — S5/S6 + D8 labeling-backfill tooling. App +
-Core, no schema, no two-device pass.** Approved (architect review) 2026-08-04; app build re-verified green after
-the Amendment 3 surface revision. **Device look owed on merge:** detail **Edit Tags** groups assignments by facet,
-inline add/delete preserves assignments, Suggest produces useful high-effort on-device proposals, and DEBUG Facet
-Coverage discovers under-labeled recipes through the three absence views.
-
-**[PR #277](https://github.com/jonphillips/yes-chef/pull/277) — ADR-0049 Amd 2 OQ4, editorial facet seed. Core
-only, no schema.** Approved (architect review) 2026-08-04; **light two-device convergence pass owed on merge:**
-back up first, then confirm the four new facets (Protein / Dietary / Dish Type / Technique) and their 49 values
-each appear **once** — not duplicated — on a second device after sync.
-
-**[PR #276](https://github.com/jonphillips/yes-chef/pull/276) — ADR-0049 Amd 2 F1/F2, recipe-facing facet
-surfaces. App + Core, no schema, no two-device pass** (writes/reads only). Approved (architect review)
-2026-08-04; **device look owed on merge:** confirm (a) hiding a category value removes it from recipe rows,
-detail, and the filter, and unhiding restores it; and (b) the recipe editor's category picker now groups values
-under their facet header (Cuisine/Course sections), loose labels under "Other Categories".
+*(The full ADR-0049 facet/labeling arc — PRs #270/#272/#274 (D1–D3), #275 (D5), #276 (F1/F2), #277 (OQ4 seed),
+#278 (S5/S6+D8 backfill tooling), #281 (Amd-4 floor), #282 (Edit Tags refine) — is device-passed 2026-08-05 and
+removed. D4 hand pass done.)*
 
 **[PR #262](https://github.com/jonphillips/yes-chef/pull/262) — prep plan dish links and dates. Merged
 2026-07-30, no schema.** Slice 1 (day-anchored sessions on a placed menu) is **device-confirmed 2026-07-30**.

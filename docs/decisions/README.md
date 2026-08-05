@@ -21,7 +21,7 @@ plus any app-specific calls.
 - [ADR-0016](ADR-0016-multi-recipe-cook-session.md) — Multi-recipe cook session: cook a planner day's (or menu's) recipes together in the existing Reader with a chip-strip switcher + session-only "done"; not Cooking Mode, no voice, no schema change (Accepted)
 - [ADR-0017](ADR-0017-llm-model-and-reasoning-effort.md) — Frontier default → `gpt-5.5`; add provider-agnostic `reasoningEffort` to `ModelRequest` (OpenAI `reasoning_effort`); effort assigned per feature (lookup=low, judgment=high); model shown in Settings; cross-repo (shared `LLMClientKit`) (Accepted)
 - [ADR-0018](ADR-0018-prompt-customization-taste-profile.md) — Prompt customization: layered global **taste profile** injected at the `LLMClientKit` boundary (reaches every generative call, fixing the recipe-chat-only gap) + optional per-task preferences on generative-judgment tasks; never expose raw task prompts (Accepted)
-- [ADR-0021](ADR-0021-recipe-variations.md) — **Amd 4 (Proposed 2026-08-01)** — a *second* relation: **related recipes are symmetric peer edges**
+- [ADR-0021](ADR-0021-recipe-variations.md) — **Amd 4 (Ratified 2026-08-05)** — a *second* relation: **related recipes are symmetric peer edges**
   (one synced join table), rendered beside variations in a single Playbook **Choices** section, because the
   cook's question — *what are my choices with this dish?* — is one question over two storage models. The
   group entity is **not** built: Jon withdrew the "de-clog the library list" requirement, which was its only
