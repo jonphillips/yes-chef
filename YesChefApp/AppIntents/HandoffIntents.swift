@@ -748,6 +748,7 @@ enum HandoffAppOperations {
       sourceID: metadata.sourceID,
       taskType: metadata.taskType,
       dayOffset: metadata.dayOffset,
+      variationID: metadata.variationID,
       createdAt: now,
       regenerates: source.prepPlanIntent == .regenerate,
       exportedPrompt: ""

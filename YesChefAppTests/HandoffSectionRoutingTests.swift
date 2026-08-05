@@ -1,3 +1,4 @@
+import Dependencies
 import Foundation
 import Testing
 import YesChefCore
@@ -56,6 +57,50 @@ struct HandoffSectionRoutingTests {
     #expect(HandoffExportSource.recipeAdjustment(recipeID, variationID: variationID).matches(variationHandoff))
     #expect(!HandoffExportSource.recipeAdjustment(recipeID).matches(variationHandoff))
     #expect(!HandoffExportSource.recipeAdjustment(recipeID, variationID: otherVariationID).matches(variationHandoff))
+  }
+
+  @Test
+  @MainActor
+  func unmatchedVariationPasteRestagesTheOriginalVariationScope() async throws {
+    let recipeID = UUID(uuidString: "00000000-0000-0000-0000-000000003910")!
+    let variationID = UUID(uuidString: "00000000-0000-0000-0000-000000003911")!
+    let unrecognizedHandoffID = UUID(uuidString: "00000000-0000-0000-0000-000000003912")!
+    let now = Date(timeIntervalSinceReferenceDate: 840_300_000)
+    let coordinator = HandoffReviewCoordinator()
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+      $0.uuid = .incrementing
+      $0.handoffReviewCoordinator = coordinator
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try await database.write { db in
+        try Recipe.insert {
+          Recipe(id: recipeID, title: "Variation Handoff", dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+      }
+
+      let transport = HandoffInAppTransport()
+      await transport.pastedResultsReceived(
+        ["""
+        YC-HANDOFF: \(unrecognizedHandoffID.uuidString)
+        \(AIHandoffReturnContract.marker)
+        Use a lighter sauce for this variation.
+        """],
+        source: .recipeAdjustment(recipeID, variationID: variationID)
+      )
+
+      #expect(transport.isShowingUnmatchedConfirmation)
+      await transport.reviewUnmatchedResult()
+
+      guard case let .recipeAdjustmentBrief(review) = coordinator.review else {
+        Issue.record("Expected a recipe-adjustment brief review.")
+        return
+      }
+      #expect(review.variationID == variationID)
+    }
   }
 
   @Test

@@ -885,7 +885,7 @@ private struct WorkbenchExperimentsReviewSheet: View {
   }
 }
 
-private enum HandoffReviewError: LocalizedError, CustomStringConvertible {
+enum HandoffReviewError: LocalizedError, CustomStringConvertible {
   case emptyLearnings
   case emptyDeliverable
   case unparsedStrategyText([String])

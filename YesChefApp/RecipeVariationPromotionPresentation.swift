@@ -69,7 +69,9 @@ struct RecipeVariationChoices: View {
       } label: {
         HStack(alignment: .top, spacing: 10) {
           Image(systemName: variation.id == activeVariationID ? "checkmark.circle.fill" : "circle")
-            .foregroundStyle(variation.id == activeVariationID ? .tint : .secondary)
+            .foregroundStyle(
+              variation.id == activeVariationID ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary)
+            )
             .frame(minWidth: 20)
             .padding(.top, 2)
           VStack(alignment: .leading, spacing: 3) {
