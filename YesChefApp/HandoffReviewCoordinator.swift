@@ -617,6 +617,7 @@ extension HandoffReviewCoordinator {
   }
 
   func presentPendingAdjustmentReviewAfterReviewDismissal() {
+    clearError()
     guard let pendingAdjustmentReview else { return }
     self.pendingAdjustmentReview = nil
     presentAdjustmentReview(pendingAdjustmentReview)

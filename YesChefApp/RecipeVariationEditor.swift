@@ -24,6 +24,7 @@ final class RecipeVariationEditorModel {
   var name = ""
   var note = ""
   var isSaving = false
+  var errorTitle = "Could Not Load Variation"
   var errorMessage: String?
   var isShowingError = false
   private var hasLoaded = false
@@ -48,6 +49,7 @@ final class RecipeVariationEditorModel {
       note = variation.note ?? ""
       hasLoaded = true
     } catch {
+      errorTitle = "Could Not Load Variation"
       errorMessage = error.localizedDescription
       isShowingError = true
     }
@@ -147,6 +149,7 @@ final class RecipeVariationEditorModel {
       }
       return derivation.isRepresentable ? .saved : .needsSplitOff(derivation.unrepresentableEdits)
     } catch {
+      errorTitle = "Could Not Save Variation"
       errorMessage = error.localizedDescription
       isShowingError = true
       return .failed
@@ -168,6 +171,7 @@ final class RecipeVariationEditorModel {
       }
       return true
     } catch {
+      errorTitle = "Could Not Split Off Variation"
       errorMessage = error.localizedDescription
       isShowingError = true
       return false
@@ -226,7 +230,7 @@ struct RecipeVariationEditorView: View {
     }
     .onAppear { model.baseDetailChanged(model.baseDetail) }
     .onChange(of: model.baseDetail) { _, detail in model.baseDetailChanged(detail) }
-    .alert("Could Not Save Variation", isPresented: $model.isShowingError) {
+    .alert(model.errorTitle, isPresented: $model.isShowingError) {
       Button("OK", role: .cancel) {}
     } message: {
       Text(model.errorMessage ?? "Something went wrong.")

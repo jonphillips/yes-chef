@@ -1164,6 +1164,10 @@ extension DependencyValues {
             AppLog.dataIntegrity.warning("\(facetMigrationAudit.logSummary, privacy: .public)")
           }
           try CategoryRepository.foldDormantTagsIntoCategories(in: db)
+          let variationAnchorBackfill = try RecipeRepository.backfillVariationAnchors(in: db)
+          if variationAnchorBackfill.hasFindings {
+            AppLog.dataIntegrity.warning("\(variationAnchorBackfill.logSummary, privacy: .public)")
+          }
         }
       }
     }

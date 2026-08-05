@@ -141,7 +141,7 @@ extension RecipeCoreTests {
           .remove(RecipeIngredientReference(originalText: "1 teaspoon honey")),
         ],
         methodStepReplacements: [
-          RecipeMethodStepReplacement(stepNumber: 2, replacementText: "Simmer the sauce until glossy.")
+          RecipeMethodStepReplacement(id: cookStepID, replacementText: "Simmer the sauce until glossy.")
         ]
       )
       var uuids = SampleUUIDSequence(start: 31_220)
@@ -193,6 +193,7 @@ extension RecipeCoreTests {
       let restorePoint = try database.write { db in
         let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
         let lemonLine = try #require(detail.ingredientLines.first { $0.originalText == "1 tablespoon lemon juice" })
+        let instructionStep = try #require(detail.instructionSteps.first)
         return try RecipeRepository.overwriteRecipeWithAdjustmentProposal(
           RecipeAdjustmentProposal(
             summary: "Use lime.",
@@ -200,7 +201,7 @@ extension RecipeCoreTests {
               .substitute(RecipeIngredientReference(id: lemonLine.id), line: "2 tablespoons lime juice")
             ],
             methodStepReplacements: [
-              RecipeMethodStepReplacement(stepNumber: 1, replacementText: "Toss, taste, and serve.")
+              RecipeMethodStepReplacement(id: instructionStep.id, replacementText: "Toss, taste, and serve.")
             ]
           ),
           recipeID: recipeID,
