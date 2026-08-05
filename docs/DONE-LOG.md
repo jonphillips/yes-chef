@@ -9,6 +9,41 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## variation-anchor-repair Dispatch 0 (+3) — anchors normalized to base IDs, backfill, loud-at-save
+
+**Approved (architect review) 2026-08-05; PR [#284](https://github.com/jonphillips/yes-chef/pull/284), branch
+`codex/variation-anchor-repair-dispatch-0`.** Spec:
+[`efforts/variation-anchor-repair.md`](../efforts/variation-anchor-repair.md). **Core-heavy + a small app-layer
+touch, no schema, no prod-schema entry** (`recipeVariations` was already on the promotion list); a backfill data
+pass with a **device gate owed**.
+
+**What it does.** Closes the standing ADR-0021 data-loss defect (found on device 2026-08-01). A variation's
+ingredient/method anchors were copied verbatim from model output and never normalized to base row IDs, so
+correcting a typo in a base step orphaned the variation and `resolved(applying:)` **threw** — taking out that
+recipe's editor, reader fold, and grocery contribution. Now `keepAdjustmentProposalAsVariation` normalizes anchors
+to live base-row IDs *before* writing the blob, throwing **loud-at-save** on an unresolvable anchor rather than
+persisting a dead one. A post-engine, idempotent `RecipeRepository.backfillVariationAnchors` walks existing
+`recipeVariations.deltas`, repairs what resolves and **reports — never guesses** the rest
+(`variation-anchor-backfill` warning on `AppLog.dataIntegrity`, category `dataIntegrity`); it runs *after*
+`makeSyncEngine`, alongside the other post-engine passes, so the repair upload carries SyncMetadata
+([[migration-writes-bypass-sync-triggers]]) and converges deterministically (base IDs are identical across
+devices). The positional `stepNumber` fallback in `index(in:)` is **deleted** (a silent-corruption hazard after a
+reorder); ID-first → exact-trimmed-text is the only matching — no fuzzy/positional widening. Dispatch 3 rode
+along: distinct editor error titles (Could Not Load / Save / Split-Off Variation) and a `clearError()` on the
+adjustment-review sheet hand-off.
+
+**Verified.** All 5 new `RecipeVariationAnchorRepairTests` and the 6 (id-migrated) `RecipeAdjustmentTests` pass
+locally — architect ran both suites 2026-08-05; the idempotency + convergence + reorder-safety asserts are the
+spine. Codex's PR run added `scripts/check-drift.sh` and the elevated generic-iOS app build.
+
+**Device gate owed** (see Device passes): export a backup, cold-launch with Console streaming the iPhone to read
+the first-run `variation-anchor-backfill` line, then the two-device pass.
+
+**Remaining in the effort (still Ready, no schema):** Dispatch 1 — make `resolved(applying:)` **degrade, not
+throw** (apply every op that resolves, banner the dead one); it **gates ADR-0021 Amd4 V4c**. Dispatch 2 — the
+repair UI.
+
+---
 ## ADR-0014 Amendment 1 — header follow-through complete
 
 **Jon's hand-repair done 2026-08-05.** The three recipes still carrying `isHeader = 1` rows — *Beef Birria Taco

@@ -191,6 +191,130 @@ public struct RecipeVariationPayload: Codable, Equatable, Sendable {
       throw RecipeAdjustmentError.variationPayloadUnreadable(variationID)
     }
   }
+
+  fileprivate func normalizingAnchors(in detail: RecipeDetailData) throws -> Self {
+    var payload = self
+    let steps = detail.instructionGroups.flatMap(\.steps)
+    payload.ingredientOps = try ingredientOps.map { operation in
+      switch operation {
+      case .add:
+        return operation
+      case let .remove(reference):
+        return .remove(try normalizedIngredientReference(reference, in: detail.ingredientLines))
+      case let .substitute(reference, line):
+        return .substitute(try normalizedIngredientReference(reference, in: detail.ingredientLines), line: line)
+      case let .scale(reference, line):
+        return .scale(try normalizedIngredientReference(reference, in: detail.ingredientLines), line: line)
+      }
+    }
+    payload.methodStepReplacements = try methodStepReplacements.map { replacement in
+      var replacement = replacement
+      guard let index = replacement.index(in: steps) else {
+        throw RecipeAdjustmentError.unresolvedInstructionStep(replacement.displayText)
+      }
+      replacement.id = steps[index].id
+      return replacement
+    }
+    return payload
+  }
+
+  fileprivate func backfillingAnchors(
+    in detail: RecipeDetailData,
+    variation: RecipeVariation
+  ) -> (payload: Self, unresolvedAnchors: [RecipeVariationAnchorBackfillReport.UnresolvedAnchor]) {
+    var payload = self
+    var unresolvedAnchors: [RecipeVariationAnchorBackfillReport.UnresolvedAnchor] = []
+
+    payload.ingredientOps = ingredientOps.map { operation in
+      switch operation {
+      case .add:
+        return operation
+      case let .remove(reference):
+        guard let reference = normalizedIngredientReferenceIfPossible(reference, in: detail.ingredientLines) else {
+          unresolvedAnchors.append(
+            .ingredient(variationID: variation.id, variationName: variation.name, text: reference.displayText)
+          )
+          return operation
+        }
+        return .remove(reference)
+      case let .substitute(reference, line):
+        guard let reference = normalizedIngredientReferenceIfPossible(reference, in: detail.ingredientLines) else {
+          unresolvedAnchors.append(
+            .ingredient(variationID: variation.id, variationName: variation.name, text: reference.displayText)
+          )
+          return operation
+        }
+        return .substitute(reference, line: line)
+      case let .scale(reference, line):
+        guard let reference = normalizedIngredientReferenceIfPossible(reference, in: detail.ingredientLines) else {
+          unresolvedAnchors.append(
+            .ingredient(variationID: variation.id, variationName: variation.name, text: reference.displayText)
+          )
+          return operation
+        }
+        return .scale(reference, line: line)
+      }
+    }
+
+    let steps = detail.instructionGroups.flatMap(\.steps)
+    payload.methodStepReplacements = methodStepReplacements.map { replacement in
+      var replacement = replacement
+      guard let index = replacement.index(in: steps) else {
+        unresolvedAnchors.append(
+          .instructionStep(
+            variationID: variation.id,
+            variationName: variation.name,
+            text: replacement.displayText
+          )
+        )
+        return replacement
+      }
+      replacement.id = steps[index].id
+      return replacement
+    }
+    return (payload, unresolvedAnchors)
+  }
+}
+
+public struct RecipeVariationAnchorBackfillReport: Equatable, Sendable {
+  public enum UnresolvedAnchor: Equatable, Sendable {
+    case ingredient(variationID: RecipeVariation.ID, variationName: String, text: String)
+    case instructionStep(variationID: RecipeVariation.ID, variationName: String, text: String)
+    case unreadablePayload(variationID: RecipeVariation.ID, variationName: String)
+  }
+
+  public var updatedVariationIDs: [RecipeVariation.ID]
+  public var unresolvedAnchors: [UnresolvedAnchor]
+
+  public init(
+    updatedVariationIDs: [RecipeVariation.ID] = [],
+    unresolvedAnchors: [UnresolvedAnchor] = []
+  ) {
+    self.updatedVariationIDs = updatedVariationIDs
+    self.unresolvedAnchors = unresolvedAnchors
+  }
+
+  public var requiresReview: Bool { !unresolvedAnchors.isEmpty }
+  public var hasFindings: Bool { !updatedVariationIDs.isEmpty || requiresReview }
+
+  public var logSummary: String {
+    let unresolved = unresolvedAnchors.map { anchor in
+      switch anchor {
+      case let .ingredient(variationID, variationName, text):
+        "ingredient(variation=\(variationName),id=\(variationID.uuidString),text=\(text))"
+      case let .instructionStep(variationID, variationName, text):
+        "instructionStep(variation=\(variationName),id=\(variationID.uuidString),text=\(text))"
+      case let .unreadablePayload(variationID, variationName):
+        "unreadablePayload(variation=\(variationName),id=\(variationID.uuidString))"
+      }
+    }
+    return [
+      "variation-anchor-backfill",
+      "updatedVariationIDs=[\(updatedVariationIDs.map(\.uuidString).joined(separator: ","))]",
+      "unresolved=[\(unresolved.joined(separator: ","))]",
+    ]
+    .joined(separator: " ")
+  }
 }
 
 /// A lossless description of an edit the current variation vocabulary cannot carry.
@@ -314,15 +438,31 @@ public struct RecipeMethodStepReplacement: Codable, Equatable, Sendable {
     if let id, let existingIndex = steps.firstIndex(where: { $0.id == id }) {
       return existingIndex
     }
-    if let stepNumber {
-      let index = stepNumber - 1
-      if steps.indices.contains(index) { return index }
-    }
     guard let originalText = originalText?.trimmingCharacters(in: .whitespacesAndNewlines), !originalText.isEmpty else {
       return nil
     }
     return steps.firstIndex { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) == originalText }
   }
+}
+
+private func normalizedIngredientReference(
+  _ reference: RecipeIngredientReference,
+  in lines: [IngredientLine]
+) throws -> RecipeIngredientReference {
+  guard let reference = normalizedIngredientReferenceIfPossible(reference, in: lines) else {
+    throw RecipeAdjustmentError.unresolvedIngredient(reference.displayText)
+  }
+  return reference
+}
+
+private func normalizedIngredientReferenceIfPossible(
+  _ reference: RecipeIngredientReference,
+  in lines: [IngredientLine]
+) -> RecipeIngredientReference? {
+  guard let index = reference.index(in: lines) else { return nil }
+  var reference = reference
+  reference.id = lines[index].id
+  return reference
 }
 
 public struct RecipeAdjustmentClient: Sendable {
@@ -504,6 +644,36 @@ extension DependencyValues {
 }
 
 extension RecipeRepository {
+  /// Repairs legacy model-authored anchors after the sync engine is installed, so updates to the
+  /// existing `recipeVariations` table are observed and uploaded. It deliberately preserves an
+  /// anchor when the current base cannot match it exactly; the report is the repair queue.
+  public static func backfillVariationAnchors(in db: Database) throws -> RecipeVariationAnchorBackfillReport {
+    var report = RecipeVariationAnchorBackfillReport()
+    let variations = try RecipeVariation.fetchAll(db).sorted { $0.id.uuidString < $1.id.uuidString }
+
+    for var variation in variations {
+      guard let detail = try fetchDetail(recipeID: variation.recipeID, in: db) else { continue }
+      let payload: RecipeVariationPayload
+      do {
+        payload = try RecipeVariationPayload.decode(variation.deltas, variationID: variation.id)
+      } catch {
+        report.unresolvedAnchors.append(
+          .unreadablePayload(variationID: variation.id, variationName: variation.name)
+        )
+        continue
+      }
+
+      let repaired = payload.backfillingAnchors(in: detail, variation: variation)
+      report.unresolvedAnchors.append(contentsOf: repaired.unresolvedAnchors)
+      guard repaired.payload != payload else { continue }
+
+      variation.deltas = try repaired.payload.encodedData()
+      try RecipeVariation.upsert { variation }.execute(db)
+      report.updatedVariationIDs.append(variation.id)
+    }
+    return report
+  }
+
   public static func overwriteRecipeWithAdjustmentProposal(
     _ proposal: RecipeAdjustmentProposal,
     recipeID: Recipe.ID,
@@ -550,6 +720,7 @@ extension RecipeRepository {
     guard let detail = try fetchDetail(recipeID: recipeID, in: db) else {
       throw RecipeAdjustmentError.missingRecipe(recipeID)
     }
+    let payload = try RecipeVariationPayload(proposal: proposal).normalizingAnchors(in: detail)
     let variationID = uuid()
     let variation = RecipeVariation(
       id: variationID,
@@ -557,7 +728,7 @@ extension RecipeRepository {
       name: variationName(name, fallback: proposal.summary),
       note: proposal.methodNote?.nonEmptyAdjustmentText,
       sortIndex: try nextVariationSortIndex(recipeID: recipeID, in: db),
-      deltas: try RecipeVariationPayload(proposal: proposal).encodedData(),
+      deltas: try payload.encodedData(),
       origin: .chat,
       dateCreated: now,
       dateModified: now

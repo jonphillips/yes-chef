@@ -22,20 +22,13 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**The facet/labeling gate is cleared — no hard-gated dispatch is queued.** Amendment 4's deterministic floor
-shipped (PR [#281](https://github.com/jonphillips/yes-chef/pull/281)) and filling in per-recipe coverage is Jon's
-ongoing hand work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**. Live candidates:
+**The facet/labeling gate is cleared and the variation-anchor data-loss defect is fixed at the write path — no
+hard-gated dispatch is queued.** Amendment 4's deterministic floor shipped (PR
+[#281](https://github.com/jonphillips/yes-chef/pull/281)) and variation-anchor-repair **Dispatch 0 (+3) shipped**
+(PR [#284](https://github.com/jonphillips/yes-chef/pull/284), device gate owed); filling in per-recipe coverage is
+Jon's ongoing hand work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**. Live candidates:
 
-- **⚠️ Dispatch now — [`efforts/variation-anchor-repair.md`](efforts/variation-anchor-repair.md) Dispatch 0
-  (+ Dispatch 3, one PR).** A **standing data-loss defect**: a variation's anchors are copied from model output
-  and never normalized to base row IDs (`keepAdjustmentProposalAsVariation` at
-  [`RecipeAdjustment.swift:560/565`](../YesChefPackage/Sources/YesChefCore/RecipeAdjustment.swift) resolves the
-  anchors against the live base and *throws the result away*), so correcting a typo in a base step orphans the
-  variation permanently and `resolved(applying:)` **throws** — taking out the editor, the reader fold, and the
-  grocery contribution. **Every base edit Jon makes before this lands is another chance to lose a variation.**
-  Core-heavy (tests carry it), no schema; Pass B is a backup-first data pass over the `deltas` BLOB owing a
-  convergence check. Dispatch 3 rides along (missing `.alert` + progress + sheet-handoff fixes).
-- **Then — Variations → the Playbook = [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4, V4a.
+- **Variations → the Playbook = [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4, V4a.
   Amd 4 is RATIFIED (Jon, 2026-08-05); V4a is dispatchable.** *(This is the idea Jon recalled — the record was
   the never-applied APPLY file, folded into ADR-0021 2026-08-05.)* **V4a** relocates the variation picker from
   the Body to a Playbook **Choices** section (Amd4-D5, correcting an ADR-0039 D1 drift), renders variations as a
@@ -43,6 +36,12 @@ ongoing hand work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**. Liv
   complaint (1); ships alone and first. V4b (related-recipe edge table — **OQ2 resolved: order by name, no
   ordering column**; the schema slice, two-device pass owed) and V4c (the two new step ops — **gated behind
   anchor-repair Dispatch 1**) follow.
+- **anchor-repair Dispatch 1 — make `resolved(applying:)` degrade, not throw**
+  ([`efforts/variation-anchor-repair.md`](efforts/variation-anchor-repair.md)). Dispatch 0 stopped *new* dead
+  anchors and repaired the resolvable legacy ones, but a single unresolvable anchor still **throws** and takes out
+  that recipe's editor + reader fold + grocery. Dispatch 1 applies every op that resolves and banners the dead one
+  — and it **gates ADR-0021 Amd4 V4c** (the two new `stepInsert`/`stepRemove` ops). Dispatch 2 (the repair UI)
+  follows. No schema.
 - **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser S1.** All the facet infrastructure it
   needs is shipped (facets, editable membership, the deterministic floor, the three coverage views). Its old
   "wait until primary facets classify a majority of the library" gate is **retired** — the manual backfill no
@@ -97,12 +96,13 @@ section is work.**
 Drawn into **Next Up** as needed; not itself a dispatch target. Completed efforts live in
 [`docs/DONE-LOG.md`](DONE-LOG.md).
 
-**⚠️ [`efforts/variation-anchor-repair.md`](efforts/variation-anchor-repair.md) — variation anchors are
-unrepairable; the adjust surface fails silently (2026-08-01). Designed, nothing shipped.** A standing
-**data-loss** defect (model-supplied anchors are never normalized to base IDs; `resolved(applying:)` throws on
-one dead anchor, taking out editor + reader fold + grocery). Four dispatches, **no schema**. **Dispatch 0 (+3)
-should ship immediately** and is drawn into Next Up above; Dispatch 1 (degrade-don't-throw) then gates ADR-0021
-Amd4 V4c. Pass B is a backup-first data pass over `recipeVariations.deltas` owing a convergence check.
+**[`efforts/variation-anchor-repair.md`](efforts/variation-anchor-repair.md) — Dispatch 0 (+3) SHIPPED** (PR
+[#284](https://github.com/jonphillips/yes-chef/pull/284), architect-approved 2026-08-05; **device gate owed**).
+The write path no longer mints dead anchors (normalized to base IDs, loud-at-save) and a post-engine idempotent
+backfill repairs / report-don't-guess over `recipeVariations.deltas`; the `stepNumber` positional fallback is
+gone. **Two dispatches remain, no schema:** Dispatch 1 (make `resolved(applying:)` **degrade-not-throw**; **gates
+ADR-0021 Amd4 V4c**) — drawn into Next Up — and Dispatch 2 (the repair UI). Full record in
+[`DONE-LOG.md`](DONE-LOG.md).
 
 **[`efforts/recipe-facets.md`](efforts/recipe-facets.md) — ADR-0049 (the facet model + labeling): COMPLETE and
 archived.** D1–D5, F1/F2, OQ4 seed, the S5/S6+D8 backfill tooling, and the Amd-4 deterministic floor all shipped
@@ -204,6 +204,13 @@ Not work, a checklist.
 *(The full ADR-0049 facet/labeling arc — PRs #270/#272/#274 (D1–D3), #275 (D5), #276 (F1/F2), #277 (OQ4 seed),
 #278 (S5/S6+D8 backfill tooling), #281 (Amd-4 floor), #282 (Edit Tags refine) — is device-passed 2026-08-05 and
 removed. D4 hand pass done.)*
+
+**[PR #284](https://github.com/jonphillips/yes-chef/pull/284) — variation-anchor-repair Dispatch 0 (+3). Backfill
+data pass, no schema.** **Export a backup first.** Cold-launch with Console streaming the iPhone
+(`subsystem == "com.jonphillips.yeschef"`, category `dataIntegrity`) to catch the first-run
+`variation-anchor-backfill` line — a populated `updatedVariationIDs` with an empty `unresolved` confirms the
+backfill repaired the Crean→Cream variation, and the line should **vanish on the next launch** (idempotent). Any
+`unresolved=[…]` is the repair queue (report-don't-guess) awaiting Dispatch 2. Then the two-device pass.
 
 **[PR #262](https://github.com/jonphillips/yes-chef/pull/262) — prep plan dish links and dates. Merged
 2026-07-30, no schema.** Slice 1 (day-anchored sessions on a placed menu) is **device-confirmed 2026-07-30**.
