@@ -17,7 +17,7 @@ struct MenuPrepPlanStepView: View {
 
       VStack(alignment: .leading, spacing: 4) {
         Text(step.task)
-        if let serves = step.serves { servesLabel(serves) }
+        if let dishChipLabel { servesLabel(dishChipLabel) }
       }
       Spacer(minLength: 8)
     }
@@ -43,6 +43,21 @@ struct MenuPrepPlanStepView: View {
       Label(serves, systemImage: "fork.knife")
         .font(.caption).foregroundStyle(.secondary).recipeChip()
     }
+  }
+
+  /// The text shown on the dish chip. Prefers the free-text `serves` (which AI
+  /// steps populate); for hand-authored steps that only linked a dish, falls
+  /// back to the linked dish's title so the link is visible on the row.
+  private var dishChipLabel: String? {
+    if let serves = step.serves?.trimmingCharacters(in: .whitespacesAndNewlines),
+       !serves.isEmpty {
+      return serves
+    }
+    if let sourceDish = step.sourceDish,
+       let row = itemRows.first(where: { $0.id == sourceDish }) {
+      return row.displayTitle
+    }
+    return nil
   }
 
   private var recipePresentation: RecipeDetailPresentation? {

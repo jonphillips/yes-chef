@@ -65,7 +65,12 @@ struct RecipeVariationChoices: View {
   private func variationRow(_ variation: RecipeVariation) -> some View {
     HStack(alignment: .top, spacing: 8) {
       Button {
-        model.activeVariationSelectionChanged(variation.id)
+        // Re-tapping the active variation deselects it (back to the base recipe);
+        // otherwise select it. Without the toggle there is no way to deselect a
+        // lone variation.
+        model.activeVariationSelectionChanged(
+          variation.id == activeVariationID ? nil : variation.id
+        )
       } label: {
         HStack(alignment: .top, spacing: 10) {
           Image(systemName: variation.id == activeVariationID ? "checkmark.circle.fill" : "circle")
