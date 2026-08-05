@@ -890,6 +890,7 @@ enum HandoffReviewError: LocalizedError, CustomStringConvertible {
   case emptyDeliverable
   case unparsedStrategyText([String])
   case unparsedLearningText([String])
+  case variationNeedsRepair([String])
 
   var errorDescription: String? {
     switch self {
@@ -901,6 +902,8 @@ enum HandoffReviewError: LocalizedError, CustomStringConvertible {
       "Could not save these make-ahead strategy lines: \(lines.joined(separator: " | "))"
     case let .unparsedLearningText(lines):
       "Could not save these learning lines. Each learning must begin with a bullet: \(lines.joined(separator: " | "))"
+    case let .variationNeedsRepair(anchors):
+      "This variation has changes that no longer match the recipe. Repair it before adjusting: \(anchors.joined(separator: " | "))"
     }
   }
 

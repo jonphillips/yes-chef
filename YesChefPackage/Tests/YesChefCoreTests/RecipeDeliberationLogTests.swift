@@ -102,7 +102,7 @@ extension RecipeCoreTests {
         let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
         return try RecipeRepository.splitVariationOff(
           variation.id,
-          resolvedDetail: try detail.resolved(applying: variation),
+          resolvedDetail: try detail.resolved(applying: variation).detail,
           name: "Lime Pasta",
           in: db,
           now: now.addingTimeInterval(120),

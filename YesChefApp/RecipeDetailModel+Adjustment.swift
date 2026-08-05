@@ -160,7 +160,7 @@ extension RecipeDetailModel {
       let variation = baseDetail.variations.first(where: { $0.id == variationID })
     else { return }
     do {
-      let resolvedDetail = try baseDetail.resolved(applying: variation)
+      let resolvedDetail = try baseDetail.resolved(applying: variation).requiringAllAnchorsResolved()
       let now = now
       let makeUUID = uuid
       try await database.write { db in

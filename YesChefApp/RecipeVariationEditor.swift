@@ -27,6 +27,7 @@ final class RecipeVariationEditorModel {
   var errorTitle = "Could Not Load Variation"
   var errorMessage: String?
   var isShowingError = false
+  var unresolvedAnchors: [RecipeVariationUnresolvedAnchor] = []
   private var hasLoaded = false
 
   init(recipeID: Recipe.ID, variationID: RecipeVariation.ID) {
@@ -36,7 +37,7 @@ final class RecipeVariationEditorModel {
   }
 
   var isSaveDisabled: Bool {
-    isSaving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    isSaving || !unresolvedAnchors.isEmpty || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
   func baseDetailChanged(_ detail: RecipeDetailData?) {
@@ -44,9 +45,11 @@ final class RecipeVariationEditorModel {
       return
     }
     do {
-      resolvedDetail = try detail.resolved(applying: variation)
+      let resolution = try detail.resolved(applying: variation)
+      resolvedDetail = resolution.detail
       name = variation.name
       note = variation.note ?? ""
+      unresolvedAnchors = resolution.unresolvedAnchors
       hasLoaded = true
     } catch {
       errorMessage = error.localizedDescription
@@ -196,6 +199,14 @@ struct RecipeVariationEditorView: View {
       Section("Variation") {
         TextField("Name", text: $model.name)
         TextField("Method note", text: $model.note, axis: .vertical)
+      }
+      if !model.unresolvedAnchors.isEmpty {
+        Section {
+          RecipeVariationRepairNotice(
+            anchors: model.unresolvedAnchors,
+            blocksSaving: true
+          )
+        }
       }
       if let detail = model.resolvedDetail {
         ingredients(detail: detail, model: model)

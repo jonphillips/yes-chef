@@ -22,34 +22,30 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**The facet/labeling gate is cleared, the variation-anchor data-loss defect is fixed at the write path, and
-ADR-0021 V4a (Choices section) is code-approved — no hard-gated dispatch is queued.** Amendment 4's
+**The facet/labeling gate is cleared, the variation-anchor data-loss arc is fixed through the read path, and
+ADR-0021 V4a (Choices section) is shipped — no hard-gated dispatch is queued.** Amendment 4's
 deterministic floor shipped (PR [#281](https://github.com/jonphillips/yes-chef/pull/281)),
-variation-anchor-repair **Dispatch 0 (+3) shipped** (PR [#284](https://github.com/jonphillips/yes-chef/pull/284),
-device gate owed), and **V4a shipped to PR [#285](https://github.com/jonphillips/yes-chef/pull/285)**
+variation-anchor-repair **Dispatch 0 (+3) and Dispatch 1 both shipped** (PRs
+[#284](https://github.com/jonphillips/yes-chef/pull/284) + `codex/variation-anchor-repair-dispatch-1`, both device
+gates owed), and **V4a shipped to PR [#285](https://github.com/jonphillips/yes-chef/pull/285)**
 (architect-approved 2026-08-05, device gate owed); filling in per-recipe coverage is Jon's ongoing hand work
 (Edit Tags + DEBUG Facet Coverage) that **gates nothing**.
 
-**Recommended next dispatch: anchor-repair Dispatch 1** — pure logic, no schema, runs on the cheap package
-build (dispatchable now, no device pass), it **gates V4c**, and the V4a review confirmed fresh motivation: V4a's
-own hand-off export/draft paths call `resolved(applying:)`, which today still **throws** on an unresolvable
-anchor, so Dispatch 1 hardens exactly the surface V4a widened. Hold **V4b** (schema slice) until Jon is local
-for its two-device sync pass. Live candidates:
+**Dispatch 1 cleared the V4c gate.** `resolved(applying:)` now degrades instead of throwing (read-lenient /
+write-strict), so an orphaned anchor no longer takes out a recipe's editor/reader/grocery, and the two
+variation-scoped hand-off reads block loudly rather than feeding an LLM a partial recipe. **V4c** (the two new
+`stepInsert`/`stepRemove` step ops) is therefore **unblocked**; **Dispatch 2** (the in-app repair UI that makes
+the surfaced repair queue directly actionable) and **V4b** (schema slice, hold until Jon is local for its
+two-device sync pass) remain. Live candidates:
 
-- **anchor-repair Dispatch 1 — make `resolved(applying:)` degrade, not throw** *(recommended next)*
-  ([`efforts/variation-anchor-repair.md`](efforts/variation-anchor-repair.md)). Dispatch 0 stopped *new* dead
-  anchors and repaired the resolvable legacy ones, but a single unresolvable anchor still **throws** and takes out
-  that recipe's editor + reader fold + grocery — **and now the V4a variation hand-off export/draft paths too**.
-  Dispatch 1 applies every op that resolves and banners the dead one — and it **gates ADR-0021 Amd4 V4c** (the two
-  new `stepInsert`/`stepRemove` ops). Dispatch 2 (the repair UI) follows. No schema.
 - **Variations → the Playbook = [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4. V4a shipped
   (PR [#285](https://github.com/jonphillips/yes-chef/pull/285)); V4b/V4c remain.** V4a relocated the variation
   picker from the Body to a Playbook **Choices** section (Amd4-D5), rendered variations as a proper list with
   descriptions + full action set, and scoped the hand-off via the local `aiHandoffs.variationID` discriminator
   ([[aihandoffs-local-scope-discriminator]]) — app-only, schema-free. **V4b** (related-recipe edge table — the
   Choices section's second half; **OQ2 resolved: order by name, no ordering column**; the schema slice,
-  **two-device pass owed, back up first**) and **V4c** (the two new step ops — **gated behind anchor-repair
-  Dispatch 1**) follow.
+  **two-device pass owed, back up first**) and **V4c** (the two new step ops — **gate cleared by anchor-repair
+  Dispatch 1, now dispatchable**) follow.
 - **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser S1.** All the facet infrastructure it
   needs is shipped (facets, editable membership, the deterministic floor, the three coverage views). Its old
   "wait until primary facets classify a majority of the library" gate is **retired** — the manual backfill no
@@ -77,8 +73,8 @@ section is work.**
   not a bug to patch (ADR-0014 Amd1-D4):** adding a header inside a recipe that has variations mints a new
   section, so `derivingVariation` hits `.ingredientSectionAdded` → `variationNeedsReview`. Fixing it needs a
   delta-vocabulary decision and it is **ADR-0021's** — do not extend the delta ops on this momentum. **Note:
-  Amd4-D4's two new step ops (`stepInsert`/`stepRemove`) are the sanctioned widening, and V4c is gated behind
-  anchor-repair Dispatch 1 — that is the disciplined path, not an ad-hoc extension here.**
+  Amd4-D4's two new step ops (`stepInsert`/`stepRemove`) are the sanctioned widening, and V4c's anchor-repair
+  Dispatch 1 gate is now cleared — that is the disciplined path, not an ad-hoc extension here.**
 - **ADR-0042 S3 (`workbenchDraft`) stays deferred and un-queued** — no concrete want. **Do not build it on
   ADR momentum.** There is no S5.
 - **`PlaybookSectionMeta` is not queued anywhere — do not resurrect it.** ADR-0041 closed at S2.6, S3
@@ -104,12 +100,13 @@ section is work.**
 Drawn into **Next Up** as needed; not itself a dispatch target. Completed efforts live in
 [`docs/DONE-LOG.md`](DONE-LOG.md).
 
-**[`efforts/variation-anchor-repair.md`](efforts/variation-anchor-repair.md) — Dispatch 0 (+3) SHIPPED** (PR
-[#284](https://github.com/jonphillips/yes-chef/pull/284), architect-approved 2026-08-05; **device gate owed**).
-The write path no longer mints dead anchors (normalized to base IDs, loud-at-save) and a post-engine idempotent
-backfill repairs / report-don't-guess over `recipeVariations.deltas`; the `stepNumber` positional fallback is
-gone. **Two dispatches remain, no schema:** Dispatch 1 (make `resolved(applying:)` **degrade-not-throw**; **gates
-ADR-0021 Amd4 V4c**) — drawn into Next Up — and Dispatch 2 (the repair UI). Full record in
+**[`efforts/variation-anchor-repair.md`](efforts/variation-anchor-repair.md) — Dispatch 0 (+3) and Dispatch 1
+SHIPPED** (PRs [#284](https://github.com/jonphillips/yes-chef/pull/284) +
+`codex/variation-anchor-repair-dispatch-1`, architect-approved 2026-08-05; **both device gates owed**). The write
+path no longer mints dead anchors (normalized to base IDs, loud-at-save) with a post-engine idempotent backfill,
+and `resolved(applying:)` now **degrades instead of throwing** (read-lenient / write-strict, loud repair queue at
+every read incl. the two hand-off surfaces). **Only Dispatch 2 remains, no schema:** the in-app repair UI that
+makes the surfaced repair queue directly actionable (re-anchor or drop an orphaned op). Full record in
 [`DONE-LOG.md`](DONE-LOG.md).
 
 **[`efforts/recipe-facets.md`](efforts/recipe-facets.md) — ADR-0049 (the facet model + labeling): COMPLETE and
@@ -219,6 +216,14 @@ data pass, no schema.** **Export a backup first.** Cold-launch with Console stre
 `variation-anchor-backfill` line — a populated `updatedVariationIDs` with an empty `unresolved` confirms the
 backfill repaired the Crean→Cream variation, and the line should **vanish on the next launch** (idempotent). Any
 `unresolved=[…]` is the repair queue (report-don't-guess) awaiting Dispatch 2. Then the two-device pass.
+
+**variation-anchor-repair Dispatch 1 (`codex/variation-anchor-repair-dispatch-1`) — degrade-not-throw read path.
+App + Core, no schema.** Orphan a variation (open one, then edit the base ingredient/step it anchors to; or reuse
+a recipe Dispatch 0's backfill reported `unresolved`). Confirm it **no longer breaks**: reader and editor show the
+orange **Variation Needs Repair** notice with the dead anchors while resolvable changes still fold, the editor's
+**Save is disabled**, and that variation's grocery list carries a **"(needs repair)"** subtitle. Then confirm both
+hand-off paths **block** — variation **Hand Off** and the Adjust draft scoped to it should refuse with "repair the
+variation first" rather than export/adjust a partial recipe. A healthy variation is unchanged.
 
 **[PR #285](https://github.com/jonphillips/yes-chef/pull/285) — ADR-0021 V4a Choices section. App-only, no
 schema.** Confirm the relocated **Choices** section renders above Notes with each variation's name +

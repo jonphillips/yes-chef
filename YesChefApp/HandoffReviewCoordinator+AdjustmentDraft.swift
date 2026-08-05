@@ -26,7 +26,16 @@ extension HandoffReviewCoordinator {
     if review.variationID != nil, scopedVariation == nil {
       throw RecipeAdjustmentError.missingVariation(review.variationID!)
     }
-    let detail = try scopedVariation.map { try baseDetail.resolved(applying: $0) } ?? baseDetail
+    let detail: RecipeDetailData
+    if let scopedVariation {
+      let resolution = try baseDetail.resolved(applying: scopedVariation)
+      guard !resolution.requiresRepair else {
+        throw HandoffReviewError.variationNeedsRepair(resolution.unresolvedAnchors.map(\.displayText))
+      }
+      detail = resolution.detail
+    } else {
+      detail = baseDetail
+    }
 
     let availableProviders = FrontierProvider.allCases.filter { apiKeyStore.key($0) != nil }
     let resolvedTier = try resolveTier(

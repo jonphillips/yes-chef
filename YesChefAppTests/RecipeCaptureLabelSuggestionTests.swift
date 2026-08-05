@@ -68,7 +68,7 @@ struct RecipeCaptureLabelSuggestionTests {
 
     let visible = model.filteringHarvestedLabels(
       from: [.loose("Italian"), .loose("weeknight"), .loose("party")],
-      in: ParsedRecipePage(title: "Pasta", categoryNames: ["italian"], tagNames: ["Weeknight"])
+      in: ParsedRecipePage(title: "Pasta", tagNames: ["Weeknight"], categoryNames: ["italian"])
     )
 
     expectNoDifference(visible, [.loose("party")])

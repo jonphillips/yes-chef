@@ -402,8 +402,14 @@ public enum GroceryRepository {
       throw GroceryRepositoryError.noShoppableIngredients
     }
 
-    let sourceSubtitle = source.sourceSubtitle
-      ?? folded?.variation.map { "Variation: \($0.name)" }
+    let variationSubtitle = folded?.variation.map { variation in
+      let repairSuffix = folded?.unresolvedAnchors.isEmpty == false ? " (needs repair)" : ""
+      return "Variation: \(variation.name)\(repairSuffix)"
+    }
+    let sourceSubtitle = [source.sourceSubtitle, variationSubtitle]
+      .compactMap { $0 }
+      .joined(separator: " · ")
+      .nonEmptyGroceryText
     let scale = try groceryScale(
       recipeID: recipe.id,
       menuItemID: source.menuItemID,

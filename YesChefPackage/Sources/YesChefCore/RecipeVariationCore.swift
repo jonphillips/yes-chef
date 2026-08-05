@@ -66,11 +66,12 @@ extension RecipeRepository {
   public static func fetchDetailApplyingActiveVariation(
     recipeID: Recipe.ID,
     in db: Database
-  ) throws -> (detail: RecipeDetailData, variation: RecipeVariation?)? {
+  ) throws -> (detail: RecipeDetailData, variation: RecipeVariation?, unresolvedAnchors: [RecipeVariationUnresolvedAnchor])? {
     guard let detail = try fetchDetail(recipeID: recipeID, in: db) else { return nil }
     guard let variation = detail.activeVariation else {
-      return (detail, nil)
+      return (detail, nil, [])
     }
-    return (try detail.resolved(applying: variation), variation)
+    let resolution = try detail.resolved(applying: variation)
+    return (resolution.detail, variation, resolution.unresolvedAnchors)
   }
 }

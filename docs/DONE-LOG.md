@@ -9,6 +9,47 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## variation-anchor-repair Dispatch 1 — `resolved(applying:)` degrades instead of throwing
+
+**Approved (architect review) 2026-08-05; branch `codex/variation-anchor-repair-dispatch-1`** (Codex ran out of
+tokens; architect completed the handoff-site fixes + verification). Spec:
+[`efforts/variation-anchor-repair.md`](../efforts/variation-anchor-repair.md). **Core + app-layer read surfaces,
+no schema.** **Unblocks ADR-0021 Amd4 V4c** (the `stepInsert`/`stepRemove` step ops).
+
+**What it does.** Dispatch 0 stopped *new* dead anchors and repaired the resolvable legacy ones, but a single
+unresolvable anchor still made `resolved(applying:)` **throw**, taking out that recipe's editor, reader fold, and
+grocery contribution. Dispatch 1 splits resolution into *read-lenient / write-strict*. `resolved(applying:)` now
+returns a `RecipeVariationResolution` (the partial detail with every still-exact op applied, plus a
+`unresolvedAnchors` repair queue) instead of throwing on the first orphan; `variationIngredientHighlights` and
+`fetchDetailApplyingActiveVariation` carry the same queue. **Every write path opts back into strict behavior via
+`.requiringAllAnchorsResolved()`** — variation create, base re-derive + siblings, proposed-base validation, and
+the app overwrite — so no write can silently drop an op. Read surfaces are **loud**: the reader and the variation
+editor render a `RecipeVariationRepairNotice` (the editor also blocks Save), and grocery generation stamps the
+source subtitle `"Variation: <name> (needs repair)"`.
+
+**Handoff sites (architect fix).** The two variation-scoped hand-off reads —
+`HandoffReviewCoordinator.draftRecipeAdjustment` (in-app LLM adjustment base) and
+`HandoffAppOperations.exportedRecipeAdjustmentHandoff` (the outbound Shortcuts/AppIntent export) — had no repair
+UI of their own, so feeding an LLM a silently-partial recipe would violate lossless-or-loud. They now **block on
+`requiresRepair`** with tailored errors (`HandoffReviewError.variationNeedsRepair`,
+`HandoffIntentSurfaceError.variationNeedsRepair`) telling the user to repair the variation first — consistent with
+the editor's Save gate. Cosmetic: a stray blank line in `RecipeDetailView` removed.
+
+**Verified.** Core `swift build` + all variation/grocery/resolution suites pass (incl. the new
+`RecipeVariationResolutionTests`, which asserts the partial-apply + grocery `(needs repair)` stamp); the elevated
+generic-iOS app build is green (exit 0); `scripts/check-drift.sh` is green. **Dispatch 2 (the repair UI that lets
+the user re-anchor or drop an orphaned op) remains** — until it ships, the repair queue is surfaced but not yet
+directly actionable in-app (repair happens by editing the base back or promoting/splitting the variation).
+
+**Rode along (pre-existing drift, unrelated to anchor-repair).** `RecipeCaptureLabelSuggestionTests` called
+`ParsedRecipePage(categoryNames:tagNames:)` in the wrong argument order — a stale test left by the ADR-0049 facet
+arc (PRs #275–#282), which the SQLiteData `Ld` wall had been masking by short-circuiting `check-drift`'s
+build-for-testing before it reached the test compile. One-line reorder to match Core; flagged so the masking
+pattern is on the record ([[exported-import-not-link-time]]).
+
+**Device gate owed** (see Device passes).
+
+---
 ## variation-anchor-repair Dispatch 0 (+3) — anchors normalized to base IDs, backfill, loud-at-save
 
 **Approved (architect review) 2026-08-05; PR [#284](https://github.com/jonphillips/yes-chef/pull/284), branch

@@ -69,7 +69,7 @@ extension RecipeCoreTests {
         ])
 
         let detail = try #require(try RecipeRepository.fetchDetail(recipeID: ids.recipeID, in: db))
-        let resolved = try detail.resolved(applying: stored)
+        let resolved = try detail.resolved(applying: stored).detail
         expectNoDifference(resolved.ingredientLines.map(\.originalText), ["2 tablespoons lime juice"])
         expectNoDifference(resolved.instructionSteps.map(\.text), ["Finish with lime."])
       }
@@ -208,7 +208,7 @@ extension RecipeCoreTests {
         dateModified: now
       )
 
-      let resolved = try detail.resolved(applying: variation)
+      let resolved = try detail.resolved(applying: variation).detail
       expectNoDifference(resolved.ingredientLines.map(\.originalText), ["2 tablespoons lime juice"])
     }
 
@@ -243,7 +243,7 @@ extension RecipeCoreTests {
         dateModified: now
       )
 
-      let resolved = try detail.resolved(applying: variation)
+      let resolved = try detail.resolved(applying: variation).detail
       expectNoDifference(resolved.instructionSteps.map(\.text), ["First step.", "Changed second step."])
     }
   }
