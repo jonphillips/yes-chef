@@ -306,6 +306,22 @@ regardless. So verify with **compiler + tests once**, then hand off:
   sandbox can SIGTERM Xcode before compilation by denying user-level service/cache access, so start with the
   elevated command. A sandbox-shaped `143` is not a green result. If the elevated build cannot reach the
   compiler, record the full-log path and **the architect runs the same build locally before approving.**
+- **Run the `YesChefTests` app target when a change touches `YesChefApp/` *model* code** (a `@Observable`
+  model, its extensions, or a display model — **not** view-only or copy changes):
+  `scripts/xcodebuild-summary.sh -scheme YesChef -destination 'platform=iOS Simulator,id=<udid>' -skipMacroValidation test`
+  (`xcrun simctl list devices available` for a udid). **This is the one sanctioned simulator use** and it is a
+  deliberate narrowing of guardrail #8, not a hole in it: it *runs tests*, it does not drive UI, install a
+  dogfood build, or take screenshots. Jon still owns the device pass. **Why it earns the ~2 minutes:**
+  nothing else executes this target — the generic build only compiles it — so it rots invisibly. Found
+  2026-08-06: five tests had been red on `main` for some time (models resolve `@Dependency(\.uuid)` eagerly in
+  `init`, so *constructing* one outside a scope fails), and they surfaced only because a V4c review happened
+  to write app-level tests. **Gotcha:** the scheme's target is **`YesChefTests`** while the directory is
+  `YesChefAppTests/` — `-only-testing:YesChefAppTests/…` fails with a misleading "isn't a member of the
+  specified test plan or scheme."
+- **The app target is where the model + binding *assembly* is certified.** Core tests certify the parts.
+  Two shipped defects lived exactly in that gap — ADR-0030's restore (dead through three reviews and a green
+  Core suite) and V4c's inserted-step section drift — so a fix to a model-level defect wants its regression
+  test *here*, not only in Core ([[alert-ispresented-destructive-setter]]).
 - **Corollary — keep pure logic out of the App layer.** String formatting, serialization, and parsing belong
   in `YesChefPackage` (which Codex *can* compile and test). #185's break was `HandoffIntents.swift` calling
   `date: .full` — logic that belonged in Core, where the package build would have caught it instantly.
