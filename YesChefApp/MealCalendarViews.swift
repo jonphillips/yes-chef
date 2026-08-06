@@ -271,6 +271,7 @@ private struct MealCalendarStackedContent: View {
 }
 
 private struct MealCalendarCalendarBody: View {
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   let model: MealCalendarModel
   var monthCellMinHeight: CGFloat
   var weekCellMinHeight: CGFloat
@@ -284,7 +285,18 @@ private struct MealCalendarCalendarBody: View {
     case .month:
       MealCalendarMonthGrid(model: model, cellMinHeight: monthCellMinHeight)
     case .week:
-      MealCalendarWeekGrid(model: model, cellMinHeight: weekCellMinHeight)
+      // The 7-across week grid needs ~552pt and can't tap through to a recipe.
+      // On compact width it overflows the phone, so fall back to a vertical day
+      // list that reuses the agenda rows (which already carry onRecipeSelected).
+      if horizontalSizeClass == .compact {
+        MealCalendarWeekList(
+          model: model,
+          onMenuSelected: onMenuSelected,
+          onRecipeSelected: onRecipeSelected
+        )
+      } else {
+        MealCalendarWeekGrid(model: model, cellMinHeight: weekCellMinHeight)
+      }
     case .day:
       MealCalendarDayAgendaView(
         model: model,
@@ -730,6 +742,72 @@ private struct MealCalendarWeekGrid: View {
           }
       }
     }
+  }
+}
+
+private struct MealCalendarWeekList: View {
+  let model: MealCalendarModel
+  var onMenuSelected: ((CoreMenu.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 20) {
+      ForEach(model.visibleWeekSummaries) { summary in
+        MealCalendarWeekDaySection(
+          model: model,
+          summary: summary,
+          onMenuSelected: onMenuSelected,
+          onRecipeSelected: onRecipeSelected
+        )
+      }
+    }
+  }
+}
+
+private struct MealCalendarWeekDaySection: View {
+  let model: MealCalendarModel
+  let summary: MealCalendarDaySummary
+  var onMenuSelected: ((CoreMenu.ID) -> Void)?
+  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
+
+  private var isToday: Bool { model.isToday(summary.date) }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Button {
+        model.selectDateButtonTapped(summary.date)
+      } label: {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+          Text(summary.date, format: .dateTime.weekday(.wide))
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(isToday ? Color.accentColor : Color.primary)
+          Text(summary.date, format: .dateTime.month(.abbreviated).day())
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+          Spacer(minLength: 0)
+        }
+        .contentShape(.rect)
+      }
+      .buttonStyle(.plain)
+
+      if summary.rows.isEmpty {
+        Text("No meals scheduled")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+      } else {
+        ForEach(summary.mealSlots, id: \.self) { mealSlot in
+          MealPlanSlotSection(
+            model: model,
+            mealSlot: mealSlot,
+            rows: summary.rows.filter { $0.item.mealSlot == mealSlot },
+            onMenuSelected: onMenuSelected,
+            onRecipeSelected: onRecipeSelected
+          )
+        }
+      }
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel(summary.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))
   }
 }
 
