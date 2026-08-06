@@ -62,7 +62,9 @@ rather than feed an LLM a partial recipe — which **cleared the V4c gate**. Liv
   `.workbenchDraft` is device-local. **Gate: S3a (the door out + the ask) ships first, then Jon hand-runs a
   real finalize to confirm the JSON-LD block survives the paste path, *before* S3b wires the import.** Do not
   add a new recipe-text parser and do not route through `WorkbenchDraftRecipeClient` (that re-invents). The
-  paste-text / photo-OCR surfaces are the *same* extraction seam (Amd2-D5) — out of scope here, do not build.
+  paste-text / photo-OCR surfaces are the *same* extraction seam — out of scope here, do not build. **This is
+  the first path built to [ADR-0051](decisions/ADR-0051-text-to-recipe-extraction-strategy.md)** (the
+  consolidated text→recipe strategy + no-fork guardrail — see Standing guards).
 - **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell.** Unblocked
   since 2026-07-25; moves all eight chat call sites onto one Ask. Ready but larger.
 
@@ -78,6 +80,15 @@ section is work.**
 - **⚠️ The ADR-0042 return contract is v2.1** (`AIHandoffReturnContract.version`) — re-copy the project
   instructions from AI Settings or every verb fails the marker gate. (Operational: it bites on any hand-off
   dogfooding session.)
+- **⚠️ [ADR-0051](decisions/ADR-0051-text-to-recipe-extraction-strategy.md) — text→recipe has ONE strategy; do
+  not fork a new parser.** Any new "turn this text/markup into a recipe" path (paste, photo→OCR, another
+  hand-off return, …) MUST route LLM extraction through **`RecipeExtractionClient`**, reuse the existing
+  deterministic extractors for structured sources (schema.org → `RecipeJSONLDExtractor`), and terminate in
+  **`RecipeEditorDraft`** → the existing review + save. **A fifth bespoke parser, a second "text→recipe" model
+  call, or a new terminal draft type is a review block** (D7). The four existing front-ends stay plural *by
+  design* (web/schema.org, menu-note heading heuristic, workbench synthesis, JSON-LD return) — consolidate the
+  sink and the engine, not the parsers. `RecipeExtractionClient` gets lifted out of `WebRecipeCapture` at the
+  second extraction consumer (workbench return or paste), not before.
 - **ADR-0021 (variations) V1–V3 are shipped; Amendment 4 is RATIFIED (2026-08-05); V4a done + device-passed
   (DONE-LOG), V4b/V4c queued in Next Up — see there.** ADR-0023 (recipe edit proposals) has nothing queued: its
   *iterative refine loop* is **WITHDRAWN** (ADR-0042 D7 — it happens in the live external thread; **do not

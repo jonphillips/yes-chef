@@ -628,6 +628,14 @@ whole point of this correction. **A cross-app note:** the capture engine was har
 ([[galavant-capture-engine-reuse]]), so a later lift of the extraction core to LLMClientKit is plausible on
 the ADR-0044 model — but that is a convergence question with its own trigger, not this slice's business.
 
+**Follow-up (2026-08-05): this seam observation was escalated to its own decision — the trigger fired.** A
+*fourth* existing consumer surfaced (the menu-note "turn into a recipe" button, a deterministic heading parser
+→ `WorkbenchDraftRecipe` → the shared sink), which put the shape past the single-consumer bar. See
+**[ADR-0051](ADR-0051-text-to-recipe-extraction-strategy.md)** for the ratified strategy (one sink
+`RecipeEditorDraft`, plural source front-ends, one extraction engine) and its forcing guardrail — the rule
+that no new text→recipe path may fork a fifth parser. This slice (`workbenchDraft` return) is the first path
+built to that strategy.
+
 ### Amd2-D6 — Learnings: run the D8 test; the workbench log is the residue's home
 
 A draft is a **synthesis producing genuine findings** — which candidate won on which axis, what was
