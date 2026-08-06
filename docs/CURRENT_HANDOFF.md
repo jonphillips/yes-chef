@@ -67,6 +67,16 @@ rather than feed an LLM a partial recipe — which **cleared the V4c gate**. Liv
   consolidated text→recipe strategy + no-fork guardrail — see Standing guards).
 - **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell.** Unblocked
   since 2026-07-25; moves all eight chat call sites onto one Ask. Ready but larger.
+- **Grocery learned area table = [ADR-0052](decisions/ADR-0052-grocery-learned-area-table.md) (ratified
+  2026-08-05).** A synced `canonicalName → area` table so store-area corrections **stick** across generations and
+  devices; the classifier **auto-promotes** its first answer (loses to seed + user by a fixed precedence ladder)
+  and a name is classified **once ever**, then a free deterministic lookup. Also lands the hard fix that on-device
+  classification must not run at `.low` effort ([[personal-app-latency-tolerance]] hard rule) — raise the grocery
+  categorizer to `.high` **with** a bigger token budget ([[reasoning-budget-starves-output]]; the *only* `.low`
+  site in the codebase). **Batch S1+S2** (table + write paths) as one dispatch; S3 repoints ADR-0037's
+  seed-coverage view to *audit* `.model` rows (amends, doesn't delete, ADR-0037). **New synced table but an
+  empty create — no data backfill (D6), so lower-risk than V4b's schema slice** — still wants Jon's two-device
+  sync pass, and joins the prod-schema promotion list only when it merges.
 
 The ATK grocery-bug slice ([`efforts/import-text-normalization.md`](efforts/import-text-normalization.md)) is a
 **data migration wanting backup-first + a device pass** — hold it until Jon is local. D3's settled
