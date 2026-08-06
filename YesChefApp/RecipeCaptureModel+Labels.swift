@@ -57,6 +57,11 @@ extension RecipeCaptureModel {
     draft.page.readerFeedbackBlocks = draft.page.readerFeedbackBlocks
       .map { ParsedRecipeReaderFeedbackBlock(text: $0.text) }
       .filter { !$0.text.isEmpty }
+    // Re-normalize the harvested labels the cook may have renamed at capture time: trim, drop
+    // rows emptied by a rename, and collapse case-insensitive duplicates (preserving order and the
+    // first-seen casing). The builder normalizes on parse; hand-edits need the same pass before commit.
+    draft.page.categoryNames = Self.normalizedLabelNames(draft.page.categoryNames)
+    draft.page.tagNames = Self.normalizedLabelNames(draft.page.tagNames)
     self.draft = draft
     // Selection stays pure until commit, so re-extraction cannot turn an accepted chip into a
     // harvested-looking label. The repository receives typed suggestions alongside the imported
@@ -108,6 +113,19 @@ extension RecipeCaptureModel {
         isSuggestingLabels = false
       }
     }
+  }
+
+  static func normalizedLabelNames(_ names: [String]) -> [String] {
+    var seen: Set<String> = []
+    var result: [String] = []
+    for name in names {
+      let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !trimmed.isEmpty else { continue }
+      let key = trimmed.lowercased()
+      guard seen.insert(key).inserted else { continue }
+      result.append(trimmed)
+    }
+    return result
   }
 
   func filteringHarvestedLabels(

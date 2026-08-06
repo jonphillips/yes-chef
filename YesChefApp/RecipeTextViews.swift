@@ -31,16 +31,18 @@ struct IngredientLineText: View {
   }
 
   var body: some View {
-    renderedText
+    Text(renderedText)
   }
 
-  private var renderedText: Text {
-    IngredientAuthorNote.segments(in: text).reduce(Text("")) { rendered, segment in
+  private var renderedText: AttributedString {
+    IngredientAuthorNote.segments(in: text).reduce(into: AttributedString()) { rendered, segment in
       switch segment {
       case let .text(value):
-        rendered + Text(value)
+        rendered += AttributedString(value)
       case let .authorNote(value):
-        rendered + Text(value).foregroundStyle(.secondary)
+        var note = AttributedString(value)
+        note.foregroundColor = .secondary
+        rendered += note
       }
     }
   }

@@ -464,6 +464,43 @@ final class RecipeCaptureModel {
     set { draft?.page.readerFeedbackBlocks = newValue }
   }
 
+  /// Harvested (verbatim publisher) categories, editable before commit. Edits land on the live
+  /// `draft.page`, so they flow straight through `curatedDraftForCommit()` to the importer — the
+  /// same path `editorialBlocks` uses. See Thread C1 in the 2026-08-06 dogfood-fixes effort.
+  var reviewCategoryNames: [String] {
+    get { draft?.page.categoryNames ?? [] }
+    set { draft?.page.categoryNames = newValue }
+  }
+
+  var reviewTagNames: [String] {
+    get { draft?.page.tagNames ?? [] }
+    set { draft?.page.tagNames = newValue }
+  }
+
+  func updateReviewCategoryName(_ name: String, at index: Int) {
+    guard var names = draft?.page.categoryNames, names.indices.contains(index) else { return }
+    names[index] = name
+    draft?.page.categoryNames = names
+  }
+
+  func removeReviewCategories(atOffsets offsets: IndexSet) {
+    guard var names = draft?.page.categoryNames else { return }
+    names.remove(atOffsets: offsets)
+    draft?.page.categoryNames = names
+  }
+
+  func updateReviewTagName(_ name: String, at index: Int) {
+    guard var names = draft?.page.tagNames, names.indices.contains(index) else { return }
+    names[index] = name
+    draft?.page.tagNames = names
+  }
+
+  func removeReviewTags(atOffsets offsets: IndexSet) {
+    guard var names = draft?.page.tagNames else { return }
+    names.remove(atOffsets: offsets)
+    draft?.page.tagNames = names
+  }
+
   var reviewTitle: String {
     get { draft?.page.title ?? "" }
     set { draft?.page.title = newValue.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty }

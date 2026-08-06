@@ -311,18 +311,32 @@ private struct RecipeCaptureReviewSections: View {
         }
       }
 
-      if !page.categoryNames.isEmpty || !page.tagNames.isEmpty {
-        Section("Categories & Tags") {
-          if !page.categoryNames.isEmpty {
-            LabeledContent("Categories") {
-              Text(page.categoryNames.joined(separator: ", "))
+      if !model.reviewCategoryNames.isEmpty || !model.reviewTagNames.isEmpty {
+        Section {
+          if !model.reviewCategoryNames.isEmpty {
+            Text("Categories")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+            ForEach(model.reviewCategoryNames.indices, id: \.self) { index in
+              TextField("Category", text: categoryNameBinding(at: index))
+                .textInputAutocapitalization(.words)
             }
+            .onDelete { model.removeReviewCategories(atOffsets: $0) }
           }
-          if !page.tagNames.isEmpty {
-            LabeledContent("Tags") {
-              Text(page.tagNames.joined(separator: ", "))
+          if !model.reviewTagNames.isEmpty {
+            Text("Tags")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+            ForEach(model.reviewTagNames.indices, id: \.self) { index in
+              TextField("Tag", text: tagNameBinding(at: index))
+                .textInputAutocapitalization(.words)
             }
+            .onDelete { model.removeReviewTags(atOffsets: $0) }
           }
+        } header: {
+          Text("Categories & Tags")
+        } footer: {
+          Text("Rename or swipe to remove labels the site provided before you save.")
         }
       }
 
@@ -563,6 +577,24 @@ private struct RecipeCaptureReviewSections: View {
       return model.editorialBlocks[index].text
     } set: { text in
       model.updateEditorialBlockText(text, at: index)
+    }
+  }
+
+  private func categoryNameBinding(at index: Int) -> Binding<String> {
+    Binding {
+      guard model.reviewCategoryNames.indices.contains(index) else { return "" }
+      return model.reviewCategoryNames[index]
+    } set: { name in
+      model.updateReviewCategoryName(name, at: index)
+    }
+  }
+
+  private func tagNameBinding(at index: Int) -> Binding<String> {
+    Binding {
+      guard model.reviewTagNames.indices.contains(index) else { return "" }
+      return model.reviewTagNames[index]
+    } set: { name in
+      model.updateReviewTagName(name, at: index)
     }
   }
 
