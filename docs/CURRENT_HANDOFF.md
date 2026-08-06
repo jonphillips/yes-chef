@@ -29,22 +29,17 @@ shipped, merged, and device-passed 2026-08-05, now archived to [`DONE-LOG.md`](D
 per-recipe facet/tag coverage is Jon's ongoing hand work (Edit Tags + DEBUG Facet Coverage) that **gates
 nothing**.
 
-**The remaining ADR-0021 Amendment 4 work is V4b + V4c** (V4a done), plus **anchor-repair Dispatch 2** (the
+**The remaining ADR-0021 Amendment 4 work is V4b** (V4a and V4c done), plus **anchor-repair Dispatch 2** (the
 in-app repair UI). Dispatch 1 left `resolved(applying:)` **read-lenient / write-strict** — an orphaned anchor
 no longer takes out a recipe's editor/reader/grocery, and the two variation-scoped hand-off reads block loudly
-rather than feed an LLM a partial recipe — which **cleared the V4c gate**. Live candidates:
+rather than feed an LLM a partial recipe. Live candidates:
 
-- **Variations → the Playbook = [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4 — V4b + V4c
-  remain** (V4a done, DONE-LOG). **V4c is DISPATCHED**, bundled with a **variation Delete affordance** (a
-  gap-fill, not in the ADR — Amd2-D4 already sanctions delete; the Choices menu never got the button). Spec:
-  [`efforts/adr-0021-v4c-and-variation-delete.md`](efforts/adr-0021-v4c-and-variation-delete.md) — one dispatch,
-  Delete (app + thin Core, schema-free) landable first, then V4c's two `stepInsert`/`stepRemove` ops (gate
-  cleared by anchor-repair Dispatch 1; Amd4-D4 is the sanctioned delta-op widening — do not extend the ops ad
-  hoc elsewhere). The one non-obvious edge is baked into the spec: Delete syncs the row but the active-selection
-  highlight is per-cook, so the resolve path must degrade to base when the active variation is wholly missing.
-  **V4b** — the related-recipe edge table, the Choices section's second half (**OQ2 resolved: order by name, no
-  ordering column**); it is the **schema slice**, so **hold until Jon is local for its two-device sync pass,
-  back up first**. This is where reordering lands (linked split-off, not a variation).
+- **Variations → the Playbook = [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4 — only V4b
+  remains** (V4a and V4c + Delete done, DONE-LOG). **V4b** — the related-recipe edge table, the Choices
+  section's second half (**OQ2 resolved: order by name, no ordering column**); it is the **schema slice**, so
+  **hold until Jon is local for its two-device sync pass, back up first**. This is where reordering lands
+  (linked split-off, not a variation). Amd4-D4's step ops are now spent — `stepInsert`/`stepRemove` shipped and
+  the vocabulary is closed again; **do not extend the delta ops further** without a new ADR decision.
 - **anchor-repair Dispatch 2 — the repair UI, no schema.** The read path already surfaces the orphaned-anchor
   repair queue (reader/editor notice, grocery `(needs repair)` subtitle, blocked Save + blocked hand-offs);
   Dispatch 2 makes it **directly actionable** (re-anchor or drop an orphaned op). Spec:
@@ -99,15 +94,15 @@ section is work.**
   design* (web/schema.org, menu-note heading heuristic, workbench synthesis, JSON-LD return) — consolidate the
   sink and the engine, not the parsers. `RecipeExtractionClient` gets lifted out of `WebRecipeCapture` at the
   second extraction consumer (workbench return or paste), not before.
-- **ADR-0021 (variations) V1–V3 are shipped; Amendment 4 is RATIFIED (2026-08-05); V4a done + device-passed
-  (DONE-LOG), V4b/V4c queued in Next Up — see there.** ADR-0023 (recipe edit proposals) has nothing queued: its
+- **ADR-0021 (variations) V1–V3 are shipped; Amendment 4 is RATIFIED (2026-08-05); V4a and V4c done
+  (DONE-LOG), only V4b queued in Next Up — see there.** ADR-0023 (recipe edit proposals) has nothing queued: its
   *iterative refine loop* is **WITHDRAWN** (ADR-0042 D7 — it happens in the live external thread; **do not
   rebuild it**); per D2 the in-app adjust verb is the **only** path that writes a structured delta. **Expected,
   not a bug to patch (ADR-0014 Amd1-D4):** adding a header inside a recipe that has variations mints a new
   section, so `derivingVariation` hits `.ingredientSectionAdded` → `variationNeedsReview`. Fixing it needs a
   delta-vocabulary decision and it is **ADR-0021's** — do not extend the delta ops on this momentum. **Note:
-  Amd4-D4's two new step ops (`stepInsert`/`stepRemove`) are the sanctioned widening, and V4c's anchor-repair
-  Dispatch 1 gate is now cleared — that is the disciplined path, not an ad-hoc extension here.**
+  Amd4-D4's two step ops (`stepInsert`/`stepRemove`) were the sanctioned widening and have now shipped (V4c);
+  the vocabulary is closed again, so a *section* op still needs its own ADR decision, not this momentum.**
 - **ADR-0042 S3 (`workbenchDraft`) is RATIFIED (Amendment 2, 2026-08-05) and queued in Next Up** — the
   concrete want is *cost* (draft against a flat-rate subscription, not the metered onboard synthesis). The
   return is **extraction, not synthesis**: the outboard emits schema.org JSON-LD, parsed for free by the

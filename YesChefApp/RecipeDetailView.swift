@@ -798,7 +798,7 @@ private struct RecipeReaderView: View {
       Text("Instructions")
         .font(.title2.bold())
       VStack(alignment: .leading, spacing: 20) {
-        ForEach(model.instructionGroups) { group in
+        ForEach(model.instructionStepDisplayGroups) { group in
           VStack(alignment: .leading, spacing: 8) {
             if let name = group.name {
               Text(name)
@@ -807,15 +807,8 @@ private struct RecipeReaderView: View {
                 .accessibilityAddTraits(.isHeader)
             }
             VStack(alignment: .leading, spacing: 14) {
-              ForEach(Array(group.steps.enumerated()), id: \.element.id) { index, step in
-                HStack(alignment: .top, spacing: 12) {
-                  Text("\(index + 1)")
-                    .font(.caption.bold())
-                    .foregroundStyle(.white)
-                    .frame(width: 26, height: 26)
-                    .background(Circle().fill(Color.accentColor))
-                  Text(step.text)
-                }
+              ForEach(group.steps) { display in
+                InstructionStepRow(display: display)
               }
             }
           }
@@ -832,45 +825,6 @@ private struct RecipeReaderView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
     .attentionCard()
-  }
-}
-
-private struct IngredientLineRow: View {
-  let display: IngredientLineDisplay
-  let scaledText: String
-
-  private var line: IngredientLine { display.line }
-
-  var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 8) {
-      if line.isHeader {
-        Text(line.originalText.trimmingCharacters(in: CharacterSet(charactersIn: ":").union(.whitespacesAndNewlines)))
-          .font(.headline)
-      } else {
-        Text("•")
-          .foregroundStyle(.secondary)
-        IngredientLineText(scaledText)
-          .font(.body)
-          .strikethrough(display.highlight == .removed)
-      }
-    }
-    .foregroundStyle(display.highlight == .removed ? .secondary : .primary)
-    .padding(.horizontal, display.highlight == nil ? 0 : 8)
-    .padding(.vertical, display.highlight == nil ? 0 : 4)
-    .background(highlightColor, in: RoundedRectangle(cornerRadius: 6))
-  }
-
-  private var highlightColor: Color {
-    switch display.highlight {
-    case .added:
-      Color.green.opacity(0.14)
-    case .changed:
-      Color.accentColor.opacity(0.12)
-    case .removed:
-      Color.secondary.opacity(0.10)
-    case nil:
-      Color.clear
-    }
   }
 }
 

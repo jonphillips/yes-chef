@@ -125,6 +125,26 @@ extension RecipeDetailModel {
     }
   }
 
+  func deleteVariation(_ variationID: RecipeVariation.ID) {
+    Task {
+      let now = now
+      let makeUUID = uuid
+      do {
+        try await database.write { db in
+          try RecipeRepository.deleteVariation(
+            variationID,
+            in: db,
+            now: now,
+            uuid: { makeUUID() }
+          )
+        }
+      } catch {
+        errorMessage = String(describing: error)
+        isShowingError = true
+      }
+    }
+  }
+
   func editVariationButtonTapped(_ variationID: RecipeVariation.ID) {
     destination = .variationEditor(variationID)
   }

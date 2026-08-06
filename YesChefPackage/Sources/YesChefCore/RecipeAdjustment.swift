@@ -99,7 +99,8 @@ public struct RecipeAdjustmentProposal: Codable, Equatable, Sendable {
   fileprivate func applyingResolvedOperations(
     to detail: RecipeDetailData,
     now: Date,
-    uuid: () -> UUID
+    uuid: () -> UUID,
+    methodStepStructuralOps: [RecipeMethodStepStructuralOp] = []
   ) throws -> RecipeVariationResolution {
     var ingredientSections = detail.ingredientSections
     var ingredientLines = sortedIngredientLines(detail.ingredientLines, sections: ingredientSections)
@@ -148,6 +149,14 @@ public struct RecipeAdjustmentProposal: Codable, Equatable, Sendable {
       }
       instructionSteps[index].text = replacement.replacementText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+    instructionSteps = applyingStepStructuralOps(
+      methodStepStructuralOps,
+      to: instructionSteps,
+      sections: detail.instructionSections,
+      recipeID: detail.recipe.id,
+      unresolvedAnchors: &unresolvedAnchors,
+      uuid: uuid
+    )
 
     let notes = notesWithMethodNote(
       existing: detail.notes,
@@ -180,13 +189,16 @@ public struct RecipeAdjustmentProposal: Codable, Equatable, Sendable {
 public struct RecipeVariationPayload: Codable, Equatable, Sendable {
   public var ingredientOps: [RecipeIngredientDelta]
   public var methodStepReplacements: [RecipeMethodStepReplacement]
+  public var methodStepStructuralOps: [RecipeMethodStepStructuralOp]
 
   public init(
     ingredientOps: [RecipeIngredientDelta],
-    methodStepReplacements: [RecipeMethodStepReplacement]
+    methodStepReplacements: [RecipeMethodStepReplacement],
+    methodStepStructuralOps: [RecipeMethodStepStructuralOp] = []
   ) {
     self.ingredientOps = ingredientOps
     self.methodStepReplacements = methodStepReplacements
+    self.methodStepStructuralOps = methodStepStructuralOps
   }
 
   public init(proposal: RecipeAdjustmentProposal) {
@@ -194,6 +206,18 @@ public struct RecipeVariationPayload: Codable, Equatable, Sendable {
       ingredientOps: proposal.ingredientOps,
       methodStepReplacements: proposal.methodStepReplacements
     )
+  }
+
+  // Decodes tolerantly: variations stored before Amd4-D4 carry no `methodStepStructuralOps` key,
+  // so its absence must read as an empty op list rather than fail the whole payload.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.ingredientOps = try container.decode([RecipeIngredientDelta].self, forKey: .ingredientOps)
+    self.methodStepReplacements = try container.decode([RecipeMethodStepReplacement].self, forKey: .methodStepReplacements)
+    self.methodStepStructuralOps = try container.decodeIfPresent(
+      [RecipeMethodStepStructuralOp].self,
+      forKey: .methodStepStructuralOps
+    ) ?? []
   }
 
   public func encodedData() throws -> Data {
@@ -231,6 +255,21 @@ public struct RecipeVariationPayload: Codable, Equatable, Sendable {
       }
       replacement.id = steps[index].id
       return replacement
+    }
+    payload.methodStepStructuralOps = try methodStepStructuralOps.map { op in
+      switch op {
+      case let .insert(after, sectionID, text):
+        guard let after else { return .insert(after: nil, sectionID: sectionID, text: text) }
+        guard let normalized = after.normalizedIfPossible(in: steps) else {
+          throw RecipeAdjustmentError.unresolvedInstructionStep(after.displayText)
+        }
+        return .insert(after: normalized, sectionID: sectionID, text: text)
+      case let .remove(reference):
+        guard let normalized = reference.normalizedIfPossible(in: steps) else {
+          throw RecipeAdjustmentError.unresolvedInstructionStep(reference.displayText)
+        }
+        return .remove(normalized)
+      }
     }
     return payload
   }
@@ -289,6 +328,27 @@ public struct RecipeVariationPayload: Codable, Equatable, Sendable {
       replacement.id = steps[index].id
       return replacement
     }
+    payload.methodStepStructuralOps = methodStepStructuralOps.map { op in
+      switch op {
+      case let .insert(after, sectionID, text):
+        guard let after else { return .insert(after: nil, sectionID: sectionID, text: text) }
+        guard let normalized = after.normalizedIfPossible(in: steps) else {
+          unresolvedAnchors.append(
+            .instructionStep(variationID: variation.id, variationName: variation.name, text: after.displayText)
+          )
+          return op
+        }
+        return .insert(after: normalized, sectionID: sectionID, text: text)
+      case let .remove(reference):
+        guard let normalized = reference.normalizedIfPossible(in: steps) else {
+          unresolvedAnchors.append(
+            .instructionStep(variationID: variation.id, variationName: variation.name, text: reference.displayText)
+          )
+          return op
+        }
+        return .remove(normalized)
+      }
+    }
     return (payload, unresolvedAnchors)
   }
 }
@@ -346,8 +406,6 @@ public enum RecipeVariationUnrepresentableEdit: Equatable, Sendable {
   case instructionSectionAdded(String)
   case instructionSectionRemoved(String)
   case instructionSectionChanged(String)
-  case instructionStepAdded(String)
-  case instructionStepRemoved(String)
   case instructionStepMoved(String)
 
   public var description: String {
@@ -360,8 +418,6 @@ public enum RecipeVariationUnrepresentableEdit: Equatable, Sendable {
     case let .instructionSectionAdded(name): "a new instruction section (\(name))"
     case let .instructionSectionRemoved(name): "the instruction section (\(name))"
     case let .instructionSectionChanged(name): "the instruction section (\(name))"
-    case let .instructionStepAdded(text): "a new instruction step (\(text))"
-    case let .instructionStepRemoved(text): "the instruction step (\(text))"
     case let .instructionStepMoved(text): "the instruction order for \(text)"
     }
   }
@@ -502,6 +558,68 @@ public struct RecipeMethodStepReplacement: Codable, Equatable, Sendable {
   }
 }
 
+/// A base-step anchor. Reuses `RecipeMethodStepReplacement`'s id → stepNumber → originalText
+/// resolution so the anchor-repair machinery (normalize/backfill) treats the structural step
+/// ops and text substitutions identically.
+public struct RecipeStepReference: Codable, Equatable, Sendable {
+  public var id: InstructionStep.ID?
+  public var stepNumber: Int?
+  public var originalText: String?
+
+  public init(
+    id: InstructionStep.ID? = nil,
+    stepNumber: Int? = nil,
+    originalText: String? = nil
+  ) {
+    self.id = id
+    self.stepNumber = stepNumber
+    self.originalText = originalText
+  }
+
+  public var displayText: String {
+    originalText?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmptyAdjustmentText
+      ?? stepNumber.map { "step \($0)" }
+      ?? id?.uuidString
+      ?? "unknown step"
+  }
+
+  fileprivate func index(in steps: [InstructionStep]) -> Int? {
+    if let id, let existingIndex = steps.firstIndex(where: { $0.id == id }) {
+      return existingIndex
+    }
+    guard let originalText = originalText?.trimmingCharacters(in: .whitespacesAndNewlines), !originalText.isEmpty else {
+      return nil
+    }
+    return steps.firstIndex { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) == originalText }
+  }
+
+  /// Returns a copy whose `id` is pinned to the resolved base step, or `nil` when the anchor no
+  /// longer resolves against `steps`.
+  fileprivate func normalizedIfPossible(in steps: [InstructionStep]) -> RecipeStepReference? {
+    guard let index = index(in: steps) else { return nil }
+    var reference = self
+    reference.id = steps[index].id
+    return reference
+  }
+}
+
+/// The two structural instruction-step ops a variation may carry (Amd4-D4), and deliberately only
+/// these two: any edit that requires placing something relative to steps it was not anchored to (a
+/// move, an instruction-section op) stays unrepresentable and routes to split-off.
+public enum RecipeMethodStepStructuralOp: Codable, Equatable, Sendable {
+  /// Insert a new step immediately after `after` (a base step); a nil anchor means "before everything".
+  ///
+  /// `sectionID` is the base instruction section the new step belongs to, carried explicitly
+  /// because the anchor's section is *not* always the right home: a step added at the head of a
+  /// section anchors to the last step of the *previous* section, and inheriting that anchor's
+  /// section would silently move it. This mirrors the ingredient `add` op, which carries its
+  /// section too. It falls back to the anchor's section when it no longer resolves — the section
+  /// is a placement hint, not a second anchor, so it never reports an unresolved anchor of its own.
+  case insert(after: RecipeStepReference?, sectionID: InstructionSection.ID?, text: String)
+  /// Remove an anchored base step.
+  case remove(RecipeStepReference)
+}
+
 private func normalizedIngredientReference(
   _ reference: RecipeIngredientReference,
   in lines: [IngredientLine]
@@ -520,6 +638,88 @@ private func normalizedIngredientReferenceIfPossible(
   var reference = reference
   reference.id = lines[index].id
   return reference
+}
+
+/// Applies the variation's structural step ops (Amd4-D4) to the resolved step list: an insert
+/// mints a new step in *its own* section immediately after its anchor (or at the head of the first
+/// section for a nil anchor), a remove drops an anchored base step. Unresolved anchors are
+/// reported (read-lenient) rather than thrown. `sortOrder` is re-sequenced to the rebuilt display
+/// order — downstream readers regroup by section identity, so global ordering is sufficient.
+private func applyingStepStructuralOps(
+  _ ops: [RecipeMethodStepStructuralOp],
+  to steps: [InstructionStep],
+  sections: [InstructionSection],
+  recipeID: Recipe.ID,
+  unresolvedAnchors: inout [RecipeVariationUnresolvedAnchor],
+  uuid: () -> UUID
+) -> [InstructionStep] {
+  guard !ops.isEmpty else { return steps }
+  // Resolve anchors against the reader's display order so they match what the derivation saw.
+  let ordered = InstructionStepGroup.groups(sections: sections, steps: steps).flatMap(\.steps)
+  let knownSectionIDs = Set(sections.map(\.id))
+  var removedIDs: Set<InstructionStep.ID> = []
+  var headInserts: [(text: String, sectionID: InstructionSection.ID?)] = []
+  var insertsAfter: [InstructionStep.ID: [(text: String, sectionID: InstructionSection.ID?)]] = [:]
+  for op in ops {
+    switch op {
+    case let .remove(reference):
+      guard let index = reference.index(in: ordered) else {
+        unresolvedAnchors.append(.instructionStep(reference.displayText))
+        continue
+      }
+      removedIDs.insert(ordered[index].id)
+    case let .insert(after, sectionID, text):
+      // A section that no longer exists degrades to the anchor's section rather than reporting an
+      // anchor failure: placement is a hint, the step anchor is the thing that has to resolve.
+      let section = sectionID.flatMap { knownSectionIDs.contains($0) ? $0 : nil }
+      guard let after else {
+        headInserts.append((text, section))
+        continue
+      }
+      guard let index = after.index(in: ordered) else {
+        unresolvedAnchors.append(.instructionStep(after.displayText))
+        continue
+      }
+      insertsAfter[ordered[index].id, default: []].append((text, section))
+    }
+  }
+
+  let firstSectionID = sections
+    .sorted { $0.sortOrder != $1.sortOrder ? $0.sortOrder < $1.sortOrder : $0.id.uuidString < $1.id.uuidString }
+    .first?.id ?? ordered.first?.sectionID
+  var rebuilt: [InstructionStep] = []
+  for insert in headInserts {
+    guard let sectionID = insert.sectionID ?? firstSectionID else { continue }
+    rebuilt.append(newVariationStep(insert.text, recipeID: recipeID, sectionID: sectionID, uuid: uuid))
+  }
+  for step in ordered where !removedIDs.contains(step.id) {
+    rebuilt.append(step)
+    for insert in insertsAfter[step.id] ?? [] {
+      rebuilt.append(
+        newVariationStep(insert.text, recipeID: recipeID, sectionID: insert.sectionID ?? step.sectionID, uuid: uuid)
+      )
+    }
+  }
+  return rebuilt.enumerated().map { offset, step in
+    var step = step
+    step.sortOrder = offset
+    return step
+  }
+}
+
+private func newVariationStep(
+  _ text: String,
+  recipeID: Recipe.ID,
+  sectionID: InstructionSection.ID,
+  uuid: () -> UUID
+) -> InstructionStep {
+  InstructionStep(
+    id: uuid(),
+    recipeID: recipeID,
+    sectionID: sectionID,
+    text: text.trimmingCharacters(in: .whitespacesAndNewlines),
+    sortOrder: 0
+  )
 }
 
 public struct RecipeAdjustmentClient: Sendable {
@@ -849,6 +1049,34 @@ extension RecipeRepository {
       $0.dateModified = now
     }
     .execute(db)
+  }
+
+  /// Deletes a variation overlay (Amd2-D4). Clears the recipe's active selection
+  /// *only* when the deleted variation was the active one — a different active
+  /// variation must survive, so this must not blindly `setActiveVariation(nil,…)`.
+  public static func deleteVariation(
+    _ variationID: RecipeVariation.ID,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws {
+    guard let variation = try RecipeVariation.find(variationID).fetchOne(db) else {
+      throw RecipeAdjustmentError.missingVariation(variationID)
+    }
+    // Resolve the active selection against the pre-deletion variation set so we
+    // know whether the row we are about to remove was the active one.
+    let variations = try RecipeVariation
+      .where { $0.recipeID.eq(variation.recipeID) }
+      .fetchAll(db)
+    let currentActiveID = try activeVariationID(
+      recipeID: variation.recipeID,
+      variations: variations,
+      in: db
+    )
+    try RecipeVariation.find(variationID).delete().execute(db)
+    if currentActiveID == variationID {
+      try setActiveVariation(nil, recipeID: variation.recipeID, in: db, now: now, uuid: uuid)
+    }
   }
 
   /// Re-derives a variation from its edited resolved detail. A caller must inspect
@@ -1320,6 +1548,7 @@ public extension RecipeDetailData {
   func derivingVariation(from edited: RecipeDetailData) -> RecipeVariationDerivation {
     var ingredientOps: [RecipeIngredientDelta] = []
     var stepReplacements: [RecipeMethodStepReplacement] = []
+    var stepStructuralOps: [RecipeMethodStepStructuralOp] = []
     var unrepresentable: [RecipeVariationUnrepresentableEdit] = []
 
     let baseIngredientSections = Dictionary(uniqueKeysWithValues: ingredientSections.map { ($0.id, $0) })
@@ -1381,12 +1610,26 @@ public extension RecipeDetailData {
 
     let baseSteps = Dictionary(uniqueKeysWithValues: instructionSteps.map { ($0.id, $0) })
     let editedSteps = Dictionary(uniqueKeysWithValues: edited.instructionSteps.map { ($0.id, $0) })
+    // A within-section move is detected from the *relative* order of the base steps that survive
+    // into the edit, not their absolute `sortOrder`: resolving a variation that carries structural
+    // ops re-sequences sortOrder, so an absolute comparison would false-positive on a re-edit
+    // (Amd4-D4). Inserts and removes leave the surviving base steps' relative order intact.
+    let survivingBaseOrderInBase = instructionGroups.flatMap(\.steps).map(\.id)
+      .filter { editedSteps[$0] != nil }
+    let survivingBaseOrderInEdited = edited.instructionGroups.flatMap(\.steps).map(\.id)
+      .filter { baseSteps[$0] != nil }
+    let basePositions = Dictionary(
+      uniqueKeysWithValues: survivingBaseOrderInBase.enumerated().map { ($1, $0) }
+    )
+    let editedPositions = Dictionary(
+      uniqueKeysWithValues: survivingBaseOrderInEdited.enumerated().map { ($1, $0) }
+    )
     for base in instructionGroups.flatMap(\.steps) {
       guard let current = editedSteps[base.id] else {
-        unrepresentable.append(.instructionStepRemoved(base.text))
+        stepStructuralOps.append(.remove(RecipeStepReference(id: base.id, originalText: base.text)))
         continue
       }
-      if current.sectionID != base.sectionID || current.sortOrder != base.sortOrder {
+      if current.sectionID != base.sectionID || basePositions[base.id] != editedPositions[base.id] {
         unrepresentable.append(.instructionStepMoved(current.text))
       }
       if current.text != base.text {
@@ -1395,15 +1638,29 @@ public extension RecipeDetailData {
         )
       }
     }
-    for step in edited.instructionGroups.flatMap(\.steps)
-    where baseSteps[step.id] == nil {
-      unrepresentable.append(.instructionStepAdded(step.text))
+    // A newly added step becomes an insert anchored to the nearest preceding *base* step in the
+    // edited order (nil = head), carrying its own section: a step added at the head of a section
+    // anchors to the last step of the *previous* section, so inheriting the anchor's section on
+    // resolve would silently move it. A step added into a brand-new section is left to the
+    // `instructionSectionAdded` report above, which keeps the whole edit unrepresentable.
+    var lastBaseStepID: InstructionStep.ID?
+    for step in edited.instructionGroups.flatMap(\.steps) {
+      if baseSteps[step.id] != nil {
+        lastBaseStepID = step.id
+        continue
+      }
+      guard baseInstructionSections[step.sectionID] != nil else { continue }
+      let anchor = lastBaseStepID.map { id in
+        RecipeStepReference(id: id, originalText: baseSteps[id]?.text)
+      }
+      stepStructuralOps.append(.insert(after: anchor, sectionID: step.sectionID, text: step.text))
     }
 
     return RecipeVariationDerivation(
       payload: RecipeVariationPayload(
         ingredientOps: ingredientOps,
-        methodStepReplacements: stepReplacements
+        methodStepReplacements: stepReplacements,
+        methodStepStructuralOps: stepStructuralOps
       ),
       unrepresentableEdits: unrepresentable
     )
@@ -1427,7 +1684,12 @@ public extension RecipeDetailData {
       ingredientOps: payload.ingredientOps,
       methodStepReplacements: payload.methodStepReplacements
     )
-    .applyingResolvedOperations(to: self, now: recipe.dateModified, uuid: { uuids.next() })
+    .applyingResolvedOperations(
+      to: self,
+      now: recipe.dateModified,
+      uuid: { uuids.next() },
+      methodStepStructuralOps: payload.methodStepStructuralOps
+    )
     resolution.detail.variations = variations
     resolution.detail.activeVariationID = variation.id
     return resolution

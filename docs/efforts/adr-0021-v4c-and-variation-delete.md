@@ -1,5 +1,7 @@
 # Dispatch — ADR-0021 V4c (two step ops) + variation Delete affordance
 
+**Status:** Done — architect-reviewed 2026-08-06, write-up in [`../DONE-LOG.md`](../DONE-LOG.md). Both parts
+shipped; review changed the insert op to carry its own `sectionID` (see Part B below).
 **Owner:** Codex · **Architect:** Jon
 **ADR:** [ADR-0021 Amendment 4](../decisions/ADR-0021-recipe-variations.md) (D4 / V4c) + a gap-fill not in the ADR (Delete).
 **Gate:** cleared — anchor-repair Dispatch 1 shipped + device-passed (2026-08-05). Both parts are **schema-free** (the `deltas` BLOB / an existing synced row); **no prod-schema promotion entry**.
@@ -38,8 +40,14 @@ Add a **destructive** `Button("Delete", role: .destructive)` to the row `Menu`, 
 **What "add instructions" means in the model.** Today a variation's payload carries `ingredientOps` + `methodStepReplacements` (substitutions only) — [`RecipeVariationPayload`, `RecipeAdjustment.swift:180`](../../YesChefPackage/Sources/YesChefCore/RecipeAdjustment.swift). There is **no way to add or remove a step**, so "add an instruction" forces a whole separate recipe. Amd4-D4 widens the vocabulary by **exactly two** ops.
 
 ### The two ops (and only these two)
-- `stepInsert(after: RecipeStepReference, text: String)` — anchored to a base step, plus a head position for "before everything."
+- `stepInsert(after: RecipeStepReference, sectionID: InstructionSection.ID?, text: String)` — anchored to a base step, plus a head position for "before everything."
 - `stepRemove(RecipeStepReference)`.
+
+**`sectionID` was added in review (2026-08-06).** As first built the op carried only the anchor, so resolve gave
+the new step its *anchor's* section — and a step added at the head of a section anchors to the last step of the
+section *above*, so it silently moved there. The ingredient `add` op always carried its section for the same
+reason. The section is a **placement hint, not a second anchor**: if it no longer resolves the insert falls back
+to the anchor's section rather than reporting an unresolved anchor.
 
 `RecipeStepReference` **reuses `RecipeMethodStepReplacement`'s anchoring** ([`:469`](../../YesChefPackage/Sources/YesChefCore/RecipeAdjustment.swift)) — the same base-step-ID anchor the anchor-repair effort just made repairable. Do **not** invent a parallel anchoring scheme.
 

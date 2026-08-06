@@ -9,6 +9,55 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0021 Amendment 4 V4c — the two structural step ops + a variation Delete affordance
+
+**Architect review 2026-08-06.** Decision: [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4
+(D4), plus a gap-fill Delete that Amd2-D4 already sanctioned but that was never built. **Schema-free** — both
+halves ride the existing `deltas` BLOB and an existing synced row, **no prod-schema promotion entry**. Spec:
+[`efforts/adr-0021-v4c-and-variation-delete.md`](efforts/adr-0021-v4c-and-variation-delete.md). Gate was
+anchor-repair Dispatch 1 (read-lenient / write-strict), cleared 2026-08-05.
+
+**What it does.** A variation can now **add and remove instruction steps**, which is what forced Jon's
+motivating case (one technique, several treatments, a different finishing step each) out of the variation model
+entirely. The vocabulary widens by exactly two anchored ops — `stepInsert(after:sectionID:text:)` and
+`stepRemove` — reusing `RecipeMethodStepReplacement`'s base-step anchoring so they normalize write-strict and
+backfill read-lenient through the *existing* repair queue rather than a second one.
+`instructionStepAdded`/`instructionStepRemoved` leave `RecipeVariationUnrepresentableEdit`; `instructionStepMoved`
+and every section op stay unrepresentable and still route to split-off. In the reader an inserted step renders as
+an addition and a **removed step stays visible, struck through and unnumbered**, so the base procedure is legible
+underneath the overlay (D3) instead of silently vanishing. Separately, the Choices menu finally has **Delete**,
+behind a confirmation.
+
+**Three architect-review fixes before approval.**
+1. **An inserted step silently changed section.** The op carried no section, so resolve gave the new step its
+   *anchor's* section — and a step added at the head of a section anchors to the last step of the section
+   *above*. Derive→resolve identity was broken for every multi-section recipe (and for the "Base Recipe"
+   restore variation that promote mints), and it passed green because the tests only covered a single-section
+   base. The op now carries its own `sectionID`, mirroring the ingredient `add` op, and degrades to the
+   anchor's section when that section is gone — placement is a hint, the step anchor is the thing that must
+   resolve.
+2. **The Delete confirm was the [[alert-ispresented-destructive-setter]] shape** — the `isPresented` setter
+   discarded the staged variation the action was about to read. Restated with `presenting:` so the value is
+   handed *into* the closure. That shape shipped ADR-0030's restore dead through three reviews; a silent no-op
+   on an irreversible destructive action is exactly where it must be impossible, not merely unlikely.
+3. **Removed steps had no reader affordance** — resolution drops them, so they just disappeared, which is the
+   opposite of what a removed *ingredient* does. The reader now splices them back at their base position.
+
+**Verified.** `swift test` (595 tests) and `scripts/check-drift.sh` pass except for
+`DatabaseBackupTests.restorePreparationForwardMigratesAGenuineNMinusOneBackup`. Elevated generic-iOS app build
+green after `xcodegen generate`. The `YesChefTests` app target adds two **new app-level tests** — both passing —
+that drive the model + display seam rather than Core alone, which is the seam that hid both the section drift
+and the ADR-0030 restore defect.
+
+**⚠️ `main` is currently red in two places, neither caused by this slice** (both reproduce on a stashed,
+clean tree): the `DatabaseBackupTests` migration-ordering failure above, and **5 app-target failures** in
+`RecipeCaptureLabelSuggestionTests` / `RecipeDetailLabelSuggestionTests` / `RecipeListPresetTests` /
+comment-curation, all tripping the unimplemented-`uuid` dependency trap. Worth its own fix before they
+normalise into background noise. Jon's device pass still owed, with the cross-device case worth exercising by hand:
+Delete syncs the row but the active-selection highlight is per-cook, so a peer whose local selection points at
+a deleted variation must degrade to base (covered by a Core test, but it is the non-obvious edge).
+
+---
 ## ADR-0021 Amendment 4 V4a — variations relocate to a Playbook "Choices" section
 
 **Approved (architect review) and merged 2026-08-05; PR [#285](https://github.com/jonphillips/yes-chef/pull/285).**
