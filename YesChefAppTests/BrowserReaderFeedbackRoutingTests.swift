@@ -37,6 +37,8 @@ struct BrowserReaderFeedbackRoutingTests {
       $0.readerFeedbackCurationClient = ReaderFeedbackCurationClient { _, _ in
         throw ModelTierResolutionError.frontierRequired
       }
+      // `RecipeCaptureModel.init` mints its reader-feedback capture ID eagerly.
+      $0.uuid = .incrementing
     } operation: {
       let browser = BrowserModel()
       browser.stageLoadedReaderFeedbackComments(comments)

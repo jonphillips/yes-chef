@@ -38,6 +38,7 @@ struct RecipeListPresetTests {
 
     try await withDependencies {
       try $0.bootstrapDatabase()
+      $0.uuid = .incrementing
     } operation: {
       @Dependency(\.defaultDatabase) var database
       try await database.write { db in
