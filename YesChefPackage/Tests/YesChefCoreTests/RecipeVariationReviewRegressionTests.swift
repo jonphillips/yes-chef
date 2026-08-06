@@ -42,7 +42,9 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func derivingAnInsertedInstructionStepReportsItWithoutProducingAPartialPayload() {
+    func derivingAnInsertedInstructionStepProducesAnAnchoredStepInsert() {
+      // Amd4-D4: adding an instruction step is now representable as a `stepInsert` anchored to the
+      // preceding base step, rather than an unrepresentable edit that forces a split-off.
       let now = Date(timeIntervalSinceReferenceDate: 819_305_000)
       let recipeID = SampleUUIDSequence.uuid(33_251)
       let sectionID = SampleUUIDSequence.uuid(33_252)
@@ -61,7 +63,18 @@ extension RecipeCoreTests {
       let derivation = base.derivingVariation(from: edited)
 
       expectNoDifference(derivation.payload.methodStepReplacements, [])
-      expectNoDifference(derivation.unrepresentableEdits, [.instructionStepAdded("Taste and serve.")])
+      expectNoDifference(
+        derivation.payload.methodStepStructuralOps,
+        [
+          .insert(
+            after: RecipeStepReference(id: originalStepID, originalText: "Simmer."),
+            sectionID: sectionID,
+            text: "Taste and serve."
+          )
+        ]
+      )
+      expectNoDifference(derivation.unrepresentableEdits, [])
+      #expect(derivation.isRepresentable)
     }
 
     @Test

@@ -24,6 +24,12 @@ it's touched.
 
 ## Active / recent
 
+- [adr-0021-v4c-and-variation-delete.md](adr-0021-v4c-and-variation-delete.md) — **Done** (write-up in
+  [`../DONE-LOG.md`](../DONE-LOG.md)) · [ADR-0021](../decisions/ADR-0021-recipe-variations.md) Amd4-D4 ·
+  Widens the variation delta vocabulary by **exactly two** anchored ops — `stepInsert` / `stepRemove` — so a
+  variation can add and drop instruction steps instead of being forced out to a separate recipe, and adds the
+  **Delete** affordance Amd2-D4 sanctioned but nobody ever built. Both halves schema-free. Moves and every
+  section op stay unrepresentable and still route to split-off; the vocabulary is closed again.
 - [variation-anchor-repair.md](variation-anchor-repair.md) — **Designed, Dispatch 0 ships immediately** ·
   Defects in [ADR-0021](../decisions/ADR-0021-recipe-variations.md)'s anchor handling · A variation's
   anchors are taken from **model output** and never normalized to base IDs, so a base text edit orphans the

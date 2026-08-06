@@ -13,6 +13,7 @@ struct RecipeVariationChoices: View {
 
   @State private var renamingVariation: RecipeVariation?
   @State private var variationNameDraft = ""
+  @State private var deletingVariation: RecipeVariation?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -59,6 +60,27 @@ struct RecipeVariationChoices: View {
       }
     } message: {
       Text("This creates a new standalone recipe and removes the variation.")
+    }
+    // `presenting:` hands the staged variation *into* the action closure. Reading
+    // `deletingVariation` from inside the button instead would be the shape that shipped ADR-0030's
+    // restore dead: SwiftUI writes `false` to `isPresented` on confirm-dismissal before the action
+    // runs, so a setter that discards the payload leaves the action with nothing and the delete
+    // silently no-ops. Destructive + irreversible is exactly where that must not be possible.
+    .confirmationDialog(
+      "Delete this variation?",
+      isPresented: Binding(
+        get: { deletingVariation != nil },
+        set: { if !$0 { deletingVariation = nil } }
+      ),
+      titleVisibility: .visible,
+      presenting: deletingVariation
+    ) { variation in
+      Button("Delete", role: .destructive) {
+        model.deleteVariation(variation.id)
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: { _ in
+      Text("This can't be undone.")
     }
   }
 
@@ -128,6 +150,9 @@ struct RecipeVariationChoices: View {
         }
         Button("Promote to Base") {
           promotingVariation = variation
+        }
+        Button("Delete", role: .destructive) {
+          deletingVariation = variation
         }
       } label: {
         Label("\(variation.name) actions", systemImage: "ellipsis.circle")
