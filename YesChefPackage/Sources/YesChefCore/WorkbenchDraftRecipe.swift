@@ -72,6 +72,13 @@ public struct WorkbenchDraftRecipe: Equatable, Sendable {
       || rationale.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
+  /// Enough to stage for review, **independent of the rationale** — which the review sheet can fill.
+  /// ADR-0042 Amd 2's declined-draft test is "no ingredients and no instructions," so a draft that
+  /// argued its rationale in-thread (and omitted the block) is still a real recipe, not a decline.
+  public var hasReviewableContent: Bool {
+    !ingredientLines.isEmpty || !instructionLines.isEmpty
+  }
+
   public func renderedReview() -> String {
     var lines: [String] = []
     if !rationale.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

@@ -810,6 +810,302 @@ extension AIHandoffTests {
       ]
     )
   }
+
+  // MARK: - Workbench draft hand-off (ADR-0042 S3a, the door out only)
+
+  @Test
+  func workbenchDraftTaskTitleDrivesTheDerivedThreadTitle() {
+    // The D9 title line is `\(taskType.title): \(workbench title)`, so "Draft" here yields
+    // `Draft: <workbench title>` at the export site.
+    expectNoDifference(AIHandoffTaskType.workbenchDraft.title, "Draft")
+  }
+
+  @Test
+  func workbenchDraftAskNamesSchemaOrgJSONLDAndASeparateRationale() {
+    let context = WorkbenchChatContext(title: "Cookie Study")
+    let ask = context.draftHandoffPrompt()
+
+    // The body shape is schema.org Recipe JSON-LD, so the deterministic RecipeJSONLDExtractor can
+    // parse the S3b return for free — the ask must name the exact keys that extractor reads.
+    #expect(ask.contains("\"@type\":\"Recipe\""))
+    #expect(ask.contains("recipeIngredient"))
+    #expect(ask.contains("recipeInstructions"))
+    // The rationale is a separate prose block, never smeared into the JSON (Amd2-D3/D6).
+    #expect(ask.contains("return the rationale as a separate prose block"))
+    // Learnings are aimed at rejected candidates / constraints, not the draft's own choices.
+    #expect(ask.contains("candidates you considered and rejected"))
+  }
+
+  @Test
+  func workbenchDraftDiscussPromptCarriesTheTitleLineAndFinalizeDeliverable() {
+    let handoffID = SampleUUIDSequence.uuid(38_030)
+    let context = WorkbenchChatContext(title: "Cookie Study")
+    let prompt = AIHandoffToken.prompt(
+      handoffID: handoffID,
+      title: "\(AIHandoffTaskType.workbenchDraft.title): Cookie Study",
+      context: context.draftHandoffPrompt(),
+      mode: .discuss,
+      deliverableFormat: .workbenchDraft
+    )
+
+    #expect(prompt.hasPrefix("Draft: Cookie Study\n"))
+    #expect(prompt.contains("YC-HANDOFF: \(handoffID.uuidString)"))
+    #expect(
+      prompt.contains(
+        "return the drafted recipe as the schema.org Recipe JSON-LD block described above"
+      )
+    )
+  }
+
+  @Test
+  func workbenchDraftImportParsesCurlyQuotedJSONLDIntoAReviewableDraft() throws {
+    // The hand-run finding (ADR-0042 Amd 2): the paste path autoformats JSON delimiters into
+    // typographic quotes, which the deterministic salvage must normalize (curly -> straight).
+    @Dependency(\.defaultDatabase) var database
+    let workbenchID = SampleUUIDSequence.uuid(38_040)
+    let handoffID = SampleUUIDSequence.uuid(38_041)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    let straightJSON = #"""
+    {"@context":"https://schema.org","@type":"Recipe","name":"Kung Pao Chicken","description":"Glossy and robust.","recipeCuisine":"Chinese-American","recipeCategory":"Main course","recipeYield":"4 to 6 servings","prepTime":"PT25M","cookTime":"PT15M","recipeIngredient":["1 1/2 pounds chicken thighs","1/2 cup peanuts"],"recipeInstructions":[{"@type":"HowToSection","name":"Stir-fry","itemListElement":[{"@type":"HowToStep","text":"Sear the chicken."},{"@type":"HowToStep","text":"Add the sauce and toss."}]}]}
+    """#
+    // Simulate the copy/paste autoformatter: each "..." token becomes a curly-open/curly-close pair.
+    let mangledJSON = straightJSON.replacingOccurrences(
+      of: "\"([^\"]*)\"",
+      with: "\u{201C}$1\u{201D}",
+      options: .regularExpression
+    )
+
+    try database.write { db in
+      try Workbench.insert {
+        Workbench(id: workbenchID, title: "Kung Pao Study", sortOrder: 0, dateCreated: now, dateModified: now)
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID, sourceType: .workbench, sourceID: workbenchID,
+          taskType: .workbenchDraft, createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      let review = try AIHandoffIntentImport.stageReview(
+        handoffID: handoffID,
+        result: """
+        YC-HANDOFF: \(handoffID.uuidString)
+        \(mangledJSON)
+
+        Rationale: Built on the Cook's Illustrated base for its thicker sauce; rejected the sweeter hoisin-forward candidate.
+
+        YC-LEARNINGS:
+        The target is Boston Chinatown-style, so a thicker, slightly sweeter sauce is a constraint, not a defect.
+        """,
+        in: db,
+        now: now
+      )
+
+      guard case let .workbenchDraft(draftReview) = review else {
+        Issue.record("Expected a workbench draft review.")
+        return
+      }
+      expectNoDifference(draftReview.workbenchID, workbenchID)
+      let draft = draftReview.draftRecipe
+      expectNoDifference(draft.title, "Kung Pao Chicken")
+      expectNoDifference(draft.summary, "Glossy and robust.")
+      expectNoDifference(draft.servingsText, "4 to 6 servings")
+      expectNoDifference(draft.prepTimeMinutes, 25)
+      expectNoDifference(draft.cookTimeMinutes, 15)
+      expectNoDifference(draft.cuisine, "Chinese-American")
+      expectNoDifference(draft.course, "Main course")
+      // Named HowToSection flattens into the draft's flat step list (matches the onboard shape).
+      expectNoDifference(draft.ingredientLines, ["1 1/2 pounds chicken thighs", "1/2 cup peanuts"])
+      expectNoDifference(draft.instructionLines, ["Sear the chicken.", "Add the sauce and toss."])
+      // Rationale rides as its own block; the apostrophe survives (salvage replaces, never deletes).
+      #expect(draft.rationale.contains("Cook's Illustrated"))
+      // A naked-sentence learning is captured losslessly, not dropped.
+      #expect(draftReview.learnings.contains { $0.contains("Boston Chinatown-style") })
+    }
+  }
+
+  @Test
+  func workbenchDraftImportDegradesADeclinedDraftToALoudFailure() throws {
+    // The declined-draft contract (ADR-0042 Amd 2): an empty title with no ingredients and no
+    // instructions must fail loudly, never promote an empty recipe into review.
+    @Dependency(\.defaultDatabase) var database
+    let workbenchID = SampleUUIDSequence.uuid(38_042)
+    let handoffID = SampleUUIDSequence.uuid(38_043)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Workbench.insert {
+        Workbench(id: workbenchID, title: "Empty Study", sortOrder: 0, dateCreated: now, dateModified: now)
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID, sourceType: .workbench, sourceID: workbenchID,
+          taskType: .workbenchDraft, createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      #expect(throws: AIHandoffIntentImportError.emptyPlan) {
+        _ = try AIHandoffIntentImport.stageReview(
+          handoffID: handoffID,
+          result: """
+          YC-HANDOFF: \(handoffID.uuidString)
+          {"@context":"https://schema.org","@type":"Recipe","name":""}
+          """,
+          in: db,
+          now: now
+        )
+      }
+    }
+  }
+
+  @Test
+  func workbenchDraftReturnSplitsJSONLDFromTrailingRationale() {
+    let returned = AIHandoffReturn.workbenchDraft(
+      from: """
+      {"@context":"https://schema.org","@type":"Recipe","name":"Test Dish","recipeIngredient":["1 egg"],"recipeInstructions":[{"@type":"HowToStep","text":"Cook it."}]}
+
+      Rationale: Chose the simplest candidate.
+
+      YC-LEARNINGS:
+      - Eggs are a constraint.
+      """,
+      capturedAt: Date(timeIntervalSinceReferenceDate: 840_000_000)
+    )
+
+    guard let draft = returned.draftRecipe else {
+      Issue.record("Expected a parsed draft recipe.")
+      return
+    }
+    expectNoDifference(draft.title, "Test Dish")
+    // The rationale is captured as its own block, with the label stripped and JSON kept out of it.
+    expectNoDifference(draft.rationale, "Chose the simplest candidate.")
+    expectNoDifference(returned.learnings, ["Eggs are a constraint."])
+  }
+
+  @Test
+  func workbenchDraftReturnReInlinesIngredientGroupHeadings() {
+    // Grouped ingredients must not silently lose their headings (ADR-0040 lossless): the section
+    // names re-inline as colon-terminated lines the editor reads back into groups.
+    let returned = AIHandoffReturn.workbenchDraft(
+      from: #"""
+      {"@context":"https://schema.org","@type":"Recipe","name":"Two-Part Dish","recipeIngredient":["For the sauce:","1 tbsp soy","For the chicken:","2 thighs"],"recipeInstructions":[{"@type":"HowToStep","text":"Cook."}]}
+
+      Rationale: Simple split.
+      """#,
+      capturedAt: Date(timeIntervalSinceReferenceDate: 840_000_000)
+    )
+
+    guard let draft = returned.draftRecipe else {
+      Issue.record("Expected a parsed draft recipe.")
+      return
+    }
+    expectNoDifference(
+      draft.ingredientLines,
+      ["For the sauce:", "1 tbsp soy", "For the chicken:", "2 thighs"]
+    )
+    expectNoDifference(draft.ingredientSectionName, nil)
+  }
+
+  @Test
+  func workbenchDraftReturnKeepsARecipeThatOmitsTheRationale() {
+    // A draft that argued its rationale in-thread and omitted the block is a real recipe, not a
+    // decline — it stages with an empty rationale rather than being discarded whole.
+    let returned = AIHandoffReturn.workbenchDraft(
+      from: #"""
+      {"@context":"https://schema.org","@type":"Recipe","name":"No-Rationale Dish","recipeIngredient":["1 egg"],"recipeInstructions":[{"@type":"HowToStep","text":"Cook it."}]}
+
+      YC-LEARNINGS:
+      - Eggs are a constraint.
+      """#,
+      capturedAt: Date(timeIntervalSinceReferenceDate: 840_000_000)
+    )
+
+    guard let draft = returned.draftRecipe else {
+      Issue.record("Expected a parsed draft recipe despite the missing rationale.")
+      return
+    }
+    expectNoDifference(draft.title, "No-Rationale Dish")
+    expectNoDifference(draft.rationale, "")
+    #expect(draft.hasReviewableContent)
+    expectNoDifference(returned.learnings, ["Eggs are a constraint."])
+  }
+
+  @Test
+  func workbenchDraftReturnRecoversARationaleWrittenBeforeTheJSON() {
+    // Models sometimes write the rationale first; the text before the block must not be dropped.
+    let returned = AIHandoffReturn.workbenchDraft(
+      from: #"""
+      Rationale: I led with the reasoning this time.
+
+      {"@context":"https://schema.org","@type":"Recipe","name":"Lead Dish","recipeIngredient":["1 egg"],"recipeInstructions":[{"@type":"HowToStep","text":"Cook it."}]}
+      """#,
+      capturedAt: Date(timeIntervalSinceReferenceDate: 840_000_000)
+    )
+
+    expectNoDifference(returned.draftRecipe?.rationale, "I led with the reasoning this time.")
+  }
+
+  @Test
+  func workbenchDraftReturnStripsAMarkdownFenceFromTheRationale() {
+    // Models fence JSON reflexively; the stray closing fence must not leak into the rationale.
+    let returned = AIHandoffReturn.workbenchDraft(
+      from: """
+      ```json
+      {"@context":"https://schema.org","@type":"Recipe","name":"Fenced Dish","recipeIngredient":["1 egg"],"recipeInstructions":[{"@type":"HowToStep","text":"Cook it."}]}
+      ```
+
+      Rationale: Clean rationale.
+      """,
+      capturedAt: Date(timeIntervalSinceReferenceDate: 840_000_000)
+    )
+
+    expectNoDifference(returned.draftRecipe?.title, "Fenced Dish")
+    expectNoDifference(returned.draftRecipe?.rationale, "Clean rationale.")
+  }
+
+  @Test
+  func workbenchDraftImportDegradesMalformedJSONPastSalvageToALoudFailure() throws {
+    // A block that is still unparseable after the curly->straight salvage (here: an unterminated
+    // object) yields no recipe and must fail loud, not stage an empty draft.
+    @Dependency(\.defaultDatabase) var database
+    let workbenchID = SampleUUIDSequence.uuid(38_044)
+    let handoffID = SampleUUIDSequence.uuid(38_045)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Workbench.insert {
+        Workbench(id: workbenchID, title: "Broken Study", sortOrder: 0, dateCreated: now, dateModified: now)
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID, sourceType: .workbench, sourceID: workbenchID,
+          taskType: .workbenchDraft, createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      #expect(throws: AIHandoffIntentImportError.emptyPlan) {
+        _ = try AIHandoffIntentImport.stageReview(
+          handoffID: handoffID,
+          result: """
+          YC-HANDOFF: \(handoffID.uuidString)
+          {"@context":"https://schema.org","@type":"Recipe","name":"Broken","recipeIngredient":["1 egg"
+          """,
+          in: db,
+          now: now
+        )
+      }
+    }
+  }
 }
 
 private enum SeedFailure: Error, Sendable {

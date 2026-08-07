@@ -682,23 +682,31 @@ per D8 and keep only the draft.
 
 ### Amd2 open questions
 
-- **Amd2-OQ1 — the learnings hand-run (Amd2-D6).** Same gate as Amd1-OQ1; resolve before S3b wires the
-  deposit.
+- **Amd2-OQ1 — RESOLVED (Jon's hand-run, 2026-08-07): keep the two-part return.** The real finalize
+  (a Boston-Chinatown Kung Pao draft) returned learnings that were genuine **constraints on the dish** and
+  **rejected candidates** ("thicker, slightly sweeter sauce is a constraint, not a defect"; "don't return
+  the rested-chicken juices") — argument residue the draft's rationale cannot carry, **not** the D8
+  restatement pattern. So learnings stay on for this verb and deposit to the workbench log as an
+  `.observation` row (Amd2-D6). The pinned D8 fallback (suppress) was not needed.
 - **Amd2-OQ2 — is `workbenchDraft` workbench-only, or does recipe *creation* want the same door?** v1 is
   workbench-only: the candidates/references/log are what make the synthesis worth outboarding. A blank-slate
   "draft me a recipe from scratch" hand-off is a different surface with no in-app home yet — do not build it
   from inside this slice. **This is the same seam as pasted-text import** (Amd2-D5): when that surface is
   built, revisit whether the two share one entry point.
-- **Amd2-OQ3 — RESOLVED (Jon, 2026-08-05): the free deterministic path (Amd2-D3).** The earlier
-  direct-parse-vs-middle-term question dissolved once the return was recognized as *extraction*: JSON-LD +
-  the deterministic `RecipeJSONLDExtractor` is free and reuses the capture tier. **The remaining fallback
-  question** — on malformed JSON-LD past salvage, error loud vs. a one-shot `RecipeExtractionClient` pass on
-  the raw text — is settled at S3b by the hand-run: prefer *loud* unless the hand-run shows the paste path
-  mangles clean JSON-LD often enough to justify the metered rescue.
-- **Amd2-OQ4 — the extractor-driver shape (implementation detail).** `RecipeJSONLDExtractor.extract` reads
-  `<script type="application/ld+json">` off a SwiftSoup `Document`; feeding a raw returned block means either
-  wrapping it in a minimal HTML doc or surfacing the inner `jsonObject → recipeNodes → mine` path. S3b's
-  call, not the ADR's — flagged so it is chosen deliberately, not by wrapping-in-HTML reflex.
+- **Amd2-OQ3 — RESOLVED (Jon, 2026-08-05 + hand-run 2026-08-07): free deterministic path, loud fallback,
+  and the mangling is real.** The direct-parse-vs-middle-term question dissolved once the return was
+  recognized as *extraction* (Amd2-D3): JSON-LD + the deterministic `RecipeJSONLDExtractor` is free and
+  reuses the capture tier. **The remaining fallback question is now settled by the hand-run:** the paste path
+  **does** mangle clean JSON-LD — it autoformats the delimiters into typographic/curly quotes — so a salvage
+  is *required*, but it is **deterministic and free**: `cleanedJSON` now **replaces** curly doubles with `"`
+  (and curly singles with `'`, preserving `Cook's`), where the old salvage *deleted* them and left invalid
+  unquoted JSON. Past that salvage, the return degrades **loud** to `.emptyPlan` — **no metered
+  `RecipeExtractionClient` rescue**, which would have softened the cost want for a failure mode the free
+  salvage already covers.
+- **Amd2-OQ4 — RESOLVED (S3b): a raw-block entry point, not HTML-wrapping.** `RecipeJSONLDExtractor` gained
+  `extract(fromJSONLD:into:)`, which runs the same `jsonObject → recipeNodes → mineIfComplete` path (and
+  therefore the same curly-quote salvage) on a raw returned block, so the returned JSON-LD is never wrapped
+  in a synthetic `<script>`/`Document`.
 
 ## Storage sketch — S1 is schema-free; S2 adds three synced columns
 

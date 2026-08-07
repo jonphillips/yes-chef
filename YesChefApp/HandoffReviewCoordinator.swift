@@ -47,6 +47,8 @@ final class HandoffReviewCoordinator {
       workbenchCompareReviewItems(for: review)
     case .workbenchExperiments:
       []
+    case let .workbenchDraft(review):
+      workbenchDraftReviewItems(for: review)
     }
   }
 
@@ -291,24 +293,8 @@ final class HandoffReviewCoordinator {
       )
     }
     if !review.learnings.isEmpty {
-      let editableText = review.learnings.map { "- \($0)" }.joined(separator: "\n")
       items.append(
-        ChatApplyReviewItem(
-          title: "Review learnings",
-          summary: editableText,
-          presentation: .sheet,
-          editableTitle: "Learnings",
-          editableText: editableText,
-          commitTitle: "Save to Workbench Log",
-          committingTitle: "Saving learnings…",
-          committedTitle: "Saved to Workbench Log",
-          commit: { [weak self] approvedText in
-            try self?.commitWorkbenchObservation(
-              workbenchID: review.workbenchID,
-              text: "Learnings:\n\(approvedText)"
-            )
-          }
-        )
+        workbenchLearningsReviewItem(workbenchID: review.workbenchID, learnings: review.learnings)
       )
     }
     return items
@@ -560,6 +546,91 @@ final class HandoffReviewCoordinator {
   }
 }
 
+// The workbench-draft hand-off return (ADR-0042 S3b). Extraction, not synthesis: the parsed
+// `WorkbenchDraftRecipe` lands in the existing draft review + create-working-recipe path, and the
+// returned learnings/residue deposit to the workbench log (Amd2-D6). Kept in an extension so the
+// coordinator's primary type body stays within the lint budget.
+extension HandoffReviewCoordinator {
+  func workbenchDraftReviewItems(
+    for review: AIHandoffWorkbenchDraftReview
+  ) -> [ChatApplyReviewItem] {
+    var items: [ChatApplyReviewItem] = []
+    let draft = review.draftRecipe
+    // The recipe item stages whenever there is a recipe to make — independent of the rationale,
+    // which the editable prose fields can fill (finding: an argued-in-thread draft omits it).
+    if draft.hasReviewableContent {
+      let originalEditableText = draft.editableProseReviewText()
+      items.append(
+        ChatApplyReviewItem(
+          id: review.handoffID,
+          title: "Review working recipe",
+          summary: draft.renderedReview(),
+          presentation: .sheet,
+          editableTitle: "Draft prose fields",
+          editableText: originalEditableText,
+          commitTitle: "Create Working Recipe",
+          committingTitle: "Creating working recipe…",
+          committedTitle: "Created Working Recipe",
+          commit: { [weak self] editedText in
+            let approved = editedText == originalEditableText
+              ? draft
+              : draft.applyingEditableProseReviewText(editedText)
+            try self?.commitWorkbenchDraftRecipe(approved, workbenchID: review.workbenchID)
+          }
+        )
+      )
+    }
+    // Learnings are the argument residue, staged independently of the recipe and deposited to the
+    // workbench log (Amd2-D6). Same item shape as the compare verb — see the shared helper.
+    if !review.learnings.isEmpty {
+      items.append(
+        workbenchLearningsReviewItem(workbenchID: review.workbenchID, learnings: review.learnings)
+      )
+    }
+    return items
+  }
+
+  /// The workbench-log learnings review item, shared by the compare and draft return verbs.
+  func workbenchLearningsReviewItem(
+    workbenchID: Workbench.ID,
+    learnings: [String]
+  ) -> ChatApplyReviewItem {
+    let editableText = learnings.map { "- \($0)" }.joined(separator: "\n")
+    return ChatApplyReviewItem(
+      title: "Review learnings",
+      summary: editableText,
+      presentation: .sheet,
+      editableTitle: "Learnings",
+      editableText: editableText,
+      commitTitle: "Save to Workbench Log",
+      committingTitle: "Saving learnings…",
+      committedTitle: "Saved to Workbench Log",
+      commit: { [weak self] approvedText in
+        try self?.commitWorkbenchObservation(
+          workbenchID: workbenchID,
+          text: "Learnings:\n\(approvedText)"
+        )
+      }
+    )
+  }
+
+  private func commitWorkbenchDraftRecipe(
+    _ draft: WorkbenchDraftRecipe,
+    workbenchID: Workbench.ID
+  ) throws {
+    guard draft.hasReviewableContent else { throw HandoffReviewError.emptyDeliverable }
+    _ = try database.write { db in
+      try WorkbenchRepository.createDraftRecipe(
+        draft,
+        for: workbenchID,
+        in: db,
+        now: now,
+        uuid: { uuid() }
+      )
+    }
+  }
+}
+
 extension HandoffReviewCoordinator {
   func presentAdjustmentReview(_ adjustmentReview: RecipeAdjustmentReviewState) {
     clearError()
@@ -629,7 +700,7 @@ struct HandoffReviewSheet: View {
         originalReview: review
       )
     case .menuPrepPlan, .menuComplement, .recipeMakeAhead, .recipeChefItUp, .recipeServeWith,
-         .mealPlanMakeAhead, .mealPlanComplement, .workbenchCompare:
+         .mealPlanMakeAhead, .mealPlanComplement, .workbenchCompare, .workbenchDraft:
       standardReviewSheet
     }
   }

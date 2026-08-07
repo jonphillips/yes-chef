@@ -2,6 +2,16 @@ import Foundation
 import SwiftSoup
 
 enum RecipeJSONLDExtractor {
+  /// Mine a raw schema.org `Recipe` JSON-LD block that did not arrive inside an HTML `<script>` —
+  /// the ADR-0042 workbench-draft hand-off return. Reuses the same parse + salvage + node-walk as the
+  /// document path, so a curly-quote-mangled paste is normalized identically (see `cleanedJSON`).
+  static func extract(fromJSONLD raw: String, into builder: inout RecipeParseBuilder) {
+    guard let top = jsonObject(from: raw) else { return }
+    for node in recipeNodes(in: top) {
+      mineIfComplete(node, into: &builder)
+    }
+  }
+
   static func extract(from document: Document, into builder: inout RecipeParseBuilder) {
     let scripts = (try? document.select("script[type=application/ld+json]").array()) ?? []
     for script in scripts {
@@ -177,9 +187,18 @@ enum RecipeJSONLDExtractor {
       || normalized.hasPrefix("... and more")
   }
 
+  /// Salvage JSON whose delimiters were replaced with typographic quotes — the signature of a
+  /// copy/paste autoformatter (ADR-0042 Amd 2, the workbench-draft hand-run). We **replace** curly
+  /// doubles with straight `"` (not delete them: deleting leaves keys/values unquoted, which never
+  /// parses) and curly singles with a straight apostrophe, so `"Cook's Illustrated"` survives intact
+  /// rather than becoming `"Cooks Illustrated"`. Only reached after a strict parse fails, so
+  /// well-formed content keeps its real apostrophes and curly quotes untouched.
   private static func cleanedJSON(_ raw: String) -> Data? {
     raw
-      .replacingOccurrences(of: "[\u{201C}\u{201D}\u{2019}]", with: "", options: .regularExpression)
+      .replacingOccurrences(of: "\u{201C}", with: "\"")
+      .replacingOccurrences(of: "\u{201D}", with: "\"")
+      .replacingOccurrences(of: "\u{2018}", with: "'")
+      .replacingOccurrences(of: "\u{2019}", with: "'")
       .data(using: .utf8)
   }
 }
