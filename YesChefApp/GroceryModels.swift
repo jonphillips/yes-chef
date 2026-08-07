@@ -609,41 +609,6 @@ final class GroceryLibraryModel {
     selectRecipeButtonTapped(recipeID: recipeID, scaleContext: scaleContext)
   }
 
-  func addRecipeImmediately(recipeID: Recipe.ID) {
-    do {
-      let selectedListID = selectedListID
-      let listID = try database.write { db in
-        let listID = try selectedOrDefaultGroceryListID(
-          selectedListID,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
-        try GroceryRepository.addRecipe(
-          recipeID: recipeID,
-          groceryListID: listID,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
-        return listID
-      }
-      self.selectedListID = listID
-      scheduleCategorization()
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
-    }
-  }
-
-  func title(forList listID: CoreGroceryList.ID) -> String {
-    listRows.first { $0.id == listID }?.list.title ?? "Grocery List"
-  }
-
-  func title(forPantryItem itemID: PantryItem.ID) -> String {
-    pantryItems.first { $0.id == itemID }?.title ?? "Pantry Item"
-  }
-
 }
 
 extension GroceryLibraryModel {
@@ -1043,4 +1008,42 @@ private func selectedOrDefaultGroceryListID(
     now: now,
     uuid: uuid
   )
+}
+
+// Split from the primary class body to keep it under the SwiftLint type-body-length budget.
+extension GroceryLibraryModel {
+  func addRecipeImmediately(recipeID: Recipe.ID) {
+    do {
+      let selectedListID = selectedListID
+      let listID = try database.write { db in
+        let listID = try selectedOrDefaultGroceryListID(
+          selectedListID,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+        try GroceryRepository.addRecipe(
+          recipeID: recipeID,
+          groceryListID: listID,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+        return listID
+      }
+      self.selectedListID = listID
+      scheduleCategorization()
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func title(forList listID: CoreGroceryList.ID) -> String {
+    listRows.first { $0.id == listID }?.list.title ?? "Grocery List"
+  }
+
+  func title(forPantryItem itemID: PantryItem.ID) -> String {
+    pantryItems.first { $0.id == itemID }?.title ?? "Pantry Item"
+  }
 }
