@@ -1,6 +1,13 @@
 # Current Handoff
 
-Last updated: August 5, 2026. (**The entire ADR-0049 facet/labeling arc is closed as a gate.** Amendment 2 (the
+Last updated: August 7, 2026. (**Next Up changed shape today.** A product review of the paste-text want
+promoted it from "a fifth front-end landing in the add sheet" to
+**[ADR-0053](decisions/ADR-0053-create-recipe-destination.md) — Create Recipe is a full-screen destination**
+(Proposed; answers ADR-0051 OQ1; OCR explicitly deferred; the session is transient and never synced). The same
+review found and corrected a factual error in ADR-0051 D1 — **web capture does not use the sink and commits
+through a second save path** — recorded as
+[Amd 1](decisions/ADR-0051-text-to-recipe-extraction-strategy.md#amendment-1--d1-was-wrong-about-capture-there-are-two-save-paths-and-the-review-surface-is-source-specific-2026-08-07)
+and reflected in the Standing guard. **The entire ADR-0049 facet/labeling arc is closed as a gate.** Amendment 2 (the
 facet model) is complete and archived ([`DONE-LOG.md`](DONE-LOG.md)): D1–D5, F1/F2, and the OQ4 editorial-facet
 seed all shipped and device-passed (PRs [#275](https://github.com/jonphillips/yes-chef/pull/275)–[#277](https://github.com/jonphillips/yes-chef/pull/277)),
 D4 hand pass done. The S5/S6 + D8 labeling-backfill **tooling** shipped (PR [#278](https://github.com/jonphillips/yes-chef/pull/278)),
@@ -22,36 +29,67 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**Next Up → paste text → recipe: the [ADR-0051](decisions/ADR-0051-text-to-recipe-extraction-strategy.md)
-paste-text front-end.** Jon's want: paste unstructured recipe text and create a recipe. This is the **fifth
-source** in ADR-0051's table — a *new front-end*, governed by the strategy, **not** a new parser. Build it to
-D1–D7:
+**Next Up → [ADR-0053](decisions/ADR-0053-create-recipe-destination.md) S1 — Create Recipe (the destination) +
+the paste-text front-end.** Jon's want is still "paste unstructured recipe text and create a recipe," but the
+2026-08-07 product review **re-homed it**: paste does not land in the existing add sheet, it lands in a new
+**full-screen Create Recipe destination** off the library `+`. ADR-0053 is Proposed and answers ADR-0051's OQ1.
+**The front-end, engine, sink and save are exactly as ADR-0051 scoped them — what changed is the entry point and
+the enclosing screen.** One dispatch, built to ADR-0053 D1–D8 and ADR-0051 D1–D7:
 
-- **Front-end (D4, two-tier).** The pasted text goes through the capture engine's pattern: if it happens to be
-  schema.org markup/JSON-LD, the deterministic `RecipeJSONLDExtractor` parses it **free**; otherwise the LLM
-  engine `RecipeExtractionClient` extracts it **faithfully** (never invent). Plain pasted recipe text — the
-  common case — is the LLM path.
-- **Sink (D1).** → `RecipeExtraction` core → **`RecipeEditorDraft`** → the **existing** review sheet →
-  `RecipeCore.save(draft:)`. **No new save path, review surface, or terminal draft type.**
-- **This slice triggers the D5 lift.** Paste-text is the **second real consumer of `RecipeExtractionClient`**
-  (web is the first; the S3 workbench return used the *deterministic* JSON-LD extractor, not the LLM client).
-  So **rename + relocate `RecipeExtractionClient` out of the `WebRecipeCapture` namespace** to a source-neutral
-  home and rename its vestigial `structuredPageText` parameter → `text`. Do it here, deliberately (D5).
-- **Guardrail (D7, Standing).** A fifth bespoke parser, a second "text→recipe" model call, or a new terminal
-  draft type is a **review block**. Route through the seam.
-- **Deferred, do NOT build (D6/OQ3).** Paste-text *triggers* the menu-note LLM-fallback question — it is a
-  separate offer-don't-impose decision; do not fold it in on this momentum.
-
-**Open for Jon before dispatch:** (a) **OQ1 — the entry point.** Where does "Paste recipe text" live (the
-library add menu? a share-sheet? its own screen?), and does it share one entry with the workbench-return /
-menu-note surfaces or keep a thin per-source entry (ADR lean: its own thin entry, shared engine)? (b) the
-default tier for the LLM extraction (frontier vs on-device — [[personal-app-latency-tolerance]] says a slow,
-good answer is fine).
+- **The destination (0053 D1/D2).** Replace the `addRecipe` **sheet**
+  ([RecipeLibraryView.swift:113](../YesChefApp/RecipeLibraryView.swift)) with a navigation destination. `+`
+  stops meaning "create a `Recipe` row." **No landing screen and no "Import vs. Manual" picker** (OQ1, resolved):
+  it opens with the compose material and the structured draft both present and **the structured half
+  immediately usable**, so a cook typing from memory just starts typing. Both halves are one
+  **`RecipeEditorDraft`** — the editor already binds it, so there is no second model. **Do not add a
+  `RecipeContent` type.**
+- **Front-end (0051 D4, two-tier) — unchanged.** If the paste happens to be schema.org markup/JSON-LD, the
+  deterministic `RecipeJSONLDExtractor` parses it **free**; otherwise `RecipeExtractionClient` extracts it
+  **faithfully** (never invent). Plain pasted recipe text — the common case — is the LLM path.
+- **Tier (0053 OQ2, resolved: frontier).** **By reusing capture's existing policy verbatim — do not add a
+  paste-specific tier constant.** `RecipeExtractionClient` already resolves through `resolveTier(useFrontier:
+  tierPreference.current(), …, requirement: .onDeviceCompatible)` on ADR-0047 OQ1's reasoning (low-volume,
+  user-initiated → strongest configured model). A new constant would break three things at once: the cook's
+  tier preference governing from settings ([[personal-app-latency-tolerance]]), the honest
+  `.degradedToOnDevice` record when no key exists, and degrade-don't-fail.
+- **Sink + save (0051 D1, as corrected by Amd 1).** → `RecipeExtraction` core → **`RecipeEditorDraft`** →
+  **`RecipeRepository.save(draft:)`**. Paste has **no external identity**, so it is `save(draft:)` and **not**
+  `importBundle` — see the Standing guard. No new terminal draft type, no third save path.
+- **Labels (0053 OQ3, resolved: yes).** Assisted labeling (`labelProposer`, ADR-0049) runs on the Create Recipe
+  save, as capture already does — proposed pre-save, accepted by the cook. The plain manual editor still does
+  **not** propose labels; that asymmetry is intended, do not "fix" it here.
+- **Session lifetime (0053 D4) — the invariant this whole design exists for.** The session is **transient: no
+  draft table, local or synced, ever.** Nothing canonical until an explicit Save. **Do not** write an unreviewed
+  extraction to the library at `.reference` placement — the workbench-draft precedent is deliberately declined.
+  A failed extraction never destroys the supplied material; a malformed model response is rejected **whole**,
+  never partially applied.
+- **Source seam (0053 D5) — build the small version now.** The session holds an **ordered list** of source
+  items, each with a **kind**; V1 ships `pastedText` and `typedText` **only**. Ship the list and the kind so
+  images are an addition later, not a rewrite. **Do not build it out further.**
+- **This slice triggers the 0051 D5 lift.** Paste-text is the **second real consumer of
+  `RecipeExtractionClient`** (web is the first; the S3 workbench return used the *deterministic* JSON-LD
+  extractor, not the LLM client). So **rename + relocate `RecipeExtractionClient` out of the `WebRecipeCapture`
+  namespace** to a source-neutral home and rename its vestigial `structuredPageText` parameter → `text`. Do it
+  here, deliberately.
+- **Deferred — do NOT build on this momentum (0053 D8).** Image/photo/**OCR** and Vision/VisionKit (Jon's
+  explicit call, 2026-08-07) · multi-page sources · durable or resumable sessions · the iPad source-|-draft
+  split (when built it reuses `ChatWorkspaceDivider`'s detents, not a second layout architecture) ·
+  conversational refinement and the explicit authorship verb · source-to-field provenance UI · share-sheet and
+  PDF ingestion · URL ingestion (capture owns URLs, richer review, different save path) · **the menu-note
+  LLM-fallback tier** (0051 D6/OQ3 — paste-text is its *trigger*, which makes this dispatch exactly the
+  momentum that would swallow it; it stays separate and offer-don't-impose) · any convergence of `save(draft:)`
+  and `importBundle`.
+- **S2, not this dispatch:** the deterministic issue pass (0053 D6) — computed **after** extraction, never
+  self-reported by the model, no confidence scores. S1 is valuable without it.
 
 **Verify** per [[lean-verification-default]]: `swift build` + Core tests (pasted plain text →
 `RecipeExtraction` → `RecipeEditorDraft` round-trip; a JSON-LD paste takes the deterministic path; an
-empty/garbage paste degrades **loud**), one elevated `generic/platform=iOS` build (`xcodegen generate` if new
-`YesChefApp/` files), `scripts/check-drift.sh`; **Jon device-passes** paste → review → save.
+empty/garbage paste degrades **loud**; **no canonical row exists before Save**), one elevated
+`generic/platform=iOS` build — **`xcodegen generate` is required, this slice adds `YesChefApp/` files** — and
+`scripts/check-drift.sh`. **Run `YesChefTests` too**: S1 adds an app-layer creation model, and the generic build
+compiles that target without running it ([[app-test-target-not-in-verification]]). **Schema-free — nothing for
+the prod-schema promotion list**, which follows directly from the transient-session decision. **Jon
+device-passes** `+` → paste → review → Save.
 
 *(ADR-0042 Amendment 2 `workbenchDraft` S3a + S3b is **built, device-passed 2026-08-07, and recorded in
 [`DONE-LOG.md`](DONE-LOG.md)**; PR [#289](https://github.com/jonphillips/yes-chef/pull/289). Schema-free,
@@ -117,11 +155,21 @@ section is work.**
   not fork a new parser.** Any new "turn this text/markup into a recipe" path (paste, photo→OCR, another
   hand-off return, …) MUST route LLM extraction through **`RecipeExtractionClient`**, reuse the existing
   deterministic extractors for structured sources (schema.org → `RecipeJSONLDExtractor`), and terminate in
-  **`RecipeEditorDraft`** → the existing review + save. **A fifth bespoke parser, a second "text→recipe" model
-  call, or a new terminal draft type is a review block** (D7). The four existing front-ends stay plural *by
-  design* (web/schema.org, menu-note heading heuristic, workbench synthesis, JSON-LD return) — consolidate the
-  sink and the engine, not the parsers. `RecipeExtractionClient` gets lifted out of `WebRecipeCapture` at the
-  second extraction consumer (workbench return or paste), not before.
+  **`RecipeEditorDraft`**. **A fifth bespoke parser, a second "text→recipe" model call, a new terminal draft
+  type, or a third save path is a review block** (D7, as restated by Amd1-D3). The four existing front-ends stay
+  plural *by design* (web/schema.org, menu-note heading heuristic, workbench synthesis, JSON-LD return) —
+  consolidate the sink and the engine, not the parsers. `RecipeExtractionClient` gets lifted out of
+  `WebRecipeCapture` at the second extraction consumer (workbench return or paste), not before.
+  - **⚠️ [Amd 1](decisions/ADR-0051-text-to-recipe-extraction-strategy.md#amendment-1--d1-was-wrong-about-capture-there-are-two-save-paths-and-the-review-surface-is-source-specific-2026-08-07)
+    corrected D1 — do not read the old wording as "capture uses the sink."** It does not: `RecipeCaptureView`
+    reviews on **`ParsedRecipePage`** and commits through a **second** canonical save path
+    (`importCapturedRecipe` → `importBundle`), which Paprika import shares. The enforceable rule is **one sink
+    type; ONE SAVE PATH PER IDENTITY CLASS** — a source with a stable external identity (URL, Paprika record)
+    commits through `importBundle` and gets `RecipeImportRef` dedupe/warnings/rollback; a source authored in the
+    app (paste, typed, menu-note, workbench) commits through `save(draft:)`. **Review surfaces may be
+    source-specific but must edit the sink**; capture is a *named grandfathered exception*, **not a precedent**
+    to cite. **Converging the two save paths is not queued work** — it needs a source that is both authored and
+    externally identified, which does not exist yet.
 - **ADR-0021 (variations) V1–V3 are shipped; Amendment 4 is RATIFIED (2026-08-05); V4a and V4c done
   (DONE-LOG), only V4b queued in Next Up — see there.** ADR-0023 (recipe edit proposals) has nothing queued: its
   *iterative refine loop* is **WITHDRAWN** (ADR-0042 D7 — it happens in the live external thread; **do not

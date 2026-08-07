@@ -16,6 +16,14 @@ extraction-vs-synthesis line and routed the `workbenchDraft` return through the 
 built *to* this strategy). **Holds the [[llm-vs-determinism-surface-boundary]] line** and applies
 [[editable-at-the-grain-stored]] (the sink is the human's last edit).
 
+**[Amendment 1](#amendment-1--d1-was-wrong-about-capture-there-are-two-save-paths-and-the-review-surface-is-source-specific-2026-08-07)
+— Proposed 2026-08-07.** Corrects a factual error in D1: web capture — the largest and most mature front-end —
+does **not** terminate in `RecipeEditorDraft`. It reviews on `ParsedRecipePage` and commits through a **second
+canonical save path** (`importCapturedRecipe` → `importBundle`), which Paprika import shares. Restates the rule
+in a form a review can actually enforce: **one sink type; one save path per identity class; review surfaces may
+be source-specific but must edit the sink.** Names capture as a grandfathered exception with its reason. Found
+while drafting [ADR-0053](ADR-0053-create-recipe-destination.md), which answers OQ1.
+
 ## Context
 
 **"Turn this text into a recipe" happens in four places, and each grew its own front-end.** This is not a
@@ -133,10 +141,80 @@ into a recipe must:**
 review block** — the author routes through the seam or brings a decision here first. This is a Standing guard
 in `CURRENT_HANDOFF`, because the whole risk is a dispatch quietly forking the seam under deadline.
 
+## Amendment 1 — D1 was wrong about capture: there are two save paths, and the review surface is source-specific (2026-08-07)
+
+**D1 asserted a convergence that does not exist.** It says every text→recipe path terminates in
+`RecipeEditorDraft` → the review sheet → `save(draft:)`, and that "this is already true." It is not true of the
+web-capture path — the largest, oldest and most exercised front-end in the table:
+
+- **Review edits `ParsedRecipePage`, not the sink.** `RecipeCaptureView`'s editable fields — `reviewTitle`,
+  `reviewSummary`, `reviewServingsText`, `editorialBlocks`, `readerFeedbackBlocks`, `reviewCategoryNames`,
+  `reviewTagNames` — are computed get/set pairs straight onto `draft.page`
+  ([RecipeModels.swift:459](../../YesChefApp/RecipeModels.swift)).
+- **Commit runs a second canonical save path.** `RecipeRepository.importCapturedRecipe`
+  ([WebRecipeCaptureClient.swift:319](../../YesChefPackage/Sources/YesChefCore/WebRecipeCapture/WebRecipeCaptureClient.swift))
+  calls `page.makeRecipeBundle(...)` → `importBundle`
+  ([RecipeRepository+Import.swift:207](../../YesChefPackage/Sources/YesChefCore/RecipeRepository+Import.swift)).
+  Paprika import uses the same path. `save(draft:)`'s callers are the editor, menu-note promotion, workbench
+  `createDraftRecipe`, and `SampleData` — capture is not among them.
+
+**Left uncorrected this is worse than a documentation error: it makes D7 unenforceable.** A reviewer told "no new
+terminal draft type, the sink is already one thing" cannot reconcile that with the capture code in front of them,
+and the natural resolutions are both wrong — either wave the guardrail through as aspirational, or open a
+convergence refactor nobody asked for.
+
+### Amd1-D1 — The split is real and mostly correct: **import identity is what separates the two paths**
+
+`importBundle` carries what `RecipeEditorDraft` does not model, and the extras are not incidental: dedupe against
+`RecipeImportRef` by normalized source URL + title, `RecipeImportWarning` (title-only collision, ambiguous
+identity), batch preview, batch import and rollback, plus photo / editorial / reader-feedback payloads.
+
+**Those exist because the source has a stable external identity.** A URL or a Paprika record can be imported
+twice and must not become two recipes. **Typed and pasted text have no such identity** — there is nothing to
+dedupe against, and inventing one would be fabricating provenance. So the rule is not "one save path"; it is:
+
+> **One save path per identity class.** A source with a stable external identity commits through `importBundle`.
+> A source authored in the app commits through `save(draft:)`.
+
+Paste-text and everything else in [ADR-0053](ADR-0053-create-recipe-destination.md) is therefore correctly on
+`save(draft:)`, and **converging the two paths is not work this ADR owes.** It would be a real decision with a
+real trigger (a source that is both authored and externally identified), not a tidy-up.
+
+### Amd1-D2 — D1 restated: one **sink type**, plural **review surfaces** — the same logic as D2, one layer later
+
+D2 already establishes that front-ends stay plural because sources genuinely differ. **The review layer inherits
+that argument**: capture's review surface exists because the review must show what *that source* contributed —
+harvested categories and tags, editorial prose blocks, reader-feedback candidates — none of which a paste has.
+Forcing capture through the editor's review would delete affordances, not unify anything.
+
+D1 is therefore restated as three clauses, each independently checkable:
+
+1. **One terminal draft *type*: `RecipeEditorDraft`.** A new source may not introduce a new terminal draft type.
+2. **One save path per identity class** (Amd1-D1). A new source may not introduce a *third*.
+3. **A review surface may be source-specific, but it edits the sink.** New surfaces justify themselves by
+   source-specific content to show, not by convenience.
+
+**Capture is a named, grandfathered exception to clause 3** — it predates the strategy, it edits `ParsedRecipePage`
+rather than the sink, and its extras are exactly the justification clause 3 asks for. It is recorded here as an
+exception with a reason rather than left as a silent contradiction. **It is not a precedent**: a new source
+citing capture to skip the sink is the review block D7 describes.
+
+### Amd1-D3 — D7's guardrail, restated to match
+
+A change that turns a new source into a recipe must: route LLM extraction through `RecipeExtractionClient`;
+reuse an existing deterministic extractor where the source is structured; **terminate in `RecipeEditorDraft`**;
+and **commit through the save path its identity class dictates**. A PR adding a fifth bespoke parser, a second
+"text→recipe" model call, a new terminal draft type, or a third save path is a review block. Unchanged in spirit;
+now stated in terms the code actually supports.
+
 ## Open questions
 
 - **OQ1 — one entry point for paste + workbench-return + menu-note, or per-source?** All three are "free text
   → recipe." Decide when paste-text is scoped; until then each keeps its own thin entry and shares the engine.
+  **Answered 2026-08-07 by [ADR-0053](ADR-0053-create-recipe-destination.md):** paste and typed text get **one
+  first-class destination** (Create Recipe, reached from the library `+`), and the workbench-return and menu-note
+  entries **stay where they are** — each belongs to a subject (a workbench, a menu) and arriving via the library
+  would be the wrong door. See ADR-0053 OQ5 for the residue.
 - **OQ2 — do the two waypoints ever merge into one source-neutral draft envelope?** *Lean: no* — they carry
   genuinely different extras. Revisit only if a third envelope appears that adds nothing new.
 - **OQ3 — the menu-note LLM-fallback tier (D6),** triggered by paste-text. Offer-don't-impose if built.
