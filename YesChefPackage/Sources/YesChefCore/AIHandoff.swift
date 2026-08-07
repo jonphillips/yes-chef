@@ -82,6 +82,7 @@ public enum AIHandoffTaskType: String, Codable, QueryBindable, QueryDecodable, S
   case readerFeedbackCuration
   case workbenchCompare
   case workbenchExperiments
+  case workbenchDraft
 
   public var title: String {
     switch self {
@@ -97,6 +98,7 @@ public enum AIHandoffTaskType: String, Codable, QueryBindable, QueryDecodable, S
     case .readerFeedbackCuration: "Reader Feedback"
     case .workbenchCompare: "Compare"
     case .workbenchExperiments: "Experiments"
+    case .workbenchDraft: "Draft"
     }
   }
 }
@@ -462,6 +464,7 @@ public enum AIHandoffToken {
     case mealPlanComplement
     case readerFeedbackCuration
     case workbenchExperiments
+    case workbenchDraft
 
     var discussInstruction: String {
       switch self {
@@ -483,6 +486,8 @@ public enum AIHandoffToken {
         "the paste-ready reader-feedback points"
       case .workbenchExperiments:
         "the proposed experiments"
+      case .workbenchDraft:
+        "the drafted recipe as the schema.org Recipe JSON-LD block described above, then its rationale as a separate block"
       }
     }
 
@@ -506,6 +511,8 @@ public enum AIHandoffToken {
         "Return the completed reader-feedback curation in your first response when useful tips exist."
       case .workbenchExperiments:
         "Return the proposed experiments in your first response when the workbench needs them."
+      case .workbenchDraft:
+        "Return the drafted recipe as the schema.org Recipe JSON-LD block described above, then its rationale as a separate block, in your first response."
       }
     }
 
@@ -790,6 +797,7 @@ public enum AIHandoffReview: Equatable, Sendable {
   case mealPlanComplement(AIHandoffMealPlanComplementReview)
   case workbenchCompare(AIHandoffWorkbenchCompareReview)
   case workbenchExperiments(AIHandoffWorkbenchExperimentsReview)
+  case workbenchDraft(AIHandoffWorkbenchDraftReview)
 
   public var handoffID: AIHandoff.ID {
     switch self {
@@ -803,6 +811,7 @@ public enum AIHandoffReview: Equatable, Sendable {
     case let .mealPlanComplement(review): review.handoffID
     case let .workbenchCompare(review): review.handoffID
     case let .workbenchExperiments(review): review.handoffID
+    case let .workbenchDraft(review): review.handoffID
     }
   }
 }

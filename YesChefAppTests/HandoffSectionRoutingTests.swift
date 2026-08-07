@@ -104,6 +104,31 @@ struct HandoffSectionRoutingTests {
   }
 
   @Test
+  @MainActor
+  func workbenchDraftReviewStagesTheRecipeEvenWhenTheRationaleIsMissing() {
+    // ADR-0042 S3b: a draft that omitted the rationale block (it argued it in-thread) must still
+    // stage the recipe item — the review sheet fills the empty rationale — alongside its learnings.
+    let coordinator = HandoffReviewCoordinator()
+    let review = AIHandoffWorkbenchDraftReview(
+      handoffID: UUID(uuidString: "00000000-0000-0000-0000-000000003940")!,
+      workbenchID: UUID(uuidString: "00000000-0000-0000-0000-000000003941")!,
+      draftRecipe: WorkbenchDraftRecipe(
+        title: "No-Rationale Dish",
+        ingredientLines: ["1 egg"],
+        instructionLines: ["Cook it."],
+        rationale: ""
+      ),
+      learnings: ["Eggs are a constraint."]
+    )
+
+    let items = coordinator.workbenchDraftReviewItems(for: review)
+
+    #expect(items.count == 2)
+    #expect(items.first?.commitTitle == "Create Working Recipe")
+    #expect(items.last?.commitTitle == "Save to Workbench Log")
+  }
+
+  @Test
   func recipeAdjustmentRoundTripKeepsTheTokenContractMarkerProseAndLearnings() throws {
     let handoffID = UUID(uuidString: "00000000-0000-0000-0000-000000003903")!
     let result = """

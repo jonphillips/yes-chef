@@ -9,6 +9,49 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0042 Amendment 2 — `workbenchDraft` hand-off (S3a + S3b): draft a working recipe outboard
+
+**Built + architect-reviewed + device-passed 2026-08-07; PR [#289](https://github.com/jonphillips/yes-chef/pull/289).**
+Un-defers ADR-0042 S3 on a *cost* want (draft against a flat-rate ChatGPT/Claude subscription instead of the
+metered onboard synthesis). **Schema-free** — `AIHandoff` is device-local, so **nothing on the prod-schema
+promotion list, no `YC-CONTRACT` bump.** The first path built to [ADR-0051](decisions/ADR-0051-text-to-recipe-extraction-strategy.md).
+
+**What it does.** The Working Recipe section gains a **Copy Draft Prompt + Paste** door (gated on the onboard
+verb's own conditions: no working recipe yet, ≥1 candidate). The outboard argues a draft out and `finalize`
+returns a schema.org `Recipe` **JSON-LD** block + a separate prose rationale block. The return is **extraction,
+not synthesis** — the existing deterministic `RecipeJSONLDExtractor` parses it **for free** (new raw-block
+entry `extract(fromJSONLD:)`, no synthetic `<script>`), into `WorkbenchDraftRecipe` → the **existing** draft
+review sheet → `createDraftRecipe` (Create Working Recipe → Promote). Learnings deposit to the workbench log as
+an `.observation` row. A declined/empty draft degrades **loud** (`.emptyPlan`).
+
+**The hand-run finding that shaped S3b.** The paste path autoformats JSON delimiters into typographic/curly
+quotes — the transport-level mangling Amd2-OQ3 anticipated — and the old `cleanedJSON` salvage would *not* have
+rescued it (it **deleted** curly quotes, leaving invalid unquoted JSON). Fixed deterministically: the salvage
+now **replaces** curly doubles with `"` and curly singles with `'` (so `Cook's` survives), no metered rescue.
+
+**Architect-review fixes before approval (all with regression tests).** (1) The outboard door was ungated —
+it invited a round trip that could only fail with `draftRecipeAlreadyExists`; now gated. (2) A draft that
+omitted the rationale block (argued it in-thread) was discarded whole; the declined test is now the ADR's — *no
+ingredients and no instructions* — and a missing rationale stages as an empty field, with the recipe and
+learnings as independent review items; a rationale written *before* the JSON is also recovered. (3) Ingredient
+group headings were silently deleted; now re-inlined as colon-terminated lines the editor reads back
+(ADR-0040 lossless). (4) A stray Markdown code fence leaked into the rationale; now stripped. (5) Shared the
+learnings review item with the compare verb.
+
+**Resolved (recorded in the ADR).** Amd2-OQ1 — keep the two-part return (the real learnings were dish
+constraints / rejected candidates, not restatement). Amd2-OQ3 — the paste path *does* mangle JSON-LD; the free
+deterministic curly→straight salvage handles it, loud fallback, no metered rescue. Amd2-OQ4 — a raw-block
+extractor entry point, not HTML-wrapping.
+
+**Verified.** Core `swift build` + 13 `workbenchDraft` tests (curly-quote round-trip, declined-loud,
+malformed-past-salvage, ingredient-heading re-inline, missing-rationale-stages, rationale-before-JSON,
+fence-strip, JSON-LD/rationale split) + 143 in the AIHandoff/Workbench/capture filter; elevated
+`generic/platform=iOS` build; `YesChefTests` app-target suite (35 tests / 12 suites, incl. a new review-staging
+test); `scripts/check-drift.sh` clean of the S3 files. **Device gate: PASSED 2026-08-07** (Jon). Note: the
+draft's instruction `HowToSection` groupings flatten (single instruction section by construction); the
+`learnings + unparsedLines` combine is a flagged verb-local patch of the known `learningBullets` floor bug.
+
+---
 ## ADR-0021 Amendment 4 V4c — the two structural step ops + a variation Delete affordance
 
 **Architect review 2026-08-06.** Decision: [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4

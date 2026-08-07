@@ -166,7 +166,8 @@ private enum AIHandoffReviewStager {
         handoffID: handoff.id, menuID: menu.id, plan: returned.plan, unparsedBlocks: returned.unparsedBlocks
       ))
     case .recipeMakeAhead, .chefItUp, .serveWith, .adjustRecipe, .mealPlanMakeAheadStrategy,
-      .mealPlanComplement, .readerFeedbackCuration, .workbenchCompare, .workbenchExperiments:
+      .mealPlanComplement, .readerFeedbackCuration, .workbenchCompare, .workbenchExperiments,
+      .workbenchDraft:
       throw AIHandoffIntentImportError.wrongTask
     }
   }
@@ -210,7 +211,7 @@ private enum AIHandoffReviewStager {
         learnings: returned.learnings
       ))
     case .prepPlan, .mealPlanMakeAheadStrategy, .mealPlanComplement, .menuComplement,
-      .readerFeedbackCuration, .workbenchCompare, .workbenchExperiments:
+      .readerFeedbackCuration, .workbenchCompare, .workbenchExperiments, .workbenchDraft:
       throw AIHandoffIntentImportError.wrongTask
     }
   }
@@ -239,7 +240,7 @@ private enum AIHandoffReviewStager {
         plan: returned.plan, unparsedBlocks: returned.unparsedBlocks
       ))
     case .prepPlan, .recipeMakeAhead, .chefItUp, .serveWith, .adjustRecipe, .menuComplement,
-      .readerFeedbackCuration, .workbenchCompare, .workbenchExperiments:
+      .readerFeedbackCuration, .workbenchCompare, .workbenchExperiments, .workbenchDraft:
       throw AIHandoffIntentImportError.wrongTask
     }
   }
@@ -269,6 +270,21 @@ private enum AIHandoffReviewStager {
       guard !returned.experiments.isEmpty else { throw AIHandoffIntentImportError.emptyPlan }
       return .workbenchExperiments(AIHandoffWorkbenchExperimentsReview(
         handoffID: handoff.id, workbenchID: handoff.sourceID, experiments: returned.experiments
+      ))
+    case .workbenchDraft:
+      // Extraction, not synthesis (ADR-0042 Amd 2): the outboard's schema.org JSON-LD is parsed for
+      // free by the deterministic extractor into the existing draft. A declined/empty draft degrades
+      // to a loud `.emptyPlan` rather than promoting an empty recipe into review.
+      let returned = AIHandoffReturn.workbenchDraft(from: payload, capturedAt: handoff.createdAt)
+      // `fromJSONLD` returns nil only for the ADR declined case (no ingredients and no
+      // instructions); a missing rationale is not a decline, so do not gate on `isEmpty` (which is
+      // rationale-sensitive) — the review sheet fills an empty rationale.
+      guard let draftRecipe = returned.draftRecipe else {
+        throw AIHandoffIntentImportError.emptyPlan
+      }
+      return .workbenchDraft(AIHandoffWorkbenchDraftReview(
+        handoffID: handoff.id, workbenchID: handoff.sourceID,
+        draftRecipe: draftRecipe, learnings: returned.learnings
       ))
     case .prepPlan, .learning, .recipeMakeAhead, .chefItUp, .serveWith, .adjustRecipe,
       .mealPlanMakeAheadStrategy, .mealPlanComplement, .menuComplement, .readerFeedbackCuration:

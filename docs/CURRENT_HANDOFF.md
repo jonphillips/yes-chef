@@ -22,12 +22,49 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**The facet/labeling gate is cleared and the variation-anchor data-loss arc is fixed and device-passed;
-ADR-0021 V4a (Choices section) is shipped, merged, and device-passed — no hard-gated dispatch is queued.**
-Amendment 4's deterministic floor, V4a, and variation-anchor-repair **Dispatch 0 (+3) and Dispatch 1** all
-shipped, merged, and device-passed 2026-08-05, now archived to [`DONE-LOG.md`](DONE-LOG.md). Filling in
-per-recipe facet/tag coverage is Jon's ongoing hand work (Edit Tags + DEBUG Facet Coverage) that **gates
-nothing**.
+**Next Up → paste text → recipe: the [ADR-0051](decisions/ADR-0051-text-to-recipe-extraction-strategy.md)
+paste-text front-end.** Jon's want: paste unstructured recipe text and create a recipe. This is the **fifth
+source** in ADR-0051's table — a *new front-end*, governed by the strategy, **not** a new parser. Build it to
+D1–D7:
+
+- **Front-end (D4, two-tier).** The pasted text goes through the capture engine's pattern: if it happens to be
+  schema.org markup/JSON-LD, the deterministic `RecipeJSONLDExtractor` parses it **free**; otherwise the LLM
+  engine `RecipeExtractionClient` extracts it **faithfully** (never invent). Plain pasted recipe text — the
+  common case — is the LLM path.
+- **Sink (D1).** → `RecipeExtraction` core → **`RecipeEditorDraft`** → the **existing** review sheet →
+  `RecipeCore.save(draft:)`. **No new save path, review surface, or terminal draft type.**
+- **This slice triggers the D5 lift.** Paste-text is the **second real consumer of `RecipeExtractionClient`**
+  (web is the first; the S3 workbench return used the *deterministic* JSON-LD extractor, not the LLM client).
+  So **rename + relocate `RecipeExtractionClient` out of the `WebRecipeCapture` namespace** to a source-neutral
+  home and rename its vestigial `structuredPageText` parameter → `text`. Do it here, deliberately (D5).
+- **Guardrail (D7, Standing).** A fifth bespoke parser, a second "text→recipe" model call, or a new terminal
+  draft type is a **review block**. Route through the seam.
+- **Deferred, do NOT build (D6/OQ3).** Paste-text *triggers* the menu-note LLM-fallback question — it is a
+  separate offer-don't-impose decision; do not fold it in on this momentum.
+
+**Open for Jon before dispatch:** (a) **OQ1 — the entry point.** Where does "Paste recipe text" live (the
+library add menu? a share-sheet? its own screen?), and does it share one entry with the workbench-return /
+menu-note surfaces or keep a thin per-source entry (ADR lean: its own thin entry, shared engine)? (b) the
+default tier for the LLM extraction (frontier vs on-device — [[personal-app-latency-tolerance]] says a slow,
+good answer is fine).
+
+**Verify** per [[lean-verification-default]]: `swift build` + Core tests (pasted plain text →
+`RecipeExtraction` → `RecipeEditorDraft` round-trip; a JSON-LD paste takes the deterministic path; an
+empty/garbage paste degrades **loud**), one elevated `generic/platform=iOS` build (`xcodegen generate` if new
+`YesChefApp/` files), `scripts/check-drift.sh`; **Jon device-passes** paste → review → save.
+
+*(ADR-0042 Amendment 2 `workbenchDraft` S3a + S3b is **built, device-passed 2026-08-07, and recorded in
+[`DONE-LOG.md`](DONE-LOG.md)**; PR [#289](https://github.com/jonphillips/yes-chef/pull/289). Schema-free,
+nothing on the promotion list. It is the first path built to ADR-0051.)*
+
+---
+
+**Prior candidates (queue — not the designated target):** the facet/labeling gate is cleared and the
+variation-anchor data-loss arc is fixed and device-passed; ADR-0021 V4a (Choices section) is shipped, merged,
+and device-passed. Amendment 4's deterministic floor, V4a, and variation-anchor-repair **Dispatch 0 (+3) and
+Dispatch 1** all shipped, merged, and device-passed 2026-08-05, now archived to [`DONE-LOG.md`](DONE-LOG.md).
+Filling in per-recipe facet/tag coverage is Jon's ongoing hand work (Edit Tags + DEBUG Facet Coverage) that
+**gates nothing**.
 
 **The remaining ADR-0021 Amendment 4 work is V4b** (V4a and V4c done), plus **anchor-repair Dispatch 2** (the
 in-app repair UI). Dispatch 1 left `resolved(applying:)` **read-lenient / write-strict** — an orphaned anchor
@@ -49,17 +86,8 @@ rather than feed an LLM a partial recipe. Live candidates:
   "wait until primary facets classify a majority of the library" gate is **retired** — the manual backfill no
   longer gates anything (Jon, 2026-08-05). Needs its own scoping pass. (Amd4-OQ1 wants variation/related-recipe
   indexing answered while `RecipeBrowserQuery` is still being designed.)
-- **[ADR-0042](decisions/ADR-0042-workbench-handoff-and-the-return-block.md) Amendment 2 — `workbenchDraft`
-  outboards (RATIFIED 2026-08-05).** Un-defers S3: draft the working recipe in a flat-rate subscription thread
-  instead of the metered onboard synthesis. The return is **extraction, not synthesis** — outboard emits
-  schema.org JSON-LD, parsed **free** by the existing deterministic `RecipeJSONLDExtractor` into
-  `WorkbenchDraftRecipe`, landing in the existing draft review + promote path. Schema-free, no contract bump,
-  `.workbenchDraft` is device-local. **Gate: S3a (the door out + the ask) ships first, then Jon hand-runs a
-  real finalize to confirm the JSON-LD block survives the paste path, *before* S3b wires the import.** Do not
-  add a new recipe-text parser and do not route through `WorkbenchDraftRecipeClient` (that re-invents). The
-  paste-text / photo-OCR surfaces are the *same* extraction seam — out of scope here, do not build. **This is
-  the first path built to [ADR-0051](decisions/ADR-0051-text-to-recipe-extraction-strategy.md)** (the
-  consolidated text→recipe strategy + no-fork guardrail — see Standing guards).
+  *(ADR-0042 Amendment 2 `workbenchDraft` is now the Next Up item above — S3a built, S3b gated on the
+  hand-run — so it is no longer listed as a loose candidate here.)*
 - **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell.** Unblocked
   since 2026-07-25; moves all eight chat call sites onto one Ask. Ready but larger.
 - **Grocery learned area table = [ADR-0052](decisions/ADR-0052-grocery-learned-area-table.md) (ratified
@@ -103,11 +131,10 @@ section is work.**
   delta-vocabulary decision and it is **ADR-0021's** — do not extend the delta ops on this momentum. **Note:
   Amd4-D4's two step ops (`stepInsert`/`stepRemove`) were the sanctioned widening and have now shipped (V4c);
   the vocabulary is closed again, so a *section* op still needs its own ADR decision, not this momentum.**
-- **ADR-0042 S3 (`workbenchDraft`) is RATIFIED (Amendment 2, 2026-08-05) and queued in Next Up** — the
-  concrete want is *cost* (draft against a flat-rate subscription, not the metered onboard synthesis). The
-  return is **extraction, not synthesis**: the outboard emits schema.org JSON-LD, parsed for free by the
-  existing deterministic `RecipeJSONLDExtractor` — **do not build a new recipe-text parser** (Amd2-D2/D5).
-  There is no S5.
+- **ADR-0042 S3 (`workbenchDraft`) is DONE — S3a + S3b built, device-passed 2026-08-07 (PR #289),
+  recorded in [`DONE-LOG.md`](DONE-LOG.md).** The return is **extraction, not synthesis** (schema.org JSON-LD
+  → the deterministic `RecipeJSONLDExtractor`); **do not build a new recipe-text parser** (Amd2-D2/D5). There
+  is no S5. Amd2-OQ1/OQ3/OQ4 are resolved (see the ADR). It is the first path built to ADR-0051.
 - **`PlaybookSectionMeta` is not queued anywhere — do not resurrect it.** ADR-0041 closed at S2.6, S3
   withdrawn ([Amd 3](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-3--s3-is-withdrawn-the-conversation-url-does-not-exist-2026-07-19)).
   If section provenance is ever wanted it designs its own storage against its own consumer

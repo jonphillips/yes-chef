@@ -268,11 +268,13 @@ extension HandoffExportSource {
 enum WorkbenchHandoffTask: Sendable {
   case compare
   case experiments
+  case draft
 
   var handoffTaskType: AIHandoffTaskType {
     switch self {
     case .compare: .workbenchCompare
     case .experiments: .workbenchExperiments
+    case .draft: .workbenchDraft
     }
   }
 }
@@ -688,6 +690,9 @@ enum HandoffAppOperations {
       case .experiments:
         context = workbenchContext.experimentsHandoffPrompt()
         deliverableFormat = .workbenchExperiments
+      case .draft:
+        context = workbenchContext.draftHandoffPrompt()
+        deliverableFormat = .workbenchDraft
       }
       let prompt = AIHandoffToken.prompt(
         handoffID: handoffID,
