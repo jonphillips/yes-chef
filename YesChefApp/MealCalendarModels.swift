@@ -36,6 +36,12 @@ final class MealCalendarModel {
   var isShowingError = false
   var toastCenter: AppToastCenter?
 
+  /// Wired by the app container to the grocery model's immediate add. Kept as a closure so the
+  /// Meal Calendar can push a day into groceries without owning a reference to the grocery model
+  /// (the grocery model already reaches the other way, pulling meal rows into its review sheet).
+  @ObservationIgnored
+  var onAddDayToGroceries: (@MainActor ([MealPlanItemRowData]) -> Void)?
+
   init(selectedDate: Date = Date(), toastCenter: AppToastCenter? = nil) {
     self.selectedDate = Calendar.autoupdatingCurrent.startOfDay(for: selectedDate)
     self.toastCenter = toastCenter
@@ -89,6 +95,17 @@ final class MealCalendarModel {
 
   var selectedDayRows: [MealPlanItemRowData] {
     rows(on: selectedDate)
+  }
+
+  /// True only when the grocery entry point is wired and the selected day has at least one recipe
+  /// row worth shopping — note-only days have nothing to add.
+  var canAddSelectedDayToGroceries: Bool {
+    onAddDayToGroceries != nil
+      && selectedDayRows.contains { $0.item.kind == .recipe && $0.item.recipeID != nil }
+  }
+
+  func addSelectedDayToGroceriesButtonTapped() {
+    onAddDayToGroceries?(selectedDayRows)
   }
 
   var itemRows: [MealPlanItemRowData] {

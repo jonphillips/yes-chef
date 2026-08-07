@@ -556,6 +556,52 @@ final class GroceryLibraryModel {
     }
   }
 
+  /// Adds every recipe row for a day straight to the selected (or default) grocery list, with no
+  /// review sheet. The review-sheet `destination` is presented in the Grocery tab's own view
+  /// hierarchy, so a call originating in the Meal Calendar (a different tab) has nowhere to show it
+  /// — this immediate path is the Meal-Calendar entry point (item 2). A success toast stands in for
+  /// the sheet's confirmation.
+  @discardableResult
+  func addMealRowsImmediately(_ rows: [MealPlanItemRowData]) -> Bool {
+    let recipeRows = rows.filter { $0.item.kind == .recipe && $0.item.recipeID != nil }
+    guard !recipeRows.isEmpty else { return false }
+    let date = recipeRows.first?.item.scheduledDate
+    do {
+      let selectedListID = selectedListID
+      let result = try database.write { db -> (CoreGroceryList.ID, Int) in
+        let listID = try selectedOrDefaultGroceryListID(
+          selectedListID,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+        let itemIDs = try GroceryRepository.addMealPlanRows(
+          recipeRows,
+          groceryListID: listID,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+        return (listID, itemIDs.count)
+      }
+      self.selectedListID = result.0
+      toastCenter?.postSuccess(
+        GroceryAddConfirmation(
+          sourceTitle: date?.formatted(.dateTime.month(.abbreviated).day()) ?? "Meal Plan",
+          sourceSubtitle: "Meal Calendar",
+          listTitle: title(forList: result.0),
+          ingredientCount: result.1
+        ).message
+      )
+      scheduleCategorization()
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
   func addRecipeButtonTapped(
     recipeID: Recipe.ID,
     scaleContext: ScaleContext? = nil
@@ -813,6 +859,14 @@ extension GroceryLibraryModel {
       }
       self.selectedListID = listID
       destination = nil
+      toastCenter?.postSuccess(
+        GroceryAddConfirmation(
+          sourceTitle: title,
+          sourceSubtitle: nil,
+          listTitle: self.title(forList: listID),
+          ingredientCount: nil
+        ).message
+      )
       scheduleCategorization()
       return true
     } catch {

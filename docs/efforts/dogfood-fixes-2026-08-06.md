@@ -104,6 +104,12 @@ lightweight, reusable toast, then call it from the grocery add path," not "drop 
 Worth doing as a shared treatment since it'll be reused well beyond grocery. **Size:** small (plus a
 one-time primitive).
 
+### B3 — Add-item field keyboard traps the tab bar (item 7, added 2026-08-06)
+
+See screenshot: the grocery **Add Item** input field keeps keyboard focus with no way to defocus, so the
+keyboard stays up and covers the bottom Tabs on iPhone. Need a way to dismiss the keyboard (submit clears
+focus / scroll-to-dismiss / tap-away) so the tab bar is reachable again. **Size:** small, view layer only.
+
 ---
 
 ## Thread C — Label suggestions (items 4 + 6)

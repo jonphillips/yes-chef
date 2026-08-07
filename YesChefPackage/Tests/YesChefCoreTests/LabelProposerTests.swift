@@ -254,7 +254,44 @@ extension RecipeCoreTests {
         )
       )
 
-      expectNoDifference(suggestions, [.existingCategory(chicken), .existingCategory(fry)])
+      // The protein floor scans every ingredient line now, not just the first, so the eggs on the
+      // second line surface as a reviewable suggestion. Cuisine ("American") is not a whole word in
+      // the title, so it stays out; the title-only Salad/dish-type evidence is likewise absent.
+      expectNoDifference(
+        suggestions,
+        [.existingCategory(chicken), .existingCategory(eggs), .existingCategory(fry)]
+      )
+    }
+
+    @Test
+    func deterministicFloorMatchesInVocabularyCuisineInTitle() {
+      let cuisine = Facet(id: SampleUUIDSequence.uuid(70_331), name: "Cuisine", sortOrder: 0, dateCreated: .distantPast)
+      let thai = Category(id: SampleUUIDSequence.uuid(70_332), name: "Thai", facetID: cuisine.id, sortOrder: 0, dateCreated: .distantPast)
+      let italian = Category(id: SampleUUIDSequence.uuid(70_333), name: "Italian", facetID: cuisine.id, sortOrder: 1, dateCreated: .distantPast)
+
+      let suggestions = LabelProposer.floor(
+        recipe: .init(title: "Thai Green Curry"),
+        vocabulary: .init(facets: [cuisine], categories: [thai, italian])
+      )
+
+      expectNoDifference(suggestions, [.existingCategory(thai)])
+    }
+
+    @Test
+    func deterministicFloorScansEveryIngredientLineForProtein() {
+      let protein = Facet(id: SampleUUIDSequence.uuid(70_336), name: "Protein", sortOrder: 0, dateCreated: .distantPast)
+      let pork = Category(id: SampleUUIDSequence.uuid(70_337), name: "Pork", facetID: protein.id, sortOrder: 0, dateCreated: .distantPast)
+
+      let suggestions = LabelProposer.floor(
+        recipe: .init(
+          title: "Spanish Pork Bites",
+          ingredientLines: ["2 tablespoons olive oil", "1 teaspoon salt", "1 pound pork shoulder, cubed"]
+        ),
+        vocabulary: .init(facets: [protein], categories: [pork])
+      )
+
+      // `.first` was olive oil; the headline protein on line three would have been missed before.
+      expectNoDifference(suggestions, [.existingCategory(pork)])
     }
 
     @Test

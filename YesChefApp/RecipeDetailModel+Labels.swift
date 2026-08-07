@@ -1,3 +1,4 @@
+import LLMClientKit
 import Observation
 import YesChefCore
 
@@ -63,7 +64,23 @@ extension RecipeDetailModel {
             categories: try Category.fetchAll(db)
           )
         }
-        let proposal = try await labelProposer(recipe: detail.labelProposalRecipe, vocabulary: vocabulary)
+        // This is a user-tapped action on an existing recipe — the cook taps Suggest and waits, so
+        // it can afford the better tier for the "name the cuisine" judgment the on-device model is
+        // weakest at ([[personal-app-latency-tolerance]]). Resolve from the same AI-settings
+        // preferences the chat uses; `.onDeviceCompatible` degrades to on-device when no frontier
+        // key is configured or the cook has chosen on-device, so nothing changes for those users.
+        let availableProviders = FrontierProvider.allCases.filter { apiKeyStore.key($0) != nil }
+        let resolvedTier = try resolveTier(
+          useFrontier: labelTierPreference.current(),
+          preferredProvider: labelProviderPreference.current(),
+          availableProviders: availableProviders,
+          requirement: .onDeviceCompatible
+        )
+        let proposal = try await labelProposer(
+          recipe: detail.labelProposalRecipe,
+          vocabulary: vocabulary,
+          tier: resolvedTier.tier
+        )
         labelState.suggestions = proposal.accepted
       } catch is CancellationError {
       } catch {

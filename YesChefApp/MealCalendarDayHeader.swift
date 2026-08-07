@@ -16,7 +16,7 @@ struct MealCalendarDayHeader: View {
         Spacer()
         cookButton
         chatButton
-        handoffControls
+        dayActionsMenu
         addMenu
       }
       VStack(alignment: .leading, spacing: 12) {
@@ -27,7 +27,7 @@ struct MealCalendarDayHeader: View {
         }
         HStack {
           chatButton
-          handoffControls
+          dayActionsMenu
           addMenu
           Spacer()
         }
@@ -65,24 +65,39 @@ struct MealCalendarDayHeader: View {
     }
   }
 
+  /// Per-day overflow menu. Hosts the grocery add (item 2) alongside the hand-off actions so a cook
+  /// can send a whole day to their list without switching to the Grocery tab. Shows whenever either
+  /// affordance is available.
   @ViewBuilder
-  private var handoffControls: some View {
-    if let handoffSource, let complementHandoffSource {
+  private var dayActionsMenu: some View {
+    if model.canAddSelectedDayToGroceries || (handoffSource != nil && complementHandoffSource != nil) {
       Menu {
-        HandoffMenuActions(
-          handoffSource: handoffSource,
-          complementHandoffSource: complementHandoffSource,
-          transport: handoffTransport,
-          prepLabel: "Handoff Make-ahead",
-          pastePrepLabel: "Paste Make-ahead",
-          complementLabel: "Handoff Complement",
-          pasteComplementLabel: "Paste Complement"
-        )
+        if model.canAddSelectedDayToGroceries {
+          Button {
+            model.addSelectedDayToGroceriesButtonTapped()
+          } label: {
+            Label("Add Day to Groceries", systemImage: "cart.badge.plus")
+          }
+        }
+
+        if let handoffSource, let complementHandoffSource {
+          Section {
+            HandoffMenuActions(
+              handoffSource: handoffSource,
+              complementHandoffSource: complementHandoffSource,
+              transport: handoffTransport,
+              prepLabel: "Handoff Make-ahead",
+              pastePrepLabel: "Paste Make-ahead",
+              complementLabel: "Handoff Complement",
+              pasteComplementLabel: "Paste Complement"
+            )
+          }
+        }
       } label: {
-        Label("Day handoff actions", systemImage: "ellipsis.circle")
+        Label("Day actions", systemImage: "ellipsis.circle")
           .labelStyle(.iconOnly)
       }
-      .accessibilityLabel("Day handoff actions")
+      .accessibilityLabel("Day actions")
     }
   }
 

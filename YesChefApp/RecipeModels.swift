@@ -1,5 +1,6 @@
 import CasePaths
 import Dependencies
+import LLMClientKit
 import Observation
 import SwiftUI
 import WebExtractorKit
@@ -840,6 +841,12 @@ final class RecipeDetailModel {
   @Dependency(\.uuid) var uuid
   @ObservationIgnored
   @Dependency(\.labelProposer) var labelProposer
+  @ObservationIgnored
+  @Dependency(\.apiKeyStore) var apiKeyStore
+  @ObservationIgnored
+  @Dependency(\.recipeChatProviderPreference) var labelProviderPreference
+  @ObservationIgnored
+  @Dependency(\.recipeChatTierPreference) var labelTierPreference
   @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
   @ObservationIgnored

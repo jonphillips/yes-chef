@@ -129,6 +129,8 @@ struct GroceryDetailView: View {
             )
           }
         }
+        // Dragging the list dismisses the keyboard so it stops covering the tab bar on iPhone.
+        .scrollDismissesKeyboard(.immediately)
         .safeAreaInset(edge: .top, spacing: 0) {
           GroceryRapidAddField(model: model)
             .attentionCard()
@@ -767,6 +769,14 @@ private struct GroceryRapidAddField: View {
           .onSubmit(commit)
           .textInputAutocapitalization(.never)
           .autocorrectionDisabled()
+          .toolbar {
+            // The field re-focuses after each add for rapid entry, so without an explicit dismiss
+            // the keyboard stays up and covers the tab bar on iPhone. Give it a Done affordance.
+            ToolbarItemGroup(placement: .keyboard) {
+              Spacer()
+              Button("Done") { isFocused = false }
+            }
+          }
 
         Button(action: commit) {
           Image(systemName: "plus.circle.fill")

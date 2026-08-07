@@ -24,10 +24,17 @@ struct AppContainer: View {
 
   init() {
     let toastCenter = AppToastCenter()
+    let mealCalendarModel = MealCalendarModel(toastCenter: toastCenter)
+    let groceryModel = GroceryLibraryModel(toastCenter: toastCenter)
+    // Push a day's recipes into the grocery list from the Meal Calendar without either model
+    // holding the other (item 2). The immediate add toasts on its own.
+    mealCalendarModel.onAddDayToGroceries = { [weak groceryModel] rows in
+      groceryModel?.addMealRowsImmediately(rows)
+    }
     _toastCenter = State(wrappedValue: toastCenter)
-    _mealCalendarModel = State(wrappedValue: MealCalendarModel(toastCenter: toastCenter))
+    _mealCalendarModel = State(wrappedValue: mealCalendarModel)
     _menuModel = State(wrappedValue: MenuLibraryModel(toastCenter: toastCenter))
-    _groceryModel = State(wrappedValue: GroceryLibraryModel(toastCenter: toastCenter))
+    _groceryModel = State(wrappedValue: groceryModel)
   }
 
   var body: some View {

@@ -261,6 +261,12 @@ extension LabelProposer: DependencyKey {
     Prefer exact existing paths over new labels. A new child under an existing category is cheaper than a new
     loose label; a new namespace is the most expensive and should be exceptional. Do not duplicate suggestions,
     invent paths that cannot be mapped to the supplied tree, or suggest irrelevant labels.
+
+    Cuisine is the exception to the prefer-existing rule. When a recipe's title or origin clearly names a
+    cuisine that is not already in the Cuisine group (e.g. "Spanish", "Peruvian", "Ethiopian"), propose it as a
+    newChild under Cuisine — never force the nearest existing cuisine. Naming the correct new cuisine is better
+    than assigning a wrong existing one; "Spanish Style Garlic Shrimp" should yield newChild ["Cuisine","Spanish"],
+    not existingCategory ["Cuisine","Italian"].
     """
 
   static func prompt(recipe: LabelProposalRecipe, vocabulary: LabelVocabulary) -> String {
@@ -356,8 +362,13 @@ extension LabelProposer: DependencyKey {
     // These are English starter-facet names. A user rename deliberately opts that facet out of
     // this best-effort floor; the model proposal remains available for it.
     if let protein = categories(inFacetNamed: "Protein", vocabulary: vocabulary) {
-      let primaryIngredient = recipe.ingredientLines.first ?? ""
-      append(protein.filter { containsWholeWords($0.name, in: primaryIngredient) })
+      // Scan every ingredient line, not just the first: the headline protein rarely sits on line 1
+      // (usually oil / salt / an aromatic), so `.first` structurally under-fired — "Spanish Pork
+      // Bites" got nothing. Match per line so words from adjacent lines can't fuse into a false
+      // whole-word hit. Recall over precision here: the floor only proposes, the cook still reviews.
+      append(protein.filter { category in
+        recipe.ingredientLines.contains { containsWholeWords(category.name, in: $0) }
+      })
     }
 
     if let technique = categories(inFacetNamed: "Technique", vocabulary: vocabulary) {
@@ -367,6 +378,13 @@ extension LabelProposer: DependencyKey {
 
     if let dishType = categories(inFacetNamed: "Dish Type", vocabulary: vocabulary) {
       append(dishType.filter { containsWholeWords($0.name, in: recipe.title) })
+    }
+
+    // Cuisine was excluded from the floor by design, so even in-vocabulary cuisines ("Thai Green
+    // Curry" → Thai) depended entirely on the model. A whole-word title match against existing
+    // Cuisine values is cheap and reviewable; the model still covers cuisines named only by origin.
+    if let cuisine = categories(inFacetNamed: "Cuisine", vocabulary: vocabulary) {
+      append(cuisine.filter { containsWholeWords($0.name, in: recipe.title) })
     }
 
     return suggestions
