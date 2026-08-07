@@ -6,9 +6,10 @@ import YesChefCore
 /// memory just starts typing into the form; a cook with text to paste drops it in the compose box and
 /// extracts. Nothing is written until Save (D4).
 struct CreateRecipeView: View {
-  @Environment(\.dismiss) private var dismiss
-  let libraryModel: RecipeLibraryModel
   let model: CreateRecipeModel
+  /// Called with the saved recipe's ID so the app can jump to it in the library. The session is a
+  /// resident sidebar destination, not a modal, so there is nothing to dismiss here.
+  let onSaved: (Recipe.ID) -> Void
   @FocusState private var focusedIngredientSectionID: IngredientSection.ID?
   @FocusState private var focusedIngredientSectionNameID: IngredientSection.ID?
 
@@ -76,8 +77,10 @@ struct CreateRecipeView: View {
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-            .disabled(model.isSaving)
+          Button("Clear", role: .destructive) {
+            model.reset()
+          }
+          .disabled(model.isEmpty || model.isSaving)
         }
         ToolbarItem(placement: .confirmationAction) {
           Button {
@@ -87,8 +90,7 @@ struct CreateRecipeView: View {
             }
             Task {
               if let recipeID = await model.saveButtonTapped() {
-                libraryModel.selectedRecipeID = recipeID
-                dismiss()
+                onSaved(recipeID)
               }
             }
           } label: {

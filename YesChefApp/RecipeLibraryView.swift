@@ -12,6 +12,7 @@ struct AppContainer: View {
   @Dependency(\.handoffReviewCoordinator) private var handoffReviewCoordinator
   @State private var toastCenter: AppToastCenter
   @State private var recipeModel = RecipeLibraryModel()
+  @State private var createRecipeModel = CreateRecipeModel()
   @State private var workbenchModel = WorkbenchLibraryModel()
   @State private var browserModel = BrowserModel()
   @State private var mealCalendarModel: MealCalendarModel
@@ -53,6 +54,7 @@ struct AppContainer: View {
       mealCalendarModel: mealCalendarModel,
       menuModel: menuModel,
       groceryModel: groceryModel,
+      createRecipeModel: createRecipeModel,
       selectedSection: $selectedSection,
       selectedSettingsPane: $selectedSettingsPane,
       onBrowserCapture: browserCaptureButtonTapped,
@@ -61,7 +63,8 @@ struct AppContainer: View {
       },
       onCookSessionRequested: { presentation in
         presentedCookSession = presentation
-      }
+      },
+      onRecipeCreated: recipeCreated
     )
     .fullScreenCover(item: $presentedRecipe) { presentation in
       RecipeFullScreenCover(
@@ -110,11 +113,6 @@ struct AppContainer: View {
       recipeModel: recipeModel,
       isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil
     )
-    .fullScreenCover(isPresented: $recipeModel.destination.addRecipe) {
-      NavigationStack {
-        CreateRecipeView(libraryModel: recipeModel, model: recipeModel.createModel)
-      }
-    }
     .sheet(isPresented: $recipeModel.destination.captureRecipe) {
       NavigationStack {
         RecipeCaptureView(libraryModel: recipeModel, model: recipeModel.captureModel)
@@ -308,6 +306,15 @@ struct AppContainer: View {
       menuModel: menuModel,
       groceryModel: groceryModel
     )
+  }
+
+  /// A Create Recipe save lands the cook on the recipe they just made (Jon's call): select it in the
+  /// library and switch to Recipes. The Create Recipe session is finished, so its in-memory model is
+  /// replaced with a fresh one for the next visit.
+  @MainActor private func recipeCreated(_ recipeID: Recipe.ID) {
+    recipeModel.selectedRecipeID = recipeID
+    createRecipeModel = CreateRecipeModel()
+    selectedSection = .recipes
   }
 
   @MainActor private func browserCaptureButtonTapped(page: WebPage) async {
@@ -531,12 +538,6 @@ struct RecipeListView: View {
               ? "line.3.horizontal.decrease.circle.fill"
               : "line.3.horizontal.decrease.circle"
           )
-        }
-        .disabled(model.isImporting)
-        Button {
-          model.addRecipeButtonTapped()
-        } label: {
-          Label("Add Recipe", systemImage: "plus")
         }
         .disabled(model.isImporting)
         Button {

@@ -12,7 +12,6 @@ import YesChefCore
 final class RecipeLibraryModel {
   @CasePathable
   enum Destination {
-    case addRecipe
     case captureRecipe
     case editRecipe(Recipe.ID)
     case originalSnapshot(Recipe.ID)
@@ -45,7 +44,6 @@ final class RecipeLibraryModel {
   var isPresentingPaprikaImporter = false
   var isPresentingPaprikaBackupSupplementer = false
   var captureModel = RecipeCaptureModel()
-  var createModel = CreateRecipeModel()
   var importModel = RecipeImportModel()
   var searchText = ""
   var selectedRecipeID: Recipe.ID?
@@ -63,13 +61,6 @@ final class RecipeLibraryModel {
 
   func reloadAfterExternalChange() async {
     try? await $recipeRows.load()
-  }
-
-  func addRecipeButtonTapped() {
-    // A fresh session each time: Create Recipe holds transient, unsaved source material and a draft
-    // (ADR-0053 D4), so a new one must not inherit a previous open's state.
-    createModel = CreateRecipeModel()
-    destination = .addRecipe
   }
 
   func workbenchSelectionButtonTapped() {

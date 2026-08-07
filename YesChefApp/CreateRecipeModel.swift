@@ -48,6 +48,31 @@ final class CreateRecipeModel {
     !composeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isExtracting && !isSaving
   }
 
+  /// True when there is nothing for Clear to discard — an empty compose box, no recorded source, and a
+  /// title-less draft. Drives whether the Clear affordance is enabled.
+  var isEmpty: Bool {
+    composeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      && sources.isEmpty
+      && editorModel.draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      && editorModel.draft.ingredientSections.allSatisfy { $0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+      && editorModel.draft.instructionSections.allSatisfy { $0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+  }
+
+  /// Discards the whole in-progress session and returns to a blank form. The session is in-memory only
+  /// (ADR-0053 D4), so this simply resets that memory — nothing persisted is touched.
+  func reset() {
+    composeText = ""
+    sources = []
+    isExtracting = false
+    extractionError = nil
+    editorModel.applyExtractedDraft(RecipeEditorDraft())
+    suggestedLabels = []
+    acceptedSuggestedLabelIDs = []
+    labelProposalError = nil
+    isSuggestingLabels = false
+    labelGeneration += 1
+  }
+
   /// Save requires a title, matching the plain editor. The structured half is what gets saved, so its
   /// gate is authoritative.
   var isSavingDisabled: Bool {

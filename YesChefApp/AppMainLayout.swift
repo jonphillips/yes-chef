@@ -14,11 +14,13 @@ struct AppMainLayout: View {
   let mealCalendarModel: MealCalendarModel
   let menuModel: MenuLibraryModel
   let groceryModel: GroceryLibraryModel
+  let createRecipeModel: CreateRecipeModel
   @Binding var selectedSection: AppSection?
   @Binding var selectedSettingsPane: SettingsPane?
   let onBrowserCapture: (WebPage) async -> Void
   var onRecipeSelected: (RecipeDetailPresentation) -> Void
   var onCookSessionRequested: (CookSessionPresentation) -> Void
+  var onRecipeCreated: (Recipe.ID) -> Void
 
   var body: some View {
     if horizontalSizeClass == .compact {
@@ -30,11 +32,21 @@ struct AppMainLayout: View {
         mealCalendarModel: mealCalendarModel,
         menuModel: menuModel,
         groceryModel: groceryModel,
+        createRecipeModel: createRecipeModel,
         onBrowserCapture: onBrowserCapture,
         onMenuSelected: openMenuFromCalendar,
         onRecipeSelected: onRecipeSelected,
-        onCookSessionRequested: onCookSessionRequested
+        onCookSessionRequested: onCookSessionRequested,
+        onRecipeCreated: onRecipeCreated
       )
+    } else if selectedSection == .createRecipe {
+      NavigationSplitView {
+        AppSidebar(selection: $selectedSection)
+      } detail: {
+        NavigationStack {
+          CreateRecipeView(model: createRecipeModel, onSaved: onRecipeCreated)
+        }
+      }
     } else if selectedSection == .browser {
       NavigationSplitView {
         AppSidebar(selection: $selectedSection)
@@ -152,7 +164,7 @@ private enum AppMainColumnSection {
       self = .menus
     case .settings:
       self = .settings
-    case .browser, .mealCalendar:
+    case .createRecipe, .browser, .mealCalendar:
       return nil
     }
   }
@@ -166,10 +178,12 @@ private struct AppCompactTabView: View {
   let mealCalendarModel: MealCalendarModel
   let menuModel: MenuLibraryModel
   let groceryModel: GroceryLibraryModel
+  let createRecipeModel: CreateRecipeModel
   let onBrowserCapture: (WebPage) async -> Void
   let onMenuSelected: (CoreMenu.ID) -> Void
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
   let onCookSessionRequested: (CookSessionPresentation) -> Void
+  let onRecipeCreated: (Recipe.ID) -> Void
 
   var body: some View {
     TabView(selection: compactSelection) {
@@ -225,8 +239,10 @@ private struct AppCompactTabView: View {
           browserModel: browserModel,
           recipeModel: recipeModel,
           groceryModel: groceryModel,
+          createRecipeModel: createRecipeModel,
           onBrowserCapture: onBrowserCapture,
           onRecipeSelected: onRecipeSelected,
+          onRecipeCreated: onRecipeCreated,
           onSectionSelected: { selection = $0 }
         )
       }
@@ -267,7 +283,7 @@ private enum AppCompactTab: Hashable {
       self = .mealCalendar
     case .groceries:
       self = .groceries
-    case .browser, .workbenches, .settings:
+    case .createRecipe, .browser, .workbenches, .settings:
       self = .more
     }
   }
@@ -288,8 +304,10 @@ private struct AppMoreStack: View {
   let browserModel: BrowserModel
   let recipeModel: RecipeLibraryModel
   let groceryModel: GroceryLibraryModel
+  let createRecipeModel: CreateRecipeModel
   let onBrowserCapture: (WebPage) async -> Void
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
+  let onRecipeCreated: (Recipe.ID) -> Void
   let onSectionSelected: (AppSection) -> Void
 
   var body: some View {
@@ -299,6 +317,12 @@ private struct AppMoreStack: View {
     // Keep external navigation writers out until More has a route enum that can represent every section.
     NavigationStack(path: $workbenchModel.navigationPath) {
       List {
+        NavigationLink {
+          CreateRecipeView(model: createRecipeModel, onSaved: onRecipeCreated)
+            .onAppear { onSectionSelected(.createRecipe) }
+        } label: {
+          AppSection.createRecipe.label
+        }
         NavigationLink {
           BrowserWorkspaceView(model: browserModel, onCapture: onBrowserCapture)
             .onAppear { onSectionSelected(.browser) }
