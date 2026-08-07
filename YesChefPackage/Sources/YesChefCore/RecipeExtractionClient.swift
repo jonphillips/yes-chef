@@ -85,7 +85,12 @@ extension RecipeExtractionClient: DependencyKey {
     Never invent a quantity, ingredient, timing, temperature, or instruction. If information is missing or
     incomplete, leave it missing or incomplete rather than filling the gap from cooking knowledge.
 
-    Preserve named ingredient and instruction groups as separate sections. Return ONLY strict JSON in this shape:
+    Preserve named ingredient and instruction groups as separate sections.
+    Each entry in a section's "steps" is one complete instruction step as the recipe presents it. Do not
+    split a single step across multiple entries: when a step ends with a colon and is followed by amounts,
+    options, or a short list (for example a choice of salt), keep them together in that same step. Keep
+    genuinely separate actions as separate steps, and never merge distinct actions into one.
+    Return ONLY strict JSON in this shape:
     {
       "title": "optional title or null",
       "summary": "optional summary or null",
