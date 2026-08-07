@@ -24,6 +24,7 @@
 		15FC79679962B0C395487A81 /* RecipeListViewOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8281916C17EA01F6099FA119 /* RecipeListViewOptions.swift */; };
 		195F4BE15DAFE5DF10414E83 /* IngredientFractionPillRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5B6A9C5B5B1B8A7AA3C2136 /* IngredientFractionPillRow.swift */; };
 		1B3549FAE4F58ED491148794 /* SeedCoverageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EAAE31879D63DD62F7855F8 /* SeedCoverageModel.swift */; };
+		1E85B0A719E8F9BB6CB8C50F /* CreateRecipeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B1CB234FC5497D9446B09B8 /* CreateRecipeView.swift */; };
 		1F9D9FA528F07B4D0FD90A83 /* WorkbenchReferenceModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95B7026C795D2C7ADE1E0837 /* WorkbenchReferenceModel.swift */; };
 		210BE26D7D55A64BB3FCB1D3 /* RecipeCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C39EB2615AF4AAC9AFF1F6C3 /* RecipeCaptureView.swift */; };
 		22E5C9EEE3DB5F09E84941BA /* CategoryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED3C57E4D25E07B0D4161163 /* CategoryViews.swift */; };
@@ -52,6 +53,7 @@
 		4530607B3DE651BAE0CC6641 /* RecipeListRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B9BCF538013B597BB0D401 /* RecipeListRow.swift */; };
 		47B32696007AA6735D4B282B /* SharePreprocessor.js in Resources */ = {isa = PBXBuildFile; fileRef = B9CC26315C4C3E333C66F625 /* SharePreprocessor.js */; };
 		4D72BD312BA97BFBE8164E15 /* RecipeCaptureReaderFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = C87478FA946EAC365096D2B2 /* RecipeCaptureReaderFeedback.swift */; };
+		50F8C8268BD864F2D22ADD11 /* CreateRecipeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3825239A440A94D8108B41C5 /* CreateRecipeModel.swift */; };
 		54C7C79CC2EBB0130F4953B3 /* FacetCoverageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9191D1F59D6B79E1E49A82B8 /* FacetCoverageView.swift */; };
 		54D6A2CD5836F57CBEE81879 /* RecipeDetailModel+Labels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE5A1F4C00B47C679035FCEA /* RecipeDetailModel+Labels.swift */; };
 		5556826F5F47C4461DD123F2 /* MenuDetailChatPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC10A57FB9A55D40CD97546E /* MenuDetailChatPresentation.swift */; };
@@ -210,6 +212,7 @@
 		30B04E29C6A847886ED9EB0B /* RecipeListPresetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeListPresetTests.swift; sourceTree = "<group>"; };
 		34C3AE6422BC004DC084E05B /* RecipePlaybookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipePlaybookView.swift; sourceTree = "<group>"; };
 		366ED59A5E8E94F4A9C1D8B5 /* RecipeImportSummaries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeImportSummaries.swift; sourceTree = "<group>"; };
+		3825239A440A94D8108B41C5 /* CreateRecipeModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateRecipeModel.swift; sourceTree = "<group>"; };
 		396029D84F6F6E49A17C47D2 /* YesChefShareExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = YesChefShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		3A9BA1822C178E165616DFE6 /* ChatStarterMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStarterMenu.swift; sourceTree = "<group>"; };
 		3CCF32B5108C44892607FF3B /* RecipeDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeDetailView.swift; sourceTree = "<group>"; };
@@ -222,6 +225,7 @@
 		49DE0FC092C74EF212303986 /* RecipeCaptureLabelSuggestionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeCaptureLabelSuggestionTests.swift; sourceTree = "<group>"; };
 		4A44F5DE22E861C4E705A6BB /* RecipeVariationPromotionPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeVariationPromotionPresentation.swift; sourceTree = "<group>"; };
 		4ADDB4E672F69BB9AD2EB58F /* WorkbenchCompareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchCompareView.swift; sourceTree = "<group>"; };
+		4B1CB234FC5497D9446B09B8 /* CreateRecipeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateRecipeView.swift; sourceTree = "<group>"; };
 		4DAE8E8E7A12CF150A296B0F /* WebRecipeCaptureSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRecipeCaptureSummary.swift; sourceTree = "<group>"; };
 		4E98DAAE2876452488D71CD0 /* WideLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WideLayout.swift; sourceTree = "<group>"; };
 		4EE9C07029923DFFFC06A977 /* RecipeTextViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeTextViews.swift; sourceTree = "<group>"; };
@@ -463,6 +467,8 @@
 				F23F8E8EAB36E54DADF23A71 /* ChatSurface.swift */,
 				471D8E1304E5EF631EB996C3 /* ChatWorkspaceDivider.swift */,
 				90AEA6C80CDEFF87884B65A7 /* CookSessionView.swift */,
+				3825239A440A94D8108B41C5 /* CreateRecipeModel.swift */,
+				4B1CB234FC5497D9446B09B8 /* CreateRecipeView.swift */,
 				C96B85DDE40C2676CFF7A14C /* EditableRowsSection.swift */,
 				9191D1F59D6B79E1E49A82B8 /* FacetCoverageView.swift */,
 				FF86C88A023D5D19CDE64102 /* FocusToolbarButton.swift */,
@@ -766,6 +772,8 @@
 				BE4BD3C03012A0A5F11A6852 /* ChatSurface.swift in Sources */,
 				B197F2566EB325113BC5D498 /* ChatWorkspaceDivider.swift in Sources */,
 				CCFC4DC9297E465E3E045AAA /* CookSessionView.swift in Sources */,
+				50F8C8268BD864F2D22ADD11 /* CreateRecipeModel.swift in Sources */,
+				1E85B0A719E8F9BB6CB8C50F /* CreateRecipeView.swift in Sources */,
 				405995E434055C9790D6B594 /* EditableRowsSection.swift in Sources */,
 				54C7C79CC2EBB0130F4953B3 /* FacetCoverageView.swift in Sources */,
 				3846277BD575C412195ACF75 /* FocusToolbarButton.swift in Sources */,

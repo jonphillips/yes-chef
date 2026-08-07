@@ -36,6 +36,24 @@ final class RecipeEditorModel {
     }
   }
 
+  /// Seeds a brand-new recipe's structured half with an already-populated draft — the Create Recipe
+  /// destination hands the editor an extraction result (ADR-0053 D2). There is no `recipeID` to fetch,
+  /// and `hasLoadedDraft` starts true so the (empty) detail observation never clobbers the seed.
+  init(seededDraft: RecipeEditorDraft) {
+    recipeID = nil
+    _detail = Fetch(wrappedValue: nil)
+    draft = seededDraft
+    hasLoadedDraft = true
+  }
+
+  /// Replaces the structured draft with a fresh extraction result while a Create Recipe session is
+  /// open. The source material that produced it lives on `CreateRecipeModel`, so a re-extraction
+  /// re-seeds the form without losing what the cook supplied (ADR-0053 D4).
+  func applyExtractedDraft(_ extracted: RecipeEditorDraft) {
+    draft = extracted
+    hasLoadedDraft = true
+  }
+
   var isSavingDisabled: Bool {
     isSaving || draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }

@@ -20,22 +20,22 @@ public enum RecipeExtractionError: Error, Equatable, LocalizedError, Sendable {
 }
 
 public struct RecipeExtractionClient: Sendable {
-  public var extract: @Sendable (_ structuredPageText: String) async throws -> RecipeExtraction
+  public var extract: @Sendable (_ text: String) async throws -> RecipeExtraction
 
   public init(
-    extract: @escaping @Sendable (_ structuredPageText: String) async throws -> RecipeExtraction
+    extract: @escaping @Sendable (_ text: String) async throws -> RecipeExtraction
   ) {
     self.extract = extract
   }
 
-  public func callAsFunction(structuredPageText: String) async throws -> RecipeExtraction {
-    try await extract(structuredPageText)
+  public func callAsFunction(text: String) async throws -> RecipeExtraction {
+    try await extract(text)
   }
 }
 
 extension RecipeExtractionClient: DependencyKey {
   public static var liveValue: Self {
-    Self { structuredPageText in
+    Self { text in
       @Dependency(\.modelClient) var modelClient
       @Dependency(\.apiKeyStore) var apiKeyStore
       @Dependency(\.recipeChatProviderPreference) var providerPreference
@@ -56,7 +56,7 @@ extension RecipeExtractionClient: DependencyKey {
       )
 
       let response = try await call(
-        structuredPageText: structuredPageText,
+        text: text,
         tier: resolvedTier.tier,
         tierResolution: resolvedTier.resolution
       )
@@ -100,12 +100,12 @@ extension RecipeExtractionClient: DependencyKey {
     }
     """
 
-  static func prompt(structuredPageText: String) -> String {
-    "Extract the recipe from this cleaned, structure-preserving page text:\n\n\(structuredPageText)"
+  static func prompt(text: String) -> String {
+    "Extract the recipe from this cleaned, structure-preserving page text:\n\n\(text)"
   }
 
   static func call(
-    structuredPageText: String,
+    text: String,
     tier: ModelTier,
     tierResolution: ModelCallTierResolution
   ) -> ModelCall {
@@ -116,7 +116,7 @@ extension RecipeExtractionClient: DependencyKey {
       contextLayers: [.structuredPageText],
       tier: tier,
       system: instructions,
-      prompt: prompt(structuredPageText: structuredPageText),
+      prompt: prompt(text: text),
       maxTokens: maxTokens,
       reasoningEffort: .high
     )

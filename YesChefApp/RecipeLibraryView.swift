@@ -110,9 +110,9 @@ struct AppContainer: View {
       recipeModel: recipeModel,
       isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil
     )
-    .sheet(isPresented: $recipeModel.destination.addRecipe) {
+    .fullScreenCover(isPresented: $recipeModel.destination.addRecipe) {
       NavigationStack {
-        RecipeEditorView(recipeID: nil)
+        CreateRecipeView(libraryModel: recipeModel, model: recipeModel.createModel)
       }
     }
     .sheet(isPresented: $recipeModel.destination.captureRecipe) {

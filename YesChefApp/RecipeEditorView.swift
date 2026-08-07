@@ -5,7 +5,6 @@ import YesChefCore
 
 struct RecipeEditorView: View {
   @State private var model: RecipeEditorModel
-  @State private var selectedHeroPhotoItem: PhotosPickerItem?
   @FocusState private var focusedIngredientSectionID: IngredientSection.ID?
   @FocusState private var focusedIngredientSectionNameID: IngredientSection.ID?
   @Environment(\.dismiss) private var dismiss
@@ -19,6 +18,86 @@ struct RecipeEditorView: View {
 
     ScrollViewReader { proxy in
       Form {
+        RecipeEditorFields(
+          model: model,
+          proxy: proxy,
+          focusedIngredientSectionID: $focusedIngredientSectionID,
+          focusedIngredientSectionNameID: $focusedIngredientSectionNameID
+        )
+      }
+      .safeAreaInset(edge: .bottom, spacing: 0) {
+        if let focusedIngredientSectionID {
+          IngredientFractionPillRow { fraction in
+            model.ingredientFractionTapped(fraction, sectionID: focusedIngredientSectionID)
+            self.focusedIngredientSectionID = focusedIngredientSectionID
+          }
+          .padding(.horizontal)
+          .background(.bar)
+          .overlay(alignment: .top) {
+            Divider()
+          }
+        }
+      }
+      .navigationTitle(model.recipeID == nil ? "New Recipe" : "Edit Recipe")
+      .toolbar {
+      ToolbarItem(placement: .cancellationAction) {
+        Button("Cancel") { dismiss() }
+          .disabled(model.isSaving)
+      }
+      ToolbarItem(placement: .confirmationAction) {
+        Button {
+          if let focusedIngredientSectionNameID {
+            model.ingredientSectionNameChanged(sectionID: focusedIngredientSectionNameID)
+            self.focusedIngredientSectionNameID = nil
+          }
+          Task {
+            if await model.saveButtonTapped() {
+              dismiss()
+            }
+          }
+        } label: {
+          if model.isSaving {
+            ProgressView()
+          } else {
+            Text("Save")
+          }
+        }
+        .disabled(model.isSavingDisabled)
+      }
+      }
+      .onAppear {
+        model.detailChanged(model.detail)
+      }
+      .onChange(of: model.detail) { _, detail in
+        model.detailChanged(detail)
+      }
+      .onChange(of: focusedIngredientSectionNameID) { oldValue, newValue in
+        guard let oldValue, oldValue != newValue else { return }
+        model.ingredientSectionNameChanged(sectionID: oldValue)
+      }
+      .alert("Could Not Save Recipe", isPresented: $model.isShowingError) {
+        Button("OK") {}
+      } message: {
+        Text(model.errorMessage ?? "")
+      }
+    }
+  }
+}
+
+/// The structured recipe form — every field the editor and Create Recipe both present, bound to a
+/// shared `RecipeEditorModel`. Extracted so the two screens edit *one* draft implementation (ADR-0051
+/// D1 / ADR-0053 D2) rather than diverging. The owning screen supplies the `Form`, the scroll proxy,
+/// the focus state, and its own chrome (title, toolbar, Save).
+struct RecipeEditorFields: View {
+  let model: RecipeEditorModel
+  let proxy: ScrollViewProxy
+  @FocusState.Binding var focusedIngredientSectionID: IngredientSection.ID?
+  @FocusState.Binding var focusedIngredientSectionNameID: IngredientSection.ID?
+
+  var body: some View {
+    @Bindable var model = model
+
+    Group {
       if let variationName = model.activeVariationName {
         Section {
           RecipeVariationBaseWriteNotice(variationName: variationName)
@@ -33,10 +112,7 @@ struct RecipeEditorView: View {
       }
 
       Section("Photo") {
-        RecipeHeroPhotoPickerRow(
-          model: model,
-          selectedItem: $selectedHeroPhotoItem
-        )
+        RecipeHeroPhotoPickerRow(model: model)
       }
 
       Section("Source") {
@@ -94,7 +170,7 @@ struct RecipeEditorView: View {
           )
           .onChange(of: section.text) { _, _ in
             if let newSectionID = model.ingredientTextChanged(sectionID: section.id) {
-              scrollToAndFocusIngredientSection(newSectionID, using: proxy)
+              scrollToAndFocusIngredientSection(newSectionID)
             }
           }
 
@@ -159,69 +235,10 @@ struct RecipeEditorView: View {
           minHeight: 120
         )
       }
-      }
-      .safeAreaInset(edge: .bottom, spacing: 0) {
-        if let focusedIngredientSectionID {
-          IngredientFractionPillRow { fraction in
-            model.ingredientFractionTapped(fraction, sectionID: focusedIngredientSectionID)
-            self.focusedIngredientSectionID = focusedIngredientSectionID
-          }
-          .padding(.horizontal)
-          .background(.bar)
-          .overlay(alignment: .top) {
-            Divider()
-          }
-        }
-      }
-      .navigationTitle(model.recipeID == nil ? "New Recipe" : "Edit Recipe")
-      .toolbar {
-      ToolbarItem(placement: .cancellationAction) {
-        Button("Cancel") { dismiss() }
-          .disabled(model.isSaving)
-      }
-      ToolbarItem(placement: .confirmationAction) {
-        Button {
-          if let focusedIngredientSectionNameID {
-            model.ingredientSectionNameChanged(sectionID: focusedIngredientSectionNameID)
-            self.focusedIngredientSectionNameID = nil
-          }
-          Task {
-            if await model.saveButtonTapped() {
-              dismiss()
-            }
-          }
-        } label: {
-          if model.isSaving {
-            ProgressView()
-          } else {
-            Text("Save")
-          }
-        }
-        .disabled(model.isSavingDisabled)
-      }
-      }
-      .onAppear {
-        model.detailChanged(model.detail)
-      }
-      .onChange(of: model.detail) { _, detail in
-        model.detailChanged(detail)
-      }
-      .onChange(of: focusedIngredientSectionNameID) { oldValue, newValue in
-        guard let oldValue, oldValue != newValue else { return }
-        model.ingredientSectionNameChanged(sectionID: oldValue)
-      }
-      .alert("Could Not Save Recipe", isPresented: $model.isShowingError) {
-        Button("OK") {}
-      } message: {
-        Text(model.errorMessage ?? "")
-      }
     }
   }
 
-  private func scrollToAndFocusIngredientSection(
-    _ sectionID: IngredientSection.ID,
-    using proxy: ScrollViewProxy
-  ) {
+  private func scrollToAndFocusIngredientSection(_ sectionID: IngredientSection.ID) {
     withAnimation {
       proxy.scrollTo(sectionID, anchor: .center)
     }
@@ -234,7 +251,7 @@ struct RecipeEditorView: View {
 
 private struct RecipeHeroPhotoPickerRow: View {
   let model: RecipeEditorModel
-  @Binding var selectedItem: PhotosPickerItem?
+  @State private var selectedItem: PhotosPickerItem?
 
   var body: some View {
     let hasPhoto = model.heroPhotoPreviewData != nil
