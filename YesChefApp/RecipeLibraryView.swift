@@ -418,10 +418,6 @@ struct RecipeListView: View {
   @AppStorage("RecipeList.rowDensity") private var rowDensityRawValue = RecipeListRowDensity.rich.rawValue
   @AppStorage("RecipeList.showsSourceMetadata") private var showsSourceMetadata = true
   @AppStorage("RecipeList.showsCategoryMetadata") private var showsCategoryMetadata = true
-  @AppStorage("RecipeList.savedPresets") private var savedPresetsData = Data()
-
-  @State private var isSavingListPreset = false
-  @State private var isManagingListPresets = false
 
   let model: RecipeLibraryModel
   let style: Style
@@ -433,8 +429,6 @@ struct RecipeListView: View {
       showsSourceMetadata: showsSourceMetadata,
       showsCategoryMetadata: showsCategoryMetadata
     )
-    let savedPresets = savedListPresets
-    let activePresetID = activeListPresetID
 
     Group {
       if model.isSelectingWorkbenchRecipes {
@@ -492,6 +486,23 @@ struct RecipeListView: View {
     }
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {
+        Button {
+          model.filterButtonTapped()
+        } label: {
+          Label(
+            "Filter Recipes",
+            systemImage: model.hasActiveFilters
+              ? "line.3.horizontal.decrease.circle.fill"
+              : "line.3.horizontal.decrease.circle"
+          )
+        }
+        .disabled(model.isImporting)
+        RecipeSortMenu(model: model)
+        RecipeListViewOptionsMenu(
+          rowDensityRawValue: $rowDensityRawValue,
+          showsSourceMetadata: $showsSourceMetadata,
+          showsCategoryMetadata: $showsCategoryMetadata
+        )
         if model.isSelectingWorkbenchRecipes {
           Button {
             model.cancelWorkbenchSelectionButtonTapped()
@@ -512,101 +523,8 @@ struct RecipeListView: View {
           }
           .disabled(model.isImporting)
         }
-        RecipeListPresetMenu(
-          presets: savedPresets,
-          activePresetID: activePresetID
-        ) { preset in
-          model.applyListPreset(preset)
-        } saveCurrentView: {
-          isSavingListPreset = true
-        } managePresets: {
-          isManagingListPresets = true
-        }
-        .disabled(model.isImporting)
-        RecipeSortMenu(model: model)
-        RecipeListViewOptionsMenu(
-          rowDensityRawValue: $rowDensityRawValue,
-          showsSourceMetadata: $showsSourceMetadata,
-          showsCategoryMetadata: $showsCategoryMetadata
-        )
-        Button {
-          model.filterButtonTapped()
-        } label: {
-          Label(
-            "Filter Recipes",
-            systemImage: model.hasActiveFilters
-              ? "line.3.horizontal.decrease.circle.fill"
-              : "line.3.horizontal.decrease.circle"
-          )
-        }
-        .disabled(model.isImporting)
-        Button {
-          model.captureRecipeButtonTapped()
-        } label: {
-          Label("Capture Recipe", systemImage: "link.badge.plus")
-        }
-        .disabled(model.isImporting)
       }
     }
-    .sheet(isPresented: $isSavingListPreset) {
-      NavigationStack {
-        RecipeListPresetSaveView(
-          state: model.currentListPresetState,
-          recipeCount: model.filteredRecipeCount,
-          existingNames: savedListPresets.map(\.name)
-        ) { name in
-          saveCurrentListPreset(named: name)
-        }
-      }
-      .presentationDetents([.medium, .large])
-    }
-    .sheet(isPresented: $isManagingListPresets) {
-      NavigationStack {
-        RecipeListPresetManagementView(
-          presets: savedListPresets,
-          activePresetID: activeListPresetID
-        ) { preset in
-          model.recipeCount(for: preset)
-        } applyPreset: { preset in
-          model.applyListPreset(preset)
-        } deletePreset: { preset in
-          deleteListPreset(preset)
-        }
-      }
-    }
-  }
-
-  private var savedListPresets: [RecipeListPreset] {
-    get {
-      RecipeListPresetPersistence.decode(savedPresetsData)
-    }
-    nonmutating set {
-      savedPresetsData = RecipeListPresetPersistence.encode(newValue)
-    }
-  }
-
-  private var activeListPresetID: RecipeListPreset.ID? {
-    savedListPresets.first { $0.state == model.currentListPresetState }?.id
-  }
-
-  private func saveCurrentListPreset(named name: String) {
-    let timestamp = Date()
-    let preset = RecipeListPreset(
-      id: UUID(),
-      name: name,
-      state: model.currentListPresetState,
-      dateCreated: timestamp,
-      dateModified: timestamp
-    )
-    var presets = savedListPresets
-    presets.append(preset)
-    savedListPresets = presets
-  }
-
-  private func deleteListPreset(_ preset: RecipeListPreset) {
-    var presets = savedListPresets
-    presets.removeAll { $0.id == preset.id }
-    savedListPresets = presets
   }
 }
 
