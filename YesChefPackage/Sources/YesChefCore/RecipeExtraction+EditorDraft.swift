@@ -36,11 +36,16 @@ extension RecipeExtraction {
       cookTimeMinutes: Self.minutes(from: cookTime) ?? 0
     )
 
+    // The model already segmented ingredients and instructions; the sink's save path re-derives steps
+    // and lines by splitting the flat text on *every* newline (`InstructionParser`, `ingredientTextChanged`).
+    // So each item is flattened to a single line first — otherwise an internal line break inside one
+    // model step or line would explode into several, inflating the numbered steps. One model item stays
+    // one saved item.
     let ingredientDrafts = ingredientSections.map { section in
       RecipeEditorIngredientSectionDraft(
         id: uuid(),
         name: section.name ?? "",
-        text: section.lines.joined(separator: "\n")
+        text: section.lines.map(Self.singleLine).joined(separator: "\n")
       )
     }
     draft.ingredientSections = ingredientDrafts.isEmpty
@@ -51,7 +56,7 @@ extension RecipeExtraction {
       RecipeEditorInstructionSectionDraft(
         id: uuid(),
         name: section.name ?? "",
-        text: section.steps.joined(separator: "\n\n")
+        text: section.steps.map(Self.singleLine).joined(separator: "\n\n")
       )
     }
     draft.instructionSections = instructionDrafts.isEmpty
@@ -62,6 +67,17 @@ extension RecipeExtraction {
       _ = draft.ingredientTextChanged(sectionID: sectionID, uuid: uuid)
     }
     return draft
+  }
+
+  /// Collapses any internal line breaks in a single extracted step or ingredient line to spaces, so the
+  /// sink's newline-splitting save path preserves the model's segmentation (one item = one saved item)
+  /// rather than re-splitting a paragraph-shaped step into several numbered ones.
+  static func singleLine(_ text: String) -> String {
+    text
+      .split(whereSeparator: \.isNewline)
+      .map { $0.trimmingCharacters(in: .whitespaces) }
+      .filter { !$0.isEmpty }
+      .joined(separator: " ")
   }
 
   /// Reads whole minutes from the varied duration shapes the two front-ends emit: an ISO-8601 duration

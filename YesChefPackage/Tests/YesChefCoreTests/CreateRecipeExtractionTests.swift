@@ -130,5 +130,35 @@ extension RecipeCoreTests {
       #expect(draft.ingredientSections[1].name == "For the topping")
       #expect(draft.ingredientSections[1].lineDrafts.map(\.originalText) == ["1 cup cheese"])
     }
+
+    /// A model step that carries an internal line break stays **one** saved step — otherwise the sink's
+    /// newline-splitting save path would re-segment a paragraph-shaped step and inflate the numbering.
+    @Test
+    func aParagraphShapedStepStaysASingleStep() {
+      let extraction = RecipeExtraction(
+        title: "Braise",
+        instructionSections: [
+          .init(name: nil, steps: [
+            "Sear the beef on all sides.\nWork in batches so the pan stays hot.",
+            "Add the wine and simmer.",
+          ]),
+        ]
+      )
+
+      let draft = extraction.editorDraft(uuid: { UUID() })
+
+      // The editor text carries the two steps as blank-line-separated paragraphs, with the internal
+      // break in the first flattened to a space — so the save path parses exactly two steps.
+      let steps = InstructionParser.steps(
+        from: draft.instructionSections[0].text,
+        recipeID: UUID(),
+        sectionID: draft.instructionSections[0].id,
+        uuid: { UUID() }
+      )
+      #expect(steps.map(\.text) == [
+        "Sear the beef on all sides. Work in batches so the pan stays hot.",
+        "Add the wine and simmer.",
+      ])
+    }
   }
 }
