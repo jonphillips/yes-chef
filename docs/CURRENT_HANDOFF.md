@@ -22,45 +22,40 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**Owed: Jon device-passes [ADR-0042](decisions/ADR-0042-workbench-handoff-and-the-return-block.md)
-Amendment 2 — `workbenchDraft` (S3a + S3b both built on this branch, not yet merged/device-passed).**
-The full round-trip is wired: open a workbench with live candidates → **Copy Draft Prompt** (Working Recipe
-section) → argue it out in ChatGPT/Claude → `finalize` → **Paste** → review the drafted working recipe (and
-learnings) → **Create Working Recipe**. Jon's real hand-run already exercised the outbound half and settled
-the two open questions below; the device pass is the remaining signal (paste → review → create; then
-optionally **Promote** to the library).
+**Next Up → paste text → recipe: the [ADR-0051](decisions/ADR-0051-text-to-recipe-extraction-strategy.md)
+paste-text front-end.** Jon's want: paste unstructured recipe text and create a recipe. This is the **fifth
+source** in ADR-0051's table — a *new front-end*, governed by the strategy, **not** a new parser. Build it to
+D1–D7:
 
-*The hand-run finding that shaped S3b:* the paste path **autoformats the JSON delimiters into curly/smart
-quotes** — the exact transport-level mangling Amd2-OQ3 anticipated, and the old `cleanedJSON` salvage would
-*not* have rescued it (it deleted curly quotes, leaving invalid unquoted JSON). Fixed deterministically:
-the salvage now **replaces** curly doubles with `"` (and curly singles with `'`, so `Cook's` survives), no
-metered rescue. Everything else in the real return held — token first, `YC-CONTRACT: v2.1` echoed, JSON-LD
-body, separate rationale naming candidates with no IDs, and learnings correctly aimed at
-constraints/rejected-candidates (not restatement).
+- **Front-end (D4, two-tier).** The pasted text goes through the capture engine's pattern: if it happens to be
+  schema.org markup/JSON-LD, the deterministic `RecipeJSONLDExtractor` parses it **free**; otherwise the LLM
+  engine `RecipeExtractionClient` extracts it **faithfully** (never invent). Plain pasted recipe text — the
+  common case — is the LLM path.
+- **Sink (D1).** → `RecipeExtraction` core → **`RecipeEditorDraft`** → the **existing** review sheet →
+  `RecipeCore.save(draft:)`. **No new save path, review surface, or terminal draft type.**
+- **This slice triggers the D5 lift.** Paste-text is the **second real consumer of `RecipeExtractionClient`**
+  (web is the first; the S3 workbench return used the *deterministic* JSON-LD extractor, not the LLM client).
+  So **rename + relocate `RecipeExtractionClient` out of the `WebRecipeCapture` namespace** to a source-neutral
+  home and rename its vestigial `structuredPageText` parameter → `text`. Do it here, deliberately (D5).
+- **Guardrail (D7, Standing).** A fifth bespoke parser, a second "text→recipe" model call, or a new terminal
+  draft type is a **review block**. Route through the seam.
+- **Deferred, do NOT build (D6/OQ3).** Paste-text *triggers* the menu-note LLM-fallback question — it is a
+  separate offer-don't-impose decision; do not fold it in on this momentum.
 
-*Resolved by the hand-run (fold into the ADR):* **Amd2-OQ1 — keep the two-part return** (learnings held the
-argument residue, not restatement). **Amd2-OQ3 — the paste path *does* mangle clean JSON-LD; the free
-deterministic curly→straight salvage handles it, loud `.emptyPlan` fallback, no metered `RecipeExtractionClient`
-rescue.** **Amd2-OQ4 — the driver is a new `RecipeJSONLDExtractor.extract(fromJSONLD:)` raw-block entry
-point** (reuses the parse/salvage/node-walk), not HTML-wrapping.
+**Open for Jon before dispatch:** (a) **OQ1 — the entry point.** Where does "Paste recipe text" live (the
+library add menu? a share-sheet? its own screen?), and does it share one entry with the workbench-return /
+menu-note surfaces or keep a thin per-source entry (ADR lean: its own thin entry, shared engine)? (b) the
+default tier for the LLM extraction (frontier vs on-device — [[personal-app-latency-tolerance]] says a slow,
+good answer is fine).
 
-*What shipped (this branch, S3a + S3b):* `.workbenchDraft` task type (title `"Draft"`) + `DeliverableFormat`
-+ `WorkbenchChatContext.draftHandoffPrompt()` (schema.org JSON-LD body + separate rationale + rejected-candidate
-learnings aim); export via `HandoffAppOperations.export`; the **Copy + Paste** door in the Working Recipe
-section; import route `.workbench × .workbenchDraft` → `RecipeJSONLDExtractor.extract(fromJSONLD:)` →
-`ParsedRecipePage` → `WorkbenchDraftRecipe` (+ rationale) → the **existing** draft review + `createDraftRecipe`
-promote path; learnings deposited to the workbench log as an `.observation` row (Amd2-D6); a declined/empty
-draft degrades **loud** to `.emptyPlan`. Device-local `AIHandoff`, **schema-free, no `YC-CONTRACT` bump —
-nothing on the promotion list.** [ADR-0051](decisions/ADR-0051-text-to-recipe-extraction-strategy.md) held:
-no new parser, no fourth text→recipe path, extraction routes through the deterministic extractor. Verified:
-`swift build` + Core suites (11 new `workbenchDraft` tests: curly-quote round-trip, declined-loud,
-malformed-past-salvage, JSON-LD/rationale split, ingredient-heading re-inline, missing-rationale-still-stages,
-rationale-before-JSON, fence-strip; plus a new app-target review-staging test), elevated `generic/platform=iOS`
-build, `YesChefTests` app-target suite, `check-drift` clean of S3 files.
+**Verify** per [[lean-verification-default]]: `swift build` + Core tests (pasted plain text →
+`RecipeExtraction` → `RecipeEditorDraft` round-trip; a JSON-LD paste takes the deterministic path; an
+empty/garbage paste degrades **loud**), one elevated `generic/platform=iOS` build (`xcodegen generate` if new
+`YesChefApp/` files), `scripts/check-drift.sh`; **Jon device-passes** paste → review → save.
 
-*Small style follow-up (optional):* the new `HandoffReviewCoordinator` workbench-draft methods are an inline
-`extension` in `HandoffReviewCoordinator.swift` (to stay under the type-body lint budget); the house pattern
-splits these into `HandoffReviewCoordinator+*.swift` files — moving them there needs an `xcodegen generate`.
+*(ADR-0042 Amendment 2 `workbenchDraft` S3a + S3b is **built, device-passed 2026-08-07, and recorded in
+[`DONE-LOG.md`](DONE-LOG.md)**; PR [#289](https://github.com/jonphillips/yes-chef/pull/289). Schema-free,
+nothing on the promotion list. It is the first path built to ADR-0051.)*
 
 ---
 
@@ -136,11 +131,10 @@ section is work.**
   delta-vocabulary decision and it is **ADR-0021's** — do not extend the delta ops on this momentum. **Note:
   Amd4-D4's two step ops (`stepInsert`/`stepRemove`) were the sanctioned widening and have now shipped (V4c);
   the vocabulary is closed again, so a *section* op still needs its own ADR decision, not this momentum.**
-- **ADR-0042 S3 (`workbenchDraft`) is BUILT (S3a + S3b, Amendment 2) and awaiting Jon's device pass** — see
-  the owed-pass entry under Next Up. The concrete want was *cost* (draft against a flat-rate subscription,
-  not the metered onboard synthesis). The return is **extraction, not synthesis**: the outboard emits
-  schema.org JSON-LD, parsed for free by the deterministic `RecipeJSONLDExtractor` — **do not build a new
-  recipe-text parser** (Amd2-D2/D5). There is no S5. Amd2-OQ1/OQ3/OQ4 are resolved (see the ADR).
+- **ADR-0042 S3 (`workbenchDraft`) is DONE — S3a + S3b built, device-passed 2026-08-07 (PR #289),
+  recorded in [`DONE-LOG.md`](DONE-LOG.md).** The return is **extraction, not synthesis** (schema.org JSON-LD
+  → the deterministic `RecipeJSONLDExtractor`); **do not build a new recipe-text parser** (Amd2-D2/D5). There
+  is no S5. Amd2-OQ1/OQ3/OQ4 are resolved (see the ADR). It is the first path built to ADR-0051.
 - **`PlaybookSectionMeta` is not queued anywhere — do not resurrect it.** ADR-0041 closed at S2.6, S3
   withdrawn ([Amd 3](decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md#amendment-3--s3-is-withdrawn-the-conversation-url-does-not-exist-2026-07-19)).
   If section provenance is ever wanted it designs its own storage against its own consumer
