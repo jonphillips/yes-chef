@@ -32,8 +32,8 @@ extension RecipeExtraction {
       sourceAuthor: author ?? "",
       sourcePublicationName: publisherName ?? "",
       servingsText: servingsText ?? "",
-      prepTimeMinutes: Self.minutes(from: prepTime) ?? 0,
-      cookTimeMinutes: Self.minutes(from: cookTime) ?? 0
+      prepTimeMinutes: prepTime.flatMap(RecipeDurationParser.minutes) ?? 0,
+      cookTimeMinutes: cookTime.flatMap(RecipeDurationParser.minutes) ?? 0
     )
 
     // The model already segmented ingredients and instructions; the sink's save path re-derives steps
@@ -80,43 +80,4 @@ extension RecipeExtraction {
       .joined(separator: " ")
   }
 
-  /// Reads whole minutes from the varied duration shapes the two front-ends emit: an ISO-8601 duration
-  /// (`PT1H30M`, common in schema.org JSON-LD), a spelled-out span (`1 hr 30 min`), or a bare number of
-  /// minutes (how the JSON-LD branch re-encodes an already-parsed page time). Returns nil when nothing
-  /// numeric is present, leaving the draft's time at zero rather than guessing.
-  static func minutes(from text: String?) -> Int? {
-    guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
-      return nil
-    }
-    if let iso = iso8601Minutes(text) { return iso }
-
-    let lowercased = text.lowercased()
-    let hours = firstNumber(#"(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|hr|h)\b"#, in: lowercased) ?? 0
-    let minutes = firstNumber(#"(\d+(?:\.\d+)?)\s*(?:minutes?|mins?|min|m)\b"#, in: lowercased) ?? 0
-    let total = hours * 60 + minutes
-    if total > 0 { return Int(total.rounded()) }
-
-    return firstNumber(#"^\s*(\d+(?:\.\d+)?)\s*$"#, in: lowercased).map { Int($0.rounded()) }
-  }
-
-  private static func iso8601Minutes(_ text: String) -> Int? {
-    let upper = text.uppercased()
-    guard upper.hasPrefix("PT") else { return nil }
-    let hours = firstNumber(#"(\d+(?:\.\d+)?)\s*H"#, in: upper) ?? 0
-    let minutes = firstNumber(#"(\d+(?:\.\d+)?)\s*M"#, in: upper) ?? 0
-    let total = hours * 60 + minutes
-    return total > 0 ? Int(total.rounded()) : nil
-  }
-
-  private static func firstNumber(_ pattern: String, in text: String) -> Double? {
-    guard
-      let range = text.range(of: pattern, options: .regularExpression)
-    else { return nil }
-    // Pull the leading numeric run out of the matched slice.
-    let matched = String(text[range])
-    guard let numberRange = matched.range(of: #"\d+(?:\.\d+)?"#, options: .regularExpression) else {
-      return nil
-    }
-    return Double(matched[numberRange])
-  }
 }

@@ -24,6 +24,13 @@ struct CreateRecipeView: View {
             text: $model.composeText,
             minHeight: 140
           )
+          .onChange(of: model.composeText) {
+            model.composeTextChanged()
+          }
+          PasteButton(payloadType: String.self) { strings in
+            model.pastedTextReceived(strings)
+          }
+          .accessibilityLabel("Paste recipe text")
           Button {
             Task { await model.extractButtonTapped() }
           } label: {
@@ -51,6 +58,10 @@ struct CreateRecipeView: View {
 
         if model.hasLabelActivity {
           CreateRecipeLabelSection(model: model)
+        }
+
+        if !model.extractionIssues.isEmpty {
+          CreateRecipeIssueSection(issues: model.extractionIssues)
         }
 
         RecipeEditorFields(
@@ -111,6 +122,25 @@ struct CreateRecipeView: View {
         Button("OK") {}
       } message: {
         Text(model.errorMessage ?? "")
+      }
+    }
+  }
+}
+
+/// Deterministic review cues from the last extraction. These are prompts for a cook to verify in the
+/// editable fields, not model-provided confidence scores (ADR-0053 D6).
+private struct CreateRecipeIssueSection: View {
+  let issues: [RecipeExtractionIssue]
+
+  var body: some View {
+    Section("Review") {
+      ForEach(issues) { issue in
+        Label {
+          Text(issue.message)
+        } icon: {
+          Image(systemName: "exclamationmark.triangle")
+        }
+        .foregroundStyle(.orange)
       }
     }
   }

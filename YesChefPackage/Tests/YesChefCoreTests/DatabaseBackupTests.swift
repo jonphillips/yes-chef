@@ -322,6 +322,11 @@ struct DatabaseBackupTests {
     }
     // Keep this fixture exactly the migrations listed here behind the current schema.
     // Update this tail when it changes.
+    //
+    // The four "workbench references" repairs are guarded no-ops against a clean
+    // workbenchReferences table (each acts only when pragma_table_info shows a missing or
+    // orphaned column), so downgrading past them needs no schema reversal below — they simply
+    // re-run as no-ops during forward migration.
     let migrationsToReplay = [
       "Move recipe Serve With into editable rows",
       "Add regenerate intent to local AI handoffs",
@@ -330,6 +335,10 @@ struct DatabaseBackupTests {
       "Create synced category seed tombstones",
       "Promote category namespaces to facets",
       "Add variation scope to local AI handoffs",
+      "Backfill captureKind column on workbench references",
+      "Reconcile late-added workbench references columns",
+      "Drop orphaned kind column from workbench references",
+      "Drop all non-model columns from workbench references",
     ]
     #expect(latestMigrationIdentifier == migrationsToReplay.last)
     try await backupDatabase.write { db in
