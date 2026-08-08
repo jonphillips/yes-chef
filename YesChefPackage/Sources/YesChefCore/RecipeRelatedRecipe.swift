@@ -186,10 +186,15 @@ extension RecipeRepository {
 
   static func relatedRecipes(for recipeID: Recipe.ID, in db: Database) throws -> [Recipe] {
     let relatedRecipeIDs = Set(
-      try RecipeRelatedRecipe.fetchAll(db).compactMap { $0.otherRecipeID(connectedTo: recipeID) }
+      try RecipeRelatedRecipe
+        .where { $0.recipeID.eq(recipeID) || $0.relatedRecipeID.eq(recipeID) }
+        .fetchAll(db)
+        .compactMap { $0.otherRecipeID(connectedTo: recipeID) }
     )
-    return try Recipe.fetchAll(db)
-      .filter { relatedRecipeIDs.contains($0.id) && !$0.archived }
+    guard !relatedRecipeIDs.isEmpty else { return [] }
+    return try Recipe
+      .where { relatedRecipeIDs.contains($0.id) && !$0.archived }
+      .fetchAll(db)
       .sorted(by: relatedRecipeDisplayOrder)
   }
 }
