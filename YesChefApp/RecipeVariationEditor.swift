@@ -24,10 +24,12 @@ final class RecipeVariationEditorModel {
   var name = ""
   var note = ""
   var isSaving = false
+  var isRepairingAnchor = false
   var errorTitle = "Could Not Load Variation"
   var errorMessage: String?
   var isShowingError = false
   var unresolvedAnchors: [RecipeVariationUnresolvedAnchor] = []
+  var repairItems: [RecipeVariationAnchorRepairItem] = []
   private var hasLoaded = false
 
   init(recipeID: Recipe.ID, variationID: RecipeVariation.ID) {
@@ -37,7 +39,15 @@ final class RecipeVariationEditorModel {
   }
 
   var isSaveDisabled: Bool {
-    isSaving || !unresolvedAnchors.isEmpty || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    isSaving || isRepairingAnchor || !unresolvedAnchors.isEmpty || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  var repairIngredientLines: [IngredientLine] {
+    baseDetail?.ingredientLines.sorted { $0.sortOrder < $1.sortOrder } ?? []
+  }
+
+  var repairInstructionSteps: [InstructionStep] {
+    baseDetail?.instructionGroups.flatMap(\.steps) ?? []
   }
 
   func baseDetailChanged(_ detail: RecipeDetailData?) {
@@ -50,8 +60,42 @@ final class RecipeVariationEditorModel {
       name = variation.name
       note = variation.note ?? ""
       unresolvedAnchors = resolution.unresolvedAnchors
+      repairItems = try RecipeRepository.variationAnchorRepairItems(for: variation, in: detail)
       hasLoaded = true
     } catch {
+      errorMessage = error.localizedDescription
+      isShowingError = true
+    }
+  }
+
+  func repairAnchor(
+    _ item: RecipeVariationAnchorRepairItem,
+    reanchoringTo targetID: UUID?
+  ) async {
+    guard !isRepairingAnchor else { return }
+    isRepairingAnchor = true
+    defer { isRepairingAnchor = false }
+    let now = now
+    do {
+      let variation = try await database.write { db in
+        try RecipeRepository.repairVariationAnchor(
+          item.address,
+          in: variationID,
+          reanchoringTo: targetID,
+          in: db,
+          now: now
+        )
+      }
+      guard var detail = baseDetail,
+        let variationIndex = detail.variations.firstIndex(where: { $0.id == variation.id })
+      else { return }
+      detail.variations[variationIndex] = variation
+      let resolution = try detail.resolved(applying: variation)
+      resolvedDetail = resolution.detail
+      unresolvedAnchors = resolution.unresolvedAnchors
+      repairItems = try RecipeRepository.variationAnchorRepairItems(for: variation, in: detail)
+    } catch {
+      errorTitle = "Could Not Repair Variation"
       errorMessage = error.localizedDescription
       isShowingError = true
     }
@@ -187,6 +231,7 @@ struct RecipeVariationEditorView: View {
   @State private var unrepresentableEdits: [RecipeVariationUnrepresentableEdit] = []
   @State private var isNamingSplitOff = false
   @State private var splitOffTitleDraft = ""
+  @State private var isRepairingAnchors = false
 
   init(recipeID: Recipe.ID, variationID: RecipeVariation.ID) {
     _model = State(wrappedValue: RecipeVariationEditorModel(recipeID: recipeID, variationID: variationID))
@@ -206,6 +251,9 @@ struct RecipeVariationEditorView: View {
             anchors: model.unresolvedAnchors,
             blocksSaving: true
           )
+          Button("Repair Anchors", systemImage: "wrench.and.screwdriver") {
+            isRepairingAnchors = true
+          }
         }
       }
       if let detail = model.resolvedDetail {
@@ -274,6 +322,11 @@ struct RecipeVariationEditorView: View {
     } message: {
       Text("This creates a new standalone recipe and removes the variation.")
     }
+    .sheet(isPresented: $isRepairingAnchors) {
+      NavigationStack {
+        RecipeVariationAnchorRepairView(model: model)
+      }
+    }
   }
 
   @ViewBuilder
@@ -293,6 +346,91 @@ struct RecipeVariationEditorView: View {
         VariationInstructionSectionEditor(section: section, model: model)
       }
       Button("Add Instruction Section", systemImage: "plus") { model.addInstructionSection() }
+    }
+  }
+}
+
+private struct RecipeVariationAnchorRepairView: View {
+  @Environment(\.dismiss) private var dismiss
+  let model: RecipeVariationEditorModel
+  @State private var discardingItem: RecipeVariationAnchorRepairItem?
+
+  var body: some View {
+    List {
+      if model.repairItems.isEmpty {
+        ContentUnavailableView(
+          "All Anchors Repaired",
+          systemImage: "checkmark.circle",
+          description: Text("This variation is ready to save.")
+        )
+      } else {
+        ForEach(model.repairItems) { item in
+          repairSection(item)
+        }
+      }
+    }
+    .navigationTitle("Repair Variation")
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .confirmationAction) {
+        Button("Done") { dismiss() }
+          .disabled(model.isRepairingAnchor)
+      }
+    }
+    .confirmationDialog(
+      "Discard this variation change?",
+      isPresented: Binding(
+        get: { discardingItem != nil },
+        set: { if !$0 { discardingItem = nil } }
+      ),
+      titleVisibility: .visible,
+      presenting: discardingItem
+    ) { item in
+      Button("Discard Change", role: .destructive) {
+        Task {
+          await model.repairAnchor(item, reanchoringTo: nil)
+          discardingItem = nil
+        }
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: { item in
+      Text("This removes the variation change anchored to “\(item.originalText)”.")
+    }
+  }
+
+  @ViewBuilder
+  private func repairSection(_ item: RecipeVariationAnchorRepairItem) -> some View {
+    Section {
+      Text(item.originalText)
+        .font(.headline)
+      Text("Choose the current recipe row this change should use.")
+        .foregroundStyle(.secondary)
+      switch item.kind {
+      case .ingredient:
+        ForEach(model.repairIngredientLines) { line in
+          Button {
+            Task { await model.repairAnchor(item, reanchoringTo: line.id) }
+          } label: {
+            Text(line.originalText)
+          }
+          .disabled(model.isRepairingAnchor)
+        }
+      case .instructionStep:
+        ForEach(model.repairInstructionSteps) { step in
+          Button {
+            Task { await model.repairAnchor(item, reanchoringTo: step.id) }
+          } label: {
+            Text(step.text)
+          }
+          .disabled(model.isRepairingAnchor)
+        }
+      }
+      Button("Discard This Change", role: .destructive) {
+        discardingItem = item
+      }
+      .disabled(model.isRepairingAnchor)
+    } header: {
+      Label(item.kind == .ingredient ? "Ingredient Anchor" : "Instruction Anchor", systemImage: "link.badge.plus")
     }
   }
 }

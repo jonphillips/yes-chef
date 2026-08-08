@@ -185,6 +185,141 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func repairReanchorsOnlyTheChosenUnresolvedOperation() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 910_250_000)
+      let ids = AnchorRepairFixtureIDs(start: 91_350)
+      let variationID = SampleUUIDSequence.uuid(91_351)
+      let payload = try RecipeVariationPayload(
+        ingredientOps: [
+          .substitute(
+            RecipeIngredientReference(
+              id: SampleUUIDSequence.uuid(91_600),
+              originalText: "1 tablespoon vanished juice"
+            ),
+            line: "2 tablespoons lime juice"
+          )
+        ],
+        methodStepReplacements: [
+          RecipeMethodStepReplacement(
+            id: SampleUUIDSequence.uuid(91_601),
+            originalText: "Vanished instruction.",
+            replacementText: "Replacement."
+          )
+        ]
+      )
+      .encodedData()
+
+      try database.write { db in
+        try insertAnchorRepairBase(ids: ids, now: now, in: db)
+        try RecipeVariation.insert {
+          RecipeVariation(
+            id: variationID,
+            recipeID: ids.recipeID,
+            name: "Needs repair",
+            sortIndex: 0,
+            deltas: payload,
+            dateCreated: now,
+            dateModified: now
+          )
+        }
+        .execute(db)
+
+        _ = try RecipeRepository.repairVariationAnchor(
+          .ingredientOperation(0),
+          in: variationID,
+          reanchoringTo: ids.ingredientID,
+          in: db,
+          now: now.addingTimeInterval(1)
+        )
+      }
+
+      try database.read { db in
+        let variation = try #require(try RecipeVariation.find(variationID).fetchOne(db))
+        let detail = try #require(try RecipeRepository.fetchDetail(recipeID: ids.recipeID, in: db))
+        expectNoDifference(
+          try RecipeRepository.variationAnchorRepairItems(for: variation, in: detail),
+          [
+            RecipeVariationAnchorRepairItem(
+              address: .methodStepReplacement(0),
+              kind: .instructionStep,
+              originalText: "Vanished instruction."
+            )
+          ]
+        )
+        let repairedPayload = try RecipeVariationPayload.decode(variation.deltas, variationID: variationID)
+        expectNoDifference(repairedPayload.ingredientOps, [
+          .substitute(
+            RecipeIngredientReference(
+              id: ids.ingredientID,
+              originalText: "1 tablespoon vanished juice"
+            ),
+            line: "2 tablespoons lime juice"
+          )
+        ])
+        let resolution = try detail.resolved(applying: variation)
+        expectNoDifference(resolution.detail.ingredientLines.map(\.originalText), ["2 tablespoons lime juice"])
+        expectNoDifference(resolution.unresolvedAnchors, [.instructionStep("Vanished instruction.")])
+      }
+    }
+
+    @Test
+    func repairCanDiscardAnUnresolvedOperationWithoutDroppingOtherChanges() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 910_275_000)
+      let ids = AnchorRepairFixtureIDs(start: 91_375)
+      let variationID = SampleUUIDSequence.uuid(91_376)
+      let payload = try RecipeVariationPayload(
+        ingredientOps: [
+          .remove(RecipeIngredientReference(originalText: "1 tablespoon vanished juice"))
+        ],
+        methodStepReplacements: [
+          RecipeMethodStepReplacement(
+            id: ids.stepID,
+            originalText: "Finish with lemon.",
+            replacementText: "Finish with lime."
+          )
+        ]
+      )
+      .encodedData()
+
+      try database.write { db in
+        try insertAnchorRepairBase(ids: ids, now: now, in: db)
+        try RecipeVariation.insert {
+          RecipeVariation(
+            id: variationID,
+            recipeID: ids.recipeID,
+            name: "Needs repair",
+            sortIndex: 0,
+            deltas: payload,
+            dateCreated: now,
+            dateModified: now
+          )
+        }
+        .execute(db)
+
+        _ = try RecipeRepository.repairVariationAnchor(
+          .ingredientOperation(0),
+          in: variationID,
+          reanchoringTo: nil,
+          in: db,
+          now: now.addingTimeInterval(1)
+        )
+      }
+
+      try database.read { db in
+        let variation = try #require(try RecipeVariation.find(variationID).fetchOne(db))
+        let detail = try #require(try RecipeRepository.fetchDetail(recipeID: ids.recipeID, in: db))
+        let repairedPayload = try RecipeVariationPayload.decode(variation.deltas, variationID: variationID)
+        expectNoDifference(repairedPayload.ingredientOps, [])
+        expectNoDifference(try RecipeRepository.variationAnchorRepairItems(for: variation, in: detail), [])
+        let resolution = try detail.resolved(applying: variation)
+        expectNoDifference(resolution.unresolvedAnchors, [])
+        expectNoDifference(resolution.detail.instructionSteps.map(\.text), ["Finish with lime."])
+      }
+    }
+
+    @Test
     func legacyOriginalTextAnchorStillResolves() throws {
       let now = Date(timeIntervalSinceReferenceDate: 910_300_000)
       let ids = AnchorRepairFixtureIDs(start: 91_400)

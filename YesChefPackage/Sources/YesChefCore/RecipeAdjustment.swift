@@ -17,6 +17,8 @@ public enum RecipeAdjustmentError: Error, Equatable, LocalizedError {
   case variationNeedsReview(String, String)
   case unresolvedIngredient(String)
   case unresolvedInstructionStep(String)
+  case invalidVariationAnchorRepair
+  case invalidVariationAnchorTarget
 
   public var errorDescription: String? {
     switch self {
@@ -38,6 +40,10 @@ public enum RecipeAdjustmentError: Error, Equatable, LocalizedError {
       "The adjustment references an ingredient that could not be matched: \(text)"
     case let .unresolvedInstructionStep(text):
       "The adjustment references an instruction step that could not be matched: \(text)"
+    case .invalidVariationAnchorRepair:
+      "This variation anchor is no longer available to repair."
+    case .invalidVariationAnchorTarget:
+      "The selected recipe row is no longer available."
     }
   }
 }
@@ -351,6 +357,58 @@ public struct RecipeVariationPayload: Codable, Equatable, Sendable {
     }
     return (payload, unresolvedAnchors)
   }
+
+  fileprivate func repairItems(in detail: RecipeDetailData) -> [RecipeVariationAnchorRepairItem] {
+    var items: [RecipeVariationAnchorRepairItem] = []
+    for (index, operation) in ingredientOps.enumerated() {
+      let reference: RecipeIngredientReference?
+      switch operation {
+      case .add:
+        reference = nil
+      case let .remove(candidate), let .substitute(candidate, _), let .scale(candidate, _):
+        reference = candidate
+      }
+      guard let reference, reference.index(in: detail.ingredientLines) == nil else { continue }
+      items.append(
+        RecipeVariationAnchorRepairItem(
+          address: .ingredientOperation(index),
+          kind: .ingredient,
+          originalText: reference.displayText
+        )
+      )
+    }
+
+    let steps = detail.instructionGroups.flatMap(\.steps)
+    for (index, replacement) in methodStepReplacements.enumerated()
+    where replacement.index(in: steps) == nil {
+      items.append(
+        RecipeVariationAnchorRepairItem(
+          address: .methodStepReplacement(index),
+          kind: .instructionStep,
+          originalText: replacement.displayText
+        )
+      )
+    }
+
+    for (index, operation) in methodStepStructuralOps.enumerated() {
+      let reference: RecipeStepReference?
+      switch operation {
+      case let .insert(after, _, _):
+        reference = after
+      case let .remove(candidate):
+        reference = candidate
+      }
+      guard let reference, reference.index(in: steps) == nil else { continue }
+      items.append(
+        RecipeVariationAnchorRepairItem(
+          address: .methodStepStructuralOperation(index),
+          kind: .instructionStep,
+          originalText: reference.displayText
+        )
+      )
+    }
+    return items
+  }
 }
 
 public struct RecipeVariationAnchorBackfillReport: Equatable, Sendable {
@@ -475,6 +533,38 @@ public enum RecipeVariationUnresolvedAnchor: Equatable, Sendable {
     case let .ingredient(text): .unresolvedIngredient(text)
     case let .instructionStep(text): .unresolvedInstructionStep(text)
     }
+  }
+}
+
+/// The precise stored operation that needs a new base-row ID or an explicit discard.
+/// The position is intentionally payload-local: variation operations have no independent
+/// persisted identity and no other consumer anchors to them.
+public enum RecipeVariationAnchorRepairAddress: Hashable, Sendable {
+  case ingredientOperation(Int)
+  case methodStepReplacement(Int)
+  case methodStepStructuralOperation(Int)
+}
+
+public enum RecipeVariationAnchorRepairKind: Equatable, Sendable {
+  case ingredient
+  case instructionStep
+}
+
+public struct RecipeVariationAnchorRepairItem: Identifiable, Equatable, Sendable {
+  public let address: RecipeVariationAnchorRepairAddress
+  public let kind: RecipeVariationAnchorRepairKind
+  public let originalText: String
+
+  public var id: RecipeVariationAnchorRepairAddress { address }
+
+  public init(
+    address: RecipeVariationAnchorRepairAddress,
+    kind: RecipeVariationAnchorRepairKind,
+    originalText: String
+  ) {
+    self.address = address
+    self.kind = kind
+    self.originalText = originalText
   }
 }
 
@@ -637,6 +727,24 @@ private func normalizedIngredientReferenceIfPossible(
   guard let index = reference.index(in: lines) else { return nil }
   var reference = reference
   reference.id = lines[index].id
+  return reference
+}
+
+private func reanchoring(
+  _ reference: RecipeIngredientReference,
+  to id: IngredientLine.ID
+) -> RecipeIngredientReference {
+  var reference = reference
+  reference.id = id
+  return reference
+}
+
+private func reanchoring(
+  _ reference: RecipeStepReference,
+  to id: InstructionStep.ID
+) -> RecipeStepReference {
+  var reference = reference
+  reference.id = id
   return reference
 }
 
@@ -901,6 +1009,101 @@ extension DependencyValues {
 }
 
 extension RecipeRepository {
+  public static func variationAnchorRepairItems(
+    for variation: RecipeVariation,
+    in detail: RecipeDetailData
+  ) throws -> [RecipeVariationAnchorRepairItem] {
+    try RecipeVariationPayload.decode(variation.deltas, variationID: variation.id).repairItems(in: detail)
+  }
+
+  /// Replaces one unresolved anchor's base-row ID, or discards its whole operation when no target
+  /// is supplied. The repair queue is recomputed in the same transaction so a stale sheet cannot
+  /// rewrite an anchor that has already been fixed by another device.
+  @discardableResult
+  public static func repairVariationAnchor(
+    _ address: RecipeVariationAnchorRepairAddress,
+    in variationID: RecipeVariation.ID,
+    reanchoringTo targetID: UUID?,
+    in db: Database,
+    now: Date
+  ) throws -> RecipeVariation {
+    guard var variation = try RecipeVariation.find(variationID).fetchOne(db) else {
+      throw RecipeAdjustmentError.missingVariation(variationID)
+    }
+    guard let detail = try fetchDetail(recipeID: variation.recipeID, in: db) else {
+      throw RecipeAdjustmentError.missingRecipe(variation.recipeID)
+    }
+    var payload = try RecipeVariationPayload.decode(variation.deltas, variationID: variationID)
+    guard payload.repairItems(in: detail).contains(where: { $0.address == address }) else {
+      throw RecipeAdjustmentError.invalidVariationAnchorRepair
+    }
+
+    switch address {
+    case let .ingredientOperation(index):
+      guard payload.ingredientOps.indices.contains(index) else {
+        throw RecipeAdjustmentError.invalidVariationAnchorRepair
+      }
+      guard let targetID else {
+        payload.ingredientOps.remove(at: index)
+        break
+      }
+      guard detail.ingredientLines.contains(where: { $0.id == targetID }) else {
+        throw RecipeAdjustmentError.invalidVariationAnchorTarget
+      }
+      switch payload.ingredientOps[index] {
+      case .add:
+        throw RecipeAdjustmentError.invalidVariationAnchorRepair
+      case let .remove(reference):
+        payload.ingredientOps[index] = .remove(reanchoring(reference, to: targetID))
+      case let .substitute(reference, line):
+        payload.ingredientOps[index] = .substitute(reanchoring(reference, to: targetID), line: line)
+      case let .scale(reference, line):
+        payload.ingredientOps[index] = .scale(reanchoring(reference, to: targetID), line: line)
+      }
+
+    case let .methodStepReplacement(index):
+      guard payload.methodStepReplacements.indices.contains(index) else {
+        throw RecipeAdjustmentError.invalidVariationAnchorRepair
+      }
+      guard let targetID else {
+        payload.methodStepReplacements.remove(at: index)
+        break
+      }
+      guard detail.instructionSteps.contains(where: { $0.id == targetID }) else {
+        throw RecipeAdjustmentError.invalidVariationAnchorTarget
+      }
+      payload.methodStepReplacements[index].id = targetID
+
+    case let .methodStepStructuralOperation(index):
+      guard payload.methodStepStructuralOps.indices.contains(index) else {
+        throw RecipeAdjustmentError.invalidVariationAnchorRepair
+      }
+      guard let targetID else {
+        payload.methodStepStructuralOps.remove(at: index)
+        break
+      }
+      guard detail.instructionSteps.contains(where: { $0.id == targetID }) else {
+        throw RecipeAdjustmentError.invalidVariationAnchorTarget
+      }
+      switch payload.methodStepStructuralOps[index] {
+      case let .insert(after, sectionID, text):
+        guard let after else { throw RecipeAdjustmentError.invalidVariationAnchorRepair }
+        payload.methodStepStructuralOps[index] = .insert(
+          after: reanchoring(after, to: targetID),
+          sectionID: sectionID,
+          text: text
+        )
+      case let .remove(reference):
+        payload.methodStepStructuralOps[index] = .remove(reanchoring(reference, to: targetID))
+      }
+    }
+
+    variation.deltas = try payload.encodedData()
+    variation.dateModified = now
+    try RecipeVariation.upsert { variation }.execute(db)
+    return variation
+  }
+
   /// Repairs legacy model-authored anchors after the sync engine is installed, so updates to the
   /// existing `recipeVariations` table are observed and uploaded. It deliberately preserves an
   /// anchor when the current base cannot match it exactly; the report is the repair queue.
