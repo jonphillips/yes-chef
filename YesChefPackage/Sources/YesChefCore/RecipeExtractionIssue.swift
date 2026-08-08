@@ -7,6 +7,7 @@ public struct RecipeExtractionIssue: Equatable, Identifiable, Sendable {
     case missingTitle
     case emptyIngredients
     case emptyInstructions
+    case missingYield
     case missingIngredientQuantity
     case duplicateIngredient
     case ingredientNotReferenced
@@ -14,7 +15,6 @@ public struct RecipeExtractionIssue: Equatable, Identifiable, Sendable {
     case unparseablePrepTime
     case unparseableCookTime
     case unparseableTotalTime
-    case unattributedSource
   }
 
   public var kind: Kind
@@ -39,6 +39,8 @@ public struct RecipeExtractionIssue: Equatable, Identifiable, Sendable {
       "Add at least one ingredient."
     case .emptyInstructions:
       "Add at least one instruction."
+    case .missingYield:
+      "Add a yield or serving count."
     case .missingIngredientQuantity:
       "Check the quantity for \(quotedDetail)."
     case .duplicateIngredient:
@@ -53,8 +55,6 @@ public struct RecipeExtractionIssue: Equatable, Identifiable, Sendable {
       "Check cook time \(quotedDetail); it is not a readable duration."
     case .unparseableTotalTime:
       "Check total time \(quotedDetail); it is not a readable duration."
-    case .unattributedSource:
-      "Review this source; its terms do not appear in the extracted recipe."
     }
   }
 
@@ -65,12 +65,10 @@ public struct RecipeExtractionIssue: Equatable, Identifiable, Sendable {
 
 /// The pure, fixture-testable uncertainty pass for Create Recipe. It is deliberately conservative:
 /// linguistic provenance and semantic interpretation remain deferred, so it reports only direct structural,
-/// parsing, and lexical mismatches that a cook can verify in the editor.
+/// parsing, and lexical mismatches that a cook can verify in the editor. It presents at most two cues: D6 is an
+/// attention-allocation surface, not a request to proofread the entire recipe.
 public enum RecipeExtractionIssueDetector {
-  public static func issues(
-    in extraction: RecipeExtraction,
-    sources: [CreateRecipeSourceItem]
-  ) -> [RecipeExtractionIssue] {
+  public static func issues(in extraction: RecipeExtraction) -> [RecipeExtractionIssue] {
     let ingredientLines = extraction.ingredientSections
       .flatMap(\.lines)
       .filter { !$0.trimmedRecipeExtractionText.isEmpty }
@@ -88,13 +86,16 @@ public enum RecipeExtractionIssueDetector {
     if instructionSteps.isEmpty {
       issues.append(.init(kind: .emptyInstructions))
     }
+    if extraction.servingsText?.trimmedRecipeExtractionText.isEmpty != false {
+      issues.append(.init(kind: .missingYield))
+    }
 
     appendUnparseableDuration(extraction.prepTime, kind: .unparseablePrepTime, to: &issues)
     appendUnparseableDuration(extraction.cookTime, kind: .unparseableCookTime, to: &issues)
     appendUnparseableDuration(extraction.totalTime, kind: .unparseableTotalTime, to: &issues)
 
     let ingredients = ingredientLines.compactMap(Ingredient.init)
-    for ingredient in ingredients where ingredient.parsed.quantity == nil {
+    for ingredient in ingredients where ingredient.parsed.quantity == nil && !isPantryOrGarnish(ingredient) {
       issues.append(.init(kind: .missingIngredientQuantity, detail: ingredient.line))
     }
 
@@ -105,7 +106,11 @@ public enum RecipeExtractionIssueDetector {
 
     let listedNames = Set(ingredients.map(\.canonicalName))
     let referencedNames = instructionIngredientNames(in: instructionSteps)
-    for name in listedNames.sorted() where !referencedNames.contains(name) {
+    let unreferencedNames = listedNames.filter { name in
+      !referencedNames.contains(name)
+        && ingredients.contains { $0.canonicalName == name && !isPantryOrGarnish($0) }
+    }
+    for name in unreferencedNames.sorted() {
       issues.append(.init(kind: .ingredientNotReferenced, detail: name))
     }
 
@@ -113,14 +118,15 @@ public enum RecipeExtractionIssueDetector {
       issues.append(.init(kind: .referencedIngredientNotListed, detail: name))
     }
 
-    let extractionWords = meaningfulWords(in: extractionText(extraction))
-    for source in sources {
-      let sourceWords = meaningfulWords(in: source.text)
-      guard !sourceWords.isEmpty, sourceWords.isDisjoint(with: extractionWords) else { continue }
-      issues.append(.init(kind: .unattributedSource, sourceID: source.id))
-    }
-
     return issues
+      .enumerated()
+      .sorted { lhs, rhs in
+        let lhsPriority = priority(of: lhs.element.kind)
+        let rhsPriority = priority(of: rhs.element.kind)
+        return lhsPriority == rhsPriority ? lhs.offset < rhs.offset : lhsPriority < rhsPriority
+      }
+      .prefix(maximumIssueCount)
+      .map(\.element)
   }
 
   private static func appendUnparseableDuration(
@@ -145,6 +151,16 @@ public enum RecipeExtractionIssueDetector {
       }
     }
     return result
+  }
+
+  /// Salt, pepper, cooking fats and water, aromatics, and garnish/to-taste lines are routinely implicit in
+  /// recipe prose. Asking a cook to reconcile them against every step is D6 noise, not useful review work.
+  private static func isPantryOrGarnish(_ ingredient: Ingredient) -> Bool {
+    let line = ingredient.line.foldedRecipeExtractionWords.joined(separator: " ")
+    if line.contains("to taste") || line.contains("for garnish") || line.contains("to serve") || line.contains("optional") {
+      return true
+    }
+    return pantryAndAromaticNames.contains(ingredient.canonicalName)
   }
 
   private static func instructionIngredientNames(in steps: [String]) -> Set<String> {
@@ -210,30 +226,27 @@ public enum RecipeExtractionIssueDetector {
     text.foldedRecipeExtractionWords
   }
 
-  private static func extractionText(_ extraction: RecipeExtraction) -> String {
-    let fields = [
-      extraction.title,
-      extraction.summary,
-      extraction.author,
-      extraction.publisherName,
-      extraction.servingsText,
-      extraction.prepTime,
-      extraction.cookTime,
-      extraction.totalTime,
-    ]
-    .compactMap { $0 }
-    return (fields + extraction.ingredientSections.flatMap(\.lines) + extraction.instructionSections.flatMap(\.steps))
-      .joined(separator: "\n")
+  private static func priority(of kind: RecipeExtractionIssue.Kind) -> Int {
+    switch kind {
+    case .emptyIngredients, .emptyInstructions, .missingTitle:
+      0
+    case .unparseablePrepTime, .unparseableCookTime, .unparseableTotalTime, .duplicateIngredient:
+      1
+    case .missingYield:
+      2
+    case .referencedIngredientNotListed, .ingredientNotReferenced, .missingIngredientQuantity:
+      3
+    }
   }
 
-  /// Excluding tokens no longer than the English article "an" avoids treating articles and short units as
-  /// provenance evidence without a hand-tuned numeric threshold.
-  private static func meaningfulWords(in text: String) -> Set<String> {
-    Set(text.foldedRecipeExtractionWords.filter { $0.count > "an".count })
-  }
-
+  private static let maximumIssueCount = 2
   private static let ingredientIntroductionVerbs: Set<String> = ["add", "combine", "fold", "mix", "stir", "whisk"]
   private static let ingredientIntroductionFillers: Set<String> = ["a", "an", "in", "the", "together", "with"]
+  private static let pantryAndAromaticNames: Set<String> = [
+    "black pepper", "canola oil", "cilantro", "garlic", "ginger", "green onions", "ice", "neutral oil",
+    "oil", "olive oil", "onion", "parsley", "pepper", "salt", "scallion", "sea salt", "vegetable oil",
+    "water", "white pepper",
+  ]
 
   private struct Ingredient {
     let line: String

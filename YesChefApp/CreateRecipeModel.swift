@@ -153,7 +153,7 @@ final class CreateRecipeModel {
       let makeUUID = uuid
       let extractedDraft = extraction.editorDraft(uuid: { makeUUID() })
       editorModel.applyExtractedDraft(extractedDraft)
-      extractionIssues = RecipeExtractionIssueDetector.issues(in: extraction, sources: sources)
+      extractionIssues = RecipeExtractionIssueDetector.issues(in: extraction)
       proposeLabels(for: extraction)
     } catch {
       extractionError = RecipeChatErrorText.describe(error)

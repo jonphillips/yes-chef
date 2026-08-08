@@ -162,9 +162,7 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func deterministicIssuePassFindsConcreteExtractionMismatches() {
-      let attributedSourceID = SampleUUIDSequence.uuid(54_001)
-      let unattributedSourceID = SampleUUIDSequence.uuid(54_002)
+    func deterministicIssuePassRanksTheTwoMostActionableMismatches() {
       let extraction = RecipeExtraction(
         prepTime: "until tender",
         ingredientSections: [
@@ -174,32 +172,42 @@ extension RecipeCoreTests {
           .init(steps: ["Stir in butter."]),
         ]
       )
-      let issues = RecipeExtractionIssueDetector.issues(
-        in: extraction,
-        sources: [
-          .init(id: attributedSourceID, kind: .pastedText, content: "Scallions and salt"),
-          .init(id: unattributedSourceID, kind: .typedText, content: "Aardvark xylophone"),
-        ]
-      )
+      let issues = RecipeExtractionIssueDetector.issues(in: extraction)
 
       expectNoDifference(issues, [
         .init(kind: .missingTitle),
         .init(kind: .unparseablePrepTime, detail: "until tender"),
-        .init(kind: .missingIngredientQuantity, detail: "salt"),
-        .init(kind: .duplicateIngredient, detail: "green onions"),
-        .init(kind: .ingredientNotReferenced, detail: "green onions"),
-        .init(kind: .ingredientNotReferenced, detail: "salt"),
-        .init(kind: .referencedIngredientNotListed, detail: "butter"),
-        .init(kind: .unattributedSource, sourceID: unattributedSourceID),
       ])
     }
 
     @Test
-    func deterministicIssuePassReportsEmptyRecipeHalves() {
-      let issues = RecipeExtractionIssueDetector.issues(
-        in: RecipeExtraction(title: "Only a title"),
-        sources: []
+    func deterministicIssuePassIgnoresImplicitPantryAndGarnishIngredients() {
+      let extraction = RecipeExtraction(
+        title: "Roasted Vegetables",
+        servingsText: "Serves 4",
+        ingredientSections: [
+          .init(lines: ["salt to taste", "olive oil", "garlic", "parsley, for garnish"]),
+        ],
+        instructionSections: [.init(steps: ["Roast the vegetables until browned."])]
       )
+
+      expectNoDifference(RecipeExtractionIssueDetector.issues(in: extraction), [])
+    }
+
+    @Test
+    func deterministicIssuePassDetectsMissingYield() {
+      let extraction = RecipeExtraction(
+        title: "Bean Salad",
+        ingredientSections: [.init(lines: ["1 cup beans"])],
+        instructionSections: [.init(steps: ["Serve the beans."])]
+      )
+
+      expectNoDifference(RecipeExtractionIssueDetector.issues(in: extraction), [.init(kind: .missingYield)])
+    }
+
+    @Test
+    func deterministicIssuePassReportsEmptyRecipeHalves() {
+      let issues = RecipeExtractionIssueDetector.issues(in: RecipeExtraction(title: "Only a title"))
 
       expectNoDifference(issues, [.init(kind: .emptyIngredients), .init(kind: .emptyInstructions)])
     }
