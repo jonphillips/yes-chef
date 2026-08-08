@@ -9,6 +9,44 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0053 S1 — Create Recipe destination + paste-text front-end
+
+**Built + architect-reviewed + merged 2026-08-08; PR [#290](https://github.com/jonphillips/yes-chef/pull/290). Device pass owed — see CURRENT_HANDOFF.**
+Re-homes Jon's "paste unstructured recipe text and create a recipe" want as the **Create Recipe** destination,
+answering [ADR-0051](decisions/ADR-0051-text-to-recipe-extraction-strategy.md)'s OQ1 and built to its
+one-sink / plural-front-ends / one-engine strategy. **Schema-free** — the session is transient and never synced
+(D4), so **nothing on the prod-schema promotion list.**
+
+**Core.** The **ADR-0051 D5 lift** landed at the second real extraction consumer: `RecipeExtractionClient` moved
+out of the `WebRecipeCapture/` namespace to a source-neutral home, vestigial `structuredPageText` → `text`, the
+one live caller (`WebRecipeCaptureClient`) updated. `RecipeExtraction.editorDraft(uuid:)` maps the shared
+extraction core onto `RecipeEditorDraft`, the single terminal sink; `CreateRecipeExtraction` is the two-tier
+front-end (deterministic schema.org/JSON-LD first, faithful LLM engine otherwise); `CreateRecipeSourceItem` is
+the D5 source-list seam (`pastedText`/`typedText` kinds), shipped small so images are a later addition, not a
+rewrite.
+
+**App.** `CreateRecipeModel` / `CreateRecipeView` — one screen, compose material + structured draft, the
+structured half immediately usable (D2/OQ1). Transient session, nothing canonical until Save; a failed
+extraction preserves the material and surfaces a loud error. Tier reuses capture's policy verbatim (OQ2). Labels
+propose after a successful extraction, accepted by the cook, written facet-aware in the same write as
+`save(draft:)` (OQ3). Save commits through `save(draft:)` — the app-authored identity class (ADR-0051 Amd 1),
+no `importBundle`, no third save path. The editor's `Form` was extracted into a reusable `RecipeEditorFields`
+so `RecipeEditorView` and `CreateRecipeView` edit **one** draft implementation.
+
+**Amendment 1 (2026-08-07, commit `9c0e738`) supersedes D1's entry point.** Create Recipe is a first-class
+**sidebar destination** (`AppSection.createRecipe`), rendered full-width beside the sidebar like Browser/Calendar
+— **not** a full-screen destination off the library `+`, and the recipe-list `+` is removed. The session model is
+**resident** (an in-progress draft resumes across section switches, still in-memory only — D4 intact), a **Clear**
+affordance resets it, and after Save the app **jumps to the new recipe**.
+
+**Follow-up refinements (later commits on the branch).** Step segmentation: the model was emitting
+colon-terminated list continuations as separate numbered steps; the sink mapping now flattens internal line
+breaks and the **shared** extraction prompt gained step-granularity guidance (which also improves web capture —
+hence the owed capture re-check).
+
+**S2 (deterministic issue pass, D6) shipped separately in PR [#291].**
+
+---
 ## ADR-0042 Amendment 2 — `workbenchDraft` hand-off (S3a + S3b): draft a working recipe outboard
 
 **Built + architect-reviewed + device-passed 2026-08-07; PR [#289](https://github.com/jonphillips/yes-chef/pull/289).**

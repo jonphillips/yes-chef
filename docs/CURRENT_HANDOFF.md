@@ -1,13 +1,17 @@
 # Current Handoff
 
-Last updated: August 7, 2026. (**Next Up changed shape today.** A product review of the paste-text want
-promoted it from "a fifth front-end landing in the add sheet" to
-**[ADR-0053](decisions/ADR-0053-create-recipe-destination.md) — Create Recipe is a full-screen destination**
-(Proposed; answers ADR-0051 OQ1; OCR explicitly deferred; the session is transient and never synced). The same
-review found and corrected a factual error in ADR-0051 D1 — **web capture does not use the sink and commits
-through a second save path** — recorded as
-[Amd 1](decisions/ADR-0051-text-to-recipe-extraction-strategy.md#amendment-1--d1-was-wrong-about-capture-there-are-two-save-paths-and-the-review-surface-is-source-specific-2026-08-07)
-and reflected in the Standing guard. **The entire ADR-0049 facet/labeling arc is closed as a gate.** Amendment 2 (the
+Last updated: August 8, 2026. (**ADR-0053 shipped its two slices.** S1 — the Create Recipe destination + the
+paste-text front-end — is **merged** (PR [#290](https://github.com/jonphillips/yes-chef/pull/290); the ADR-0051
+D5 lift landed with it, and [Amd 1](decisions/ADR-0053-create-recipe-destination.md) re-homed it from a
+library-`+` full-screen destination to a **sidebar section**, `AppSection.createRecipe`). S2 — the deterministic
+issue pass (D6) — is **built and in review** (PR [#291](https://github.com/jonphillips/yes-chef/pull/291)),
+architect-reviewed, awaiting Jon's device pass before merge. **Both are recorded in
+[`DONE-LOG.md`](DONE-LOG.md) (S1) / below (S2 in-flight).** Next Up advances to **ADR-0052 grocery learned-area
+table** (Jon's call, 2026-08-08). ⚠️ **A Codex-env gotcha bit #291 and is now a standing note:** the
+simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
+the app tests" is structural, not a regression — and it *masked two genuinely red tests* (missing
+`bootstrapDatabase()` → `RecipeEditorModel`'s eager `@Fetch` tripped SQLiteData's blank-DB reporter), fixed by
+the architect running the target locally ([[codex-build-excuse-reproduce]]). **The entire ADR-0049 facet/labeling arc is closed as a gate.** Amendment 2 (the
 facet model) is complete and archived ([`DONE-LOG.md`](DONE-LOG.md)): D1–D5, F1/F2, and the OQ4 editorial-facet
 seed all shipped and device-passed (PRs [#275](https://github.com/jonphillips/yes-chef/pull/275)–[#277](https://github.com/jonphillips/yes-chef/pull/277)),
 D4 hand pass done. The S5/S6 + D8 labeling-backfill **tooling** shipped (PR [#278](https://github.com/jonphillips/yes-chef/pull/278)),
@@ -29,71 +33,55 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**Next Up → [ADR-0053](decisions/ADR-0053-create-recipe-destination.md) S1 — Create Recipe (the destination) +
-the paste-text front-end.** Jon's want is still "paste unstructured recipe text and create a recipe," but the
-2026-08-07 product review **re-homed it**: paste does not land in the existing add sheet, it lands in a new
-**full-screen Create Recipe destination** off the library `+`. ADR-0053 is Proposed and answers ADR-0051's OQ1.
-**The front-end, engine, sink and save are exactly as ADR-0051 scoped them — what changed is the entry point and
-the enclosing screen.** One dispatch, built to ADR-0053 D1–D8 and ADR-0051 D1–D7:
+**Next Up → [ADR-0052](decisions/ADR-0052-grocery-learned-area-table.md) — the grocery learned store-area table
+(batch S1+S2).** Ratified 2026-08-05; designated 2026-08-08. Today store-area classification is recomputed every
+generation, so a cook's correction never sticks and re-runs drift. Give it a **synced `canonicalName → area`
+table** so corrections **persist across generations and devices**, and a name is classified **once ever** then
+served by a free deterministic lookup ([[grocery-area-no-learned-cache]]).
 
-- **The destination (0053 D1/D2).** Replace the `addRecipe` **sheet**
-  ([RecipeLibraryView.swift:113](../YesChefApp/RecipeLibraryView.swift)) with a navigation destination. `+`
-  stops meaning "create a `Recipe` row." **No landing screen and no "Import vs. Manual" picker** (OQ1, resolved):
-  it opens with the compose material and the structured draft both present and **the structured half
-  immediately usable**, so a cook typing from memory just starts typing. Both halves are one
-  **`RecipeEditorDraft`** — the editor already binds it, so there is no second model. **Do not add a
-  `RecipeContent` type.**
-- **Front-end (0051 D4, two-tier) — unchanged.** If the paste happens to be schema.org markup/JSON-LD, the
-  deterministic `RecipeJSONLDExtractor` parses it **free**; otherwise `RecipeExtractionClient` extracts it
-  **faithfully** (never invent). Plain pasted recipe text — the common case — is the LLM path.
-- **Tier (0053 OQ2, resolved: frontier).** **By reusing capture's existing policy verbatim — do not add a
-  paste-specific tier constant.** `RecipeExtractionClient` already resolves through `resolveTier(useFrontier:
-  tierPreference.current(), …, requirement: .onDeviceCompatible)` on ADR-0047 OQ1's reasoning (low-volume,
-  user-initiated → strongest configured model). A new constant would break three things at once: the cook's
-  tier preference governing from settings ([[personal-app-latency-tolerance]]), the honest
-  `.degradedToOnDevice` record when no key exists, and degrade-don't-fail.
-- **Sink + save (0051 D1, as corrected by Amd 1).** → `RecipeExtraction` core → **`RecipeEditorDraft`** →
-  **`RecipeRepository.save(draft:)`**. Paste has **no external identity**, so it is `save(draft:)` and **not**
-  `importBundle` — see the Standing guard. No new terminal draft type, no third save path.
-- **Labels (0053 OQ3, resolved: yes).** Assisted labeling (`labelProposer`, ADR-0049) runs on the Create Recipe
-  save, as capture already does — proposed pre-save, accepted by the cook. The plain manual editor still does
-  **not** propose labels; that asymmetry is intended, do not "fix" it here.
-- **Session lifetime (0053 D4) — the invariant this whole design exists for.** The session is **transient: no
-  draft table, local or synced, ever.** Nothing canonical until an explicit Save. **Do not** write an unreviewed
-  extraction to the library at `.reference` placement — the workbench-draft precedent is deliberately declined.
-  A failed extraction never destroys the supplied material; a malformed model response is rejected **whole**,
-  never partially applied.
-- **Source seam (0053 D5) — build the small version now.** The session holds an **ordered list** of source
-  items, each with a **kind**; V1 ships `pastedText` and `typedText` **only**. Ship the list and the kind so
-  images are an addition later, not a rewrite. **Do not build it out further.**
-- **This slice triggers the 0051 D5 lift.** Paste-text is the **second real consumer of
-  `RecipeExtractionClient`** (web is the first; the S3 workbench return used the *deterministic* JSON-LD
-  extractor, not the LLM client). So **rename + relocate `RecipeExtractionClient` out of the `WebRecipeCapture`
-  namespace** to a source-neutral home and rename its vestigial `structuredPageText` parameter → `text`. Do it
-  here, deliberately.
-- **Deferred — do NOT build on this momentum (0053 D8).** Image/photo/**OCR** and Vision/VisionKit (Jon's
-  explicit call, 2026-08-07) · multi-page sources · durable or resumable sessions · the iPad source-|-draft
-  split (when built it reuses `ChatWorkspaceDivider`'s detents, not a second layout architecture) ·
-  conversational refinement and the explicit authorship verb · source-to-field provenance UI · share-sheet and
-  PDF ingestion · URL ingestion (capture owns URLs, richer review, different save path) · **the menu-note
-  LLM-fallback tier** (0051 D6/OQ3 — paste-text is its *trigger*, which makes this dispatch exactly the
-  momentum that would swallow it; it stays separate and offer-don't-impose) · any convergence of `save(draft:)`
-  and `importBundle`.
-- **S2, not this dispatch:** the deterministic issue pass (0053 D6) — computed **after** extraction, never
-  self-reported by the model, no confidence scores. S1 is valuable without it.
+- **The table + precedence (S1).** A new **synced** table keyed by the grocery `canonicalName` (ADR-0022/0052),
+  holding an `area` and a provenance. Precedence is a fixed ladder — **user > seed > model**: a user correction
+  always wins, `seedAreas` stays a code constant read at classify time (the middle tier, **not** migrated into
+  the table), and the classifier's own answer is the lowest.
+- **Auto-promote + write paths (S2).** On first classification of an unseen name the classifier **auto-promotes
+  its answer as `.model`** into the table; thereafter that name is a deterministic lookup with **no model call**.
+  A user correction writes a `.user` row that outranks it. The read path stays deterministic — **ADR-0022 holds**
+  (the "slug" naming is a stale misnomer kept only as the link anchor).
+- **⚠️ Fold in the `.low`-effort hard-rule fix here.** The grocery categorizer is the **only** `.low`-effort LLM
+  site in the codebase, violating [[personal-app-latency-tolerance]]'s hard rule. Raise it to `.high` **with** a
+  bigger token budget so reasoning doesn't starve output ([[reasoning-budget-starves-output]]) — the classify
+  path is already open in this dispatch.
+- **⚠️ New synced table, but an EMPTY create — no data backfill (D6).** So it is **lower-risk than V4b's schema
+  slice**: no migrator data pass, no deterministic-UUID seeding, nothing to diverge
+  ([[migration-writes-bypass-sync-triggers]] does not bite an empty create). It still **joins the prod-schema
+  promotion list when it merges** and still **wants Jon's two-device sync pass** — his current local window is
+  why it's designated now.
+- **Not this dispatch — S3.** Repointing ADR-0037's seed-coverage view to **audit** the `.model` rows (amends,
+  never deletes, ADR-0037) is a separate later slice. Batch **S1+S2 only**.
 
-**Verify** per [[lean-verification-default]]: `swift build` + Core tests (pasted plain text →
-`RecipeExtraction` → `RecipeEditorDraft` round-trip; a JSON-LD paste takes the deterministic path; an
-empty/garbage paste degrades **loud**; **no canonical row exists before Save**), one elevated
-`generic/platform=iOS` build — **`xcodegen generate` is required, this slice adds `YesChefApp/` files** — and
-`scripts/check-drift.sh`. **Run `YesChefTests` too**: S1 adds an app-layer creation model, and the generic build
-compiles that target without running it ([[app-test-target-not-in-verification]]). **Schema-free — nothing for
-the prod-schema promotion list**, which follows directly from the transient-session decision. **Jon
-device-passes** `+` → paste → review → Save.
+**Verify** per [[lean-verification-default]]: `swift build` + Core tests (precedence resolves user>seed>model; an
+unseen name auto-promotes `.model`; a `.user` correction outranks a `.model` row; a classified name is a
+deterministic lookup with no second model call), one elevated `generic/platform=iOS` build (**`xcodegen generate`
+if it adds `YesChefApp/` files**), and `scripts/check-drift.sh`; **run `YesChefTests`** if an app-layer model is
+touched. **Register the new table in `CloudSync` and add it to the prod-schema promotion list in the same PR**
+(the check is the registration list, both directions). **Jon does the two-device sync pass — back up first.**
 
-*(ADR-0042 Amendment 2 `workbenchDraft` S3a + S3b is **built, device-passed 2026-08-07, and recorded in
-[`DONE-LOG.md`](DONE-LOG.md)**; PR [#289](https://github.com/jonphillips/yes-chef/pull/289). Schema-free,
-nothing on the promotion list. It is the first path built to ADR-0051.)*
+---
+
+**In flight — [ADR-0053](decisions/ADR-0053-create-recipe-destination.md) S2 (PR
+[#291](https://github.com/jonphillips/yes-chef/pull/291)) — architect-reviewed, awaiting Jon's device pass +
+merge.** The deterministic issue pass (D6): a pure, fixture-tested `RecipeExtractionIssueDetector` over the
+extracted structure + source text (missing title/halves/quantity, unparseable duration, duplicate ingredient,
+listed-vs-referenced mismatch, unattributed source), surfaced as review cues in Create Recipe — **no confidence
+scores, no model self-report**. Also consolidated duration parsing onto `RecipeDurationParser`, and now captures
+**typed-vs-pasted** source distinctly and preserves it across a failed extraction (the S1 provenance gap).
+Architect fixes rode in `9cfa4fb` (the `DatabaseBackupTests` migration-tail + two masked-red `CreateRecipeModelTests`
+— see the header gotcha). **Two review notes for the device pass to settle:** (1) **cue noise** —
+`missingIngredientQuantity` + `ingredientNotReferenced` fire for *every* staple (salt, pepper, oil, "to taste",
+garnishes), in tension with D6's "attention allocation, not proofreading"; eyeball the volume on 2–3 real pastes.
+(2) **`unattributedSource` points at a source with no UI** (source-list is D8-deferred). If either bites they are
+**ADR-0053 S2.1** (suppress staples from those two categories; gate the unattributed cue until the source list
+surfaces) — small, not yet designated.
 
 ---
 
@@ -128,16 +116,8 @@ rather than feed an LLM a partial recipe. Live candidates:
   hand-run — so it is no longer listed as a loose candidate here.)*
 - **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell.** Unblocked
   since 2026-07-25; moves all eight chat call sites onto one Ask. Ready but larger.
-- **Grocery learned area table = [ADR-0052](decisions/ADR-0052-grocery-learned-area-table.md) (ratified
-  2026-08-05).** A synced `canonicalName → area` table so store-area corrections **stick** across generations and
-  devices; the classifier **auto-promotes** its first answer (loses to seed + user by a fixed precedence ladder)
-  and a name is classified **once ever**, then a free deterministic lookup. Also lands the hard fix that on-device
-  classification must not run at `.low` effort ([[personal-app-latency-tolerance]] hard rule) — raise the grocery
-  categorizer to `.high` **with** a bigger token budget ([[reasoning-budget-starves-output]]; the *only* `.low`
-  site in the codebase). **Batch S1+S2** (table + write paths) as one dispatch; S3 repoints ADR-0037's
-  seed-coverage view to *audit* `.model` rows (amends, doesn't delete, ADR-0037). **New synced table but an
-  empty create — no data backfill (D6), so lower-risk than V4b's schema slice** — still wants Jon's two-device
-  sync pass, and joins the prod-schema promotion list only when it merges.
+- **Grocery learned area table = [ADR-0052](decisions/ADR-0052-grocery-learned-area-table.md) — now the
+  designated Next Up (see above), no longer a loose candidate.**
 
 The ATK grocery-bug slice ([`efforts/import-text-normalization.md`](efforts/import-text-normalization.md)) is a
 **data migration wanting backup-first + a device pass** — hold it until Jon is local. D3's settled
@@ -158,8 +138,9 @@ section is work.**
   **`RecipeEditorDraft`**. **A fifth bespoke parser, a second "text→recipe" model call, a new terminal draft
   type, or a third save path is a review block** (D7, as restated by Amd1-D3). The four existing front-ends stay
   plural *by design* (web/schema.org, menu-note heading heuristic, workbench synthesis, JSON-LD return) —
-  consolidate the sink and the engine, not the parsers. `RecipeExtractionClient` gets lifted out of
-  `WebRecipeCapture` at the second extraction consumer (workbench return or paste), not before.
+  consolidate the sink and the engine, not the parsers. **The D5 lift is DONE** — `RecipeExtractionClient` now
+  lives in a source-neutral home (out of `WebRecipeCapture`), lifted at paste-text, the second real consumer
+  (ADR-0053 S1, PR #290); `structuredPageText` → `text`.
   - **⚠️ [Amd 1](decisions/ADR-0051-text-to-recipe-extraction-strategy.md#amendment-1--d1-was-wrong-about-capture-there-are-two-save-paths-and-the-review-surface-is-source-specific-2026-08-07)
     corrected D1 — do not read the old wording as "capture uses the sink."** It does not: `RecipeCaptureView`
     reviews on **`ParsedRecipePage`** and commits through a **second** canonical save path
@@ -307,6 +288,13 @@ selection (per-bubble `UITextView` caps the payload).
 ## Device passes owed
 
 Not work, a checklist.
+
+**[ADR-0053](decisions/ADR-0053-create-recipe-destination.md) Create Recipe — S1 (PR #290, merged) + S2 (PR #291,
+in review).** One combined pass: **sidebar → Create Recipe → paste → review cues → Save → lands on the new
+recipe**; the **Clear** affordance; the **resident** session resuming across sidebar switches; the paste
+**tier** and **labels-on-save** behavior; and a **web-capture re-check** (the shared extraction prompt changed
+in S1). For S2 specifically, judge the **review-cue volume** on 2–3 real pastes (drives whether S2.1 is worth
+doing) and whether the `unattributedSource` cue reads as noise without a source-list UI. Merge #291 after.
 
 *(The full ADR-0049 facet/labeling arc — PRs #270/#272/#274 (D1–D3), #275 (D5), #276 (F1/F2), #277 (OQ4 seed),
 #278 (S5/S6+D8 backfill tooling), #281 (Amd-4 floor), #282 (Edit Tags refine) — is device-passed 2026-08-05 and
