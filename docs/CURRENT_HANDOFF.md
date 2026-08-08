@@ -1,13 +1,15 @@
 # Current Handoff
 
-Last updated: August 8, 2026. (**ADR-0053 shipped its two slices.** S1 — the Create Recipe destination + the
-paste-text front-end — is **merged** (PR [#290](https://github.com/jonphillips/yes-chef/pull/290); the ADR-0051
-D5 lift landed with it, and [Amd 1](decisions/ADR-0053-create-recipe-destination.md) re-homed it from a
-library-`+` full-screen destination to a **sidebar section**, `AppSection.createRecipe`). S2 — the deterministic
-issue pass (D6) — is **built and in review** (PR [#291](https://github.com/jonphillips/yes-chef/pull/291)),
-architect-reviewed, awaiting Jon's device pass before merge. **Both are recorded in
-[`DONE-LOG.md`](DONE-LOG.md) (S1) / below (S2 in-flight).** Next Up advances to **ADR-0052 grocery learned-area
-table** (Jon's call, 2026-08-08). ⚠️ **A Codex-env gotcha bit #291 and is now a standing note:** the
+Last updated: August 8, 2026. (**Three slices shipped, merged, and device-passed 2026-08-08.** **ADR-0053 S1** —
+the Create Recipe destination + paste-text front-end (PR
+[#290](https://github.com/jonphillips/yes-chef/pull/290); the ADR-0051 D5 lift landed with it, and
+[Amd 1](decisions/ADR-0053-create-recipe-destination.md) re-homed it to a **sidebar section**,
+`AppSection.createRecipe`). **ADR-0053 S2** — the deterministic issue pass, D6 (PR
+[#291](https://github.com/jonphillips/yes-chef/pull/291)). **ADR-0052 S1+S2** — the synced grocery learned-area
+table (PR [#292](https://github.com/jonphillips/yes-chef/pull/292); joins the prod-schema promotion list). **All
+three are recorded in [`DONE-LOG.md`](DONE-LOG.md) and off the live front.** Next Up advances to **ADR-0021
+Amendment 4 V4b — the related-recipe edge table** (Jon's call, 2026-08-08).
+⚠️ **A Codex-env gotcha bit #291 and is now a standing note:** the
 simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
 the app tests" is structural, not a regression — and it *masked two genuinely red tests* (missing
 `bootstrapDatabase()` → `RecipeEditorModel`'s eager `@Fetch` tripped SQLiteData's blank-DB reporter), fixed by
@@ -33,55 +35,25 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**Next Up → [ADR-0052](decisions/ADR-0052-grocery-learned-area-table.md) — the grocery learned store-area table
-(batch S1+S2).** Ratified 2026-08-05; designated 2026-08-08. Today store-area classification is recomputed every
-generation, so a cook's correction never sticks and re-runs drift. Give it a **synced `canonicalName → area`
-table** so corrections **persist across generations and devices**, and a name is classified **once ever** then
-served by a free deterministic lookup ([[grocery-area-no-learned-cache]]).
+**Next Up → [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4 V4b — the related-recipe edge
+table.** Designated 2026-08-08 (Jon's call). V4a and V4c + Delete are done and in [`DONE-LOG.md`](DONE-LOG.md);
+V4b is the last remaining Amendment 4 slice. It is the **second half of the Playbook "Choices" section**: a
+synced edge table linking a recipe to related recipes, where **reordering lands as a linked split-off** (not a
+variation). **OQ2 is resolved — order by name, no ordering column** ([[recipe-variations-overlay]]).
 
-- **The table + precedence (S1).** A new **synced** table keyed by the grocery `canonicalName` (ADR-0022/0052),
-  holding an `area` and a provenance. Precedence is a fixed ladder — **user > seed > model**: a user correction
-  always wins, `seedAreas` stays a code constant read at classify time (the middle tier, **not** migrated into
-  the table), and the classifier's own answer is the lowest.
-- **Auto-promote + write paths (S2).** On first classification of an unseen name the classifier **auto-promotes
-  its answer as `.model`** into the table; thereafter that name is a deterministic lookup with **no model call**.
-  A user correction writes a `.user` row that outranks it. The read path stays deterministic — **ADR-0022 holds**
-  (the "slug" naming is a stale misnomer kept only as the link anchor).
-- **⚠️ Fold in the `.low`-effort hard-rule fix here.** The grocery categorizer is the **only** `.low`-effort LLM
-  site in the codebase, violating [[personal-app-latency-tolerance]]'s hard rule. Raise it to `.high` **with** a
-  bigger token budget so reasoning doesn't starve output ([[reasoning-budget-starves-output]]) — the classify
-  path is already open in this dispatch.
-- **⚠️ New synced table, but an EMPTY create — no data backfill (D6).** So it is **lower-risk than V4b's schema
-  slice**: no migrator data pass, no deterministic-UUID seeding, nothing to diverge
-  ([[migration-writes-bypass-sync-triggers]] does not bite an empty create). It still **joins the prod-schema
-  promotion list when it merges** and still **wants Jon's two-device sync pass** — his current local window is
-  why it's designated now.
-- **Not this dispatch — S3.** Repointing ADR-0037's seed-coverage view to **audit** the `.model` rows (amends,
-  never deletes, ADR-0037) is a separate later slice. Batch **S1+S2 only**.
+- **It is the schema slice.** A new **synced** edge table → it **joins the prod-schema promotion list when it
+  merges**, registers in `CloudSync` (the check is the registration list, both directions), and **wants Jon's
+  two-device sync pass — back up first**. Designated now while Jon's local window is open
+  ([[synced-table-cost-calibration]] — the table itself is cheap; the sync pass is the cost).
+- **The delta-op vocabulary is closed.** Amd4-D4's `stepInsert`/`stepRemove` shipped and the step ops are spent —
+  **do not extend the delta ops further** without a new ADR decision.
+- **Answer Amd4-OQ1 while here:** variation / related-recipe indexing wants a decision while
+  [ADR-0050](decisions/ADR-0050-recipe-power-browser.md)'s `RecipeBrowserQuery` is still being designed.
 
-**Verify** per [[lean-verification-default]]: `swift build` + Core tests (precedence resolves user>seed>model; an
-unseen name auto-promotes `.model`; a `.user` correction outranks a `.model` row; a classified name is a
-deterministic lookup with no second model call), one elevated `generic/platform=iOS` build (**`xcodegen generate`
-if it adds `YesChefApp/` files**), and `scripts/check-drift.sh`; **run `YesChefTests`** if an app-layer model is
-touched. **Register the new table in `CloudSync` and add it to the prod-schema promotion list in the same PR**
-(the check is the registration list, both directions). **Jon does the two-device sync pass — back up first.**
-
----
-
-**In flight — [ADR-0053](decisions/ADR-0053-create-recipe-destination.md) S2 (PR
-[#291](https://github.com/jonphillips/yes-chef/pull/291)) — architect-reviewed, awaiting Jon's device pass +
-merge.** The deterministic issue pass (D6): a pure, fixture-tested `RecipeExtractionIssueDetector` over the
-extracted structure + source text (missing title/halves/quantity, unparseable duration, duplicate ingredient,
-listed-vs-referenced mismatch, unattributed source), surfaced as review cues in Create Recipe — **no confidence
-scores, no model self-report**. Also consolidated duration parsing onto `RecipeDurationParser`, and now captures
-**typed-vs-pasted** source distinctly and preserves it across a failed extraction (the S1 provenance gap).
-Architect fixes rode in `9cfa4fb` (the `DatabaseBackupTests` migration-tail + two masked-red `CreateRecipeModelTests`
-— see the header gotcha). **Two review notes for the device pass to settle:** (1) **cue noise** —
-`missingIngredientQuantity` + `ingredientNotReferenced` fire for *every* staple (salt, pepper, oil, "to taste",
-garnishes), in tension with D6's "attention allocation, not proofreading"; eyeball the volume on 2–3 real pastes.
-(2) **`unattributedSource` points at a source with no UI** (source-list is D8-deferred). If either bites they are
-**ADR-0053 S2.1** (suppress staples from those two categories; gate the unattributed cue until the source list
-surfaces) — small, not yet designated.
+**Verify** per [[lean-verification-default]]: `swift build` + Core tests, one elevated `generic/platform=iOS`
+build (**`xcodegen generate` if it adds `YesChefApp/` files**), and `scripts/check-drift.sh`; **run
+`YesChefTests`** if an app-layer model is touched. **Register the new table in `CloudSync` and add it to the
+prod-schema promotion list in the same PR.** **Jon does the two-device sync pass — back up first.**
 
 ---
 
@@ -92,17 +64,13 @@ Dispatch 1** all shipped, merged, and device-passed 2026-08-05, now archived to 
 Filling in per-recipe facet/tag coverage is Jon's ongoing hand work (Edit Tags + DEBUG Facet Coverage) that
 **gates nothing**.
 
-**The remaining ADR-0021 Amendment 4 work is V4b** (V4a and V4c done), plus **anchor-repair Dispatch 2** (the
-in-app repair UI). Dispatch 1 left `resolved(applying:)` **read-lenient / write-strict** — an orphaned anchor
+**The remaining ADR-0021 Amendment 4 work is V4b — now the designated Next Up (see above)**, plus **anchor-repair
+Dispatch 2** (the in-app repair UI). Dispatch 1 left `resolved(applying:)` **read-lenient / write-strict** — an orphaned anchor
 no longer takes out a recipe's editor/reader/grocery, and the two variation-scoped hand-off reads block loudly
 rather than feed an LLM a partial recipe. Live candidates:
 
-- **Variations → the Playbook = [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4 — only V4b
-  remains** (V4a and V4c + Delete done, DONE-LOG). **V4b** — the related-recipe edge table, the Choices
-  section's second half (**OQ2 resolved: order by name, no ordering column**); it is the **schema slice**, so
-  **hold until Jon is local for its two-device sync pass, back up first**. This is where reordering lands
-  (linked split-off, not a variation). Amd4-D4's step ops are now spent — `stepInsert`/`stepRemove` shipped and
-  the vocabulary is closed again; **do not extend the delta ops further** without a new ADR decision.
+- **Variations → the Playbook = [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4 — V4b is now the
+  designated Next Up (see above).** It was the last remaining Amendment 4 slice (V4a, V4c + Delete done, DONE-LOG).
 - **anchor-repair Dispatch 2 — the repair UI, no schema.** The read path already surfaces the orphaned-anchor
   repair queue (reader/editor notice, grocery `(needs repair)` subtitle, blocked Save + blocked hand-offs);
   Dispatch 2 makes it **directly actionable** (re-anchor or drop an orphaned op). Spec:
@@ -116,8 +84,9 @@ rather than feed an LLM a partial recipe. Live candidates:
   hand-run — so it is no longer listed as a loose candidate here.)*
 - **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell.** Unblocked
   since 2026-07-25; moves all eight chat call sites onto one Ask. Ready but larger.
-- **Grocery learned area table = [ADR-0052](decisions/ADR-0052-grocery-learned-area-table.md) — now the
-  designated Next Up (see above), no longer a loose candidate.**
+- **Grocery learned area table = [ADR-0052](decisions/ADR-0052-grocery-learned-area-table.md) — shipped, merged,
+  and device-passed (PR [#292](https://github.com/jonphillips/yes-chef/pull/292)), DONE-LOG. Only **S3** remains
+  (not designated): repoint ADR-0037's seed-coverage view to **audit** the `.model` rows (amends, never deletes).**
 
 The ATK grocery-bug slice ([`efforts/import-text-normalization.md`](efforts/import-text-normalization.md)) is a
 **data migration wanting backup-first + a device pass** — hold it until Jon is local. D3's settled
@@ -289,12 +258,12 @@ selection (per-bubble `UITextView` caps the payload).
 
 Not work, a checklist.
 
-**[ADR-0053](decisions/ADR-0053-create-recipe-destination.md) Create Recipe — S1 (PR #290, merged) + S2 (PR #291,
-in review).** One combined pass: **sidebar → Create Recipe → paste → review cues → Save → lands on the new
-recipe**; the **Clear** affordance; the **resident** session resuming across sidebar switches; the paste
-**tier** and **labels-on-save** behavior; and a **web-capture re-check** (the shared extraction prompt changed
-in S1). For S2 specifically, judge the **review-cue volume** on 2–3 real pastes (drives whether S2.1 is worth
-doing) and whether the `unattributedSource` cue reads as noise without a source-list UI. Merge #291 after.
+**None currently owed.**
+
+*(Device-passed 2026-08-08 and removed: **ADR-0053 S1 (PR #290) + S2 (PR #291)** — the combined Create Recipe
+pass (sidebar → paste → review cues → Save → lands on the new recipe, Clear, resident session, tier/labels-on-save,
+web-capture re-check); the S2 cue-volume and `unattributedSource` notes did not warrant an S2.1. **ADR-0052 S1+S2
+(PR #292)** — the grocery learned-area two-device correction-sync and the high-effort budget stress both cleared.)*
 
 *(The full ADR-0049 facet/labeling arc — PRs #270/#272/#274 (D1–D3), #275 (D5), #276 (F1/F2), #277 (OQ4 seed),
 #278 (S5/S6+D8 backfill tooling), #281 (Amd-4 floor), #282 (Edit Tags refine) — is device-passed 2026-08-05 and
