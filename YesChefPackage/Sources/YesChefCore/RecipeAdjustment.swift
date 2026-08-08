@@ -1147,6 +1147,7 @@ extension RecipeRepository {
       }
       .execute(db)
     }
+    try linkRelatedRecipes(variation.recipeID, recipeID, in: db, now: now, uuid: uuid)
     try RecipeVariation.find(variationID).delete().execute(db)
     try setActiveVariation(nil, recipeID: variation.recipeID, in: db, now: now, uuid: uuid)
     return recipeID

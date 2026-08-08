@@ -79,6 +79,10 @@ extension RecipeDetailModel {
     detail?.activeVariation
   }
 
+  var relatedRecipes: [Recipe] {
+    detail?.relatedRecipes ?? []
+  }
+
   var activeVariationNote: String? {
     guard let note = activeVariation?.note?.trimmingCharacters(in: .whitespacesAndNewlines),
           !note.isEmpty

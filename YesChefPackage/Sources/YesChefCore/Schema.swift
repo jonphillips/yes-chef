@@ -1240,6 +1240,20 @@ extension DependencyValues {
           "dateModified" TEXT NOT NULL
         ) STRICT
         """)
+      .execute(db)
+    }
+
+    migrator.registerMigration("Create related recipe edges") { db in
+      // Both recipe IDs are intentionally loose: this is a symmetric peer edge, not a child
+      // relationship, and a second FK is incompatible with SQLiteData's CloudKit sharing model.
+      try #sql("""
+        CREATE TABLE "recipeRelatedRecipes" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "recipeID" TEXT NOT NULL,
+          "relatedRecipeID" TEXT NOT NULL,
+          "dateCreated" TEXT NOT NULL
+        ) STRICT
+        """)
         .execute(db)
     }
 

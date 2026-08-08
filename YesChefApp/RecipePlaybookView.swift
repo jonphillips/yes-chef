@@ -6,6 +6,7 @@ struct RecipePlaybookView: View {
   let model: RecipeDetailModel
   let handoffTransport: HandoffInAppTransport
   let ask: () -> Void
+  let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   @State private var isMakeAheadExpanded = true
   @State private var isChoicesExpanded = true
@@ -35,14 +36,14 @@ struct RecipePlaybookView: View {
       ) {
         makeAheadContent(model.makeAhead)
       }
-      if !model.variations.isEmpty {
-        playbookSection(
-          "Choices",
-          isFilled: true,
-          isExpanded: $isChoicesExpanded,
-          showsActions: false,
-          actions: { EmptyView() }
-        ) {
+      playbookSection(
+        "Choices",
+        isFilled: !model.variations.isEmpty || !model.relatedRecipes.isEmpty,
+        isExpanded: $isChoicesExpanded,
+        showsActions: false,
+        actions: { EmptyView() }
+      ) {
+        VStack(alignment: .leading, spacing: 16) {
           RecipeVariationChoices(
             variations: model.variations,
             activeVariationID: model.detail?.activeVariationID,
@@ -51,6 +52,11 @@ struct RecipePlaybookView: View {
             promotingVariation: $promotingVariation,
             splittingOffVariation: $splittingOffVariation,
             splitOffTitleDraft: $splitOffTitleDraft
+          )
+          RecipeRelatedRecipeChoices(
+            relatedRecipes: model.relatedRecipes,
+            model: model,
+            onRecipeSelected: onRecipeSelected
           )
         }
       }
