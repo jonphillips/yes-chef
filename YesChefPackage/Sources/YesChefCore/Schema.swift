@@ -1255,12 +1255,6 @@ extension DependencyValues {
         ) STRICT
         """)
         .execute(db)
-      for statement in [
-        #"CREATE INDEX "index_recipeRelatedRecipes_on_recipeID" ON "recipeRelatedRecipes"("recipeID")"#,
-        #"CREATE INDEX "index_recipeRelatedRecipes_on_relatedRecipeID" ON "recipeRelatedRecipes"("relatedRecipeID")"#,
-      ] {
-        try db.execute(sql: statement)
-      }
     }
 
     try migrator.migrate(database)

@@ -216,6 +216,24 @@ extension RecipeDetailModel {
     }
   }
 
+  func linkRelatedRecipeButtonTapped() {
+    guard !isLoadingRelatedRecipePicker else { return }
+    isLoadingRelatedRecipePicker = true
+    let database = database
+    Task {
+      do {
+        relatedRecipePickerRows = try await database.read { db in
+          try RecipeRepository.relatedRecipePickerRows(in: db)
+        }
+        destination = .relatedRecipePicker
+      } catch {
+        errorMessage = error.localizedDescription
+        isShowingError = true
+      }
+      isLoadingRelatedRecipePicker = false
+    }
+  }
+
   func unlinkRelatedRecipe(_ relatedRecipeID: Recipe.ID) {
     Task {
       do {

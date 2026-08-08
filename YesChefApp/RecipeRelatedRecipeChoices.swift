@@ -6,19 +6,21 @@ struct RecipeRelatedRecipeChoices: View {
   let model: RecipeDetailModel
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
-  @State private var isLinkingRecipe = false
   @State private var unlinkingRecipe: Recipe?
 
   var body: some View {
+    @Bindable var model = model
+
     VStack(alignment: .leading, spacing: 8) {
       HStack {
         Text("Related Recipes")
           .font(.title3.bold())
         Spacer()
         Button("Link Recipe", systemImage: "link") {
-          isLinkingRecipe = true
+          model.linkRelatedRecipeButtonTapped()
         }
         .buttonStyle(.bordered)
+        .disabled(model.isLoadingRelatedRecipePicker)
       }
 
       if relatedRecipes.isEmpty {
@@ -31,9 +33,9 @@ struct RecipeRelatedRecipeChoices: View {
         }
       }
     }
-    .sheet(isPresented: $isLinkingRecipe) {
+    .sheet(isPresented: $model.destination.relatedRecipePicker) {
       RelatedRecipePicker(
-        recipeRows: model.recipeRows,
+        recipeRows: model.relatedRecipePickerRows,
         currentRecipeID: model.recipeID,
         linkedRecipeIDs: Set(relatedRecipes.map(\.id)),
         link: model.linkRelatedRecipe
@@ -94,28 +96,28 @@ struct RecipeRelatedRecipeChoices: View {
 private struct RelatedRecipePicker: View {
   @Environment(\.dismiss) private var dismiss
 
-  let recipeRows: [RecipeListRowData]
+  let recipeRows: [RecipeRelatedRecipePickerRow]
   let currentRecipeID: Recipe.ID
   let linkedRecipeIDs: Set<Recipe.ID>
   let link: (Recipe.ID) -> Void
 
   @State private var searchText = ""
 
-  private var availableRecipeRows: [RecipeListRowData] {
+  private var availableRecipeRows: [RecipeRelatedRecipePickerRow] {
     let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     return recipeRows
-      .filter { $0.recipe.id != currentRecipeID && !linkedRecipeIDs.contains($0.recipe.id) }
+      .filter { $0.id != currentRecipeID && !linkedRecipeIDs.contains($0.id) }
       .filter { row in
         query.isEmpty || RecipeSearchMatcher.matches(
           query: query,
-          in: [row.recipe.title, row.recipe.subtitle, row.recipe.summary]
+          in: [row.title, row.subtitle, row.summary]
             .compactMap(\.self) + row.categoryNames
         )
       }
       .sorted { lhs, rhs in
-        let titleOrder = lhs.recipe.title.localizedStandardCompare(rhs.recipe.title)
+        let titleOrder = lhs.title.localizedStandardCompare(rhs.title)
         if titleOrder != .orderedSame { return titleOrder == .orderedAscending }
-        return lhs.recipe.id.uuidString < rhs.recipe.id.uuidString
+        return lhs.id.uuidString < rhs.id.uuidString
       }
   }
 
@@ -127,13 +129,13 @@ private struct RelatedRecipePicker: View {
         } else {
           ForEach(availableRecipeRows) { row in
             Button {
-              link(row.recipe.id)
+              link(row.id)
               dismiss()
             } label: {
               VStack(alignment: .leading, spacing: 3) {
-                Text(row.recipe.title)
+                Text(row.title)
                   .font(.headline)
-                if let subtitle = row.recipe.subtitle, !subtitle.isEmpty {
+                if let subtitle = row.subtitle, !subtitle.isEmpty {
                   Text(subtitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)

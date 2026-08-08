@@ -708,6 +708,7 @@ final class RecipeDetailModel {
     case repairServeWith(ServeWithRepairPresentation)
     case adjustmentReview(RecipeAdjustmentReviewState)
     case variationEditor(RecipeVariation.ID)
+    case relatedRecipePicker
   }
 
   let recipeID: Recipe.ID
@@ -733,8 +734,6 @@ final class RecipeDetailModel {
   @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
   @ObservationIgnored
-  @Fetch(RecipeListRequest(), animation: .default) var recipeRows: [RecipeListRowData] = []
-  @ObservationIgnored
   @Fetch var workbenchCandidateLinks: [WorkbenchCandidateLink] = []
   @ObservationIgnored
   @Fetch var persistedScale: Double?
@@ -754,6 +753,8 @@ final class RecipeDetailModel {
   var scaleFraction = ScaleFraction.none
   var adjustmentRestorePoint: RecipeAdjustmentRestorePoint?
   var labelState = RecipeLabelState()
+  var relatedRecipePickerRows: [RecipeRelatedRecipePickerRow] = []
+  var isLoadingRelatedRecipePicker = false
   @ObservationIgnored let detailFetchAnimationDescription: String
   private var lastAppliedPersistedScale: Double?
   private(set) var seededAskSection: PlaybookSectionKind?

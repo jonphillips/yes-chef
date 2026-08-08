@@ -38,6 +38,30 @@ public enum RecipeRelatedRecipeError: Error, Equatable, LocalizedError {
   }
 }
 
+/// The lightweight recipe metadata needed to choose a related recipe. This intentionally omits
+/// sources and photos so opening the picker does not materialize library thumbnails on a writer.
+public struct RecipeRelatedRecipePickerRow: Identifiable, Equatable, Sendable {
+  public let id: Recipe.ID
+  public var title: String
+  public var subtitle: String?
+  public var summary: String?
+  public var categoryNames: [String]
+
+  public init(
+    id: Recipe.ID,
+    title: String,
+    subtitle: String?,
+    summary: String?,
+    categoryNames: [String]
+  ) {
+    self.id = id
+    self.title = title
+    self.subtitle = subtitle
+    self.summary = summary
+    self.categoryNames = categoryNames
+  }
+}
+
 extension RecipeRelatedRecipe {
   /// A stable canonical form gives every writer the same representation of an undirected edge.
   static func canonicalPair(
@@ -64,6 +88,52 @@ extension RecipeRelatedRecipe {
 }
 
 extension RecipeRepository {
+  /// Loads link-picker candidates with a scoped read instead of observing the full library.
+  /// In particular, this query never touches `recipePhotos`, whose thumbnail BLOBs are only for
+  /// the browsing list.
+  public static func relatedRecipePickerRows(in db: Database) throws -> [RecipeRelatedRecipePickerRow] {
+    let recipes = try Recipe
+      .where { !$0.archived }
+      .select {
+        RelatedRecipePickerRecipeRow.Columns(
+          id: $0.id,
+          title: $0.title,
+          subtitle: $0.subtitle,
+          summary: $0.summary
+        )
+      }
+      .fetchAll(db)
+    let facets = try Facet.fetchAll(db)
+    let categoriesByID = Dictionary(
+      uniqueKeysWithValues: CategoryRepository.visibleCategories(
+        try Category.fetchAll(db),
+        facets: facets
+      )
+      .map { ($0.id, $0) }
+    )
+    let categoryNamesByRecipeID = Dictionary(grouping: try RecipeCategory.fetchAll(db), by: \.recipeID)
+      .mapValues { recipeCategories in
+        let categories = recipeCategories
+          .compactMap { categoriesByID[$0.categoryID] }
+          .sorted { $0.sortOrder < $1.sortOrder }
+        return categories.map {
+          CategoryHierarchy.displayName(for: $0, categoriesByID: categoriesByID)
+        }
+      }
+
+    return recipes
+      .map {
+        RecipeRelatedRecipePickerRow(
+          id: $0.id,
+          title: $0.title,
+          subtitle: $0.subtitle,
+          summary: $0.summary,
+          categoryNames: categoryNamesByRecipeID[$0.id] ?? []
+        )
+      }
+      .sorted(by: relatedRecipePickerOrder)
+  }
+
   /// Creates the relationship once, and converges any offline duplicates on the stable lowest UUID.
   /// This is the only writer for the logically unique unordered recipe pair.
   public static func linkRelatedRecipes(
@@ -124,7 +194,24 @@ extension RecipeRepository {
   }
 }
 
+@Selection
+private struct RelatedRecipePickerRecipeRow: Equatable, Sendable {
+  let id: Recipe.ID
+  let title: String
+  let subtitle: String?
+  let summary: String?
+}
+
 private func relatedRecipeDisplayOrder(_ lhs: Recipe, _ rhs: Recipe) -> Bool {
+  let titleOrder = lhs.title.localizedStandardCompare(rhs.title)
+  if titleOrder != .orderedSame { return titleOrder == .orderedAscending }
+  return lhs.id.uuidString < rhs.id.uuidString
+}
+
+private func relatedRecipePickerOrder(
+  _ lhs: RecipeRelatedRecipePickerRow,
+  _ rhs: RecipeRelatedRecipePickerRow
+) -> Bool {
   let titleOrder = lhs.title.localizedStandardCompare(rhs.title)
   if titleOrder != .orderedSame { return titleOrder == .orderedAscending }
   return lhs.id.uuidString < rhs.id.uuidString
