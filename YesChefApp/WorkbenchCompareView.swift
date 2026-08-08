@@ -6,6 +6,7 @@ import YesChefCore
 /// flip-through (Full) over a workbench's working recipe + candidates. A pure read over the
 /// already-loaded detail — no fetch, no schema. Presented full-screen on iPad, as a sheet on iPhone.
 struct WorkbenchCompareView: View {
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   enum Segment: String, CaseIterable, Identifiable {
     case ingredients = "Ingredients"
     case full = "Full"
@@ -16,12 +17,12 @@ struct WorkbenchCompareView: View {
   let detail: WorkbenchDetailData
   let alignmentModel: WorkbenchCompareAlignmentModel
   let tier: ModelTier
-  var compactChatContext: RecipeChatContext?
-  var compactChatActiveTierChanged: (ModelTier) -> Void = { _ in }
-  var compactApplyActions: (RecipeChatModel) -> [AnyChatApplyAction] = { _ in [] }
+  var chatContext: RecipeChatContext?
+  var chatActiveTierChanged: (ModelTier) -> Void = { _ in }
+  var chatApplyActions: (RecipeChatModel) -> [AnyChatApplyAction] = { _ in [] }
   @Environment(\.dismiss) private var dismiss
   @State private var segment: Segment = .ingredients
-  @State private var compactChatModel: RecipeChatModel?
+  @State private var chatModel: RecipeChatModel?
 
   private var workingDetail: RecipeDetailData? {
     detail.draftRecipeDetail
@@ -118,13 +119,13 @@ struct WorkbenchCompareView: View {
             dismiss()
           }
         }
-        if let compactChatContext {
+        if let chatContext {
           ToolbarItem(placement: .topBarLeading) {
             Button {
-              if compactChatModel != nil {
-                compactChatModel = nil
+              if chatModel != nil {
+                chatModel = nil
               } else {
-                compactChatModel = RecipeChatModel(context: compactChatContext)
+                chatModel = RecipeChatModel(context: chatContext)
               }
             } label: {
               Label("Ask", systemImage: "sparkles")
@@ -165,12 +166,24 @@ struct WorkbenchCompareView: View {
         }
       }
     }
-    .sheet(item: $compactChatModel) { chatModel in
+    .recipeChatInspector(
+      chatModel: $chatModel,
+      isEnabled: isChatInspectorEnabled
+    ) { panelModel in
+      .workbenchCompareInspector(
+        content: .init(
+          applyActions: chatApplyActions(panelModel),
+          activeTierChanged: chatActiveTierChanged
+        ),
+        onDismiss: { chatModel = nil }
+      )
+    }
+    .sheet(item: isChatInspectorEnabled ? .constant(nil) : $chatModel) { panelModel in
       WorkbenchCompareChatSheet(
-        chatModel: chatModel,
-        applyActions: compactApplyActions(chatModel),
-        activeTierChanged: compactChatActiveTierChanged,
-        onDismiss: { compactChatModel = nil }
+        chatModel: panelModel,
+        applyActions: chatApplyActions(panelModel),
+        activeTierChanged: chatActiveTierChanged,
+        onDismiss: { chatModel = nil }
       )
     }
   }
@@ -196,6 +209,10 @@ struct WorkbenchCompareView: View {
   /// actually run (a cold miss or an explicit refresh), never for re-displaying a cached result.
   private var alignmentLoadID: String {
     alignmentKey.contentSignature
+  }
+
+  private var isChatInspectorEnabled: Bool {
+    WideLayout.isEnabled(horizontalSizeClass: horizontalSizeClass)
   }
 }
 

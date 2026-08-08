@@ -1,3 +1,4 @@
+import CustomDump
 import Dependencies
 import Foundation
 import Testing
@@ -64,11 +65,10 @@ struct ChatSurfaceTests {
   @Test
   func noneFactoriesExposeNoStarterControl() {
     let noneSurfaces = [
-      ChatSurface.calendarWorkspaceColumn(content: content),
-      ChatSurface.workbenchDetailColumn(content: content),
-      ChatSurface.workbenchCompareColumn(content: content),
+      ChatSurface.calendarWorkspaceInspector(content: content, onDismiss: {}),
+      ChatSurface.workbenchDetailInspector(content: content, onDismiss: {}),
+      ChatSurface.workbenchCompareInspector(content: content, onDismiss: {}),
       ChatSurface.calendarCompactSheet(content: content, onDismiss: {}),
-      ChatSurface.calendarDayCompactSheet(content: content, onDismiss: {}),
       ChatSurface.workbenchCompactSheet(content: content, onDismiss: {}),
       ChatSurface.workbenchCompareCompactSheet(content: content, onDismiss: {}),
     ]
@@ -77,6 +77,20 @@ struct ChatSurfaceTests {
       #expect(starters(in: surface).isEmpty)
       #expect(activeStarterID(in: surface) == nil)
       #expect(surface.resolvedContract.sections == .none)
+    }
+  }
+
+  @Test
+  func inspectorFactoriesUseTheSharedPanelPresentation() {
+    let inspectorSurfaces = [
+      ChatSurface.calendarWorkspaceInspector(content: content, onDismiss: {}),
+      ChatSurface.workbenchDetailInspector(content: content, onDismiss: {}),
+      ChatSurface.workbenchCompareInspector(content: content, onDismiss: {}),
+    ]
+
+    for surface in inspectorSurfaces {
+      expectNoDifference(surface.resolvedContract.presentation, .embeddedHeader)
+      expectNoDifference(surface.resolvedContract.dismissal, .panelOwned)
     }
   }
 

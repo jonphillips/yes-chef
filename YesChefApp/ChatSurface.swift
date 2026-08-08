@@ -111,23 +111,19 @@ struct ChatSurface {
     )
   }
 
-  static func calendarWorkspaceColumn(content: Content) -> Self {
-    column(content: content, detent: .calendar)
+  static func calendarWorkspaceInspector(content: Content, onDismiss: @escaping () -> Void) -> Self {
+    inspector(content: content, onDismiss: onDismiss)
   }
 
-  static func workbenchDetailColumn(content: Content) -> Self {
-    column(content: content, detent: .workbenchDetail)
+  static func workbenchDetailInspector(content: Content, onDismiss: @escaping () -> Void) -> Self {
+    inspector(content: content, onDismiss: onDismiss)
   }
 
-  static func workbenchCompareColumn(content: Content) -> Self {
-    column(content: content, detent: .workbenchCompare)
+  static func workbenchCompareInspector(content: Content, onDismiss: @escaping () -> Void) -> Self {
+    inspector(content: content, onDismiss: onDismiss)
   }
 
   static func calendarCompactSheet(content: Content, onDismiss: @escaping () -> Void) -> Self {
-    sheet(content: content, onDismiss: onDismiss)
-  }
-
-  static func calendarDayCompactSheet(content: Content, onDismiss: @escaping () -> Void) -> Self {
     sheet(content: content, onDismiss: onDismiss)
   }
 
@@ -152,8 +148,8 @@ struct ChatSurface {
     )
   }
 
-  private static func column(content: Content, detent: DetentIdentity) -> Self {
-    Self(content: content, sections: .none, presentation: .column(detent: detent))
+  private static func inspector(content: Content, onDismiss: @escaping () -> Void) -> Self {
+    Self(content: content, sections: .none, presentation: .embeddedHeader(onDismiss: onDismiss))
   }
 
   private static func sheet(content: Content, onDismiss: @escaping () -> Void) -> Self {
