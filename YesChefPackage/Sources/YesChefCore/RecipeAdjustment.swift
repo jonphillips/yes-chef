@@ -358,38 +358,82 @@ public struct RecipeVariationPayload: Codable, Equatable, Sendable {
     return (payload, unresolvedAnchors)
   }
 
-  fileprivate func repairItems(in detail: RecipeDetailData) -> [RecipeVariationAnchorRepairItem] {
+  fileprivate func repairItems(
+    in detail: RecipeDetailData,
+    variationID: RecipeVariation.ID
+  ) -> [RecipeVariationAnchorRepairItem] {
     var items: [RecipeVariationAnchorRepairItem] = []
+    var ingredientSections = detail.ingredientSections
+    var ingredientLines = sortedIngredientLines(detail.ingredientLines, sections: ingredientSections)
+    var uuids = VariationUUIDSequence(variationID: variationID)
     for (index, operation) in ingredientOps.enumerated() {
-      let reference: RecipeIngredientReference?
       switch operation {
-      case .add:
-        reference = nil
-      case let .remove(candidate), let .substitute(candidate, _), let .scale(candidate, _):
-        reference = candidate
+      case let .add(line, sectionName):
+        guard let section = targetIngredientSection(
+          named: sectionName,
+          sections: &ingredientSections,
+          recipeID: detail.recipe.id,
+          uuid: { uuids.next() }
+        ) else { continue }
+        if let line = newIngredientLine(
+          line,
+          recipeID: detail.recipe.id,
+          sectionID: section.id,
+          sortOrder: nextIngredientSortOrder(in: section.id, lines: ingredientLines),
+          uuid: { uuids.next() }
+        ) {
+          ingredientLines.append(line)
+        }
+
+      case let .remove(reference):
+        guard let lineIndex = reference.index(in: ingredientLines) else {
+          items.append(
+            RecipeVariationAnchorRepairItem(
+              address: .ingredientOperation(index),
+              kind: .ingredient,
+              originalText: reference.displayText
+            )
+          )
+          continue
+        }
+        ingredientLines.remove(at: lineIndex)
+
+      case let .substitute(reference, line), let .scale(reference, line):
+        guard let lineIndex = reference.index(in: ingredientLines) else {
+          items.append(
+            RecipeVariationAnchorRepairItem(
+              address: .ingredientOperation(index),
+              kind: .ingredient,
+              originalText: reference.displayText
+            )
+          )
+          continue
+        }
+        ingredientLines[lineIndex] = ingredientLines[lineIndex].replacingOriginalText(with: line)
       }
-      guard let reference, reference.index(in: detail.ingredientLines) == nil else { continue }
-      items.append(
-        RecipeVariationAnchorRepairItem(
-          address: .ingredientOperation(index),
-          kind: .ingredient,
-          originalText: reference.displayText
-        )
-      )
+      ingredientLines = sortedIngredientLines(ingredientLines, sections: ingredientSections)
     }
 
-    let steps = detail.instructionGroups.flatMap(\.steps)
-    for (index, replacement) in methodStepReplacements.enumerated()
-    where replacement.index(in: steps) == nil {
-      items.append(
-        RecipeVariationAnchorRepairItem(
-          address: .methodStepReplacement(index),
-          kind: .instructionStep,
-          originalText: replacement.displayText
+    var instructionSteps = detail.instructionGroups.flatMap(\.steps)
+    for (index, replacement) in methodStepReplacements.enumerated() {
+      guard let stepIndex = replacement.index(in: instructionSteps) else {
+        items.append(
+          RecipeVariationAnchorRepairItem(
+            address: .methodStepReplacement(index),
+            kind: .instructionStep,
+            originalText: replacement.displayText
+          )
         )
-      )
+        continue
+      }
+      instructionSteps[stepIndex].text = replacement.replacementText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    let orderedSteps = InstructionStepGroup.groups(
+      sections: detail.instructionSections,
+      steps: instructionSteps
+    )
+    .flatMap(\.steps)
     for (index, operation) in methodStepStructuralOps.enumerated() {
       let reference: RecipeStepReference?
       switch operation {
@@ -398,7 +442,7 @@ public struct RecipeVariationPayload: Codable, Equatable, Sendable {
       case let .remove(candidate):
         reference = candidate
       }
-      guard let reference, reference.index(in: steps) == nil else { continue }
+      guard let reference, reference.index(in: orderedSteps) == nil else { continue }
       items.append(
         RecipeVariationAnchorRepairItem(
           address: .methodStepStructuralOperation(index),
@@ -732,19 +776,22 @@ private func normalizedIngredientReferenceIfPossible(
 
 private func reanchoring(
   _ reference: RecipeIngredientReference,
-  to id: IngredientLine.ID
+  to line: IngredientLine
 ) -> RecipeIngredientReference {
   var reference = reference
-  reference.id = id
+  reference.id = line.id
+  reference.originalText = line.originalText
   return reference
 }
 
 private func reanchoring(
   _ reference: RecipeStepReference,
-  to id: InstructionStep.ID
+  to step: InstructionStep
 ) -> RecipeStepReference {
   var reference = reference
-  reference.id = id
+  reference.id = step.id
+  reference.stepNumber = nil
+  reference.originalText = step.text
   return reference
 }
 
@@ -1013,7 +1060,9 @@ extension RecipeRepository {
     for variation: RecipeVariation,
     in detail: RecipeDetailData
   ) throws -> [RecipeVariationAnchorRepairItem] {
-    try RecipeVariationPayload.decode(variation.deltas, variationID: variation.id).repairItems(in: detail)
+    try RecipeVariationPayload
+      .decode(variation.deltas, variationID: variation.id)
+      .repairItems(in: detail, variationID: variation.id)
   }
 
   /// Replaces one unresolved anchor's base-row ID, or discards its whole operation when no target
@@ -1034,7 +1083,7 @@ extension RecipeRepository {
       throw RecipeAdjustmentError.missingRecipe(variation.recipeID)
     }
     var payload = try RecipeVariationPayload.decode(variation.deltas, variationID: variationID)
-    guard payload.repairItems(in: detail).contains(where: { $0.address == address }) else {
+    guard payload.repairItems(in: detail, variationID: variationID).contains(where: { $0.address == address }) else {
       throw RecipeAdjustmentError.invalidVariationAnchorRepair
     }
 
@@ -1047,18 +1096,18 @@ extension RecipeRepository {
         payload.ingredientOps.remove(at: index)
         break
       }
-      guard detail.ingredientLines.contains(where: { $0.id == targetID }) else {
+      guard let target = detail.ingredientLines.first(where: { $0.id == targetID }) else {
         throw RecipeAdjustmentError.invalidVariationAnchorTarget
       }
       switch payload.ingredientOps[index] {
       case .add:
         throw RecipeAdjustmentError.invalidVariationAnchorRepair
       case let .remove(reference):
-        payload.ingredientOps[index] = .remove(reanchoring(reference, to: targetID))
+        payload.ingredientOps[index] = .remove(reanchoring(reference, to: target))
       case let .substitute(reference, line):
-        payload.ingredientOps[index] = .substitute(reanchoring(reference, to: targetID), line: line)
+        payload.ingredientOps[index] = .substitute(reanchoring(reference, to: target), line: line)
       case let .scale(reference, line):
-        payload.ingredientOps[index] = .scale(reanchoring(reference, to: targetID), line: line)
+        payload.ingredientOps[index] = .scale(reanchoring(reference, to: target), line: line)
       }
 
     case let .methodStepReplacement(index):
@@ -1069,10 +1118,12 @@ extension RecipeRepository {
         payload.methodStepReplacements.remove(at: index)
         break
       }
-      guard detail.instructionSteps.contains(where: { $0.id == targetID }) else {
+      guard let target = detail.instructionSteps.first(where: { $0.id == targetID }) else {
         throw RecipeAdjustmentError.invalidVariationAnchorTarget
       }
-      payload.methodStepReplacements[index].id = targetID
+      payload.methodStepReplacements[index].id = target.id
+      payload.methodStepReplacements[index].stepNumber = nil
+      payload.methodStepReplacements[index].originalText = target.text
 
     case let .methodStepStructuralOperation(index):
       guard payload.methodStepStructuralOps.indices.contains(index) else {
@@ -1082,19 +1133,19 @@ extension RecipeRepository {
         payload.methodStepStructuralOps.remove(at: index)
         break
       }
-      guard detail.instructionSteps.contains(where: { $0.id == targetID }) else {
+      guard let target = detail.instructionSteps.first(where: { $0.id == targetID }) else {
         throw RecipeAdjustmentError.invalidVariationAnchorTarget
       }
       switch payload.methodStepStructuralOps[index] {
       case let .insert(after, sectionID, text):
         guard let after else { throw RecipeAdjustmentError.invalidVariationAnchorRepair }
         payload.methodStepStructuralOps[index] = .insert(
-          after: reanchoring(after, to: targetID),
+          after: reanchoring(after, to: target),
           sectionID: sectionID,
           text: text
         )
       case let .remove(reference):
-        payload.methodStepStructuralOps[index] = .remove(reanchoring(reference, to: targetID))
+        payload.methodStepStructuralOps[index] = .remove(reanchoring(reference, to: target))
       }
     }
 

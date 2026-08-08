@@ -252,7 +252,7 @@ extension RecipeCoreTests {
           .substitute(
             RecipeIngredientReference(
               id: ids.ingredientID,
-              originalText: "1 tablespoon vanished juice"
+              originalText: "1 tablespoon lemon juice"
             ),
             line: "2 tablespoons lime juice"
           )
@@ -260,6 +260,78 @@ extension RecipeCoreTests {
         let resolution = try detail.resolved(applying: variation)
         expectNoDifference(resolution.detail.ingredientLines.map(\.originalText), ["2 tablespoons lime juice"])
         expectNoDifference(resolution.unresolvedAnchors, [.instructionStep("Vanished instruction.")])
+      }
+    }
+
+    @Test
+    func repairQueueUsesTheResolverOrderForConflictingOperations() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 910_260_000)
+      let ids = AnchorRepairFixtureIDs(start: 91_360)
+      let variationID = SampleUUIDSequence.uuid(91_365)
+      let payload = try RecipeVariationPayload(
+        ingredientOps: [
+          .remove(RecipeIngredientReference(id: ids.ingredientID, originalText: "1 tablespoon lemon juice")),
+          .substitute(
+            RecipeIngredientReference(id: ids.ingredientID, originalText: "1 tablespoon lemon juice"),
+            line: "2 tablespoons lime juice"
+          ),
+        ],
+        methodStepReplacements: []
+      )
+      .encodedData()
+
+      try database.write { db in
+        try insertAnchorRepairBase(ids: ids, now: now, in: db)
+        try RecipeVariation.insert {
+          RecipeVariation(
+            id: variationID,
+            recipeID: ids.recipeID,
+            name: "Conflicting changes",
+            sortIndex: 0,
+            deltas: payload,
+            dateCreated: now,
+            dateModified: now
+          )
+        }
+        .execute(db)
+
+        let stored = try #require(try RecipeVariation.find(variationID).fetchOne(db))
+        let detail = try #require(try RecipeRepository.fetchDetail(recipeID: ids.recipeID, in: db))
+        expectNoDifference(
+          try RecipeRepository.variationAnchorRepairItems(for: stored, in: detail),
+          [
+            RecipeVariationAnchorRepairItem(
+              address: .ingredientOperation(1),
+              kind: .ingredient,
+              originalText: "1 tablespoon lemon juice"
+            )
+          ]
+        )
+        expectNoDifference(
+          try detail.resolved(applying: stored).unresolvedAnchors,
+          [.ingredient("1 tablespoon lemon juice")]
+        )
+
+        _ = try RecipeRepository.repairVariationAnchor(
+          .ingredientOperation(1),
+          in: variationID,
+          reanchoringTo: nil,
+          in: db,
+          now: now.addingTimeInterval(1)
+        )
+      }
+
+      try database.read { db in
+        let variation = try #require(try RecipeVariation.find(variationID).fetchOne(db))
+        let detail = try #require(try RecipeRepository.fetchDetail(recipeID: ids.recipeID, in: db))
+        expectNoDifference(
+          try RecipeRepository.variationAnchorRepairItems(for: variation, in: detail),
+          []
+        )
+        let resolution = try detail.resolved(applying: variation)
+        expectNoDifference(resolution.unresolvedAnchors, [])
+        expectNoDifference(resolution.detail.ingredientLines, [])
       }
     }
 
