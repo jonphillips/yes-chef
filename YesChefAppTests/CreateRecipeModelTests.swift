@@ -8,8 +8,9 @@ import YesChefCore
 @MainActor
 struct CreateRecipeModelTests {
   @Test
-  func typedMaterialIsRecordedBeforeAFailedExtraction() async {
-    await withDependencies {
+  func typedMaterialIsRecordedBeforeAFailedExtraction() async throws {
+    try await withDependencies {
+      try $0.bootstrapDatabase()
       $0.uuid = .incrementing
       $0.recipeExtractionClient = .testValue
     } operation: {
@@ -27,8 +28,9 @@ struct CreateRecipeModelTests {
   }
 
   @Test
-  func pastedMaterialKeepsItsDistinctSourceKind() {
-    withDependencies {
+  func pastedMaterialKeepsItsDistinctSourceKind() throws {
+    try withDependencies {
+      try $0.bootstrapDatabase()
       $0.uuid = .incrementing
     } operation: {
       let model = CreateRecipeModel()
