@@ -305,6 +305,7 @@ prod/TestFlight cut. At that cut, deploy the following to the production schema:
 - The synced **`workbenchReferences`** table (ADR-0032 S1)
 - The synced **`recipeDeliberationLog`** table (ADR-0021 V3 / [Amd 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23))
 - The synced **`groceryAreaAssignments`** table (ADR-0052 S1+S2)
+- The synced **`recipeRelatedRecipes`** table (ADR-0021 Amendment 4 V4b)
 
 *The `Menu.prepPlan` BLOB is **not** on this list and must not be re-added — it was dropped outright, so the
 dead CKAsset field never enters the prod schema.*

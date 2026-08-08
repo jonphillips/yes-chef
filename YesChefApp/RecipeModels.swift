@@ -733,6 +733,8 @@ final class RecipeDetailModel {
   @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
   @ObservationIgnored
+  @Fetch(RecipeListRequest(), animation: .default) var recipeRows: [RecipeListRowData] = []
+  @ObservationIgnored
   @Fetch var workbenchCandidateLinks: [WorkbenchCandidateLink] = []
   @ObservationIgnored
   @Fetch var persistedScale: Double?
