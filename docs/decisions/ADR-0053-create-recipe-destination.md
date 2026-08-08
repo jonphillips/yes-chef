@@ -15,6 +15,12 @@ structured fields), and the [[llm-vs-determinism-surface-boundary]] line. Reuses
 **This ADR decides the destination, the trust boundary, the source seam, and where uncertainty is computed. It
 deliberately does not design the UI.**
 
+> **[Amendment 1](#amendment-1--the-entry-point-is-a-sidebar-destination-not-the-library--2026-08-07)
+> (2026-08-07):** supersedes D1's entry point — Create Recipe is a **sidebar section**, not a full-screen
+> destination launched from the library `+`, and the `+` is removed. D4's transient-session invariant is
+> unchanged (the session is resident in memory and resumes across switches, but is still never persisted or
+> synced).
+
 ## Context
 
 **The want is small and the failure mode is not.** Jon wants to paste unstructured recipe text and get a recipe.
@@ -223,6 +229,32 @@ wants its own fixture corpus. Extends the existing capture fixtures
 Verification per [[lean-verification-default]], plus `YesChefTests` if any app-layer model changes
 ([[app-test-target-not-in-verification]]). **Schema-free — both slices.** Nothing for the prod-schema promotion
 list, which follows directly from D4.
+
+## Amendment 1 — the entry point is a sidebar destination, not the library `+` (2026-08-07)
+
+**D1 said `+` routes to Create Recipe and Create Recipe is a full-screen destination.** In the S1 device pass Jon
+made a different product call: **Create Recipe is a first-class sidebar section** (`AppSection.createRecipe`),
+rendered as a full-width workspace beside the collapsible sidebar — the same shell as Browser and Calendar, with
+the built-in split-view toggle to hide the sidebar for full width. **The library `+` is removed entirely**; the
+sidebar entry (and, on compact width, the "More" tab) is the way in. D1's own text flagged the presentation as
+"the cheap part… a small change" and correctly located the load-bearing decisions elsewhere (D4/D5) — so this
+amends only where the door is, not what happens past it.
+
+**Why the sidebar wins over the modal.** A modal launched from a list frames creation as a transient interruption
+of *browsing the library*; but the job is a several-minutes, own-lifecycle task (D1's own words). A resident
+workspace with a collapsible sidebar fits that shape, gives the iPad its real estate without a cover, and lines up
+with the sidebar-adaptable direction ([ADR-0046](ADR-0046-sidebar-adaptable-app-shell.md)) rather than fighting it.
+
+**D4's trust invariant is fully intact — this changes *when the session clears*, not *whether it persists*.** The
+session model is now **resident in memory** so an in-progress draft **resumes** across sidebar switches instead of
+being discarded on dismissal; it is still **never written to a table, never synced**, and nothing is canonical
+until an explicit Save. The discard trigger moves from "leave the modal" to an explicit **Clear** affordance, and
+a successful **Save resets the session and jumps to the newly created recipe** in the library. D2 (one
+environment, structured half immediately usable), D5 (the source seam), and D6/D7 are untouched.
+
+**The one deliberate cost:** the `+` shortcut's discoverability is gone. Accepted — the sidebar is a stable,
+always-visible home, and a redundant `+` that merely re-selects the section would reintroduce the "hangs off the
+list" framing this amendment removes.
 
 ## Open questions
 

@@ -12,7 +12,6 @@ import YesChefCore
 final class RecipeLibraryModel {
   @CasePathable
   enum Destination {
-    case addRecipe
     case captureRecipe
     case editRecipe(Recipe.ID)
     case originalSnapshot(Recipe.ID)
@@ -62,10 +61,6 @@ final class RecipeLibraryModel {
 
   func reloadAfterExternalChange() async {
     try? await $recipeRows.load()
-  }
-
-  func addRecipeButtonTapped() {
-    destination = .addRecipe
   }
 
   func workbenchSelectionButtonTapped() {

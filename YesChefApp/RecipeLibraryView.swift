@@ -12,6 +12,7 @@ struct AppContainer: View {
   @Dependency(\.handoffReviewCoordinator) private var handoffReviewCoordinator
   @State private var toastCenter: AppToastCenter
   @State private var recipeModel = RecipeLibraryModel()
+  @State private var createRecipeModel = CreateRecipeModel()
   @State private var workbenchModel = WorkbenchLibraryModel()
   @State private var browserModel = BrowserModel()
   @State private var mealCalendarModel: MealCalendarModel
@@ -53,6 +54,7 @@ struct AppContainer: View {
       mealCalendarModel: mealCalendarModel,
       menuModel: menuModel,
       groceryModel: groceryModel,
+      createRecipeModel: createRecipeModel,
       selectedSection: $selectedSection,
       selectedSettingsPane: $selectedSettingsPane,
       onBrowserCapture: browserCaptureButtonTapped,
@@ -61,7 +63,8 @@ struct AppContainer: View {
       },
       onCookSessionRequested: { presentation in
         presentedCookSession = presentation
-      }
+      },
+      onRecipeCreated: recipeCreated
     )
     .fullScreenCover(item: $presentedRecipe) { presentation in
       RecipeFullScreenCover(
@@ -110,11 +113,6 @@ struct AppContainer: View {
       recipeModel: recipeModel,
       isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil
     )
-    .sheet(isPresented: $recipeModel.destination.addRecipe) {
-      NavigationStack {
-        RecipeEditorView(recipeID: nil)
-      }
-    }
     .sheet(isPresented: $recipeModel.destination.captureRecipe) {
       NavigationStack {
         RecipeCaptureView(libraryModel: recipeModel, model: recipeModel.captureModel)
@@ -310,6 +308,15 @@ struct AppContainer: View {
     )
   }
 
+  /// A Create Recipe save lands the cook on the recipe they just made (Jon's call): select it in the
+  /// library and switch to Recipes. The Create Recipe session is finished, so its in-memory model is
+  /// replaced with a fresh one for the next visit.
+  @MainActor private func recipeCreated(_ recipeID: Recipe.ID) {
+    recipeModel.selectedRecipeID = recipeID
+    createRecipeModel = CreateRecipeModel()
+    selectedSection = .recipes
+  }
+
   @MainActor private func browserCaptureButtonTapped(page: WebPage) async {
     let outcome = await browserModel.captureButtonTapped(page: page) { html, url in
       await recipeModel.captureModel.ingestBrowserCapture(html: html, sourceURL: url)
@@ -411,10 +418,6 @@ struct RecipeListView: View {
   @AppStorage("RecipeList.rowDensity") private var rowDensityRawValue = RecipeListRowDensity.rich.rawValue
   @AppStorage("RecipeList.showsSourceMetadata") private var showsSourceMetadata = true
   @AppStorage("RecipeList.showsCategoryMetadata") private var showsCategoryMetadata = true
-  @AppStorage("RecipeList.savedPresets") private var savedPresetsData = Data()
-
-  @State private var isSavingListPreset = false
-  @State private var isManagingListPresets = false
 
   let model: RecipeLibraryModel
   let style: Style
@@ -426,8 +429,6 @@ struct RecipeListView: View {
       showsSourceMetadata: showsSourceMetadata,
       showsCategoryMetadata: showsCategoryMetadata
     )
-    let savedPresets = savedListPresets
-    let activePresetID = activeListPresetID
 
     Group {
       if model.isSelectingWorkbenchRecipes {
@@ -485,6 +486,23 @@ struct RecipeListView: View {
     }
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {
+        Button {
+          model.filterButtonTapped()
+        } label: {
+          Label(
+            "Filter Recipes",
+            systemImage: model.hasActiveFilters
+              ? "line.3.horizontal.decrease.circle.fill"
+              : "line.3.horizontal.decrease.circle"
+          )
+        }
+        .disabled(model.isImporting)
+        RecipeSortMenu(model: model)
+        RecipeListViewOptionsMenu(
+          rowDensityRawValue: $rowDensityRawValue,
+          showsSourceMetadata: $showsSourceMetadata,
+          showsCategoryMetadata: $showsCategoryMetadata
+        )
         if model.isSelectingWorkbenchRecipes {
           Button {
             model.cancelWorkbenchSelectionButtonTapped()
@@ -505,107 +523,8 @@ struct RecipeListView: View {
           }
           .disabled(model.isImporting)
         }
-        RecipeListPresetMenu(
-          presets: savedPresets,
-          activePresetID: activePresetID
-        ) { preset in
-          model.applyListPreset(preset)
-        } saveCurrentView: {
-          isSavingListPreset = true
-        } managePresets: {
-          isManagingListPresets = true
-        }
-        .disabled(model.isImporting)
-        RecipeSortMenu(model: model)
-        RecipeListViewOptionsMenu(
-          rowDensityRawValue: $rowDensityRawValue,
-          showsSourceMetadata: $showsSourceMetadata,
-          showsCategoryMetadata: $showsCategoryMetadata
-        )
-        Button {
-          model.filterButtonTapped()
-        } label: {
-          Label(
-            "Filter Recipes",
-            systemImage: model.hasActiveFilters
-              ? "line.3.horizontal.decrease.circle.fill"
-              : "line.3.horizontal.decrease.circle"
-          )
-        }
-        .disabled(model.isImporting)
-        Button {
-          model.addRecipeButtonTapped()
-        } label: {
-          Label("Add Recipe", systemImage: "plus")
-        }
-        .disabled(model.isImporting)
-        Button {
-          model.captureRecipeButtonTapped()
-        } label: {
-          Label("Capture Recipe", systemImage: "link.badge.plus")
-        }
-        .disabled(model.isImporting)
       }
     }
-    .sheet(isPresented: $isSavingListPreset) {
-      NavigationStack {
-        RecipeListPresetSaveView(
-          state: model.currentListPresetState,
-          recipeCount: model.filteredRecipeCount,
-          existingNames: savedListPresets.map(\.name)
-        ) { name in
-          saveCurrentListPreset(named: name)
-        }
-      }
-      .presentationDetents([.medium, .large])
-    }
-    .sheet(isPresented: $isManagingListPresets) {
-      NavigationStack {
-        RecipeListPresetManagementView(
-          presets: savedListPresets,
-          activePresetID: activeListPresetID
-        ) { preset in
-          model.recipeCount(for: preset)
-        } applyPreset: { preset in
-          model.applyListPreset(preset)
-        } deletePreset: { preset in
-          deleteListPreset(preset)
-        }
-      }
-    }
-  }
-
-  private var savedListPresets: [RecipeListPreset] {
-    get {
-      RecipeListPresetPersistence.decode(savedPresetsData)
-    }
-    nonmutating set {
-      savedPresetsData = RecipeListPresetPersistence.encode(newValue)
-    }
-  }
-
-  private var activeListPresetID: RecipeListPreset.ID? {
-    savedListPresets.first { $0.state == model.currentListPresetState }?.id
-  }
-
-  private func saveCurrentListPreset(named name: String) {
-    let timestamp = Date()
-    let preset = RecipeListPreset(
-      id: UUID(),
-      name: name,
-      state: model.currentListPresetState,
-      dateCreated: timestamp,
-      dateModified: timestamp
-    )
-    var presets = savedListPresets
-    presets.append(preset)
-    savedListPresets = presets
-  }
-
-  private func deleteListPreset(_ preset: RecipeListPreset) {
-    var presets = savedListPresets
-    presets.removeAll { $0.id == preset.id }
-    savedListPresets = presets
   }
 }
 

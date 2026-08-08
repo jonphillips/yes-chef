@@ -151,7 +151,7 @@ public struct WebRecipeCaptureClient: Sendable {
       throw RecipeExtractionError.emptyRecipe
     }
     @Dependency(\.recipeExtractionClient) var recipeExtractionClient
-    let extraction = try await recipeExtractionClient(structuredPageText: structuredPageText)
+    let extraction = try await recipeExtractionClient(text: structuredPageText)
     var escalatedDraft = draft
     escalatedDraft.page = WebRecipePageParser.merging(draft.page, with: extraction)
     return escalatedDraft
