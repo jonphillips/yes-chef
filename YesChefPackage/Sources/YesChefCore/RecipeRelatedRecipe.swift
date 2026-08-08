@@ -193,7 +193,7 @@ extension RecipeRepository {
     )
     guard !relatedRecipeIDs.isEmpty else { return [] }
     return try Recipe
-      .where { relatedRecipeIDs.contains($0.id) && !$0.archived }
+      .where { $0.id.in(relatedRecipeIDs) && !$0.archived }
       .fetchAll(db)
       .sorted(by: relatedRecipeDisplayOrder)
   }
