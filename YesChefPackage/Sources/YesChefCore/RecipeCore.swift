@@ -497,6 +497,12 @@ extension RecipeRepository {
   }
 
   public static func permanentlyDelete(recipeID: Recipe.ID, in db: Database) throws {
+    // This peer-edge table intentionally has no FK for CloudKit compatibility, so SQLite cannot
+    // cascade it with the recipe's normal children.
+    try RecipeRelatedRecipe
+      .where { $0.recipeID.eq(recipeID) || $0.relatedRecipeID.eq(recipeID) }
+      .delete()
+      .execute(db)
     try Recipe.find(recipeID).delete().execute(db)
   }
 
