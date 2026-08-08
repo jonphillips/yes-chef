@@ -195,6 +195,58 @@ extension RecipeDetailModel {
     }
   }
 
+  func linkRelatedRecipe(_ relatedRecipeID: Recipe.ID) {
+    Task {
+      let now = now
+      let makeUUID = uuid
+      do {
+        try await database.write { db in
+          try RecipeRepository.linkRelatedRecipes(
+            recipeID,
+            relatedRecipeID,
+            in: db,
+            now: now,
+            uuid: { makeUUID() }
+          )
+        }
+      } catch {
+        errorMessage = error.localizedDescription
+        isShowingError = true
+      }
+    }
+  }
+
+  func linkRelatedRecipeButtonTapped() {
+    guard !isLoadingRelatedRecipePicker else { return }
+    isLoadingRelatedRecipePicker = true
+    let database = database
+    Task {
+      do {
+        relatedRecipePickerRows = try await database.read { db in
+          try RecipeRepository.relatedRecipePickerRows(in: db)
+        }
+        destination = .relatedRecipePicker
+      } catch {
+        errorMessage = error.localizedDescription
+        isShowingError = true
+      }
+      isLoadingRelatedRecipePicker = false
+    }
+  }
+
+  func unlinkRelatedRecipe(_ relatedRecipeID: Recipe.ID) {
+    Task {
+      do {
+        try await database.write { db in
+          try RecipeRepository.unlinkRelatedRecipes(recipeID, relatedRecipeID, in: db)
+        }
+      } catch {
+        errorMessage = error.localizedDescription
+        isShowingError = true
+      }
+    }
+  }
+
   /// Switches the active variation, instrumented per ADR-0029 Amendment 5 S6c.
   /// The write helper explicitly leaves the main actor, which lets the capture
   /// distinguish writer completion from the waiting time before this model task

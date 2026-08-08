@@ -105,6 +105,7 @@ public struct RecipeDetailData: Equatable, Sendable {
   public var learnings: [Learning]
   public var serveWith: [RecipeServeWith]
   public var variations: [RecipeVariation]
+  public var relatedRecipes: [Recipe]
   public var deliberationLogEntries: [RecipeDeliberationLogEntry]
   public var activeVariationID: RecipeVariation.ID?
 
@@ -124,6 +125,7 @@ public struct RecipeDetailData: Equatable, Sendable {
     learnings: [Learning] = [],
     serveWith: [RecipeServeWith] = [],
     variations: [RecipeVariation] = [],
+    relatedRecipes: [Recipe] = [],
     deliberationLogEntries: [RecipeDeliberationLogEntry] = [],
     activeVariationID: RecipeVariation.ID? = nil
   ) {
@@ -142,6 +144,7 @@ public struct RecipeDetailData: Equatable, Sendable {
     self.learnings = learnings
     self.serveWith = serveWith
     self.variations = variations
+    self.relatedRecipes = relatedRecipes
     self.deliberationLogEntries = deliberationLogEntries
     self.activeVariationID = activeVariationID
   }
@@ -309,6 +312,7 @@ public enum RecipeRepository {
       learnings: try LearningRepository.learnings(sourceType: .recipe, sourceID: recipeID, in: db),
       serveWith: serveWith,
       variations: variations,
+      relatedRecipes: try relatedRecipes(for: recipeID, in: db),
       deliberationLogEntries: deliberationLogEntries,
       activeVariationID: activeVariationID
     )
@@ -493,6 +497,12 @@ extension RecipeRepository {
   }
 
   public static func permanentlyDelete(recipeID: Recipe.ID, in db: Database) throws {
+    // This peer-edge table intentionally has no FK for CloudKit compatibility, so SQLite cannot
+    // cascade it with the recipe's normal children.
+    try RecipeRelatedRecipe
+      .where { $0.recipeID.eq(recipeID) || $0.relatedRecipeID.eq(recipeID) }
+      .delete()
+      .execute(db)
     try Recipe.find(recipeID).delete().execute(db)
   }
 

@@ -9,6 +9,32 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0021 Amendment 4 V4b — the synced related-recipe edge table
+
+**Built + architect-reviewed + merged 2026-08-08; PR [#293](https://github.com/jonphillips/yes-chef/pull/293). Joins the prod-schema promotion list; Jon's two-device sync pass owed (back up first).**
+The second half of the Playbook "Choices" section: a **synced `recipeRelatedRecipes` table** of symmetric peer
+edges linking two recipes. Both recipe IDs are intentionally **loose columns** — an edge has no owning recipe, and
+a second SQL FK would violate the CloudKit single-FK sharing rule ([[sqlitedata-single-fk-sync-limit]]). Every
+writer stores the same undirected edge via a **canonical lowest-UUID pair**; offline duplicates **converge
+deterministically on the lowest edge UUID** at the next link; unlink removes every copy; reads dedupe and **order
+by name — OQ2 resolved, no ordering column** ([[recipe-variations-overlay]]). **Split-off links the new standalone
+recipe to its former base** in the same transaction (the "get more involved → promote it" release valve).
+Registered in `CloudSync`.
+
+**Architect review caught and Codex refixed a reintroduced writer convoy.** The link picker first held an
+always-on whole-library `@Fetch(RecipeListRequest())` on `RecipeDetailModel` — a heavyweight fetch (thumbnail
+BLOBs and all) that re-ran synchronously on the writer on every recipe edit, exactly the ADR-0029 Finding 8
+pattern PRs #148/#149 killed ([[sqlitedata-fetch-writer-convoy]]). Refixed to an **on-demand scoped read**
+(`relatedRecipePickerRows`, never touches `recipePhotos`) fired when the picker opens, onto the model's
+swift-navigation `Destination` enum instead of a `@State` boolean. Two dead indexes were dropped. Core tests cover
+symmetry, idempotency, offline-duplicate convergence, unlink, split-off linkage, and the lightweight picker rows.
+
+**Amd4-OQ1 answered (architect, 2026-08-08): list/browser indexing stays unchanged.** Whether `RecipeBrowserQuery`
+indexes variation names or related-recipe edges is a **Power Browser (ADR-0050) product decision** — that ADR is
+still proposed and defines no semantics, so this slice does not silently invent a synced query contract
+([[withdraw-not-defer-orphaned-schema]]). **Amendment 4 is now COMPLETE** — V4a, V4b, and V4c + Delete all shipped.
+
+---
 ## ADR-0052 S1+S2 — the synced grocery learned store-area table
 
 **Built + architect-reviewed + merged + device-passed 2026-08-08; PR [#292](https://github.com/jonphillips/yes-chef/pull/292). Joins the prod-schema promotion list.**

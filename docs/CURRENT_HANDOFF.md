@@ -10,8 +10,7 @@ shipped and archived to [`DONE-LOG.md`](DONE-LOG.md): **ADR-0053 S1/S2** (Create
 PRs #290/#291), **ADR-0052 S1+S2** (synced grocery learned-area table, PR #292), and the full **ADR-0049**
 facet/labeling arc (PRs #275–#282). **Next Up advances to [ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md)
 — the sidebar-adaptable app shell** (Jon's call, 2026-08-08).
-⚠️ **A standing Codex-env gotcha:** the
-simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
+⚠️ **A standing Codex-env gotcha:** the simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
 the app tests" is structural, not a regression — and it once *masked two genuinely red tests* (missing
 `bootstrapDatabase()` → `RecipeEditorModel`'s eager `@Fetch` tripped SQLiteData's blank-DB reporter), fixed by
 the architect running the target locally ([[codex-build-excuse-reproduce]]). **Filling in per-recipe
@@ -61,6 +60,7 @@ hand work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**. Live candid
   longer gates anything (Jon, 2026-08-05). Needs its own scoping pass. (**Amd4-OQ1** — whether `RecipeBrowserQuery`
   indexes variation names / related-recipe edges is this ADR's call; list/browser indexing stays unchanged until
   it decides.)
+
 - **Grocery learned area table = [ADR-0052](decisions/ADR-0052-grocery-learned-area-table.md) — shipped, merged,
   and device-passed (PR [#292](https://github.com/jonphillips/yes-chef/pull/292)), DONE-LOG. Only **S3** remains
   (not designated): repoint ADR-0037's seed-coverage view to **audit** the `.model` rows (amends, never deletes).**

@@ -638,6 +638,7 @@ private struct RecipeReaderView: View {
         model: model,
         handoffTransport: handoffTransport,
         ask: model.askButtonTapped,
+        onRecipeSelected: onRecipeSelected,
         promotingVariation: $promotingVariation,
         splittingOffVariation: $splittingOffVariation,
         splitOffTitleDraft: $splitOffTitleDraft
@@ -701,6 +702,7 @@ private struct RecipeReaderView: View {
             model: model,
             handoffTransport: handoffTransport,
             ask: model.askButtonTapped,
+            onRecipeSelected: onRecipeSelected,
             promotingVariation: $promotingVariation,
             splittingOffVariation: $splittingOffVariation,
             splitOffTitleDraft: $splitOffTitleDraft
