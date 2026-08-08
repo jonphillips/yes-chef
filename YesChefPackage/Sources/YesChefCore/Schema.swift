@@ -1230,6 +1230,19 @@ extension DependencyValues {
       }
     }
 
+    migrator.registerMigration("Create learned grocery area assignments") { db in
+      try #sql("""
+        CREATE TABLE "groceryAreaAssignments" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "canonicalName" TEXT NOT NULL,
+          "area" TEXT NOT NULL,
+          "source" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+        .execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

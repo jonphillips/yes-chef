@@ -305,5 +305,177 @@ extension RecipeCoreTests {
         expectNoDifference(zaatar.aisle, nil)
       }
     }
+
+    @Test
+    func learnedAssignmentsResolveUserThenSeedThenModelAndReconcileDuplicates() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 880_200_000)
+      let listID = SampleUUIDSequence.uuid(88_301)
+      let potatoID = SampleUUIDSequence.uuid(88_302)
+      let misoID = SampleUUIDSequence.uuid(88_303)
+      let sumacID = SampleUUIDSequence.uuid(88_304)
+
+      try database.write { db in
+        try GroceryList.insert {
+          GroceryList(
+            id: listID,
+            title: "Shopping",
+            sortOrder: 0,
+            isDefault: true,
+            dateCreated: now,
+            dateModified: now
+          )
+        }
+        .execute(db)
+        for (id, title, canonicalName, sortOrder) in [
+          (potatoID, "Potatoes", "potato", 0),
+          (misoID, "Miso", "miso", 1),
+          (sumacID, "Sumac", "sumac", 2),
+        ] {
+          try GroceryItem.insert {
+            GroceryItem(
+              id: id,
+              groceryListID: listID,
+              title: title,
+              canonicalName: canonicalName,
+              sortOrder: sortOrder,
+              dateCreated: now,
+              dateModified: now
+            )
+          }
+          .execute(db)
+        }
+        for assignment in [
+          GroceryAreaAssignment(
+            id: SampleUUIDSequence.uuid(88_310),
+            canonicalName: "potato",
+            area: "Spices",
+            source: .model,
+            dateModified: now
+          ),
+          GroceryAreaAssignment(
+            id: SampleUUIDSequence.uuid(88_311),
+            canonicalName: "potato",
+            area: "My Produce Room",
+            source: .user,
+            dateModified: now
+          ),
+          GroceryAreaAssignment(
+            id: SampleUUIDSequence.uuid(88_312),
+            canonicalName: "miso",
+            area: "Frozen",
+            source: .model,
+            dateModified: now
+          ),
+          GroceryAreaAssignment(
+            id: SampleUUIDSequence.uuid(88_313),
+            canonicalName: "miso",
+            area: "Canned & Dry",
+            source: .model,
+            dateModified: now.addingTimeInterval(1)
+          ),
+        ] {
+          try GroceryAreaAssignment.insert { assignment }.execute(db)
+        }
+
+        try GroceryStoreAreaCache.backfill(in: db)
+
+        let items = try GroceryItem.fetchAll(db)
+        expectNoDifference(items.first(where: { $0.id == potatoID })?.aisle, "My Produce Room")
+        expectNoDifference(items.first(where: { $0.id == misoID })?.aisle, "Canned & Dry")
+        expectNoDifference(items.first(where: { $0.id == sumacID })?.aisle, nil)
+        expectNoDifference(
+          try GroceryStoreAreaCache.uncategorizedCanonicalNames(in: db),
+          ["sumac"]
+        )
+      }
+    }
+
+    @Test
+    func classificationAutoPromotesOnceAndUserCorrectionPersistsAcrossNewItems() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 880_300_000)
+      let correctedAt = now.addingTimeInterval(1)
+      let listID = SampleUUIDSequence.uuid(88_401)
+      let firstHarissaID = SampleUUIDSequence.uuid(88_402)
+      let secondHarissaID = SampleUUIDSequence.uuid(88_403)
+
+      try database.write { db in
+        try GroceryList.insert {
+          GroceryList(
+            id: listID,
+            title: "Shopping",
+            sortOrder: 0,
+            isDefault: true,
+            dateCreated: now,
+            dateModified: now
+          )
+        }
+        .execute(db)
+        try GroceryItem.insert {
+          GroceryItem(
+            id: firstHarissaID,
+            groceryListID: listID,
+            title: "Harissa",
+            canonicalName: "harissa",
+            sortOrder: 0,
+            dateCreated: now,
+            dateModified: now
+          )
+        }
+        .execute(db)
+
+        try GroceryStoreAreaCache.applyClassified(
+          ["harissa": .condimentsAndOils],
+          in: db,
+          now: now,
+          uuid: { SampleUUIDSequence.uuid(88_404) }
+        )
+        expectNoDifference(
+          try GroceryStoreAreaCache.uncategorizedCanonicalNames(in: db),
+          []
+        )
+
+        try GroceryStoreAreaCache.applyUserCorrection(
+          canonicalName: "harissa",
+          area: "International Market",
+          in: db,
+          now: correctedAt,
+          uuid: { SampleUUIDSequence.uuid(88_405) }
+        )
+        try GroceryStoreAreaCache.applyUserCorrection(
+          canonicalName: "harissa",
+          area: "International Market",
+          in: db,
+          now: correctedAt.addingTimeInterval(1),
+          uuid: { SampleUUIDSequence.uuid(88_406) }
+        )
+        try GroceryItem.insert {
+          GroceryItem(
+            id: secondHarissaID,
+            groceryListID: listID,
+            title: "Harissa paste",
+            canonicalName: "harissa",
+            sortOrder: 1,
+            dateCreated: correctedAt,
+            dateModified: correctedAt
+          )
+        }
+        .execute(db)
+        try GroceryStoreAreaCache.backfill(in: db)
+
+        let assignments = try GroceryAreaAssignment.fetchAll(db)
+        #expect(assignments.count == 1)
+        let assignment = try #require(assignments.first)
+        expectNoDifference(assignment.canonicalName, "harissa")
+        expectNoDifference(assignment.area, "International Market")
+        expectNoDifference(assignment.source, .user)
+        expectNoDifference(assignment.dateModified, correctedAt)
+        expectNoDifference(
+          try GroceryItem.find(secondHarissaID).fetchOne(db)?.aisle,
+          "International Market"
+        )
+      }
+    }
   }
 }

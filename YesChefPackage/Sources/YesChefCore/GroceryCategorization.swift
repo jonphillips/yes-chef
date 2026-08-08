@@ -43,10 +43,10 @@ extension GroceryCategorizationClient: DependencyKey {
 
   public static let testValue = GroceryCategorizationClient { _, _ in [:] }
 
-  /// Eight entries leave ample room for the complete name-to-area JSON map within the 1,024-token
-  /// response budget on constrained on-device models, including one retry for omitted names.
+  /// Eight entries keep the name-to-area JSON map compact enough to leave the 2,048-token response
+  /// budget available for both high-effort reasoning and a complete result, including one retry.
   static let maximumNamesPerRequest = 8
-  static let maximumResponseTokens = 1_024
+  static let maximumResponseTokens = 2_048
 
   static let instructions = """
     You categorize grocery ingredient names by the store area where a shopper would buy them.
@@ -70,7 +70,7 @@ extension GroceryCategorizationClient: DependencyKey {
       system: instructions,
       prompt: prompt(names: names),
       maxTokens: maximumResponseTokens,
-      reasoningEffort: .low
+      reasoningEffort: .high
     )
   }
 
