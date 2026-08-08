@@ -9,9 +9,37 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0052 S1+S2 — the synced grocery learned store-area table
+
+**Built + architect-reviewed + merged + device-passed 2026-08-08; PR [#292](https://github.com/jonphillips/yes-chef/pull/292). Joins the prod-schema promotion list.**
+Store-area classification used to be recomputed every generation, so a cook's correction never stuck and re-runs
+drifted. Now a **synced `GroceryAreaAssignment` table** (append-only create, no data pass —
+[[migration-writes-bypass-sync-triggers]] doesn't bite an empty create) makes a name **classified once ever**, then
+served by a free deterministic lookup, and corrections **persist across generations and devices**
+([[grocery-area-no-learned-cache]]).
+
+**Precedence is a fixed ladder — user > seed > model.** A `.user` correction always wins; `seedAreas` stays a code
+constant read at classify time (the middle tier, **not** migrated into the table); the classifier's own answer is
+the floor. On first classification of an unseen name the classifier **auto-promotes its answer as `.model`**; a
+correction writes a `.user` row that outranks it and purges the matching `.model` row; correcting *to* the seed
+area deletes the learned rows and reverts to seed. Duplicate rows (offline races) reconcile deterministically at
+read time by source then `dateModified`. The read path stays deterministic — **ADR-0022 holds** (the "slug"
+naming is a stale misnomer kept only as the link anchor). Registered in `CloudSync`.
+
+**The last `.low`-effort LLM site closed.** The grocery categorizer went `.low → .high` with the response budget
+raised 1,024 → 2,048 so reasoning doesn't starve output ([[reasoning-budget-starves-output]],
+[[personal-app-latency-tolerance]]). The device pass cleared both watch items — unusual ingredients come back
+classified under the new budget, and a corrected unusual ingredient persisted after regeneration and synced across
+two devices with no second model call.
+
+**S3 remains (not designated):** repoint ADR-0037's seed-coverage view to **audit** the `.model` rows (amends,
+never deletes). Also un-fixed **by design**: stale `.model` rows from offline dup races are only ever GC'd by a
+`.user` correction — harmless at ~10 users.
+
+---
 ## ADR-0053 S2 — the deterministic extraction issue pass (D6)
 
-**Built + architect-reviewed + merged 2026-08-08; PR [#291](https://github.com/jonphillips/yes-chef/pull/291). Device pass owed — see CURRENT_HANDOFF.**
+**Built + architect-reviewed + merged + device-passed 2026-08-08; PR [#291](https://github.com/jonphillips/yes-chef/pull/291).**
 The D6 issue pass: a pure, fixture-tested `RecipeExtractionIssueDetector` over the extracted structure + source
 text — missing title/halves/quantity, unparseable duration, duplicate ingredient, listed-vs-referenced mismatch,
 unattributed source — surfaced as **review cues** in Create Recipe, with **no confidence scores and no model
@@ -25,16 +53,17 @@ the app tests" is structural, not a regression — but it hid two genuinely red 
 → `RecipeEditorModel`'s eager `@Fetch` tripped SQLiteData's blank-DB reporter), fixed by the architect running the
 target locally ([[codex-build-excuse-reproduce]]).
 
-**Two review notes carried to the device pass** (become **ADR-0053 S2.1** if either bites; not yet designated):
-(1) **cue noise** — `missingIngredientQuantity` + `ingredientNotReferenced` fire for *every* staple (salt, pepper,
-oil, "to taste", garnishes), in tension with D6's "attention allocation, not proofreading"; eyeball the volume on
-2–3 real pastes and suppress staples from those two categories if it bites. (2) **`unattributedSource` points at a
-source with no UI** (the source list is D8-deferred) — gate that cue until the source list surfaces.
+**Two review notes were checked on the 2026-08-08 device pass; neither warranted an **ADR-0053 S2.1** (not
+designated).** They stay documented in case real use reopens them: (1) **cue noise** — `missingIngredientQuantity`
++ `ingredientNotReferenced` can fire for staples (salt, pepper, oil, "to taste", garnishes), in tension with D6's
+"attention allocation, not proofreading"; the fix if it reopens is to suppress staples from those two categories.
+(2) **`unattributedSource` points at a source with no UI** (the source list is D8-deferred) — gate that cue until
+the source list surfaces.
 
 ---
 ## ADR-0053 S1 — Create Recipe destination + paste-text front-end
 
-**Built + architect-reviewed + merged 2026-08-08; PR [#290](https://github.com/jonphillips/yes-chef/pull/290). Device pass owed — see CURRENT_HANDOFF.**
+**Built + architect-reviewed + merged + device-passed 2026-08-08; PR [#290](https://github.com/jonphillips/yes-chef/pull/290).**
 Re-homes Jon's "paste unstructured recipe text and create a recipe" want as the **Create Recipe** destination,
 answering [ADR-0051](decisions/ADR-0051-text-to-recipe-extraction-strategy.md)'s OQ1 and built to its
 one-sink / plural-front-ends / one-engine strategy. **Schema-free** — the session is transient and never synced
