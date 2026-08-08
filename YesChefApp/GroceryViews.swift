@@ -1,49 +1,16 @@
 import SwiftUI
 import YesChefCore
 
-struct GroceriesStack: View {
-  let model: GroceryLibraryModel
-  let mealCalendarModel: MealCalendarModel
-
-  var body: some View {
-    NavigationStack {
-      GroceryDetailView(
-        model: model,
-        mealCalendarModel: mealCalendarModel,
-        showsListPicker: true
-      )
-    }
-  }
-}
-
 struct GroceryListView: View {
-  enum Style {
-    case navigation
-    case selection
-  }
-
   let model: GroceryLibraryModel
-  var style: Style
 
   var body: some View {
     @Bindable var model = model
 
-    Group {
-      switch style {
-      case .navigation:
-        List {
-          ForEach(model.listRows) { row in
-            GroceryListRowView(row: row)
-              .groceryListManagementActions(row: row, model: model)
-          }
-        }
-      case .selection:
-        List(model.listRows, selection: $model.selectedListID) { row in
-          GroceryListRowView(row: row)
-            .groceryListManagementActions(row: row, model: model)
-            .tag(row.id)
-        }
-      }
+    List(model.listRows, selection: $model.selectedListID) { row in
+      GroceryListRowView(row: row)
+        .groceryListManagementActions(row: row, model: model)
+        .tag(row.id)
     }
     .navigationTitle("Groceries")
     .toolbar {

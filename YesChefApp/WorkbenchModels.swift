@@ -25,7 +25,6 @@ final class WorkbenchLibraryModel {
   @Fetch(WorkbenchListRequest(), animation: .default) var workbenchList = WorkbenchListData()
 
   var destination: Destination?
-  var navigationPath: [Workbench.ID] = []
   var selectedWorkbenchID: Workbench.ID?
   var errorMessage: String?
   var isShowingError = false
@@ -40,7 +39,6 @@ final class WorkbenchLibraryModel {
 
   func selectWorkbench(_ workbenchID: Workbench.ID) {
     selectedWorkbenchID = workbenchID
-    navigationPath = [workbenchID]
   }
 
   func saveWorkbenchButtonTapped(title: String, notes: String) -> Bool {
@@ -115,7 +113,6 @@ final class WorkbenchLibraryModel {
       if selectedWorkbenchID == context.workbenchID {
         selectedWorkbenchID = nil
       }
-      navigationPath.removeAll { $0 == context.workbenchID }
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true

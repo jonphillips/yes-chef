@@ -1,25 +1,6 @@
 import SwiftUI
 import YesChefCore
 
-struct MealCalendarStack: View {
-  let model: MealCalendarModel
-  var onMenuSelected: ((CoreMenu.ID) -> Void)?
-  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
-  var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
-
-  var body: some View {
-    NavigationStack {
-      MealCalendarPlannerView(
-        model: model,
-        showsSelectedDayAgenda: true,
-        onMenuSelected: onMenuSelected,
-        onRecipeSelected: onRecipeSelected,
-        onCookSessionRequested: onCookSessionRequested
-      )
-    }
-  }
-}
-
 struct MealCalendarWorkspaceView: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   let model: MealCalendarModel

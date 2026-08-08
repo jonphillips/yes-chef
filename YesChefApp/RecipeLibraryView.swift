@@ -410,17 +410,11 @@ private struct CookSessionFullScreenCover: View {
 }
 
 struct RecipeListView: View {
-  enum Style {
-    case navigation
-    case selection
-  }
-
   @AppStorage("RecipeList.rowDensity") private var rowDensityRawValue = RecipeListRowDensity.rich.rawValue
   @AppStorage("RecipeList.showsSourceMetadata") private var showsSourceMetadata = true
   @AppStorage("RecipeList.showsCategoryMetadata") private var showsCategoryMetadata = true
 
   let model: RecipeLibraryModel
-  let style: Style
 
   var body: some View {
     @Bindable var model = model
@@ -440,13 +434,10 @@ struct RecipeListView: View {
         }
         .environment(\.editMode, .constant(.active))
       } else {
-        switch style {
-        case .navigation:
-          List {
-            ForEach(model.visibleRecipeRows) { row in
-              NavigationLink(value: row.recipe.id) {
-                RecipeListRow(row: row, options: viewOptions)
-              }
+        List(selection: $model.selectedRecipeID) {
+          ForEach(model.visibleRecipeRows) { row in
+            RecipeListRow(row: row, options: viewOptions)
+              .tag(row.recipe.id)
               .swipeActions {
                 Button {
                   model.deleteButtonTapped(recipeID: row.recipe.id)
@@ -455,22 +446,6 @@ struct RecipeListView: View {
                 }
                 .tint(.red)
               }
-            }
-          }
-        case .selection:
-          List(selection: $model.selectedRecipeID) {
-            ForEach(model.visibleRecipeRows) { row in
-              RecipeListRow(row: row, options: viewOptions)
-                .tag(row.recipe.id)
-                .swipeActions {
-                  Button {
-                    model.deleteButtonTapped(recipeID: row.recipe.id)
-                  } label: {
-                    Label("Archive", systemImage: "archivebox")
-                  }
-                  .tint(.red)
-                }
-            }
           }
         }
       }

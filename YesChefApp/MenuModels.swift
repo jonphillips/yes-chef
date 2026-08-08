@@ -33,7 +33,6 @@ final class MenuLibraryModel {
   @Fetch(RecipeListRequest(), animation: .default) var recipeRows: [RecipeListRowData] = []
 
   var destination: Destination?
-  var navigationPath: [CoreMenu.ID] = []
   var selectedMenuID: CoreMenu.ID?
   var errorMessage: String?
   var isShowingError = false
@@ -62,7 +61,6 @@ final class MenuLibraryModel {
 
   func selectMenu(_ menuID: CoreMenu.ID) {
     selectedMenuID = menuID
-    navigationPath = [menuID]
   }
 
   func addItemButtonTapped(
@@ -288,7 +286,6 @@ final class MenuLibraryModel {
       if selectedMenuID == context.menuID {
         selectedMenuID = nil
       }
-      navigationPath.removeAll { $0 == context.menuID }
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
@@ -999,11 +996,6 @@ struct MenuNoteReplacementOffer: Identifiable {
   let recipeTitle: String
 
   var id: Recipe.ID { recipeID }
-}
-
-enum MenuListStyle {
-  case navigation
-  case selection
 }
 
 struct MenuItemDraftContext: Hashable, Sendable {
