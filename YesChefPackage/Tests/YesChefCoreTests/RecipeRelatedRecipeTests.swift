@@ -9,6 +9,38 @@ extension RecipeCoreTests {
   @Suite
   struct RecipeRelatedRecipeTests {
     @Test
+    func permanentlyDeletingARecipeRemovesItsLooseRelatedRecipeEdges() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 901_800_000)
+      let deletedRecipeID = SampleUUIDSequence.uuid(91_801)
+      let relatedRecipeID = SampleUUIDSequence.uuid(91_802)
+
+      try database.write { db in
+        for recipe in [
+          Recipe(id: deletedRecipeID, title: "Deleted", dateCreated: now, dateModified: now),
+          Recipe(id: relatedRecipeID, title: "Related", dateCreated: now, dateModified: now),
+        ] {
+          try Recipe.insert { recipe }.execute(db)
+        }
+        try RecipeRepository.linkRelatedRecipes(
+          deletedRecipeID,
+          relatedRecipeID,
+          in: db,
+          now: now,
+          uuid: { SampleUUIDSequence.uuid(91_803) }
+        )
+
+        try RecipeRepository.permanentlyDelete(recipeID: deletedRecipeID, in: db)
+      }
+
+      try database.read { db in
+        expectNoDifference(try Recipe.find(deletedRecipeID).fetchOne(db), nil)
+        expectNoDifference(try RecipeRelatedRecipe.fetchAll(db), [])
+        expectNoDifference(try Recipe.find(relatedRecipeID).fetchOne(db)?.title, "Related")
+      }
+    }
+
+    @Test
     func pickerRowsAreLightweightSortedAndExcludeArchivedRecipes() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 901_900_000)
