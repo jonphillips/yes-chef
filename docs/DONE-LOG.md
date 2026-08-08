@@ -9,6 +9,29 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0053 S2 — the deterministic extraction issue pass (D6)
+
+**Built + architect-reviewed + merged 2026-08-08; PR [#291](https://github.com/jonphillips/yes-chef/pull/291). Device pass owed — see CURRENT_HANDOFF.**
+The D6 issue pass: a pure, fixture-tested `RecipeExtractionIssueDetector` over the extracted structure + source
+text — missing title/halves/quantity, unparseable duration, duplicate ingredient, listed-vs-referenced mismatch,
+unattributed source — surfaced as **review cues** in Create Recipe, with **no confidence scores and no model
+self-report** (attention allocation, not proofreading). Duration parsing was consolidated onto
+`RecipeDurationParser`, and the session now captures **typed-vs-pasted** source distinctly and preserves it across
+a failed extraction (closing the S1 provenance gap).
+
+**Architect fixes rode in `9cfa4fb`:** the `DatabaseBackupTests` migration-tail, and two masked-red
+`CreateRecipeModelTests`. The `YesChefTests` target can't run in Codex's sim-less sandbox, so its "couldn't run
+the app tests" is structural, not a regression — but it hid two genuinely red tests (missing `bootstrapDatabase()`
+→ `RecipeEditorModel`'s eager `@Fetch` tripped SQLiteData's blank-DB reporter), fixed by the architect running the
+target locally ([[codex-build-excuse-reproduce]]).
+
+**Two review notes carried to the device pass** (become **ADR-0053 S2.1** if either bites; not yet designated):
+(1) **cue noise** — `missingIngredientQuantity` + `ingredientNotReferenced` fire for *every* staple (salt, pepper,
+oil, "to taste", garnishes), in tension with D6's "attention allocation, not proofreading"; eyeball the volume on
+2–3 real pastes and suppress staples from those two categories if it bites. (2) **`unattributedSource` points at a
+source with no UI** (the source list is D8-deferred) — gate that cue until the source list surfaces.
+
+---
 ## ADR-0053 S1 — Create Recipe destination + paste-text front-end
 
 **Built + architect-reviewed + merged 2026-08-08; PR [#290](https://github.com/jonphillips/yes-chef/pull/290). Device pass owed — see CURRENT_HANDOFF.**
