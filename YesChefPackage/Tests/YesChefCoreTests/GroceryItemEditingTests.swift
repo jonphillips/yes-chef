@@ -67,7 +67,8 @@ extension RecipeCoreTests {
           aisle: " Dairy case ",
           notes: " Organic if available ",
           in: db,
-          now: editedAt
+          now: editedAt,
+          uuid: { uuids.next() }
         )
 
         let editedRow = try #require(try GroceryItemListRequest().fetch(db).first { $0.id == itemID })
@@ -79,6 +80,12 @@ extension RecipeCoreTests {
         expectNoDifference(editedRow.item.notes, "Organic if available")
         expectNoDifference(editedRow.item.dateModified, editedAt)
         expectNoDifference(editedRow.sources, originalRow.sources)
+        let assignments = try GroceryAreaAssignment.fetchAll(db)
+        #expect(assignments.count == 1)
+        let assignment = try #require(assignments.first)
+        expectNoDifference(assignment.canonicalName, "whole milk")
+        expectNoDifference(assignment.area, "Dairy case")
+        expectNoDifference(assignment.source, .user)
       }
     }
   }

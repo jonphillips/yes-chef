@@ -32,7 +32,8 @@ extension RecipeCoreTests {
 
       let request = await recorder.first()
       expectNoDifference(request?.tier, .onDevice)
-      expectNoDifference(request?.reasoningEffort, .low)
+      expectNoDifference(request?.reasoningEffort, .high)
+      expectNoDifference(request?.maxTokens, GroceryCategorizationClient.maximumResponseTokens)
       expectNoDifference(request?.promptPreferenceKey, nil)
       #expect(request?.messages.first?.text.contains("harissa\nmiso") == true)
     }
@@ -149,11 +150,15 @@ extension RecipeCoreTests {
 
         try GroceryStoreAreaCache.applyClassified(
           ["harissa": .condimentsAndOils, "miso": .cannedAndDry],
-          in: db
+          in: db,
+          now: now,
+          uuid: { SampleUUIDSequence.uuid(88_304) }
         )
         try GroceryStoreAreaCache.applyClassified(
           ["harissa": .frozen, "miso": .frozen],
-          in: db
+          in: db,
+          now: now.addingTimeInterval(1),
+          uuid: { SampleUUIDSequence.uuid(88_305) }
         )
 
         let harissa = try #require(try GroceryItem.find(harissaID).fetchOne(db))

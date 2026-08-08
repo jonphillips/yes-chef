@@ -729,7 +729,8 @@ extension GroceryLibraryModel {
           aisle: aisle,
           notes: notes,
           in: db,
-          now: now
+          now: now,
+          uuid: { uuid() }
         )
       }
       destination = nil
@@ -773,8 +774,16 @@ extension GroceryLibraryModel {
       // these names as attempted, so a classification that made it back must be applied — the
       // on-appear caller is cancelled on disappear, and bailing out would discard a paid-for
       // result while leaving the names permanently unclassifiable for this model's lifetime.
+      let classifiedAt = now
+      let uuidGenerator = uuid
+      let nextUUID: @Sendable () -> UUID = { uuidGenerator() }
       try await database.write { db in
-        try GroceryStoreAreaCache.applyClassified(classified, in: db)
+        try GroceryStoreAreaCache.applyClassified(
+          classified,
+          in: db,
+          now: classifiedAt,
+          uuid: nextUUID
+        )
       }
       try? await $itemRows.load()
     } catch {

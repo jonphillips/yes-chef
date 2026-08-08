@@ -10,7 +10,8 @@ extension GroceryRepository {
     aisle: String? = nil,
     notes: String? = nil,
     in db: Database,
-    now: Date
+    now: Date,
+    uuid: () -> UUID
   ) throws {
     guard var item = try GroceryItem.find(itemID).fetchOne(db) else {
       throw GroceryRepositoryError.itemNotFound(itemID)
@@ -23,6 +24,7 @@ extension GroceryRepository {
     let unit = unit?.nonEmptyGroceryText
     let aisle = aisle?.nonEmptyGroceryText
     let notes = notes?.nonEmptyGroceryText
+    let didChangeAisle = item.aisle != aisle
     let didChangeDisplayFields = item.title != title
       || item.quantityText != quantityText
       || item.unit != unit
@@ -40,5 +42,15 @@ extension GroceryRepository {
     }
     item.dateModified = now
     try GroceryItem.upsert { item }.execute(db)
+
+    if didChangeAisle, let aisle {
+      try GroceryStoreAreaCache.applyUserCorrection(
+        canonicalName: item.canonicalName,
+        area: aisle,
+        in: db,
+        now: now,
+        uuid: uuid
+      )
+    }
   }
 }
