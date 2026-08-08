@@ -1,30 +1,21 @@
 # Current Handoff
 
-Last updated: August 8, 2026. (**Three slices shipped, merged, and device-passed 2026-08-08.** **ADR-0053 S1** —
-the Create Recipe destination + paste-text front-end (PR
-[#290](https://github.com/jonphillips/yes-chef/pull/290); the ADR-0051 D5 lift landed with it, and
-[Amd 1](decisions/ADR-0053-create-recipe-destination.md) re-homed it to a **sidebar section**,
-`AppSection.createRecipe`). **ADR-0053 S2** — the deterministic issue pass, D6 (PR
-[#291](https://github.com/jonphillips/yes-chef/pull/291)). **ADR-0052 S1+S2** — the synced grocery learned-area
-table (PR [#292](https://github.com/jonphillips/yes-chef/pull/292); joins the prod-schema promotion list). **All
-three are recorded in [`DONE-LOG.md`](DONE-LOG.md) and off the live front.** **ADR-0021 Amendment 4 V4b — the
-synced related-recipe edge table (PR [#293](https://github.com/jonphillips/yes-chef/pull/293)) — is now merged
-too, closing Amendment 4** (DONE-LOG); its two-device sync pass is owed (see "Device passes owed"). Next Up
-advances to **ADR-0021 variation anchor-repair Dispatch 2 — the in-app repair UI** (Jon's call, 2026-08-08).
-⚠️ **A Codex-env gotcha bit #291 and is now a standing note:** the
-simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
-the app tests" is structural, not a regression — and it *masked two genuinely red tests* (missing
+Last updated: August 8, 2026. **The entire ADR-0021 variation arc is COMPLETE** — V1–V3, Amendment 4
+(V4a/V4b/V4c + Delete), and anchor-repair Dispatch 0/1/2 all shipped. The last pieces: **V4b** (the synced
+`recipeRelatedRecipes` edge table, PR [#293](https://github.com/jonphillips/yes-chef/pull/293)) + its
+delete-cascade / scoped-read follow-up (PR [#296](https://github.com/jonphillips/yes-chef/pull/296)), and
+anchor-repair **Dispatch 2** (the in-app repair UI, PR [#294](https://github.com/jonphillips/yes-chef/pull/294)).
+**Two device passes are owed — V4b sync and Dispatch 2 repair UI (see "Device passes owed").** Also recently
+shipped and archived to [`DONE-LOG.md`](DONE-LOG.md): **ADR-0053 S1/S2** (Create Recipe destination + issue pass,
+PRs #290/#291), **ADR-0052 S1+S2** (synced grocery learned-area table, PR #292), and the full **ADR-0049**
+facet/labeling arc (PRs #275–#282). **Next Up advances to [ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md)
+— the sidebar-adaptable app shell** (Jon's call, 2026-08-08).
+⚠️ **A standing Codex-env gotcha:** the simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
+the app tests" is structural, not a regression — and it once *masked two genuinely red tests* (missing
 `bootstrapDatabase()` → `RecipeEditorModel`'s eager `@Fetch` tripped SQLiteData's blank-DB reporter), fixed by
-the architect running the target locally ([[codex-build-excuse-reproduce]]). **The entire ADR-0049 facet/labeling arc is closed as a gate.** Amendment 2 (the
-facet model) is complete and archived ([`DONE-LOG.md`](DONE-LOG.md)): D1–D5, F1/F2, and the OQ4 editorial-facet
-seed all shipped and device-passed (PRs [#275](https://github.com/jonphillips/yes-chef/pull/275)–[#277](https://github.com/jonphillips/yes-chef/pull/277)),
-D4 hand pass done. The S5/S6 + D8 labeling-backfill **tooling** shipped (PR [#278](https://github.com/jonphillips/yes-chef/pull/278)),
-the ADR-0004 S4 structured-output correction merged (PR [#280](https://github.com/jonphillips/yes-chef/pull/280) +
-jon-platform [#36](https://github.com/jonphillips/jon-platform/pull/36)), and **Amendment 4's deterministic
-exact-match label floor shipped** (PR [#281](https://github.com/jonphillips/yes-chef/pull/281); Edit Tags
-two-column refinement in PR [#282](https://github.com/jonphillips/yes-chef/pull/282)). **Filling in per-recipe
+the architect running the target locally ([[codex-build-excuse-reproduce]]). **Filling in per-recipe
 facet/tag coverage is Jon's ongoing hand work and gates nothing** — Power Browser (ADR-0050) and everything
-downstream move forward without waiting on it. Records in [`DONE-LOG.md`](DONE-LOG.md).)
+downstream move forward without waiting on it.
 
 **Standing state (not a task):** iCloud sync round-trips end-to-end across two physical devices
 (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`) — the M4 one-way gate is **crossed and holding**. We stay in
@@ -37,48 +28,39 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**Next Up → [ADR-0021](decisions/ADR-0021-recipe-variations.md) variation anchor-repair **Dispatch 2** — the
-in-app repair UI.** Designated 2026-08-08 (Jon's call). Spec:
-[`efforts/variation-anchor-repair.md`](efforts/variation-anchor-repair.md); Dispatch 0 (+3) and Dispatch 1 are
-done and in [`DONE-LOG.md`](DONE-LOG.md). **No schema.** The read path already *surfaces* the orphaned-anchor
-repair queue (reader/editor notice, grocery `(needs repair)` subtitle, blocked Save + blocked hand-offs);
-Dispatch 2 makes it **directly actionable** — re-anchor an orphaned op to a live base ID, or drop it.
+**Next Up → [ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell.**
+Designated 2026-08-08 (Jon's call). Its gate was satisfied 2026-07-25; nothing held it but appetite, and
+ADR-0021 is now fully clear. It moves **all eight chat call sites onto one Ask** (they inherit one Ask rather
+than six) and owns the Calendar/Workbench detent split and the Recipe inspector. **Larger than a single slice —
+wants its own scoping pass first** (Jon scopes, then dispatch).
 
-- **Read-lenient / write-strict is the invariant to preserve** ([[variation-anchor-repair]]). Dispatch 1 left
-  `resolved(applying:)` degrading (an orphan no longer takes out a recipe's editor/reader/grocery) while the two
-  variation-scoped hand-off reads block loudly. Dispatch 2 adds a *repair action*, not a new read tolerance —
-  do not loosen the write path or the hand-off blocks.
-- **It closes the ADR-0021 variation arc.** V1–V3, Amendment 4 (V4a/V4b/V4c + Delete), and anchor-repair
-  Dispatch 0/1 are all shipped; Dispatch 2 is the last piece.
+- **App-shell consolidation, not a data slice — no schema expected.** It touches many `YesChefApp/` view/model
+  sites, so this is squarely a **`YesChefTests`** job (the model+binding assembly gate) plus the elevated
+  generic build.
+- **Chat-surface uniformity is cross-surface, not cross-device** (the closed chat-ask-uniformity effort): modal
+  sheets keep the iOS nav bar; embedded/column presentations keep the in-panel header. **That divergence is
+  intended — do not "unify" it.**
+- **ADR-0045 cold-start entry points ride alongside** (the meal-calendar day-header Chat and the Workbench
+  Chat) — decide whether they want their own starters *before* ADR-0046 rearranges those surfaces; they pass
+  `.none` today, which is an explicit answer, not an omission.
 
 **Verify** per [[lean-verification-default]]: `swift build` + Core tests, one elevated `generic/platform=iOS`
-build (**`xcodegen generate` if it adds `YesChefApp/` files**), and `scripts/check-drift.sh`; **run
-`YesChefTests`** if an app-layer model is touched.
+build (**`xcodegen generate` if it adds `YesChefApp/` files**), `scripts/check-drift.sh`, and **`YesChefTests`**
+(app-layer models are touched).
 
 ---
 
-**Prior candidates (queue — not the designated target):** the facet/labeling gate is cleared and the
-variation-anchor data-loss arc is fixed and device-passed; ADR-0021 V4a (Choices section) is shipped, merged,
-and device-passed. Amendment 4's deterministic floor, V4a, and variation-anchor-repair **Dispatch 0 (+3) and
-Dispatch 1** all shipped, merged, and device-passed 2026-08-05, now archived to [`DONE-LOG.md`](DONE-LOG.md).
-Filling in per-recipe facet/tag coverage is Jon's ongoing hand work (Edit Tags + DEBUG Facet Coverage) that
-**gates nothing**.
-
-**ADR-0021 Amendment 4 is now COMPLETE (V4a/V4b/V4c + Delete shipped, DONE-LOG). The remaining ADR-0021 work is
-anchor-repair Dispatch 2 — now the designated Next Up (see above).** Dispatch 1 left `resolved(applying:)`
-**read-lenient / write-strict** — an orphaned anchor no longer takes out a recipe's editor/reader/grocery, and the
-two variation-scoped hand-off reads block loudly rather than feed an LLM a partial recipe. Other live candidates:
+**Prior candidates (queue — not the designated target).** The facet/labeling gate is cleared, the **entire
+ADR-0021 variation arc is COMPLETE** (all shipped, DONE-LOG), and per-recipe facet/tag coverage is Jon's ongoing
+hand work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**. Live candidates:
 
 - **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser S1.** All the facet infrastructure it
   needs is shipped (facets, editable membership, the deterministic floor, the three coverage views). Its old
   "wait until primary facets classify a majority of the library" gate is **retired** — the manual backfill no
-  longer gates anything (Jon, 2026-08-05). Needs its own scoping pass. (**Amd4-OQ1 is answered** — list/browser
-  indexing of variation names / related-recipe edges stays unchanged; whether `RecipeBrowserQuery` indexes them
-  is this ADR's call, not a prior slice's silent default.)
-  *(ADR-0042 Amendment 2 `workbenchDraft` is now the Next Up item above — S3a built, S3b gated on the
-  hand-run — so it is no longer listed as a loose candidate here.)*
-- **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell.** Unblocked
-  since 2026-07-25; moves all eight chat call sites onto one Ask. Ready but larger.
+  longer gates anything (Jon, 2026-08-05). Needs its own scoping pass. (**Amd4-OQ1** — whether `RecipeBrowserQuery`
+  indexes variation names / related-recipe edges is this ADR's call; list/browser indexing stays unchanged until
+  it decides.)
+
 - **Grocery learned area table = [ADR-0052](decisions/ADR-0052-grocery-learned-area-table.md) — shipped, merged,
   and device-passed (PR [#292](https://github.com/jonphillips/yes-chef/pull/292)), DONE-LOG. Only **S3** remains
   (not designated): repoint ADR-0037's seed-coverage view to **audit** the `.model` rows (amends, never deletes).**
@@ -115,8 +97,8 @@ section is work.**
     source-specific but must edit the sink**; capture is a *named grandfathered exception*, **not a precedent**
     to cite. **Converging the two save paths is not queued work** — it needs a source that is both authored and
     externally identified, which does not exist yet.
-- **ADR-0021 (variations) V1–V3 are shipped; Amendment 4 is RATIFIED (2026-08-05) and now COMPLETE — V4a,
-  V4b, and V4c + Delete all shipped (DONE-LOG).** ADR-0023 (recipe edit proposals) has nothing queued: its
+- **ADR-0021 (variations) is COMPLETE — V1–V3, Amendment 4 (V4a/V4b/V4c + Delete), and anchor-repair
+  Dispatch 0/1/2 all shipped (DONE-LOG).** ADR-0023 (recipe edit proposals) has nothing queued: its
   *iterative refine loop* is **WITHDRAWN** (ADR-0042 D7 — it happens in the live external thread; **do not
   rebuild it**); per D2 the in-app adjust verb is the **only** path that writes a structured delta. **Expected,
   not a bug to patch (ADR-0014 Amd1-D4):** adding a header inside a recipe that has variations mints a new
@@ -151,10 +133,10 @@ section is work.**
 Drawn into **Next Up** as needed; not itself a dispatch target. Completed efforts live in
 [`docs/DONE-LOG.md`](DONE-LOG.md).
 
-**[`efforts/variation-anchor-repair.md`](efforts/variation-anchor-repair.md) — Dispatch 0 (+3) and Dispatch 1
-SHIPPED, merged, and device-passed 2026-08-05 (→ [`DONE-LOG.md`](DONE-LOG.md)).** Only **Dispatch 2** remains
-(the in-app repair UI that makes the already-surfaced orphan repair queue directly actionable, no schema) —
-**now the designated Next Up (see above).**
+**[`efforts/variation-anchor-repair.md`](efforts/variation-anchor-repair.md) — COMPLETE.** Dispatch 0 (+3) and
+Dispatch 1 shipped, merged, and device-passed 2026-08-05; **Dispatch 2** (the in-app repair UI, PR
+[#294](https://github.com/jonphillips/yes-chef/pull/294)) landed 2026-08-08. Full record in
+[`DONE-LOG.md`](DONE-LOG.md); its device pass is owed (see below).
 
 **[`efforts/recipe-facets.md`](efforts/recipe-facets.md) — ADR-0049 (the facet model + labeling): COMPLETE and
 archived.** D1–D5, F1/F2, OQ4 seed, the S5/S6+D8 backfill tooling, and the Amd-4 deterministic floor all shipped
@@ -175,9 +157,8 @@ one key, so any of those recipes on a menu puts "Gather your ingredient" on the 
 - **P2 (Milk Street's all-caps) is DECLINED**; P3's Amd1-D1 dependency is now discharged (shipped 2026-07-28)
   but it stays parked behind the declined P2. Don't build either on momentum.
 
-**[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell. Unblocked
-but unscheduled.** Its gate was satisfied 2026-07-25; nothing holds it except appetite. It moves all eight
-chat call sites, which now inherit **one** Ask rather than six.
+**[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell — is now the
+designated Next Up (see above).**
 
 **ADR-0045 leftovers — two cold-start entry points, each its own small slice.** The meal-calendar day-header
 Chat and the Workbench Chat, same dead end, no section to carry. Recorded in the ADR, deliberately not folded
@@ -255,7 +236,14 @@ Not work, a checklist.
 
 **ADR-0021 Amendment 4 V4b (PR [#293](https://github.com/jonphillips/yes-chef/pull/293)) — the two-device
 `recipeRelatedRecipes` sync pass.** A new synced table: verify a link/unlink round-trips across
-`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro` and that offline-duplicate convergence holds. **Back up first.**
+`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro` and that offline-duplicate convergence holds. **Also verify the
+delete-cascade follow-up (PR [#296](https://github.com/jonphillips/yes-chef/pull/296)):** permanently deleting a
+recipe removes its related-recipe edges, so no orphaned link is resurrected by a full-zone fetch. **Back up first.**
+
+**ADR-0021 anchor-repair Dispatch 2 (PR [#294](https://github.com/jonphillips/yes-chef/pull/294)) — the repair-UI
+pass, no schema.** Open a previously orphaned variation → **Edit Variation → Repair Anchors**, re-anchor an
+orphaned op to the intended current row (and exercise **Discard**), and verify the fold holds after the base
+wording changes and that Save unblocks once the queue is empty.
 
 *(Device-passed 2026-08-08 and removed: **ADR-0053 S1 (PR #290) + S2 (PR #291)** — the combined Create Recipe
 pass (sidebar → paste → review cues → Save → lands on the new recipe, Clear, resident session, tier/labels-on-save,
