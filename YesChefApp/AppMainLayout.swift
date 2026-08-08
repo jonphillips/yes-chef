@@ -76,7 +76,9 @@ struct AppMainLayout: View {
         systemImage: AppSection.browser.systemImage,
         value: AppSection.browser
       ) {
-        BrowserWorkspaceView(model: browserModel, onCapture: onBrowserCapture)
+        NavigationStack {
+          BrowserWorkspaceView(model: browserModel, onCapture: onBrowserCapture)
+        }
       }
       .defaultVisibility(.hidden, for: .tabBar)
 
@@ -94,7 +96,9 @@ struct AppMainLayout: View {
         systemImage: AppSection.createRecipe.systemImage,
         value: AppSection.createRecipe
       ) {
-        CreateRecipeView(model: createRecipeModel, onSaved: onRecipeCreated)
+        NavigationStack {
+          CreateRecipeView(model: createRecipeModel, onSaved: onRecipeCreated)
+        }
       }
       .defaultVisibility(.hidden, for: .tabBar)
 
@@ -210,30 +214,24 @@ private struct MenusTab: View {
 }
 
 private struct MealCalendarTab: View {
-  @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
-
   let model: MealCalendarModel
   let onMenuSelected: (CoreMenu.ID) -> Void
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
   let onCookSessionRequested: (CookSessionPresentation) -> Void
 
+  // Single-column, like Browser/Create Recipe. `MealCalendarWorkspaceView` adapts to width on its
+  // own (calendar + agenda rail + chat when wide, stacked when compact), so a plain NavigationStack
+  // hosts its title/toolbar without a spurious empty leading column. Calendar has no list to focus,
+  // so it carries no Focus button.
   var body: some View {
-    NavigationSplitView(columnVisibility: $columnVisibility) {
-      EmptyView()
-    } detail: {
+    NavigationStack {
       MealCalendarWorkspaceView(
         model: model,
         onMenuSelected: onMenuSelected,
         onRecipeSelected: onRecipeSelected,
-        onCookSessionRequested: onCookSessionRequested,
-        isFocusActive: columnVisibility == .detailOnly,
-        focusButtonTapped: focusButtonTapped
+        onCookSessionRequested: onCookSessionRequested
       )
     }
-  }
-
-  private func focusButtonTapped() {
-    columnVisibility = columnVisibility == .detailOnly ? .doubleColumn : .detailOnly
   }
 }
 

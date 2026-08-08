@@ -8,8 +8,9 @@ anchor-repair **Dispatch 2** (the in-app repair UI, PR [#294](https://github.com
 **Two device passes are owed — V4b sync and Dispatch 2 repair UI (see "Device passes owed").** Also recently
 shipped and archived to [`DONE-LOG.md`](DONE-LOG.md): **ADR-0053 S1/S2** (Create Recipe destination + issue pass,
 PRs #290/#291), **ADR-0052 S1+S2** (synced grocery learned-area table, PR #292), and the full **ADR-0049**
-facet/labeling arc (PRs #275–#282). **Next Up advances to [ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md)
-— the sidebar-adaptable app shell** (Jon's call, 2026-08-08).
+facet/labeling arc (PRs #275–#282). **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) S1 (the
+sidebar-adaptable app-shell container) shipped 2026-08-08 (PR #297); Next Up advances to its S2 — the chat
+presentation merge** (gated on S1's device pass + Jon's inspector-vs-split call).
 ⚠️ **A standing Codex-env gotcha:** the simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
 the app tests" is structural, not a regression — and it once *masked two genuinely red tests* (missing
 `bootstrapDatabase()` → `RecipeEditorModel`'s eager `@Fetch` tripped SQLiteData's blank-DB reporter), fixed by
@@ -28,25 +29,24 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**Next Up → [ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell.**
-Designated 2026-08-08 (Jon's call). Its gate was satisfied 2026-07-25; nothing held it but appetite, and
-ADR-0021 is now fully clear. It moves **all eight chat call sites onto one Ask** (they inherit one Ask rather
-than six) and owns the Calendar/Workbench detent split and the Recipe inspector. **Larger than a single slice —
-wants its own scoping pass first** (Jon scopes, then dispatch).
+**S1 shipped** — the sidebar-adaptable app-shell container ([ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md),
+PR [#297](https://github.com/jonphillips/yes-chef/pull/297), 2026-08-08): one `TabView(.sidebarAdaptable)` replaces
+the compact/regular fork and collapses the four-way taxonomy to a single `AppSection`. Under Jon's dogfood;
+**device pass owed** (below). Archived to [`DONE-LOG.md`](DONE-LOG.md).
 
-- **App-shell consolidation, not a data slice — no schema expected.** It touches many `YesChefApp/` view/model
-  sites, so this is squarely a **`YesChefTests`** job (the model+binding assembly gate) plus the elevated
-  generic build.
-- **Chat-surface uniformity is cross-surface, not cross-device** (the closed chat-ask-uniformity effort): modal
-  sheets keep the iOS nav bar; embedded/column presentations keep the in-panel header. **That divergence is
-  intended — do not "unify" it.**
-- **ADR-0045 cold-start entry points ride alongside** (the meal-calendar day-header Chat and the Workbench
-  Chat) — decide whether they want their own starters *before* ADR-0046 rearranges those surfaces; they pass
-  `.none` today, which is an explicit answer, not an omission.
+**Next Up → [ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) S2 — the chat presentation merge.**
+Briefed in [`efforts/sidebar-adaptable-shell.md`](efforts/sidebar-adaptable-shell.md). Reconcile the **three**
+surviving wide-width chat presentations (Recipe `.inspector` vs Calendar/Workbench `ChatWorkspaceSplit` detent vs
+Menu embedded) down to one. **Gated on two things:** S1's device pass, **and Jon's one product decision —
+inspector vs. detent split vs. don't-merge** (the brief lays out A/B/C; Codex cannot choose it). View-layer only,
+no contract/catalog/schema change; compact stays a modal sheet.
 
-**Verify** per [[lean-verification-default]]: `swift build` + Core tests, one elevated `generic/platform=iOS`
-build (**`xcodegen generate` if it adds `YesChefApp/` files**), `scripts/check-drift.sh`, and **`YesChefTests`**
-(app-layer models are touched).
+- **Chat uniformity is cross-surface, not cross-device** — do **not** "unify" the sheet-vs-column header split.
+- **ADR-0045 cold-start starters ride alongside:** decide whether the Calendar day-header Chat and the Workbench
+  Chat want their own starters *before* S2 rearranges them; they pass `.none` today — an explicit answer.
+
+**Verify** per [[lean-verification-default]]: one elevated `generic/platform=iOS` build (**`xcodegen generate` if
+it adds `YesChefApp/` files**), `scripts/check-drift.sh`, and **`YesChefTests`** (app-layer models/bindings are touched).
 
 ---
 
@@ -126,7 +126,8 @@ section is work.**
 - **Chat entry points are unified and closed** ([`efforts/chat-ask-uniformity.md`](efforts/chat-ask-uniformity.md),
   PR #244). Uniformity is **cross-surface, not cross-device**: modal sheets keep the iOS nav bar; embedded and
   column presentations keep the in-panel header row. **That divergence is intended — do not "unify" it.** The
-  Calendar/Workbench detent split and the Recipe inspector belong to ADR-0046.
+  Calendar/Workbench detent split and the Recipe inspector belong to **ADR-0046 S2** (now briefed in
+  [`efforts/sidebar-adaptable-shell.md`](efforts/sidebar-adaptable-shell.md); Jon locks inspector-vs-split first).
 
 ## Ready Efforts (queue)
 
@@ -233,6 +234,14 @@ selection (per-bubble `UITextView` caps the payload).
 ## Device passes owed
 
 Not work, a checklist.
+
+**ADR-0046 S1 — the sidebar-adaptable app shell (PR [#297](https://github.com/jonphillips/yes-chef/pull/297)), no
+schema.** Both physical devices × both orientations × **sidebar and tab-bar modes**; the system sidebar⇄tab-bar
+toggle; `TabViewCustomization` reorder/hide/pin **persisting across launches**; the ADR-0039 third-glyph check.
+Exercise the S1 review-fix surfaces specifically: **Calendar** renders (was blank on iPhone / empty pane on iPad),
+**Create Recipe** shows its Save/Clear and a save round-trips, the menu/workbench deep-links + `openMenuFromCalendar`
+land, and the full-screen cook/recipe covers still present over the `TabView`. Jon's early check looked good;
+this confirms it.
 
 **ADR-0021 Amendment 4 V4b (PR [#293](https://github.com/jonphillips/yes-chef/pull/293)) — the two-device
 `recipeRelatedRecipes` sync pass.** A new synced table: verify a link/unlink round-trips across
