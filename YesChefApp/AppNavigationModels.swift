@@ -56,10 +56,6 @@ enum AppSection: String, CaseIterable, Identifiable {
 
   var id: Self { self }
 
-  @ViewBuilder var label: some View {
-    Label(title, systemImage: systemImage)
-  }
-
   var title: String {
     switch self {
     case .recipes: "Recipes"

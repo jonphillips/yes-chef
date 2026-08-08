@@ -9,6 +9,30 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0046 S1 — the sidebar-adaptable app-shell container
+
+**Built + architect-reviewed + merged 2026-08-08; PR [#297](https://github.com/jonphillips/yes-chef/pull/297). No
+schema. Jon's device pass owed (under dogfood).** One `TabView(selection:).tabViewStyle(.sidebarAdaptable)` with a
+`Tab` per `AppSection` replaces the old size-class fork — the compact `AppCompactTabView` **and** the four
+regular-width `NavigationSplitView` branches — collapsing the four-way taxonomy (`AppSection` / `AppCompactTab` /
+`AppMainColumnSection` / the hand branches) to the single `AppSection` source of truth, and giving the free system
+sidebar⇄tab-bar toggle. Each tab owns its own internal layout and its **own** `@State columnVisibility` (no
+cross-tab focus bleed); the four secondary sections carry `.defaultVisibility(.hidden, for: .tabBar)` to replicate
+"primary 4 + More" without a lossy enum; `TabViewCustomization` persists reorder/hide/pin. The workbench/menu
+`navigationPath` More-stacks are gone — deep-links now drive split selection — and `AppContainer`'s full-screen
+covers still present above the `TabView`.
+
+**Architect review before the device pass caught a defect class Codex's sim-less build could not:** the three
+single-column tabs had no navigation container. **Calendar** was wrapped in `NavigationSplitView { EmptyView() }`,
+which rendered a blank leading pane on iPad and a **fully blank screen on iPhone** (a collapsed split shows its
+empty root, never the detail) — rewritten to a single-column `NavigationStack` (the workspace adapts to width on
+its own; Calendar loses its now-meaningless Focus button, Jon's live-with-it call). **Create Recipe** and
+**Browser** were bare tab children, so Create Recipe lost its title **and its Clear/Save buttons** — both now
+wrapped in `NavigationStack`. Dead `MealCalendarPlannerView` + `AppSection.label` removed. Verified: elevated
+generic build + `YesChefTests` 40/40 green. **S2 (the chat presentation merge) is briefed and queued** behind this
+device pass; see [`efforts/sidebar-adaptable-shell.md`](../efforts/sidebar-adaptable-shell.md).
+
+---
 ## ADR-0021 Amendment 4 V4b — the synced related-recipe edge table
 
 **Built + architect-reviewed + merged 2026-08-08; PR [#293](https://github.com/jonphillips/yes-chef/pull/293). Joins the prod-schema promotion list; Jon's two-device sync pass owed (back up first).**

@@ -3,37 +3,17 @@ import SwiftUI
 import YesChefCore
 
 struct WorkbenchListView: View {
-  enum Style {
-    case navigation
-    case selection
-  }
-
   let model: WorkbenchLibraryModel
-  var style: Style
   @State private var selectedFilter: WorkbenchListFilter = .active
   @State private var completedSearchText = ""
 
   var body: some View {
     @Bindable var model = model
 
-    Group {
-      switch style {
-      case .navigation:
-        List {
-          ForEach(workbenchRows(for: model)) { row in
-            NavigationLink(value: row.id) {
-              WorkbenchRowView(row: row)
-            }
-            .workbenchSwipeActions(row, model: model)
-          }
-        }
-      case .selection:
-        List(workbenchRows(for: model), selection: $model.selectedWorkbenchID) { row in
-          WorkbenchRowView(row: row)
-            .tag(row.id)
-            .workbenchSwipeActions(row, model: model)
-        }
-      }
+    List(workbenchRows(for: model), selection: $model.selectedWorkbenchID) { row in
+      WorkbenchRowView(row: row)
+        .tag(row.id)
+        .workbenchSwipeActions(row, model: model)
     }
     .navigationTitle("Workbenches")
     .safeAreaInset(edge: .top) {

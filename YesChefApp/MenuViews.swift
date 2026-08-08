@@ -2,68 +2,22 @@ import SwiftUI
 import UniformTypeIdentifiers
 import YesChefCore
 
-struct MenusStack: View {
-  let model: MenuLibraryModel
-  let recipeModel: RecipeLibraryModel
-  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
-  var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
-
-  var body: some View {
-    @Bindable var model = model
-
-    NavigationStack(path: $model.navigationPath) {
-      MenuListView(model: model, style: .navigation)
-        .navigationDestination(for: CoreMenu.ID.self) { menuID in
-          MenuDetailView(
-            model: model,
-            recipeModel: recipeModel,
-            menuID: menuID,
-            onRecipeSelected: onRecipeSelected,
-            onCookSessionRequested: onCookSessionRequested
-          )
-            .id(menuID)
-        }
-    }
-  }
-}
-
 struct MenuListView: View {
   let model: MenuLibraryModel
-  var style: MenuListStyle
 
   var body: some View {
     @Bindable var model = model
 
-    Group {
-      switch style {
-      case .navigation:
-        List {
-          ForEach(model.menuRows) { row in
-            NavigationLink(value: row.id) {
-              MenuRowView(row: row)
-            }
-            .swipeActions {
-              Button(role: .destructive) {
-                model.deleteMenuButtonTapped(row)
-              } label: {
-                Label("Delete", systemImage: "trash")
-              }
-            }
+    List(model.menuRows, selection: $model.selectedMenuID) { row in
+      MenuRowView(row: row)
+        .tag(row.id)
+        .swipeActions {
+          Button(role: .destructive) {
+            model.deleteMenuButtonTapped(row)
+          } label: {
+            Label("Delete", systemImage: "trash")
           }
         }
-      case .selection:
-        List(model.menuRows, selection: $model.selectedMenuID) { row in
-          MenuRowView(row: row)
-            .tag(row.id)
-            .swipeActions {
-              Button(role: .destructive) {
-                model.deleteMenuButtonTapped(row)
-              } label: {
-                Label("Delete", systemImage: "trash")
-              }
-            }
-        }
-      }
     }
     .navigationTitle("Menus")
     .toolbar {

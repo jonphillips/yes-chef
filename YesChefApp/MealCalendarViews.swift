@@ -1,25 +1,6 @@
 import SwiftUI
 import YesChefCore
 
-struct MealCalendarStack: View {
-  let model: MealCalendarModel
-  var onMenuSelected: ((CoreMenu.ID) -> Void)?
-  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
-  var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
-
-  var body: some View {
-    NavigationStack {
-      MealCalendarPlannerView(
-        model: model,
-        showsSelectedDayAgenda: true,
-        onMenuSelected: onMenuSelected,
-        onRecipeSelected: onRecipeSelected,
-        onCookSessionRequested: onCookSessionRequested
-      )
-    }
-  }
-}
-
 struct MealCalendarWorkspaceView: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   let model: MealCalendarModel
@@ -127,62 +108,6 @@ struct MealCalendarWorkspaceView: View {
 
   private func weekCellHeight(for workspaceHeight: CGFloat) -> CGFloat {
     min(max(workspaceHeight - 210, 320), 520)
-  }
-}
-
-struct MealCalendarPlannerView: View {
-  let model: MealCalendarModel
-  var showsSelectedDayAgenda: Bool
-  var onMenuSelected: ((CoreMenu.ID) -> Void)?
-  var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
-  var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
-  @State private var compactChatModel: RecipeChatModel?
-
-  var body: some View {
-    MealCalendarStackedContent(
-      model: model,
-      showsSelectedDayAgenda: showsSelectedDayAgenda,
-      monthCellMinHeight: 86,
-      weekCellMinHeight: 240,
-      maxContentWidth: 980,
-      chatButtonTapped: chatButtonTapped,
-      onMenuSelected: onMenuSelected,
-      onRecipeSelected: onRecipeSelected,
-      onCookSessionRequested: onCookSessionRequested
-    )
-    .navigationTitle("Meal Calendar")
-    .toolbar {
-      MealCalendarNavigationToolbar(model: model)
-    }
-    .sheet(item: $compactChatModel) { chatModel in
-      NavigationStack {
-        RecipeChatPanel(
-          chatModel: chatModel,
-          surface: .calendarDayCompactSheet(
-            content: .init(applyActions: model.applyActionCatalog(for: chatModel)),
-            onDismiss: { compactChatModel = nil }
-          )
-        )
-      }
-    }
-  }
-
-  private func chatButtonTapped() {
-    if compactChatModel != nil {
-      compactChatModel = nil
-    } else {
-      compactChatModel = RecipeChatModel(context: mealPlanChatContext)
-    }
-  }
-
-  private var mealPlanChatContext: RecipeChatContext {
-    .mealPlan(
-      MealPlanChatContext(
-        title: model.selectedDateTitle,
-        subjectDate: model.selectedDate,
-        rows: model.selectedDayRows
-      )
-    )
   }
 }
 

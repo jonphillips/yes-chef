@@ -4,9 +4,10 @@ import WebKit
 import YesChefCore
 
 struct AppMainLayout: View {
-  @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
-  @State private var mealCalendarColumnVisibility: NavigationSplitViewVisibility = .doubleColumn
+  @AppStorage("app-shell-tab-customization") private var customization: TabViewCustomization
 
+  // Kept as an input so AppContainer retains its existing ownership shape. The per-tab split views
+  // adapt automatically as their available width changes.
   let horizontalSizeClass: UserInterfaceSizeClass?
   let recipeModel: RecipeLibraryModel
   let workbenchModel: WorkbenchLibraryModel
@@ -23,120 +24,99 @@ struct AppMainLayout: View {
   var onRecipeCreated: (Recipe.ID) -> Void
 
   var body: some View {
-    if horizontalSizeClass == .compact {
-      AppCompactTabView(
-        selection: $selectedSection,
-        recipeModel: recipeModel,
-        workbenchModel: workbenchModel,
-        browserModel: browserModel,
-        mealCalendarModel: mealCalendarModel,
-        menuModel: menuModel,
-        groceryModel: groceryModel,
-        createRecipeModel: createRecipeModel,
-        onBrowserCapture: onBrowserCapture,
-        onMenuSelected: openMenuFromCalendar,
-        onRecipeSelected: onRecipeSelected,
-        onCookSessionRequested: onCookSessionRequested,
-        onRecipeCreated: onRecipeCreated
-      )
-    } else if selectedSection == .createRecipe {
-      NavigationSplitView {
-        AppSidebar(selection: $selectedSection)
-      } detail: {
+    TabView(selection: $selectedSection) {
+      Tab(
+        AppSection.recipes.title,
+        systemImage: AppSection.recipes.systemImage,
+        value: AppSection.recipes
+      ) {
+        RecipesTab(
+          model: recipeModel,
+          mealCalendarModel: mealCalendarModel,
+          groceryModel: groceryModel
+        )
+      }
+
+      Tab(
+        AppSection.menus.title,
+        systemImage: AppSection.menus.systemImage,
+        value: AppSection.menus
+      ) {
+        MenusTab(
+          model: menuModel,
+          recipeModel: recipeModel,
+          onRecipeSelected: onRecipeSelected,
+          onCookSessionRequested: onCookSessionRequested
+        )
+      }
+
+      Tab(
+        AppSection.mealCalendar.title,
+        systemImage: AppSection.mealCalendar.systemImage,
+        value: AppSection.mealCalendar
+      ) {
+        MealCalendarTab(
+          model: mealCalendarModel,
+          onMenuSelected: openMenuFromCalendar,
+          onRecipeSelected: onRecipeSelected,
+          onCookSessionRequested: onCookSessionRequested
+        )
+      }
+
+      Tab(
+        AppSection.groceries.title,
+        systemImage: AppSection.groceries.systemImage,
+        value: AppSection.groceries
+      ) {
+        GroceriesTab(model: groceryModel, mealCalendarModel: mealCalendarModel)
+      }
+
+      Tab(
+        AppSection.browser.title,
+        systemImage: AppSection.browser.systemImage,
+        value: AppSection.browser
+      ) {
+        NavigationStack {
+          BrowserWorkspaceView(model: browserModel, onCapture: onBrowserCapture)
+        }
+      }
+      .defaultVisibility(.hidden, for: .tabBar)
+
+      Tab(
+        AppSection.workbenches.title,
+        systemImage: AppSection.workbenches.systemImage,
+        value: AppSection.workbenches
+      ) {
+        WorkbenchesTab(model: workbenchModel, onRecipeSelected: onRecipeSelected)
+      }
+      .defaultVisibility(.hidden, for: .tabBar)
+
+      Tab(
+        AppSection.createRecipe.title,
+        systemImage: AppSection.createRecipe.systemImage,
+        value: AppSection.createRecipe
+      ) {
         NavigationStack {
           CreateRecipeView(model: createRecipeModel, onSaved: onRecipeCreated)
         }
       }
-    } else if selectedSection == .browser {
-      NavigationSplitView {
-        AppSidebar(selection: $selectedSection)
-      } detail: {
-        BrowserWorkspaceView(
-          model: browserModel,
-          onCapture: onBrowserCapture
+      .defaultVisibility(.hidden, for: .tabBar)
+
+      Tab(
+        AppSection.settings.title,
+        systemImage: AppSection.settings.systemImage,
+        value: AppSection.settings
+      ) {
+        SettingsTab(
+          recipeModel: recipeModel,
+          groceryModel: groceryModel,
+          selectedPane: $selectedSettingsPane
         )
       }
-    } else if selectedSection == .mealCalendar {
-      NavigationSplitView(columnVisibility: $mealCalendarColumnVisibility) {
-        AppSidebar(selection: $selectedSection)
-      } detail: {
-        MealCalendarWorkspaceView(
-          model: mealCalendarModel,
-          onMenuSelected: openMenuFromCalendar,
-          onRecipeSelected: onRecipeSelected,
-          onCookSessionRequested: onCookSessionRequested,
-          isFocusActive: mealCalendarColumnVisibility == .detailOnly,
-          focusButtonTapped: {
-            mealCalendarColumnVisibility = mealCalendarColumnVisibility == .detailOnly
-              ? .doubleColumn
-              : .detailOnly
-          }
-        )
-      }
-    } else {
-      let columnSection = AppMainColumnSection(selectedSection ?? .recipes) ?? .recipes
-      NavigationSplitView(columnVisibility: $columnVisibility) {
-        AppSidebar(selection: $selectedSection)
-      } content: {
-        switch columnSection {
-        case .recipes:
-          RecipeListView(model: recipeModel, style: .selection)
-        case .workbenches:
-          WorkbenchListView(model: workbenchModel, style: .selection)
-        case .groceries:
-          GroceryListView(model: groceryModel, style: .selection)
-        case .menus:
-          MenuListView(model: menuModel, style: .selection)
-        case .settings:
-          SettingsView(
-            model: recipeModel,
-            groceryModel: groceryModel,
-            selectedPane: $selectedSettingsPane
-          )
-        }
-      } detail: {
-        switch columnSection {
-        case .recipes:
-          RecipeDetailColumn(
-            model: recipeModel,
-            mealCalendarModel: mealCalendarModel,
-            groceryModel: groceryModel,
-            columnVisibility: $columnVisibility
-          )
-        case .workbenches:
-          WorkbenchDetailColumn(
-            model: workbenchModel,
-            onRecipeSelected: onRecipeSelected,
-            isFocusActive: columnVisibility == .detailOnly,
-            focusButtonTapped: {
-              columnVisibility = columnVisibility == .detailOnly ? .doubleColumn : .detailOnly
-            }
-          )
-        case .groceries:
-          GroceryDetailColumn(
-            model: groceryModel,
-            mealCalendarModel: mealCalendarModel
-          )
-        case .menus:
-          MenuDetailColumn(
-            model: menuModel,
-            recipeModel: recipeModel,
-            onRecipeSelected: onRecipeSelected,
-            onCookSessionRequested: onCookSessionRequested,
-            isFocusActive: columnVisibility == .detailOnly,
-            focusButtonTapped: {
-              columnVisibility = columnVisibility == .detailOnly ? .doubleColumn : .detailOnly
-            }
-          )
-        case .settings:
-          SettingsDetailPane(
-            selectedPane: selectedSettingsPane,
-            model: recipeModel,
-            groceryModel: groceryModel
-          )
-        }
-      }
+      .defaultVisibility(.hidden, for: .tabBar)
     }
+    .tabViewStyle(.sidebarAdaptable)
+    .tabViewCustomization($customization)
   }
 
   private func openMenuFromCalendar(_ menuID: CoreMenu.ID) {
@@ -145,243 +125,136 @@ struct AppMainLayout: View {
   }
 }
 
-private enum AppMainColumnSection {
-  case recipes
-  case workbenches
-  case groceries
-  case menus
-  case settings
+private struct RecipesTab: View {
+  @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
 
-  init?(_ section: AppSection) {
-    switch section {
-    case .recipes:
-      self = .recipes
-    case .workbenches:
-      self = .workbenches
-    case .groceries:
-      self = .groceries
-    case .menus:
-      self = .menus
-    case .settings:
-      self = .settings
-    case .createRecipe, .browser, .mealCalendar:
-      return nil
-    }
-  }
-}
-
-private struct AppCompactTabView: View {
-  @Binding var selection: AppSection?
-  let recipeModel: RecipeLibraryModel
-  let workbenchModel: WorkbenchLibraryModel
-  let browserModel: BrowserModel
-  let mealCalendarModel: MealCalendarModel
-  let menuModel: MenuLibraryModel
-  let groceryModel: GroceryLibraryModel
-  let createRecipeModel: CreateRecipeModel
-  let onBrowserCapture: (WebPage) async -> Void
-  let onMenuSelected: (CoreMenu.ID) -> Void
-  let onRecipeSelected: (RecipeDetailPresentation) -> Void
-  let onCookSessionRequested: (CookSessionPresentation) -> Void
-  let onRecipeCreated: (Recipe.ID) -> Void
-
-  var body: some View {
-    TabView(selection: compactSelection) {
-      Tab(
-        AppSection.recipes.title,
-        systemImage: AppSection.recipes.systemImage,
-        value: .recipes
-      ) {
-        RecipesStack(
-          model: recipeModel,
-          mealCalendarModel: mealCalendarModel,
-          groceryModel: groceryModel,
-          onRecipeSelected: onRecipeSelected
-        )
-      }
-      Tab(
-        AppSection.menus.title,
-        systemImage: AppSection.menus.systemImage,
-        value: .menus
-      ) {
-        MenusStack(
-          model: menuModel,
-          recipeModel: recipeModel,
-          onRecipeSelected: onRecipeSelected,
-          onCookSessionRequested: onCookSessionRequested
-        )
-      }
-      Tab(
-        AppSection.mealCalendar.title,
-        systemImage: AppSection.mealCalendar.systemImage,
-        value: .mealCalendar
-      ) {
-        MealCalendarStack(
-          model: mealCalendarModel,
-          onMenuSelected: onMenuSelected,
-          onRecipeSelected: onRecipeSelected,
-          onCookSessionRequested: onCookSessionRequested
-        )
-      }
-      Tab(
-        AppSection.groceries.title,
-        systemImage: AppSection.groceries.systemImage,
-        value: .groceries
-      ) {
-        GroceriesStack(
-          model: groceryModel,
-          mealCalendarModel: mealCalendarModel
-        )
-      }
-      Tab("More", systemImage: "ellipsis.circle", value: .more) {
-        AppMoreStack(
-          workbenchModel: workbenchModel,
-          browserModel: browserModel,
-          recipeModel: recipeModel,
-          groceryModel: groceryModel,
-          createRecipeModel: createRecipeModel,
-          onBrowserCapture: onBrowserCapture,
-          onRecipeSelected: onRecipeSelected,
-          onRecipeCreated: onRecipeCreated,
-          onSectionSelected: { selection = $0 }
-        )
-      }
-    }
-  }
-
-  private var compactSelection: Binding<AppCompactTab> {
-    Binding {
-      AppCompactTab(section: selection)
-    } set: { tab in
-      guard let section = tab.section else {
-        // `AppSection` has no More case because the regular-width sidebar needs the real destinations.
-        // Browser is the More root's first destination and gives a regular-width transition a useful home.
-        if AppCompactTab(section: selection) != .more {
-          selection = .browser
-        }
-        return
-      }
-      selection = section
-    }
-  }
-}
-
-private enum AppCompactTab: Hashable {
-  case recipes
-  case menus
-  case mealCalendar
-  case groceries
-  case more
-
-  init(section: AppSection?) {
-    switch section {
-    case .recipes, nil:
-      self = .recipes
-    case .menus:
-      self = .menus
-    case .mealCalendar:
-      self = .mealCalendar
-    case .groceries:
-      self = .groceries
-    case .createRecipe, .browser, .workbenches, .settings:
-      self = .more
-    }
-  }
-
-  var section: AppSection? {
-    switch self {
-    case .recipes: .recipes
-    case .menus: .menus
-    case .mealCalendar: .mealCalendar
-    case .groceries: .groceries
-    case .more: nil
-    }
-  }
-}
-
-private struct AppMoreStack: View {
-  let workbenchModel: WorkbenchLibraryModel
-  let browserModel: BrowserModel
-  let recipeModel: RecipeLibraryModel
-  let groceryModel: GroceryLibraryModel
-  let createRecipeModel: CreateRecipeModel
-  let onBrowserCapture: (WebPage) async -> Void
-  let onRecipeSelected: (RecipeDetailPresentation) -> Void
-  let onRecipeCreated: (Recipe.ID) -> Void
-  let onSectionSelected: (AppSection) -> Void
-
-  var body: some View {
-    @Bindable var workbenchModel = workbenchModel
-
-    // This typed path is only written from the Workbench list after that list has been pushed here.
-    // Keep external navigation writers out until More has a route enum that can represent every section.
-    NavigationStack(path: $workbenchModel.navigationPath) {
-      List {
-        NavigationLink {
-          CreateRecipeView(model: createRecipeModel, onSaved: onRecipeCreated)
-            .onAppear { onSectionSelected(.createRecipe) }
-        } label: {
-          AppSection.createRecipe.label
-        }
-        NavigationLink {
-          BrowserWorkspaceView(model: browserModel, onCapture: onBrowserCapture)
-            .onAppear { onSectionSelected(.browser) }
-        } label: {
-          AppSection.browser.label
-        }
-        NavigationLink {
-          WorkbenchListView(model: workbenchModel, style: .navigation)
-            .onAppear { onSectionSelected(.workbenches) }
-        } label: {
-          AppSection.workbenches.label
-        }
-        NavigationLink {
-          SettingsView(model: recipeModel, groceryModel: groceryModel)
-            .onAppear { onSectionSelected(.settings) }
-        } label: {
-          AppSection.settings.label
-        }
-      }
-      .navigationTitle("More")
-      .navigationDestination(for: Workbench.ID.self) { workbenchID in
-        WorkbenchDetailView(workbenchID: workbenchID, onRecipeSelected: onRecipeSelected)
-          .id(workbenchID)
-      }
-    }
-  }
-}
-
-private struct AppSidebar: View {
-  @Binding var selection: AppSection?
-
-  var body: some View {
-    List(AppSection.allCases, selection: $selection) { section in
-      section.label
-        .tag(section)
-    }
-    .navigationTitle("Yes Chef")
-  }
-}
-
-private struct RecipesStack: View {
   let model: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
+
+  var body: some View {
+    NavigationSplitView(columnVisibility: $columnVisibility) {
+      RecipeListView(model: model)
+    } detail: {
+      RecipeDetailColumn(
+        model: model,
+        mealCalendarModel: mealCalendarModel,
+        groceryModel: groceryModel,
+        columnVisibility: $columnVisibility
+      )
+    }
+  }
+}
+
+private struct WorkbenchesTab: View {
+  @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
+
+  let model: WorkbenchLibraryModel
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   var body: some View {
+    NavigationSplitView(columnVisibility: $columnVisibility) {
+      WorkbenchListView(model: model)
+    } detail: {
+      WorkbenchDetailColumn(
+        model: model,
+        onRecipeSelected: onRecipeSelected,
+        isFocusActive: columnVisibility == .detailOnly,
+        focusButtonTapped: focusButtonTapped
+      )
+    }
+  }
+
+  private func focusButtonTapped() {
+    columnVisibility = columnVisibility == .detailOnly ? .doubleColumn : .detailOnly
+  }
+}
+
+private struct GroceriesTab: View {
+  @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
+
+  let model: GroceryLibraryModel
+  let mealCalendarModel: MealCalendarModel
+
+  var body: some View {
+    NavigationSplitView(columnVisibility: $columnVisibility) {
+      GroceryListView(model: model)
+    } detail: {
+      GroceryDetailColumn(model: model, mealCalendarModel: mealCalendarModel)
+    }
+  }
+}
+
+private struct MenusTab: View {
+  @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
+
+  let model: MenuLibraryModel
+  let recipeModel: RecipeLibraryModel
+  let onRecipeSelected: (RecipeDetailPresentation) -> Void
+  let onCookSessionRequested: (CookSessionPresentation) -> Void
+
+  var body: some View {
+    NavigationSplitView(columnVisibility: $columnVisibility) {
+      MenuListView(model: model)
+    } detail: {
+      MenuDetailColumn(
+        model: model,
+        recipeModel: recipeModel,
+        onRecipeSelected: onRecipeSelected,
+        onCookSessionRequested: onCookSessionRequested,
+        isFocusActive: columnVisibility == .detailOnly,
+        focusButtonTapped: focusButtonTapped
+      )
+    }
+  }
+
+  private func focusButtonTapped() {
+    columnVisibility = columnVisibility == .detailOnly ? .doubleColumn : .detailOnly
+  }
+}
+
+private struct MealCalendarTab: View {
+  let model: MealCalendarModel
+  let onMenuSelected: (CoreMenu.ID) -> Void
+  let onRecipeSelected: (RecipeDetailPresentation) -> Void
+  let onCookSessionRequested: (CookSessionPresentation) -> Void
+
+  // Single-column, like Browser/Create Recipe. `MealCalendarWorkspaceView` adapts to width on its
+  // own (calendar + agenda rail + chat when wide, stacked when compact), so a plain NavigationStack
+  // hosts its title/toolbar without a spurious empty leading column. Calendar has no list to focus,
+  // so it carries no Focus button.
+  var body: some View {
     NavigationStack {
-      RecipeListView(model: model, style: .navigation)
-        .navigationDestination(for: Recipe.ID.self) { recipeID in
-          RecipeDetailView(
-            recipeID: recipeID,
-            libraryModel: model,
-            mealCalendarModel: mealCalendarModel,
-            groceryModel: groceryModel,
-            onRecipeSelected: onRecipeSelected
-          )
-            .id(recipeID)
-        }
+      MealCalendarWorkspaceView(
+        model: model,
+        onMenuSelected: onMenuSelected,
+        onRecipeSelected: onRecipeSelected,
+        onCookSessionRequested: onCookSessionRequested
+      )
+    }
+  }
+}
+
+private struct SettingsTab: View {
+  @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
+
+  let recipeModel: RecipeLibraryModel
+  let groceryModel: GroceryLibraryModel
+  @Binding var selectedPane: SettingsPane?
+
+  var body: some View {
+    NavigationSplitView(columnVisibility: $columnVisibility) {
+      SettingsView(
+        model: recipeModel,
+        groceryModel: groceryModel,
+        selectedPane: $selectedPane
+      )
+    } detail: {
+      SettingsDetailPane(
+        selectedPane: selectedPane,
+        model: recipeModel,
+        groceryModel: groceryModel
+      )
     }
   }
 }
@@ -405,7 +278,7 @@ private struct RecipeDetailColumn: View {
           model.selectedRecipeID = presentation.recipeID
         }
       )
-        .id(recipe.id)
+      .id(recipe.id)
     } else {
       ContentUnavailableView("Select a Recipe", systemImage: "fork.knife")
     }
