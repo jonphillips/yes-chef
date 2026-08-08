@@ -160,5 +160,48 @@ extension RecipeCoreTests {
         "Add the wine and simmer.",
       ])
     }
+
+    @Test
+    func deterministicIssuePassFindsConcreteExtractionMismatches() {
+      let attributedSourceID = SampleUUIDSequence.uuid(54_001)
+      let unattributedSourceID = SampleUUIDSequence.uuid(54_002)
+      let extraction = RecipeExtraction(
+        prepTime: "until tender",
+        ingredientSections: [
+          .init(lines: ["2 cups scallions", "salt", "1 cup scallions"]),
+        ],
+        instructionSections: [
+          .init(steps: ["Stir in butter."]),
+        ]
+      )
+      let issues = RecipeExtractionIssueDetector.issues(
+        in: extraction,
+        sources: [
+          .init(id: attributedSourceID, kind: .pastedText, content: "Scallions and salt"),
+          .init(id: unattributedSourceID, kind: .typedText, content: "Aardvark xylophone"),
+        ]
+      )
+
+      expectNoDifference(issues, [
+        .init(kind: .missingTitle),
+        .init(kind: .unparseablePrepTime, detail: "until tender"),
+        .init(kind: .missingIngredientQuantity, detail: "salt"),
+        .init(kind: .duplicateIngredient, detail: "green onions"),
+        .init(kind: .ingredientNotReferenced, detail: "green onions"),
+        .init(kind: .ingredientNotReferenced, detail: "salt"),
+        .init(kind: .referencedIngredientNotListed, detail: "butter"),
+        .init(kind: .unattributedSource, sourceID: unattributedSourceID),
+      ])
+    }
+
+    @Test
+    func deterministicIssuePassReportsEmptyRecipeHalves() {
+      let issues = RecipeExtractionIssueDetector.issues(
+        in: RecipeExtraction(title: "Only a title"),
+        sources: []
+      )
+
+      expectNoDifference(issues, [.init(kind: .emptyIngredients), .init(kind: .emptyInstructions)])
+    }
   }
 }

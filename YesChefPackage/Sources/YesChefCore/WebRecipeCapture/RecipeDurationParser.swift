@@ -1,7 +1,7 @@
 import Foundation
 
-enum RecipeDurationParser {
-  static func minutes(_ text: String) -> Int? {
+public enum RecipeDurationParser {
+  public static func minutes(_ text: String) -> Int? {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return nil }
     if let iso = iso8601Minutes(trimmed) { return iso }

@@ -31,6 +31,9 @@ final class CreateRecipeModel {
   var composeText = ""
   var isExtracting = false
   var extractionError: String?
+  private(set) var extractionIssues: [RecipeExtractionIssue] = []
+  private var composeSourceID: CreateRecipeSourceItem.ID?
+  private var composeSourceIsLocked = false
 
   var isSaving = false
   var errorMessage: String?
@@ -65,6 +68,9 @@ final class CreateRecipeModel {
     sources = []
     isExtracting = false
     extractionError = nil
+    extractionIssues = []
+    composeSourceID = nil
+    composeSourceIsLocked = false
     editorModel.applyExtractedDraft(RecipeEditorDraft())
     suggestedLabels = []
     acceptedSuggestedLabelIDs = []
@@ -95,12 +101,49 @@ final class CreateRecipeModel {
     }
   }
 
+  /// Records text entered into the compose field as typed source material. The value stays in the transient
+  /// source list even if extraction fails. Before an extraction attempt, edits update that item rather than
+  /// creating a row per keystroke; after an attempt, it is frozen so later corrections cannot rewrite the
+  /// material that produced the reviewed draft (ADR-0053 D4/D5).
+  func composeTextChanged() {
+    guard !composeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
+    if let composeSourceID,
+      let index = sources.firstIndex(where: { $0.id == composeSourceID }) {
+      if sources[index].content == composeText {
+        return
+      }
+      if !composeSourceIsLocked {
+        sources[index].content = composeText
+        return
+      }
+    }
+
+    let source = CreateRecipeSourceItem(id: uuid(), kind: .typedText, content: composeText)
+    sources.append(source)
+    composeSourceID = source.id
+    composeSourceIsLocked = false
+  }
+
+  /// Accepts user-initiated clipboard text as its own pasted source item. Editing it remains possible in the
+  /// compose field, but the source list preserves that it arrived through the paste path.
+  func pastedTextReceived(_ strings: [String]) {
+    guard let text = strings.first, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+    let source = CreateRecipeSourceItem(id: uuid(), kind: .pastedText, content: text)
+    sources.append(source)
+    composeSourceID = source.id
+    composeSourceIsLocked = false
+    composeText = text
+  }
+
   /// Runs the two-tier front-end over the compose box (ADR-0051 D4): deterministic schema.org first,
   /// the faithful LLM engine otherwise. On success the structured half is (re)seeded and the source is
   /// recorded; on failure the material is preserved and the error is shown.
   func extractButtonTapped() async {
     let text = composeText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty, !isExtracting else { return }
+    composeTextChanged()
+    composeSourceIsLocked = true
     isExtracting = true
     extractionError = nil
     defer { isExtracting = false }
@@ -110,8 +153,7 @@ final class CreateRecipeModel {
       let makeUUID = uuid
       let extractedDraft = extraction.editorDraft(uuid: { makeUUID() })
       editorModel.applyExtractedDraft(extractedDraft)
-      sources.append(CreateRecipeSourceItem(id: uuid(), kind: .pastedText, content: text))
-      composeText = ""
+      extractionIssues = RecipeExtractionIssueDetector.issues(in: extraction, sources: sources)
       proposeLabels(for: extraction)
     } catch {
       extractionError = RecipeChatErrorText.describe(error)
