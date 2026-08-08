@@ -335,9 +335,13 @@ regardless. So verify with **compiler + tests once**, then hand off:
   elevated command. A sandbox-shaped `143` is not a green result. If the elevated build cannot reach the
   compiler, record the full-log path and **the architect runs the same build locally before approving.**
 - **Run the `YesChefTests` app target when a change touches `YesChefApp/` *model* code** (a `@Observable`
-  model, its extensions, or a display model — **not** view-only or copy changes):
-  `scripts/xcodebuild-summary.sh -scheme YesChef -destination 'platform=iOS Simulator,id=<udid>' -skipMacroValidation test`
-  (`xcrun simctl list devices available` for a udid). **This is the one sanctioned simulator use** and it is a
+  model, its extensions, or a display model — **not** view-only or copy changes). **Run it
+  elevated/unsandboxed on the *first* attempt** — the default sandbox has no CoreSimulator service and a
+  denied Swift/Clang module cache, so a sandboxed run *cannot* reach the tests. Do not attempt it sandboxed
+  first, and do not fall back to a focused `swift test --filter` (it hits the same denied module cache). One
+  invocation resolves a udid and runs the target:
+  `udid=$(xcrun simctl list devices available | grep -oE '[0-9A-Fa-f-]{36}' | head -1); scripts/xcodebuild-summary.sh -scheme YesChef -destination "platform=iOS Simulator,id=$udid" -skipMacroValidation test`.
+  **This is the one sanctioned simulator use** and it is a
   deliberate narrowing of guardrail #8, not a hole in it: it *runs tests*, it does not drive UI, install a
   dogfood build, or take screenshots. Jon still owns the device pass. **Why it earns the ~2 minutes:**
   nothing else executes this target — the generic build only compiles it — so it rots invisibly. Found

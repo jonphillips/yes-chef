@@ -201,10 +201,13 @@ These are now project rules, not preferences:
      generic build a required approval gate. If it reaches the compiler and reports source errors,
      fix those errors and rerun the same command to verify the fix.
    - **A PR that touches `YesChefApp/` *model* code must also run the `YesChefTests` app target on a
-     simulator** — the generic build compiles that target but never executes it, so it rots unseen
-     (five tests were found red on `main`, 2026-08-06). This narrows guardrail #8 rather than
-     contradicting it: running a test target is not simulator-driving, and Jon still owns the UI
-     pass. View-only or copy changes do not need it.
+     simulator, elevated/unsandboxed from the first attempt** — the default sandbox has no CoreSimulator
+     service and a denied module cache, so a sandboxed run cannot reach the tests; do not try it sandboxed
+     first or fall back to `swift test --filter`. The generic build compiles that target but never executes
+     it, so it rots unseen (five tests were found red on `main`, 2026-08-06). This narrows guardrail #8
+     rather than contradicting it: running a test target is not simulator-driving, and Jon still owns the UI
+     pass. View-only or copy changes do not need it. See the Verification Pattern in `CURRENT_HANDOFF.md`
+     for the exact command.
 
    See the Verification Pattern in `CURRENT_HANDOFF.md` for the command sequence.
 
