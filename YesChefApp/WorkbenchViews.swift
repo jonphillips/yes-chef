@@ -16,6 +16,7 @@ struct WorkbenchListView: View {
         .workbenchSwipeActions(row, model: model)
     }
     .navigationTitle("Workbenches")
+    .toolbar(removing: .sidebarToggle)
     .safeAreaInset(edge: .top) {
       VStack(spacing: 8) {
         Picker("Workbench status", selection: $selectedFilter) {

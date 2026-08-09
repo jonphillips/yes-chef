@@ -20,6 +20,7 @@ struct MenuListView: View {
         }
     }
     .navigationTitle("Menus")
+    .toolbar(removing: .sidebarToggle)
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Button {

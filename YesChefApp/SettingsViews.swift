@@ -107,7 +107,7 @@ struct SettingsView: View {
         .disabled(model.isImporting)
       }
     }
-    .navigationTitle("Settings")
+    .toolbar(removing: .sidebarToggle)
     // Refresh the sync signals on appear, on scene activation (the same hook that
     // drives the pending-change redrain), and on cross-process DB changes.
     .task { await syncHealth.refresh() }

@@ -65,6 +65,42 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func aFacetWithASingleDividingValueStaysAvailable() throws {
+      // Sparse coverage: three Korean recipes, only one carries a Protein value. Selecting
+      // Korean must still offer Protein → Beef (1) as a valid narrowing rather than hiding the
+      // facet for having fewer than two populated values (D4).
+      let fixture = BrowserFixture()
+      let koreanStew = RecipeBrowserRecipe(
+        id: fixture.ids.next(), title: "Korean Stew", dateCreated: fixture.now, dateModified: fixture.now
+      )
+      let koreanSoup = RecipeBrowserRecipe(
+        id: fixture.ids.next(), title: "Korean Soup", dateCreated: fixture.now, dateModified: fixture.now
+      )
+      let engine = RecipeBrowserEngine(
+        recipes: [fixture.koreanBeef, koreanStew, koreanSoup],
+        recipeCategories: [
+          .init(id: fixture.ids.next(), recipeID: fixture.koreanBeef.id, categoryID: fixture.korean.id),
+          .init(id: fixture.ids.next(), recipeID: fixture.koreanBeef.id, categoryID: fixture.beef.id),
+          .init(id: fixture.ids.next(), recipeID: koreanStew.id, categoryID: fixture.korean.id),
+          .init(id: fixture.ids.next(), recipeID: koreanSoup.id, categoryID: fixture.korean.id),
+        ],
+        categories: [fixture.korean, fixture.mexican, fixture.beef, fixture.pork],
+        facets: [fixture.cuisine, fixture.protein]
+      )
+
+      let result = engine.result(
+        for: RecipeBrowserQuery(
+          facetSelections: [.init(facetID: fixture.cuisine.id, categoryIDs: [fixture.korean.id])]
+        )
+      )
+
+      expectNoDifference(result.matchingRecipeIDs.count, 3)
+      let proteinValues = try #require(result.availableFacets.first { $0.facet.id == fixture.protein.id }?.values)
+      expectNoDifference(proteinValues.map(\.category.id), [fixture.beef.id])
+      expectNoDifference(proteinValues.map(\.matchingRecipeCount), [1])
+    }
+
+    @Test
     func selectingAFacetAncestorMatchesAssignmentsToItsDescendants() {
       let fixture = BrowserFixture()
       let engine = RecipeBrowserEngine(
