@@ -51,6 +51,13 @@ final class HandoffInAppTransport {
     }
   }
 
+  /// Project-aware Recipe capture returns raw JSON-LD through Create Recipe, not the one-shot routed
+  /// handoff importer. No database row or generic product envelope is needed for that independent path.
+  func copyRecipeCaptureRequest() {
+    UIPasteboard.general.string = RecipeJSONLDContract.captureRequest()
+    toastCenter?.postSuccess("Recipe capture request copied.")
+  }
+
   func stageReview(for result: String, source: HandoffExportSource) async {
     do {
       guard let routedText = AIHandoffToken.stripping(from: result) else {

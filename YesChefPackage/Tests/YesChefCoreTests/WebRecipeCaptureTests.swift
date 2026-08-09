@@ -734,7 +734,7 @@ private struct SanitizedSiteCase {
       expectedTitle: "杏仁 Breakfast Buns",
       expectedSourceName: "King Arthur Baking",
       expectedIngredientSectionNames: [nil],
-      expectedInstructionSectionNames: [nil, nil, nil],
+      expectedInstructionSectionNames: [nil],
       expectedWarnings: []
     )
   }
@@ -747,7 +747,7 @@ private struct SanitizedSiteCase {
       expectedTitle: "Skillet Noodles",
       expectedSourceName: "Allrecipes",
       expectedIngredientSectionNames: [nil],
-      expectedInstructionSectionNames: [nil, nil],
+      expectedInstructionSectionNames: [nil],
       expectedWarnings: [],
       expectsRenderedFallback: true
     )

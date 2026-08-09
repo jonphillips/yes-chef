@@ -35,6 +35,8 @@ be prose and which must be pinned). **Amends the slice plan of [ADR-0023](ADR-00
 [ADR-0019](ADR-0019-recipe-design-studies.md)** (its S3 `Workbench.experiments` BLOB is superseded by
 `workbenchLog` rows). Holds the [[llm-vs-determinism-surface-boundary]] line and applies
 [[llm-curation-not-synthesis]] to every return shape here.
+**[Amendment 3](#amendment-3--late-bound-recipe-capture-ends-a-product-turn-not-the-conversation-2026-08-09)
+— Proposed 2026-08-09 (first post-dogfood run; deliberately scoped to Recipe capture).**
 
 ## Context
 
@@ -832,6 +834,53 @@ Verify per [[lean-verification-default]] — package build + tests for the parse
 - **OQ5 — what happens to the in-app workbench verbs once the external path exists?** ADR-0041 OQ4's answer
   for the Playbook was *complementary, not redundant* (the in-app verbs distill a live conversation; the
   hand-off exports for a fresh one). Confirm the same holds here before retiring anything.
+
+## Amendment 3 — Late-bound Recipe capture ends a product turn, not the conversation (2026-08-09)
+
+**Status: Proposed — limited to one post-dogfood run.** A shared ChatGPT Project with its instructions,
+the current Recipe JSON-LD source, and current menu context sustained one ongoing external menu conversation.
+That conversation produced and imported two different Recipe JSON-LD captures, then continued. This is enough
+evidence to amend the terminal-turn framing for a Recipe product; it is **not** evidence for a generic
+conversation-product framework, a plug-in surface, or wider product validation.
+
+### Amd3-D1 — Conversation lifecycle and product lifecycle are separate
+
+A bounded job can still end with a durable result, but an open conversation can emit a durable **product**
+midstream and keep going. The Recipe capture request is therefore a product-specific terminal turn: it returns
+one JSON-LD object and nothing else, imports through Create Recipe's existing review-and-save path, and leaves
+the external conversation open for the next ask. No `YC-HANDOFF` token is used: that token identifies a
+single-use, task-specific routed return row, while a raw Recipe capture has no such row and is not a prep-plan
+result.
+
+### Amd3-D2 — Project instructions hold stable semantics; each capture request stays thin
+
+The Project source holds the versioned Recipe contract. Dynamic menu or other current state remains in the
+conversation. The app's capture action sends only `YC-PRODUCT: Recipe`, the Recipe contract marker, the target
+recipe when known, and the request to return the structured product. It does not re-send the schema or attempt
+to serialize the conversation. If the target is ambiguous, it asks the cook to choose rather than guessing.
+The existing self-contained handoff instructions remain available for a universal, non-Project context.
+
+### Amd3-D3 — Recipe JSON-LD v2 preserves both interoperability and editorial structure
+
+The first capture preserved flat `recipeIngredient` values but lost their named groups. Plain schema.org
+`Recipe.recipeIngredient` has no named-section equivalent, so v2 keeps its full ordered flat list as the
+interoperable fallback and adds the narrowly namespaced `yesChef:ingredientSections` representation for the
+authoritative in-app grouping. It does not encode headings as fake ingredient rows. Named method groups use
+`HowToSection`; an unsectioned method uses ordered top-level `HowToStep` values and imports as one unnamed
+section, never one section per step.
+
+### Amd3-D4 — Capture remains a reviewable Create Recipe import
+
+The resulting JSON-LD follows the existing deterministic `RecipeJSONLDExtractor` route into
+`RecipeExtraction`, then the existing editable `RecipeEditorDraft` and canonical repository save. Preserve
+title, summary, yield, prep/cook/derived total time, cuisine, course, ingredient groups and instruction
+groups through that route. No prep-plan export is repurposed as conversation context, and no model-specific
+transport or external framework is introduced.
+
+**Follow-up evidence to collect:** repeat the capture from a different external conversation and from a
+non-menu starting context; verify that the copied v2 Project source has actually replaced the older upload;
+and record whether the thin action is clear enough when multiple recipes are discussed. Those are validation
+questions, not implied commitments to generalize this slice.
 
 ## Related
 

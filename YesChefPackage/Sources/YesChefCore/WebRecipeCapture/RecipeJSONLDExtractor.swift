@@ -86,7 +86,14 @@ enum RecipeJSONLDExtractor {
     for cuisine in flatStrings(node["recipeCuisine"]) { builder.addCuisine(cuisine) }
     for keyword in flatStrings(node["keywords"]) { builder.addTag(keyword) }
     for image in imageStrings(node["image"]) { builder.addImage(image) }
-    for ingredient in flatStrings(node["recipeIngredient"]) { builder.addIngredient(ingredient) }
+    let groupedIngredients = ingredientSections(node["yesChef:ingredientSections"])
+    if groupedIngredients.isEmpty {
+      for ingredient in flatStrings(node["recipeIngredient"]) { builder.addIngredient(ingredient) }
+    } else {
+      for section in groupedIngredients {
+        builder.addIngredientSection(name: section.name, lines: section.lines)
+      }
+    }
     mineInstructions(node["recipeInstructions"], into: &builder)
   }
 
@@ -112,6 +119,22 @@ enum RecipeJSONLDExtractor {
       }
     default:
       return
+    }
+  }
+
+  /// `recipeIngredient` has no schema.org equivalent of `HowToSection`: its values are ingredient
+  /// entries, not named groups. The narrow v2 extension preserves Yes Chef's canonical grouping while
+  /// the parallel standard `recipeIngredient` remains an interoperable flat fallback.
+  private static func ingredientSections(_ value: Any?) -> [(name: String?, lines: [String])] {
+    switch value {
+    case let array as [Any]:
+      return array.flatMap { ingredientSections($0) }
+    case let dict as [String: Any]:
+      let lines = flatStrings(dict["recipeIngredient"])
+      guard !lines.isEmpty else { return [] }
+      return [(firstString(dict["name"]), lines)]
+    default:
+      return []
     }
   }
 
