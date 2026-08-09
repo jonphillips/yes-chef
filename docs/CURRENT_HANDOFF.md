@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: August 8, 2026 (evening). **The entire ADR-0021 variation arc is COMPLETE** — V1–V3, Amendment 4
+Last updated: August 9, 2026. **The entire ADR-0021 variation arc is COMPLETE** — V1–V3, Amendment 4
 (V4a/V4b/V4c + Delete), and anchor-repair Dispatch 0/1/2 all shipped. The last pieces: **V4b** (the synced
 `recipeRelatedRecipes` edge table, PR [#293](https://github.com/jonphillips/yes-chef/pull/293)) + its
 delete-cascade / scoped-read follow-up (PR [#296](https://github.com/jonphillips/yes-chef/pull/296)), and
@@ -14,8 +14,8 @@ presentation merge) rides in PR [#298](https://github.com/jonphillips/yes-chef/p
 call locked: **inspector everywhere on wide iPad** (not the detent split, not don't-merge), no Calendar/Workbench
 cold-start starters. **Both ADR-0046 device passes are owed** (see "Device passes owed"); Next Up advances past
 the whole ADR to the open queue. **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser S1 (the
-headless query engine) is now implemented and in review — PR [#299](https://github.com/jonphillips/yes-chef/pull/299)**
-(Codex's engine + an architect review fix on the self-excluding counts); Next Up's leading candidate advances to S2.
+headless query engine) is in review — PR [#299](https://github.com/jonphillips/yes-chef/pull/299); S2 (the iPad
+surface) is built — PR [#301](https://github.com/jonphillips/yes-chef/pull/301).**
 ⚠️ **A standing Codex-env gotcha:** the simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
 the app tests" is structural, not a regression — and it once *masked two genuinely red tests* (missing
 `bootstrapDatabase()` → `RecipeEditorModel`'s eager `@Fetch` tripped SQLiteData's blank-DB reporter), fixed by
@@ -41,20 +41,8 @@ and every hit outside those two sections is a removal candidate — not merely f
 
 ## Next Up
 
-**No designated target — Jon picks from the queue after the ADR-0046 device passes.** The whole
-sidebar-adaptable shell (ADR-0046 S1 + S2) is built and archived to [`DONE-LOG.md`](DONE-LOG.md); only its two
-device passes remain (below).
-
-**Leading candidate → [ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser S2 (the
-iPad/macOS surface).** **S1 (the headless query engine) is implemented and in review — PR
-[#299](https://github.com/jonphillips/yes-chef/pull/299)**: Codex's engine (`RecipeBrowserQuery`, descendant
-matching, OR-within/AND-across, self-excluding counts, availability + deterministic ranking) plus an architect
-review fix — the self-excluding counts collapsed for any *unselected* facet, so an empty query offered zero
-facets and selecting one facet hid every other; fixed + regression-tested. Pure Core, no UI, **no device pass
-owed**. **Amd4-OQ1 is answered in code** — `RecipeBrowserQuery` indexes variation names as text aliases and does
-**not** expand related-recipe edges. Once #299 merges, **S2** draws the surface (search field, selection chips,
-ranked facets, expandable values, results, sort, clear); *batchable with S3 if S1 lands clean.* See "Prior
-candidates" for the rest.
+**No designated target — Jon picks from the queue.** The whole sidebar-adaptable shell (ADR-0046 S1 + S2) is
+built and archived to [`DONE-LOG.md`](DONE-LOG.md); only its two device passes remain (below).
 
 - **Chat uniformity is cross-surface, not cross-device** — do **not** "unify" the sheet-vs-inspector header split.
   That divergence is intended and now the *only* wide/compact chat difference left.
@@ -68,10 +56,10 @@ candidates" for the rest.
 ADR-0021 variation arc is COMPLETE** (all shipped, DONE-LOG), and per-recipe facet/tag coverage is Jon's ongoing
 hand work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**. Live candidates:
 
-- **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser — S1 in review (PR
-  [#299](https://github.com/jonphillips/yes-chef/pull/299)), see Next Up.** Remaining after it merges: **S2** (the
-  iPad/macOS surface, batchable with S3), **S3** (attribute/source/usage filters with type-appropriate controls),
-  and **S3.5** (re-point `RecipeActiveFilterBar` onto the engine — a *deletion*; acceptance test is "the phone
+- **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser — S1 is in review (PR
+  [#299](https://github.com/jonphillips/yes-chef/pull/299)).** Remaining after it merges: **S3**
+  (attribute/source/usage filters with type-appropriate controls) and **S3.5** (re-point
+  `RecipeActiveFilterBar` onto the engine — a *deletion*; acceptance test is "the phone
   list and the browser now agree on what a selection means"). The old "wait until primary facets classify a
   majority of the library" gate is **retired** (Jon, 2026-08-05).
 
@@ -241,6 +229,13 @@ selection (per-bubble `UITextView` caps the payload).
 ## Device passes owed
 
 Not work, a checklist.
+
+**ADR-0050 S2 — Power Browser surface (PR [#301](https://github.com/jonphillips/yes-chef/pull/301)), no
+schema.** On wide iPad, open the dedicated **Power Browser** sidebar tab: the top-ranked facet should be expanded
+with contextual counts, chip selection/removal and Clear should update the available values and result list,
+search and every sort should work, and a result should open its recipe detail. Confirm the tab remains a peer of
+the Safari web-capture Browser and can be focused with the system sidebar controls. Exercise an empty library and
+a library containing a parent/descendant facet value.
 
 **ADR-0046 S1 — the sidebar-adaptable app shell (PR [#297](https://github.com/jonphillips/yes-chef/pull/297)), no
 schema.** Both physical devices × both orientations × **sidebar and tab-bar modes**; the system sidebar⇄tab-bar
