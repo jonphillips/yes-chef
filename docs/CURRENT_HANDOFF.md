@@ -32,16 +32,11 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) is fully built — both slices in
-[`DONE-LOG.md`](DONE-LOG.md), two device passes owed (below).** S1 (the `TabView(.sidebarAdaptable)` shell, PR
-[#297](https://github.com/jonphillips/yes-chef/pull/297)) and S2 (the chat presentation merge, PR
-[#298](https://github.com/jonphillips/yes-chef/pull/298)) are done. **Jon's S2 product call is locked: inspector
-everywhere on wide iPad** — the bespoke `ChatWorkspaceSplit` detent/divider is retired and Calendar / Workbench
-Detail / Workbench Compare now use the same `.inspector` presentation Recipe already had; compact stays a modal
-sheet. The now-dead `.column` / `DetentIdentity` / host-owned-`Dismissal` contract was removed in the same PR.
-**No new designated target** — Jon picks from the queue below after the device pass.
+**No designated target — Jon picks from the queue after the ADR-0046 device passes.** The whole
+sidebar-adaptable shell (ADR-0046 S1 + S2) is built and archived to [`DONE-LOG.md`](DONE-LOG.md); only its two
+device passes remain (below).
 
-**Leading queue candidate → [ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser S1.** All the
+**Leading candidate → [ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser S1.** All the
 facet infrastructure it needs is shipped; its old backfill gate is retired (Jon, 2026-08-05). **Needs its own
 scoping pass before dispatch** (Amd4-OQ1 — whether `RecipeBrowserQuery` indexes variation names / related-recipe
 edges is this ADR's call). See "Prior candidates" for the rest.
@@ -65,9 +60,9 @@ hand work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**. Live candid
   indexes variation names / related-recipe edges is this ADR's call; list/browser indexing stays unchanged until
   it decides.)
 
-- **Grocery learned area table = [ADR-0052](decisions/ADR-0052-grocery-learned-area-table.md) — shipped, merged,
-  and device-passed (PR [#292](https://github.com/jonphillips/yes-chef/pull/292)), DONE-LOG. Only **S3** remains
-  (not designated): repoint ADR-0037's seed-coverage view to **audit** the `.model` rows (amends, never deletes).**
+- **[ADR-0052](decisions/ADR-0052-grocery-learned-area-table.md) S3 (not designated):** repoint ADR-0037's
+  seed-coverage view to **audit** the `.model` rows (amends, never deletes). The rest of ADR-0052 is shipped and
+  device-passed (DONE-LOG).
 
 The ATK grocery-bug slice ([`efforts/import-text-normalization.md`](efforts/import-text-normalization.md)) is a
 **data migration wanting backup-first + a device pass** — hold it until Jon is local. D3's settled
@@ -140,16 +135,9 @@ section is work.**
 Drawn into **Next Up** as needed; not itself a dispatch target. Completed efforts live in
 [`docs/DONE-LOG.md`](DONE-LOG.md).
 
-**[`efforts/variation-anchor-repair.md`](efforts/variation-anchor-repair.md) — COMPLETE.** Dispatch 0 (+3) and
-Dispatch 1 shipped, merged, and device-passed 2026-08-05; **Dispatch 2** (the in-app repair UI, PR
-[#294](https://github.com/jonphillips/yes-chef/pull/294)) landed 2026-08-08. Full record in
-[`DONE-LOG.md`](DONE-LOG.md); its device pass is owed (see below).
-
-**[`efforts/recipe-facets.md`](efforts/recipe-facets.md) — ADR-0049 (the facet model + labeling): COMPLETE and
-archived.** D1–D5, F1/F2, OQ4 seed, the S5/S6+D8 backfill tooling, and the Amd-4 deterministic floor all shipped
-and device-passed (PRs #275–#282); full record in [`DONE-LOG.md`](DONE-LOG.md). The **only** live thread it hands
-off is **F3/OQ5** (retire the typed freeform Cuisine/Course editor fields, **preserving** the per-facet
-single-select picker affordance — rebind, don't delete), deferred to **ADR-0050 S3.5**, do not fold in elsewhere.
+**ADR-0049 (facets) hand-off — one live thread: F3/OQ5.** Retire the typed freeform Cuisine/Course editor
+fields, **preserving** the per-facet single-select picker affordance (rebind, don't delete); deferred to
+**ADR-0050 S3.5**, do not fold in elsewhere. The rest of ADR-0049 is complete (DONE-LOG).
 
 **[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md) — ATK's "Gather Your
 Ingredients" is a latent grocery bug (scoped 2026-07-28). P1 only; **no schema**.** 101 shoppable ingredient
@@ -163,9 +151,6 @@ one key, so any of those recipes on a menu puts "Gather your ingredient" on the 
   ([[migration-writes-bypass-sync-triggers]]). Back up first.
 - **P2 (Milk Street's all-caps) is DECLINED**; P3's Amd1-D1 dependency is now discharged (shipped 2026-07-28)
   but it stays parked behind the declined P2. Don't build either on momentum.
-
-**[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell — is fully
-built (S1 PR #297 + S2 PR #298), both in [`DONE-LOG.md`](DONE-LOG.md); only the two device passes remain (below).**
 
 **ADR-0045 leftovers — two cold-start entry points, each its own small slice.** The meal-calendar day-header
 Chat and the Workbench Chat, same dead end, no section to carry. Recorded in the ADR, deliberately not folded
