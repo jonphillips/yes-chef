@@ -100,6 +100,8 @@ extension RecipeExtractionClient: DependencyKey {
       "prepTime": "optional duration text or null",
       "cookTime": "optional duration text or null",
       "totalTime": "optional duration text or null",
+      "cuisine": "optional cuisine or null",
+      "course": "optional course or category or null",
       "ingredientSections": [{"name":"optional section name or null","lines":["exact ingredient line"]}],
       "instructionSections": [{"name":"optional section name or null","steps":["exact instruction step"]}]
     }
@@ -180,6 +182,8 @@ public struct RecipeExtraction: Codable, Equatable, Sendable {
   public var prepTime: String?
   public var cookTime: String?
   public var totalTime: String?
+  public var cuisine: String?
+  public var course: String?
   public var ingredientSections: [IngredientSection]
   public var instructionSections: [InstructionSection]
 
@@ -192,6 +196,8 @@ public struct RecipeExtraction: Codable, Equatable, Sendable {
     prepTime: String? = nil,
     cookTime: String? = nil,
     totalTime: String? = nil,
+    cuisine: String? = nil,
+    course: String? = nil,
     ingredientSections: [IngredientSection] = [],
     instructionSections: [InstructionSection] = []
   ) {
@@ -203,6 +209,8 @@ public struct RecipeExtraction: Codable, Equatable, Sendable {
     self.prepTime = prepTime
     self.cookTime = cookTime
     self.totalTime = totalTime
+    self.cuisine = cuisine
+    self.course = course
     self.ingredientSections = ingredientSections
     self.instructionSections = instructionSections
   }
@@ -217,6 +225,8 @@ public struct RecipeExtraction: Codable, Equatable, Sendable {
     copy.prepTime = copy.prepTime?.nonEmpty
     copy.cookTime = copy.cookTime?.nonEmpty
     copy.totalTime = copy.totalTime?.nonEmpty
+    copy.cuisine = copy.cuisine?.nonEmpty
+    copy.course = copy.course?.nonEmpty
     copy.ingredientSections = copy.ingredientSections.compactMap { section in
       let lines = section.lines.compactMap(\.nonEmpty)
       guard !lines.isEmpty else { return nil }
@@ -265,6 +275,8 @@ public struct RecipeExtraction: Codable, Equatable, Sendable {
     builder.votes.add(.prepTime, prepTime, priority: RecipeAttributeVotes.modelPriority)
     builder.votes.add(.cookTime, cookTime, priority: RecipeAttributeVotes.modelPriority)
     builder.votes.add(.totalTime, totalTime, priority: RecipeAttributeVotes.modelPriority)
+    builder.addCuisine(cuisine)
+    builder.addCategory(course)
     for section in ingredientSections {
       builder.addIngredientSection(name: section.name, lines: section.lines)
     }

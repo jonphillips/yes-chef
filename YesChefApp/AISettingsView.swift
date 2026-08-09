@@ -82,6 +82,11 @@ struct AISettingsView: View {
         } label: {
           Label("Copy Project Instructions", systemImage: "doc.on.doc")
         }
+        Button {
+          UIPasteboard.general.string = RecipeJSONLDContract.projectSource
+        } label: {
+          Label("Copy Recipe Contract Source", systemImage: "doc.on.doc")
+        }
       } header: {
         Text("External Handoff")
       } footer: {

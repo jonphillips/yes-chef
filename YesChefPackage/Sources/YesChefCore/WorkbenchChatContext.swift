@@ -98,11 +98,9 @@ public struct WorkbenchChatContext: Equatable, Sendable {
     """
     Draft one working recipe for this workbench by synthesizing the candidates, references, and log below. Make a coherent editorial choice — a base recipe plus any deliberate variations — rather than averaging every candidate together.
 
-    When the cook asks you to finalize, return the drafted recipe as a single schema.org `Recipe` JSON-LD object, and nothing else on those lines. Use this shape, with straight ASCII double quotes only:
+    When the cook asks you to finalize, return the drafted recipe as a single schema.org `Recipe` JSON-LD object, and nothing else on those lines.
 
-    {"@context":"https://schema.org","@type":"Recipe","name":"working recipe title","description":"one- or two-sentence summary","recipeCuisine":"cuisine or omit","recipeCategory":"course or omit","recipeYield":"servings or yield, or omit","prepTime":"ISO 8601 duration like PT20M, or omit","cookTime":"ISO 8601 duration like PT35M, or omit","totalTime":"ISO 8601 duration or omit","recipeIngredient":["one ingredient line each"],"recipeInstructions":[{"@type":"HowToStep","text":"one method step each"}]}
-
-    To group ingredients or steps under headings, use `HowToSection` entries in `recipeInstructions` ({"@type":"HowToSection","name":"heading","itemListElement":[{"@type":"HowToStep","text":"step"}]}). Omit any field you cannot fill confidently rather than inventing it. Do not wrap the JSON in a Markdown code fence, and do not put IDs, prices, or rationale inside the JSON.
+    \(RecipeJSONLDContract.outputInstructions)
 
     After the JSON-LD block, return the rationale as a separate prose block: name the candidate choices this draft borrows from or rejects, using each candidate's title and source label from the context — never any candidate or recipe ID.
 

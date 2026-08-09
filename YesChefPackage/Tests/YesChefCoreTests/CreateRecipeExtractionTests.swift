@@ -74,10 +74,106 @@ extension RecipeCoreTests {
       #expect(result.title == "Simple Broth")
       #expect(result.ingredientSections.flatMap(\.lines) == ["1 onion, halved", "2 quarts water"])
       #expect(result.instructionSections.flatMap(\.steps) == ["Combine in a pot.", "Simmer for twenty minutes."])
+      #expect(result.instructionSections.count == 1)
+      #expect(result.instructionSections.first?.name == nil)
 
       let draft = result.editorDraft(uuid: { UUID() })
       #expect(draft.prepTimeMinutes == 10)
       #expect(draft.cookTimeMinutes == 20)
+    }
+
+    /// Direct HowToSteps are one ordered, unsectioned method. They must not become one unnamed
+    /// section per step merely because the JSON-LD walker visits each array item independently.
+    @Test
+    func unsectionedJSONLDPasteKeepsStepsInOneOrderedSection() async throws {
+      let jsonLD = """
+        {"@context":"https://schema.org","@type":"Recipe","name":"Simple Salad","recipeIngredient":["1 cucumber"],"recipeInstructions":[{"@type":"HowToStep","text":"Slice the cucumber."},{"@type":"HowToStep","text":"Season and serve."}]}
+        """
+
+      let result = try await withDependencies {
+        $0.recipeExtractionClient = .testValue
+      } operation: {
+        try await CreateRecipeExtraction.extract(text: jsonLD)
+      }
+
+      expectNoDifference(result.instructionSections, [
+        .init(name: nil, steps: ["Slice the cucumber.", "Season and serve."]),
+      ])
+    }
+
+    /// The Project-aware v2 extension keeps exact ingredient section labels without putting fake
+    /// heading rows into schema.org's flat `recipeIngredient` fallback. This verifies every field
+    /// survives the raw JSON-LD → review draft → canonical save path.
+    @Test
+    func v2JSONLDPastePreservesEditorialStructureThroughSave() async throws {
+      @Dependency(\.defaultDatabase) var database
+      let jsonLD = """
+        {"@context":["https://schema.org",{"yesChef":"https://yeschef.app/ns#"}],"@type":"Recipe","yesChef:recipeContractVersion":"2","name":"Braised Cabbage","description":"Tangy cabbage with sesame sauce.","recipeCuisine":"Levantine","recipeCategory":"Main course","recipeYield":"4 servings","prepTime":"PT15M","cookTime":"PT30M","totalTime":"PT45M","recipeIngredient":["1 small cabbage","1 tsp salt","2 tbsp tahini"],"yesChef:ingredientSections":[{"name":"For the cabbage","recipeIngredient":["1 small cabbage","1 tsp salt"]},{"name":"For the sauce","recipeIngredient":["2 tbsp tahini"]}],"recipeInstructions":[{"@type":"HowToSection","name":"Prepare the cabbage","itemListElement":[{"@type":"HowToStep","text":"Slice the cabbage."},{"@type":"HowToStep","text":"Salt and rest for 10 minutes."}]},{"@type":"HowToSection","name":"Dress and serve","itemListElement":[{"@type":"HowToStep","text":"Whisk the tahini."},{"@type":"HowToStep","text":"Toss and serve."}]}]}
+        """
+
+      let result = try await withDependencies {
+        $0.recipeExtractionClient = .testValue
+      } operation: {
+        try await CreateRecipeExtraction.extract(text: jsonLD)
+      }
+
+      #expect(result.cuisine == "Levantine")
+      #expect(result.course == "Main course")
+      expectNoDifference(result.ingredientSections, [
+        .init(name: "For the cabbage", lines: ["1 small cabbage", "1 tsp salt"]),
+        .init(name: "For the sauce", lines: ["2 tbsp tahini"]),
+      ])
+      expectNoDifference(result.instructionSections, [
+        .init(name: "Prepare the cabbage", steps: ["Slice the cabbage.", "Salt and rest for 10 minutes."]),
+        .init(name: "Dress and serve", steps: ["Whisk the tahini.", "Toss and serve."]),
+      ])
+
+      let draft = result.editorDraft(uuid: UUID.init)
+      let now = Date(timeIntervalSinceReferenceDate: 831_000_000)
+      try await database.write { db in
+        let recipeID = try RecipeRepository.save(
+          draft: draft,
+          in: db,
+          now: now,
+          uuid: UUID.init
+        )
+        let detail = try #require(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db))
+
+        #expect(detail.recipe.title == "Braised Cabbage")
+        #expect(detail.recipe.summary == "Tangy cabbage with sesame sauce.")
+        #expect(detail.recipe.servingsText == "4 servings")
+        #expect(detail.recipe.prepTimeMinutes == 15)
+        #expect(detail.recipe.cookTimeMinutes == 30)
+        #expect(detail.recipe.totalTimeMinutes == 45)
+        #expect(detail.recipe.cuisine == "Levantine")
+        #expect(detail.recipe.course == "Main course")
+        #expect(detail.ingredientSections.map(\.name) == ["For the cabbage", "For the sauce"])
+        #expect(detail.instructionSections.map(\.name) == ["Prepare the cabbage", "Dress and serve"])
+
+        let ingredientLines = Dictionary(grouping: detail.ingredientLines, by: \.sectionID)
+        let instructionSteps = Dictionary(grouping: detail.instructionSteps, by: \.sectionID)
+        expectNoDifference(detail.ingredientSections.map { ingredientLines[$0.id, default: []].map(\.originalText) }, [
+          ["1 small cabbage", "1 tsp salt"],
+          ["2 tbsp tahini"],
+        ])
+        expectNoDifference(detail.instructionSections.map { instructionSteps[$0.id, default: []].map(\.text) }, [
+          ["Slice the cabbage.", "Salt and rest for 10 minutes."],
+          ["Whisk the tahini.", "Toss and serve."],
+        ])
+      }
+    }
+
+    @Test
+    func recipeContractV2DeclaresTheProjectSourceAndCaptureRequest() {
+      #expect(RecipeJSONLDContract.projectSource.contains(RecipeJSONLDContract.marker))
+      #expect(RecipeJSONLDContract.projectSource.contains("yesChef:ingredientSections"))
+      #expect(RecipeJSONLDContract.projectSource.contains("do not make one section per step"))
+
+      let request = RecipeJSONLDContract.captureRequest(recipeName: "Braised Cabbage")
+      #expect(request.contains("YC-PRODUCT: Recipe"))
+      #expect(request.contains(RecipeJSONLDContract.marker))
+      #expect(request.contains("Braised Cabbage"))
+      #expect(!request.contains("YC-HANDOFF:"))
     }
 
     /// An empty paste degrades loudly rather than producing a blank recipe.

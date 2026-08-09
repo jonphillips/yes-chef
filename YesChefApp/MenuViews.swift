@@ -371,6 +371,10 @@ struct MenuPrepPlanSection: View {
         Spacer()
 
         Menu {
+          Button("Copy Recipe Capture Request") {
+            handoffTransport.copyRecipeCaptureRequest()
+          }
+          Divider()
           Button("Handoff Prep") {
             Task { await handoffTransport.copyPrompt(for: handoffSource) }
           }

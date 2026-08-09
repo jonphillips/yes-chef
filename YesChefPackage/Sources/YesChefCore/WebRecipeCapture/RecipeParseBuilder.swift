@@ -7,6 +7,7 @@ struct RecipeParseBuilder {
   private(set) var tagNames: [String] = []
   private(set) var categoryNames: [String] = []
   private(set) var ingredients: [String] = []
+  private(set) var explicitIngredientSections: [ParsedRecipeIngredientSection] = []
   private(set) var instructionSections: [ParsedRecipeInstructionSection] = []
   private(set) var editorialBlocks: [ParsedRecipeEditorialBlock] = []
   private var sawTruncatedStructuredData = false
@@ -59,7 +60,7 @@ struct RecipeParseBuilder {
   mutating func addInstruction(_ rawValue: String?) {
     let steps = Self.lines(rawValue)
     guard !steps.isEmpty else { return }
-    appendInstructionSection(name: nil, steps: steps)
+    appendUnsectionedInstructions(steps)
   }
 
   mutating func addInstructionSection(name: String?, steps: [String]) {
@@ -69,9 +70,14 @@ struct RecipeParseBuilder {
   }
 
   mutating func addIngredientSection(name: String?, lines: [String]) {
-    let heading = name?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
-    if let heading { addIngredient("\(heading):") }
-    for line in lines { addIngredient(line) }
+    let cleanedLines = lines.flatMap(Self.lines)
+    guard !cleanedLines.isEmpty else { return }
+    explicitIngredientSections.append(
+      ParsedRecipeIngredientSection(
+        name: name?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty,
+        lines: cleanedLines
+      )
+    )
   }
 
   mutating func addEditorialBlock(label: String, text: String) {
@@ -88,12 +94,15 @@ struct RecipeParseBuilder {
     let prepTime = votes.winner(.prepTime).flatMap(RecipeDurationParser.minutes)
     let cookTime = votes.winner(.cookTime).flatMap(RecipeDurationParser.minutes)
     let totalTime = votes.winner(.totalTime).flatMap(RecipeDurationParser.minutes)
-    let ingredientSections = Self.sectionedIngredients(ingredients)
+    let ingredientSections = explicitIngredientSections.isEmpty
+      ? Self.sectionedIngredients(ingredients)
+      : explicitIngredientSections
     let missingIngredients = ingredientSections.allSatisfy(\.lines.isEmpty)
     let missingInstructions = instructionSections.allSatisfy(\.steps.isEmpty)
     var warnings: [WebRecipeCaptureWarning] = []
     let hasStructuredRecipe = schemaTypes.contains("Recipe")
       || !ingredients.isEmpty
+      || !explicitIngredientSections.isEmpty
       || !instructionSections.isEmpty
       || votes.winner(.servingsText) != nil
       || prepTime != nil
@@ -136,6 +145,15 @@ struct RecipeParseBuilder {
   private mutating func appendInstructionSection(name: String?, steps: [String]) {
     let section = ParsedRecipeInstructionSection(name: name?.nonEmpty, steps: steps)
     if !instructionSections.contains(section) { instructionSections.append(section) }
+  }
+
+  private mutating func appendUnsectionedInstructions(_ steps: [String]) {
+    guard !steps.isEmpty else { return }
+    if let index = instructionSections.indices.last, instructionSections[index].name == nil {
+      instructionSections[index].steps.append(contentsOf: steps)
+    } else {
+      instructionSections.append(ParsedRecipeInstructionSection(name: nil, steps: steps))
+    }
   }
 
   private func resolvedTitle() -> String? {

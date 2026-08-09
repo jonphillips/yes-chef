@@ -14,6 +14,10 @@ extension RecipeExtraction {
       prepTime: page.prepTimeMinutes.map(String.init),
       cookTime: page.cookTimeMinutes.map(String.init),
       totalTime: page.totalTimeMinutes.map(String.init),
+      cuisine: page.categoryNames
+        .first { $0.hasPrefix("Cuisine > ") }
+        .map { String($0.dropFirst("Cuisine > ".count)) },
+      course: page.categoryNames.first { !$0.hasPrefix("Cuisine > ") },
       ingredientSections: page.ingredientSections.map { .init(name: $0.name, lines: $0.lines) },
       instructionSections: page.instructionSections.map { .init(name: $0.name, steps: $0.steps) }
     )
@@ -33,7 +37,9 @@ extension RecipeExtraction {
       sourcePublicationName: publisherName ?? "",
       servingsText: servingsText ?? "",
       prepTimeMinutes: prepTime.flatMap(RecipeDurationParser.minutes) ?? 0,
-      cookTimeMinutes: cookTime.flatMap(RecipeDurationParser.minutes) ?? 0
+      cookTimeMinutes: cookTime.flatMap(RecipeDurationParser.minutes) ?? 0,
+      cuisine: cuisine ?? "",
+      course: course ?? ""
     )
 
     // The model already segmented ingredients and instructions; the sink's save path re-derives steps
