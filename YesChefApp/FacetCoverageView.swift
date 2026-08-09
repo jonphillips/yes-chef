@@ -1,4 +1,3 @@
-#if DEBUG
 import SQLiteData
 import SwiftUI
 import YesChefCore
@@ -12,22 +11,27 @@ struct FacetCoverageView: View {
     List {
       ForEach(coverage.facetSummaries) { summary in
         Section(summary.facet.name) {
-          LabeledContent("Classified", value: "\(summary.classifiedRecipeCount)")
           NavigationLink {
             FacetCoverageRecipeList(focusedFacet: summary.facet)
           } label: {
-            LabeledContent("Unclassified", value: "\(summary.unclassifiedRecipeCount)")
+            Label("Recipes missing a \(summary.facet.name)", systemImage: "tag")
           }
+          LabeledContent("Classified", value: "\(summary.classifiedRecipeCount)")
+          LabeledContent("Unclassified", value: "\(summary.unclassifiedRecipeCount)")
           ForEach(summary.valueCounts.filter { $0.recipeCount > 0 }) { value in
             LabeledContent(value.category.name, value: "\(value.recipeCount)")
           }
         }
       }
     }
-    .navigationTitle("Facet Coverage")
+    .navigationTitle("Label Recipes")
     .overlay {
       if coverage.facetSummaries.isEmpty {
-        ContentUnavailableView("No Visible Facets", systemImage: "chart.bar")
+        ContentUnavailableView(
+          "No Recipe Labels to Review",
+          systemImage: "tag",
+          description: Text("Add a facet before using this label list.")
+        )
       }
     }
   }
@@ -48,14 +52,14 @@ private struct FacetCoverageRecipeList: View {
   var body: some View {
     List {
       Section {
-        Picker("Coverage", selection: $coverageView) {
+        Picker("Recipes to label", selection: $coverageView) {
           ForEach(RecipeFacetCoverageView.allCases) { view in
-            Text(view.title).tag(view)
+            Text(view.labelingTitle).tag(view)
           }
         }
         .onChange(of: coverageView) { _, _ in focusedFacet = nil }
       } footer: {
-        Text(focusedFacet.map { "Recipes missing \($0.name). Choose a coverage view to browse the D8 work list." } ?? coverageView.detail)
+        Text(focusedFacet.map { "Choose labels for recipes missing a \($0.name)." } ?? coverageView.labelingDetail)
       }
 
       Section {
@@ -71,10 +75,14 @@ private struct FacetCoverageRecipeList: View {
         }
       }
     }
-    .navigationTitle(focusedFacet.map { "Missing \($0.name)" } ?? "Coverage Recipes")
+    .navigationTitle(focusedFacet.map { "Recipes missing a \($0.name)" } ?? coverageView.labelingTitle)
     .overlay {
       if filteredRows.isEmpty {
-        ContentUnavailableView("No Recipes", systemImage: "checkmark.circle")
+        ContentUnavailableView(
+          "No Recipes to Label",
+          systemImage: "checkmark.circle",
+          description: Text("Everything in this list already has the labels it needs.")
+        )
       }
     }
   }
@@ -88,4 +96,21 @@ private struct FacetCoverageRecipeList: View {
     return recipeRows.filter { !$0.recipe.archived && matchingIDs.contains($0.recipe.id) }
   }
 }
-#endif
+
+private extension RecipeFacetCoverageView {
+  var labelingTitle: String {
+    switch self {
+    case .missingProtein: "Recipes missing a Protein"
+    case .missingPrimaryFacet: "Recipes missing a primary label"
+    case .noEditorialLabels: "Recipes without editorial labels"
+    }
+  }
+
+  var labelingDetail: String {
+    switch self {
+    case .missingProtein: "These recipes do not yet have a Protein label."
+    case .missingPrimaryFacet: "These recipes are missing a Protein, Dish Type, or Technique label."
+    case .noEditorialLabels: "These recipes do not yet have Protein, Dietary, Dish Type, or Technique labels."
+    }
+  }
+}

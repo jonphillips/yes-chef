@@ -233,6 +233,9 @@ Nothing here is dispatchable until ADR-0049 Amd 2 is ratified and its data pass 
 - **S4 — saved browsers**, including D9's unresolved-selection repair.
 - **S5 — iPhone presentation** over the same engine.
 - **S6 — classification diagnostics and cleanup entry points**, promoted out of D8's dev-only scaffolding.
+  **Partial: the existing facet work list is a Release labeling surface** (`Settings → Label Recipes`) that routes
+  directly to the per-recipe tag editor. The queue is usable now; suggestion prefetch across it is the fast
+  follow-on, with no change to the labeling engine or proposer in this slice.
 - **Parked, explicitly:** personalized ranking, information-gain scoring, AI match explanations, `NOT`,
   primary/secondary values. Each needs a real want, not this ADR's momentum
   ([[withdraw-not-defer-orphaned-schema]]).
