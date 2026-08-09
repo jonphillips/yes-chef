@@ -13,7 +13,9 @@ built** — S1 (the sidebar-adaptable app-shell container) shipped 2026-08-08 (P
 presentation merge) rides in PR [#298](https://github.com/jonphillips/yes-chef/pull/298)** with Jon's product
 call locked: **inspector everywhere on wide iPad** (not the detent split, not don't-merge), no Calendar/Workbench
 cold-start starters. **Both ADR-0046 device passes are owed** (see "Device passes owed"); Next Up advances past
-the whole ADR to the open queue.
+the whole ADR to the open queue. **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser S1 (the
+headless query engine) is now implemented and in review — PR [#299](https://github.com/jonphillips/yes-chef/pull/299)**
+(Codex's engine + an architect review fix on the self-excluding counts); Next Up's leading candidate advances to S2.
 ⚠️ **A standing Codex-env gotcha:** the simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
 the app tests" is structural, not a regression — and it once *masked two genuinely red tests* (missing
 `bootstrapDatabase()` → `RecipeEditorModel`'s eager `@Fetch` tripped SQLiteData's blank-DB reporter), fixed by
@@ -43,10 +45,16 @@ and every hit outside those two sections is a removal candidate — not merely f
 sidebar-adaptable shell (ADR-0046 S1 + S2) is built and archived to [`DONE-LOG.md`](DONE-LOG.md); only its two
 device passes remain (below).
 
-**Leading candidate → [ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser S1.** All the
-facet infrastructure it needs is shipped; its old backfill gate is retired (Jon, 2026-08-05). **Needs its own
-scoping pass before dispatch** (Amd4-OQ1 — whether `RecipeBrowserQuery` indexes variation names / related-recipe
-edges is this ADR's call). See "Prior candidates" for the rest.
+**Leading candidate → [ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser S2 (the
+iPad/macOS surface).** **S1 (the headless query engine) is implemented and in review — PR
+[#299](https://github.com/jonphillips/yes-chef/pull/299)**: Codex's engine (`RecipeBrowserQuery`, descendant
+matching, OR-within/AND-across, self-excluding counts, availability + deterministic ranking) plus an architect
+review fix — the self-excluding counts collapsed for any *unselected* facet, so an empty query offered zero
+facets and selecting one facet hid every other; fixed + regression-tested. Pure Core, no UI, **no device pass
+owed**. **Amd4-OQ1 is answered in code** — `RecipeBrowserQuery` indexes variation names as text aliases and does
+**not** expand related-recipe edges. Once #299 merges, **S2** draws the surface (search field, selection chips,
+ranked facets, expandable values, results, sort, clear); *batchable with S3 if S1 lands clean.* See "Prior
+candidates" for the rest.
 
 - **Chat uniformity is cross-surface, not cross-device** — do **not** "unify" the sheet-vs-inspector header split.
   That divergence is intended and now the *only* wide/compact chat difference left.
@@ -60,12 +68,12 @@ edges is this ADR's call). See "Prior candidates" for the rest.
 ADR-0021 variation arc is COMPLETE** (all shipped, DONE-LOG), and per-recipe facet/tag coverage is Jon's ongoing
 hand work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**. Live candidates:
 
-- **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser S1.** All the facet infrastructure it
-  needs is shipped (facets, editable membership, the deterministic floor, the three coverage views). Its old
-  "wait until primary facets classify a majority of the library" gate is **retired** — the manual backfill no
-  longer gates anything (Jon, 2026-08-05). Needs its own scoping pass. (**Amd4-OQ1** — whether `RecipeBrowserQuery`
-  indexes variation names / related-recipe edges is this ADR's call; list/browser indexing stays unchanged until
-  it decides.)
+- **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser — S1 in review (PR
+  [#299](https://github.com/jonphillips/yes-chef/pull/299)), see Next Up.** Remaining after it merges: **S2** (the
+  iPad/macOS surface, batchable with S3), **S3** (attribute/source/usage filters with type-appropriate controls),
+  and **S3.5** (re-point `RecipeActiveFilterBar` onto the engine — a *deletion*; acceptance test is "the phone
+  list and the browser now agree on what a selection means"). The old "wait until primary facets classify a
+  majority of the library" gate is **retired** (Jon, 2026-08-05).
 
 - **[ADR-0052](decisions/ADR-0052-grocery-learned-area-table.md) S3 (not designated):** repoint ADR-0037's
   seed-coverage view to **audit** the `.model` rows (amends, never deletes). The rest of ADR-0052 is shipped and
