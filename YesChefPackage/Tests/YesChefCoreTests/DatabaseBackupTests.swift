@@ -321,7 +321,10 @@ struct DatabaseBackupTests {
       )
     }
     // Keep this fixture exactly the migrations listed here behind the current schema.
-    // Update this tail when it changes.
+    // Update this tail whenever a `registerMigration(...)` is appended in
+    // YesChefCore/Schema.swift — this list must end at the last one registered there
+    // (the current schema head). The suffix guard below fails loudly if it drifts, so a
+    // sim-less run that can't execute the full restore still catches a stale fixture.
     //
     // The four "workbench references" repairs are guarded no-ops against a clean
     // workbenchReferences table (each acts only when pragma_table_info shows a missing or
@@ -339,7 +342,16 @@ struct DatabaseBackupTests {
       "Reconcile late-added workbench references columns",
       "Drop orphaned kind column from workbench references",
       "Drop all non-model columns from workbench references",
+      "Create learned grocery area assignments",
+      "Create related recipe edges",
     ]
+    // Guard against fixture drift without running the full restore: the source database's
+    // grdb_migrations table is the migrator's actual ordered identifier list, so this tail
+    // must be its exact suffix (which also pins the last element to the registered head).
+    let allRegisteredMigrations = try await sourceDatabase.read { db in
+      try String.fetchAll(db, sql: "SELECT identifier FROM grdb_migrations ORDER BY rowid ASC")
+    }
+    #expect(Array(allRegisteredMigrations.suffix(migrationsToReplay.count)) == migrationsToReplay)
     #expect(latestMigrationIdentifier == migrationsToReplay.last)
     try await backupDatabase.write { db in
       try db.execute(sql: "DROP TABLE facets")
@@ -349,6 +361,8 @@ struct DatabaseBackupTests {
       try db.execute(sql: "ALTER TABLE aiHandoffs DROP COLUMN regenerates")
       try db.execute(sql: "DROP TABLE recipeServeWith")
       try db.execute(sql: "ALTER TABLE categories DROP COLUMN color")
+      try db.execute(sql: #"DROP TABLE "groceryAreaAssignments""#)
+      try db.execute(sql: #"DROP TABLE "recipeRelatedRecipes""#)
       for migration in migrationsToReplay {
         try db.execute(sql: "DELETE FROM grdb_migrations WHERE identifier = ?", arguments: [migration])
       }
