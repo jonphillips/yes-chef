@@ -30,6 +30,13 @@ prod-schema promotion list, Verification Pattern, nothing else. Completed-slice 
 background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do **not** read it on a dispatch).
 `docs/AGENTS.md` remains the authoritative project/agent guide.
 
+**Invariant — no completed work in Next Up or Ready Efforts.** The moment a slice merges, its blurb is
+**deleted here** and the record moves to [`DONE-LOG.md`](DONE-LOG.md); an item may keep at most its *one live
+follow-on thread* (trimmed to that thread, not the recap). Shipped work is **named** only in two places:
+**Standing guards** (as "don't re-queue this") and **Device passes owed** (the pass *is* the work). "Clean up
+this file" **means run that sweep** — `grep -niE 'complete|shipped|done|device-passed' docs/CURRENT_HANDOFF.md`,
+and every hit outside those two sections is a removal candidate — not merely fix statuses in place.
+
 ## Next Up
 
 **No designated target — Jon picks from the queue after the ADR-0046 device passes.** The whole
