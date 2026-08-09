@@ -145,6 +145,45 @@ public struct RecipeBrowserVariation: Equatable, Sendable {
   }
 }
 
+/// The observed inputs to the Power Browser. Keeping this as a `FetchKeyRequest` value lets the
+/// app surface re-run the pure engine whenever recipe, taxonomy, source, or variation data changes.
+public struct RecipeBrowserData: Equatable, Sendable {
+  public var recipes: [RecipeBrowserRecipe]
+  public var recipeCategories: [RecipeCategory]
+  public var categories: [Category]
+  public var facets: [Facet]
+  public var sources: [RecipeBrowserSource]
+  public var variations: [RecipeBrowserVariation]
+
+  public init(
+    recipes: [RecipeBrowserRecipe],
+    recipeCategories: [RecipeCategory],
+    categories: [Category],
+    facets: [Facet],
+    sources: [RecipeBrowserSource] = [],
+    variations: [RecipeBrowserVariation] = []
+  ) {
+    self.recipes = recipes
+    self.recipeCategories = recipeCategories
+    self.categories = categories
+    self.facets = facets
+    self.sources = sources
+    self.variations = variations
+  }
+
+  public func result(for query: RecipeBrowserQuery) -> RecipeBrowserResult {
+    RecipeBrowserEngine(
+      recipes: recipes,
+      recipeCategories: recipeCategories,
+      categories: categories,
+      facets: facets,
+      sources: sources,
+      variations: variations
+    )
+    .result(for: query)
+  }
+}
+
 public struct RecipeBrowserEngine: Sendable {
   private let recipesByID: [Recipe.ID: RecipeBrowserRecipe]
   private let recipeCategoryIDsByRecipeID: [Recipe.ID: Set<Category.ID>]
@@ -242,7 +281,12 @@ public struct RecipeBrowserEngine: Sendable {
         $0.isSelected || ($0.matchingRecipeCount > 0 && $0.matchingRecipeCount != matchingRecipeIDs.count)
       }
       let viableValues = displayedValues.filter { $0.matchingRecipeCount > 0 }
-      guard viableValues.count >= 2 else { return nil }
+      // A facet is worth showing as long as *one* value still partitions the result (D4). A
+      // single populated value — e.g. the one Beef recipe among 67 Korean ones — is a valid
+      // narrowing, so requiring two would hide useful drilldowns on a sparsely classified
+      // library. The second guard still drops a facet whose only viable value covers the whole
+      // result and therefore divides nothing.
+      guard !viableValues.isEmpty else { return nil }
       guard viableValues.contains(where: { $0.matchingRecipeCount != matchingRecipeIDs.count }) else { return nil }
       let largestValueCount = viableValues.map(\.matchingRecipeCount).max() ?? 0
       return RecipeBrowserResult.FacetAvailability(
@@ -439,6 +483,14 @@ public struct RecipeBrowserEngine: Sendable {
 
 public extension RecipeRepository {
   static func browserResult(for query: RecipeBrowserQuery, in db: Database) throws -> RecipeBrowserResult {
+    try RecipeBrowserDataRequest().fetch(db).result(for: query)
+  }
+}
+
+public struct RecipeBrowserDataRequest: FetchKeyRequest {
+  public init() {}
+
+  public func fetch(_ db: Database) throws -> RecipeBrowserData {
     let recipes = try Recipe
       .select {
         RecipeBrowserRecipeRow.Columns(
@@ -481,7 +533,7 @@ public extension RecipeRepository {
       }
       .fetchAll(db)
       .map { RecipeBrowserVariation(recipeID: $0.recipeID, name: $0.name) }
-    return RecipeBrowserEngine(
+    return RecipeBrowserData(
       recipes: recipes,
       recipeCategories: try RecipeCategory.fetchAll(db),
       categories: try Category.fetchAll(db),
@@ -489,7 +541,6 @@ public extension RecipeRepository {
       sources: sources,
       variations: variations
     )
-    .result(for: query)
   }
 }
 

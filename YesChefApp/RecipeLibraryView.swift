@@ -12,6 +12,7 @@ struct AppContainer: View {
   @Dependency(\.handoffReviewCoordinator) private var handoffReviewCoordinator
   @State private var toastCenter: AppToastCenter
   @State private var recipeModel = RecipeLibraryModel()
+  @State private var powerBrowserModel = PowerBrowserModel()
   @State private var createRecipeModel = CreateRecipeModel()
   @State private var workbenchModel = WorkbenchLibraryModel()
   @State private var browserModel = BrowserModel()
@@ -49,6 +50,7 @@ struct AppContainer: View {
     AppMainLayout(
       horizontalSizeClass: horizontalSizeClass,
       recipeModel: recipeModel,
+      powerBrowserModel: powerBrowserModel,
       workbenchModel: workbenchModel,
       browserModel: browserModel,
       mealCalendarModel: mealCalendarModel,
@@ -451,6 +453,7 @@ struct RecipeListView: View {
       }
     }
     .navigationTitle("Recipes")
+    .toolbar(removing: .sidebarToggle)
     .searchable(
       text: $model.searchText,
       placement: .navigationBarDrawer(displayMode: .always),

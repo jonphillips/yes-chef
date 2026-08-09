@@ -82,9 +82,11 @@ mappings are cached, not recomputed per row.
 This is the whole product, and it is the only genuinely hard part of the implementation.
 
 **Availability.** A facet is shown when it can still meaningfully divide the surviving recipes. The initial rules
-are deterministic and dull on purpose: at least one surviving recipe carries a value; at least two viable values
-remain (or one that would exclude a meaningful share); selecting something would change the result; the facet is
-not already fully constrained; coverage is high enough not to mislead (D6). Ordering is **configured priority,
+are deterministic and dull on purpose: at least one surviving recipe carries a value; **at least one viable value
+still partitions the result** (a lone value that narrows the set — one Beef recipe among sixty-seven Korean ones —
+is a valid drilldown, so requiring two would hide useful narrowing on a sparsely classified library); selecting
+something would change the result; the facet is not already fully constrained (a single value covering the whole
+result divides nothing and is dropped); coverage is high enough not to mislead (D6). Ordering is **configured priority,
 then narrowing potential.** Information-gain or entropy scoring is a later refinement and needs data to be worth
 having; **the ranking must stay deterministic and testable** either way.
 
@@ -239,6 +241,12 @@ Nothing here is dispatchable until ADR-0049 Amd 2 is ratified and its data pass 
 
 ## Resolved
 
+- **OQ1 — the Power Browser lives as its own app-shell tab (closed 2026-08-09).** It is
+  neither a Library mode nor a sheet over the Library: browsing is a distinct task with a
+  simultaneous facets-and-results layout on iPad/macOS. The existing `Browser` tab remains the
+  web-capture workspace, so the Power Browser has its own clearly named entry point rather than
+  overloading capture navigation.
+
 - **OQ2 — the library filter bar stays, and becomes a preset over `RecipeBrowserQuery` (closed 2026-08-01).**
   The existing filter bar is good on the phone and is **not** being replaced as a surface. What it stops doing
   is computing filtering *itself*. Today `RecipeListRequest` fetches every recipe and
@@ -267,8 +275,6 @@ Nothing here is dispatchable until ADR-0049 Amd 2 is ratified and its data pass 
 
 ## Open
 
-- **OQ1 — where does the browser live in the shell?** A tab, the library's own mode, or a sheet over the
-  library. Interacts with ADR-0046 and should be decided with it, not before it.
 - **OQ3 — what is the coverage threshold in D6's gate, numerically?** Cannot be answered until D8's diagnostics
   measure the library. Deliberately left open rather than guessed.
 - **OQ5 — the typed `Recipe.cuisine` / `Recipe.course` fields are redundant with the Cuisine/Course facets, and
