@@ -6,15 +6,6 @@ import YesChefCore
 struct ChatSurfaceResolutionTests {
   @Test
   func preservesThePresentationContract() {
-    expectNoDifference(
-      ChatSurfaceResolution.DetentIdentity.calendar.rawValue,
-      "recipeChatWorkspaceDetent"
-    )
-    expectNoDifference(
-      Set(ChatSurfaceResolution.DetentIdentity.allCases.map(\.rawValue)).count,
-      3
-    )
-
     assertPresentation(
       .modalSheet,
       dismissal: .panelOwned,
@@ -26,12 +17,6 @@ struct ChatSurfaceResolutionTests {
       dismissal: .panelOwned,
       drawsEmbeddedHeader: true,
       panelOwnsActiveTierPropagation: true
-    )
-    assertPresentation(
-      .column(detent: .calendar),
-      dismissal: .hostOwned,
-      drawsEmbeddedHeader: true,
-      panelOwnsActiveTierPropagation: false
     )
   }
 

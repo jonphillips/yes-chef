@@ -3,11 +3,9 @@ import YesChefCore
 
 /// A host's complete contract with the shared chat panel.
 ///
-/// The three structural choices have no defaults. In particular, panel-owned presentations cannot
-/// omit their dismissal choice, while a column is explicitly embedded and host-owned.
+/// The structural choices have no defaults. Every presentation is panel-owned: the panel draws its
+/// own dismissal control, whether it is embedded (inspector) or modal (compact sheet).
 struct ChatSurface {
-  typealias DetentIdentity = ChatSurfaceResolution.DetentIdentity
-
   struct ChatStarter: Identifiable, Equatable {
     let id: String
     let title: String
@@ -32,7 +30,6 @@ struct ChatSurface {
   enum Presentation {
     case modalSheet(onDismiss: () -> Void)
     case embeddedHeader(onDismiss: () -> Void)
-    case column(detent: DetentIdentity)
 
     var drawsEmbeddedHeader: Bool {
       resolvedPresentation.drawsEmbeddedHeader
@@ -41,7 +38,6 @@ struct ChatSurface {
     var onDismiss: (() -> Void)? {
       switch self {
       case let .modalSheet(onDismiss), let .embeddedHeader(onDismiss): onDismiss
-      case .column: nil
       }
     }
 
@@ -53,7 +49,6 @@ struct ChatSurface {
       switch self {
       case .modalSheet: .modalSheet
       case .embeddedHeader: .embeddedHeader
-      case let .column(detent): .column(detent: detent)
       }
     }
   }

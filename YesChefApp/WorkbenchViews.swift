@@ -205,7 +205,7 @@ struct WorkbenchDetailView: View {
         WorkbenchCandidatePhotoPickerView(model: model)
       }
     }
-    .sheet(item: $model.destination.chat) { chatModel in
+    .sheet(item: isSplitEnabled ? .constant(nil) : $model.destination.chat) { chatModel in
       NavigationStack {
         RecipeChatPanel(
           chatModel: chatModel,
