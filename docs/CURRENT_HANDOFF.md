@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: August 8, 2026. **The entire ADR-0021 variation arc is COMPLETE** — V1–V3, Amendment 4
+Last updated: August 8, 2026 (evening). **The entire ADR-0021 variation arc is COMPLETE** — V1–V3, Amendment 4
 (V4a/V4b/V4c + Delete), and anchor-repair Dispatch 0/1/2 all shipped. The last pieces: **V4b** (the synced
 `recipeRelatedRecipes` edge table, PR [#293](https://github.com/jonphillips/yes-chef/pull/293)) + its
 delete-cascade / scoped-read follow-up (PR [#296](https://github.com/jonphillips/yes-chef/pull/296)), and
@@ -8,9 +8,12 @@ anchor-repair **Dispatch 2** (the in-app repair UI, PR [#294](https://github.com
 **Two device passes are owed — V4b sync and Dispatch 2 repair UI (see "Device passes owed").** Also recently
 shipped and archived to [`DONE-LOG.md`](DONE-LOG.md): **ADR-0053 S1/S2** (Create Recipe destination + issue pass,
 PRs #290/#291), **ADR-0052 S1+S2** (synced grocery learned-area table, PR #292), and the full **ADR-0049**
-facet/labeling arc (PRs #275–#282). **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) S1 (the
-sidebar-adaptable app-shell container) shipped 2026-08-08 (PR #297); Next Up advances to its S2 — the chat
-presentation merge** (gated on S1's device pass + Jon's inspector-vs-split call).
+facet/labeling arc (PRs #275–#282). **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) is fully
+built** — S1 (the sidebar-adaptable app-shell container) shipped 2026-08-08 (PR #297), and **S2 (the chat
+presentation merge) rides in PR [#298](https://github.com/jonphillips/yes-chef/pull/298)** with Jon's product
+call locked: **inspector everywhere on wide iPad** (not the detent split, not don't-merge), no Calendar/Workbench
+cold-start starters. **Both ADR-0046 device passes are owed** (see "Device passes owed"); Next Up advances past
+the whole ADR to the open queue.
 ⚠️ **A standing Codex-env gotcha:** the simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
 the app tests" is structural, not a regression — and it once *masked two genuinely red tests* (missing
 `bootstrapDatabase()` → `RecipeEditorModel`'s eager `@Fetch` tripped SQLiteData's blank-DB reporter), fixed by
@@ -29,24 +32,25 @@ background live in [`docs/DONE-LOG.md`](DONE-LOG.md) (read-rarely archive — do
 
 ## Next Up
 
-**S1 shipped** — the sidebar-adaptable app-shell container ([ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md),
-PR [#297](https://github.com/jonphillips/yes-chef/pull/297), 2026-08-08): one `TabView(.sidebarAdaptable)` replaces
-the compact/regular fork and collapses the four-way taxonomy to a single `AppSection`. Under Jon's dogfood;
-**device pass owed** (below). Archived to [`DONE-LOG.md`](DONE-LOG.md).
+**[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) is fully built — both slices in
+[`DONE-LOG.md`](DONE-LOG.md), two device passes owed (below).** S1 (the `TabView(.sidebarAdaptable)` shell, PR
+[#297](https://github.com/jonphillips/yes-chef/pull/297)) and S2 (the chat presentation merge, PR
+[#298](https://github.com/jonphillips/yes-chef/pull/298)) are done. **Jon's S2 product call is locked: inspector
+everywhere on wide iPad** — the bespoke `ChatWorkspaceSplit` detent/divider is retired and Calendar / Workbench
+Detail / Workbench Compare now use the same `.inspector` presentation Recipe already had; compact stays a modal
+sheet. The now-dead `.column` / `DetentIdentity` / host-owned-`Dismissal` contract was removed in the same PR.
+**No new designated target** — Jon picks from the queue below after the device pass.
 
-**Next Up → [ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) S2 — the chat presentation merge.**
-Briefed in [`efforts/sidebar-adaptable-shell.md`](efforts/sidebar-adaptable-shell.md). Reconcile the **three**
-surviving wide-width chat presentations (Recipe `.inspector` vs Calendar/Workbench `ChatWorkspaceSplit` detent vs
-Menu embedded) down to one. **Gated on two things:** S1's device pass, **and Jon's one product decision —
-inspector vs. detent split vs. don't-merge** (the brief lays out A/B/C; Codex cannot choose it). View-layer only,
-no contract/catalog/schema change; compact stays a modal sheet.
+**Leading queue candidate → [ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser S1.** All the
+facet infrastructure it needs is shipped; its old backfill gate is retired (Jon, 2026-08-05). **Needs its own
+scoping pass before dispatch** (Amd4-OQ1 — whether `RecipeBrowserQuery` indexes variation names / related-recipe
+edges is this ADR's call). See "Prior candidates" for the rest.
 
-- **Chat uniformity is cross-surface, not cross-device** — do **not** "unify" the sheet-vs-column header split.
-- **ADR-0045 cold-start starters ride alongside:** decide whether the Calendar day-header Chat and the Workbench
-  Chat want their own starters *before* S2 rearranges them; they pass `.none` today — an explicit answer.
-
-**Verify** per [[lean-verification-default]]: one elevated `generic/platform=iOS` build (**`xcodegen generate` if
-it adds `YesChefApp/` files**), `scripts/check-drift.sh`, and **`YesChefTests`** (app-layer models/bindings are touched).
+- **Chat uniformity is cross-surface, not cross-device** — do **not** "unify" the sheet-vs-inspector header split.
+  That divergence is intended and now the *only* wide/compact chat difference left.
+- **ADR-0045 cold-start starters are still open, no longer time-gated:** S2 rearranged the Calendar day-header
+  Chat and the Workbench Chat into inspectors and left them passing `.none`. Whether they want their own starters
+  ("Plan this week" / "What should I prep tonight?") is Jon's call whenever — it no longer blocks anything.
 
 ---
 
@@ -124,10 +128,12 @@ section is work.**
   corollary: a conjecture suppresses learnings, a **cooked** experiment is findings, so learnings come back
   on). That amendment gets written when that half is scoped, **deliberately not now.**
 - **Chat entry points are unified and closed** ([`efforts/chat-ask-uniformity.md`](efforts/chat-ask-uniformity.md),
-  PR #244). Uniformity is **cross-surface, not cross-device**: modal sheets keep the iOS nav bar; embedded and
-  column presentations keep the in-panel header row. **That divergence is intended — do not "unify" it.** The
-  Calendar/Workbench detent split and the Recipe inspector belong to **ADR-0046 S2** (now briefed in
-  [`efforts/sidebar-adaptable-shell.md`](efforts/sidebar-adaptable-shell.md); Jon locks inspector-vs-split first).
+  PR #244), and **ADR-0046 S2 (PR #298) closed the presentation half too** — every wide-width surface (Recipe,
+  Calendar, Workbench Detail, Workbench Compare) is now the **`.inspector`** presentation; compact stays a modal
+  sheet. Uniformity is **cross-surface, not cross-device**: modal sheets keep the iOS nav bar, embedded/inspector
+  presentations keep the in-panel header row. **That divergence is intended — do not "unify" it.** The old
+  `ChatWorkspaceSplit` detent/divider and the `.column`/`DetentIdentity` contract are **deleted; do not resurrect
+  them.**
 
 ## Ready Efforts (queue)
 
@@ -158,14 +164,15 @@ one key, so any of those recipes on a menu puts "Gather your ingredient" on the 
 - **P2 (Milk Street's all-caps) is DECLINED**; P3's Amd1-D1 dependency is now discharged (shipped 2026-07-28)
   but it stays parked behind the declined P2. Don't build either on momentum.
 
-**[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell — is now the
-designated Next Up (see above).**
+**[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) — the sidebar-adaptable app shell — is fully
+built (S1 PR #297 + S2 PR #298), both in [`DONE-LOG.md`](DONE-LOG.md); only the two device passes remain (below).**
 
 **ADR-0045 leftovers — two cold-start entry points, each its own small slice.** The meal-calendar day-header
 Chat and the Workbench Chat, same dead end, no section to carry. Recorded in the ADR, deliberately not folded
 into V1. **Open for Jon:** now that starters are host-supplied, do the Calendar and Workbench want starters of
-their own ("Plan this week", "What should I prep tonight?")? They pass `.none` today, which is an explicit
-answer rather than an omission — worth deciding before ADR-0046 rearranges these surfaces.
+their own ("Plan this week", "What should I prep tonight?")? **ADR-0046 S2 has now rearranged both into
+inspectors and left them passing `.none`** — an explicit answer, not an omission — so the timing pressure is
+gone; decide whenever, it blocks nothing.
 
 **ADR-0041 deferred follow-ons** (on the record, **not** dispatchable without Jon scoping them) — the **menu**
 Playbook sections getting the same per-section toolbar, and section-selection checkboxes on the whole-recipe
@@ -242,6 +249,15 @@ Exercise the S1 review-fix surfaces specifically: **Calendar** renders (was blan
 **Create Recipe** shows its Save/Clear and a save round-trips, the menu/workbench deep-links + `openMenuFromCalendar`
 land, and the full-screen cook/recipe covers still present over the `TabView`. Jon's early check looked good;
 this confirms it.
+
+**ADR-0046 S2 — the chat presentation merge (PR [#298](https://github.com/jonphillips/yes-chef/pull/298)), no
+schema.** On **wide iPad**, open Ask in **Recipe, Calendar (workspace + day header), Workbench Detail, and
+Workbench Compare** — each should open the **inspector** (never a modal sheet on top), close cleanly, and
+propagate the workbench tier to Compare; on **compact iPhone** each still opens the modal sheet. **Exercise the
+review fix directly:** on wide iPad tap Ask in **Workbench Detail** and confirm you get the inspector *only* (the
+double-presentation bug was the compact sheet firing alongside it). Verify the live-context refresh — edit a
+workbench while its chat inspector is open and the chat's context updates without dropping the transcript. Both
+physical devices × both sidebar and tab-bar modes.
 
 **ADR-0021 Amendment 4 V4b (PR [#293](https://github.com/jonphillips/yes-chef/pull/293)) — the two-device
 `recipeRelatedRecipes` sync pass.** A new synced table: verify a link/unlink round-trips across
