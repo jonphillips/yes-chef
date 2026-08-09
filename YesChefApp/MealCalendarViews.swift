@@ -9,34 +9,32 @@ struct MealCalendarWorkspaceView: View {
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
   var isFocusActive = false
   var focusButtonTapped: (() -> Void)?
-  @State private var chatToggleRequest = 0
-  @State private var compactChatModel: RecipeChatModel?
+  @State private var chatModel: RecipeChatModel?
 
   var body: some View {
-    Group {
-      if isChatWorkspaceEnabled {
-        ChatWorkspaceSplit(
-          context: mealPlanChatContext,
-          detentIdentity: .calendar,
-          toggleRequest: chatToggleRequest,
-          applyActions: { chatModel in model.applyActionCatalog(for: chatModel) }
-        ) {
-          calendarContent
-        }
-      } else {
-        calendarContent
-      }
+    calendarContent
+    .recipeChatInspector(
+      chatModel: $chatModel,
+      isEnabled: isChatInspectorEnabled
+    ) { panelModel in
+      .calendarWorkspaceInspector(
+        content: .init(applyActions: model.applyActionCatalog(for: panelModel)),
+        onDismiss: { chatModel = nil }
+      )
     }
-    .sheet(item: $compactChatModel) { chatModel in
+    .sheet(item: isChatInspectorEnabled ? .constant(nil) : $chatModel) { panelModel in
       NavigationStack {
         RecipeChatPanel(
-          chatModel: chatModel,
+          chatModel: panelModel,
           surface: .calendarCompactSheet(
-            content: .init(applyActions: model.applyActionCatalog(for: chatModel)),
-            onDismiss: { compactChatModel = nil }
+            content: .init(applyActions: model.applyActionCatalog(for: panelModel)),
+            onDismiss: { chatModel = nil }
           )
         )
       }
+    }
+    .onChange(of: mealPlanChatContext) { _, context in
+      chatModel?.updateContext(context)
     }
     .navigationTitle("Meal Calendar")
     .toolbar {
@@ -87,17 +85,15 @@ struct MealCalendarWorkspaceView: View {
     )
   }
 
-  private var isChatWorkspaceEnabled: Bool {
+  private var isChatInspectorEnabled: Bool {
     WideLayout.isEnabled(horizontalSizeClass: horizontalSizeClass)
   }
 
   private func chatButtonTapped() {
-    if isChatWorkspaceEnabled {
-      chatToggleRequest += 1
-    } else if compactChatModel != nil {
-      compactChatModel = nil
+    if chatModel != nil {
+      chatModel = nil
     } else {
-      compactChatModel = RecipeChatModel(context: mealPlanChatContext)
+      chatModel = RecipeChatModel(context: mealPlanChatContext)
     }
   }
 

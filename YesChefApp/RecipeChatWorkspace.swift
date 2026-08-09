@@ -4,192 +4,57 @@ import SwiftUI
 import UIKit
 import YesChefCore
 
-enum ChatWorkspaceDetent: String, CaseIterable {
-  case readerOnly
-  case balanced
-  case chatDive
+enum ChatInspectorMetrics {
+  // Matches the established Menu recipe-browser inspector range so companion panels
+  // keep a readable, non-dominating width across regular iPad layouts.
+  static let minimumWidth: CGFloat = 320
+  static let idealWidth: CGFloat = 380
+  static let maximumWidth: CGFloat = 480
+}
 
-  var title: String {
-    switch self {
-    case .readerOnly: "Reader Only"
-    case .balanced: "Balanced"
-    case .chatDive: "Chat Dive"
-    }
+private struct ChatInspectorPresentationModifier: ViewModifier {
+  @Binding var chatModel: RecipeChatModel?
+  let isEnabled: Bool
+  let surface: (RecipeChatModel) -> ChatSurface
+
+  func body(content: Content) -> some View {
+    content
+      .inspector(isPresented: isPresented) {
+        if let chatModel {
+          RecipeChatPanel(chatModel: chatModel, surface: surface(chatModel))
+            .inspectorColumnWidth(
+              min: ChatInspectorMetrics.minimumWidth,
+              ideal: ChatInspectorMetrics.idealWidth,
+              max: ChatInspectorMetrics.maximumWidth
+            )
+        }
+      }
   }
 
-  var next: Self {
-    switch self {
-    case .readerOnly: .balanced
-    case .balanced: .chatDive
-    case .chatDive: .readerOnly
-    }
-  }
-
-  var previous: Self {
-    switch self {
-    case .readerOnly: .chatDive
-    case .balanced: .readerOnly
-    case .chatDive: .balanced
-    }
+  private var isPresented: Binding<Bool> {
+    Binding(
+      get: { isEnabled && chatModel != nil },
+      set: { isPresented in
+        guard !isPresented else { return }
+        chatModel = nil
+      }
+    )
   }
 }
 
-struct ChatWorkspaceSplit<Reader: View>: View {
-  let context: RecipeChatContext
-  let detentIdentity: ChatSurface.DetentIdentity
-  let toggleRequest: Int
-  let activeTierChanged: (ModelTier) -> Void
-  let applyActions: (RecipeChatModel) -> [AnyChatApplyAction]
-  let reader: Reader
-
-  @AppStorage private var detentRaw: String
-  @State private var chatModel: RecipeChatModel
-  @GestureState private var dragTranslation: CGFloat = 0
-
-  init(
-    context: RecipeChatContext,
-    detentIdentity: ChatSurface.DetentIdentity,
-    toggleRequest: Int = 0,
-    activeTierChanged: @escaping (ModelTier) -> Void = { _ in },
-    applyActions: @escaping (RecipeChatModel) -> [AnyChatApplyAction],
-    @ViewBuilder reader: () -> Reader
-  ) {
-    self.context = context
-    self.detentIdentity = detentIdentity
-    self.toggleRequest = toggleRequest
-    self.activeTierChanged = activeTierChanged
-    self.applyActions = applyActions
-    self.reader = reader()
-    _detentRaw = AppStorage(
-      wrappedValue: ChatWorkspaceDetent.balanced.rawValue,
-      detentIdentity.rawValue
+extension View {
+  func recipeChatInspector(
+    chatModel: Binding<RecipeChatModel?>,
+    isEnabled: Bool,
+    surface: @escaping (RecipeChatModel) -> ChatSurface
+  ) -> some View {
+    modifier(
+      ChatInspectorPresentationModifier(
+        chatModel: chatModel,
+        isEnabled: isEnabled,
+        surface: surface
+      )
     )
-    _chatModel = State(wrappedValue: RecipeChatModel(context: context))
-  }
-
-  var body: some View {
-    GeometryReader { proxy in
-      let detent = currentDetent
-      let baseChatWidth = chatWidth(for: detent, totalWidth: proxy.size.width)
-      let liveChatWidth = proposedChatWidth(
-        base: baseChatWidth,
-        translation: dragTranslation,
-        totalWidth: proxy.size.width
-      )
-
-      HStack(spacing: 0) {
-        reader
-          .frame(width: readerWidth(totalWidth: proxy.size.width, chatWidth: liveChatWidth))
-          .clipped()
-
-        ChatWorkspaceDivider(detent: detent) {
-          cycleDetent()
-        } decrement: {
-          currentDetent = detent.previous
-        } increment: {
-          currentDetent = detent.next
-        }
-        .simultaneousGesture(
-          DragGesture(minimumDistance: 2)
-            .updating($dragTranslation) { value, state, _ in
-              state = value.translation.width
-            }
-            .onEnded { value in
-              let proposed = proposedChatWidth(
-                base: baseChatWidth,
-                translation: value.translation.width,
-                totalWidth: proxy.size.width
-              )
-              currentDetent = nearestDetent(toChatWidth: proposed, totalWidth: proxy.size.width)
-            }
-        )
-
-        if liveChatWidth > 1 {
-          RecipeChatPanel(
-            chatModel: chatModel,
-            surface: chatSurface
-          )
-          .frame(width: liveChatWidth)
-          .transition(.move(edge: .trailing).combined(with: .opacity))
-        }
-      }
-      .animation(.snappy(duration: 0.22), value: currentDetent)
-      .frame(width: proxy.size.width, height: proxy.size.height, alignment: .leading)
-    }
-    .onChange(of: context) { _, context in
-      chatModel.updateContext(context)
-    }
-    .onAppear {
-      activeTierChanged(chatModel.activeTier)
-    }
-    .onChange(of: chatModel.activeTier) { _, tier in
-      activeTierChanged(tier)
-    }
-    .onChange(of: toggleRequest) { _, _ in
-      currentDetent = currentDetent == .readerOnly ? .balanced : .readerOnly
-    }
-  }
-
-  private var chatSurface: ChatSurface {
-    let content = ChatSurface.Content(applyActions: applyActions(chatModel))
-    switch detentIdentity {
-    case .calendar:
-      return ChatSurface.calendarWorkspaceColumn(content: content)
-    case .workbenchDetail:
-      return ChatSurface.workbenchDetailColumn(content: content)
-    case .workbenchCompare:
-      return ChatSurface.workbenchCompareColumn(content: content)
-    }
-  }
-
-  private var currentDetent: ChatWorkspaceDetent {
-    get {
-      ChatWorkspaceDetent(rawValue: detentRaw) ?? .balanced
-    }
-    nonmutating set {
-      detentRaw = newValue.rawValue
-    }
-  }
-
-  private func readerWidth(totalWidth: CGFloat, chatWidth: CGFloat) -> CGFloat {
-    max(0, totalWidth - ChatWorkspaceDivider.dividerWidth - chatWidth)
-  }
-
-  private func proposedChatWidth(base: CGFloat, translation: CGFloat, totalWidth: CGFloat) -> CGFloat {
-    let maximum = max(0, totalWidth - ChatWorkspaceDivider.dividerWidth - ChatWorkspaceMetrics.minimumSegmentedReaderWidth)
-    return min(max(base - translation, 0), maximum)
-  }
-
-  private func chatWidth(for detent: ChatWorkspaceDetent, totalWidth: CGFloat) -> CGFloat {
-    let available = max(0, totalWidth - ChatWorkspaceDivider.dividerWidth)
-    switch detent {
-    case .readerOnly:
-      return 0
-    case .balanced:
-      return min(
-        max(totalWidth * ChatWorkspaceMetrics.balancedWidthFraction, ChatWorkspaceMetrics.balancedMinimumChatWidth),
-        min(
-          ChatWorkspaceMetrics.balancedMaximumChatWidth,
-          available * ChatWorkspaceMetrics.balancedAvailableWidthLimit
-        )
-      )
-    case .chatDive:
-      return min(
-        max(totalWidth * ChatWorkspaceMetrics.chatDiveWidthFraction, ChatWorkspaceMetrics.chatDiveMinimumChatWidth),
-        available
-      )
-    }
-  }
-
-  private func nearestDetent(toChatWidth chatWidth: CGFloat, totalWidth: CGFloat) -> ChatWorkspaceDetent {
-    ChatWorkspaceDetent.allCases.min { lhs, rhs in
-      abs(self.chatWidth(for: lhs, totalWidth: totalWidth) - chatWidth)
-        < abs(self.chatWidth(for: rhs, totalWidth: totalWidth) - chatWidth)
-    } ?? .balanced
-  }
-
-  private func cycleDetent() {
-    currentDetent = currentDetent.next
   }
 }
 

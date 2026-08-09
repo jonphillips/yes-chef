@@ -241,14 +241,6 @@ struct RecipeDetailView: View {
   }
 }
 
-private enum RecipeAskSlideOverMetrics {
-  // Matches the established Menu recipe-browser inspector range so companion panels
-  // keep a readable, non-dominating width across regular iPad layouts.
-  static let minimumWidth: CGFloat = 320
-  static let idealWidth: CGFloat = 380
-  static let maximumWidth: CGFloat = 480
-}
-
 private struct RecipeAskPresentationModifier: ViewModifier {
   let model: RecipeDetailModel
   let isSplitEnabled: Bool
@@ -310,9 +302,9 @@ private struct RecipeAskPresentationModifier: ViewModifier {
       )
     )
     .inspectorColumnWidth(
-      min: RecipeAskSlideOverMetrics.minimumWidth,
-      ideal: RecipeAskSlideOverMetrics.idealWidth,
-      max: RecipeAskSlideOverMetrics.maximumWidth
+      min: ChatInspectorMetrics.minimumWidth,
+      ideal: ChatInspectorMetrics.idealWidth,
+      max: ChatInspectorMetrics.maximumWidth
     )
   }
 }

@@ -156,50 +156,23 @@ struct WorkbenchDetailView: View {
   var body: some View {
     @Bindable var model = model
 
-    Group {
-      if let detail = model.detail {
-        Group {
-          if isSplitEnabled, let chatContext = model.chatContext {
-            ChatWorkspaceSplit(
-              context: .workbench(chatContext),
-              detentIdentity: .workbenchDetail,
-              activeTierChanged: { compareTier = $0 },
-              applyActions: { chatModel in
-                model.applyActionCatalog(for: chatModel)
-              }
-            ) {
-              WorkbenchReader(
-                model: model,
-                detail: detail,
-                handoffTransport: handoffTransport,
-                compareButtonTapped: {
-                  await openCompare(detail: detail)
-                }
-              )
-            }
-          } else {
-            WorkbenchReader(
-              model: model,
-              detail: detail,
-              handoffTransport: handoffTransport,
-              compareButtonTapped: {
-                await openCompare(detail: detail)
-              }
-            )
-          }
-        }
-        .navigationTitle(detail.workbench.title)
-      } else {
-        ContentUnavailableView("Workbench Not Found", systemImage: "hammer")
-      }
+    readerContent
+    .recipeChatInspector(
+      chatModel: $model.destination.chat,
+      isEnabled: isSplitEnabled
+    ) { chatModel in
+      .workbenchDetailInspector(
+        content: .init(
+          applyActions: model.applyActionCatalog(for: chatModel),
+          activeTierChanged: { compareTier = $0 }
+        ),
+        onDismiss: { model.destination = nil }
+      )
     }
-    // Keyed on both inputs: the split turning on (a size-class change on iPad) needs the first load, and
-    // every workbench write bumps `dateModified`, which is what keeps `ChatWorkspaceSplit`'s live
-    // `onChange(of: context)` firing without a standing full-extract fetch.
-    .task(id: isSplitEnabled ? model.detail?.workbench.dateModified : nil) {
-      if isSplitEnabled {
-        _ = await model.loadChatContext()
-      }
+    // Each workbench write bumps `dateModified`. Refresh an open chat's context, preserving the
+    // prior split's live transcript updates without fetching merely to render a closed inspector.
+    .task(id: model.detail?.workbench.dateModified) {
+      await refreshOpenChatContext()
     }
     .toolbar {
       if model.detail != nil {
@@ -214,12 +187,10 @@ struct WorkbenchDetailView: View {
           } label: {
             Label("Add Candidates", systemImage: "plus")
           }
-          if !isSplitEnabled {
-            Button {
-              model.chatButtonTapped()
-            } label: {
-              Label("Ask", systemImage: "sparkles")
-            }
+          Button {
+            model.chatButtonTapped()
+          } label: {
+            Label("Ask", systemImage: "sparkles")
           }
         }
       }
@@ -234,7 +205,7 @@ struct WorkbenchDetailView: View {
         WorkbenchCandidatePhotoPickerView(model: model)
       }
     }
-    .sheet(item: $model.destination.chat) { chatModel in
+    .sheet(item: isSplitEnabled ? .constant(nil) : $model.destination.chat) { chatModel in
       NavigationStack {
         RecipeChatPanel(
           chatModel: chatModel,
@@ -292,8 +263,8 @@ struct WorkbenchDetailView: View {
           : "This deletes the draft working recipe so you can draft a new one. This can't be undone."
       )
     }
-    // Full-screen focus cover on regular-width iPad (no third pane — the chat split owns the detail);
-    // a sheet on compact iPhone. Same responsive Compare view either way.
+    // Full-screen focus cover on regular-width iPad; a sheet on compact iPhone.
+    // The Compare view owns the same inspector/sheet adaptation as the detail reader.
     .fullScreenCover(
       isPresented: isRegularWidth ? $model.isShowingCompare : .constant(false)
     ) {
@@ -315,33 +286,32 @@ struct WorkbenchDetailView: View {
 
   @ViewBuilder private var compareCover: some View {
     if let detail = model.detail {
-      if isRegularWidth, let chatContext = model.chatContext {
-        ChatWorkspaceSplit(
-          context: .workbench(chatContext),
-          detentIdentity: .workbenchCompare,
-          activeTierChanged: { compareTier = $0 },
-          applyActions: { chatModel in
-            model.applyActionCatalog(for: chatModel)
-          }
-        ) {
-          WorkbenchCompareView(
-            detail: detail,
-            alignmentModel: model.compareAlignmentModel,
-            tier: compareTier
-          )
+      WorkbenchCompareView(
+        detail: detail,
+        alignmentModel: model.compareAlignmentModel,
+        tier: compareTier,
+        chatContext: model.chatContext.map { .workbench($0) },
+        chatActiveTierChanged: { compareTier = $0 },
+        chatApplyActions: { chatModel in
+          model.applyActionCatalog(for: chatModel)
         }
-      } else {
-        WorkbenchCompareView(
-          detail: detail,
-          alignmentModel: model.compareAlignmentModel,
-          tier: compareTier,
-          compactChatContext: model.chatContext.map { .workbench($0) },
-          compactChatActiveTierChanged: { compareTier = $0 },
-          compactApplyActions: { chatModel in
-            model.applyActionCatalog(for: chatModel)
-          }
-        )
-      }
+      )
+    }
+  }
+
+  @ViewBuilder private var readerContent: some View {
+    if let detail = model.detail {
+      WorkbenchReader(
+        model: model,
+        detail: detail,
+        handoffTransport: handoffTransport,
+        compareButtonTapped: {
+          await openCompare(detail: detail)
+        }
+      )
+      .navigationTitle(detail.workbench.title)
+    } else {
+      ContentUnavailableView("Workbench Not Found", systemImage: "hammer")
     }
   }
 
@@ -352,6 +322,13 @@ struct WorkbenchDetailView: View {
     )
     _ = await model.loadChatContext()
     model.compareButtonTapped()
+  }
+
+  private func refreshOpenChatContext() async {
+    guard isSplitEnabled, case let .chat(chatModel)? = model.destination,
+          let context = await model.loadChatContext()
+    else { return }
+    chatModel.updateContext(.workbench(context))
   }
 
   private var isRegularWidth: Bool {

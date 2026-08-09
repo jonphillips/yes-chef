@@ -9,6 +9,37 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0046 S2 — the chat presentation merge
+
+**Built + architect-reviewed 2026-08-08; PR [#298](https://github.com/jonphillips/yes-chef/pull/298) (the doc bump
+rides in it). No schema. Jon's device pass owed.** The deferred second half of ADR-0046: with all eight sections
+now living in per-tab layouts, reconcile the wide-width chat presentations to one. **Jon's product call: inspector
+everywhere on wide iPad** (not the detent split, not don't-merge), and **no Calendar/Workbench cold-start
+starters** (they keep `.none`). The bespoke `ChatWorkspaceSplit` + `ChatWorkspaceDivider` + `ChatWorkspaceDetent`
+(reader-only/balanced/chat-dive draggable divider, its `@AppStorage` detents, the width math) is **deleted**;
+**Calendar, Workbench Detail, and Workbench Compare** now route through the same `.inspector` presentation Recipe
+already used, via a shared `recipeChatInspector` view modifier and `ChatInspectorMetrics` (which absorbs the old
+`RecipeAskSlideOverMetrics` 320/380/480 range). Compact iPhone still gets the modal sheet. **Tier propagation is
+preserved** — `.embeddedHeader` reports `panelOwnsActiveTierPropagation`, so `RecipeChatPanel` now drives
+`compareTier` from its own `onAppear`/`onChange(of: activeTier)` where the split used to; **live context refresh
+is preserved** (an open inspector's chat re-reads workbench context on each `dateModified` bump without a standing
+full-extract fetch).
+
+**Architect review caught a double-presentation defect the sim-less build could not.** S2 made the Workbench
+Detail **Ask** button unconditional (it was `if !isSplitEnabled` before), so on regular-width iPad tapping Ask now
+sets `destination.chat` *while the split is enabled* — but the pre-existing compact `.sheet(item:
+$model.destination.chat)` was left ungated, so the inspector **and** the modal sheet both presented over the same
+`RecipeChatModel`. Calendar and Compare already gated their fallback sheet with `isChatInspectorEnabled ?
+.constant(nil) : …`; Workbench Detail was the one that didn't. Fixed by the same guard
+(`isSplitEnabled ? .constant(nil) : $model.destination.chat`). **Folded in the same PR:** the now-unreachable
+chat-surface contract — `Presentation.column`, `ChatSurfaceResolution.DetentIdentity`, and the host-owned
+`Dismissal` case no factory can produce — was removed so the type stops advertising a presentation no host can
+construct ([[withdraw-not-defer-orphaned-schema]]). Verified: elevated generic iOS build green, `ChatSurface`/
+`ChatSurfaceResolution` tests green, `check-drift.sh` green except one **pre-existing, unrelated** red
+(`DatabaseBackupTests.restorePreparationForwardMigratesAGenuineNMinusOneBackup`, a migration test already failing
+on the branch head independent of this diff — flagged to Jon).
+
+---
 ## ADR-0046 S1 — the sidebar-adaptable app-shell container
 
 **Built + architect-reviewed + merged 2026-08-08; PR [#297](https://github.com/jonphillips/yes-chef/pull/297). No

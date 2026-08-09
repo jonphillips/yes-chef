@@ -3,11 +3,9 @@ import YesChefCore
 
 /// A host's complete contract with the shared chat panel.
 ///
-/// The three structural choices have no defaults. In particular, panel-owned presentations cannot
-/// omit their dismissal choice, while a column is explicitly embedded and host-owned.
+/// The structural choices have no defaults. Every presentation is panel-owned: the panel draws its
+/// own dismissal control, whether it is embedded (inspector) or modal (compact sheet).
 struct ChatSurface {
-  typealias DetentIdentity = ChatSurfaceResolution.DetentIdentity
-
   struct ChatStarter: Identifiable, Equatable {
     let id: String
     let title: String
@@ -32,7 +30,6 @@ struct ChatSurface {
   enum Presentation {
     case modalSheet(onDismiss: () -> Void)
     case embeddedHeader(onDismiss: () -> Void)
-    case column(detent: DetentIdentity)
 
     var drawsEmbeddedHeader: Bool {
       resolvedPresentation.drawsEmbeddedHeader
@@ -41,7 +38,6 @@ struct ChatSurface {
     var onDismiss: (() -> Void)? {
       switch self {
       case let .modalSheet(onDismiss), let .embeddedHeader(onDismiss): onDismiss
-      case .column: nil
       }
     }
 
@@ -53,7 +49,6 @@ struct ChatSurface {
       switch self {
       case .modalSheet: .modalSheet
       case .embeddedHeader: .embeddedHeader
-      case let .column(detent): .column(detent: detent)
       }
     }
   }
@@ -111,23 +106,19 @@ struct ChatSurface {
     )
   }
 
-  static func calendarWorkspaceColumn(content: Content) -> Self {
-    column(content: content, detent: .calendar)
+  static func calendarWorkspaceInspector(content: Content, onDismiss: @escaping () -> Void) -> Self {
+    inspector(content: content, onDismiss: onDismiss)
   }
 
-  static func workbenchDetailColumn(content: Content) -> Self {
-    column(content: content, detent: .workbenchDetail)
+  static func workbenchDetailInspector(content: Content, onDismiss: @escaping () -> Void) -> Self {
+    inspector(content: content, onDismiss: onDismiss)
   }
 
-  static func workbenchCompareColumn(content: Content) -> Self {
-    column(content: content, detent: .workbenchCompare)
+  static func workbenchCompareInspector(content: Content, onDismiss: @escaping () -> Void) -> Self {
+    inspector(content: content, onDismiss: onDismiss)
   }
 
   static func calendarCompactSheet(content: Content, onDismiss: @escaping () -> Void) -> Self {
-    sheet(content: content, onDismiss: onDismiss)
-  }
-
-  static func calendarDayCompactSheet(content: Content, onDismiss: @escaping () -> Void) -> Self {
     sheet(content: content, onDismiss: onDismiss)
   }
 
@@ -152,8 +143,8 @@ struct ChatSurface {
     )
   }
 
-  private static func column(content: Content, detent: DetentIdentity) -> Self {
-    Self(content: content, sections: .none, presentation: .column(detent: detent))
+  private static func inspector(content: Content, onDismiss: @escaping () -> Void) -> Self {
+    Self(content: content, sections: .none, presentation: .embeddedHeader(onDismiss: onDismiss))
   }
 
   private static func sheet(content: Content, onDismiss: @escaping () -> Void) -> Self {
