@@ -32,6 +32,39 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func anEmptyQueryOffersEveryDividingFacetWithSelfExcludingCounts() throws {
+      let fixture = BrowserFixture()
+
+      let result = fixture.engine.result(for: RecipeBrowserQuery())
+
+      expectNoDifference(result.matchingRecipeIDs.count, 4)
+      expectNoDifference(result.availableFacets.map(\.facet.id), [fixture.protein.id, fixture.cuisine.id])
+      let cuisineValues = try #require(result.availableFacets.first { $0.facet.id == fixture.cuisine.id }?.values)
+      expectNoDifference(cuisineValues.map(\.category.id), [fixture.korean.id, fixture.mexican.id])
+      expectNoDifference(cuisineValues.map(\.matchingRecipeCount), [2, 2])
+      let proteinValues = try #require(result.availableFacets.first { $0.facet.id == fixture.protein.id }?.values)
+      expectNoDifference(proteinValues.map(\.category.id), [fixture.beef.id, fixture.pork.id])
+      expectNoDifference(proteinValues.map(\.matchingRecipeCount), [2, 2])
+    }
+
+    @Test
+    func selectingOneFacetKeepsOtherFacetsAvailableWithNarrowedCounts() throws {
+      let fixture = BrowserFixture()
+
+      let result = fixture.engine.result(
+        for: RecipeBrowserQuery(
+          facetSelections: [.init(facetID: fixture.cuisine.id, categoryIDs: [fixture.korean.id])]
+        )
+      )
+
+      expectNoDifference(result.matchingRecipeIDs, [fixture.koreanBeef.id, fixture.koreanPork.id])
+      let proteinValues = try #require(result.availableFacets.first { $0.facet.id == fixture.protein.id }?.values)
+      expectNoDifference(proteinValues.map(\.category.id), [fixture.beef.id, fixture.pork.id])
+      expectNoDifference(proteinValues.map(\.matchingRecipeCount), [1, 1])
+      expectNoDifference(proteinValues.map(\.isSelected), [false, false])
+    }
+
+    @Test
     func selectingAFacetAncestorMatchesAssignmentsToItsDescendants() {
       let fixture = BrowserFixture()
       let engine = RecipeBrowserEngine(

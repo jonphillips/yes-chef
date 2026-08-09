@@ -223,10 +223,18 @@ public struct RecipeBrowserEngine: Sendable {
         for: selfExcludedRecipeIDs,
         facetID: facet.id
       )
+      // Self-excluding counts (D4): the base every value ORs into is the set of
+      // self-excluded recipes carrying a *currently selected* value of this facet
+      // — which is the full result when the facet is selected, and empty when it is
+      // not. Unioning against the whole result set instead collapses every count to
+      // |result| for any unselected facet, which hides the facet entirely.
+      let selectedMatchingRecipeIDs = selectedCategoryIDs.reduce(into: Set<Recipe.ID>()) { result, categoryID in
+        result.formUnion(matchingRecipeIDsByCategoryID[categoryID] ?? [])
+      }
       let values = (categoriesByFacetID[facet.id] ?? []).map { category in
         return RecipeBrowserResult.ValueAvailability(
           category: category,
-          matchingRecipeCount: matchingRecipeIDs.union(matchingRecipeIDsByCategoryID[category.id] ?? []).count,
+          matchingRecipeCount: selectedMatchingRecipeIDs.union(matchingRecipeIDsByCategoryID[category.id] ?? []).count,
           isSelected: selectedCategoryIDs.contains(category.id)
         )
       }
