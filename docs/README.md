@@ -46,6 +46,10 @@ change is migration-aware.
   discoverable."
 - [reviews/](reviews/) — architect review passes (historical and ongoing).
 
+## Operator setup
+
+- [CHATGPT-SETUP.md](CHATGPT-SETUP.md) — install and maintain Jon's shared `Yes Chef` ChatGPT Project; its version-controlled Project artifacts live in [chatgpt/](chatgpt/).
+
 ## House layer
 
 Yes Chef is the app-specific layer. The general "how Jon builds software" layer is
