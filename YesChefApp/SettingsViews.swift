@@ -40,13 +40,13 @@ struct SettingsView: View {
         categoryRow
         pantryRow
         archivedRecipesRow
+        facetCoverageRow
       }
 
       Section("Developer") {
         seedCoverageRow
 #if DEBUG
         modelCallInventoryRow
-        facetCoverageRow
 #endif
       }
 
@@ -301,6 +301,22 @@ struct SettingsView: View {
     }
   }
 
+  @ViewBuilder private var facetCoverageRow: some View {
+    if let selectedPane {
+      Button {
+        selectedPane.wrappedValue = .facetCoverage
+      } label: {
+        SettingsPane.facetCoverage.label
+      }
+      .foregroundStyle(.primary)
+    } else {
+      NavigationLink {
+        FacetCoverageView()
+      } label: {
+        SettingsPane.facetCoverage.label
+      }
+    }
+  }
 #if DEBUG
   @ViewBuilder private var modelCallInventoryRow: some View {
     if let selectedPane {
@@ -315,23 +331,6 @@ struct SettingsView: View {
         ModelCallInventoryView()
       } label: {
         SettingsPane.modelCallInventory.label
-      }
-    }
-  }
-
-  @ViewBuilder private var facetCoverageRow: some View {
-    if let selectedPane {
-      Button {
-        selectedPane.wrappedValue = .facetCoverage
-      } label: {
-        SettingsPane.facetCoverage.label
-      }
-      .foregroundStyle(.primary)
-    } else {
-      NavigationLink {
-        FacetCoverageView()
-      } label: {
-        SettingsPane.facetCoverage.label
       }
     }
   }
@@ -414,14 +413,14 @@ struct SettingsDetailPane: View {
       }
     case .seedCoverage:
       SeedCoverageView()
+    case .facetCoverage:
+      NavigationStack {
+        FacetCoverageView()
+      }
 #if DEBUG
     case .modelCallInventory:
       NavigationStack {
         ModelCallInventoryView()
-      }
-    case .facetCoverage:
-      NavigationStack {
-        FacetCoverageView()
       }
 #endif
     case nil:
