@@ -50,6 +50,7 @@ enum AppSection: String, CaseIterable, Identifiable {
   case groceries
   case mealCalendar
   case menus
+  case powerBrowser
   case browser
   case workbenches
   case settings
@@ -63,6 +64,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     case .groceries: "Groceries"
     case .mealCalendar: "Calendar"
     case .menus: "Menus"
+    case .powerBrowser: "Power Browser"
     case .browser: "Browser"
     case .workbenches: "Workbench"
     case .settings: "Settings"
@@ -74,6 +76,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     case .recipes: "book.closed"
     case .createRecipe: "square.and.pencil"
     case .workbenches: "hammer"
+    case .powerBrowser: "square.grid.2x2"
     case .browser: "safari"
     case .mealCalendar: "calendar"
     case .groceries: "cart"

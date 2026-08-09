@@ -10,6 +10,7 @@ struct AppMainLayout: View {
   // adapt automatically as their available width changes.
   let horizontalSizeClass: UserInterfaceSizeClass?
   let recipeModel: RecipeLibraryModel
+  let powerBrowserModel: PowerBrowserModel
   let workbenchModel: WorkbenchLibraryModel
   let browserModel: BrowserModel
   let mealCalendarModel: MealCalendarModel
@@ -36,6 +37,15 @@ struct AppMainLayout: View {
           groceryModel: groceryModel
         )
       }
+
+      Tab(
+        AppSection.powerBrowser.title,
+        systemImage: AppSection.powerBrowser.systemImage,
+        value: AppSection.powerBrowser
+      ) {
+        PowerBrowserView(model: powerBrowserModel, onRecipeSelected: onRecipeSelected)
+      }
+      .defaultVisibility(.hidden, for: .tabBar)
 
       Tab(
         AppSection.menus.title,

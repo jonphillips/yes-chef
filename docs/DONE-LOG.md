@@ -9,6 +9,26 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0050 S2 — Power Browser surface
+
+**Built 2026-08-09; PR [#301](https://github.com/jonphillips/yes-chef/pull/301). No schema. Jon's iPad device pass
+owed.** The Power Browser is now its own app-shell tab, deliberately distinct from the Safari web-capture Browser
+(ADR OQ1 resolved); it is hidden from the compact tab bar until S5 provides the phone presentation. Its balanced
+split keeps ranked, contextual facets alongside results: the top available facet opens initially so counts are
+immediately useful, selection chips use full hierarchy names to disambiguate values, and search, sort, Clear, and
+recipe-detail routing are all present. The balanced split is intentional: facets and results are peer working
+areas, rather than the master/detail pattern that needs a Focus visibility toggle.
+
+**The model owns the performance boundary.** `RecipeBrowserDataRequest` observes the engine's raw inputs;
+`PowerBrowserModel` rebuilds its `RecipeBrowserEngine` only when that `Equatable` data changes and memoizes the
+result for the current query. The view reads that result once and passes it to both panes, avoiding a duplicate
+engine construction and availability pass for each keystroke or chip toggle. Rich recipe rows remain separately
+observed and are mapped from engine result IDs. Focused model tests cover selection, Clear defaults, and one-time
+initial facet expansion; the existing S1 Core suite covers query semantics. Verified before review: `xcodegen
+generate`, targeted SwiftLint (0 violations), elevated generic iOS build, and `YesChefTests` (44 tests / 15 suites)
+all passed.
+
+---
 ## ADR-0046 S2 — the chat presentation merge
 
 **Built + architect-reviewed 2026-08-08; PR [#298](https://github.com/jonphillips/yes-chef/pull/298) (the doc bump
