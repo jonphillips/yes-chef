@@ -76,6 +76,18 @@ section is work.**
     source-specific but must edit the sink**; capture is a *named grandfathered exception*, **not a precedent**
     to cite. **Converging the two save paths is not queued work** — it needs a source that is both authored and
     externally identified, which does not exist yet.
+- **⚠️ [ADR-0053 Amd 2](decisions/ADR-0053-create-recipe-destination.md#amendment-2--a-headless-transport-shortcuts--app-intent-into-create-recipe-2026-08-10)
+  — the Shortcuts return path has ONE correct wiring; three traps are review blocks** (effort
+  [`shortcuts-return-path-create-recipe-2026-08-10.md`](efforts/shortcuts-return-path-create-recipe-2026-08-10.md),
+  Ready). A headless `CaptureRecipeFromText` App Intent lands clipboard text in Create Recipe. **(1)** It routes to
+  **Create Recipe / `save(draft:)`, NEVER the routed handoff importer** (`ImportHandoffResult` /
+  `HandoffReviewCoordinator`) — clipboard text has no `handoffID` and no subject, so a new recipe through that
+  surface is a category error (Amd2-D2). **(2)** No new parser and no second "text→recipe" model call — reuse
+  `CreateRecipeExtraction.extract` (this *is* the ADR-0051 guard above); and **no `yeschef://` URL scheme** — the
+  app has none, foreground via an `openAppWhenRun` opener + a `CreateRecipeCoordinator` mirroring the handoff one
+  (Amd2-D3). **(3)** Seed the resident session **non-destructively** — `pastedTextReceived` overwrites
+  `composeText`, so it must never clobber unsaved work (Amd2-D4). The transport stays producer-agnostic and
+  menu-unaware, preserving exact text (Amd2-D1/D5); durable staging = a new synced table = a non-goal (D4).
 - **ADR-0021 (variations) is COMPLETE — V1–V3, Amendment 4 (V4a/V4b/V4c + Delete), and anchor-repair
   Dispatch 0/1/2 all shipped (DONE-LOG).** ADR-0023 (recipe edit proposals) has nothing queued: its
   *iterative refine loop* is **WITHDRAWN** (ADR-0042 D7 — it happens in the live external thread; **do not
