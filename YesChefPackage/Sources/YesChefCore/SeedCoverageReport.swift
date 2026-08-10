@@ -3,19 +3,30 @@ import SQLiteData
 
 /// The read-only audit of grocery placements the classifier learned on its own.
 public struct SeedCoverageReport: Equatable, Sendable {
-  public var modelAssignments: [GroceryAreaAssignment]
+  public var unreviewedModelAssignments: [GroceryAreaAssignment]
+  public var confirmedModelAssignments: [GroceryAreaAssignment]
 
-  public init(modelAssignments: [GroceryAreaAssignment] = []) {
-    self.modelAssignments = modelAssignments
+  public init(
+    unreviewedModelAssignments: [GroceryAreaAssignment] = [],
+    confirmedModelAssignments: [GroceryAreaAssignment] = []
+  ) {
+    self.unreviewedModelAssignments = unreviewedModelAssignments
+    self.confirmedModelAssignments = confirmedModelAssignments
+  }
+
+  public var modelAssignments: [GroceryAreaAssignment] {
+    unreviewedModelAssignments + confirmedModelAssignments
   }
 
   /// Keeps the audit tied to persisted learned rows, rather than deriving another
   /// queue from recipe and grocery-item history.
   public static func make(from assignments: [GroceryAreaAssignment]) -> Self {
-    Self(
-      modelAssignments: assignments
-        .filter { $0.source == .model }
-        .sorted(by: areModelAssignmentsInAuditOrder)
+    let modelAssignments = assignments
+      .filter { $0.source == .model }
+      .sorted(by: areModelAssignmentsInAuditOrder)
+    return Self(
+      unreviewedModelAssignments: modelAssignments.filter { $0.reviewedAt == nil },
+      confirmedModelAssignments: modelAssignments.filter { $0.reviewedAt != nil }
     )
   }
 

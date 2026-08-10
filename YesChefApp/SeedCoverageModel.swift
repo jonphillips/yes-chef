@@ -13,6 +13,24 @@ final class SeedCoverageModel {
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored @Dependency(\.uuid) private var uuid
 
+  func confirmButtonTapped(assignment: GroceryAreaAssignment) -> Bool {
+    do {
+      try database.write { db in
+        try GroceryStoreAreaCache.confirmModelAssignment(
+          id: assignment.id,
+          in: db,
+          now: now
+        )
+      }
+      errorMessage = nil
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
   func correctionButtonTapped(
     assignment: GroceryAreaAssignment,
     area: String

@@ -74,6 +74,47 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func separatesConfirmedModelAssignmentsFromUnreviewedAssignments() {
+      let now = Date(timeIntervalSinceReferenceDate: 900_050_000)
+      let report = SeedCoverageReport.make(
+        from: [
+          GroceryAreaAssignment(
+            id: SampleUUIDSequence.uuid(90_051),
+            canonicalName: "sumac",
+            area: "Spices",
+            source: .model,
+            dateModified: now
+          ),
+          GroceryAreaAssignment(
+            id: SampleUUIDSequence.uuid(90_052),
+            canonicalName: "harissa",
+            area: "Condiments & Oils",
+            source: .model,
+            dateModified: now,
+            reviewedAt: now.addingTimeInterval(1)
+          ),
+          GroceryAreaAssignment(
+            id: SampleUUIDSequence.uuid(90_053),
+            canonicalName: "miso",
+            area: "Frozen",
+            source: .user,
+            dateModified: now,
+            reviewedAt: now.addingTimeInterval(1)
+          ),
+        ]
+      )
+
+      expectNoDifference(
+        report.unreviewedModelAssignments.map(\.canonicalName),
+        ["sumac"]
+      )
+      expectNoDifference(
+        report.confirmedModelAssignments.map(\.canonicalName),
+        ["harissa"]
+      )
+    }
+
+    @Test
     func adapterReadsTheAssignmentTableNotTheDerivedIngredientCorpus() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 900_100_000)

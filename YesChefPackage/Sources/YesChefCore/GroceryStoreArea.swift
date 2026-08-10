@@ -464,6 +464,20 @@ public enum GroceryStoreAreaCache {
     }
   }
 
+  public static func confirmModelAssignment(
+    id: GroceryAreaAssignment.ID,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard
+      var assignment = try GroceryAreaAssignment.find(id).fetchOne(db),
+      assignment.source == .model,
+      assignment.reviewedAt == nil
+    else { return }
+    assignment.reviewedAt = now
+    try GroceryAreaAssignment.upsert { assignment }.execute(db)
+  }
+
   private static func assignmentRows(in db: Database) throws -> [GroceryAreaAssignment] {
     // This method also runs from the older seed-only migration on a clean install, before
     // the append-only learned-area migration has created its table.

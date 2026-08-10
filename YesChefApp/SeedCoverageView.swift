@@ -7,17 +7,37 @@ import YesChefCore
 struct SeedCoverageView: View {
   @Fetch(SeedCoverageReportRequest(), animation: .default) private var report = SeedCoverageReport()
   @State private var model = SeedCoverageModel()
+  @State private var reviewScope: LearnedAreaAuditScope = .unreviewed
+
+  private var scopedAssignments: [GroceryAreaAssignment] {
+    switch reviewScope {
+    case .unreviewed:
+      report.unreviewedModelAssignments
+    case .confirmed:
+      report.confirmedModelAssignments
+    }
+  }
 
   var body: some View {
     @Bindable var model = model
 
     List {
       Section {
-        if report.modelAssignments.isEmpty {
-          Text("No model placements need review.")
+        Picker("Review status", selection: $reviewScope) {
+          ForEach(LearnedAreaAuditScope.allCases) { scope in
+            Text("\(scope.title) (\(scope.count(in: report)))").tag(scope)
+          }
+        }
+        .pickerStyle(.segmented)
+        .accessibilityLabel("Placement review status")
+      }
+
+      Section {
+        if scopedAssignments.isEmpty {
+          Text("No \(reviewScope.title.lowercased()) model placements.")
             .foregroundStyle(.secondary)
         } else {
-          ForEach(report.modelAssignments) { assignment in
+          ForEach(scopedAssignments) { assignment in
             NavigationLink {
               LearnedAreaAuditDetail(assignment: assignment, model: model)
             } label: {
@@ -26,9 +46,9 @@ struct SeedCoverageView: View {
           }
         }
       } header: {
-        Text("Model placements (\(report.modelAssignments.count))")
+        Text("\(reviewScope.title) model placements (\(scopedAssignments.count))")
       } footer: {
-        Text("Model placements already persist. Keep a correct placement unchanged; correcting one creates a user placement that wins permanently. Promoting a well-worn placement into the reviewed seed floor is optional.")
+        Text("Model placements already persist. Confirming records your review; correcting one creates a user placement that wins permanently. Promoting confirmed placements into the reviewed seed floor is optional.")
       }
     }
     .navigationTitle("Learned Areas")
@@ -39,11 +59,13 @@ struct SeedCoverageView: View {
     }
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {
-        Menu("Promote to seed", systemImage: "doc.on.doc") {
-          Button("Copy model placements as seed entries") {
-            UIPasteboard.general.string = SeedCoverageReport.swiftLiteralEntries(for: report.modelAssignments)
+        Menu("Promote confirmed to seed", systemImage: "doc.on.doc") {
+          Button("Copy confirmed placements as seed entries") {
+            UIPasteboard.general.string = SeedCoverageReport.swiftLiteralEntries(
+              for: report.confirmedModelAssignments
+            )
           }
-          .disabled(report.modelAssignments.isEmpty)
+          .disabled(report.confirmedModelAssignments.isEmpty)
         }
       }
     }
@@ -72,12 +94,14 @@ private struct LearnedAreaAuditDetail: View {
 
       Section {
         Button("Confirm model placement") {
-          dismiss()
+          if model.confirmButtonTapped(assignment: assignment) {
+            dismiss()
+          }
         }
       } header: {
         Text("Audit")
       } footer: {
-        Text("Confirmation is a no-op: this learned placement is already durable.")
+        Text("Confirmation records this placement as reviewed and moves it to Confirmed.")
       }
 
       Section {
@@ -113,5 +137,26 @@ private struct LearnedAreaAuditRow: View {
   var body: some View {
     LabeledContent(assignment.canonicalName, value: assignment.area)
       .accessibilityLabel("\(assignment.canonicalName), model placement \(assignment.area)")
+  }
+}
+
+private enum LearnedAreaAuditScope: String, CaseIterable, Hashable, Identifiable {
+  case unreviewed
+  case confirmed
+
+  var id: Self { self }
+
+  var title: String {
+    switch self {
+    case .unreviewed: "Unreviewed"
+    case .confirmed: "Confirmed"
+    }
+  }
+
+  func count(in report: SeedCoverageReport) -> Int {
+    switch self {
+    case .unreviewed: report.unreviewedModelAssignments.count
+    case .confirmed: report.confirmedModelAssignments.count
+    }
   }
 }
