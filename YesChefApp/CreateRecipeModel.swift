@@ -12,6 +12,14 @@ import YesChefCore
 @Observable
 @MainActor
 final class CreateRecipeModel {
+  struct IncomingPastedText: Equatable {
+    let content: String
+  }
+
+  enum Destination: Equatable {
+    case incomingPastedTextOffer(IncomingPastedText)
+  }
+
   @ObservationIgnored
   @Dependency(\.date.now) private var now
   @ObservationIgnored
@@ -34,6 +42,7 @@ final class CreateRecipeModel {
   private(set) var extractionIssues: [RecipeExtractionIssue] = []
   private var composeSourceID: CreateRecipeSourceItem.ID?
   private var composeSourceIsLocked = false
+  var destination: Destination?
 
   var isSaving = false
   var errorMessage: String?
@@ -71,6 +80,7 @@ final class CreateRecipeModel {
     extractionIssues = []
     composeSourceID = nil
     composeSourceIsLocked = false
+    destination = nil
     editorModel.applyExtractedDraft(RecipeEditorDraft())
     suggestedLabels = []
     acceptedSuggestedLabelIDs = []
@@ -134,6 +144,23 @@ final class CreateRecipeModel {
     composeSourceID = source.id
     composeSourceIsLocked = false
     composeText = text
+  }
+
+  /// Holds an App Intent payload until the cook decides whether to make it the next pasted source. This
+  /// deliberately does not call `pastedTextReceived(_:)`: that method replaces the compose box, which is
+  /// unsafe while another transient Create Recipe session is in progress (ADR-0053 Amd2-D4).
+  func offerIncomingPastedText(_ text: String) {
+    guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+    destination = .incomingPastedTextOffer(IncomingPastedText(content: text))
+  }
+
+  func acceptIncomingPastedText(_ text: String) {
+    destination = nil
+    pastedTextReceived([text])
+  }
+
+  func discardIncomingPastedText() {
+    destination = nil
   }
 
   /// Runs the two-tier front-end over the compose box (ADR-0051 D4): deterministic schema.org first,

@@ -10,6 +10,7 @@ import YesChefCore
 struct AppContainer: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   @Dependency(\.handoffReviewCoordinator) private var handoffReviewCoordinator
+  @Dependency(\.createRecipeCoordinator) private var createRecipeCoordinator
   @State private var toastCenter: AppToastCenter
   @State private var recipeModel = RecipeLibraryModel()
   @State private var powerBrowserModel = PowerBrowserModel()
@@ -161,6 +162,11 @@ struct AppContainer: View {
         keepAsVariation: { handoffReviewCoordinator.keepAdjustmentAsVariationButtonTapped($0, name: $1) },
         saveVariation: { handoffReviewCoordinator.saveScopedVariationButtonTapped($0) }
       )
+    }
+    .task(id: createRecipeCoordinator.stagedText) {
+      guard createRecipeCoordinator.stagedText != nil else { return }
+      selectedSection = .createRecipe
+      await createRecipeCoordinator.applyStagedText(to: createRecipeModel)
     }
     .confirmationDialog(
       "Remove Meal Plan Item?",
@@ -346,6 +352,7 @@ private struct RecipeFullScreenCover: View {
         recipeID: presentation.recipeID,
         scaleContext: presentation.scaleContext,
         workbenchID: presentation.workbenchID,
+        includingArchivedRecipe: presentation.includingArchivedRecipe,
         libraryModel: recipeModel,
         mealCalendarModel: mealCalendarModel,
         groceryModel: groceryModel,

@@ -123,7 +123,44 @@ struct CreateRecipeView: View {
       } message: {
         Text(model.errorMessage ?? "")
       }
+      .confirmationDialog(
+        "A recipe is already in progress.",
+        isPresented: incomingPastedTextOfferBinding(for: model),
+        titleVisibility: .visible
+      ) {
+        if case let .incomingPastedTextOffer(incomingText) = model.destination {
+          Button("Use New Text") {
+            model.acceptIncomingPastedText(incomingText.content)
+          }
+        }
+        Button("Discard New Text", role: .destructive) {
+          model.discardIncomingPastedText()
+        }
+        Button("Keep Current Recipe", role: .cancel) {
+          model.discardIncomingPastedText()
+        }
+      } message: {
+        Text("Use the incoming text as a new pasted source, or keep the recipe already in progress. Your current draft will not be replaced automatically.")
+      }
     }
+  }
+
+  private func incomingPastedTextOfferBinding(for model: CreateRecipeModel) -> Binding<Bool> {
+    Binding(
+      get: {
+        guard let destination = model.destination else { return false }
+        if case .incomingPastedTextOffer = destination {
+          return true
+        } else {
+          return false
+        }
+      },
+      set: { isPresented in
+        if !isPresented {
+          model.discardIncomingPastedText()
+        }
+      }
+    )
   }
 }
 

@@ -63,6 +63,12 @@ If ChatGPT asks which recipe to capture when several are in play, choose one. Th
 
 Expected Project behavior: normal discussion stays conversational; a capture request produces one valid JSON-LD Recipe object and nothing else; uncertain fields are omitted rather than invented; ingredient headings are not fake ingredient rows; and a recipe with no named method groups has direct ordered `HowToStep` values rather than one one-step section per instruction.
 
+## Faster return path with Shortcuts
+
+Create a Shortcut named **Send to Yes Chef** with two actions: **Get Clipboard**, then **Capture a recipe from text** (Yes Chef). Copy a recipe response, run the Shortcut, and Yes Chef opens on Create Recipe with the text extracted for review. Review and tap Save; the Shortcut never creates a recipe by itself.
+
+The ordinary fallback is unchanged: copy the response, open Yes Chef, choose Create Recipe, paste the text, and extract it. The App Intent also makes the action available from Shortcuts, Home Screen, Action Button, and Control Center without a separate Yes Chef UI.
+
 ## Outside the Project / universal fallback
 
 Do not rely on the thin **Copy Recipe Capture Request** outside the `Yes Chef` Project: it explicitly expects the Recipe source to be available there. The Project is the preferred durable setup.

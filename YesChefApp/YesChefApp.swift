@@ -6,6 +6,7 @@ import YesChefCore
 @main
 struct YesChefApp: App {
   private let handoffReviewCoordinator: HandoffReviewCoordinator
+  private let createRecipeCoordinator: CreateRecipeCoordinator
 #if DEBUG
   private let modelCallRecordCollector: ModelCallRecordCollector
 #endif
@@ -13,6 +14,8 @@ struct YesChefApp: App {
   init() {
     let handoffReviewCoordinator = HandoffReviewCoordinator()
     self.handoffReviewCoordinator = handoffReviewCoordinator
+    let createRecipeCoordinator = CreateRecipeCoordinator()
+    self.createRecipeCoordinator = createRecipeCoordinator
 #if DEBUG
     let modelCallRecordCollector = ModelCallRecordCollector()
     self.modelCallRecordCollector = modelCallRecordCollector
@@ -26,6 +29,7 @@ struct YesChefApp: App {
       try! $0.seedPantryItemsIfNeeded(titles: legacyPantryItems)
       try! $0.seedSampleDataIfNeeded()
       $0.handoffReviewCoordinator = handoffReviewCoordinator
+      $0.createRecipeCoordinator = createRecipeCoordinator
       $0.webRecipeCaptureClient = WebRecipeCaptureClient(
         fetchHTML: WebRecipeCaptureClient.liveValue.fetchHTML,
         renderHTML: { url in

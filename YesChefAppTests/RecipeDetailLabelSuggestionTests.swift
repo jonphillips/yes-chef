@@ -9,6 +9,38 @@ import YesChefCore
 @MainActor
 struct RecipeDetailLabelSuggestionTests {
   @Test
+  func menuDetailCanReadAnArchivedRecipe() async throws {
+    let recipeID = SampleUUIDSequence.uuid(61_000)
+    let now = Date(timeIntervalSinceReferenceDate: 840_999_000)
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try await database.write { db in
+        try Recipe.insert {
+          Recipe(
+            id: recipeID,
+            title: "Archived Menu Recipe",
+            archived: true,
+            dateCreated: now,
+            dateModified: now
+          )
+        }
+        .execute(db)
+      }
+
+      let libraryModel = RecipeDetailModel(recipeID: recipeID)
+      try await libraryModel.$detail.load()
+      #expect(libraryModel.detail == nil)
+
+      let menuModel = RecipeDetailModel(recipeID: recipeID, includingArchivedRecipe: true)
+      try await menuModel.$detail.load()
+      expectNoDifference(menuModel.detail?.recipe.id, recipeID)
+    }
+  }
+
+  @Test
   func acceptingASuggestionPersistsItImmediately() async throws {
     let recipeID = SampleUUIDSequence.uuid(61_001)
     let categoryID = SampleUUIDSequence.uuid(61_002)

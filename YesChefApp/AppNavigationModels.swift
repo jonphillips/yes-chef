@@ -5,19 +5,22 @@ struct RecipeDetailPresentation: Hashable, Identifiable {
   var recipeID: Recipe.ID
   var scaleContext: ScaleContext
   var workbenchID: Workbench.ID?
+  var includingArchivedRecipe: Bool
 
   init(
     recipeID: Recipe.ID,
     scaleContext: ScaleContext? = nil,
-    workbenchID: Workbench.ID? = nil
+    workbenchID: Workbench.ID? = nil,
+    includingArchivedRecipe: Bool = false
   ) {
     self.recipeID = recipeID
     self.scaleContext = scaleContext ?? .recipe(recipeID)
     self.workbenchID = workbenchID
+    self.includingArchivedRecipe = includingArchivedRecipe
   }
 
   var id: String {
-    "\(recipeID.uuidString):\(scaleContext.id):\(workbenchID?.uuidString ?? "")"
+    "\(recipeID.uuidString):\(scaleContext.id):\(workbenchID?.uuidString ?? ""):\(includingArchivedRecipe)"
   }
 }
 

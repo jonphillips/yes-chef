@@ -3,17 +3,39 @@ import SwiftUI
 import YesChefCore
 
 struct WorkbenchListView: View {
+  enum Style {
+    case navigation
+    case selection
+  }
+
   let model: WorkbenchLibraryModel
+  var style: Style = .selection
+  var onRecipeSelected: (RecipeDetailPresentation) -> Void = { _ in }
   @State private var selectedFilter: WorkbenchListFilter = .active
   @State private var completedSearchText = ""
 
   var body: some View {
     @Bindable var model = model
 
-    List(workbenchRows(for: model), selection: $model.selectedWorkbenchID) { row in
-      WorkbenchRowView(row: row)
-        .tag(row.id)
-        .workbenchSwipeActions(row, model: model)
+    Group {
+      switch style {
+      case .navigation:
+        List(workbenchRows(for: model)) { row in
+          NavigationLink {
+            WorkbenchDetailView(workbenchID: row.id, onRecipeSelected: onRecipeSelected)
+              .id(row.id)
+          } label: {
+            WorkbenchRowView(row: row)
+          }
+          .workbenchSwipeActions(row, model: model)
+        }
+      case .selection:
+        List(workbenchRows(for: model), selection: $model.selectedWorkbenchID) { row in
+          WorkbenchRowView(row: row)
+            .tag(row.id)
+            .workbenchSwipeActions(row, model: model)
+        }
+      }
     }
     .navigationTitle("Workbenches")
     .toolbar(removing: .sidebarToggle)

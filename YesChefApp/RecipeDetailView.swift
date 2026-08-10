@@ -25,6 +25,7 @@ struct RecipeDetailView: View {
     recipeID: Recipe.ID,
     scaleContext: ScaleContext? = nil,
     workbenchID: Workbench.ID? = nil,
+    includingArchivedRecipe: Bool = false,
     libraryModel: RecipeLibraryModel,
     mealCalendarModel: MealCalendarModel,
     groceryModel: GroceryLibraryModel,
@@ -35,7 +36,8 @@ struct RecipeDetailView: View {
     let model = RecipeDetailModel(
       recipeID: recipeID,
       scaleContext: scaleContext,
-      workbenchID: workbenchID
+      workbenchID: workbenchID,
+      includingArchivedRecipe: includingArchivedRecipe
     )
     _model = State(
       wrappedValue: model

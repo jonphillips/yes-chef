@@ -65,7 +65,11 @@ struct MenuPrepPlanStepView: View {
           let row = itemRows.first(where: { $0.id == sourceDish }),
           let recipeID = row.recipe?.id,
           onRecipeSelected != nil else { return nil }
-    return RecipeDetailPresentation(recipeID: recipeID, scaleContext: .menuItem(row.id))
+    return RecipeDetailPresentation(
+      recipeID: recipeID,
+      scaleContext: .menuItem(row.id),
+      includingArchivedRecipe: true
+    )
   }
 }
 

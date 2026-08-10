@@ -152,9 +152,11 @@ public struct RecipeDetailData: Equatable, Sendable {
 
 public struct RecipeDetailRequest: FetchKeyRequest {
   public let recipeID: Recipe.ID
+  public let includingArchivedRecipe: Bool
 
-  public init(recipeID: Recipe.ID) {
+  public init(recipeID: Recipe.ID, includingArchivedRecipe: Bool = false) {
     self.recipeID = recipeID
+    self.includingArchivedRecipe = includingArchivedRecipe
   }
 
   public func fetch(_ db: Database) throws -> RecipeDetailData? {
@@ -164,7 +166,11 @@ public struct RecipeDetailRequest: FetchKeyRequest {
       let duration = String(describing: start.duration(to: clock.now))
       AppLog.performance.log("recipe-detail-request-fetch duration=\(duration, privacy: .public)")
     }
-    return try RecipeRepository.fetchDetail(recipeID: recipeID, in: db)
+    return try RecipeRepository.fetchDetail(
+      recipeID: recipeID,
+      includingArchivedRecipe: includingArchivedRecipe,
+      in: db
+    )
   }
 }
 
@@ -209,11 +215,15 @@ struct RecipeDetailPhotoRow: Equatable, Sendable {
 }
 
 public enum RecipeRepository {
-  public static func fetchDetail(recipeID: Recipe.ID, in db: Database) throws -> RecipeDetailData? {
+  public static func fetchDetail(
+    recipeID: Recipe.ID,
+    includingArchivedRecipe: Bool = false,
+    in db: Database
+  ) throws -> RecipeDetailData? {
     guard let recipe = try (Recipe.where { $0.id.eq(recipeID) })
       .fetchOne(db)
     else { return nil }
-    guard !recipe.archived else { return nil }
+    guard includingArchivedRecipe || !recipe.archived else { return nil }
 
     let ingredientSections = try (IngredientSection.where { $0.recipeID.eq(recipeID) })
       .order { $0.sortOrder }
@@ -453,8 +463,6 @@ extension RecipeRepository {
   public static func archive(recipeID: Recipe.ID, in db: Database, now: Date) throws {
     try #sql("DELETE FROM \"mealPlanItems\" WHERE \"recipeID\" = \(bind: recipeID)")
       .execute(db)
-    try #sql("DELETE FROM \"menuItems\" WHERE \"recipeID\" = \(bind: recipeID)")
-      .execute(db)
     try Recipe.find(recipeID).update {
       $0.archived = true
       $0.dateModified = now
@@ -497,6 +505,8 @@ extension RecipeRepository {
   }
 
   public static func permanentlyDelete(recipeID: Recipe.ID, in db: Database) throws {
+    try #sql("DELETE FROM \"menuItems\" WHERE \"recipeID\" = \(bind: recipeID)")
+      .execute(db)
     // This peer-edge table intentionally has no FK for CloudKit compatibility, so SQLite cannot
     // cascade it with the recipe's normal children.
     try RecipeRelatedRecipe
