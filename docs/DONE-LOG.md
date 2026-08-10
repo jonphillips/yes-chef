@@ -9,6 +9,24 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0042 Amd 3 — Recipe JSON-LD v2 capture contract
+
+**Merged 2026-08-09; PR [#302](https://github.com/jonphillips/yes-chef/pull/302). No schema. Jon's device pass
+owed.** Late-bound Recipe capture (ADR-0042 Amendment 3): an external Project conversation can emit a durable Recipe
+*product* midstream and keep going, without a `YC-HANDOFF` row. New `RecipeJSONLDContract` centralizes the versioned
+(v2) Project source, the self-contained handoff output instructions, and a thin `captureRequest()`;
+`WorkbenchChatContext` now sources its output shape from it instead of an inline literal. v2 adds the namespaced
+`yesChef:ingredientSections` so named ingredient groups round-trip while `recipeIngredient` stays the complete flat
+schema.org interop fallback (no fake heading rows). cuisine/course thread through `RecipeExtraction`, the parse
+builder, and the editor draft to the canonical save. Top-level `HowToStep` entries now coalesce into one unnamed
+instruction section instead of one-section-per-step — which also fixed a latent web-capture bug; the King Arthur and
+Allrecipes real-shape fixtures were corrected. App: "Copy Recipe Contract Source" (AI Settings) and "Copy Recipe
+Capture Request" (Menu) actions. Verified: `swift test` full package suite green (640 tests). **Follow-ups (not
+queued):** `captureRequest(recipeName:)`'s named path is unwired — the app always emits the generic "ask me which
+recipe" variant; the extractor trusts `yesChef:ingredientSections` wholesale and matches the literal namespaced key,
+safe under the controlled Project contract but a fidelity assumption.
+
+---
 ## ADR-0050 S2 — Power Browser surface
 
 **Built 2026-08-09; PR [#301](https://github.com/jonphillips/yes-chef/pull/301). No schema. Jon's iPad device pass
@@ -27,6 +45,21 @@ observed and are mapped from engine result IDs. Focused model tests cover select
 initial facet expansion; the existing S1 Core suite covers query semantics. Verified before review: `xcodegen
 generate`, targeted SwiftLint (0 violations), elevated generic iOS build, and `YesChefTests` (44 tests / 15 suites)
 all passed.
+
+---
+## ADR-0050 S1 — Power Browser query engine
+
+**Merged 2026-08-09; PR [#299](https://github.com/jonphillips/yes-chef/pull/299). No schema, no device surface (that
+is S2).** The headless query engine: `RecipeBrowserQuery`, descendant matching, OR-within/AND-across semantics,
+matching-id retrieval, self-excluding counts, availability + deterministic ranking. Pure Core. Amd4-OQ1 is answered
+in code — `RecipeBrowserQuery` indexes variation names as text-search aliases and does **not** expand related-recipe
+edges (`variationNamesAreTextSearchAliasesWithoutExpandingRelatedRecipes`). **Architect review caught a D4 defect:**
+self-excluding facet counts collapsed for any facet without a selection — each value unioned against the *full*
+result set, so for an unselected facet every value's count became `|result|` and the discrimination filter hid the
+whole facet (an empty query offered zero facets; selecting one facet hid every other). The four original tests
+passed only because each selected *every* facet — the one arrangement where the full result is the right union base.
+Fixed to union against only recipes carrying a currently-selected value of that facet; added empty-query and
+single-selection availability regression tests. Verified: `swift test` full package suite green (636 tests).
 
 ---
 ## ADR-0046 S2 — the chat presentation merge

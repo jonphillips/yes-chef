@@ -1,21 +1,8 @@
 # Current Handoff
 
-Last updated: August 9, 2026. **The entire ADR-0021 variation arc is COMPLETE** — V1–V3, Amendment 4
-(V4a/V4b/V4c + Delete), and anchor-repair Dispatch 0/1/2 all shipped. The last pieces: **V4b** (the synced
-`recipeRelatedRecipes` edge table, PR [#293](https://github.com/jonphillips/yes-chef/pull/293)) + its
-delete-cascade / scoped-read follow-up (PR [#296](https://github.com/jonphillips/yes-chef/pull/296)), and
-anchor-repair **Dispatch 2** (the in-app repair UI, PR [#294](https://github.com/jonphillips/yes-chef/pull/294)).
-**Two device passes are owed — V4b sync and Dispatch 2 repair UI (see "Device passes owed").** Also recently
-shipped and archived to [`DONE-LOG.md`](DONE-LOG.md): **ADR-0053 S1/S2** (Create Recipe destination + issue pass,
-PRs #290/#291), **ADR-0052 S1+S2** (synced grocery learned-area table, PR #292), and the full **ADR-0049**
-facet/labeling arc (PRs #275–#282). **[ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) is fully
-built** — S1 (the sidebar-adaptable app-shell container) shipped 2026-08-08 (PR #297), and **S2 (the chat
-presentation merge) rides in PR [#298](https://github.com/jonphillips/yes-chef/pull/298)** with Jon's product
-call locked: **inspector everywhere on wide iPad** (not the detent split, not don't-merge), no Calendar/Workbench
-cold-start starters. **Both ADR-0046 device passes are owed** (see "Device passes owed"); Next Up advances past
-the whole ADR to the open queue. **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser S1 (the
-headless query engine) is in review — PR [#299](https://github.com/jonphillips/yes-chef/pull/299); S2 (the iPad
-surface) is built — PR [#301](https://github.com/jonphillips/yes-chef/pull/301).**
+Last updated: August 9, 2026. **No designated Next Up target — Jon picks from the queue;** the live candidates are
+**ADR-0050 Power Browser S3 + S3.5** and **ADR-0052 S3** (both in Next Up). Newly-merged work has moved to
+[`DONE-LOG.md`](DONE-LOG.md); the device passes it owes are in their own section below.
 ⚠️ **A standing Codex-env gotcha:** the simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
 the app tests" is structural, not a regression — and it once *masked two genuinely red tests* (missing
 `bootstrapDatabase()` → `RecipeEditorModel`'s eager `@Fetch` tripped SQLiteData's blank-DB reporter), fixed by
@@ -41,27 +28,23 @@ and every hit outside those two sections is a removal candidate — not merely f
 
 ## Next Up
 
-**No designated target — Jon picks from the queue.** The whole sidebar-adaptable shell (ADR-0046 S1 + S2) is
-built and archived to [`DONE-LOG.md`](DONE-LOG.md); only its two device passes remain (below).
+**No designated target — Jon picks from the queue.**
 
-- **Chat uniformity is cross-surface, not cross-device** — do **not** "unify" the sheet-vs-inspector header split.
-  That divergence is intended and now the *only* wide/compact chat difference left.
 - **ADR-0045 cold-start starters are still open, no longer time-gated:** S2 rearranged the Calendar day-header
   Chat and the Workbench Chat into inspectors and left them passing `.none`. Whether they want their own starters
   ("Plan this week" / "What should I prep tonight?") is Jon's call whenever — it no longer blocks anything.
 
 ---
 
-**Prior candidates (queue — not the designated target).** The facet/labeling gate is cleared, the **entire
-ADR-0021 variation arc is COMPLETE** (all shipped, DONE-LOG), and per-recipe facet/tag coverage is Jon's ongoing
-hand work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**. Live candidates:
+**Prior candidates (queue — not the designated target).** Per-recipe facet/tag coverage is Jon's ongoing hand
+work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**. Live candidates:
 
-- **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser — S1 is in review (PR
-  [#299](https://github.com/jonphillips/yes-chef/pull/299)).** Remaining after it merges: **S3**
-  (attribute/source/usage filters with type-appropriate controls) and **S3.5** (re-point
-  `RecipeActiveFilterBar` onto the engine — a *deletion*; acceptance test is "the phone
-  list and the browser now agree on what a selection means"). The old "wait until primary facets classify a
-  majority of the library" gate is **retired** (Jon, 2026-08-05).
+- **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser — S1 + S2 shipped (DONE-LOG; S2 device
+  pass owed).** Remaining: **S3** (attribute/source/usage filters with type-appropriate controls) and **S3.5**
+  (re-point `RecipeActiveFilterBar` onto the engine — a *deletion*; acceptance test is "the phone list and the
+  browser now agree on what a selection means"). **S3.5 also absorbs ADR-0049 F3/OQ5** — retire the freeform
+  Cuisine/Course editor fields while preserving the per-facet single-select picker (Ready Efforts). The old "wait
+  until primary facets classify a majority of the library" gate is **retired** (Jon, 2026-08-05).
 
 - **[ADR-0052](decisions/ADR-0052-grocery-learned-area-table.md) S3 (not designated):** repoint ADR-0037's
   seed-coverage view to **audit** the `.model` rows (amends, never deletes). The rest of ADR-0052 is shipped and
@@ -236,6 +219,13 @@ with contextual counts, chip selection/removal and Clear should update the avail
 search and every sort should work, and a result should open its recipe detail. Confirm the tab remains a peer of
 the Safari web-capture Browser and can be focused with the system sidebar controls. Exercise an empty library and
 a library containing a parent/descendant facet value.
+
+**ADR-0042 Amd 3 — Recipe JSON-LD v2 capture (PR [#302](https://github.com/jonphillips/yes-chef/pull/302)), no
+schema.** In AI Settings, **Copy Recipe Contract Source**, and from the Menu, **Copy Recipe Capture Request** — each
+should copy the expected text. Then paste a v2 JSON-LD block (carrying `yesChef:ingredientSections` plus both a
+`HowToSection`-named and an unsectioned-`HowToStep` instruction shape) into Create Recipe and confirm it reviews and
+saves with cuisine/course, the named ingredient groups, and a single unnamed instruction section (never one section
+per step). Re-check that an ordinary schema.org paste still imports unchanged.
 
 **ADR-0046 S1 — the sidebar-adaptable app shell (PR [#297](https://github.com/jonphillips/yes-chef/pull/297)), no
 schema.** Both physical devices × both orientations × **sidebar and tab-bar modes**; the system sidebar⇄tab-bar
