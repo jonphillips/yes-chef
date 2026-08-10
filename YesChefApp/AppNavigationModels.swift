@@ -105,7 +105,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case .categories: "Categories"
     case .pantry: "Pantry"
     case .archivedRecipes: "Archived Recipes"
-    case .seedCoverage: "Seed Coverage"
+    case .seedCoverage: "Learned Areas"
     case .facetCoverage: "Label Recipes"
 #if DEBUG
     case .modelCallInventory: "Model Calls"

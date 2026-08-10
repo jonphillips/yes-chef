@@ -1,110 +1,110 @@
+import Foundation
+import SQLiteData
 import SwiftUI
 import UIKit
 import YesChefCore
 
 struct SeedCoverageView: View {
+  @Fetch(SeedCoverageReportRequest(), animation: .default) private var report = SeedCoverageReport()
   @State private var model = SeedCoverageModel()
 
   var body: some View {
+    @Bindable var model = model
+
     List {
       Section {
-        gapRows(model.report.uncovered, emptyMessage: "Every uncovered name has a seed.")
+        if report.modelAssignments.isEmpty {
+          Text("No model placements need review.")
+            .foregroundStyle(.secondary)
+        } else {
+          ForEach(report.modelAssignments) { assignment in
+            NavigationLink {
+              LearnedAreaAuditDetail(assignment: assignment, model: model)
+            } label: {
+              LearnedAreaAuditRow(assignment: assignment)
+            }
+          }
+        }
       } header: {
-        Text("Uncovered (\(model.report.uncovered.count))")
-      }
-
-      Section {
-        gapRows(model.report.coveredElsewhere, emptyMessage: "No existing placements need a seed.")
-      } header: {
-        Text("Covered elsewhere (\(model.report.coveredElsewhere.count))")
+        Text("Model placements (\(report.modelAssignments.count))")
       } footer: {
-        Text("Tap an entry to copy its seed literal. Add the copied entries to GroceryStoreArea.seedAreas, then rebuild to remove them from this queue.")
+        Text("Model placements already persist. Keep a correct placement unchanged; correcting one creates a user placement that wins permanently. Promoting a well-worn placement into the reviewed seed floor is optional.")
       }
     }
-    .navigationTitle("Seed Coverage")
-    .overlay {
-      if let errorMessage = model.errorMessage {
-        ContentUnavailableView(
-          "Seed coverage unavailable",
-          systemImage: "exclamationmark.triangle",
-          description: Text(errorMessage)
-        )
-      }
+    .navigationTitle("Learned Areas")
+    .alert("Couldn't save correction", isPresented: $model.isShowingError) {
+      Button("OK") {}
+    } message: {
+      Text(model.errorMessage ?? "Unknown error")
     }
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {
-        Menu("Copy seed entries", systemImage: "doc.on.doc") {
-          Button("Copy uncovered (\(model.report.uncovered.count))") {
-            copy(model.report.uncovered)
+        Menu("Promote to seed", systemImage: "doc.on.doc") {
+          Button("Copy model placements as seed entries") {
+            UIPasteboard.general.string = SeedCoverageReport.swiftLiteralEntries(for: report.modelAssignments)
           }
-          .disabled(model.report.uncovered.isEmpty)
-
-          Button("Copy covered elsewhere (\(model.report.coveredElsewhere.count))") {
-            copy(model.report.coveredElsewhere)
-          }
-          .disabled(model.report.coveredElsewhere.isEmpty)
+          .disabled(report.modelAssignments.isEmpty)
         }
       }
     }
-    .task { await model.refresh() }
-    .task {
-      for await _ in NotificationCenter.default.notifications(named: DatabaseChangeBeacon.didChange) {
-        await model.refresh()
-      }
-    }
-  }
-
-  @ViewBuilder private func gapRows(
-    _ gaps: [SeedCoverageReport.Gap],
-    emptyMessage: String
-  ) -> some View {
-    if gaps.isEmpty {
-      Text(emptyMessage)
-        .foregroundStyle(.secondary)
-    } else {
-      ForEach(gaps) { gap in
-        Button {
-          copy([gap])
-        } label: {
-          SeedCoverageGapRow(gap: gap)
-        }
-        .accessibilityLabel(accessibilityLabel(for: gap))
-        .accessibilityHint("Copies this seed entry")
-      }
-    }
-  }
-
-  private func copy(_ gaps: [SeedCoverageReport.Gap]) {
-    UIPasteboard.general.string = SeedCoverageReport.swiftLiteralEntries(for: gaps)
-  }
-
-  private func accessibilityLabel(for gap: SeedCoverageReport.Gap) -> String {
-    var label = "\(gap.canonicalName), \(gap.occurrences) occurrence\(gap.occurrences == 1 ? "" : "s")"
-    if let suggestedArea = gap.suggestedArea {
-      label += ", suggested area \(suggestedArea.title)"
-    }
-    return label
   }
 }
 
-private struct SeedCoverageGapRow: View {
-  let gap: SeedCoverageReport.Gap
+private struct LearnedAreaAuditDetail: View {
+  @Environment(\.dismiss) private var dismiss
+  @State private var correctedArea: String
+
+  let assignment: GroceryAreaAssignment
+  let model: SeedCoverageModel
+
+  init(assignment: GroceryAreaAssignment, model: SeedCoverageModel) {
+    self.assignment = assignment
+    self.model = model
+    _correctedArea = State(initialValue: assignment.area)
+  }
 
   var body: some View {
-    HStack(spacing: 8) {
-      Text(gap.canonicalName)
-        .foregroundStyle(.primary)
-      Text("×\(gap.occurrences)")
-        .foregroundStyle(.secondary)
-        .monospacedDigit()
-      if let suggestedArea = gap.suggestedArea {
-        Text(suggestedArea.title)
-          .foregroundStyle(.secondary)
+    Form {
+      Section("Model placement") {
+        LabeledContent("Ingredient", value: assignment.canonicalName)
+        LabeledContent("Aisle", value: assignment.area)
       }
-      Spacer(minLength: 8)
-      Image(systemName: "doc.on.doc")
-        .foregroundStyle(.tertiary)
-        .accessibilityHidden(true)
+
+      Section {
+        Button("Confirm model placement") {
+          dismiss()
+        }
+      } header: {
+        Text("Audit")
+      } footer: {
+        Text("Confirmation is a no-op: this learned placement is already durable.")
+      }
+
+      Section {
+        StackedTextField(title: "Aisle", text: $correctedArea, prompt: "Spices")
+
+        Button("Save correction") {
+          if model.correctionButtonTapped(assignment: assignment, area: correctedArea) {
+            dismiss()
+          }
+        }
+        .disabled(correctedArea.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+      } header: {
+        Text("Correct placement")
+      } footer: {
+        Text("A correction becomes a user placement and replaces this model placement.")
+      }
     }
+    .navigationTitle(assignment.canonicalName)
+    .navigationBarTitleDisplayMode(.inline)
+  }
+}
+
+private struct LearnedAreaAuditRow: View {
+  let assignment: GroceryAreaAssignment
+
+  var body: some View {
+    LabeledContent(assignment.canonicalName, value: assignment.area)
+      .accessibilityLabel("\(assignment.canonicalName), model placement \(assignment.area)")
   }
 }
