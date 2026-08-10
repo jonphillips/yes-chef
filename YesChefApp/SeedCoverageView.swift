@@ -81,14 +81,21 @@ private struct LearnedAreaAuditDetail: View {
       }
 
       Section {
-        StackedTextField(title: "Aisle", text: $correctedArea, prompt: "Spices")
+        StackedFormField(title: "Aisle") {
+          Picker("Aisle", selection: $correctedArea) {
+            ForEach(GroceryStoreArea.canonicalAreas, id: \.self) { area in
+              Text(area.title).tag(area.title)
+            }
+          }
+          .labelsHidden()
+        }
 
         Button("Save correction") {
           if model.correctionButtonTapped(assignment: assignment, area: correctedArea) {
             dismiss()
           }
         }
-        .disabled(correctedArea.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .disabled(correctedArea == assignment.area)
       } header: {
         Text("Correct placement")
       } footer: {
