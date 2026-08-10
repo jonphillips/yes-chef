@@ -9,6 +9,18 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0050 OQ5(a) — Cuisine/Course facet backfill
+
+**Built 2026-08-10; PR [#305](https://github.com/jonphillips/yes-chef/pull/305). No schema. Jon's device pass
+owed.** The post-SyncEngine Core pass moves free-text `Recipe.cuisine` / `Recipe.course` values into their matching
+existing Cuisine/Course facet values only: every new `RecipeCategory` identity is a UUIDv5 derived from the stable
+recipe/category pair, so independent devices converge on one link row. A matched value clears its now-moot live
+column, including when a cook already classified that facet differently; unmatched text is preserved and reported.
+The move means an assignment a cook later removes stays removed — no shadow free-text source remains to recreate it.
+`originalSnapshot` is untouched. Nine Core tests cover matching, normalization, unmatched preservation, removed-stays-
+removed, deterministic idempotence, user precedence, Course, mixed-field behavior, and snapshot preservation.
+
+---
 ## ADR-0042 Amd 3 — Recipe JSON-LD v2 capture contract
 
 **Merged 2026-08-09; PR [#302](https://github.com/jonphillips/yes-chef/pull/302). No schema. Jon's device pass

@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: August 9, 2026. **No designated Next Up target — Jon picks from the queue;** the live candidates are
+Last updated: August 10, 2026. **No designated Next Up target — Jon picks from the queue;** the live candidates are
 **ADR-0050 Power Browser S3 + S3.5** and **ADR-0052 S3** (both in Next Up). Newly-merged work has moved to
 [`DONE-LOG.md`](DONE-LOG.md); the device passes it owes are in their own section below.
 ⚠️ **A standing Codex-env gotcha:** the simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
@@ -42,7 +42,7 @@ work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**. Live candidates:
 - **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser — S1 + S2 shipped (DONE-LOG; S2 device
   pass owed).** Remaining: **S3** (attribute/source/usage filters with type-appropriate controls) and **S3.5**
   (re-point `RecipeActiveFilterBar` onto the engine — a *deletion*; acceptance test is "the phone list and the
-  browser now agree on what a selection means"). **S3.5 also absorbs ADR-0049 F3/OQ5** — retire the freeform
+  browser now agree on what a selection means"). **S3.5 also absorbs ADR-0049 F3/OQ5(b)+(c)** — retire the freeform
   Cuisine/Course editor fields while preserving the per-facet single-select picker (Ready Efforts). The old "wait
   until primary facets classify a majority of the library" gate is **retired** (Jon, 2026-08-05).
 
@@ -120,10 +120,6 @@ section is work.**
 
 Drawn into **Next Up** as needed; not itself a dispatch target. Completed efforts live in
 [`docs/DONE-LOG.md`](DONE-LOG.md).
-
-**ADR-0049 (facets) hand-off — one live thread: F3/OQ5.** Retire the typed freeform Cuisine/Course editor
-fields, **preserving** the per-facet single-select picker affordance (rebind, don't delete); deferred to
-**ADR-0050 S3.5**, do not fold in elsewhere. The rest of ADR-0049 is complete (DONE-LOG).
 
 **[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md) — ATK's "Gather Your
 Ingredients" is a latent grocery bug (scoped 2026-07-28). P1 only; **no schema**.** 101 shoppable ingredient

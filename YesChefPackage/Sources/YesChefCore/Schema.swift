@@ -1281,6 +1281,10 @@ extension DependencyValues {
           if variationAnchorBackfill.hasFindings {
             AppLog.dataIntegrity.warning("\(variationAnchorBackfill.logSummary, privacy: .public)")
           }
+          let cuisineCourseBackfill = try RecipeRepository.backfillCuisineCourseFacets(in: db)
+          if cuisineCourseBackfill.hasFindings {
+            AppLog.dataIntegrity.warning("\(cuisineCourseBackfill.logSummary, privacy: .public)")
+          }
         }
       }
     }
