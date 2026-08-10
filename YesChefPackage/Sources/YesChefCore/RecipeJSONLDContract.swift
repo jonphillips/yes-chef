@@ -21,6 +21,7 @@ public enum RecipeJSONLDContract {
     \(example)
 
     `recipeIngredient` is always the complete, ordered flat ingredient list for ordinary schema.org consumers. Do not put section headings such as `For the sauce:` in that list.
+    Never put `HowToSection`, `itemListElement`, or any other objects inside `recipeIngredient`.
 
     If ingredients have meaningful named groups, also include `yesChef:ingredientSections`. It is the authoritative Yes Chef grouping and intentionally repeats the ingredient lines so ordinary schema.org consumers retain the flat list:
 
@@ -40,7 +41,7 @@ public enum RecipeJSONLDContract {
 
     \(example)
 
-    When ingredient groups matter, keep `recipeIngredient` as the complete ordered flat list and add `"yesChef:ingredientSections":[{"name":"group name","recipeIngredient":["ingredient line"]}]`. Do not put ingredient section headings into `recipeIngredient`.
+    When ingredient groups matter, keep `recipeIngredient` as the complete ordered flat list and add `"yesChef:ingredientSections":[{"name":"group name","recipeIngredient":["ingredient line"]}]`. Do not put ingredient section headings, `HowToSection`, `itemListElement`, or other objects into `recipeIngredient`.
 
     Use `HowToSection` only for named instruction groups. For an unsectioned recipe, use ordered `HowToStep` entries directly in `recipeInstructions`; do not make one section per step. Omit any field you cannot fill confidently rather than inventing it. Do not put IDs, prices, or rationale inside the JSON.
     """

@@ -101,6 +101,36 @@ extension RecipeCoreTests {
       ])
     }
 
+    /// Recover the first dogfood return shape, which incorrectly used HowToSection objects as
+    /// `recipeIngredient` entries. The v2 source forbids it, but importing the actual return must
+    /// retain the ingredient lines rather than saving only the group names.
+    @Test
+    func malformedHowToSectionsInsideRecipeIngredientsAreRecovered() async throws {
+      let jsonLD = """
+        {"@context":"https://schema.org","@type":"Recipe","name":"Mini Charred Cabbage with Lime Sauce","recipeIngredient":[{"@type":"HowToSection","name":"For the cabbage","itemListElement":["1/2 small green cabbage, cut into 2 wedges","1 tbsp neutral oil","1/4 tsp kosher salt"]},{"@type":"HowToSection","name":"For the lime sauce","itemListElement":["1 tbsp lime juice","1 tsp fish sauce","1 tsp brown sugar","1 tbsp chopped peanuts"]}],"recipeInstructions":[{"@type":"HowToStep","text":"Char the cabbage."}]}
+        """
+
+      let result = try await withDependencies {
+        $0.recipeExtractionClient = .testValue
+      } operation: {
+        try await CreateRecipeExtraction.extract(text: jsonLD)
+      }
+
+      expectNoDifference(result.ingredientSections, [
+        .init(name: "For the cabbage", lines: [
+          "1/2 small green cabbage, cut into 2 wedges",
+          "1 tbsp neutral oil",
+          "1/4 tsp kosher salt",
+        ]),
+        .init(name: "For the lime sauce", lines: [
+          "1 tbsp lime juice",
+          "1 tsp fish sauce",
+          "1 tsp brown sugar",
+          "1 tbsp chopped peanuts",
+        ]),
+      ])
+    }
+
     /// The Project-aware v2 extension keeps exact ingredient section labels without putting fake
     /// heading rows into schema.org's flat `recipeIngredient` fallback. This verifies every field
     /// survives the raw JSON-LD → review draft → canonical save path.
@@ -167,6 +197,7 @@ extension RecipeCoreTests {
     func recipeContractV2DeclaresTheProjectSourceAndCaptureRequest() {
       #expect(RecipeJSONLDContract.projectSource.contains(RecipeJSONLDContract.marker))
       #expect(RecipeJSONLDContract.projectSource.contains("yesChef:ingredientSections"))
+      #expect(RecipeJSONLDContract.projectSource.contains("Never put `HowToSection`"))
       #expect(RecipeJSONLDContract.projectSource.contains("do not make one section per step"))
 
       let request = RecipeJSONLDContract.captureRequest(recipeName: "Braised Cabbage")

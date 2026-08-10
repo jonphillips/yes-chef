@@ -86,9 +86,19 @@ enum RecipeJSONLDExtractor {
     for cuisine in flatStrings(node["recipeCuisine"]) { builder.addCuisine(cuisine) }
     for keyword in flatStrings(node["keywords"]) { builder.addTag(keyword) }
     for image in imageStrings(node["image"]) { builder.addImage(image) }
+    // v2's namespaced sections are authoritative. Also recover the early dogfood shape that put
+    // HowToSection objects in `recipeIngredient`: it is not schema.org-correct, but losing every
+    // ingredient line is worse than accepting that recoverable malformed return.
     let groupedIngredients = ingredientSections(node["yesChef:ingredientSections"])
+    let legacyGroupedIngredients = ingredientSections(node["recipeIngredient"])
     if groupedIngredients.isEmpty {
-      for ingredient in flatStrings(node["recipeIngredient"]) { builder.addIngredient(ingredient) }
+      if legacyGroupedIngredients.isEmpty {
+        for ingredient in flatStrings(node["recipeIngredient"]) { builder.addIngredient(ingredient) }
+      } else {
+        for section in legacyGroupedIngredients {
+          builder.addIngredientSection(name: section.name, lines: section.lines)
+        }
+      }
     } else {
       for section in groupedIngredients {
         builder.addIngredientSection(name: section.name, lines: section.lines)
@@ -130,7 +140,7 @@ enum RecipeJSONLDExtractor {
     case let array as [Any]:
       return array.flatMap { ingredientSections($0) }
     case let dict as [String: Any]:
-      let lines = flatStrings(dict["recipeIngredient"])
+      let lines = flatStrings(dict["recipeIngredient"] ?? dict["itemListElement"])
       guard !lines.isEmpty else { return [] }
       return [(firstString(dict["name"]), lines)]
     default:
