@@ -344,6 +344,7 @@ struct DatabaseBackupTests {
       "Drop all non-model columns from workbench references",
       "Create learned grocery area assignments",
       "Create related recipe edges",
+      "Add review timestamp to learned grocery area assignments",
     ]
     // Guard against fixture drift without running the full restore: the source database's
     // grdb_migrations table is the migrator's actual ordered identifier list, so this tail

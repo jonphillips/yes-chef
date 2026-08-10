@@ -19,6 +19,11 @@ Governed by [ADR-0022](ADR-0022-grocery-merge-stays-deterministic.md) (grocery p
 [ADR-0043](ADR-0043-model-call-chokepoint.md) (every model call declares itself), and the migration-ordering rule
 that migration data writes bypass sync triggers ([[migration-writes-bypass-sync-triggers]]).
 
+**Amendment — 2026-08-10.** Jon reversed S3's "confirm is a no-op" detail: a confirmation is durable review
+metadata, not a placement correction. The audit now separates unreviewed and confirmed `.model` placements. This
+does not reopen the auto-promote decision — model rows still take effect before review and remain below user and seed
+precedence — it records which learned placements have received human attention.
+
 **Reverses one half of a prior decision, on purpose.** The 2026-07-13 grocery call ([[grocery-area-no-learned-cache]])
 had two halves: (a) *truth is deterministic; the classifier is never the source of truth*, and (b) *every classifier
 answer must be human-reviewed, in code, before it counts*. Half (a) is kept and in fact hardened here. Half (b) is
@@ -66,6 +71,7 @@ One row per learned placement. This is the durable, cross-generation, cross-devi
   var canonicalName: String        // the resolution key (CanonicalIngredient.canonicalName output)
   var area: String                 // GroceryStoreArea title (or custom label), same encoding as GroceryItem.aisle
   var source: Source               // .model | .user  — see D3; .seed is NOT stored (it lives in code)
+  var reviewedAt: Date?            // nil until a human confirms a .model placement; review does not affect precedence
   var dateModified: Date           // last-writer-wins tie-break across devices
 }
 enum Source: String, Codable, Sendable { case model, user }
@@ -131,10 +137,11 @@ Why auto-promote is safe here, stated as the trade it is:
 
 **Review survives as an audit surface, not a bottleneck.** ADR-0037's seed-coverage diagnostic is repurposed: instead
 of surfacing *uncovered* names (auto-promote means names stop being uncovered after first sight) and exporting Swift
-literals, it becomes a **browse of `.model` rows** — "here's what the classifier decided on its own; fix or confirm
-any that look wrong." Fixing one writes a `.user` row (D3); confirming is a no-op. The "copy → paste into `seedAreas`
-→ rebuild" export is demoted to optional (you *may* still promote a well-worn name into the reviewed code floor), no
-longer the only way a placement persists. See [Amendment note to ADR-0037](#amends-adr-0037).
+literals, it becomes a **browse of `.model` rows** split into unreviewed and confirmed placements — "here's what the
+classifier decided on its own; fix or confirm any that look wrong." Fixing one writes a `.user` row (D3); confirming
+stamps `reviewedAt` while deliberately leaving the placement and `dateModified` tie-break untouched. The "copy → paste
+into `seedAreas` → rebuild" export is demoted to optional (you *may* still promote a confirmed placement into the
+reviewed code floor), no longer the only way a placement persists. See [Amendment note to ADR-0037](#amends-adr-0037).
 
 ### D5 — This does not cross ADR-0022; it makes placement *more* deterministic, not less
 
@@ -212,8 +219,8 @@ paste-ready Swift dict literals, its explicit loop is "review → clipboard → 
 and its Context states outright *"there is deliberately no persistent `canonicalName → area` cache … the way to make
 a placement permanently stable is to add it to `seedAreas` in code."* **This ADR is that persistent cache**, so that
 sentence and that loop are superseded as the *primary* path. ADR-0037's computation and Settings surface are **kept
-and re-pointed**: the same `SeedCoverageReport` machinery now audits `.model` rows (fix→`.user`, confirm→no-op)
-rather than exporting code. The Swift-literal export is retained as an *optional* promote-into-the-reviewed-floor
+and re-pointed**: the same `SeedCoverageReport` machinery now audits `.model` rows (fix→`.user`, confirm→durable review metadata)
+rather than exporting code. The Swift-literal export is retained as an *optional* promotion of confirmed placements into the reviewed floor
 action, not the mechanism of persistence. No part of ADR-0037 is deleted; its purpose shifts from *the* stability
 mechanism to *an audit over* the stability mechanism.
 
@@ -245,8 +252,10 @@ mechanism to *an audit over* the stability mechanism.
   (D3), in addition to setting the row's `aisle` for immediate display. Test: correct an item, remove it, regenerate
   a list containing it, assert the corrected area holds without a model call.
 - **S3 — repoint the audit surface (amends ADR-0037).** `SeedCoverageReport`/`SeedCoverageView` browse `.model`
-  rows; fix→`.user`, confirm→no-op; Swift-literal export demoted to an optional promote-to-seed action. Test the
-  report over table rows rather than the derived-corpus.
+  rows, split into unreviewed and confirmed placements. `reviewedAt` is nullable synced review metadata (an additive,
+  data-free migration): fix→`.user`, confirm stamps the model row without changing its placement or resolution
+  tie-break; Swift-literal export is an optional promote-to-seed action for confirmed placements. Test the report and
+  confirmation over table rows rather than the derived corpus.
 
 Natural batch: **S1 + S2** as one Codex dispatch (the table is inert without the write paths that feed it). S3 can
 ride the same dispatch or follow — it's the audit layer, not the mechanism.

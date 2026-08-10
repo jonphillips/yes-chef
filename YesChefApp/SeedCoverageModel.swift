@@ -6,21 +6,51 @@ import YesChefCore
 @Observable
 @MainActor
 final class SeedCoverageModel {
-  private(set) var report = SeedCoverageReport()
-  private(set) var errorMessage: String?
+  var errorMessage: String?
+  var isShowingError = false
 
+  @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
+  @ObservationIgnored @Dependency(\.uuid) private var uuid
 
-  func refresh() async {
+  func confirmButtonTapped(assignment: GroceryAreaAssignment) -> Bool {
     do {
-      report = try await database.read { db in
-        try GroceryStoreAreaCache.seedCoverage(in: db)
+      try database.write { db in
+        try GroceryStoreAreaCache.confirmModelAssignment(
+          id: assignment.id,
+          in: db,
+          now: now
+        )
       }
       errorMessage = nil
-    } catch is CancellationError {
-      // SwiftUI cancels this view's refresh task when the pane disappears.
+      return true
     } catch {
       errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
+  func correctionButtonTapped(
+    assignment: GroceryAreaAssignment,
+    area: String
+  ) -> Bool {
+    do {
+      try database.write { db in
+        try GroceryStoreAreaCache.applyUserCorrection(
+          canonicalName: assignment.canonicalName,
+          area: area,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+      errorMessage = nil
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
     }
   }
 }

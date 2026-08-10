@@ -883,7 +883,7 @@ extension DependencyValues {
         CREATE INDEX "index_learnings_on_sourceType_sourceID"
         ON "learnings"("sourceType", "sourceID")
         """)
-      .execute(db)
+        .execute(db)
     }
 
     migrator.registerMigration("Add sparse learning ordering") { db in
@@ -1255,6 +1255,14 @@ extension DependencyValues {
         ) STRICT
         """)
         .execute(db)
+    }
+
+    migrator.registerMigration("Add review timestamp to learned grocery area assignments") { db in
+      try #sql("""
+        ALTER TABLE "groceryAreaAssignments"
+        ADD COLUMN "reviewedAt" TEXT
+        """)
+      .execute(db)
     }
 
     try migrator.migrate(database)
