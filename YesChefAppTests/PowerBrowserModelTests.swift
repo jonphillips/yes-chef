@@ -67,4 +67,26 @@ struct PowerBrowserModelTests {
       expectNoDifference(model.expandedFacetIDs, [secondFacetID])
     }
   }
+
+  @Test
+  func sourceAndUsageControlsWriteTheTypedBrowserQuery() throws {
+    try withDependencies {
+      try $0.bootstrapDatabase()
+    } operation: {
+      let model = PowerBrowserModel()
+
+      model.sourceValueButtonTapped("Milk Street", field: .publication)
+      model.requiresNeverCookedChanged(true)
+      model.requiresFrequentCookingChanged(true)
+
+      expectNoDifference(
+        model.query.sourceFilters,
+        [.values(field: .publication, values: ["Milk Street"])]
+      )
+      expectNoDifference(
+        Set(model.query.attributeFilters),
+        [.neverCooked, .cookedMoreThan(PowerBrowserModel.frequentCookedThreshold)]
+      )
+    }
+  }
 }

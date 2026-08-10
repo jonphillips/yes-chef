@@ -92,6 +92,34 @@ final class RecipeEditorModel {
     return selectedNames.joined(separator: ", ")
   }
 
+  func selectedCategoryID(inFacetNamed facetName: String) -> YesChefCore.Category.ID? {
+    guard let facetID = facets.first(where: { $0.name.caseInsensitiveCompare(facetName) == .orderedSame })?.id else {
+      return nil
+    }
+    return categorySections
+      .first(where: { $0.id == .facet(facetID) })?
+      .rows
+      .first(where: { selectedCategoryIDs.contains($0.category.id) })?
+      .category.id
+  }
+
+  func singleFacetCategorySelectionChanged(
+    _ categoryID: YesChefCore.Category.ID?,
+    inFacetNamed facetName: String
+  ) {
+    guard let facetID = facets.first(where: { $0.name.caseInsensitiveCompare(facetName) == .orderedSame })?.id else {
+      return
+    }
+    var categoryIDs = selectedCategoryIDs
+    categoryIDs.subtract(categories.filter { $0.facetID == facetID }.map(\.id))
+    if let categoryID { categoryIDs.insert(categoryID) }
+    draft.selectedCategoryIDs = categoryIDs
+    draft.categoryNames = categoryRows
+      .filter { categoryIDs.contains($0.category.id) }
+      .map(\.displayName)
+      .joined(separator: ", ")
+  }
+
   var pendingHeroPhoto: RecipeEditorPhotoDraft? {
     draft.pendingPhotos.last { $0.kind == .hero }
   }

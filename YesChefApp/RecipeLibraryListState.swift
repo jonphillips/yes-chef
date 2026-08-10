@@ -18,21 +18,22 @@ extension RecipeLibraryModel {
   }
 
   var visibleRecipeRows: [RecipeListRowData] {
-    unarchivedRecipeRows
-      .filter { row in
-        matchesSearch(row)
-          && matchesFilters(row)
-      }
-      .sorted(by: areInIncreasingOrder)
+    let rowsByID = Dictionary(uniqueKeysWithValues: recipeRows.map { ($0.recipe.id, $0) })
+    return RecipeBrowserEngine(
+      recipes: browserData.recipes,
+      recipeCategories: browserData.recipeCategories,
+      categories: browserData.categories,
+      facets: browserData.facets,
+      sources: browserData.sources,
+      variations: browserData.variations,
+      recipeIDsWithPhotos: browserData.recipeIDsWithPhotos
+    )
+    .matchingRecipeIDs(for: browserQuery)
+    .compactMap { rowsByID[$0] }
   }
 
   var filteredRecipeCount: Int {
-    unarchivedRecipeRows
-      .filter { row in
-        matchesSearch(row)
-          && matchesFilters(row)
-      }
-      .count
+    visibleRecipeRows.count
   }
 
   var hasActiveFilters: Bool {
@@ -40,8 +41,6 @@ extension RecipeLibraryModel {
       || showsPhotosOnly
       || libraryScope != .main
       || !selectedCategoryNames.isEmpty
-      || selectedCuisine != nil
-      || selectedCourse != nil
       || !selectedSourceNames.isEmpty
       || !selectedAuthorNames.isEmpty
   }
@@ -69,24 +68,6 @@ extension RecipeLibraryModel {
           kind: .categories,
           detail: selectedFilterDetail(selectedCategoryNames),
           selectionCount: selectedCategoryNames.count
-        )
-      )
-    }
-    if let selectedCuisine {
-      facets.append(
-        RecipeActiveFilterFacet(
-          kind: .cuisine,
-          detail: selectedCuisine,
-          selectionCount: 1
-        )
-      )
-    }
-    if let selectedCourse {
-      facets.append(
-        RecipeActiveFilterFacet(
-          kind: .course,
-          detail: selectedCourse,
-          selectionCount: 1
         )
       )
     }
@@ -125,16 +106,13 @@ extension RecipeLibraryModel {
 
   var categoryFilterAvailabilityByName: [String: RecipeCategoryFilterAvailability] {
     let categoryNames = distinctOptions(categoryFilterOptions + Array(selectedCategoryNames))
-    let categoryNameSet = Set(categoryNames)
     var matchingRecipeCounts = Dictionary(uniqueKeysWithValues: categoryNames.map { ($0, 0) })
 
-    for row in unarchivedRecipeRows where matchesSearch(row) && matchesFilters(row, categoryNames: []) {
-      let rowCategoryNames = Set(row.categoryFilterNames)
-      guard selectedCategoryNames.isSubset(of: rowCategoryNames) else { continue }
-
-      for categoryName in rowCategoryNames where categoryNameSet.contains(categoryName) {
-        matchingRecipeCounts[categoryName, default: 0] += 1
-      }
+    for categoryName in categoryNames {
+      var prospectiveSelections = selectedCategoryNames
+      prospectiveSelections.insert(categoryName)
+      let count = matchingRecipeCount(categoryNames: prospectiveSelections)
+      matchingRecipeCounts[categoryName] = count
     }
 
     return Dictionary(
@@ -149,14 +127,6 @@ extension RecipeLibraryModel {
         )
       }
     )
-  }
-
-  var cuisineFilterOptions: [String] {
-    distinctOptions(unarchivedRecipeRows.compactMap(\.recipe.cuisine))
-  }
-
-  var courseFilterOptions: [String] {
-    distinctOptions(unarchivedRecipeRows.compactMap(\.recipe.course))
   }
 
   var sourceFilterOptions: [String] {
@@ -235,10 +205,6 @@ extension RecipeLibraryModel {
       showsPhotosOnly = false
     case .categories:
       selectedCategoryNames = []
-    case .cuisine:
-      selectedCuisine = nil
-    case .course:
-      selectedCourse = nil
     case .sources:
       selectedSourceNames = []
     case .authors:
@@ -259,12 +225,16 @@ extension RecipeLibraryModel {
   }
 
   func recipeCount(for state: RecipeListPresetState) -> Int {
-    unarchivedRecipeRows
-      .filter { row in
-        matchesSearch(row, searchText: state.searchText)
-          && matchesFilters(row, state: state)
-      }
-      .count
+    RecipeBrowserEngine(
+      recipes: browserData.recipes,
+      recipeCategories: browserData.recipeCategories,
+      categories: browserData.categories,
+      facets: browserData.facets,
+      sources: browserData.sources,
+      variations: browserData.variations,
+      recipeIDsWithPhotos: browserData.recipeIDsWithPhotos
+    )
+    .matchingRecipeIDs(for: browserQuery(from: state)).count
   }
 
   func categoryFilterButtonTapped(_ categoryName: String) {
@@ -301,41 +271,29 @@ extension RecipeLibraryModel {
     libraryScope = state.libraryScope
     showsFavoritesOnly = state.showsFavoritesOnly
     showsPhotosOnly = state.showsPhotosOnly
-    selectedCategoryNames = canonicalCategoryNames(for: state.selectedCategoryNames)
-    selectedCuisine = state.selectedCuisine
-    selectedCourse = state.selectedCourse
+    var categoryNames = canonicalCategoryNames(for: state.selectedCategoryNames)
+    // Older saved list views stored Cuisine/Course as free text. Resolve those values once
+    // against the corresponding facet, then leave the retired fields empty.
+    for (value, facetName) in [(state.selectedCuisine, "Cuisine"), (state.selectedCourse, "Course")] {
+      guard let category = legacyFacetValue(value, facetNamed: facetName) else { continue }
+      let categoriesByID = Dictionary(uniqueKeysWithValues: browserData.categories.map { ($0.id, $0) })
+      categoryNames.insert(CategoryHierarchy.displayName(for: category, categoriesByID: categoriesByID))
+    }
+    selectedCategoryNames = categoryNames
+    selectedCuisine = nil
+    selectedCourse = nil
     selectedSourceNames = Set(state.selectedSourceNames)
     selectedAuthorNames = Set(state.selectedAuthorNames)
   }
 
-  private func matchesSearch(_ row: RecipeListRowData) -> Bool {
-    matchesSearch(row, searchText: searchText)
-  }
-
-  private func matchesSearch(_ row: RecipeListRowData, searchText: String) -> Bool {
-    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !query.isEmpty else { return true }
-    let recipe = row.recipe
-    return recipe.title.localizedCaseInsensitiveContains(query)
-      || (recipe.subtitle?.localizedCaseInsensitiveContains(query) ?? false)
-      || (recipe.summary?.localizedCaseInsensitiveContains(query) ?? false)
-      || (recipe.cuisine?.localizedCaseInsensitiveContains(query) ?? false)
-      || (recipe.course?.localizedCaseInsensitiveContains(query) ?? false)
-      || row.sourceSearchValues.contains { $0.localizedCaseInsensitiveContains(query) }
-      || row.categoryNames.contains { $0.localizedCaseInsensitiveContains(query) }
-  }
-
-  private func matchesFilters(_ row: RecipeListRowData) -> Bool {
-    matchesFilters(row, categoryNames: selectedCategoryNames)
-  }
-
-  private func matchesFilters(_ row: RecipeListRowData, categoryNames: Set<String>) -> Bool {
-    matchesFilters(
-      row,
+  private var browserQuery: RecipeBrowserQuery {
+    browserQuery(
+      searchText: searchText,
+      sortOrder: sortOrder,
       libraryScope: libraryScope,
       showsFavoritesOnly: showsFavoritesOnly,
       showsPhotosOnly: showsPhotosOnly,
-      categoryNames: categoryNames,
+      categoryNames: selectedCategoryNames,
       selectedCuisine: selectedCuisine,
       selectedCourse: selectedCourse,
       sourceNames: selectedSourceNames,
@@ -343,9 +301,10 @@ extension RecipeLibraryModel {
     )
   }
 
-  private func matchesFilters(_ row: RecipeListRowData, state: RecipeListPresetState) -> Bool {
-    matchesFilters(
-      row,
+  private func browserQuery(from state: RecipeListPresetState) -> RecipeBrowserQuery {
+    browserQuery(
+      searchText: state.searchText,
+      sortOrder: state.sortOrder,
       libraryScope: state.libraryScope,
       showsFavoritesOnly: state.showsFavoritesOnly,
       showsPhotosOnly: state.showsPhotosOnly,
@@ -357,8 +316,9 @@ extension RecipeLibraryModel {
     )
   }
 
-  private func matchesFilters(
-    _ row: RecipeListRowData,
+  private func browserQuery(
+    searchText: String,
+    sortOrder: RecipeListSort,
     libraryScope: RecipeLibraryScope,
     showsFavoritesOnly: Bool,
     showsPhotosOnly: Bool,
@@ -367,41 +327,87 @@ extension RecipeLibraryModel {
     selectedCourse: String?,
     sourceNames: Set<String>,
     authorNames: Set<String>
-  ) -> Bool {
-    let recipe = row.recipe
+  ) -> RecipeBrowserQuery {
+    let categoriesByID = Dictionary(uniqueKeysWithValues: browserData.categories.map { ($0.id, $0) })
+    var selectedCategories = browserData.categories.filter { category in
+      let displayNames = CategoryHierarchy.filterDisplayNames(for: category, categoriesByID: categoriesByID)
+      return categoryNames.contains { selected in
+        displayNames.contains { $0.caseInsensitiveCompare(selected) == .orderedSame }
+      }
+    }
+    selectedCategories += [
+      legacyFacetValue(selectedCuisine, facetNamed: "Cuisine"),
+      legacyFacetValue(selectedCourse, facetNamed: "Course"),
+    ]
+    .compactMap(\.self)
+    let facetSelections = Dictionary(grouping: selectedCategories.compactMap { category in
+      category.facetID.map { ($0, category.id) }
+    }, by: \.0)
+    .map { RecipeBrowserQuery.FacetSelection(facetID: $0.key, categoryIDs: Set($0.value.map(\.1))) }
+    let looseLabelIDs = Set(selectedCategories.filter { $0.facetID == nil }.map(\.id))
+
+    var attributeFilters: [RecipeBrowserAttributeFilter] = []
     switch libraryScope {
-    case .main where recipe.libraryPlacement != .main:
-      return false
-    case .reference where recipe.libraryPlacement != .reference:
-      return false
-    case .all, .main, .reference:
+    case .main:
+      attributeFilters.append(.libraryPlacement(.main))
+    case .reference:
+      attributeFilters.append(.libraryPlacement(.reference))
+    case .all:
       break
     }
-    if showsFavoritesOnly && !recipe.favorite { return false }
-    if showsPhotosOnly && !row.hasPhoto { return false }
-    if !categoryNames.isEmpty,
-       !categoryNames.allSatisfy({ selectedName in
-         row.categoryFilterNames.contains {
-           $0.caseInsensitiveCompare(selectedName) == .orderedSame
-         }
-       }) {
-      return false
+    if showsFavoritesOnly { attributeFilters.append(.favoritesOnly) }
+    if showsPhotosOnly { attributeFilters.append(.hasPhoto) }
+
+    var sourceFilters: [RecipeBrowserSourceFilter] = []
+    if !sourceNames.isEmpty { sourceFilters.append(.values(field: .name, values: sourceNames)) }
+    if !authorNames.isEmpty { sourceFilters.append(.values(field: .author, values: authorNames)) }
+
+    let trimmedSearchText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    return RecipeBrowserQuery(
+      text: trimmedSearchText.isEmpty ? nil : trimmedSearchText,
+      facetSelections: facetSelections,
+      attributeFilters: attributeFilters,
+      sourceFilters: sourceFilters,
+      looseLabelIDs: looseLabelIDs,
+      sort: sortOrder.browserSort
+    )
+  }
+
+  private func matchingRecipeCount(categoryNames: Set<String>) -> Int {
+    let query = browserQuery(
+      searchText: searchText,
+      sortOrder: sortOrder,
+      libraryScope: libraryScope,
+      showsFavoritesOnly: showsFavoritesOnly,
+      showsPhotosOnly: showsPhotosOnly,
+      categoryNames: categoryNames,
+      selectedCuisine: selectedCuisine,
+      selectedCourse: selectedCourse,
+      sourceNames: selectedSourceNames,
+      authorNames: selectedAuthorNames
+    )
+    return RecipeBrowserEngine(
+      recipes: browserData.recipes,
+      recipeCategories: browserData.recipeCategories,
+      categories: browserData.categories,
+      facets: browserData.facets,
+      sources: browserData.sources,
+      variations: browserData.variations,
+      recipeIDsWithPhotos: browserData.recipeIDsWithPhotos
+    )
+    .matchingRecipeIDs(for: query).count
+  }
+
+  private func legacyFacetValue(_ value: String?, facetNamed facetName: String) -> YesChefCore.Category? {
+    guard
+      let value,
+      let facetID = browserData.facets.first(where: {
+        $0.name.caseInsensitiveCompare(facetName) == .orderedSame
+      })?.id
+    else { return nil }
+    return browserData.categories.first {
+      $0.facetID == facetID && $0.name.caseInsensitiveCompare(value) == .orderedSame
     }
-    if let selectedCuisine, recipe.cuisine != selectedCuisine {
-      return false
-    }
-    if let selectedCourse, recipe.course != selectedCourse {
-      return false
-    }
-    if !sourceNames.isEmpty,
-       !sourceNames.contains(row.filterSourceName ?? "") {
-      return false
-    }
-    if !authorNames.isEmpty,
-       !authorNames.contains(row.source?.author.nonEmpty ?? "") {
-      return false
-    }
-    return true
   }
 
   private func canonicalCategoryNames(for names: [String]) -> Set<String> {
@@ -412,76 +418,6 @@ extension RecipeLibraryModel {
         } ?? selectedName
       }
     )
-  }
-
-  private func areInIncreasingOrder(_ lhs: RecipeListRowData, _ rhs: RecipeListRowData) -> Bool {
-    switch sortOrder {
-    case .title:
-      titleSort(lhs.recipe, rhs.recipe)
-    case .newest:
-      descendingDateSort(lhs.recipe.dateCreated, rhs.recipe.dateCreated, lhs.recipe, rhs.recipe)
-    case .recentlyModified:
-      descendingDateSort(lhs.recipe.dateModified, rhs.recipe.dateModified, lhs.recipe, rhs.recipe)
-    case .cookTime:
-      optionalIntSort(lhs.recipe.listCookTimeMinutes, rhs.recipe.listCookTimeMinutes, lhs.recipe, rhs.recipe)
-    case .recentlyCooked:
-      optionalDateSort(lhs.recipe.lastCookedAt, rhs.recipe.lastCookedAt, lhs.recipe, rhs.recipe)
-    }
-  }
-
-  private func titleSort(_ lhs: Recipe, _ rhs: Recipe) -> Bool {
-    let titleOrder = lhs.title.localizedStandardCompare(rhs.title)
-    if titleOrder != .orderedSame {
-      return titleOrder == .orderedAscending
-    }
-    // Every sort mode falls through to `titleSort` as its final tiebreak, so making it a total
-    // order on the stable id keeps rows with an identical sort key (e.g. a duplicate import) from
-    // swapping between otherwise-identical republishes. Swift's `sort` is not stable, and an
-    // animated List diffs those phantom moves into an invalid batch update (crash).
-    return lhs.id.uuidString < rhs.id.uuidString
-  }
-
-  private func descendingDateSort(_ lhsDate: Date, _ rhsDate: Date, _ lhs: Recipe, _ rhs: Recipe) -> Bool {
-    if lhsDate != rhsDate {
-      return lhsDate > rhsDate
-    }
-    return titleSort(lhs, rhs)
-  }
-
-  private func optionalDateSort(
-    _ lhsDate: Date?,
-    _ rhsDate: Date?,
-    _ lhs: Recipe,
-    _ rhs: Recipe
-  ) -> Bool {
-    switch (lhsDate, rhsDate) {
-    case let (lhsDate?, rhsDate?) where lhsDate != rhsDate:
-      lhsDate > rhsDate
-    case (nil, nil), (_?, _?):
-      titleSort(lhs, rhs)
-    case (_?, nil):
-      true
-    case (nil, _?):
-      false
-    }
-  }
-
-  private func optionalIntSort(
-    _ lhsValue: Int?,
-    _ rhsValue: Int?,
-    _ lhs: Recipe,
-    _ rhs: Recipe
-  ) -> Bool {
-    switch (lhsValue, rhsValue) {
-    case let (lhsValue?, rhsValue?) where lhsValue != rhsValue:
-      lhsValue < rhsValue
-    case (nil, nil), (_?, _?):
-      titleSort(lhs, rhs)
-    case (_?, nil):
-      true
-    case (nil, _?):
-      false
-    }
   }
 
   private func distinctOptions(_ values: [String]) -> [String] {
@@ -555,6 +491,18 @@ enum RecipeListSort: String, CaseIterable, Codable, Identifiable, Sendable {
   }
 }
 
+private extension RecipeListSort {
+  var browserSort: RecipeBrowserSort {
+    switch self {
+    case .title: .title
+    case .newest: .newest
+    case .recentlyModified: .recentlyModified
+    case .cookTime: .cookTime
+    case .recentlyCooked: .recentlyCooked
+    }
+  }
+}
+
 enum RecipeLibraryScope: String, CaseIterable, Codable, Identifiable, Sendable {
   case main
   case reference
@@ -587,35 +535,11 @@ extension RecipeLibraryPlacement {
   }
 }
 
-private extension Recipe {
-  var listCookTimeMinutes: Int? {
-    if let totalTimeMinutes {
-      return totalTimeMinutes
-    }
-    let parts = [prepTimeMinutes, cookTimeMinutes, activeTimeMinutes].compactMap { $0 }
-    guard !parts.isEmpty else { return nil }
-    return parts.reduce(0, +)
-  }
-}
-
 private extension RecipeListRowData {
   var filterSourceName: String? {
     source?.name.nonEmpty
       ?? source?.publicationName.nonEmpty
       ?? source?.bookTitle.nonEmpty
-  }
-
-  var sourceSearchValues: [String] {
-    [
-      source?.name,
-      source?.url,
-      source?.author,
-      source?.publicationName,
-      source?.bookTitle,
-      source?.pageNumber,
-      source?.sourceNotes,
-    ]
-    .compactMap { $0?.nonEmpty }
   }
 }
 

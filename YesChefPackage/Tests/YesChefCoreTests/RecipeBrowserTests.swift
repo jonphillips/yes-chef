@@ -48,6 +48,108 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func typedAttributeAndUsageFiltersAreAndedAtTheSharedEngineBoundary() {
+      let fixture = BrowserFixture()
+      let olderDate = fixture.now.addingTimeInterval(-86_400)
+      let matching = RecipeBrowserRecipe(
+        id: fixture.ids.next(),
+        title: "Weeknight Braise",
+        dateCreated: fixture.now,
+        dateModified: fixture.now,
+        totalTimeMinutes: 45,
+        servings: 6,
+        rating: 5,
+        timesCooked: 6,
+        makeAheadText: "Braised dishes improve overnight."
+      )
+      let tooSlow = RecipeBrowserRecipe(
+        id: fixture.ids.next(),
+        title: "Slow Braise",
+        dateCreated: fixture.now,
+        dateModified: fixture.now,
+        totalTimeMinutes: 90,
+        servings: 6,
+        rating: 5,
+        timesCooked: 6,
+        makeAheadText: "Braised dishes improve overnight."
+      )
+      let neverCooked = RecipeBrowserRecipe(
+        id: fixture.ids.next(),
+        title: "New Recipe",
+        dateCreated: fixture.now,
+        dateModified: fixture.now,
+        totalTimeMinutes: 45,
+        servings: 6,
+        rating: 5,
+        timesCooked: 0,
+        makeAheadText: "Make it early."
+      )
+      let oldRecipe = RecipeBrowserRecipe(
+        id: fixture.ids.next(),
+        title: "Old Recipe",
+        dateCreated: olderDate,
+        dateModified: olderDate,
+        totalTimeMinutes: 45,
+        servings: 6,
+        rating: 5,
+        timesCooked: 6,
+        makeAheadText: "Make it early."
+      )
+      let engine = RecipeBrowserEngine(recipes: [matching, tooSlow, neverCooked, oldRecipe], recipeCategories: [], categories: [], facets: [])
+
+      expectNoDifference(
+        engine.matchingRecipeIDs(
+          for: RecipeBrowserQuery(
+            attributeFilters: [
+              .totalTimeAtMost(45),
+              .servingsAtLeast(6),
+              .ratingAtLeast(5),
+              .hasMakeAhead,
+              .addedAfter(olderDate.addingTimeInterval(1)),
+              .cookedMoreThan(5),
+            ]
+          )
+        ),
+        [matching.id]
+      )
+      expectNoDifference(
+        engine.matchingRecipeIDs(for: RecipeBrowserQuery(attributeFilters: [.neverCooked])),
+        [neverCooked.id]
+      )
+    }
+
+    @Test
+    func sourceValuesAreAlternativesWithinAFieldAndDifferentFieldsAreAnded() {
+      let fixture = BrowserFixture()
+      let matching = RecipeBrowserRecipe(id: fixture.ids.next(), title: "Book Recipe", dateCreated: fixture.now, dateModified: fixture.now)
+      let wrongAuthor = RecipeBrowserRecipe(id: fixture.ids.next(), title: "Other Author", dateCreated: fixture.now, dateModified: fixture.now)
+      let wrongBook = RecipeBrowserRecipe(id: fixture.ids.next(), title: "Other Book", dateCreated: fixture.now, dateModified: fixture.now)
+      let engine = RecipeBrowserEngine(
+        recipes: [matching, wrongAuthor, wrongBook],
+        recipeCategories: [],
+        categories: [],
+        facets: [],
+        sources: [
+          .init(recipeID: matching.id, author: "Samin Nosrat", cookbook: "Salt Fat Acid Heat"),
+          .init(recipeID: wrongAuthor.id, author: "Other Cook", cookbook: "Salt Fat Acid Heat"),
+          .init(recipeID: wrongBook.id, author: "Samin Nosrat", cookbook: "Other Book"),
+        ]
+      )
+
+      expectNoDifference(
+        engine.matchingRecipeIDs(
+          for: RecipeBrowserQuery(
+            sourceFilters: [
+              .values(field: .author, values: ["Samin Nosrat", "Other Cook"]),
+              .values(field: .cookbook, values: ["Salt Fat Acid Heat"]),
+            ]
+          )
+        ),
+        [matching.id, wrongAuthor.id]
+      )
+    }
+
+    @Test
     func selectingOneFacetKeepsOtherFacetsAvailableWithNarrowedCounts() throws {
       let fixture = BrowserFixture()
 

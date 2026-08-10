@@ -145,8 +145,8 @@ struct RecipeEditorFields: View {
               .tag(placement)
           }
         }
-        StackedTextField(title: "Cuisine", text: $model.draft.cuisine)
-        StackedTextField(title: "Course", text: $model.draft.course)
+        RecipeFacetSingleSelectPicker(model: model, facetName: "Cuisine")
+        RecipeFacetSingleSelectPicker(model: model, facetName: "Course")
         RecipeCategorySelectionField(model: model)
       }
 
@@ -246,6 +246,32 @@ struct RecipeEditorFields: View {
       await Task.yield()
       focusedIngredientSectionID = sectionID
     }
+  }
+}
+
+private struct RecipeFacetSingleSelectPicker: View {
+  let model: RecipeEditorModel
+  let facetName: String
+
+  private var rows: [CategoryHierarchy.DisplayRow] {
+    guard let facet = model.facets.first(where: { $0.name.caseInsensitiveCompare(facetName) == .orderedSame }) else {
+      return []
+    }
+    return CategoryHierarchy.displayRows(from: model.categories.filter { $0.facetID == facet.id })
+  }
+
+  var body: some View {
+    Picker(facetName, selection: Binding(
+      get: { model.selectedCategoryID(inFacetNamed: facetName) },
+      set: { model.singleFacetCategorySelectionChanged($0, inFacetNamed: facetName) }
+    )) {
+      Text("None").tag(Optional<YesChefCore.Category.ID>.none)
+      ForEach(rows) { row in
+        Text(row.displayName)
+          .tag(Optional(row.category.id))
+      }
+    }
+    .disabled(rows.isEmpty)
   }
 }
 

@@ -19,8 +19,6 @@ enum RecipeFilterFacetKind: Hashable, Identifiable, Sendable {
   case favorites
   case photos
   case categories
-  case cuisine
-  case course
   case sources
   case authors
 
@@ -32,8 +30,6 @@ enum RecipeFilterFacetKind: Hashable, Identifiable, Sendable {
     case .favorites: "Favorites"
     case .photos: "Photos"
     case .categories: "Categories"
-    case .cuisine: "Cuisine"
-    case .course: "Course"
     case .sources: "Sources"
     case .authors: "Authors"
     }
@@ -45,8 +41,6 @@ enum RecipeFilterFacetKind: Hashable, Identifiable, Sendable {
     case .favorites: "star.fill"
     case .photos: "photo"
     case .categories: "folder"
-    case .cuisine: "globe.americas"
-    case .course: "fork.knife"
     case .sources: "book"
     case .authors: "person.text.rectangle"
     }

@@ -33,6 +33,10 @@ final class RecipeLibraryModel {
   @Dependency(\.uuid) private var uuid
   @ObservationIgnored
   @Fetch(RecipeListRequest(), animation: .default) var recipeRows: [RecipeListRowData] = []
+  @ObservationIgnored
+  @Fetch(RecipeBrowserDataRequest(), animation: .default) var browserData = RecipeBrowserData(
+    recipes: [], recipeCategories: [], categories: [], facets: []
+  )
   @ObservationIgnored @Fetch(CategoryListRequest(), animation: .default) var categoryFilterCategories: [YesChefCore.Category] = []
   @ObservationIgnored @Fetch(FacetListRequest(), animation: .default) var categoryFilterFacets: [Facet] = []
 

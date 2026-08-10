@@ -4,17 +4,23 @@ import SQLiteData
 public struct RecipeBrowserQuery: Codable, Hashable, Sendable {
   public var text: String?
   public var facetSelections: [FacetSelection]
+  public var attributeFilters: [RecipeBrowserAttributeFilter]
+  public var sourceFilters: [RecipeBrowserSourceFilter]
   public var looseLabelIDs: Set<Category.ID>
   public var sort: RecipeBrowserSort
 
   public init(
     text: String? = nil,
     facetSelections: [FacetSelection] = [],
+    attributeFilters: [RecipeBrowserAttributeFilter] = [],
+    sourceFilters: [RecipeBrowserSourceFilter] = [],
     looseLabelIDs: Set<Category.ID> = [],
     sort: RecipeBrowserSort = .title
   ) {
     self.text = text
     self.facetSelections = facetSelections
+    self.attributeFilters = attributeFilters
+    self.sourceFilters = sourceFilters
     self.looseLabelIDs = looseLabelIDs
     self.sort = sort
   }
@@ -28,6 +34,32 @@ public struct RecipeBrowserQuery: Codable, Hashable, Sendable {
       self.categoryIDs = categoryIDs
     }
   }
+}
+
+public enum RecipeBrowserAttributeFilter: Codable, Hashable, Sendable {
+  case libraryPlacement(RecipeLibraryPlacement)
+  case favoritesOnly
+  case hasPhoto
+  case totalTimeAtMost(Int)
+  case servingsAtLeast(Double)
+  case ratingAtLeast(Int)
+  case hasMakeAhead
+  case addedAfter(Date)
+  case neverCooked
+  case cookedMoreThan(Int)
+}
+
+public enum RecipeBrowserSourceField: String, CaseIterable, Codable, Hashable, Sendable {
+  case name
+  case author
+  case cookbook
+  case publication
+  case website
+}
+
+public enum RecipeBrowserSourceFilter: Codable, Hashable, Sendable {
+  /// Values within one source field are alternatives; distinct source fields are combined with AND.
+  case values(field: RecipeBrowserSourceField, values: Set<String>)
 }
 
 public enum RecipeBrowserSort: String, CaseIterable, Codable, Hashable, Sendable {
@@ -89,7 +121,12 @@ public struct RecipeBrowserRecipe: Equatable, Sendable {
   public var prepTimeMinutes: Int?
   public var cookTimeMinutes: Int?
   public var activeTimeMinutes: Int?
+  public var servings: Double?
+  public var rating: Int?
+  public var favorite: Bool
+  public var libraryPlacement: RecipeLibraryPlacement
   public var lastCookedAt: Date?
+  public var timesCooked: Int
   public var archived: Bool
 
   public init(
@@ -105,7 +142,13 @@ public struct RecipeBrowserRecipe: Equatable, Sendable {
     prepTimeMinutes: Int? = nil,
     cookTimeMinutes: Int? = nil,
     activeTimeMinutes: Int? = nil,
+    servings: Double? = nil,
+    rating: Int? = nil,
+    favorite: Bool = false,
+    libraryPlacement: RecipeLibraryPlacement = .main,
     lastCookedAt: Date? = nil,
+    timesCooked: Int = 0,
+    makeAheadText: String? = nil,
     archived: Bool = false
   ) {
     self.id = id
@@ -120,18 +163,66 @@ public struct RecipeBrowserRecipe: Equatable, Sendable {
     self.prepTimeMinutes = prepTimeMinutes
     self.cookTimeMinutes = cookTimeMinutes
     self.activeTimeMinutes = activeTimeMinutes
+    self.servings = servings
+    self.rating = rating
+    self.favorite = favorite
+    self.libraryPlacement = libraryPlacement
     self.lastCookedAt = lastCookedAt
+    self.timesCooked = timesCooked
+    self.makeAheadText = makeAheadText
     self.archived = archived
   }
+
+  public var listTimeMinutes: Int? {
+    if let totalTimeMinutes { return totalTimeMinutes }
+    let parts = [prepTimeMinutes, cookTimeMinutes, activeTimeMinutes].compactMap { $0 }
+    return parts.isEmpty ? nil : parts.reduce(0, +)
+  }
+
+  public var hasMakeAhead: Bool {
+    makeAheadText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+  }
+
+  /// `RecipeBrowserRecipe` intentionally carries only query summaries. The full make-ahead prose
+  /// stays in the database row; this marker gives the browser its typed presence predicate.
+  public var makeAheadText: String?
 }
 
 public struct RecipeBrowserSource: Equatable, Sendable {
   public var recipeID: Recipe.ID
+  public var name: String?
+  public var author: String?
+  public var cookbook: String?
+  public var publication: String?
+  public var website: String?
   public var searchValues: [String]
 
-  public init(recipeID: Recipe.ID, searchValues: [String]) {
+  public init(
+    recipeID: Recipe.ID,
+    name: String? = nil,
+    author: String? = nil,
+    cookbook: String? = nil,
+    publication: String? = nil,
+    website: String? = nil,
+    searchValues: [String] = []
+  ) {
     self.recipeID = recipeID
+    self.name = name
+    self.author = author
+    self.cookbook = cookbook
+    self.publication = publication
+    self.website = website
     self.searchValues = searchValues
+  }
+
+  public func value(for field: RecipeBrowserSourceField) -> String? {
+    switch field {
+    case .name: name
+    case .author: author
+    case .cookbook: cookbook
+    case .publication: publication
+    case .website: website
+    }
   }
 }
 
@@ -154,6 +245,7 @@ public struct RecipeBrowserData: Equatable, Sendable {
   public var facets: [Facet]
   public var sources: [RecipeBrowserSource]
   public var variations: [RecipeBrowserVariation]
+  public var recipeIDsWithPhotos: Set<Recipe.ID>
 
   public init(
     recipes: [RecipeBrowserRecipe],
@@ -161,7 +253,8 @@ public struct RecipeBrowserData: Equatable, Sendable {
     categories: [Category],
     facets: [Facet],
     sources: [RecipeBrowserSource] = [],
-    variations: [RecipeBrowserVariation] = []
+    variations: [RecipeBrowserVariation] = [],
+    recipeIDsWithPhotos: Set<Recipe.ID> = []
   ) {
     self.recipes = recipes
     self.recipeCategories = recipeCategories
@@ -169,6 +262,7 @@ public struct RecipeBrowserData: Equatable, Sendable {
     self.facets = facets
     self.sources = sources
     self.variations = variations
+    self.recipeIDsWithPhotos = recipeIDsWithPhotos
   }
 
   public func result(for query: RecipeBrowserQuery) -> RecipeBrowserResult {
@@ -178,7 +272,8 @@ public struct RecipeBrowserData: Equatable, Sendable {
       categories: categories,
       facets: facets,
       sources: sources,
-      variations: variations
+      variations: variations,
+      recipeIDsWithPhotos: recipeIDsWithPhotos
     )
     .result(for: query)
   }
@@ -193,7 +288,9 @@ public struct RecipeBrowserEngine: Sendable {
   private let descendantIDsByCategoryID: [Category.ID: Set<Category.ID>]
   private let ancestorIDsByCategoryID: [Category.ID: Set<Category.ID>]
   private let sourceSearchValuesByRecipeID: [Recipe.ID: [String]]
+  private let sourcesByRecipeID: [Recipe.ID: [RecipeBrowserSource]]
   private let variationNamesByRecipeID: [Recipe.ID: [String]]
+  private let recipeIDsWithPhotos: Set<Recipe.ID>
 
   public init(
     recipes: [RecipeBrowserRecipe],
@@ -201,7 +298,8 @@ public struct RecipeBrowserEngine: Sendable {
     categories: [Category],
     facets: [Facet],
     sources: [RecipeBrowserSource] = [],
-    variations: [RecipeBrowserVariation] = []
+    variations: [RecipeBrowserVariation] = [],
+    recipeIDsWithPhotos: Set<Recipe.ID> = []
   ) {
     let visibleCategories = CategoryRepository.visibleCategories(categories, facets: facets)
     let visibleCategoryIDs = Set(visibleCategories.map(\.id))
@@ -229,8 +327,10 @@ public struct RecipeBrowserEngine: Sendable {
     )
     self.sourceSearchValuesByRecipeID = Dictionary(grouping: sources, by: \.recipeID)
       .mapValues { $0.flatMap(\.searchValues) }
+    self.sourcesByRecipeID = Dictionary(grouping: sources, by: \.recipeID)
     self.variationNamesByRecipeID = Dictionary(grouping: variations, by: \.recipeID)
       .mapValues { $0.map(\.name) }
+    self.recipeIDsWithPhotos = recipeIDsWithPhotos
   }
 
   public func result(for query: RecipeBrowserQuery) -> RecipeBrowserResult {
@@ -315,8 +415,67 @@ public struct RecipeBrowserEngine: Sendable {
   ) -> Bool {
     guard !recipe.archived else { return false }
     guard matchesText(recipe, text: query.text) else { return false }
+    guard matchesAttributes(recipe, filters: query.attributeFilters) else { return false }
+    guard matchesSources(recipe, filters: query.sourceFilters) else { return false }
     guard matchesLooseLabels(recipe, selectedCategoryIDs: query.looseLabelIDs) else { return false }
     return matchesFacetSelections(recipe, query: query, excludingFacetID: excludingFacetID)
+  }
+
+  private func matchesAttributes(
+    _ recipe: RecipeBrowserRecipe,
+    filters: [RecipeBrowserAttributeFilter]
+  ) -> Bool {
+    filters.allSatisfy { filter in
+      switch filter {
+      case let .libraryPlacement(placement):
+        return recipe.libraryPlacement == placement
+      case .favoritesOnly:
+        return recipe.favorite
+      case .hasPhoto:
+        return recipeIDsWithPhotos.contains(recipe.id)
+      case let .totalTimeAtMost(minutes):
+        guard let time = recipe.listTimeMinutes else { return false }
+        return time <= minutes
+      case let .servingsAtLeast(servings):
+        guard let recipeServings = recipe.servings else { return false }
+        return recipeServings >= servings
+      case let .ratingAtLeast(rating):
+        guard let recipeRating = recipe.rating else { return false }
+        return recipeRating >= rating
+      case .hasMakeAhead:
+        return recipe.hasMakeAhead
+      case let .addedAfter(date):
+        return recipe.dateCreated >= date
+      case .neverCooked:
+        return recipe.timesCooked == 0
+      case let .cookedMoreThan(count):
+        return recipe.timesCooked > count
+      }
+    }
+  }
+
+  private func matchesSources(
+    _ recipe: RecipeBrowserRecipe,
+    filters: [RecipeBrowserSourceFilter]
+  ) -> Bool {
+    let valuesByField = Dictionary(grouping: filters.compactMap { filter -> (RecipeBrowserSourceField, Set<String>)? in
+      guard case let .values(field, values) = filter, !values.isEmpty else { return nil }
+      return (field, values)
+    }, by: \.0)
+    .mapValues { groups in groups.reduce(into: Set<String>()) { $0.formUnion($1.1) } }
+
+    return valuesByField.allSatisfy { field, selectedValues in
+      let normalizedSelections = Set(selectedValues.map(Self.normalizedSourceValue))
+      return (sourcesByRecipeID[recipe.id] ?? []).contains { source in
+        guard let value = source.value(for: field) else { return false }
+        return normalizedSelections.contains(Self.normalizedSourceValue(value))
+      }
+    }
+  }
+
+  private static func normalizedSourceValue(_ value: String) -> String {
+    value.trimmingCharacters(in: .whitespacesAndNewlines)
+      .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
   }
 
   private func matchesText(_ recipe: RecipeBrowserRecipe, text: String?) -> Bool {
@@ -422,7 +581,7 @@ public struct RecipeBrowserEngine: Sendable {
     case .recentlyModified:
       descendingDateOrder(lhs.dateModified, rhs.dateModified, lhs, rhs)
     case .cookTime:
-      optionalIntOrder(lhs.cookTimeMinutes, rhs.cookTimeMinutes, lhs, rhs)
+      optionalIntOrder(lhs.listTimeMinutes, rhs.listTimeMinutes, lhs, rhs)
     case .recentlyCooked:
       optionalDateOrder(lhs.lastCookedAt, rhs.lastCookedAt, lhs, rhs)
     }
@@ -506,7 +665,13 @@ public struct RecipeBrowserDataRequest: FetchKeyRequest {
           prepTimeMinutes: $0.prepTimeMinutes,
           cookTimeMinutes: $0.cookTimeMinutes,
           activeTimeMinutes: $0.activeTimeMinutes,
+          servings: $0.servings,
+          rating: $0.rating,
+          favorite: $0.favorite,
+          libraryPlacement: $0.libraryPlacement,
           lastCookedAt: $0.lastCookedAt,
+          timesCooked: $0.timesCooked,
+          makeAhead: $0.makeAhead,
           archived: $0.archived
         )
       }
@@ -515,6 +680,13 @@ public struct RecipeBrowserDataRequest: FetchKeyRequest {
     let sources = try RecipeSource.fetchAll(db).map { source in
       RecipeBrowserSource(
         recipeID: source.recipeID,
+        // Match the compact list's long-standing "Source" display priority while keeping
+        // publication and cookbook independently queryable through their typed fields.
+        name: source.name?.nonEmpty ?? source.publicationName?.nonEmpty ?? source.bookTitle?.nonEmpty,
+        author: source.author,
+        cookbook: source.bookTitle,
+        publication: source.publicationName,
+        website: source.url,
         searchValues: [
           source.name,
           source.url,
@@ -539,7 +711,17 @@ public struct RecipeBrowserDataRequest: FetchKeyRequest {
       categories: try Category.fetchAll(db),
       facets: try Facet.fetchAll(db),
       sources: sources,
-      variations: variations
+      variations: variations,
+      recipeIDsWithPhotos: Set(
+        try RecipePhoto
+          .select {
+            RecipeBrowserPhotoRow.Columns(recipeID: $0.recipeID, thumbnailData: $0.thumbnailData, kind: $0.kind)
+          }
+          .fetchAll(db)
+          .compactMap { row in
+            row.kind == .referenceDocument || row.thumbnailData == nil ? nil : row.recipeID
+          }
+      )
     )
   }
 }
@@ -558,7 +740,13 @@ private struct RecipeBrowserRecipeRow: Equatable, Sendable {
   let prepTimeMinutes: Int?
   let cookTimeMinutes: Int?
   let activeTimeMinutes: Int?
+  let servings: Double?
+  let rating: Int?
+  let favorite: Bool
+  let libraryPlacement: RecipeLibraryPlacement
   let lastCookedAt: Date?
+  let timesCooked: Int
+  let makeAhead: String?
   let archived: Bool
 
   var browserRecipe: RecipeBrowserRecipe {
@@ -575,7 +763,13 @@ private struct RecipeBrowserRecipeRow: Equatable, Sendable {
       prepTimeMinutes: prepTimeMinutes,
       cookTimeMinutes: cookTimeMinutes,
       activeTimeMinutes: activeTimeMinutes,
+      servings: servings,
+      rating: rating,
+      favorite: favorite,
+      libraryPlacement: libraryPlacement,
       lastCookedAt: lastCookedAt,
+      timesCooked: timesCooked,
+      makeAheadText: makeAhead,
       archived: archived
     )
   }
@@ -585,6 +779,13 @@ private struct RecipeBrowserRecipeRow: Equatable, Sendable {
 private struct RecipeBrowserVariationRow: Equatable, Sendable {
   let recipeID: Recipe.ID
   let name: String
+}
+
+@Selection
+private struct RecipeBrowserPhotoRow: Equatable, Sendable {
+  let recipeID: Recipe.ID
+  let thumbnailData: Data?
+  let kind: RecipePhotoKind
 }
 
 private extension String {
