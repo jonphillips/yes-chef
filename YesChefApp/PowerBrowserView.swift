@@ -30,6 +30,10 @@ private struct PowerBrowserFacetsView: View {
     @Bindable var model = model
 
     List {
+      PowerBrowserAttributeFilters(model: model)
+      PowerBrowserUsageFilters(model: model)
+      PowerBrowserSourceFilters(model: model)
+
       if result.availableFacets.isEmpty {
         ContentUnavailableView(
           "No Facets Available",
@@ -91,6 +95,133 @@ private struct PowerBrowserFacetValueRow: View {
     .accessibilityLabel(value.category.name)
     .accessibilityValue("\(value.matchingRecipeCount) recipes\(value.isSelected ? ", selected" : "")")
     .accessibilityHint(value.isSelected ? "Removes this selection" : "Adds this selection")
+  }
+}
+
+private struct PowerBrowserAttributeFilters: View {
+  let model: PowerBrowserModel
+
+  var body: some View {
+    @Bindable var model = model
+
+    Section("Attributes") {
+      TextField("Total time at most (min)", text: $model.totalTimeAtMostText)
+        .keyboardType(.numberPad)
+        .onSubmit(model.totalTimeTextChanged)
+        .onChange(of: model.totalTimeAtMostText) { _, _ in
+          model.totalTimeTextChanged()
+        }
+
+      TextField("Servings at least", text: $model.servingsAtLeastText)
+        .keyboardType(.decimalPad)
+        .onSubmit(model.servingsTextChanged)
+        .onChange(of: model.servingsAtLeastText) { _, _ in
+          model.servingsTextChanged()
+        }
+
+      Picker("Rating", selection: Binding(
+        get: { model.minimumRating },
+        set: model.minimumRatingChanged
+      )) {
+        Text("Any rating").tag(Optional<Int>.none)
+        ForEach(1...5, id: \.self) { rating in
+          Text("\(rating) or more").tag(Optional(rating))
+        }
+      }
+
+      Toggle("Has make-ahead notes", isOn: Binding(
+        get: { model.requiresMakeAhead },
+        set: model.requiresMakeAheadChanged
+      ))
+    }
+  }
+}
+
+private struct PowerBrowserUsageFilters: View {
+  let model: PowerBrowserModel
+
+  var body: some View {
+    Section("Usage") {
+      Toggle("Never cooked", isOn: Binding(
+        get: { model.requiresNeverCooked },
+        set: model.requiresNeverCookedChanged
+      ))
+      Toggle(
+        "Cooked more than \(PowerBrowserModel.frequentCookedThreshold) times",
+        isOn: Binding(
+          get: { model.requiresFrequentCooking },
+          set: model.requiresFrequentCookingChanged
+        )
+      )
+      Toggle("Added after", isOn: Binding(
+        get: { model.filtersByAddedDate },
+        set: model.addedAfterChanged
+      ))
+      if model.filtersByAddedDate {
+        DatePicker("Date", selection: Binding(
+          get: { model.addedAfterDate },
+          set: { model.addedAfterDate = $0; model.addedAfterDateChanged() }
+        ), displayedComponents: .date)
+      }
+    }
+  }
+}
+
+private struct PowerBrowserSourceFilters: View {
+  let model: PowerBrowserModel
+
+  var body: some View {
+    Section("Source") {
+      ForEach(RecipeBrowserSourceField.allCases, id: \.self) { field in
+        let options = model.sourceFilterOptions[field] ?? []
+        if !options.isEmpty {
+          NavigationLink {
+            PowerBrowserSourceFilterPicker(model: model, field: field, options: options)
+          } label: {
+            LabeledContent(field.title, value: model.selectedSourceValues(for: field).summary)
+          }
+        }
+      }
+    }
+  }
+}
+
+private struct PowerBrowserSourceFilterPicker: View {
+  let model: PowerBrowserModel
+  let field: RecipeBrowserSourceField
+  let options: [String]
+  @State private var searchText = ""
+
+  private var visibleOptions: [String] {
+    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !query.isEmpty else { return options }
+    return options.filter { $0.localizedCaseInsensitiveContains(query) }
+  }
+
+  var body: some View {
+    List {
+      ForEach(visibleOptions, id: \.self) { option in
+        let isSelected = model.selectedSourceValues(for: field).contains(option)
+        Button {
+          model.sourceValueButtonTapped(option, field: field)
+        } label: {
+          HStack {
+            Text(option)
+            Spacer()
+            if isSelected {
+              Image(systemName: "checkmark")
+                .foregroundStyle(.tint)
+                .accessibilityHidden(true)
+            }
+          }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(option)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+      }
+    }
+    .navigationTitle(field.title)
+    .searchable(text: $searchText, prompt: "Search \(field.title.lowercased())")
   }
 }
 
@@ -164,23 +295,20 @@ private struct PowerBrowserSelectionBar: View {
           .disabled(!model.hasActiveSelections)
       }
 
-      if !model.activeFacetSelections.isEmpty {
+      if !model.activeSelections.isEmpty {
         ScrollView(.horizontal) {
           HStack(spacing: 8) {
-            ForEach(model.activeFacetSelections) { selection in
+            ForEach(model.activeSelections) { selection in
               Button {
-                model.removeSelectionButtonTapped(
-                  categoryID: selection.category.id,
-                  in: selection.facet.id
-                )
+                model.removeSelectionButtonTapped(selection)
               } label: {
                 Label(
-                  model.selectionTitle(for: selection.category.id, in: selection.facet),
+                  selection.title,
                   systemImage: "xmark"
                 )
               }
               .buttonStyle(.bordered)
-              .accessibilityLabel("Remove \(model.selectionTitle(for: selection.category.id, in: selection.facet))")
+              .accessibilityLabel("Remove \(selection.title)")
             }
           }
         }
@@ -189,6 +317,14 @@ private struct PowerBrowserSelectionBar: View {
     }
     .padding()
     .background(.bar)
+  }
+}
+
+private extension Set where Element == String {
+  var summary: String {
+    guard !isEmpty else { return "All" }
+    let values = sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    return values.count == 1 ? values[0] : "\(values.count) selected"
   }
 }
 

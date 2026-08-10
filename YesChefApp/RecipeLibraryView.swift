@@ -646,19 +646,6 @@ private struct RecipeFilterView: View {
         }
       }
 
-      Section("Fields") {
-        RecipeOptionalStringPicker(
-          title: "Cuisine",
-          selection: $model.selectedCuisine,
-          options: model.cuisineFilterOptions
-        )
-        RecipeOptionalStringPicker(
-          title: "Course",
-          selection: $model.selectedCourse,
-          options: model.courseFilterOptions
-        )
-      }
-
       Section {
         RecipeStringFilterNavigationRow(
           title: "Sources",
