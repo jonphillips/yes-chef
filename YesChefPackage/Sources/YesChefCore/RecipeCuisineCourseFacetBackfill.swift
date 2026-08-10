@@ -87,7 +87,7 @@ extension RecipeRepository {
           report: &report,
           in: db
         ) {
-          recipe.cuisine = ""
+          recipe.cuisine = nil
           clearsRecipe = true
         }
       }
@@ -102,7 +102,7 @@ extension RecipeRepository {
           report: &report,
           in: db
         ) {
-          recipe.course = ""
+          recipe.course = nil
           clearsRecipe = true
         }
       }

@@ -23,7 +23,7 @@ extension RecipeCoreTests {
           try RecipeCategory.where { $0.recipeID.eq(recipe.id) }.fetchAll(db).map(\.categoryID),
           [thaiCategoryID]
         )
-        expectNoDifference(try Recipe.find(recipe.id).fetchOne(db)?.cuisine, "")
+        expectNoDifference(try Recipe.find(recipe.id).fetchOne(db)?.cuisine, nil)
       }
     }
 
@@ -41,7 +41,7 @@ extension RecipeCoreTests {
           try RecipeCategory.where { $0.recipeID.eq(recipe.id) }.fetchAll(db).map(\.categoryID),
           [thaiCategoryID]
         )
-        expectNoDifference(try Recipe.find(recipe.id).fetchOne(db)?.cuisine, "")
+        expectNoDifference(try Recipe.find(recipe.id).fetchOne(db)?.cuisine, nil)
       }
     }
 
@@ -84,7 +84,7 @@ extension RecipeCoreTests {
         let report = try RecipeRepository.backfillCuisineCourseFacets(in: db)
         expectNoDifference(report, RecipeCuisineCourseFacetBackfillReport())
         expectNoDifference(try RecipeCategory.where { $0.recipeID.eq(recipe.id) }.fetchAll(db), [])
-        expectNoDifference(try Recipe.find(recipe.id).fetchOne(db)?.cuisine, "")
+        expectNoDifference(try Recipe.find(recipe.id).fetchOne(db)?.cuisine, nil)
       }
     }
 
@@ -105,7 +105,7 @@ extension RecipeCoreTests {
         _ = try RecipeRepository.backfillCuisineCourseFacets(in: db)
         let first = try #require(try RecipeCategory.where { $0.recipeID.eq(recipe.id) }.fetchOne(db))
         expectNoDifference(first.id, deterministicThaiAssignmentID)
-        expectNoDifference(try Recipe.find(recipe.id).fetchOne(db)?.cuisine, "")
+        expectNoDifference(try Recipe.find(recipe.id).fetchOne(db)?.cuisine, nil)
 
         let second = try RecipeRepository.backfillCuisineCourseFacets(in: db)
         expectNoDifference(second, RecipeCuisineCourseFacetBackfillReport())
@@ -132,7 +132,7 @@ extension RecipeCoreTests {
         expectNoDifference(report.alreadyClassifiedCount, 1)
         expectNoDifference(report.clearedCount, 1)
         expectNoDifference(try RecipeCategory.where { $0.recipeID.eq(recipe.id) }.fetchAll(db), [mexicanAssignment])
-        expectNoDifference(try Recipe.find(recipe.id).fetchOne(db)?.cuisine, "")
+        expectNoDifference(try Recipe.find(recipe.id).fetchOne(db)?.cuisine, nil)
       }
     }
 
@@ -152,7 +152,7 @@ extension RecipeCoreTests {
           try RecipeCategory.where { $0.recipeID.eq(recipe.id) }.fetchAll(db).map(\.categoryID),
           [dinnerCategoryID]
         )
-        expectNoDifference(try Recipe.find(recipe.id).fetchOne(db)?.course, "")
+        expectNoDifference(try Recipe.find(recipe.id).fetchOne(db)?.course, nil)
       }
     }
 
@@ -175,7 +175,7 @@ extension RecipeCoreTests {
           Set(try RecipeCategory.where { $0.recipeID.eq(recipe.id) }.fetchAll(db).map(\.categoryID)),
           [thaiCategoryID]
         )
-        expectNoDifference(try Recipe.find(recipe.id).fetchOne(db)?.cuisine, "")
+        expectNoDifference(try Recipe.find(recipe.id).fetchOne(db)?.cuisine, nil)
         expectNoDifference(try Recipe.find(recipe.id).fetchOne(db)?.course, "Cajun")
       }
     }
@@ -196,7 +196,7 @@ extension RecipeCoreTests {
 
         _ = try RecipeRepository.backfillCuisineCourseFacets(in: db)
         let stored = try #require(try Recipe.find(recipe.id).fetchOne(db))
-        expectNoDifference(stored.cuisine, "")
+        expectNoDifference(stored.cuisine, nil)
         expectNoDifference(stored.originalSnapshot, originalSnapshot)
       }
     }
