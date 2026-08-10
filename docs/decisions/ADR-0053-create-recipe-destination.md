@@ -20,6 +20,13 @@ deliberately does not design the UI.**
 > destination launched from the library `+`, and the `+` is removed. D4's transient-session invariant is
 > unchanged (the session is resident in memory and resumes across switches, but is still never persisted or
 > synced).
+>
+> **[Amendment 2](#amendment-2--a-headless-transport-shortcuts--app-intent-into-create-recipe-2026-08-10)
+> (2026-08-10):** builds one of the "other global entries… compatible and unbuilt" D1 named — a **Shortcuts /
+> App Intent** door that lands clipboard text (a ChatGPT return, most often) in a Create Recipe session for
+> review. Moves no boundary this ADR drew: same destination, same D4 trust invariant, same sink and `save(draft:)`
+> path, same `CreateRecipeExtraction.extract` engine. Adds a producer-agnostic transport and a small foreground
+> coordinator — **not** the routed handoff importer, and **not** a URL scheme.
 
 ## Context
 
@@ -256,6 +263,106 @@ environment, structured half immediately usable), D5 (the source seam), and D6/D
 always-visible home, and a redundant `+` that merely re-selects the section would reintroduce the "hangs off the
 list" framing this amendment removes.
 
+## Amendment 2 — a headless transport (Shortcuts / App Intent) into Create Recipe (2026-08-10)
+
+**D1 named the class and left it unbuilt:** *"Other global entries into Create Recipe (share sheet, a Files
+hand-off) are compatible and unbuilt."* This builds one — a **Shortcuts → App Intent** path that takes text
+already on the clipboard (Jon does most ChatGPT work on iPhone/iPad, and copies the response) and lands it in a
+Create Recipe session for review. It is an amendment, not a new ADR, because it **moves no boundary this document
+drew**: the destination is still Create Recipe, the trust invariant is still D4, the sink is still
+`RecipeEditorDraft` committing through `save(draft:)`, and the engine is still `CreateRecipeExtraction.extract`.
+What it adds is a *door* and a small foreground coordinator. The load-bearing risk is not the code — it is tiny —
+but that a dispatch reading a mature return-path in the codebase wires the new door to the **wrong** one. Amd2-D2
+exists to prevent exactly that.
+
+### Amd2-D1 — The transport is producer-agnostic and app-owned. The operation is *capture a recipe from text*, not *import from ChatGPT*
+
+The semantic operation is **`CaptureRecipeFromText(text:)`**, never `ImportRecipeFromChatGPT`. ChatGPT is one
+producer of text among a paste, Apple Notes, a Files hand-off, a future share-sheet. The App Intent accepts exact
+input text and routes it through the existing Create Recipe extraction + review; the **Shortcut layer is transport
+only** — `Get Clipboard → the intent`, and nothing else. The Shortcut does not inspect JSON, touch code fences,
+decide whether text is a recipe, infer a menu or day, or write anything. Clipboard access stays *out* of the
+Recipe domain: the intent takes a `String`, and the Shortcut is the only thing that knows it came from the
+pasteboard.
+
+### Amd2-D2 — It lands in **Create Recipe** (`save(draft:)`, transient session), **never** the routed handoff importer
+
+The load-bearing routing decision, stated so it cannot drift. Yes Chef has **two** return paths, split by
+identity class ([ADR-0051 Amd1-D1](ADR-0051-text-to-recipe-extraction-strategy.md#amendment-1--d1-was-wrong-about-capture-there-are-two-save-paths-and-the-review-surface-is-source-specific-2026-08-07)):
+
+- the **routed handoff importer** — `ImportHandoffResult` → `HandoffAppOperations.stageReview` →
+  `HandoffReviewCoordinator` ([HandoffIntents.swift:68](../../YesChefApp/AppIntents/HandoffIntents.swift)) —
+  returns **already-decided content to an existing subject** (a recipe, a menu day, a workbench), matched by a
+  `handoffID` token and reconciled against that subject; and
+- **Create Recipe** — admits **a new recipe with no prior identity**, on `save(draft:)`.
+
+A ChatGPT-authored recipe from the clipboard has **no `handoffID` and no subject**. It is Create Recipe,
+categorically. Routing it through the handoff coordinator would be a category error — it would demand a token the
+text does not carry and force a brand-new recipe through a surface built to reconcile against an existing one.
+The maturity of the handoff machinery is precisely the trap: the dispatch must add a *sibling* intent, not reuse
+`ImportHandoffResult`.
+
+### Amd2-D3 — Reuse the shipped operation; **no new parser, no URL scheme**
+
+The app-owned "text → recipe" already exists: `CreateRecipeExtraction.extract(text:)` — the two-tier
+deterministic-JSON-LD-then-faithful-LLM engine (ADR-0051 D4, honoring the D7 guardrail). The intent feeds text
+into the resident `CreateRecipeModel` through **the same seam a paste uses** (`pastedTextReceived`) and runs that
+engine; it does not re-derive extraction. It foregrounds the app the way the handoff path already does — an
+**`openAppWhenRun` intent plus a coordinator** ([OpenHandoffReviewIntent](../../YesChefApp/AppIntents/HandoffIntents.swift), `openAppWhenRun == true`) — **not** a `yeschef://`
+URL scheme. The app has no URL scheme today (`onOpenURL` is unused), and minting one to do what a coordinator
+already does is the "new navigation stack" the shell decision ([ADR-0046](ADR-0046-sidebar-adaptable-app-shell.md))
+refuses. ADR-0051 D7 / Amd1-D3 apply unchanged: this **adds a front-end, not a parser and not a save path** — a
+PR that forks a second "text → recipe" model call or a bespoke JSON-LD parser inside the intent is the review
+block that guardrail describes.
+
+### Amd2-D4 — Staging is transient and in-memory; it seeds the resident session and **never clobbers unsaved work**
+
+D4's trust invariant extends to the transport: there is **no durable or synced pending-import table.** The Create
+Recipe session is already resident in memory and resumes across sidebar switches (Amd 1); the intent seeds *that*
+session and selects `AppSection.createRecipe`, through a small **`CreateRecipeCoordinator`** that mirrors
+`HandoffReviewCoordinator` (a `present`/route entry plus the `openAppWhenRun` opener). One sharp edge the seam
+must handle: `pastedTextReceived` **overwrites `composeText`**, so a Shortcut firing while the cook has unsaved
+material in an open session would wipe it. The coordinator's seed path must therefore **append the incoming text
+as a new pasted source without discarding the current draft** — and, if a draft is already extracted, offer the
+new material rather than silently replace it. Destroying supplied material is the one thing D4 forbids
+("source material outlives its interpretation"). If durable sessions are ever wanted, that is the local-`aiHandoffs`
+shape D4 already names ([[aihandoffs-local-scope-discriminator]]) — **not** a new synced table built on this door's
+momentum.
+
+### Amd2-D5 — Exact source text is preserved; menu/day provenance stays deferred **and stays on the handoff path**
+
+The transport preserves the **exact** clipboard text into the source list (`CreateRecipeSourceItem.content`
+already does this), so a future provenance marker riding in the text — a `YC-HANDOFF`/menu-day token — remains
+extractable later. The intent must not strip, re-encode, or normalize it. But this generic door stays
+**menu-unaware**: it never picks a menu or a day, and grows no provenance schema (the D8 deferral of menu/day
+association is unchanged). When that association is built, a menu-scoped recipe returns through the **handoff**
+path, which already carries `sourceID`/`dayOffset` — not through this producer-agnostic door. The only
+forward-compatibility obligation this slice owes is: **do not mangle the text.**
+
+### Amd2-D6 — Error behavior rides the existing surfaces; the tolerant contract means "version mismatch" is *not* this path's concern
+
+- **Empty clipboard** → the intent fails cleanly (nothing to stage), surfaced by Shortcuts. No session is
+  opened.
+- **Non-recipe or malformed text** → the extractor's existing empty/failed-extraction handling and the review
+  surface show it; nothing canonical is written without the cook's Save (D4). The material is preserved (D4),
+  never silently discarded.
+- **No contract handshake.** The prompt's "contract/version mismatch" case belongs to the *handoff* return (the
+  `YC-CONTRACT` marker + `AIHandoffReturnContract.strippingMarker`). Create Recipe is tolerant of prose and code
+  fences **by design** — the deterministic JSON-LD tier falls through to the LLM engine on anything it cannot
+  parse — so there is no version handshake to fail here, and **none should be added.**
+
+### Slice — S3: the headless transport
+
+One App Intent (`CaptureRecipeFromText(text:)`), a `CreateRecipeCoordinator` (seed-non-destructively +
+select-section + `openAppWhenRun` opener) mirroring the handoff coordinator, an entry in the existing
+`AppShortcutsProvider`, and the "Faster return path with Shortcuts" operator-doc section. Reuses
+`CreateRecipeExtraction.extract`, `CreateRecipeModel.pastedTextReceived`/`extractButtonTapped`, and
+`AppSection.createRecipe`. **Schema-free** — the session is D4-transient, so nothing is owed to the prod-schema
+promotion list. iOS 27 deployment target means modern App Intents throughout: extend the existing provider, no
+SiriKit-era patterns, no deprecated intent lifecycle. Verification per [[lean-verification-default]] plus
+`YesChefTests` (this is an app-layer coordinator/model change, [[app-test-target-in-verification]]); the intent
+and the coordinator's non-clobber seeding are the unit-testable core — the Shortcut itself is not tested.
+
 ## Open questions
 
 - **OQ1 — is there still a fast path to a blank structured form?** Someone typing a family recipe from memory
@@ -282,6 +389,14 @@ list" framing this amendment removes.
   new recipe — and it is not a defect to go fix on this ADR's momentum.
 - **OQ4 — where does "Start Workbench from this Recipe" live** (D3's escalation edge)? Deferred with the edge
   itself.
+- **OQ6 — when the Shortcut fires with a session already in progress, seed-and-append or open a fresh session?**
+  (Amd 2.) Amd2-D4 fixes the **invariant** — unsaved material is never destroyed — but not the **product** choice
+  between appending the incoming text to the open session and starting a clean one (the open draft parked, not
+  lost). *Lean: seed-and-append when the open session is empty (`CreateRecipeModel.isEmpty`), and when it is not,
+  surface the incoming text as a new pasted source the cook can accept or discard* — no silent replace either way.
+  Also open: does the intent **auto-run extraction** on a fresh seed (so the app foregrounds on the reviewed
+  structured draft, not a raw compose box)? *Lean: yes on a fresh session, never over existing unsaved work.*
+  Resolve on Jon's device pass.
 - **OQ5 — does Create Recipe eventually absorb the workbench-return and menu-note entries?** ADR-0051 OQ1's
   residue. *Lean: no.* Both have a subject they belong to (a workbench, a menu) and arriving via the library's
   `+` would be the wrong door. Revisit only if a third free-text entry appears with no subject of its own.
