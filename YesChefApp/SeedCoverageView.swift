@@ -52,7 +52,7 @@ struct SeedCoverageView: View {
       }
     }
     .navigationTitle("Learned Areas")
-    .alert("Couldn't save correction", isPresented: $model.isShowingError) {
+    .alert("Couldn't save change", isPresented: $model.isShowingError) {
       Button("OK") {}
     } message: {
       Text(model.errorMessage ?? "Unknown error")
@@ -92,21 +92,26 @@ private struct LearnedAreaAuditDetail: View {
         LabeledContent("Aisle", value: assignment.area)
       }
 
-      Section {
-        Button("Confirm model placement") {
-          if model.confirmButtonTapped(assignment: assignment) {
-            dismiss()
+      if assignment.reviewedAt == nil {
+        Section {
+          Button("Confirm model placement") {
+            if model.confirmButtonTapped(assignment: assignment) {
+              dismiss()
+            }
           }
+        } header: {
+          Text("Audit")
+        } footer: {
+          Text("Confirmation records this placement as reviewed and moves it to Confirmed.")
         }
-      } header: {
-        Text("Audit")
-      } footer: {
-        Text("Confirmation records this placement as reviewed and moves it to Confirmed.")
       }
 
       Section {
         StackedFormField(title: "Aisle") {
           Picker("Aisle", selection: $correctedArea) {
+            if let customArea {
+              Text("Current: \(customArea)").tag(customArea)
+            }
             ForEach(GroceryStoreArea.canonicalAreas, id: \.self) { area in
               Text(area.title).tag(area.title)
             }
@@ -128,6 +133,14 @@ private struct LearnedAreaAuditDetail: View {
     }
     .navigationTitle(assignment.canonicalName)
     .navigationBarTitleDisplayMode(.inline)
+  }
+
+  private var customArea: String? {
+    guard
+      !correctedArea.isEmpty,
+      !GroceryStoreArea.canonicalAreas.map(\.title).contains(correctedArea)
+    else { return nil }
+    return correctedArea
   }
 }
 
