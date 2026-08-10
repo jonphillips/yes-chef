@@ -7,31 +7,19 @@ enum RecipeJSONLDExtractor {
   /// document path, so a curly-quote-mangled paste is normalized identically (see `cleanedJSON`).
   static func extract(fromJSONLD raw: String, into builder: inout RecipeParseBuilder) {
     guard let top = jsonObject(from: raw) else { return }
-    for node in recipeNodes(in: top) {
-      mineIfComplete(node, into: &builder)
-    }
+    minePrimaryCandidate(in: [top], into: &builder)
   }
 
   static func extract(from document: Document, into builder: inout RecipeParseBuilder) {
-    let scripts = (try? document.select("script[type=application/ld+json]").array()) ?? []
-    for script in scripts {
-      guard let top = jsonObject(from: script.data()) else { continue }
-      for node in recipeNodes(in: top) {
-        mineIfComplete(node, into: &builder)
+    let elements = (try? document.select("script[type=application/ld+json], meta[name]").array()) ?? []
+    let documents = elements.compactMap { element -> Any? in
+      if ((try? element.attr("name")) ?? "").lowercased() == "application/ld+json" {
+        guard let content = try? element.attr("content"), !content.isEmpty else { return nil }
+        return jsonObject(from: content)
       }
+      return jsonObject(from: element.data())
     }
-
-    let metas = (try? document.select("meta[name]").array()) ?? []
-    for meta in metas {
-      guard ((try? meta.attr("name")) ?? "").lowercased() == "application/ld+json",
-        let content = try? meta.attr("content"),
-        !content.isEmpty,
-        let top = jsonObject(from: content)
-      else { continue }
-      for node in recipeNodes(in: top) {
-        mineIfComplete(node, into: &builder)
-      }
-    }
+    minePrimaryCandidate(in: documents, into: &builder)
   }
 
   /// Parse the raw JSON-LD **first**, so well-formed content keeps its apostrophes and
@@ -48,24 +36,99 @@ enum RecipeJSONLDExtractor {
     return object
   }
 
-  private static func recipeNodes(in value: Any) -> [[String: Any]] {
+  /// Fidelity: lossless-or-loud. A page can contain more than one complete Recipe node, but this
+  /// single-recipe builder mines only a deterministic primary and records the ambiguity for review.
+  private static func minePrimaryCandidate(in documents: [Any], into builder: inout RecipeParseBuilder) {
+    let candidates = documents.enumerated().flatMap { documentOrder, document in
+      recipeCandidates(in: document, documentOrder: documentOrder)
+    }
+    guard let primary = candidates.min(by: primaryCandidatePrecedes) else { return }
+    if candidates.count > 1 { builder.markMultipleRecipeCandidates() }
+    mineIfComplete(primary.node, into: &builder)
+  }
+
+  /// A primary is a root Recipe, an `@graph` member, or a `mainEntity` before a Recipe nested in
+  /// another field. Ties use document then `@graph` traversal order, never dictionary iteration.
+  private static func primaryCandidatePrecedes(_ lhs: RecipeCandidate, _ rhs: RecipeCandidate) -> Bool {
+    if lhs.isPreferredLocation != rhs.isPreferredLocation {
+      return lhs.isPreferredLocation
+    }
+    if lhs.documentOrder != rhs.documentOrder { return lhs.documentOrder < rhs.documentOrder }
+    return lhs.nodeOrder < rhs.nodeOrder
+  }
+
+  private static func recipeCandidates(in value: Any, documentOrder: Int) -> [RecipeCandidate] {
+    var candidates: [RecipeCandidate] = []
+    var nodeOrder = 0
+    collectRecipeCandidates(
+      in: value,
+      documentOrder: documentOrder,
+      location: .topLevel,
+      nodeOrder: &nodeOrder,
+      into: &candidates
+    )
+    return candidates
+  }
+
+  private static func collectRecipeCandidates(
+    in value: Any,
+    documentOrder: Int,
+    location: RecipeCandidateLocation,
+    nodeOrder: inout Int,
+    into candidates: inout [RecipeCandidate]
+  ) {
     switch value {
     case let dict as [String: Any]:
-      var found: [[String: Any]] = []
-      if isRecipeNode(dict) { found.append(dict) }
-      for (_, child) in dict {
-        found.append(contentsOf: recipeNodes(in: child))
+      if isRecipeNode(dict), isMateriallyComplete(dict) {
+        candidates.append(
+          RecipeCandidate(
+            node: dict,
+            isPreferredLocation: location.isPreferred,
+            documentOrder: documentOrder,
+            nodeOrder: nodeOrder
+          )
+        )
+        nodeOrder += 1
       }
-      return found
+      for key in dict.keys.sorted() {
+        guard let child = dict[key] else { continue }
+        let childLocation: RecipeCandidateLocation
+        switch key {
+        case "@graph": childLocation = .topLevel
+        case "mainEntity": childLocation = .mainEntity
+        default: childLocation = .nested
+        }
+        collectRecipeCandidates(
+          in: child,
+          documentOrder: documentOrder,
+          location: childLocation,
+          nodeOrder: &nodeOrder,
+          into: &candidates
+        )
+      }
     case let array as [Any]:
-      return array.flatMap(recipeNodes(in:))
+      for child in array {
+        collectRecipeCandidates(
+          in: child,
+          documentOrder: documentOrder,
+          location: location,
+          nodeOrder: &nodeOrder,
+          into: &candidates
+        )
+      }
     default:
-      return []
+      return
     }
   }
 
   private static func isRecipeNode(_ dict: [String: Any]) -> Bool {
     typeStrings(dict["@type"]).contains { RecipeSchemaOrg.recipeTypes.contains($0) }
+  }
+
+  private static func isMateriallyComplete(_ node: [String: Any]) -> Bool {
+    let hasIngredients = !flatStrings(node["recipeIngredient"]).isEmpty
+      || !ingredientSections(node["yesChef:ingredientSections"]).isEmpty
+    return hasIngredients && !instructionSteps(node["recipeInstructions"]).isEmpty
   }
 
   private static func mineIfComplete(_ node: [String: Any], into builder: inout RecipeParseBuilder) {
@@ -121,14 +184,76 @@ enum RecipeJSONLDExtractor {
     case let dict as [String: Any]:
       let types = typeStrings(dict["@type"])
       if types.contains("HowToSection") {
-        let name = firstString(dict["name"])
-        let steps = instructionStrings(dict["itemListElement"] ?? dict["steps"])
-        builder.addInstructionSection(name: name, steps: steps)
+        mineInstructionSection(dict, parentName: nil, into: &builder)
       } else if let text = firstString(dict["text"] ?? dict["name"]) {
         builder.addInstruction(text)
       }
     default:
       return
+    }
+  }
+
+  private static func mineInstructionSection(
+    _ section: [String: Any],
+    parentName: String?,
+    into builder: inout RecipeParseBuilder
+  ) {
+    let name = composedSectionName(parent: parentName, child: firstString(section["name"]))
+    let items = section["itemListElement"] ?? section["steps"]
+    var directSteps: [String] = []
+    var nestedSections: [[String: Any]] = []
+    collectInstructionItems(items, directSteps: &directSteps, nestedSections: &nestedSections)
+    builder.addInstructionSection(name: name, steps: directSteps)
+
+    for nestedSection in nestedSections {
+      builder.markNestedInstructionSectionsFlattened()
+      mineInstructionSection(nestedSection, parentName: name, into: &builder)
+    }
+  }
+
+  private static func collectInstructionItems(
+    _ value: Any?,
+    directSteps: inout [String],
+    nestedSections: inout [[String: Any]]
+  ) {
+    switch value {
+    case let string as String:
+      directSteps.append(string)
+    case let array as [Any]:
+      for item in array {
+        collectInstructionItems(item, directSteps: &directSteps, nestedSections: &nestedSections)
+      }
+    case let dict as [String: Any]:
+      if typeStrings(dict["@type"]).contains("HowToSection") {
+        nestedSections.append(dict)
+      } else if let text = firstString(dict["text"] ?? dict["name"]) {
+        directSteps.append(text)
+      } else {
+        collectInstructionItems(dict["itemListElement"] ?? dict["steps"], directSteps: &directSteps, nestedSections: &nestedSections)
+      }
+    default:
+      return
+    }
+  }
+
+  private static func instructionSteps(_ value: Any?) -> [String] {
+    var steps: [String] = []
+    var nestedSections: [[String: Any]] = []
+    collectInstructionItems(value, directSteps: &steps, nestedSections: &nestedSections)
+    for section in nestedSections {
+      steps.append(contentsOf: instructionSteps(section["itemListElement"] ?? section["steps"]))
+    }
+    return steps
+  }
+
+  private static func composedSectionName(parent: String?, child: String?) -> String? {
+    let parent = parent?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let child = child?.trimmingCharacters(in: .whitespacesAndNewlines)
+    return switch (parent?.isEmpty == false ? parent : nil, child?.isEmpty == false ? child : nil) {
+    case let (parent?, child?): "\(parent) — \(child)"
+    case let (parent?, nil): parent
+    case let (nil, child?): child
+    case (nil, nil): nil
     }
   }
 
@@ -218,6 +343,26 @@ enum RecipeJSONLDExtractor {
       .lowercased()
     return normalized.contains("sign up for full access")
       || normalized.hasPrefix("... and more")
+  }
+
+  private struct RecipeCandidate {
+    let node: [String: Any]
+    let isPreferredLocation: Bool
+    let documentOrder: Int
+    let nodeOrder: Int
+  }
+
+  private enum RecipeCandidateLocation {
+    case topLevel
+    case mainEntity
+    case nested
+
+    var isPreferred: Bool {
+      switch self {
+      case .topLevel, .mainEntity: true
+      case .nested: false
+      }
+    }
   }
 
   /// Salvage JSON whose delimiters were replaced with typographic quotes — the signature of a
