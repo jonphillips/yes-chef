@@ -137,7 +137,9 @@ private struct RecipeDetailDestinationsModifier: ViewModifier {
         }
         Button("Cancel", role: .cancel) {}
       } message: { recipeID in
-        Text("Archive \(recipeModel.title(for: recipeID))? It will be removed from meal plans and menus.")
+        Text(
+          "Archive \(recipeModel.title(for: recipeID))? It will be removed from meal plans, hidden from your recipe library, and kept on existing menus."
+        )
       }
       .confirmationDialog(
         "Delete Permanently?",

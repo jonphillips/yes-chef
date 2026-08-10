@@ -719,6 +719,7 @@ final class RecipeDetailModel {
   let recipeID: Recipe.ID
   let scaleContext: ScaleContext
   let workbenchID: Workbench.ID?
+  let includingArchivedRecipe: Bool
 
   @ObservationIgnored
   @Dependency(\.date.now) var now
@@ -767,23 +768,25 @@ final class RecipeDetailModel {
   init(
     recipeID: Recipe.ID,
     scaleContext: ScaleContext? = nil,
-    workbenchID: Workbench.ID? = nil
+    workbenchID: Workbench.ID? = nil,
+    includingArchivedRecipe: Bool = false
   ) {
     self.recipeID = recipeID
     self.scaleContext = scaleContext ?? .recipe(recipeID)
     self.workbenchID = workbenchID
+    self.includingArchivedRecipe = includingArchivedRecipe
     #if DEBUG
     if ProcessInfo.processInfo.arguments.contains("-YesChefDisableDetailFetchAnimation") {
       detailFetchAnimationDescription = "nil"
       _detail = Fetch(
         wrappedValue: nil,
-        RecipeDetailRequest(recipeID: recipeID)
+        RecipeDetailRequest(recipeID: recipeID, includingArchivedRecipe: includingArchivedRecipe)
       )
     } else {
       detailFetchAnimationDescription = "default"
       _detail = Fetch(
         wrappedValue: nil,
-        RecipeDetailRequest(recipeID: recipeID),
+        RecipeDetailRequest(recipeID: recipeID, includingArchivedRecipe: includingArchivedRecipe),
         animation: .default
       )
     }
@@ -791,7 +794,7 @@ final class RecipeDetailModel {
     detailFetchAnimationDescription = "default"
     _detail = Fetch(
       wrappedValue: nil,
-      RecipeDetailRequest(recipeID: recipeID),
+      RecipeDetailRequest(recipeID: recipeID, includingArchivedRecipe: includingArchivedRecipe),
       animation: .default
     )
     #endif

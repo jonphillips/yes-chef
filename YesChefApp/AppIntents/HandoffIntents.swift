@@ -127,6 +127,12 @@ struct HandoffAppShortcuts: AppShortcutsProvider {
       shortTitle: "Import Handoff",
       systemImageName: "arrow.down.doc"
     )
+    AppShortcut(
+      intent: CaptureRecipeFromText(),
+      phrases: ["Capture a recipe from text in \(.applicationName)"],
+      shortTitle: "Capture Recipe",
+      systemImageName: "square.and.pencil"
+    )
   }
 }
 

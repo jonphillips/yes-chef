@@ -315,9 +315,9 @@ private extension CookSessionPresentation {
 
 private extension CookSessionItem {
   init?(menuItemRow row: MenuItemRowData) {
-    guard row.item.kind == .recipe, let recipeID = row.recipe?.id else { return nil }
+    guard row.item.kind == .recipe, let recipe = row.recipe, !recipe.archived else { return nil }
     self.init(
-      recipeID: recipeID,
+      recipeID: recipe.id,
       scaleContext: .menuItem(row.item.id),
       title: row.displayTitle
     )

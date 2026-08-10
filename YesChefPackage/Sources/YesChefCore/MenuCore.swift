@@ -84,14 +84,7 @@ public struct MenuListRequest: FetchKeyRequest {
   public init() {}
 
   public func fetch(_ db: Database) throws -> [MenuRowData] {
-    let activeRecipeIDs = Set(try Recipe.fetchAll(db).filter { !$0.archived }.map(\.id))
-    let itemsByMenuID = Dictionary(
-      grouping: try MenuItem.fetchAll(db).filter { item in
-        guard item.kind == .recipe, let recipeID = item.recipeID else { return true }
-        return activeRecipeIDs.contains(recipeID)
-      },
-      by: \.menuID
-    )
+    let itemsByMenuID = Dictionary(grouping: try MenuItem.fetchAll(db), by: \.menuID)
     let placementsByMenuID = Dictionary(grouping: try MenuPlacement.fetchAll(db), by: \.menuID)
 
     return try Menu.fetchAll(db)
@@ -119,9 +112,7 @@ public struct MenuDetailRequest: FetchKeyRequest {
     guard let menu = try Menu.find(menuID).fetchOne(db) else { return nil }
 
     let recipesByID = Dictionary(
-      uniqueKeysWithValues: try Recipe.fetchAll(db)
-        .filter { !$0.archived }
-        .map { ($0.id, $0) }
+      uniqueKeysWithValues: try Recipe.fetchAll(db).map { ($0.id, $0) }
     )
     let recipeIDs = Set(recipesByID.keys)
     let photoRows = try RecipePhoto

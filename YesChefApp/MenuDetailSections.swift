@@ -442,7 +442,8 @@ private struct MenuDishRowView: View {
       onRecipeSelected(
         RecipeDetailPresentation(
           recipeID: recipeID,
-          scaleContext: .menuItem(row.item.id)
+          scaleContext: .menuItem(row.item.id),
+          includingArchivedRecipe: true
         )
       )
     } else {

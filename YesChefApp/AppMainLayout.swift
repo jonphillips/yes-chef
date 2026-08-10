@@ -78,7 +78,11 @@ struct AppMainLayout: View {
         systemImage: AppSection.groceries.systemImage,
         value: AppSection.groceries
       ) {
-        GroceriesTab(model: groceryModel, mealCalendarModel: mealCalendarModel)
+        GroceriesTab(
+          model: groceryModel,
+          mealCalendarModel: mealCalendarModel,
+          usesCompactTabLayout: horizontalSizeClass == .compact
+        )
       }
 
       Tab(
@@ -97,7 +101,11 @@ struct AppMainLayout: View {
         systemImage: AppSection.workbenches.systemImage,
         value: AppSection.workbenches
       ) {
-        WorkbenchesTab(model: workbenchModel, onRecipeSelected: onRecipeSelected)
+        WorkbenchesTab(
+          model: workbenchModel,
+          onRecipeSelected: onRecipeSelected,
+          usesCompactTabLayout: horizontalSizeClass == .compact
+        )
       }
       .defaultVisibility(.hidden, for: .tabBar)
 
@@ -120,7 +128,8 @@ struct AppMainLayout: View {
         SettingsTab(
           recipeModel: recipeModel,
           groceryModel: groceryModel,
-          selectedPane: $selectedSettingsPane
+          selectedPane: $selectedSettingsPane,
+          usesCompactTabLayout: horizontalSizeClass == .compact
         )
       }
       .defaultVisibility(.hidden, for: .tabBar)
@@ -161,17 +170,26 @@ private struct WorkbenchesTab: View {
 
   let model: WorkbenchLibraryModel
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
+  let usesCompactTabLayout: Bool
 
   var body: some View {
-    NavigationSplitView(columnVisibility: $columnVisibility) {
-      WorkbenchListView(model: model)
-    } detail: {
-      WorkbenchDetailColumn(
+    if usesCompactTabLayout {
+      WorkbenchListView(
         model: model,
-        onRecipeSelected: onRecipeSelected,
-        isFocusActive: columnVisibility == .detailOnly,
-        focusButtonTapped: focusButtonTapped
+        style: .navigation,
+        onRecipeSelected: onRecipeSelected
       )
+    } else {
+      NavigationSplitView(columnVisibility: $columnVisibility) {
+        WorkbenchListView(model: model)
+      } detail: {
+        WorkbenchDetailColumn(
+          model: model,
+          onRecipeSelected: onRecipeSelected,
+          isFocusActive: columnVisibility == .detailOnly,
+          focusButtonTapped: focusButtonTapped
+        )
+      }
     }
   }
 
@@ -185,12 +203,21 @@ private struct GroceriesTab: View {
 
   let model: GroceryLibraryModel
   let mealCalendarModel: MealCalendarModel
+  let usesCompactTabLayout: Bool
 
   var body: some View {
-    NavigationSplitView(columnVisibility: $columnVisibility) {
-      GroceryListView(model: model)
-    } detail: {
-      GroceryDetailColumn(model: model, mealCalendarModel: mealCalendarModel)
+    if usesCompactTabLayout {
+      GroceryDetailView(
+        model: model,
+        mealCalendarModel: mealCalendarModel,
+        showsListPicker: true
+      )
+    } else {
+      NavigationSplitView(columnVisibility: $columnVisibility) {
+        GroceryListView(model: model)
+      } detail: {
+        GroceryDetailColumn(model: model, mealCalendarModel: mealCalendarModel)
+      }
     }
   }
 }
@@ -251,20 +278,27 @@ private struct SettingsTab: View {
   let recipeModel: RecipeLibraryModel
   let groceryModel: GroceryLibraryModel
   @Binding var selectedPane: SettingsPane?
+  let usesCompactTabLayout: Bool
 
   var body: some View {
-    NavigationSplitView(columnVisibility: $columnVisibility) {
-      SettingsView(
-        model: recipeModel,
-        groceryModel: groceryModel,
-        selectedPane: $selectedPane
-      )
-    } detail: {
-      SettingsDetailPane(
-        selectedPane: selectedPane,
-        model: recipeModel,
-        groceryModel: groceryModel
-      )
+    if usesCompactTabLayout {
+      // The More tab supplies the compact navigation context. Passing no pane binding keeps these
+      // rows as NavigationLinks instead of changing a split-view selection with no compact push.
+      SettingsView(model: recipeModel, groceryModel: groceryModel)
+    } else {
+      NavigationSplitView(columnVisibility: $columnVisibility) {
+        SettingsView(
+          model: recipeModel,
+          groceryModel: groceryModel,
+          selectedPane: $selectedPane
+        )
+      } detail: {
+        SettingsDetailPane(
+          selectedPane: selectedPane,
+          model: recipeModel,
+          groceryModel: groceryModel
+        )
+      }
     }
   }
 }

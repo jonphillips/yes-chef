@@ -8,7 +8,7 @@ extension RecipeCoreTests {
   @Suite
   struct RecipeArchiveTests {
     @Test
-    func archiveRecipeMarksRecipeArchivedRemovesPlacementsAndPreservesChildren() throws {
+    func archiveRecipeHidesItFromTheLibraryRemovesMealPlansAndPreservesMenuReferences() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 802_000_000)
       let archivedAt = now.addingTimeInterval(60)
@@ -98,8 +98,20 @@ extension RecipeCoreTests {
           .map(\.id)
         expectNoDifference(visibleRecipeIDs.contains(recipeID), false)
         expectNoDifference(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db), nil)
+        expectNoDifference(
+          try RecipeDetailRequest(recipeID: recipeID, includingArchivedRecipe: true).fetch(db)?.recipe.id,
+          recipeID
+        )
         expectNoDifference(try MealPlanItem.find(mealPlanItemID).fetchOne(db), nil)
-        expectNoDifference(try MenuItem.find(menuItemID).fetchOne(db), nil)
+        expectNoDifference(try MenuItem.find(menuItemID).fetchOne(db)?.recipeID, recipeID)
+        expectNoDifference(
+          try MenuListRequest().fetch(db).first { $0.menu.id == menuID }?.itemCount,
+          1
+        )
+        let archivedMenuDetail = try #require(try MenuDetailRequest(menuID: menuID).fetch(db))
+        expectNoDifference(archivedMenuDetail.itemRows.map(\.id), [menuItemID])
+        expectNoDifference(archivedMenuDetail.itemRows.first?.recipe?.id, recipeID)
+        expectNoDifference(archivedMenuDetail.itemRows.first?.recipeIngredientLines, ["1 onion"])
         expectNoDifference(try IngredientSection.find(sectionID).fetchOne(db)?.id, sectionID)
         expectNoDifference(try IngredientLine.find(lineID).fetchOne(db)?.id, lineID)
 
@@ -108,18 +120,19 @@ extension RecipeCoreTests {
         expectNoDifference(restoredRecipe.archived, false)
         expectNoDifference(try RecipeRepository.fetchDetail(recipeID: recipeID, in: db)?.recipe.id, recipeID)
         expectNoDifference(try MealPlanItem.find(mealPlanItemID).fetchOne(db), nil)
-        expectNoDifference(try MenuItem.find(menuItemID).fetchOne(db), nil)
+        expectNoDifference(try MenuItem.find(menuItemID).fetchOne(db)?.recipeID, recipeID)
 
         try RecipeRepository.archive(recipeID: recipeID, in: db, now: archivedAt.addingTimeInterval(120))
         try RecipeRepository.permanentlyDelete(recipeID: recipeID, in: db)
         expectNoDifference(try Recipe.find(recipeID).fetchOne(db), nil)
+        expectNoDifference(try MenuItem.find(menuItemID).fetchOne(db), nil)
         expectNoDifference(try IngredientSection.find(sectionID).fetchOne(db), nil)
         expectNoDifference(try IngredientLine.find(lineID).fetchOne(db), nil)
       }
     }
 
     @Test
-    func archivedRecipeReferencesDoNotResolveIntoCalendarOrMenus() throws {
+    func archivedRecipeReferencesResolveInMenusButNotTheCalendar() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 802_050_000)
       let recipeID = SampleUUIDSequence.uuid(221)
@@ -193,7 +206,9 @@ extension RecipeCoreTests {
         expectNoDifference(calendarRows.contains { $0.item.id == mealPlanItemID }, false)
         expectNoDifference(calendarRows.contains { $0.menuItem?.id == menuItemID }, false)
         let detail = try #require(try MenuDetailRequest(menuID: menuID).fetch(db))
-        expectNoDifference(detail.itemRows.map(\.id), [])
+        expectNoDifference(detail.itemRows.map(\.id), [menuItemID])
+        expectNoDifference(detail.itemRows.first?.recipe?.id, recipeID)
+        expectNoDifference(detail.itemRows.first?.recipe?.archived, true)
       }
     }
   }
