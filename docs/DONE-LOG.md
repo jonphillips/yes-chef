@@ -21,6 +21,35 @@ The move means an assignment a cook later removes stays removed — no shadow fr
 removed, deterministic idempotence, user precedence, Course, mixed-field behavior, and snapshot preservation.
 
 ---
+## ADR-0050 S3 + S3.5 — Power Browser typed filters and compact-list convergence
+
+**Merged 2026-08-10; PR [#303](https://github.com/jonphillips/yes-chef/pull/303). No schema. Jon's device pass
+owed.** S3 adds typed attribute/source/usage filters to `RecipeBrowserQuery` and the shared `RecipeBrowserEngine`:
+time-at-most, servings-at-least, rating, make-ahead, added-after, never-cooked, and cooked-more-than-5× (ADR-0050
+D7's named threshold), plus per-field source pickers (name/author/cookbook/publication/website) with values OR-ed
+within a field and AND-ed across fields, and removable active-selection chips. S3.5 routes the **compact recipe
+list** through the same engine, deleting its separate in-memory filter and sort loop, so the phone list and the
+Power Browser now agree on what a selection means. Absorbs ADR-0049 F3/OQ5(b)+(c): the editor's freeform
+Cuisine/Course fields become single-select facet pickers (the typed columns are retained without a migration — the
+OQ5(a) backfill moves the data). Freezer-suitability deferred (no typed storage yet). Core tests assert the
+within-field OR / cross-field AND filter semantics at the engine boundary.
+
+---
+## Import — preserve divergent import duplicates (Semantic Fidelity Audit P0)
+
+**Merged 2026-08-10; PR [#304](https://github.com/jonphillips/yes-chef/pull/304). No schema. Jon's device pass
+owed.** Fixes a standing synced data-loss defect (Codex Semantic Fidelity Audit, P0): `mergeDuplicateImportedRecipes`
+repointed meal-plan/menu/grocery references off a duplicate recipe and then hard-deleted it with no content check —
+and because the canonical survivor is the *oldest* row, the deleted copy was the *newer, edited* one, with the
+delete propagating through sync as a tombstone. The merge now converges **only a provably content-empty husk**
+(`recipeIsContentEmpty` checks every recipe-scoped content and provenance table plus `originalSnapshot`); any
+divergent duplicate is kept and the previously-dead ambiguous-import-identity warning fires (report-and-warn at the
+canonical recipe, never a third copy, never a delete). Preview performs the same live check so it matches import.
+Already-shipped convergence damage is unrecoverable in code (ADR-0030 restore is the only recovery); this is
+forward-looking. Governed by ADR-0040 (lossless-or-loud) and ADR-0030. Four semantic-fidelity Core tests cover
+divergent content, mixed collisions, safe-husk convergence, and preview parity.
+
+---
 ## ADR-0042 Amd 3 — Recipe JSON-LD v2 capture contract
 
 **Merged 2026-08-09; PR [#302](https://github.com/jonphillips/yes-chef/pull/302). No schema. Jon's device pass

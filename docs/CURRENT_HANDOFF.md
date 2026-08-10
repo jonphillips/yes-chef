@@ -1,8 +1,9 @@
 # Current Handoff
 
 Last updated: August 10, 2026. **No designated Next Up target — Jon picks from the queue;** the live candidates are
-**ADR-0050 Power Browser S3 + S3.5** and **ADR-0052 S3** (both in Next Up). Newly-merged work has moved to
-[`DONE-LOG.md`](DONE-LOG.md); the device passes it owes are in their own section below.
+**ADR-0052 S3**, **ADR-0054** (extraction fidelity), and the **ADR-0053 Amd 2 Shortcuts return path** (Ready
+Efforts). Newly-merged work has moved to [`DONE-LOG.md`](DONE-LOG.md); the device passes it owes are in their own
+section below.
 ⚠️ **A standing Codex-env gotcha:** the simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
 the app tests" is structural, not a regression — and it once *masked two genuinely red tests* (missing
 `bootstrapDatabase()` → `RecipeEditorModel`'s eager `@Fetch` tripped SQLiteData's blank-DB reporter), fixed by
@@ -38,13 +39,6 @@ and every hit outside those two sections is a removal candidate — not merely f
 
 **Prior candidates (queue — not the designated target).** Per-recipe facet/tag coverage is Jon's ongoing hand
 work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**. Live candidates:
-
-- **[ADR-0050](decisions/ADR-0050-recipe-power-browser.md) Power Browser — S1 + S2 shipped (DONE-LOG; S2 device
-  pass owed).** Remaining: **S3** (attribute/source/usage filters with type-appropriate controls) and **S3.5**
-  (re-point `RecipeActiveFilterBar` onto the engine — a *deletion*; acceptance test is "the phone list and the
-  browser now agree on what a selection means"). **S3.5 also absorbs ADR-0049 F3/OQ5(b)+(c)** — retire the freeform
-  Cuisine/Course editor fields while preserving the per-facet single-select picker (Ready Efforts). The old "wait
-  until primary facets classify a majority of the library" gate is **retired** (Jon, 2026-08-05).
 
 - **[ADR-0052](decisions/ADR-0052-grocery-learned-area-table.md) S3 (not designated):** repoint ADR-0037's
   seed-coverage view to **audit** the `.model` rows (amends, never deletes). The rest of ADR-0052 is shipped and
@@ -120,6 +114,25 @@ section is work.**
 
 Drawn into **Next Up** as needed; not itself a dispatch target. Completed efforts live in
 [`docs/DONE-LOG.md`](DONE-LOG.md).
+
+**[ADR-0054](decisions/ADR-0054-extraction-preserves-structure-and-identity.md) — extraction preserves structure
+and identity (Proposed 2026-08-10, from the Codex Semantic Fidelity Audit).** Four **no-schema** slices at the
+`RecipeParseBuilder`/model boundary, all governed by ADR-0040 lossless-or-loud ([[editable-at-the-grain-stored]]):
+**D1** carry named instruction sections end-to-end (retire the flat `WorkbenchDraftRecipe.instructionLines` narrow
+point — both source and sink are already section-aware); **D2** one builder per candidate, so multiple
+materially-complete JSON-LD Recipe nodes never blend (deterministic primary + `.multipleRecipeCandidates` warning,
+user selection later); **D3** nested `HowToSection` is **declared-lossy** — flatten but preserve the child name and
+warn, no recursive schema; **D4** ingredient dedup is section-scoped, not global. No effort doc yet. The same
+audit's **P0** (destructive import convergence) already shipped (PR #304, DONE-LOG).
+
+**[ADR-0053 Amd 2 / S3](decisions/ADR-0053-create-recipe-destination.md#amendment-2--a-headless-transport-shortcuts--app-intent-into-create-recipe-2026-08-10)
+— Shortcuts return path** ([`efforts/shortcuts-return-path-create-recipe-2026-08-10.md`](efforts/shortcuts-return-path-create-recipe-2026-08-10.md)).
+A headless `CaptureRecipeFromText` App Intent + a `Get Clipboard` Shortcut lands clipboard text (usually a ChatGPT
+return) in the **resident Create Recipe** session for review — collapsing copy→open→paste→Extract. **No schema**
+(the session is D4-transient). ⚠️ **Amd2-D2 is the trap:** wire it to Create Recipe / `save(draft:)`, **never** the
+routed handoff importer (the clipboard text has no `handoffID` and no subject). Seed **non-destructively** —
+`pastedTextReceived` overwrites `composeText`, so it must never clobber unsaved work. Designed; independent of any
+branch. App-layer, so `YesChefTests` applies ([[app-test-target-in-verification]]).
 
 **[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md) — ATK's "Gather Your
 Ingredients" is a latent grocery bug (scoped 2026-07-28). P1 only; **no schema**.** 101 shoppable ingredient
@@ -208,6 +221,26 @@ selection (per-bubble `UITextView` caps the payload).
 ## Device passes owed
 
 Not work, a checklist.
+
+**ADR-0050 S3 + S3.5 — Power Browser typed filters + compact-list convergence (PR
+[#303](https://github.com/jonphillips/yes-chef/pull/303)), no schema.** In the Power Browser, exercise the new
+**Attributes / Usage / Source** filters (time-at-most, servings-at-least, rating, make-ahead, never-cooked,
+cooked-more-than-5×, added-after, and the per-field source pickers) and confirm active-selection chips add and
+remove correctly. Then confirm the **compact recipe list and the browser now agree** on what a selection means
+(S3.5 routed both through the one engine), and that the editor's **Cuisine/Course** are now single-select facet
+pickers (freeform fields retired). Check that an un-migrated free-text cuisine still turns up in text search.
+
+**Import P0 — preserve divergent import duplicates (PR
+[#304](https://github.com/jonphillips/yes-chef/pull/304)), no schema.** Capture a recipe, edit it (add a note and a
+photo), then re-import the same source and confirm the edited copy **survives** and the ambiguous-identity
+**warning** appears — no third copy, no silent delete. (Already-shipped convergence damage is unrecoverable in
+code; this is forward-looking protection.)
+
+**ADR-0050 OQ5(a) — Cuisine/Course facet backfill (PR
+[#305](https://github.com/jonphillips/yes-chef/pull/305)), no schema.** On a library with imported/hand-entered
+cuisines, launch once → recipes that had free-text Cuisine/Course now surface under the facet filters with the old
+Fields value gone (moved, not doubled); unmatched values stay put and show in the log summary. Confirm a second
+launch changes nothing, and that a facet assignment you *remove* stays removed across relaunch.
 
 **ADR-0050 S2 — Power Browser surface (PR [#301](https://github.com/jonphillips/yes-chef/pull/301)), no
 schema.** On wide iPad, open the dedicated **Power Browser** sidebar tab: the top-ranked facet should be expanded
