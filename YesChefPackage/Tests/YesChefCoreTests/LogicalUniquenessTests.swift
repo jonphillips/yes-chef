@@ -8,6 +8,10 @@ import YesChefCore
 extension RecipeCoreTests {
   @Suite
   struct LogicalUniquenessTests {
+  }
+
+  @Suite
+  struct ImportDuplicateConvergenceTests {
     @Test
     func sourceBackedImportIdentityConvergesDuplicateRefsAndRecipeReferences() throws {
       @Dependency(\.defaultDatabase) var database
@@ -137,7 +141,7 @@ extension RecipeCoreTests {
       }
 
       let snapshot = try database.read { db in
-        (
+        return (
           recipes: try Recipe.fetchAll(db).map(\.id).sorted { $0.uuidString < $1.uuidString },
           refs: try RecipeImportRef.fetchAll(db).map(\.recipeID),
           mealPlanRecipeIDs: try MealPlanItem.fetchAll(db).map(\.recipeID),
@@ -155,6 +159,315 @@ extension RecipeCoreTests {
       expectNoDifference(snapshot.grocerySourceRecipeIDs, [winnerID])
     }
 
+    @Test
+    func sourceBackedImportIdentityKeepsDivergentRecipeContentAndReportsCollision() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 814_010_000)
+      let later = now.addingTimeInterval(60)
+      let canonicalID = SampleUUIDSequence.uuid(31_101)
+      let divergentID = SampleUUIDSequence.uuid(31_102)
+      let incomingID = SampleUUIDSequence.uuid(31_103)
+      let sourceURL = "https://example.com/recipes/edited-sync-race"
+
+      let bundle = RecipeBundleCoding.RecipeBundle(
+        recipe: Recipe(id: incomingID, title: "Sync Race Stew", dateCreated: later, dateModified: later),
+        source: RecipeSource(id: SampleUUIDSequence.uuid(31_150), recipeID: incomingID, url: sourceURL)
+      )
+
+      try database.write { db in
+        try Recipe.insert {
+          Recipe(id: canonicalID, title: "Sync Race Stew", dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+        try Recipe.insert {
+          Recipe(id: divergentID, title: "Sync Race Stew", dateCreated: later, dateModified: later)
+        }
+        .execute(db)
+        try RecipeImportRef.insert {
+          RecipeImportRef(
+            id: SampleUUIDSequence.uuid(31_110),
+            recipeID: canonicalID,
+            normalizedSourceURL: sourceURL,
+            normalizedTitle: "sync race stew",
+            dateCreated: now
+          )
+        }
+        .execute(db)
+        try RecipeImportRef.insert {
+          RecipeImportRef(
+            id: SampleUUIDSequence.uuid(31_111),
+            recipeID: divergentID,
+            normalizedSourceURL: sourceURL,
+            normalizedTitle: "sync race stew",
+            dateCreated: later
+          )
+        }
+        .execute(db)
+
+        let instructionSectionID = SampleUUIDSequence.uuid(31_120)
+        try InstructionSection.insert {
+          InstructionSection(id: instructionSectionID, recipeID: divergentID, name: "Method", sortOrder: 0)
+        }
+        .execute(db)
+        try InstructionStep.insert {
+          InstructionStep(
+            id: SampleUUIDSequence.uuid(31_121),
+            recipeID: divergentID,
+            sectionID: instructionSectionID,
+            text: "Toast the spices until fragrant.",
+            sortOrder: 0
+          )
+        }
+        .execute(db)
+        try RecipeNote.insert {
+          RecipeNote(
+            id: SampleUUIDSequence.uuid(31_122),
+            recipeID: divergentID,
+            text: "Use the extra-hot smoked paprika.",
+            dateCreated: later,
+            dateModified: later
+          )
+        }
+        .execute(db)
+        try RecipePhoto.insert {
+          RecipePhoto(
+            id: SampleUUIDSequence.uuid(31_123),
+            recipeID: divergentID,
+            imageDataReference: "photos/sync-race.jpg",
+            caption: "My finished stew",
+            sortOrder: 0,
+            dateCreated: later
+          )
+        }
+        .execute(db)
+        try RecipeVariation.insert {
+          RecipeVariation(
+            id: SampleUUIDSequence.uuid(31_124),
+            recipeID: divergentID,
+            name: "Smoky",
+            note: "Add chipotle.",
+            sortIndex: 0,
+            dateCreated: later,
+            dateModified: later
+          )
+        }
+        .execute(db)
+
+        try MealPlanItem.insert {
+          MealPlanItem(
+            id: SampleUUIDSequence.uuid(31_130),
+            kind: .recipe,
+            recipeID: divergentID,
+            title: "Dinner",
+            scheduledDate: later,
+            mealSlot: .dinner,
+            sortOrder: 0,
+            dateCreated: later,
+            dateModified: later
+          )
+        }
+        .execute(db)
+      }
+
+      let preview = try database.read { db in
+        try RecipeRepository.previewImportBundles(
+          [bundle],
+          against: try RecipeImportRef.fetchAll(db),
+          in: db
+        )
+      }
+      let result = try database.write { db in
+        try RecipeRepository.importBundle(bundle, in: db, now: later, uuid: { SampleUUIDSequence.uuid(31_160) })
+      }
+      let snapshot = try database.read { db in
+        let recipeIDs = try Recipe.fetchAll(db).map(\.id).sorted { $0.uuidString < $1.uuidString }
+        let importRefRecipeIDs = try RecipeImportRef.fetchAll(db).map(\.recipeID).sorted {
+          $0.uuidString < $1.uuidString
+        }
+        let steps = try InstructionStep.where { $0.recipeID.eq(divergentID) }.fetchAll(db).map(\.text)
+        let notes = try RecipeNote.where { $0.recipeID.eq(divergentID) }.fetchAll(db).map(\.text)
+        let photos = try RecipePhoto.where { $0.recipeID.eq(divergentID) }.fetchAll(db).map(\.caption)
+        let variations = try RecipeVariation.where { $0.recipeID.eq(divergentID) }.fetchAll(db).map(\.name)
+        return (
+          recipeIDs: recipeIDs,
+          importRefRecipeIDs: importRefRecipeIDs,
+          steps: steps,
+          notes: notes,
+          photos: photos,
+          variations: variations,
+          mealPlanRecipeIDs: try MealPlanItem.fetchAll(db).map(\.recipeID)
+        )
+      }
+
+      let warning = RecipeImportWarning.Kind.ambiguousImportIdentity
+      expectNoDifference(preview.results[0].recipeID, canonicalID)
+      expectNoDifference(preview.results[0].status, .alreadyImported)
+      expectNoDifference(preview.warnings.map(\.kind), [warning])
+      expectNoDifference(result.recipeID, canonicalID)
+      expectNoDifference(result.outcome, .alreadyImported)
+      expectNoDifference(result.warnings.map(\.kind), [warning])
+      expectNoDifference(snapshot.recipeIDs, [canonicalID, divergentID].sorted { $0.uuidString < $1.uuidString })
+      expectNoDifference(snapshot.importRefRecipeIDs, [canonicalID, divergentID].sorted { $0.uuidString < $1.uuidString })
+      expectNoDifference(snapshot.steps, ["Toast the spices until fragrant."])
+      expectNoDifference(snapshot.notes, ["Use the extra-hot smoked paprika."])
+      expectNoDifference(snapshot.photos, ["My finished stew"])
+      expectNoDifference(snapshot.variations, ["Smoky"])
+      expectNoDifference(snapshot.mealPlanRecipeIDs, [divergentID])
+    }
+
+    @Test
+    func sourceBackedImportIdentityMergesOnlyEmptyHusksInAMixedCollision() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 814_020_000)
+      let later = now.addingTimeInterval(60)
+      let canonicalID = SampleUUIDSequence.uuid(31_201)
+      let huskID = SampleUUIDSequence.uuid(31_202)
+      let divergentID = SampleUUIDSequence.uuid(31_203)
+      let incomingID = SampleUUIDSequence.uuid(31_204)
+      let sourceURL = "https://example.com/recipes/mixed-sync-race"
+
+      let result = try database.write { db in
+        for (recipeID, date) in [(canonicalID, now), (huskID, later), (divergentID, later.addingTimeInterval(1))] {
+          try Recipe.insert {
+            Recipe(id: recipeID, title: "Mixed Sync Race", dateCreated: date, dateModified: date)
+          }
+          .execute(db)
+        }
+        for (id, recipeID, date) in [
+          (SampleUUIDSequence.uuid(31_210), canonicalID, now),
+          (SampleUUIDSequence.uuid(31_211), huskID, later),
+          (SampleUUIDSequence.uuid(31_212), divergentID, later.addingTimeInterval(1)),
+        ] {
+          try RecipeImportRef.insert {
+            RecipeImportRef(
+              id: id,
+              recipeID: recipeID,
+              normalizedSourceURL: sourceURL,
+              normalizedTitle: "mixed sync race",
+              dateCreated: date
+            )
+          }
+          .execute(db)
+        }
+        try RecipeNote.insert {
+          RecipeNote(
+            id: SampleUUIDSequence.uuid(31_213),
+            recipeID: divergentID,
+            text: "Keep this edited copy.",
+            dateCreated: later,
+            dateModified: later
+          )
+        }
+        .execute(db)
+        try MealPlanItem.insert {
+          MealPlanItem(
+            id: SampleUUIDSequence.uuid(31_214),
+            kind: .recipe,
+            recipeID: huskID,
+            title: "Husk dinner",
+            scheduledDate: later,
+            mealSlot: .dinner,
+            sortOrder: 0,
+            dateCreated: later,
+            dateModified: later
+          )
+        }
+        .execute(db)
+        try MealPlanItem.insert {
+          MealPlanItem(
+            id: SampleUUIDSequence.uuid(31_215),
+            kind: .recipe,
+            recipeID: divergentID,
+            title: "Edited dinner",
+            scheduledDate: later,
+            mealSlot: .lunch,
+            sortOrder: 0,
+            dateCreated: later,
+            dateModified: later
+          )
+        }
+        .execute(db)
+
+        return try RecipeRepository.importBundle(
+          RecipeBundleCoding.RecipeBundle(
+            recipe: Recipe(id: incomingID, title: "Mixed Sync Race", dateCreated: later, dateModified: later),
+            source: RecipeSource(id: SampleUUIDSequence.uuid(31_216), recipeID: incomingID, url: sourceURL)
+          ),
+          in: db,
+          now: later,
+          uuid: { SampleUUIDSequence.uuid(31_217) }
+        )
+      }
+      let snapshot = try database.read { db in
+        let recipeIDs = try Recipe.fetchAll(db).map(\.id).sorted { $0.uuidString < $1.uuidString }
+        let importRefRecipeIDs = try RecipeImportRef.fetchAll(db).map(\.recipeID).sorted {
+          $0.uuidString < $1.uuidString
+        }
+        let notes = try RecipeNote.where { $0.recipeID.eq(divergentID) }.fetchAll(db).map(\.text)
+        let mealPlanRecipeIDs = try MealPlanItem.fetchAll(db).map(\.recipeID).sorted {
+          ($0?.uuidString ?? "") < ($1?.uuidString ?? "")
+        }
+        return (
+          recipeIDs: recipeIDs,
+          importRefRecipeIDs: importRefRecipeIDs,
+          notes: notes,
+          mealPlanRecipeIDs: mealPlanRecipeIDs
+        )
+      }
+
+      expectNoDifference(result.recipeID, canonicalID)
+      expectNoDifference(result.outcome, .alreadyImported)
+      expectNoDifference(result.warnings.map(\.kind), [.ambiguousImportIdentity])
+      expectNoDifference(snapshot.recipeIDs, [canonicalID, divergentID].sorted { $0.uuidString < $1.uuidString })
+      expectNoDifference(snapshot.importRefRecipeIDs, [canonicalID, divergentID].sorted { $0.uuidString < $1.uuidString })
+      expectNoDifference(snapshot.notes, ["Keep this edited copy."])
+      expectNoDifference(snapshot.mealPlanRecipeIDs, [canonicalID, divergentID].sorted { $0.uuidString < $1.uuidString })
+    }
+
+    @Test
+    func titleOnlyImportIdentityStillDoesNotConvergeRecipes() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 814_030_000)
+      let firstID = SampleUUIDSequence.uuid(31_301)
+      let secondID = SampleUUIDSequence.uuid(31_302)
+      let incomingID = SampleUUIDSequence.uuid(31_303)
+
+      let result = try database.write { db in
+        for recipeID in [firstID, secondID] {
+          try Recipe.insert {
+            Recipe(id: recipeID, title: "Untitled Stew", dateCreated: now, dateModified: now)
+          }
+          .execute(db)
+        }
+        for (id, recipeID) in [(SampleUUIDSequence.uuid(31_310), firstID), (SampleUUIDSequence.uuid(31_311), secondID)] {
+          try RecipeImportRef.insert {
+            RecipeImportRef(id: id, recipeID: recipeID, normalizedTitle: "untitled stew", dateCreated: now)
+          }
+          .execute(db)
+        }
+        return try RecipeRepository.importBundle(
+          RecipeBundleCoding.RecipeBundle(
+            recipe: Recipe(id: incomingID, title: "Untitled Stew", dateCreated: now, dateModified: now)
+          ),
+          in: db,
+          now: now,
+          uuid: { SampleUUIDSequence.uuid(31_312) }
+        )
+      }
+      let recipeIDs = try database.read { db in
+        try Recipe.fetchAll(db).map(\.id).sorted { $0.uuidString < $1.uuidString }
+      }
+
+      expectNoDifference(result.recipeID, incomingID)
+      expectNoDifference(result.outcome, .imported)
+      expectNoDifference(result.warnings.map(\.kind), [.titleOnlyCollision])
+      expectNoDifference(recipeIDs, [firstID, secondID, incomingID].sorted { $0.uuidString < $1.uuidString })
+    }
+
+  }
+
+  @Suite
+  struct RemainingLogicalUniquenessTests {
     @Test
     func defaultGroceryListReadConvergesToOneDefaultWithoutDeletingLists() throws {
       @Dependency(\.defaultDatabase) var database

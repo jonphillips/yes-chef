@@ -431,9 +431,10 @@ extension RecipeCoreTests {
         try recipe.makeRecipeBundle(now: now.addingTimeInterval(60), uuid: { previewBundleUUIDs.next() })
       }
       let preview = try database.read { db in
-        RecipeRepository.previewImportBundles(
+        try RecipeRepository.previewImportBundles(
           previewBundles,
-          against: try RecipeImportRef.fetchAll(db)
+          against: try RecipeImportRef.fetchAll(db),
+          in: db
         )
       }
       let countsAfterPreview = try database.read { db in
