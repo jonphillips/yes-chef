@@ -36,9 +36,10 @@ extension RecipeCoreTests {
       }
 
       let preview = try database.read { db in
-        RecipeRepository.previewImportBundles(
+        try RecipeRepository.previewImportBundles(
           firstBundles,
-          against: try RecipeImportRef.fetchAll(db)
+          against: try RecipeImportRef.fetchAll(db),
+          in: db
         )
       }
       expectNoDifference(preview.newCount, 5)
@@ -121,9 +122,10 @@ extension RecipeCoreTests {
         try recipe.makeRecipeBundle(now: importDate.addingTimeInterval(60), uuid: { secondBundleUUIDs.next() })
       }
       let secondPreview = try database.read { db in
-        RecipeRepository.previewImportBundles(
+        try RecipeRepository.previewImportBundles(
           secondBundles,
-          against: try RecipeImportRef.fetchAll(db)
+          against: try RecipeImportRef.fetchAll(db),
+          in: db
         )
       }
       let secondSummary = try database.write { db in

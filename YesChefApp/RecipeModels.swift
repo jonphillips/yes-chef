@@ -319,9 +319,10 @@ final class RecipeImportModel {
       )
     }
     let preview = try await database.read { db in
-      RecipeRepository.previewImportBundles(
+      try RecipeRepository.previewImportBundles(
         bundles,
-        against: try RecipeImportRef.fetchAll(db)
+        against: try RecipeImportRef.fetchAll(db),
+        in: db
       )
     }
     draft = PaprikaRecipeImportDraft(

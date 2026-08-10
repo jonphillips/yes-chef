@@ -171,8 +171,9 @@ public struct RecipeImportRollbackResult: Equatable, Sendable {
 extension RecipeRepository {
   public static func previewImportBundles(
     _ bundles: [RecipeBundleCoding.RecipeBundle],
-    against importRefs: [RecipeImportRef]
-  ) -> RecipeImportBatchPreview {
+    against importRefs: [RecipeImportRef],
+    in db: Database
+  ) throws -> RecipeImportBatchPreview {
     let titleOnlyBatchCounts = titleOnlyBatchCounts(for: bundles)
     var simulatedImportRefs = importRefs
     var results: [RecipeImportPreviewResult] = []
@@ -180,10 +181,11 @@ extension RecipeRepository {
     for bundle in bundles {
       let key = importIdentityKey(for: bundle)
       let titleOnlyBatchCount = key.isTitleOnly ? titleOnlyBatchCounts[key, default: 1] : 1
-      let result = previewImportBundle(
+      let result = try previewImportBundle(
         bundle,
         importRefs: simulatedImportRefs,
-        titleOnlyBatchCount: titleOnlyBatchCount
+        titleOnlyBatchCount: titleOnlyBatchCount,
+        in: db
       )
       results.append(result)
 
@@ -383,18 +385,10 @@ extension RecipeRepository {
       )
       return RecipeImportBundleResult(recipeID: recipeID, title: bundle.recipe.title, outcome: .imported)
     default:
-      let recipeID = try insertImportedBundle(
-        bundle,
-        identityKey: key,
-        in: db,
-        now: now,
-        uuid: uuid,
-        importRefs: &importRefs
-      )
       return RecipeImportBundleResult(
-        recipeID: recipeID,
+        recipeID: matchingRefs[0].recipeID,
         title: bundle.recipe.title,
-        outcome: .imported,
+        outcome: .alreadyImported,
         warnings: [ambiguousImportIdentityWarning(title: bundle.recipe.title)]
       )
     }
@@ -498,10 +492,11 @@ extension RecipeRepository {
   private static func previewImportBundle(
     _ bundle: RecipeBundleCoding.RecipeBundle,
     importRefs: [RecipeImportRef],
-    titleOnlyBatchCount: Int
-  ) -> RecipeImportPreviewResult {
+    titleOnlyBatchCount: Int,
+    in db: Database
+  ) throws -> RecipeImportPreviewResult {
     let key = importIdentityKey(for: bundle)
-    let matchingRefs = matchingImportRefsForPreview(for: key, in: importRefs)
+    let matchingRefs = try matchingImportRefsForPreview(for: key, in: importRefs, db: db)
 
     if key.isTitleOnly {
       if titleOnlyBatchCount > 1, matchingRefs.count == titleOnlyBatchCount {
@@ -541,9 +536,9 @@ extension RecipeRepository {
       return RecipeImportPreviewResult(recipeID: bundle.recipe.id, title: bundle.recipe.title, status: .new)
     default:
       return RecipeImportPreviewResult(
-        recipeID: bundle.recipe.id,
+        recipeID: matchingRefs[0].recipeID,
         title: bundle.recipe.title,
-        status: .new,
+        status: .alreadyImported,
         warnings: [ambiguousImportIdentityWarning(title: bundle.recipe.title)]
       )
     }
@@ -559,27 +554,83 @@ extension RecipeRepository {
 
     let canonicalRef = refs[0]
     let duplicateRefs = Array(refs.dropFirst())
+    let mergeableRecipeIDs = Set(
+      try duplicateRefs.compactMap { ref in
+        try recipeIsContentEmpty(recipeID: ref.recipeID, in: db) ? ref.recipeID : nil
+      }
+    ).subtracting([canonicalRef.recipeID])
+
     try mergeDuplicateImportedRecipes(
       canonicalRecipeID: canonicalRef.recipeID,
-      duplicateRecipeIDs: Set(duplicateRefs.map(\.recipeID)).subtracting([canonicalRef.recipeID]),
+      duplicateRecipeIDs: mergeableRecipeIDs,
       in: db
     )
-    for ref in duplicateRefs {
+    for ref in duplicateRefs where mergeableRecipeIDs.contains(ref.recipeID) {
       try RecipeImportRef.find(ref.id).delete().execute(db)
     }
 
-    let duplicateRefIDs = Set(duplicateRefs.map(\.id))
-    importRefs.removeAll { duplicateRefIDs.contains($0.id) }
-    return [canonicalRef]
+    importRefs.removeAll { mergeableRecipeIDs.contains($0.recipeID) }
+    return refs.filter { !mergeableRecipeIDs.contains($0.recipeID) }
   }
 
   private static func matchingImportRefsForPreview(
     for key: RecipeImportIdentityKey,
-    in importRefs: [RecipeImportRef]
-  ) -> [RecipeImportRef] {
+    in importRefs: [RecipeImportRef],
+    db: Database
+  ) throws -> [RecipeImportRef] {
     let refs = rawMatchingImportRefs(for: key, in: importRefs)
     guard !key.isTitleOnly, refs.count > 1 else { return refs }
-    return Array(refs.prefix(1))
+
+    let mergeableRecipeIDs = Set(
+      try refs.dropFirst().compactMap { ref in
+        try recipeIsContentEmpty(recipeID: ref.recipeID, in: db) ? ref.recipeID : nil
+      }
+    ).subtracting([refs[0].recipeID])
+    return refs.filter { !mergeableRecipeIDs.contains($0.recipeID) }
+  }
+
+  private static func recipeIsContentEmpty(recipeID: Recipe.ID, in db: Database) throws -> Bool {
+    guard let recipe = try Recipe.find(recipeID).fetchOne(db), recipe.originalSnapshot == nil else {
+      return false
+    }
+
+    // Scalar-only Recipe edits remain the deliberately accepted residual: this guard only proves that no
+    // independently stored content or provenance would be lost by deleting the duplicate.
+    let recipeSubjectKind: ChatSubjectKind = .recipe
+    let recipeSourceType: AIHandoffSourceType = .recipe
+    if try RecipeSource.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try IngredientSection.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try IngredientLine.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try InstructionSection.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try InstructionStep.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try RecipeNote.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try RecipePhoto.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try RecipeTag.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try RecipeCategory.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try RecipeEquipment.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try RecipeVariation.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try RecipeActiveVariation.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try RecipeDeliberationLogEntry.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try RecipeServeWith.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try RecipeRelatedRecipe.where({
+      $0.recipeID.eq(recipeID) || $0.relatedRecipeID.eq(recipeID)
+    }).fetchOne(db) != nil { return false }
+    if try ChatThreadRecord.where({
+      $0.subjectKind.eq(recipeSubjectKind) && $0.subjectID.eq(recipeID.uuidString)
+    }).fetchOne(db) != nil { return false }
+    if try ChatMessageRecord.where({
+      $0.subjectKind.eq(recipeSubjectKind) && $0.subjectID.eq(recipeID.uuidString)
+    }).fetchOne(db) != nil { return false }
+    if try AIHandoff.where({
+      $0.sourceType.eq(recipeSourceType) && $0.sourceID.eq(recipeID)
+    }).fetchOne(db) != nil { return false }
+    if try Learning.where({
+      $0.sourceType.eq(recipeSourceType) && $0.sourceID.eq(recipeID)
+    }).fetchOne(db) != nil { return false }
+    if try Workbench.where({ $0.draftRecipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try WorkbenchCandidate.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try WorkbenchLogEntry.where({ $0.relatedRecipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    return true
   }
 
   private static func rawMatchingImportRefs(
@@ -640,7 +691,7 @@ extension RecipeRepository {
     RecipeImportWarning(
       kind: .ambiguousImportIdentity,
       title: title,
-      message: "An import identity matched more than one existing recipe, so this recipe was imported as new."
+      message: "An import identity matched more than one existing recipe, so the existing recipe was kept."
     )
   }
 }
