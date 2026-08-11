@@ -19,7 +19,8 @@ extension RecipeExtraction {
         .map { String($0.dropFirst("Cuisine > ".count)) },
       course: page.categoryNames.first { !$0.hasPrefix("Cuisine > ") },
       ingredientSections: page.ingredientSections.map { .init(name: $0.name, lines: $0.lines) },
-      instructionSections: page.instructionSections.map { .init(name: $0.name, steps: $0.steps) }
+      instructionSections: page.instructionSections.map { .init(name: $0.name, steps: $0.steps) },
+      warnings: page.warnings
     )
   }
 

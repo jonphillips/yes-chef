@@ -186,6 +186,9 @@ public struct RecipeExtraction: Codable, Equatable, Sendable {
   public var course: String?
   public var ingredientSections: [IngredientSection]
   public var instructionSections: [InstructionSection]
+  /// Deterministic capture evidence that the Create Recipe review surface must preserve. Optional keeps
+  /// the LLM's existing response shape valid; only structured capture currently supplies these.
+  public var warnings: [WebRecipeCaptureWarning]?
 
   public init(
     title: String? = nil,
@@ -199,7 +202,8 @@ public struct RecipeExtraction: Codable, Equatable, Sendable {
     cuisine: String? = nil,
     course: String? = nil,
     ingredientSections: [IngredientSection] = [],
-    instructionSections: [InstructionSection] = []
+    instructionSections: [InstructionSection] = [],
+    warnings: [WebRecipeCaptureWarning]? = nil
   ) {
     self.title = title
     self.summary = summary
@@ -213,6 +217,7 @@ public struct RecipeExtraction: Codable, Equatable, Sendable {
     self.course = course
     self.ingredientSections = ingredientSections
     self.instructionSections = instructionSections
+    self.warnings = warnings
   }
 
   var cleaned: Self {

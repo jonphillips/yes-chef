@@ -11,6 +11,8 @@ struct RecipeParseBuilder {
   private(set) var instructionSections: [ParsedRecipeInstructionSection] = []
   private(set) var editorialBlocks: [ParsedRecipeEditorialBlock] = []
   private var sawTruncatedStructuredData = false
+  private var sawMultipleRecipeCandidates = false
+  private var sawNestedInstructionSectionsFlattened = false
 
   let sourceURL: URL?
   let originalHTML: String
@@ -70,7 +72,7 @@ struct RecipeParseBuilder {
   }
 
   mutating func addIngredientSection(name: String?, lines: [String]) {
-    let cleanedLines = lines.flatMap(Self.lines)
+    let cleanedLines = Self.uniqued(lines.flatMap(Self.lines))
     guard !cleanedLines.isEmpty else { return }
     explicitIngredientSections.append(
       ParsedRecipeIngredientSection(
@@ -88,6 +90,14 @@ struct RecipeParseBuilder {
 
   mutating func markTruncatedStructuredData() {
     sawTruncatedStructuredData = true
+  }
+
+  mutating func markMultipleRecipeCandidates() {
+    sawMultipleRecipeCandidates = true
+  }
+
+  mutating func markNestedInstructionSectionsFlattened() {
+    sawNestedInstructionSectionsFlattened = true
   }
 
   func build(capturedAt: Date) -> ParsedRecipePage {
@@ -112,6 +122,8 @@ struct RecipeParseBuilder {
     if sawTruncatedStructuredData, missingIngredients || missingInstructions {
       warnings.append(.truncatedStructuredData)
     }
+    if sawMultipleRecipeCandidates { warnings.append(.multipleRecipeCandidates) }
+    if sawNestedInstructionSectionsFlattened { warnings.append(.nestedInstructionSectionsFlattened) }
     if votes.winner(.title) == nil { warnings.append(.untitledRecipe) }
     if missingIngredients { warnings.append(.noIngredients) }
     if missingInstructions { warnings.append(.noInstructions) }
@@ -206,6 +218,14 @@ struct RecipeParseBuilder {
   private static func sectionedIngredients(_ lines: [String]) -> [ParsedRecipeIngredientSection] {
     IngredientSectionHeading.sections(in: lines)
       .map { ParsedRecipeIngredientSection(name: $0.name, lines: $0.lines) }
+  }
+
+  private static func uniqued(_ lines: [String]) -> [String] {
+    var result: [String] = []
+    for line in lines where !result.contains(line) {
+      result.append(line)
+    }
+    return result
   }
 
   private static func ratingValue(_ text: String) -> Int? {

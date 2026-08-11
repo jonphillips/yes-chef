@@ -867,7 +867,7 @@ extension AIHandoffTests {
     let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
 
     let straightJSON = #"""
-    {"@context":"https://schema.org","@type":"Recipe","name":"Kung Pao Chicken","description":"Glossy and robust.","recipeCuisine":"Chinese-American","recipeCategory":"Main course","recipeYield":"4 to 6 servings","prepTime":"PT25M","cookTime":"PT15M","recipeIngredient":["1 1/2 pounds chicken thighs","1/2 cup peanuts"],"recipeInstructions":[{"@type":"HowToSection","name":"Stir-fry","itemListElement":[{"@type":"HowToStep","text":"Sear the chicken."},{"@type":"HowToStep","text":"Add the sauce and toss."}]}]}
+    {"@context":"https://schema.org","@type":"Recipe","name":"Kung Pao Chicken","description":"Glossy and robust.","recipeCuisine":"Chinese-American","recipeCategory":"Main course","recipeYield":"4 to 6 servings","prepTime":"PT25M","cookTime":"PT15M","recipeIngredient":["1 1/2 pounds chicken thighs","1/2 cup peanuts"],"recipeInstructions":[{"@type":"HowToSection","name":"Make the sauce","itemListElement":[{"@type":"HowToStep","text":"Whisk the sauce."}]},{"@type":"HowToSection","name":"Stir-fry","itemListElement":[{"@type":"HowToStep","text":"Sear the chicken."},{"@type":"HowToStep","text":"Add the sauce and toss."}]}]}
     """#
     // Simulate the copy/paste autoformatter: each "..." token becomes a curly-open/curly-close pair.
     let mangledJSON = straightJSON.replacingOccurrences(
@@ -918,9 +918,24 @@ extension AIHandoffTests {
       expectNoDifference(draft.cookTimeMinutes, 15)
       expectNoDifference(draft.cuisine, "Chinese-American")
       expectNoDifference(draft.course, "Main course")
-      // Named HowToSection flattens into the draft's flat step list (matches the onboard shape).
       expectNoDifference(draft.ingredientLines, ["1 1/2 pounds chicken thighs", "1/2 cup peanuts"])
-      expectNoDifference(draft.instructionLines, ["Sear the chicken.", "Add the sauce and toss."])
+      expectNoDifference(
+        draft.instructionSections,
+        [
+          WorkbenchDraftInstructionSection(name: "Make the sauce", steps: ["Whisk the sauce."]),
+          WorkbenchDraftInstructionSection(
+            name: "Stir-fry",
+            steps: ["Sear the chicken.", "Add the sauce and toss."]
+          ),
+        ]
+      )
+      var uuids = SampleUUIDSequence(start: 38_050)
+      let editorDraft = draft.editorDraft(libraryPlacement: .reference, uuid: { uuids.next() })
+      expectNoDifference(editorDraft.instructionSections.map(\.name), ["Make the sauce", "Stir-fry"])
+      expectNoDifference(
+        editorDraft.instructionSections.map(\.text),
+        ["Whisk the sauce.", "Sear the chicken.\n\nAdd the sauce and toss."]
+      )
       // Rationale rides as its own block; the apostrophe survives (salvage replaces, never deletes).
       #expect(draft.rationale.contains("Cook's Illustrated"))
       // A naked-sentence learning is captured losslessly, not dropped.

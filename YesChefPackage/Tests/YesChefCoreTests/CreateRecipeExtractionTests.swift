@@ -101,6 +101,30 @@ extension RecipeCoreTests {
       ])
     }
 
+    /// Create Recipe uses the same warning evidence as capture: choosing one complete recipe from an
+    /// ambiguous graph and flattening a nested method must both be visible in its two-cue review budget.
+    @Test
+    func jsonLDPasteCarriesAmbiguityAndFlatteningWarningsIntoReviewIssues() async throws {
+      let jsonLD = """
+        {"@context":"https://schema.org","@graph":[
+          {"@type":"Recipe","name":"Primary stew","recipeYield":"4 servings","recipeIngredient":["1 onion"],"recipeInstructions":[{"@type":"HowToSection","name":"Cook stew","itemListElement":[{"@type":"HowToStep","text":"Cook the onion."},{"@type":"HowToSection","name":"Finish","itemListElement":[{"@type":"HowToStep","text":"Serve the stew."}]}]}]},
+          {"@type":"Recipe","name":"Second stew","recipeIngredient":["1 carrot"],"recipeInstructions":["Cook the carrot."]}
+        ]}
+        """
+
+      let result = try await withDependencies {
+        $0.recipeExtractionClient = .testValue
+      } operation: {
+        try await CreateRecipeExtraction.extract(text: jsonLD)
+      }
+
+      expectNoDifference(result.warnings, [.multipleRecipeCandidates, .nestedInstructionSectionsFlattened])
+      expectNoDifference(RecipeExtractionIssueDetector.issues(in: result), [
+        .init(kind: .multipleRecipeCandidates),
+        .init(kind: .nestedInstructionSectionsFlattened),
+      ])
+    }
+
     /// Recover the first dogfood return shape, which incorrectly used HowToSection objects as
     /// `recipeIngredient` entries. The v2 source forbids it, but importing the actual return must
     /// retain the ingredient lines rather than saving only the group names.

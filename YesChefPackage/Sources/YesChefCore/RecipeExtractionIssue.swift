@@ -15,6 +15,8 @@ public struct RecipeExtractionIssue: Equatable, Identifiable, Sendable {
     case unparseablePrepTime
     case unparseableCookTime
     case unparseableTotalTime
+    case multipleRecipeCandidates
+    case nestedInstructionSectionsFlattened
   }
 
   public var kind: Kind
@@ -55,6 +57,10 @@ public struct RecipeExtractionIssue: Equatable, Identifiable, Sendable {
       "Check cook time \(quotedDetail); it is not a readable duration."
     case .unparseableTotalTime:
       "Check total time \(quotedDetail); it is not a readable duration."
+    case .multipleRecipeCandidates:
+      "This page contained more than one complete recipe; review the selected recipe."
+    case .nestedInstructionSectionsFlattened:
+      "Nested instruction sections were flattened; review the method groups."
     }
   }
 
@@ -76,6 +82,19 @@ public enum RecipeExtractionIssueDetector {
       .flatMap(\.steps)
       .filter { !$0.trimmedRecipeExtractionText.isEmpty }
     var issues: [RecipeExtractionIssue] = []
+
+    // These are source facts, not inferences. Put them ahead of ordinary completeness checks so the
+    // two-cue review budget never hides the lossless-or-loud evidence supplied by deterministic JSON-LD.
+    for warning in extraction.warnings ?? [] {
+      switch warning {
+      case .multipleRecipeCandidates:
+        issues.append(.init(kind: .multipleRecipeCandidates))
+      case .nestedInstructionSectionsFlattened:
+        issues.append(.init(kind: .nestedInstructionSectionsFlattened))
+      default:
+        break
+      }
+    }
 
     if extraction.title?.trimmedRecipeExtractionText.isEmpty != false {
       issues.append(.init(kind: .missingTitle))
@@ -228,14 +247,16 @@ public enum RecipeExtractionIssueDetector {
 
   private static func priority(of kind: RecipeExtractionIssue.Kind) -> Int {
     switch kind {
-    case .emptyIngredients, .emptyInstructions, .missingTitle:
+    case .multipleRecipeCandidates, .nestedInstructionSectionsFlattened:
       0
-    case .unparseablePrepTime, .unparseableCookTime, .unparseableTotalTime, .duplicateIngredient:
+    case .emptyIngredients, .emptyInstructions, .missingTitle:
       1
-    case .missingYield:
+    case .unparseablePrepTime, .unparseableCookTime, .unparseableTotalTime, .duplicateIngredient:
       2
-    case .referencedIngredientNotListed, .ingredientNotReferenced, .missingIngredientQuantity:
+    case .missingYield:
       3
+    case .referencedIngredientNotListed, .ingredientNotReferenced, .missingIngredientQuantity:
+      4
     }
   }
 

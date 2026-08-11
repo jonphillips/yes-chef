@@ -150,6 +150,76 @@ extension RecipeCoreTests {
       expectNoDifference(recipe.totalTimeMinutes, 45)
     }
 
+    @Test
+    func multipleCompleteJSONLDRecipesChooseTheMainEntityWithoutBlending() {
+      let page = WebRecipePageParser.parse(html: """
+        <script type="application/ld+json">
+        {"@type":"WebPage","relatedRecipe":{"@type":"Recipe","name":"Nested Recipe","recipeIngredient":["nested ingredient"],"recipeInstructions":["Cook nested."]}}
+        </script>
+        <script type="application/ld+json">
+        {"@type":"WebPage","mainEntity":{"@type":"Recipe","name":"Main Recipe","recipeIngredient":["main ingredient"],"recipeInstructions":["Cook main."]}}
+        </script>
+        """)
+
+      // `mainEntity` outranks an earlier nested Recipe, so primary selection is not first-seen.
+      expectNoDifference(page.title, "Main Recipe")
+      expectNoDifference(page.ingredientSections.flatMap(\.lines), ["main ingredient"])
+      expectNoDifference(page.instructionSections.flatMap(\.steps), ["Cook main."])
+      expectNoDifference(page.warnings, [.multipleRecipeCandidates])
+    }
+
+    @Test
+    func JSONLDRecipeTeaserIsIgnoredWithoutAMultipleCandidateWarning() {
+      let page = WebRecipePageParser.parse(html: """
+        <script type="application/ld+json">
+        {"@graph":[
+          {"@type":"Recipe","name":"Complete Recipe","recipeIngredient":["1 onion"],"recipeInstructions":["Cook the onion."]},
+          {"@type":"Recipe","name":"Teaser Recipe","image":"https://example.com/teaser.jpg"}
+        ]}
+        </script>
+        """)
+
+      expectNoDifference(page.title, "Complete Recipe")
+      expectNoDifference(page.ingredientSections.flatMap(\.lines), ["1 onion"])
+      expectNoDifference(page.warnings, [])
+    }
+
+    @Test
+    func nestedHowToSectionsFlattenWithAComposedNameAndWarning() {
+      let page = WebRecipePageParser.parse(html: """
+        <script type="application/ld+json">
+        {"@type":"Recipe","name":"Nested Method","recipeIngredient":["1 onion"],"recipeInstructions":[{"@type":"HowToSection","name":"Make dinner","itemListElement":[{"@type":"HowToStep","text":"Heat the pan."},{"@type":"HowToSection","name":"Finish sauce","itemListElement":[{"@type":"HowToStep","text":"Stir in butter."}]}]}]}
+        </script>
+        """)
+
+      expectNoDifference(
+        page.instructionSections,
+        [
+          ParsedRecipeInstructionSection(name: "Make dinner", steps: ["Heat the pan."]),
+          ParsedRecipeInstructionSection(name: "Make dinner — Finish sauce", steps: ["Stir in butter."]),
+        ]
+      )
+      expectNoDifference(page.warnings, [.nestedInstructionSectionsFlattened])
+      #expect(!page.instructionSections.flatMap(\.steps).contains("Finish sauce"))
+    }
+
+    @Test
+    func JSONLDIngredientDedupIsScopedToEachSection() {
+      let page = WebRecipePageParser.parse(html: """
+        <script type="application/ld+json">
+        {"@type":"Recipe","name":"Divided Sugar","yesChef:ingredientSections":[{"name":"Cake","recipeIngredient":["1 cup sugar","1 cup sugar"]},{"name":"Frosting","recipeIngredient":["1 cup sugar"]}],"recipeInstructions":["Bake the cake."]}
+        </script>
+        """)
+
+      expectNoDifference(
+        page.ingredientSections,
+        [
+          ParsedRecipeIngredientSection(name: "Cake", lines: ["1 cup sugar"]),
+          ParsedRecipeIngredientSection(name: "Frosting", lines: ["1 cup sugar"]),
+        ]
+      )
+    }
+
     private final class LockedSampleUUIDSequence: @unchecked Sendable {
       private let lock = NSLock()
       private var sequence: SampleUUIDSequence

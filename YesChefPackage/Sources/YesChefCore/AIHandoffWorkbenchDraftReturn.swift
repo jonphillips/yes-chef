@@ -116,9 +116,8 @@ extension WorkbenchDraftRecipe {
   /// Ingredient group headings are preserved: when the extractor sections the ingredients under
   /// names, those names are re-inlined as colon-terminated heading lines (the form the editor reads
   /// back via `IngredientSectionHeading`), so nothing is silently dropped (ADR-0040 lossless). Named
-  /// `HowToSection` *instruction* groupings collapse into the flat step list — the draft's
-  /// instruction field is single-section by construction, and the cook re-sections after promoting.
-  /// `capturedAt` is provenance only.
+  /// `HowToSection` instruction groups carry as typed draft sections into the editor. `capturedAt` is
+  /// provenance only.
   static func fromJSONLD(_ jsonLD: String, rationale: String, capturedAt: Date) -> WorkbenchDraftRecipe? {
     let trimmed = jsonLD.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return nil }
@@ -128,9 +127,11 @@ extension WorkbenchDraftRecipe {
     let page = builder.build(capturedAt: capturedAt)
 
     let title = page.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-    let instructionLines = page.instructionSections.flatMap(\.steps)
+    let instructionSections = page.instructionSections.map {
+      WorkbenchDraftInstructionSection(name: $0.name, steps: $0.steps)
+    }
     let (ingredientLines, ingredientSectionName) = flattenedIngredients(page.ingredientSections)
-    guard !ingredientLines.isEmpty || !instructionLines.isEmpty else { return nil }
+    guard !ingredientLines.isEmpty || !instructionSections.flatMap(\.steps).isEmpty else { return nil }
 
     let cuisinePrefix = "Cuisine > "
     let cuisine = page.categoryNames
@@ -148,7 +149,7 @@ extension WorkbenchDraftRecipe {
       course: course,
       ingredientSectionName: ingredientSectionName,
       ingredientLines: ingredientLines,
-      instructionLines: instructionLines,
+      instructionSections: instructionSections,
       notes: [],
       rationale: rationale
     )

@@ -30,7 +30,12 @@ public struct WorkbenchDraftRecipe: Equatable, Sendable {
   public var course: String?
   public var ingredientSectionName: String?
   public var ingredientLines: [String]
-  public var instructionLines: [String]
+  /// Fidelity: lossless. JSON-LD instruction group names stay structured until this draft reaches
+  /// the editor sink; flat instruction lines are only a compatibility view for older callers.
+  public var instructionSections: [WorkbenchDraftInstructionSection]
+  public var instructionLines: [String] {
+    instructionSections.flatMap(\.steps)
+  }
   public var notes: [String]
   public var rationale: String
 
@@ -47,6 +52,7 @@ public struct WorkbenchDraftRecipe: Equatable, Sendable {
     ingredientSectionName: String? = nil,
     ingredientLines: [String] = [],
     instructionLines: [String] = [],
+    instructionSections: [WorkbenchDraftInstructionSection]? = nil,
     notes: [String] = [],
     rationale: String
   ) {
@@ -61,7 +67,9 @@ public struct WorkbenchDraftRecipe: Equatable, Sendable {
     self.course = course
     self.ingredientSectionName = ingredientSectionName
     self.ingredientLines = ingredientLines
-    self.instructionLines = instructionLines
+    self.instructionSections = instructionSections ?? [
+      WorkbenchDraftInstructionSection(steps: instructionLines),
+    ].filter { !$0.steps.isEmpty }
     self.notes = notes
     self.rationale = rationale
   }
@@ -99,7 +107,16 @@ public struct WorkbenchDraftRecipe: Equatable, Sendable {
     if !instructionLines.isEmpty {
       lines.append("")
       lines.append("Instructions:")
-      lines.append(contentsOf: instructionLines.enumerated().map { index, step in "\(index + 1). \(step)" })
+      var stepNumber = 1
+      for section in instructionSections {
+        if let name = section.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+          lines.append("\(name):")
+        }
+        lines.append(contentsOf: section.steps.map { step in
+          defer { stepNumber += 1 }
+          return "\(stepNumber). \(step)"
+        })
+      }
     }
     if !notes.isEmpty {
       lines.append("")
@@ -162,7 +179,6 @@ public struct WorkbenchDraftRecipe: Equatable, Sendable {
       libraryPlacement: libraryPlacement,
       ingredientSectionName: ingredientSectionName ?? "",
       ingredientText: ingredientLines.joined(separator: "\n"),
-      instructionText: instructionLines.joined(separator: "\n\n"),
       noteText: noteParagraphs.joined(separator: "\n\n")
     )
   }
@@ -174,8 +190,29 @@ public struct WorkbenchDraftRecipe: Equatable, Sendable {
     uuid: () -> UUID
   ) -> RecipeEditorDraft {
     var draft = editorDraft(libraryPlacement: libraryPlacement)
+    let instructionDrafts = instructionSections.map { section in
+      RecipeEditorInstructionSectionDraft(
+        id: uuid(),
+        name: section.name ?? "",
+        text: section.steps.joined(separator: "\n\n")
+      )
+    }
+    if !instructionDrafts.isEmpty {
+      draft.instructionSections = instructionDrafts
+    }
     _ = draft.ingredientTextChanged(sectionID: draft.ingredientSections[0].id, uuid: uuid)
     return draft
+  }
+}
+
+/// One pre-canonical instruction group carried by a workbench draft until the editor assigns its ID.
+public struct WorkbenchDraftInstructionSection: Equatable, Sendable {
+  public var name: String?
+  public var steps: [String]
+
+  public init(name: String? = nil, steps: [String]) {
+    self.name = name
+    self.steps = steps
   }
 }
 
