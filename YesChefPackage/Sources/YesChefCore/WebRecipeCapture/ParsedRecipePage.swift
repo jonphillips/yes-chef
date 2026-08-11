@@ -42,7 +42,7 @@ public struct ParsedRecipeReaderFeedbackBlock: Equatable, Sendable {
   }
 }
 
-public enum WebRecipeCaptureWarning: String, Equatable, Sendable {
+public enum WebRecipeCaptureWarning: String, Codable, Equatable, Sendable {
   case noStructuredRecipeData
   case truncatedStructuredData
   case multipleRecipeCandidates
