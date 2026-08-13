@@ -9,6 +9,41 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0054 — extraction preserves structure and identity
+
+**Merged 2026-08-11; PR [#308](https://github.com/jonphillips/yes-chef/pull/308). No schema. Jon's device pass owed.**
+Four no-schema slices at the `RecipeParseBuilder`/model boundary, all under ADR-0040 lossless-or-loud
+([[editable-at-the-grain-stored]]). **D1** carries named workbench/JSON-LD instruction sections end-to-end through the
+editor sink, retiring the flat `WorkbenchDraftRecipe.instructionLines` narrow point (both source and sink were already
+section-aware). **D2** builds one candidate per materially-complete JSON-LD Recipe node instead of blending them: a
+deterministic primary imports and a `.multipleRecipeCandidates` warning surfaces the rest (user selection deferred).
+**D3** flattens nested `HowToSection` as *declared-lossy* — the child section name is preserved and a warning raised,
+no recursive schema. **D4** scopes ingredient dedup to each section rather than globally, so a legitimately-repeated
+ingredient across groups survives. Warning cases carry their minimal capture-review titles in `RecipeCaptureView`.
+New Core tests in `WebRecipeCapturePolishTests`, `CreateRecipeExtractionTests`, `AIHandoffRecipeMealPlanTests`. First
+fidelity work built to the ADR-0051 sink/engine guard; the same Semantic Fidelity Audit's P0 (destructive-import
+convergence) shipped earlier in PR #304.
+
+---
+## ADR-0053 Amd 2 / S3 — Shortcuts return path into Create Recipe
+
+**Merged 2026-08-10; PR [#307](https://github.com/jonphillips/yes-chef/pull/307). No schema. Jon's device pass owed.**
+A headless `CaptureRecipeFromText` App Intent + a `Get Clipboard` Shortcut land clipboard text (usually a ChatGPT
+reply) in the **resident, transient** Create Recipe session for review, collapsing copy→open→paste→Extract. Wired as a
+`CreateRecipeCoordinator` **sibling** of `ImportHandoffResult`, **never** the routed handoff importer — clipboard text
+has no `handoffID`/subject, so it is Create Recipe / `save(draft:)`, categorically (Amd2-D2). Reuses
+`CreateRecipeExtraction.extract` (no new parser — the ADR-0051 guard), foregrounds via `openAppWhenRun` with no
+`yeschef://` scheme (Amd2-D3), and seeds **non-destructively**: an empty session extracts immediately; a non-empty
+session offers the incoming text as a new source via a confirmation dialog whose "Use New Text" button captures its
+payload at build time so the `isPresented` setter can't null it first ([[alert-ispresented-destructive-setter]];
+Amd2-D4). Verbatim clipboard text preserved into the source (Amd2-D5). 6 new `CreateRecipeModel` intent/coordinator
+tests in `YesChefAppTests` (rode to the device pass — the beta sim couldn't host the target in Codex's env). **Two
+approved ride-alongs:** (1) archived recipes stay linkable from a menu — `archive()` keeps `menuItems` and severs only
+the meal-plan link, `permanentlyDelete()` takes over the `menuItems` deletion, and `fetchDetail`/`RecipeDetailRequest`
+gain `includingArchivedRecipe`; uses the existing `archived` column, no schema; (2) iPhone compact-tab Settings /
+Groceries / Workbenches route through the More tab's nav context (compact push was busted).
+
+---
 ## ADR-0050 OQ5(a) — Cuisine/Course facet backfill
 
 **Built 2026-08-10; PR [#305](https://github.com/jonphillips/yes-chef/pull/305). No schema. Jon's device pass

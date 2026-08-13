@@ -1,9 +1,8 @@
 # Current Handoff
 
-Last updated: August 10, 2026. **No designated Next Up target — Jon picks from the queue;** the live candidates are
-**ADR-0052 S3**, **ADR-0054** (extraction fidelity), and the **ADR-0053 Amd 2 Shortcuts return path** (Ready
-Efforts). Newly-merged work has moved to [`DONE-LOG.md`](DONE-LOG.md); the device passes it owes are in their own
-section below.
+Last updated: August 12, 2026. **No designated Next Up target — Jon picks from the queue;** the one live candidate
+left in Ready Efforts is **ADR-0052 S3**. Newly-merged work has moved to [`DONE-LOG.md`](DONE-LOG.md); the device
+passes it owes are in their own section below.
 ⚠️ **A standing Codex-env gotcha:** the simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
 the app tests" is structural, not a regression — and it once *masked two genuinely red tests* (missing
 `bootstrapDatabase()` → `RecipeEditorModel`'s eager `@Fetch` tripped SQLiteData's blank-DB reporter), fixed by
@@ -77,17 +76,16 @@ section is work.**
     to cite. **Converging the two save paths is not queued work** — it needs a source that is both authored and
     externally identified, which does not exist yet.
 - **⚠️ [ADR-0053 Amd 2](decisions/ADR-0053-create-recipe-destination.md#amendment-2--a-headless-transport-shortcuts--app-intent-into-create-recipe-2026-08-10)
-  — the Shortcuts return path has ONE correct wiring; three traps are review blocks** (effort
-  [`shortcuts-return-path-create-recipe-2026-08-10.md`](efforts/shortcuts-return-path-create-recipe-2026-08-10.md),
-  Ready). A headless `CaptureRecipeFromText` App Intent lands clipboard text in Create Recipe. **(1)** It routes to
-  **Create Recipe / `save(draft:)`, NEVER the routed handoff importer** (`ImportHandoffResult` /
-  `HandoffReviewCoordinator`) — clipboard text has no `handoffID` and no subject, so a new recipe through that
-  surface is a category error (Amd2-D2). **(2)** No new parser and no second "text→recipe" model call — reuse
-  `CreateRecipeExtraction.extract` (this *is* the ADR-0051 guard above); and **no `yeschef://` URL scheme** — the
-  app has none, foreground via an `openAppWhenRun` opener + a `CreateRecipeCoordinator` mirroring the handoff one
-  (Amd2-D3). **(3)** Seed the resident session **non-destructively** — `pastedTextReceived` overwrites
-  `composeText`, so it must never clobber unsaved work (Amd2-D4). The transport stays producer-agnostic and
-  menu-unaware, preserving exact text (Amd2-D1/D5); durable staging = a new synced table = a non-goal (D4).
+  — the Shortcuts return path SHIPPED (PR #307, DONE-LOG); its ONE correct wiring is now load-bearing, do not re-fork
+  it.** The headless `CaptureRecipeFromText` App Intent lands clipboard text in Create Recipe via a
+  `CreateRecipeCoordinator` **sibling** of `ImportHandoffResult` — **never** the routed handoff importer
+  (`HandoffReviewCoordinator`): clipboard text has no `handoffID` and no subject, so it is Create Recipe /
+  `save(draft:)`, categorically (Amd2-D2). It reuses `CreateRecipeExtraction.extract` — **no new parser, no second
+  "text→recipe" model call** (this *is* the ADR-0051 guard above) — with **no `yeschef://` URL scheme** (the app has
+  none; it foregrounds via an `openAppWhenRun` opener; Amd2-D3), and it seeds **non-destructively** — a non-empty
+  session offers the incoming text as a new source and never clobbers unsaved work (Amd2-D4). The transport stays
+  producer-agnostic and menu-unaware, preserving exact text (Amd2-D1/D5); durable staging = a new synced table = a
+  non-goal (D4).
 - **ADR-0021 (variations) is COMPLETE — V1–V3, Amendment 4 (V4a/V4b/V4c + Delete), and anchor-repair
   Dispatch 0/1/2 all shipped (DONE-LOG).** ADR-0023 (recipe edit proposals) has nothing queued: its
   *iterative refine loop* is **WITHDRAWN** (ADR-0042 D7 — it happens in the live external thread; **do not
@@ -126,25 +124,6 @@ section is work.**
 
 Drawn into **Next Up** as needed; not itself a dispatch target. Completed efforts live in
 [`docs/DONE-LOG.md`](DONE-LOG.md).
-
-**[ADR-0054](decisions/ADR-0054-extraction-preserves-structure-and-identity.md) — extraction preserves structure
-and identity (Proposed 2026-08-10, from the Codex Semantic Fidelity Audit).** Four **no-schema** slices at the
-`RecipeParseBuilder`/model boundary, all governed by ADR-0040 lossless-or-loud ([[editable-at-the-grain-stored]]):
-**D1** carry named instruction sections end-to-end (retire the flat `WorkbenchDraftRecipe.instructionLines` narrow
-point — both source and sink are already section-aware); **D2** one builder per candidate, so multiple
-materially-complete JSON-LD Recipe nodes never blend (deterministic primary + `.multipleRecipeCandidates` warning,
-user selection later); **D3** nested `HowToSection` is **declared-lossy** — flatten but preserve the child name and
-warn, no recursive schema; **D4** ingredient dedup is section-scoped, not global. No effort doc yet. The same
-audit's **P0** (destructive import convergence) already shipped (PR #304, DONE-LOG).
-
-**[ADR-0053 Amd 2 / S3](decisions/ADR-0053-create-recipe-destination.md#amendment-2--a-headless-transport-shortcuts--app-intent-into-create-recipe-2026-08-10)
-— Shortcuts return path** ([`efforts/shortcuts-return-path-create-recipe-2026-08-10.md`](efforts/shortcuts-return-path-create-recipe-2026-08-10.md)).
-A headless `CaptureRecipeFromText` App Intent + a `Get Clipboard` Shortcut lands clipboard text (usually a ChatGPT
-return) in the **resident Create Recipe** session for review — collapsing copy→open→paste→Extract. **No schema**
-(the session is D4-transient). ⚠️ **Amd2-D2 is the trap:** wire it to Create Recipe / `save(draft:)`, **never** the
-routed handoff importer (the clipboard text has no `handoffID` and no subject). Seed **non-destructively** —
-`pastedTextReceived` overwrites `composeText`, so it must never clobber unsaved work. Designed; independent of any
-branch. App-layer, so `YesChefTests` applies ([[app-test-target-in-verification]]).
 
 **[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md) — ATK's "Gather Your
 Ingredients" is a latent grocery bug (scoped 2026-07-28). P1 only; **no schema**.** 101 shoppable ingredient
@@ -233,6 +212,26 @@ selection (per-bubble `UITextView` caps the payload).
 ## Device passes owed
 
 Not work, a checklist.
+
+**ADR-0054 — extraction preserves structure & identity (PR
+[#308](https://github.com/jonphillips/yes-chef/pull/308)), no schema.** Paste JSON-LD and confirm: **(a)** named
+`HowToSection` instruction groups survive as named instruction sections (not one flat block); **(b)** a *nested*
+`HowToSection` flattens with the child name preserved and a visible warning; **(c)** two materially-complete Recipe
+nodes → one deterministic primary imports and a `.multipleRecipeCandidates` warning appears (no blended recipe);
+**(d)** duplicate ingredient lines across two sections are kept (dedup is section-scoped). Each warning's
+capture-review title should render in Create Recipe, and an ordinary schema.org paste should still import unchanged.
+
+**ADR-0053 Amd 2 / S3 — Shortcuts return path + two ride-alongs (PR
+[#307](https://github.com/jonphillips/yes-chef/pull/307)), no schema.** Run the `Get Clipboard` Shortcut both from a
+**cold launch** and while the app is **already running** — clipboard text lands in the resident Create Recipe session
+for review. Empty clipboard fails cleanly. **Fire the Shortcut while a different draft is in progress and confirm it
+does NOT wipe it** — a non-empty session offers the incoming text as a new source via a confirmation dialog (the
+`isPresented` destructive-setter trap, [[alert-ispresented-destructive-setter]]). Ride-alongs: **an archived recipe
+opens from a menu link** (archive severs only the meal-plan link and keeps `menuItems`; permanent delete severs them),
+and **iPhone Settings / Groceries / Workbenches navigation** pushes correctly through the More tab. ⚠️ **Architect
+note:** the new app-target `CreateRecipeModelTests` are app-layer *model* code and could not run in Codex's env, so
+the [[app-test-target-in-verification]] gate is open — run `YesChefTests` locally to close it, or let this device pass
+stand as the check.
 
 **ADR-0050 S3 + S3.5 — Power Browser typed filters + compact-list convergence (PR
 [#303](https://github.com/jonphillips/yes-chef/pull/303)), no schema.** In the Power Browser, exercise the new
