@@ -1,6 +1,6 @@
 # Current Handoff
 
-Last updated: August 12, 2026. **No designated Next Up target — Jon picks from the queue;** the one live candidate
+Last updated: August 15, 2026. **No designated Next Up target — Jon picks from the queue;** the one live candidate
 left in Ready Efforts is **ADR-0052 S3**. Newly-merged work has moved to [`DONE-LOG.md`](DONE-LOG.md); the device
 passes it owes are in their own section below.
 ⚠️ **A standing Codex-env gotcha:** the simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
@@ -89,7 +89,16 @@ section is work.**
 - **ADR-0021 (variations) is COMPLETE — V1–V3, Amendment 4 (V4a/V4b/V4c + Delete), and anchor-repair
   Dispatch 0/1/2 all shipped (DONE-LOG).** ADR-0023 (recipe edit proposals) has nothing queued: its
   *iterative refine loop* is **WITHDRAWN** (ADR-0042 D7 — it happens in the live external thread; **do not
-  rebuild it**); per D2 the in-app adjust verb is the **only** path that writes a structured delta. **Expected,
+  rebuild it**); per D2 the in-app adjust verb is the **only** path that writes a structured delta.
+  - **⚠️ [ADR-0042 Amd 4](decisions/ADR-0042-workbench-handoff-and-the-return-block.md#amendment-4--the-recipe-body-hand-off-finalizes-two-ways-revise-or-riff-into-a-new-recipe-2026-08-15) — the recipe-body hand-off is now DUAL-SINK; do not assume it is prose/delta-only.** The `adjustRecipe`
+    hand-off finalizes two ways, chosen in the external conversation and recovered by **return SHAPE**
+    (`RecipeAdjustmentFinalize.classify`, reusing S3's `fromJSONLD`): a **revision brief** (prose) → the
+    `.recipeAdjustmentBrief` review (delta against live rows, D2 intact); a **new recipe** (schema.org JSON-LD)
+    → **Create Recipe** as a standalone draft via `CreateRecipeCoordinator.stage` (the same door as
+    capture/workbenchDraft — this *is* the ADR-0051 sink guard, **no new parser**). The "only path that writes a
+    structured **delta**" line still holds — a new recipe is not a delta, it has no identity to reconcile.
+    v1 is standalone (no "riffed-from" provenance) and drops learnings on the new-recipe branch. The old
+    `.menuPrepPlan` deliverable-default leak on the recipe body is fixed (`AIHandoffToken.selfContainedPrompt`). **Expected,
   not a bug to patch (ADR-0014 Amd1-D4):** adding a header inside a recipe that has variations mints a new
   section, so `derivingVariation` hits `.ingredientSectionAdded` → `variationNeedsReview`. Fixing it needs a
   delta-vocabulary decision and it is **ADR-0021's** — do not extend the delta ops on this momentum. **Note:
@@ -212,6 +221,18 @@ selection (per-bubble `UITextView` caps the payload).
 ## Device passes owed
 
 Not work, a checklist.
+
+**ADR-0042 Amd 4 — recipe-body hand-off finalizes two ways (PR pending — this slice), no schema.** On a recipe,
+**Copy Prompt** and confirm the tail no longer says "prep plan" and the body clearly describes *both* finalize
+outcomes (revision brief vs. new recipe). Then paste, into the recipe's **Paste** control, each of: **(a)** a prose
+revision brief → the side-by-side **adjustment review** opens (revise-this-recipe); **(b)** a schema.org `Recipe`
+JSON-LD block → **Create Recipe** opens with a populated **standalone** draft (riff-into-new), and the original
+recipe is untouched. Both must carry the `YC-HANDOFF` token + `YC-CONTRACT: v2.1` marker (a real return does).
+⚠️ **Ride-along build fix:** this slice also fixes a **pre-existing** red build on `main` — commit 34c579b added
+`WebRecipeCaptureWarning.multipleRecipeCandidates` + `.nestedInstructionSectionsFlattened` but never updated the
+**Share Extension**'s exhaustive `shareReviewTitle` switch, so `YesChefShareExtension` did not compile (the app
+scheme builds the extension). Worth checking why that merged green. Core (`AIHandoffTests`, 54) + app
+(`AIHandoffRecipePasteRoutingTests`, 2) suites pass locally.
 
 **ADR-0054 — extraction preserves structure & identity (PR
 [#308](https://github.com/jonphillips/yes-chef/pull/308)), no schema.** Paste JSON-LD and confirm: **(a)** named

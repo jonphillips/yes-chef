@@ -73,6 +73,56 @@ extension AIHandoffTests {
     #expect(prompt.contains("Current make-ahead section:"))
     #expect(prompt.contains("Chill the dough overnight."))
     #expect(prompt.contains("Do not add bacon to this cookie."))
+
+    // Dual finalize (ADR-0042 Amd 4): the body names both outcomes, references the JSON-LD contract
+    // for the new-recipe branch, and disambiguates by intent (ask-if-unsure), not a magic phrase.
+    #expect(prompt.contains("A NEW RECIPE"))
+    #expect(prompt.contains("schema.org `Recipe` JSON-LD object"))
+    #expect(prompt.contains("if it is genuinely ambiguous"))
+    #expect(prompt.contains("A revision is never a rewritten full recipe; a new recipe is never prose."))
+    // The old menu leftover must not ride along on the recipe body.
+    #expect(!prompt.contains("prep plan"))
+  }
+
+  @Test
+  func selfContainedPromptEmitsTitleThenTokenThenBodyWithNoDeliverableTail() {
+    let handoffID = SampleUUIDSequence.uuid(38_060)
+    let prompt = AIHandoffToken.selfContainedPrompt(
+      handoffID: handoffID,
+      title: "Adjust Recipe: Chili",
+      body: "The body carries its own finalize contract."
+    )
+
+    #expect(prompt == """
+    Adjust Recipe: Chili
+    YC-HANDOFF: \(handoffID.uuidString)
+
+    The body carries its own finalize contract.
+    """)
+    // No single-deliverable tail, so no chance of the `.menuPrepPlan` default leaking here.
+    #expect(!prompt.contains("prep plan"))
+    #expect(!prompt.contains("finalize, return"))
+  }
+
+  @Test
+  func recipeAdjustmentFinalizeClassifiesByShapeNotKeyword() {
+    let revision = """
+    \(AIHandoffReturnContract.marker)
+    Take the butter to 120g and brown it — more nutty depth.
+    Move the salt into the flour so it distributes evenly.
+    """
+    #expect(RecipeAdjustmentFinalize.classify(payload: revision) == .revisionBrief)
+
+    // Prose that merely mentions the word "recipe" is still a revision — there is no Recipe object.
+    let prosaicRecipeMention = "Rework the recipe so the sauce reduces further before plating."
+    #expect(RecipeAdjustmentFinalize.classify(payload: prosaicRecipeMention) == .revisionBrief)
+
+    let newRecipe = """
+    {"@context":"https://schema.org","@type":"Recipe","name":"Charred Cabbage",\
+    "recipeIngredient":["1 head cabbage","2 tbsp olive oil"],\
+    "recipeInstructions":[{"@type":"HowToStep","text":"Char the cabbage over high heat."}]}
+    """
+    #expect(RecipeAdjustmentFinalize.classify(payload: newRecipe) == .newRecipe)
   }
 
   @Test

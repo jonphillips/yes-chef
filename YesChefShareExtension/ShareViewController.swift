@@ -512,6 +512,10 @@ private extension WebRecipeCaptureWarning {
       "No structured recipe data found."
     case .truncatedStructuredData:
       "Structured recipe data appears truncated."
+    case .multipleRecipeCandidates:
+      "This page contained more than one complete recipe; showing one."
+    case .nestedInstructionSectionsFlattened:
+      "Nested instruction sections were flattened for review."
     case .untitledRecipe:
       "No title found."
     case .noIngredients:

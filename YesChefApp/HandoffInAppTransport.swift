@@ -10,6 +10,7 @@ final class HandoffInAppTransport {
   @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored @Dependency(\.handoffReviewCoordinator) private var handoffReviewCoordinator
+  @ObservationIgnored @Dependency(\.createRecipeCoordinator) private var createRecipeCoordinator
   @ObservationIgnored @Dependency(\.uuid) private var uuid
 
   var errorMessage: String?
@@ -68,6 +69,20 @@ final class HandoffInAppTransport {
         try AIHandoffRepository.handoff(id: routedText.handoffID, in: db)
       }), source.matches(handoff) else {
         presentUnmatched(result: result, source: source)
+        return
+      }
+      // A recipe-body hand-off can be finalized two ways (ADR-0042 Amd): a prose revision brief that
+      // resolves against this recipe's live rows, or a whole new recipe as schema.org JSON-LD. Route
+      // on the payload's shape — a new recipe goes to Create Recipe as a standalone draft, not the
+      // adjustment review — and mark the handoff imported so its ledger row does not stay open.
+      if handoff.sourceType == .recipe, handoff.taskType == .adjustRecipe,
+        case .newRecipe = RecipeAdjustmentFinalize.classify(payload: routedText.payload) {
+        let importDate = now
+        try await database.write { db in
+          try AIHandoffRepository.markImported(id: handoff.id, at: importDate, in: db)
+        }
+        createRecipeCoordinator.stage(text: routedText.payload)
+        toastCenter?.postSuccess("New recipe sent to Create Recipe.")
         return
       }
       let review = try await HandoffAppOperations.stageReview(

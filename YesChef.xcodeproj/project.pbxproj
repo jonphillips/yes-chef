@@ -16,6 +16,7 @@
 		08BD875D5906E5BA5A4908CA /* RecipeDetailModel+Adjustment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B573934FCB2C87190085B3E /* RecipeDetailModel+Adjustment.swift */; };
 		0CC37A24661F09BC79B0D2DD /* ChatAssistantSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 842FC32385274C6E7D875B4D /* ChatAssistantSelectionTests.swift */; };
 		0E82B1425855BBD9736BDFD7 /* RecipeFilterPickerViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8DD44679AA1444215DC743E /* RecipeFilterPickerViews.swift */; };
+		0FC786DD6158C0277309423D /* AIHandoffRecipePasteRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E178BA63F9FC305703A8061E /* AIHandoffRecipePasteRoutingTests.swift */; };
 		107B90CD03C25B8D40433561 /* WorkbenchReferenceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7D5D51E71889140798985EB /* WorkbenchReferenceViews.swift */; };
 		143D0594FDEA8800409997C3 /* RecipePlaybookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C3AE6422BC004DC084E05B /* RecipePlaybookView.swift */; };
 		14E37061E039F075AE64FE31 /* HandoffReviewCoordinator+AdjustmentDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2595BD656B447EC9519CE389 /* HandoffReviewCoordinator+AdjustmentDraft.swift */; };
@@ -326,6 +327,7 @@
 		DC10A57FB9A55D40CD97546E /* MenuDetailChatPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuDetailChatPresentation.swift; sourceTree = "<group>"; };
 		DD0F7538696E770B31AA47A0 /* RecipeActiveFilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeActiveFilterBar.swift; sourceTree = "<group>"; };
 		DE4284C2FB4F46CA20889B5B /* RecipeVariationBaseWriteGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeVariationBaseWriteGuard.swift; sourceTree = "<group>"; };
+		E178BA63F9FC305703A8061E /* AIHandoffRecipePasteRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIHandoffRecipePasteRoutingTests.swift; sourceTree = "<group>"; };
 		E29F682A3093D37071F5A924 /* PaprikaImportReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaprikaImportReviewView.swift; sourceTree = "<group>"; };
 		E48B9ACFF26E71C15146E3E9 /* RecipeListPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeListPresets.swift; sourceTree = "<group>"; };
 		E4E2858E5F7AA38D95511ACB /* BrowserReaderFeedbackRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserReaderFeedbackRoutingTests.swift; sourceTree = "<group>"; };
@@ -405,6 +407,7 @@
 			isa = PBXGroup;
 			children = (
 				792C0EBCFF5BA678E266946D /* AIHandoffMenuPasteTests.swift */,
+				E178BA63F9FC305703A8061E /* AIHandoffRecipePasteRoutingTests.swift */,
 				E4E2858E5F7AA38D95511ACB /* BrowserReaderFeedbackRoutingTests.swift */,
 				842FC32385274C6E7D875B4D /* ChatAssistantSelectionTests.swift */,
 				4802BA56B714BCEF8679A289 /* ChatSurfaceTests.swift */,
@@ -753,6 +756,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E04A28BE098B255C0B136810 /* AIHandoffMenuPasteTests.swift in Sources */,
+				0FC786DD6158C0277309423D /* AIHandoffRecipePasteRoutingTests.swift in Sources */,
 				2E34817DD5653BC61AFF9BB1 /* BrowserReaderFeedbackRoutingTests.swift in Sources */,
 				0CC37A24661F09BC79B0D2DD /* ChatAssistantSelectionTests.swift in Sources */,
 				B1A4B0832475BA500093C538 /* ChatSurfaceTests.swift in Sources */,

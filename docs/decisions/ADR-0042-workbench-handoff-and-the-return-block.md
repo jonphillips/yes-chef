@@ -882,6 +882,44 @@ non-menu starting context; verify that the copied v2 Project source has actually
 and record whether the thin action is clear enough when multiple recipes are discussed. Those are validation
 questions, not implied commitments to generalize this slice.
 
+## Amendment 4 — The recipe-body hand-off finalizes two ways: revise, or riff into a new recipe (2026-08-15)
+
+**Status: Accepted.** Answers **Amd2-OQ2** (does recipe *creation* want the same JSON-LD door?) for the
+recipe-body "Adjust Recipe" hand-off: **yes.** The cook opens one discussion and decides at finalize time —
+in the conversation, not at export — whether the outcome is a revision of this recipe or a new dish. This
+neither adds a mode toggle to the export nor a magic finalize phrase.
+
+### Amd4-D1 — Two finalize outcomes, disambiguated by return shape
+
+The one hand-off carries both finalize contracts in its (now self-contained) prompt: a **revision** returns a
+prose brief; a **new recipe** returns one schema.org `Recipe` JSON-LD object per `RecipeJSONLDContract`. The
+prompt tells the model to infer which the cook means, ask one short question if genuinely ambiguous, and never
+emit both — "a revision is never a rewritten full recipe; a new recipe is never prose." The app recovers the
+choice from the payload's **shape** (`RecipeAdjustmentFinalize.classify`, reusing the workbench-draft
+`RecipeJSONLDExtractor` detection), not from a keyword. Prose that merely mentions "recipe" carries no
+parseable Recipe object and stays a revision.
+
+### Amd4-D2 — The prose/JSON boundary is what keeps the two outcomes from cross-contaminating
+
+This does **not** erode the D2 boundary; the asymmetry is load-bearing. A **revision edits live rows**, so it
+must stay prose — the model holds no row identity and the structured edit is derived in-app and reviewed side
+by side (unchanged: `.recipeAdjustmentBrief`). A **new recipe creates a fresh record**, so there is no
+identity to reconcile and JSON-LD is safe — it lands in Create Recipe as a standalone draft through the same
+door as capture and workbench-draft (`CreateRecipeCoordinator.stage(text:)` → `RecipeExtraction` →
+`RecipeEditorDraft`). JSON is only ever the new-recipe shape; prose is only ever the revise shape; each maps
+one-to-one to a different in-app sink, so no return can plausibly reach the wrong one. The wrong-shape case (a
+full JSON recipe when the cook wanted a tweak) is accepted: it surfaces a visible, one-tap-discard Create
+Recipe draft, guarded by the prompt.
+
+### Amd4-D3 — Fixes a stray "return a prep plan" leak; new recipe is standalone in v1
+
+The recipe-body prompt was assembled through the generic `AIHandoffToken.prompt(...)`, whose
+`deliverableFormat` defaulted to `.menuPrepPlan` and appended a "return the paste-ready prep plan" tail that
+contradicted the body. The body is now self-contained and assembled via `AIHandoffToken.selfContainedPrompt`,
+which appends no deliverable tail. v1 keeps the new recipe **standalone** — no "riffed from {original}"
+provenance back-link (deferred), and no learnings on the new-recipe branch (it is a create, not a durable
+finding about the source).
+
 ## Related
 
 - [ADR-0038](ADR-0038-external-llm-handoff.md) + Amd 1 (`Learning` as the two-part return, the model for D6)

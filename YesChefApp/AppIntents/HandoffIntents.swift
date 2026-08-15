@@ -408,11 +408,14 @@ enum HandoffAppOperations {
     now: Date,
     handoffID: AIHandoff.ID
   ) throws -> AIHandoff {
-    let prompt = AIHandoffToken.prompt(
+    // The recipe-body prompt is self-contained: it describes both finalize outcomes (revision brief
+    // vs. new-recipe JSON-LD) itself, so it must NOT get the generic single-deliverable tail whose
+    // `.menuPrepPlan` default was appending a stray "return a prep plan" line. `mode` is intentionally
+    // unused here — a two-outcome conversation has no single immediate deliverable to nudge for.
+    let prompt = AIHandoffToken.selfContainedPrompt(
       handoffID: handoffID,
       title: "\(metadata.taskType.title): \(detail.recipe.title)",
-      context: try RecipeHandoffContext(detail: detail).prompt(forTask: .adjustRecipe),
-      mode: mode
+      body: try RecipeHandoffContext(detail: detail).prompt(forTask: .adjustRecipe)
     )
     return AIHandoff(
       id: handoffID,

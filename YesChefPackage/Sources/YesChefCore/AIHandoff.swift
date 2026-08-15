@@ -530,6 +530,21 @@ public enum AIHandoffToken {
 
   public static let prefix = "YC-HANDOFF:"
 
+  /// Assembles a hand-off whose body already carries its own return contract — the recipe-body
+  /// adjustment prompt describes both of its finalize outcomes (revision brief vs. new-recipe
+  /// JSON-LD) itself. Unlike `prompt(...)`, it appends no generic deliverable instruction: that
+  /// single-deliverable tail is meaningless for a body with two finalize shapes, and its
+  /// `.menuPrepPlan` default was leaking a stray "return a prep plan" line onto the recipe body.
+  public static func selfContainedPrompt(
+    handoffID: AIHandoff.ID,
+    title: String = "",
+    body: String
+  ) -> String {
+    let titleLine = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    let titlePrefix = titleLine.isEmpty ? "" : "\(titleLine)\n"
+    return "\(titlePrefix)\(header(handoffID: handoffID))\n\n\(body)"
+  }
+
   public static func prompt(
     handoffID: AIHandoff.ID,
     title: String = "",

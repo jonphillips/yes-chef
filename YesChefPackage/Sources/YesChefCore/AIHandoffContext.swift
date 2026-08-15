@@ -193,28 +193,39 @@ public struct RecipeHandoffContext: Equatable, Sendable {
   ) -> String {
     """
     You are helping rethink one recipe. Discuss it freely: argue, push back, ask
-    questions, and change your mind. When the cook asks you to finalize, return a
-    revision brief.
+    questions, and change your mind.
 
-    A revision brief is plain prose stating the revision you and the cook settled on:
-    what to change, and why, in a cook's language. One change per line, in the order the
-    change happens. Refer to ingredients and steps by their existing wording so each
-    change can be matched to the recipe as it stands.
+    When the cook asks you to finalize, produce exactly one of two things, and nothing
+    else. Decide which from the conversation; if it is genuinely ambiguous, ask one short
+    question before you emit anything. Never emit both.
 
-    Return only the brief itself: nothing before it, nothing after it, no title, no
-    summary of the discussion. One change per line, like this:
+    1. A REVISION of this recipe — targeted changes to the recipe as it stands. Return a
+    revision brief: plain prose stating what to change and why, in a cook's language, one
+    change per line, in the order the change happens. Refer to ingredients and steps by
+    their existing wording so each change can be matched to the recipe as it stands.
+    Return only the brief itself — nothing before it, nothing after it, no title, no
+    summary of the discussion. Like this:
 
     Take the butter to 120g and brown it before creaming — more nutty depth, less spread.
     Move the salt into the flour instead of the wet mix so it distributes evenly.
     Rest the dough 20 minutes before shaping so the flour hydrates.
 
     Do not return a rewritten recipe, an ingredient list, JSON, IDs, or any structured
-    format. Yes Chef derives the structured edit from your brief itself, and the cook
-    reviews that edit side by side against the current recipe before anything is saved.
+    format for a revision. Yes Chef derives the structured edit from your brief itself,
+    and the cook reviews that edit side by side against the current recipe before anything
+    is saved.
 
-    In the learnings section, record only what was considered and rejected, or
-    established as a constraint on this dish — never restate a change that already
-    appears in the brief.
+    2. A NEW RECIPE — only when you and the cook have riffed into a substantially different
+    dish that deserves to stand on its own rather than edit this one. Return it as
+    structured schema.org Recipe JSON-LD, following these rules exactly:
+
+    \(RecipeJSONLDContract.outputInstructions)
+
+    A revision is never a rewritten full recipe; a new recipe is never prose.
+
+    In the learnings section, record only what was considered and rejected, or established
+    as a constraint on this dish — never restate a change that already appears in a brief.
+    Skip the learnings section entirely for a new recipe.
 
     Taste profile:
     \(tasteProfile)
