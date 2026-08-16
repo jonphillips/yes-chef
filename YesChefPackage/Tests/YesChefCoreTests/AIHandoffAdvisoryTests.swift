@@ -220,7 +220,7 @@ struct AIHandoffAdvisoryTests {
         ),
         in: db
       )
-      let review = try AIHandoffIntentImport.stageReaderFeedbackReview(
+      let staged = try AIHandoffIntentImport.stageReaderFeedbackReview(
         handoffID: handoffID,
         result: """
         YC-HANDOFF: \(handoffID.uuidString)
@@ -233,6 +233,7 @@ struct AIHandoffAdvisoryTests {
         in: db,
         now: now
       )
+      let review = staged.review
 
       expectNoDifference(
         review.tips.map(\.text),
@@ -271,7 +272,7 @@ struct AIHandoffAdvisoryTests {
         in: db
       )
 
-      let review = try AIHandoffIntentImport.stageReaderFeedbackReview(
+      let staged = try AIHandoffIntentImport.stageReaderFeedbackReview(
         handoffID: handoffID,
         result: """
         [
@@ -288,6 +289,7 @@ struct AIHandoffAdvisoryTests {
         in: db,
         now: now
       )
+      let review = staged.review
 
       expectNoDifference(
         review.tips,
@@ -337,7 +339,7 @@ struct AIHandoffAdvisoryTests {
         in: db
       )
 
-      let review = try AIHandoffIntentImport.stageReaderFeedbackReview(
+      let staged = try AIHandoffIntentImport.stageReaderFeedbackReview(
         handoffID: currentHandoffID,
         result: """
         YC-HANDOFF: \(foreignHandoffID.uuidString)
@@ -357,6 +359,7 @@ struct AIHandoffAdvisoryTests {
         in: db,
         now: now
       )
+      let review = staged.review
 
       expectNoDifference(
         review.tips.first?.backingComments,

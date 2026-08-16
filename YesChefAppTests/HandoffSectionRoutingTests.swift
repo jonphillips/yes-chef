@@ -139,8 +139,8 @@ struct HandoffSectionRoutingTests {
     - Bacon was rejected because it would overpower the cookie.
     """
 
-    let contractChecked = try #require(AIHandoffReturnContract.strippingMarker(from: result))
-    let routed = try #require(AIHandoffToken.stripping(from: contractChecked))
+    let contractChecked = try AIHandoffReturnContract.strippingMarker(from: result)
+    let routed = try #require(AIHandoffToken.stripping(from: contractChecked.text))
     let returned = AIHandoffReturn.plainText(from: routed.payload)
 
     #expect(routed.handoffID == handoffID)

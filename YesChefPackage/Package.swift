@@ -39,6 +39,7 @@ let package = Package(
     .package(url: "https://github.com/pointfreeco/swift-structured-queries", from: "0.31.0"),
     .package(path: "../../../jon-platform/packages/LLMClientKit"),
     .package(path: "../../../jon-platform/packages/CloudSyncKit"),
+    .package(path: "../../../jon-platform/packages/LLMHandoffKit"),
   ],
   targets: [
     .target(
@@ -48,6 +49,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
         .product(name: "LLMClientKit", package: "LLMClientKit"),
+        .product(name: "LLMHandoffKit", package: "LLMHandoffKit"),
         .product(name: "SQLiteData", package: "sqlite-data"),
         .product(name: "StructuredQueriesCore", package: "swift-structured-queries"),
         .product(name: "SwiftSoup", package: "SwiftSoup"),

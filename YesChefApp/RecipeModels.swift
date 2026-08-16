@@ -431,6 +431,7 @@ final class RecipeCaptureModel {
   var readerFeedbackProposals: [ReaderFeedbackTip] = []
   var readerFeedbackComments: [RawComment] = []
   var readerFeedbackHandoffEvidence: [String] = []
+  var readerFeedbackHandoffWarning: String?
   var isCuratingReaderFeedback = false
   @ObservationIgnored private(set) var readerFeedbackCaptureID: UUID
 
@@ -546,6 +547,7 @@ final class RecipeCaptureModel {
     readerFeedbackProposals = []
     readerFeedbackComments = []
     readerFeedbackHandoffEvidence = []
+    readerFeedbackHandoffWarning = nil
     isCuratingReaderFeedback = false
     readerFeedbackCaptureID = uuid()
   }

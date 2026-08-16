@@ -229,7 +229,7 @@ struct AIHandoffMenuPasteTests {
         handoffID: UUID(uuidString: "00000000-0000-0000-0000-000000003811")!
       )
 
-      guard case let .menuPrepPlan(prepPlanReview) = review else {
+      guard case let .menuPrepPlan(prepPlanReview) = review.review else {
         Issue.record("Expected a menu prep-plan review.")
         return
       }

@@ -20,8 +20,8 @@ public enum RecipeAdjustmentFinalize: Equatable, Sendable {
   /// extractor. `WorkbenchDraftRecipe.fromJSONLD` yields `nil` unless the block has ingredients or
   /// instructions, so a real Recipe object is required to route to `.newRecipe`. `capturedAt` is
   /// provenance-only and irrelevant to classification.
-  public static func classify(payload: String) -> RecipeAdjustmentFinalize {
-    let unmarked = AIHandoffReturnContract.strippingMarker(from: payload) ?? payload
+  public static func classify(payload: String) throws -> RecipeAdjustmentFinalize {
+    let unmarked = try AIHandoffReturnContract.strippingMarker(from: payload).text
     let deliverable = AIHandoffReturn.plainText(from: unmarked).deliverable
     let jsonLD = AIHandoffReturn.splittingJSONLDAndRationale(deliverable).jsonLD
     let draft = WorkbenchDraftRecipe.fromJSONLD(jsonLD, rationale: "", capturedAt: .distantPast)
