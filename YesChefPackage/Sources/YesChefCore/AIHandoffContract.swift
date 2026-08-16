@@ -3,7 +3,7 @@ import LLMHandoffKit
 /// The single, pasteable return contract for the external Yes Chef project. It deliberately lives outside
 /// each hand-off payload: the payload carries only a title, routing token, context, and the verb's ask.
 public enum AIHandoffReturnContract {
-  public static let version = "2.1"
+  public static let version = "3"
   private static let contractMarker = HandoffContractMarker(prefix: "YC-CONTRACT", version: "v\(version)")
   public static let marker = contractMarker.marker
 

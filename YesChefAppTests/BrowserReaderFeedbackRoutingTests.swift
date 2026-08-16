@@ -137,7 +137,7 @@ struct BrowserReaderFeedbackRoutingTests {
       var reviews: [AIHandoffReaderFeedbackResult] = []
       let staleResult = """
       YC-HANDOFF: \(staleHandoffID.uuidString)
-      \(AIHandoffReturnContract.marker)
+      YC-CONTRACT: v2.1
       \(readerFeedbackJSON)
       """
 
@@ -153,7 +153,7 @@ struct BrowserReaderFeedbackRoutingTests {
       await transport.reviewUnmatchedResult()
 
       expectNoDifference(reviews.map(\.review.tips), [expectedTips(for: comments)])
-      #expect(reviews.first?.warning == nil)
+      #expect(reviews.first?.warning != nil)
       let handoffs = try await database.read { db in try AIHandoff.fetchAll(db) }
       #expect(handoffs.first { $0.id == staleHandoffID }?.status == .awaitingReturn)
       #expect(handoffs.contains {

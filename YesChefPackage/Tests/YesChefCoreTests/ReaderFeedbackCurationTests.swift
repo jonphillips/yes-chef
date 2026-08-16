@@ -107,7 +107,7 @@ extension RecipeCoreTests {
       let returned = AIHandoffReturn.readerFeedbackReturn(
         from: """
         YC-HANDOFF: 5D7A4A74-D38B-4CFB-94DE-8E97763E8B49
-        YC-CONTRACT: v2.1
+        YC-CONTRACT: v3
         [
           {
             “text”: “Brown the tofu, then return it only to coat and warm through.”,

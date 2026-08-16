@@ -8,12 +8,12 @@ Use one shared Project named exactly **`Yes Chef`**. Do not make per-menu or per
 
 | Install location | Version-controlled artifact | Current version |
 | --- | --- | --- |
-| Project Instructions | [`docs/chatgpt/PROJECT-INSTRUCTIONS.md`](chatgpt/PROJECT-INSTRUCTIONS.md) — paste the entire file, unchanged | hand-off `YC-CONTRACT: v2.1` |
+| Project Instructions | [`docs/chatgpt/PROJECT-INSTRUCTIONS.md`](chatgpt/PROJECT-INSTRUCTIONS.md) — paste the entire file, unchanged | hand-off `YC-CONTRACT: v3` |
 | Project source file | [`docs/chatgpt/RECIPE-CONTRACT.md`](chatgpt/RECIPE-CONTRACT.md) — upload this file, unchanged | Recipe JSON-LD `v2`; `YC-RECIPE-CONTRACT: v2` |
 
 `RECIPE-CONTRACT.md` is the only required uploaded Project source. `PROJECT-INSTRUCTIONS.md` is pasted into Project Instructions; do not upload it instead of setting the instructions.
 
-The two markers have different jobs. `YC-CONTRACT: v2.1` is the return-contract marker for routed Yes Chef hand-offs; the app checks it and reports stale Project Instructions. `YC-RECIPE-CONTRACT: v2` identifies the Recipe capture contract. A Recipe capture returns raw schema.org JSON-LD through **Create Recipe**, not a `YC-HANDOFF` response, and does not echo `YC-CONTRACT` or carry a `YC-HANDOFF` token. The v2 extension preserves named ingredient groups in `yesChef:ingredientSections` while retaining the ordinary schema.org flat `recipeIngredient` list.
+The two markers have different jobs. `YC-CONTRACT: v3` is the return-contract marker for routed Yes Chef hand-offs; the app checks it and reports stale Project Instructions. `YC-RECIPE-CONTRACT: v2` identifies the Recipe capture contract. A Recipe capture returns raw schema.org JSON-LD through **Create Recipe**, not a `YC-HANDOFF` response, and does not echo `YC-CONTRACT` or carry a `YC-HANDOFF` token. The v2 extension preserves named ingredient groups in `yesChef:ingredientSections` while retaining the ordinary schema.org flat `recipeIngredient` list.
 
 ## Prerequisites
 
@@ -27,7 +27,7 @@ The two markers have different jobs. `YC-CONTRACT: v2.1` is the return-contract 
 1. In ChatGPT, create a Project and name it exactly `Yes Chef`. Give it an icon/color if useful, but do not vary the name.
 2. Open the Project's menu, choose **Project settings**, and replace the Project Instructions with the complete contents of [`docs/chatgpt/PROJECT-INSTRUCTIONS.md`](chatgpt/PROJECT-INSTRUCTIONS.md). Save the setting. Do not prepend personal instructions or retain an older Yes Chef instruction block.
 3. In the Project's sources/files area, upload [`docs/chatgpt/RECIPE-CONTRACT.md`](chatgpt/RECIPE-CONTRACT.md). This is the required Project source. If an older Recipe contract is present, remove it first rather than leaving both versions available.
-4. Open the uploaded source and confirm its first two lines are `# Yes Chef Recipe JSON-LD contract — v2` and `YC-RECIPE-CONTRACT: v2`. Re-open Project settings and confirm the pasted instructions contain `YC-CONTRACT: v2.1`.
+4. Open the uploaded source and confirm its first two lines are `# Yes Chef Recipe JSON-LD contract — v2` and `YC-RECIPE-CONTRACT: v2`. Re-open Project settings and confirm the pasted instructions contain `YC-CONTRACT: v3`.
 5. Start a new chat from inside the `Yes Chef` Project. Chats created outside the Project do not automatically acquire its files and instructions; move an existing chat into the Project only if it is genuinely part of this cooking conversation.
 
 Project Instructions override global ChatGPT custom instructions inside that Project. If the ChatGPT UI's labels move, use the Project's settings/menu and sources/files area; do not substitute global Custom Instructions.
@@ -93,7 +93,7 @@ The app's **Settings → AI** copy buttons are a useful cross-check: their conte
 
 ### Contract mismatch
 
-- For a routed hand-off error saying the instructions are out of date, `YC-CONTRACT: v2.1` is missing or stale. Replace Project Instructions from [`PROJECT-INSTRUCTIONS.md`](chatgpt/PROJECT-INSTRUCTIONS.md), not just the source file.
+- For a routed hand-off error saying the instructions are out of date, `YC-CONTRACT: v3` is missing or stale. Replace Project Instructions from [`PROJECT-INSTRUCTIONS.md`](chatgpt/PROJECT-INSTRUCTIONS.md), not just the source file.
 - For Recipe capture, check the Project source's `YC-RECIPE-CONTRACT: v2` and JSON field `yesChef:recipeContractVersion":"2"`. The Recipe extractor continues to accept ordinary schema.org JSON-LD, so an old but valid object may import; it can still lose v2-only editorial grouping. Replace the source and capture again before saving.
 - Recipe capture is not a routed hand-off. A response starting `YC-HANDOFF:` is the wrong format for Create Recipe; re-send the Recipe capture request in the configured Project.
 

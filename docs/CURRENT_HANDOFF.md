@@ -52,7 +52,7 @@ hidden-vocabulary rule lives in ADR-0049 D11.
 Closed decisions that stay closed, here only so a dispatch does not re-queue them. **Nothing in this
 section is work.**
 
-- **⚠️ The ADR-0042 return contract is v2.1** (`AIHandoffReturnContract.version`) — re-copy the project
+- **⚠️ The ADR-0042 return contract is v3** (`AIHandoffReturnContract.version`) — re-copy the project
   instructions from AI Settings or every verb fails the marker gate. (Operational: it bites on any hand-off
   dogfooding session.)
 - **⚠️ [ADR-0051](decisions/ADR-0051-text-to-recipe-extraction-strategy.md) — text→recipe has ONE strategy; do
@@ -227,7 +227,7 @@ Not work, a checklist.
 outcomes (revision brief vs. new recipe). Then paste, into the recipe's **Paste** control, each of: **(a)** a prose
 revision brief → the side-by-side **adjustment review** opens (revise-this-recipe); **(b)** a schema.org `Recipe`
 JSON-LD block → **Create Recipe** opens with a populated **standalone** draft (riff-into-new), and the original
-recipe is untouched. Both must carry the `YC-HANDOFF` token + `YC-CONTRACT: v2.1` marker (a real return does).
+recipe is untouched. Both must carry the `YC-HANDOFF` token + `YC-CONTRACT: v3` marker (a real return does).
 ⚠️ **Ride-along build fix:** this slice also fixes a **pre-existing** red build on `main` — commit 34c579b added
 `WebRecipeCaptureWarning.multipleRecipeCandidates` + `.nestedInstructionSectionsFlattened` but never updated the
 **Share Extension**'s exhaustive `shareReviewTitle` switch, so `YesChefShareExtension` did not compile (the app

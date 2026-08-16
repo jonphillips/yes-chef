@@ -27,7 +27,7 @@ struct AIHandoffTests {
     #expect(AIHandoffReturnContract.projectInstructions.contains("Return no preamble, sign-off, headings, or nesting"))
     #expect(AIHandoffReturnContract.projectInstructions.contains("Hypothesis: <one sentence>"))
     #expect(AIHandoffReturnContract.projectInstructions.contains("Do not include `YC-LEARNINGS:` for Experiments"))
-    #expect(AIHandoffReturnContract.version == "2.1")
+    #expect(AIHandoffReturnContract.version == "3")
     #expect(AIHandoffReturnContract.projectInstructions.contains("straight ASCII double-quote characters"))
 
     let routedText = try #require(
@@ -85,12 +85,12 @@ struct AIHandoffTests {
     #expect(missing.text == "Comparison text")
     #expect(missing.warning != nil)
 
-    let older = try AIHandoffReturnContract.strippingMarker(from: "YC-CONTRACT: v1\nComparison text")
+    let older = try AIHandoffReturnContract.strippingMarker(from: "YC-CONTRACT: v2.1\nComparison text")
     #expect(older.text == "Comparison text")
     #expect(older.warning != nil)
 
     #expect(throws: AIHandoffReturnContractError.instructionsOutOfDate) {
-      try AIHandoffReturnContract.strippingMarker(from: "YC-CONTRACT: v3\nComparison text")
+      try AIHandoffReturnContract.strippingMarker(from: "YC-CONTRACT: v4\nComparison text")
     }
   }
 
