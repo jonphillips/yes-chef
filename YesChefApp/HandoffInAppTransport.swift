@@ -14,11 +14,12 @@ final class HandoffInAppTransport {
   @ObservationIgnored @Dependency(\.uuid) private var uuid
 
   var errorMessage: String?
+  var errorTitle = "Could Not Process Handoff"
   var isShowingError = false
   var unmatchedResult: String?
   var unmatchedSource: HandoffExportSource?
   var isShowingUnmatchedConfirmation = false
-  @ObservationIgnored private var readerFeedbackReceive: ((AIHandoffReaderFeedbackReview) -> Void)?
+  @ObservationIgnored private var readerFeedbackReceive: ((AIHandoffReaderFeedbackResult) -> Void)?
 
   var unmatchedMessage: String {
     if case .readerFeedback? = unmatchedSource {
@@ -61,7 +62,8 @@ final class HandoffInAppTransport {
 
   func stageReview(for result: String, source: HandoffExportSource) async {
     do {
-      guard let routedText = AIHandoffToken.stripping(from: result) else {
+      let contract = try AIHandoffReturnContract.strippingMarker(from: result)
+      guard let routedText = AIHandoffToken.stripping(from: contract.text) else {
         presentUnmatched(result: result, source: source)
         return
       }
@@ -76,22 +78,27 @@ final class HandoffInAppTransport {
       // on the payload's shape — a new recipe goes to Create Recipe as a standalone draft, not the
       // adjustment review — and mark the handoff imported so its ledger row does not stay open.
       if handoff.sourceType == .recipe, handoff.taskType == .adjustRecipe,
-        case .newRecipe = RecipeAdjustmentFinalize.classify(payload: routedText.payload) {
+        case .newRecipe = try RecipeAdjustmentFinalize.classify(payload: routedText.payload) {
         let importDate = now
         try await database.write { db in
           try AIHandoffRepository.markImported(id: handoff.id, at: importDate, in: db)
         }
         createRecipeCoordinator.stage(text: routedText.payload)
+        if let warning = contract.warning {
+          errorTitle = "Imported with a warning"
+          errorMessage = warning
+          isShowingError = true
+        }
         toastCenter?.postSuccess("New recipe sent to Create Recipe.")
         return
       }
-      let review = try await HandoffAppOperations.stageReview(
+      let staged = try await HandoffAppOperations.stageReview(
         handoffID: handoff.id,
         result: result,
         in: database,
         now: now
       )
-      handoffReviewCoordinator.present(source.applyingScope(to: review))
+      handoffReviewCoordinator.present(source.applyingScope(to: staged.review), warning: staged.warning)
     } catch {
       present(error)
     }
@@ -109,7 +116,7 @@ final class HandoffInAppTransport {
   func pastedReaderFeedbackResults(
     _ results: [String],
     source: HandoffExportSource,
-    receive: @escaping (AIHandoffReaderFeedbackReview) -> Void
+    receive: @escaping (AIHandoffReaderFeedbackResult) -> Void
   ) async {
     guard let result = results.first, !result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       errorMessage = "No handoff result was pasted."
@@ -131,7 +138,7 @@ final class HandoffInAppTransport {
         presentUnmatched(result: result, source: source, readerFeedbackReceive: receive)
         return
       }
-      let review = try await database.write { db in
+      let staged = try await database.write { db in
         try AIHandoffIntentImport.stageReaderFeedbackReview(
           handoffID: handoff.id,
           result: result,
@@ -141,7 +148,7 @@ final class HandoffInAppTransport {
           now: importDate
         )
       }
-      receive(review)
+      receive(staged)
     } catch {
       present(error)
     }
@@ -158,23 +165,26 @@ final class HandoffInAppTransport {
         guard let readerFeedbackReceive else {
           throw AIHandoffIntentImportError.wrongTask
         }
-        let review = try await HandoffAppOperations.stageReaderFeedbackReviewForKnownSource(
+        let staged = try await HandoffAppOperations.stageReaderFeedbackReviewForKnownSource(
           source: unmatchedSource,
           result: unmatchedResult,
           in: database,
           now: now,
           handoffID: uuid()
         )
-        readerFeedbackReceive(review)
+        readerFeedbackReceive(staged)
       default:
-        let review = try await HandoffAppOperations.stageReviewForKnownSource(
+        let staged = try await HandoffAppOperations.stageReviewForKnownSource(
           source: unmatchedSource,
           result: unmatchedResult,
           in: database,
           now: now,
           handoffID: uuid()
         )
-        handoffReviewCoordinator.present(unmatchedSource.applyingScope(to: review))
+        handoffReviewCoordinator.present(
+          unmatchedSource.applyingScope(to: staged.review),
+          warning: staged.warning
+        )
       }
     } catch {
       present(error)
@@ -189,6 +199,7 @@ final class HandoffInAppTransport {
   }
 
   private func present(_ error: Error) {
+    errorTitle = "Could Not Process Handoff"
     errorMessage = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
     isShowingError = true
   }
@@ -196,7 +207,7 @@ final class HandoffInAppTransport {
   private func presentUnmatched(
     result: String,
     source: HandoffExportSource,
-    readerFeedbackReceive: ((AIHandoffReaderFeedbackReview) -> Void)? = nil
+    readerFeedbackReceive: ((AIHandoffReaderFeedbackResult) -> Void)? = nil
   ) {
     unmatchedResult = result
     unmatchedSource = source
@@ -282,7 +293,7 @@ struct HandoffMenuActions: View {
 struct ReaderFeedbackHandoffControls: View {
   let source: HandoffExportSource
   let transport: HandoffInAppTransport
-  let receive: (AIHandoffReaderFeedbackReview) -> Void
+  let receive: (AIHandoffReaderFeedbackResult) -> Void
 
   var body: some View {
     HStack(spacing: 8) {
@@ -308,7 +319,7 @@ private struct HandoffTransportAlert: ViewModifier {
   func body(content: Content) -> some View {
     @Bindable var transport = transport
 
-    content.alert("Could Not Process Handoff", isPresented: $transport.isShowingError) {
+    content.alert(transport.errorTitle, isPresented: $transport.isShowingError) {
       Button("OK") {}
     } message: {
       Text(transport.errorMessage ?? "Something went wrong.")

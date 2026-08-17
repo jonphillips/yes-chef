@@ -12,10 +12,11 @@ public extension AIHandoffIntentImport {
     allowUnmatchedToken: Bool = false,
     in db: Database,
     now: Date
-  ) throws -> AIHandoffReaderFeedbackReview {
+  ) throws -> AIHandoffReaderFeedbackResult {
+    let markedResult = try AIHandoffReturnContract.strippingMarker(from: result)
     let payload: String
-    if let markedResult = AIHandoffReturnContract.strippingMarker(from: result) {
-      guard let routedText = AIHandoffToken.stripping(from: markedResult),
+    if let routedText = AIHandoffToken.stripping(from: markedResult.text) {
+      guard
         routedText.handoffID == handoffID || allowUnmatchedToken
       else {
         throw AIHandoffIntentImportError.wrongTask
@@ -26,13 +27,13 @@ public extension AIHandoffIntentImport {
       // Its capture-local transport can therefore accept the JSON directly after it has selected
       // this durable handoff by the prompt it just copied. Keep ordinary handoff returns on the
       // contract-marker route, and keep legacy `Tip:` returns there as well.
-      guard AIHandoffToken.stripping(from: result) == nil,
+      guard
         ReaderFeedbackCurationClient.parseJSONReturn(
-          result,
+          markedResult.text,
           comments: ReaderFeedbackCurationClient.preparedComments(comments)
         ) != nil
       else { throw AIHandoffReturnContractError.instructionsOutOfDate }
-      payload = result
+      payload = markedResult.text
     }
     guard
       let handoff = try AIHandoffRepository.handoff(id: handoffID, in: db),
@@ -51,10 +52,13 @@ public extension AIHandoffIntentImport {
       throw AIHandoffIntentImportError.emptyPlan
     }
     try AIHandoffRepository.markImported(id: handoffID, at: now, in: db)
-    return AIHandoffReaderFeedbackReview(
-      handoffID: handoffID,
-      tips: returned.tips,
-      unparsedLines: returned.unparsedLines
+    return AIHandoffReaderFeedbackResult(
+      review: AIHandoffReaderFeedbackReview(
+        handoffID: handoffID,
+        tips: returned.tips,
+        unparsedLines: returned.unparsedLines
+      ),
+      warning: markedResult.warning
     )
   }
 
@@ -109,9 +113,10 @@ public extension AIHandoffIntentImport {
     handoff: AIHandoff,
     result: String,
     in db: Database
-  ) throws -> AIHandoffReview {
-    let payload = AIHandoffReturnContract.strippingMarker(from: result) ?? result
-    return try AIHandoffReviewStager.stage(handoff: handoff, payload: payload, in: db)
+  ) throws -> AIHandoffReviewResult {
+    let contract = try AIHandoffReturnContract.strippingMarker(from: result)
+    let review = try AIHandoffReviewStager.stage(handoff: handoff, payload: contract.text, in: db)
+    return AIHandoffReviewResult(review: review, warning: contract.warning)
   }
 }
 

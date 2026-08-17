@@ -26,10 +26,12 @@ extension RecipeCaptureModel {
   func stageReaderFeedback(
     tips: [ReaderFeedbackTip],
     comments: [RawComment],
-    unparsedLines: [String] = []
+    unparsedLines: [String] = [],
+    contractWarning: String? = nil
   ) {
     readerFeedbackComments = comments
     readerFeedbackHandoffEvidence = unparsedLines
+    readerFeedbackHandoffWarning = contractWarning
     guard !tips.isEmpty else { return }
     let acceptedKeys = Set(readerFeedbackBlocks.map { $0.text.lowercased() })
     var seen = Set(readerFeedbackProposals.map { $0.text.lowercased() })

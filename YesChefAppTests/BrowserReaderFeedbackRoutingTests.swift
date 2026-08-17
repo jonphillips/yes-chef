@@ -73,7 +73,7 @@ struct BrowserReaderFeedbackRoutingTests {
       let captureID = capture.readerFeedbackCaptureID
       let source = readerFeedbackSource(captureID: captureID, comments: comments)
       let transport = HandoffInAppTransport()
-      var reviews: [AIHandoffReaderFeedbackReview] = []
+      var reviews: [AIHandoffReaderFeedbackResult] = []
 
       await transport.pastedReaderFeedbackResults(
         [readerFeedbackJSON],
@@ -88,7 +88,8 @@ struct BrowserReaderFeedbackRoutingTests {
       await transport.reviewUnmatchedResult()
 
       #expect(!transport.isShowingUnmatchedConfirmation)
-      expectNoDifference(reviews.map(\.tips), [expectedTips(for: comments)])
+      expectNoDifference(reviews.map(\.review.tips), [expectedTips(for: comments)])
+      #expect(reviews.first?.warning != nil)
       let handoffs = try await database.read { db in
         try AIHandoff.fetchAll(db).first {
           $0.sourceID == captureID && $0.status == .imported
@@ -133,10 +134,10 @@ struct BrowserReaderFeedbackRoutingTests {
       let captureID = capture.readerFeedbackCaptureID
       let source = readerFeedbackSource(captureID: captureID, comments: comments)
       let transport = HandoffInAppTransport()
-      var reviews: [AIHandoffReaderFeedbackReview] = []
+      var reviews: [AIHandoffReaderFeedbackResult] = []
       let staleResult = """
       YC-HANDOFF: \(staleHandoffID.uuidString)
-      \(AIHandoffReturnContract.marker)
+      YC-CONTRACT: v2.1
       \(readerFeedbackJSON)
       """
 
@@ -151,7 +152,8 @@ struct BrowserReaderFeedbackRoutingTests {
 
       await transport.reviewUnmatchedResult()
 
-      expectNoDifference(reviews.map(\.tips), [expectedTips(for: comments)])
+      expectNoDifference(reviews.map(\.review.tips), [expectedTips(for: comments)])
+      #expect(reviews.first?.warning != nil)
       let handoffs = try await database.read { db in try AIHandoff.fetchAll(db) }
       #expect(handoffs.first { $0.id == staleHandoffID }?.status == .awaitingReturn)
       #expect(handoffs.contains {
@@ -192,7 +194,7 @@ struct BrowserReaderFeedbackRoutingTests {
         )
       }
       let transport = HandoffInAppTransport()
-      var reviews: [AIHandoffReaderFeedbackReview] = []
+      var reviews: [AIHandoffReaderFeedbackResult] = []
 
       await transport.pastedReaderFeedbackResults(
         ["""
@@ -205,7 +207,8 @@ struct BrowserReaderFeedbackRoutingTests {
       )
 
       #expect(!transport.isShowingUnmatchedConfirmation)
-      expectNoDifference(reviews.map(\.tips), [expectedTips(for: comments)])
+      expectNoDifference(reviews.map(\.review.tips), [expectedTips(for: comments)])
+      #expect(reviews.first?.warning == nil)
       #expect(try await database.read { db in
         try AIHandoffRepository.handoff(id: handoffID, in: db)?.status == .imported
       })

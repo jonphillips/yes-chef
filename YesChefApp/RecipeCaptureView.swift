@@ -482,9 +482,10 @@ private struct RecipeCaptureReviewSections: View {
               transport: readerFeedbackHandoffTransport,
               receive: { review in
                 model.stageReaderFeedback(
-                  tips: review.tips,
+                  tips: review.review.tips,
                   comments: model.readerFeedbackComments,
-                  unparsedLines: review.unparsedLines
+                  unparsedLines: review.review.unparsedLines,
+                  contractWarning: review.warning
                 )
                 readerFeedbackSheet = .review
               }
@@ -502,6 +503,13 @@ private struct RecipeCaptureReviewSections: View {
                 .textSelection(.enabled)
             }
             .accessibilityElement(children: .combine)
+          }
+
+          if let warning = model.readerFeedbackHandoffWarning {
+            Text(warning)
+              .font(.footnote)
+              .foregroundStyle(.orange)
+              .textSelection(.enabled)
           }
 
           ForEach(model.readerFeedbackBlocks.indices, id: \.self) { index in

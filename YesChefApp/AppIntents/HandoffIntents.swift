@@ -102,13 +102,13 @@ struct ImportHandoffResult: AppIntent {
       parsedHandoffID = nil
     }
 
-    let review = try await HandoffAppOperations.stageReview(
+    let staged = try await HandoffAppOperations.stageReview(
       handoffID: parsedHandoffID,
       result: result,
       in: database,
       now: now
     )
-    await handoffReviewCoordinator.present(review)
+    await handoffReviewCoordinator.present(staged.review, warning: staged.warning)
     return .result(opensIntent: OpenHandoffReviewIntent(), dialog: "Review the returned handoff in Yes Chef.")
   }
 }
@@ -735,17 +735,16 @@ enum HandoffAppOperations {
     result: String,
     in database: any DatabaseWriter,
     now: Date
-  ) async throws -> AIHandoffReview {
-    guard let result = AIHandoffReturnContract.strippingMarker(from: result) else {
-      throw AIHandoffReturnContractError.instructionsOutOfDate
-    }
+  ) async throws -> AIHandoffReviewResult {
+    let contract = try AIHandoffReturnContract.strippingMarker(from: result)
     return try await database.write { db in
-      try AIHandoffIntentImport.stageReview(
+      let review = try AIHandoffIntentImport.stageReview(
         handoffID: handoffID,
-        result: result,
+        result: contract.text,
         in: db,
         now: now
       )
+      return AIHandoffReviewResult(review: review, warning: contract.warning)
     }
   }
 
@@ -755,10 +754,8 @@ enum HandoffAppOperations {
     in database: any DatabaseWriter,
     now: Date,
     handoffID: AIHandoff.ID
-  ) async throws -> AIHandoffReview {
-    guard let result = AIHandoffReturnContract.strippingMarker(from: result) else {
-      throw AIHandoffReturnContractError.instructionsOutOfDate
-    }
+  ) async throws -> AIHandoffReviewResult {
+    let contract = try AIHandoffReturnContract.strippingMarker(from: result)
     let metadata = source.metadata(handoffID: handoffID)
     let handoff = AIHandoff(
       id: handoffID,
@@ -773,12 +770,13 @@ enum HandoffAppOperations {
     )
     return try await database.write { db in
       try AIHandoffRepository.create(handoff, in: db)
-      return try AIHandoffIntentImport.stageReview(
+      let review = try AIHandoffIntentImport.stageReview(
         handoffID: handoff.id,
-        result: result,
+        result: contract.text,
         in: db,
         now: now
       )
+      return AIHandoffReviewResult(review: review, warning: contract.warning)
     }
   }
 
@@ -788,7 +786,7 @@ enum HandoffAppOperations {
     in database: any DatabaseWriter,
     now: Date,
     handoffID: AIHandoff.ID
-  ) async throws -> AIHandoffReaderFeedbackReview {
+  ) async throws -> AIHandoffReaderFeedbackResult {
     guard case let .readerFeedback(context) = source else {
       throw AIHandoffIntentImportError.wrongTask
     }
@@ -822,7 +820,7 @@ enum HandoffAppOperations {
     in database: any DatabaseWriter,
     now: Date,
     handoffID: AIHandoff.ID
-  ) async throws -> AIHandoffReview {
+  ) async throws -> AIHandoffReviewResult {
     let metadata = source.metadata(handoffID: handoffID)
     let handoff = AIHandoff(
       id: handoffID,

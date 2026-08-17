@@ -14,14 +14,16 @@ final class HandoffReviewCoordinator {
   @ObservationIgnored @Dependency(\.uuid) var uuid
 
   var review: AIHandoffReview?
+  var contractWarning: String?
   var adjustmentReview: RecipeAdjustmentReviewState?
   private var pendingAdjustmentReview: RecipeAdjustmentReviewState?
   var errorMessage: String?
   var errorTitle = "Could Not Save Handoff"
   var isShowingError = false
 
-  func present(_ review: AIHandoffReview) {
+  func present(_ review: AIHandoffReview, warning: String? = nil) {
     clearError()
+    contractWarning = warning
     self.review = review
   }
 
@@ -657,18 +659,19 @@ extension HandoffReviewCoordinator {
   /// Unlike an external handoff, this does not create an exported prompt or consume a routed
   /// handoff row; it only uses the shared return parsing and review presentation.
   func stageOnboardReview(source: HandoffExportSource, result: String) async throws {
-    let review = try await HandoffAppOperations.stageOnboardReview(
+    let staged = try await HandoffAppOperations.stageOnboardReview(
       source: source,
       result: result,
       in: database,
       now: now,
       handoffID: uuid()
     )
-    present(review)
+    present(staged.review, warning: staged.warning)
   }
 
   private func clearError() {
     errorMessage = nil
+    contractWarning = nil
     errorTitle = "Could Not Save Handoff"
     isShowingError = false
   }
@@ -686,23 +689,37 @@ struct HandoffReviewSheet: View {
   }
 
   var body: some View {
-    switch review {
-    case let .workbenchExperiments(experimentsReview):
-      WorkbenchExperimentsReviewSheet(
-        coordinator: coordinator,
-        review: experimentsReview,
-        originalReview: review
-      )
-    case let .recipeAdjustmentBrief(briefReview):
-      RecipeAdjustmentBriefReviewSheet(
-        coordinator: coordinator,
-        review: briefReview,
-        originalReview: review
-      )
-    case .menuPrepPlan, .menuComplement, .recipeMakeAhead, .recipeChefItUp, .recipeServeWith,
-         .mealPlanMakeAhead, .mealPlanComplement, .workbenchCompare, .workbenchDraft:
-      standardReviewSheet
+    Group {
+      switch review {
+      case let .workbenchExperiments(experimentsReview):
+        WorkbenchExperimentsReviewSheet(
+          coordinator: coordinator,
+          review: experimentsReview,
+          originalReview: review
+        )
+      case let .recipeAdjustmentBrief(briefReview):
+        RecipeAdjustmentBriefReviewSheet(
+          coordinator: coordinator,
+          review: briefReview,
+          originalReview: review
+        )
+      case .menuPrepPlan, .menuComplement, .recipeMakeAhead, .recipeChefItUp, .recipeServeWith,
+           .mealPlanMakeAhead, .mealPlanComplement, .workbenchCompare, .workbenchDraft:
+        standardReviewSheet
+      }
     }
+    .alert("Imported with a warning", isPresented: contractWarningPresented) {
+      Button("OK") { coordinator.contractWarning = nil }
+    } message: {
+      Text(coordinator.contractWarning ?? "")
+    }
+  }
+
+  private var contractWarningPresented: Binding<Bool> {
+    Binding(
+      get: { coordinator.contractWarning != nil },
+      set: { if !$0 { coordinator.contractWarning = nil } }
+    )
   }
 
   private var standardReviewSheet: some View {
