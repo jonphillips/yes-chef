@@ -633,7 +633,7 @@ public enum MenuRepository {
     case .end:
       let destinationItems = remainingItems
         .filter { $0.dayOffset == destinationDayOffset }
-        .sorted(by: areMenuItemsInReorderOrder)
+        .sorted(by: areMenuItemsInDisplayOrder)
       destinationMealSlot = destinationItems.last?.mealSlot ?? .dinner
       insertionIndex = destinationItems.filter { $0.mealSlot == destinationMealSlot }.count
     }
@@ -783,6 +783,13 @@ private func areMenuItemsInReorderOrder(_ lhs: MenuItem, _ rhs: MenuItem) -> Boo
     return lhs.sortOrder < rhs.sortOrder
   }
   return lhs.id.uuidString < rhs.id.uuidString
+}
+
+private func areMenuItemsInDisplayOrder(_ lhs: MenuItem, _ rhs: MenuItem) -> Bool {
+  if lhs.mealSlot.sortOrder != rhs.mealSlot.sortOrder {
+    return lhs.mealSlot.sortOrder < rhs.mealSlot.sortOrder
+  }
+  return areMenuItemsInReorderOrder(lhs, rhs)
 }
 
 public enum MenuRepositoryError: Error, Equatable, Sendable {

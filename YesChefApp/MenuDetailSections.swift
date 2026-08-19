@@ -518,5 +518,5 @@ struct MenuDraggedRecipe: Codable, Transferable {
 }
 
 extension UTType {
-  static let yesChefMenuRecipe = UTType(exportedAs: "com.jon.yeschef.menu-recipe")
+  static let yesChefMenuRecipe = UTType(exportedAs: "com.jonphillips.yeschef.menu-recipe")
 }
