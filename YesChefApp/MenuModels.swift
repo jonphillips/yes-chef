@@ -195,23 +195,30 @@ final class MenuLibraryModel {
   func addRecipesToMenu(
     recipeIDs: [Recipe.ID],
     menuID: CoreMenu.ID,
-    dayOffset: Int,
-    mealSlot: MealPlanItemSlot = .dinner
+    destinationDayOffset: Int,
+    destination: MenuItemReorderDestination
   ) -> Bool {
     do {
       try database.write { db in
-        for recipeID in recipeIDs {
+        let itemIDs = try recipeIDs.map { recipeID in
           try MenuRepository.addRecipeItem(
             menuID: menuID,
             recipeID: recipeID,
-            dayOffset: dayOffset,
-            mealSlot: mealSlot,
+            dayOffset: destinationDayOffset,
+            mealSlot: .dinner,
             notes: nil,
             in: db,
             now: now,
             uuid: { uuid() }
           )
         }
+        try MenuRepository.reorderItems(
+          itemIDs: itemIDs,
+          destinationDayOffset: destinationDayOffset,
+          destination: destination,
+          in: db,
+          now: now
+        )
       }
       return true
     } catch {
@@ -245,19 +252,22 @@ final class MenuLibraryModel {
   }
 
   @discardableResult
-  func reorderMenuItemWithinDay(
-    itemID: MenuItem.ID,
-    direction: MenuItemMoveDirection
+  func reorderMenuItems(
+    itemIDs: [MenuItem.ID],
+    destinationDayOffset: Int,
+    destination: MenuItemReorderDestination
   ) -> Bool {
     do {
-      return try database.write { db in
-        try MenuRepository.reorderItemWithinDay(
-          itemID: itemID,
-          direction: direction,
+      try database.write { db in
+        try MenuRepository.reorderItems(
+          itemIDs: itemIDs,
+          destinationDayOffset: destinationDayOffset,
+          destination: destination,
           in: db,
           now: now
         )
       }
+      return true
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true

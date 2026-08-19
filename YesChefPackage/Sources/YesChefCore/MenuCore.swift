@@ -579,43 +579,102 @@ public enum MenuRepository {
     try MenuItem.upsert { item }.execute(db)
   }
 
-  /// Interim within-a-day reorder (parked drag-and-drop stand-in). Swaps an item's position with its
-  /// adjacent same-day, same-meal-slot sibling by renumbering the slot's `sortOrder` sequentially, so
-  /// the move is stable even if stored `sortOrder`s had gaps or ties. No-op (returns `false`) when the
-  /// item is already at the slot's edge in the requested direction.
-  @discardableResult
-  public static func reorderItemWithinDay(
-    itemID: MenuItem.ID,
-    direction: MenuItemMoveDirection,
+  /// Reorders one or more menu items into a day-wide destination. The destination day is the reorder
+  /// container's collection ID; the meal slot is inferred from the row before which the items land, or
+  /// from the last row in the day when they land at the end. Empty days use dinner as the intentional
+  /// default slot.
+  public static func reorderItems(
+    itemIDs: [MenuItem.ID],
+    destinationDayOffset: Int,
+    destination: MenuItemReorderDestination,
     in db: Database,
     now: Date
-  ) throws -> Bool {
-    guard let item = try MenuItem.find(itemID).fetchOne(db) else {
-      throw MenuRepositoryError.menuItemNotFound(itemID)
+  ) throws {
+    guard !itemIDs.isEmpty else { return }
+    let uniqueItemIDs = Set(itemIDs)
+    guard uniqueItemIDs.count == itemIDs.count else { return }
+
+    guard let firstItem = try MenuItem.find(itemIDs[0]).fetchOne(db) else {
+      throw MenuRepositoryError.menuItemNotFound(itemIDs[0])
     }
 
-    var siblings = try MenuItem
-      .where {
-        $0.menuID.eq(item.menuID)
-          && $0.dayOffset.eq(item.dayOffset)
-          && $0.mealSlot.eq(item.mealSlot)
-      }
+    let menu = try requireMenu(firstItem.menuID, in: db)
+    try validateDayOffset(destinationDayOffset, for: menu)
+    let allItems = try MenuItem
+      .where { $0.menuID.eq(firstItem.menuID) }
       .fetchAll(db)
-      .sorted { $0.sortOrder < $1.sortOrder }
-
-    guard let index = siblings.firstIndex(where: { $0.id == itemID }) else { return false }
-    let neighborIndex = direction == .earlier ? index - 1 : index + 1
-    guard siblings.indices.contains(neighborIndex) else { return false }
-
-    siblings.swapAt(index, neighborIndex)
-
-    for (position, sibling) in siblings.enumerated() where sibling.sortOrder != position {
-      var updated = sibling
-      updated.sortOrder = position
-      updated.dateModified = now
-      try MenuItem.upsert { updated }.execute(db)
+    let itemsByID = Dictionary(uniqueKeysWithValues: allItems.map { ($0.id, $0) })
+    let movedItems = try itemIDs.map { itemID in
+      guard let item = itemsByID[itemID] else {
+        throw MenuRepositoryError.menuItemNotFound(itemID)
+      }
+      return item
     }
-    return true
+
+    let remainingItems = allItems.filter { !uniqueItemIDs.contains($0.id) }
+    let destinationMealSlot: MealPlanItemSlot
+    let insertionIndex: Int
+    switch destination {
+    case let .before(destinationID):
+      guard let destinationItem = itemsByID[destinationID], !uniqueItemIDs.contains(destinationID) else {
+        throw MenuRepositoryError.menuItemNotFound(destinationID)
+      }
+      guard destinationItem.dayOffset == destinationDayOffset else {
+        throw MenuRepositoryError.invalidReorderDestination
+      }
+      destinationMealSlot = destinationItem.mealSlot
+      let destinationItems = remainingItems
+        .filter { $0.dayOffset == destinationDayOffset && $0.mealSlot == destinationMealSlot }
+        .sorted(by: areMenuItemsInReorderOrder)
+      guard let index = destinationItems.firstIndex(where: { $0.id == destinationID }) else {
+        throw MenuRepositoryError.menuItemNotFound(destinationID)
+      }
+      insertionIndex = index
+    case .end:
+      let destinationItems = remainingItems
+        .filter { $0.dayOffset == destinationDayOffset }
+        .sorted(by: areMenuItemsInReorderOrder)
+      destinationMealSlot = destinationItems.last?.mealSlot ?? .dinner
+      insertionIndex = destinationItems.filter { $0.mealSlot == destinationMealSlot }.count
+    }
+
+    let movedItemsForDestination = movedItems.map { item in
+      var movedItem = item
+      movedItem.dayOffset = destinationDayOffset
+      movedItem.mealSlot = destinationMealSlot
+      return movedItem
+    }
+    let destinationGroup = MenuItemReorderGroupKey(
+      dayOffset: destinationDayOffset,
+      mealSlot: destinationMealSlot
+    )
+    var groups: [MenuItemReorderGroupKey: [MenuItem]] = [:]
+    for item in remainingItems {
+      let key = MenuItemReorderGroupKey(dayOffset: item.dayOffset, mealSlot: item.mealSlot)
+      groups[key, default: []].append(item)
+    }
+    for key in groups.keys {
+      groups[key]?.sort(by: areMenuItemsInReorderOrder)
+    }
+    var destinationItems = groups[destinationGroup, default: []]
+    destinationItems.insert(contentsOf: movedItemsForDestination, at: min(insertionIndex, destinationItems.count))
+    groups[destinationGroup] = destinationItems
+
+    let affectedGroups = Set(
+      movedItems.map { MenuItemReorderGroupKey(dayOffset: $0.dayOffset, mealSlot: $0.mealSlot) }
+    )
+    .union([destinationGroup])
+    for group in affectedGroups {
+      guard let items = groups[group] else { continue }
+      for (sortOrder, item) in items.enumerated() {
+        var updated = item
+        updated.sortOrder = sortOrder
+        if uniqueItemIDs.contains(item.id) || updated.sortOrder != item.sortOrder {
+          updated.dateModified = now
+        }
+        try MenuItem.upsert { updated }.execute(db)
+      }
+    }
   }
 
   public static func deleteItem(
@@ -704,11 +763,26 @@ public enum MenuRepository {
   }
 }
 
-/// Direction for `MenuRepository.reorderItemWithinDay` — `.earlier` moves a dish up (toward the top of
-/// its meal-slot group), `.later` moves it down.
+public enum MenuItemReorderDestination: Sendable, Equatable {
+  case before(MenuItem.ID)
+  case end
+}
+
 public enum MenuItemMoveDirection: Sendable {
   case earlier
   case later
+}
+
+private struct MenuItemReorderGroupKey: Hashable {
+  let dayOffset: Int
+  let mealSlot: MealPlanItemSlot
+}
+
+private func areMenuItemsInReorderOrder(_ lhs: MenuItem, _ rhs: MenuItem) -> Bool {
+  if lhs.sortOrder != rhs.sortOrder {
+    return lhs.sortOrder < rhs.sortOrder
+  }
+  return lhs.id.uuidString < rhs.id.uuidString
 }
 
 public enum MenuRepositoryError: Error, Equatable, Sendable {
@@ -718,6 +792,7 @@ public enum MenuRepositoryError: Error, Equatable, Sendable {
   case menuNotFound(Menu.ID)
   case menuItemNotFound(MenuItem.ID)
   case menuItemIsNotNote(MenuItem.ID)
+  case invalidReorderDestination
   case placementNotFound(MenuPlacement.ID)
   case recipeNotFound(Recipe.ID)
 }

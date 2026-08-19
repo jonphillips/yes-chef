@@ -37,16 +37,26 @@
 			</array>
 			<key>UTTypeDescription</key>
 			<string>Yes Chef Backup</string>
-			<key>UTTypeIdentifier</key>
-			<string>com.jonphillips.yeschef.database-backup</string>
-			<key>UTTypeTagSpecification</key>
-			<dict>
+				<key>UTTypeIdentifier</key>
+				<string>com.jonphillips.yeschef.database-backup</string>
+				<key>UTTypeTagSpecification</key>
+				<dict>
 				<key>public.filename-extension</key>
 				<array>
-					<string>sqlite</string>
-				</array>
+						<string>sqlite</string>
+					</array>
+				</dict>
 			</dict>
-		</dict>
-	</array>
+			<dict>
+				<key>UTTypeConformsTo</key>
+				<array>
+					<string>public.data</string>
+				</array>
+				<key>UTTypeDescription</key>
+				<string>Yes Chef Menu Recipe</string>
+				<key>UTTypeIdentifier</key>
+				<string>com.jon.yeschef.menu-recipe</string>
+			</dict>
+		</array>
 </dict>
 </plist>

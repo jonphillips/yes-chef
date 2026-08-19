@@ -112,6 +112,36 @@ struct MenuDishList: View {
         )
       }
     }
+    .reorderContainer(for: MenuItemRowData.self, in: Int.self) { difference in
+      let destination: MenuItemReorderDestination = switch difference.destination.position {
+      case let .before(itemID):
+        .before(itemID)
+      case .end:
+        .end
+      }
+      _ = model.reorderMenuItems(
+        itemIDs: difference.sources,
+        destinationDayOffset: difference.destination.collectionID,
+        destination: destination
+      )
+    }
+    .dropDestination(for: MenuDraggedRecipe.self) { recipes, session -> Void in
+      guard !recipes.isEmpty else { return }
+      let reorderDestination = session.reorderDestination(for: MenuItemRowData.self, in: Int.self)
+      let destinationDayOffset = reorderDestination?.collectionID ?? max(detail.menu.dayCount - 1, 0)
+      let destination: MenuItemReorderDestination = switch reorderDestination?.position {
+      case let .before(itemID):
+        .before(itemID)
+      case .end, nil:
+        .end
+      }
+      _ = model.addRecipesToMenu(
+        recipeIDs: recipes.map(\.recipeID),
+        menuID: menu.id,
+        destinationDayOffset: destinationDayOffset,
+        destination: destination
+      )
+    }
   }
 
   private var dishHeader: some View {
@@ -226,21 +256,12 @@ private struct MenuDaySection: View {
           .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
       } else if isExpanded {
         VStack(spacing: 0) {
-          ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-            // Interim within-day reorder: a dish can move up/down only past an adjacent sibling in the
-            // same meal slot (rows are sorted day → meal slot → sortOrder, so same-slot items are
-            // contiguous). Moving across meal slots stays the meal-slot pill's job.
-            let canMoveUp = index > 0
-              && rows[index - 1].item.mealSlot == row.item.mealSlot
-            let canMoveDown = index < rows.count - 1
-              && rows[index + 1].item.mealSlot == row.item.mealSlot
+          ForEach(rows) { row in
             MenuDishRowView(
               model: model,
               detailModel: detailModel,
               menu: menu,
               row: row,
-              canMoveUp: canMoveUp,
-              canMoveDown: canMoveDown,
               onRecipeSelected: onRecipeSelected
             )
             if row.id != rows.last?.id {
@@ -248,6 +269,7 @@ private struct MenuDaySection: View {
                 .padding(.leading, 44)
             }
           }
+          .reorderable(collectionID: dayOffset)
         }
         .background(.background)
         .clipShape(.rect(cornerRadius: 8))
@@ -259,21 +281,6 @@ private struct MenuDaySection: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .contentShape(Rectangle())
-    .dropDestination(for: MenuDraggedRecipe.self) { recipes, _ -> Bool in
-      return model.addRecipesToMenu(
-        recipeIDs: recipes.map(\.recipeID),
-        menuID: menu.id,
-        dayOffset: dayOffset,
-        mealSlot: .dinner
-      )
-    }
-    .dropDestination(for: MenuDraggedMenuItem.self) { items, _ in
-      let sameMenuItems = items.filter { $0.menuID == menu.id }
-      guard !sameMenuItems.isEmpty else { return false }
-      return sameMenuItems.allSatisfy { item in
-        model.moveMenuItem(itemID: item.itemID, toDayOffset: dayOffset)
-      }
-    }
   }
 
   private var dayTitle: Text {
@@ -302,8 +309,6 @@ private struct MenuDishRowView: View {
   let detailModel: MenuDetailModel
   let menu: CoreMenu
   let row: MenuItemRowData
-  var canMoveUp: Bool = false
-  var canMoveDown: Bool = false
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   private var isDepositTarget: Bool {
@@ -313,35 +318,11 @@ private struct MenuDishRowView: View {
   var body: some View {
     rowContent
       .background(isDepositTarget ? Color.accentColor.opacity(0.12) : Color.clear)
-      .draggable(
-        MenuDraggedMenuItem(
-          menuID: row.item.menuID,
-          itemID: row.item.id
-        )
-      )
       .swipeActions {
         Button(role: .destructive) {
           model.deleteMenuItemButtonTapped(row)
         } label: {
           Label("Delete", systemImage: "trash")
-        }
-
-        if canMoveUp {
-          Button {
-            _ = model.reorderMenuItemWithinDay(itemID: row.id, direction: .earlier)
-          } label: {
-            Label("Move Up", systemImage: "arrow.up")
-          }
-          .tint(.indigo)
-        }
-
-        if canMoveDown {
-          Button {
-            _ = model.reorderMenuItemWithinDay(itemID: row.id, direction: .later)
-          } label: {
-            Label("Move Down", systemImage: "arrow.down")
-          }
-          .tint(.teal)
         }
 
         Menu {
@@ -536,16 +517,6 @@ struct MenuDraggedRecipe: Codable, Transferable {
   }
 }
 
-struct MenuDraggedMenuItem: Codable, Transferable {
-  var menuID: CoreMenu.ID
-  var itemID: MenuItem.ID
-
-  static var transferRepresentation: some TransferRepresentation {
-    CodableRepresentation(contentType: .yesChefMenuItem)
-  }
-}
-
 extension UTType {
   static let yesChefMenuRecipe = UTType(exportedAs: "com.jon.yeschef.menu-recipe")
-  static let yesChefMenuItem = UTType(exportedAs: "com.jon.yeschef.menu-item")
 }

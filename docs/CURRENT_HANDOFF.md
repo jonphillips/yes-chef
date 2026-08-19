@@ -158,10 +158,14 @@ gone; decide whenever, it blocks nothing.
 Playbook sections getting the same per-section toolbar, and section-selection checkboxes on the whole-recipe
 hand-off (the scoped per-section verbs make these *less* necessary, not more).
 
-**Drag recipes from Browse into a meal (BLOCKED on iPadOS Beta 4).** The pipeline is **already wired**
-(`.draggable`/`.dropDestination` between `MenuRecipeBrowserPanel` and `MenuDishDayList`, slide-over stays
-interactive) but drag-and-drop is not firing reliably in the current betas. **Retry after Beta 4;** then it's
-confirm-E2E + polish, no schema.
+**[ADR-0055](decisions/ADR-0055-drag-and-drop-on-the-sanctioned-reorder-path.md) — menu Dishes drag-to-reorder.**
+Brief: [`efforts/menu-dishes-reorder-container.md`](efforts/menu-dishes-reorder-container.md). Supersedes the
+old "drag from Browse into a meal is BLOCKED on Beta 4" park, which turned out to be three tangled causes: an
+Xcode 27 beta defect **Galavant also parked and neither app re-checked**, two `UTType(exportedAs:)` payload
+types missing from our `Info.plist`, and a Dishes list that was never on the SDK 27 reorder API at all.
+**S0 is Jon's device probe** (three questions, one sitting); **S1–S3 ship regardless of its outcome** (D7).
+Schema-free. **S1 creates `docs/KNOWN-ISSUES.md` and deletes this beta park from here** — beta parks are
+standing conditions and die in the dispatcher (D2).
 
 **Meal-Planner chat verbs** (ADR-0013 + `efforts/cooking-workspace.md`) — the one remaining named
 actionable-chat verb instance. Classify each verb's commit shape first ([[chat-verb-commit-shapes]]) — likely
