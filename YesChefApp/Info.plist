@@ -47,6 +47,16 @@
 				</array>
 			</dict>
 		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Yes Chef Menu Recipe</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.jonphillips.yeschef.menu-recipe</string>
+		</dict>
 	</array>
 </dict>
 </plist>

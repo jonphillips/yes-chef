@@ -24,6 +24,9 @@ it's touched.
 
 ## Active / recent
 
+- [menu-dishes-reorder-container.md](menu-dishes-reorder-container.md) — **Dispatched** · One PR for
+  S1–S3: declare the recipe UTI, move menu Dishes onto the SDK 27 sectioned reorder container, and place
+  Browse Recipes drops at the hovered reorder destination. Schema-free.
 - [adr-0021-v4c-and-variation-delete.md](adr-0021-v4c-and-variation-delete.md) — **Done** (write-up in
   [`../DONE-LOG.md`](../DONE-LOG.md)) · [ADR-0021](../decisions/ADR-0021-recipe-variations.md) Amd4-D4 ·
   Widens the variation delta vocabulary by **exactly two** anchored ops — `stepInsert` / `stepRemove` — so a

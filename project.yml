@@ -91,6 +91,10 @@ targets:
             UTTypeTagSpecification:
               public.filename-extension:
                 - sqlite
+          - UTTypeConformsTo:
+              - public.data
+            UTTypeDescription: Yes Chef Menu Recipe
+            UTTypeIdentifier: com.jonphillips.yeschef.menu-recipe
         UILaunchScreen: {}
     dependencies:
       - package: YesChefPackage
