@@ -920,6 +920,49 @@ which appends no deliverable tail. v1 keeps the new recipe **standalone** — no
 provenance back-link (deferred), and no learnings on the new-recipe branch (it is a create, not a durable
 finding about the source).
 
+## Amendment 5 — the return-contract marker is the first lift from LLMHandoffKit; tolerant, not strict (2026-08-16)
+
+**Status: Proposed** (architect; shipped in [#309](https://github.com/jonphillips/yes-chef/pull/309),
+awaiting Jon's device pass). Answers the recon gate in
+[`docs/llmhandoffkit-convergence-recon.md`](../llmhandoffkit-convergence-recon.md) — *is graceful
+stale-marker tolerance wanted?* — with **yes**, and takes **Path A**: lift only the one genuinely
+neutral helper, leave the persistence and return-model forks alone.
+
+### Amd5-D1 — The marker engine moves to the shared package; nothing else does
+
+`AIHandoffReturnContract` now wraps `LLMHandoffKit.HandoffContractMarker(prefix: "YC-CONTRACT",
+version: "v3")` in place of the hand-rolled `strippingMarker`. This is the *only* overlap with
+galavant worth sharing — the router (`AIHandoffToken.stripping`), the `AIHandoff` `@Table`,
+`Learning`, and every `AIHandoff*` domain type stay in `YesChefCore` untouched. The package's
+galavant router, its UserDefaults `HandoffSessionStore`, and its `HandoffCandidateLink.tripIdeaID`
+never entered the build. Full de-galavant-ification of the package (Path B) stays deferred until a
+third consumer justifies it.
+
+### Amd5-D2 — Strict-reject becomes import-with-warning, except for a *newer* marker
+
+D4 pinned the version marker so drift is loud. Amd5 **softens** that for the backward cases, because
+the JSON decode — not the marker line — is the real lossless-or-loud guard
+([ADR-0040](ADR-0040-editable-at-the-grain-it-is-stored.md)): a **missing or older** marker imports
+anyway and carries a non-blocking warning to the review surface (App Intents, in-app review,
+reader-feedback capture, and the Amd4 new-recipe path each show it); the **current** marker is
+silent; a **newer** marker stays a hard stop — the one case where decoding a future schema could
+silently misread. `strippingMarker` therefore now returns a `(text, warning?)` result and throws
+only on the newer-marker case, rather than returning `nil` on any non-exact marker.
+
+### Amd5-D3 — Version normalized decimal `2.1` → integer `v3`; galavant copy stays out at the seam
+
+The package compares the *leading integer* of the marker line, so the contract folds from decimal
+`2.1` to integer `v3`. An old `YC-CONTRACT: v2.1` return parses as `2 < 3` (older ⇒ warn-and-import);
+future bumps stay integer `vN`. The package is still galavant-named internally, so yes-chef keeps its
+identity out of the UI at the call seam: it passes the marker's **default neutral** `remediation` copy
+for warnings, and **translates** the package's galavant-worded `HandoffContractError` into its own
+`AIHandoffReturnContractError.instructionsOutOfDate`. No "Galavant"/"Settings" copy reaches a user.
+
+**Watch item (not blocking):** the tokenless bare-JSON reader-feedback shortcut carries no marker by
+design, so it now always shows the "missing contract marker" footnote — a mild false positive on a
+legitimate path. Left as-is pending a dogfood read; the fix, if wanted, is to marker-exempt that one
+path rather than tighten the tolerance.
+
 ## Related
 
 - [ADR-0038](ADR-0038-external-llm-handoff.md) + Amd 1 (`Learning` as the two-part return, the model for D6)
