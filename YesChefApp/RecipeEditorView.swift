@@ -1,7 +1,19 @@
+import CoreTransferable
 import PhotosUI
 import SwiftUI
 import UIKit
 import YesChefCore
+
+extension UIImage: @retroactive Transferable {
+  public static var transferRepresentation: some TransferRepresentation {
+    DataRepresentation(importedContentType: .image) { data in
+      guard let image = UIImage(data: data) else {
+        throw PastedPhotoEncodingError()
+      }
+      return image
+    }
+  }
+}
 
 struct RecipeEditorView: View {
   @State private var model: RecipeEditorModel
@@ -311,6 +323,20 @@ private struct RecipeHeroPhotoPickerRow: View {
           }
         }
 
+        PasteButton(payloadType: UIImage.self) { images in
+          guard let image = images.first, let data = image.pngData() else {
+            model.heroPhotoSelectionFailed(PastedPhotoEncodingError())
+            return
+          }
+          Task {
+            await model.heroPhotoSelected(
+              sourceData: data,
+              sourcePath: "Pasted Image.png"
+            )
+          }
+        }
+        .accessibilityLabel("Paste photo")
+
         if hasPhoto {
           Button(role: .destructive) {
             model.heroPhotoRemoved()
@@ -331,7 +357,13 @@ private struct RecipeHeroPhotoPickerRow: View {
   }
 }
 
-private struct RecipeHeroPhotoPreview: View {
+private struct PastedPhotoEncodingError: Error, CustomStringConvertible {
+  var description: String {
+    "The pasted image could not be read."
+  }
+}
+
+struct RecipeHeroPhotoPreview: View {
   let data: Data
 
   var body: some View {

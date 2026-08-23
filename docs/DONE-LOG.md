@@ -9,6 +9,63 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## ADR-0055 — menu Dishes drag-to-reorder on the sanctioned reorder path
+
+**Merged 2026-08-21; PR [#310](https://github.com/jonphillips/yes-chef/pull/310). No schema. Jon's device pass
+owed.** Closes the nine-month "drag from Browse into a meal is BLOCKED on Beta" park, which turned out to be
+three tangled causes, not one beta defect: an Xcode 27 beta drag-and-drop bug **both apps parked and neither
+re-checked** (S0 device probe, Jon, beta 5 — root cause was actually *two stacked `.dropDestination` modifiers*,
+the inner shadowing the outer), two `UTType(exportedAs:)` payload types missing from our `Info.plist`, and a
+Dishes list that was never on the SDK 27 reorder API at all. S1–S3 put the Menu Dishes list on
+`.reorderable(collectionID:)` + `.reorderContainer(for:in:)` (the same path the prep plan and Playbook already
+use), retiring the interim Move Up/Down swipe actions and the row `.draggable`. **S1 created
+[`docs/KNOWN-ISSUES.md`](KNOWN-ISSUES.md)** (beta parks are standing conditions and now die in the dispatcher,
+D2) and deleted the beta park from the handoff. Schema-free.
+
+---
+## ADR-0042 Amd 4 — the recipe-body hand-off finalizes two ways (revise, or riff into a new recipe)
+
+**Merged 2026-08-17; PR [#309](https://github.com/jonphillips/yes-chef/pull/309). No schema. Jon's device pass
+owed.** The `adjustRecipe` hand-off is now **dual-sink**: the finalize path is chosen in the external
+conversation and recovered by **return SHAPE** (`RecipeAdjustmentFinalize.classify`, reusing S3's `fromJSONLD`).
+A **revision brief** (prose) → the `.recipeAdjustmentBrief` review (delta against live rows, D2 intact); a **new
+recipe** (schema.org JSON-LD) → **Create Recipe** as a standalone draft via `CreateRecipeCoordinator.stage` (the
+capture/workbenchDraft door — the ADR-0051 sink guard, no new parser). A new recipe is not a delta and has no
+identity to reconcile, so the "in-app adjust verb is the only path that writes a structured delta" line holds;
+v1 is standalone (no "riffed-from" provenance) and drops learnings on the new-recipe branch. Fixed the old
+`.menuPrepPlan` deliverable-default leak on the recipe body (`AIHandoffToken.selfContainedPrompt`). Ride-along:
+fixed a pre-existing red `main` build — commit 34c579b added `WebRecipeCaptureWarning.multipleRecipeCandidates`
++ `.nestedInstructionSectionsFlattened` but never updated the Share Extension's exhaustive `shareReviewTitle`
+switch.
+
+---
+## ADR-0042 Amd 5 — the return-contract marker is the first LLMHandoffKit lift; tolerant, not strict
+
+**Merged 2026-08-17; PR [#309](https://github.com/jonphillips/yes-chef/pull/309). No schema. Jon's device pass
+owed.** Takes **Path A** on the [convergence recon](llmhandoffkit-convergence-recon.md): lift *only* the one
+genuinely neutral helper (`LLMHandoffKit.HandoffContractMarker`), leaving the package's galavant router,
+UserDefaults `HandoffSessionStore`, and return-model forks out of the build ([[llmhandoffkit-adoption-path-a]]).
+`AIHandoffReturnContract` now wraps the shared marker. **Strict-reject softened to import-with-warning** for the
+backward cases (the JSON decode, not the marker line, is the real lossless-or-loud guard): a **missing or older**
+marker imports with a non-blocking warning surfaced on every review surface; the **current** marker is silent; a
+**newer** marker stays a hard stop. Version **normalized decimal `2.1` → integer `v3`** (the package compares the
+leading integer; an old `v2.1` folds to `2 < 3` → warn-and-import). Galavant's identity is kept out of the UI at
+the seam: yes-chef passes the marker's neutral remediation copy and translates the package's galavant-worded
+error into `AIHandoffReturnContractError.instructionsOutOfDate`. **Watch item (not blocking):** the tokenless
+bare-JSON reader-feedback shortcut carries no marker by design, so it now always shows the "missing contract
+marker" footnote — a mild false positive, left pending a dogfood read.
+
+---
+## ADR-0052 S3 — audit the learned grocery store-area `.model` rows
+
+**Merged 2026-08-10; PR [#306](https://github.com/jonphillips/yes-chef/pull/306). No schema. Jon's device pass
+owed.** Repoints ADR-0037's seed-coverage view to **audit** the classifier-promoted `.model` rows in the synced
+learned canonicalName→area table (amends, never deletes): confirmed learned placements are tracked, and a
+correction uses an aisle picker whose choice wins as a `user` row (precedence user > seed > model holds). The
+rest of ADR-0052 (the synced table itself, S1+S2) shipped earlier in PR #292. Closes out the one live candidate
+that had been left in the handoff queue.
+
+---
 ## ADR-0054 — extraction preserves structure and identity
 
 **Merged 2026-08-11; PR [#308](https://github.com/jonphillips/yes-chef/pull/308). No schema. Jon's device pass owed.**

@@ -95,6 +95,14 @@ struct CreateRecipeView: View {
         }
         ToolbarItem(placement: .confirmationAction) {
           Button {
+            model.destination = .preview
+          } label: {
+            Label("Preview", systemImage: "eye")
+          }
+          .disabled(model.editorModel.isSavingDisabled)
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button {
             if let focusedIngredientSectionNameID {
               model.editorModel.ingredientSectionNameChanged(sectionID: focusedIngredientSectionNameID)
               self.focusedIngredientSectionNameID = nil
@@ -122,6 +130,11 @@ struct CreateRecipeView: View {
         Button("OK") {}
       } message: {
         Text(model.errorMessage ?? "")
+      }
+      .sheet(isPresented: previewPresentationBinding(for: model)) {
+        NavigationStack {
+          RecipeDraftPreviewView(draft: model.editorModel.draft)
+        }
       }
       .confirmationDialog(
         "A recipe is already in progress.",
@@ -158,6 +171,17 @@ struct CreateRecipeView: View {
       set: { isPresented in
         if !isPresented {
           model.discardIncomingPastedText()
+        }
+      }
+    )
+  }
+
+  private func previewPresentationBinding(for model: CreateRecipeModel) -> Binding<Bool> {
+    Binding(
+      get: { model.destination == .preview },
+      set: { isPresented in
+        if !isPresented, model.destination == .preview {
+          model.destination = nil
         }
       }
     )

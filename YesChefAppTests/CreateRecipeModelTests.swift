@@ -1,5 +1,6 @@
 import CustomDump
 import Dependencies
+import Foundation
 import Testing
 import YesChefCore
 @testable import YesChef
@@ -7,6 +8,25 @@ import YesChefCore
 @Suite
 @MainActor
 struct CreateRecipeModelTests {
+  @Test
+  func pastedImageDataCreatesPendingHeroPhotoWithPastedSourcePath() async throws {
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.uuid = .incrementing
+    } operation: {
+      let model = RecipeEditorModel(seededDraft: RecipeEditorDraft())
+
+      await model.heroPhotoSelected(
+        sourceData: Data([0x01, 0x02, 0x03, 0x04]),
+        sourcePath: "Pasted Image.png"
+      )
+
+      let photo = try #require(model.draft.pendingPhotos.first)
+      #expect(photo.kind == .hero)
+      #expect(photo.originalSourcePath == "Pasted Image.png")
+    }
+  }
+
   @Test
   func emptyShortcutTextFailsWithoutStagingASession() async {
     let coordinator = CreateRecipeCoordinator()

@@ -1,8 +1,9 @@
 # Current Handoff
 
-Last updated: August 15, 2026. **No designated Next Up target — Jon picks from the queue;** the one live candidate
-left in Ready Efforts is **ADR-0052 S3**. Newly-merged work has moved to [`DONE-LOG.md`](DONE-LOG.md); the device
-passes it owes are in their own section below.
+Last updated: August 23, 2026. **No designated Next Up target — Jon picks from the queue;** the standout live
+candidate is the **learnings parser floor** effort — **its PR A unblocks Jon's testing immediately** (he cannot
+produce a single recipe learning by any route today). Newly-merged work (ADR-0052 S3, ADR-0055, ADR-0042 Amd
+4/Amd 5) has moved to [`DONE-LOG.md`](DONE-LOG.md); the device passes it owes are in their own section below.
 ⚠️ **A standing Codex-env gotcha:** the simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
 the app tests" is structural, not a regression — and it once *masked two genuinely red tests* (missing
 `bootstrapDatabase()` → `RecipeEditorModel`'s eager `@Fetch` tripped SQLiteData's blank-DB reporter), fixed by
@@ -30,6 +31,18 @@ and every hit outside those two sections is a removal candidate — not merely f
 
 **No designated target — Jon picks from the queue.**
 
+- **⭐ Learnings parser floor + the paste door that rescopes a return —
+  [`efforts/handoff-learnings-parser-floor-2026-08-19.md`](efforts/handoff-learnings-parser-floor-2026-08-19.md)
+  (designed, ready to dispatch).** Two PRs off one dispatch, no schema. `learningBullets` invents a
+  "must begin with a bullet" rule that exists nowhere in the contract, and on the recipe and workbench-compare
+  paths a single non-conforming `YC-LEARNINGS:` line **throws away the entire return, deliverable included** —
+  the worst ADR-0040 corner (loud *and* lossy). Compounding it, there is no in-app way to author a recipe
+  learning at all. **PR A** (tolerant `learnings(from:)` + drop the throws + add the recipe Add-Learning door)
+  **unblocks Jon immediately.** **PR B** makes the return token, not the paste door, authoritative for scope
+  (a variation brief pasted at the base door no longer silently rescopes to the base). ⚠️ **One staleness to
+  flag on dispatch:** the effort doc says the contract version "stays 2.1" — it is now integer **`v3`** (PR
+  #309, Amd 5); the *point* still holds (do not touch `AIHandoffReturnContract.version` and change no prompt
+  text), only the number moved.
 - **ADR-0045 cold-start starters are still open, no longer time-gated:** S2 rearranged the Calendar day-header
   Chat and the Workbench Chat into inspectors and left them passing `.none`. Whether they want their own starters
   ("Plan this week" / "What should I prep tonight?") is Jon's call whenever — it no longer blocks anything.
@@ -37,11 +50,7 @@ and every hit outside those two sections is a removal candidate — not merely f
 ---
 
 **Prior candidates (queue — not the designated target).** Per-recipe facet/tag coverage is Jon's ongoing hand
-work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**. Live candidates:
-
-- **[ADR-0052](decisions/ADR-0052-grocery-learned-area-table.md) S3 (not designated):** repoint ADR-0037's
-  seed-coverage view to **audit** the `.model` rows (amends, never deletes). The rest of ADR-0052 is shipped and
-  device-passed (DONE-LOG).
+work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**.
 
 The ATK grocery-bug slice ([`efforts/import-text-normalization.md`](efforts/import-text-normalization.md)) is a
 **data migration wanting backup-first + a device pass** — hold it until Jon is local. D3's settled
@@ -158,15 +167,6 @@ gone; decide whenever, it blocks nothing.
 Playbook sections getting the same per-section toolbar, and section-selection checkboxes on the whole-recipe
 hand-off (the scoped per-section verbs make these *less* necessary, not more).
 
-**[ADR-0055](decisions/ADR-0055-drag-and-drop-on-the-sanctioned-reorder-path.md) — menu Dishes drag-to-reorder.**
-Brief: [`efforts/menu-dishes-reorder-container.md`](efforts/menu-dishes-reorder-container.md). Supersedes the
-old "drag from Browse into a meal is BLOCKED on Beta 4" park, which turned out to be three tangled causes: an
-Xcode 27 beta defect **Galavant also parked and neither app re-checked**, two `UTType(exportedAs:)` payload
-types missing from our `Info.plist`, and a Dishes list that was never on the SDK 27 reorder API at all.
-**S0 is Jon's device probe** (three questions, one sitting); **S1–S3 ship regardless of its outcome** (D7).
-Schema-free. **S1 creates `docs/KNOWN-ISSUES.md` and deletes this beta park from here** — beta parks are
-standing conditions and die in the dispatcher (D2).
-
 **Meal-Planner chat verbs** (ADR-0013 + `efforts/cooking-workspace.md`) — the one remaining named
 actionable-chat verb instance. Classify each verb's commit shape first ([[chat-verb-commit-shapes]]) — likely
 no-commit advisory or a per-day note, not a per-recipe write; respect [[llm-curation-not-synthesis]].
@@ -226,7 +226,29 @@ selection (per-bubble `UITextView` caps the payload).
 
 Not work, a checklist.
 
-**ADR-0042 Amd 4 — recipe-body hand-off finalizes two ways (PR pending — this slice), no schema.** On a recipe,
+**ADR-0055 — menu Dishes drag-to-reorder (PR [#310](https://github.com/jonphillips/yes-chef/pull/310)), no
+schema.** On device (Xcode 27 beta 5+), reorder dishes within a menu day by drag — a row lifts and drops in the
+new position with no not-allowed badge, and the order persists. Confirm the interim Move Up/Down swipe actions
+are gone. Exercise a sectioned menu (multiple days) — the sectioned `reorderContainer(for:in:)` was the one live
+unknown (ADR-0055 OQ3) and S2 built against it. Cross-check `docs/KNOWN-ISSUES.md` reads correctly.
+
+**ADR-0042 Amd 5 — tolerant LLMHandoffKit contract marker (PR
+[#309](https://github.com/jonphillips/yes-chef/pull/309)), no schema.** Paste a return whose `YC-CONTRACT:`
+marker is **missing** or **older** (`v2` / `v2.1`) and confirm it still **imports, with a non-blocking warning**
+on the review surface — no hard rejection. Paste one with the **current** `v3` marker → silent, no warning.
+Paste one claiming a **newer** marker (`v4`) → hard stop. Confirm no "Galavant"/"Settings" wording ever reaches
+a user (the error must read as Yes Chef's own "instructions out of date"). Known mild false positive to eyeball,
+not fix: the tokenless bare-JSON reader-feedback path always shows the missing-marker footnote.
+
+**ADR-0052 S3 — audit learned grocery `.model` placements (PR
+[#306](https://github.com/jonphillips/yes-chef/pull/306)), no schema.** In the grocery seed-coverage audit view,
+confirm classifier-promoted `.model` rows are listed for audit (amended, never deleted); correct one via the
+aisle picker and confirm the correction wins as a `user` row and survives relaunch (precedence user > seed >
+model). ⚠️ **Architect note:** touches app-layer model code — the [[app-test-target-in-verification]] gate may be
+open; run `YesChefTests` locally or let this device pass stand as the check.
+
+**ADR-0042 Amd 4 — recipe-body hand-off finalizes two ways (PR
+[#309](https://github.com/jonphillips/yes-chef/pull/309)), no schema.** On a recipe,
 **Copy Prompt** and confirm the tail no longer says "prep plan" and the body clearly describes *both* finalize
 outcomes (revision brief vs. new recipe). Then paste, into the recipe's **Paste** control, each of: **(a)** a prose
 revision brief → the side-by-side **adjustment review** opens (revise-this-recipe); **(b)** a schema.org `Recipe`

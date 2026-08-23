@@ -18,6 +18,7 @@ final class CreateRecipeModel {
 
   enum Destination: Equatable {
     case incomingPastedTextOffer(IncomingPastedText)
+    case preview
   }
 
   @ObservationIgnored
