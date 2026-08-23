@@ -335,7 +335,6 @@ struct RecipePlaybookView: View {
       } label: {
         Label("Paste", systemImage: "doc.on.clipboard")
       }
-      .disabled(!UIPasteboard.general.hasStrings)
 
       if section != .serveWith {
         Button(isFilled ? "Edit" : "Write manually") {

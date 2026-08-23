@@ -201,7 +201,6 @@ struct RecipeDetailView: View {
         } label: {
           Label("Paste", systemImage: "doc.on.clipboard")
         }
-        .disabled(!UIPasteboard.general.hasStrings)
       } label: {
         Label("Hand off", systemImage: "sparkles.square.filled.on.square")
       }

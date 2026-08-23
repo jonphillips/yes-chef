@@ -389,7 +389,6 @@ struct MenuPrepPlanSection: View {
               )
             }
           }
-          .disabled(!UIPasteboard.general.hasStrings)
           Divider()
           Button("Clear Prep Plan", role: .destructive) {
             isClearConfirmationPresented = true

@@ -30,11 +30,6 @@ and every hit outside those two sections is a removal candidate — not merely f
 
 **No designated target — Jon picks from the queue.**
 
-- **⭐ Paste door scope authority —
-  [`efforts/handoff-learnings-parser-floor-2026-08-19.md`](efforts/handoff-learnings-parser-floor-2026-08-19.md),
-  PR B (S4–S5).** No schema. A return token that resolves to a stored hand-off must control its item, task,
-  variation, and day scope regardless of the paste door; same-item redirects are silent except for a target toast,
-  cross-item redirects remain confirmable, and the six stale `UIPasteboard.hasStrings` snapshots are removed.
 - **ADR-0045 cold-start starters are still open, no longer time-gated:** S2 rearranged the Calendar day-header
   Chat and the Workbench Chat into inspectors and left them passing `.none`. Whether they want their own starters
   ("Plan this week" / "What should I prep tonight?") is Jon's call whenever — it no longer blocks anything.
