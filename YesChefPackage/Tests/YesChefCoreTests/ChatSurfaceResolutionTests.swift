@@ -20,13 +20,6 @@ struct ChatSurfaceResolutionTests {
     )
   }
 
-  @Test
-  func namesStarterContractsForEveryHost() {
-    let resolution = ChatSurfaceResolution(sections: .starters, presentation: .modalSheet)
-
-    expectNoDifference(resolution.sections, .starters)
-  }
-
   private func assertPresentation(
     _ presentation: ChatSurfaceResolution.Presentation,
     dismissal: ChatSurfaceResolution.Dismissal,

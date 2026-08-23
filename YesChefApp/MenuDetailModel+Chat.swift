@@ -31,7 +31,6 @@ extension MenuDetailModel {
       return
     }
     prepPlanHandoffIntent = .refine
-    activeChatStarterID = nil
     tool = .chat(RecipeChatModel(context: .menu(MenuChatContext(detail: detail))))
   }
 
@@ -39,7 +38,6 @@ extension MenuDetailModel {
     if case .recipeBrowser? = tool {
       dismissTool()
     } else {
-      activeChatStarterID = nil
       tool = .recipeBrowser
     }
   }
