@@ -209,7 +209,9 @@ struct AIHandoffTests {
       expectNoDifference(recipeReview.learnings, ["Let the sauce rest overnight before serving."])
     }
   }
+}
 
+extension AIHandoffTests {
   @Test
   func matchedMenuHandoffImportsOnceAndMissingHandoffPreservesManualPaste() throws {
     @Dependency(\.defaultDatabase) var database
