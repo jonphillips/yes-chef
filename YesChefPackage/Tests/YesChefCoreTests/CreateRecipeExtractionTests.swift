@@ -82,6 +82,28 @@ extension RecipeCoreTests {
       #expect(draft.cookTimeMinutes == 20)
     }
 
+    /// A ChatGPT/Shortcuts reply usually wraps its JSON-LD in a Markdown ```` ```json ```` code fence.
+    /// The fence must not push the paste off the free deterministic tier onto the LLM: unwrap the fence
+    /// before parsing, so the model is never called. (`.testValue` throws if the deterministic path fails.)
+    @Test
+    func fencedJSONLDPasteTakesTheDeterministicPathWithoutTheModel() async throws {
+      let fenced = """
+        ```json
+        {"@context":"https://schema.org","@type":"Recipe","name":"Shortcut Broth","recipeIngredient":["1 onion"],"recipeInstructions":["Simmer."]}
+        ```
+        """
+
+      let result = try await withDependencies {
+        $0.recipeExtractionClient = .testValue
+      } operation: {
+        try await CreateRecipeExtraction.extract(text: fenced)
+      }
+
+      #expect(result.title == "Shortcut Broth")
+      #expect(result.ingredientSections.flatMap(\.lines) == ["1 onion"])
+      #expect(result.instructionSections.flatMap(\.steps) == ["Simmer."])
+    }
+
     /// Direct HowToSteps are one ordered, unsectioned method. They must not become one unnamed
     /// section per step merely because the JSON-LD walker visits each array item independently.
     @Test

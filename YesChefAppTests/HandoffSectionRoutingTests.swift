@@ -6,9 +6,15 @@ import YesChefCore
 
 @Suite
 struct HandoffSectionRoutingTests {
+  // ADR-0038 Amd 7: the token's stored row is authoritative for scope, so `matches` is now an
+  // item-level test (same source type + id) that decides only whether the return belongs to *this*
+  // item at all. The task/day/variation discriminator moved to `matchesScope`, which drives the
+  // redirect toast on a same-item mismatch rather than a rejection. These tests pin that split.
+
   @Test
-  func chefItUpReturnDoesNotMatchMakeAheadForTheSameRecipe() {
+  func recipeSectionReturnMatchesTheRecipeButScopesToItsOwnSection() {
     let recipeID = UUID(uuidString: "00000000-0000-0000-0000-000000003901")!
+    let otherRecipeID = UUID(uuidString: "00000000-0000-0000-0000-000000003921")!
     let chefItUpHandoff = AIHandoff(
       id: UUID(uuidString: "00000000-0000-0000-0000-000000003902")!,
       sourceType: .recipe,
@@ -18,13 +24,22 @@ struct HandoffSectionRoutingTests {
       exportedPrompt: ""
     )
 
-    #expect(!HandoffExportSource.recipeSection(recipeID, .makeAhead).matches(chefItUpHandoff))
+    // Any section door on the same recipe matches at the item level — so a Chef It Up return pasted
+    // into the Make Ahead door is routed by its stored row, not rejected.
     #expect(HandoffExportSource.recipeSection(recipeID, .chefItUp).matches(chefItUpHandoff))
+    #expect(HandoffExportSource.recipeSection(recipeID, .makeAhead).matches(chefItUpHandoff))
+    // A door on a different recipe does not match.
+    #expect(!HandoffExportSource.recipeSection(otherRecipeID, .chefItUp).matches(chefItUpHandoff))
+
+    // Scope still distinguishes the section: only the originating door is in scope.
+    #expect(HandoffExportSource.recipeSection(recipeID, .chefItUp).matchesScope(chefItUpHandoff))
+    #expect(!HandoffExportSource.recipeSection(recipeID, .makeAhead).matchesScope(chefItUpHandoff))
   }
 
   @Test
-  func menuDayReturnOnlyMatchesItsOriginalDay() {
+  func menuDayReturnMatchesTheMenuButScopesToItsOriginalDay() {
     let menuID = UUID(uuidString: "00000000-0000-0000-0000-000000003904")!
+    let otherMenuID = UUID(uuidString: "00000000-0000-0000-0000-000000003924")!
     let dayTwoHandoff = AIHandoff(
       id: UUID(uuidString: "00000000-0000-0000-0000-000000003905")!,
       sourceType: .menu,
@@ -35,15 +50,22 @@ struct HandoffSectionRoutingTests {
       exportedPrompt: ""
     )
 
+    // Either day's door on the same menu matches at the item level; a different menu does not.
     #expect(HandoffExportSource.menuDay(menuID, dayOffset: 1).matches(dayTwoHandoff))
-    #expect(!HandoffExportSource.menuDay(menuID, dayOffset: 0).matches(dayTwoHandoff))
+    #expect(HandoffExportSource.menuDay(menuID, dayOffset: 0).matches(dayTwoHandoff))
+    #expect(!HandoffExportSource.menuDay(otherMenuID, dayOffset: 1).matches(dayTwoHandoff))
+
+    // Scope pins the return to its original day.
+    #expect(HandoffExportSource.menuDay(menuID, dayOffset: 1).matchesScope(dayTwoHandoff))
+    #expect(!HandoffExportSource.menuDay(menuID, dayOffset: 0).matchesScope(dayTwoHandoff))
   }
 
   @Test
-  func variationAdjustmentReturnOnlyMatchesItsOriginalVariation() {
+  func variationAdjustmentReturnMatchesTheRecipeButScopesToItsOriginalVariation() {
     let recipeID = UUID(uuidString: "00000000-0000-0000-0000-000000003906")!
     let variationID = UUID(uuidString: "00000000-0000-0000-0000-000000003907")!
     let otherVariationID = UUID(uuidString: "00000000-0000-0000-0000-000000003908")!
+    let otherRecipeID = UUID(uuidString: "00000000-0000-0000-0000-000000003926")!
     let variationHandoff = AIHandoff(
       id: UUID(uuidString: "00000000-0000-0000-0000-000000003909")!,
       sourceType: .recipe,
@@ -54,9 +76,17 @@ struct HandoffSectionRoutingTests {
       exportedPrompt: ""
     )
 
+    // Base, exact-variation, and other-variation doors all match at the item level (same recipe);
+    // a different recipe does not.
     #expect(HandoffExportSource.recipeAdjustment(recipeID, variationID: variationID).matches(variationHandoff))
-    #expect(!HandoffExportSource.recipeAdjustment(recipeID).matches(variationHandoff))
-    #expect(!HandoffExportSource.recipeAdjustment(recipeID, variationID: otherVariationID).matches(variationHandoff))
+    #expect(HandoffExportSource.recipeAdjustment(recipeID).matches(variationHandoff))
+    #expect(HandoffExportSource.recipeAdjustment(recipeID, variationID: otherVariationID).matches(variationHandoff))
+    #expect(!HandoffExportSource.recipeAdjustment(otherRecipeID, variationID: variationID).matches(variationHandoff))
+
+    // Scope is what prevents a silent base rewrite: only the originating variation is in scope.
+    #expect(HandoffExportSource.recipeAdjustment(recipeID, variationID: variationID).matchesScope(variationHandoff))
+    #expect(!HandoffExportSource.recipeAdjustment(recipeID).matchesScope(variationHandoff))
+    #expect(!HandoffExportSource.recipeAdjustment(recipeID, variationID: otherVariationID).matchesScope(variationHandoff))
   }
 
   @Test

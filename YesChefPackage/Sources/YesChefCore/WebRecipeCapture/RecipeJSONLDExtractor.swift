@@ -372,11 +372,27 @@ enum RecipeJSONLDExtractor {
   /// rather than becoming `"Cooks Illustrated"`. Only reached after a strict parse fails, so
   /// well-formed content keeps its real apostrophes and curly quotes untouched.
   private static func cleanedJSON(_ raw: String) -> Data? {
-    raw
+    strippingCodeFence(raw)
       .replacingOccurrences(of: "\u{201C}", with: "\"")
       .replacingOccurrences(of: "\u{201D}", with: "\"")
       .replacingOccurrences(of: "\u{2018}", with: "'")
       .replacingOccurrences(of: "\u{2019}", with: "'")
       .data(using: .utf8)
+  }
+
+  /// A model frequently wraps a JSON-LD block in a Markdown code fence (```` ```json … ``` ````) — the
+  /// dominant shape of a ChatGPT clipboard reply. The fence is not valid JSON, so a fenced block would
+  /// otherwise miss the free deterministic tier and fall through to the LLM. Unwrap a *leading* fence
+  /// line and a trailing fence; this only removes a fence, it is not a general JSON slicer, so prose
+  /// wrapped around an unfenced object is left for the caller's higher tier.
+  private static func strippingCodeFence(_ raw: String) -> String {
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed.hasPrefix("```"), let firstNewline = trimmed.firstIndex(of: "\n") else { return raw }
+    var body = String(trimmed[trimmed.index(after: firstNewline)...])
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    if body.hasSuffix("```") {
+      body = String(body.dropLast(3))
+    }
+    return body.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 }
