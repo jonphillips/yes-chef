@@ -119,29 +119,38 @@ struct AIHandoffTests {
   }
 
   @Test
-  func learningBulletsPreserveNakedSentencesAndParagraphsAsRemainder() {
-    let returned = AIHandoffReturn.learningBullets(
+  func learningsAreFormatAgnosticAndDropOnlyCodeFenceLines() {
+    let returned = AIHandoffReturn.learnings(
       from: """
-      - Salt the chicken a day ahead.
-      Taste the sauce before adding more salt.
-      This paragraph describes why the sauce needs a final adjustment.
-      It should be kept for the cook to review.
+      1. Salt the chicken a day ahead.
+      2) Taste the sauce before adding more salt.
+      – Rest the sauce before adjusting it.
+      — Serve it warm.
+      -text without a space
+      A plain sentence is still a learning.
+      ```
+      ```swift
+      ## Review the sauce before serving.
+      * Salt the chicken a day ahead.
       """
     )
 
-    expectNoDifference(returned.learnings, ["Salt the chicken a day ahead."])
     expectNoDifference(
-      returned.unparsedLines,
+      returned.learnings,
       [
+        "Salt the chicken a day ahead.",
         "Taste the sauce before adding more salt.",
-        "This paragraph describes why the sauce needs a final adjustment.",
-        "It should be kept for the cook to review.",
+        "Rest the sauce before adjusting it.",
+        "Serve it warm.",
+        "text without a space",
+        "A plain sentence is still a learning.",
+        "Review the sauce before serving.",
       ]
     )
   }
 
   @Test
-  func menuPrepPlanCarriesUnparsedLearningLinesIntoItsExistingEvidence() {
+  func menuPrepPlanDoesNotTreatLearningLinesAsPlanEvidence() {
     let returned = AIHandoffReturn.menuPrepPlan(
       from: """
       Wednesday evening:
@@ -152,7 +161,53 @@ struct AIHandoffTests {
       currentPlan: MenuPrepPlan()
     )
 
-    expectNoDifference(returned.unparsedLines, ["Taste the sauce before adding more salt."])
+    expectNoDifference(returned.unparsedLines, [])
+    expectNoDifference(returned.learnings, ["Taste the sauce before adding more salt."])
+  }
+
+  @Test
+  func recipeDeliverableSurvivesAPlainLearningLine() throws {
+    @Dependency(\.defaultDatabase) var database
+    let recipeID = SampleUUIDSequence.uuid(38_090)
+    let handoffID = SampleUUIDSequence.uuid(38_091)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+
+    try database.write { db in
+      try Recipe.insert {
+        Recipe(id: recipeID, title: "Birria", dateCreated: now, dateModified: now)
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .recipe,
+          sourceID: recipeID,
+          taskType: .recipeMakeAhead,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      let review = try AIHandoffIntentImport.stageReview(
+        handoffID: handoffID,
+        result: """
+        YC-HANDOFF: \(handoffID.uuidString)
+        Make the chile sauce up to two days ahead.
+        YC-LEARNINGS:
+        Let the sauce rest overnight before serving.
+        """,
+        in: db,
+        now: now
+      )
+
+      guard case let .recipeMakeAhead(recipeReview) = review else {
+        Issue.record("Expected a recipe make-ahead review.")
+        return
+      }
+      expectNoDifference(recipeReview.makeAhead, "Make the chile sauce up to two days ahead.")
+      expectNoDifference(recipeReview.learnings, ["Let the sauce rest overnight before serving."])
+    }
   }
 
   @Test

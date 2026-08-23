@@ -100,14 +100,13 @@ struct RecipePlaybookView: View {
           )
         }
       }
-      if !model.learnings.isEmpty {
-        LearningsSection(
-          learnings: model.learnings,
-          updateLearning: model.updateLearning,
-          deleteLearning: model.deleteLearning,
-          reorderLearnings: model.reorderLearnings
-        )
-      }
+      LearningsSection(
+        learnings: model.learnings,
+        addLearning: model.createLearning,
+        updateLearning: model.updateLearning,
+        deleteLearning: model.deleteLearning,
+        reorderLearnings: model.reorderLearnings
+      )
     }
     .sheet(item: $editingSection) { section in
       switch section {

@@ -422,10 +422,7 @@ final class HandoffReviewCoordinator {
     sourceID: UUID,
     approvedText: String
   ) throws {
-    let returned = AIHandoffReturn.learningBullets(from: approvedText)
-    guard returned.unparsedLines.isEmpty else {
-      throw HandoffReviewError.unparsedLearningText(returned.unparsedLines)
-    }
+    let returned = AIHandoffReturn.learnings(from: approvedText)
     guard !returned.learnings.isEmpty else { throw HandoffReviewError.emptyLearnings }
     _ = try database.write { db in
       // Exact-dedup on ingest against what's already stored (ADR-0038 Amd 4). All-duplicate commits
@@ -977,19 +974,16 @@ enum HandoffReviewError: LocalizedError, CustomStringConvertible {
   case emptyLearnings
   case emptyDeliverable
   case unparsedStrategyText([String])
-  case unparsedLearningText([String])
   case variationNeedsRepair([String])
 
   var errorDescription: String? {
     switch self {
     case .emptyLearnings:
-      "Add at least one bulleted learning before saving."
+      "Add at least one learning before saving."
     case .emptyDeliverable:
       "Add at least one make-ahead item before saving."
     case let .unparsedStrategyText(lines):
       "Could not save these make-ahead strategy lines: \(lines.joined(separator: " | "))"
-    case let .unparsedLearningText(lines):
-      "Could not save these learning lines. Each learning must begin with a bullet: \(lines.joined(separator: " | "))"
     case let .variationNeedsRepair(anchors):
       "This variation has changes that no longer match the recipe. Repair it before adjusting: \(anchors.joined(separator: " | "))"
     }
