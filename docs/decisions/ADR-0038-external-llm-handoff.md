@@ -490,6 +490,78 @@ ambient `readerFeedbackHandoffID` fallback introduced in PR #273; that state is 
 reader-feedback warn-but-allow path is wired to `stageReaderFeedbackReview` (it currently misroutes to the
 generic `stageReviewForKnownSource`).
 
+## Amendment 7 — a `YC-LEARNINGS:` line is a learning (format-agnostic); the token, not the paste door, is the authority for scope (2026-08-23)
+
+**Status: Accepted** — 2026-08-23 (architect). Ships in the
+[learnings parser-floor effort](../efforts/handoff-learnings-parser-floor-2026-08-19.md). Amends **Amd 1**
+(the two-part Deliverable + Learnings return), **Amd 4** (append-only ingest + exact dedup), and **D6** (route
+by ID first); extends **Amd 6**'s routing rule to the scope discriminators.
+
+### Amd7-D1 — The parser does not invent a format rule; the review sheet is the filter
+
+The contract's only statement about learnings is *"Include a `YC-LEARNINGS:` section with distinct durable
+learnings unless the hand-off expressly asks you to omit it"* — it prescribes **no format**. Yet the parser
+accepted a line only if it began with exactly `- `, `* `, or `• `, so a numbered learning, an en/em-dash
+bullet, a `#`-prefixed line, a stray code fence, or a plain sentence — all contract-compliant — parsed to
+**zero** learnings and a pile of remainder. On the recipe and workbench-compare paths that remainder threw an
+error **above** the task-type switch, so a single non-conforming line **discarded the entire return,
+deliverable included**. That is the worst corner of [ADR-0040](ADR-0040-editable-at-the-grain-it-is-stored.md):
+**loud *and* lossy.**
+
+The rule, corrected: **within a `YC-LEARNINGS:` section, any non-empty text is a learning.** A leading list
+marker is *stripped if present* (`-` `*` `•` `–` `—` `‣` `·`, with or without a following space; a leading `#`
+run; an ordinal `\d{1,3}[.)]\s`), never *required*. The one silent drop is a line that is only a code fence,
+which carries no content. Amd 4's exact dedup is unchanged. **`unparsedLines` for learnings therefore goes to
+`[]` and the concept leaves the learnings parser** — an always-empty field is withdrawn, not left as dead
+plumbing ([[withdraw-not-defer-orphaned-schema]]). `MenuPrepPlanReturn.unparsedLines` stays: its entries come
+from the *deliverable* parse, a different and still-correct strictness.
+
+**Why this is safe — the human is the filter, not the parser.** Learnings are an *editable review item* (Amd
+1): a stray `Learnings:` header or a model's chatty sign-off becomes a visible, editable, one-swipe-from-gone
+junk learning in the review sheet. That trade was already made when learnings became editable; losing an entire
+deliverable to protect against a stray line is not a trade this design ever chose. **The real lossless-or-loud
+guard is the deliverable's JSON/structured decode** (Amd 6's standing condition), **not** the learnings-line
+format — the marker line and the bullet glyph were never the integrity boundary.
+
+**No contract or version change.** The shipped instructions are already sufficient; the parser was inventing
+the strictness. `AIHandoffReturnContract.version` stays **`v3`** (integer, per Amd 5) and **no prompt text
+changes** — a bump would silently invalidate the project instructions already pasted into every chat app.
+
+**Consequence for the missing door.** The only in-app way to author a recipe learning was through this broken
+return path (the recipe Learnings section was hidden when empty, with no Add affordance), which is why the
+library had zero recipe learnings. The fix restores the human-authored path: `RecipeDetailModel.createLearning`
+mirrors `MenuDetailModel`, and the shared `LearningsSection` renders its empty state + Add row on recipes as it
+already does on menus. Authoring a learning must not require an LLM in the loop.
+
+### Amd7-D2 — The token is the authority for scope; the paste door is only a door
+
+D6 routes by ID first. But scope is more than *which item* — the stored `aiHandoffs` row carries the true
+`sourceType`, `sourceID`, `taskType`, `variationID`, and `dayOffset`, and the paste door was overriding the
+last three. A variation-scoped brief pasted at the base-recipe door reported "doesn't match" and, on *Review
+Anyway*, **silently rescoped the revision to the base recipe** (`stageReviewForKnownSource` rebuilt a synthetic
+hand-off from the *door's* metadata, `variationID: nil` and all); the same shape let a Make-Ahead return pasted
+into the Serve With door parse as a Serve With list.
+
+The rule: **when a return's `YC-HANDOFF:` token resolves to a stored hand-off, route by that row, whatever door
+it was pasted into.**
+
+- **Same item, different discriminator** (same `sourceType` + `sourceID`, differing `taskType` / `variationID`
+  / `dayOffset`) → route by the row with **no mismatch warning** — the token *is* the app being told where the
+  return belongs. Surface the redirect with a toast that names the real target (e.g. *"Reviewing against the
+  'Spicy' variation."*) so it is never invisible.
+- **Different item** (different `sourceID`) → keep the warn-but-allow confirmation (Amd 6), with copy naming
+  both ends, and on confirm route to the **stored row's** item, not the door's.
+- **No token, or an ID with no stored row** → the door is the only signal available and stays authoritative.
+  This is the legitimate regenerated / hand-typed-result case, and `stageReviewForKnownSource` is correct
+  there.
+
+This closes the gap Amd 6 opened for the reader-feedback path and generalizes its principle: **no return is
+filed by where it happened to be pasted; it is filed by what it says it is.** The stale
+`UIPasteboard.hasStrings` snapshots that greyed out Paste against a clipboard holding a minutes-old result are a
+separate defect folded into the same effort — a body-time snapshot, not an open-time one, and every one of
+those actions already routes the empty case to the transport for visible feedback, so the guard bought a
+dead-looking button and nothing else.
+
 ## Deferred (on the record, explicitly not built here)
 
 - **Widened share-extension "Import into Yes Chef."** A polished entry point for when you're already

@@ -107,9 +107,10 @@ a junk learning — visible, editable, and one swipe from gone in the review she
 design already made when it made learnings an editable review item; losing an entire return to protect
 against a stray line is not.
 
-**Do not touch `AIHandoffReturnContract.version`.** It stays `2.1`. The parser change makes the shipped
-contract sufficient, and a bump silently invalidates the project instructions in every chat app Jon has
-pasted them into (standing guard). No prompt text changes in this effort.
+**Do not touch `AIHandoffReturnContract.version`.** It is now `v3` (integer, normalized in PR #309 *after* this
+doc was written — the earlier `2.1` in this line was correct at authoring time; the number moved, the rule did
+not). The parser change makes the shipped contract sufficient, and a bump silently invalidates the project
+instructions in every chat app Jon has pasted them into (standing guard). No prompt text changes in this effort.
 
 ## S2 — a stray line stops destroying the return
 
