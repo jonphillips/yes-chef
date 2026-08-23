@@ -1,8 +1,7 @@
 # Current Handoff
 
 Last updated: August 23, 2026. **No designated Next Up target — Jon picks from the queue;** the standout live
-candidate is the **learnings parser floor** effort — **its PR A unblocks Jon's testing immediately** (he cannot
-produce a single recipe learning by any route today). Newly-merged work (ADR-0052 S3, ADR-0055, ADR-0042 Amd
+candidate is the **paste-door scope** follow-on in the learnings parser-floor effort. Newly-merged work (ADR-0052 S3, ADR-0055, ADR-0042 Amd
 4/Amd 5) has moved to [`DONE-LOG.md`](DONE-LOG.md); the device passes it owes are in their own section below.
 ⚠️ **A standing Codex-env gotcha:** the simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
 the app tests" is structural, not a regression — and it once *masked two genuinely red tests* (missing
@@ -31,18 +30,6 @@ and every hit outside those two sections is a removal candidate — not merely f
 
 **No designated target — Jon picks from the queue.**
 
-- **⭐ Learnings parser floor + the paste door that rescopes a return —
-  [`efforts/handoff-learnings-parser-floor-2026-08-19.md`](efforts/handoff-learnings-parser-floor-2026-08-19.md)
-  (designed, ready to dispatch).** Two PRs off one dispatch, no schema. `learningBullets` invents a
-  "must begin with a bullet" rule that exists nowhere in the contract, and on the recipe and workbench-compare
-  paths a single non-conforming `YC-LEARNINGS:` line **throws away the entire return, deliverable included** —
-  the worst ADR-0040 corner (loud *and* lossy). Compounding it, there is no in-app way to author a recipe
-  learning at all. **PR A** (tolerant `learnings(from:)` + drop the throws + add the recipe Add-Learning door)
-  **unblocks Jon immediately.** **PR B** makes the return token, not the paste door, authoritative for scope
-  (a variation brief pasted at the base door no longer silently rescopes to the base). ⚠️ **One staleness to
-  flag on dispatch:** the effort doc says the contract version "stays 2.1" — it is now integer **`v3`** (PR
-  #309, Amd 5); the *point* still holds (do not touch `AIHandoffReturnContract.version` and change no prompt
-  text), only the number moved.
 - **ADR-0045 cold-start starters are still open, no longer time-gated:** S2 rearranged the Calendar day-header
   Chat and the Workbench Chat into inspectors and left them passing `.none`. Whether they want their own starters
   ("Plan this week" / "What should I prep tonight?") is Jon's call whenever — it no longer blocks anything.
@@ -208,10 +195,6 @@ remain to build, plus one upstream loose end:
   first: it is an *in-app* draft verb and the draft is a structured write.
 - **`stageReaderFeedback` defaults `unparsedLines` to `[]`**, so accepting a single tip through the *in-app*
   path clears the evidence banner (cosmetic).
-- **From the PR #244 review, all one-liners:** `MenuDetailModel.tool`'s `didSet` and
-  `recipeBrowserButtonTapped` both clear `activeChatStarterID` — say it once; `MenuDetailReader`'s
-  `isAskActive`/`askButtonTapped`/`regeneratePrepPlan` closure params are now pure passthroughs (fine to leave
-  for ADR-0046); `namesStarterContractsForEveryHost` asserts `.starters == .starters` and proves nothing.
 
 **Still-deferred, separate future efforts:** ADR-0027 **OQ4** (a note-worthiness taste preference);
 **ADR-0036 S3** — promote a `RecipeNote` deposited *on a recipe*; **ADR-0038 Amd 4 — smart Learning

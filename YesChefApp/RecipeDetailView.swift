@@ -33,16 +33,17 @@ struct RecipeDetailView: View {
     focusButtonTapped: (() -> Void)? = nil,
     onRecipeSelected: @escaping (RecipeDetailPresentation) -> Void = { _ in }
   ) {
+    let toastCenter = AppToastCenter()
     let model = RecipeDetailModel(
       recipeID: recipeID,
       scaleContext: scaleContext,
       workbenchID: workbenchID,
-      includingArchivedRecipe: includingArchivedRecipe
+      includingArchivedRecipe: includingArchivedRecipe,
+      toastCenter: toastCenter
     )
     _model = State(
       wrappedValue: model
     )
-    let toastCenter = AppToastCenter()
     _toastCenter = State(wrappedValue: toastCenter)
     _handoffTransport = State(wrappedValue: HandoffInAppTransport(toastCenter: toastCenter))
     self.libraryModel = libraryModel
@@ -200,7 +201,6 @@ struct RecipeDetailView: View {
         } label: {
           Label("Paste", systemImage: "doc.on.clipboard")
         }
-        .disabled(!UIPasteboard.general.hasStrings)
       } label: {
         Label("Hand off", systemImage: "sparkles.square.filled.on.square")
       }

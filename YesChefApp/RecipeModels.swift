@@ -739,6 +739,7 @@ final class RecipeDetailModel {
   @Dependency(\.recipeChatProviderPreference) var labelProviderPreference
   @ObservationIgnored
   @Dependency(\.recipeChatTierPreference) var labelTierPreference
+  @ObservationIgnored var toastCenter: AppToastCenter?
   @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
   @ObservationIgnored
@@ -771,12 +772,14 @@ final class RecipeDetailModel {
     recipeID: Recipe.ID,
     scaleContext: ScaleContext? = nil,
     workbenchID: Workbench.ID? = nil,
-    includingArchivedRecipe: Bool = false
+    includingArchivedRecipe: Bool = false,
+    toastCenter: AppToastCenter? = nil
   ) {
     self.recipeID = recipeID
     self.scaleContext = scaleContext ?? .recipe(recipeID)
     self.workbenchID = workbenchID
     self.includingArchivedRecipe = includingArchivedRecipe
+    self.toastCenter = toastCenter
     #if DEBUG
     if ProcessInfo.processInfo.arguments.contains("-YesChefDisableDetailFetchAnimation") {
       detailFetchAnimationDescription = "nil"

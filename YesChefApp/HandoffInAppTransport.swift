@@ -18,6 +18,8 @@ final class HandoffInAppTransport {
   var isShowingError = false
   var unmatchedResult: String?
   var unmatchedSource: HandoffExportSource?
+  private var unmatchedHandoff: AIHandoff?
+  private var unmatchedMessageText: String?
   var isShowingUnmatchedConfirmation = false
   @ObservationIgnored private var readerFeedbackReceive: ((AIHandoffReaderFeedbackResult) -> Void)?
 
@@ -25,7 +27,10 @@ final class HandoffInAppTransport {
     if case .readerFeedback? = unmatchedSource {
       return "This Reader Feedback response is missing its tag or does not match this capture. Import it anyway? Backing-comment numbering assumes it was curated against these comments."
     }
-    return "The handoff ID is missing or doesn't match this \(unmatchedSource?.unmatchedSubject ?? "item"). Review the pasted result against it anyway — check it carefully before committing."
+    if let unmatchedMessageText {
+      return unmatchedMessageText
+    }
+    return "This pasted result has no handoff token, or its token has no stored handoff row, so it cannot be matched to this \(unmatchedSource?.unmatchedSubject ?? "item"). Review it against this item anyway — check it carefully before committing."
   }
 
   /// Optional: surfaces a confirmation toast when a prompt lands on the pasteboard, since a
@@ -69,8 +74,17 @@ final class HandoffInAppTransport {
       }
       guard let handoff = try await database.read({ db in
         try AIHandoffRepository.handoff(id: routedText.handoffID, in: db)
-      }), source.matches(handoff) else {
+      }) else {
         presentUnmatched(result: result, source: source)
+        return
+      }
+      guard source.matches(handoff) else {
+        presentUnmatched(
+          result: result,
+          source: source,
+          storedHandoff: handoff,
+          message: await crossItemMessage(for: source, storedHandoff: handoff)
+        )
         return
       }
       // A recipe-body hand-off can be finalized two ways (ADR-0042 Amd): a prose revision brief that
@@ -98,7 +112,13 @@ final class HandoffInAppTransport {
         in: database,
         now: now
       )
-      handoffReviewCoordinator.present(source.applyingScope(to: staged.review), warning: staged.warning)
+      handoffReviewCoordinator.present(
+        source.applyingScope(to: staged.review, resolvedHandoff: handoff),
+        warning: staged.warning
+      )
+      if let message = await scopeRedirectMessage(for: source, handoff: handoff) {
+        toastCenter?.postSuccess(message)
+      }
     } catch {
       present(error)
     }
@@ -157,6 +177,7 @@ final class HandoffInAppTransport {
   func reviewUnmatchedResult() async {
     guard let unmatchedResult, let unmatchedSource else { return }
     let readerFeedbackReceive = readerFeedbackReceive
+    let storedHandoff = unmatchedHandoff
     dismissUnmatchedConfirmation()
 
     do {
@@ -174,15 +195,25 @@ final class HandoffInAppTransport {
         )
         readerFeedbackReceive(staged)
       default:
-        let staged = try await HandoffAppOperations.stageReviewForKnownSource(
-          source: unmatchedSource,
-          result: unmatchedResult,
-          in: database,
-          now: now,
-          handoffID: uuid()
-        )
+        let staged: AIHandoffReviewResult
+        if let storedHandoff {
+          staged = try await HandoffAppOperations.stageReview(
+            handoffID: storedHandoff.id,
+            result: unmatchedResult,
+            in: database,
+            now: now
+          )
+        } else {
+          staged = try await HandoffAppOperations.stageReviewForKnownSource(
+            source: unmatchedSource,
+            result: unmatchedResult,
+            in: database,
+            now: now,
+            handoffID: uuid()
+          )
+        }
         handoffReviewCoordinator.present(
-          unmatchedSource.applyingScope(to: staged.review),
+          unmatchedSource.applyingScope(to: staged.review, resolvedHandoff: storedHandoff),
           warning: staged.warning
         )
       }
@@ -194,6 +225,8 @@ final class HandoffInAppTransport {
   func dismissUnmatchedConfirmation() {
     unmatchedResult = nil
     unmatchedSource = nil
+    unmatchedHandoff = nil
+    unmatchedMessageText = nil
     readerFeedbackReceive = nil
     isShowingUnmatchedConfirmation = false
   }
@@ -207,12 +240,76 @@ final class HandoffInAppTransport {
   private func presentUnmatched(
     result: String,
     source: HandoffExportSource,
+    storedHandoff: AIHandoff? = nil,
+    message: String? = nil,
     readerFeedbackReceive: ((AIHandoffReaderFeedbackResult) -> Void)? = nil
   ) {
     unmatchedResult = result
     unmatchedSource = source
+    unmatchedHandoff = storedHandoff
+    unmatchedMessageText = message
     self.readerFeedbackReceive = readerFeedbackReceive
     isShowingUnmatchedConfirmation = true
+  }
+
+  private func scopeRedirectMessage(for source: HandoffExportSource, handoff: AIHandoff) async -> String? {
+    guard !source.matchesScope(handoff) else { return nil }
+    let variationName: String?
+    if let variationID = handoff.variationID {
+      variationName = try? await database.read { db in
+        try RecipeVariation.find(variationID).fetchOne(db)?.name
+      }
+    } else {
+      variationName = nil
+    }
+    if let variationName {
+      return "Reviewing against the \"\(variationName)\" variation."
+    }
+    if let dayOffset = handoff.dayOffset {
+      return "Reviewing against menu day \(dayOffset + 1)."
+    }
+    return "Reviewing \(handoff.taskType.title)."
+  }
+
+  private func crossItemMessage(
+    for source: HandoffExportSource,
+    storedHandoff: AIHandoff
+  ) async -> String {
+    let doorMetadata = source.metadata(handoffID: storedHandoff.id)
+    let storedName = await itemName(sourceType: storedHandoff.sourceType, sourceID: storedHandoff.sourceID)
+      ?? storedHandoff.sourceType.handoffSubject
+    let doorName = await itemName(sourceType: doorMetadata.sourceType, sourceID: doorMetadata.sourceID)
+      ?? source.unmatchedSubject
+    return "This result belongs to \"\(storedName)\" (\(storedHandoff.sourceType.handoffSubject)), but it was pasted into \"\(doorName)\" (\(source.unmatchedSubject)). Review it anyway — check it carefully before committing."
+  }
+
+  private func itemName(sourceType: AIHandoffSourceType, sourceID: UUID) async -> String? {
+    try? await database.read { db in
+      switch sourceType {
+      case .capture:
+        nil
+      case .recipe:
+        try Recipe.find(sourceID).fetchOne(db)?.title
+      case .menu:
+        try Menu.find(sourceID).fetchOne(db)?.title
+      case .mealPlan:
+        try MealPlanItem.find(sourceID).fetchOne(db)?.title
+      case .workbench:
+        try Workbench.find(sourceID).fetchOne(db)?.title
+      }
+    }
+  }
+}
+
+private extension AIHandoffSourceType {
+  var handoffSubject: String {
+    switch self {
+    case .capture: "capture"
+    case .recipe: "recipe"
+    case .menu: "menu"
+    case .mealPlan: "meal-plan day"
+    case .workbench: "workbench"
+    }
   }
 }
 
@@ -271,7 +368,6 @@ struct HandoffMenuActions: View {
         )
       }
     }
-    .disabled(!UIPasteboard.general.hasStrings)
     Button(complementLabel) {
       Task { await transport.copyPrompt(for: complementHandoffSource) }
     }
@@ -283,7 +379,6 @@ struct HandoffMenuActions: View {
         )
       }
     }
-    .disabled(!UIPasteboard.general.hasStrings)
   }
 }
 

@@ -506,9 +506,7 @@ final class MenuDetailModel {
   var isShowingError = false
   var tool: MenuDetailInspector? {
     didSet {
-      if tool == nil {
-        activeChatStarterID = nil
-      }
+      activeChatStarterID = nil
     }
   }
   var activeChatStarterID: ChatSurface.ChatStarter.ID?

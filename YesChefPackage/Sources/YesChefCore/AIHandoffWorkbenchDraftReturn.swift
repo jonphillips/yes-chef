@@ -50,14 +50,7 @@ extension AIHandoffReturn {
       rationale: parts.rationale,
       capturedAt: capturedAt
     )
-    // The learnings section may arrive bulleted or as naked sentences; keep both so argument
-    // residue is deposited losslessly rather than dropped to `unparsedLines`. NOTE: this is a
-    // verb-local patch of the known `learningBullets` floor bug (it drops naked-sentence learnings
-    // to `unparsedLines`). It diverges from every other verb and reorders (bullets first, naked
-    // lines appended). When the global floor fix lands in `learningBullets`/`plainText`, fold this
-    // back and drop the local combine.
-    let learnings = split.learnings + split.unparsedLines
-    return WorkbenchDraftReturn(draftRecipe: draftRecipe, learnings: learnings)
+    return WorkbenchDraftReturn(draftRecipe: draftRecipe, learnings: split.learnings)
   }
 
   /// Split the deliverable into the JSON-LD object and the rationale prose. The JSON block is found

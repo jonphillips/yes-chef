@@ -135,7 +135,6 @@ struct RecipeVariationChoices: View {
             )
           }
         }
-        .disabled(!UIPasteboard.general.hasStrings)
         Divider()
         Button("Rename") {
           variationNameDraft = variation.name

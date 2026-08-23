@@ -312,6 +312,32 @@ extension RecipeDetailModel {
     }
   }
 
+  func createLearning(_ text: String) -> LearningCreationResult {
+    do {
+      let inserted = try database.write { db in
+        try LearningRepository.insertNew(
+          texts: [text],
+          sourceType: .recipe,
+          sourceID: recipeID,
+          provenance: .inApp,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+      guard inserted > 0 else {
+        toastCenter?.postSuccess("That learning is already saved.")
+        return .duplicate
+      }
+      toastCenter?.postSuccess("Added learning.")
+      return .added
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return .failed
+    }
+  }
+
   func reorderLearnings(_ ids: [Learning.ID], destination: LearningReorderDestination) {
     do {
       _ = try database.write { db in

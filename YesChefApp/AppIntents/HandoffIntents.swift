@@ -233,6 +233,18 @@ extension HandoffExportSource {
         && handoff.taskType == .readerFeedbackCuration
     default:
       let metadata = metadata(handoffID: handoff.id)
+      return handoff.sourceType == metadata.sourceType && handoff.sourceID == metadata.sourceID
+    }
+  }
+
+  func matchesScope(_ handoff: AIHandoff) -> Bool {
+    switch self {
+    case let .readerFeedback(context):
+      return handoff.sourceType == .capture
+        && handoff.sourceID == context.captureID
+        && handoff.taskType == .readerFeedbackCuration
+    default:
+      let metadata = metadata(handoffID: handoff.id)
       return handoff.matches(
         sourceType: metadata.sourceType,
         sourceID: metadata.sourceID,
@@ -252,10 +264,16 @@ extension HandoffExportSource {
     }
   }
 
-  func applyingScope(to review: AIHandoffReview) -> AIHandoffReview {
-    guard case let .menuDayComplement(_, dayOffset) = self,
-      case let .menuComplement(complementReview) = review
-    else { return review }
+  func applyingScope(to review: AIHandoffReview, resolvedHandoff: AIHandoff? = nil) -> AIHandoffReview {
+    let dayOffset: Int?
+    if let resolvedHandoff {
+      dayOffset = resolvedHandoff.dayOffset
+    } else if case let .menuDayComplement(_, doorDayOffset) = self {
+      dayOffset = doorDayOffset
+    } else {
+      return review
+    }
+    guard let dayOffset, case let .menuComplement(complementReview) = review else { return review }
 
     let plan = MenuComplementPlan(items: complementReview.plan.items.map { suggestion in
       var suggestion = suggestion

@@ -808,12 +808,10 @@ public enum AIHandoffReturn {
   public struct PlainTextReturn: Equatable, Sendable {
     public var deliverable: String
     public var learnings: [String]
-    public var unparsedLines: [String]
   }
 
-  public struct LearningBulletsReturn: Equatable, Sendable {
+  public struct LearningsReturn: Equatable, Sendable {
     public var learnings: [String]
-    public var unparsedLines: [String]
   }
 
   public static let learningsMarker = "YC-LEARNINGS:"
@@ -824,11 +822,11 @@ public enum AIHandoffReturn {
   ) -> MenuPrepPlanReturn {
     let split = splitting(text)
     let parsed = currentPlan.parsingEditableReviewText(split.deliverable)
-    let learnings = learningBullets(from: split.learnings)
+    let parsedLearnings = learnings(from: split.learnings)
     return MenuPrepPlanReturn(
       plan: parsed.plan,
-      learnings: learnings.learnings,
-      unparsedLines: parsed.unparsedLines + learnings.unparsedLines
+      learnings: parsedLearnings.learnings,
+      unparsedLines: parsed.unparsedLines
     )
   }
 
@@ -919,38 +917,44 @@ public enum AIHandoffReturn {
 
   public static func plainText(from text: String) -> PlainTextReturn {
     let split = splitting(text)
-    let learnings = learningBullets(from: split.learnings)
+    let parsedLearnings = learnings(from: split.learnings)
     return PlainTextReturn(
       deliverable: split.deliverable.trimmingCharacters(in: .whitespacesAndNewlines),
-      learnings: learnings.learnings,
-      unparsedLines: learnings.unparsedLines
+      learnings: parsedLearnings.learnings
     )
   }
 
-  public static func learningBullets(from text: String) -> LearningBulletsReturn {
+  public static func learnings(from text: String) -> LearningsReturn {
     var seen = Set<String>()
     var learnings: [String] = []
-    var unparsedLines: [String] = []
 
     for rawLine in text.components(separatedBy: .newlines) {
       let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !line.isEmpty else { continue }
-      let bullet: String?
-      if line.hasPrefix("- ") || line.hasPrefix("* ") || line.hasPrefix("• ") {
-        bullet = String(line.dropFirst(2)).trimmingCharacters(in: .whitespacesAndNewlines)
-      } else {
-        bullet = nil
-      }
-
-      guard let bullet, !bullet.isEmpty else {
-        unparsedLines.append(line)
-        continue
-      }
-      guard seen.insert(bullet).inserted else { continue }
-      learnings.append(bullet)
+      guard !line.matchesCodeFenceOnly else { continue }
+      let learning = strippingLearningMarker(from: line)
+      guard !learning.isEmpty else { continue }
+      guard seen.insert(learning).inserted else { continue }
+      learnings.append(learning)
     }
 
-    return LearningBulletsReturn(learnings: learnings, unparsedLines: unparsedLines)
+    return LearningsReturn(learnings: learnings)
+  }
+
+  private static func strippingLearningMarker(from line: String) -> String {
+    var line = line
+    if let first = line.first, "-*•–—‣·".contains(first) {
+      line.removeFirst()
+      return line.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    if line.first == "#" {
+      line = String(line.drop(while: { $0 == "#" }))
+      return line.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    if let ordinal = line.range(of: #"^\d{1,3}[.)]\s+"#, options: .regularExpression) {
+      line.removeSubrange(ordinal)
+    }
+    return line.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
   static func splitting(_ text: String) -> (deliverable: String, learnings: String) {
@@ -972,6 +976,12 @@ public enum AIHandoffReturn {
 
 }
 
+private extension String {
+  var matchesCodeFenceOnly: Bool {
+    range(of: #"^```(?:[A-Za-z0-9_+-]+)?$"#, options: .regularExpression) != nil
+  }
+}
+
 public enum AIHandoffReturnContractError: Error, Equatable, LocalizedError, Sendable {
   case instructionsOutOfDate
 
@@ -989,7 +999,6 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
   case unparsedPlanText([String])
   case unparsedExperimentBlocks([String])
   case unparsedReaderFeedbackLines([String])
-  case unparsedLearningLines([String])
 
   public var errorDescription: String? {
     switch self {
@@ -1002,15 +1011,13 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
     case .duplicate:
       "This handoff result was already imported for review."
     case .emptyPlan:
-      "The returned handoff needs a deliverable or at least one learning bullet."
+      "The returned handoff needs a deliverable or at least one learning."
     case let .unparsedPlanText(lines):
       "Could not import these prep-plan lines: \(lines.joined(separator: " | "))"
     case let .unparsedExperimentBlocks(blocks):
       "Could not import these experiment blocks: \(blocks.joined(separator: " | "))"
     case let .unparsedReaderFeedbackLines(lines):
       "Could not read these reader-feedback lines. Each tip must begin with `Tip:`: \(lines.joined(separator: " | "))"
-    case let .unparsedLearningLines(lines):
-      "Could not read these learning lines. Each learning must begin with a bullet: \(lines.joined(separator: " | "))"
     }
   }
 
