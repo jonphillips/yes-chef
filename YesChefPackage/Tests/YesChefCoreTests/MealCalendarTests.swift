@@ -8,6 +8,116 @@ extension RecipeCoreTests {
   @Suite
   struct MealCalendarTests {
     @Test
+    func derivesLastCookedFromPastRecipeCalendarItems() throws {
+      @Dependency(\.defaultDatabase) var database
+      let today = Date(timeIntervalSinceReferenceDate: 803_400_000)
+      let olderDate = today.addingTimeInterval(-86_400)
+      let newestDate = today.addingTimeInterval(-3_600)
+      let futureDate = today.addingTimeInterval(86_400)
+      let cookedRecipeID = SampleUUIDSequence.uuid(5_901)
+      let futureOnlyRecipeID = SampleUUIDSequence.uuid(5_902)
+
+      try database.write { db in
+        for recipe in [
+          Recipe(
+            id: cookedRecipeID,
+            title: "Cooked Recipe",
+            dateCreated: today,
+            dateModified: today,
+            lastCookedAt: futureDate,
+            timesCooked: 99
+          ),
+          Recipe(
+            id: futureOnlyRecipeID,
+            title: "Future Recipe",
+            dateCreated: today,
+            dateModified: today,
+            lastCookedAt: olderDate,
+            timesCooked: 99
+          ),
+        ] {
+          try Recipe.insert { recipe }.execute(db)
+        }
+        for item in [
+          MealPlanItem(
+            id: SampleUUIDSequence.uuid(5_910),
+            kind: .recipe,
+            recipeID: cookedRecipeID,
+            title: "Cooked Recipe",
+            scheduledDate: olderDate,
+            mealSlot: .dinner,
+            sortOrder: 0,
+            dateCreated: today,
+            dateModified: today
+          ),
+          MealPlanItem(
+            id: SampleUUIDSequence.uuid(5_911),
+            kind: .recipe,
+            recipeID: cookedRecipeID,
+            title: "Cooked Recipe",
+            scheduledDate: newestDate,
+            mealSlot: .dinner,
+            sortOrder: 1,
+            dateCreated: today,
+            dateModified: today
+          ),
+          MealPlanItem(
+            id: SampleUUIDSequence.uuid(5_912),
+            kind: .recipe,
+            recipeID: futureOnlyRecipeID,
+            title: "Future Recipe",
+            scheduledDate: futureDate,
+            mealSlot: .dinner,
+            sortOrder: 0,
+            dateCreated: today,
+            dateModified: today
+          ),
+          MealPlanItem(
+            id: SampleUUIDSequence.uuid(5_913),
+            kind: .recipe,
+            recipeID: cookedRecipeID,
+            title: "Cooked Recipe",
+            scheduledDate: today,
+            mealSlot: .dinner,
+            sortOrder: 2,
+            dateCreated: today,
+            dateModified: today
+          ),
+        ] {
+          try MealPlanItem.insert { item }.execute(db)
+        }
+
+        let batch = try RecipeCookingHistory.lastCookedValues(onOrBefore: today, in: db)
+        let batchCooked = try #require(batch[cookedRecipeID])
+        expectNoDifference(batchCooked.lastCookedAt, today)
+        expectNoDifference(batchCooked.timesCooked, 3)
+        #expect(!batch.keys.contains(futureOnlyRecipeID))
+        let singleCookedValue = try RecipeCookingHistory.lastCookedValue(
+          for: cookedRecipeID,
+          onOrBefore: today,
+          in: db
+        )
+        let singleCooked = try #require(singleCookedValue)
+        expectNoDifference(singleCooked.lastCookedAt, today)
+        expectNoDifference(singleCooked.timesCooked, 3)
+        let singleFuture = try RecipeCookingHistory.lastCookedValue(
+          for: futureOnlyRecipeID,
+          onOrBefore: today,
+          in: db
+        )
+        #expect(singleFuture.map { _ in false } ?? true)
+
+        let browserRecipes = try RecipeBrowserDataRequest(today: today).fetch(db).recipes
+        let browserCookedRecipe = try #require(browserRecipes.first { $0.id == cookedRecipeID })
+        expectNoDifference(browserCookedRecipe.lastCookedAt, today)
+        expectNoDifference(browserCookedRecipe.timesCooked, 3)
+        let browserFutureRecipe = try #require(browserRecipes.first { $0.id == futureOnlyRecipeID })
+        expectNoDifference(browserFutureRecipe.lastCookedAt, nil)
+        expectNoDifference(browserFutureRecipe.timesCooked, 0)
+      }
+    }
+
+    @Test
     func addsRecipeAndNoteItemsToMealCalendar() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 803_000_000)

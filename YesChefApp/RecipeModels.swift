@@ -51,7 +51,7 @@ final class RecipeLibraryModel {
   var importModel = RecipeImportModel()
   var searchText = ""
   var selectedRecipeID: Recipe.ID?
-  var sortOrder = RecipeListSort.title
+  var sortOrder = RecipeListSort.newest
   var libraryScope = RecipeLibraryScope.main
   var showsFavoritesOnly = false
   var showsPhotosOnly = false
@@ -743,6 +743,8 @@ final class RecipeDetailModel {
   @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
   @ObservationIgnored
+  @Fetch var derivedLastCookedAt: Date?
+  @ObservationIgnored
   @Fetch var workbenchCandidateLinks: [WorkbenchCandidateLink] = []
   @ObservationIgnored
   @Fetch var persistedScale: Double?
@@ -803,6 +805,11 @@ final class RecipeDetailModel {
       animation: .default
     )
     #endif
+    _derivedLastCookedAt = Fetch(
+      wrappedValue: nil,
+      RecipeLastCookedAtRequest(recipeID: recipeID),
+      animation: .default
+    )
     _workbenchCandidateLinks = Fetch(
       wrappedValue: [],
       RecipeWorkbenchLinksRequest(recipeID: recipeID),

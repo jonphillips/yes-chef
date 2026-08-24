@@ -92,6 +92,7 @@ struct RecipeEditorView: View {
       } message: {
         Text(model.errorMessage ?? "")
       }
+      .interactiveDismissDisabled(model.hasUnsavedEdits)
     }
   }
 }

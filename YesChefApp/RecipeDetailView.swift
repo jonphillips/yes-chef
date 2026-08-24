@@ -577,6 +577,13 @@ private struct RecipeReaderView: View {
       Label("\(totalTime) min", systemImage: "clock")
         .recipeChip()
     }
+    if let lastCookedAt = model.derivedLastCookedAt {
+      Label(
+        "Last cooked \(lastCookedAt.formatted(date: .abbreviated, time: .omitted))",
+        systemImage: "clock.arrow.circlepath"
+      )
+      .recipeChip()
+    }
     if let rating = recipe.rating, rating > 0 {
       Label("\(rating)", systemImage: "star.fill")
         .accessibilityLabel(Text("Rating \(rating) out of 5"))

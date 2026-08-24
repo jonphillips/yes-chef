@@ -26,6 +26,7 @@ final class RecipeEditorModel {
   var isShowingError = false
   var isSaving = false
   private var hasLoadedDraft = false
+  private var baselineDraft = RecipeEditorDraft()
 
   init(recipeID: Recipe.ID?) {
     self.recipeID = recipeID
@@ -43,6 +44,7 @@ final class RecipeEditorModel {
     recipeID = nil
     _detail = Fetch(wrappedValue: nil)
     draft = seededDraft
+    baselineDraft = seededDraft
     hasLoadedDraft = true
   }
 
@@ -56,6 +58,10 @@ final class RecipeEditorModel {
 
   var isSavingDisabled: Bool {
     isSaving || draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  var hasUnsavedEdits: Bool {
+    hasLoadedDraft && draft != baselineDraft
   }
 
   /// Non-nil when the reader has a variation selected. The editor writes to the base regardless, so
@@ -149,6 +155,7 @@ final class RecipeEditorModel {
   func detailChanged(_ detail: RecipeDetailData?) {
     guard !hasLoadedDraft, let detail else { return }
     draft = RecipeEditorDraft(detail: detail)
+    baselineDraft = draft
     hasLoadedDraft = true
   }
 
