@@ -375,6 +375,12 @@ prod/TestFlight cut. At that cut, deploy the following to the production schema:
 *The `Menu.prepPlan` BLOB is **not** on this list and must not be re-added — it was dropped outright, so the
 dead CKAsset field never enters the prod schema.*
 
+*`Recipe.lastCookedAt` and `Recipe.timesCooked` are **not** on this list and must not be promoted — both are
+superseded by calendar-derived values (this slice) and are to be **dropped in the pre-prod baseline squash**:
+omit them from the squashed `CREATE TABLE "recipes"` and remove the fields + CodingKeys from the `Recipe`
+model. Old backup JSON carrying these keys still decodes (unknown keys are ignored), so no backup-compat
+migration is needed.*
+
 **The check is the registration list, in both directions.** A column on a synced table is on this list; a
 column on a table that is *not* registered in `CloudSync` is local and belongs nowhere near it. Both
 mistakes have been made — verify against `CloudSync.swift`, not against intuition.

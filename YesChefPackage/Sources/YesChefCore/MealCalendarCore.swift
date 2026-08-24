@@ -199,6 +199,84 @@ public struct MealCalendarRequest: FetchKeyRequest {
   }
 }
 
+/// Calendar-derived cooking history. A past planned recipe is intentionally treated as cooked for
+/// this projection; this is a planned-as-proxy signal, not an explicit cook log.
+public enum RecipeCookingHistory {
+  public typealias LastCookedValue = (lastCookedAt: Date, timesCooked: Int)
+
+  public static func lastCookedValues(
+    onOrBefore today: Date,
+    in db: Database
+  ) throws -> [Recipe.ID: LastCookedValue] {
+    try MealPlanItem
+      .where {
+        $0.kind.eq(MealPlanItemKind.recipe)
+          && $0.recipeID.isNot(nil)
+          && $0.scheduledDate.lte(today)
+      }
+      .group(by: \.recipeID)
+      .select {
+        RecipeLastCookedRow.Columns(
+          recipeID: $0.recipeID,
+          lastCookedAt: $0.scheduledDate.max(),
+          timesCooked: $0.id.count()
+        )
+      }
+      .fetchAll(db)
+      .reduce(into: [:]) { result, row in
+        guard let recipeID = row.recipeID, let lastCookedAt = row.lastCookedAt else { return }
+        result[recipeID] = (lastCookedAt: lastCookedAt, timesCooked: row.timesCooked)
+      }
+  }
+
+  public static func lastCookedValue(
+    for recipeID: Recipe.ID,
+    onOrBefore today: Date,
+    in db: Database
+  ) throws -> LastCookedValue? {
+    try MealPlanItem
+      .where {
+        $0.kind.eq(MealPlanItemKind.recipe)
+          && $0.recipeID.eq(recipeID)
+          && $0.scheduledDate.lte(today)
+      }
+      .group(by: \.recipeID)
+      .select {
+        RecipeLastCookedRow.Columns(
+          recipeID: $0.recipeID,
+          lastCookedAt: $0.scheduledDate.max(),
+          timesCooked: $0.id.count()
+        )
+      }
+      .fetchOne(db)
+      .flatMap { row in
+        guard let lastCookedAt = row.lastCookedAt else { return nil }
+        return (lastCookedAt: lastCookedAt, timesCooked: row.timesCooked)
+      }
+  }
+}
+
+public struct RecipeLastCookedAtRequest: FetchKeyRequest {
+  public let recipeID: Recipe.ID
+  public let today: Date
+
+  public init(recipeID: Recipe.ID, today: Date = Date()) {
+    self.recipeID = recipeID
+    self.today = today
+  }
+
+  public func fetch(_ db: Database) throws -> Date? {
+    try RecipeCookingHistory.lastCookedValue(for: recipeID, onOrBefore: today, in: db)?.lastCookedAt
+  }
+}
+
+@Selection
+private struct RecipeLastCookedRow: Equatable, Sendable {
+  let recipeID: Recipe.ID?
+  let lastCookedAt: Date?
+  let timesCooked: Int
+}
+
 public enum MealCalendarRepository {
   @discardableResult
   public static func addRecipeItem(

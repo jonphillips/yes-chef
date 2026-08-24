@@ -647,9 +647,14 @@ public extension RecipeRepository {
 }
 
 public struct RecipeBrowserDataRequest: FetchKeyRequest {
-  public init() {}
+  public let today: Date
+
+  public init(today: Date = Date()) {
+    self.today = today
+  }
 
   public func fetch(_ db: Database) throws -> RecipeBrowserData {
+    let lastCookedValues = try RecipeCookingHistory.lastCookedValues(onOrBefore: today, in: db)
     let recipes = try Recipe
       .select {
         RecipeBrowserRecipeRow.Columns(
@@ -669,14 +674,20 @@ public struct RecipeBrowserDataRequest: FetchKeyRequest {
           rating: $0.rating,
           favorite: $0.favorite,
           libraryPlacement: $0.libraryPlacement,
-          lastCookedAt: $0.lastCookedAt,
-          timesCooked: $0.timesCooked,
           makeAhead: $0.makeAhead,
           archived: $0.archived
         )
       }
       .fetchAll(db)
-      .map(\.browserRecipe)
+      .map { row in
+        var browserRecipe = row.browserRecipe
+        // These fields are calendar-derived: a recipe scheduled on or before today is treated as
+        // cooked (planned-as-proxy), intentionally not a stored cook log.
+        let lastCooked = lastCookedValues[browserRecipe.id]
+        browserRecipe.lastCookedAt = lastCooked?.lastCookedAt
+        browserRecipe.timesCooked = lastCooked?.timesCooked ?? 0
+        return browserRecipe
+      }
     let sources = try RecipeSource.fetchAll(db).map { source in
       RecipeBrowserSource(
         recipeID: source.recipeID,
@@ -744,8 +755,6 @@ private struct RecipeBrowserRecipeRow: Equatable, Sendable {
   let rating: Int?
   let favorite: Bool
   let libraryPlacement: RecipeLibraryPlacement
-  let lastCookedAt: Date?
-  let timesCooked: Int
   let makeAhead: String?
   let archived: Bool
 
@@ -767,8 +776,6 @@ private struct RecipeBrowserRecipeRow: Equatable, Sendable {
       rating: rating,
       favorite: favorite,
       libraryPlacement: libraryPlacement,
-      lastCookedAt: lastCookedAt,
-      timesCooked: timesCooked,
       makeAheadText: makeAhead,
       archived: archived
     )

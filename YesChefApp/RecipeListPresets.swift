@@ -23,7 +23,7 @@ struct RecipeListPresetState: Codable, Equatable {
 
   var isDefault: Bool {
     searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      && sortOrder == .title
+      && sortOrder == .newest
       && libraryScope == .main
       && !showsFavoritesOnly
       && !showsPhotosOnly
