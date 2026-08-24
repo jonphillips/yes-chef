@@ -419,8 +419,6 @@ private struct CookSessionFullScreenCover: View {
 }
 
 struct RecipeListView: View {
-  private static let topID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
-
   @AppStorage("RecipeList.rowDensity") private var rowDensityRawValue = RecipeListRowDensity.rich.rawValue
   @AppStorage("RecipeList.showsSourceMetadata") private var showsSourceMetadata = true
   @AppStorage("RecipeList.showsCategoryMetadata") private var showsCategoryMetadata = true
@@ -450,7 +448,6 @@ struct RecipeListView: View {
           List(selection: $model.selectedRecipeID) {
             ForEach(model.visibleRecipeRows) { row in
               RecipeListRow(row: row, options: viewOptions)
-                .id(row.recipe.id == model.visibleRecipeRows.first?.recipe.id ? Self.topID : row.recipe.id)
                 .tag(row.recipe.id)
                 .swipeActions {
                   Button {
@@ -470,8 +467,9 @@ struct RecipeListView: View {
           .overlay(alignment: .bottomTrailing) {
             if isRecipeListScrolled {
               Button {
+                guard let topID = model.visibleRecipeRows.first?.id else { return }
                 withAnimation {
-                  proxy.scrollTo(Self.topID, anchor: .top)
+                  proxy.scrollTo(topID, anchor: .top)
                 }
               } label: {
                 Image(systemName: "chevron.up")
