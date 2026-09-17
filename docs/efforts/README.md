@@ -24,6 +24,15 @@ it's touched.
 
 ## Active / recent
 
+- [prepared-components.md](prepared-components.md) — **Designed (proposal)**, not dispatched, **post-cutover** ·
+  Feeds a future ADR · Gives cooking its missing middle layer (`ingredients → prepared components → dishes`):
+  a `Recipe.kind` enum makes a recipe a reusable component and a **directional** `recipeComponentLink` edge
+  table (single-FK-safe) links a dish to the components it uses, at **recipe grain** (a "Components used"
+  section — ingredient-line linking is declined to dodge anchor-repair). The flavor vocabulary
+  (ACID/CRUNCH/UMAMI) is **one new facet** surfaced to the user as **"Dimension"** — no schema change, and
+  the `Facet` table/type keeps its name. Entirely additive schema. The "on hand / use soon" inventory
+  **ledger is parked on purpose** — it reopens the §14 settled boundary. Timing: additive ⇒ safe
+  post-cutover, no forcing function to build before ship.
 - [menu-dishes-reorder-container.md](menu-dishes-reorder-container.md) — **Dispatched** · One PR for
   S1–S3: declare the recipe UTI, move menu Dishes onto the SDK 27 sectioned reorder container, and place
   Browse Recipes drops at the hovered reorder destination. Schema-free.
