@@ -91,6 +91,14 @@ CloudKit's single-FK sharing rule (documented in `RecipeRelatedRecipe.swift`). B
 directional** table, not a reuse of `RecipeRelatedRecipe` — component-usage has a direction (a dish uses
 a component, not the reverse), and `RecipeRelatedRecipe` is deliberately symmetric.
 
+**Directional ≠ one-way queryable.** The edge is read from both ends: on a dish, `WHERE recipeID = …`
+renders "Components used"; on a component, `WHERE componentID = …` renders "Used in these dishes" (index
+`componentID` for that reverse lookup). Direction only fixes *meaning* — it stops the app implying "Salsa
+Verde uses Grilled Salmon" — it does not cost you the "what uses this?" view; it is what makes that view
+correct. Note the scope line: this edge answers **"what dishes use this component?"** exactly. The looser
+**"what should I make *with* Salsa Verde?"** is a different, superset feature served by dimension-coverage
+reasoning (§3) plus `RecipeRelatedRecipe`/`ServeWith`, not by this table.
+
 **Why not ingredient grain, and what it costs.** An ingredient-line link ("½ cup chicken stock" →
 *your* 4× concentrate) would need a stable `ingredientRef` that survives a base-text edit — the exact
 anchor-repair rabbit hole that bit variations when anchors came off model output
