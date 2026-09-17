@@ -3,9 +3,10 @@
 **Status:** Designed (proposal) — **not dispatched, not an ADR.** Feeds a future ADR; nothing here
 is ratified. Explicitly **post-cutover** work (see Timing).
 **Summary:** Give cooking its missing middle layer — `ingredients → prepared components → dishes` —
-by letting a recipe *be* a reusable component and letting a dish *link an ingredient line to* that
-component. The abstraction is a `Recipe.kind` enum plus one component↔dish **edge table**; it is
-entirely **additive** schema. The stateful "what's in my larder right now / use soon" inventory ledger
+by letting a recipe *be* a reusable component and letting a dish *link to* that component at
+**recipe grain** (a "components used" section, not an inline ingredient-line link — see §2). The
+abstraction is a `Recipe.kind` enum plus one **directional** dish→component edge table; it is entirely
+**additive** schema. The stateful "what's in my larder right now / use soon" inventory ledger
 is **parked**, on purpose — it reopens a boundary [`FUTURE_INTELLIGENCE_AND_PLANNING.md`](../FUTURE_INTELLIGENCE_AND_PLANNING.md)
 §14 already settled.
 **Related:** [`../PRODUCT_BRIEF.md`](../PRODUCT_BRIEF.md) (non-goals: *automatic pantry deduction*,
@@ -35,11 +36,15 @@ the surrounding pitch is our own roadmap handed back to us. Logged here so we do
 | Substitutions when a component is missing | §8.4 |
 | make/buy, storage life, effort, "suited-for" | §11 **Recipe Intelligence Metadata** (`suitability` OptionSet, `makeAheadScore`, `activeWorkload`) |
 
-**The one genuinely missing abstraction** — the load-bearing thing — is that **an ingredient line cannot
-point at another recipe.** `RecipeRelatedRecipe` links *recipe→recipe*; `RecipeServeWith` is loose title
-strings. Neither lets "½ cup chicken stock" in a dish resolve to *your* Chicken Stock Concentrate. That
-edge is what unlocks make-extra, inline-expand, and "you already have the sauce." It is the function-call
-factoring a cook with a software brain keeps reaching for. Everything else is polish on top of it.
+**The one genuinely missing abstraction** — the load-bearing thing — is that **a dish cannot say it uses
+one of your components.** `RecipeRelatedRecipe` links *recipe→recipe* but symmetrically and untyped;
+`RecipeServeWith` is loose title strings. Neither lets a dish declare "this uses your Chicken Stock
+Concentrate" as a first-class, directional fact the app can reason over. That link is what unlocks
+"you already have the sauce," substitute-down, and capability-awareness. It is the function-call factoring
+a cook with a software brain keeps reaching for. Everything else is polish on top of it.
+
+We deliberately draw the link at **recipe grain, not ingredient-line grain** — see §2 for why, and what
+it costs.
 
 ## The shape
 
@@ -65,50 +70,69 @@ intentionally produced/stored for future cooking. A dish's private subassembly (
 langoustine course) stays an ingredient section or a plain recipe; it earns `.component` only when reuse
 actually shows up. This is a UI/authoring gate, not a constraint the schema enforces.
 
-### 2. The component↔dish link is an **edge table**, not an ingredient FK
+### 2. The link is a directional dish→component edge table, at recipe grain
 
-The obvious move — put `relatedRecipeID` on the ingredient row so "2 Tbsp Chicken Glace" points at the
-component — **fails our CloudKit constraint.** An ingredient already carries one foreign key (to its
-recipe); a second FK on the same record violates CloudKit's single-FK sharing rule. This is not
-hypothetical: `RecipeRelatedRecipe.swift` already documents and works around exactly this ("two SQL
-foreign keys would violate CloudKit's single-FK sharing rule"). So the link wants the same shape it
-uses — a **loose-column edge table**:
+Draw the link at **recipe grain, displayed in its own "Components used" section** (the way ServeWith and
+Related recipes already surface), **not** as an inline pointer on an ingredient line. Decided: we are
+**not** linking at ingredient-line grain.
 
 ```text
-@Table ingredientComponentLink {
+@Table recipeComponentLink {
   id: UUID
-  recipeID:      Recipe.ID      // the dish (loose column, not a SQL FK)
-  ingredientRef: <stable ingredient anchor within that recipe>
-  componentID:   Recipe.ID      // the .component recipe (loose column)
+  recipeID:    Recipe.ID   // the dish   (loose column, not a SQL FK)
+  componentID: Recipe.ID   // the .component recipe (loose column)
+  sortOrder: Int
   dateCreated: Date
 }
 ```
 
-Open design question for the ADR, flagged not answered: **what is `ingredientRef`?** It must survive a
-base-text edit the way variation anchors must (see [`variation-anchor-repair.md`](variation-anchor-repair.md)
-for how anchoring off model output bit us — do not repeat that). Options: an anchor into the stored
-ingredient grain (ADR-0040), or link at the *ingredient-section* grain instead of the line. Resolve
-before building.
+Loose columns, not SQL FKs — same reason `RecipeRelatedRecipe` uses them: two FKs on one record violate
+CloudKit's single-FK sharing rule (documented in `RecipeRelatedRecipe.swift`). But this is a **new,
+directional** table, not a reuse of `RecipeRelatedRecipe` — component-usage has a direction (a dish uses
+a component, not the reverse), and `RecipeRelatedRecipe` is deliberately symmetric.
 
-### 3. Reuse `Facet` for the function vocabulary
+**Why not ingredient grain, and what it costs.** An ingredient-line link ("½ cup chicken stock" →
+*your* 4× concentrate) would need a stable `ingredientRef` that survives a base-text edit — the exact
+anchor-repair rabbit hole that bit variations when anchors came off model output
+([`variation-anchor-repair.md`](variation-anchor-repair.md)). We decline it. The cost is real and worth
+stating: we lose the **inline** behaviors — a dish can't auto-rewrite "½ cup stock" to "use 2 Tbsp of
+your 4× concentrate" *at that line*, and make-extra can't anchor to a specific ingredient. What survives
+at recipe grain: "this dish uses your Salsa Verde / Chicken Glace," substitute-down, "you already have
+the sauce," and the capability-awareness payoff — i.e. most of the value, none of the anchor risk. If
+inline ever earns its keep, it's a separate future decision with its own anchoring ADR.
 
-ACID / CRUNCH / UMAMI / BODY / RICH / FRESH / ALLIUM / HEAT is the §12 menu-balance vocabulary and
-`Facet` is already a first-class table. Tag components (and dishes) with facets; do **not** invent a
-parallel `function` field. Compositional reasoning ("this plate has richness and acid but no
-freshness → your Salsa Verde") then falls out of facet coverage, which `RecipeFacetCoverage` /
-`SeedCoverageReport` machinery already computes — AI narrates, determinism counts (§7.5).
+### 3. The flavor vocabulary is a new **facet**, surfaced as "Dimension"
+
+Correction to an earlier glib note: `Facet` is **not** a generic tag bag — it is Yes Chef's *taxonomy
+axis* (`@Table("facets")`, migrated in as "Promote category namespaces to facets"). "Cuisine" and
+"Course" *are* facets; Italian / Appetizer are values under them. So ACID / CRUNCH / UMAMI / BODY / RICH /
+FRESH / ALLIUM / HEAT (the §12 menu-balance vocabulary) is **one new facet whose values are the
+flavor-functions** — reusing the entire facet mechanism with **zero schema change**, not a parallel
+`function` field.
+
+Naming: leave the **table and type `Facet`** — it's shipped into the Production-bound schema, and "facet"
+is genuinely correct for a taxonomy axis (a recipe's cuisine *is* a facet of it); renaming it is a
+breaking change bought for taste. But `Facet` is an internal name the user never sees — the user sees the
+facet's `name`. So give the new flavor axis the user-facing name **"Dimension"** (or Profile/Flavor). You
+get the word you prefer exactly where it's a free seed-row + UI-label choice, while "facet" stays in code
+where it's apt. Splitting them is strictly better than a rename: "Dimension" fits the flavor axis, "Facet"
+still fits Cuisine/Course.
+
+One reasoning-layer nuance for the ADR, not a storage one: for a **component** a dimension value means
+"what this *provides*" (glace provides UMAMI/BODY); for a **dish** it means "what's *present*." Same
+storage (a facet value tagged on a recipe); the make-extra / gap-analysis logic reads it in both senses.
+Compositional reasoning ("this plate has richness and acid but no freshness → your Salsa Verde") then
+falls out of the coverage `RecipeFacetCoverage` / `SeedCoverageReport` already compute — AI narrates,
+determinism counts (§7.5).
 
 ## What this unlocks (all from the two additive pieces above)
 
-- **Inline expand vs. linked component** (§16 flavor): a dish can *embed* the vinaigrette prep (stays
-  self-contained) or *link* the `.component` and expand it inline for whoever doesn't have it made. Same
-  duality functions have between inlining and calling.
 - **Make-extra**, when the economics are strongly favorable: a dish needing 2 Tbsp brown butter whose
   component has a 3-week fridge life prompts "brown 8 oz, use 2 Tbsp, refrigerate the rest." Gated on
   §11 storage-life metadata, not on any inventory state.
 - **Substitute-down** when the component isn't made: "2 Tbsp Chicken Glace" → "½ cup unsalted stock,
   reduced to ~2 Tbsp." Pure recipe knowledge, no ledger.
-- **"You already have X" / "Improve this dish"**: facet-coverage narration over the dish + the set of
+- **"You already have X" / "Improve this dish"**: dimension-coverage narration over the dish + the set of
   components you *know how to make* — capability, not stock.
 
 Note the load-bearing word: **capability**, not inventory. A freezer of glace/roasted-garlic/brown-butter
@@ -153,24 +177,26 @@ Pre-ship *feels* like the moment to bake this in. It isn't, because the design i
 
 ## Slice plan (post-cutover; sketch for the future ADR)
 
-- **S1 — `Recipe.kind` + authoring.** Additive column defaulting to `.dish`; a way to mark a recipe a
-  component; the promotion-rule gate lives in copy/affordance, not schema. Facet tagging already works.
-  No link yet. Ships value alone (a browsable component shelf, filterable by facet).
-- **S2 — the edge link + inline expand.** The `ingredientComponentLink` table; resolve the
-  `ingredientRef` anchoring question first; render a linked ingredient with expand-inline vs.
-  view-component. This is the abstraction; everything downstream needs it.
+- **S1 — `Recipe.kind` + the "Dimension" facet + authoring.** Additive column defaulting to `.dish`; a
+  way to mark a recipe a component; seed the flavor-function facet (user-facing name "Dimension"). The
+  promotion-rule gate lives in copy/affordance, not schema. No link yet. Ships value alone (a browsable
+  component shelf, filterable by dimension).
+- **S2 — the directional link + "Components used" section.** The `recipeComponentLink` table; render the
+  linked components in their own section on the dish (recipe grain, no ingredient anchoring). This is the
+  abstraction; everything downstream needs it.
 - **S3 — make-extra + substitute-down.** §11 storage-life/effort metadata + deterministic
   economics; AI narrates. No inventory state.
-- **S4 (maybe, separate ADR) — "improve this dish" / "you already have."** Facet-coverage narration over
-  dish + known components.
+- **S4 (maybe, separate ADR) — "improve this dish" / "you already have."** Dimension-coverage narration
+  over dish + known components.
 - **Not planned:** the on-hand/use-soon ledger. Reopen only via the §14 Inventory-Confirm door, as its
   own decision.
 
 ## Open questions for the ADR
 
-1. `ingredientRef` grain and anchor-repair story (line vs. section; survive base edits) — the S2 blocker.
+1. Ingredient-line linking is **declined** (see §2), so no anchor-repair work. Revisit only as a separate
+   future decision with its own anchoring ADR if inline behaviors ever earn their keep.
 2. Does a `.component` recipe show in the main library list, a separate shelf, or both? (Browsability vs.
-   noise.)
+   noise.) And is "Dimension" the right user-facing label, or Profile/Flavor?
 3. Import/export + backup coverage for `kind` and the link table (old JSON must still decode — the
    §Phase-1 "unknown keys ignored" property should hold).
 4. Where make-extra economics live: pure core function (preferred, §7.5) with AI only phrasing it.
