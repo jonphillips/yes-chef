@@ -1,8 +1,8 @@
 # Effort — Prepared Components (the reusable intermediate layer)
 
-**Status:** Designed (proposal) — **not dispatched.** Governed by
-[ADR-0057](../decisions/ADR-0057-prepared-components.md) (Proposed, not ratified); this is its worked design +
-slice detail. Explicitly **post-cutover** work (see Timing).
+**Status:** Designed — **ratified, not dispatched.** Governed by
+[ADR-0057](../decisions/ADR-0057-prepared-components.md) (**Accepted** 2026-09-17); this is its worked design +
+slice detail. Build explicitly **post-cutover** (see Timing).
 **Summary:** Give cooking its missing middle layer — `ingredients → prepared components → dishes` —
 by letting a recipe *be* a reusable component and letting a dish *link to* that component at
 **recipe grain** (a "components used" section, not an inline ingredient-line link — see §2). The

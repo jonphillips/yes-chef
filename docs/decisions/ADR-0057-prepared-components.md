@@ -7,8 +7,10 @@
 > §12 menu-balance vocabulary). "Larder" is the browsable view of your components; it is **capability** ("what I
 > can deploy"), never **inventory** ("how much of it I have right now").
 
-Status: **Proposed** — 2026-09-17. **Not yet ratified, and deliberately not scheduled: this is post-cutover work**
-(D7). Origin: Jon, pressure-testing a ChatGPT "home-larder / prepared-components" pitch and asking for it to be
+Status: **Accepted** — 2026-09-17 (Jon: agreed D5, resolved OQ1=Dimension, OQ2=main-library list filtered by
+`kind == .component`, OQ5=ServeWith stays separate). **Deliberately not scheduled: this is post-cutover work** (D7) —
+Accepted records the design is ratified, not that the build is queued. Origin: Jon, pressure-testing a ChatGPT
+"home-larder / prepared-components" pitch and asking for it to be
 right-sized rather than cheerled. The measured result is that most of the pitch is already our roadmap
 ([`../PRODUCT_BRIEF.md`](../PRODUCT_BRIEF.md), [`../FUTURE_INTELLIGENCE_AND_PLANNING.md`](../FUTURE_INTELLIGENCE_AND_PLANNING.md)
 §4.4/§11/§12/§14) and the one load-bearing new abstraction is small. Worked design + slice detail live in the
@@ -139,8 +141,8 @@ parallel `function` field.
 Naming: **leave the table and type named `Facet`.** It is shipped into the Production-bound schema, and "facet" is
 genuinely correct for a taxonomy axis (a recipe's cuisine *is* a facet of it); a rename is a breaking change bought
 purely for taste. `Facet` is an internal name the user never sees — the user sees the facet's `name`. So the new
-flavor axis gets the **user-facing label "Dimension"** (Profile/Flavor are alternatives — see OQ1). Splitting the
-concern is strictly better than a rename: "Dimension" fits the flavor axis; "Facet" still fits Cuisine/Course.
+flavor axis gets the **user-facing label "Dimension"** (ratified — OQ1). Splitting the concern is strictly better
+than a rename: "Dimension" fits the flavor axis; "Facet" still fits Cuisine/Course.
 
 **Reasoning nuance for the coverage layer, not a storage one:** for a `.component`, a dimension value means "what
 this *provides*" (glace provides UMAMI/BODY); for a `.dish`, it means "what's *present*." Same storage (a facet
@@ -208,10 +210,12 @@ reason to manufacture certainty or widen the frozen baseline. Ship cutover clean
 
 ## Open questions
 
-- **OQ1 — the user-facing label.** "Dimension" vs. "Profile" vs. "Flavor" for the new facet. Leaning "Dimension";
-  not load-bearing, decide at build.
-- **OQ2 — where components appear.** Main library list, a separate "Larder" shelf, or both, and how they filter
-  (by dimension). Browsability vs. noise; likely a filtered view over `kind == .component`, not a separate store.
+- **OQ1 — the user-facing label. RESOLVED 2026-09-17 (Jon): "Dimension".** The new facet is surfaced to the user as
+  "Dimension" (D4).
+- **OQ2 — where components appear. RESOLVED 2026-09-17 (Jon): the main library list, filtered by
+  `kind == .component`.** Components live in the one library alongside dishes — not a separate store or "Larder"
+  table — and the larder view is a **filter over `kind == .component`**, not a second home. (Sort/hide treatment so
+  ten vinaigrettes don't crowd out dinners is a UI detail for S1, not a data decision.)
 - **OQ3 — import/export + backup coverage.** `kind` and `RecipeComponentLink` must round-trip, and old backup JSON
   lacking `kind` must still decode (unknown-keys-ignored, as the cutover squash already relies on). Confirm in S1.
 - **OQ4 — make-extra economics home.** The "brown 8 oz, use 2 Tbsp, keep the rest" decision is a deterministic core
