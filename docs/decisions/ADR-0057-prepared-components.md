@@ -154,7 +154,7 @@ already computes — deterministic core computes, AI only narrates (§7.5).
 *where-it-sits* axis. A component is not a `reference` recipe: it is a normal, cookable, favoritable `main`-library
 recipe that happens to be built for reuse. Overloading `reference` (or adding a `component` placement case) would
 conflate "what it is" with "where it lives" and break both queries. `kind` is its own orthogonal axis. A component
-is `kind: .component` and typically `libraryPlacement: .main`.
+is `kind: .component` and typically `libraryPlacement: .main`. **Confirmed by Jon, 2026-09-17.**
 
 ### D6 — The on-hand / "use soon" inventory ledger is **out of scope, and stays out**
 
@@ -216,9 +216,13 @@ reason to manufacture certainty or widen the frozen baseline. Ship cutover clean
   lacking `kind` must still decode (unknown-keys-ignored, as the cutover squash already relies on). Confirm in S1.
 - **OQ4 — make-extra economics home.** The "brown 8 oz, use 2 Tbsp, keep the rest" decision is a deterministic core
   function (storage-life + portion math), with AI only phrasing it (§7.5). Confirm it does not leak into a model call.
-- **OQ5 — convergence with `ServeWith`.** `RecipeServeWith` (loose "goes with" strings) and the component link
-  overlap conceptually. Do they stay separate, or does a serve-with entry that resolves to a saved recipe become a
-  component link? Defer until both have real data; do not pre-merge.
+- **OQ5 — convergence with `ServeWith`. RESOLVED 2026-09-17 (Jon): they stay separate; do not converge.**
+  `RecipeServeWith` and a component link model **different relationships** and only looked adjacent. ServeWith is a
+  *pairing / accompaniment* — what to put **beside** a dish on the plate or the menu (roasted cabbage next to the
+  pork), and it may point at no recipe at all. A component link is *consumption* — what a dish is **built from** and
+  reduces to during cooking (the glace that becomes the pan sauce). Beside-on-the-plate is not is-an-ingredient-in,
+  so a serve-with entry does **not** become a component link even when it happens to resolve to a saved recipe. Two
+  relationships, two tables; no merge, now or later.
 
 ## Slices (post-cutover)
 
