@@ -3,21 +3,22 @@ import YesChefCore
 
 struct RecipeAdjustmentReviewView: View {
   let review: RecipeAdjustmentReviewState
-  let overwrite: (RecipeAdjustmentReviewState) -> Bool
-  let keepAsVariation: (RecipeAdjustmentReviewState, String) -> Bool
-  let saveVariation: ((RecipeAdjustmentReviewState) -> Bool)?
+  let overwrite: (RecipeAdjustmentReviewState) -> Result<Void, any Error>
+  let keepAsVariation: (RecipeAdjustmentReviewState, String) -> Result<Void, any Error>
+  let saveVariation: ((RecipeAdjustmentReviewState) -> Result<Void, any Error>)?
 
   @Environment(\.dismiss) private var dismiss
   @State private var segment = Segment.ingredients
   @State private var variationName: String
   @State private var isOverwriting = false
   @State private var isKeepingVariation = false
+  @State private var errorMessage: String?
 
   init(
     review: RecipeAdjustmentReviewState,
-    overwrite: @escaping (RecipeAdjustmentReviewState) -> Bool,
-    keepAsVariation: @escaping (RecipeAdjustmentReviewState, String) -> Bool,
-    saveVariation: ((RecipeAdjustmentReviewState) -> Bool)? = nil
+    overwrite: @escaping (RecipeAdjustmentReviewState) -> Result<Void, any Error>,
+    keepAsVariation: @escaping (RecipeAdjustmentReviewState, String) -> Result<Void, any Error>,
+    saveVariation: ((RecipeAdjustmentReviewState) -> Result<Void, any Error>)? = nil
   ) {
     self.review = review
     self.overwrite = overwrite
@@ -121,6 +122,11 @@ struct RecipeAdjustmentReviewView: View {
           }
         }
       }
+      .alert("Could Not Save Adjustment", isPresented: errorPresented) {
+        Button("OK", role: .cancel) {}
+      } message: {
+        Text(errorMessage ?? "Something went wrong.")
+      }
     }
   }
 
@@ -141,30 +147,45 @@ struct RecipeAdjustmentReviewView: View {
     .background(.bar)
   }
 
+  private var errorPresented: Binding<Bool> {
+    Binding(
+      get: { errorMessage != nil },
+      set: { if !$0 { errorMessage = nil } }
+    )
+  }
+
   private func keepAsVariationButtonTapped() {
     isKeepingVariation = true
-    if keepAsVariation(review, variationName) {
+    switch keepAsVariation(review, variationName) {
+    case .success:
       dismiss()
-    } else {
+    case let .failure(error):
       isKeepingVariation = false
+      errorMessage = error.localizedDescription
     }
   }
 
-  private func saveVariationButtonTapped(_ saveVariation: (RecipeAdjustmentReviewState) -> Bool) {
+  private func saveVariationButtonTapped(
+    _ saveVariation: (RecipeAdjustmentReviewState) -> Result<Void, any Error>
+  ) {
     isKeepingVariation = true
-    if saveVariation(review) {
+    switch saveVariation(review) {
+    case .success:
       dismiss()
-    } else {
+    case let .failure(error):
       isKeepingVariation = false
+      errorMessage = error.localizedDescription
     }
   }
 
   private func overwriteButtonTapped() {
     isOverwriting = true
-    if overwrite(review) {
+    switch overwrite(review) {
+    case .success:
       dismiss()
-    } else {
+    case let .failure(error):
       isOverwriting = false
+      errorMessage = error.localizedDescription
     }
   }
 }

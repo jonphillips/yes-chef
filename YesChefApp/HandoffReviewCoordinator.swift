@@ -477,7 +477,7 @@ final class HandoffReviewCoordinator {
     }
   }
 
-  func overwriteAdjustmentButtonTapped(_ review: RecipeAdjustmentReviewState) -> Bool {
+  func overwriteAdjustmentButtonTapped(_ review: RecipeAdjustmentReviewState) -> Result<Void, any Error> {
     do {
       try database.write { db in
         _ = try RecipeRepository.overwriteRecipeWithAdjustmentProposal(
@@ -490,19 +490,16 @@ final class HandoffReviewCoordinator {
         )
       }
       adjustmentReview = nil
-      return true
+      return .success(())
     } catch {
-      errorTitle = "Could Not Overwrite Recipe"
-      errorMessage = error.localizedDescription
-      isShowingError = true
-      return false
+      return .failure(error)
     }
   }
 
   func keepAdjustmentAsVariationButtonTapped(
     _ review: RecipeAdjustmentReviewState,
     name: String
-  ) -> Bool {
+  ) -> Result<Void, any Error> {
     do {
       try database.write { db in
         _ = try RecipeRepository.keepAdjustmentProposalAsVariation(
@@ -516,12 +513,9 @@ final class HandoffReviewCoordinator {
         )
       }
       adjustmentReview = nil
-      return true
+      return .success(())
     } catch {
-      errorTitle = "Could Not Keep Variation"
-      errorMessage = error.localizedDescription
-      isShowingError = true
-      return false
+      return .failure(error)
     }
   }
 
@@ -975,6 +969,8 @@ enum HandoffReviewError: LocalizedError, CustomStringConvertible {
   case emptyDeliverable
   case unparsedStrategyText([String])
   case variationNeedsRepair([String])
+  case invalidVariationReview
+  case variationCannotRepresent
 
   var errorDescription: String? {
     switch self {
@@ -986,6 +982,10 @@ enum HandoffReviewError: LocalizedError, CustomStringConvertible {
       "Could not save these make-ahead strategy lines: \(lines.joined(separator: " | "))"
     case let .variationNeedsRepair(anchors):
       "This variation has changes that no longer match the recipe. Repair it before adjusting: \(anchors.joined(separator: " | "))"
+    case .invalidVariationReview:
+      "The variation review is incomplete. Open it again and try saving."
+    case .variationCannotRepresent:
+      "This revision includes changes that cannot be kept in a variation yet."
     }
   }
 
