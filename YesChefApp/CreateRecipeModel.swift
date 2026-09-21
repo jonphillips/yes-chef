@@ -12,8 +12,19 @@ import YesChefCore
 @Observable
 @MainActor
 final class CreateRecipeModel {
+  struct ExtractionCandidate: Identifiable, Equatable {
+    let id: UUID
+    let extraction: RecipeExtraction
+  }
+
   struct IncomingPastedText: Equatable {
     let content: String
+    let referral: FindReferral?
+
+    init(content: String, referral: FindReferral? = nil) {
+      self.content = content
+      self.referral = referral
+    }
   }
 
   enum Destination: Equatable {
@@ -41,6 +52,10 @@ final class CreateRecipeModel {
   var isExtracting = false
   var extractionError: String?
   private(set) var extractionIssues: [RecipeExtractionIssue] = []
+  private(set) var extractionCandidates: [ExtractionCandidate] = []
+  private(set) var selectedExtractionID: UUID?
+  private(set) var foundNoRecipe = false
+  private(set) var referralProvenance: FindProvenance?
   private var composeSourceID: CreateRecipeSourceItem.ID?
   private var composeSourceIsLocked = false
   var destination: Destination?
@@ -79,6 +94,10 @@ final class CreateRecipeModel {
     isExtracting = false
     extractionError = nil
     extractionIssues = []
+    extractionCandidates = []
+    selectedExtractionID = nil
+    foundNoRecipe = false
+    referralProvenance = nil
     composeSourceID = nil
     composeSourceIsLocked = false
     destination = nil
@@ -93,7 +112,9 @@ final class CreateRecipeModel {
   /// Save requires a title, matching the plain editor. The structured half is what gets saved, so its
   /// gate is authoritative.
   var isSavingDisabled: Bool {
-    isSaving || editorModel.isSavingDisabled
+    isSaving
+      || editorModel.isSavingDisabled
+      || (extractionCandidates.count > 1 && selectedExtractionID == nil)
   }
 
   var hasLabelActivity: Bool {
@@ -151,17 +172,38 @@ final class CreateRecipeModel {
   /// deliberately does not call `pastedTextReceived(_:)`: that method replaces the compose box, which is
   /// unsafe while another transient Create Recipe session is in progress (ADR-0053 Amd2-D4).
   func offerIncomingPastedText(_ text: String) {
+    offerIncomingPastedText(text, referral: nil)
+  }
+
+  func offerIncomingPastedText(_ text: String, referral: FindReferral?) {
     guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-    destination = .incomingPastedTextOffer(IncomingPastedText(content: text))
+    destination = .incomingPastedTextOffer(IncomingPastedText(content: text, referral: referral))
   }
 
   func acceptIncomingPastedText(_ text: String) {
+    let referral: FindReferral?
+    if case let .incomingPastedTextOffer(incoming)? = destination {
+      referral = incoming.referral
+    } else {
+      referral = nil
+    }
     destination = nil
+    beginReferral(referral)
     pastedTextReceived([text])
   }
 
   func discardIncomingPastedText() {
     destination = nil
+  }
+
+  func beginReferral(_ referral: FindReferral?) {
+    referralProvenance = referral?.provenance
+  }
+
+  func selectExtraction(id: UUID) {
+    guard let candidate = extractionCandidates.first(where: { $0.id == id }) else { return }
+    selectedExtractionID = id
+    applyExtraction(candidate.extraction)
   }
 
   /// Runs the two-tier front-end over the compose box (ADR-0051 D4): deterministic schema.org first,
@@ -174,18 +216,35 @@ final class CreateRecipeModel {
     composeSourceIsLocked = true
     isExtracting = true
     extractionError = nil
+    foundNoRecipe = false
+    extractionCandidates = []
+    selectedExtractionID = nil
     defer { isExtracting = false }
 
     do {
-      let extraction = try await CreateRecipeExtraction.extract(text: text)
-      let makeUUID = uuid
-      let extractedDraft = extraction.editorDraft(uuid: { makeUUID() })
-      editorModel.applyExtractedDraft(extractedDraft)
-      extractionIssues = RecipeExtractionIssueDetector.issues(in: extraction)
-      proposeLabels(for: extraction)
+      let extractions = try await CreateRecipeExtraction.extractMany(text: text)
+      extractionCandidates = extractions.map { ExtractionCandidate(id: uuid(), extraction: $0) }
+      if extractions.isEmpty {
+        foundNoRecipe = true
+        suggestedLabels = []
+        acceptedSuggestedLabelIDs = []
+        labelProposalError = nil
+        isSuggestingLabels = false
+      } else if let candidate = extractionCandidates.first, extractionCandidates.count == 1 {
+        selectedExtractionID = candidate.id
+        applyExtraction(candidate.extraction)
+      }
     } catch {
       extractionError = RecipeChatErrorText.describe(error)
     }
+  }
+
+  private func applyExtraction(_ extraction: RecipeExtraction) {
+    let makeUUID = uuid
+    let extractedDraft = extraction.editorDraft(uuid: { makeUUID() })
+    editorModel.applyExtractedDraft(extractedDraft)
+    extractionIssues = RecipeExtractionIssueDetector.issues(in: extraction)
+    proposeLabels(for: extraction)
   }
 
   /// Commits the reviewed draft (`save(draft:)` — the app-authored identity class, ADR-0051 Amd 1) and

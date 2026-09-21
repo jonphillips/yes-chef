@@ -1,3 +1,4 @@
+import Dependencies
 import SwiftUI
 import YesChefCore
 
@@ -6,6 +7,7 @@ import YesChefCore
 /// memory just starts typing into the form; a cook with text to paste drops it in the compose box and
 /// extracts. Nothing is written until Save (D4).
 struct CreateRecipeView: View {
+  @Dependency(\.createRecipeCoordinator) private var createRecipeCoordinator
   let model: CreateRecipeModel
   /// Called with the saved recipe's ID so the app can jump to it in the library. The session is a
   /// resident sidebar destination, not a modal, so there is nothing to dismiss here.
@@ -50,14 +52,28 @@ struct CreateRecipeView: View {
             }
             .foregroundStyle(.orange)
           }
+
+          if model.foundNoRecipe {
+            Label("No complete recipe found in this text.", systemImage: "questionmark.circle")
+              .foregroundStyle(.secondary)
+          }
+
         } header: {
           Text("Source")
         } footer: {
           Text("Paste an unstructured recipe and Yes Chef will fill in the fields below without inventing anything. You can also just type into the form.")
         }
 
+        if model.extractionCandidates.count > 1 {
+          CreateRecipeCandidateSection(model: model)
+        }
+
         if model.hasLabelActivity {
           CreateRecipeLabelSection(model: model)
+        }
+
+        if let provenance = model.referralProvenance {
+          CreateRecipeReferralSection(provenance: provenance)
         }
 
         if !model.extractionIssues.isEmpty {
@@ -89,7 +105,10 @@ struct CreateRecipeView: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Clear", role: .destructive) {
-            model.reset()
+            Task {
+              await createRecipeCoordinator.declineReferral()
+              model.reset()
+            }
           }
           .disabled(model.isEmpty || model.isSaving)
         }
@@ -108,7 +127,7 @@ struct CreateRecipeView: View {
               self.focusedIngredientSectionNameID = nil
             }
             Task {
-              if let recipeID = await model.saveButtonTapped() {
+              if let recipeID = await createRecipeCoordinator.saveButtonTapped(for: model) {
                 onSaved(recipeID)
               }
             }
@@ -147,10 +166,16 @@ struct CreateRecipeView: View {
           }
         }
         Button("Discard New Text", role: .destructive) {
-          model.discardIncomingPastedText()
+          Task {
+            await createRecipeCoordinator.declineReferral()
+            model.discardIncomingPastedText()
+          }
         }
         Button("Keep Current Recipe", role: .cancel) {
-          model.discardIncomingPastedText()
+          Task {
+            await createRecipeCoordinator.declineReferral()
+            model.discardIncomingPastedText()
+          }
         }
       } message: {
         Text("Use the incoming text as a new pasted source, or keep the recipe already in progress. Your current draft will not be replaced automatically.")
@@ -170,7 +195,10 @@ struct CreateRecipeView: View {
       },
       set: { isPresented in
         if !isPresented {
-          model.discardIncomingPastedText()
+          Task {
+            await createRecipeCoordinator.declineReferral()
+            model.discardIncomingPastedText()
+          }
         }
       }
     )
@@ -185,6 +213,77 @@ struct CreateRecipeView: View {
         }
       }
     )
+  }
+}
+
+private struct CreateRecipeCandidateSection: View {
+  let model: CreateRecipeModel
+
+  var body: some View {
+    Section {
+      ForEach(model.extractionCandidates) { candidate in
+        Button {
+          model.selectExtraction(id: candidate.id)
+        } label: {
+          HStack {
+            VStack(alignment: .leading) {
+              Text(title(for: candidate.extraction))
+                .foregroundStyle(.primary)
+              Text(summary(for: candidate.extraction))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if model.selectedExtractionID == candidate.id {
+              Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.tint)
+            }
+          }
+        }
+        .accessibilityLabel("Use \(title(for: candidate.extraction))")
+        .accessibilityValue(model.selectedExtractionID == candidate.id ? "Selected" : "Not selected")
+      }
+    } header: {
+      Text("Recipes Found")
+    } footer: {
+      Text("Choose one recipe to review. The original text remains available above.")
+    }
+  }
+
+  private func title(for extraction: RecipeExtraction) -> String {
+    let title = extraction.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return title.isEmpty ? "Recipe" : title
+  }
+
+  private func summary(for extraction: RecipeExtraction) -> String {
+    let ingredientCount = extraction.ingredientSections.reduce(0) { $0 + $1.lines.count }
+    let instructionCount = extraction.instructionSections.reduce(0) { $0 + $1.steps.count }
+    return "\(ingredientCount) ingredients · \(instructionCount) steps"
+  }
+}
+
+private struct CreateRecipeReferralSection: View {
+  let provenance: FindProvenance
+
+  var body: some View {
+    Section("From Find") {
+      if let sender = provenance.sender {
+        LabeledContent("Sender", value: sender)
+      }
+      if let publisher = provenance.publisher {
+        LabeledContent("Publisher", value: publisher)
+      }
+      if let seriesID = provenance.seriesID {
+        LabeledContent("Series", value: seriesID)
+      }
+      if let arrivalDate = provenance.arrivalDate {
+        LabeledContent("Received", value: arrivalDate.formatted(date: .abbreviated, time: .shortened))
+      }
+      if let note = provenance.note {
+        Text(note)
+          .font(.callout)
+      }
+    }
   }
 }
 

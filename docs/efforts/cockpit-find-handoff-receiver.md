@@ -1,5 +1,9 @@
 # Effort — Cockpit → Yes Chef recipe Find handoff (receiver side)
 
+Status: In progress
+Summary: Receive raw Cockpit Find referrals, isolate 0/1/N recipes for Create Recipe review, and emit a typed verdict through the deferred return-transport seam.
+Related: Cockpit M6 Gate 5 slice plan (`cockpit/docs/milestones/M6-gate5-find-handoff-slice-plan.md`)
+
 > **Ready-to-build brief for the Yes Chef executor.** Authored 2026-09-21 from the Cockpit side as the
 > receiver half of Cockpit's M6 Gate 5 (first specialist Find handoff). The **contract is the only
 > coupling** and is frozen jointly; everything else here is Yes Chef's to build and Yes Chef owns all

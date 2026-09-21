@@ -7,7 +7,7 @@ import Foundation
 ///
 /// - Important: `referralID` is an **opaque, machine-only** correlation token — never surface it to the
 ///   cook. `provenance.contentPieceToken` is opaque Cockpit custody state — round-trip it untouched.
-public struct FindReferral: Equatable, Sendable {
+public struct FindReferral: Codable, Equatable, Sendable {
   /// Opaque correlation token. Echoed back in the ``FindVerdict``; never shown to the cook.
   public let referralID: String
 
@@ -27,7 +27,7 @@ public struct FindReferral: Equatable, Sendable {
 /// Source context Cockpit attaches to a referral. Every field is an advisory hint for the cook's review
 /// **except** ``contentPieceToken``, which is opaque Cockpit custody state to be echoed back untouched.
 /// Yes Chef never learns Cockpit's schema and never interprets these beyond display.
-public struct FindProvenance: Equatable, Sendable {
+public struct FindProvenance: Codable, Equatable, Sendable {
   public var sender: String?
   public var publisher: String?
   public var arrivalDate: Date?
@@ -37,6 +37,8 @@ public struct FindProvenance: Equatable, Sendable {
   public var contentPieceToken: String?
   /// Cockpit's why-it-mattered note, shown to the cook for context during review.
   public var note: String?
+  /// Small advisory values from Cockpit. Yes Chef does not use them for recipe decisions.
+  public var hints: [String: String]
 
   public init(
     sender: String? = nil,
@@ -44,7 +46,8 @@ public struct FindProvenance: Equatable, Sendable {
     arrivalDate: Date? = nil,
     seriesID: String? = nil,
     contentPieceToken: String? = nil,
-    note: String? = nil
+    note: String? = nil,
+    hints: [String: String] = [:]
   ) {
     self.sender = sender
     self.publisher = publisher
@@ -52,5 +55,6 @@ public struct FindProvenance: Equatable, Sendable {
     self.seriesID = seriesID
     self.contentPieceToken = contentPieceToken
     self.note = note
+    self.hints = hints
   }
 }

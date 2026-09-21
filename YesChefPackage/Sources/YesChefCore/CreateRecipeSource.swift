@@ -37,15 +37,22 @@ public struct CreateRecipeSourceItem: Identifiable, Equatable, Sendable {
 /// system prompt is fidelity-only, and the deterministic tier only reports what the markup stated.
 public enum CreateRecipeExtraction {
   public static func extract(text: String) async throws -> RecipeExtraction {
+    guard let extraction = try await extractMany(text: text).first else {
+      throw RecipeExtractionError.emptyRecipe
+    }
+    return extraction
+  }
+
+  public static func extractMany(text: String) async throws -> [RecipeExtraction] {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { throw RecipeExtractionError.emptyRecipe }
 
     if let deterministic = deterministicJSONLD(trimmed) {
-      return deterministic
+      return [deterministic]
     }
 
     @Dependency(\.recipeExtractionClient) var recipeExtractionClient
-    return try await recipeExtractionClient(text: trimmed)
+    return try await recipeExtractionClient.extractMany(trimmed)
   }
 
   /// The free deterministic tier: a paste that *is* a schema.org `Recipe` JSON-LD block (the same shape
