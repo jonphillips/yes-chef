@@ -8,6 +8,10 @@ import OSLog
 public enum AppLog {
   public static let applyAction = Logger(subsystem: subsystem, category: "applyAction")
   public static let dataIntegrity = Logger(subsystem: subsystem, category: "dataIntegrity")
+
+  /// Cross-app referral round-trips (Cockpit → Yes Chef Find handoff, M6 Gate 5). The verdict return
+  /// is the one device-only risk in that effort, so its delivery is logged for the device pass.
+  public static let handoff = Logger(subsystem: subsystem, category: "handoff")
   public static let llm = Logger(subsystem: subsystem, category: "llm")
 
   /// Interactive-latency diagnostics (ADR-0029). Paired with `performanceSignposter`
