@@ -23,9 +23,26 @@ final class PowerBrowserModel {
     var id: YesChefCore.Category.ID { category.id }
   }
 
+  struct SourceFilterOption: Identifiable, Equatable {
+    var value: String
+    var matchingRecipeCount: Int
+    var isSelected: Bool
+
+    var id: String { value }
+  }
+
+  struct LooseCategoryOption: Identifiable, Equatable {
+    var category: YesChefCore.Category
+    var matchingRecipeCount: Int
+    var isSelected: Bool
+
+    var id: YesChefCore.Category.ID { category.id }
+  }
+
   struct ActiveSelection: Identifiable, Equatable {
     enum Kind: Hashable {
       case facet(categoryID: YesChefCore.Category.ID, facetID: Facet.ID)
+      case looseCategory(categoryID: YesChefCore.Category.ID)
       case attribute(RecipeBrowserAttributeFilter)
       case source(field: RecipeBrowserSourceField, value: String)
     }
@@ -119,6 +136,16 @@ final class PowerBrowserModel {
         title: selectionTitle(for: $0.category.id, in: $0.facet)
       )
     }
+    let categoriesByID = Dictionary(uniqueKeysWithValues: browserData.categories.map { ($0.id, $0) })
+    let looseCategorySelections: [ActiveSelection] = Array(query.looseLabelIDs).compactMap {
+      (categoryID: YesChefCore.Category.ID) -> ActiveSelection? in
+      guard let category = categoriesByID[categoryID], category.facetID == nil else { return nil }
+      return ActiveSelection(
+        kind: .looseCategory(categoryID: category.id),
+        title: "Label: \(category.name)"
+      )
+    }
+    .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     let attributeSelections = query.attributeFilters.map {
       ActiveSelection(kind: .attribute($0), title: $0.title)
     }
@@ -128,7 +155,7 @@ final class PowerBrowserModel {
         ActiveSelection(kind: .source(field: field, value: $0), title: "\(field.title): \($0)")
       }
     }
-    return facetSelections + attributeSelections + sourceSelections
+    return facetSelections + looseCategorySelections + attributeSelections + sourceSelections
   }
 
   var totalTimeAtMost: Int? {
@@ -171,12 +198,68 @@ final class PowerBrowserModel {
     }
   }
 
-  var sourceFilterOptions: [RecipeBrowserSourceField: [String]] {
-    Dictionary(uniqueKeysWithValues: RecipeBrowserSourceField.allCases.map { field in
-      let values = Set(browserData.sources.compactMap { $0.value(for: field)?.trimmedNonEmpty })
-        .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-      return (field, values)
-    })
+  func sourceFilterOptions(
+    for result: RecipeBrowserResult
+  ) -> [RecipeBrowserSourceField: [SourceFilterOption]] {
+    let matchingRecipeIDs = Set(result.matchingRecipeIDs)
+    let sourcesByRecipeID = Dictionary(grouping: browserData.sources, by: \.recipeID)
+
+    return RecipeBrowserSourceField.allCases.reduce(into: [:]) { optionsByField, field in
+      let selectedValues = selectedSourceValues(for: field)
+      let currentValues = browserData.sources
+        .filter { matchingRecipeIDs.contains($0.recipeID) }
+        .compactMap { $0.value(for: field)?.trimmedNonEmpty }
+      let values = Set(currentValues).union(selectedValues)
+
+      optionsByField[field] = values
+        .map { value in
+          let normalizedValue = Self.normalizedSourceValue(value)
+          let matchingRecipeCount = matchingRecipeIDs.reduce(into: 0) { count, recipeID in
+            if (sourcesByRecipeID[recipeID] ?? []).contains(where: { source in
+              guard let sourceValue = source.value(for: field)?.trimmedNonEmpty else { return false }
+              return Self.normalizedSourceValue(sourceValue) == normalizedValue
+            }) {
+              count += 1
+            }
+          }
+          return SourceFilterOption(
+            value: value,
+            matchingRecipeCount: matchingRecipeCount,
+            isSelected: selectedValues.contains(value)
+          )
+        }
+        .sorted { $0.value.localizedStandardCompare($1.value) == .orderedAscending }
+    }
+  }
+
+  func looseCategoryOptions(for result: RecipeBrowserResult) -> [LooseCategoryOption] {
+    let matchingRecipeIDs = Set(result.matchingRecipeIDs)
+    let categoriesByID = Dictionary(uniqueKeysWithValues: browserData.categories.map { ($0.id, $0) })
+    let categoryIDsByRecipeID = Dictionary(grouping: browserData.recipeCategories, by: \.recipeID)
+      .mapValues { Set($0.map(\.categoryID)) }
+    let currentCategoryIDs = matchingRecipeIDs.reduce(into: Set<YesChefCore.Category.ID>()) { categoryIDs, recipeID in
+      categoryIDs.formUnion(categoryIDsByRecipeID[recipeID] ?? [])
+    }
+    let optionIDs = currentCategoryIDs.union(query.looseLabelIDs)
+
+    return optionIDs.compactMap { categoryID in
+      guard let category = categoriesByID[categoryID], category.facetID == nil else { return nil }
+      let matchingRecipeCount = matchingRecipeIDs.reduce(into: 0) { count, recipeID in
+        if categoryIDsByRecipeID[recipeID]?.contains(categoryID) == true {
+          count += 1
+        }
+      }
+      return LooseCategoryOption(
+        category: category,
+        matchingRecipeCount: matchingRecipeCount,
+        isSelected: query.looseLabelIDs.contains(categoryID)
+      )
+    }
+    .sorted {
+      let nameComparison = $0.category.name.localizedStandardCompare($1.category.name)
+      if nameComparison != .orderedSame { return nameComparison == .orderedAscending }
+      return $0.category.id.uuidString < $1.category.id.uuidString
+    }
   }
 
   func recipeRows(for result: RecipeBrowserResult) -> [RecipeListRowData] {
@@ -278,6 +361,15 @@ final class PowerBrowserModel {
     setSourceValues(values, field: field)
   }
 
+  func looseCategoryButtonTapped(_ category: YesChefCore.Category) {
+    guard category.facetID == nil else { return }
+    if query.looseLabelIDs.contains(category.id) {
+      query.looseLabelIDs.remove(category.id)
+    } else {
+      query.looseLabelIDs.insert(category.id)
+    }
+  }
+
   func selectedSourceValues(for field: RecipeBrowserSourceField) -> Set<String> {
     query.sourceFilters.reduce(into: Set<String>()) { result, filter in
       guard case let .values(filterField, values) = filter, filterField == field else { return }
@@ -289,6 +381,8 @@ final class PowerBrowserModel {
     switch selection.kind {
     case let .facet(categoryID, facetID):
       removeSelectionButtonTapped(categoryID: categoryID, in: facetID)
+    case let .looseCategory(categoryID):
+      query.looseLabelIDs.remove(categoryID)
     case let .attribute(filter):
       query.attributeFilters.removeAll { $0 == filter }
       switch filter {
@@ -336,6 +430,11 @@ final class PowerBrowserModel {
     case .libraryPlacement, .favoritesOnly, .hasPhoto:
       nil
     }
+  }
+
+  private static func normalizedSourceValue(_ value: String) -> String {
+    value.trimmingCharacters(in: .whitespacesAndNewlines)
+      .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
   }
 
   private func browserEngine() -> RecipeBrowserEngine {

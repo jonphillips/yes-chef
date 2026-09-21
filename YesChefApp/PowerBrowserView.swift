@@ -32,15 +32,14 @@ private struct PowerBrowserFacetsView: View {
     List {
       PowerBrowserAttributeFilters(model: model)
       PowerBrowserUsageFilters(model: model)
-      PowerBrowserSourceFilters(model: model)
+      PowerBrowserSourceFilters(
+        model: model,
+        optionsByField: model.sourceFilterOptions(for: result)
+      )
 
-      if result.availableFacets.isEmpty {
-        ContentUnavailableView(
-          "No Facets Available",
-          systemImage: "square.grid.2x2",
-          description: Text("As recipes are classified, useful ways to narrow this result will appear here.")
-        )
-      } else {
+      let looseCategoryOptions = model.looseCategoryOptions(for: result)
+
+      if !result.availableFacets.isEmpty {
         ForEach(result.availableFacets) { availability in
           Section {
             DisclosureGroup(
@@ -58,29 +57,52 @@ private struct PowerBrowserFacetsView: View {
           }
         }
       }
+
+      if !looseCategoryOptions.isEmpty {
+        Section("Ungrouped Categories") {
+          ForEach(looseCategoryOptions) { option in
+            PowerBrowserValueRow(
+              title: option.category.name,
+              matchingRecipeCount: option.matchingRecipeCount,
+              isSelected: option.isSelected,
+              action: { model.looseCategoryButtonTapped(option.category) }
+            )
+          }
+        }
+      }
+
+      if result.availableFacets.isEmpty && looseCategoryOptions.isEmpty {
+        ContentUnavailableView(
+          "No Facets Available",
+          systemImage: "square.grid.2x2",
+          description: Text("As recipes are classified, useful ways to narrow this result will appear here.")
+        )
+      }
     }
     .listStyle(.sidebar)
     .toolbar(removing: .sidebarToggle)
   }
 }
 
-private struct PowerBrowserFacetValueRow: View {
-  let value: RecipeBrowserResult.ValueAvailability
+private struct PowerBrowserValueRow: View {
+  let title: String
+  let matchingRecipeCount: Int
+  let isSelected: Bool
   let action: () -> Void
 
   var body: some View {
     Button(action: action) {
       HStack(spacing: 8) {
-        Text(value.category.name)
+        Text(title)
           .foregroundStyle(.primary)
 
         Spacer()
 
-        Text(value.matchingRecipeCount, format: .number)
+        Text(matchingRecipeCount, format: .number)
           .font(.caption)
           .foregroundStyle(.secondary)
 
-        if value.isSelected {
+        if isSelected {
           Image(systemName: "checkmark.circle.fill")
             .foregroundStyle(.tint)
             .accessibilityHidden(true)
@@ -92,9 +114,9 @@ private struct PowerBrowserFacetValueRow: View {
       }
     }
     .buttonStyle(.plain)
-    .accessibilityLabel(value.category.name)
-    .accessibilityValue("\(value.matchingRecipeCount) recipes\(value.isSelected ? ", selected" : "")")
-    .accessibilityHint(value.isSelected ? "Removes this selection" : "Adds this selection")
+    .accessibilityLabel(title)
+    .accessibilityValue("\(matchingRecipeCount) recipes\(isSelected ? ", selected" : "")")
+    .accessibilityHint(isSelected ? "Removes this selection" : "Adds this selection")
   }
 }
 
@@ -169,59 +191,83 @@ private struct PowerBrowserUsageFilters: View {
 
 private struct PowerBrowserSourceFilters: View {
   let model: PowerBrowserModel
+  let optionsByField: [RecipeBrowserSourceField: [PowerBrowserModel.SourceFilterOption]]
+
+  private var sourceFields: [RecipeBrowserSourceField] {
+    RecipeBrowserSourceField.allCases.filter { $0 != .website }
+  }
 
   var body: some View {
-    Section("Source") {
-      ForEach(RecipeBrowserSourceField.allCases, id: \.self) { field in
-        let options = model.sourceFilterOptions[field] ?? []
-        if !options.isEmpty {
-          NavigationLink {
-            PowerBrowserSourceFilterPicker(model: model, field: field, options: options)
-          } label: {
-            LabeledContent(field.title, value: model.selectedSourceValues(for: field).summary)
-          }
+    let fieldsWithOptions = sourceFields.filter { !(optionsByField[$0] ?? []).isEmpty }
+
+    if !fieldsWithOptions.isEmpty {
+      Section("Source") {
+        ForEach(fieldsWithOptions, id: \.self) { field in
+          PowerBrowserSourceDisclosureGroup(
+            model: model,
+            field: field,
+            options: optionsByField[field] ?? []
+          )
         }
       }
     }
   }
 }
 
-private struct PowerBrowserSourceFilterPicker: View {
+private struct PowerBrowserSourceDisclosureGroup: View {
   let model: PowerBrowserModel
   let field: RecipeBrowserSourceField
-  let options: [String]
+  let options: [PowerBrowserModel.SourceFilterOption]
+  @State private var isExpanded = false
   @State private var searchText = ""
 
-  private var visibleOptions: [String] {
+  private static let containsFilterThreshold = 8
+
+  private var visibleOptions: [PowerBrowserModel.SourceFilterOption] {
     let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !query.isEmpty else { return options }
-    return options.filter { $0.localizedCaseInsensitiveContains(query) }
+    return options.filter { $0.value.localizedCaseInsensitiveContains(query) }
   }
 
   var body: some View {
-    List {
-      ForEach(visibleOptions, id: \.self) { option in
-        let isSelected = model.selectedSourceValues(for: field).contains(option)
-        Button {
-          model.sourceValueButtonTapped(option, field: field)
-        } label: {
-          HStack {
-            Text(option)
-            Spacer()
-            if isSelected {
-              Image(systemName: "checkmark")
-                .foregroundStyle(.tint)
-                .accessibilityHidden(true)
-            }
-          }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(option)
-        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+    DisclosureGroup(isExpanded: $isExpanded) {
+      if options.count > Self.containsFilterThreshold
+        || !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        TextField("Filter \(field.title.lowercased())", text: $searchText)
+          .textFieldStyle(.roundedBorder)
+      }
+
+      ForEach(visibleOptions) { option in
+        PowerBrowserValueRow(
+          title: option.value,
+          matchingRecipeCount: option.matchingRecipeCount,
+          isSelected: option.isSelected,
+          action: { model.sourceValueButtonTapped(option.value, field: field) }
+        )
+      }
+    } label: {
+      HStack {
+        Label(field.title, systemImage: "book")
+        Spacer()
+        Text(model.selectedSourceValues(for: field).summary)
+          .foregroundStyle(model.selectedSourceValues(for: field).isEmpty ? .secondary : .primary)
+          .lineLimit(1)
       }
     }
-    .navigationTitle(field.title)
-    .searchable(text: $searchText, prompt: "Search \(field.title.lowercased())")
+  }
+}
+
+private struct PowerBrowserFacetValueRow: View {
+  let value: RecipeBrowserResult.ValueAvailability
+  let action: () -> Void
+
+  var body: some View {
+    PowerBrowserValueRow(
+      title: value.category.name,
+      matchingRecipeCount: value.matchingRecipeCount,
+      isSelected: value.isSelected,
+      action: action
+    )
   }
 }
 

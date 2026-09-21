@@ -322,6 +322,10 @@ private struct RecipeCaptureReviewSections: View {
                 .textInputAutocapitalization(.words)
             }
             .onDelete { model.removeReviewCategories(atOffsets: $0) }
+
+            Button("Remove All Categories", role: .destructive) {
+              model.removeAllReviewCategories()
+            }
           }
           if !model.reviewTagNames.isEmpty {
             Text("Tags")
@@ -332,6 +336,10 @@ private struct RecipeCaptureReviewSections: View {
                 .textInputAutocapitalization(.words)
             }
             .onDelete { model.removeReviewTags(atOffsets: $0) }
+
+            Button("Remove All Tags", role: .destructive) {
+              model.removeAllReviewTags()
+            }
           }
         } header: {
           Text("Categories & Tags")

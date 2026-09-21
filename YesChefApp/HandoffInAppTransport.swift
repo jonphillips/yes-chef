@@ -398,12 +398,18 @@ struct ReaderFeedbackHandoffControls: View {
         Label("Copy Curation Prompt", systemImage: "sparkles.square.filled.on.square")
       }
 
-      PasteButton(payloadType: String.self) { results in
+      Button {
+        let results = UIPasteboard.general.string.map { [$0] } ?? []
         Task {
-          await transport.pastedReaderFeedbackResults(results, source: source, receive: receive)
+          await transport.pastedReaderFeedbackResults(
+            results,
+            source: source,
+            receive: receive
+          )
         }
+      } label: {
+        Label("Paste Curated Comments", systemImage: "doc.on.clipboard")
       }
-      .accessibilityLabel("Paste Reader Feedback Result")
     }
   }
 }
