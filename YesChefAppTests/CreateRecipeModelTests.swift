@@ -9,6 +9,38 @@ import YesChefCore
 @MainActor
 struct CreateRecipeModelTests {
   @Test
+  func movingRecipeSectionsReordersDraftAndMarksItDirty() {
+    let firstIngredientID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    let secondIngredientID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    let firstInstructionID = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+    let secondInstructionID = UUID(uuidString: "00000000-0000-0000-0000-000000000004")!
+    var draft = RecipeEditorDraft()
+    draft.ingredientSections = [
+      RecipeEditorIngredientSectionDraft(id: firstIngredientID, name: "First"),
+      RecipeEditorIngredientSectionDraft(id: secondIngredientID, name: "Second"),
+    ]
+    draft.instructionSections = [
+      RecipeEditorInstructionSectionDraft(id: firstInstructionID, name: "First"),
+      RecipeEditorInstructionSectionDraft(id: secondInstructionID, name: "Second"),
+    ]
+
+    let model = RecipeEditorModel(seededDraft: draft)
+    #expect(!model.hasUnsavedEdits)
+
+    model.moveIngredientSection(id: secondIngredientID, up: true)
+    model.moveInstructionSection(id: firstInstructionID, up: false)
+
+    #expect(model.draft.ingredientSections.map(\.id) == [secondIngredientID, firstIngredientID])
+    #expect(model.draft.instructionSections.map(\.id) == [secondInstructionID, firstInstructionID])
+    #expect(model.hasUnsavedEdits)
+
+    model.moveIngredientSection(id: secondIngredientID, up: true)
+    model.moveInstructionSection(id: firstInstructionID, up: false)
+    #expect(model.draft.ingredientSections.map(\.id) == [secondIngredientID, firstIngredientID])
+    #expect(model.draft.instructionSections.map(\.id) == [secondInstructionID, firstInstructionID])
+  }
+
+  @Test
   func pastedImageDataCreatesPendingHeroPhotoWithPastedSourcePath() async throws {
     try await withDependencies {
       try $0.bootstrapDatabase()

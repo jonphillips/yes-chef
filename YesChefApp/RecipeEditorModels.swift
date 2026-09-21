@@ -193,6 +193,10 @@ final class RecipeEditorModel {
     draft.ingredientSections.append(RecipeEditorIngredientSectionDraft(id: uuid()))
   }
 
+  func moveIngredientSection(id: IngredientSection.ID, up: Bool) {
+    moveSection(in: &draft.ingredientSections, id: id, up: up)
+  }
+
   func deleteIngredientSection(id: IngredientSection.ID) {
     draft.ingredientSections.removeAll { $0.id == id }
   }
@@ -201,8 +205,23 @@ final class RecipeEditorModel {
     draft.instructionSections.append(RecipeEditorInstructionSectionDraft(id: uuid()))
   }
 
+  func moveInstructionSection(id: InstructionSection.ID, up: Bool) {
+    moveSection(in: &draft.instructionSections, id: id, up: up)
+  }
+
   func deleteInstructionSection(id: InstructionSection.ID) {
     draft.instructionSections.removeAll { $0.id == id }
+  }
+
+  private func moveSection<Section: Identifiable>(
+    in sections: inout [Section],
+    id: Section.ID,
+    up: Bool
+  ) {
+    guard let index = sections.firstIndex(where: { $0.id == id }) else { return }
+    let destination = up ? index - 1 : index + 1
+    guard sections.indices.contains(destination) else { return }
+    sections.swapAt(index, destination)
   }
 
   func heroPhotoSelected(sourceData: Data, sourcePath: String) async {
