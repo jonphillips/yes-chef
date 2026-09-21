@@ -146,7 +146,7 @@ private struct RecipeDetailDestinationsModifier: ViewModifier {
         item: gatedBinding($recipeModel.destination.deleteArchivedRecipe, enabled: isPresentationEnabled),
         titleVisibility: .visible
       ) { recipeID in
-        Button("Delete Permanently", role: .destructive) {
+        Button("Delete Permanently", role: .destructive) { [recipeID] in
           recipeModel.confirmDeleteArchivedRecipeButtonTapped(recipeID: recipeID)
         }
         Button("Cancel", role: .cancel) {}

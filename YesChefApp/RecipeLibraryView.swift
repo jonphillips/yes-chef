@@ -425,6 +425,7 @@ struct RecipeListView: View {
   @State private var isRecipeListScrolled = false
 
   let model: RecipeLibraryModel
+  let onArchivedRecipesRequested: () -> Void
 
   var body: some View {
     @Bindable var model = model
@@ -456,6 +457,11 @@ struct RecipeListView: View {
                     Label("Archive", systemImage: "archivebox")
                   }
                   .tint(.red)
+                  Button(role: .destructive) {
+                    model.deleteArchivedRecipeButtonTapped(recipeID: row.recipe.id)
+                  } label: {
+                    Label("Delete…", systemImage: "trash")
+                  }
                 }
             }
           }
@@ -533,6 +539,13 @@ struct RecipeListView: View {
             Label("Workbench These", systemImage: "checklist")
           }
           .disabled(model.isImporting)
+        }
+      }
+      ToolbarItem(placement: .secondaryAction) {
+        Button {
+          onArchivedRecipesRequested()
+        } label: {
+          Label("Archived Recipes", systemImage: "archivebox")
         }
       }
     }
