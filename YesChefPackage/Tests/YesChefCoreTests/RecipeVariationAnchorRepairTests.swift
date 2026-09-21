@@ -8,6 +8,45 @@ extension RecipeCoreTests {
   @Suite
   struct RecipeVariationAnchorRepairTests {
     @Test
+    func keepingVariationReportsAnUnresolvedInstructionAnchor() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 909_900_000)
+      let ids = AnchorRepairFixtureIDs(start: 90_900)
+
+      try database.write { db in
+        try insertAnchorRepairBase(ids: ids, now: now, in: db)
+        var step = try #require(try InstructionStep.find(ids.stepID).fetchOne(db))
+        step.text = "Finish with preserved lemon."
+        try InstructionStep.upsert { step }.execute(db)
+      }
+
+      do {
+        try database.write { db in
+          _ = try RecipeRepository.keepAdjustmentProposalAsVariation(
+            RecipeAdjustmentProposal(
+              methodStepReplacements: [
+                RecipeMethodStepReplacement(
+                  originalText: "Finish with lemon.",
+                  replacementText: "Finish with lime."
+                )
+              ]
+            ),
+            recipeID: ids.recipeID,
+            name: "Lime",
+            deliberationBody: nil,
+            in: db,
+            now: now,
+            uuid: { SampleUUIDSequence.uuid(90_910) }
+          )
+        }
+        Issue.record("Expected keeping the variation to fail for the stale instruction anchor.")
+      } catch let error as RecipeAdjustmentError {
+        #expect(error == .unresolvedInstructionStep("Finish with lemon."))
+        #expect(error.localizedDescription == "The adjustment references an instruction step that could not be matched: Finish with lemon.")
+      }
+    }
+
+    @Test
     func keepsModelSuppliedTextAnchorsAsBaseIDs() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 910_000_000)

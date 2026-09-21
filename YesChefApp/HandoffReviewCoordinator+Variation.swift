@@ -1,9 +1,9 @@
 import YesChefCore
 
 extension HandoffReviewCoordinator {
-  func saveScopedVariationButtonTapped(_ review: RecipeAdjustmentReviewState) -> Bool {
+  func saveScopedVariationButtonTapped(_ review: RecipeAdjustmentReviewState) -> Result<Void, any Error> {
     guard let variationID = review.variationID, let variationName = review.variationName else {
-      return false
+      return .failure(HandoffReviewError.invalidVariationReview)
     }
     do {
       let derivation = try database.write { db in
@@ -17,18 +17,12 @@ extension HandoffReviewCoordinator {
         )
       }
       guard derivation.isRepresentable else {
-        errorTitle = "Could Not Save Variation"
-        errorMessage = "This revision includes changes that cannot be kept in a variation yet."
-        isShowingError = true
-        return false
+        return .failure(HandoffReviewError.variationCannotRepresent)
       }
       adjustmentReview = nil
-      return true
+      return .success(())
     } catch {
-      errorTitle = "Could Not Save Variation"
-      errorMessage = error.localizedDescription
-      isShowingError = true
-      return false
+      return .failure(error)
     }
   }
 }

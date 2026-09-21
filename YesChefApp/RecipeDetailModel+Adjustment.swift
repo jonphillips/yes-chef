@@ -35,7 +35,7 @@ extension RecipeDetailModel {
     )
   }
 
-  func overwriteAdjustmentButtonTapped(_ review: RecipeAdjustmentReviewState) -> Bool {
+  func overwriteAdjustmentButtonTapped(_ review: RecipeAdjustmentReviewState) -> Result<Void, any Error> {
     do {
       let restorePoint = try database.write { db in
         let restorePoint = try RecipeRepository.overwriteRecipeWithAdjustmentProposal(
@@ -54,18 +54,16 @@ extension RecipeDetailModel {
         data: restorePoint
       )
       destination = nil
-      return true
+      return .success(())
     } catch {
-      errorMessage = error.localizedDescription
-      isShowingError = true
-      return false
+      return .failure(error)
     }
   }
 
   func keepAdjustmentAsVariationButtonTapped(
     _ review: RecipeAdjustmentReviewState,
     name: String
-  ) -> Bool {
+  ) -> Result<Void, any Error> {
     do {
       try database.write { db in
         _ = try RecipeRepository.keepAdjustmentProposalAsVariation(
@@ -80,11 +78,9 @@ extension RecipeDetailModel {
         try addAdjustmentRationaleToWorkbenchIfNeeded(review, in: db)
       }
       destination = nil
-      return true
+      return .success(())
     } catch {
-      errorMessage = error.localizedDescription
-      isShowingError = true
-      return false
+      return .failure(error)
     }
   }
 
