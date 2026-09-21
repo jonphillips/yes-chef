@@ -1,6 +1,6 @@
 # Effort — Cockpit → Yes Chef recipe Find handoff (receiver side)
 
-Status: In progress
+Status: Compute slice complete; return transport and multi-admit deferred
 Summary: Receive raw Cockpit Find referrals, isolate 0/1/N recipes for Create Recipe review, and emit a typed verdict through the deferred return-transport seam.
 Related: Cockpit M6 Gate 5 slice plan (`cockpit/docs/milestones/M6-gate5-find-handoff-slice-plan.md`)
 
@@ -65,6 +65,12 @@ This is a capability upgrade you want regardless — it improves the manual past
   shared ownership*. Never move, mutate, or delete anything on Cockpit's side; the Yes Chef recipe is a
   wholly separate record with its own custody.
 
+This receiver slice deliberately admits **one selected candidate per referral**. The `FindVerdict` shape
+remains set-valued for the eventual multi-admit contract, but this Create Recipe review UI is pick-one-of-N
+and clears the referral after the first admitted save. Cockpit must not depend on receiving N admitted
+outcomes until a follow-up multi-save UI slice lands; unselected candidates are intentionally not reported
+as declines.
+
 ## Guardrails / first checks
 
 - **Reuse, don't reinvent:** the foregrounding `.main` pattern (`CaptureRecipeFromText`) and the
@@ -81,10 +87,10 @@ This is a capability upgrade you want regardless — it improves the manual past
 ## Verification (house style)
 
 `swift test`, `swiftlint lint --strict`, unsigned build. The set-valued verdict, the 1..N isolation, the
-decline/duplicate path, and the referralID round-trip are all deterministic core behavior — test them in
-`YesChefCoreTests` (extraction) and around the intent's coordinator, not on device. The one genuine
-device-only risk (silent cross-app return delivery) is named above; flag it as an unverified risk in the
-handoff report rather than closing it from an agent.
+decline/duplicate path, referralID round-trip, and exactly-one-verdict abandonment guarantee are all
+deterministic behavior — test them in `YesChefCoreTests` (extraction) and around the intent's coordinator,
+not on device. The one genuine device-only risk (silent cross-app return delivery) is named above; flag it
+as an unverified risk in the handoff report rather than closing it from an agent.
 
 ## Architect re-review (2026-09-21, Yes Chef side) — transport seam is blocked, effort is not
 

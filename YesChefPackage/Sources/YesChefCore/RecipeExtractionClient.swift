@@ -171,6 +171,8 @@ extension RecipeExtractionClient: DependencyKey {
     return nil
   }
 
+  // Model responses may include a short prose wrapper. The slice is intentionally bounded to the first
+  // JSON opening and last closing delimiter; decoding still rejects mismatched or over-sliced values.
   private static func jsonValueSlice(_ text: String) -> String? {
     let openings = [text.firstIndex(of: "{"), text.firstIndex(of: "[")].compactMap { $0 }
     let closings = [text.lastIndex(of: "}"), text.lastIndex(of: "]")].compactMap { $0 }

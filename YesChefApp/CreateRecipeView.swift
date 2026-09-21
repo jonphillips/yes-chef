@@ -34,7 +34,7 @@ struct CreateRecipeView: View {
           }
           .accessibilityLabel("Paste recipe text")
           Button {
-            Task { await model.extractButtonTapped() }
+            Task { await createRecipeCoordinator.extractButtonTapped(for: model) }
           } label: {
             if model.isExtracting {
               ProgressView("Extracting recipe")

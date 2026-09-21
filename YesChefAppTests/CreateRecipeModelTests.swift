@@ -136,7 +136,7 @@ struct CreateRecipeModelTests {
     } operation: {
       let coordinator = CreateRecipeCoordinator()
       let model = CreateRecipeModel()
-      coordinator.stage(referral: referral)
+      await coordinator.stage(referral: referral)
       await coordinator.applyStagedText(to: model)
 
       let recipeID = try #require(await coordinator.saveButtonTapped(for: model))
@@ -159,7 +159,7 @@ struct CreateRecipeModelTests {
       }
     } operation: {
       let coordinator = CreateRecipeCoordinator()
-      coordinator.stage(
+      await coordinator.stage(
         referral: FindReferral(
           referralID: "referral-dismissed",
           rawText: "not yet reviewed",
@@ -169,6 +169,68 @@ struct CreateRecipeModelTests {
       await coordinator.declineReferral(.duplicate)
 
       #expect(await recorder.verdicts == [.declined(referralID: "referral-dismissed", .duplicate)])
+      #expect(coordinator.referralID == nil)
+    }
+  }
+
+  @Test
+  func abandonedReferralEmitsExactlyOneDismissalAndSupersessionDoesNotStrandIt() async {
+    let recorder = AppFindReturnRecorder()
+
+    await withDependencies {
+      $0.uuid = .incrementing
+      $0.findReturnEmitter = FindReturnEmitter { verdict in
+        await recorder.record(verdict)
+      }
+    } operation: {
+      let coordinator = CreateRecipeCoordinator()
+      await coordinator.stage(
+        referral: FindReferral(
+          referralID: "referral-abandoned",
+          rawText: "recipe text",
+          provenance: FindProvenance()
+        )
+      )
+      await coordinator.stage(text: "ordinary text replaces the referral")
+      await coordinator.abandonOutstandingReferral()
+
+      #expect(await recorder.verdicts == [.declined(referralID: "referral-abandoned", .dismissed)])
+      #expect(coordinator.referralID == nil)
+    }
+  }
+
+  @Test
+  func acceptedReferralOfferWithNoRecipeEmitsADecline() async throws {
+    let recorder = AppFindReturnRecorder()
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.uuid = .incrementing
+      $0.recipeExtractionClient = RecipeExtractionClient(
+        extract: { _ in RecipeExtraction(title: "unused") },
+        extractMany: { _ in [] }
+      )
+      $0.findReturnEmitter = FindReturnEmitter { verdict in
+        await recorder.record(verdict)
+      }
+    } operation: {
+      let coordinator = CreateRecipeCoordinator()
+      let model = CreateRecipeModel()
+      model.composeText = "Existing recipe draft"
+      model.composeTextChanged()
+
+      await coordinator.stage(
+        referral: FindReferral(
+          referralID: "referral-offer-no-recipe",
+          rawText: "newsletter with no complete recipe",
+          provenance: FindProvenance()
+        )
+      )
+      await coordinator.applyStagedText(to: model)
+      model.acceptIncomingPastedText("newsletter with no complete recipe")
+      await coordinator.extractButtonTapped(for: model)
+
+      #expect(await recorder.verdicts == [.declined(referralID: "referral-offer-no-recipe", .noRecipeFound)])
       #expect(coordinator.referralID == nil)
     }
   }
@@ -187,7 +249,7 @@ struct CreateRecipeModelTests {
       let model = CreateRecipeModel()
       let text = "1 cup lentils"
 
-      coordinator.stage(text: text)
+      await coordinator.stage(text: text)
       await coordinator.applyStagedText(to: model)
 
       #expect(model.sources.count == 1)
@@ -218,7 +280,7 @@ struct CreateRecipeModelTests {
       ```
       """
 
-      coordinator.stage(text: text)
+      await coordinator.stage(text: text)
       await coordinator.applyStagedText(to: model)
 
       #expect(model.sources.first?.content == text)
@@ -239,7 +301,7 @@ struct CreateRecipeModelTests {
       model.composeTextChanged()
       model.editorModel.draft.title = "Existing Draft"
 
-      coordinator.stage(text: incomingText)
+      await coordinator.stage(text: incomingText)
       await coordinator.applyStagedText(to: model)
 
       #expect(model.composeText == existingText)
@@ -272,7 +334,7 @@ struct CreateRecipeModelTests {
       ```
       """
 
-      coordinator.stage(text: text)
+      await coordinator.stage(text: text)
       await coordinator.applyStagedText(to: model)
 
       #expect(model.editorModel.draft.title == "Shortcut Broth")
@@ -292,7 +354,7 @@ struct CreateRecipeModelTests {
       let model = CreateRecipeModel()
       let text = "a reminder to buy lemons"
 
-      coordinator.stage(text: text)
+      await coordinator.stage(text: text)
       await coordinator.applyStagedText(to: model)
 
       #expect(model.sources.first?.content == text)

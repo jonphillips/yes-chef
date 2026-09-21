@@ -97,7 +97,7 @@ final class HandoffInAppTransport {
         try await database.write { db in
           try AIHandoffRepository.markImported(id: handoff.id, at: importDate, in: db)
         }
-        createRecipeCoordinator.stage(text: routedText.payload)
+        await createRecipeCoordinator.stage(text: routedText.payload)
         if let warning = contract.warning {
           errorTitle = "Imported with a warning"
           errorMessage = warning

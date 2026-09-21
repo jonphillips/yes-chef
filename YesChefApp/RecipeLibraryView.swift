@@ -9,6 +9,7 @@ import YesChefCore
 
 struct AppContainer: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+  @Environment(\.scenePhase) private var scenePhase
   @Dependency(\.handoffReviewCoordinator) private var handoffReviewCoordinator
   @Dependency(\.createRecipeCoordinator) private var createRecipeCoordinator
   @State private var toastCenter: AppToastCenter
@@ -167,6 +168,14 @@ struct AppContainer: View {
       guard createRecipeCoordinator.stagedText != nil else { return }
       selectedSection = .createRecipe
       await createRecipeCoordinator.applyStagedText(to: createRecipeModel)
+    }
+    .onChange(of: selectedSection) { oldSection, newSection in
+      guard oldSection == .createRecipe, newSection != .createRecipe else { return }
+      Task { await createRecipeCoordinator.abandonOutstandingReferral() }
+    }
+    .onChange(of: scenePhase) { _, phase in
+      guard phase == .background else { return }
+      Task { await createRecipeCoordinator.abandonOutstandingReferral() }
     }
     .confirmationDialog(
       "Remove Meal Plan Item?",
