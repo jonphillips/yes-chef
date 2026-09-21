@@ -7,6 +7,55 @@ import Testing
 extension RecipeCoreTests {
   @Suite
   struct CreateRecipeExtractionTests {
+    @Test
+    func batchResponseIsParsedAsSeparateRecipes() throws {
+      let response = """
+        {"recipes":[
+          {"title":"Beans","ingredientSections":[{"lines":["1 cup beans"]}],"instructionSections":[{"steps":["Simmer the beans."]}]},
+          {"title":"Rice","ingredientSections":[{"lines":["1 cup rice"]}],"instructionSections":[{"steps":["Steam the rice."]}]}
+        ]}
+        """
+
+      let extractions = try #require(RecipeExtractionClient.parseMany(response))
+
+      #expect(extractions.map(\.title) == ["Beans", "Rice"])
+      #expect(extractions.map { $0.ingredientSections.flatMap(\.lines) } == [["1 cup beans"], ["1 cup rice"]])
+      #expect(extractions.map { $0.instructionSections.flatMap(\.steps) } == [["Simmer the beans."], ["Steam the rice."]])
+    }
+
+    @Test
+    func batchExtractionReturnsZeroWithoutThrowingWhenNoRecipeIsFound() async throws {
+      let result = try await withDependencies {
+        $0.recipeExtractionClient = RecipeExtractionClient(
+          extract: { _ in throw RecipeExtractionError.responseUnreadable },
+          extractMany: { _ in [] }
+        )
+      } operation: {
+        try await CreateRecipeExtraction.extractMany(text: "A newsletter with no cooking instructions.")
+      }
+
+      #expect(result.isEmpty)
+    }
+
+    @Test
+    func batchExtractionPreservesEveryCandidateForReview() async throws {
+      let extractions = [
+        RecipeExtraction(title: "Beans", ingredientSections: [.init(lines: ["1 cup beans"])]),
+        RecipeExtraction(title: "Rice", instructionSections: [.init(steps: ["Steam the rice."])])
+      ]
+
+      let result = try await withDependencies {
+        $0.recipeExtractionClient = RecipeExtractionClient(
+          extract: { _ in extractions[0] },
+          extractMany: { _ in extractions }
+        )
+      } operation: {
+        try await CreateRecipeExtraction.extractMany(text: "Two recipes in one email")
+      }
+
+      expectNoDifference(result, extractions)
+    }
+
     /// The common paste case: ordinary prose routes through the LLM extraction engine and the result
     /// maps onto `RecipeEditorDraft`, the shared sink, with every named section preserved.
     @Test

@@ -24,6 +24,9 @@ it's touched.
 
 ## Active / recent
 
+- [cockpit-find-handoff-receiver.md](cockpit-find-handoff-receiver.md) — **In progress** · Receive raw Cockpit
+  Find referrals, isolate 0/1/N recipes for Create Recipe review, and emit a typed verdict through the deferred
+  return-transport seam.
 - [prepared-components.md](prepared-components.md) — **Designed (proposal)**, not dispatched, **post-cutover** ·
   Feeds a future ADR · Gives cooking its missing middle layer (`ingredients → prepared components → dishes`):
   a `Recipe.kind` enum makes a recipe a reusable component and a **directional** `recipeComponentLink` edge
