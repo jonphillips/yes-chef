@@ -78,7 +78,7 @@ struct WorkbenchListView: View {
 
 private extension View {
   func workbenchSwipeActions(_ row: WorkbenchRowData, model: WorkbenchLibraryModel) -> some View {
-    swipeActions {
+    swipeActions(allowsFullSwipe: false) {
       if row.workbench.dateCompleted == nil {
         Button {
           model.markWorkbenchCompletedButtonTapped(row)
