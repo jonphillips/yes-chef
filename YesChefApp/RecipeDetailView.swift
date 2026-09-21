@@ -234,10 +234,15 @@ struct RecipeDetailView: View {
           Label("View Original", systemImage: "doc.text.magnifyingglass")
         }
       }
-      Button(role: .destructive) {
+      Button {
         libraryModel.deleteButtonTapped(recipeID: model.recipeID)
       } label: {
         Label("Archive", systemImage: "archivebox")
+      }
+      Button(role: .destructive) {
+        libraryModel.deleteArchivedRecipeButtonTapped(recipeID: model.recipeID)
+      } label: {
+        Label("Delete…", systemImage: "trash")
       }
     }
   }

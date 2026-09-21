@@ -34,7 +34,11 @@ struct AppMainLayout: View {
         RecipesTab(
           model: recipeModel,
           mealCalendarModel: mealCalendarModel,
-          groceryModel: groceryModel
+          groceryModel: groceryModel,
+          onArchivedRecipesRequested: {
+            selectedSection = .settings
+            selectedSettingsPane = .archivedRecipes
+          }
         )
       }
 
@@ -150,10 +154,14 @@ private struct RecipesTab: View {
   let model: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
+  let onArchivedRecipesRequested: () -> Void
 
   var body: some View {
     NavigationSplitView(columnVisibility: $columnVisibility) {
-      RecipeListView(model: model)
+      RecipeListView(
+        model: model,
+        onArchivedRecipesRequested: onArchivedRecipesRequested
+      )
     } detail: {
       RecipeDetailColumn(
         model: model,
