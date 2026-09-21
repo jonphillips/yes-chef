@@ -187,6 +187,13 @@ struct RecipeEditorFields: View {
             }
           }
 
+          sectionMoveControls(
+            isFirst: section.id == model.draft.ingredientSections.first?.id,
+            isLast: section.id == model.draft.ingredientSections.last?.id,
+            moveUp: { model.moveIngredientSection(id: section.id, up: true) },
+            moveDown: { model.moveIngredientSection(id: section.id, up: false) }
+          )
+
           if model.draft.ingredientSections.count > 1 {
             Button(role: .destructive) {
               model.deleteIngredientSection(id: section.id)
@@ -219,6 +226,13 @@ struct RecipeEditorFields: View {
             minHeight: 220
           )
 
+          sectionMoveControls(
+            isFirst: section.id == model.draft.instructionSections.first?.id,
+            isLast: section.id == model.draft.instructionSections.last?.id,
+            moveUp: { model.moveInstructionSection(id: section.id, up: true) },
+            moveDown: { model.moveInstructionSection(id: section.id, up: false) }
+          )
+
           if model.draft.instructionSections.count > 1 {
             Button(role: .destructive) {
               model.deleteInstructionSection(id: section.id)
@@ -231,6 +245,7 @@ struct RecipeEditorFields: View {
             Text("Instructions")
           }
         }
+        .id(section.id)
       }
 
       Section {
@@ -258,6 +273,25 @@ struct RecipeEditorFields: View {
     Task { @MainActor in
       await Task.yield()
       focusedIngredientSectionID = sectionID
+    }
+  }
+
+  private func sectionMoveControls(
+    isFirst: Bool,
+    isLast: Bool,
+    moveUp: @escaping () -> Void,
+    moveDown: @escaping () -> Void
+  ) -> some View {
+    HStack(spacing: 16) {
+      Button(action: moveUp) {
+        Label("Move Up", systemImage: "chevron.up")
+      }
+      .disabled(isFirst)
+
+      Button(action: moveDown) {
+        Label("Move Down", systemImage: "chevron.down")
+      }
+      .disabled(isLast)
     }
   }
 }

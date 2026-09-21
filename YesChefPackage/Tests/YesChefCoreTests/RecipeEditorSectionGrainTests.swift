@@ -154,6 +154,26 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func reorderingSectionsPersistsContiguousSortOrder() throws {
+      let now = Date(timeIntervalSinceReferenceDate: 830_050_000)
+      try seedMultiSectionRecipe(now: now)
+      let before = try fetchedDetail()
+      var draft = RecipeEditorDraft(detail: before)
+      draft.ingredientSections.swapAt(0, 1)
+      draft.instructionSections.swapAt(0, 1)
+
+      let updated = try save(draft, now: now.addingTimeInterval(60), uuidStart: 51_500)
+
+      let ingredients = updated.ingredientSections.sorted { $0.sortOrder < $1.sortOrder }
+      expectNoDifference(ingredients.map(\.name), ["Meatballs", "Sauce"])
+      expectNoDifference(ingredients.map(\.sortOrder), [0, 1])
+
+      let instructions = updated.instructionSections.sorted { $0.sortOrder < $1.sortOrder }
+      expectNoDifference(instructions.map(\.name), ["Cook", "Make the sauce"])
+      expectNoDifference(instructions.map(\.sortOrder), [0, 1])
+    }
+
+    @Test
     func editingSecondSectionLeavesFirstUntouched() throws {
       let now = Date(timeIntervalSinceReferenceDate: 830_100_000)
       try seedMultiSectionRecipe(now: now)
