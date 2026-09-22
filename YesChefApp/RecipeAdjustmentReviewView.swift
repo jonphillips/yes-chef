@@ -86,7 +86,11 @@ struct RecipeAdjustmentReviewView: View {
           .disabled(isBusy)
         }
         ToolbarItemGroup(placement: .confirmationAction) {
-          if let saveVariation {
+          // The scoped "Save Variation" button only makes sense when the review is actually scoped to
+          // an existing variation. A base-recipe adjustment (variationID == nil) has no variation to
+          // save into, so it takes the "Keep as Variation" + "Overwrite" pair — even when the presenter
+          // supplied a saveVariation closure (the library sheet always does).
+          if let saveVariation, review.variationID != nil {
             Button {
               saveVariationButtonTapped(saveVariation)
             } label: {

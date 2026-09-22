@@ -748,6 +748,9 @@ enum HandoffAppOperations {
     )
   }
 
+  /// Staging for the in-app paste doors always allows a re-stage: pasting a return should re-open its
+  /// review even if a prior paste already staged (and thus marked) the same handoff but the cook backed
+  /// out. The caller's `present` then replaces whatever review was in process.
   static func stageReview(
     handoffID: AIHandoff.ID?,
     result: String,
@@ -760,7 +763,8 @@ enum HandoffAppOperations {
         handoffID: handoffID,
         result: contract.text,
         in: db,
-        now: now
+        now: now,
+        allowRestage: true
       )
       return AIHandoffReviewResult(review: review, warning: contract.warning)
     }

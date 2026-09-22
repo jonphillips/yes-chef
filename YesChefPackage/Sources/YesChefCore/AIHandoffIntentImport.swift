@@ -77,11 +77,18 @@ public extension AIHandoffIntentImport {
     return review
   }
 
+  /// - Parameter allowRestage: A pasted return marks its handoff `.imported` the instant its review is
+  ///   *staged*, before the cook commits anything. Backing out of that review strands the handoff — the
+  ///   in-memory review is gone and re-pasting the same result would otherwise fail as a `.duplicate`.
+  ///   The in-app paste transports pass `true` so a re-paste simply re-opens the review: re-staging is a
+  ///   pure read that rebuilds the review from current rows, so repeating it is safe. Strict callers (and
+  ///   the typed menu wrapper) leave it `false`, preserving the double-import guard.
   static func stageReview(
     handoffID: AIHandoff.ID?,
     result: String,
     in db: Database,
-    now: Date
+    now: Date,
+    allowRestage: Bool = false
   ) throws -> AIHandoffReview {
     let routedText = AIHandoffToken.stripping(from: result)
     guard let id = handoffID ?? routedText?.handoffID else {
@@ -90,7 +97,8 @@ public extension AIHandoffIntentImport {
     guard let handoff = try AIHandoffRepository.handoff(id: id, in: db) else {
       throw AIHandoffIntentImportError.handoffNotFound(id)
     }
-    guard handoff.status == .awaitingReturn, handoff.importedAt == nil else {
+    let alreadyImported = handoff.status != .awaitingReturn || handoff.importedAt != nil
+    guard allowRestage || !alreadyImported else {
       throw AIHandoffIntentImportError.duplicate
     }
     let review = try AIHandoffReviewStager.stage(

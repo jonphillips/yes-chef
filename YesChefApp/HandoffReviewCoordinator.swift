@@ -24,6 +24,10 @@ final class HandoffReviewCoordinator {
   func present(_ review: AIHandoffReview, warning: String? = nil) {
     clearError()
     contractWarning = warning
+    // A fresh paste replaces whatever review was in process, including a half-finished adjustment
+    // sub-flow, so re-pasting after backing out reliably lands on the new review.
+    adjustmentReview = nil
+    pendingAdjustmentReview = nil
     self.review = review
   }
 

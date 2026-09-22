@@ -209,6 +209,62 @@ struct AIHandoffTests {
       expectNoDifference(recipeReview.learnings, ["Let the sauce rest overnight before serving."])
     }
   }
+
+  @Test
+  func restagingAnAlreadyImportedHandoffReopensReviewOnlyWhenAllowed() throws {
+    @Dependency(\.defaultDatabase) var database
+    let recipeID = SampleUUIDSequence.uuid(38_100)
+    let handoffID = SampleUUIDSequence.uuid(38_101)
+    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
+    let result = """
+    YC-HANDOFF: \(handoffID.uuidString)
+    Make the chile sauce up to two days ahead.
+    """
+
+    try database.write { db in
+      try Recipe.insert {
+        Recipe(id: recipeID, title: "Birria", dateCreated: now, dateModified: now)
+      }
+      .execute(db)
+      try AIHandoffRepository.create(
+        AIHandoff(
+          id: handoffID,
+          sourceType: .recipe,
+          sourceID: recipeID,
+          taskType: .recipeMakeAhead,
+          createdAt: now,
+          exportedPrompt: "YC-HANDOFF: \(handoffID.uuidString)"
+        ),
+        in: db
+      )
+
+      // First paste stages the review and marks the handoff imported.
+      _ = try AIHandoffIntentImport.stageReview(handoffID: handoffID, result: result, in: db, now: now)
+      #expect(try AIHandoffRepository.handoff(id: handoffID, in: db)?.status == .imported)
+
+      // A strict re-paste (the default) still guards against a double import…
+      #expect(
+        throws: AIHandoffIntentImportError.duplicate,
+        performing: {
+          _ = try AIHandoffIntentImport.stageReview(handoffID: handoffID, result: result, in: db, now: now)
+        }
+      )
+
+      // …but the in-app paste doors allow a re-stage, re-opening the same review after a backed-out one.
+      let restaged = try AIHandoffIntentImport.stageReview(
+        handoffID: handoffID,
+        result: result,
+        in: db,
+        now: now,
+        allowRestage: true
+      )
+      guard case let .recipeMakeAhead(recipeReview) = restaged else {
+        Issue.record("Expected a recipe make-ahead review on re-stage.")
+        return
+      }
+      expectNoDifference(recipeReview.makeAhead, "Make the chile sauce up to two days ahead.")
+    }
+  }
 }
 
 extension AIHandoffTests {
