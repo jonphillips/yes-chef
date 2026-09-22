@@ -15,9 +15,23 @@ struct IngredientLineRow: View {
       } else {
         Text("•")
           .foregroundStyle(.secondary)
-        IngredientLineText(scaledText)
-          .font(.body)
-          .strikethrough(display.highlight == .removed)
+        if let presentation = IngredientLineReaderPresentation.display(for: line, scaledText: scaledText) {
+          VStack(alignment: .leading, spacing: 1) {
+            IngredientLineText(presentation.primaryText)
+              .font(.body.weight(.medium))
+              .strikethrough(display.highlight == .removed)
+            if let secondaryText = presentation.secondaryText {
+              IngredientLineText(secondaryText)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .strikethrough(display.highlight == .removed)
+            }
+          }
+        } else {
+          IngredientLineText(scaledText)
+            .font(.body)
+            .strikethrough(display.highlight == .removed)
+        }
       }
     }
     .foregroundStyle(display.highlight == .removed ? .secondary : .primary)

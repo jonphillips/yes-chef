@@ -9,6 +9,56 @@ extension RecipeCoreTests {
   @Suite
   struct RecipeEnrichmentTests {
     @Test
+    func ingredientReaderPresentationPromotesMeasureAndItemWhenFieldsCoverSource() {
+      let line = IngredientLine(
+        id: SampleUUIDSequence.uuid(36_500),
+        recipeID: SampleUUIDSequence.uuid(36_501),
+        sectionID: SampleUUIDSequence.uuid(36_502),
+        originalText: "2 tablespoons finely chopped fresh rosemary",
+        quantity: 2,
+        quantityText: "2",
+        unit: "tablespoon",
+        item: "fresh rosemary",
+        preparation: "finely chopped",
+        sortOrder: 0
+      )
+
+      expectNoDifference(
+        IngredientLineReaderPresentation.display(
+          for: line,
+          scaledText: "4 tablespoons finely chopped fresh rosemary"
+        ),
+        IngredientLineReaderDisplay(
+          primaryText: "4 tablespoons fresh rosemary",
+          secondaryText: "finely chopped"
+        )
+      )
+    }
+
+    @Test
+    func ingredientReaderPresentationFallsBackWhenParsedFieldsOmitSourceWords() {
+      let line = IngredientLine(
+        id: SampleUUIDSequence.uuid(36_510),
+        recipeID: SampleUUIDSequence.uuid(36_511),
+        sectionID: SampleUUIDSequence.uuid(36_512),
+        originalText: "2 tablespoons finely chopped fresh rosemary leaves, plus extra to finish",
+        quantity: 2,
+        quantityText: "2",
+        unit: "tablespoon",
+        item: "fresh rosemary",
+        preparation: "finely chopped",
+        sortOrder: 0
+      )
+
+      #expect(
+        IngredientLineReaderPresentation.display(
+          for: line,
+          scaledText: "4 tablespoons finely chopped fresh rosemary leaves, plus extra to finish"
+        ) == nil
+      )
+    }
+
+    @Test
     func chefItUpClientFailsLoudlyWhenAStrictResponseIsTruncated() async {
       await withDependencies {
         $0.modelClient = StubModelClient { _ in
@@ -207,7 +257,13 @@ extension RecipeCoreTests {
           }
           .execute(db)
         }
-        try RecipeServeWithRepository.update(id: firstID, title: "Charred lime crema", in: db, now: updatedAt)
+        try RecipeServeWithRepository.update(
+          id: firstID,
+          title: "Charred lime crema",
+          note: "With lime zest",
+          in: db,
+          now: updatedAt
+        )
         _ = try RecipeServeWithRepository.reorder(
           movingIDs: [thirdID], destination: .before(secondID), for: recipeID, in: db, now: updatedAt
         )
@@ -218,7 +274,7 @@ extension RecipeCoreTests {
           try RecipeServeWithRepository.serveWith(for: recipeID, in: db),
           [
             RecipeServeWith(
-              id: firstID, recipeID: recipeID, title: "Charred lime crema", sortOrder: 0,
+              id: firstID, recipeID: recipeID, title: "Charred lime crema", note: "With lime zest", sortOrder: 0,
               provenance: .model, dateCreated: createdAt, dateModified: updatedAt
             ),
             RecipeServeWith(

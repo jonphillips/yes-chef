@@ -5,21 +5,18 @@ import YesChefCore
 struct RecipePlaybookView: View {
   let model: RecipeDetailModel
   let handoffTransport: HandoffInAppTransport
-  let ask: () -> Void
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
+  var isComfortablePlaybookWidth = false
+  var onReadFull: () -> Void = {}
 
-  @State private var isMakeAheadExpanded = true
-  @State private var isChoicesExpanded = true
-  @State private var isNotesExpanded = true
-  @State private var isChefItUpExpanded = true
-  @State private var isServeWithExpanded = true
+  @State private var isMakeAheadExpanded = false
+  @State private var isRelatedRecipesExpanded = false
+  @State private var isNotesExpanded = false
+  @State private var isChefItUpExpanded = false
   @State private var isDeliberationLogExpanded = false
   @State private var editingSection: PlaybookSectionKind?
   @State private var clearingSection: PlaybookSectionKind?
-  @Binding var promotingVariation: RecipeVariation?
-  @Binding var splittingOffVariation: RecipeVariation?
-  @Binding var splitOffTitleDraft: String
-
+  @State private var isWritingNote = false
   var body: some View {
     let visibleNotes = model.visibleNotes
     let readerFeedbackNotes = visibleNotes.filter { $0.noteType == .readerFeedback }
@@ -28,63 +25,49 @@ struct RecipePlaybookView: View {
     let serveWithNeedsRepair = model.serveWithRepairError != nil
 
     VStack(alignment: .leading, spacing: 18) {
-      playbookHeader
       playbookSection(
-        .makeAhead,
-        isFilled: model.makeAhead != nil,
-        isExpanded: $isMakeAheadExpanded
-      ) {
-        makeAheadContent(model.makeAhead)
-      }
-      playbookSection(
-        "Choices",
-        isFilled: !model.variations.isEmpty || !model.relatedRecipes.isEmpty,
-        isExpanded: $isChoicesExpanded,
+        "Notes",
+        isFilled: !visibleNotes.isEmpty,
+        preview: notesPreview(visibleNotes),
+        isExpanded: $isNotesExpanded,
         showsActions: false,
         actions: { EmptyView() }
       ) {
-        VStack(alignment: .leading, spacing: 16) {
-          RecipeVariationChoices(
-            variations: model.variations,
-            activeVariationID: model.detail?.activeVariationID,
-            model: model,
-            handoffTransport: handoffTransport,
-            promotingVariation: $promotingVariation,
-            splittingOffVariation: $splittingOffVariation,
-            splitOffTitleDraft: $splitOffTitleDraft
-          )
-          RecipeRelatedRecipeChoices(
-            relatedRecipes: model.relatedRecipes,
-            model: model,
-            onRecipeSelected: onRecipeSelected
-          )
-        }
-      }
-      notesSection(
-        "Notes",
-        isFilled: !visibleNotes.isEmpty,
-        isExpanded: $isNotesExpanded
-      ) {
-        if !readerFeedbackNotes.isEmpty {
-          readerFeedbackView(readerFeedbackNotes)
-        }
-        if !otherNotes.isEmpty {
-          notesView(otherNotes)
-        }
+        notesContent(
+          visibleNotes: visibleNotes,
+          readerFeedbackNotes: readerFeedbackNotes,
+          otherNotes: otherNotes
+        )
       }
       playbookSection(
         .chefItUp,
         isFilled: model.chefItUp != nil,
+        preview: firstMeaningfulLine(model.chefItUp),
         isExpanded: $isChefItUpExpanded
       ) {
         chefItUpContent(model.chefItUp)
       }
       playbookSection(
-        .serveWith,
-        isFilled: !serveWith.isEmpty,
-        isExpanded: $isServeWithExpanded
+        .makeAhead,
+        isFilled: model.makeAhead != nil,
+        preview: firstMeaningfulLine(model.makeAhead),
+        isExpanded: $isMakeAheadExpanded
       ) {
-        serveWithContent(serveWith, needsRepair: serveWithNeedsRepair)
+        makeAheadContent(model.makeAhead)
+      }
+      playbookSection(
+        "Related Recipes",
+        isFilled: !model.relatedRecipes.isEmpty,
+        isExpanded: $isRelatedRecipesExpanded,
+        showsActions: false,
+        actions: { EmptyView() }
+      ) {
+        RecipeRelatedRecipeChoices(
+          relatedRecipes: model.relatedRecipes,
+          model: model,
+          onRecipeSelected: onRecipeSelected,
+          showsSectionTitle: false
+        )
       }
       if !model.deliberationLogEntries.isEmpty {
         playbookSection(
@@ -106,6 +89,11 @@ struct RecipePlaybookView: View {
         updateLearning: model.updateLearning,
         deleteLearning: model.deleteLearning,
         reorderLearnings: model.reorderLearnings
+      )
+      RecipeServeWithStrip(
+        model: model,
+        items: serveWith,
+        needsRepair: serveWithNeedsRepair
       )
     }
     .sheet(item: $editingSection) { section in
@@ -140,46 +128,22 @@ struct RecipePlaybookView: View {
         Text("This permanently clears the \(section.title) section. This cannot be undone.")
       }
     }
-  }
-
-  private var playbookHeader: some View {
-    HStack(alignment: .top, spacing: 12) {
-      Spacer()
-      askButton
+    .sheet(isPresented: $isWritingNote) {
+      RecipePlaybookNoteEditorSheet(save: model.createGeneralNote)
     }
-    .accessibilityElement(children: .contain)
-    .accessibilityLabel("Playbook actions")
-  }
-
-  private var isAskActive: Bool {
-    model.destination.chat != nil
-  }
-
-  private var askButton: some View {
-    Button(action: ask) {
-      Label("Ask", systemImage: "sparkles")
-    }
-    .buttonStyle(.bordered)
-    .buttonBorderShape(.roundedRectangle(radius: 8))
-    .overlay {
-      // Light the trigger up in the activity color while its panel is open.
-      if isAskActive {
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
-          .strokeBorder(.tint, lineWidth: 3)
-      }
-    }
-    .accessibilityValue(isAskActive ? Text("Panel open") : Text("Panel closed"))
   }
 
   private func playbookSection<Content: View>(
     _ section: PlaybookSectionKind,
     isFilled: Bool,
+    preview: String? = nil,
     isExpanded: Binding<Bool>,
     @ViewBuilder content: @escaping () -> Content
   ) -> some View {
     playbookSection(
       section.title,
       isFilled: isFilled,
+      preview: preview,
       isExpanded: isExpanded,
       showsActions: true,
       actions: { sectionMenu(for: section, isFilled: isFilled) },
@@ -190,6 +154,7 @@ struct RecipePlaybookView: View {
   private func playbookSection<Actions: View, Content: View>(
     _ title: String,
     isFilled: Bool,
+    preview: String? = nil,
     isExpanded: Binding<Bool>,
     showsActions: Bool,
     @ViewBuilder actions: @escaping () -> Actions,
@@ -204,8 +169,16 @@ struct RecipePlaybookView: View {
       // The fill-dot and the disclosure chevron read as one status pair hugging the trailing edge; the menu
       // sits well clear of them so its tap target can't be confused for the disclosure's.
       HStack(spacing: 0) {
-        Text(title)
-          .font(.title2.bold())
+        VStack(alignment: .leading, spacing: 2) {
+          Text(title)
+            .font(.title2.bold())
+          if let preview {
+            Text(preview)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+          }
+        }
         Spacer(minLength: 12)
         if showsActions, isExpanded.wrappedValue {
           actions()
@@ -219,32 +192,13 @@ struct RecipePlaybookView: View {
     .accessibilityValue(Text(isFilled ? "Contains content" : "Empty"))
   }
 
-  private func notesSection<Content: View>(
-    _ title: String,
-    isFilled: Bool,
-    isExpanded: Binding<Bool>,
-    @ViewBuilder content: @escaping () -> Content
-  ) -> some View {
-    DisclosureGroup(isExpanded: isExpanded) {
-      content()
-        .padding(.top, 8)
-    } label: {
-      HStack {
-        Text(title)
-          .font(.title2.bold())
-        Spacer()
-        Image(systemName: isFilled ? "circle.fill" : "circle")
-          .foregroundStyle(isFilled ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-          .accessibilityLabel(Text(isFilled ? "Contains content" : "Empty"))
-      }
-    }
-    .accessibilityValue(Text(isFilled ? "Contains content" : "Empty"))
-  }
-
   private func makeAheadContent(_ makeAhead: String?) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       if let makeAhead {
-        enrichmentText(makeAhead)
+        enrichmentContent(makeAhead)
+      } else {
+        Button("Add make-ahead", systemImage: "plus") { editingSection = .makeAhead }
+          .buttonStyle(.plain)
       }
     }
   }
@@ -252,8 +206,26 @@ struct RecipePlaybookView: View {
   private func chefItUpContent(_ chefItUp: String?) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       if let chefItUp {
-        enrichmentText(chefItUp)
+        enrichmentContent(chefItUp)
+      } else {
+        Button("Add an idea", systemImage: "plus") { editingSection = .chefItUp }
+          .buttonStyle(.plain)
       }
+    }
+  }
+
+  @ViewBuilder
+  private func enrichmentContent(_ text: String) -> some View {
+    if isComfortablePlaybookWidth, text.count > 280 {
+      VStack(alignment: .leading, spacing: 8) {
+        RecipeMarkdownText(String(text.prefix(260)).trimmingCharacters(in: .whitespacesAndNewlines) + "…")
+          .frame(maxWidth: .infinity, alignment: .leading)
+        Button("Read full") { onReadFull() }
+          .font(.caption.weight(.semibold))
+          .buttonStyle(.plain)
+      }
+    } else {
+      enrichmentText(text)
     }
   }
 
@@ -265,48 +237,56 @@ struct RecipePlaybookView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private func serveWithContent(_ items: [RecipeServeWith], needsRepair: Bool) -> some View {
-    VStack(alignment: .leading, spacing: 12) {
-      if needsRepair {
-        ServeWithRepairBanner(repair: model.repairServeWithButtonTapped)
+  @ViewBuilder
+  private func notesContent(
+    visibleNotes: [RecipeNote],
+    readerFeedbackNotes: [RecipeNote],
+    otherNotes: [RecipeNote]
+  ) -> some View {
+    if visibleNotes.isEmpty {
+      Button("Write a note", systemImage: "plus") { isWritingNote = true }
+        .buttonStyle(.plain)
+    } else if isComfortablePlaybookWidth,
+      let longNote = visibleNotes.first(where: { $0.text.count > 280 }) {
+      VStack(alignment: .leading, spacing: 8) {
+        RecipeMarkdownText(String(longNote.text.prefix(260)).trimmingCharacters(in: .whitespacesAndNewlines) + "…")
+        Button("Read full") { onReadFull() }
+          .font(.caption.weight(.semibold))
+          .buttonStyle(.plain)
       }
-      EditableRowsSection(
-        title: "Serve With",
-        titleFont: .title3.bold(),
-        editorLabel: "Serve With",
-        items: items,
-        itemText: \.title,
-        addItem: model.createServeWith,
-        addButtonLabel: "Add Serve With",
-        updateItem: model.updateServeWith,
-        deleteItem: { model.deleteServeWith($0.id) },
-        reorderItems: { ids, destinationID in
-          model.reorderServeWith(ids, destination: destinationID.map(ServeWithReorderDestination.before) ?? .end)
-        }
-      ) {
-        ContentUnavailableView(
-          "No Serve With Yet",
-          systemImage: "fork.knife",
-          description: Text("Add an accompaniment or save one from an AI handoff here.")
-        )
-      } itemContent: { item in
-        VStack(alignment: .leading, spacing: 3) {
-          Text(item.title)
-            .font(.headline)
-          if let note = item.note {
-            Text(note)
-              .font(.callout)
-              .foregroundStyle(.secondary)
-          }
-        }
-      } badge: { item in
-        if item.provenance == .handAuthored {
-          Label("Hand-authored", systemImage: "pencil")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    } else {
+      if !readerFeedbackNotes.isEmpty {
+        readerFeedbackView(readerFeedbackNotes)
+      }
+      if !otherNotes.isEmpty {
+        notesView(otherNotes)
       }
     }
+  }
+
+  private func notesPreview(_ notes: [RecipeNote]) -> String? {
+    guard let firstNote = notes.first, let firstLine = firstMeaningfulLine(firstNote.text) else { return nil }
+    let count = notes.count
+    return "\(count) note\(count == 1 ? "" : "s") · \(firstLine)"
+  }
+
+  private func firstMeaningfulLine(_ text: String?) -> String? {
+    guard let text else { return nil }
+    let line = text
+      .split(whereSeparator: \.isNewline)
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .first { !$0.isEmpty }
+    guard var line else { return nil }
+    while let first = line.first, ["#", "-", "*", "•", "–"].contains(String(first)) {
+      line.removeFirst()
+      line = line.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    guard !line.isEmpty else { return nil }
+    if line.count > 96 {
+      return String(line.prefix(93)).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
+    }
+    return line
   }
 
   private func sectionMenu(for section: PlaybookSectionKind, isFilled: Bool) -> some View {
@@ -407,6 +387,264 @@ struct RecipePlaybookView: View {
       EmptyView()
     } itemContent: { note in
       RecipeMarkdownText(note.text)
+    }
+  }
+}
+
+private struct RecipeServeWithStrip: View {
+  let model: RecipeDetailModel
+  let items: [RecipeServeWith]
+  let needsRepair: Bool
+
+  @State private var editor: ServeWithItemEditorRoute?
+  @State private var isManaging = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Text("Serve With")
+          .font(.title3.bold())
+        Spacer()
+        if !items.isEmpty {
+          Button {
+            isManaging = true
+          } label: {
+            Image(systemName: "slider.horizontal.3")
+              .frame(width: 44, height: 44)
+          }
+          .accessibilityLabel("Manage Serve With")
+        }
+      }
+
+      if needsRepair {
+        ServeWithRepairBanner(repair: model.repairServeWithButtonTapped)
+      }
+
+      if items.isEmpty {
+        Button {
+          editor = .add
+        } label: {
+          Label("Add", systemImage: "plus")
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, 13)
+            .frame(minHeight: 38)
+            .background(.quaternary.opacity(0.55), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Add Serve With item")
+      } else {
+        ScrollView(.horizontal) {
+          HStack(spacing: 8) {
+            ForEach(items) { item in
+              Button {
+                editor = .edit(item)
+              } label: {
+                Text(item.title)
+                  .font(.subheadline.weight(.medium))
+                  .lineLimit(1)
+                  .padding(.horizontal, 12)
+                  .frame(minHeight: 38)
+                  .background(.quaternary.opacity(0.55), in: Capsule())
+              }
+              .buttonStyle(.plain)
+              .accessibilityLabel(item.title)
+              .accessibilityHint("Opens the full note and editing actions.")
+            }
+            Button {
+              editor = .add
+            } label: {
+              Label("Add", systemImage: "plus")
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 12)
+                .frame(minHeight: 38)
+                .background(.quaternary.opacity(0.55), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Add Serve With item")
+          }
+        }
+        .scrollIndicators(.visible)
+        .overlay(alignment: .trailing) {
+          LinearGradient(
+            colors: [.clear, Color(uiColor: .systemBackground)],
+            startPoint: .leading,
+            endPoint: .trailing
+          )
+          .frame(width: 12)
+          .allowsHitTesting(false)
+          .accessibilityHidden(true)
+        }
+      }
+    }
+    .sheet(item: $editor) { route in
+      ServeWithItemEditorSheet(
+        item: route.item,
+        save: { title, note in
+          if let item = route.item {
+            model.updateServeWith(item, title: title, note: note)
+            return true
+          }
+          return model.createServeWith(title: title, note: note)
+        },
+        delete: {
+          guard let item = route.item else { return }
+          model.deleteServeWith(item.id)
+        }
+      )
+    }
+    .sheet(isPresented: $isManaging) {
+      NavigationStack {
+        ScrollView {
+          VStack(alignment: .leading, spacing: 12) {
+            if needsRepair {
+              ServeWithRepairBanner(repair: model.repairServeWithButtonTapped)
+            }
+            EditableRowsSection(
+              title: "Accompaniments",
+              titleFont: .headline,
+              editorLabel: "Accompaniment title",
+              items: items,
+              itemText: \.title,
+              addItem: model.createServeWith,
+              addButtonLabel: "Add Serve With",
+              updateItem: { model.updateServeWith($0, text: $1) },
+              deleteItem: { model.deleteServeWith($0.id) },
+              reorderItems: { ids, destinationID in
+                model.reorderServeWith(
+                  ids,
+                  destination: destinationID.map(ServeWithReorderDestination.before) ?? .end
+                )
+              }
+            ) {
+              Text("No Serve With items yet.")
+                .foregroundStyle(.secondary)
+            } itemContent: { item in
+              VStack(alignment: .leading, spacing: 3) {
+                Text(item.title).font(.headline)
+                if let note = item.note {
+                  Text(note).font(.callout).foregroundStyle(.secondary)
+                }
+              }
+            } badge: { item in
+              Label(
+                item.provenance == .handAuthored ? "Hand-authored" : "Suggested",
+                systemImage: item.provenance == .handAuthored ? "pencil" : "sparkles"
+              )
+              .font(.caption)
+              .foregroundStyle(.secondary)
+            }
+          }
+          .padding()
+        }
+        .navigationTitle("Manage Serve With")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+          ToolbarItem(placement: .confirmationAction) {
+            Button("Done") { isManaging = false }
+          }
+        }
+      }
+      .presentationDetents([.medium, .large])
+    }
+  }
+}
+
+private enum ServeWithItemEditorRoute: Identifiable {
+  case add
+  case edit(RecipeServeWith)
+
+  var id: String {
+    switch self {
+    case .add: "new"
+    case let .edit(item): item.id.uuidString
+    }
+  }
+
+  var item: RecipeServeWith? {
+    guard case let .edit(item) = self else { return nil }
+    return item
+  }
+}
+
+private struct ServeWithItemEditorSheet: View {
+  @Environment(\.dismiss) private var dismiss
+  let item: RecipeServeWith?
+  let save: (String, String?) -> Bool
+  let delete: () -> Void
+
+  @State private var title: String
+  @State private var note: String
+  @State private var isConfirmingDelete = false
+
+  init(item: RecipeServeWith?, save: @escaping (String, String?) -> Bool, delete: @escaping () -> Void) {
+    self.item = item
+    self.save = save
+    self.delete = delete
+    _title = State(initialValue: item?.title ?? "")
+    _note = State(initialValue: item?.note ?? "")
+  }
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        TextField("Accompaniment", text: $title)
+        Section("Note") {
+          TextEditor(text: $note)
+            .frame(minHeight: 130)
+        }
+        if item != nil {
+          Section {
+            Button("Delete Serve With", role: .destructive) { isConfirmingDelete = true }
+          }
+        }
+      }
+      .navigationTitle(item == nil ? "Add Serve With" : item?.title ?? "Serve With")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancel") { dismiss() }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Save") {
+            let cleanNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+            if save(title, cleanNote.isEmpty ? nil : cleanNote) { dismiss() }
+          }
+          .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+      }
+      .confirmationDialog("Delete this accompaniment?", isPresented: $isConfirmingDelete) {
+        Button("Delete", role: .destructive) {
+          delete()
+          dismiss()
+        }
+        Button("Cancel", role: .cancel) {}
+      }
+    }
+  }
+}
+
+private struct RecipePlaybookNoteEditorSheet: View {
+  @Environment(\.dismiss) private var dismiss
+  let save: (String) -> Bool
+  @State private var text = ""
+
+  var body: some View {
+    NavigationStack {
+      TextEditor(text: $text)
+        .padding()
+        .navigationTitle("New Note")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+          ToolbarItem(placement: .cancellationAction) {
+            Button("Cancel") { dismiss() }
+          }
+          ToolbarItem(placement: .confirmationAction) {
+            Button("Save") {
+              if save(text) { dismiss() }
+            }
+            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          }
+        }
     }
   }
 }

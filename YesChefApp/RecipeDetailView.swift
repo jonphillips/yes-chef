@@ -201,6 +201,12 @@ struct RecipeDetailView: View {
         } label: {
           Label("Paste", systemImage: "doc.on.clipboard")
         }
+
+        Button {
+          model.askButtonTapped()
+        } label: {
+          Label("Ask now", systemImage: "sparkles")
+        }
       } label: {
         Label("Hand off", systemImage: "sparkles.square.filled.on.square")
       }
@@ -341,9 +347,6 @@ private struct RecipeReaderView: View {
 
   private enum HeaderMetrics {
     static let compactThumbnailSideLength: CGFloat = 72
-    // The nested wide-column header can use its reclaimed vertical space for a
-    // more legible cover photo without changing the compact reader's density.
-    static let wideColumnPhotoSideLength: CGFloat = 96
   }
 
   private let twoColumnThreshold: CGFloat = 640
@@ -360,6 +363,8 @@ private struct RecipeReaderView: View {
   @State private var compactSection: CompactSection = .ingredients
   @GestureState private var playbookDragTranslation: CGFloat = 0
   @State private var isPhotoGalleryPresented = false
+  @State private var isVariationManagerPresented = false
+  @State private var isSummaryExpanded = false
   @State private var promotingVariation: RecipeVariation?
   @State private var splittingOffVariation: RecipeVariation?
   @State private var splitOffTitleDraft = ""
@@ -426,6 +431,29 @@ private struct RecipeReaderView: View {
         }
       }
     }
+    .sheet(isPresented: $isVariationManagerPresented) {
+      NavigationStack {
+        ScrollView {
+          RecipeVariationChoices(
+            variations: model.variations,
+            model: model,
+            handoffTransport: handoffTransport,
+            promotingVariation: $promotingVariation,
+            splittingOffVariation: $splittingOffVariation,
+            splitOffTitleDraft: $splitOffTitleDraft
+          )
+          .padding()
+        }
+        .navigationTitle("Manage Variations")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+          ToolbarItem(placement: .confirmationAction) {
+            Button("Done") { isVariationManagerPresented = false }
+          }
+        }
+      }
+      .presentationDetents([.medium, .large])
+    }
     .keepsScreenAwakeWhilePresented()
     .onChange(of: model.detail?.activeVariationID) {
       #if DEBUG
@@ -460,8 +488,20 @@ private struct RecipeReaderView: View {
       if let summary = recipe.summary {
         RecipeMarkdownText(summary)
           .font(.callout)
-          .lineLimit(2)
+          .lineLimit(isSummaryExpanded ? nil : 1)
+        Button(isSummaryExpanded ? "Less" : "More") {
+          isSummaryExpanded.toggle()
+        }
+        .font(.caption.weight(.semibold))
+        .buttonStyle(.plain)
+        .accessibilityHint(isSummaryExpanded ? "Shows less recipe summary." : "Shows the full recipe summary.")
       }
+      RecipeVariationSelector(
+        variations: model.variations,
+        activeVariationID: model.detail?.activeVariationID,
+        select: model.activeVariationSelectionChanged,
+        manage: { isVariationManagerPresented = true }
+      )
     }
   }
 
@@ -470,7 +510,7 @@ private struct RecipeReaderView: View {
       header(recipe)
         .frame(maxWidth: .infinity, alignment: .leading)
       if let photo = model.primaryDisplayPhoto {
-        RecipeReaderThumbnail(photo: photo, sideLength: HeaderMetrics.wideColumnPhotoSideLength) {
+        RecipeReaderThumbnail(photo: photo, sideLength: HeaderMetrics.compactThumbnailSideLength) {
           isPhotoGalleryPresented = true
         }
       }
@@ -511,7 +551,7 @@ private struct RecipeReaderView: View {
         }
       }
 
-      if let notes = model.detail?.source?.sourceNotes?.nonEmpty {
+      if let notes = model.detail?.source?.sourceNotes?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty {
         RecipeMarkdownText(notes)
           .font(.caption)
           .foregroundStyle(.secondary)
@@ -543,6 +583,57 @@ private struct RecipeReaderView: View {
           Label("Undo Adjustment", systemImage: "arrow.uturn.backward")
         }
         .buttonStyle(.bordered)
+      }
+    }
+  }
+
+  private func wideMetadata(_ recipe: Recipe) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      recipeStats(recipe)
+
+      ScrollView(.horizontal) {
+        HStack(spacing: 8) {
+          if recipe.libraryPlacement == .reference {
+            Label(recipe.libraryPlacement.title, systemImage: "books.vertical")
+              .font(.caption)
+              .recipeChip()
+          }
+          ForEach(Array((model.detail?.categoryDisplayNames ?? []).enumerated()), id: \.offset) { _, name in
+            Text(name)
+              .font(.caption)
+              .recipeChip()
+          }
+          Button {
+            model.suggestLabelsButtonTapped()
+          } label: {
+            Label("Edit Tags", systemImage: "tag")
+              .font(.caption.weight(.medium))
+              .frame(minHeight: 36)
+          }
+          .buttonStyle(.plain)
+
+          if model.adjustmentRestorePoint != nil {
+            Button {
+              model.undoLastAdjustmentButtonTapped()
+            } label: {
+              Label("Undo", systemImage: "arrow.uturn.backward")
+                .font(.caption.weight(.medium))
+                .frame(minHeight: 36)
+            }
+            .buttonStyle(.plain)
+          }
+        }
+      }
+      .scrollIndicators(.hidden)
+
+      if let source = model.detail?.source {
+        SourceMetadataView(source: source)
+      }
+      if let notes = model.detail?.source?.sourceNotes?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty {
+        Text(notes)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
       }
     }
   }
@@ -579,7 +670,7 @@ private struct RecipeReaderView: View {
       scaleButton("Scale \(model.scaleSummary)")
     }
     if let totalTime = recipe.totalTimeMinutes {
-      Label("\(totalTime) min", systemImage: "clock")
+      Label(RecipeDurationText.readable(totalTime), systemImage: "clock")
         .recipeChip()
     }
     if let lastCookedAt = model.derivedLastCookedAt {
@@ -643,11 +734,7 @@ private struct RecipeReaderView: View {
       RecipePlaybookView(
         model: model,
         handoffTransport: handoffTransport,
-        ask: model.askButtonTapped,
-        onRecipeSelected: onRecipeSelected,
-        promotingVariation: $promotingVariation,
-        splittingOffVariation: $splittingOffVariation,
-        splitOffTitleDraft: $splitOffTitleDraft
+        onRecipeSelected: onRecipeSelected
       )
     }
   }
@@ -674,7 +761,7 @@ private struct RecipeReaderView: View {
       ScrollView {
         VStack(alignment: .leading, spacing: 16) {
           wideColumnHeader(recipe)
-          metadata(recipe, showsPhoto: false)
+          wideMetadata(recipe)
           directionsColumn
         }
         .padding()
@@ -707,11 +794,9 @@ private struct RecipeReaderView: View {
           RecipePlaybookView(
             model: model,
             handoffTransport: handoffTransport,
-            ask: model.askButtonTapped,
             onRecipeSelected: onRecipeSelected,
-            promotingVariation: $promotingVariation,
-            splittingOffVariation: $splittingOffVariation,
-            splitOffTitleDraft: $splitOffTitleDraft
+            isComfortablePlaybookWidth: detent == .comfortable,
+            onReadFull: { currentPlaybookDetent = .wide }
           )
           .padding()
           .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -746,14 +831,6 @@ private struct RecipeReaderView: View {
       }
       if let note = model.activeVariationNote {
         variationMethodNote(note)
-      }
-      if model.activeVariation != nil {
-        Button {
-          model.activeVariationSelectionChanged(nil)
-        } label: {
-          Label("Return to Base Recipe", systemImage: "arrow.uturn.backward")
-        }
-        .buttonStyle(.bordered)
       }
       if !model.instructionGroups.isEmpty {
         instructions
@@ -833,225 +910,5 @@ private struct RecipeReaderView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
     .attentionCard()
-  }
-}
-
-private struct SourceMetadataView: View {
-  let source: RecipeSource
-
-  var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 8) {
-      Image(systemName: "book")
-        .foregroundStyle(.secondary)
-      if let urlString = source.url, let url = URL(string: urlString) {
-        Link(source.displayName, destination: url)
-      } else {
-        Text(source.displayName)
-      }
-      if let detail = source.compactDetail {
-        Text(detail)
-          .foregroundStyle(.secondary)
-      }
-    }
-    .lineLimit(1)
-    .font(.caption)
-  }
-}
-
-private extension RecipeSource {
-  var displayName: String {
-    name?.nonEmpty ?? publicationName?.nonEmpty ?? bookTitle?.nonEmpty ?? url?.nonEmpty ?? "Source"
-  }
-
-  var compactDetail: String? {
-    author.nonEmpty ?? publicationName.nonEmpty ?? bookTitle.nonEmpty ?? pageNumber.nonEmpty
-  }
-}
-
-private extension String {
-  var nonEmpty: String? {
-    let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmed.isEmpty ? nil : trimmed
-  }
-}
-
-private extension Optional where Wrapped == String {
-  var nonEmpty: String? {
-    flatMap(\.nonEmpty)
-  }
-}
-
-private struct WorkbenchCandidateLinksView: View {
-  let links: [WorkbenchCandidateLink]
-  let onRecipeSelected: (RecipeDetailPresentation) -> Void
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Label("Drafted From", systemImage: "arrow.triangle.branch")
-        .font(.subheadline.weight(.semibold))
-      ForEach(links) { link in
-        if let recipeID = link.recipeID {
-          Button {
-            onRecipeSelected(RecipeDetailPresentation(recipeID: recipeID))
-          } label: {
-            linkLabel(link)
-          }
-          .buttonStyle(.plain)
-        } else {
-          linkLabel(link)
-            .foregroundStyle(.secondary)
-        }
-      }
-    }
-    .font(.subheadline)
-  }
-
-  private func linkLabel(_ link: WorkbenchCandidateLink) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: 8) {
-      Image(systemName: link.recipeID == nil ? "book.closed" : "arrow.up.right.square")
-        .foregroundStyle(.secondary)
-      VStack(alignment: .leading, spacing: 2) {
-        Text(link.title)
-        if let sourceName = link.sourceName {
-          Text(sourceName)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-      }
-    }
-  }
-}
-
-
-extension View {
-  func recipeChip() -> some View {
-    modifier(RecipeChip())
-  }
-}
-
-private extension View {
-  @ViewBuilder
-  func adjustmentReviewPresentation<Item: Identifiable, Content: View>(
-    item: Binding<Item?>,
-    usesFullScreenCover: Bool,
-    @ViewBuilder content: @escaping (Item) -> Content
-  ) -> some View {
-    if usesFullScreenCover {
-      fullScreenCover(item: item, content: content)
-    } else {
-      sheet(item: item, content: content)
-    }
-  }
-}
-
-private struct RecipeChip: ViewModifier {
-  func body(content: Content) -> some View {
-    content
-      .padding(.horizontal, 8)
-      .padding(.vertical, 4)
-      .overlay {
-        Capsule()
-          .stroke(.quaternary, lineWidth: 1)
-      }
-  }
-}
-
-private struct ScalePanel: View {
-  let model: RecipeDetailModel
-
-  var body: some View {
-    @Bindable var model = model
-
-    VStack(alignment: .leading, spacing: 16) {
-      Label("Scale Ingredients", systemImage: "slider.horizontal.3")
-        .font(.headline)
-
-      if let recipe = model.recipe {
-        LabeledContent("Original", value: recipe.servingsText ?? recipe.yieldText ?? "Unknown")
-          .font(.subheadline)
-      }
-
-      VStack(alignment: .leading, spacing: 8) {
-        Text("Multiplier")
-          .font(.subheadline.bold())
-
-        HStack(spacing: 0) {
-          Picker("Whole multiplier", selection: $model.scaleWholePart) {
-            ForEach(0...ScaleFraction.maximumWholeMultiplier, id: \.self) { whole in
-              Text("\(whole)")
-                .tag(whole)
-            }
-          }
-          .pickerStyle(.wheel)
-          .frame(width: 96, height: 128)
-          .clipped()
-
-          Picker("Fraction", selection: $model.scaleFraction) {
-            ForEach(ScaleFraction.allCases) { fraction in
-              Text(fraction.label)
-                .tag(fraction)
-            }
-          }
-          .pickerStyle(.wheel)
-          .frame(width: 112, height: 128)
-          .clipped()
-        }
-      }
-      .frame(maxWidth: .infinity, alignment: .center)
-      .onChange(of: model.scaleWholePart) { _, _ in
-        model.scalePickerChanged()
-      }
-      .onChange(of: model.scaleFraction) { _, _ in
-        model.scalePickerChanged()
-      }
-
-      LabeledContent("Multiplier", value: ScaleText.factor(model.scaleFactor))
-        .font(.subheadline)
-      if let scaledServingsSummary = model.scaledServingsSummary {
-        LabeledContent("Makes", value: "~\(scaledServingsSummary)")
-          .font(.subheadline)
-      }
-
-      HStack {
-        LabeledContent("Units", value: "Default")
-          .font(.subheadline)
-          .foregroundStyle(.secondary)
-        Spacer()
-        Button("Reset") {
-          model.resetScaleButtonTapped()
-        }
-        .disabled(model.scaleFactor == 1)
-      }
-    }
-    .padding()
-    .frame(width: 300)
-  }
-}
-
-private struct WrappingLabels: View {
-  let labels: [String]
-  let systemImage: String
-
-  var body: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: 8) {
-        chips
-      }
-      .fixedSize(horizontal: true, vertical: false)
-
-      VStack(alignment: .leading, spacing: 8) {
-        chips
-      }
-    }
-    .font(.caption)
-    .foregroundStyle(.secondary)
-  }
-
-  @ViewBuilder
-  private var chips: some View {
-    ForEach(labels, id: \.self) { label in
-      Label(label, systemImage: systemImage)
-        .recipeChip()
-    }
   }
 }

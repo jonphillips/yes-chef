@@ -5,6 +5,7 @@ struct RecipeRelatedRecipeChoices: View {
   let relatedRecipes: [Recipe]
   let model: RecipeDetailModel
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
+  var showsSectionTitle = true
 
   @State private var unlinkingRecipe: Recipe?
 
@@ -13,8 +14,10 @@ struct RecipeRelatedRecipeChoices: View {
 
     VStack(alignment: .leading, spacing: 8) {
       HStack {
-        Text("Related Recipes")
-          .font(.title3.bold())
+        if showsSectionTitle {
+          Text("Related Recipes")
+            .font(.title3.bold())
+        }
         Spacer()
         Button("Link Recipe", systemImage: "link") {
           model.linkRelatedRecipeButtonTapped()

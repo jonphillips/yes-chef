@@ -99,6 +99,98 @@ public enum PlaybookEnrichmentText {
   }
 }
 
+public struct IngredientLineReaderDisplay: Equatable, Sendable {
+  public var primaryText: String
+  public var secondaryText: String?
+
+  public init(primaryText: String, secondaryText: String? = nil) {
+    self.primaryText = primaryText
+    self.secondaryText = secondaryText
+  }
+}
+
+/// Splits a parsed ingredient into a scan-first amount/item and a quieter preparation detail only
+/// when the parsed fields account for every word in the imported source line. Otherwise callers
+/// keep rendering `scaledText` intact, so this is strictly a presentation improvement.
+public enum IngredientLineReaderPresentation {
+  public static func display(for line: IngredientLine, scaledText: String) -> IngredientLineReaderDisplay? {
+    guard !line.isHeader,
+      let item = line.item?.trimmingCharacters(in: .whitespacesAndNewlines), !item.isEmpty,
+      accountsForSource(line)
+    else { return nil }
+
+    let preparation = line.preparation?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+    let comment = line.comment?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+    let secondaryText = [preparation, comment].compactMap(\.self).joined(separator: ", ").nonEmpty
+
+    let amountAndUnit: String
+    if let unit = line.unit?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty {
+      guard let unitEnd = unitEnd(in: scaledText, unit: unit) else { return nil }
+      amountAndUnit = String(scaledText[..<unitEnd]).trimmingCharacters(in: .whitespacesAndNewlines)
+    } else if let quantity = line.quantity {
+      amountAndUnit = IngredientScaler.formattedQuantity(quantity)
+    } else {
+      amountAndUnit = ""
+    }
+
+    let primaryText = [amountAndUnit, item].filter { !$0.isEmpty }.joined(separator: " ")
+    guard !primaryText.isEmpty else { return nil }
+    return IngredientLineReaderDisplay(primaryText: primaryText, secondaryText: secondaryText)
+  }
+
+  private static func accountsForSource(_ line: IngredientLine) -> Bool {
+    let source = tokens(line.originalText)
+    guard !source.isEmpty else { return false }
+
+    var expected = tokens(line.quantityText ?? "")
+      + tokens(line.item ?? "")
+      + tokens(line.preparation ?? "")
+      + tokens(line.comment ?? "")
+
+    if let unit = line.unit?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty {
+      let unitTokens = tokens(unit)
+      guard !unitTokens.isEmpty,
+        let unitStart = source.indices.first(where: { start in
+          let unitRange = start..<(start + unitTokens.count)
+          guard unitRange.upperBound <= source.count else { return false }
+          return zip(source[unitRange], unitTokens).allSatisfy { pair in
+            pair.0 == pair.1 || pair.0 == pair.1 + "s"
+          }
+        })
+      else { return false }
+      expected += source[unitStart..<(unitStart + unitTokens.count)]
+    }
+
+    return expected.sorted() == source.sorted()
+  }
+
+  private static func unitEnd(in text: String, unit: String) -> String.Index? {
+    guard let range = text.range(of: unit, options: [.caseInsensitive]) else { return nil }
+    guard range.lowerBound == text.startIndex || text[text.index(before: range.lowerBound)].isWhitespace else {
+      return nil
+    }
+    var end = range.upperBound
+    if end < text.endIndex, text[end].lowercased() == "s", !unit.lowercased().hasSuffix("s") {
+      end = text.index(after: end)
+    }
+    guard end == text.endIndex || !text[end].isLetter else { return nil }
+    return end
+  }
+
+  private static func tokens(_ text: String) -> [String] {
+    text
+      .lowercased()
+      .split { !$0.isLetter && !$0.isNumber }
+      .map(String.init)
+  }
+}
+
+private extension String {
+  var nonEmpty: String? {
+    isEmpty ? nil : self
+  }
+}
+
 public struct ServeWithPlan: Equatable, Sendable {
   public var items: [ServeWithSuggestion]
 
@@ -515,12 +607,14 @@ public enum RecipeServeWithRepository {
   public static func update(
     id: RecipeServeWith.ID,
     title: String,
+    note: String?,
     in db: Database,
     now: Date
   ) throws {
     guard let existing = try RecipeServeWith.find(id).fetchOne(db) else { return }
     try RecipeServeWith.find(id).update {
       $0.title = #bind(title)
+      $0.note = #bind(note)
       $0.dateModified = #bind(now)
     }
     .execute(db)

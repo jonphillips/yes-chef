@@ -218,12 +218,17 @@ extension RecipeDetailModel {
   }
 
   func createServeWith(_ text: String) -> Bool {
+    createServeWith(title: text, note: nil)
+  }
+
+  func createServeWith(title text: String, note: String?) -> Bool {
     let title = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !title.isEmpty else { return false }
     do {
       try database.write { db in
         try RecipeServeWithRepository.append(
-          [ServeWithSuggestion(title: title)],
+          [ServeWithSuggestion(title: title, note: trimmedNote?.isEmpty == false ? trimmedNote : nil)],
           to: recipeID,
           provenance: .handAuthored,
           in: db,
@@ -240,7 +245,12 @@ extension RecipeDetailModel {
   }
 
   func updateServeWith(_ item: RecipeServeWith, text: String) {
+    updateServeWith(item, title: text, note: item.note)
+  }
+
+  func updateServeWith(_ item: RecipeServeWith, title text: String, note: String?) {
     let title = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !title.isEmpty else {
       errorMessage = "A Serve With item can't be blank."
       isShowingError = true
@@ -248,7 +258,13 @@ extension RecipeDetailModel {
     }
     do {
       try database.write { db in
-        try RecipeServeWithRepository.update(id: item.id, title: title, in: db, now: now)
+        try RecipeServeWithRepository.update(
+          id: item.id,
+          title: title,
+          note: trimmedNote?.isEmpty == false ? trimmedNote : nil,
+          in: db,
+          now: now
+        )
       }
     } catch {
       errorMessage = String(describing: error)
@@ -403,6 +419,28 @@ extension RecipeDetailModel {
     }
     try database.write { db in
       try RecipeRepository.updateChefItUp(approvedText, recipeID: recipeID, in: db, now: now)
+    }
+  }
+
+  func createGeneralNote(_ rawText: String) -> Bool {
+    let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return false }
+    do {
+      try database.write { db in
+        _ = try RecipeRepository.appendRecipeNote(
+          recipeID: recipeID,
+          text: text,
+          noteType: .general,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
     }
   }
 

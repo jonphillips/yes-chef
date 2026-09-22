@@ -4,7 +4,6 @@ import YesChefCore
 
 struct RecipeVariationChoices: View {
   let variations: [RecipeVariation]
-  let activeVariationID: RecipeVariation.ID?
   let model: RecipeDetailModel
   let handoffTransport: HandoffInAppTransport
   @Binding var promotingVariation: RecipeVariation?
@@ -86,37 +85,17 @@ struct RecipeVariationChoices: View {
 
   private func variationRow(_ variation: RecipeVariation) -> some View {
     HStack(alignment: .top, spacing: 8) {
-      Button {
-        // Re-tapping the active variation deselects it (back to the base recipe);
-        // otherwise select it. Without the toggle there is no way to deselect a
-        // lone variation.
-        model.activeVariationSelectionChanged(
-          variation.id == activeVariationID ? nil : variation.id
-        )
-      } label: {
-        HStack(alignment: .top, spacing: 10) {
-          Image(systemName: variation.id == activeVariationID ? "checkmark.circle.fill" : "circle")
-            .foregroundStyle(
-              variation.id == activeVariationID ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary)
-            )
-            .frame(minWidth: 20)
-            .padding(.top, 2)
-          VStack(alignment: .leading, spacing: 3) {
-            Text(variation.name)
-              .font(.headline)
-              .foregroundStyle(.primary)
-            if let note = variation.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
-              Text(note)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-          }
+      VStack(alignment: .leading, spacing: 3) {
+        Text(variation.name)
+          .font(.headline)
+        if let note = variation.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+          Text(note)
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
       }
-      .buttonStyle(.plain)
-      .accessibilityLabel(variation.name)
-      .accessibilityValue(variation.id == activeVariationID ? "Selected" : "Not selected")
+      .frame(maxWidth: .infinity, alignment: .leading)
 
       Menu {
         Button("Hand Off") {
