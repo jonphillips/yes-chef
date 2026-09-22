@@ -14,6 +14,9 @@ shared by recipe and menu** — superseding Amendment 1's Cook/Plan toggle and D
 width) and moves **Browse/Ask off `.inspector` to true trailing overlays** — persistent context is a column,
 transient tools slide *over* (see the
 [Amendment 3](#amendment-3--2026-07-16-the-menu-playbook-is-permanent-and-transient-tools-go-over-it-not-beside-it) section).
+**[Amendment 4](#amendment-4--recipe-reader-density-and-playbook-order-2026-09-22)**
+(2026-09-22) sets the recipe-only Playbook order and moves its Ask entry into the sparkle toolbar menu;
+**accepted by Jon**, scoped in [recipe-reader-density](../efforts/recipe-reader-density.md).
 Origin: Jon, immediately after the [ADR-0038](ADR-0038-external-llm-handoff.md)
 S2 device pass. **Depends on [ADR-0038 Amendment 1](ADR-0038-external-llm-handoff.md)** (the two-part
 Deliverable + Learnings return contract — this ADR is *where those Learnings become visible*). Touches
@@ -483,3 +486,23 @@ deliberate, not forgotten.
   [[personal-app-latency-tolerance]], [[llm-vs-determinism-surface-boundary]] (D5 is its cousin — the axis
   here is *abstraction vs. context*, not determinism), [[prep-plan-horizon-redesign]],
   [[macos-longterm-target]].
+
+## Amendment 4 — recipe reader density and Playbook order (2026-09-22)
+
+**Status: Accepted — Jon-approved 2026-09-22.** Implementation contract:
+[recipe-reader-density](../efforts/recipe-reader-density.md). This is scoped to the recipe reader;
+Amendments 2 and 3's persistent/resizable column and menu behavior stand.
+
+The recipe Playbook is a compact reference beside Ingredients and Directions. Its prominent sections
+appear **Notes → Chef It Up → Make-ahead**, with Related Recipes lower in the column and **Serve With as a
+horizontal capsule strip at the end of Playbook content**. Empty Serve With is a simple Add action; filled
+Serve With retains access to full notes and management. Prose sections open collapsed, show a short
+faithful preview when filled, and provide Read full in the Wide Playbook detent for long content.
+
+The recipe-level **Ask now** action moves from the top of the Playbook into the existing sparkle toolbar
+menu, beside Hand off and Paste. It launches the existing Ask panel with the same context. Section menus
+and scoped hand-off behavior stay. The compact Ingredients / Directions / Playbook picker stays.
+
+This supersedes the recipe Playbook order and recipe Ask placement in D3/Amendment 1. It does not change
+the underlying sections or Ask behavior, nor the menu Playbook. Variation placement is governed by
+[ADR-0021 Amendment 5](ADR-0021-recipe-variations.md#amendment-5--variation-selection-returns-to-the-reader-header-2026-09-22).

@@ -32,6 +32,11 @@ Sync-safe by construction (ADR-0002).
 picker relocates to the Playbook) is **ACCEPTED — ratified by Jon 2026-08-05.** OQ2 resolved (order by name,
 no ordering column); OQ1 belongs to [ADR-0050](ADR-0050-recipe-power-browser.md); OQ3 presumed **no**. It is the
 second part of this ADR that adds schema (one synced join table), and its consumer ships with it.**
+**[Amendment 5](#amendment-5--variation-selection-returns-to-the-reader-header-2026-09-22)**
+(variation selection in the recipe header; related recipes separately in the Playbook) is **ACCEPTED —
+Jon-approved 2026-09-22**. It supersedes Amendment 4's combined Choices placement, not its two typed
+relations or their behavior. Implementation is scoped in
+[recipe-reader-density](../efforts/recipe-reader-density.md).
 
 ## Context
 
@@ -570,7 +575,7 @@ Three complaints arrived together, and they looked like one complaint about vari
 The unifying observation: **the cook's question is always "what are my choices with this dish?", and it does
 not care how the answer is stored.** One surface, two relations underneath.
 
-### Amd4-D1 — One **Choices** surface, two typed relations underneath
+### Amd4-D1 — One **Choices** surface, two typed relations underneath (placement superseded by Amendment 5)
 
 A single Playbook section lists, together:
 
@@ -655,7 +660,7 @@ ingredient `add`s plus roughly one added step per treatment. Under today's vocab
 out of the variation model for a reason that has nothing to do with how a cook thinks about it. Under this
 one it fits.
 
-### Amd4-D5 — The variation picker relocates to the Playbook; the fold stays in the Body
+### Amd4-D5 — The variation picker relocates to the Playbook; the fold stays in the Body (picker placement superseded by Amendment 5)
 
 **This corrects a drift, not a decision.** [ADR-0039](ADR-0039-playbook-column-thinking-vs-doing.md) D1
 already lists variations among the Playbook's contents; Amendment 1's contents-cut table moved only the
@@ -809,3 +814,28 @@ the fold is the guard.
 **Update (2026-07-21):** still true for LLM-written deltas. For a **hand-edited** variation there is nothing
 to stage at all — see
 [Amd1-D2](#amd1-d2--this-is-oq1s-edit-born-path-promoted-from-a-creation-lean-to-the-editing-mechanism).
+
+## Amendment 5 — variation selection returns to the reader header (2026-09-22)
+
+**Status: Accepted — Jon-approved 2026-09-22.** See the
+[implementation brief](../efforts/recipe-reader-density.md) and its approved mockup.
+
+The Playbook's combined Choices section makes a cook select a variation deep in the right column, then
+scroll back to the Directions/Ingredients fold to see what changed. Its long variation text also repeats
+information that the folded recipe presents in place. The two relations remain typed and distinct, but
+their reading surfaces now follow their use:
+
+- **Variation selection belongs in the shared recipe header**, beside the recipe being changed, on wide
+  and compact layouts. The control names Base Recipe or the active variation and offers every variation
+  plus Manage Variations. Selecting Base clears the local active variation. The active ingredient and
+  method fold, highlights, method note in Directions, and grocery fold remain unchanged.
+- **Management stays fully reachable** from Manage Variations: Hand Off, Paste, Rename, Edit Variation,
+  Split Off as Recipe, Promote to Base, and Delete. The return-to-base button in Directions is redundant
+  once Base Recipe is present in the header selector.
+- **Related Recipes remains a separate, low-priority Playbook section**, with navigation, link and unlink.
+  It is no longer interleaved with selectable variations. The symmetric edge table and split-off link
+  transaction from Amendment 4 do not change.
+
+This supersedes **Amd4-D1's single Choices surface** and **Amd4-D5's picker placement and return-to-base
+control**. Amendment 4's storage, delta vocabulary, expressibility rule, and variation hand-off contracts
+stand. It is a UI-only change with no schema or migration.

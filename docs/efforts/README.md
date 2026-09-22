@@ -24,6 +24,7 @@ it's touched.
 
 ## Active / recent
 
+- [recipe-reader-density.md](recipe-reader-density.md) — **Designed, not dispatched** · Put variation selection beside the recipe, shorten the reader header, and make the Playbook a compact Notes → Chef It Up → Make-ahead reference with a Serve With capsule strip and Ask now in the sparkle menu.
 - [cockpit-find-handoff-receiver.md](cockpit-find-handoff-receiver.md) — **In progress** · Receive raw Cockpit
   Find referrals, isolate 0/1/N recipes for Create Recipe review, and emit a typed verdict through the deferred
   return-transport seam.
