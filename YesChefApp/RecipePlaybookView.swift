@@ -6,17 +6,17 @@ struct RecipePlaybookView: View {
   let model: RecipeDetailModel
   let handoffTransport: HandoffInAppTransport
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
-  var isComfortablePlaybookWidth = false
-  var onReadFull: () -> Void = {}
 
   @State private var isMakeAheadExpanded = false
   @State private var isRelatedRecipesExpanded = false
   @State private var isNotesExpanded = false
   @State private var isChefItUpExpanded = false
+  @State private var isLearningsExpanded = false
   @State private var isDeliberationLogExpanded = false
   @State private var editingSection: PlaybookSectionKind?
   @State private var clearingSection: PlaybookSectionKind?
   @State private var isWritingNote = false
+  @State private var fullText: RecipePlaybookFullText?
   var body: some View {
     let visibleNotes = model.visibleNotes
     let readerFeedbackNotes = visibleNotes.filter { $0.noteType == .readerFeedback }
@@ -83,13 +83,23 @@ struct RecipePlaybookView: View {
           )
         }
       }
-      LearningsSection(
-        learnings: model.learnings,
-        addLearning: model.createLearning,
-        updateLearning: model.updateLearning,
-        deleteLearning: model.deleteLearning,
-        reorderLearnings: model.reorderLearnings
-      )
+      playbookSection(
+        "Learnings",
+        isFilled: !model.learnings.isEmpty,
+        isExpanded: $isLearningsExpanded,
+        showsActions: false,
+        actions: { EmptyView() }
+      ) {
+        LearningsSection(
+          learnings: model.learnings,
+          showsTitle: false,
+          showsEmptyPlaceholder: false,
+          addLearning: model.createLearning,
+          updateLearning: model.updateLearning,
+          deleteLearning: model.deleteLearning,
+          reorderLearnings: model.reorderLearnings
+        )
+      }
       RecipeServeWithStrip(
         model: model,
         items: serveWith,
@@ -130,6 +140,23 @@ struct RecipePlaybookView: View {
     }
     .sheet(isPresented: $isWritingNote) {
       RecipePlaybookNoteEditorSheet(save: model.createGeneralNote)
+    }
+    .sheet(item: $fullText) { item in
+      NavigationStack {
+        ScrollView {
+          RecipeMarkdownText(item.text)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+        }
+        .navigationTitle(item.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+          ToolbarItem(placement: .confirmationAction) {
+            Button("Done") { fullText = nil }
+          }
+        }
+      }
+      .presentationDetents([.medium, .large])
     }
   }
 
@@ -195,7 +222,7 @@ struct RecipePlaybookView: View {
   private func makeAheadContent(_ makeAhead: String?) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       if let makeAhead {
-        enrichmentContent(makeAhead)
+        enrichmentContent(makeAhead, title: "Make-ahead")
       } else {
         Button("Add make-ahead", systemImage: "plus") { editingSection = .makeAhead }
           .buttonStyle(.plain)
@@ -206,7 +233,7 @@ struct RecipePlaybookView: View {
   private func chefItUpContent(_ chefItUp: String?) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       if let chefItUp {
-        enrichmentContent(chefItUp)
+        enrichmentContent(chefItUp, title: "Chef It Up")
       } else {
         Button("Add an idea", systemImage: "plus") { editingSection = .chefItUp }
           .buttonStyle(.plain)
@@ -215,17 +242,23 @@ struct RecipePlaybookView: View {
   }
 
   @ViewBuilder
-  private func enrichmentContent(_ text: String) -> some View {
-    if isComfortablePlaybookWidth, text.count > 280 {
-      VStack(alignment: .leading, spacing: 8) {
-        RecipeMarkdownText(String(text.prefix(260)).trimmingCharacters(in: .whitespacesAndNewlines) + "…")
-          .frame(maxWidth: .infinity, alignment: .leading)
-        Button("Read full") { onReadFull() }
-          .font(.caption.weight(.semibold))
-          .buttonStyle(.plain)
-      }
+  private func enrichmentContent(_ text: String, title: String) -> some View {
+    if text.count > 280 {
+      excerpt(text, title: title)
     } else {
       enrichmentText(text)
+    }
+  }
+
+  private func excerpt(_ text: String, title: String) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      RecipeMarkdownText(String(text.prefix(260)).trimmingCharacters(in: .whitespacesAndNewlines) + "…")
+        .frame(maxWidth: .infinity, alignment: .leading)
+      Button("Read full") {
+        fullText = RecipePlaybookFullText(title: title, text: text)
+      }
+      .font(.caption.weight(.semibold))
+      .buttonStyle(.plain)
     }
   }
 
@@ -246,15 +279,6 @@ struct RecipePlaybookView: View {
     if visibleNotes.isEmpty {
       Button("Write a note", systemImage: "plus") { isWritingNote = true }
         .buttonStyle(.plain)
-    } else if isComfortablePlaybookWidth,
-      let longNote = visibleNotes.first(where: { $0.text.count > 280 }) {
-      VStack(alignment: .leading, spacing: 8) {
-        RecipeMarkdownText(String(longNote.text.prefix(260)).trimmingCharacters(in: .whitespacesAndNewlines) + "…")
-        Button("Read full") { onReadFull() }
-          .font(.caption.weight(.semibold))
-          .buttonStyle(.plain)
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
     } else {
       if !readerFeedbackNotes.isEmpty {
         readerFeedbackView(readerFeedbackNotes)
@@ -367,7 +391,11 @@ struct RecipePlaybookView: View {
           Text(note.noteType.displayTitle)
             .font(.caption.bold())
             .foregroundStyle(.secondary)
-          RecipeMarkdownText(note.text)
+          if note.text.count > 280 {
+            excerpt(note.text, title: note.noteType.displayTitle)
+          } else {
+            RecipeMarkdownText(note.text)
+          }
         }
         .padding(.vertical, 4)
       }
@@ -389,6 +417,12 @@ struct RecipePlaybookView: View {
       RecipeMarkdownText(note.text)
     }
   }
+}
+
+private struct RecipePlaybookFullText: Identifiable {
+  let id = UUID()
+  let title: String
+  let text: String
 }
 
 private struct RecipeServeWithStrip: View {

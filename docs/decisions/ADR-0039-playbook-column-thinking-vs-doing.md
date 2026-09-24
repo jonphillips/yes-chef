@@ -17,6 +17,9 @@ transient tools slide *over* (see the
 **[Amendment 4](#amendment-4--recipe-reader-density-and-playbook-order-2026-09-22)**
 (2026-09-22) sets the recipe-only Playbook order and moves its Ask entry into the sparkle toolbar menu;
 **accepted by Jon**, scoped in [recipe-reader-density](../efforts/recipe-reader-density.md).
+**[Amendment 5](#amendment-5--recipe-playbook-moves-below-the-reader-2026-09-22)**
+(2026-09-22 device review) moves the recipe Playbook below Instructions in the Directions scroll;
+**accepted by Jon** and supersedes Amendment 4's retained right-column placement.
 Origin: Jon, immediately after the [ADR-0038](ADR-0038-external-llm-handoff.md)
 S2 device pass. **Depends on [ADR-0038 Amendment 1](ADR-0038-external-llm-handoff.md)** (the two-part
 Deliverable + Learnings return contract — this ADR is *where those Learnings become visible*). Touches
@@ -491,7 +494,8 @@ deliberate, not forgotten.
 
 **Status: Accepted — Jon-approved 2026-09-22.** Implementation contract:
 [recipe-reader-density](../efforts/recipe-reader-density.md). This is scoped to the recipe reader;
-Amendments 2 and 3's persistent/resizable column and menu behavior stand.
+Amendments 2 and 3's menu behavior stands. **The retained recipe right-column placement below was
+superseded by Amendment 5 after Jon reviewed the implementation on device.**
 
 The recipe Playbook is a compact reference beside Ingredients and Directions. Its prominent sections
 appear **Notes → Chef It Up → Make-ahead**, with Related Recipes lower in the column and **Serve With as a
@@ -506,3 +510,21 @@ and scoped hand-off behavior stay. The compact Ingredients / Directions / Playbo
 This supersedes the recipe Playbook order and recipe Ask placement in D3/Amendment 1. It does not change
 the underlying sections or Ask behavior, nor the menu Playbook. Variation placement is governed by
 [ADR-0021 Amendment 5](ADR-0021-recipe-variations.md#amendment-5--variation-selection-returns-to-the-reader-header-2026-09-22).
+
+## Amendment 5 — recipe Playbook moves below the reader (2026-09-22)
+
+**Status: Accepted — Jon's device review, 2026-09-22.** The
+[effort's placement correction](../efforts/recipe-reader-density.md#follow-up-correction--remove-the-right-playbook-column)
+is the implementation contract for the existing draft PR.
+
+The returned iPad layout still showed a third/right supplemental column because the effort had explicitly
+retained it. Jon clarified the intended placement: **Ingredients and Directions are the only side-by-side
+columns; the recipe Playbook follows Instructions in the Directions column's vertical scroll.** Ingredients
+remain independently scrollable. The Playbook need not extend under Ingredients if that column is shorter.
+The recipe's Playbook toolbar control becomes a jump to the Playbook, with an easy return to the top of
+Directions. Long supplemental prose opens in a readable focused presentation. Empty sections, especially
+Learnings, remain compact. Serve With is the final horizontal capsule strip.
+
+This supersedes the recipe-only third-column placement and its resize/detent machinery in Amendment 2 and
+Amendment 4. The recipe Playbook's sections, order, Ask now placement, section actions, and storage stay.
+The **menu** Playbook's persistent column and overlay behavior from Amendments 2–3 are unaffected.

@@ -26,6 +26,28 @@ struct RecipeReaderThumbnail: View {
   }
 }
 
+struct RecipeReaderHero: View {
+  let photo: RecipeDetailPhoto
+  let width: CGFloat
+  let action: () -> Void
+
+  var body: some View {
+    if photo.isDisplayable {
+      Button(action: action) {
+        RecipePhotoFrame(
+          photo: photo,
+          aspectRatio: photo.displayAspectRatio,
+          variant: .hero
+        )
+        .frame(width: width)
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(Text(photo.caption ?? "Recipe photo"))
+      .accessibilityHint(Text("Opens photo gallery."))
+    }
+  }
+}
+
 struct RecipePhotoGallery: View {
   let photos: [RecipeDetailPhoto]
   let coverPhotoID: RecipePhoto.ID?

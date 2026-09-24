@@ -176,6 +176,8 @@ struct PrepPlanStepEditorSheet: View {
 
 struct LearningsSection: View {
   let learnings: [Learning]
+  var showsTitle = true
+  var showsEmptyPlaceholder = true
   var addLearning: ((String) -> LearningCreationResult)? = nil
   var updateLearning: (Learning, String) -> Void
   var deleteLearning: (Learning.ID) -> Void
@@ -183,7 +185,7 @@ struct LearningsSection: View {
 
   var body: some View {
     EditableRowsSection(
-      title: "Learnings",
+      title: showsTitle ? "Learnings" : "",
       titleFont: .title2.weight(.semibold),
       editorLabel: "Learning",
       items: learnings,
@@ -208,11 +210,15 @@ struct LearningsSection: View {
         )
       }
     ) {
-      ContentUnavailableView(
-        "No Learnings Yet",
-        systemImage: "lightbulb",
-        description: Text("Add a cooking observation or keep useful ideas from an AI handoff here.")
-      )
+      if showsEmptyPlaceholder {
+        ContentUnavailableView(
+          "No Learnings Yet",
+          systemImage: "lightbulb",
+          description: Text("Add a cooking observation or keep useful ideas from an AI handoff here.")
+        )
+      } else {
+        EmptyView()
+      }
     } itemContent: { learning in
       Text(learning.text)
     } badge: { learning in

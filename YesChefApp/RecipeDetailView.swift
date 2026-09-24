@@ -5,15 +5,14 @@ import YesChefCore
 
 struct RecipeDetailView: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-  @AppStorage(RecipePlaybookColumnPreferences.visibilityStorageKey)
-  private var isPlaybookColumnVisible = true
   @State private var model: RecipeDetailModel
   @State private var handoffTransport: HandoffInAppTransport
   /// Own toast host: this view is presented from four places (full-screen cover, both iPad split
   /// layouts, and the cook session) and only one of them mounts an overlay.
   @State private var toastCenter: AppToastCenter
   @State private var isConfirmingBaseRecipeHandoff = false
-  @State private var isPlaybookToggleAvailable = false
+  @State private var isPlaybookJumpAvailable = false
+  @State private var playbookJumpRequest = UUID()
   let libraryModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
@@ -142,8 +141,8 @@ struct RecipeDetailView: View {
       model: model,
       handoffTransport: handoffTransport,
       libraryModel: libraryModel,
-      isPlaybookColumnVisible: $isPlaybookColumnVisible,
-      isPlaybookToggleAvailable: $isPlaybookToggleAvailable,
+      isPlaybookJumpAvailable: $isPlaybookJumpAvailable,
+      playbookJumpRequest: playbookJumpRequest,
       onRecipeSelected: onRecipeSelected
     )
   }
@@ -210,15 +209,13 @@ struct RecipeDetailView: View {
       } label: {
         Label("Hand off", systemImage: "sparkles.square.filled.on.square")
       }
-      if isPlaybookToggleAvailable {
+      if isPlaybookJumpAvailable {
         Button {
-          isPlaybookColumnVisible.toggle()
+          playbookJumpRequest = UUID()
         } label: {
-          Label(
-            isPlaybookColumnVisible ? "Hide Playbook" : "Show Playbook",
-            systemImage: "sidebar.trailing"
-          )
+          Label("Playbook", systemImage: "text.book.closed")
         }
+        .accessibilityHint("Jumps to the recipe Playbook after the instructions.")
       }
       Button {
         libraryModel.editButtonTapped(recipeID: model.recipeID)
@@ -346,22 +343,21 @@ private struct RecipeReaderView: View {
   }
 
   private enum HeaderMetrics {
-    static let compactThumbnailSideLength: CGFloat = 72
+    static let compactThumbnailSideLength: CGFloat = 288
+    static let wideHeroWidth: CGFloat = 360
   }
 
   private let twoColumnThreshold: CGFloat = 640
+  private let directionsContentMaximumWidth: CGFloat = 920
 
   let model: RecipeDetailModel
   let handoffTransport: HandoffInAppTransport
   let libraryModel: RecipeLibraryModel
-  @Binding var isPlaybookColumnVisible: Bool
-  @Binding var isPlaybookToggleAvailable: Bool
+  @Binding var isPlaybookJumpAvailable: Bool
+  let playbookJumpRequest: UUID
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
-  @AppStorage(RecipePlaybookColumnPreferences.detentStorageKey)
-  private var playbookDetentRaw = RecipePlaybookColumnDetent.comfortable.rawValue
   @State private var compactSection: CompactSection = .ingredients
-  @GestureState private var playbookDragTranslation: CGFloat = 0
   @State private var isPhotoGalleryPresented = false
   @State private var isVariationManagerPresented = false
   @State private var isSummaryExpanded = false
@@ -398,16 +394,18 @@ private struct RecipeReaderView: View {
         }
       }
       .onAppear {
-        isPlaybookToggleAvailable = model.recipe != nil && proxy.size.width >= twoColumnThreshold
+        isPlaybookJumpAvailable = model.recipe != nil
       }
-      .onChange(of: proxy.size.width) { _, width in
-        isPlaybookToggleAvailable = model.recipe != nil && width >= twoColumnThreshold
+      .onChange(of: playbookJumpRequest) { _, _ in
+        if proxy.size.width < twoColumnThreshold {
+          compactSection = .playbook
+        }
       }
-      .onChange(of: model.recipe?.id) {
-        isPlaybookToggleAvailable = model.recipe != nil && proxy.size.width >= twoColumnThreshold
+      .onChange(of: model.recipe?.id) { _, _ in
+        isPlaybookJumpAvailable = model.recipe != nil
       }
       .onDisappear {
-        isPlaybookToggleAvailable = false
+        isPlaybookJumpAvailable = false
       }
     }
     .sheet(isPresented: $isPhotoGalleryPresented) {
@@ -488,7 +486,7 @@ private struct RecipeReaderView: View {
       if let summary = recipe.summary {
         RecipeMarkdownText(summary)
           .font(.callout)
-          .lineLimit(isSummaryExpanded ? nil : 1)
+          .lineLimit(isSummaryExpanded ? nil : 2)
         Button(isSummaryExpanded ? "Less" : "More") {
           isSummaryExpanded.toggle()
         }
@@ -507,10 +505,47 @@ private struct RecipeReaderView: View {
 
   private func wideColumnHeader(_ recipe: Recipe) -> some View {
     HStack(alignment: .top, spacing: 12) {
-      header(recipe)
-        .frame(maxWidth: .infinity, alignment: .leading)
+      VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
+          HStack(alignment: .firstTextBaseline) {
+            Text(recipe.title)
+              .font(.title.bold())
+            if recipe.favorite {
+              Image(systemName: "star.fill")
+                .foregroundStyle(.yellow)
+            }
+          }
+          if let subtitle = recipe.subtitle {
+            Text(subtitle)
+              .font(.subheadline.weight(.medium))
+              .foregroundStyle(.secondary)
+          }
+          if let summary = recipe.summary {
+            RecipeMarkdownText(summary)
+              .font(.callout)
+              .lineLimit(isSummaryExpanded ? nil : 2)
+            Button(isSummaryExpanded ? "Less" : "More") {
+              isSummaryExpanded.toggle()
+            }
+            .font(.caption.weight(.semibold))
+            .buttonStyle(.plain)
+            .accessibilityHint(isSummaryExpanded ? "Shows less recipe summary." : "Shows the full recipe summary.")
+          }
+        }
+
+        wideMetadata(recipe)
+
+        RecipeVariationSelector(
+          variations: model.variations,
+          activeVariationID: model.detail?.activeVariationID,
+          select: model.activeVariationSelectionChanged,
+          manage: { isVariationManagerPresented = true }
+        )
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+
       if let photo = model.primaryDisplayPhoto {
-        RecipeReaderThumbnail(photo: photo, sideLength: HeaderMetrics.compactThumbnailSideLength) {
+        RecipeReaderHero(photo: photo, width: HeaderMetrics.wideHeroWidth) {
           isPhotoGalleryPresented = true
         }
       }
@@ -740,84 +775,65 @@ private struct RecipeReaderView: View {
   }
 
   private func wideRecipeColumns(_ recipe: Recipe, in size: CGSize) -> some View {
-    let layout = RecipeWideColumnLayout(width: size.width, isPlaybookVisible: isPlaybookColumnVisible)
-    let detent = currentPlaybookDetent
-    let basePlaybookWidth = layout.playbookWidth(for: detent)
-    let livePlaybookWidth = layout.proposedPlaybookWidth(
-      base: basePlaybookWidth,
-      translation: playbookDragTranslation
-    )
-
+    let ingredientsWidth = size.width * 0.27
+    let directionsWidth = size.width - ingredientsWidth - PlaybookColumnMetrics.separatorWidth
     return HStack(alignment: .top, spacing: 0) {
       ScrollView {
         ingredients
           .padding()
           .frame(maxWidth: .infinity, alignment: .topLeading)
       }
-      .frame(width: layout.ingredientsWidth)
+      .frame(width: ingredientsWidth)
 
       RecipeWideColumnSeparator()
 
-      ScrollView {
-        VStack(alignment: .leading, spacing: 16) {
-          wideColumnHeader(recipe)
-          wideMetadata(recipe)
-          directionsColumn
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-      }
-      .frame(width: layout.directionsWidth(playbookWidth: livePlaybookWidth))
-
-      if isPlaybookColumnVisible {
-        RecipePlaybookResizeHandle(
-          detent: detent,
-          cycle: { currentPlaybookDetent = detent.next },
-          decrement: { currentPlaybookDetent = detent.previous },
-          increment: { currentPlaybookDetent = detent.next }
-        )
-        .simultaneousGesture(
-          DragGesture(minimumDistance: 2)
-            .updating($playbookDragTranslation) { value, state, _ in
-              state = value.translation.width
-            }
-            .onEnded { value in
-              let proposedWidth = layout.proposedPlaybookWidth(
-                base: basePlaybookWidth,
-                translation: value.translation.width
-              )
-              currentPlaybookDetent = layout.nearestDetent(to: proposedWidth)
-            }
-        )
-
+      ScrollViewReader { scrollProxy in
         ScrollView {
-          RecipePlaybookView(
-            model: model,
-            handoffTransport: handoffTransport,
-            onRecipeSelected: onRecipeSelected,
-            isComfortablePlaybookWidth: detent == .comfortable,
-            onReadFull: { currentPlaybookDetent = .wide }
-          )
+          VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
+              wideColumnHeader(recipe)
+                .id("recipe-directions-top")
+              directionsColumn
+            }
+
+            Divider()
+
+            HStack {
+              Text("Playbook")
+                .font(.title2.bold())
+              Spacer()
+              Button {
+                withAnimation(.snappy) {
+                  scrollProxy.scrollTo("recipe-directions-top", anchor: .top)
+                }
+              } label: {
+                Label("Directions", systemImage: "arrow.up")
+                  .font(.caption.weight(.semibold))
+              }
+              .buttonStyle(.plain)
+              .accessibilityHint("Returns to the top of the recipe directions.")
+            }
+            .id("recipe-playbook")
+
+            RecipePlaybookView(
+              model: model,
+              handoffTransport: handoffTransport,
+              onRecipeSelected: onRecipeSelected
+            )
+          }
           .padding()
+          .frame(maxWidth: directionsContentMaximumWidth, alignment: .topLeading)
           .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .swipeActionsContainer()
-        .frame(width: livePlaybookWidth, alignment: .topLeading)
-        .transition(.move(edge: .trailing).combined(with: .opacity))
+        .onChange(of: playbookJumpRequest) { _, _ in
+          withAnimation(.snappy) {
+            scrollProxy.scrollTo("recipe-playbook", anchor: .top)
+          }
+        }
+        .frame(width: directionsWidth)
       }
     }
-    .animation(.snappy(duration: 0.22), value: isPlaybookColumnVisible)
-    .animation(.snappy(duration: 0.22), value: playbookDetentRaw)
     .frame(width: size.width, height: size.height, alignment: .topLeading)
-  }
-
-  private var currentPlaybookDetent: RecipePlaybookColumnDetent {
-    get {
-      RecipePlaybookColumnDetent(rawValue: playbookDetentRaw) ?? .comfortable
-    }
-    nonmutating set {
-      playbookDetentRaw = newValue.rawValue
-    }
   }
 
   @ViewBuilder

@@ -1,11 +1,6 @@
 import Foundation
 import SwiftUI
 
-enum RecipePlaybookColumnPreferences {
-  static let visibilityStorageKey = "RecipeReader.isPlaybookColumnVisible"
-  static let detentStorageKey = "RecipeReader.playbookColumnDetent"
-}
-
 enum MenuPlaybookColumnPreferences {
   static let visibilityStorageKey = "MenuReader.isPlaybookColumnVisible"
   static let detentsStorageKey = "MenuReader.playbookColumnDetents"
@@ -47,68 +42,13 @@ enum RecipePlaybookColumnDetent: String, CaseIterable, Codable, Equatable {
   }
 }
 
-enum RecipeWideColumnMetrics {
+enum PlaybookColumnMetrics {
   // Matches the established chat-workspace resize affordance, including the
   // control's VoiceOver-adjustable action and visual grip dimensions below.
   static let resizeHandleWidth: CGFloat = 22
   static let separatorWidth: CGFloat = 1
   static let resizeGripWidth: CGFloat = 5
   static let resizeGripHeight: CGFloat = 48
-}
-
-struct RecipeWideColumnLayout {
-  // The device pass tuned Ingredients to 90% of its prior 30% share while
-  // preserving the Directions floor. The detents evenly divide only the
-  // remaining width, so no device-specific Playbook width is encoded here.
-  private static let ingredientsColumnFraction: CGFloat = 0.27
-  private static let directionsMinimumFraction: CGFloat = 0.30
-
-  let width: CGFloat
-  let isPlaybookVisible: Bool
-
-  var ingredientsWidth: CGFloat {
-    width * Self.ingredientsColumnFraction
-  }
-
-  private var directionsMinimumWidth: CGFloat {
-    width * Self.directionsMinimumFraction
-  }
-
-  private var maximumPlaybookWidth: CGFloat {
-    guard isPlaybookVisible else { return 0 }
-    return max(
-      0,
-      width
-        - ingredientsWidth
-        - directionsMinimumWidth
-        - RecipeWideColumnMetrics.separatorWidth
-        - RecipeWideColumnMetrics.resizeHandleWidth
-    )
-  }
-
-  func playbookWidth(for detent: RecipePlaybookColumnDetent) -> CGFloat {
-    let index = RecipePlaybookColumnDetent.allCases.firstIndex(of: detent) ?? 0
-    let fraction = CGFloat(index + 1) / CGFloat(RecipePlaybookColumnDetent.allCases.count)
-    return maximumPlaybookWidth * fraction
-  }
-
-  func directionsWidth(playbookWidth: CGFloat) -> CGFloat {
-    width
-      - ingredientsWidth
-      - RecipeWideColumnMetrics.separatorWidth
-      - (isPlaybookVisible ? RecipeWideColumnMetrics.resizeHandleWidth + playbookWidth : 0)
-  }
-
-  func proposedPlaybookWidth(base: CGFloat, translation: CGFloat) -> CGFloat {
-    min(max(base - translation, 0), maximumPlaybookWidth)
-  }
-
-  func nearestDetent(to playbookWidth: CGFloat) -> RecipePlaybookColumnDetent {
-    RecipePlaybookColumnDetent.allCases.min { lhs, rhs in
-      abs(self.playbookWidth(for: lhs) - playbookWidth)
-        < abs(self.playbookWidth(for: rhs) - playbookWidth)
-    } ?? .comfortable
-  }
 }
 
 struct MenuWideColumnLayout {
@@ -130,7 +70,7 @@ struct MenuWideColumnLayout {
       0,
       width
         - bodyMinimumWidth
-        - RecipeWideColumnMetrics.resizeHandleWidth
+        - PlaybookColumnMetrics.resizeHandleWidth
     )
   }
 
@@ -141,7 +81,7 @@ struct MenuWideColumnLayout {
   }
 
   func bodyWidth(playbookWidth: CGFloat) -> CGFloat {
-    width - (isPlaybookVisible ? RecipeWideColumnMetrics.resizeHandleWidth + playbookWidth : 0)
+    width - (isPlaybookVisible ? PlaybookColumnMetrics.resizeHandleWidth + playbookWidth : 0)
   }
 
   func proposedPlaybookWidth(base: CGFloat, translation: CGFloat) -> CGFloat {
@@ -160,7 +100,7 @@ struct RecipeWideColumnSeparator: View {
   var body: some View {
     Rectangle()
       .fill(.separator)
-      .frame(width: RecipeWideColumnMetrics.separatorWidth)
+      .frame(width: PlaybookColumnMetrics.separatorWidth)
   }
 }
 
@@ -190,17 +130,17 @@ struct RecipePlaybookResizeHandle: View {
       ZStack {
         Rectangle()
           .fill(.separator)
-          .frame(width: RecipeWideColumnMetrics.separatorWidth)
+          .frame(width: PlaybookColumnMetrics.separatorWidth)
         Capsule()
           .fill(.secondary.opacity(0.55))
           .frame(
-            width: RecipeWideColumnMetrics.resizeGripWidth,
-            height: RecipeWideColumnMetrics.resizeGripHeight
+            width: PlaybookColumnMetrics.resizeGripWidth,
+            height: PlaybookColumnMetrics.resizeGripHeight
           )
       }
       .frame(
-        minWidth: RecipeWideColumnMetrics.resizeHandleWidth,
-        maxWidth: RecipeWideColumnMetrics.resizeHandleWidth,
+        minWidth: PlaybookColumnMetrics.resizeHandleWidth,
+        maxWidth: PlaybookColumnMetrics.resizeHandleWidth,
         maxHeight: .infinity
       )
       .contentShape(Rectangle())
