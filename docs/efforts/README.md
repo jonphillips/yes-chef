@@ -25,9 +25,10 @@ it's touched.
 ## Active / recent
 
 - [recipe-reader-density.md](recipe-reader-density.md) — **In progress, placement correction in draft PR** · Put variation selection beside the recipe, shorten the reader header, and move the supplemental Playbook below Instructions in the Directions column as a compact Notes → Chef It Up → Make-ahead reference with a Serve With capsule strip and Ask now in the sparkle menu.
-- [cockpit-find-handoff-receiver.md](cockpit-find-handoff-receiver.md) — **In progress** · Receive raw Cockpit
-  Find referrals, isolate 0/1/N recipes for Create Recipe review, and emit a typed verdict through the deferred
-  return-transport seam.
+- [cockpit-find-handoff-receiver.md](cockpit-find-handoff-receiver.md) — **In progress; S-y3 (transport) is Next
+  Up** · [ADR-0058](../decisions/ADR-0058-cockpit-find-referral-transport.md) · Receive raw Cockpit Find referrals
+  through a pair-scoped App Group mailbox opened by a single-purpose `yeschef://find-referral` door, isolate
+  0/1/N recipes for Create Recipe review, and return a typed verdict silently through the same mailbox.
 - [prepared-components.md](prepared-components.md) — **Designed (proposal)**, not dispatched, **post-cutover** ·
   Feeds a future ADR · Gives cooking its missing middle layer (`ingredients → prepared components → dishes`):
   a `Recipe.kind` enum makes a recipe a reusable component and a **directional** `recipeComponentLink` edge

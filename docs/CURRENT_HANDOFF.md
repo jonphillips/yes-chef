@@ -1,7 +1,7 @@
 # Current Handoff
 
-Last updated: August 23, 2026. **No designated Next Up target — Jon picks from the queue;** the standout live
-candidate is the **paste-door scope** follow-on in the learnings parser-floor effort. Newly-merged work (ADR-0052 S3, ADR-0055, ADR-0042 Amd
+Last updated: September 24, 2026. **Next Up: Cockpit Find handoff S-y3 (the transport, ADR-0058).** The
+paste-door scope follow-on in the learnings parser-floor effort remains the standout queue candidate. Newly-merged work (ADR-0052 S3, ADR-0055, ADR-0042 Amd
 4/Amd 5) has moved to [`DONE-LOG.md`](DONE-LOG.md); the device passes it owes are in their own section below.
 ⚠️ **A standing Codex-env gotcha:** the simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
 the app tests" is structural, not a regression — and it once *masked two genuinely red tests* (missing
@@ -28,7 +28,15 @@ and every hit outside those two sections is a removal candidate — not merely f
 
 ## Next Up
 
-**No designated target — Jon picks from the queue.**
+**[`efforts/cockpit-find-handoff-receiver.md`](efforts/cockpit-find-handoff-receiver.md) — S-y3, the transport
+([ADR-0058](decisions/ADR-0058-cockpit-find-referral-transport.md)).** Wire the pair-scoped App Group mailbox
+and the single-purpose `yeschef://find-referral` door. Pin the golden wire fixtures, make exactly one verdict
+survive process death (dropping abandon-on-scene-background), and trim `CaptureRecipeFromText` back to text
+only. Build to the effort's S-y3 list and done-when. **Stop and ask Jon** if the new App Group can't be
+registered from the command line. The two-app round trip is Jon's device pass (Cockpit's S-join), not this
+dispatch's.
+
+**Also open (not the designated target):**
 
 - **ADR-0045 cold-start starters are still open, no longer time-gated:** S2 rearranged the Calendar day-header
   Chat and the Workbench Chat into inspectors and left them passing `.none`. Whether they want their own starters
@@ -77,8 +85,9 @@ section is work.**
   `CreateRecipeCoordinator` **sibling** of `ImportHandoffResult` — **never** the routed handoff importer
   (`HandoffReviewCoordinator`): clipboard text has no `handoffID` and no subject, so it is Create Recipe /
   `save(draft:)`, categorically (Amd2-D2). It reuses `CreateRecipeExtraction.extract` — **no new parser, no second
-  "text→recipe" model call** (this *is* the ADR-0051 guard above) — with **no `yeschef://` URL scheme** (the app has
-  none; it foregrounds via an `openAppWhenRun` opener; Amd2-D3), and it seeds **non-destructively** — a non-empty
+  "text→recipe" model call** (this *is* the ADR-0051 guard above) — with **no general `yeschef://` URL scheme**
+  (it foregrounds via an `openAppWhenRun` opener; Amd2-D3). The **only** carve-out is ADR-0058 D2's single-purpose
+  `find-referral` door for Cockpit: one host, one parameter, calling `stage(referral:)`, never a router. It seeds **non-destructively** — a non-empty
   session offers the incoming text as a new source and never clobbers unsaved work (Amd2-D4). The transport stays
   producer-agnostic and menu-unaware, preserving exact text (Amd2-D1/D5); durable staging = a new synced table = a
   non-goal (D4).

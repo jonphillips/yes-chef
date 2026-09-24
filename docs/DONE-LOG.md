@@ -9,6 +9,18 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## Cockpit Find handoff — receiver compute (S-y1 + S-y2 compute)
+
+**Merged 2026-09-21; PR [#322](https://github.com/jonphillips/yes-chef/pull/322). No schema.** Yes Chef's half of
+Cockpit's M6 Gate 5, the first cross-app Find referral. `RecipeExtractionClient` now isolates **0/1/N** recipes
+from messy or large text, and 0 is a clean decline rather than a thrown `.emptyRecipe`. A `FindReferral` (raw
+text, provenance, and an opaque `referralID`) stages into Create Recipe review with provenance shown; review is
+pick-one-of-N. `CreateRecipeCoordinator` emits **exactly one** set-valued `FindVerdict` per referral through the
+`FindReturnEmitter` seam, which shipped as a logging stub. Codex's key finding was that **no public API lets one
+app invoke another's App Intent**. That later proved to break the transport in both directions, and it is
+resolved by [ADR-0058](decisions/ADR-0058-cockpit-find-referral-transport.md); S-y3 carries the transport.
+
+---
 ## ADR-0055 — menu Dishes drag-to-reorder on the sanctioned reorder path
 
 **Merged 2026-08-21; PR [#310](https://github.com/jonphillips/yes-chef/pull/310). No schema. Jon's device pass
