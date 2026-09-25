@@ -10,6 +10,7 @@ import YesChefCore
 @MainActor
 final class CreateRecipeCoordinator {
   static let outstandingReferralDefaultsKey = "cockpitFindOutstandingReferralID"
+  static let admittedReferralRecipeIDsDefaultsKey = "cockpitFindAdmittedRecipeIDs"
 
   struct StagedText: Equatable {
     let id: UUID
@@ -17,13 +18,21 @@ final class CreateRecipeCoordinator {
     let referral: FindReferral?
   }
 
+  enum SaveResult {
+    case failed
+    case saved(recipeID: Recipe.ID, sessionComplete: Bool)
+  }
+
   @ObservationIgnored @Dependency(\.uuid) private var uuid
   @ObservationIgnored @Dependency(\.findReturnEmitter) private var findReturnEmitter
   private let defaults: UserDefaults
   private(set) var stagedText: StagedText?
   private(set) var referralID: String?
+  private(set) var admittedRecipeIDs: [Recipe.ID] = []
   private var savingReferralID: String?
   private var savingReferralWasAbandoned = false
+  private var savingReferralCloseReason: FindDeclineReason = .dismissed
+  private var saveCompletionContinuation: CheckedContinuation<Void, Never>?
 
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
@@ -32,26 +41,41 @@ final class CreateRecipeCoordinator {
   /// Keeps the transport payload in memory only until the app root can select Create Recipe and apply it
   /// to the live session. The content is intentionally not normalized so source fidelity is retained.
   func stage(text: String) async {
-    await reconcileOutstandingReferral()
+    await declineReferral(.dismissed)
+    await waitForSaveToFinish()
+    await reconcilePersistedReferral()
     referralID = nil
+    admittedRecipeIDs = []
     stagedText = StagedText(id: uuid(), text: text, referral: nil)
   }
 
   @discardableResult
   func stage(referral: FindReferral) async -> Bool {
-    if let activeReferralID = referralID {
-      // Reopening the same referral should preserve its live review session.
-      if activeReferralID == referral.referralID { return true }
+    if referralID == referral.referralID { return true }
+    if referralID != nil {
+      let activeReferralID = referralID
       await declineReferral(.dismissed)
-    } else if let persistedReferralID = defaults.string(forKey: Self.outstandingReferralDefaultsKey),
-              persistedReferralID != referral.referralID {
-      // A prior process may have died before completing review. Dismiss that stale referral, then
-      // continue intake even if writing its verdict fails; the newly received id becomes outstanding.
-      await emit(.declined(referralID: persistedReferralID, .dismissed))
+      await waitForSaveToFinish()
+      if let activeReferralID,
+         defaults.string(forKey: Self.outstandingReferralDefaultsKey) == activeReferralID {
+        return false
+      }
+    }
+    if let persistedReferralID = defaults.string(forKey: Self.outstandingReferralDefaultsKey),
+       persistedReferralID != referral.referralID {
+      // A prior process may have died before completing review. Resolve its admitted set before
+      // accepting the new referral. Keep both persisted values if the mailbox write fails.
+      guard await closeReferral(id: persistedReferralID, reason: .dismissed) else { return false }
+    }
+    if defaults.string(forKey: Self.outstandingReferralDefaultsKey) == referral.referralID {
+      admittedRecipeIDs = persistedAdmittedRecipeIDs
+    } else {
+      admittedRecipeIDs = []
     }
     referralID = referral.referralID
     stagedText = StagedText(id: uuid(), text: referral.rawText, referral: referral)
     defaults.set(referral.referralID, forKey: Self.outstandingReferralDefaultsKey)
+    defaults.set(admittedRecipeIDs.map(\.uuidString), forKey: Self.admittedReferralRecipeIDsDefaultsKey)
     return true
   }
 
@@ -86,86 +110,137 @@ final class CreateRecipeCoordinator {
 
   func extractButtonTapped(for model: CreateRecipeModel) async {
     await model.extractButtonTapped()
-    guard let referralID else { return }
+    guard referralID != nil else { return }
     if model.foundNoRecipe {
-      await resolve(.declined(referralID: referralID, .noRecipeFound))
+      await declineReferral(.noRecipeFound)
     } else if let extractionError = model.extractionError {
-      await resolve(.declined(referralID: referralID, .extractionFailed(extractionError)))
+      await declineReferral(.extractionFailed(extractionError))
     }
   }
 
-  func saveButtonTapped(for model: CreateRecipeModel) async -> Recipe.ID? {
+  func saveButtonTapped(for model: CreateRecipeModel) async -> SaveResult {
+    guard !model.isSavingDisabled else { return .failed }
     let savingReferralID = referralID
-    self.savingReferralID = savingReferralID
-    savingReferralWasAbandoned = false
-    guard let recipeID = await model.saveButtonTapped() else {
-      let shouldDismiss = savingReferralWasAbandoned
-      self.savingReferralID = nil
+    if let savingReferralID {
+      self.savingReferralID = savingReferralID
       savingReferralWasAbandoned = false
-      if shouldDismiss, let savingReferralID {
-        await emit(.declined(referralID: savingReferralID, .dismissed))
-      }
-      return nil
+      savingReferralCloseReason = .dismissed
     }
-    guard let savingReferralID else { return recipeID }
 
-    await resolve(
-      FindVerdict(
-        referralID: savingReferralID,
-        outcomes: [.admitted(FindRecipeRef(recipeID))]
-      )
-    )
-    self.savingReferralID = nil
-    savingReferralWasAbandoned = false
-    return recipeID
+    guard let recipeID = await model.saveButtonTapped() else {
+      if let savingReferralID, savingReferralWasAbandoned {
+        await finishSavingReferral(id: savingReferralID, reason: savingReferralCloseReason)
+      } else {
+        clearSavingReferral()
+      }
+      return .failed
+    }
+
+    if let savingReferralID {
+      if !admittedRecipeIDs.contains(recipeID) {
+        admittedRecipeIDs.append(recipeID)
+      }
+      defaults.set(admittedRecipeIDs.map(\.uuidString), forKey: Self.admittedReferralRecipeIDsDefaultsKey)
+      if model.isSessionComplete || savingReferralWasAbandoned {
+        await finishSavingReferral(id: savingReferralID, reason: savingReferralCloseReason)
+      } else {
+        clearSavingReferral()
+      }
+    }
+
+    return .saved(recipeID: recipeID, sessionComplete: model.isSessionComplete)
   }
 
   func declineReferral(_ reason: FindDeclineReason = .dismissed) async {
     guard let referralID else { return }
     if savingReferralID == referralID {
       savingReferralWasAbandoned = true
+      savingReferralCloseReason = reason
       return
     }
-    await resolve(.declined(referralID: referralID, reason))
+    await closeReferral(id: referralID, reason: reason)
   }
 
   /// Reconciles a referral when the cook leaves Create Recipe or another intake supersedes it. A save
-  /// already in flight is allowed to finish and admit; if that save fails, the abandonment becomes the
-  /// resulting dismissal instead.
+  /// already in flight is allowed to finish and admit; if that save fails, the prior admitted set is closed.
   func abandonOutstandingReferral() async {
     await declineReferral(.dismissed)
   }
 
-  /// Called once after dependency preparation at process launch. Only the correlation id survives a
-  /// crash; without an in-memory review session, that referral is now a dismissal.
+  /// Called once after dependency preparation at process launch. The referral id and admitted recipe ids
+  /// survive a crash so a partial multi-save is returned accurately instead of being dismissed.
   func reconcilePersistedReferralAfterLaunch() async {
     guard referralID == nil,
           let referralID = defaults.string(forKey: Self.outstandingReferralDefaultsKey)
     else { return }
-    await emit(.declined(referralID: referralID, .dismissed), preservingLiveSession: true)
+    await closeReferral(id: referralID, reason: .dismissed)
   }
 
-  private func reconcileOutstandingReferral() async {
-    await declineReferral(.dismissed)
+  private func reconcilePersistedReferral() async {
+    guard let referralID = defaults.string(forKey: Self.outstandingReferralDefaultsKey) else { return }
+    await closeReferral(id: referralID, reason: .dismissed)
   }
 
-  private func resolve(_ verdict: FindVerdict) async {
-    guard referralID == verdict.referralID || savingReferralID == verdict.referralID else { return }
-    if referralID == verdict.referralID {
-      referralID = nil
+  @discardableResult
+  private func closeReferral(id: String, reason: FindDeclineReason) async -> Bool {
+    if savingReferralID == id {
+      savingReferralWasAbandoned = true
+      savingReferralCloseReason = reason
+      return false
     }
-    await emit(verdict)
+    let recipeIDs = referralID == id ? admittedRecipeIDs : persistedAdmittedRecipeIDs
+    if referralID == id {
+      referralID = nil
+      admittedRecipeIDs = []
+    }
+    let verdict: FindVerdict
+    if recipeIDs.isEmpty {
+      verdict = .declined(referralID: id, reason)
+    } else {
+      verdict = FindVerdict(referralID: id, outcomes: recipeIDs.map { .admitted(FindRecipeRef($0)) })
+    }
+    return await emit(verdict)
   }
 
-  private func emit(_ verdict: FindVerdict, preservingLiveSession: Bool = false) async {
+  private func finishSavingReferral(id: String, reason: FindDeclineReason) async {
+    if referralID == id {
+      referralID = nil
+      admittedRecipeIDs = []
+    }
+    clearSavingReferral()
+    await closeReferral(id: id, reason: reason)
+    saveCompletionContinuation?.resume()
+    saveCompletionContinuation = nil
+  }
+
+  private func clearSavingReferral() {
+    savingReferralID = nil
+    savingReferralWasAbandoned = false
+    savingReferralCloseReason = .dismissed
+  }
+
+  private func waitForSaveToFinish() async {
+    guard savingReferralID != nil else { return }
+    await withCheckedContinuation { continuation in
+      saveCompletionContinuation = continuation
+    }
+  }
+
+  private var persistedAdmittedRecipeIDs: [Recipe.ID] {
+    (defaults.stringArray(forKey: Self.admittedReferralRecipeIDsDefaultsKey) ?? []).compactMap { UUID(uuidString: $0) }
+  }
+
+  private func emit(_ verdict: FindVerdict) async -> Bool {
     do {
       try await findReturnEmitter(verdict)
-      if defaults.string(forKey: Self.outstandingReferralDefaultsKey) == verdict.referralID,
-         !preservingLiveSession || referralID != verdict.referralID {
+      if defaults.string(forKey: Self.outstandingReferralDefaultsKey) == verdict.referralID {
         defaults.removeObject(forKey: Self.outstandingReferralDefaultsKey)
+        defaults.removeObject(forKey: Self.admittedReferralRecipeIDsDefaultsKey)
       }
+      return true
     } catch {
       AppLog.handoff.error("Find verdict emission failed: \(String(describing: error), privacy: .public)")
+      return false
     }
   }
 }

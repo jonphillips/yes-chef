@@ -1,6 +1,6 @@
 # Effort — Cockpit → Yes Chef recipe Find handoff (receiver side)
 
-Status: Built: S-y1 + S-y2 compute (#322) and S-y3 transport (#325). The two-app round trip is owed (Cockpit S-c2, then Jon's S-join device pass); multi-admit queued in [`cockpit-find-multi-admit.md`](cockpit-find-multi-admit.md)
+Status: Built: S-y1 + S-y2 compute (#322), S-y3 transport (#325), and multi-admit (see [`cockpit-find-multi-admit.md`](cockpit-find-multi-admit.md)). The two-app round trip is owed (Cockpit S-c2, then Jon's S-join device pass).
 Summary: Receive raw Cockpit Find referrals through a pair-scoped App Group mailbox opened by a single-purpose `yeschef://find-referral` door, isolate 0/1/N recipes for Create Recipe review, and return a typed verdict silently through the same mailbox.
 Related: [ADR-0058](../decisions/ADR-0058-cockpit-find-referral-transport.md) (transport) ·
 [ADR-0053 Amd 2](../decisions/ADR-0053-create-recipe-destination.md#amendment-2--a-headless-transport-shortcuts--app-intent-into-create-recipe-2026-08-10)
@@ -65,7 +65,7 @@ the quality signal extraction has never had. Cockpit never learns recipe schema 
   - `noRecipeFound` / `duplicate` are the quality signal: the Find is resolved as declined.
   - `dismissed` / `extractionFailed` mean "not admitted." The Find becomes re-sendable, and neither is
     counted against the hint.
-  - Under v1's one-of-N review UI, **one admitted outcome is a complete verdict**.
+  - A referral resolves once at close. Its verdict may contain every candidate the cook saved; unsaved candidates stay out.
 
 ## Deltas
 
@@ -77,10 +77,11 @@ the quality signal extraction has never had. Cockpit never learns recipe schema 
 review. The coordinator produces exactly one `FindVerdict` per referral through the `FindReturnEmitter`
 seam, whose live value is still the logging stub.
 
-This receiver deliberately admits **one selected candidate per referral**. The `FindVerdict` shape
-remains set-valued for the eventual multi-admit contract, but the Create Recipe review UI is
-pick-one-of-N and clears the referral after the first admitted save. Unselected candidates are
-intentionally not reported as declines.
+Create Recipe supports saving **any number of candidates** from one review session. It emits one
+set-valued `FindVerdict` when the session closes, containing every recipe saved during the referral.
+Unsaved candidates are intentionally not reported as declines. The admitted set is persisted beside the
+outstanding referral id so a relaunch after a partial save resolves the referral accurately. See
+[`cockpit-find-multi-admit.md`](cockpit-find-multi-admit.md) for the implementation contract.
 
 ### S-y3 — The transport (ADR-0058) — ✅ done (#325)
 
@@ -163,7 +164,7 @@ intentionally not reported as declines.
 - **Auto-routing** or any non-user-initiated intake. Cockpit's first handoff is one deliberate act.
 - **Any generalized receiver framework or second receiver.** A second receiver does not join the pair
   group.
-- **Multi-admit** (N admitted from one referral) — queued as its own effort,
-  [`cockpit-find-multi-admit.md`](cockpit-find-multi-admit.md); the verdict shape is ready.
+- **Multi-admit** is implemented in the follow-on effort,
+  [`cockpit-find-multi-admit.md`](cockpit-find-multi-admit.md); this receiver remains one deliberate user-initiated referral door.
 - **A "Back to Cockpit" hop** after save — a convenience on top of the silent return, not now.
 - **Yes Chef publishing Current Context *back* to Cockpit** — a separate direction, not this effort.

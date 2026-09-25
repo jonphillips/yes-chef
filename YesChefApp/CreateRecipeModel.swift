@@ -53,6 +53,8 @@ final class CreateRecipeModel {
   var extractionError: String?
   private(set) var extractionIssues: [RecipeExtractionIssue] = []
   private(set) var extractionCandidates: [ExtractionCandidate] = []
+  private(set) var savedExtractionIDs: Set<UUID> = []
+  private(set) var mostRecentlySavedRecipeID: Recipe.ID?
   private(set) var selectedExtractionID: UUID?
   private(set) var foundNoRecipe = false
   private(set) var referralProvenance: FindProvenance?
@@ -95,6 +97,8 @@ final class CreateRecipeModel {
     extractionError = nil
     extractionIssues = []
     extractionCandidates = []
+    savedExtractionIDs = []
+    mostRecentlySavedRecipeID = nil
     selectedExtractionID = nil
     foundNoRecipe = false
     referralProvenance = nil
@@ -115,6 +119,15 @@ final class CreateRecipeModel {
     isSaving
       || editorModel.isSavingDisabled
       || (extractionCandidates.count > 1 && selectedExtractionID == nil)
+      || selectedExtractionID.map(savedExtractionIDs.contains) == true
+  }
+
+  var hasUnsavedCandidates: Bool {
+    extractionCandidates.contains { !savedExtractionIDs.contains($0.id) }
+  }
+
+  var isSessionComplete: Bool {
+    !hasUnsavedCandidates
   }
 
   var hasLabelActivity: Bool {
@@ -201,6 +214,7 @@ final class CreateRecipeModel {
   }
 
   func selectExtraction(id: UUID) {
+    guard !savedExtractionIDs.contains(id) else { return }
     guard let candidate = extractionCandidates.first(where: { $0.id == id }) else { return }
     selectedExtractionID = id
     applyExtraction(candidate.extraction)
@@ -218,6 +232,7 @@ final class CreateRecipeModel {
     extractionError = nil
     foundNoRecipe = false
     extractionCandidates = []
+    savedExtractionIDs = []
     selectedExtractionID = nil
     defer { isExtracting = false }
 
@@ -271,6 +286,13 @@ final class CreateRecipeModel {
         )
         return recipeID
       }
+      if let selectedExtractionID {
+        savedExtractionIDs.insert(selectedExtractionID)
+        if let nextCandidate = extractionCandidates.first(where: { !savedExtractionIDs.contains($0.id) }) {
+          selectExtraction(id: nextCandidate.id)
+        }
+      }
+      mostRecentlySavedRecipeID = recipeID
       return recipeID
     } catch {
       errorMessage = String(describing: error)
