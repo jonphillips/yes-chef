@@ -81,15 +81,7 @@ struct CreateRecipeModelTests {
   }
 
   @Test
-  func referralIntentKeepsRawTextAndTypedProvenanceWithMachineID() async throws {
-    let provenance = FindProvenance(
-      sender: "news@example.com",
-      publisher: "Example Kitchen",
-      seriesID: "weekly-recipes",
-      contentPieceToken: "opaque-content-piece",
-      note: "This looked worth trying."
-    )
-
+  func shortcutIntentStagesTextOnly() async throws {
     var coordinator: CreateRecipeCoordinator?
     try await withDependencies {
       $0.uuid = .incrementing
@@ -97,16 +89,11 @@ struct CreateRecipeModelTests {
       $0.createRecipeCoordinator = coordinator!
     } operation: {
       let coordinator = coordinator!
-      _ = try await CaptureRecipeFromText(
-        rawText: "Newsletter chrome\nRecipe body\nFooter",
-        provenance: provenance,
-        referralID: "opaque-referral"
-      ).perform()
+      _ = try await CaptureRecipeFromText(rawText: "Newsletter chrome\nRecipe body\nFooter").perform()
 
       #expect(coordinator.stagedText?.text == "Newsletter chrome\nRecipe body\nFooter")
-      #expect(coordinator.referralID == "opaque-referral")
-      #expect(coordinator.stagedText?.referral?.provenance == provenance)
-      #expect(coordinator.stagedText?.referral?.provenance.contentPieceToken == "opaque-content-piece")
+      #expect(coordinator.referralID == nil)
+      #expect(coordinator.stagedText?.referral == nil)
     }
   }
 
@@ -174,6 +161,55 @@ struct CreateRecipeModelTests {
   }
 
   @Test
+  func stalePersistedReferralIsDismissedAndNewReferralStillStages() async throws {
+    let suiteName = "FindReferralTests-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set("referral-crashed", forKey: CreateRecipeCoordinator.outstandingReferralDefaultsKey)
+    let recorder = AppFindReturnRecorder()
+
+    await withDependencies {
+      $0.uuid = .incrementing
+      $0.findReturnEmitter = FindReturnEmitter { verdict in await recorder.record(verdict) }
+    } operation: {
+      let coordinator = CreateRecipeCoordinator(defaults: defaults)
+      let staged = await coordinator.stage(
+        referral: FindReferral(referralID: "referral-new", rawText: "new recipe", provenance: FindProvenance())
+      )
+
+      #expect(staged)
+      #expect(coordinator.referralID == "referral-new")
+      #expect(coordinator.stagedText?.text == "new recipe")
+      #expect(defaults.string(forKey: CreateRecipeCoordinator.outstandingReferralDefaultsKey) == "referral-new")
+    }
+
+    #expect(await recorder.verdicts == [.declined(referralID: "referral-crashed", .dismissed)])
+  }
+
+  @Test
+  func staleReferralWriteFailureDoesNotBlockNewReferral() async throws {
+    let suiteName = "FindReferralTests-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set("referral-unwritable", forKey: CreateRecipeCoordinator.outstandingReferralDefaultsKey)
+
+    await withDependencies {
+      $0.uuid = .incrementing
+      $0.findReturnEmitter = FindReturnEmitter { _ in throw FindReturnWriteError.failed }
+    } operation: {
+      let coordinator = CreateRecipeCoordinator(defaults: defaults)
+      let staged = await coordinator.stage(
+        referral: FindReferral(referralID: "referral-after-failure", rawText: "new recipe", provenance: FindProvenance())
+      )
+
+      #expect(staged)
+      #expect(coordinator.referralID == "referral-after-failure")
+      #expect(coordinator.stagedText?.text == "new recipe")
+      #expect(defaults.string(forKey: CreateRecipeCoordinator.outstandingReferralDefaultsKey) == "referral-after-failure")
+    }
+  }
+
+  @Test
   func abandonedReferralEmitsExactlyOneDismissalAndSupersessionDoesNotStrandIt() async {
     let recorder = AppFindReturnRecorder()
 
@@ -197,6 +233,49 @@ struct CreateRecipeModelTests {
       #expect(await recorder.verdicts == [.declined(referralID: "referral-abandoned", .dismissed)])
       #expect(coordinator.referralID == nil)
     }
+  }
+
+  @Test
+  func mailboxReceivePersistsBeforeDeletingAndRelaunchRetriesDismissal() async throws {
+    let suiteName = "FindReferralTests-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let mailbox = FindReferralMailbox(rootURL: root)
+    let referral = FindReferral(referralID: "ref-relaunch", rawText: "recipe", provenance: FindProvenance())
+    let referralURL = root.appendingPathComponent("find-referrals", isDirectory: true).appendingPathComponent("ref-relaunch.json")
+    try FileManager.default.createDirectory(at: referralURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try JSONEncoder().encode(referral).write(to: referralURL)
+
+    let recorder = AppFindReturnRecorder()
+    await withDependencies {
+      $0.uuid = .incrementing
+      $0.findReturnEmitter = FindReturnEmitter { verdict in await recorder.record(verdict) }
+    } operation: {
+      let receivingCoordinator = CreateRecipeCoordinator(defaults: defaults)
+      let didReceive: Bool
+      do {
+        didReceive = try await receivingCoordinator.receiveReferral(id: referral.referralID, from: mailbox)
+      } catch {
+        Issue.record(error)
+        return
+      }
+      #expect(didReceive)
+      #expect(defaults.string(forKey: CreateRecipeCoordinator.outstandingReferralDefaultsKey) == referral.referralID)
+      #expect(!FileManager.default.fileExists(atPath: referralURL.path))
+    }
+
+    await withDependencies {
+      $0.uuid = .incrementing
+      $0.findReturnEmitter = FindReturnEmitter { verdict in await recorder.record(verdict) }
+    } operation: {
+      let relaunchedCoordinator = CreateRecipeCoordinator(defaults: defaults)
+      await relaunchedCoordinator.reconcilePersistedReferralAfterLaunch()
+    }
+
+    #expect(await recorder.verdicts == [.declined(referralID: "ref-relaunch", .dismissed)])
+    #expect(defaults.string(forKey: CreateRecipeCoordinator.outstandingReferralDefaultsKey) == nil)
   }
 
   @Test
@@ -449,4 +528,8 @@ private actor AppFindReturnRecorder {
   func record(_ verdict: FindVerdict) {
     verdicts.append(verdict)
   }
+}
+
+private enum FindReturnWriteError: Error {
+  case failed
 }

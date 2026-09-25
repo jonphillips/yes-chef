@@ -62,7 +62,11 @@ let package = Package(
         .product(name: "CustomDump", package: "swift-custom-dump"),
         .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
       ],
-      exclude: ["Fixtures"]
+      exclude: ["Fixtures/PaprikaHTML", "Fixtures/WebRecipeCapture"],
+      resources: [
+        .copy("Fixtures/find-referral-v1.json"),
+        .copy("Fixtures/find-verdict-v1.json"),
+      ]
     ),
   ]
 )

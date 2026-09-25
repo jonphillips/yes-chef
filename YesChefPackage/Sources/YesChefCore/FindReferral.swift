@@ -22,6 +22,32 @@ public struct FindReferral: Codable, Equatable, Sendable {
     self.rawText = rawText
     self.provenance = provenance
   }
+
+  fileprivate enum CodingKeys: String, CodingKey { case version, referralID, rawText, provenance }
+
+  public init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    try Self.validateVersion(in: values)
+    referralID = try values.decode(String.self, forKey: .referralID)
+    rawText = try values.decode(String.self, forKey: .rawText)
+    provenance = try values.decode(FindProvenance.self, forKey: .provenance)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var values = encoder.container(keyedBy: CodingKeys.self)
+    try values.encode(1, forKey: .version)
+    try values.encode(referralID, forKey: .referralID)
+    try values.encode(rawText, forKey: .rawText)
+    try values.encode(provenance, forKey: .provenance)
+  }
+
+  static func validateVersion<Key: CodingKey>(in values: KeyedDecodingContainer<Key>) throws {
+    guard let versionKey = Key(stringValue: "version") else { return }
+    let version = try values.decode(Int.self, forKey: versionKey)
+    guard version == 1 else {
+      throw DecodingError.dataCorruptedError(forKey: versionKey, in: values, debugDescription: "Unsupported Find referral version: \(version)")
+    }
+  }
 }
 
 /// Source context Cockpit attaches to a referral. Every field is an advisory hint for the cook's review
@@ -56,5 +82,54 @@ public struct FindProvenance: Codable, Equatable, Sendable {
     self.contentPieceToken = contentPieceToken
     self.note = note
     self.hints = hints
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case sender, publisher, arrivalDate, seriesID, contentPieceToken, note, hints
+  }
+
+  public init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    sender = try values.decodeIfPresent(String.self, forKey: .sender)
+    publisher = try values.decodeIfPresent(String.self, forKey: .publisher)
+    if let date = try values.decodeIfPresent(String.self, forKey: .arrivalDate) {
+      arrivalDate = try FindWireDate.decode(date, codingPath: values.codingPath + [CodingKeys.arrivalDate])
+    } else {
+      arrivalDate = nil
+    }
+    seriesID = try values.decodeIfPresent(String.self, forKey: .seriesID)
+    contentPieceToken = try values.decodeIfPresent(String.self, forKey: .contentPieceToken)
+    note = try values.decodeIfPresent(String.self, forKey: .note)
+    hints = try values.decodeIfPresent([String: String].self, forKey: .hints) ?? [:]
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var values = encoder.container(keyedBy: CodingKeys.self)
+    try values.encodeIfPresent(sender, forKey: .sender)
+    try values.encodeIfPresent(publisher, forKey: .publisher)
+    try values.encodeIfPresent(arrivalDate.map(FindWireDate.encode), forKey: .arrivalDate)
+    try values.encodeIfPresent(seriesID, forKey: .seriesID)
+    try values.encodeIfPresent(contentPieceToken, forKey: .contentPieceToken)
+    try values.encodeIfPresent(note, forKey: .note)
+    try values.encode(hints, forKey: .hints)
+  }
+}
+
+private enum FindWireDate {
+  static func encode(_ date: Date) -> String {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter.string(from: date)
+  }
+
+  static func decode(_ value: String, codingPath: [any CodingKey]) throws -> Date {
+    for options: ISO8601DateFormatter.Options in [
+      [.withInternetDateTime, .withFractionalSeconds], [.withInternetDateTime],
+    ] {
+      let formatter = ISO8601DateFormatter()
+      formatter.formatOptions = options
+      if let date = formatter.date(from: value) { return date }
+    }
+    throw DecodingError.dataCorrupted(.init(codingPath: codingPath, debugDescription: "Invalid ISO-8601 date"))
   }
 }
