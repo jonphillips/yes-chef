@@ -25,6 +25,10 @@ it's touched.
 ## Active / recent
 
 - [recipe-reader-density.md](recipe-reader-density.md) — **In progress, placement correction in draft PR** · Put variation selection beside the recipe, shorten the reader header, and move the supplemental Playbook below Instructions in the Directions column as a compact Notes → Chef It Up → Make-ahead reference with a Serve With capsule strip and Ask now in the sparkle menu.
+- [cockpit-find-multi-admit.md](cockpit-find-multi-admit.md) — **Designed (queued 2026-09-25)**, schema-free ·
+  Follow-up to the Cockpit Find receiver · When extraction finds N recipes, let the cook save any number of
+  them from the one Create Recipe session instead of losing the rest after the first Save; a Cockpit referral
+  then returns **one** verdict listing every saved recipe.
 - [cockpit-find-handoff-receiver.md](cockpit-find-handoff-receiver.md) — **Built (#322, #325); two-app round trip
   owed** · [ADR-0058](../decisions/ADR-0058-cockpit-find-referral-transport.md) · Receive raw Cockpit Find referrals
   through a pair-scoped App Group mailbox opened by a single-purpose `yeschef://find-referral` door, isolate

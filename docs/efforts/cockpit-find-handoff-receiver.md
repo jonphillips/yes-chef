@@ -1,6 +1,6 @@
 # Effort — Cockpit → Yes Chef recipe Find handoff (receiver side)
 
-Status: Built: S-y1 + S-y2 compute (#322) and S-y3 transport (#325). The two-app round trip is owed (Cockpit S-c2, then Jon's S-join device pass); multi-admit deferred
+Status: Built: S-y1 + S-y2 compute (#322) and S-y3 transport (#325). The two-app round trip is owed (Cockpit S-c2, then Jon's S-join device pass); multi-admit queued in [`cockpit-find-multi-admit.md`](cockpit-find-multi-admit.md)
 Summary: Receive raw Cockpit Find referrals through a pair-scoped App Group mailbox opened by a single-purpose `yeschef://find-referral` door, isolate 0/1/N recipes for Create Recipe review, and return a typed verdict silently through the same mailbox.
 Related: [ADR-0058](../decisions/ADR-0058-cockpit-find-referral-transport.md) (transport) ·
 [ADR-0053 Amd 2](../decisions/ADR-0053-create-recipe-destination.md#amendment-2--a-headless-transport-shortcuts--app-intent-into-create-recipe-2026-08-10)
@@ -163,7 +163,7 @@ intentionally not reported as declines.
 - **Auto-routing** or any non-user-initiated intake. Cockpit's first handoff is one deliberate act.
 - **Any generalized receiver framework or second receiver.** A second receiver does not join the pair
   group.
-- **Multi-admit** (N admitted from one referral) — a follow-up review-UI slice; the verdict shape is
-  ready.
+- **Multi-admit** (N admitted from one referral) — queued as its own effort,
+  [`cockpit-find-multi-admit.md`](cockpit-find-multi-admit.md); the verdict shape is ready.
 - **A "Back to Cockpit" hop** after save — a convenience on top of the silent return, not now.
 - **Yes Chef publishing Current Context *back* to Cockpit** — a separate direction, not this effort.

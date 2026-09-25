@@ -132,6 +132,16 @@ section is work.**
 Drawn into **Next Up** as needed; not itself a dispatch target. Completed efforts live in
 [`docs/DONE-LOG.md`](DONE-LOG.md).
 
+**[`efforts/cockpit-find-multi-admit.md`](efforts/cockpit-find-multi-admit.md) — save every recipe in a
+multi-recipe Create Recipe session (queued 2026-09-25). One dispatch, **no schema**, no wire-format change.**
+Today the first Save discards the other candidates and closes the Cockpit referral, so the rest of a
+two-recipe email can't be admitted. Save now keeps the session open until every candidate is saved or the cook
+taps Done, and the referral returns **one** verdict with N `.admitted` outcomes.
+- **⚠️ Emit once, at close, never per save.** Cockpit's drain ignores a second verdict for a resolved referral.
+- **⚠️ Relaunch reconcile must replay the admitted set, not `.dismissed`.** Otherwise it causes a false
+  `duplicate` strike on a re-send.
+- **Best landed before Jon's S-join** so that one device pass covers it. It does not gate S-join.
+
 **[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md) — ATK's "Gather Your
 Ingredients" is a latent grocery bug (scoped 2026-07-28). P1 only; **no schema**.** 101 shoppable ingredient
 lines + 70 section names across **171 recipes** are page chrome captured as content, all canonicalizing to
