@@ -9,6 +9,23 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## Cockpit Find handoff — S-y3, the transport (ADR-0058)
+
+**Merged 2026-09-25; PR [#325](https://github.com/jonphillips/yes-chef/pull/325). No schema. The two-app device round
+trip is owed after Cockpit S-c2.** Wires [ADR-0058](decisions/ADR-0058-cockpit-find-referral-transport.md):
+- the pair-scoped `group.com.jonphillips.cockpit-yeschef` App Group (portal registration succeeded from the
+  command line);
+- the single-purpose `yeschef://find-referral` door (`FindReferralDoor`, which rejects any other form), staging
+  through `stage(referral:)` before consuming the message;
+- hand-written `Codable` pinned to golden fixtures byte-identical with Cockpit's;
+- the mailbox writer as `FindReturnEmitter.liveValue`;
+- a device-local outstanding `referralID`, so exactly one verdict survives process death. A stale id is
+  dismissed rather than blocking the next referral, in either cold-launch order;
+- abandon-on-scene-background removed, and `CaptureRecipeFromText` text-only again.
+
+Architect review re-ran the `YesChefTests` target locally (66 pass); Codex's run had stalled in log finalization.
+
+---
 ## Cockpit Find handoff — receiver compute (S-y1 + S-y2 compute)
 
 **Merged 2026-09-21; PR [#322](https://github.com/jonphillips/yes-chef/pull/322). No schema.** Yes Chef's half of

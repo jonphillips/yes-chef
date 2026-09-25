@@ -1,6 +1,6 @@
 # Effort — Cockpit → Yes Chef recipe Find handoff (receiver side)
 
-Status: S-y1 + S-y2 compute done (#322); **S-y3 (transport) ready — Next Up**; multi-admit deferred
+Status: Built: S-y1 + S-y2 compute (#322) and S-y3 transport (#325). The two-app round trip is owed (Cockpit S-c2, then Jon's S-join device pass); multi-admit deferred
 Summary: Receive raw Cockpit Find referrals through a pair-scoped App Group mailbox opened by a single-purpose `yeschef://find-referral` door, isolate 0/1/N recipes for Create Recipe review, and return a typed verdict silently through the same mailbox.
 Related: [ADR-0058](../decisions/ADR-0058-cockpit-find-referral-transport.md) (transport) ·
 [ADR-0053 Amd 2](../decisions/ADR-0053-create-recipe-destination.md#amendment-2--a-headless-transport-shortcuts--app-intent-into-create-recipe-2026-08-10)
@@ -82,7 +82,7 @@ remains set-valued for the eventual multi-admit contract, but the Create Recipe 
 pick-one-of-N and clears the referral after the first admitted save. Unselected candidates are
 intentionally not reported as declines.
 
-### S-y3 — The transport (ADR-0058) — **Next Up**
+### S-y3 — The transport (ADR-0058) — ✅ done (#325)
 
 1. **Entitlement.** Add `group.com.jonphillips.cockpit-yeschef` to the **app** target
    (`YesChefApp/YesChef.entitlements` + `project.yml`), alongside the existing group. The share
