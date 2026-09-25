@@ -75,6 +75,10 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UIApplicationSupportsIndirectInputEvents: true
+        CFBundleURLTypes:
+          - CFBundleURLSchemes:
+              - yeschef
+            CFBundleURLName: com.jonphillips.yeschef.find-referral
         UIBackgroundModes:
           - remote-notification
         # ADR-0030's backup file type. This MUST live here, not hand-added to

@@ -9,7 +9,6 @@ import YesChefCore
 
 struct AppContainer: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-  @Environment(\.scenePhase) private var scenePhase
   @Dependency(\.handoffReviewCoordinator) private var handoffReviewCoordinator
   @Dependency(\.createRecipeCoordinator) private var createRecipeCoordinator
   @State private var toastCenter: AppToastCenter
@@ -169,12 +168,14 @@ struct AppContainer: View {
       selectedSection = .createRecipe
       await createRecipeCoordinator.applyStagedText(to: createRecipeModel)
     }
+    .task {
+      await createRecipeCoordinator.reconcilePersistedReferralAfterLaunch()
+    }
+    .onOpenURL { url in
+      Task { await receiveFindReferral(from: url) }
+    }
     .onChange(of: selectedSection) { oldSection, newSection in
       guard oldSection == .createRecipe, newSection != .createRecipe else { return }
-      Task { await createRecipeCoordinator.abandonOutstandingReferral() }
-    }
-    .onChange(of: scenePhase) { _, phase in
-      guard phase == .background else { return }
       Task { await createRecipeCoordinator.abandonOutstandingReferral() }
     }
     .confirmationDialog(
@@ -323,6 +324,28 @@ struct AppContainer: View {
       menuModel: menuModel,
       groceryModel: groceryModel
     )
+  }
+
+  private func receiveFindReferral(from url: URL) async {
+    guard let referralID = FindReferralDoor.referralID(from: url) else {
+      AppLog.handoff.info("Ignoring unrecognized Yes Chef URL door")
+      return
+    }
+    guard let container = FileManager.default.containerURL(
+      forSecurityApplicationGroupIdentifier: "group.com.jonphillips.cockpit-yeschef"
+    ) else {
+      AppLog.handoff.error("Find referral shared container is unavailable")
+      return
+    }
+    let mailbox = FindReferralMailbox(rootURL: container)
+    do {
+      guard try await createRecipeCoordinator.receiveReferral(id: referralID, from: mailbox) else {
+        AppLog.handoff.error("Find referral message is missing")
+        return
+      }
+    } catch {
+      AppLog.handoff.error("Find referral message could not be consumed: \(String(describing: error), privacy: .public)")
+    }
   }
 
   /// A Create Recipe save lands the cook on the recipe they just made (Jon's call): select it in the

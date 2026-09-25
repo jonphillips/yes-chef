@@ -1,7 +1,8 @@
 # Current Handoff
 
-Last updated: September 24, 2026. **Next Up: Cockpit Find handoff S-y3 (the transport, ADR-0058).** The
-paste-door scope follow-on in the learnings parser-floor effort remains the standout queue candidate. Newly-merged work (ADR-0052 S3, ADR-0055, ADR-0042 Amd
+Last updated: September 25, 2026. **No designated Next Up target — Jon picks from the queue;** the standout live
+candidate is the **paste-door scope** follow-on in the learnings parser-floor effort. The Cockpit Find handoff
+(S-y3, #325) has moved to [`DONE-LOG.md`](DONE-LOG.md); its device pass is in its own section below. Newly-merged work (ADR-0052 S3, ADR-0055, ADR-0042 Amd
 4/Amd 5) has moved to [`DONE-LOG.md`](DONE-LOG.md); the device passes it owes are in their own section below.
 ⚠️ **A standing Codex-env gotcha:** the simulator-hosted `YesChefTests` target cannot run in Codex's sandbox (no CoreSimulator), so its "couldn't run
 the app tests" is structural, not a regression — and it once *masked two genuinely red tests* (missing
@@ -28,15 +29,7 @@ and every hit outside those two sections is a removal candidate — not merely f
 
 ## Next Up
 
-**[`efforts/cockpit-find-handoff-receiver.md`](efforts/cockpit-find-handoff-receiver.md) — S-y3, the transport
-([ADR-0058](decisions/ADR-0058-cockpit-find-referral-transport.md)).** Wire the pair-scoped App Group mailbox
-and the single-purpose `yeschef://find-referral` door. Pin the golden wire fixtures, make exactly one verdict
-survive process death (dropping abandon-on-scene-background), and trim `CaptureRecipeFromText` back to text
-only. Build to the effort's S-y3 list and done-when. **Stop and ask Jon** if the new App Group can't be
-registered from the command line. The two-app round trip is Jon's device pass (Cockpit's S-join), not this
-dispatch's.
-
-**Also open (not the designated target):**
+**No designated target — Jon picks from the queue.**
 
 - **ADR-0045 cold-start starters are still open, no longer time-gated:** S2 rearranged the Calendar day-header
   Chat and the Workbench Chat into inspectors and left them passing `.none`. Whether they want their own starters
@@ -217,6 +210,16 @@ selection (per-bubble `UITextView` caps the payload).
 ## Device passes owed
 
 Not work, a checklist.
+
+**Cockpit Find handoff — the two-app round trip ([ADR-0058](decisions/ADR-0058-cockpit-find-referral-transport.md),
+PRs [#322](https://github.com/jonphillips/yes-chef/pull/322) + [#325](https://github.com/jonphillips/yes-chef/pull/325)),
+no schema.** This is Cockpit's S-join, so it is owed **after Cockpit S-c2** (verdict drain) lands; until then, Yes
+Chef's half can only be seen in `AppLog.handoff`. On device:
+- Send a multi-recipe email from Cockpit; Create Recipe opens with its provenance.
+- Save one candidate; switch back and the Find shows admitted, with no id seen and no hop.
+- Glance back at Cockpit mid-review; the referral is **not** dismissed, and a later save still admits it.
+- Kill Yes Chef mid-review; the next launch dismisses it.
+- The Shortcuts "Capture a Recipe from Text" action shows only its text field.
 
 **ADR-0055 — menu Dishes drag-to-reorder (PR [#310](https://github.com/jonphillips/yes-chef/pull/310)), no
 schema.** On device (Xcode 27 beta 5+), reorder dishes within a menu day by drag — a row lifts and drops in the

@@ -1,9 +1,10 @@
 # ADR-0058 — Cockpit Find referrals travel through a **pair-scoped App Group mailbox**, opened by a **single-purpose `yeschef://find-referral` door**; the verdict returns silently
 
-Status: **Proposed.** D1, the transport choice, was **ratified by Jon on 2026-09-24** in Cockpit's plan
+Status: **Accepted — 2026-09-24.** D1, the transport choice, was ratified by Jon in Cockpit's plan
 ([jonphillips/cockpit#81](https://github.com/jonphillips/cockpit/pull/81)), which also records it as a
-narrow exception to Cockpit's `APP-FAMILY-INTERACTION.md` §9. D2–D6 are the Yes Chef-side consequences of
-that choice and become Accepted when this ADR's PR merges. Worked design + slice detail:
+narrow exception to Cockpit's `APP-FAMILY-INTERACTION.md` §9. D2–D6 were accepted on the merge of
+[#324](https://github.com/jonphillips/yes-chef/pull/324), and all six were built in
+[#325](https://github.com/jonphillips/yes-chef/pull/325). Worked design + slice detail:
 [`../efforts/cockpit-find-handoff-receiver.md`](../efforts/cockpit-find-handoff-receiver.md). Amends
 [ADR-0053 Amd2-D3](ADR-0053-create-recipe-destination.md#amd2-d3--reuse-the-shipped-operation-no-new-parser-no-url-scheme)
 (no URL scheme) for this one door; Amd2-D1/D2/D4 are unchanged.

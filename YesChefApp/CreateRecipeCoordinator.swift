@@ -9,6 +9,8 @@ import YesChefCore
 @Observable
 @MainActor
 final class CreateRecipeCoordinator {
+  static let outstandingReferralDefaultsKey = "cockpitFindOutstandingReferralID"
+
   struct StagedText: Equatable {
     let id: UUID
     let text: String
@@ -17,10 +19,15 @@ final class CreateRecipeCoordinator {
 
   @ObservationIgnored @Dependency(\.uuid) private var uuid
   @ObservationIgnored @Dependency(\.findReturnEmitter) private var findReturnEmitter
+  private let defaults: UserDefaults
   private(set) var stagedText: StagedText?
   private(set) var referralID: String?
   private var savingReferralID: String?
   private var savingReferralWasAbandoned = false
+
+  init(defaults: UserDefaults = .standard) {
+    self.defaults = defaults
+  }
 
   /// Keeps the transport payload in memory only until the app root can select Create Recipe and apply it
   /// to the live session. The content is intentionally not normalized so source fidelity is retained.
@@ -30,10 +37,30 @@ final class CreateRecipeCoordinator {
     stagedText = StagedText(id: uuid(), text: text, referral: nil)
   }
 
-  func stage(referral: FindReferral) async {
-    await reconcileOutstandingReferral()
+  @discardableResult
+  func stage(referral: FindReferral) async -> Bool {
+    if let activeReferralID = referralID {
+      // Reopening the same referral should preserve its live review session.
+      if activeReferralID == referral.referralID { return true }
+      await declineReferral(.dismissed)
+    } else if let persistedReferralID = defaults.string(forKey: Self.outstandingReferralDefaultsKey),
+              persistedReferralID != referral.referralID {
+      // A prior process may have died before completing review. Dismiss that stale referral, then
+      // continue intake even if writing its verdict fails; the newly received id becomes outstanding.
+      await emit(.declined(referralID: persistedReferralID, .dismissed))
+    }
     referralID = referral.referralID
     stagedText = StagedText(id: uuid(), text: referral.rawText, referral: referral)
+    defaults.set(referral.referralID, forKey: Self.outstandingReferralDefaultsKey)
+    return true
+  }
+
+  @discardableResult
+  func receiveReferral(id: String, from mailbox: FindReferralMailbox) async throws -> Bool {
+    guard let referral = try mailbox.readReferral(id: id) else { return false }
+    guard await stage(referral: referral) else { throw FindMailboxError.outstandingReferralPending }
+    try mailbox.deleteReferral(id: id)
+    return true
   }
 
   /// Applies a staged payload to the resident session. A blank session can safely use the ordinary paste
@@ -109,6 +136,15 @@ final class CreateRecipeCoordinator {
     await declineReferral(.dismissed)
   }
 
+  /// Called once after dependency preparation at process launch. Only the correlation id survives a
+  /// crash; without an in-memory review session, that referral is now a dismissal.
+  func reconcilePersistedReferralAfterLaunch() async {
+    guard referralID == nil,
+          let referralID = defaults.string(forKey: Self.outstandingReferralDefaultsKey)
+    else { return }
+    await emit(.declined(referralID: referralID, .dismissed), preservingLiveSession: true)
+  }
+
   private func reconcileOutstandingReferral() async {
     await declineReferral(.dismissed)
   }
@@ -121,9 +157,13 @@ final class CreateRecipeCoordinator {
     await emit(verdict)
   }
 
-  private func emit(_ verdict: FindVerdict) async {
+  private func emit(_ verdict: FindVerdict, preservingLiveSession: Bool = false) async {
     do {
       try await findReturnEmitter(verdict)
+      if defaults.string(forKey: Self.outstandingReferralDefaultsKey) == verdict.referralID,
+         !preservingLiveSession || referralID != verdict.referralID {
+        defaults.removeObject(forKey: Self.outstandingReferralDefaultsKey)
+      }
     } catch {
       AppLog.handoff.error("Find verdict emission failed: \(String(describing: error), privacy: .public)")
     }

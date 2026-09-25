@@ -5,20 +5,9 @@ import Foundation
 /// (M6 Gate 5, return half). Modeled as a closure-struct dependency client to match the house idiom
 /// (see `RecipeExtractionClient`), not a `protocol`.
 ///
-/// **Why a seam and not a direct call.** No public API lets Yes Chef invoke Cockpit's registered App
-/// Intent silently — App Intents surface to the *system* (Shortcuts/Siri/Spotlight/widgets), not to peer
-/// apps (2026-09-21 architect re-review; see the effort doc's re-review section). So the verdict is
-/// decoupled from *how it travels*. The real conformance is one of two swappable transports, decided
-/// later and injected by the app layer:
-///
-/// - **App-Group verdict dead-drop** — write the verdict to a shared-container mailbox keyed by
-///   `referralID`; Cockpit reads it on next foreground. Preserves the silent / zero-housekeeping promise.
-/// - **`cockpit://` foreground hop** — open Cockpit once carrying the whole N/M verdict; costs one
-///   foreground blink per referral.
-///
-/// Until that fork resolves, ``liveValue`` is a **no-op logging stub**: S-y1 and the coordinator threading
-/// build and test against this seam now, and the transport becomes a one-line `$0.findReturnEmitter = …`
-/// override in the app's dependency preparation.
+/// The live value atomically writes to the pair-scoped App Group mailbox. The seam keeps transport
+/// behavior replaceable in tests without moving filesystem logic into the app model. This path is
+/// intentionally separate from the `AIHandoff*` types, which serve external-chat round trips.
 ///
 /// - Note: This is intentionally **not** entangled with the `AIHandoff*` token machinery — that axis is
 ///   the outboard-to-external-chat (copy prompt / paste result) flow. This is app-to-app; keep it separate.
@@ -35,18 +24,12 @@ public struct FindReturnEmitter: Sendable {
 }
 
 extension FindReturnEmitter: DependencyKey {
-  /// No-op stub until the return-transport fork is decided. It records the verdict to `AppLog.handoff`
-  /// so the round-trip is observable during a device pass, but it does **not** reach Cockpit. The app
-  /// overrides `$0.findReturnEmitter` with the real transport once the fork resolves.
   public static var liveValue: FindReturnEmitter {
     FindReturnEmitter { verdict in
-      AppLog.handoff.log(
-        """
-        FindReturnEmitter stub: no transport wired — verdict for referral \
-        \(verdict.referralID, privacy: .public) NOT delivered to Cockpit \
-        (\(verdict.admitted.count, privacy: .public) admitted, \(verdict.declines.count, privacy: .public) declined)
-        """
-      )
+      guard let container = FileManager.default.containerURL(
+        forSecurityApplicationGroupIdentifier: "group.com.jonphillips.cockpit-yeschef"
+      ) else { throw FindMailboxError.sharedContainerUnavailable }
+      try FindReferralMailbox(rootURL: container).write(verdict: verdict)
     }
   }
 

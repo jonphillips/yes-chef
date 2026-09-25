@@ -38,9 +38,8 @@ public enum FindOutcome: Equatable, Sendable {
 /// and emitted at the moment of admit/decline via ``FindReturnEmitter``; Cockpit resolves its Find from
 /// it with zero cook housekeeping on either side.
 ///
-/// This is the frozen return *shape*. It is deliberately independent of the return *transport* (App-Group
-/// dead-drop vs. `cockpit://` foreground hop), which is decided later behind ``FindReturnEmitter``.
-public struct FindVerdict: Equatable, Sendable {
+/// The frozen return shape travels as a versioned JSON message through the Cockpit pair mailbox.
+public struct FindVerdict: Codable, Equatable, Sendable {
   public let referralID: String
   public let outcomes: [FindOutcome]
 
@@ -66,5 +65,78 @@ public struct FindVerdict: Equatable, Sendable {
   /// A whole-referral decline (0 recipes found, or the cook dismissed) — the common non-admit shape.
   public static func declined(referralID: String, _ reason: FindDeclineReason) -> FindVerdict {
     FindVerdict(referralID: referralID, outcomes: [.declined(reason)])
+  }
+
+  private enum CodingKeys: String, CodingKey { case version, referralID, outcomes }
+
+  public init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    try FindReferral.validateVersion(in: values)
+    referralID = try values.decode(String.self, forKey: .referralID)
+    outcomes = try values.decode([FindOutcome].self, forKey: .outcomes)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var values = encoder.container(keyedBy: CodingKeys.self)
+    try values.encode(1, forKey: .version)
+    try values.encode(referralID, forKey: .referralID)
+    try values.encode(outcomes, forKey: .outcomes)
+  }
+}
+
+extension FindOutcome: Codable {
+  private enum CodingKeys: String, CodingKey { case kind, recipeRef, reason, detail }
+
+  public init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    switch try values.decode(String.self, forKey: .kind) {
+    case "admitted":
+      self = .admitted(FindRecipeRef(rawValue: try values.decode(String.self, forKey: .recipeRef)))
+    case "declined":
+      let reason = try values.decode(String.self, forKey: .reason)
+      switch reason {
+      case "noRecipeFound": self = .declined(.noRecipeFound)
+      case "duplicate": self = .declined(.duplicate)
+      case "dismissed": self = .declined(.dismissed)
+      case "extractionFailed": self = .declined(.extractionFailed(try values.decode(String.self, forKey: .detail)))
+      default: throw Self.invalidValue(reason, codingPath: values.codingPath + [CodingKeys.reason])
+      }
+    default:
+      throw Self.invalidValue(try values.decode(String.self, forKey: .kind), codingPath: values.codingPath + [CodingKeys.kind])
+    }
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var values = encoder.container(keyedBy: CodingKeys.self)
+    switch self {
+    case let .admitted(recipeRef):
+      try values.encode("admitted", forKey: .kind)
+      try values.encode(recipeRef.rawValue, forKey: .recipeRef)
+    case let .declined(reason):
+      try values.encode("declined", forKey: .kind)
+      switch reason {
+      case .noRecipeFound: try values.encode("noRecipeFound", forKey: .reason)
+      case .duplicate: try values.encode("duplicate", forKey: .reason)
+      case .dismissed: try values.encode("dismissed", forKey: .reason)
+      case let .extractionFailed(detail):
+        try values.encode("extractionFailed", forKey: .reason)
+        try values.encode(detail, forKey: .detail)
+      }
+    }
+  }
+
+  private static func invalidValue(_ value: String, codingPath: [any CodingKey]) -> DecodingError {
+    .dataCorrupted(.init(codingPath: codingPath, debugDescription: "Unknown Find outcome value: \(value)"))
+  }
+}
+
+extension FindRecipeRef: Codable {
+  public init(from decoder: Decoder) throws {
+    rawValue = try decoder.singleValueContainer().decode(String.self)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var value = encoder.singleValueContainer()
+    try value.encode(rawValue)
   }
 }
