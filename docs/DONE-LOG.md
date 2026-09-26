@@ -9,6 +9,11 @@ lean precisely because this history lives here instead.
 Newest first.
 
 ---
+## Cockpit Find multi-admit — save every extracted candidate from Create Recipe
+
+**Implementation in PR [#326](https://github.com/jonphillips/yes-chef/pull/326), opened 2026-09-25. No schema or wire-format change. The two-app device pass is owed with Cockpit S-join.** Create Recipe now keeps a multi-candidate session open after a save, marks that candidate saved, and advances to the next unsaved candidate. Done closes a partially saved session and returns the most recently saved recipe. The coordinator collects the admitted recipes and emits one verdict at close; it persists their IDs beside the outstanding referral ID so relaunch returns the partial admitted set instead of dismissing it. Unsaved candidates stay out of the verdict. Per-candidate edits are still replaced when switching candidates, as scoped out.
+
+---
 ## Cockpit Find handoff — S-y3, the transport (ADR-0058)
 
 **Merged 2026-09-25; PR [#325](https://github.com/jonphillips/yes-chef/pull/325). No schema. The two-app device round

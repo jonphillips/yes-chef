@@ -100,6 +100,9 @@ struct CreateRecipeModelTests {
   @Test
   func referralSaveEmitsAnAdmittedVerdictWithoutPersistingReferralMetadata() async throws {
     let recorder = AppFindReturnRecorder()
+    let suiteName = "FindReferralSingleSave-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
     let referral = FindReferral(
       referralID: "referral-save",
       rawText: "A recipe from Find",
@@ -121,12 +124,15 @@ struct CreateRecipeModelTests {
         await recorder.record(verdict)
       }
     } operation: {
-      let coordinator = CreateRecipeCoordinator()
+      let coordinator = CreateRecipeCoordinator(defaults: defaults)
       let model = CreateRecipeModel()
       await coordinator.stage(referral: referral)
       await coordinator.applyStagedText(to: model)
 
-      let recipeID = try #require(await coordinator.saveButtonTapped(for: model))
+      guard case let .saved(recipeID, true) = await coordinator.saveButtonTapped(for: model) else {
+        Issue.record("Expected the single recipe save to complete the session")
+        return
+      }
       let verdicts = await recorder.verdicts
 
       #expect(verdicts == [FindVerdict(referralID: "referral-save", outcomes: [.admitted(FindRecipeRef(recipeID))])])
@@ -136,8 +142,189 @@ struct CreateRecipeModelTests {
   }
 
   @Test
+  func savingEveryCandidateEmitsOneVerdictWithEveryAdmittedRecipe() async throws {
+    let recorder = AppFindReturnRecorder()
+    let suiteName = "FindReferralMultiSave-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let referral = FindReferral(referralID: "referral-multi-save", rawText: "Two recipes", provenance: FindProvenance())
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.uuid = .incrementing
+      $0.date.now = Date(timeIntervalSinceReferenceDate: 900_100_001)
+      $0.recipeExtractionClient = RecipeExtractionClient(
+        extract: { _ in RecipeExtraction(title: "unused") },
+        extractMany: { _ in [
+          RecipeExtraction(title: "Green Beans", ingredientSections: [.init(lines: ["1 cup beans"]) ]),
+          RecipeExtraction(title: "Roast Carrots", ingredientSections: [.init(lines: ["2 carrots"]) ]),
+        ] }
+      )
+      $0.findReturnEmitter = FindReturnEmitter { await recorder.record($0) }
+    } operation: {
+      let coordinator = CreateRecipeCoordinator(defaults: defaults)
+      let model = CreateRecipeModel()
+      await coordinator.stage(referral: referral)
+      await coordinator.applyStagedText(to: model)
+      let first = try #require(model.extractionCandidates.first)
+      model.selectExtraction(id: first.id)
+
+      guard case let .saved(firstID, firstComplete) = await coordinator.saveButtonTapped(for: model) else {
+        Issue.record("Expected first candidate to save")
+        return
+      }
+      #expect(!firstComplete)
+      #expect(await recorder.verdicts.isEmpty)
+      #expect(model.savedExtractionIDs == [first.id])
+      #expect(model.editorModel.draft.title == "Roast Carrots")
+      #expect(model.selectedExtractionID == model.extractionCandidates.last?.id)
+
+      guard case let .saved(secondID, secondComplete) = await coordinator.saveButtonTapped(for: model) else {
+        Issue.record("Expected second candidate to save")
+        return
+      }
+      #expect(secondComplete)
+      let expected = FindVerdict(
+        referralID: referral.referralID,
+        outcomes: [.admitted(FindRecipeRef(firstID)), .admitted(FindRecipeRef(secondID))]
+      )
+      #expect(await recorder.verdicts == [expected])
+      #expect(coordinator.referralID == nil)
+    }
+  }
+
+  @Test
+  func savedCandidateCannotBeSelectedOrSavedAgain() async throws {
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.uuid = .incrementing
+      $0.date.now = Date(timeIntervalSinceReferenceDate: 900_100_002)
+      $0.recipeExtractionClient = RecipeExtractionClient(
+        extract: { _ in RecipeExtraction(title: "unused") },
+        extractMany: { _ in [RecipeExtraction(title: "One"), RecipeExtraction(title: "Two")] }
+      )
+    } operation: {
+      let model = CreateRecipeModel()
+      model.pastedTextReceived(["two recipes"])
+      await model.extractButtonTapped()
+      let first = try #require(model.extractionCandidates.first)
+      model.selectExtraction(id: first.id)
+      _ = try #require(await model.saveButtonTapped())
+
+      #expect(model.isSavingDisabled == false)
+      let currentTitle = model.editorModel.draft.title
+      model.selectExtraction(id: first.id)
+      #expect(model.editorModel.draft.title == currentTitle)
+      #expect(model.selectedExtractionID == model.extractionCandidates.last?.id)
+      #expect(model.savedExtractionIDs.contains(first.id))
+    }
+  }
+
+  @Test
+  func relaunchReconcilesThePersistedAdmittedSetInsteadOfDismissal() async throws {
+    let suiteName = "FindReferralMultiSave-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let recorder = AppFindReturnRecorder()
+    let referral = FindReferral(referralID: "referral-relaunch-multi", rawText: "Two recipes", provenance: FindProvenance())
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.uuid = .incrementing
+      $0.date.now = Date(timeIntervalSinceReferenceDate: 900_100_003)
+      $0.recipeExtractionClient = RecipeExtractionClient(
+        extract: { _ in RecipeExtraction(title: "unused") },
+        extractMany: { _ in [RecipeExtraction(title: "First"), RecipeExtraction(title: "Second")] }
+      )
+      $0.findReturnEmitter = FindReturnEmitter { await recorder.record($0) }
+    } operation: {
+      let coordinator = CreateRecipeCoordinator(defaults: defaults)
+      let model = CreateRecipeModel()
+      await coordinator.stage(referral: referral)
+      await coordinator.applyStagedText(to: model)
+      let first = try #require(model.extractionCandidates.first)
+      model.selectExtraction(id: first.id)
+      guard case let .saved(recipeID, _) = await coordinator.saveButtonTapped(for: model) else {
+        Issue.record("Expected the first candidate to save")
+        return
+      }
+
+      #expect(await recorder.verdicts.isEmpty)
+      #expect(defaults.stringArray(forKey: CreateRecipeCoordinator.admittedReferralRecipeIDsDefaultsKey) == [recipeID.uuidString])
+
+      let relaunchedCoordinator = CreateRecipeCoordinator(defaults: defaults)
+      await relaunchedCoordinator.reconcilePersistedReferralAfterLaunch()
+
+      #expect(await recorder.verdicts == [FindVerdict(
+        referralID: referral.referralID,
+        outcomes: [.admitted(FindRecipeRef(recipeID))]
+      )])
+      #expect(defaults.string(forKey: CreateRecipeCoordinator.outstandingReferralDefaultsKey) == nil)
+      #expect(defaults.object(forKey: CreateRecipeCoordinator.admittedReferralRecipeIDsDefaultsKey) == nil)
+    }
+  }
+
+  @Test
+  func partialReferralCanCloseThroughDoneClearLeavingOrSupersedingIntake() async throws {
+    let recorder = AppFindReturnRecorder()
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.uuid = .incrementing
+      $0.date.now = Date(timeIntervalSinceReferenceDate: 900_100_004)
+      $0.recipeExtractionClient = RecipeExtractionClient(
+        extract: { _ in RecipeExtraction(title: "unused") },
+        extractMany: { _ in [RecipeExtraction(title: "First"), RecipeExtraction(title: "Second")] }
+      )
+      $0.findReturnEmitter = FindReturnEmitter { await recorder.record($0) }
+    } operation: {
+      for closeStyle in ["done", "clear", "leave", "supersede"] {
+        let suiteName = "FindReferralClose-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let coordinator = CreateRecipeCoordinator(defaults: defaults)
+        let model = CreateRecipeModel()
+        let referralID = "referral-\(closeStyle)"
+        await coordinator.stage(referral: FindReferral(
+          referralID: referralID,
+          rawText: "Two recipes",
+          provenance: FindProvenance()
+        ))
+        await coordinator.applyStagedText(to: model)
+        let first = try #require(model.extractionCandidates.first)
+        model.selectExtraction(id: first.id)
+        guard case .saved(_, false) = await coordinator.saveButtonTapped(for: model) else {
+          Issue.record("Expected the first candidate to save")
+          return
+        }
+
+        switch closeStyle {
+        case "done", "clear":
+          await coordinator.declineReferral()
+        case "leave":
+          await coordinator.abandonOutstandingReferral()
+        default:
+          await coordinator.stage(referral: FindReferral(
+            referralID: "replacement-\(referralID)",
+            rawText: "Replacement",
+            provenance: FindProvenance()
+          ))
+        }
+
+        let verdict = try #require(await recorder.verdicts.last)
+        #expect(verdict.referralID == referralID)
+        #expect(verdict.admitted.count == 1)
+        #expect(verdict.outcomes.allSatisfy { if case .admitted = $0 { true } else { false } })
+        defaults.removePersistentDomain(forName: suiteName)
+      }
+      #expect(await recorder.verdicts.count == 4)
+    }
+  }
+
+  @Test
   func referralDismissalEmitsAFirstClassDecline() async throws {
     let recorder = AppFindReturnRecorder()
+    let suiteName = "FindReferralDismissal-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
 
     await withDependencies {
       $0.uuid = .incrementing
@@ -145,7 +332,7 @@ struct CreateRecipeModelTests {
         await recorder.record(verdict)
       }
     } operation: {
-      let coordinator = CreateRecipeCoordinator()
+      let coordinator = CreateRecipeCoordinator(defaults: defaults)
       await coordinator.stage(
         referral: FindReferral(
           referralID: "referral-dismissed",
@@ -187,11 +374,13 @@ struct CreateRecipeModelTests {
   }
 
   @Test
-  func staleReferralWriteFailureDoesNotBlockNewReferral() async throws {
+  func staleReferralWriteFailurePreservesOutstandingStateAndDefersNewReferral() async throws {
     let suiteName = "FindReferralTests-\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
     defaults.set("referral-unwritable", forKey: CreateRecipeCoordinator.outstandingReferralDefaultsKey)
+    defaults.set([UUID().uuidString], forKey: CreateRecipeCoordinator.admittedReferralRecipeIDsDefaultsKey)
+    let admittedIDs = defaults.stringArray(forKey: CreateRecipeCoordinator.admittedReferralRecipeIDsDefaultsKey)
 
     await withDependencies {
       $0.uuid = .incrementing
@@ -202,10 +391,11 @@ struct CreateRecipeModelTests {
         referral: FindReferral(referralID: "referral-after-failure", rawText: "new recipe", provenance: FindProvenance())
       )
 
-      #expect(staged)
-      #expect(coordinator.referralID == "referral-after-failure")
-      #expect(coordinator.stagedText?.text == "new recipe")
-      #expect(defaults.string(forKey: CreateRecipeCoordinator.outstandingReferralDefaultsKey) == "referral-after-failure")
+      #expect(!staged)
+      #expect(coordinator.referralID == nil)
+      #expect(coordinator.stagedText == nil)
+      #expect(defaults.string(forKey: CreateRecipeCoordinator.outstandingReferralDefaultsKey) == "referral-unwritable")
+      #expect(defaults.stringArray(forKey: CreateRecipeCoordinator.admittedReferralRecipeIDsDefaultsKey) == admittedIDs)
     }
   }
 
@@ -285,6 +475,7 @@ struct CreateRecipeModelTests {
     try await withDependencies {
       try $0.bootstrapDatabase()
       $0.uuid = .incrementing
+      $0.date.now = Date(timeIntervalSinceReferenceDate: 900_100_004)
       $0.recipeExtractionClient = RecipeExtractionClient(
         extract: { _ in RecipeExtraction(title: "unused") },
         extractMany: { _ in [] }

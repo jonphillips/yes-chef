@@ -1,6 +1,6 @@
 # Effort — Multi-admit: save every recipe in a multi-recipe Create Recipe session
 
-Status: Designed (queued 2026-09-25, not dispatched). Schema-free.
+Status: Implemented in [PR #326](https://github.com/jonphillips/yes-chef/pull/326) (opened 2026-09-25); two-app device pass is owed with Cockpit S-join. Schema-free.
 Summary: When extraction finds N recipes, let the cook save any number of them from the one Create Recipe
 session instead of losing the rest after the first Save. A Cockpit referral then returns **one** verdict
 listing every saved recipe.

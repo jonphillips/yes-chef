@@ -127,7 +127,8 @@ struct CreateRecipeView: View {
               self.focusedIngredientSectionNameID = nil
             }
             Task {
-              if let recipeID = await createRecipeCoordinator.saveButtonTapped(for: model) {
+              if case let .saved(recipeID, sessionComplete) = await createRecipeCoordinator.saveButtonTapped(for: model),
+                 sessionComplete {
                 onSaved(recipeID)
               }
             }
@@ -139,6 +140,19 @@ struct CreateRecipeView: View {
             }
           }
           .disabled(model.isSavingDisabled)
+        }
+        if !model.savedExtractionIDs.isEmpty && model.hasUnsavedCandidates {
+          ToolbarItem(placement: .automatic) {
+            Button("Done") {
+              Task {
+                await createRecipeCoordinator.declineReferral()
+                if let recipeID = model.mostRecentlySavedRecipeID {
+                  onSaved(recipeID)
+                }
+              }
+            }
+            .disabled(model.isSaving)
+          }
         }
       }
       .onChange(of: focusedIngredientSectionNameID) { oldValue, newValue in
@@ -222,6 +236,7 @@ private struct CreateRecipeCandidateSection: View {
   var body: some View {
     Section {
       ForEach(model.extractionCandidates) { candidate in
+        let isSaved = model.savedExtractionIDs.contains(candidate.id)
         Button {
           model.selectExtraction(id: candidate.id)
         } label: {
@@ -234,19 +249,24 @@ private struct CreateRecipeCandidateSection: View {
                 .foregroundStyle(.secondary)
             }
             Spacer()
-            if model.selectedExtractionID == candidate.id {
+            if isSaved {
+              Label("Saved", systemImage: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else if model.selectedExtractionID == candidate.id {
               Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.tint)
             }
           }
         }
+        .disabled(isSaved)
         .accessibilityLabel("Use \(title(for: candidate.extraction))")
-        .accessibilityValue(model.selectedExtractionID == candidate.id ? "Selected" : "Not selected")
+        .accessibilityValue(isSaved ? "Saved" : model.selectedExtractionID == candidate.id ? "Selected" : "Not selected")
       }
     } header: {
       Text("Recipes Found")
     } footer: {
-      Text("Choose one recipe to review. The original text remains available above.")
+      Text("Review and save each recipe in turn. The original text remains available above.")
     }
   }
 
