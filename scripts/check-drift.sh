@@ -4,7 +4,14 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
-swiftlint lint --strict --config .swiftlint.yml --cache-path .build/swiftlint-cache
+# Noisy stages run through jon-platform's quiet-run: full log to a file, only
+# errors and verdicts to the terminal, so an agent's context isn't flooded
+# (jon-platform docs/agent-workflow.md § Token discipline). Without a platform
+# checkout it's empty and the stages run verbose, exactly as before.
+qr="${JON_PLATFORM:-$HOME/code/jon-platform}/scripts/quiet-run"
+[[ -x "$qr" ]] || qr=""
+
+$qr swiftlint lint --strict --config .swiftlint.yml --cache-path .build/swiftlint-cache
 
 # Search with grep, not rg: ripgrep is not a project prerequisite, and when it
 # is missing the old `|| true` turned "the check never ran" into a green result.
@@ -114,7 +121,7 @@ EOF
   exit 1
 fi
 
-swift test --package-path YesChefPackage
+$qr swift test --package-path YesChefPackage
 
 # ---------------------------------------------------------------------------
 # The app test target (YesChefAppTests → the YesChefTests bundle)
@@ -219,7 +226,7 @@ EOF
   # `set +e` rather than relying on `set -e`: the point of this stage is to say
   # WHY it failed, and `set -e` would exit before the message.
   set +e
-  xcodebuild build-for-testing \
+  $qr xcodebuild build-for-testing \
     -scheme "$app_test_scheme" \
     -destination "$app_test_destination" \
     -skipMacroValidation \
@@ -237,7 +244,7 @@ EOF
 
   if [[ -n "${YESCHEF_RUN_APP_TESTS:-}" ]]; then
     echo "Running the app test target (YESCHEF_RUN_APP_TESTS is set)..."
-    xcodebuild test-without-building \
+    $qr xcodebuild test-without-building \
       -scheme "$app_test_scheme" \
       -destination "$app_test_destination" \
       -skipMacroValidation \

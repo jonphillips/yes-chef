@@ -3,11 +3,11 @@ set -euo pipefail
 
 # Run xcodebuild but surface only a summary to the terminal/chat.
 #
-# The full log always lands in a file; we print just the matching lines
-# (errors, warnings, the verdict) plus the exit code. This keeps package
-# resolution, dependency graphs, compile commands, and signing noise out of
-# an agent's context while still leaving the raw log addressable when a
-# failure needs real diagnosis.
+# The summarizing now lives once, in jon-platform's scripts/quiet-run (shared by
+# every app; see its docs/agent-workflow.md § Token discipline): full log to a
+# file, errors/warnings/verdicts plus exit code and log path to the terminal,
+# xcodebuild's exit status returned unchanged. This wrapper keeps the name the
+# docs and habits already use, and the toolchain selection below.
 #
 # Usage: scripts/xcodebuild-summary.sh <xcodebuild args...>
 # Example:
@@ -17,31 +17,14 @@ set -euo pipefail
 #     -skipMacroValidation \
 #     build
 
-log="$(mktemp -t yeschef-xcodebuild.XXXXXX).log"
-
 # Mirror check-drift.sh's toolchain selection so both paths build the same way.
 if [[ -z "${DEVELOPER_DIR:-}" && -d /Applications/Xcode-beta.app/Contents/Developer ]]; then
   export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
 fi
 
-# Capture, don't pipe: piping into rg would discard the full log (needed when a
-# build fails for a non-compile reason) and mask xcodebuild's exit status.
-set +e
-xcodebuild "$@" >"$log" 2>&1
-status=$?
-set -e
-
-# grep, not rg: ripgrep is not a project prerequisite, and when it is missing
-# the summary silently vanishes. Exit 1 just means "no matching lines"; anything
-# higher is a real search failure and is worth saying out loud. xcodebuild's own
-# status stays authoritative either way.
-set +e
-grep -nE "error:|warning:|BUILD SUCCEEDED|BUILD FAILED|Testing failed|Linker command failed|The following build commands failed" "$log"
-grep_status=$?
-set -e
-if (( grep_status > 1 )); then
-  echo "--- summary unavailable: grep failed (exit $grep_status)" >&2
+qr="${JON_PLATFORM:-$HOME/code/jon-platform}/scripts/quiet-run"
+if [[ ! -x "$qr" ]]; then
+  echo "xcodebuild-summary.sh: $qr not found — Yes Chef needs ~/code/jon-platform (see AGENTS.md)." >&2
+  exit 1
 fi
-
-echo "--- exit=$status  full log: $log"
-exit "$status"
+exec "$qr" --label yeschef-xcodebuild xcodebuild "$@"
