@@ -1,8 +1,8 @@
 # Yes Chef Docs
 
 The product and architecture brief for Yes Chef. This folder is the working source
-of truth; `docs/CURRENT_HANDOFF.md` is the executor's rolling ledger, not the
-contract.
+of truth. `docs/NEXT_UP.md` is the executor's one dispatch ticket, not the contract
+(jon-platform ADR-0005).
 
 ## Core sentences
 

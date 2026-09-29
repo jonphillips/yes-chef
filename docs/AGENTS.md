@@ -18,23 +18,30 @@ through `quiet-run` (same doc, § "Token discipline").
 
 ## Work Intake & Dispatch
 
-One front door: `docs/CURRENT_HANDOFF.md` (**Next Up** = the single dispatch; **Ready
-Efforts** = the queue it's drawn from). The funnel (open-questions → milestones → efforts →
-handoff → PR), what an "effort" is, and the reasoning behind each rule are in
-[`docs/work-intake.md`](work-intake.md).
+The document shape is jon-platform ADR-0005, and the loop is `jon-platform/docs/agent-collaboration.md`.
+The dispatch is **`docs/NEXT_UP.md`**: one ticket, and the executor's only planning input. The rest
+have a home the executor doesn't load: candidates go in `docs/open-questions.md`, Jon's device passes
+and held ops in `docs/device-passes.md`, and history in `docs/DONE-LOG.md`. Closed decisions live in
+`docs/standing-guards.md`; read it when a dispatch touches what it guards. The reasoning behind the
+rules below is in [`docs/work-intake.md`](work-intake.md).
 
-1. **Dispatch trigger:** *"Do the Next Up effort in `docs/CURRENT_HANDOFF.md`."* Read Next Up,
-   open its brief, implement that — nothing else.
-2. **Never infer the next task.** Next Up empty, missing, or ambiguous → STOP and ask Jon.
-3. **Curation is the architect's job** — promotion, the Next Up pointer, and the brief.
-4. **The handoff points, it does not duplicate** — briefs reference milestone sections.
-5. **Batch cohesive slices by default** (they share files and a mental model); keep a slice
-   separate when it could be wrong or redirect the next. A bundled Next Up = one PR.
-6. **Keep the handoff lean.** Only Next Up, Ready, and the Verification Pattern. History lives
-   in `docs/DONE-LOG.md`, which no dispatch reads.
-7. **On approval, MOVE — don't mark.** The DONE-LOG entry is written and the handoff block
-   deleted on the same approved PR branch. Litmus: *a sentence describing finished work belongs
-   in DONE-LOG.* Only exception: a one-line owed device/CloudKit verification under Next Up.
+1. **Dispatch trigger:** "go" (or *"do Next Up"*). Read `docs/NEXT_UP.md`, open the briefs it links,
+   and implement that, nothing else. "comments posted" means: run `jon-platform/scripts/pr-verdicts`
+   and address every `changes` verdict.
+2. **Never infer the next task.** If `NEXT_UP.md` says `Nothing dispatched.` or is missing, STOP and
+   ask Jon. Never pick from open questions, efforts, or milestones yourself.
+3. **Curation is the architect's job.** The architect sets `NEXT_UP.md` in the plan PR that writes a
+   brief or milestone, and the PR that completes a dispatch advances it in plan order. No PR exists
+   only to move it.
+4. **The ticket points, it does not duplicate.** `NEXT_UP.md` links brief and milestone sections; it
+   doesn't re-spec them.
+5. **Batch cohesive slices by default** (slices that share files and a mental model), decided at plan
+   time. Keep a slice separate when it could be wrong or redirect the next. One dispatch = one PR.
+6. **Keep `NEXT_UP.md` a ticket:** the ADR-0005 template, about 300 words, replaced wholesale, never
+   appended to.
+7. **Move, don't mark.** The completing PR adds a `DONE-LOG.md` entry naming its branch (and ticks
+   any ledger box). Litmus: *a sentence describing finished work belongs in DONE-LOG.* Owed device
+   passes go to `device-passes.md`, with a one-line pointer under **Owed**.
 
 ## Development Priorities
 
@@ -105,8 +112,8 @@ These are project rules, not preferences:
    - A PR touching `YesChefApp/` **model** code also runs the `YesChefTests` app target on a
      simulator, elevated from the first attempt (never sandboxed first, never falling back to
      `swift test --filter`). Running a test target is not simulator-driving, so this narrows #8
-     rather than contradicting it. View-only or copy changes don't need it. Exact commands: the
-     Verification Pattern in `CURRENT_HANDOFF.md`.
+     rather than contradicting it. View-only or copy changes don't need it. Exact commands:
+     `docs/verification.md`.
 
 ## Data Preservation Rules
 

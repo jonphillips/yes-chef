@@ -4,6 +4,11 @@ The rules themselves are summarized in `docs/AGENTS.md` § Work Intake (same num
 this is the reasoning and detail behind them. Moved here verbatim on 2026-09-29 to keep the
 always-read guide lean.
 
+> **Superseded in part by jon-platform ADR-0005 (2026-09-29).** `CURRENT_HANDOFF.md` is retired.
+> Next Up became `docs/NEXT_UP.md`; the Ready queue became candidates in `docs/open-questions.md`;
+> the Verification Pattern became `docs/verification.md`. The rules in `docs/AGENTS.md` are current.
+> The text below is the original reasoning, kept for its rationale (batching, move-don't-mark).
+
 ## Work Intake & Dispatch (full text)
 
 There is **one front door** for "what do I work on": `docs/CURRENT_HANDOFF.md`. Work flows
