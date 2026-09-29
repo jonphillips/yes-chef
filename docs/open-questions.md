@@ -1,5 +1,108 @@
 # Open Questions
 
+> **The executor never reads this file** (jon-platform ADR-0005). It is the architect's and Jon's scratch
+> pad; work becomes dispatchable only when a plan PR sets `docs/NEXT_UP.md`.
+
+## Candidates — the former Ready Efforts queue (moved from `CURRENT_HANDOFF.md`, 2026-09-29)
+
+**Per-recipe facet/tag coverage is Jon's ongoing hand work and gates nothing** — Power Browser (ADR-0050)
+and everything downstream move forward without waiting on it.
+
+From the old Next Up:
+
+
+- **ADR-0045 cold-start starters are still open, no longer time-gated:** S2 rearranged the Calendar day-header
+  Chat and the Workbench Chat into inspectors and left them passing `.none`. Whether they want their own starters
+  ("Plan this week" / "What should I prep tonight?") is Jon's call whenever — it no longer blocks anything.
+
+
+**Prior candidates (queue — not the designated target).** Per-recipe facet/tag coverage is Jon's ongoing hand
+work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**.
+
+The ATK grocery-bug slice ([`efforts/import-text-normalization.md`](efforts/import-text-normalization.md)) is a
+**data migration wanting backup-first + a device pass** — hold it until Jon is local. D3's settled
+hidden-vocabulary rule lives in ADR-0049 D11.
+
+Drawn into **Next Up** as needed; not itself a dispatch target. Completed efforts live in
+[`docs/DONE-LOG.md`](DONE-LOG.md).
+
+**[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md) — ATK's "Gather Your
+Ingredients" is a latent grocery bug (scoped 2026-07-28). P1 only; **no schema**.** 101 shoppable ingredient
+lines + 70 section names across **171 recipes** are page chrome captured as content, all canonicalizing to
+one key, so any of those recipes on a menu puts "Gather your ingredient" on the grocery list.
+- **Delete, do not de-cap.** Lines: delete the row. Sections: **clear the name, keep the section**
+  (`sectionID` is `ON DELETE CASCADE` — dropping it takes every ingredient with it).
+- **⚠️ Needs the post-engine pass** ADR-0014 Amd1-D3 described and dodged at 10 rows: a repair in the migrator
+  uploads nothing and each device diverges, and **the 101 deletes are unrepeatable** — a delete that never
+  uploads stays alive in CloudKit and any full-zone fetch resurrects it
+  ([[migration-writes-bypass-sync-triggers]]). Back up first.
+- **P2 (Milk Street's all-caps) is DECLINED**; P3's Amd1-D1 dependency is now discharged (shipped 2026-07-28)
+  but it stays parked behind the declined P2. Don't build either on momentum.
+
+**ADR-0045 leftovers — two cold-start entry points, each its own small slice.** The meal-calendar day-header
+Chat and the Workbench Chat, same dead end, no section to carry. Recorded in the ADR, deliberately not folded
+into V1. **Open for Jon:** now that starters are host-supplied, do the Calendar and Workbench want starters of
+their own ("Plan this week", "What should I prep tonight?")? **ADR-0046 S2 has now rearranged both into
+inspectors and left them passing `.none`** — an explicit answer, not an omission — so the timing pressure is
+gone; decide whenever, it blocks nothing.
+
+**ADR-0041 deferred follow-ons** (on the record, **not** dispatchable without Jon scoping them) — the **menu**
+Playbook sections getting the same per-section toolbar, and section-selection checkboxes on the whole-recipe
+hand-off (the scoped per-section verbs make these *less* necessary, not more).
+
+**Meal-Planner chat verbs** (ADR-0013 + `efforts/cooking-workspace.md`) — the one remaining named
+actionable-chat verb instance. Classify each verb's commit shape first ([[chat-verb-commit-shapes]]) — likely
+no-commit advisory or a per-day note, not a per-recipe write; respect [[llm-curation-not-synthesis]].
+**Confirm with Jon what verb scope remains.**
+
+**Recipe text normalization** — strip manual instruction numbers now that we auto-number (Milk Street
+all-caps de-cap is the DECLINED P2 above). **Unscoped**; parked in
+[`docs/open-questions.md`](open-questions.md). Interacts with ADR-0014, so sequence them.
+
+**[ADR-0030](decisions/ADR-0030-local-backup-and-restore.md) leftovers — two unbuilt slices.** The measurement
+arc is closed (OQ1/5/6/7 → DONE-LOG + [[restore-is-authoritative]]); the net covers a lost/blank zone and
+restore is authoritative **only against settled peer state**. Do **not** re-run the measurement. Two things
+remain to build, plus one upstream loose end:
+- **⚠️ NEW SLICE — enforce the restore procedure (scope with Jon).** Naive restore is unsafe: a peer's
+  unsent/held delete that syncs *after* a restore silently re-deletes the restored record on every peer (OQ6,
+  measured E2E). Restore must gate on / walk the user through *quiesce every peer (delete the app → drops its
+  unsent CKSyncEngine queue) → restore + re-enable on one device → reinstall the peers.* Verify once (throwaway
+  install) that deleting the app clears the app-group container — the whole mitigation rests on it.
+- **S3 — automatic snapshots.** Cadence/trigger + retention (keep N), local-only. **Build the pre-migration
+  snapshot first** (D4): a rolling local snapshot taken right before `migrator.migrate` runs, so a bad/erasing
+  migration is always recoverable from the step before it — the single cheapest catch for the
+  [[debug-erase-vs-sync-triggers]] class of bug. App-update-boundary and periodic snapshots follow.
+- **Loose end — file a point-free bug report:** upstream SQLiteData tombstone handling never clears
+  `_isDeleted` in `upsertFromServerRecord` (and `syncChanges` sends before it fetches), which is the root of the
+  OQ6 data-loss path above.
+
+**Small nits — not urgent, fold into a passing dispatch:**
+- **The S4 brief extractor's prompt is framed for a conversation, but S4 hands it a decision** (silent-failure
+  risk). `instructions` says *"extract … from a cooking conversation … the user is asking to review"* while
+  `HandoffReviewCoordinator.draftRecipeAdjustment` wraps a finished brief as one fake `.user` message
+  (`selection: ""`) — so a **decided** revision reads as an **in-progress ask** and the extractor hedges, and
+  under-extraction is silent (a 3-change brief yielding 2 ops just looks shorter). *Fix:* a task-specific
+  framing for the brief path, **not** a second client, and **not** taste profile / known-learnings into the
+  extractor (those belong to the outbound ask).
+- **Workbench log-editor** (ADR-0042 S2 review): the `canSave` / `normalizedLogEntryDraft` mismatch when a body
+  is combined with partially-filled typed fields, the dead save spinner, the compare `.menuPrepPlan` mislabel.
+- **Workbench synthesis-shaped apply-action** — the draft verb's own action shape (no last-reply gate/chip);
+  spec in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md). ⚠️ Re-read against ADR-0042 D2/OQ5
+  first: it is an *in-app* draft verb and the draft is a structured write.
+- **`stageReaderFeedback` defaults `unparsedLines` to `[]`**, so accepting a single tip through the *in-app*
+  path clears the evidence banner (cosmetic).
+
+**Still-deferred, separate future efforts:** ADR-0027 **OQ4** (a note-worthiness taste preference);
+**ADR-0036 S3** — promote a `RecipeNote` deposited *on a recipe*; **ADR-0038 Amd 4 — smart Learning
+curation** (an LLM pass reconciling incoming-vs-existing learnings; the deterministic exact-dedup *floor*
+already shipped, so this is the paraphrase-aware ceiling, not urgent —
+[[handoff-stateless-both-directions]]). Comment ingestion stays in `docs/open-questions.md`.
+
+**Parked to `docs/open-questions.md` (decide with Jon before build):** multi-bubble / whole-transcript chat
+selection (per-bubble `UITextView` caps the payload).
+
+---
+
 Live ambiguities and recently-resolved decisions. Resolved items stay here briefly
 (dated) so the reasoning is durable, then graduate into the relevant doc or ADR.
 

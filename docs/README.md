@@ -1,8 +1,8 @@
 # Yes Chef Docs
 
 The product and architecture brief for Yes Chef. This folder is the working source
-of truth; `docs/CURRENT_HANDOFF.md` is the executor's rolling ledger, not the
-contract.
+of truth. `docs/NEXT_UP.md` is the executor's one dispatch ticket, not the contract
+(jon-platform ADR-0005).
 
 ## Core sentences
 
@@ -45,6 +45,9 @@ change is migration-aware.
   new effort or ADR** — per jon-platform `agent-workflow.md` § "Working docs stay
   discoverable."
 - [reviews/](reviews/) — architect review passes (historical and ongoing).
+- [work-intake.md](work-intake.md) — the full dispatch protocol behind `AGENTS.md` § Work Intake.
+- [product-principles.md](product-principles.md) — recipe-model, UI, import, AI, and style
+  principles plus the original MVP scope (moved out of `AGENTS.md` to keep it lean).
 
 ## Operator setup
 

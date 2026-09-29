@@ -3,10 +3,21 @@
 Archive of completed efforts, the implemented-behavior checkpoint, and strategic
 background. **Read-rarely, append-on-approval.** No dispatch instruction should ever
 point the coding agent (or the architect during a dispatch) at this file — it is a
-human-reference archive, not a working-context source. `docs/CURRENT_HANDOFF.md` stays
-lean precisely because this history lives here instead.
+human-reference archive, not a working-context source. `docs/NEXT_UP.md` stays a
+lean ticket precisely because this history lives here instead.
 
 Newest first.
+
+---
+## Token discipline + ADR-0005 document shape (`chore/token-discipline`)
+
+**2026-09-29. No code or schema change.** `check-drift.sh` and `xcodebuild-summary.sh` run noisy stages through
+jon-platform's `quiet-run` (3.46 MB of raw app-build log became about 15 lines). `docs/AGENTS.md` went from
+18 KB to 9 KB, with its background moved out to `docs/work-intake.md` and `docs/product-principles.md`.
+`CURRENT_HANDOFF.md` is retired per jon-platform ADR-0005: `docs/NEXT_UP.md` (nothing dispatched),
+`docs/standing-guards.md`, `docs/device-passes.md` (device passes and the prod-schema list),
+`docs/verification.md`, and candidates in `docs/open-questions.md`. The handoff-hygiene stage now calls the
+shared `check-handoff`.
 
 ---
 ## Cockpit Find multi-admit — save every extracted candidate from Create Recipe
