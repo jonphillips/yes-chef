@@ -45,6 +45,9 @@ change is migration-aware.
   new effort or ADR** — per jon-platform `agent-workflow.md` § "Working docs stay
   discoverable."
 - [reviews/](reviews/) — architect review passes (historical and ongoing).
+- [work-intake.md](work-intake.md) — the full dispatch protocol behind `AGENTS.md` § Work Intake.
+- [product-principles.md](product-principles.md) — recipe-model, UI, import, AI, and style
+  principles plus the original MVP scope (moved out of `AGENTS.md` to keep it lean).
 
 ## Operator setup
 
