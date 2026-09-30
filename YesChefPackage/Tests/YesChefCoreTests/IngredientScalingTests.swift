@@ -111,6 +111,7 @@ struct IngredientScalingTests {
       ("8 to 10 ounces kale", 10, "8 to 10", "ounces", "kale"),
       ("8 - 10 ounces chard", 10, "8 - 10", "ounces", "chard"),
       ("1½-2 cups flour", 2, "1½-2", "cups", "flour"),
+      ("1 ½-2 cups flour", 2, "1 ½-2", "cups", "flour"),
     ]
 
     for (text, quantity, quantityText, unit, item) in cases {
@@ -120,5 +121,80 @@ struct IngredientScalingTests {
       expectNoDifference(parsed.unit, unit)
       expectNoDifference(parsed.item, item)
     }
+  }
+
+  @Test
+  func leadingQuantityReadsMixedNumberRangeLowerBounds() {
+    let cases: [(String, Double, Double, String)] = [
+      ("1 ½–2 eggs", 1.5, 2, "1 ½–2"),
+      ("1 1/2-2 cups", 1.5, 2, "1 1/2-2"),
+      ("4 ½–6", 4.5, 6, "4 ½–6"),
+    ]
+
+    for (text, lowerBound, upperBound, quantityText) in cases {
+      let parsed = QuantityParser.leadingQuantity(in: text)
+      #expect(parsed?.value == lowerBound)
+      #expect(parsed?.upperBound == upperBound)
+      if let parsed {
+        expectNoDifference(String(text[parsed.range]), quantityText)
+      }
+    }
+  }
+
+  @Test
+  func hyphenatedMixedNumberSizesAreNotIngredientAmounts() {
+    let cases = [
+      ("1 1/2-inch piece fresh ginger, peeled", "1 1/2-inch piece fresh ginger"),
+      ("1 ½-inch piece ginger", "1 ½-inch piece ginger"),
+      ("2 1/2-inch cubes butternut squash", "2 1/2-inch cubes butternut squash"),
+    ]
+
+    for (text, item) in cases {
+      let parsed = IngredientParser.parse(text)
+      #expect(parsed.quantity == nil)
+      #expect(parsed.quantityText == nil)
+      #expect(parsed.unit == nil)
+      expectNoDifference(parsed.item, item)
+    }
+  }
+
+  @Test
+  func scaledKnownUnitsAgreeWithQuantityAndUnknownUnitsStayAsWritten() {
+    let recipeID = SampleUUIDSequence.uuid(61)
+    let sectionID = SampleUUIDSequence.uuid(62)
+    var uuids = SampleUUIDSequence(start: 63)
+    let parsedLines = IngredientParser.lines(
+      from: """
+      ⅛ teaspoon red-pepper flakes
+      2 tablespoons olive oil
+      1 teaspoon salt
+      """,
+      recipeID: recipeID,
+      sectionID: sectionID,
+      uuid: { uuids.next() }
+    )
+    let unknownUnit = IngredientLine(
+      id: uuids.next(),
+      recipeID: recipeID,
+      sectionID: sectionID,
+      originalText: "2 scoops flour",
+      quantity: 2,
+      quantityText: "2",
+      unit: "scoops",
+      item: "flour",
+      sortOrder: 3
+    )
+    let range = IngredientParser.lines(
+      from: "1-2 teaspoon salt",
+      recipeID: recipeID,
+      sectionID: sectionID,
+      uuid: { uuids.next() }
+    )[0]
+
+    expectNoDifference(IngredientScaler.scaledText(for: parsedLines[0], factor: 2), "¼ teaspoon red-pepper flakes")
+    expectNoDifference(IngredientScaler.scaledText(for: parsedLines[1], factor: 0.5), "1 tablespoon olive oil")
+    expectNoDifference(IngredientScaler.scaledText(for: parsedLines[2], factor: 3), "3 teaspoons salt")
+    expectNoDifference(IngredientScaler.scaledText(for: unknownUnit, factor: 0.5), "1 scoops flour")
+    expectNoDifference(IngredientScaler.scaledText(for: range, factor: 2), "2–4 teaspoon salt")
   }
 }

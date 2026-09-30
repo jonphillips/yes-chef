@@ -9,6 +9,16 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Reader scales count-only amounts and agrees on unit number (`effort/reader-count-scaling`)
+
+**2026-09-30. No schema change.** The split recipe reader now takes unitless amounts from scaled text,
+including ranges. Recognized units use singular form at quantities at or below one and plural form above
+one; mixed-number range lower bounds now parse through their connector, and hyphenated sizes stay item text,
+including a post-engine repair for stale stored quantities. Unknown units and range wording stay as written.
+`scripts/check-drift.sh` passed (702 package tests;
+app test target compiled and linked, not run). Jon's device pass is owed in `docs/device-passes.md`.
+
+---
 ## Ingredient ranges scale in the reader and grocery (`effort/ingredient-range-scaling`)
 
 **2026-09-30. No schema change.** Ingredient ranges scale at both ends in the reader, while grocery

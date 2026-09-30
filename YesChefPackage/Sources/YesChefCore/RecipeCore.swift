@@ -782,6 +782,7 @@ public enum IngredientScaler {
     }
 
     guard
+      QuantityParser.leadingIngredientAmount(in: line.originalText) != nil,
       let quantity = line.quantity,
       factor != 1
     else { return line.originalText }
@@ -847,9 +848,55 @@ public enum IngredientScaler {
   }
 
   private static func pluralized(_ unit: String, quantity: Double) -> String {
-    guard quantity != 1, !unit.hasSuffix("s") else { return unit }
-    return unit + "s"
+    guard let forms = unitForms(for: unit) else { return unit }
+    return quantity > 1 ? forms.plural : forms.singular
   }
+
+  struct UnitNumberForms: Sendable {
+    var singular: String
+    var plural: String
+  }
+
+  static func unitForms(for unit: String) -> UnitNumberForms? {
+    let normalizedUnit = unit.lowercased()
+    return knownUnitNumberForms.first {
+      $0.singular == normalizedUnit || $0.plural == normalizedUnit
+    }
+  }
+
+  // These forms mirror the recognized singular/plural pairs in IngredientParser.units.
+  private static let knownUnitNumberForms: [UnitNumberForms] = [
+    .init(singular: "bag", plural: "bags"),
+    .init(singular: "bottle", plural: "bottles"),
+    .init(singular: "box", plural: "boxes"),
+    .init(singular: "bunch", plural: "bunches"),
+    .init(singular: "can", plural: "cans"),
+    .init(singular: "clove", plural: "cloves"),
+    .init(singular: "cup", plural: "cups"),
+    .init(singular: "dash", plural: "dashes"),
+    .init(singular: "ear", plural: "ears"),
+    .init(singular: "gallon", plural: "gallons"),
+    .init(singular: "gram", plural: "grams"),
+    .init(singular: "head", plural: "heads"),
+    .init(singular: "jar", plural: "jars"),
+    .init(singular: "kilogram", plural: "kilograms"),
+    .init(singular: "liter", plural: "liters"),
+    .init(singular: "milliliter", plural: "milliliters"),
+    .init(singular: "ounce", plural: "ounces"),
+    .init(singular: "package", plural: "packages"),
+    .init(singular: "packet", plural: "packets"),
+    .init(singular: "pinch", plural: "pinches"),
+    .init(singular: "pint", plural: "pints"),
+    .init(singular: "pound", plural: "pounds"),
+    .init(singular: "quart", plural: "quarts"),
+    .init(singular: "slice", plural: "slices"),
+    .init(singular: "sprig", plural: "sprigs"),
+    .init(singular: "stalk", plural: "stalks"),
+    .init(singular: "stick", plural: "sticks"),
+    .init(singular: "tablespoon", plural: "tablespoons"),
+    .init(singular: "teaspoon", plural: "teaspoons"),
+    .init(singular: "lb", plural: "lbs"),
+  ]
 
   private static let commonFractions: [(value: Double, label: String)] = [
     (1.0 / 8.0, "⅛"),

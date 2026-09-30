@@ -127,8 +127,8 @@ public enum IngredientLineReaderPresentation {
     if let unit = line.unit?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty {
       guard let unitEnd = unitEnd(in: scaledText, unit: unit) else { return nil }
       amountAndUnit = String(scaledText[..<unitEnd]).trimmingCharacters(in: .whitespacesAndNewlines)
-    } else if let quantity = line.quantity {
-      amountAndUnit = IngredientScaler.formattedQuantity(quantity)
+    } else if line.quantity != nil, let quantity = QuantityParser.leadingIngredientAmount(in: scaledText) {
+      amountAndUnit = String(scaledText[quantity.range])
     } else {
       amountAndUnit = ""
     }
@@ -165,16 +165,17 @@ public enum IngredientLineReaderPresentation {
   }
 
   private static func unitEnd(in text: String, unit: String) -> String.Index? {
-    guard let range = text.range(of: unit, options: [.caseInsensitive]) else { return nil }
-    guard range.lowerBound == text.startIndex || text[text.index(before: range.lowerBound)].isWhitespace else {
-      return nil
+    let forms = IngredientScaler.unitForms(for: unit)
+    let acceptedForms = [unit, forms?.singular, forms?.plural].compactMap(\.self)
+    for form in acceptedForms {
+      guard let range = text.range(of: form, options: [.caseInsensitive]) else { continue }
+      guard range.lowerBound == text.startIndex || text[text.index(before: range.lowerBound)].isWhitespace else {
+        continue
+      }
+      guard range.upperBound == text.endIndex || !text[range.upperBound].isLetter else { continue }
+      return range.upperBound
     }
-    var end = range.upperBound
-    if end < text.endIndex, text[end].lowercased() == "s", !unit.lowercased().hasSuffix("s") {
-      end = text.index(after: end)
-    }
-    guard end == text.endIndex || !text[end].isLetter else { return nil }
-    return end
+    return nil
   }
 
   private static func tokens(_ text: String) -> [String] {
