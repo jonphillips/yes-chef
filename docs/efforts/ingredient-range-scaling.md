@@ -1,6 +1,6 @@
 # Effort — Scale ingredient ranges ("8-10 ounces") in the reader and grocery + label a blocked compare fallback
 
-Status: Dispatched 2026-09-30. Schema-free, `YesChefCore` only (one post-engine data pass).
+Status: Built 2026-09-30 ([PR #332](https://github.com/jonphillips/yes-chef/pull/332)); device pass owed. Schema-free, `YesChefCore` only (one post-engine data pass).
 Summary: An ingredient written as a range ("8-10 ounces", "8–10 oz", "8 to 10 ounces") doesn't change when the
 recipe is scaled, and grocery drops or garbles it. The reader scales both ends of the range; grocery shops the
 upper bound (scaled), via the parser storing the upper bound as the line's quantity plus a post-engine repair of
