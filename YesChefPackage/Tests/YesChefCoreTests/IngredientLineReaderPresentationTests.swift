@@ -164,6 +164,26 @@ struct IngredientLineReaderPresentationTests {
       }
     }
 
+    let hardLines = [
+      "1-inch piece fresh ginger, peeled",
+      "½-inch slices daikon",
+      "2-3-inch pieces ginger",
+      "2 (15-ounce) cans chickpeas, drained",
+      "1 (28-ounce) can whole tomatoes",
+      "3 to 4 cups chicken stock",
+      "1 1/2 cups flour",
+      "1 bunch kale, stems removed",
+      "2 boxes cherry tomatoes, halved",
+      "Juice of 1 lemon",
+      "Salt and pepper, to taste",
+    ]
+    lines.append(contentsOf: IngredientParser.lines(
+      from: hardLines.joined(separator: "\n"),
+      recipeID: uuids.next(),
+      sectionID: uuids.next(),
+      uuid: { uuids.next() }
+    ))
+
     let soupPath = testDirectory
       .appendingPathComponent("Fixtures/WebRecipeCapture/SanitizedSites/nyt-comments.html")
     let soupHTML = try String(contentsOf: soupPath, encoding: .utf8)
@@ -183,6 +203,12 @@ struct IngredientLineReaderPresentationTests {
     let suffix = text[firstAmount.range.upperBound...]
     let whitespace = suffix.prefix(while: \.isWhitespace)
     guard !whitespace.isEmpty else { return false }
-    return QuantityParser.leadingQuantity(in: String(suffix.dropFirst(whitespace.count))) != nil
+    let remainder = String(suffix.dropFirst(whitespace.count))
+    guard let secondAmount = QuantityParser.leadingQuantity(in: remainder) else { return false }
+    let startsWithFraction = "¼½¾⅓⅔⅛⅜⅝⅞".contains(remainder[secondAmount.range.lowerBound])
+    if startsWithFraction, secondAmount.upperBound != nil {
+      return false // A mixed-number range such as "1 ½–2" is one amount.
+    }
+    return true
   }
 }
