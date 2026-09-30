@@ -106,6 +106,22 @@ struct IngredientLineReaderPresentationTests {
             "Reader display starts with two amounts: '\(scaledDisplay.primaryText)' from '\(line.originalText)' at \(factor)×"
           )
         }
+        if let quantity = line.quantity {
+          let displayedText = scaledDisplay?.primaryText ?? scaledText
+          let displayedQuantity = QuantityParser.leadingQuantity(in: displayedText)
+          #expect(
+            displayedQuantity != nil,
+            "Reader amount is missing for '\(line.originalText)' at \(factor)×: '\(displayedText)'"
+          )
+          if let displayedQuantity {
+            let displayedUpperBound = displayedQuantity.upperBound ?? displayedQuantity.value
+            let expectedUpperBound = quantity * factor
+            #expect(
+              abs(displayedUpperBound - expectedUpperBound) < 0.01,
+              "Reader amount \(displayedUpperBound) disagrees with scaled quantity \(expectedUpperBound) for '\(line.originalText)' at \(factor)×"
+            )
+          }
+        }
         #expect(
           scaledDisplay?.secondaryText == identityDisplay?.secondaryText,
           "Secondary text changed for '\(line.originalText)' at \(factor)×"
@@ -171,6 +187,8 @@ struct IngredientLineReaderPresentationTests {
       "2 (15-ounce) cans chickpeas, drained",
       "1 (28-ounce) can whole tomatoes",
       "3 to 4 cups chicken stock",
+      "3-4 eggs",
+      "5-6 shallots, sliced",
       "1 1/2 cups flour",
       "1 bunch kale, stems removed",
       "2 boxes cherry tomatoes, halved",
@@ -204,11 +222,6 @@ struct IngredientLineReaderPresentationTests {
     let whitespace = suffix.prefix(while: \.isWhitespace)
     guard !whitespace.isEmpty else { return false }
     let remainder = String(suffix.dropFirst(whitespace.count))
-    guard let secondAmount = QuantityParser.leadingQuantity(in: remainder) else { return false }
-    let startsWithFraction = "¼½¾⅓⅔⅛⅜⅝⅞".contains(remainder[secondAmount.range.lowerBound])
-    if startsWithFraction, secondAmount.upperBound != nil {
-      return false // A mixed-number range such as "1 ½–2" is one amount.
-    }
-    return true
+    return QuantityParser.leadingQuantity(in: remainder) != nil
   }
 }

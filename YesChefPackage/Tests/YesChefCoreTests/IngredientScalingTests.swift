@@ -111,6 +111,7 @@ struct IngredientScalingTests {
       ("8 to 10 ounces kale", 10, "8 to 10", "ounces", "kale"),
       ("8 - 10 ounces chard", 10, "8 - 10", "ounces", "chard"),
       ("1½-2 cups flour", 2, "1½-2", "cups", "flour"),
+      ("1 ½-2 cups flour", 2, "1 ½-2", "cups", "flour"),
     ]
 
     for (text, quantity, quantityText, unit, item) in cases {
@@ -119,6 +120,24 @@ struct IngredientScalingTests {
       expectNoDifference(parsed.quantityText, quantityText)
       expectNoDifference(parsed.unit, unit)
       expectNoDifference(parsed.item, item)
+    }
+  }
+
+  @Test
+  func leadingQuantityReadsMixedNumberRangeLowerBounds() {
+    let cases: [(String, Double, Double, String)] = [
+      ("1 ½–2 eggs", 1.5, 2, "1 ½–2"),
+      ("1 1/2-2 cups", 1.5, 2, "1 1/2-2"),
+      ("4 ½–6", 4.5, 6, "4 ½–6"),
+    ]
+
+    for (text, lowerBound, upperBound, quantityText) in cases {
+      let parsed = QuantityParser.leadingQuantity(in: text)
+      #expect(parsed?.value == lowerBound)
+      #expect(parsed?.upperBound == upperBound)
+      if let parsed {
+        expectNoDifference(String(text[parsed.range]), quantityText)
+      }
     }
   }
 

@@ -122,7 +122,7 @@ public enum QuantityParser {
 
   private static func fraction(at index: String.Index, in text: String) -> (value: Double, range: Range<String.Index>)? {
     guard index < text.endIndex else { return nil }
-    let end = text[index...].firstIndex(where: \.isWhitespace) ?? text.endIndex
+    let end = text[index...].firstIndex(where: { $0.isWhitespace || "-–—".contains($0) }) ?? text.endIndex
     let token = String(text[index..<end])
     guard let value = fractionValue(token) else { return nil }
     return (value, index..<end)
