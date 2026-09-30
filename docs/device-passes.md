@@ -13,6 +13,10 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**Reader count scaling — count-only amounts and unit agreement** ([effort brief](efforts/reader-count-scaling.md),
+schema-free). In the soup at 4 → 8 servings, confirm the reader shows `2 large onion`, `2 large carrot`,
+`6 garlic cloves`, and `¼ teaspoon red-pepper flakes`.
+
 **Ingredient range scaling — reader, grocery, and sync** ([effort brief](efforts/ingredient-range-scaling.md),
 schema-free). Scale an `8-10 ounces` ingredient to 2× and ½× in the reader and confirm both range ends
 change. Add the recipe to grocery at 2× and confirm the upper bound is 20 oz. On a second device, confirm

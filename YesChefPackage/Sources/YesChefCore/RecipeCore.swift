@@ -847,9 +847,79 @@ public enum IngredientScaler {
   }
 
   private static func pluralized(_ unit: String, quantity: Double) -> String {
-    guard quantity != 1, !unit.hasSuffix("s") else { return unit }
-    return unit + "s"
+    let normalizedUnit = unit.lowercased()
+    if quantity > 1 {
+      return pluralUnitForms[normalizedUnit] ?? unit
+    }
+    return singularUnitForms[normalizedUnit] ?? unit
   }
+
+  // These forms mirror the recognized singular/plural pairs in IngredientParser.units.
+  private static let singularUnitForms: [String: String] = [
+    "bags": "bag",
+    "bottles": "bottle",
+    "boxes": "box",
+    "bunches": "bunch",
+    "cans": "can",
+    "cloves": "clove",
+    "cups": "cup",
+    "dashes": "dash",
+    "ears": "ear",
+    "gallons": "gallon",
+    "grams": "gram",
+    "heads": "head",
+    "jars": "jar",
+    "kilograms": "kilogram",
+    "liters": "liter",
+    "milliliters": "milliliter",
+    "ounces": "ounce",
+    "packages": "package",
+    "packets": "packet",
+    "pinches": "pinch",
+    "pints": "pint",
+    "pounds": "pound",
+    "quarts": "quart",
+    "slices": "slice",
+    "sprigs": "sprig",
+    "stalks": "stalk",
+    "sticks": "stick",
+    "tablespoons": "tablespoon",
+    "teaspoons": "teaspoon",
+    "lbs": "lb",
+  ]
+
+  private static let pluralUnitForms: [String: String] = [
+    "bag": "bags",
+    "bottle": "bottles",
+    "box": "boxes",
+    "bunch": "bunches",
+    "can": "cans",
+    "clove": "cloves",
+    "cup": "cups",
+    "dash": "dashes",
+    "ear": "ears",
+    "gallon": "gallons",
+    "gram": "grams",
+    "head": "heads",
+    "jar": "jars",
+    "kilogram": "kilograms",
+    "liter": "liters",
+    "milliliter": "milliliters",
+    "ounce": "ounces",
+    "package": "packages",
+    "packet": "packets",
+    "pinch": "pinches",
+    "pint": "pints",
+    "pound": "pounds",
+    "quart": "quarts",
+    "slice": "slices",
+    "sprig": "sprigs",
+    "stalk": "stalks",
+    "stick": "sticks",
+    "tablespoon": "tablespoons",
+    "teaspoon": "teaspoons",
+    "lb": "lbs",
+  ]
 
   private static let commonFractions: [(value: Double, label: String)] = [
     (1.0 / 8.0, "⅛"),

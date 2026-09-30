@@ -121,4 +121,44 @@ struct IngredientScalingTests {
       expectNoDifference(parsed.item, item)
     }
   }
+
+  @Test
+  func scaledKnownUnitsAgreeWithQuantityAndUnknownUnitsStayAsWritten() {
+    let recipeID = SampleUUIDSequence.uuid(61)
+    let sectionID = SampleUUIDSequence.uuid(62)
+    var uuids = SampleUUIDSequence(start: 63)
+    let parsedLines = IngredientParser.lines(
+      from: """
+      ⅛ teaspoon red-pepper flakes
+      2 tablespoons olive oil
+      1 teaspoon salt
+      """,
+      recipeID: recipeID,
+      sectionID: sectionID,
+      uuid: { uuids.next() }
+    )
+    let unknownUnit = IngredientLine(
+      id: uuids.next(),
+      recipeID: recipeID,
+      sectionID: sectionID,
+      originalText: "2 scoops flour",
+      quantity: 2,
+      quantityText: "2",
+      unit: "scoops",
+      item: "flour",
+      sortOrder: 3
+    )
+    let range = IngredientParser.lines(
+      from: "1-2 teaspoon salt",
+      recipeID: recipeID,
+      sectionID: sectionID,
+      uuid: { uuids.next() }
+    )[0]
+
+    expectNoDifference(IngredientScaler.scaledText(for: parsedLines[0], factor: 2), "¼ teaspoon red-pepper flakes")
+    expectNoDifference(IngredientScaler.scaledText(for: parsedLines[1], factor: 0.5), "1 tablespoon olive oil")
+    expectNoDifference(IngredientScaler.scaledText(for: parsedLines[2], factor: 3), "3 teaspoons salt")
+    expectNoDifference(IngredientScaler.scaledText(for: unknownUnit, factor: 0.5), "1 scoops flour")
+    expectNoDifference(IngredientScaler.scaledText(for: range, factor: 2), "2–4 teaspoon salt")
+  }
 }

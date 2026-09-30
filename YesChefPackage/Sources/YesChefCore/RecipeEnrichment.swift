@@ -127,8 +127,8 @@ public enum IngredientLineReaderPresentation {
     if let unit = line.unit?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty {
       guard let unitEnd = unitEnd(in: scaledText, unit: unit) else { return nil }
       amountAndUnit = String(scaledText[..<unitEnd]).trimmingCharacters(in: .whitespacesAndNewlines)
-    } else if let quantity = line.quantity {
-      amountAndUnit = IngredientScaler.formattedQuantity(quantity)
+    } else if let quantity = QuantityParser.leadingQuantity(in: scaledText) {
+      amountAndUnit = String(scaledText[quantity.range])
     } else {
       amountAndUnit = ""
     }
