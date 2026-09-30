@@ -8,11 +8,6 @@
 **Per-recipe facet/tag coverage is Jon's ongoing hand work and gates nothing** — Power Browser (ADR-0050)
 and everything downstream move forward without waiting on it.
 
-- **Grocery for ingredient ranges (raised 2026-09-30, while briefing `ingredient-range-scaling`):** a
-  `8-10 ounces` line reaches grocery with no quantity and its text unscaled; a `8 to 10 ounces` line merges as
-  8. The reader now scales ranges; grocery doesn't. What should a range shop as: the upper bound (buy enough),
-  the text as written, or the range carried through? Changing it touches ADR-0022's deterministic merge.
-
 From the old Next Up:
 
 
