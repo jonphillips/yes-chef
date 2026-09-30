@@ -260,6 +260,7 @@ public struct RecipeVariationPayload: Codable, Equatable, Sendable {
         throw RecipeAdjustmentError.unresolvedInstructionStep(replacement.displayText)
       }
       replacement.id = steps[index].id
+      replacement.originalText = steps[index].text
       return replacement
     }
     payload.methodStepStructuralOps = try methodStepStructuralOps.map { op in
@@ -332,6 +333,7 @@ public struct RecipeVariationPayload: Codable, Equatable, Sendable {
         return replacement
       }
       replacement.id = steps[index].id
+      replacement.originalText = steps[index].text
       return replacement
     }
     payload.methodStepStructuralOps = methodStepStructuralOps.map { op in
@@ -733,6 +735,7 @@ public struct RecipeStepReference: Codable, Equatable, Sendable {
     guard let index = index(in: steps) else { return nil }
     var reference = self
     reference.id = steps[index].id
+    reference.originalText = steps[index].text
     return reference
   }
 }
@@ -771,6 +774,7 @@ private func normalizedIngredientReferenceIfPossible(
   guard let index = reference.index(in: lines) else { return nil }
   var reference = reference
   reference.id = lines[index].id
+  reference.originalText = lines[index].originalText
   return reference
 }
 
@@ -929,6 +933,9 @@ extension RecipeAdjustmentClient: DependencyKey {
     )
     let response = try await call.complete(using: modelClient)
     let trimmed = response.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    if response.wasBlockedByProvider {
+      throw StructuredModelResponseError.responseBlocked
+    }
     if response.wasTruncated || trimmed.isEmpty {
       throw RecipeAdjustmentError.responseTruncated
     }
@@ -948,14 +955,16 @@ extension RecipeAdjustmentClient: DependencyKey {
     You extract a proposed edit to one existing recipe from a cooking conversation.
 
     Return ONLY strict JSON:
-    {"summary":"brief rationale","ingredientOps":[{"op":"add","line":"new ingredient line","sectionName":"optional existing section name or null"},{"op":"remove","baseIngredientID":"uuid-or-null","originalText":"exact current line"},{"op":"substitute","baseIngredientID":"uuid-or-null","originalText":"exact current line","line":"replacement ingredient line"},{"op":"scale","baseIngredientID":"uuid-or-null","originalText":"exact current line","line":"full replacement ingredient line"}],"methodNote":"optional prose note","methodStepReplacements":[{"baseStepID":"uuid-or-null","stepNumber":1,"originalText":"exact current step","replacementText":"full replacement step text"}]}.
+    {"summary":"brief rationale","ingredientOps":[{"op":"add","line":"new ingredient line","sectionName":"optional existing section name or null"},{"op":"remove","baseIngredientID":"uuid-or-null","originalText":null},{"op":"substitute","baseIngredientID":"uuid-or-null","originalText":null,"line":"replacement ingredient line"},{"op":"scale","baseIngredientID":"uuid-or-null","originalText":null,"line":"full replacement ingredient line"}],"methodNote":"optional prose note","methodStepReplacements":[{"baseStepID":"uuid-or-null","stepNumber":1,"originalText":null,"replacementText":"full replacement step text"}]}.
 
     Emit a structured delta only. Do not return a rewritten recipe. For ingredient edits use only add,
     remove, substitute, and scale. For method edits either write a concise methodNote or replace whole
     step text; do not merge, reorder, or rewrite the whole procedure. Ingredient edits may target any
     section; when adding to a specific section, set sectionName to the exact existing section name. Use
-    exact IDs or exact current text from the recipe context when changing existing rows. Return empty
-    arrays and null methodNote when there is no concrete edit to review.
+    exact IDs or exact current text from the recipe context when changing existing rows. When a
+    baseIngredientID or baseStepID is present, set originalText to null; only quote originalText when
+    the ID is null. For a step without an ID, quote only its first 10 words. Return empty arrays and
+    null methodNote when there is no concrete edit to review.
     """
 
   static func prompt(selection: String, messages: [RecipeChatMessage], detail: RecipeDetailData) -> String {

@@ -72,6 +72,9 @@ extension WorkbenchCompareAlignerClient: DependencyKey {
       promptPreferenceKey: nil
     )
     let response = try await call.complete(using: modelClient)
+    if response.wasBlockedByProvider {
+      return WorkbenchAlignedComparison(comparison: deterministic, source: .fallback(.truncated))
+    }
     if response.wasTruncated {
       return WorkbenchAlignedComparison(comparison: deterministic, source: .fallback(.truncated))
     }

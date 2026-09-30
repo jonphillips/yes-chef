@@ -414,5 +414,29 @@ extension RecipeCoreTests {
         }
       }
     }
+
+    @Test
+    func liveClientSurfacesProviderBlockInsteadOfUnreadableResponse() async throws {
+      await #expect(throws: StructuredModelResponseError.responseBlocked) {
+        try await withDependencies {
+          $0.modelClient = StubModelClient { _ in ModelResponse(text: "partial", stopReason: "content_filter") }
+        } operation: {
+          try await RecipeAdjustmentClient.liveValue(
+            selection: "make it vegetarian",
+            messages: [],
+            detail: RecipeDetailData(
+              recipe: Recipe(
+                id: SampleUUIDSequence.uuid(31_501),
+                title: "Lemon Pasta",
+                dateCreated: Date(timeIntervalSinceReferenceDate: 819_200_000),
+                dateModified: Date(timeIntervalSinceReferenceDate: 819_200_000)
+              )
+            ),
+            tier: .frontier(.openai),
+            tierResolution: .callerProvided
+          )
+        }
+      }
+    }
   }
 }

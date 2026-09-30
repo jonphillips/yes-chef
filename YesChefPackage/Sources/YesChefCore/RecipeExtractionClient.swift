@@ -79,6 +79,7 @@ extension RecipeExtractionClient: DependencyKey {
       tierResolution: resolvedTier.resolution
     )
     .complete(using: modelClient)
+    guard !response.wasBlockedByProvider else { throw StructuredModelResponseError.responseBlocked }
     guard !response.wasTruncated else { throw RecipeExtractionError.responseTruncated }
     guard let extractions = parseMany(response.text) else { throw RecipeExtractionError.responseUnreadable }
     return extractions

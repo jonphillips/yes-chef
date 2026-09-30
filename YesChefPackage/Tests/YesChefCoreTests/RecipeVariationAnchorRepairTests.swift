@@ -61,13 +61,14 @@ extension RecipeCoreTests {
           RecipeAdjustmentProposal(
             ingredientOps: [
               .substitute(
-                RecipeIngredientReference(originalText: "1 tablespoon lemon juice"),
+                RecipeIngredientReference(id: ids.ingredientID, originalText: "model supplied text"),
                 line: "2 tablespoons lime juice"
-              )
+              ),
             ],
             methodStepReplacements: [
               RecipeMethodStepReplacement(
-                originalText: "Finish with lemon.",
+                id: ids.stepID,
+                originalText: "model supplied text",
                 replacementText: "Finish with lime."
               )
             ]
@@ -97,7 +98,7 @@ extension RecipeCoreTests {
           .substitute(
             RecipeIngredientReference(id: ids.ingredientID, originalText: "1 tablespoon lemon juice"),
             line: "2 tablespoons lime juice"
-          )
+          ),
         ])
         expectNoDifference(payload.methodStepReplacements, [
           RecipeMethodStepReplacement(
@@ -111,6 +112,48 @@ extension RecipeCoreTests {
         let resolved = try detail.resolved(applying: stored).detail
         expectNoDifference(resolved.ingredientLines.map(\.originalText), ["2 tablespoons lime juice"])
         expectNoDifference(resolved.instructionSteps.map(\.text), ["Finish with lime."])
+      }
+    }
+
+    @Test
+    func normalizesAllIDAnchoredIngredientEditsToBaseCopy() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 910_050_000)
+      let ids = AnchorRepairFixtureIDs(start: 91_050)
+      let operations: [RecipeIngredientDelta] = [
+        .remove(RecipeIngredientReference(id: ids.ingredientID)),
+        .substitute(RecipeIngredientReference(id: ids.ingredientID, originalText: "wrong text"), line: "2 tablespoons lime juice"),
+        .scale(RecipeIngredientReference(id: ids.ingredientID), line: "2 tablespoons lemon juice"),
+      ]
+
+      try database.write { db in
+        try insertAnchorRepairBase(ids: ids, now: now, in: db)
+        for (index, operation) in operations.enumerated() {
+          _ = try RecipeRepository.keepAdjustmentProposalAsVariation(
+            RecipeAdjustmentProposal(ingredientOps: [operation]),
+            recipeID: ids.recipeID,
+            name: "Edit \(index)",
+            deliberationBody: nil,
+            in: db,
+            now: now,
+            uuid: { SampleUUIDSequence.uuid(91_100 + index) }
+          )
+        }
+      }
+
+      try database.read { db in
+        let variations = try RecipeVariation.where { $0.recipeID.eq(ids.recipeID) }.fetchAll(db)
+        expectNoDifference(variations.count, operations.count)
+        for variation in variations {
+          let payload = try RecipeVariationPayload.decode(variation.deltas, variationID: variation.id)
+          switch try #require(payload.ingredientOps.first) {
+          case let .remove(reference), let .substitute(reference, _), let .scale(reference, _):
+            expectNoDifference(reference.originalText, "1 tablespoon lemon juice")
+            expectNoDifference(reference.id, ids.ingredientID)
+          case .add:
+            Issue.record("Expected an anchored edit")
+          }
+        }
       }
     }
 
@@ -168,6 +211,64 @@ extension RecipeCoreTests {
           )
         ])
         expectNoDifference(payload.methodStepReplacements.first?.id, ids.stepID)
+      }
+    }
+
+    @Test
+    func backfillUsesBaseCopyForIDAnchorsIncludingStructuralSteps() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 910_150_000)
+      let ids = AnchorRepairFixtureIDs(start: 91_250)
+      let variationID = SampleUUIDSequence.uuid(91_260)
+      let storedPayload = try RecipeVariationPayload(
+        ingredientOps: [
+          .remove(RecipeIngredientReference(id: ids.ingredientID, originalText: "model supplied text")),
+          .substitute(RecipeIngredientReference(id: ids.ingredientID), line: "2 tablespoons lime juice"),
+          .scale(RecipeIngredientReference(id: ids.ingredientID), line: "2 tablespoons lemon juice"),
+        ],
+        methodStepReplacements: [
+          RecipeMethodStepReplacement(id: ids.stepID, originalText: "model supplied text", replacementText: "Finish with lime."),
+        ],
+        methodStepStructuralOps: [
+          .insert(after: RecipeStepReference(id: ids.stepID), sectionID: ids.instructionSectionID, text: "Rest."),
+          .remove(RecipeStepReference(id: ids.stepID, originalText: "model supplied text")),
+        ]
+      ).encodedData()
+
+      try database.write { db in
+        try insertAnchorRepairBase(ids: ids, now: now, in: db)
+        try RecipeVariation.insert {
+          RecipeVariation(
+            id: variationID,
+            recipeID: ids.recipeID,
+            name: "Lime",
+            sortIndex: 0,
+            deltas: storedPayload,
+            dateCreated: now,
+            dateModified: now
+          )
+        }.execute(db)
+        let report = try RecipeRepository.backfillVariationAnchors(in: db)
+        expectNoDifference(report.unresolvedAnchors, [])
+      }
+
+      try database.read { db in
+        let variation = try #require(try RecipeVariation.find(variationID).fetchOne(db))
+        let payload = try RecipeVariationPayload.decode(variation.deltas, variationID: variationID)
+        expectNoDifference(payload.ingredientOps, [
+          .remove(RecipeIngredientReference(id: ids.ingredientID, originalText: "1 tablespoon lemon juice")),
+          .substitute(RecipeIngredientReference(id: ids.ingredientID, originalText: "1 tablespoon lemon juice"), line: "2 tablespoons lime juice"),
+          .scale(RecipeIngredientReference(id: ids.ingredientID, originalText: "1 tablespoon lemon juice"), line: "2 tablespoons lemon juice"),
+        ])
+        expectNoDifference(payload.methodStepReplacements.first?.originalText, "Finish with lemon.")
+        expectNoDifference(payload.methodStepStructuralOps, [
+          .insert(
+            after: RecipeStepReference(id: ids.stepID, originalText: "Finish with lemon."),
+            sectionID: ids.instructionSectionID,
+            text: "Rest."
+          ),
+          .remove(RecipeStepReference(id: ids.stepID, originalText: "Finish with lemon.")),
+        ])
       }
     }
 

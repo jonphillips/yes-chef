@@ -297,6 +297,7 @@ extension ChefItUpPlanClient: DependencyKey {
       promptPreferenceKey: AIPromptPreferenceKind.chefItUp.rawValue
     )
     let response = try await call.complete(using: modelClient)
+    guard !response.wasBlockedByProvider else { throw StructuredModelResponseError.responseBlocked }
     guard !response.wasTruncated else { throw StructuredModelResponseError.responseTruncated }
     return parse(response.text)
   }
@@ -371,6 +372,7 @@ extension ServeWithPlanClient: DependencyKey {
       promptPreferenceKey: AIPromptPreferenceKind.serveWith.rawValue
     )
     let response = try await call.complete(using: modelClient)
+    guard !response.wasBlockedByProvider else { throw StructuredModelResponseError.responseBlocked }
     guard !response.wasTruncated else { throw StructuredModelResponseError.responseTruncated }
     return parse(response.text)
   }

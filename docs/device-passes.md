@@ -13,6 +13,11 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**Recipe adjustment — OpenAI provider-filter regression (schema-free).** On device, set the recipe adjustment
+provider to OpenAI and ask for a vegetarian revision of a recipe with long method steps. Confirm the request
+completes and the review shows the base step text for its anchored replacement. The long source step must not
+be echoed in the model response.
+
 **Cockpit Find handoff — the two-app round trip ([ADR-0058](decisions/ADR-0058-cockpit-find-referral-transport.md),
 PRs [#322](https://github.com/jonphillips/yes-chef/pull/322) + [#325](https://github.com/jonphillips/yes-chef/pull/325)),
 no schema.** This is Cockpit's S-join, so it is owed **after Cockpit S-c2** (verdict drain) lands; until then, Yes
