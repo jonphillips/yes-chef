@@ -43,6 +43,25 @@ struct IngredientLineReaderPresentationTests {
     )
   }
 
+  @Test
+  func dimensionMeasurementsStayPartOfTheItem() {
+    let lines = parsedLines([
+      "1-inch piece fresh ginger, peeled",
+      "2-3-inch pieces ginger",
+    ])
+    expectNoDifference(lines.map(\.quantity), [nil, nil])
+
+    for factor in [1.0, 2.0] {
+      expectNoDifference(
+        lines.map { display($0, factor: factor) },
+        [
+          IngredientLineReaderDisplay(primaryText: "1-inch piece fresh ginger", secondaryText: "peeled"),
+          IngredientLineReaderDisplay(primaryText: "2-3-inch pieces ginger"),
+        ]
+      )
+    }
+  }
+
   private func display(_ line: IngredientLine, factor: Double) -> IngredientLineReaderDisplay? {
     IngredientLineReaderPresentation.display(
       for: line,

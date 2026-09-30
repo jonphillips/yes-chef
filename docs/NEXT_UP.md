@@ -1,6 +1,5 @@
-# Next Up — Nothing dispatched.
+# Next Up — nothing dispatched
 
-**Slices:** none
-**Briefs:** none
-**Done when:** none
-**Owed:** Jon's reader device passes and the held prod-schema promotion — `docs/device-passes.md` (not executor work).
+Nothing dispatched.
+
+**Owed:** Jon's device passes and the held prod-schema promotion — `docs/device-passes.md` (not executor work).

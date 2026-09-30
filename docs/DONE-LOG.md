@@ -13,7 +13,7 @@ Newest first.
 
 **2026-09-30. No schema change.** The split recipe reader now takes unitless amounts from scaled text,
 including ranges. Recognized units use singular form at quantities at or below one and plural form above
-one; unknown units and range wording stay as written. `scripts/check-drift.sh` passed (697 package tests;
+one; unknown units and range wording stay as written. `scripts/check-drift.sh` passed (698 package tests;
 app test target compiled and linked, not run). Jon's device pass is owed in `docs/device-passes.md`.
 
 ---
