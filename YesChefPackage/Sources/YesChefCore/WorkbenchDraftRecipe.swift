@@ -368,6 +368,7 @@ extension WorkbenchDraftRecipeClient: DependencyKey {
     )
     let response = try await call.complete(using: modelClient)
     let trimmed = response.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    if response.wasBlockedByProvider { throw StructuredModelResponseError.responseBlocked }
     // Distinguish a real failure from a deliberate "no recipe yet" (which comes back as valid
     // JSON with an empty title). A budget-exhausted or empty response is a retryable failure;
     // a non-empty response with no decodable JSON object is an unreadable one.

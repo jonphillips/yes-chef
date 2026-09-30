@@ -24,7 +24,7 @@ it's touched.
 
 ## Active / recent
 
-- [recipe-adjustment-content-filter.md](recipe-adjustment-content-filter.md) — **Dispatched 2026-09-30**, schema-free · Recipe revisions fail on OpenAI with `stopReason=content_filter` because the adjustment prompt makes the model copy whole method steps verbatim as anchors. Stop requiring that echo when an ID anchors the row, backfill the snapshot from our own copy, and give a provider-filter stop its own error instead of the misleading "couldn't be read".
+- [recipe-adjustment-content-filter.md](recipe-adjustment-content-filter.md) — **Done (#330, device-passed 2026-09-30)**, schema-free · Recipe revisions fail on OpenAI with `stopReason=content_filter` because the adjustment prompt makes the model copy whole method steps verbatim as anchors. Stop requiring that echo when an ID anchors the row, backfill the snapshot from our own copy, and give a provider-filter stop its own error instead of the misleading "couldn't be read".
 - [recipe-reader-density.md](recipe-reader-density.md) — **In progress, placement correction in draft PR** · Put variation selection beside the recipe, shorten the reader header, and move the supplemental Playbook below Instructions in the Directions column as a compact Notes → Chef It Up → Make-ahead reference with a Serve With capsule strip and Ask now in the sparkle menu.
 - [cockpit-find-multi-admit.md](cockpit-find-multi-admit.md) — **Designed (queued 2026-09-25)**, schema-free ·
   Follow-up to the Cockpit Find receiver · When extraction finds N recipes, let the cook save any number of

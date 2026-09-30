@@ -102,6 +102,7 @@ extension ReaderFeedbackCurationClient: DependencyKey {
       promptPreferenceKey: AIPromptPreferenceKind.readerFeedback.rawValue
     )
     let response = try await call.complete(using: modelClient)
+    if response.wasBlockedByProvider { throw StructuredModelResponseError.responseBlocked }
     if response.wasTruncated {
       throw ReaderFeedbackCurationError.responseTruncated
     }

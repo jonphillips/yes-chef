@@ -235,6 +235,7 @@ extension LabelProposer: DependencyKey {
       let deterministic = floor(recipe: recipe, vocabulary: vocabulary)
       let model = try await call(recipe: recipe, vocabulary: vocabulary, tier: tier, effort: effort)
         .complete(using: modelClient) { response in
+          guard !response.wasBlockedByProvider else { throw StructuredModelResponseError.responseBlocked }
           guard !response.wasTruncated else { throw LabelProposerError.responseTruncated }
           return try parse(response.text, vocabulary: vocabulary)
         }

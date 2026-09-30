@@ -282,6 +282,7 @@ extension MenuPrepPlanClient: DependencyKey {
       promptPreferenceKey: AIPromptPreferenceKind.makeAheadPrepPlan.rawValue
     )
     let response = try await call.complete(using: modelClient)
+    guard !response.wasBlockedByProvider else { throw StructuredModelResponseError.responseBlocked }
     guard !response.wasTruncated else { throw StructuredModelResponseError.responseTruncated }
     return parse(response.text)
   }

@@ -1,6 +1,6 @@
 # Effort — Recipe adjustment: stop echoing recipe text, and report a provider-filter stop
 
-Status: Dispatched 2026-09-30. Schema-free, `YesChefCore` only.
+Status: Done 2026-09-30 ([PR #330](https://github.com/jonphillips/yes-chef/pull/330)); device pass passed. Schema-free, `YesChefCore` only.
 Summary: Recipe revisions fail on OpenAI with `stopReason=content_filter` because the adjustment prompt makes
 the model copy whole method steps verbatim (copyrighted instruction text) as anchors. Stop requiring that echo
 when an ID anchors the row, backfill the snapshot from our own copy, and give a provider-filter stop its own
