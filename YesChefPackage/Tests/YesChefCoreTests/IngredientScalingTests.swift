@@ -142,6 +142,23 @@ struct IngredientScalingTests {
   }
 
   @Test
+  func hyphenatedMixedNumberSizesAreNotIngredientAmounts() {
+    let cases = [
+      ("1 1/2-inch piece fresh ginger, peeled", "1 1/2-inch piece fresh ginger"),
+      ("1 ½-inch piece ginger", "1 ½-inch piece ginger"),
+      ("2 1/2-inch cubes butternut squash", "2 1/2-inch cubes butternut squash"),
+    ]
+
+    for (text, item) in cases {
+      let parsed = IngredientParser.parse(text)
+      #expect(parsed.quantity == nil)
+      #expect(parsed.quantityText == nil)
+      #expect(parsed.unit == nil)
+      expectNoDifference(parsed.item, item)
+    }
+  }
+
+  @Test
   func scaledKnownUnitsAgreeWithQuantityAndUnknownUnitsStayAsWritten() {
     let recipeID = SampleUUIDSequence.uuid(61)
     let sectionID = SampleUUIDSequence.uuid(62)

@@ -13,8 +13,9 @@ Newest first.
 
 **2026-09-30. No schema change.** The split recipe reader now takes unitless amounts from scaled text,
 including ranges. Recognized units use singular form at quantities at or below one and plural form above
-one; mixed-number range lower bounds now parse through their connector. Unknown units and range wording stay
-as written. `scripts/check-drift.sh` passed (701 package tests;
+one; mixed-number range lower bounds now parse through their connector, and hyphenated sizes stay item text,
+including a post-engine repair for stale stored quantities. Unknown units and range wording stay as written.
+`scripts/check-drift.sh` passed (702 package tests;
 app test target compiled and linked, not run). Jon's device pass is owed in `docs/device-passes.md`.
 
 ---

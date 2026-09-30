@@ -782,6 +782,7 @@ public enum IngredientScaler {
     }
 
     guard
+      QuantityParser.leadingIngredientAmount(in: line.originalText) != nil,
       let quantity = line.quantity,
       factor != 1
     else { return line.originalText }

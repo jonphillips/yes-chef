@@ -49,15 +49,21 @@ struct IngredientLineReaderPresentationTests {
     let lines = parsedLines([
       "1-inch piece fresh ginger, peeled",
       "2-3-inch pieces ginger",
+      "1 1/2-inch piece fresh ginger, peeled",
+      "1 ½-inch piece ginger",
+      "2 1/2-inch cubes butternut squash",
     ])
-    expectNoDifference(lines.map(\.quantity), [nil, nil])
+    expectNoDifference(lines.map(\.quantity), [nil, nil, nil, nil, nil])
 
-    for factor in [1.0, 2.0] {
+    for factor in [1.0, 2.0, 0.5, 1.0 / 3.0] {
       expectNoDifference(
         lines.map { display($0, factor: factor) },
         [
           IngredientLineReaderDisplay(primaryText: "1-inch piece fresh ginger", secondaryText: "peeled"),
           IngredientLineReaderDisplay(primaryText: "2-3-inch pieces ginger"),
+          IngredientLineReaderDisplay(primaryText: "1 1/2-inch piece fresh ginger", secondaryText: "peeled"),
+          IngredientLineReaderDisplay(primaryText: "1 ½-inch piece ginger"),
+          IngredientLineReaderDisplay(primaryText: "2 1/2-inch cubes butternut squash"),
         ]
       )
     }
@@ -96,6 +102,14 @@ struct IngredientLineReaderPresentationTests {
       for factor in factors {
         let scaledText = IngredientScaler.scaledText(for: line, factor: factor)
         let scaledDisplay = IngredientLineReaderPresentation.display(for: line, scaledText: scaledText)
+
+        if QuantityParser.leadingQuantity(in: line.originalText) != nil,
+           QuantityParser.leadingIngredientAmount(in: line.originalText) == nil {
+          #expect(
+            scaledText == line.originalText,
+            "Hyphenated size changed from '\(line.originalText)' to '\(scaledText)' at \(factor)×"
+          )
+        }
 
         if identityDisplay != nil {
           #expect(scaledDisplay != nil, "Split reader display disappeared for '\(line.originalText)' at \(factor)×")
@@ -184,6 +198,9 @@ struct IngredientLineReaderPresentationTests {
       "1-inch piece fresh ginger, peeled",
       "½-inch slices daikon",
       "2-3-inch pieces ginger",
+      "1 1/2-inch piece fresh ginger, peeled",
+      "1 ½-inch piece ginger",
+      "2 1/2-inch cubes butternut squash",
       "2 (15-ounce) cans chickpeas, drained",
       "1 (28-ounce) can whole tomatoes",
       "3 to 4 cups chicken stock",
@@ -217,6 +234,7 @@ struct IngredientLineReaderPresentationTests {
   }
 
   private func startsWithTwoAmounts(_ text: String) -> Bool {
+    guard QuantityParser.leadingIngredientAmount(in: text) != nil else { return false }
     guard let firstAmount = QuantityParser.leadingQuantity(in: text) else { return false }
     let suffix = text[firstAmount.range.upperBound...]
     let whitespace = suffix.prefix(while: \.isWhitespace)

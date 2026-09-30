@@ -50,17 +50,18 @@ public enum QuantityParser {
     quantity(startingAt: text.startIndex, in: text)
   }
 
-  /// A leading ingredient amount range, excluding hyphenated dimensions such as "2-3-inch pieces".
-  public static func leadingIngredientRange(in text: String) -> LeadingQuantity? {
-    guard
-      let quantity = leadingQuantity(in: text),
-      quantity.upperBound != nil
-    else { return nil }
-
-    if quantity.range.upperBound < text.endIndex, "-–—".contains(text[quantity.range.upperBound]) {
+  /// A leading ingredient amount, excluding dimensions such as "1 1/2-inch pieces".
+  public static func leadingIngredientAmount(in text: String) -> LeadingQuantity? {
+    guard let amount = leadingQuantity(in: text), !isHyphenatedSize(after: amount.range.upperBound, in: text) else {
       return nil
     }
-    return quantity
+    return amount
+  }
+
+  /// A leading ingredient amount range, excluding hyphenated dimensions such as "2-3-inch pieces".
+  public static func leadingIngredientRange(in text: String) -> LeadingQuantity? {
+    guard let amount = leadingIngredientAmount(in: text), amount.upperBound != nil else { return nil }
+    return amount
   }
 
   /// The first quantity found anywhere in `text`.
@@ -122,10 +123,42 @@ public enum QuantityParser {
 
   private static func fraction(at index: String.Index, in text: String) -> (value: Double, range: Range<String.Index>)? {
     guard index < text.endIndex else { return nil }
-    let end = text[index...].firstIndex(where: { $0.isWhitespace || "-–—".contains($0) }) ?? text.endIndex
+    let tokenEnd = text[index...].firstIndex(where: \.isWhitespace) ?? text.endIndex
+    let end: String.Index
+    if let connector = text[index..<tokenEnd].firstIndex(where: { "-–—".contains($0) }) {
+      let afterConnector = text.index(after: connector)
+      let rangeValueStart = skipWhitespace(in: text, from: afterConnector)
+      if rangeValueStart < text.endIndex && isNumberStart(text[rangeValueStart]) {
+        end = connector
+      } else {
+        end = tokenEnd
+      }
+    } else {
+      end = tokenEnd
+    }
     let token = String(text[index..<end])
     guard let value = fractionValue(token) else { return nil }
     return (value, index..<end)
+  }
+
+  private static func isHyphenatedSize(after index: String.Index, in text: String) -> Bool {
+    if isFollowedByLetterConnector(at: index, in: text) { return true }
+
+    let fractionStart = skipWhitespace(in: text, from: index)
+    guard fractionStart > index else { return false }
+    let fractionEnd = text[fractionStart...].firstIndex(where: { $0.isWhitespace || "-–—".contains($0) }) ?? text.endIndex
+    guard fractionValue(String(text[fractionStart..<fractionEnd])) != nil else { return false }
+    return isFollowedByLetterConnector(at: fractionEnd, in: text)
+  }
+
+  private static func isFollowedByLetterConnector(at index: String.Index, in text: String) -> Bool {
+    guard index < text.endIndex, "-–—".contains(text[index]) else { return false }
+    let next = text.index(after: index)
+    return next < text.endIndex && text[next].isLetter
+  }
+
+  private static func isNumberStart(_ character: Character) -> Bool {
+    character.isNumber || character == "." || vulgarFractions[character] != nil
   }
 
   private static func rangeStart(in text: String, at index: String.Index) -> String.Index? {
@@ -213,6 +246,11 @@ public enum IngredientParser {
     let parts = ingredientParts(parsingText)
     let tokens = parts.ingredient.split(separator: " ").map(String.init)
     guard let first = tokens.first else { return (nil, nil, nil, nil, nil, comment, parsingText) }
+
+    if QuantityParser.leadingQuantity(in: parts.ingredient) != nil,
+       QuantityParser.leadingIngredientAmount(in: parts.ingredient) == nil {
+      return (nil, nil, nil, nonEmpty(parts.ingredient), parts.preparation, comment, parsingText)
+    }
 
     if let range = QuantityParser.leadingIngredientRange(in: parts.ingredient),
        let upperBound = range.upperBound {

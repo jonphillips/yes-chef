@@ -8,7 +8,7 @@ extension RecipeCoreTests {
   @Suite
   struct IngredientRangeBackfillTests {
     @Test
-    func repairsOnlyRangeParseFieldsAndIsIdempotent() throws {
+    func repairsRangeAndHyphenatedSizeParseFieldsAndIsIdempotent() throws {
       @Dependency(\.defaultDatabase) var database
       let recipeID = SampleUUIDSequence.uuid(84_001)
       let sectionID = SampleUUIDSequence.uuid(84_002)
@@ -50,6 +50,22 @@ extension RecipeCoreTests {
         sortOrder: 6,
         confidence: .medium
       )
+      let staleSize = IngredientLine(
+        id: SampleUUIDSequence.uuid(84_006),
+        recipeID: recipeID,
+        sectionID: sectionID,
+        originalText: "1 1/2-inch piece fresh ginger, peeled",
+        quantity: 1,
+        quantityText: "1",
+        item: "1/2-inch piece fresh ginger",
+        canonicalName: "1/2-inch piece fresh ginger",
+        preparation: "peeled",
+        isOptional: true,
+        shoppingCategory: "Produce",
+        doNotShop: true,
+        sortOrder: 7,
+        confidence: .medium
+      )
 
       try database.write { db in
         try Recipe.insert {
@@ -60,12 +76,15 @@ extension RecipeCoreTests {
           IngredientSection(id: sectionID, recipeID: recipeID, sortOrder: 0)
         }
         .execute(db)
-        for line in [oldRange, spacedRange, staleNonRange] {
+        for line in [oldRange, spacedRange, staleNonRange, staleSize] {
           try IngredientLine.insert { line }.execute(db)
         }
 
         let first = try RecipeRepository.reparseIngredientRanges(in: db)
-        expectNoDifference(first.updatedIngredientLineIDs, [oldRange.id, spacedRange.id].sorted { $0.uuidString < $1.uuidString })
+        expectNoDifference(
+          first.updatedIngredientLineIDs,
+          [oldRange.id, spacedRange.id, staleSize.id].sorted { $0.uuidString < $1.uuidString }
+        )
 
         let repaired = try #require(try IngredientLine.find(oldRange.id).fetchOne(db))
         expectNoDifference(repaired.quantity, 10)
@@ -80,6 +99,20 @@ extension RecipeCoreTests {
         expectNoDifference(repaired.sortOrder, 4)
         expectNoDifference(repaired.originalText, "8-10 ounces kale")
         expectNoDifference(try IngredientLine.find(staleNonRange.id).fetchOne(db), staleNonRange)
+
+        let repairedSize = try #require(try IngredientLine.find(staleSize.id).fetchOne(db))
+        expectNoDifference(repairedSize.quantity, nil)
+        expectNoDifference(repairedSize.quantityText, nil)
+        expectNoDifference(repairedSize.unit, nil)
+        expectNoDifference(repairedSize.item, "1 1/2-inch piece fresh ginger")
+        expectNoDifference(repairedSize.canonicalName, CanonicalIngredient.canonicalName("1 1/2-inch piece fresh ginger"))
+        expectNoDifference(repairedSize.preparation, "peeled")
+        expectNoDifference(repairedSize.confidence, .low)
+        expectNoDifference(repairedSize.shoppingCategory, "Produce")
+        expectNoDifference(repairedSize.isOptional, true)
+        expectNoDifference(repairedSize.doNotShop, true)
+        expectNoDifference(repairedSize.sortOrder, 7)
+        expectNoDifference(repairedSize.originalText, staleSize.originalText)
         expectNoDifference(try RecipeRepository.reparseIngredientRanges(in: db), IngredientRangeBackfillReport())
       }
     }
