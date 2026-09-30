@@ -15,8 +15,8 @@ Newest first.
 row and use only a short step prefix for ID-less matching; normalization and legacy backfill populate the
 snapshot from the base recipe. Provider content-filter and refusal stops now surface their own retryable error
 across structured model callers, while compare alignment retains its deterministic fallback. Verification:
-`scripts/check-drift.sh` passed (685 package tests and app test-target build). Jon's OpenAI device re-run is
-owed in `docs/device-passes.md`.
+`scripts/check-drift.sh` passed (685 package tests and app test-target build). Jon's OpenAI device re-run
+passed 2026-09-30.
 
 ---
 ## Token discipline + ADR-0005 document shape (`chore/token-discipline`)
