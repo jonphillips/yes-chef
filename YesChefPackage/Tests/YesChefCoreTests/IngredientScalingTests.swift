@@ -66,4 +66,59 @@ struct IngredientScalingTests {
       "12 lbs / 1.8 kg beef, preferably 3 lb chuck roast plus 1 lb boneless short ribs, cut into 2- to 3-inch pieces; trim only hard exterior fat"
     )
   }
+
+  @Test
+  func scalesLeadingIngredientRangesButNotHyphenatedDimensions() {
+    let recipeID = SampleUUIDSequence.uuid(51)
+    let sectionID = SampleUUIDSequence.uuid(52)
+    var uuids = SampleUUIDSequence(start: 53)
+    let lines = IngredientParser.lines(
+      from: """
+      8-10 ounces kale
+      8–10 oz spinach
+      8 to 10 ounces chard
+      8 - 10 ounces collards
+      1½-2 cups flour
+      2-3-inch pieces ginger
+      1-inch piece ginger
+      """,
+      recipeID: recipeID,
+      sectionID: sectionID,
+      uuid: { uuids.next() }
+    )
+
+    expectNoDifference(
+      lines.map { IngredientScaler.scaledText(for: $0, factor: 2) },
+      [
+        "16–20 ounces kale",
+        "16–20 oz spinach",
+        "16–20 ounces chard",
+        "16–20 ounces collards",
+        "3–4 cups flour",
+        "2-3-inch pieces ginger",
+        "1-inch piece ginger",
+      ]
+    )
+    expectNoDifference(IngredientScaler.scaledText(for: lines[0], factor: 0.5), "4–5 ounces kale")
+    expectNoDifference(IngredientScaler.scaledText(for: lines[0], factor: 1), "8-10 ounces kale")
+  }
+
+  @Test
+  func rangeParsingStoresUpperBoundAndLeavesUnitAndItemReadable() {
+    let cases: [(String, Double, String, String?, String?)] = [
+      ("8-10 ounces kale", 10, "8-10", "ounces", "kale"),
+      ("8–10 oz spinach", 10, "8–10", "oz", "spinach"),
+      ("8 to 10 ounces kale", 10, "8 to 10", "ounces", "kale"),
+      ("8 - 10 ounces chard", 10, "8 - 10", "ounces", "chard"),
+      ("1½-2 cups flour", 2, "1½-2", "cups", "flour"),
+    ]
+
+    for (text, quantity, quantityText, unit, item) in cases {
+      let parsed = IngredientParser.parse(text)
+      expectNoDifference(parsed.quantity, quantity)
+      expectNoDifference(parsed.quantityText, quantityText)
+      expectNoDifference(parsed.unit, unit)
+      expectNoDifference(parsed.item, item)
+    }
+  }
 }

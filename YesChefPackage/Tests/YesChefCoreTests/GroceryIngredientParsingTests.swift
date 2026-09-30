@@ -9,6 +9,14 @@ extension RecipeCoreTests {
   @Suite
   struct GroceryIngredientParsingTests {
     @Test
+    func rapidAddRangeUsesUpperBoundAsQuantity() throws {
+      let item = try #require(GroceryRapidAddItem(line: "8-10 apples"))
+      expectNoDifference(item.title, "apples")
+      expectNoDifference(item.quantityText, "10")
+      expectNoDifference(item.unit, nil)
+    }
+
+    @Test
     func rapidAddPreservesPreparationAndAuthorComment() throws {
       let item = try #require(
         GroceryRapidAddItem(line: "2 cups chicken broth, chopped [low sodium]")

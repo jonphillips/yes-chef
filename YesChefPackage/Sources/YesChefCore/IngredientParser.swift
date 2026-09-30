@@ -50,6 +50,19 @@ public enum QuantityParser {
     quantity(startingAt: text.startIndex, in: text)
   }
 
+  /// A leading ingredient amount range, excluding hyphenated dimensions such as "2-3-inch pieces".
+  public static func leadingIngredientRange(in text: String) -> LeadingQuantity? {
+    guard
+      let quantity = leadingQuantity(in: text),
+      quantity.upperBound != nil
+    else { return nil }
+
+    if quantity.range.upperBound < text.endIndex, "-–—".contains(text[quantity.range.upperBound]) {
+      return nil
+    }
+    return quantity
+  }
+
   /// The first quantity found anywhere in `text`.
   ///
   /// For yield and servings text, where the number is routinely preceded by a word — "Serves 2",
@@ -200,6 +213,20 @@ public enum IngredientParser {
     let parts = ingredientParts(parsingText)
     let tokens = parts.ingredient.split(separator: " ").map(String.init)
     guard let first = tokens.first else { return (nil, nil, nil, nil, nil, comment, parsingText) }
+
+    if let range = QuantityParser.leadingIngredientRange(in: parts.ingredient),
+       let upperBound = range.upperBound {
+      let quantityText = String(parts.ingredient[range.range])
+      let remainingText = parts.ingredient[range.range.upperBound...]
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+      let parsed = parsedQuantity(
+        quantity: upperBound,
+        quantityText: quantityText,
+        remainingTokens: remainingText.split(separator: " ").map(String.init),
+        preparation: parts.preparation
+      )
+      return (parsed.quantity, parsed.quantityText, parsed.unit, parsed.item, parsed.preparation, comment, parsingText)
+    }
 
     if tokens.count >= 2, let whole = Double(first), let fraction = QuantityParser.fractionValue(tokens[1]) {
       let quantityText = "\(first) \(tokens[1])"

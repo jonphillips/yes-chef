@@ -13,6 +13,11 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**Ingredient range scaling — reader, grocery, and sync** ([effort brief](efforts/ingredient-range-scaling.md),
+schema-free). Scale an `8-10 ounces` ingredient to 2× and ½× in the reader and confirm both range ends
+change. Add the recipe to grocery at 2× and confirm the upper bound is 20 oz. On a second device, confirm
+the repaired parse fields for existing range lines arrive through sync.
+
 **Cockpit Find handoff — the two-app round trip ([ADR-0058](decisions/ADR-0058-cockpit-find-referral-transport.md),
 PRs [#322](https://github.com/jonphillips/yes-chef/pull/322) + [#325](https://github.com/jonphillips/yes-chef/pull/325)),
 no schema.** This is Cockpit's S-join, so it is owed **after Cockpit S-c2** (verdict drain) lands; until then, Yes
