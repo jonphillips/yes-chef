@@ -847,78 +847,54 @@ public enum IngredientScaler {
   }
 
   private static func pluralized(_ unit: String, quantity: Double) -> String {
+    guard let forms = unitForms(for: unit) else { return unit }
+    return quantity > 1 ? forms.plural : forms.singular
+  }
+
+  struct UnitNumberForms: Sendable {
+    var singular: String
+    var plural: String
+  }
+
+  static func unitForms(for unit: String) -> UnitNumberForms? {
     let normalizedUnit = unit.lowercased()
-    if quantity > 1 {
-      return pluralUnitForms[normalizedUnit] ?? unit
+    return knownUnitNumberForms.first {
+      $0.singular == normalizedUnit || $0.plural == normalizedUnit
     }
-    return singularUnitForms[normalizedUnit] ?? unit
   }
 
   // These forms mirror the recognized singular/plural pairs in IngredientParser.units.
-  private static let singularUnitForms: [String: String] = [
-    "bags": "bag",
-    "bottles": "bottle",
-    "boxes": "box",
-    "bunches": "bunch",
-    "cans": "can",
-    "cloves": "clove",
-    "cups": "cup",
-    "dashes": "dash",
-    "ears": "ear",
-    "gallons": "gallon",
-    "grams": "gram",
-    "heads": "head",
-    "jars": "jar",
-    "kilograms": "kilogram",
-    "liters": "liter",
-    "milliliters": "milliliter",
-    "ounces": "ounce",
-    "packages": "package",
-    "packets": "packet",
-    "pinches": "pinch",
-    "pints": "pint",
-    "pounds": "pound",
-    "quarts": "quart",
-    "slices": "slice",
-    "sprigs": "sprig",
-    "stalks": "stalk",
-    "sticks": "stick",
-    "tablespoons": "tablespoon",
-    "teaspoons": "teaspoon",
-    "lbs": "lb",
-  ]
-
-  private static let pluralUnitForms: [String: String] = [
-    "bag": "bags",
-    "bottle": "bottles",
-    "box": "boxes",
-    "bunch": "bunches",
-    "can": "cans",
-    "clove": "cloves",
-    "cup": "cups",
-    "dash": "dashes",
-    "ear": "ears",
-    "gallon": "gallons",
-    "gram": "grams",
-    "head": "heads",
-    "jar": "jars",
-    "kilogram": "kilograms",
-    "liter": "liters",
-    "milliliter": "milliliters",
-    "ounce": "ounces",
-    "package": "packages",
-    "packet": "packets",
-    "pinch": "pinches",
-    "pint": "pints",
-    "pound": "pounds",
-    "quart": "quarts",
-    "slice": "slices",
-    "sprig": "sprigs",
-    "stalk": "stalks",
-    "stick": "sticks",
-    "tablespoon": "tablespoons",
-    "teaspoon": "teaspoons",
-    "lb": "lbs",
+  private static let knownUnitNumberForms: [UnitNumberForms] = [
+    .init(singular: "bag", plural: "bags"),
+    .init(singular: "bottle", plural: "bottles"),
+    .init(singular: "box", plural: "boxes"),
+    .init(singular: "bunch", plural: "bunches"),
+    .init(singular: "can", plural: "cans"),
+    .init(singular: "clove", plural: "cloves"),
+    .init(singular: "cup", plural: "cups"),
+    .init(singular: "dash", plural: "dashes"),
+    .init(singular: "ear", plural: "ears"),
+    .init(singular: "gallon", plural: "gallons"),
+    .init(singular: "gram", plural: "grams"),
+    .init(singular: "head", plural: "heads"),
+    .init(singular: "jar", plural: "jars"),
+    .init(singular: "kilogram", plural: "kilograms"),
+    .init(singular: "liter", plural: "liters"),
+    .init(singular: "milliliter", plural: "milliliters"),
+    .init(singular: "ounce", plural: "ounces"),
+    .init(singular: "package", plural: "packages"),
+    .init(singular: "packet", plural: "packets"),
+    .init(singular: "pinch", plural: "pinches"),
+    .init(singular: "pint", plural: "pints"),
+    .init(singular: "pound", plural: "pounds"),
+    .init(singular: "quart", plural: "quarts"),
+    .init(singular: "slice", plural: "slices"),
+    .init(singular: "sprig", plural: "sprigs"),
+    .init(singular: "stalk", plural: "stalks"),
+    .init(singular: "stick", plural: "sticks"),
+    .init(singular: "tablespoon", plural: "tablespoons"),
+    .init(singular: "teaspoon", plural: "teaspoons"),
+    .init(singular: "lb", plural: "lbs"),
   ]
 
   private static let commonFractions: [(value: Double, label: String)] = [
