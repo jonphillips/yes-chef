@@ -1289,6 +1289,10 @@ extension DependencyValues {
           if variationAnchorBackfill.hasFindings {
             AppLog.dataIntegrity.warning("\(variationAnchorBackfill.logSummary, privacy: .public)")
           }
+          let ingredientRangeBackfill = try RecipeRepository.reparseIngredientRanges(in: db)
+          if ingredientRangeBackfill.hasFindings {
+            AppLog.dataIntegrity.warning("\(ingredientRangeBackfill.logSummary, privacy: .public)")
+          }
           let cuisineCourseBackfill = try RecipeRepository.backfillCuisineCourseFacets(in: db)
           if cuisineCourseBackfill.hasFindings {
             AppLog.dataIntegrity.warning("\(cuisineCourseBackfill.logSummary, privacy: .public)")

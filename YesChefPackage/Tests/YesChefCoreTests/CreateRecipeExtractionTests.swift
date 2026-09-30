@@ -428,6 +428,20 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func deterministicIssuePassRecognizesIngredientRangesAsQuantified() {
+      let extraction = RecipeExtraction(
+        title: "Kale Soup",
+        servingsText: "Serves 4",
+        ingredientSections: [.init(lines: ["8-10 ounces kale"])],
+        instructionSections: [.init(steps: ["Add the kale and simmer."])]
+      )
+
+      #expect(!RecipeExtractionIssueDetector.issues(in: extraction).contains {
+        $0.kind == .missingIngredientQuantity
+      })
+    }
+
+    @Test
     func deterministicIssuePassReportsEmptyRecipeHalves() {
       let issues = RecipeExtractionIssueDetector.issues(in: RecipeExtraction(title: "Only a title"))
 

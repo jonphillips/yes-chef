@@ -858,7 +858,12 @@ private struct GroceryGeneratedItemDraft {
   init(line: IngredientLine, scale: Double = 1.0) {
     self.title = line.groceryItemTitle
     self.canonicalName = line.canonicalIngredientName ?? CanonicalIngredient.canonicalName(line.groceryItemTitle)
-    if let quantity = line.quantity {
+    if let range = QuantityParser.leadingIngredientRange(in: line.originalText),
+       let upperBound = range.upperBound {
+      let scaledQuantity = upperBound * scale
+      self.quantity = scaledQuantity
+      self.quantityText = formatGroceryQuantity(scaledQuantity)
+    } else if let quantity = line.quantity {
       let scaledQuantity = quantity * scale
       self.quantity = scaledQuantity
       self.quantityText = scale == 1 ? line.groceryQuantityText : formatGroceryQuantity(scaledQuantity)

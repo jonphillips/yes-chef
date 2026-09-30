@@ -78,8 +78,8 @@ struct RecipeCoreTests {
       lines.map(\.item),
       ["beef chuck roast", "kosher salt", "ancho chiles", "garlic"]
     )
-    // …and the primary quantity + shared unit survive the strip.
-    expectNoDifference(lines.map(\.quantity), [4, 28, 1.25, 2])
+    // …and the shared unit survives, with ranges represented by their upper bound for grocery.
+    expectNoDifference(lines.map(\.quantity), [4, 32, 1.25, 3])
     expectNoDifference(lines.map(\.unit), ["lb", "g", "ounces", "cloves"])
     expectNoDifference(lines.map(\.preparation), [nil, nil, nil, "minced"])
 

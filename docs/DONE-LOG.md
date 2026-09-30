@@ -9,6 +9,16 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Ingredient ranges scale in the reader and grocery (`effort/ingredient-range-scaling`)
+
+**2026-09-30. No schema change.** Ingredient ranges scale at both ends in the reader, while grocery
+uses the scaled upper bound and merges it with matching single quantities. A shared anchored range
+helper excludes hyphenated dimensions; parsing now stores the upper bound and range text, with an
+idempotent post-engine repair for existing range lines. Provider-blocked compare responses now have a
+distinct `.blocked` fallback reason. `scripts/check-drift.sh` passed. Jon's reader, grocery, and
+two-device sync pass is owed in `docs/device-passes.md`.
+
+---
 ## Recipe adjustment: stop echoing recipe text, report provider-filter stops (`effort/recipe-adjustment-content-filter`)
 
 **2026-09-30. No schema change.** Recipe adjustment prompts now leave source text null when an ID anchors a

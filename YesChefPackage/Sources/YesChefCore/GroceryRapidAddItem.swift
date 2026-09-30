@@ -22,10 +22,11 @@ public struct GroceryRapidAddItem: Equatable, Sendable {
   public init?(line: String) {
     let parsed = IngredientParser.parse(line)
     guard let title = parsed.item?.nonEmptyGroceryText else { return nil }
+    let rangeQuantity = QuantityParser.leadingIngredientRange(in: line)?.upperBound
 
     self.init(
       title: title,
-      quantityText: parsed.quantityText,
+      quantityText: rangeQuantity.map(IngredientScaler.formattedQuantity) ?? parsed.quantityText,
       unit: parsed.unit,
       notes: [parsed.preparation, parsed.comment]
       .compactMap { $0?.nonEmptyGroceryText }

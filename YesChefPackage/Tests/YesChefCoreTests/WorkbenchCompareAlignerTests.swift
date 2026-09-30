@@ -236,6 +236,24 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func alignerLabelsProviderBlockedFallbackSeparately() async throws {
+      let fixture = BirriaFixture()
+      let expected = WorkbenchCompare.ingredientComparison(
+        working: fixture.working,
+        candidates: [fixture.candidate, fixture.secondCandidate]
+      )
+
+      let outcome = try await alignedOutcome(
+        fixture: fixture,
+        response: "partial provider refusal",
+        stopReason: "content_filter"
+      )
+
+      expectNoDifference(outcome.source, .fallback(.blocked))
+      expectNoDifference(outcome.comparison, expected)
+    }
+
+    @Test
     func alignerRequestUsesMediumReasoningScaledTokenBudgetRawLinesAndNoPromptPreference() async throws {
       let recorder = ModelRequestRecorder()
       let recipeID = SampleUUIDSequence.uuid(62_000)

@@ -772,6 +772,15 @@ public enum InstructionParser {
 
 public enum IngredientScaler {
   public static func scaledText(for line: IngredientLine, factor: Double) -> String {
+    if factor != 1,
+       let range = QuantityParser.leadingIngredientRange(in: line.originalText),
+       let upperBound = range.upperBound {
+      let scaledRange = "\(formattedQuantity(range.value * factor))–\(formattedQuantity(upperBound * factor))"
+      return String(line.originalText[..<range.range.lowerBound])
+        + scaledRange
+        + String(line.originalText[range.range.upperBound...])
+    }
+
     guard
       let quantity = line.quantity,
       factor != 1
