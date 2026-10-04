@@ -18,18 +18,19 @@ extension RecipeLibraryModel {
   }
 
   var visibleRecipeRows: [RecipeListRowData] {
-    let rowsByID = Dictionary(uniqueKeysWithValues: recipeRows.map { ($0.recipe.id, $0) })
-    return RecipeBrowserEngine(
-      recipes: browserData.recipes,
-      recipeCategories: browserData.recipeCategories,
-      categories: browserData.categories,
-      facets: browserData.facets,
-      sources: browserData.sources,
-      variations: browserData.variations,
-      recipeIDsWithPhotos: browserData.recipeIDsWithPhotos
-    )
-    .matchingRecipeIDs(for: browserQuery)
-    .compactMap { rowsByID[$0] }
+    let query = browserQuery
+    if let cachedVisibleRecipeRows,
+      cachedVisibleRecipeRows.data == browserData,
+      cachedVisibleRecipeRows.query == query
+    {
+      return cachedVisibleRecipeRows.rows
+    }
+    let rows = measured("visible-recipe-rows") {
+      let rowsByID = Dictionary(uniqueKeysWithValues: recipeRows.map { ($0.recipe.id, $0) })
+      return browserEngine().matchingRecipeIDs(for: query).compactMap { rowsByID[$0] }
+    }
+    cachedVisibleRecipeRows = .init(data: browserData, query: query, rows: rows)
+    return rows
   }
 
   var filteredRecipeCount: Int {
@@ -225,16 +226,7 @@ extension RecipeLibraryModel {
   }
 
   func recipeCount(for state: RecipeListPresetState) -> Int {
-    RecipeBrowserEngine(
-      recipes: browserData.recipes,
-      recipeCategories: browserData.recipeCategories,
-      categories: browserData.categories,
-      facets: browserData.facets,
-      sources: browserData.sources,
-      variations: browserData.variations,
-      recipeIDsWithPhotos: browserData.recipeIDsWithPhotos
-    )
-    .matchingRecipeIDs(for: browserQuery(from: state)).count
+    browserEngine().matchingRecipeIDs(for: browserQuery(from: state)).count
   }
 
   func categoryFilterButtonTapped(_ categoryName: String) {
@@ -386,7 +378,14 @@ extension RecipeLibraryModel {
       sourceNames: selectedSourceNames,
       authorNames: selectedAuthorNames
     )
-    return RecipeBrowserEngine(
+    return browserEngine().matchingRecipeIDs(for: query).count
+  }
+
+  private func browserEngine() -> RecipeBrowserEngine {
+    if let cachedBrowserEngine, cachedBrowserEngine.data == browserData {
+      return cachedBrowserEngine.engine
+    }
+    let engine = RecipeBrowserEngine(
       recipes: browserData.recipes,
       recipeCategories: browserData.recipeCategories,
       categories: browserData.categories,
@@ -395,7 +394,21 @@ extension RecipeLibraryModel {
       variations: browserData.variations,
       recipeIDsWithPhotos: browserData.recipeIDsWithPhotos
     )
-    .matchingRecipeIDs(for: query).count
+    cachedBrowserEngine = .init(data: browserData, engine: engine)
+    cachedVisibleRecipeRows = nil
+    return engine
+  }
+
+  private func measured<T>(_ operation: String, _ work: () -> T) -> T {
+    #if DEBUG
+      let clock = ContinuousClock()
+      let start = clock.now
+      defer {
+        let duration = String(describing: start.duration(to: clock.now))
+        AppLog.performance.log("recipe-library-\(operation, privacy: .public) duration=\(duration, privacy: .public)")
+      }
+    #endif
+    return work()
   }
 
   private func legacyFacetValue(_ value: String?, facetNamed facetName: String) -> YesChefCore.Category? {

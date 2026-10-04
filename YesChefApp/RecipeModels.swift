@@ -10,6 +10,17 @@ import YesChefCore
 @Observable
 @MainActor
 final class RecipeLibraryModel {
+  struct CachedBrowserEngine {
+    var data: RecipeBrowserData
+    var engine: RecipeBrowserEngine
+  }
+
+  struct CachedVisibleRecipeRows {
+    var data: RecipeBrowserData
+    var query: RecipeBrowserQuery
+    var rows: [RecipeListRowData]
+  }
+
   @CasePathable
   enum Destination {
     case captureRecipe
@@ -37,6 +48,8 @@ final class RecipeLibraryModel {
   @Fetch(RecipeBrowserDataRequest(), animation: .default) var browserData = RecipeBrowserData(
     recipes: [], recipeCategories: [], categories: [], facets: []
   )
+  @ObservationIgnored var cachedBrowserEngine: CachedBrowserEngine?
+  @ObservationIgnored var cachedVisibleRecipeRows: CachedVisibleRecipeRows?
   @ObservationIgnored @Fetch(CategoryListRequest(), animation: .default) var categoryFilterCategories: [YesChefCore.Category] = []
   @ObservationIgnored @Fetch(FacetListRequest(), animation: .default) var categoryFilterFacets: [Facet] = []
 

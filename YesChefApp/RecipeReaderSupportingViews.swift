@@ -246,15 +246,8 @@ struct WrappingLabels: View {
   let systemImage: String
 
   var body: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: 8) {
-        chips
-      }
-      .fixedSize(horizontal: true, vertical: false)
-
-      VStack(alignment: .leading, spacing: 8) {
-        chips
-      }
+    FlowLayout(spacing: 8) {
+      chips
     }
     .font(.caption)
     .foregroundStyle(.secondary)
@@ -265,6 +258,68 @@ struct WrappingLabels: View {
     ForEach(labels, id: \.self) { label in
       Label(label, systemImage: systemImage)
         .recipeChip()
+    }
+  }
+}
+
+struct FlowLayout: Layout {
+  var spacing: CGFloat = 8
+
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout Void
+  ) -> CGSize {
+    let maximumWidth = proposal.width ?? .greatestFiniteMagnitude
+    let rows = rows(for: subviews, maximumWidth: maximumWidth)
+    return CGSize(
+      width: proposal.width ?? rows.map(\.width).max() ?? 0,
+      height: rows.reduce(0) { $0 + $1.height } + CGFloat(max(rows.count - 1, 0)) * spacing
+    )
+  }
+
+  func placeSubviews(
+    in bounds: CGRect,
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout Void
+  ) {
+    var y = bounds.minY
+    for row in rows(for: subviews, maximumWidth: bounds.width) {
+      var x = bounds.minX
+      for item in row.items {
+        item.view.place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+        x += item.size.width + spacing
+      }
+      y += row.height + spacing
+    }
+  }
+
+  private func rows(for subviews: Subviews, maximumWidth: CGFloat) -> [FlowRow] {
+    var rows: [FlowRow] = []
+    var row = FlowRow()
+    for subview in subviews {
+      let size = subview.sizeThatFits(.unspecified)
+      let proposedWidth = row.items.isEmpty ? size.width : row.width + spacing + size.width
+      if !row.items.isEmpty, proposedWidth > maximumWidth {
+        rows.append(row)
+        row = FlowRow()
+      }
+      row.append(subview, size: size, spacing: spacing)
+    }
+    if !row.items.isEmpty { rows.append(row) }
+    return rows
+  }
+
+  private struct FlowRow {
+    var items: [(view: LayoutSubview, size: CGSize)] = []
+    var width: CGFloat = 0
+    var height: CGFloat = 0
+
+    mutating func append(_ view: LayoutSubview, size: CGSize, spacing: CGFloat) {
+      width += items.isEmpty ? size.width : spacing + size.width
+      height = max(height, size.height)
+      items.append((view, size))
     }
   }
 }

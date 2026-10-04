@@ -47,7 +47,9 @@ struct AppMainLayout: View {
         systemImage: AppSection.powerBrowser.systemImage,
         value: AppSection.powerBrowser
       ) {
-        PowerBrowserView(model: powerBrowserModel, onRecipeSelected: onRecipeSelected)
+        if selectedSection == .powerBrowser {
+          PowerBrowserView(model: powerBrowserModel, onRecipeSelected: onRecipeSelected)
+        }
       }
       .defaultVisibility(.hidden, for: .tabBar)
 

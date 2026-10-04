@@ -344,7 +344,9 @@ private struct RecipeReaderView: View {
 
   private enum HeaderMetrics {
     static let compactThumbnailSideLength: CGFloat = 288
-    static let wideHeroWidth: CGFloat = 360
+    static let wideHeroMaximumWidth: CGFloat = 360
+    static let wideHeroWidthFraction: CGFloat = 0.45
+    static let wideHeroMinimumTextWidth: CGFloat = 280
   }
 
   private let twoColumnThreshold: CGFloat = 640
@@ -503,55 +505,6 @@ private struct RecipeReaderView: View {
     }
   }
 
-  private func wideColumnHeader(_ recipe: Recipe) -> some View {
-    HStack(alignment: .top, spacing: 12) {
-      VStack(alignment: .leading, spacing: 8) {
-        VStack(alignment: .leading, spacing: 4) {
-          HStack(alignment: .firstTextBaseline) {
-            Text(recipe.title)
-              .font(.title.bold())
-            if recipe.favorite {
-              Image(systemName: "star.fill")
-                .foregroundStyle(.yellow)
-            }
-          }
-          if let subtitle = recipe.subtitle {
-            Text(subtitle)
-              .font(.subheadline.weight(.medium))
-              .foregroundStyle(.secondary)
-          }
-          if let summary = recipe.summary {
-            RecipeMarkdownText(summary)
-              .font(.callout)
-              .lineLimit(isSummaryExpanded ? nil : 2)
-            Button(isSummaryExpanded ? "Less" : "More") {
-              isSummaryExpanded.toggle()
-            }
-            .font(.caption.weight(.semibold))
-            .buttonStyle(.plain)
-            .accessibilityHint(isSummaryExpanded ? "Shows less recipe summary." : "Shows the full recipe summary.")
-          }
-        }
-
-        wideMetadata(recipe)
-
-        RecipeVariationSelector(
-          variations: model.variations,
-          activeVariationID: model.detail?.activeVariationID,
-          select: model.activeVariationSelectionChanged,
-          manage: { isVariationManagerPresented = true }
-        )
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-
-      if let photo = model.primaryDisplayPhoto {
-        RecipeReaderHero(photo: photo, width: HeaderMetrics.wideHeroWidth) {
-          isPhotoGalleryPresented = true
-        }
-      }
-    }
-  }
-
   private func metadata(
     _ recipe: Recipe,
     showsPhoto: Bool = true
@@ -626,8 +579,7 @@ private struct RecipeReaderView: View {
     VStack(alignment: .leading, spacing: 8) {
       recipeStats(recipe)
 
-      ScrollView(.horizontal) {
-        HStack(spacing: 8) {
+      FlowLayout(spacing: 8) {
           if recipe.libraryPlacement == .reference {
             Label(recipe.libraryPlacement.title, systemImage: "books.vertical")
               .font(.caption)
@@ -657,9 +609,7 @@ private struct RecipeReaderView: View {
             }
             .buttonStyle(.plain)
           }
-        }
       }
-      .scrollIndicators(.hidden)
 
       if let source = model.detail?.source {
         SourceMetadataView(source: source)
@@ -777,6 +727,7 @@ private struct RecipeReaderView: View {
   private func wideRecipeColumns(_ recipe: Recipe, in size: CGSize) -> some View {
     let ingredientsWidth = size.width * 0.27
     let directionsWidth = size.width - ingredientsWidth - PlaybookColumnMetrics.separatorWidth
+    let directionsContentWidth = min(directionsWidth - 32, directionsContentMaximumWidth)
     return HStack(alignment: .top, spacing: 0) {
       ScrollView {
         ingredients
@@ -791,7 +742,7 @@ private struct RecipeReaderView: View {
         ScrollView {
           VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 16) {
-              wideColumnHeader(recipe)
+              wideColumnHeader(recipe, contentWidth: directionsContentWidth)
                 .id("recipe-directions-top")
               directionsColumn
             }
@@ -926,5 +877,69 @@ private struct RecipeReaderView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
     .attentionCard()
+  }
+}
+
+private extension RecipeReaderView {
+  func wideColumnHeader(_ recipe: Recipe, contentWidth: CGFloat) -> some View {
+    let photoWidth = min(HeaderMetrics.wideHeroMaximumWidth, contentWidth * HeaderMetrics.wideHeroWidthFraction)
+    let shouldStackPhoto = contentWidth - photoWidth - 12 < HeaderMetrics.wideHeroMinimumTextWidth
+
+    return VStack(alignment: .leading, spacing: 16) {
+      if shouldStackPhoto, let photo = model.primaryDisplayPhoto {
+        RecipeReaderHero(photo: photo, width: contentWidth) {
+          isPhotoGalleryPresented = true
+        }
+        .frame(maxHeight: 300)
+        .clipped()
+      }
+
+      HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
+          VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+              Text(recipe.title)
+                .font(.title.bold())
+              if recipe.favorite {
+                Image(systemName: "star.fill")
+                  .foregroundStyle(.yellow)
+              }
+            }
+            if let subtitle = recipe.subtitle {
+              Text(subtitle)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+            }
+            if let summary = recipe.summary {
+              RecipeMarkdownText(summary)
+                .font(.callout)
+                .lineLimit(isSummaryExpanded ? nil : 2)
+              Button(isSummaryExpanded ? "Less" : "More") {
+                isSummaryExpanded.toggle()
+              }
+              .font(.caption.weight(.semibold))
+              .buttonStyle(.plain)
+              .accessibilityHint(isSummaryExpanded ? "Shows less recipe summary." : "Shows the full recipe summary.")
+            }
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+        if !shouldStackPhoto, let photo = model.primaryDisplayPhoto {
+          RecipeReaderHero(photo: photo, width: photoWidth) {
+            isPhotoGalleryPresented = true
+          }
+        }
+      }
+
+      wideMetadata(recipe)
+
+      RecipeVariationSelector(
+        variations: model.variations,
+        activeVariationID: model.detail?.activeVariationID,
+        select: model.activeVariationSelectionChanged,
+        manage: { isVariationManagerPresented = true }
+      )
+    }
   }
 }

@@ -725,13 +725,15 @@ public struct RecipeBrowserDataRequest: FetchKeyRequest {
       variations: variations,
       recipeIDsWithPhotos: Set(
         try RecipePhoto
+          .where {
+            $0.thumbnailData.isNot(nil)
+              && $0.kind.neq(RecipePhotoKind.referenceDocument)
+          }
           .select {
-            RecipeBrowserPhotoRow.Columns(recipeID: $0.recipeID, thumbnailData: $0.thumbnailData, kind: $0.kind)
+            RecipeBrowserPhotoRow.Columns(recipeID: $0.recipeID)
           }
           .fetchAll(db)
-          .compactMap { row in
-            row.kind == .referenceDocument || row.thumbnailData == nil ? nil : row.recipeID
-          }
+          .map(\.recipeID)
       )
     )
   }
@@ -791,8 +793,6 @@ private struct RecipeBrowserVariationRow: Equatable, Sendable {
 @Selection
 private struct RecipeBrowserPhotoRow: Equatable, Sendable {
   let recipeID: Recipe.ID
-  let thumbnailData: Data?
-  let kind: RecipePhotoKind
 }
 
 private extension String {

@@ -13,6 +13,12 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**Power Browser responsiveness + reader header wrapping** ([effort brief](efforts/power-browser-perf-and-reader-header.md),
+schema-free). On iPad with the full library, remove a Power Browser selection and confirm the result updates
+immediately. After visiting Power Browser, move a category in Settings and confirm it is no slower than before
+the visit. In a narrow directions column, open Whipped Feta: the title is readable, servings stays on one line,
+and **Edit Tags** is visible and tappable.
+
 **Reader count scaling — count-only amounts and unit agreement** ([effort brief](efforts/reader-count-scaling.md),
 schema-free). In the soup at 4 → 8 servings, confirm the reader shows `2 large onion`, `2 large carrot`,
 `6 garlic cloves`, and `¼ teaspoon red-pepper flakes`.
