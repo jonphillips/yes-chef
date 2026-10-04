@@ -11,9 +11,11 @@ final class PowerBrowserModel {
     var engine: RecipeBrowserEngine
   }
 
-  private struct CachedResult {
+  private struct CachedDerivations {
     var query: RecipeBrowserQuery
     var result: RecipeBrowserResult
+    var sourceFilterOptions: [RecipeBrowserSourceField: [SourceFilterOption]]
+    var looseCategoryOptions: [LooseCategoryOption]
   }
 
   struct FacetSelection: Identifiable, Equatable {
@@ -74,7 +76,7 @@ final class PowerBrowserModel {
   @ObservationIgnored
   @Fetch(RecipeListRequest(), animation: .default) var recipeRows: [RecipeListRowData] = []
   @ObservationIgnored private var cachedEngine: CachedEngine?
-  @ObservationIgnored private var cachedResult: CachedResult?
+  @ObservationIgnored private var cachedDerivations: CachedDerivations?
   @ObservationIgnored private var hasSeededFacetExpansion = false
 
   var query = RecipeBrowserQuery()
@@ -92,13 +94,7 @@ final class PowerBrowserModel {
   }
 
   var result: RecipeBrowserResult {
-    let engine = browserEngine()
-    if let cachedResult, cachedResult.query == query {
-      return cachedResult.result
-    }
-    let result = engine.result(for: query)
-    cachedResult = CachedResult(query: query, result: result)
-    return result
+    derivations().result
   }
 
   var hasActiveSelections: Bool {
@@ -201,57 +197,59 @@ final class PowerBrowserModel {
   func sourceFilterOptions(
     for result: RecipeBrowserResult
   ) -> [RecipeBrowserSourceField: [SourceFilterOption]] {
+    derivations().sourceFilterOptions
+  }
+
+  private func sourceFilterOptionsUncached(
+    for result: RecipeBrowserResult
+  ) -> [RecipeBrowserSourceField: [SourceFilterOption]] {
     let matchingRecipeIDs = Set(result.matchingRecipeIDs)
-    let sourcesByRecipeID = Dictionary(grouping: browserData.sources, by: \.recipeID)
+    let displayedFields = RecipeBrowserSourceField.allCases.filter { $0 != .website }
+    var valuesByField: [RecipeBrowserSourceField: Set<String>] = [:]
+    var recipeIDsByFieldAndNormalizedValue: [RecipeBrowserSourceField: [String: Set<Recipe.ID>]] = [:]
 
-    return RecipeBrowserSourceField.allCases.reduce(into: [:]) { optionsByField, field in
+    for source in browserData.sources where matchingRecipeIDs.contains(source.recipeID) {
+      for field in displayedFields {
+        guard let value = source.value(for: field)?.trimmedNonEmpty else { continue }
+        let normalizedValue = Self.normalizedSourceValue(value)
+        valuesByField[field, default: []].insert(value)
+        recipeIDsByFieldAndNormalizedValue[field, default: [:]][normalizedValue, default: []].insert(source.recipeID)
+      }
+    }
+
+    return displayedFields.reduce(into: [:]) { optionsByField, field in
       let selectedValues = selectedSourceValues(for: field)
-      let currentValues = browserData.sources
-        .filter { matchingRecipeIDs.contains($0.recipeID) }
-        .compactMap { $0.value(for: field)?.trimmedNonEmpty }
-      let values = Set(currentValues).union(selectedValues)
-
-      optionsByField[field] = values
-        .map { value in
-          let normalizedValue = Self.normalizedSourceValue(value)
-          let matchingRecipeCount = matchingRecipeIDs.reduce(into: 0) { count, recipeID in
-            if (sourcesByRecipeID[recipeID] ?? []).contains(where: { source in
-              guard let sourceValue = source.value(for: field)?.trimmedNonEmpty else { return false }
-              return Self.normalizedSourceValue(sourceValue) == normalizedValue
-            }) {
-              count += 1
-            }
-          }
-          return SourceFilterOption(
-            value: value,
-            matchingRecipeCount: matchingRecipeCount,
-            isSelected: selectedValues.contains(value)
-          )
-        }
-        .sorted { $0.value.localizedStandardCompare($1.value) == .orderedAscending }
+      let values = valuesByField[field, default: []].union(selectedValues)
+      let countsByNormalizedValue = recipeIDsByFieldAndNormalizedValue[field, default: [:]]
+      optionsByField[field] = values.map { value in
+        SourceFilterOption(
+          value: value,
+          matchingRecipeCount: countsByNormalizedValue[Self.normalizedSourceValue(value), default: []].count,
+          isSelected: selectedValues.contains(value)
+        )
+      }
+      .sorted { $0.value.localizedStandardCompare($1.value) == .orderedAscending }
     }
   }
 
   func looseCategoryOptions(for result: RecipeBrowserResult) -> [LooseCategoryOption] {
+    derivations().looseCategoryOptions
+  }
+
+  private func looseCategoryOptionsUncached(for result: RecipeBrowserResult) -> [LooseCategoryOption] {
     let matchingRecipeIDs = Set(result.matchingRecipeIDs)
     let categoriesByID = Dictionary(uniqueKeysWithValues: browserData.categories.map { ($0.id, $0) })
-    let categoryIDsByRecipeID = Dictionary(grouping: browserData.recipeCategories, by: \.recipeID)
-      .mapValues { Set($0.map(\.categoryID)) }
-    let currentCategoryIDs = matchingRecipeIDs.reduce(into: Set<YesChefCore.Category.ID>()) { categoryIDs, recipeID in
-      categoryIDs.formUnion(categoryIDsByRecipeID[recipeID] ?? [])
+    var matchingRecipeIDsByCategoryID: [YesChefCore.Category.ID: Set<Recipe.ID>] = [:]
+    for assignment in browserData.recipeCategories where matchingRecipeIDs.contains(assignment.recipeID) {
+      matchingRecipeIDsByCategoryID[assignment.categoryID, default: []].insert(assignment.recipeID)
     }
-    let optionIDs = currentCategoryIDs.union(query.looseLabelIDs)
+    let optionIDs = Set(matchingRecipeIDsByCategoryID.keys).union(query.looseLabelIDs)
 
     return optionIDs.compactMap { categoryID in
       guard let category = categoriesByID[categoryID], category.facetID == nil else { return nil }
-      let matchingRecipeCount = matchingRecipeIDs.reduce(into: 0) { count, recipeID in
-        if categoryIDsByRecipeID[recipeID]?.contains(categoryID) == true {
-          count += 1
-        }
-      }
       return LooseCategoryOption(
         category: category,
-        matchingRecipeCount: matchingRecipeCount,
+        matchingRecipeCount: matchingRecipeIDsByCategoryID[categoryID, default: []].count,
         isSelected: query.looseLabelIDs.contains(categoryID)
       )
     }
@@ -263,8 +261,10 @@ final class PowerBrowserModel {
   }
 
   func recipeRows(for result: RecipeBrowserResult) -> [RecipeListRowData] {
-    let rowsByID = Dictionary(uniqueKeysWithValues: recipeRows.map { ($0.recipe.id, $0) })
-    return result.matchingRecipeIDs.compactMap { rowsByID[$0] }
+    measured("rows") {
+      let rowsByID = Dictionary(uniqueKeysWithValues: recipeRows.map { ($0.recipe.id, $0) })
+      return result.matchingRecipeIDs.compactMap { rowsByID[$0] }
+    }
   }
 
   func selectionTitle(for categoryID: YesChefCore.Category.ID, in facet: Facet) -> String {
@@ -447,11 +447,43 @@ final class PowerBrowserModel {
       categories: browserData.categories,
       facets: browserData.facets,
       sources: browserData.sources,
-      variations: browserData.variations
+      variations: browserData.variations,
+      recipeIDsWithPhotos: browserData.recipeIDsWithPhotos
     )
     cachedEngine = CachedEngine(data: browserData, engine: engine)
-    cachedResult = nil
+    cachedDerivations = nil
     return engine
+  }
+
+  private func derivations() -> CachedDerivations {
+    _ = browserEngine()
+    if let cachedDerivations, cachedDerivations.query == query {
+      return cachedDerivations
+    }
+
+    let result = measured("result") { browserEngine().result(for: query) }
+    let sourceFilterOptions = measured("source-options") { sourceFilterOptionsUncached(for: result) }
+    let looseCategoryOptions = measured("loose-category-options") { looseCategoryOptionsUncached(for: result) }
+    let derivations = CachedDerivations(
+      query: query,
+      result: result,
+      sourceFilterOptions: sourceFilterOptions,
+      looseCategoryOptions: looseCategoryOptions
+    )
+    cachedDerivations = derivations
+    return derivations
+  }
+
+  private func measured<T>(_ operation: String, _ work: () -> T) -> T {
+    #if DEBUG
+      let clock = ContinuousClock()
+      let start = clock.now
+      defer {
+        let duration = String(describing: start.duration(to: clock.now))
+        AppLog.performance.log("power-browser-\(operation, privacy: .public) duration=\(duration, privacy: .public)")
+      }
+    #endif
+    return work()
   }
 }
 

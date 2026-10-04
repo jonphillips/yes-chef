@@ -29,6 +29,7 @@ struct RecipeReaderThumbnail: View {
 struct RecipeReaderHero: View {
   let photo: RecipeDetailPhoto
   let width: CGFloat
+  var maximumHeight: CGFloat?
   let action: () -> Void
 
   var body: some View {
@@ -39,7 +40,7 @@ struct RecipeReaderHero: View {
           aspectRatio: photo.displayAspectRatio,
           variant: .hero
         )
-        .frame(width: width)
+        .frame(width: width, height: min(width / photo.displayAspectRatio, maximumHeight ?? .greatestFiniteMagnitude))
       }
       .buttonStyle(.plain)
       .accessibilityLabel(Text(photo.caption ?? "Recipe photo"))
