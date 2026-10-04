@@ -288,7 +288,10 @@ struct FlowLayout: Layout {
     for row in rows(for: subviews, maximumWidth: bounds.width) {
       var x = bounds.minX
       for item in row.items {
-        item.view.place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+        item.view.place(
+          at: CGPoint(x: x, y: y + (row.height - item.size.height) / 2),
+          proposal: item.proposal
+        )
         x += item.size.width + spacing
       }
       y += row.height + spacing
@@ -299,27 +302,34 @@ struct FlowLayout: Layout {
     var rows: [FlowRow] = []
     var row = FlowRow()
     for subview in subviews {
-      let size = subview.sizeThatFits(.unspecified)
+      let intrinsicSize = subview.sizeThatFits(.unspecified)
+      let proposal = ProposedViewSize(width: min(intrinsicSize.width, maximumWidth), height: nil)
+      let size = subview.sizeThatFits(proposal)
       let proposedWidth = row.items.isEmpty ? size.width : row.width + spacing + size.width
       if !row.items.isEmpty, proposedWidth > maximumWidth {
         rows.append(row)
         row = FlowRow()
       }
-      row.append(subview, size: size, spacing: spacing)
+      row.append(subview, size: size, proposal: proposal, spacing: spacing)
     }
     if !row.items.isEmpty { rows.append(row) }
     return rows
   }
 
   private struct FlowRow {
-    var items: [(view: LayoutSubview, size: CGSize)] = []
+    var items: [(view: LayoutSubview, size: CGSize, proposal: ProposedViewSize)] = []
     var width: CGFloat = 0
     var height: CGFloat = 0
 
-    mutating func append(_ view: LayoutSubview, size: CGSize, spacing: CGFloat) {
+    mutating func append(
+      _ view: LayoutSubview,
+      size: CGSize,
+      proposal: ProposedViewSize,
+      spacing: CGFloat
+    ) {
       width += items.isEmpty ? size.width : spacing + size.width
       height = max(height, size.height)
-      items.append((view, size))
+      items.append((view, size, proposal))
     }
   }
 }

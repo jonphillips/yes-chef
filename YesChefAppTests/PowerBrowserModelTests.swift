@@ -1,6 +1,7 @@
 import CustomDump
 import Dependencies
 import Foundation
+import SQLiteData
 import Testing
 import YesChefCore
 @testable import YesChef
@@ -99,6 +100,7 @@ struct PowerBrowserModelTests {
 
     try await withDependencies {
       try $0.bootstrapDatabase()
+      $0.uuid = .incrementing
     } operation: {
       @Dependency(\.defaultDatabase) var database
       try await database.write { db in
@@ -146,15 +148,18 @@ struct PowerBrowserModelTests {
       expectNoDifference(sourceOptions.first { $0.value == "cafe" }?.isSelected, false)
 
       let looseOptions = model.looseCategoryOptions(for: model.result)
-      expectNoDifference(looseOptions.map { ($0.category.name, $0.matchingRecipeCount) }, [("Weeknight", 2)])
+      expectNoDifference(looseOptions.count, 1)
+      expectNoDifference(looseOptions.first?.category.name, "Weeknight")
+      expectNoDifference(looseOptions.first?.matchingRecipeCount, 2)
 
       model.sourceValueButtonTapped("Missing", field: .publication)
       let emptyResult = model.result
       expectNoDifference(emptyResult.matchingRecipeIDs, [])
-      expectNoDifference(
-        model.sourceFilterOptions(for: emptyResult)[.publication]?.map { ($0.value, $0.matchingRecipeCount, $0.isSelected) },
-        [("Missing", 0, true)]
-      )
+      let retainedPublication = model.sourceFilterOptions(for: emptyResult)[.publication]
+      expectNoDifference(retainedPublication?.count, 1)
+      expectNoDifference(retainedPublication?.first?.value, "Missing")
+      expectNoDifference(retainedPublication?.first?.matchingRecipeCount, 0)
+      expectNoDifference(retainedPublication?.first?.isSelected, true)
     }
   }
 
@@ -205,5 +210,68 @@ struct PowerBrowserModelTests {
       }
       expectNoDifference(data.recipeIDsWithPhotos, [includedRecipeID])
     }
+  }
+
+  @Test
+  func rowMappingRefreshesWhenRecipeRowsArriveAfterBrowserData() async throws {
+    let now = Date(timeIntervalSinceReferenceDate: 904_300_000)
+    let recipeID = SampleUUIDSequence.uuid(94_401)
+    let recipe = Recipe(id: recipeID, title: "Late Row", dateCreated: now, dateModified: now)
+    let browserData = RecipeBrowserData(
+      recipes: [.init(id: recipeID, title: recipe.title, dateCreated: now, dateModified: now)],
+      recipeCategories: [],
+      categories: [],
+      facets: []
+    )
+    let rows = [RecipeListRowData(recipe: recipe)]
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.uuid = .incrementing
+    } operation: {
+      let powerBrowserModel = PowerBrowserModel()
+      let libraryModel = RecipeLibraryModel()
+
+      try await powerBrowserModel.$browserData.load(StaticBrowserDataRequest(data: browserData))
+      try await libraryModel.$browserData.load(StaticBrowserDataRequest(data: browserData))
+
+      expectNoDifference(powerBrowserModel.recipeRows(for: powerBrowserModel.result), [])
+      expectNoDifference(libraryModel.visibleRecipeRows, [])
+
+      try await powerBrowserModel.$recipeRows.load(StaticRecipeRowsRequest(rows: rows))
+      try await libraryModel.$recipeRows.load(StaticRecipeRowsRequest(rows: rows))
+
+      expectNoDifference(powerBrowserModel.recipeRows(for: powerBrowserModel.result).map(\.recipe.id), [recipeID])
+      expectNoDifference(libraryModel.visibleRecipeRows.map(\.recipe.id), [recipeID])
+    }
+  }
+
+}
+
+private struct StaticBrowserDataRequest: FetchKeyRequest {
+  let data: RecipeBrowserData
+
+  static func == (lhs: Self, rhs: Self) -> Bool { true }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(0)
+  }
+
+  func fetch(_ db: Database) throws -> RecipeBrowserData {
+    data
+  }
+}
+
+private struct StaticRecipeRowsRequest: FetchKeyRequest {
+  let rows: [RecipeListRowData]
+
+  static func == (lhs: Self, rhs: Self) -> Bool { true }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(0)
+  }
+
+  func fetch(_ db: Database) throws -> [RecipeListRowData] {
+    rows
   }
 }

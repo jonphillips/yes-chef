@@ -16,7 +16,6 @@ final class PowerBrowserModel {
     var result: RecipeBrowserResult
     var sourceFilterOptions: [RecipeBrowserSourceField: [SourceFilterOption]]
     var looseCategoryOptions: [LooseCategoryOption]
-    var recipeRows: [RecipeListRowData]
   }
 
   struct FacetSelection: Identifiable, Equatable {
@@ -262,7 +261,10 @@ final class PowerBrowserModel {
   }
 
   func recipeRows(for result: RecipeBrowserResult) -> [RecipeListRowData] {
-    derivations().recipeRows
+    measured("rows") {
+      let rowsByID = Dictionary(uniqueKeysWithValues: recipeRows.map { ($0.recipe.id, $0) })
+      return result.matchingRecipeIDs.compactMap { rowsByID[$0] }
+    }
   }
 
   func selectionTitle(for categoryID: YesChefCore.Category.ID, in facet: Facet) -> String {
@@ -445,7 +447,8 @@ final class PowerBrowserModel {
       categories: browserData.categories,
       facets: browserData.facets,
       sources: browserData.sources,
-      variations: browserData.variations
+      variations: browserData.variations,
+      recipeIDsWithPhotos: browserData.recipeIDsWithPhotos
     )
     cachedEngine = CachedEngine(data: browserData, engine: engine)
     cachedDerivations = nil
@@ -461,16 +464,11 @@ final class PowerBrowserModel {
     let result = measured("result") { browserEngine().result(for: query) }
     let sourceFilterOptions = measured("source-options") { sourceFilterOptionsUncached(for: result) }
     let looseCategoryOptions = measured("loose-category-options") { looseCategoryOptionsUncached(for: result) }
-    let recipeRows = measured("rows") {
-      let rowsByID = Dictionary(uniqueKeysWithValues: recipeRows.map { ($0.recipe.id, $0) })
-      return result.matchingRecipeIDs.compactMap { rowsByID[$0] }
-    }
     let derivations = CachedDerivations(
       query: query,
       result: result,
       sourceFilterOptions: sourceFilterOptions,
-      looseCategoryOptions: looseCategoryOptions,
-      recipeRows: recipeRows
+      looseCategoryOptions: looseCategoryOptions
     )
     cachedDerivations = derivations
     return derivations

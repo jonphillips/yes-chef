@@ -887,11 +887,9 @@ private extension RecipeReaderView {
 
     return VStack(alignment: .leading, spacing: 16) {
       if shouldStackPhoto, let photo = model.primaryDisplayPhoto {
-        RecipeReaderHero(photo: photo, width: contentWidth) {
+        RecipeReaderHero(photo: photo, width: contentWidth, maximumHeight: 300) {
           isPhotoGalleryPresented = true
         }
-        .frame(maxHeight: 300)
-        .clipped()
       }
 
       HStack(alignment: .top, spacing: 12) {

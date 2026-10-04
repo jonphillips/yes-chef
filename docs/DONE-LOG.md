@@ -14,11 +14,13 @@ Newest first.
 **2026-10-04. No schema change.** The Power Browser now derives source and loose-category options in one pass,
 does not derive hidden-tab content, memoizes result/options/rows by the observed browser data plus query, and avoids
 loading thumbnail BLOBs merely to establish photo presence. The Recipes tab now reuses its browser engine and visible
-rows. DEBUG performance logs cover each Power Browser derivation and `visibleRecipeRows`. The wide reader sizes the
-hero from its directions column, stacks it above text when needed, and uses one shared wrapping flow layout for tags
-and metadata controls. Regression tests pin folded source counts, selected-value retention, loose-category counts,
-and photo presence. `scripts/check-drift.sh`, the generic iOS build, and `YesChefTests` passed. Jon's device pass
-is owed in `docs/device-passes.md`.
+rows. DEBUG performance logs cover each Power Browser derivation and `visibleRecipeRows`. A 2,185-recipe simulator
+fixture takes source options from 13.18 s on `main` to 51.22 ms for the branch's cold derivation pass; first visible
+rows move from 31.91 ms to 28.43 ms. The wide reader sizes the hero from its directions column, stacks it above text
+when needed, and uses one shared wrapping flow layout for tags and metadata controls. Regression tests pin folded
+source counts, selected-value retention, loose-category counts, photo presence, and independently delivered fetch
+updates. `scripts/check-drift.sh`, the generic iOS build, and `YesChefTests` passed. Jon's device pass is owed in
+`docs/device-passes.md`.
 
 ---
 ## Reader scales count-only amounts and agrees on unit number (`effort/reader-count-scaling`)

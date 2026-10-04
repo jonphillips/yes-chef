@@ -19,18 +19,10 @@ extension RecipeLibraryModel {
 
   var visibleRecipeRows: [RecipeListRowData] {
     let query = browserQuery
-    if let cachedVisibleRecipeRows,
-      cachedVisibleRecipeRows.data == browserData,
-      cachedVisibleRecipeRows.query == query
-    {
-      return cachedVisibleRecipeRows.rows
-    }
-    let rows = measured("visible-recipe-rows") {
+    return measured("visible-recipe-rows") {
       let rowsByID = Dictionary(uniqueKeysWithValues: recipeRows.map { ($0.recipe.id, $0) })
       return browserEngine().matchingRecipeIDs(for: query).compactMap { rowsByID[$0] }
     }
-    cachedVisibleRecipeRows = .init(data: browserData, query: query, rows: rows)
-    return rows
   }
 
   var filteredRecipeCount: Int {
@@ -395,7 +387,6 @@ extension RecipeLibraryModel {
       recipeIDsWithPhotos: browserData.recipeIDsWithPhotos
     )
     cachedBrowserEngine = .init(data: browserData, engine: engine)
-    cachedVisibleRecipeRows = nil
     return engine
   }
 
