@@ -311,7 +311,7 @@ private struct RecipeCaptureReviewSections: View {
         }
       }
 
-      if !model.reviewCategoryNames.isEmpty || !model.reviewTagNames.isEmpty {
+      if !model.reviewCategoryNames.isEmpty || !draft.page.tagNames.isEmpty {
         Section {
           if !model.reviewCategoryNames.isEmpty {
             Text("Categories")
@@ -327,24 +327,29 @@ private struct RecipeCaptureReviewSections: View {
               model.removeAllReviewCategories()
             }
           }
-          if !model.reviewTagNames.isEmpty {
+          if !draft.page.tagNames.isEmpty {
             Text("Tags")
               .font(.footnote)
               .foregroundStyle(.secondary)
-            ForEach(model.reviewTagNames.indices, id: \.self) { index in
-              TextField("Tag", text: tagNameBinding(at: index))
-                .textInputAutocapitalization(.words)
-            }
-            .onDelete { model.removeReviewTags(atOffsets: $0) }
-
-            Button("Remove All Tags", role: .destructive) {
-              model.removeAllReviewTags()
+            LazyVGrid(
+              columns: [GridItem(.adaptive(minimum: 132), alignment: .leading)],
+              alignment: .leading,
+              spacing: 8
+            ) {
+              ForEach(draft.page.tagNames, id: \.self) { tag in
+                HarvestedTagChip(
+                  name: tag,
+                  isAdopted: model.isHarvestedTagAdopted(tag)
+                ) {
+                  model.harvestedTagTapped(tag)
+                }
+              }
             }
           }
         } header: {
           Text("Categories & Tags")
         } footer: {
-          Text("Rename or swipe to remove labels the site provided before you save.")
+          Text("Tap a tag to add it.")
         }
       }
 
@@ -605,15 +610,6 @@ private struct RecipeCaptureReviewSections: View {
     }
   }
 
-  private func tagNameBinding(at index: Int) -> Binding<String> {
-    Binding {
-      guard model.reviewTagNames.indices.contains(index) else { return "" }
-      return model.reviewTagNames[index]
-    } set: { name in
-      model.updateReviewTagName(name, at: index)
-    }
-  }
-
   private func readerFeedbackBlockTextBinding(at index: Int) -> Binding<String> {
     Binding {
       guard model.readerFeedbackBlocks.indices.contains(index) else { return "" }
@@ -666,6 +662,32 @@ private struct SuggestedCategoryChip: View {
       isAccepted
         ? "Removes this category so it is not added when you save the recipe"
         : "Adds this category when you save the recipe"
+    )
+  }
+}
+
+private struct HarvestedTagChip: View {
+  let name: String
+  let isAdopted: Bool
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      Label(name, systemImage: isAdopted ? "checkmark.circle.fill" : "plus.circle")
+        .font(.subheadline)
+        .lineLimit(2)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(isAdopted ? Color.green.opacity(0.16) : Color.accentColor.opacity(0.12), in: Capsule())
+    }
+    .buttonStyle(.plain)
+    .tint(isAdopted ? .green : .accentColor)
+    .accessibilityAddTraits(isAdopted ? .isSelected : [])
+    .accessibilityHint(
+      isAdopted
+        ? "Removes this tag so it is not added when you save the recipe"
+        : "Adds this tag when you save the recipe"
     )
   }
 }

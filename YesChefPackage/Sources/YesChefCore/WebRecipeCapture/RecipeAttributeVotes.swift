@@ -30,6 +30,11 @@ struct RecipeAttributeVotes {
   ) {
     guard let value = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty
     else { return }
+    if attribute == .author,
+      value.lowercased().hasPrefix("http://") || value.lowercased().hasPrefix("https://")
+    {
+      return
+    }
     var candidates = tallies[attribute] ?? []
     if let index = candidates.firstIndex(where: { $0.value == value }) {
       candidates[index].count += 1

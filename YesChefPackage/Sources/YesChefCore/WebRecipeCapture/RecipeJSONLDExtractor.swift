@@ -139,7 +139,9 @@ enum RecipeJSONLDExtractor {
 
     for type in typeStrings(node["@type"]) { builder.addSchemaType(type) }
     for (property, attribute) in RecipeSchemaOrg.scalarProperties {
-      if property == "aggregateRating" {
+      if property == "author" || property == "publisher" {
+        builder.votes.add(attribute, namedEntityList(node[property]), priority: RecipeAttributeVotes.jsonLDPriority)
+      } else if property == "aggregateRating" {
         builder.votes.add(attribute, ratingString(node[property]), priority: RecipeAttributeVotes.jsonLDPriority)
       } else {
         builder.votes.add(attribute, firstString(node[property]), priority: RecipeAttributeVotes.jsonLDPriority)
@@ -310,6 +312,33 @@ enum RecipeJSONLDExtractor {
 
   private static func firstString(_ value: Any?) -> String? {
     flatStrings(value).first
+  }
+
+  private static func namedEntityList(_ value: Any?) -> String? {
+    var names: [String] = []
+    collectNamedEntities(value, into: &names)
+    var seen: Set<String> = []
+    let distinct = names.filter { seen.insert($0).inserted }
+    return switch distinct.count {
+    case 0: nil
+    case 1: distinct[0]
+    case 2: "\(distinct[0]) and \(distinct[1])"
+    default:
+      "\(distinct.dropLast().joined(separator: ", ")), and \(distinct[distinct.count - 1])"
+    }
+  }
+
+  private static func collectNamedEntities(_ value: Any?, into names: inout [String]) {
+    switch value {
+    case let string as String:
+      if !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { names.append(string) }
+    case let array as [Any]:
+      for item in array { collectNamedEntities(item, into: &names) }
+    case let dict as [String: Any]:
+      collectNamedEntities(dict["name"], into: &names)
+    default:
+      return
+    }
   }
 
   private static func imageStrings(_ value: Any?) -> [String] {

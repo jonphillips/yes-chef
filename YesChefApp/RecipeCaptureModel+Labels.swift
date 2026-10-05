@@ -49,6 +49,24 @@ extension RecipeCaptureModel {
     acceptedSuggestedLabelIDs.contains(suggestion.id)
   }
 
+  func harvestedTagTapped(_ name: String) {
+    guard var draft else { return }
+    if let index = draft.adoptedTagNames.firstIndex(where: {
+      $0.caseInsensitiveCompare(name) == .orderedSame
+    }) {
+      draft.adoptedTagNames.remove(at: index)
+    } else {
+      draft.adoptedTagNames.append(name)
+    }
+    self.draft = draft
+  }
+
+  func isHarvestedTagAdopted(_ name: String) -> Bool {
+    draft?.adoptedTagNames.contains {
+      $0.caseInsensitiveCompare(name) == .orderedSame
+    } ?? false
+  }
+
   func curatedDraftForCommit() -> (draft: WebRecipeCaptureDraft, acceptedLabelSuggestions: [SuggestedLabel])? {
     guard var draft else { return nil }
     draft.page.editorialBlocks = draft.page.editorialBlocks
@@ -57,11 +75,10 @@ extension RecipeCaptureModel {
     draft.page.readerFeedbackBlocks = draft.page.readerFeedbackBlocks
       .map { ParsedRecipeReaderFeedbackBlock(text: $0.text) }
       .filter { !$0.text.isEmpty }
-    // Re-normalize the harvested labels the cook may have renamed at capture time: trim, drop
-    // rows emptied by a rename, and collapse case-insensitive duplicates (preserving order and the
-    // first-seen casing). The builder normalizes on parse; hand-edits need the same pass before commit.
+    // Categories are editable in this review surface; publisher tags remain untouched for the
+    // original snapshot while their separate adopted list controls the library joins.
     draft.page.categoryNames = Self.normalizedLabelNames(draft.page.categoryNames)
-    draft.page.tagNames = Self.normalizedLabelNames(draft.page.tagNames)
+    draft.adoptedTagNames = Self.normalizedLabelNames(draft.adoptedTagNames)
     self.draft = draft
     // Selection stays pure until commit, so re-extraction cannot turn an accepted chip into a
     // harvested-looking label. The repository receives typed suggestions alongside the imported
