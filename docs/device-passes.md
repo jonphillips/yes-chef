@@ -13,6 +13,11 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**Move a category's recipes to another category** (schema-free). In Settings → Categories, use **Move Recipes
+To…** on the loose **Salad** tag to move it to **Dish Type > Salad** with "Delete afterwards" on. Confirm the result
+message counts, that the recipes show Dish Type > Salad, that loose Salad is gone, and that the change arrives
+on the iPhone.
+
 **Power Browser responsiveness + reader header wrapping** ([effort brief](efforts/power-browser-perf-and-reader-header.md),
 schema-free). On iPad with the full library, remove a Power Browser selection and confirm the result updates
 immediately. After visiting Power Browser, move a category in Settings and confirm it is no slower than before

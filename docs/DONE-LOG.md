@@ -9,6 +9,21 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Move a category's recipes to another category (`effort/category-recipe-move`)
+
+**2026-10-04. No schema change.** Settings → Categories gains **Move Recipes To…** on every category's actions
+menu. A sheet shows the source and its recipe count and offers a target picker grouped like the Categories list.
+Targets are labelled with their group path ("Dish Type > Salad"), so same-named tags stay distinguishable. A toggle
+deletes the emptied source afterwards; it is disabled for starter categories and for categories with sub-categories.
+`CategoryRepository.moveRecipes` re-tags each recipe in one transaction using the deterministic `recipeCategory`
+identity, so devices converge. Recipes already carrying the target only lose the source tag, and other tags are
+untouched. Deleting the source goes through the existing `deleteCategory` guards. Only direct assignments move;
+sub-category assignments stay. Core tests cover re-tagging, already-tagged recipes, source deletion and
+self-move refusal; an app test covers the model end to end. `scripts/check-drift.sh` and `YesChefTests` passed.
+Jon's device pass is owed in `docs/device-passes.md`. The one-shot Cookbook/Chef → source-field move written in
+the same session was run against the live library and kept off `main` on `archive/cookbook-chef-source-move`.
+
+---
 ## Power Browser responsiveness + reader header wrapping (`effort/power-browser-perf-and-reader-header`)
 
 **2026-10-04. No schema change.** The Power Browser now derives source and loose-category options in one pass,

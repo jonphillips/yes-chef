@@ -14,6 +14,23 @@ struct CategoryManagementView: View {
         }
         .presentationDetents([.medium, .large])
       }
+      .sheet(item: $model.recipeMove) { move in
+        NavigationStack {
+          CategoryRecipeMoveSheet(model: model, move: move)
+        }
+        .presentationDetents([.medium, .large])
+      }
+      .alert(
+        "Recipes Moved",
+        isPresented: Binding(
+          get: { model.recipeMoveResultMessage != nil },
+          set: { if !$0 { model.recipeMoveResultMessage = nil } }
+        )
+      ) {
+        Button("OK") {}
+      } message: {
+        Text(model.recipeMoveResultMessage ?? "")
+      }
       .sheet(item: $model.facetEditor) { editor in
         NavigationStack {
           CategoryGroupEditorSheet(model: model, editor: editor)
@@ -234,6 +251,11 @@ private struct CategoryRow: View {
           Label("Edit", systemImage: "pencil")
         }
         Button {
+          model.moveRecipesButtonTapped(categoryID: category.id)
+        } label: {
+          Label("Move Recipes To…", systemImage: "arrow.right.arrow.left")
+        }
+        Button {
           model.toggleCategoryVisibilityButtonTapped(categoryID: category.id)
         } label: {
           Label(category.hidden ? "Show Category" : "Hide Category", systemImage: category.hidden ? "eye" : "eye.slash")
@@ -364,6 +386,71 @@ private struct CategoryEditorSheet: View {
     let name = editor.name.trimmingCharacters(in: .whitespacesAndNewlines)
     if !name.isEmpty { return name }
     return editor.categoryID == nil ? "New Category" : "Category"
+  }
+}
+
+private struct CategoryRecipeMoveSheet: View {
+  @Environment(\.dismiss) private var dismiss
+
+  let model: CategoryManagementModel
+  let move: CategoryRecipeMoveModel
+
+  var body: some View {
+    @Bindable var move = move
+
+    Form {
+      Section("From") {
+        LabeledContent(
+          move.sourceTitle,
+          value: move.recipeCount == 1 ? "1 recipe" : "\(move.recipeCount) recipes"
+        )
+      }
+
+      Section {
+        Picker("Category", selection: $move.targetID) {
+          Text("Choose…").tag(YesChefCore.Category.ID?.none)
+          ForEach(model.recipeMoveTargetSections(excluding: move.sourceID)) { section in
+            Section(section.title) {
+              ForEach(section.options) { option in
+                Text(option.title).tag(Optional(option.categoryID))
+              }
+            }
+          }
+        }
+        .pickerStyle(.navigationLink)
+      } header: {
+        Text("To")
+      } footer: {
+        Text("Each recipe gets the new tag and loses the old one. Recipes that already have both just lose the old one.")
+      }
+
+      Section {
+        Toggle("Delete \(move.sourceTitle) afterwards", isOn: $move.deletesSource)
+          .disabled(!move.canDeleteSource)
+      } footer: {
+        if !move.canDeleteSource {
+          Text("Starter categories and categories with sub-categories can't be deleted.")
+        }
+      }
+    }
+    .navigationTitle("Move Recipes")
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .cancellationAction) {
+        Button("Cancel") {
+          model.cancelRecipeMoveButtonTapped()
+          dismiss()
+        }
+      }
+      ToolbarItem(placement: .confirmationAction) {
+        Button("Move") {
+          if model.confirmRecipeMoveButtonTapped() {
+            dismiss()
+          }
+        }
+        .disabled(move.targetID == nil)
+      }
+    }
   }
 }
 

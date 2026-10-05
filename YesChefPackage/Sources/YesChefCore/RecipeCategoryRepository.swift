@@ -548,7 +548,7 @@ public enum CategoryRepository {
     return category
   }
 
-  private static func category(_ id: Category.ID, in categories: [Category]) throws -> Category {
+  static func category(_ id: Category.ID, in categories: [Category]) throws -> Category {
     guard let category = categories.first(where: { $0.id == id }) else {
       throw CategoryRepositoryError.categoryNotFound
     }
