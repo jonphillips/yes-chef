@@ -190,11 +190,10 @@ extension RecipeCoreTests {
         renderHTML: { _ in nil }
       )
 
-      var draft = try await client.capture(url: sourceURL, capturedAt: capturedAt)
+      let draft = try await client.capture(url: sourceURL, capturedAt: capturedAt)
 
       expectNoDifference(draft.page.title, "Lemon Chicken")
       expectNoDifference(draft.usedRenderedFallback, false)
-      draft.page.tagNames.append(contentsOf: [" quick ", "   "])
       let importedDraft = draft
 
       let uuids = LockedSampleUUIDSequence(start: 23_000)
@@ -226,11 +225,12 @@ extension RecipeCoreTests {
           recipeCategoryIDs.compactMap { categoriesByID[$0] }
             .map { CategoryHierarchy.displayName(for: $0, categoriesByID: categoriesByID) }
             .sorted(),
-          ["Chicken", "Cuisine > Mexican", "Dinner", "Quick > Supper", "quick", "weeknight"]
+          ["Chicken", "Cuisine > Mexican", "Dinner"]
         )
-        let literalKeyword = try #require(categories.first { $0.name == "Quick > Supper" })
-        expectNoDifference(literalKeyword.parentCategoryID, nil)
         expectNoDifference(recipeCategories.count, recipeCategoryIDs.count)
+        let snapshotData = try #require(recipe.originalSnapshot)
+        let snapshot = try RecipeBundleCoding.decodeSnapshot(snapshotData)
+        expectNoDifference(snapshot.tagNames, ["quick", "weeknight", "Quick > Supper", "Quick"])
       }
     }
 

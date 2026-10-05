@@ -5,15 +5,18 @@ public struct WebRecipeCaptureDraft: Equatable, Sendable {
   public var page: ParsedRecipePage
   public var usedRenderedFallback: Bool
   public var capturedInBrowser: Bool
+  public var adoptedTagNames: [String]
 
   public init(
     page: ParsedRecipePage,
     usedRenderedFallback: Bool = false,
-    capturedInBrowser: Bool = false
+    capturedInBrowser: Bool = false,
+    adoptedTagNames: [String] = []
   ) {
     self.page = page
     self.usedRenderedFallback = usedRenderedFallback
     self.capturedInBrowser = capturedInBrowser
+    self.adoptedTagNames = adoptedTagNames
   }
 
   public var isUsable: Bool {
@@ -333,7 +336,9 @@ extension RecipeRepository {
       uuid: uuid,
       preserveRawImportHTML: preserveRawImportHTML
     )
-    let result = try importBundle(bundle, in: db, now: now, uuid: uuid)
+    var adoptedBundle = bundle
+    adoptedBundle.tagNames = draft.adoptedTagNames
+    let result = try importBundle(adoptedBundle, in: db, now: now, uuid: uuid)
     try reconcileSuggestedLabels(
       acceptedLabelSuggestions,
       recipeID: result.recipeID,

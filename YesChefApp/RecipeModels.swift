@@ -480,11 +480,6 @@ final class RecipeCaptureModel {
     set { draft?.page.categoryNames = newValue }
   }
 
-  var reviewTagNames: [String] {
-    get { draft?.page.tagNames ?? [] }
-    set { draft?.page.tagNames = newValue }
-  }
-
   func updateReviewCategoryName(_ name: String, at index: Int) {
     guard var names = draft?.page.categoryNames, names.indices.contains(index) else { return }
     names[index] = name
@@ -499,22 +494,6 @@ final class RecipeCaptureModel {
 
   func removeAllReviewCategories() {
     draft?.page.categoryNames = []
-  }
-
-  func updateReviewTagName(_ name: String, at index: Int) {
-    guard var names = draft?.page.tagNames, names.indices.contains(index) else { return }
-    names[index] = name
-    draft?.page.tagNames = names
-  }
-
-  func removeReviewTags(atOffsets offsets: IndexSet) {
-    guard var names = draft?.page.tagNames else { return }
-    names.remove(atOffsets: offsets)
-    draft?.page.tagNames = names
-  }
-
-  func removeAllReviewTags() {
-    draft?.page.tagNames = []
   }
 
   var reviewTitle: String {

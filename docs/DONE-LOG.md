@@ -9,6 +9,16 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## NYT capture fidelity: ingredient groups, author name, opt-in publisher tags (`effort/nyt-capture-fidelity`)
+
+**2026-10-04. No schema change.** The NYT capture path now recovers named ingredient groups from rendered DOM
+only when their whitespace-normalized lines match JSON-LD exactly, resolves author and publisher entities by
+name, and ignores URL-valued author votes. Harvested publisher tags appear as opt-in chips for every site;
+capture and share-extension imports adopt none by default, while the original snapshot retains the full
+harvested list. `scripts/check-drift.sh`, the generic iOS build, and `YesChefTests` passed. Jon's carrot-cake
+browser and second-recipe share-sheet pass is owed in `docs/device-passes.md`.
+
+---
 ## Move a category's recipes to another category (`effort/category-recipe-move`)
 
 **2026-10-04. No schema change.** Settings → Categories gains **Move Recipes To…** on every category's actions

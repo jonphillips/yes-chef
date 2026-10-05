@@ -77,25 +77,45 @@ struct RecipeCaptureLabelSuggestionTests {
     }
   }
 
-  // Thread C1: the harvested (verbatim publisher) categories & tags are editable before commit.
-  // Renames land on the live draft page and reach the importer through `curatedDraftForCommit()`.
+  // Harvested categories remain editable on the review surface.
   @Test
-  func editsToHarvestedCategoriesAndTagsReachCommit() {
+  func editsToHarvestedCategoriesReachCommit() {
     withCaptureDependencies {
       let model = draftedModel(
         page: ParsedRecipePage(
           title: "Spanish Style Garlic Shrimp",
-          tagNames: ["weeknight", "seafood"],
           categoryNames: ["Dinner", "Tapas"]
         )
       )
 
       model.updateReviewCategoryName("Small Plates", at: 1)
-      model.removeReviewTags(atOffsets: IndexSet(integer: 0))
 
       let commit = model.curatedDraftForCommit()
       expectNoDifference(commit?.draft.page.categoryNames, ["Dinner", "Small Plates"])
-      expectNoDifference(commit?.draft.page.tagNames, ["seafood"])
+    }
+  }
+
+  @Test
+  func harvestedTagsAreUnselectedUntilTappedAndRemainInTheSnapshotPage() {
+    withCaptureDependencies {
+      let model = draftedModel(
+        page: ParsedRecipePage(
+          title: "Spanish Style Garlic Shrimp",
+          tagNames: ["weeknight", "seafood", "quick"]
+        )
+      )
+
+      #expect(!model.isHarvestedTagAdopted("weeknight"))
+      model.harvestedTagTapped("weeknight")
+      model.harvestedTagTapped("quick")
+      #expect(model.isHarvestedTagAdopted("WEEKNIGHT"))
+
+      let commit = model.curatedDraftForCommit()
+      expectNoDifference(commit?.draft.adoptedTagNames, ["weeknight", "quick"])
+      expectNoDifference(commit?.draft.page.tagNames, ["weeknight", "seafood", "quick"])
+
+      model.harvestedTagTapped("weeknight")
+      #expect(!model.isHarvestedTagAdopted("weeknight"))
     }
   }
 
@@ -103,12 +123,11 @@ struct RecipeCaptureLabelSuggestionTests {
   // case-insensitive duplicates (first-seen order and casing win) — the builder's parse-time pass
   // does not run over edits, so `curatedDraftForCommit()` has to.
   @Test
-  func commitNormalizesRenamedHarvestedLabels() {
+  func commitNormalizesRenamedHarvestedCategories() {
     withCaptureDependencies {
       let model = draftedModel(
         page: ParsedRecipePage(
           title: "Pork Bites",
-          tagNames: ["quick"],
           categoryNames: ["Dinner", "Mains", "Tapas"]
         )
       )
@@ -116,11 +135,8 @@ struct RecipeCaptureLabelSuggestionTests {
       // Rename to a case-variant duplicate, empty one out, and pad another with whitespace.
       model.updateReviewCategoryName("dinner", at: 1)
       model.updateReviewCategoryName("   ", at: 2)
-      model.updateReviewTagName("  Quick  ", at: 0)
-
       let commit = model.curatedDraftForCommit()
       expectNoDifference(commit?.draft.page.categoryNames, ["Dinner"])
-      expectNoDifference(commit?.draft.page.tagNames, ["Quick"])
     }
   }
 

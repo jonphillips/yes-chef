@@ -13,6 +13,11 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**NYT capture fidelity** ([effort brief](efforts/nyt-capture-fidelity.md)). In the in-app browser, capture the
+NYT carrot cake and confirm it shows “For the cake” and “For the frosting,” with author “Genevieve Ko.” Save
+without tapping a tag and confirm none were added. Then capture a second NYT recipe through the share sheet
+and confirm it saves without tags.
+
 **Move a category's recipes to another category** (schema-free). In Settings → Categories, use **Move Recipes
 To…** on the loose **Salad** tag to move it to **Dish Type > Salad** with "Delete afterwards" on. Confirm the result
 message counts, that the recipes show Dish Type > Salad, that loose Salad is gone, and that the change arrives
