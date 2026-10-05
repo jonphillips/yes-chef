@@ -96,6 +96,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
   case archivedRecipes
   case seedCoverage
   case facetCoverage
+  case categorySourceMove
 #if DEBUG
   case modelCallInventory
 #endif
@@ -110,6 +111,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case .archivedRecipes: "Archived Recipes"
     case .seedCoverage: "Learned Areas"
     case .facetCoverage: "Label Recipes"
+    case .categorySourceMove: "Move Cookbook & Chef"
 #if DEBUG
     case .modelCallInventory: "Model Calls"
 #endif
@@ -124,6 +126,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case .archivedRecipes: "archivebox"
     case .seedCoverage: "checklist"
     case .facetCoverage: "tag"
+    case .categorySourceMove: "arrow.right.doc.on.clipboard"
 #if DEBUG
     case .modelCallInventory: "sparkles"
 #endif

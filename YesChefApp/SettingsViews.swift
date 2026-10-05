@@ -41,6 +41,7 @@ struct SettingsView: View {
         pantryRow
         archivedRecipesRow
         facetCoverageRow
+        categorySourceMoveRow
       }
 
       Section("Developer") {
@@ -317,6 +318,23 @@ struct SettingsView: View {
       }
     }
   }
+
+  @ViewBuilder private var categorySourceMoveRow: some View {
+    if let selectedPane {
+      Button {
+        selectedPane.wrappedValue = .categorySourceMove
+      } label: {
+        SettingsPane.categorySourceMove.label
+      }
+      .foregroundStyle(.primary)
+    } else {
+      NavigationLink {
+        CategorySourceMoveView()
+      } label: {
+        SettingsPane.categorySourceMove.label
+      }
+    }
+  }
 #if DEBUG
   @ViewBuilder private var modelCallInventoryRow: some View {
     if let selectedPane {
@@ -416,6 +434,10 @@ struct SettingsDetailPane: View {
     case .facetCoverage:
       NavigationStack {
         FacetCoverageView()
+      }
+    case .categorySourceMove:
+      NavigationStack {
+        CategorySourceMoveView()
       }
 #if DEBUG
     case .modelCallInventory:
