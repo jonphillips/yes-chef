@@ -147,6 +147,7 @@
 		D38F8BF6A2B76B48D4E9F6FF /* ServeWithRepairSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 071FE50DFC8E303A1C2F824E /* ServeWithRepairSheet.swift */; };
 		D4ECC1340963D28E217E0727 /* RecipeListPresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = E48B9ACFF26E71C15146E3E9 /* RecipeListPresets.swift */; };
 		D778483B6523AB97BDE06ED6 /* MenuModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7090DA55279458851517DD5A /* MenuModels.swift */; };
+		D7F27AD6726CB1E3E48F720D /* CategoryRecipeMoveModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEA0C6E4BA57FD6DBD24F975 /* CategoryRecipeMoveModelTests.swift */; };
 		D8FB35A8C0D8195A104EE90D /* RecipeImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE2CEAA7C5D5836E123F474 /* RecipeImageLoader.swift */; };
 		DB71ABBE3820C219FEACAEB4 /* RecipeCaptureModel+Labels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9916E601292DD101C2943916 /* RecipeCaptureModel+Labels.swift */; };
 		DDDFAA0F691253337D66DE0B /* HandoffReviewCoordinator+Variation.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD955FEF5EBA92A06FCE62C /* HandoffReviewCoordinator+Variation.swift */; };
@@ -332,6 +333,7 @@
 		DC10A57FB9A55D40CD97546E /* MenuDetailChatPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuDetailChatPresentation.swift; sourceTree = "<group>"; };
 		DD0F7538696E770B31AA47A0 /* RecipeActiveFilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeActiveFilterBar.swift; sourceTree = "<group>"; };
 		DE4284C2FB4F46CA20889B5B /* RecipeVariationBaseWriteGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeVariationBaseWriteGuard.swift; sourceTree = "<group>"; };
+		DEA0C6E4BA57FD6DBD24F975 /* CategoryRecipeMoveModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryRecipeMoveModelTests.swift; sourceTree = "<group>"; };
 		E178BA63F9FC305703A8061E /* AIHandoffRecipePasteRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIHandoffRecipePasteRoutingTests.swift; sourceTree = "<group>"; };
 		E29F682A3093D37071F5A924 /* PaprikaImportReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaprikaImportReviewView.swift; sourceTree = "<group>"; };
 		E48B9ACFF26E71C15146E3E9 /* RecipeListPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeListPresets.swift; sourceTree = "<group>"; };
@@ -417,6 +419,7 @@
 				792C0EBCFF5BA678E266946D /* AIHandoffMenuPasteTests.swift */,
 				E178BA63F9FC305703A8061E /* AIHandoffRecipePasteRoutingTests.swift */,
 				E4E2858E5F7AA38D95511ACB /* BrowserReaderFeedbackRoutingTests.swift */,
+				DEA0C6E4BA57FD6DBD24F975 /* CategoryRecipeMoveModelTests.swift */,
 				842FC32385274C6E7D875B4D /* ChatAssistantSelectionTests.swift */,
 				4802BA56B714BCEF8679A289 /* ChatSurfaceTests.swift */,
 				AF820DD380C76A8BFE19ED0E /* CreateRecipeModelTests.swift */,
@@ -770,6 +773,7 @@
 				E04A28BE098B255C0B136810 /* AIHandoffMenuPasteTests.swift in Sources */,
 				0FC786DD6158C0277309423D /* AIHandoffRecipePasteRoutingTests.swift in Sources */,
 				2E34817DD5653BC61AFF9BB1 /* BrowserReaderFeedbackRoutingTests.swift in Sources */,
+				D7F27AD6726CB1E3E48F720D /* CategoryRecipeMoveModelTests.swift in Sources */,
 				0CC37A24661F09BC79B0D2DD /* ChatAssistantSelectionTests.swift in Sources */,
 				B1A4B0832475BA500093C538 /* ChatSurfaceTests.swift in Sources */,
 				4713F8207F92734799A501EE /* CreateRecipeModelTests.swift in Sources */,
