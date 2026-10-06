@@ -25,7 +25,7 @@ struct DatabaseBackupTests {
     let database = try DatabaseQueue(path: databaseURL.path)
     try database.write { db in try db.execute(sql: "CREATE TABLE unrelated (id TEXT PRIMARY KEY)") }
     #expect(throws: DatabaseBackup.BackupError.self) {
-      try DatabaseBackup.schemaVersion(in: databaseURL, configuration: YesChefCloudSync.databaseBackupConfiguration)
+      try DatabaseBackup.validateAppSchema(in: databaseURL, configuration: YesChefCloudSync.databaseBackupConfiguration)
     }
     try database.close()
   }
