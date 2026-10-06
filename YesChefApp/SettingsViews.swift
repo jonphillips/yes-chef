@@ -1,3 +1,4 @@
+import CloudSyncKit
 import SwiftUI
 import UniformTypeIdentifiers
 import YesChefCore
@@ -7,8 +8,12 @@ struct SettingsView: View {
   let groceryModel: GroceryLibraryModel
   private let selectedPane: Binding<SettingsPane?>?
   @State private var syncHealth = SyncHealthModel()
-  @State private var backupExport = YesChefDatabaseBackupExportModel()
-  @State private var backupRestore = YesChefDatabaseBackupRestoreModel()
+  @State private var backupExport = DatabaseBackupExportModel(
+    configuration: YesChefCloudSync.databaseBackupConfiguration
+  )
+  @State private var backupRestore = DatabaseBackupRestoreModel(
+    configuration: YesChefCloudSync.databaseBackupConfiguration
+  )
   @State private var backupExportDocument: BackupExportDocument?
   @State private var backupExportFilename = "YesChef-Backup.sqlite"
   @State private var isPresentingBackupExporter = false
@@ -353,9 +358,9 @@ private final class BackupExportDocument: WritableDocument {
 
   static let writableContentTypes: [UTType] = [.yesChefSQLiteBackup]
 
-  let snapshot: YesChefDatabaseBackup.Snapshot
+  let snapshot: DatabaseBackup.Snapshot
 
-  init(snapshot: YesChefDatabaseBackup.Snapshot) {
+  init(snapshot: DatabaseBackup.Snapshot) {
     self.snapshot = snapshot
   }
 
