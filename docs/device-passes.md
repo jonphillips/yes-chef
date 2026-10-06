@@ -13,6 +13,11 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**Before the CloudSyncKit backup lift's Yes Chef PR merges** ([effort brief](efforts/cloudsynckit-backup-lift.md)).
+Export a backup from the current build and store it off-device (Files / iCloud Drive). It's insurance before the
+code behind ADR-0056's re-seed moves. After the lift merges, the restore path's first real-device run is
+ADR-0056 Phase 4 (`PROD-CUTOVER.md`), which then covers the lifted code for both apps.
+
 **NYT capture fidelity** ([effort brief](efforts/nyt-capture-fidelity.md)). In the in-app browser, capture the
 NYT carrot cake and confirm it shows “For the cake” and “For the frosting,” with author “Genevieve Ko.” Save
 without tapping a tag and confirm none were added. Then capture a second NYT recipe through the share sheet
