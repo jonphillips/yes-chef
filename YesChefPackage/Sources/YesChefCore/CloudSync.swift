@@ -11,15 +11,27 @@ import SQLiteData
 /// gate keys) and `makeSyncEngine`, which lists the app's synced `@Table` types and so
 /// can't lift. Everything else forwards to `CloudSync`, passing `configuration`.
 public enum YesChefCloudSync {
-  private static let restoreRequiresManualEnablementKey =
-    "YesChefCloudKitSyncRestoreRequiresManualEnablement"
-
   /// The per-app constants — the only thing that differed from galavant's copy.
   public static let configuration = CloudSyncConfiguration(
     containerIdentifier: "iCloud.com.jonphillips.yeschef",
     enabledDefaultsKey: "YesChefCloudKitSyncEnabled",
     enabledEnvironmentKey: "YES_CHEF_CLOUDKIT_SYNC_ENABLED",
-    enabledLaunchArgument: "-YesChefCloudKitSyncEnabled"
+    enabledLaunchArgument: "-YesChefCloudKitSyncEnabled",
+    restoreRequiresManualEnablementDefaultsKey: "YesChefCloudKitSyncRestoreRequiresManualEnablement"
+  )
+
+  /// Yes Chef's store identity and migration closure for the shared backup workflow.
+  public static let databaseBackupConfiguration = DatabaseBackupConfiguration(
+    displayName: "Yes Chef",
+    backupFilenamePrefix: "YesChef-Backup-",
+    preRestoreFilenamePrefix: "YesChef-PreRestore-",
+    restoreStagingFilenamePrefix: "YesChef-Restore-",
+    identifyingTableNames: ["recipes"],
+    declaredSchemaVersion: 50,
+    lastPreRestoreDefaultsKey: "YesChefDatabaseBackupLastPreRestorePath",
+    cloudSync: configuration,
+    liveStoreURL: { try YesChefDatabaseStorage.liveSharedDatabaseURL() },
+    migrate: { try DependencyValues.migrateRestoreCandidate(at: $0) }
   )
 
   public typealias BootstrapMode = CloudSync.BootstrapMode
@@ -36,7 +48,6 @@ public enum YesChefCloudSync {
     environment: [String: String] = ProcessInfo.processInfo.environment,
     arguments: [String] = ProcessInfo.processInfo.arguments
   ) -> Bool {
-    guard !defaults.bool(forKey: restoreRequiresManualEnablementKey) else { return false }
     return CloudSync.isManuallyEnabled(
       configuration: configuration, defaults: defaults, environment: environment,
       arguments: arguments
@@ -44,23 +55,19 @@ public enum YesChefCloudSync {
   }
 
   public static func setManuallyEnabled(_ enabled: Bool, defaults: UserDefaults = .standard) {
-    if enabled {
-      defaults.removeObject(forKey: restoreRequiresManualEnablementKey)
-    }
     CloudSync.setManuallyEnabled(enabled, configuration: configuration, defaults: defaults)
   }
 
   /// A restore always begins as a new local sync peer. This persistent gate beats launch
   /// arguments and environment variables until the user deliberately turns sync back on.
   public static func disableForRestore(defaults: UserDefaults = .standard) {
-    defaults.set(true, forKey: restoreRequiresManualEnablementKey)
-    CloudSync.setManuallyEnabled(false, configuration: configuration, defaults: defaults)
+    CloudSync.disableForRestore(configuration: configuration, defaults: defaults)
   }
 
   /// True only while a restore has deliberately held sync off. The Settings UI uses this to put
   /// a final confirmation in front of the first CloudKit merge after a restore.
   public static func isDisabledByRestore(defaults: UserDefaults = .standard) -> Bool {
-    defaults.bool(forKey: restoreRequiresManualEnablementKey)
+    CloudSync.isDisabledByRestore(configuration: configuration, defaults: defaults)
   }
 
   public static func persistManualEnablementFromLaunchEnvironment(
@@ -68,7 +75,6 @@ public enum YesChefCloudSync {
     environment: [String: String] = ProcessInfo.processInfo.environment,
     arguments: [String] = ProcessInfo.processInfo.arguments
   ) {
-    guard !defaults.bool(forKey: restoreRequiresManualEnablementKey) else { return }
     CloudSync.persistManualEnablementFromLaunchEnvironment(
       configuration: configuration, defaults: defaults, environment: environment,
       arguments: arguments

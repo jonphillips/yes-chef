@@ -59,6 +59,7 @@ let package = Package(
       name: "YesChefCoreTests",
       dependencies: [
         "YesChefCore",
+        .product(name: "CloudSyncKit", package: "CloudSyncKit"),
         .product(name: "CustomDump", package: "swift-custom-dump"),
         .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
       ],
