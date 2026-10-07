@@ -140,7 +140,10 @@ struct SettingsView: View {
     )
     .fileImporter(
       isPresented: $isPresentingBackupImporter,
-      allowedContentTypes: [.yesChefSQLiteBackup],
+      // `.data` too: Galavant also exports a `.sqlite` backup type, and with both apps installed
+      // iOS resolves the extension to only one of them. Restore's prepare step validates the
+      // schema, so a non–Yes Chef file is rejected there.
+      allowedContentTypes: [.yesChefSQLiteBackup, .data],
       onCompletion: backupRestoreSelected
     )
     .alert("Restore This Backup?", isPresented: $isConfirmingRestore) {
