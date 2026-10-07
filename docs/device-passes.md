@@ -18,6 +18,10 @@ Export a backup from the current build and store it off-device (Files / iCloud D
 code behind ADR-0056's re-seed moves. After the lift merges, the restore path's first real-device run is
 ADR-0056 Phase 4 (`PROD-CUTOVER.md`), which then covers the lifted code for both apps.
 
+**Backup importer accepts `.data` (side-by-side with Galavant)** (schema-free). With Galavant also installed on
+the device, Settings → **Restore from a Backup** can select a Yes Chef `.sqlite` backup (it is not greyed out). Then pick
+a Galavant backup or any other non–Yes Chef file and confirm restore refuses it as not a Yes Chef backup.
+
 **NYT capture fidelity** ([effort brief](efforts/nyt-capture-fidelity.md)). In the in-app browser, capture the
 NYT carrot cake and confirm it shows “For the cake” and “For the frosting,” with author “Genevieve Ko.” Save
 without tapping a tag and confirm none were added. Then capture a second NYT recipe through the share sheet

@@ -9,6 +9,15 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Backup importer accepts `.data` (`backup-importer-accept-data`)
+
+**2026-10-07. No schema change.** The Settings restore importer now allows `[.yesChefSQLiteBackup, .data]`.
+Galavant exports its own `.sqlite`-claiming backup type, and with both apps installed iOS resolves the extension to
+only one of them, which could grey out Yes Chef's own backups. CloudSyncKit's restore prepare step
+(`DatabaseBackup.validateAppSchema`) still rejects any file that isn't a Yes Chef store. The exported type and the
+exporter are unchanged. Jon's side-by-side importer pass is owed in `docs/device-passes.md`.
+
+---
 ## NYT capture fidelity: ingredient groups, author name, opt-in publisher tags (`effort/nyt-capture-fidelity`)
 
 **2026-10-04. No schema change.** The NYT capture path now recovers named ingredient groups from rendered DOM
