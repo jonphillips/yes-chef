@@ -39,7 +39,14 @@ run may bless, never the plan's assumption.
 ## Phase 1 — DB-preserving baseline squash  *(ships as a reviewed slice; ADR-0056 D2)*
 
 Collapse the accumulated migrations to one baseline and drop the dead cook columns, **without erasing any
-existing device's data.**
+existing device's data.** Brief: [`efforts/prod-baseline-squash.md`](efforts/prod-baseline-squash.md). It uses
+GRDB's `registerMigration(_:merging:)`, and it also drops the retired category-seed tables (ADR-0049 Amd 1).
+
+- [ ] **Every device first runs the final pre-squash build.** The squash adopts only a store at exactly the
+      final legacy migration, and refuses anything else without changing it. Launch current `main` once on
+      each device (the share extension shares the store) before the squash build reaches it.
+- [ ] Know the restore consequence: once the squash ships, a backup from **before** the final legacy migration
+      (`user_version` below 50) restores only on a pre-squash build. Backups taken since 2026-08-10 are at 50.
 
 - [ ] Author the squash so a device that has already applied the old migrations keeps its data and schema,
       and only a *fresh install* sees the clean baseline. **No erase-on-schema-change path** — it has wiped
@@ -93,6 +100,11 @@ fallback throughout.
 - [ ] Deploy the Development schema to **Production** in the CloudKit dashboard (additive-only; **this
       permanently locks the record types** — confirm the promotion list is complete and the dropped columns
       are absent *before* deploying).
+- [ ] **Open question:** the Development *CloudKit* schema already carries `lastCookedAt` / `timesCooked` on
+      the recipes record type, created there by past uploads. Dropping them locally doesn't remove them from
+      Dev, and a deploy copies Dev's fields. Check whether the console can delete a field in Development. If
+      only a Development reset would remove them, accept them as inert fields. **Don't reset Dev**, because it
+      is the fallback.
 
 **4b — Distribution build config  (ADR-0056 D6).**
 - [ ] Shipping build has dogfood scaffolding OFF: no seed-sample-data, no erase-on-schema-change, and sync

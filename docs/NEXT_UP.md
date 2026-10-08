@@ -1,9 +1,10 @@
-# Next Up — Lift backup & restore into CloudSyncKit
+# Next Up — Production baseline squash (ADR-0056 Phase 1)
 
-**Slices:** effort `cloudsynckit-backup-lift` (two PRs, both on branch `effort/cloudsynckit-backup-lift`: jon-platform first, then yes-chef)
-**Briefs:** docs/efforts/cloudsynckit-backup-lift.md, jon-platform docs/adr/0006-lift-backup-restore-into-cloud-sync-kit.md
+**Slices:** effort `prod-baseline-squash` (one PR, branch `effort/prod-baseline-squash`)
+**Briefs:** docs/efforts/prod-baseline-squash.md, docs/decisions/ADR-0056-move-to-production-and-data-carry.md D2
 **Done when:** per the brief's "Done when"; verification per `docs/verification.md`.
 **Owed:** Jon's device passes in `docs/device-passes.md` (not executor work).
-**Notes:** A move, not a copy: Yes Chef's behavior, copy, and backup files are unchanged. The jon-platform
-PR is additive, and Galavant `main` must still build against it. Keep both defaults-key strings exact.
-Touches sync, so the architect escalates both PRs to Jon. Start from a fresh `main` in both repos.
+**Notes:** Schema change on every device's live store. **Step 0 (freeze the legacy schema fixture) comes
+before any edit to `Schema.swift`.** Use GRDB's `registerMigration(_:merging:)`; don't hand-roll identifier
+bookkeeping. If you find a dead column the brief doesn't name, stop and escalate. The architect escalates
+the PR to Jon and holds the merge until the real-store check passes on a copy of each device's database.

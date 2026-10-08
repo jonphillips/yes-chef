@@ -9,6 +9,18 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Backup & restore lifted into CloudSyncKit (`effort/cloudsynckit-backup-lift`)
+
+**2026-10-06. No schema change, touches sync.** ADR-0030 backup & restore and the restore hold moved into
+jon-platform `CloudSyncKit` ([jon-platform #66](https://github.com/jonphillips/jon-platform/pull/66)), and Yes Chef
+forwards through its facade ([#341](https://github.com/jonphillips/yes-chef/pull/341)). The UI, its copy, and the
+backup files are unchanged. Two additions: an owner-only restore guard (D3), and a declared schema version (D4,
+`declaredSchemaVersion: 50`) that ADR-0056's squash now raises. The PR reported `check-drift.sh` (707 package tests),
+`YesChefTests` (75), and the generic iOS build green. This entry was backfilled by the squash plan PR, because #341
+left out its DONE-LOG entry and `NEXT_UP.md` advance. The first real-device restore of the lifted code is ADR-0056
+Phase 4.
+
+---
 ## Backup importer accepts `.data` (`backup-importer-accept-data`)
 
 **2026-10-07. No schema change.** The Settings restore importer now allows `[.yesChefSQLiteBackup, .data]`.

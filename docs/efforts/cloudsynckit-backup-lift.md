@@ -1,6 +1,6 @@
 # Effort — Lift backup & restore into `CloudSyncKit`
 
-Status: Dispatched 2026-10-06. Schema-free (no table or column changes), but **touches sync**, so the architect
+Status: Done 2026-10-06 (jon-platform #66, yes-chef #341). Schema-free (no table or column changes), but **touches sync**, so the architect
 escalates both PRs to Jon before merge.
 Summary: Move `YesChefDatabaseBackup` (ADR-0030) and the restore hold out of Yes Chef into jon-platform's
 `CloudSyncKit`, per jon-platform ADR-0006, so Galavant can adopt it for its CloudKit Production cutover. It is
