@@ -13,6 +13,10 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**Drop legacy recipe cooking columns** ([effort brief](efforts/prod-dead-column-drop.md), schema change).
+Export a backup from each device before installing the build. Confirm the library is intact afterwards and
+“Last cooked” still appears for a cooked recipe. Edit a recipe and confirm the edit syncs to the other device.
+
 **Before the CloudSyncKit backup lift's Yes Chef PR merges** ([effort brief](efforts/cloudsynckit-backup-lift.md)).
 Export a backup from the current build and store it off-device (Files / iCloud Drive). It's insurance before the
 code behind ADR-0056's re-seed moves. After the lift merges, the restore path's first real-device run is

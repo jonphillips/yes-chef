@@ -24,16 +24,12 @@ extension RecipeCoreTests {
             title: "Cooked Recipe",
             dateCreated: today,
             dateModified: today,
-            lastCookedAt: futureDate,
-            timesCooked: 99
           ),
           Recipe(
             id: futureOnlyRecipeID,
             title: "Future Recipe",
             dateCreated: today,
             dateModified: today,
-            lastCookedAt: olderDate,
-            timesCooked: 99
           ),
         ] {
           try Recipe.insert { recipe }.execute(db)

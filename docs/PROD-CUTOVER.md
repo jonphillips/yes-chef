@@ -28,8 +28,8 @@ run may bless, never the plan's assumption.
 ## Preconditions (before anything below)
 
 - [ ] `main` is green: package build + `check-drift` + `YesChefTests`/`YesChefCoreTests`.
-- [ ] The calendar-derived cook fields have landed (ADR-0056 references), so nothing reads
-      `Recipe.lastCookedAt` / `Recipe.timesCooked` — grep both symbols; only model storage + Codable remain.
+- [ ] Calendar-derived cooking history has landed; `Recipe` no longer persists
+      `lastCookedAt` / `timesCooked`.
 - [ ] **Do not change** the bundle id (`com.jonphillips.yeschef`) or container id
       (`iCloud.com.jonphillips.yeschef`). Local-container carry depends on both being stable.
 - [ ] Schedule a window with slack — the first Production sync is large and will throttle (see Phase 4).
@@ -42,14 +42,15 @@ Brief: [`efforts/prod-dead-column-drop.md`](efforts/prod-dead-column-drop.md). *
 Production locks the CloudKit schema, not the local migration list, so the squash is deferred cleanup that
 can happen any time after the cut (ADR-0056 Amd 1).
 
-- [ ] One appended migration drops `recipes.lastCookedAt` and `recipes.timesCooked`. The fields and
+- [x] One appended migration drops `recipes.lastCookedAt` and `recipes.timesCooked`. The fields and
       CodingKeys come out of `Recipe`. Old backup JSON still decodes, since unknown keys are ignored.
-- [ ] A test proves every table's on-disk columns match its model, so no other dead column reaches
+- [x] A test proves every table's on-disk columns match its model, so no other dead column reaches
       Production unnoticed.
 - [ ] Before installing the build, export a backup from each device. Afterwards, confirm the library is
       intact and that an edit syncs to the other device.
 
-**Gate:** the drop has shipped and the device pass is clean.
+**Gate:** the drop has shipped and Jon's device pass is clean. The device pass remains owed in
+[`device-passes.md`](device-passes.md).
 
 ---
 
