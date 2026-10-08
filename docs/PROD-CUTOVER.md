@@ -14,7 +14,7 @@ is the yes-chef-specific execution on top of it; the shared *data-carry* finding
 `jon-platform/SEAM-LEDGER.md` and lifts into that house doc once the dry run (Phase 4) proves it.
 
 **Not a dispatch.** These are ops steps Jon runs (with the architect), each gated on the one before. The
-build/schema/CloudKit actions are not Codex work; the squash's *code* (D2) is the one part that ships as a
+build/schema/CloudKit actions are not Codex work; the dead-column drop's *code* (D2, as amended) is the one part that ships as a
 normal reviewed slice.
 
 **The spine (ADR-0056):** the local SQLite store carries across the update in place (same bundle id), but
@@ -36,24 +36,20 @@ run may bless, never the plan's assumption.
 
 ---
 
-## Phase 1 — DB-preserving baseline squash  *(ships as a reviewed slice; ADR-0056 D2)*
+## Phase 1 — Drop the dead cook columns  *(ships as a reviewed slice; ADR-0056 D2 as amended by Amd 1)*
 
-Collapse the accumulated migrations to one baseline and drop the dead cook columns, **without erasing any
-existing device's data.**
+Brief: [`efforts/prod-dead-column-drop.md`](efforts/prod-dead-column-drop.md). **No migration squash.**
+Production locks the CloudKit schema, not the local migration list, so the squash is deferred cleanup that
+can happen any time after the cut (ADR-0056 Amd 1).
 
-- [ ] Author the squash so a device that has already applied the old migrations keeps its data and schema,
-      and only a *fresh install* sees the clean baseline. **No erase-on-schema-change path** — it has wiped
-      the dogfood library before ([[debug-erase-vs-sync-triggers]]).
-- [ ] Omit `lastCookedAt` and `timesCooked` from the squashed `CREATE TABLE "recipes"`; remove the fields +
-      CodingKeys from the `Recipe` model. Old backup JSON carrying those keys still decodes (unknown keys
-      ignored) — no backup-compat migration needed.
-- [ ] **Test on a byte copy of Jon's real dogfood database**, not a seeded sample store: apply the squashed
-      build to the copy and confirm zero row loss, no schema drift, and a clean sync-trigger install. A
-      sample-store pass does **not** count ([[squash-migrations-at-prod-baseline]], [[never-rewrite-shipped-migration]]).
-- [ ] Never rewrite a migration body that already ran on a device; the squash presents a new baseline, it
-      does not edit history in place.
+- [ ] One appended migration drops `recipes.lastCookedAt` and `recipes.timesCooked`. The fields and
+      CodingKeys come out of `Recipe`. Old backup JSON still decodes, since unknown keys are ignored.
+- [ ] A test proves every table's on-disk columns match its model, so no other dead column reaches
+      Production unnoticed.
+- [ ] Before installing the build, export a backup from each device. Afterwards, confirm the library is
+      intact and that an edit syncs to the other device.
 
-**Gate:** the squash is proven data-preserving on a copy of the real DB. Do not proceed otherwise.
+**Gate:** the drop has shipped and the device pass is clean.
 
 ---
 
@@ -93,6 +89,11 @@ fallback throughout.
 - [ ] Deploy the Development schema to **Production** in the CloudKit dashboard (additive-only; **this
       permanently locks the record types** — confirm the promotion list is complete and the dropped columns
       are absent *before* deploying).
+- [ ] **Delete the dead fields from the Development schema first.** Development still carries
+      `lastCookedAt` / `timesCooked` on the recipes record type, created there by past uploads, and a deploy
+      copies Development's fields. Once Phase 1 has shipped to every device, delete both fields in the
+      console (Galavant's cutover did the same). **Never use "Reset Development Environment"**: it deletes the
+      Development data, and that data is the fallback.
 
 **4b — Distribution build config  (ADR-0056 D6).**
 - [ ] Shipping build has dogfood scaffolding OFF: no seed-sample-data, no erase-on-schema-change, and sync
@@ -101,7 +102,7 @@ fallback throughout.
 
 **4c — Install over the dev build; re-seed via restore.**
 - [ ] Install the distribution (TestFlight) build over the dev build on the one device. Confirm the **local
-      library is intact** after the update + squash.
+      library is intact** after the update.
 - [ ] Restore the Phase 3 backup on this build (restore begins as a new peer; sync stays held by
       `disableForRestore` until you enable it).
 - [ ] Enable sync. The whole library re-pushes into the empty Production zone as authoritative.
@@ -150,10 +151,10 @@ fallback throughout.
 ## Condensed checklist
 
 1. [ ] Preconditions: green main, cook columns unread, ids unchanged, window with slack.
-2. [ ] Phase 1 — squash proven data-preserving **on a copy of the real DB**; cook columns dropped.
+2. [ ] Phase 1 — cook columns dropped by an appended migration; no other dead columns; device pass clean.
 3. [ ] Phase 2 — SyncMetadata coverage clean; promotion list verified both directions vs `CloudSync.swift`.
 4. [ ] Phase 3 — verified pre-cut backup in two places.
-5. [ ] Phase 4a — Production schema deployed (list complete, dropped columns absent).
+5. [ ] Phase 4a — dead fields deleted from the Dev schema; Production schema deployed (list complete).
 6. [ ] Phase 4b — distribution build: scaffolding off, entitlements intact.
 7. [ ] Phase 4c — install over dev build, library intact, restore + enable sync, let throttling drain.
 8. [ ] Phase 4d — Production zone seeded, **confirmed server-side**.

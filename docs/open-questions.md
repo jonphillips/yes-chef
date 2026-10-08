@@ -10,6 +10,12 @@ and everything downstream move forward without waiting on it.
 
 From the old Next Up:
 
+- **Migration baseline squash — optional, post-cut, both apps (deferred by ADR-0056 Amd 1).** Use GRDB
+  `registerMigration(_:merging:)`. The precondition is that every device is at the final legacy migration.
+  Also raise `declaredSchemaVersion` so older backups still restore. It's tidiness only: fresh installs stop
+  replaying the repair migrations and the ones that call live app code. Galavant (43 migrations) would do the
+  same.
+
 
 - **ADR-0045 cold-start starters are still open, no longer time-gated:** S2 rearranged the Calendar day-header
   Chat and the Workbench Chat into inspectors and left them passing `.none`. Whether they want their own starters

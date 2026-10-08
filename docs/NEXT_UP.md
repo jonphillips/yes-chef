@@ -1,9 +1,9 @@
-# Next Up — Lift backup & restore into CloudSyncKit
+# Next Up — Drop the dead cook columns before the Production deploy (ADR-0056 Phase 1)
 
-**Slices:** effort `cloudsynckit-backup-lift` (two PRs, both on branch `effort/cloudsynckit-backup-lift`: jon-platform first, then yes-chef)
-**Briefs:** docs/efforts/cloudsynckit-backup-lift.md, jon-platform docs/adr/0006-lift-backup-restore-into-cloud-sync-kit.md
+**Slices:** effort `prod-dead-column-drop` (one PR, branch `effort/prod-dead-column-drop`)
+**Briefs:** docs/efforts/prod-dead-column-drop.md, docs/decisions/ADR-0056-move-to-production-and-data-carry.md Amendment 1
 **Done when:** per the brief's "Done when"; verification per `docs/verification.md`.
 **Owed:** Jon's device passes in `docs/device-passes.md` (not executor work).
-**Notes:** A move, not a copy: Yes Chef's behavior, copy, and backup files are unchanged. The jon-platform
-PR is additive, and Galavant `main` must still build against it. Keep both defaults-key strings exact.
-Touches sync, so the architect escalates both PRs to Jon. Start from a fresh `main` in both repos.
+**Notes:** An appended migration on a synced table. Never edit an existing migration body. No migration
+squash. If the dead-column test finds a column the brief doesn't name, stop and escalate. The architect
+escalates the PR to Jon.
