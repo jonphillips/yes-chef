@@ -12,6 +12,9 @@
 > auto-seed as an *unproven optimization the dry run may bless*, and puts a DB-preserving baseline squash
 > and a single-device dry run in front of the cut so nothing irreversible happens on a guess.
 
+**⚠️ [Amendment 1](#amendment-1--no-squash-before-the-cut-only-the-dead-columns-are-dropped-2026-10-08) (2026-10-08) narrows D2:** there is no squash before the cut. Only the dead cook
+columns are dropped, by an appended migration.
+
 Status: **Accepted** — 2026-08-24 (proposed and accepted same day, Jon's explicit call; the load-bearing
 decision is D1, restore-as-primary re-seed). Origin: Jon, asking whether we have a real move-to-production
 plan and whether he can leverage his local database instead of re-importing. Extends
@@ -156,3 +159,32 @@ lesson). Entitlements (app-group + iCloud container) intact on both the app and 
 - **OQ3 — Is a lightweight server-side inspection (CloudKit dashboard record count in the Prod private zone)
   part of D5(b)?** Proposed yes — "up to date" in-app has lied before ([[sqlitedata-single-fk-sync-limit]]),
   so the re-seed is confirmed against the zone, not the indicator.
+
+## Amendment 1 — no squash before the cut; only the dead columns are dropped (2026-10-08)
+
+**Decision.** D2's baseline squash comes off the cutover path. Phase 1 becomes one ordinary appended migration
+that drops `Recipe.lastCookedAt` and `Recipe.timesCooked`, plus a test that every table's on-disk columns match
+its model ([`efforts/prod-dead-column-drop.md`](../efforts/prod-dead-column-drop.md)). The squash is deferred,
+optional cleanup that can happen any time after the cut.
+
+**Why.** D2 tied two things together that only one constraint needed. **Production makes the CloudKit schema
+permanent, not the local migration list.** That list is device-local SQLite history, and GRDB's
+`registerMigration(_:merging:)` can collapse it on any device that is fully migrated, before or after
+Production. The one thing that has to precede the deploy is keeping dead fields out of the Production
+schema, and that is a column drop, not a squash. Galavant reached Production on 2026-10-08 with 43 unsquashed
+migrations and lost nothing (Galavant ADR-0049 D3 step 2). Meanwhile the squash would rewrite every live
+store's migration record in the week the library is most exposed, for a benefit that is only tidiness.
+
+**What changes.**
+- **D2:** the D2 rule still applies to the drop: no erase-on-schema-change, and the existing store is
+  preserved. The squash and its real-DB-copy gate are withdrawn from the cutover. The drop is the same
+  operation the synced `menus` table already took (`Remove legacy menu prep plan BLOB`), so the gate is
+  backup-first plus a device pass.
+- **Consequences, "This is why the squash precedes the deploy":** read it as "why the dead-column drop
+  precedes the deploy". One more step is needed. Development's CloudKit schema still carries the two fields
+  from past uploads, and a deploy copies Development's fields, so `PROD-CUTOVER.md` Phase 4a deletes them in
+  the console first. **It never resets Development**, because Development is the fallback.
+- **Failure list item 1** ("the squash erases the local store") no longer applies.
+- **Correction:** this ADR's runbook and the first plan draft also listed the retired category-seed tables for
+  dropping. Migration `Promote category namespaces to facets` already dropped them.
+

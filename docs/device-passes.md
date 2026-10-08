@@ -225,9 +225,9 @@ prod/TestFlight cut. At that cut, deploy the following to the production schema:
 dead CKAsset field never enters the prod schema.*
 
 *`Recipe.lastCookedAt` and `Recipe.timesCooked` are **not** on this list and must not be promoted — both are
-superseded by calendar-derived values (this slice) and are to be **dropped in the pre-prod baseline squash**:
-omit them from the squashed `CREATE TABLE "recipes"` and remove the fields + CodingKeys from the `Recipe`
-model. Old backup JSON carrying these keys still decodes (unknown keys are ignored), so no backup-compat
+superseded by calendar-derived values (this slice) and are **dropped by an appended migration before the deploy**
+([`efforts/prod-dead-column-drop.md`](efforts/prod-dead-column-drop.md), ADR-0056 Amd 1). Delete them from the
+Development CloudKit schema in the console before deploying (`PROD-CUTOVER.md` Phase 4a). Old backup JSON carrying these keys still decodes (unknown keys are ignored), so no backup-compat
 migration is needed.*
 
 **The check is the registration list, in both directions.** A column on a synced table is on this list; a
