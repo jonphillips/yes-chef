@@ -177,10 +177,9 @@ Build a minimal but real recipe library:
    - View original version, read-only (from the frozen `originalSnapshot`)
    - Basic scaling display
    - Cooking mode shell
-   - Meal-planner-ready cooking memory: keep `lastCookedAt`/`timesCooked` in the
-     schema, but do not expose a manual "mark cooked" or retrospective-note flow
-     in the first slice. The meal calendar will later update/derive last-cooked
-     history from planned meals whose dates have passed.
+   - Meal-planner-ready cooking memory: derive last-cooked history from past
+     planned meals; do not expose a manual "mark cooked" or retrospective-note flow
+     in the first slice.
 
 Do not implement CloudKit sync, recipe transfer (send/Family Cookbook), production
 import UI, grocery list, meal planning, pantry, or AI in the first coding pass unless

@@ -195,8 +195,8 @@ preserved — transfer is just another import path (see §29).
 Adjustments to entities defined elsewhere in this document:
 
 * Recipe has NO householdID and NO addedByCookID. favorite: Bool and rating: Int?
-remain plain columns on Recipe (your own copy — there is only one you). archived,
-timesCooked, lastCookedAt are plain fields too.
+remain plain columns on Recipe (your own copy — there is only one you). archived is a
+plain field too. Calendar-derived cooking history is not persisted on Recipe.
 * IngredientLine and InstructionStep keep their sectionID and may also keep recipeID —
 both are ordinary foreign keys now (no sharing-tree constraint).
 * RecipeNote, CookingSession, etc. carry no Cook attribution columns; everything in a
@@ -331,8 +331,6 @@ archived: Bool
 libraryPlacement: RecipeLibraryPlacement
 dateCreated: Date
 dateModified: Date
-lastCookedAt: Date?
-timesCooked: Int
 originalImportText: String?
 originalSnapshot: Data?
 importMetadata: ImportMetadata? (future, not persisted in MVP 1)
@@ -1971,11 +1969,11 @@ RecipeEquipment
 (A single owner's private library — no Household, Cook, or sharing entities. Recipe
 transfer between people is a separate feature, not part of the core schema. See §2.6.)
 
-The first vertical slice keeps `Recipe.lastCookedAt`/`timesCooked` in the schema but
-does not expose a manual "mark cooked" action or retrospective-note flow. The meal
-planner milestone owns cooking history: past dated `MealPlanEntry` records will
-update or derive the last-cooked value. Full `CookingSession` history remains
-deferred.
+The first vertical slice kept `Recipe.lastCookedAt`/`timesCooked` in the schema but
+did not expose a manual "mark cooked" action or retrospective-note flow. The meal
+calendar now derives cooking history from past dated meal entries, and the obsolete
+recipe columns were dropped before the Production schema cut. Full `CookingSession`
+history remains deferred.
 
 Defer:
 

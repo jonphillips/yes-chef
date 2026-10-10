@@ -9,6 +9,18 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Drop the dead recipe cooking columns (`effort/prod-dead-column-drop`)
+
+**2026-10-08. Synced-schema migration.** An appended migration removes the obsolete
+`Recipe.lastCookedAt` and `Recipe.timesCooked` columns while preserving other recipe
+values. The Recipe model no longer carries those fields; calendar-derived cooking
+history remains available in the browser. A Core test compares every persisted
+table's on-disk columns with its `@Table` model, and another migrates a legacy recipe
+row through the drop. `scripts/check-drift.sh` passed (709 package tests and app
+test-target compile), the generic iOS build succeeded, and all 75 `YesChefTests`
+passed. Jon's backup-and-sync device pass is owed in `docs/device-passes.md`.
+
+---
 ## Backup & restore lifted into CloudSyncKit (`effort/cloudsynckit-backup-lift`)
 
 **2026-10-06. No schema change, touches sync.** ADR-0030 backup & restore and the restore hold moved into

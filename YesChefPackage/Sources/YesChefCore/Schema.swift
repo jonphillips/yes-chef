@@ -1265,6 +1265,19 @@ extension DependencyValues {
       .execute(db)
     }
 
+    migrator.registerMigration("Drop legacy recipe cooking columns") { db in
+      for column in ["lastCookedAt", "timesCooked"] {
+        let columnExists = (try Int.fetchOne(
+          db,
+          sql: #"SELECT COUNT(*) FROM pragma_table_info('recipes') WHERE name = ?"#,
+          arguments: [column]
+        ) ?? 0) > 0
+        if columnExists {
+          try db.execute(sql: "ALTER TABLE \"recipes\" DROP COLUMN \"\(column)\"")
+        }
+      }
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

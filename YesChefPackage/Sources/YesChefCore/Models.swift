@@ -24,8 +24,6 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
   public var libraryPlacement: RecipeLibraryPlacement
   public var dateCreated: Date
   public var dateModified: Date
-  public var lastCookedAt: Date?
-  public var timesCooked: Int
   public var originalImportText: String?
   public var originalSnapshot: Data?
   public var makeAhead: String?
@@ -56,8 +54,6 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     libraryPlacement: RecipeLibraryPlacement = .main,
     dateCreated: Date,
     dateModified: Date,
-    lastCookedAt: Date? = nil,
-    timesCooked: Int = 0,
     originalImportText: String? = nil,
     originalSnapshot: Data? = nil,
     makeAhead: String? = nil,
@@ -87,8 +83,6 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     self.libraryPlacement = libraryPlacement
     self.dateCreated = dateCreated
     self.dateModified = dateModified
-    self.lastCookedAt = lastCookedAt
-    self.timesCooked = timesCooked
     self.originalImportText = originalImportText
     self.originalSnapshot = originalSnapshot
     self.makeAhead = makeAhead
@@ -120,8 +114,6 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     case libraryPlacement
     case dateCreated
     case dateModified
-    case lastCookedAt
-    case timesCooked
     case originalImportText
     case originalSnapshot
     case makeAhead
@@ -155,8 +147,6 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
       libraryPlacement: try container.decodeIfPresent(RecipeLibraryPlacement.self, forKey: .libraryPlacement) ?? .main,
       dateCreated: try container.decode(Date.self, forKey: .dateCreated),
       dateModified: try container.decode(Date.self, forKey: .dateModified),
-      lastCookedAt: try container.decodeIfPresent(Date.self, forKey: .lastCookedAt),
-      timesCooked: try container.decodeIfPresent(Int.self, forKey: .timesCooked) ?? 0,
       originalImportText: try container.decodeIfPresent(String.self, forKey: .originalImportText),
       originalSnapshot: try container.decodeIfPresent(Data.self, forKey: .originalSnapshot),
       makeAhead: try container.decodeIfPresent(String.self, forKey: .makeAhead),
