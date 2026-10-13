@@ -69,10 +69,11 @@ metadatabase. A row is **"on the server"** when its `SyncMetadata` has a `lastKn
    leave a dangling cover.
 1. **Skip the whole pass** unless at least one recipe is on the server. A device that has never synced, or has
    sync off, has nothing to repair and must not rewrite the library on every launch.
-2. **Recipes not on the server:** apply a no-op `UPDATE` (for example `SET "title" = "title"`). Don't bump
-   `dateModified`, because it drives "Newest". SQLiteData's after-update trigger has no `WHEN` clause, so any
-   `UPDATE` re-queues the row (verified in 1.9.0 `Internal/Triggers.swift`).
-3. **Children not on the server, of recipes that are:** apply the same no-op touch to the rows of every synced
+2. **Recipes not on the server:** re-queue them with `UPDATE "recipes" SET "id" = "id"`, SQLiteData's own
+   re-sweep idiom (`SyncEngine.uploadRecordsToCloudKit`). It fires the after-update trigger, and the primary-key
+   trigger stays quiet because it's guarded `WHEN old.pk != new.pk` (verified in 1.9.0
+   `Internal/Triggers.swift`). Don't bump `dateModified`, because it drives "Newest".
+3. **Children not on the server, of recipes that are:** re-queue the same way the rows of every synced
    table with a `recipeID` FK to `recipes`. **Never touch a child whose recipe isn't on the server yet.** It would
    hit `.referenceViolation`, and SQLiteData would null or delete it locally. Waiting for a later launch is the
    ordering guarantee: step 2 uploads the recipe this launch, and step 3 picks up its children on the next one.

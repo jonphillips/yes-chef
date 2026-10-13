@@ -38,9 +38,9 @@ server. That catches every cause, including ones we haven't met yet.
   summary "N items haven't synced". Its precedence is after `.downloading` and before `.upToDate`: in-progress
   states still win, but **"Up to date" requires both counts to be zero.** Reducer tests cover every new
   precedence edge.
-- **`CloudSync.requeue(recordType:primaryKeys:)`** re-queues rows with a no-op `UPDATE` of one **non-primary-key**
-  column, chosen from SQLiteData's `recordTypes.tableInfo`. Never touch the primary key, because SQLiteData has a
-  separate trigger for that. Any `UPDATE` fires its after-update trigger (verified in 1.9.0
+- **`CloudSync.requeue(recordType:primaryKeys:)`** re-queues rows with `UPDATE <table> SET <pk> = <pk>`. That's
+  SQLiteData's own re-sweep idiom (`SyncEngine.uploadRecordsToCloudKit`). It fires the after-update trigger, and
+  the primary-key-change trigger is guarded `WHEN old.pk != new.pk`, so it stays quiet (verified in 1.9.0
   `Internal/Triggers.swift`).
 - It stays domain-free, with no app table names in the package. Galavant gets it when it bumps the package, and
   nothing there changes until then.
