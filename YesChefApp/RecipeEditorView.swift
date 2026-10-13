@@ -367,7 +367,7 @@ private struct RecipeTimeTextField: View {
       .accessibilityLabel(title)
       .onAppear { input = String(minutes) }
       .onChange(of: minutes) { _, newValue in
-        if focusedField != field {
+        if (Int(input) ?? 0) != newValue {
           input = String(newValue)
         }
       }
@@ -382,7 +382,7 @@ private struct RecipeTimeTextField: View {
     Binding(
       get: { input },
       set: { newValue in
-        let digits = String(newValue.filter(\.isNumber))
+        let digits = String(newValue.filter { $0.isASCII && $0.isNumber })
         input = digits
         minutes = digits.isEmpty ? 0 : min(Int(digits) ?? 600, 600)
       }
