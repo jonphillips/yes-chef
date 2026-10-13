@@ -79,6 +79,9 @@ section is work.**
   export of raw HTML or JSON-LD "for debugging" or "for a later re-parse" is a review block. Jon accepts a capture
   at review or debugs it live, and never redoes a recipe. Large TEXT in a synced table is also how a record
   silently passes CloudKit's 1 MB limit.
+- **⚠️ A `RecipePhoto` row exists only with image bytes** ([`efforts/raw-import-html-drop.md`](efforts/raw-import-html-drop.md) S2).
+  Capture persists only images it downloaded. A URL-only photo row, or a body-image scrape that runs although a
+  structured source found an image, is a review block. Jon's rule: no dead data in the library.
 - **The Recipe Workbench store/curate/compare arc (ADR-0019) is complete**, S1–S4 shipped. Parked follow-ons
   live in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md), not here.
 - **The workbench's experiment-outcome verb is NOT scoped** — only its *placement* is ratified (ADR-0042 D8's
