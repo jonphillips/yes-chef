@@ -147,7 +147,8 @@ lesson). Entitlements (app-group + iCloud container) intact on both the app and 
 3. Migration-orphaned rows never upload and are noticed only after the Dev environment is gone (D4 + D5
    prevent — Dev stays live until Prod is proven).
 4. The bundle id or container id changes, breaking local-container carry (out of scope: **do not change
-   either**; both are already store-ready).
+   either**; both are already store-ready). This means the **Release** identity. ADR-0059 adds a Debug-only
+   `.dev` identity after the cut and leaves both of these alone.
 
 ## Open questions
 

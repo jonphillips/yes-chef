@@ -32,6 +32,8 @@ run may bless, never the plan's assumption.
       `lastCookedAt` / `timesCooked`.
 - [ ] **Do not change** the bundle id (`com.jonphillips.yeschef`) or container id
       (`iCloud.com.jonphillips.yeschef`). Local-container carry depends on both being stable.
+      ADR-0059's Debug-only `.dev` identity comes **after** the cut and leaves these Release identifiers
+      alone. Don't dispatch it before Phase 4e (ADR-0059 D1).
 - [ ] Schedule a window with slack — the first Production sync is large and will throttle (see Phase 4).
 
 ---
@@ -102,6 +104,11 @@ fallback throughout.
 - [ ] Entitlements intact on **both** the app and the share extension: app-group + iCloud container.
 
 **4c — Install over the dev build; re-seed via restore.**
+
+> ⚠️ **From here on, nothing gets an Xcode Run onto a device that has TestFlight Yes Chef.** A Debug build
+> still has the production bundle ID and app group until ADR-0059 lands, and it would install over
+> TestFlight against the Development environment. Use the simulator until then (ADR-0059 D1).
+
 - [ ] Install the distribution (TestFlight) build over the dev build on the one device. Confirm the **local
       library is intact** after the update.
 - [ ] Restore the Phase 3 backup on this build (restore begins as a new peer; sync stays held by
@@ -143,7 +150,11 @@ fallback throughout.
 ## Post-cut
 
 - [ ] Keep the **Development** zone as a cold archive through at least one confirmed two-device Production
-      round-trip before deciding whether to reset it (ADR-0056 OQ2).
+      round-trip before deciding whether to reset it (ADR-0056 OQ2). Recommended: reset it then, **before**
+      Yes Chef Dev first turns sync on, so it starts light and never writes into the archive (ADR-0059 OQ1).
+- [ ] The architect sets `NEXT_UP.md` to the Yes Chef Dev dispatch (ADR-0059; the ticket is at the end of
+      [`efforts/yes-chef-dev-variant.md`](efforts/yes-chef-dev-variant.md)). Until it merges, Xcode Run goes
+      only to the simulator.
 - [ ] In `CURRENT_HANDOFF.md`, retire the **Prod-schema promotion list** section once deployed (it is a
       one-time ops step, not standing guidance) and note the cut in `DONE-LOG.md`.
 
@@ -160,4 +171,4 @@ fallback throughout.
 7. [ ] Phase 4c — install over dev build, library intact, restore + enable sync, let throttling drain.
 8. [ ] Phase 4d — Production zone seeded, **confirmed server-side**.
 9. [ ] Phase 4e — fresh device pulls the full library. **← cut is real here.**
-10. [ ] Post-cut — Development kept as archive; handoff/DONE-LOG updated.
+10. [ ] Post-cut — Development kept as archive; handoff/DONE-LOG updated; Yes Chef Dev (ADR-0059) dispatched.
