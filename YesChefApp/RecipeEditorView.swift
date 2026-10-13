@@ -101,11 +101,17 @@ struct RecipeEditorView: View {
 /// shared `RecipeEditorModel`. Extracted so the two screens edit *one* draft implementation (ADR-0051
 /// D1 / ADR-0053 D2) rather than diverging. The owning screen supplies the `Form`, the scroll proxy,
 /// the focus state, and its own chrome (title, toolbar, Save).
+private enum RecipeTimeField: Hashable {
+  case prep
+  case cook
+}
+
 struct RecipeEditorFields: View {
   let model: RecipeEditorModel
   let proxy: ScrollViewProxy
   @FocusState.Binding var focusedIngredientSectionID: IngredientSection.ID?
   @FocusState.Binding var focusedIngredientSectionNameID: IngredientSection.ID?
+  @FocusState private var focusedTimeField: RecipeTimeField?
 
   var body: some View {
     @Bindable var model = model
@@ -141,25 +147,37 @@ struct RecipeEditorFields: View {
       }
 
       Section("Timing and Yield") {
-        StackedTextField(title: "Servings", text: $model.draft.servingsText)
-        StackedTextField(title: "Yield", text: $model.draft.yieldText)
-        Stepper(value: $model.draft.prepTimeMinutes, in: 0...600, step: 5) {
-          Text("Prep: \(model.draft.prepTimeMinutes) min")
-        }
-        Stepper(value: $model.draft.cookTimeMinutes, in: 0...600, step: 5) {
-          Text("Cook: \(model.draft.cookTimeMinutes) min")
-        }
+        AdaptiveFormRow(fields: [
+          AnyView(StackedTextField(title: "Servings", text: $model.draft.servingsText)),
+          AnyView(StackedTextField(title: "Yield", text: $model.draft.yieldText)),
+          AnyView(timeField(title: "Prep time", value: prepTimeBinding, field: .prep)),
+          AnyView(timeField(title: "Cook time", value: cookTimeBinding, field: .cook))
+        ])
       }
 
       Section("Organization") {
-        Picker("Library", selection: $model.draft.libraryPlacement) {
-          ForEach(RecipeLibraryPlacement.allCases, id: \.self) { placement in
-            Text(placement.title)
-              .tag(placement)
-          }
-        }
-        RecipeFacetSingleSelectPicker(model: model, facetName: "Cuisine")
-        RecipeFacetSingleSelectPicker(model: model, facetName: "Course")
+        AdaptiveFormRow(fields: [
+          AnyView(StackedFormField(title: "Library") {
+            Picker("Library", selection: $model.draft.libraryPlacement) {
+              ForEach(RecipeLibraryPlacement.allCases, id: \.self) { placement in
+                Text(placement.title)
+                  .tag(placement)
+              }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+          }),
+          AnyView(StackedFormField(title: "Cuisine") {
+            RecipeFacetSingleSelectPicker(model: model, facetName: "Cuisine")
+              .pickerStyle(.menu)
+              .labelsHidden()
+          }),
+          AnyView(StackedFormField(title: "Course") {
+            RecipeFacetSingleSelectPicker(model: model, facetName: "Course")
+              .pickerStyle(.menu)
+              .labelsHidden()
+          })
+        ])
         RecipeCategorySelectionField(model: model)
       }
 
@@ -264,6 +282,44 @@ struct RecipeEditorFields: View {
         )
       }
     }
+    .toolbar {
+      ToolbarItemGroup(placement: .keyboard) {
+        Spacer()
+        Button("Done") { focusedTimeField = nil }
+      }
+    }
+  }
+
+  private var prepTimeBinding: Binding<Int> {
+    Binding(
+      get: { model.draft.prepTimeMinutes },
+      set: { model.draft.prepTimeMinutes = min(max($0, 0), 600) }
+    )
+  }
+
+  private var cookTimeBinding: Binding<Int> {
+    Binding(
+      get: { model.draft.cookTimeMinutes },
+      set: { model.draft.cookTimeMinutes = min(max($0, 0), 600) }
+    )
+  }
+
+  private func timeField(title: LocalizedStringKey, value: Binding<Int>, field: RecipeTimeField) -> some View {
+    StackedFormField(title: title) {
+      HStack(spacing: 8) {
+        TextField(title, value: value, format: .number)
+          .keyboardType(.numberPad)
+          .focused($focusedTimeField, equals: field)
+          .accessibilityLabel(title)
+
+        Text("min")
+          .foregroundStyle(.secondary)
+
+        Stepper(title, value: value, in: 0...600, step: 5)
+          .labelsHidden()
+          .accessibilityLabel(title)
+      }
+    }
   }
 
   private func scrollToAndFocusIngredientSection(_ sectionID: IngredientSection.ID) {
@@ -334,7 +390,7 @@ private struct RecipeHeroPhotoPickerRow: View {
         RecipeHeroPhotoPreview(data: data)
       }
 
-      HStack(alignment: .firstTextBaseline, spacing: 12) {
+      HStack(alignment: .center, spacing: 12) {
         PhotosPicker(selection: $selectedItem, matching: .images) {
           Label(hasPhoto ? "Change Photo" : "Add Photo", systemImage: "photo.badge.plus")
         }
@@ -371,6 +427,7 @@ private struct RecipeHeroPhotoPickerRow: View {
           }
         }
         .accessibilityLabel("Paste photo")
+        .buttonBorderShape(.capsule)
 
         if hasPhoto {
           Button(role: .destructive) {

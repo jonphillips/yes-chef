@@ -63,6 +63,14 @@ final class MealCalendarModel {
     selectedDate.formatted(.dateTime.weekday(.wide).month(.wide).day())
   }
 
+  var selectedDateWeekdayTitle: String {
+    selectedDate.formatted(.dateTime.weekday(.wide))
+  }
+
+  var selectedDateMonthDayTitle: String {
+    selectedDate.formatted(.dateTime.month(.wide).day())
+  }
+
   var selectedDateShortTitle: String {
     selectedDate.formatted(.dateTime.month(.abbreviated).day())
   }

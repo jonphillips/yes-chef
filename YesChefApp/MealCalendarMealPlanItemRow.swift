@@ -56,9 +56,12 @@ struct MealPlanItemRowView: View {
       VStack(alignment: .leading, spacing: 6) {
         Text(row.displayTitle)
           .font(.headline)
-        Label(row.item.kind.title, systemImage: row.item.kind.systemImage)
-          .font(.caption)
-          .foregroundStyle(.secondary)
+          .lineLimit(3)
+        if row.item.kind != .recipe {
+          Label(row.item.kind.title, systemImage: row.item.kind.systemImage)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
         if row.isFromMenu {
           menuSourceLabel
         }

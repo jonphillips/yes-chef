@@ -9,6 +9,16 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Calendar day-rail actions and recipe-editor columns (`effort/calendar-rail-and-editor-columns`)
+
+**2026-10-13. View-only; no schema or draft-shape change.** The Calendar toolbar now owns Today, Ask, and Add; the day rail
+keeps Cook these and its Day actions menu, with Add Recipe/Add Note in the empty state. Recipe rows omit the redundant kind label
+and cap titles at three lines. The shared recipe editor adapts Timing and Yield and Organization into columns when space allows,
+uses labeled number fields for prep/cook time, and keeps the photo controls aligned. `scripts/check-drift.sh` passed (709 package
+tests; app test target compiled), all 75 `YesChefTests` passed, and the generic iOS build passed. Jon's iPad and iPhone device
+pass is owed in `docs/device-passes.md`.
+
+---
 ## Recipe thumbnails clip to their frame (`fix/recipe-thumbnail-clip`)
 
 **2026-10-13. View-only.** `RecipeThumbnail` clipped the aspect-filled photo to the photo's own oversized bounds,

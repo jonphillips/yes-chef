@@ -43,7 +43,7 @@ struct MealCalendarWorkspaceView: View {
           FocusToolbarButton(isActive: isFocusActive, action: focusButtonTapped)
         }
       }
-      MealCalendarNavigationToolbar(model: model)
+      MealCalendarNavigationToolbar(model: model, chatButtonTapped: chatButtonTapped)
     }
   }
 
@@ -257,6 +257,7 @@ private struct MealCalendarAgendaRail: View {
 
 private struct MealCalendarNavigationToolbar: ToolbarContent {
   let model: MealCalendarModel
+  var chatButtonTapped: (() -> Void)?
 
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .primaryAction) {
@@ -264,6 +265,11 @@ private struct MealCalendarNavigationToolbar: ToolbarContent {
         model.todayButtonTapped()
       } label: {
         Label("Today", systemImage: "calendar.badge.clock")
+      }
+      if let chatButtonTapped {
+        Button(action: chatButtonTapped) {
+          Label("Ask", systemImage: "sparkles")
+        }
       }
       Menu {
         Button {
@@ -309,7 +315,6 @@ struct MealCalendarDayAgendaView: View {
         MealCalendarDayHeader(
           model: model,
           cookSession: cookSessionAction,
-          chat: chatButtonTapped,
           handoffSource: handoffSource,
           complementHandoffSource: complementHandoffSource,
           handoffTransport: handoffTransport
@@ -317,11 +322,27 @@ struct MealCalendarDayAgendaView: View {
       }
 
       if model.selectedDayRows.isEmpty {
-        ContentUnavailableView(
-          "No Meals Scheduled",
-          systemImage: "calendar.badge.plus",
-          description: Text("Add a recipe or note to \(model.selectedDateShortTitle).")
-        )
+        ContentUnavailableView {
+          Label("No Meals Scheduled", systemImage: "calendar.badge.plus")
+        } description: {
+          Text("Add a recipe or note to \(model.selectedDateShortTitle).")
+        } actions: {
+          HStack(spacing: 12) {
+            Button {
+              model.addItemButtonTapped(kind: .recipe)
+            } label: {
+              Label("Add Recipe", systemImage: MealPlanItemKind.recipe.systemImage)
+            }
+            .buttonStyle(.borderedProminent)
+
+            Button {
+              model.addItemButtonTapped(kind: .note)
+            } label: {
+              Label("Add Note", systemImage: MealPlanItemKind.note.systemImage)
+            }
+            .buttonStyle(.bordered)
+          }
+        }
         .frame(maxWidth: .infinity, minHeight: 220)
       } else {
         VStack(alignment: .leading, spacing: 18) {

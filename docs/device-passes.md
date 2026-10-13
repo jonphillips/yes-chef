@@ -13,6 +13,13 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**Calendar day-rail actions and recipe-editor columns** (schema-free). On 11" and 13" iPad landscape with large Dynamic Type,
+confirm a filled day shows Cook these plus Day actions in the rail, Ask/Add stay in the toolbar, and all grocery and hand-off
+actions remain available. Confirm an empty day offers Add Recipe and Add Note. Check recipe rows omit the kind label and titles
+stay within three lines. In Create Recipe, confirm Timing and Yield fits one row, Organization shows its three pickers before
+Categories, and the editor sheet falls back without clipping. Type `90` into Prep time and confirm it saves as 90. On iPhone,
+confirm the editor remains stacked and Ask opens the chat sheet. Check the photo paste button aligns with Add Photo.
+
 **Drop legacy recipe cooking columns** ([effort brief](efforts/prod-dead-column-drop.md), schema change).
 Export a backup from each device before installing the build. Confirm the library is intact afterwards and
 “Last cooked” still appears for a cooked recipe. Edit a recipe and confirm the edit syncs to the other device.
