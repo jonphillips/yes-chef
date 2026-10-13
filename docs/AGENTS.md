@@ -119,7 +119,8 @@ These are project rules, not preferences:
 
 Import and editing preserve source fidelity:
 
-1. Never discard original imported text.
+1. Never discard original imported text: the `originalSnapshot` and each line's original text. The raw page
+   HTML is not kept ([ADR-0010 Amd 1](decisions/ADR-0010-cloudkit-sync-enablement.md#amendment-1--raw-import-html-is-not-kept-in-any-build-2026-10-13)).
 2. Ingredient parsing preserves the original ingredient line.
 3. Instruction cleanup preserves the original instruction text or source.
 4. Imported source URLs are retained.

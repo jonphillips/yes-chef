@@ -71,3 +71,30 @@ uses `dateCreated`/`dateModified`, not CloudKit's forbidden `creationDate`/`modi
   around it. Curated collections ([ADR-0008](ADR-0008-curated-collections.md)) remain post-sync.
 - **Modeling stays deferred and sync-safe:** canonical ingredient names (and any other new column or
   synced table) are additive and go in **after** the flip, backfilled lazily — not front-loaded.
+
+## Amendment 1 — Raw import HTML is not kept in any build (2026-10-13)
+
+**Decision (Jon, 2026-10-13).** D2's "stop persisting raw import HTML in release builds" now covers **every** build
+configuration. `Recipe.originalImportText` is removed, and its column and data are dropped before the Production
+deploy. No export or debug store replaces it. Brief: [`efforts/raw-import-html-drop.md`](../efforts/raw-import-html-drop.md).
+
+**Why.**
+- *The DEBUG exception leaked into the real library.* The DOM-export revival (PR #51) kept writing the page in
+  DEBUG, and Jon dogfoods DEBUG: 2,143 recipes, 36 MB. Nine captures are over CloudKit's 1 MB per-record limit,
+  since TEXT is inline and only BLOBs become assets. They never uploaded, and SQLiteData 1.9 swallows
+  `.limitExceeded` without a word. A child saved later then gets `.referenceViolation`, and SQLiteData applies the
+  FK's `ON DELETE` locally. `SET NULL` broke three calendar rows. On a `CASCADE` child the same path deletes the row.
+- *It has no reader and no future reader.* Its only consumer was the DEBUG DOM export. No re-parse path was ever
+  built, and none will be: Jon accepts a capture at review or debugs it live, and never redoes a recipe.
+  Provenance is `originalSnapshot`, the `RecipeSource` URL and each `IngredientLine.originalText`.
+
+**Rejected.**
+- A synced BLOB column: it uploads about 1 MB per capture for a debug button.
+- A local BLOB table: a store nobody reads.
+- Keeping only the JSON-LD: the snapshot already holds what the app uses from it.
+- Stripping scripts: that removes `ld+json` and `__NEXT_DATA__`, the only parts with any value.
+
+**Consequences.** Data Preservation Rule 1 ("never discard original imported text") means the snapshot plus each
+line's original text, not the raw page (`docs/AGENTS.md` now says so). `IMPORT_EXPORT.md` and `DATA_MODEL.md` drop
+the "preserve raw HTML for later re-parse" intent. ADR-0054's deferred "Create Recipe retains
+`originalImportText`" P1 is moot. Raw page storage is a standing guard.
