@@ -9,6 +9,15 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Recipe thumbnails clip to their frame (`fix/recipe-thumbnail-clip`)
+
+**2026-10-13. View-only.** `RecipeThumbnail` clipped the aspect-filled photo to the photo's own oversized bounds,
+and callers applied their frame only afterwards. A landscape photo therefore drew over adjacent text: the calendar
+day rail, the meal-plan recipe picker, and Menu dish rows. It now fills inside a `Color.clear` container that takes
+the caller's frame, and clips there. The generic iOS build passed. Jon's check rides on the
+`calendar-rail-and-editor-columns` device pass.
+
+---
 ## Drop the dead recipe cooking columns (`effort/prod-dead-column-drop`)
 
 **2026-10-08. Synced-schema migration.** An appended migration removes the obsolete
