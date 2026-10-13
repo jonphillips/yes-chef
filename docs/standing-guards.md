@@ -74,6 +74,11 @@ section is work.**
   Amd 4 is a *later* 2026-08-01 reopening, queued separately in Next Up) and "Menu is under-served by hand-off
   verbs" (ADR-0043's load test). Parked **ADR-0013** meal-planner verbs are separate and unscoped — see Ready
   Efforts.
+- **⚠️ No raw page in the store ([ADR-0010 Amd 1](decisions/ADR-0010-cloudkit-sync-enablement.md#amendment-1--raw-import-html-is-not-kept-in-any-build-2026-10-13)).**
+  Capture and import never persist the source page, in any build configuration. A column, table, BLOB, asset or
+  export of raw HTML or JSON-LD "for debugging" or "for a later re-parse" is a review block. Jon accepts a capture
+  at review or debugs it live, and never redoes a recipe. Large TEXT in a synced table is also how a record
+  silently passes CloudKit's 1 MB limit.
 - **The Recipe Workbench store/curate/compare arc (ADR-0019) is complete**, S1–S4 shipped. Parked follow-ons
   live in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md), not here.
 - **The workbench's experiment-outcome verb is NOT scoped** — only its *placement* is ratified (ADR-0042 D8's

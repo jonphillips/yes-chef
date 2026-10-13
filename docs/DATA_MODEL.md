@@ -189,7 +189,7 @@ self-contained snapshot: the Recipe plus its IngredientSections/Lines,
 InstructionSections/Steps, RecipeNotes, RecipePhotos (or photo references), and its
 tag/category NAMES (strings, not IDs — IDs are local to a library). On import,
 everything is re-keyed with fresh UUIDs and names are reconciled against the
-recipient's own tags/categories (find-or-create). source and originalImportText are
+recipient's own tags/categories (find-or-create). source is
 preserved — transfer is just another import path (see §29).
 
 Adjustments to entities defined elsewhere in this document:
@@ -331,7 +331,6 @@ archived: Bool
 libraryPlacement: RecipeLibraryPlacement
 dateCreated: Date
 dateModified: Date
-originalImportText: String?
 originalSnapshot: Data?
 importMetadata: ImportMetadata? (future, not persisted in MVP 1)
 
@@ -490,11 +489,11 @@ reference
 Reference recipes remain searchable and linkable, and may appear as related versions
 from a canonical/preferred recipe. They should not clutter the default browse list.
 
-originalImportText
+originalImportText — removed
 
-Raw text from imported source when available.
-
-This is important for debugging import, re-parsing later, or recovering lost structure.
+The raw import page is not stored in any build, and the column was dropped before the Production
+deploy ([ADR-0010 Amd 1](decisions/ADR-0010-cloudkit-sync-enablement.md#amendment-1--raw-import-html-is-not-kept-in-any-build-2026-10-13)).
+`originalSnapshot` is the provenance.
 
 originalSnapshot
 
@@ -2032,7 +2031,6 @@ struct Recipe: Identifiable {
     var dateModified: Date
     var lastCookedAt: Date?
     var timesCooked: Int
-    var originalImportText: String?
     var originalSnapshot: Data?
 }
 struct IngredientLine: Identifiable {

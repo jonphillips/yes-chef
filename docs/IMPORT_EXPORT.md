@@ -63,9 +63,9 @@ Observed recipe pages use schema.org-style item properties:
 * `itemprop="comment"` around notes.
 * `itemprop="image"` on the primary recipe image.
 
-Not every recipe has every field. Import must preserve raw HTML in
-`Recipe.originalImportText` so later parser improvements can recover fields we miss in
-the first pass.
+Not every recipe has every field. Import does **not** keep the raw HTML. A recipe is
+accepted at review or debugged live, never re-parsed later. Provenance is
+`originalSnapshot` plus each line's original text ([ADR-0010 Amd 1](decisions/ADR-0010-cloudkit-sync-enablement.md#amendment-1--raw-import-html-is-not-kept-in-any-build-2026-10-13)).
 
 2.5 Ingredients and Instructions
 
@@ -119,7 +119,6 @@ Implemented now:
 * Parse common metadata into `PaprikaHTMLRecipe`.
 * Convert parsed recipes into `RecipeBundleCoding.RecipeBundle`.
 * Write a bundle into the library through `RecipeRepository.importBundle`.
-* Preserve raw HTML as `Recipe.originalImportText`.
 * Preserve Paprika HTML source labels as source/publication identity, not as a
   confidently inferred human author.
 * Normalize known source domains into publication names when the imported source label

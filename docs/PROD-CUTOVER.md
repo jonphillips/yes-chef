@@ -50,6 +50,11 @@ can happen any time after the cut (ADR-0056 Amd 1).
       Production unnoticed.
 - [ ] Before installing the build, export a backup from each device. Afterwards, confirm the library is
       intact and that an edit syncs to the other device.
+- [ ] **Raw import HTML dropped, and its fallout repaired** ([`efforts/raw-import-html-drop.md`](efforts/raw-import-html-drop.md),
+      ADR-0010 Amd 1). This is the second reviewed slice. An appended migration drops `recipes.originalImportText`.
+      A post-engine pass re-uploads the nine recipes over CloudKit's 1 MB record limit, plus their children, and
+      re-links the three calendar rows that sync blanked. **It must land before Phase 3.** Otherwise the re-seed
+      backup carries records that can't upload and calendar links that are NULL.
 
 **Gate:** the drop has shipped and Jon's device pass is clean. The device pass remains owed in
 [`device-passes.md`](device-passes.md).
@@ -93,8 +98,9 @@ fallback throughout.
       permanently locks the record types** — confirm the promotion list is complete and the dropped columns
       are absent *before* deploying).
 - [ ] **Delete the dead fields from the Development schema first.** Development still carries
-      `lastCookedAt` / `timesCooked` on the recipes record type, created there by past uploads, and a deploy
-      copies Development's fields. Once Phase 1 has shipped to every device, delete both fields in the
+      `lastCookedAt` / `timesCooked` / `originalImportText` on the recipes record type, created there by past
+      uploads, and a deploy copies Development's fields. Once Phase 1 has shipped to every device, delete those
+      fields in the
       console (Galavant's cutover did the same). **Never use "Reset Development Environment"**: it deletes the
       Development data, and that data is the fallback.
 
@@ -163,7 +169,8 @@ fallback throughout.
 ## Condensed checklist
 
 1. [ ] Preconditions: green main, cook columns unread, ids unchanged, window with slack.
-2. [ ] Phase 1 — cook columns dropped by an appended migration; no other dead columns; device pass clean.
+2. [ ] Phase 1 — cook columns and raw import HTML dropped by appended migrations; oversize recipes re-uploaded and
+   calendar links repaired; no other dead columns; device pass clean.
 3. [ ] Phase 2 — SyncMetadata coverage clean; promotion list verified both directions vs `CloudSync.swift`.
 4. [ ] Phase 3 — verified pre-cut backup in two places.
 5. [ ] Phase 4a — dead fields deleted from the Dev schema; Production schema deployed (list complete).

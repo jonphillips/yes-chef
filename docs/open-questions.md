@@ -17,6 +17,21 @@ From the old Next Up:
   same.
 
 
+- **Capture saves other recipes' images as gallery rows (found 2026-10-13). Jon's call is pending on the
+  cleanup.** `RecipeBodyImageExtractor` runs on every capture and collects every `<img>`, srcset and CSS
+  background on the page. Keema Palak has 88 gallery rows: 6 are size variants of its own photo, and about 82 are
+  other recipes from the author and related-recipe carousels. Only the hero is ever downloaded
+  (`WebRecipeCaptureClient`), so the rest are URL-only rows, **1,526 across 28 recipes**, each one a synced
+  record. Fix: (a) the parser scrapes the page body only when JSON-LD, meta and microdata find no image, and
+  collapses size variants of one image; (b) **optional, needs Jon's OK**: delete gallery rows that came from the
+  extractor and never got image data (heroes and rows with bytes stay).
+
+- **Silent sync failures (found 2026-10-13).** SQLiteData 1.9 ignores `.limitExceeded`, so a record over 1 MB
+  never uploads and nothing says so. On `.referenceViolation` it applies a single-FK child's `ON DELETE` locally:
+  `SET NULL` blanks the link, and `CASCADE` deletes the row. Should CloudSyncKit's status surface both? The general
+  lesson belongs in jon-platform `docs/ios/persistence-and-sync.md`, since Galavant has the same exposure. See
+  [`efforts/raw-import-html-drop.md`](efforts/raw-import-html-drop.md) for the incident.
+
 - **iPad recipe editor as a cookbook page (2026-10-13).** Ingredients and Instructions side by side on wide layouts,
   instead of stacked `Form` sections. It needs a custom layout (not `Form`), so it was kept out of
   `calendar-rail-and-editor-columns`. It pairs naturally with that effort's adaptive-row helper.
