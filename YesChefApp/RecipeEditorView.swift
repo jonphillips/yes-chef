@@ -97,15 +97,23 @@ struct RecipeEditorView: View {
   }
 }
 
+private enum RecipeTimeField: Hashable {
+  case prep
+  case cook
+}
+
 /// The structured recipe form — every field the editor and Create Recipe both present, bound to a
 /// shared `RecipeEditorModel`. Extracted so the two screens edit *one* draft implementation (ADR-0051
 /// D1 / ADR-0053 D2) rather than diverging. The owning screen supplies the `Form`, the scroll proxy,
 /// the focus state, and its own chrome (title, toolbar, Save).
 struct RecipeEditorFields: View {
+  private static let compactStackCellMinimumWidth: CGFloat = 200 // 2 * 200 + 12 = 412pt, wider than the iPhone 17 Pro form row.
+
   let model: RecipeEditorModel
   let proxy: ScrollViewProxy
   @FocusState.Binding var focusedIngredientSectionID: IngredientSection.ID?
   @FocusState.Binding var focusedIngredientSectionNameID: IngredientSection.ID?
+  @FocusState private var focusedTimeField: RecipeTimeField?
 
   var body: some View {
     @Bindable var model = model
@@ -141,25 +149,37 @@ struct RecipeEditorFields: View {
       }
 
       Section("Timing and Yield") {
-        StackedTextField(title: "Servings", text: $model.draft.servingsText)
-        StackedTextField(title: "Yield", text: $model.draft.yieldText)
-        Stepper(value: $model.draft.prepTimeMinutes, in: 0...600, step: 5) {
-          Text("Prep: \(model.draft.prepTimeMinutes) min")
-        }
-        Stepper(value: $model.draft.cookTimeMinutes, in: 0...600, step: 5) {
-          Text("Cook: \(model.draft.cookTimeMinutes) min")
+        AdaptiveFormRow(minimumCellWidth: Self.compactStackCellMinimumWidth) {
+          StackedTextField(title: "Servings", text: $model.draft.servingsText)
+          StackedTextField(title: "Yield", text: $model.draft.yieldText)
+          timeField(title: "Prep time", value: prepTimeBinding, field: .prep)
+          timeField(title: "Cook time", value: cookTimeBinding, field: .cook)
         }
       }
 
       Section("Organization") {
-        Picker("Library", selection: $model.draft.libraryPlacement) {
-          ForEach(RecipeLibraryPlacement.allCases, id: \.self) { placement in
-            Text(placement.title)
-              .tag(placement)
+        AdaptiveFormRow(minimumCellWidth: Self.compactStackCellMinimumWidth) {
+          StackedFormField(title: "Library") {
+            Picker("Library", selection: $model.draft.libraryPlacement) {
+              ForEach(RecipeLibraryPlacement.allCases, id: \.self) { placement in
+                Text(placement.title)
+                  .tag(placement)
+              }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+          }
+          StackedFormField(title: "Cuisine") {
+            RecipeFacetSingleSelectPicker(model: model, facetName: "Cuisine")
+              .pickerStyle(.menu)
+              .labelsHidden()
+          }
+          StackedFormField(title: "Course") {
+            RecipeFacetSingleSelectPicker(model: model, facetName: "Course")
+              .pickerStyle(.menu)
+              .labelsHidden()
           }
         }
-        RecipeFacetSingleSelectPicker(model: model, facetName: "Cuisine")
-        RecipeFacetSingleSelectPicker(model: model, facetName: "Course")
         RecipeCategorySelectionField(model: model)
       }
 
@@ -264,6 +284,43 @@ struct RecipeEditorFields: View {
         )
       }
     }
+    .toolbar {
+      if focusedTimeField != nil {
+        ToolbarItemGroup(placement: .keyboard) {
+          Spacer()
+          Button("Done") { focusedTimeField = nil }
+        }
+      }
+    }
+  }
+
+  private var prepTimeBinding: Binding<Int> {
+    Binding(
+      get: { model.draft.prepTimeMinutes },
+      set: { model.draft.prepTimeMinutes = min(max($0, 0), 600) }
+    )
+  }
+
+  private var cookTimeBinding: Binding<Int> {
+    Binding(
+      get: { model.draft.cookTimeMinutes },
+      set: { model.draft.cookTimeMinutes = min(max($0, 0), 600) }
+    )
+  }
+
+  private func timeField(title: LocalizedStringKey, value: Binding<Int>, field: RecipeTimeField) -> some View {
+    StackedFormField(title: title) {
+      HStack(spacing: 8) {
+        RecipeTimeTextField(title: title, field: field, minutes: value, focusedField: $focusedTimeField)
+
+        Text("min")
+          .foregroundStyle(.secondary)
+
+        Stepper(title, value: value, in: 0...600, step: 5)
+          .labelsHidden()
+          .accessibilityLabel(title)
+      }
+    }
   }
 
   private func scrollToAndFocusIngredientSection(_ sectionID: IngredientSection.ID) {
@@ -293,6 +350,43 @@ struct RecipeEditorFields: View {
       }
       .disabled(isLast)
     }
+  }
+}
+
+private struct RecipeTimeTextField: View {
+  let title: LocalizedStringKey
+  let field: RecipeTimeField
+  @Binding var minutes: Int
+  @FocusState.Binding var focusedField: RecipeTimeField?
+  @State private var input = ""
+
+  var body: some View {
+    TextField(title, text: inputBinding)
+      .keyboardType(.numberPad)
+      .focused($focusedField, equals: field)
+      .accessibilityLabel(title)
+      .onAppear { input = String(minutes) }
+      .onChange(of: minutes) { _, newValue in
+        if (Int(input) ?? 0) != newValue {
+          input = String(newValue)
+        }
+      }
+      .onChange(of: focusedField) { oldValue, newValue in
+        if oldValue == field, newValue != field {
+          input = String(minutes)
+        }
+      }
+  }
+
+  private var inputBinding: Binding<String> {
+    Binding(
+      get: { input },
+      set: { newValue in
+        let digits = String(newValue.filter { $0.isASCII && $0.isNumber })
+        input = digits
+        minutes = digits.isEmpty ? 0 : min(Int(digits) ?? 600, 600)
+      }
+    )
   }
 }
 
@@ -334,7 +428,7 @@ private struct RecipeHeroPhotoPickerRow: View {
         RecipeHeroPhotoPreview(data: data)
       }
 
-      HStack(alignment: .firstTextBaseline, spacing: 12) {
+      HStack(alignment: .center, spacing: 12) {
         PhotosPicker(selection: $selectedItem, matching: .images) {
           Label(hasPhoto ? "Change Photo" : "Add Photo", systemImage: "photo.badge.plus")
         }
@@ -371,6 +465,7 @@ private struct RecipeHeroPhotoPickerRow: View {
           }
         }
         .accessibilityLabel("Paste photo")
+        .buttonBorderShape(.capsule)
 
         if hasPhoto {
           Button(role: .destructive) {

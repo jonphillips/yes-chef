@@ -4,7 +4,6 @@ import YesChefCore
 struct MealCalendarDayHeader: View {
   let model: MealCalendarModel
   var cookSession: (() -> Void)?
-  var chat: (() -> Void)?
   var handoffSource: HandoffExportSource?
   var complementHandoffSource: HandoffExportSource?
   let handoffTransport: HandoffInAppTransport
@@ -15,21 +14,13 @@ struct MealCalendarDayHeader: View {
         titleBlock
         Spacer()
         cookButton
-        chatButton
         dayActionsMenu
-        addMenu
       }
       VStack(alignment: .leading, spacing: 12) {
         titleBlock
-        if cookSession != nil {
+        HStack(spacing: 8) {
           cookButton
-            .frame(maxWidth: .infinity)
-        }
-        HStack {
-          chatButton
           dayActionsMenu
-          addMenu
-          Spacer()
         }
       }
     }
@@ -37,8 +28,11 @@ struct MealCalendarDayHeader: View {
 
   private var titleBlock: some View {
     VStack(alignment: .leading, spacing: 6) {
-      Text(model.selectedDateTitle)
-        .font(.largeTitle.bold())
+      Text(model.selectedDateWeekdayTitle)
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.secondary)
+      Text(model.selectedDateMonthDayTitle)
+        .font(.title.bold())
       Text(itemCountTitle)
         .font(.subheadline)
         .foregroundStyle(.secondary)
@@ -52,16 +46,6 @@ struct MealCalendarDayHeader: View {
         Label("Cook these", systemImage: "flame")
       }
       .buttonStyle(.borderedProminent)
-    }
-  }
-
-  @ViewBuilder
-  private var chatButton: some View {
-    if let chat {
-      Button(action: chat) {
-        Label("Ask", systemImage: "sparkles")
-      }
-      .buttonStyle(.bordered)
     }
   }
 
@@ -94,29 +78,13 @@ struct MealCalendarDayHeader: View {
           }
         }
       } label: {
-        Label("Day actions", systemImage: "ellipsis.circle")
+        Label("Day actions", systemImage: "ellipsis")
           .labelStyle(.iconOnly)
       }
+      .buttonStyle(.bordered)
+      .controlSize(.large)
       .accessibilityLabel("Day actions")
     }
-  }
-
-  private var addMenu: some View {
-    Menu {
-      Button {
-        model.addItemButtonTapped(kind: .recipe)
-      } label: {
-        Label("Recipe", systemImage: MealPlanItemKind.recipe.systemImage)
-      }
-      Button {
-        model.addItemButtonTapped(kind: .note)
-      } label: {
-        Label("Add Note", systemImage: MealPlanItemKind.note.systemImage)
-      }
-    } label: {
-      Label("Add", systemImage: "plus")
-    }
-    .buttonStyle(.borderedProminent)
   }
 
   private var itemCountTitle: String {
