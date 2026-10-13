@@ -78,11 +78,11 @@ struct MealCalendarDayHeader: View {
           }
         }
       } label: {
-        Label("Day actions", systemImage: "ellipsis.circle")
+        Label("Day actions", systemImage: "ellipsis")
           .labelStyle(.iconOnly)
       }
       .buttonStyle(.bordered)
-      .frame(minWidth: 44, minHeight: 44)
+      .controlSize(.large)
       .accessibilityLabel("Day actions")
     }
   }

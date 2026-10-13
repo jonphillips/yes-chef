@@ -97,16 +97,18 @@ struct RecipeEditorView: View {
   }
 }
 
-/// The structured recipe form — every field the editor and Create Recipe both present, bound to a
-/// shared `RecipeEditorModel`. Extracted so the two screens edit *one* draft implementation (ADR-0051
-/// D1 / ADR-0053 D2) rather than diverging. The owning screen supplies the `Form`, the scroll proxy,
-/// the focus state, and its own chrome (title, toolbar, Save).
 private enum RecipeTimeField: Hashable {
   case prep
   case cook
 }
 
+/// The structured recipe form — every field the editor and Create Recipe both present, bound to a
+/// shared `RecipeEditorModel`. Extracted so the two screens edit *one* draft implementation (ADR-0051
+/// D1 / ADR-0053 D2) rather than diverging. The owning screen supplies the `Form`, the scroll proxy,
+/// the focus state, and its own chrome (title, toolbar, Save).
 struct RecipeEditorFields: View {
+  private static let compactStackCellMinimumWidth: CGFloat = 200 // 2 * 200 + 12 = 412pt, wider than the iPhone 17 Pro form row.
+
   let model: RecipeEditorModel
   let proxy: ScrollViewProxy
   @FocusState.Binding var focusedIngredientSectionID: IngredientSection.ID?
@@ -147,17 +149,17 @@ struct RecipeEditorFields: View {
       }
 
       Section("Timing and Yield") {
-        AdaptiveFormRow(fields: [
-          AnyView(StackedTextField(title: "Servings", text: $model.draft.servingsText)),
-          AnyView(StackedTextField(title: "Yield", text: $model.draft.yieldText)),
-          AnyView(timeField(title: "Prep time", value: prepTimeBinding, field: .prep)),
-          AnyView(timeField(title: "Cook time", value: cookTimeBinding, field: .cook))
-        ])
+        AdaptiveFormRow(minimumCellWidth: Self.compactStackCellMinimumWidth) {
+          StackedTextField(title: "Servings", text: $model.draft.servingsText)
+          StackedTextField(title: "Yield", text: $model.draft.yieldText)
+          timeField(title: "Prep time", value: prepTimeBinding, field: .prep)
+          timeField(title: "Cook time", value: cookTimeBinding, field: .cook)
+        }
       }
 
       Section("Organization") {
-        AdaptiveFormRow(fields: [
-          AnyView(StackedFormField(title: "Library") {
+        AdaptiveFormRow(minimumCellWidth: Self.compactStackCellMinimumWidth) {
+          StackedFormField(title: "Library") {
             Picker("Library", selection: $model.draft.libraryPlacement) {
               ForEach(RecipeLibraryPlacement.allCases, id: \.self) { placement in
                 Text(placement.title)
@@ -166,18 +168,18 @@ struct RecipeEditorFields: View {
             }
             .pickerStyle(.menu)
             .labelsHidden()
-          }),
-          AnyView(StackedFormField(title: "Cuisine") {
+          }
+          StackedFormField(title: "Cuisine") {
             RecipeFacetSingleSelectPicker(model: model, facetName: "Cuisine")
               .pickerStyle(.menu)
               .labelsHidden()
-          }),
-          AnyView(StackedFormField(title: "Course") {
+          }
+          StackedFormField(title: "Course") {
             RecipeFacetSingleSelectPicker(model: model, facetName: "Course")
               .pickerStyle(.menu)
               .labelsHidden()
-          })
-        ])
+          }
+        }
         RecipeCategorySelectionField(model: model)
       }
 
@@ -283,9 +285,11 @@ struct RecipeEditorFields: View {
       }
     }
     .toolbar {
-      ToolbarItemGroup(placement: .keyboard) {
-        Spacer()
-        Button("Done") { focusedTimeField = nil }
+      if focusedTimeField != nil {
+        ToolbarItemGroup(placement: .keyboard) {
+          Spacer()
+          Button("Done") { focusedTimeField = nil }
+        }
       }
     }
   }
@@ -307,10 +311,7 @@ struct RecipeEditorFields: View {
   private func timeField(title: LocalizedStringKey, value: Binding<Int>, field: RecipeTimeField) -> some View {
     StackedFormField(title: title) {
       HStack(spacing: 8) {
-        TextField(title, value: value, format: .number)
-          .keyboardType(.numberPad)
-          .focused($focusedTimeField, equals: field)
-          .accessibilityLabel(title)
+        RecipeTimeTextField(title: title, field: field, minutes: value, focusedField: $focusedTimeField)
 
         Text("min")
           .foregroundStyle(.secondary)
@@ -349,6 +350,43 @@ struct RecipeEditorFields: View {
       }
       .disabled(isLast)
     }
+  }
+}
+
+private struct RecipeTimeTextField: View {
+  let title: LocalizedStringKey
+  let field: RecipeTimeField
+  @Binding var minutes: Int
+  @FocusState.Binding var focusedField: RecipeTimeField?
+  @State private var input = ""
+
+  var body: some View {
+    TextField(title, text: inputBinding)
+      .keyboardType(.numberPad)
+      .focused($focusedField, equals: field)
+      .accessibilityLabel(title)
+      .onAppear { input = String(minutes) }
+      .onChange(of: minutes) { _, newValue in
+        if focusedField != field {
+          input = String(newValue)
+        }
+      }
+      .onChange(of: focusedField) { oldValue, newValue in
+        if oldValue == field, newValue != field {
+          input = String(minutes)
+        }
+      }
+  }
+
+  private var inputBinding: Binding<String> {
+    Binding(
+      get: { input },
+      set: { newValue in
+        let digits = String(newValue.filter(\.isNumber))
+        input = digits
+        minutes = digits.isEmpty ? 0 : min(Int(digits) ?? 600, 600)
+      }
+    )
   }
 }
 

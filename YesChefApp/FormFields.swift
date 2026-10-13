@@ -1,27 +1,32 @@
 import SwiftUI
 
-struct AdaptiveFormRow: View {
-  let fields: [AnyView]
-  var minimumCellWidth: CGFloat = 150
+struct AdaptiveFormRow<Content: View>: View {
+  @ViewBuilder var content: Content
+  var minimumCellWidth: CGFloat
+
+  init(minimumCellWidth: CGFloat, @ViewBuilder content: () -> Content) {
+    self.minimumCellWidth = minimumCellWidth
+    self.content = content()
+  }
 
   var body: some View {
     ViewThatFits(in: .horizontal) {
       HStack(alignment: .top, spacing: 12) {
-        ForEach(fields.indices, id: \.self) { index in
-          fields[index]
+        ForEach(subviews: content) { subview in
+          subview
             .frame(minWidth: minimumCellWidth)
         }
       }
 
       LazyVGrid(columns: gridColumns, alignment: .leading, spacing: 12) {
-        ForEach(fields.indices, id: \.self) { index in
-          fields[index]
+        ForEach(subviews: content) { subview in
+          subview
         }
       }
 
       VStack(alignment: .leading, spacing: 12) {
-        ForEach(fields.indices, id: \.self) { index in
-          fields[index]
+        ForEach(subviews: content) { subview in
+          subview
         }
       }
     }

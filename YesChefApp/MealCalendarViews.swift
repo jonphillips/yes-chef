@@ -327,20 +327,16 @@ struct MealCalendarDayAgendaView: View {
         } description: {
           Text("Add a recipe or note to \(model.selectedDateShortTitle).")
         } actions: {
-          HStack(spacing: 12) {
-            Button {
-              model.addItemButtonTapped(kind: .recipe)
-            } label: {
-              Label("Add Recipe", systemImage: MealPlanItemKind.recipe.systemImage)
+          ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+              addRecipeButton
+              addNoteButton
             }
-            .buttonStyle(.borderedProminent)
 
-            Button {
-              model.addItemButtonTapped(kind: .note)
-            } label: {
-              Label("Add Note", systemImage: MealPlanItemKind.note.systemImage)
+            VStack(spacing: 8) {
+              addRecipeButton
+              addNoteButton
             }
-            .buttonStyle(.bordered)
           }
         }
         .frame(maxWidth: .infinity, minHeight: 220)
@@ -362,6 +358,24 @@ struct MealCalendarDayAgendaView: View {
 
   private var cookSessionPresentation: CookSessionPresentation? {
     CookSessionPresentation(plannerTitle: model.selectedDateTitle, rows: model.selectedDayRows)
+  }
+
+  private var addRecipeButton: some View {
+    Button {
+      model.addItemButtonTapped(kind: .recipe)
+    } label: {
+      Label("Add Recipe", systemImage: MealPlanItemKind.recipe.systemImage)
+    }
+    .buttonStyle(.borderedProminent)
+  }
+
+  private var addNoteButton: some View {
+    Button {
+      model.addItemButtonTapped(kind: .note)
+    } label: {
+      Label("Add Note", systemImage: MealPlanItemKind.note.systemImage)
+    }
+    .buttonStyle(.bordered)
   }
 
   private var cookSessionAction: (() -> Void)? {

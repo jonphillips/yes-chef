@@ -17,8 +17,9 @@ Not work, a checklist.
 confirm a filled day shows Cook these plus Day actions in the rail, Ask/Add stay in the toolbar, and all grocery and hand-off
 actions remain available. Confirm an empty day offers Add Recipe and Add Note. Check recipe rows omit the kind label and titles
 stay within three lines. In Create Recipe, confirm Timing and Yield fits one row, Organization shows its three pickers before
-Categories, and the editor sheet falls back without clipping. Type `90` into Prep time and confirm it saves as 90. On iPhone,
-confirm the editor remains stacked and Ask opens the chat sheet. Check the photo paste button aligns with Add Photo.
+Categories, and tap Library, Cuisine, and Course individually to confirm each opens its own menu. The editor sheet falls back
+without clipping. Type `90` into Prep time and tap Save without pressing Done; confirm it saves as 90. On iPhone, confirm both
+editor sections stay stacked and Ask opens the chat sheet. Check the photo paste button aligns with Add Photo.
 
 **Drop legacy recipe cooking columns** ([effort brief](efforts/prod-dead-column-drop.md), schema change).
 Export a backup from each device before installing the build. Confirm the library is intact afterwards and
