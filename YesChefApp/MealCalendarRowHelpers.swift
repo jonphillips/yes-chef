@@ -65,9 +65,14 @@ struct RecipeThumbnail: View {
   var body: some View {
     Group {
       if let data, let image = UIImage(data: data) {
-        Image(uiImage: image)
-          .resizable()
-          .scaledToFill()
+        // Fill inside a container that takes the caller's frame, so the clip is the thumbnail's bounds
+        // rather than the overflowing aspect-filled image (which otherwise draws over adjacent text).
+        Color.clear
+          .overlay {
+            Image(uiImage: image)
+              .resizable()
+              .scaledToFill()
+          }
       } else {
         Image(systemName: "fork.knife")
           .font(.title3)
