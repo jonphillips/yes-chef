@@ -17,6 +17,10 @@ From the old Next Up:
   same.
 
 
+- **iPad recipe editor as a cookbook page (2026-10-13).** Ingredients and Instructions side by side on wide layouts,
+  instead of stacked `Form` sections. It needs a custom layout (not `Form`), so it was kept out of
+  `calendar-rail-and-editor-columns`. It pairs naturally with that effort's adaptive-row helper.
+
 - **ADR-0045 cold-start starters are still open, no longer time-gated:** S2 rearranged the Calendar day-header
   Chat and the Workbench Chat into inspectors and left them passing `.none`. Whether they want their own starters
   ("Plan this week" / "What should I prep tonight?") is Jon's call whenever — it no longer blocks anything.
