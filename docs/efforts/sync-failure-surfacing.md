@@ -26,10 +26,13 @@ server. That catches every cause, including ones we haven't met yet.
 ## Slice 1 — jon-platform `CloudSyncKit` (additive)
 
 - **Not uploaded:** non-deleted rows of SQLiteData's `metadata` table that aren't **server-confirmed**, with
-  `userModificationTime` older than a grace window (default 30 minutes). Server-confirmed means
-  `lastKnownServerRecord?.recordChangeTag != nil`. **Not** `hasLastKnownServerRecord`: SQLiteData 1.9 stores the
-  outgoing record there before CloudKit answers and never clears it on `.limitExceeded`, so a record that failed for
-  good looks uploaded (that's how the first raw-HTML repair missed all nine recipes). Testing the change tag
+  `userModificationTime` older than a grace window (default 30 minutes). Server-confirmed means CloudKit confirmed
+  the row's *latest* change: `lastKnownServerRecord?.recordChangeTag != nil` **and** `userModificationTime` no later
+  than that record's `modificationDate` (plus a 5-minute clock-skew tolerance). **Not** `hasLastKnownServerRecord`:
+  SQLiteData 1.9 stores the outgoing record there before CloudKit answers and never clears it on `.limitExceeded`, so
+  a record that failed for good looks uploaded (that's how the first raw-HTML repair missed all nine recipes). And
+  **not** the tag alone: a row that was already on the server keeps its old tag when a later edit fails, which is
+  exactly the device pass below (edit an existing recipe offline). Testing the change tag
   means decoding the system-fields column, so compute this on demand and off the main actor (status refresh,
   Settings), never at launch. Decode only `lastKnownServerRecord`, never `_lastKnownServerRecordAllFields`. Count them only while the engine is
   running and not `isSendingChanges` or `isFetchingChanges`, so a batch in flight never counts. Return the counts
@@ -47,10 +50,12 @@ server. That catches every cause, including ones we haven't met yet.
   `_lastKnownServerRecordAllFields` to NULL, as SQLiteData's own `setLastKnownServerRecord(nil)` does. The metadata
   after-update trigger queues the save, and the resend builds a fresh `CKRecord`, so a stale cached field (like a
   dropped oversize column) can't ride along. Only a row with no metadata row uses `UPDATE <table> SET <pk> = <pk>`,
-  which creates one. **Never clear a server-confirmed row.** That would discard its change tag and turn the next
-  save into a conflict.
-- It stays domain-free, with no app table names in the package. Galavant gets it when it bumps the package, and
-  nothing there changes until then.
+  which creates one. **Never clear a row that has a change tag.** That would discard the tag and turn the next
+  save into a conflict. Such a row is re-queued by touching its metadata row instead, which re-sends the cached
+  record with its tag.
+- It stays domain-free, with no app table names in the package. Both apps load `CloudSyncKit` by local path, so
+  the new `SyncDisplayStatus` case reaches their exhaustive switches as soon as it lands: each app's sync row
+  handles `.needsAttention` (dot, detail line, explanation) alongside slice 1.
 
 ## Slice 2 — Yes Chef
 
