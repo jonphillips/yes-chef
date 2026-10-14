@@ -88,16 +88,18 @@ public enum RecipeSyncRepair {
     ) ?? 0
     try db.execute(sql: #"DELETE FROM "recipePhotos" WHERE "displayData" IS NULL AND "thumbnailData" IS NULL"#)
 
+    let confirmedRecipeIDs = Set(
+      recipeMetadata.filter {
+        $0.recordID.table == Recipe.tableName && $0.hasServerChangeTag
+      }.map(\.recordID.primaryKey)
+    )
+    guard !confirmedRecipeIDs.isEmpty else { return audit }
+
     let recipeIDs = try String.fetchAll(db, sql: #"SELECT "id" FROM "recipes""#)
     let recipeMetadataByID = Dictionary(
       uniqueKeysWithValues: recipeMetadata
         .filter { $0.recordID.table == Recipe.tableName }
         .map { ($0.recordID.primaryKey, $0) }
-    )
-    let confirmedRecipeIDs = Set(
-      recipeMetadata.filter {
-        $0.recordID.table == Recipe.tableName && $0.hasServerChangeTag
-      }.map(\.recordID.primaryKey)
     )
     let unconfirmedRecipeIDs = recipeIDs.filter { !confirmedRecipeIDs.contains($0.lowercased()) }
     audit.requeuedRecipeCount = unconfirmedRecipeIDs.count

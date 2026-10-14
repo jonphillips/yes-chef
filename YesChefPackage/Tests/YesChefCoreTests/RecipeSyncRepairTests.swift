@@ -152,12 +152,17 @@ extension RecipeCoreTests {
         )
       }
       #expect(audit.deletedPhotoCount == 1)
-      #expect(audit.requeuedRecipeCount == 1)
+      #expect(audit.requeuedRecipeCount == 0)
       try await database.read { db in
         let photos = try RecipePhoto.fetchAll(db)
         let recipe = try Recipe.find(recipeID).fetchOne(db)
+        let rememberedRecipeIDs = try String.fetchAll(
+          db,
+          sql: #"SELECT "recipeID" FROM "recipeSyncRepairQueue""#
+        )
         #expect(!photos.contains(where: { $0.id == emptyPhotoID }))
         #expect(recipe?.coverPhotoID == nil)
+        #expect(rememberedRecipeIDs.isEmpty)
       }
     }
 
@@ -245,10 +250,14 @@ extension RecipeCoreTests {
       let now = Date(timeIntervalSinceReferenceDate: 815_400_000)
       let recipeID = SampleUUIDSequence.uuid(76_000)
       let sectionID = SampleUUIDSequence.uuid(76_001)
+      let confirmedRecipeID = SampleUUIDSequence.uuid(76_002)
       try await database.write { db in
         try createRepairMetadataFixture(in: db)
         try Recipe.insert {
           Recipe(id: recipeID, title: "Needs a fresh record", dateCreated: now, dateModified: now)
+        }.execute(db)
+        try Recipe.insert {
+          Recipe(id: confirmedRecipeID, title: "Already synced", dateCreated: now, dateModified: now)
         }.execute(db)
         try IngredientSection.insert {
           IngredientSection(id: sectionID, recipeID: recipeID, sortOrder: 0)
@@ -263,7 +272,10 @@ extension RecipeCoreTests {
       let syncedTables: Set<String> = ["recipes", "ingredientSections"]
       let firstPass = try await database.write { db in
         try RecipeSyncRepair.run(
-          recipeMetadata: [RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, recipeID), hasServerChangeTag: false)],
+          recipeMetadata: [
+            RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, recipeID), hasServerChangeTag: false),
+            RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, confirmedRecipeID), hasServerChangeTag: true),
+          ],
           syncedTableNames: syncedTables,
           childMetadataFor: { _, _, _ in
             #expect(Bool(false), "Children must wait for a confirmed parent")
@@ -292,7 +304,10 @@ extension RecipeCoreTests {
 
       let secondPass = try await database.write { db in
         try RecipeSyncRepair.run(
-          recipeMetadata: [RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, recipeID), hasServerChangeTag: true)],
+          recipeMetadata: [
+            RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, recipeID), hasServerChangeTag: true),
+            RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, confirmedRecipeID), hasServerChangeTag: true),
+          ],
           syncedTableNames: syncedTables,
           childMetadataFor: { table, ids, _ in
             ids.map { RecipeSyncMetadataState(recordID: RecipeSyncRecordID(table: table, primaryKey: $0), hasServerChangeTag: false) }
@@ -311,7 +326,10 @@ extension RecipeCoreTests {
 
       let thirdPass = try await database.write { db in
         let audit = try RecipeSyncRepair.run(
-          recipeMetadata: [RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, recipeID), hasServerChangeTag: true)],
+          recipeMetadata: [
+            RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, recipeID), hasServerChangeTag: true),
+            RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, confirmedRecipeID), hasServerChangeTag: true),
+          ],
           syncedTableNames: syncedTables,
           childMetadataFor: { _, _, _ in
             #expect(Bool(false), "A drained parent must not be inspected again")
