@@ -76,7 +76,6 @@ extension RecipeCoreTests {
       expectNoDifference(bundle.recipe.cookTimeMinutes, 40)
       expectNoDifference(bundle.recipe.totalTimeMinutes, 55)
       expectNoDifference(bundle.recipe.rating, 5)
-      expectNoDifference(bundle.recipe.originalImportText, nil)
       expectNoDifference(bundle.source?.name, "Example Kitchen")
       expectNoDifference(bundle.source?.url, "https://example.com/recipes/lemon-chicken")
       expectNoDifference(bundle.source?.author, "Jamie Example")
@@ -94,30 +93,17 @@ extension RecipeCoreTests {
       expectNoDifference(bundle.ingredientLines.map(\.sortOrder), [0, 1, 2, 3])
       expectNoDifference(bundle.instructionSections.map(\.name), ["Cook"])
       expectNoDifference(bundle.instructions, ["Season the chicken.", "Roast until browned."])
-      expectNoDifference(bundle.photos.map(\.sourceURL), ["https://example.com/images/lemon-chicken.jpg"])
-      expectNoDifference(bundle.photos.map(\.kind), [.hero])
-      expectNoDifference(bundle.photos.map(\.source), [.extracted])
+      expectNoDifference(bundle.photos, [])
       expectNoDifference(bundle.recipeNotes, [])
       expectNoDifference(bundle.tagNames, ["quick", "weeknight", "Quick > Supper", "Quick"])
 
       let snapshotData = try #require(bundle.recipe.originalSnapshot)
       let snapshot = try RecipeBundleCoding.decodeSnapshot(snapshotData)
       expectNoDifference(snapshot.recipe.title, "Lemon Chicken")
-      expectNoDifference(snapshot.recipe.originalImportText, nil)
       expectNoDifference(snapshot.ingredients, bundle.ingredients)
       expectNoDifference(snapshot.notes, [])
-      expectNoDifference(snapshot.photos.map(\.sourceURL), ["https://example.com/images/lemon-chicken.jpg"])
+      expectNoDifference(snapshot.photos, [])
 
-      var preservingUUIDs = SampleUUIDSequence(start: 21_100)
-      let preservingBundle = try page.makeRecipeBundle(
-        now: now,
-        uuid: { preservingUUIDs.next() },
-        preserveRawImportHTML: true
-      )
-      expectNoDifference(preservingBundle.recipe.originalImportText?.contains("Lemon Chicken"), true)
-      let preservingSnapshotData = try #require(preservingBundle.recipe.originalSnapshot)
-      let preservingSnapshot = try RecipeBundleCoding.decodeSnapshot(preservingSnapshotData)
-      expectNoDifference(preservingSnapshot.recipe.originalImportText, nil)
     }
 
     @Test
@@ -216,10 +202,6 @@ extension RecipeCoreTests {
         let recipeCategories = try RecipeCategory.where { $0.recipeID.eq(recipe.id) }.fetchAll(db)
         let recipeCategoryIDs = Set(recipeCategories.map(\.categoryID))
         expectNoDifference(recipe.title, "Lemon Chicken")
-        expectOriginalImportTextForCurrentBuild(
-          recipe.originalImportText,
-          contains: "Lemon Chicken"
-        )
         expectNoDifference(source.url, sourceURL.absoluteString)
         expectNoDifference(
           recipeCategoryIDs.compactMap { categoriesByID[$0] }
@@ -269,7 +251,7 @@ extension RecipeCoreTests {
       expectNoDifference(firstResult.outcome, .imported)
       expectNoDifference(secondResult.outcome, .alreadyImported)
       expectNoDifference(secondResult.recipeID, firstResult.recipeID)
-      expectNoDifference(afterFirst, baseline.adding(recipeDelta: 1, sourceDelta: 1, ingredientSectionDelta: 2, ingredientLineDelta: 4, instructionSectionDelta: 1, instructionStepDelta: 2, photoDelta: 1, importRefDelta: 1))
+      expectNoDifference(afterFirst, baseline.adding(recipeDelta: 1, sourceDelta: 1, ingredientSectionDelta: 2, ingredientLineDelta: 4, instructionSectionDelta: 1, instructionStepDelta: 2, photoDelta: 0, importRefDelta: 1))
       expectNoDifference(afterSecond, afterFirst)
     }
 
@@ -377,7 +359,7 @@ extension RecipeCoreTests {
       expectNoDifference(firstResult.outcome, .imported)
       expectNoDifference(secondResult.outcome, .alreadyImported)
       expectNoDifference(secondResult.recipeID, firstResult.recipeID)
-      expectNoDifference(afterFirst, baseline.adding(recipeDelta: 1, sourceDelta: 1, ingredientSectionDelta: 2, ingredientLineDelta: 4, instructionSectionDelta: 1, instructionStepDelta: 2, photoDelta: 1, importRefDelta: 1))
+      expectNoDifference(afterFirst, baseline.adding(recipeDelta: 1, sourceDelta: 1, ingredientSectionDelta: 2, ingredientLineDelta: 4, instructionSectionDelta: 1, instructionStepDelta: 2, photoDelta: 0, importRefDelta: 1))
       expectNoDifference(afterSecond, afterFirst)
     }
 
@@ -442,10 +424,6 @@ extension RecipeCoreTests {
           let recipe = try #require(try Recipe.find(firstResult.recipeID).fetchOne(db))
           let source = try #require(try RecipeSource.fetchAll(db).first { $0.recipeID == recipe.id })
           expectNoDifference(recipe.title, siteCase.expectedTitle)
-          expectOriginalImportTextForCurrentBuild(
-            recipe.originalImportText,
-            contains: siteCase.expectedTitle
-          )
           expectNoDifference(source.name, siteCase.expectedSourceName)
           expectNoDifference(source.url, siteCase.sourceURL.absoluteString)
         }
@@ -530,20 +508,8 @@ extension RecipeCoreTests {
       try await database.read { db in
         let recipe = try #require(try Recipe.find(result.recipeID).fetchOne(db))
         expectNoDifference(recipe.title, "Caf\u{00E9} Breakfast Toast")
-        expectOriginalImportTextForCurrentBuild(
-          recipe.originalImportText,
-          encodedAs: .isoLatin1,
-          matches: data
-        )
       }
 
-      let preservingUUIDs = LockedSampleUUIDSequence(start: 27_100)
-      let preservingBundle = try draft.page.makeRecipeBundle(
-        now: Date(timeIntervalSinceReferenceDate: 804_300_060),
-        uuid: { preservingUUIDs.next() },
-        preserveRawImportHTML: true
-      )
-      expectNoDifference(preservingBundle.recipe.originalImportText?.data(using: .isoLatin1), data)
     }
 
     @Test
@@ -627,29 +593,6 @@ extension RecipeCoreTests {
     }
 
   }
-}
-
-private func expectOriginalImportTextForCurrentBuild(
-  _ originalImportText: String?,
-  contains text: String
-) {
-#if DEBUG
-  expectNoDifference(originalImportText?.contains(text), true)
-#else
-  expectNoDifference(originalImportText, nil)
-#endif
-}
-
-private func expectOriginalImportTextForCurrentBuild(
-  _ originalImportText: String?,
-  encodedAs encoding: String.Encoding,
-  matches data: Data
-) {
-#if DEBUG
-  expectNoDifference(originalImportText?.data(using: encoding), data)
-#else
-  expectNoDifference(originalImportText, nil)
-#endif
 }
 
 private struct SanitizedSiteCase {

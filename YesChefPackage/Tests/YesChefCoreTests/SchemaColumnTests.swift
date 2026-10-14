@@ -48,7 +48,6 @@ struct SchemaColumnTests {
       summary: "Still here",
       dateCreated: createdAt,
       dateModified: changedAt,
-      originalImportText: "source text"
     )
     let database = try pathBackedDatabase(at: databaseURL)
 
@@ -80,6 +79,44 @@ struct SchemaColumnTests {
       ))
       #expect(!columns.contains("lastCookedAt"))
       #expect(!columns.contains("timesCooked"))
+    }
+    try migratedDatabase.close()
+  }
+
+  @Test
+  func droppingRawImportHTMLPreservesOtherRecipeValues() async throws {
+    let databaseURL = try temporaryDirectory().appendingPathComponent("raw-html-library.sqlite")
+    let recipeID = UUID()
+    let createdAt = Date(timeIntervalSinceReferenceDate: 811_100_000)
+    let expectedRecipe = Recipe(
+      id: recipeID,
+      title: "Recipe Kept Through Migration",
+      summary: "Other values survive",
+      servingsText: "Serves 2",
+      dateCreated: createdAt,
+      dateModified: createdAt.addingTimeInterval(30)
+    )
+    let legacyImportText = "<html>\(String(repeating: "x", count: 1_050_000))</html>"
+    let database = try pathBackedDatabase(at: databaseURL)
+
+    try await database.write { db in
+      try Recipe.insert { expectedRecipe }.execute(db)
+      try db.execute(sql: #"ALTER TABLE "recipes" ADD COLUMN "originalImportText" TEXT"#)
+      try db.execute(
+        sql: #"UPDATE "recipes" SET "originalImportText" = ? WHERE "id" = ?"#,
+        arguments: [legacyImportText, recipeID]
+      )
+      try db.execute(
+        sql: #"DELETE FROM "grdb_migrations" WHERE "identifier" = 'Drop raw import HTML'"#
+      )
+    }
+    try database.close()
+
+    let migratedDatabase = try pathBackedDatabase(at: databaseURL)
+    try await migratedDatabase.read { db in
+      #expect(try Recipe.find(recipeID).fetchOne(db) == expectedRecipe)
+      let columns = Set(try String.fetchAll(db, sql: #"SELECT name FROM pragma_table_info('recipes')"#))
+      #expect(!columns.contains("originalImportText"))
     }
     try migratedDatabase.close()
   }

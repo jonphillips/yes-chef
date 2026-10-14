@@ -7,6 +7,25 @@ extension RecipeCoreTests {
   @Suite
   struct RecipeSnapshotCodingTests {
     @Test
+    func recipeDecodingIgnoresRawImportHTMLFromOlderTransfers() throws {
+      let now = Date(timeIntervalSinceReferenceDate: 802_000_000)
+      let recipe = Recipe(
+        id: SampleUUIDSequence.uuid(10),
+        title: "Older Transfer",
+        dateCreated: now,
+        dateModified: now
+      )
+      var payload = try #require(
+        JSONSerialization.jsonObject(with: JSONEncoder().encode(recipe)) as? [String: Any]
+      )
+      payload["originalImportText"] = "<html>legacy data</html>"
+      let legacyData = try JSONSerialization.data(withJSONObject: payload)
+
+      let decoded = try JSONDecoder().decode(Recipe.self, from: legacyData)
+      expectNoDifference(decoded, recipe)
+    }
+
+    @Test
     func originalSnapshotRoundTripsReadableRecipeDataWithoutRawBlobs() throws {
       let now = Date(timeIntervalSinceReferenceDate: 802_000_000)
       let recipeID = SampleUUIDSequence.uuid(1)
@@ -18,7 +37,6 @@ extension RecipeCoreTests {
         servingsText: "Serves 4",
         dateCreated: now,
         dateModified: now,
-        originalImportText: "<html>debug source</html>"
       )
       let displayData = Data(repeating: 0x42, count: 20_000)
       let thumbnailData = Data(repeating: 0x24, count: 4_000)
@@ -69,7 +87,6 @@ extension RecipeCoreTests {
 
       #expect(data.count < 5_000)
       expectNoDifference(snapshot.recipe.title, "Test Recipe")
-      expectNoDifference(snapshot.recipe.originalImportText, nil)
       expectNoDifference(snapshot.ingredients, ["1 onion"])
       expectNoDifference(snapshot.ingredientLines.first?.quantity, 1)
       expectNoDifference(snapshot.tags, ["weeknight"])

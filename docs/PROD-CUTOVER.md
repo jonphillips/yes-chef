@@ -50,7 +50,7 @@ can happen any time after the cut (ADR-0056 Amd 1).
       Production unnoticed.
 - [ ] Before installing the build, export a backup from each device. Afterwards, confirm the library is
       intact and that an edit syncs to the other device.
-- [ ] **Raw import HTML dropped, and its fallout repaired** ([`efforts/raw-import-html-drop.md`](efforts/raw-import-html-drop.md),
+- [x] **Raw import HTML dropped, and its fallout repaired** ([`efforts/raw-import-html-drop.md`](efforts/raw-import-html-drop.md),
       ADR-0010 Amd 1). This is the second reviewed slice. An appended migration drops `recipes.originalImportText`.
       A post-engine pass deletes the 1,527 photo rows that have no image bytes. It then re-uploads the nine
       recipes over CloudKit's 1 MB record limit, plus their children, and re-links the three calendar rows that

@@ -59,7 +59,9 @@ public enum WebRecipePageParser {
     RecipeMicrodataExtractor.extract(from: document, into: &builder)
     RecipeMilkStreetExtractor.extract(from: document, into: &builder)
     RecipeNYTCookingExtractor.extract(from: document, into: &builder)
-    RecipeBodyImageExtractor.extract(from: document, into: &builder)
+    if builder.images.isEmpty {
+      RecipeBodyImageExtractor.extract(from: document, into: &builder)
+    }
     RecipeEditorialProseExtractor.extract(from: document, into: &builder)
   }
 

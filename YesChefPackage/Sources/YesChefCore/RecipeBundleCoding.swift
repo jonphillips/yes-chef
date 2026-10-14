@@ -85,8 +85,6 @@ public enum RecipeBundleCoding {
     equipment: [Equipment] = [],
     recipeEquipment: [RecipeEquipment] = []
   ) throws -> Data {
-    var recipe = recipe
-    recipe.originalImportText = nil
     let snapshot = RecipeBundle(
       recipe: recipe,
       source: source,

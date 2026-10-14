@@ -326,16 +326,7 @@ extension RecipeRepository {
     now: Date,
     uuid: () -> UUID
   ) throws -> RecipeImportBundleResult {
-#if DEBUG
-    let preserveRawImportHTML = true
-#else
-    let preserveRawImportHTML = false
-#endif
-    let bundle = try draft.page.makeRecipeBundle(
-      now: now,
-      uuid: uuid,
-      preserveRawImportHTML: preserveRawImportHTML
-    )
+    let bundle = try draft.page.makeRecipeBundle(now: now, uuid: uuid)
     var adoptedBundle = bundle
     adoptedBundle.tagNames = draft.adoptedTagNames
     let result = try importBundle(adoptedBundle, in: db, now: now, uuid: uuid)

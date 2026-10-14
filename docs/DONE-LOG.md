@@ -9,6 +9,18 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Drop raw import HTML and repair CloudKit fallout (`effort/raw-import-html-drop`)
+
+**2026-10-13. Synced-schema migration and repair pass.** Removed persisted raw import HTML from `Recipe`, its
+capture and Paprika import paths, and the DEBUG DOM export; old transfer payloads still decode. Migration 52 drops
+the column without changing other recipe values. Web capture now persists only hydrated images and uses body-image
+scraping only when structured sources found no image. The post-engine pass deletes byte-less photo rows, re-queues
+unsynced recipes and children only after their recipe is on the server, and re-links unique matching calendar rows.
+`scripts/check-drift.sh` passed (715 package tests and app test-target compile), the elevated generic iOS build
+succeeded, and all 75 `YesChefTests` passed. Jon's backup-first iPad and iPhone sync pass is owed in
+`docs/device-passes.md`.
+
+---
 ## Calendar day-rail actions and recipe-editor columns (`effort/calendar-rail-and-editor-columns`)
 
 **2026-10-13. View-only; no schema or draft-shape change.** The Calendar toolbar now owns Today, Ask, and Add; the day rail

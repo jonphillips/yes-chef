@@ -1278,6 +1278,16 @@ extension DependencyValues {
       }
     }
 
+    migrator.registerMigration("Drop raw import HTML") { db in
+      let columnExists = (try Int.fetchOne(
+        db,
+        sql: #"SELECT COUNT(*) FROM pragma_table_info('recipes') WHERE name = 'originalImportText'"#
+      ) ?? 0) > 0
+      if columnExists {
+        try db.execute(sql: #"ALTER TABLE "recipes" DROP COLUMN "originalImportText""#)
+      }
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)
@@ -1309,6 +1319,15 @@ extension DependencyValues {
           let cuisineCourseBackfill = try RecipeRepository.backfillCuisineCourseFacets(in: db)
           if cuisineCourseBackfill.hasFindings {
             AppLog.dataIntegrity.warning("\(cuisineCourseBackfill.logSummary, privacy: .public)")
+          }
+          let onServerRecords = Set(
+            try SyncMetadata.fetchAll(db)
+              .filter { $0.lastKnownServerRecord != nil }
+              .map { RecipeSyncRecordID(table: $0.recordType, primaryKey: $0.recordPrimaryKey) }
+          )
+          let syncRepair = try RecipeSyncRepair.run(onServerRecords: onServerRecords, in: db)
+          if syncRepair.hasFindings {
+            AppLog.dataIntegrity.warning("\(syncRepair.logSummary, privacy: .public)")
           }
         }
       }

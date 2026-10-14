@@ -24,7 +24,6 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
   public var libraryPlacement: RecipeLibraryPlacement
   public var dateCreated: Date
   public var dateModified: Date
-  public var originalImportText: String?
   public var originalSnapshot: Data?
   public var makeAhead: String?
   public var chefItUp: String?
@@ -54,7 +53,6 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     libraryPlacement: RecipeLibraryPlacement = .main,
     dateCreated: Date,
     dateModified: Date,
-    originalImportText: String? = nil,
     originalSnapshot: Data? = nil,
     makeAhead: String? = nil,
     chefItUp: String? = nil,
@@ -83,7 +81,6 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     self.libraryPlacement = libraryPlacement
     self.dateCreated = dateCreated
     self.dateModified = dateModified
-    self.originalImportText = originalImportText
     self.originalSnapshot = originalSnapshot
     self.makeAhead = makeAhead
     self.chefItUp = chefItUp
@@ -114,7 +111,6 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     case libraryPlacement
     case dateCreated
     case dateModified
-    case originalImportText
     case originalSnapshot
     case makeAhead
     case chefItUp
@@ -147,7 +143,6 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
       libraryPlacement: try container.decodeIfPresent(RecipeLibraryPlacement.self, forKey: .libraryPlacement) ?? .main,
       dateCreated: try container.decode(Date.self, forKey: .dateCreated),
       dateModified: try container.decode(Date.self, forKey: .dateModified),
-      originalImportText: try container.decodeIfPresent(String.self, forKey: .originalImportText),
       originalSnapshot: try container.decodeIfPresent(Data.self, forKey: .originalSnapshot),
       makeAhead: try container.decodeIfPresent(String.self, forKey: .makeAhead),
       chefItUp: try container.decodeIfPresent(String.self, forKey: .chefItUp),

@@ -1604,7 +1604,6 @@ extension RecipeRepository {
       libraryPlacement: detail.recipe.libraryPlacement,
       dateCreated: now,
       dateModified: now,
-      originalImportText: detail.recipe.originalImportText,
       makeAhead: detail.recipe.makeAhead,
       chefItUp: detail.recipe.chefItUp,
       serveWith: nil,

@@ -54,9 +54,8 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func failingHeroImageFetchStillImportsSourceURLOnlyPhoto() async throws {
+    func failingHeroImageFetchDoesNotPersistPhotoRow() async throws {
       let sourceURL = try #require(URL(string: "https://example.com/recipes/lemon-chicken-image-failure"))
-      let heroURL = try #require(URL(string: "https://example.com/images/lemon-chicken.jpg"))
       let client = WebRecipeCaptureClient(
         fetchHTML: { _ in Self.jsonLDRecipe },
         renderHTML: { _ in nil },
@@ -71,10 +70,44 @@ extension RecipeCoreTests {
 
       var uuids = SampleUUIDSequence(start: 27_600)
       let bundle = try draft.page.makeRecipeBundle(now: capturedAt, uuid: { uuids.next() })
-      let hero = try #require(bundle.photos.first)
-      expectNoDifference(hero.sourceURL, heroURL.absoluteString)
-      expectNoDifference(hero.displayData, nil)
-      expectNoDifference(hero.thumbnailData, nil)
+      expectNoDifference(bundle.photos, [])
+    }
+
+    @Test
+    func structuredHeroSuppressesCarouselBodyImagesAndOnlyHydratedHeroBecomesPhoto() throws {
+      let sourceURL = try #require(URL(string: "https://example.com/recipes/lemon-chicken"))
+      let heroURL = try #require(URL(string: "https://example.com/images/lemon-chicken.jpg"))
+      let carouselURL = "https://example.com/images/another-recipe.jpg"
+      let html = Self.jsonLDRecipe.replacingOccurrences(
+        of: "<main><p>Recipe body.</p></main>",
+        with: "<main><img src=\"\(carouselURL)\"><p>Recipe body.</p></main>"
+      )
+      let page = WebRecipePageParser.parse(html: html, sourceURL: sourceURL)
+      expectNoDifference(page.imageURLs, [heroURL])
+
+      var hydratedPage = page
+      hydratedPage.processedImages[heroURL] = ProcessedRecipePhoto(
+        displayData: Data([0x01]),
+        thumbnailData: Data([0x02]),
+        mediaType: "image/jpeg",
+        checksum: "hero"
+      )
+      var uuids = SampleUUIDSequence(start: 27_650)
+      let bundle = try hydratedPage.makeRecipeBundle(
+        now: Date(timeIntervalSinceReferenceDate: 804_365_000),
+        uuid: { uuids.next() }
+      )
+      expectNoDifference(bundle.photos.map(\.sourceURL), [heroURL.absoluteString])
+      expectNoDifference(bundle.photos.map(\.displayData), [Data([0x01])])
+    }
+
+    @Test
+    func bodyImageFallbackFindsImageWhenStructuredSourcesHaveNone() throws {
+      let page = WebRecipePageParser.parse(
+        html: #"<html><head><title>Soup</title></head><body><img src="https://example.com/soup.jpg"></body></html>"#,
+        sourceURL: URL(string: "https://example.com/soup")
+      )
+      expectNoDifference(page.imageURLs.map(\.absoluteString), ["https://example.com/soup.jpg"])
     }
 
     @Test
