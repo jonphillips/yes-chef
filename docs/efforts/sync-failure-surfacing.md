@@ -25,8 +25,13 @@ server. That catches every cause, including ones we haven't met yet.
 
 ## Slice 1 — jon-platform `CloudSyncKit` (additive)
 
-- **Not uploaded:** rows of SQLiteData's `metadata` table with `hasLastKnownServerRecord = 0`, `_isDeleted = 0`,
-  and `userModificationTime` older than a grace window (default 30 minutes). Count them only while the engine is
+- **Not uploaded:** non-deleted rows of SQLiteData's `metadata` table that aren't **server-confirmed**, with
+  `userModificationTime` older than a grace window (default 30 minutes). Server-confirmed means
+  `lastKnownServerRecord?.recordChangeTag != nil`. **Not** `hasLastKnownServerRecord`: SQLiteData 1.9 stores the
+  outgoing record there before CloudKit answers and never clears it on `.limitExceeded`, so a record that failed for
+  good looks uploaded (that's how the first raw-HTML repair missed all nine recipes). Testing the change tag
+  means decoding the system-fields column, so compute this on demand and off the main actor (status refresh,
+  Settings), never at launch. Decode only `lastKnownServerRecord`, never `_lastKnownServerRecordAllFields`. Count them only while the engine is
   running and not `isSendingChanges` or `isFetchingChanges`, so a batch in flight never counts. Return the counts
   grouped by `recordType`, plus up to 50 primary keys per type for the app to name. **It reports a fact, not a
   cause.** Offline for an hour, or throttled during a bulk upload, it says these items haven't synced. That's true,
@@ -38,10 +43,12 @@ server. That catches every cause, including ones we haven't met yet.
   summary "N items haven't synced". Its precedence is after `.downloading` and before `.upToDate`: in-progress
   states still win, but **"Up to date" requires both counts to be zero.** Reducer tests cover every new
   precedence edge.
-- **`CloudSync.requeue(recordType:primaryKeys:)`** re-queues rows with `UPDATE <table> SET <pk> = <pk>`. That's
-  SQLiteData's own re-sweep idiom (`SyncEngine.uploadRecordsToCloudKit`). It fires the after-update trigger, and
-  the primary-key-change trigger is guarded `WHEN old.pk != new.pk`, so it stays quiet (verified in 1.9.0
-  `Internal/Triggers.swift`).
+- **`CloudSync.requeue(recordType:primaryKeys:)`** sets the rows' metadata `lastKnownServerRecord` and
+  `_lastKnownServerRecordAllFields` to NULL, as SQLiteData's own `setLastKnownServerRecord(nil)` does. The metadata
+  after-update trigger queues the save, and the resend builds a fresh `CKRecord`, so a stale cached field (like a
+  dropped oversize column) can't ride along. Only a row with no metadata row uses `UPDATE <table> SET <pk> = <pk>`,
+  which creates one. **Never clear a server-confirmed row.** That would discard its change tag and turn the next
+  save into a conflict.
 - It stays domain-free, with no app table names in the package. Galavant gets it when it bumps the package, and
   nothing there changes until then.
 

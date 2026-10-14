@@ -61,24 +61,40 @@ The rule: **a `RecipePhoto` row exists only with image bytes.**
 
 Add one pass to the existing `runsPostEngineDataPasses` block in `Schema.swift`, reporting through
 `AppLog.dataIntegrity` with the same `hasFindings`/`logSummary` shape as its neighbors. It uses the attached
-metadatabase. A row is **"on the server"** when its `SyncMetadata` has a `lastKnownServerRecord`.
+metadatabase.
+
+> **Corrected 2026-10-13, after the first device pass failed.** The first version defined "on the server" as "has
+> a `lastKnownServerRecord`" and re-queued with `SET id = id`. Both were wrong. SQLiteData 1.9 stores the
+> **outgoing** record as `lastKnownServerRecord` and `_lastKnownServerRecordAllFields` **before** CloudKit answers
+> (`refreshLastKnownServerRecord` from `nextRecordZoneChangeBatch`), and `.limitExceeded` never clears it. So the
+> nine never-uploaded recipes looked uploaded. A resend also starts from that cached all-fields record and
+> `record.update(with:)` never removes a key, so the stale 1.1 MB `originalImportText` field rides every retry.
+
+A row is **server-confirmed** when its metadata's `lastKnownServerRecord` has a `recordChangeTag`, which only CloudKit
+assigns. A missing metadata row, a nil record, or a record with no change tag is **unconfirmed**. Decode only the
+`lastKnownServerRecord` column (system fields, small), never `_lastKnownServerRecordAllFields`.
+
+To **re-queue** an unconfirmed row, set its metadata's `lastKnownServerRecord` and `_lastKnownServerRecordAllFields`
+to NULL. That's what SQLiteData's own `setLastKnownServerRecord(nil)` does. The metadata after-update trigger
+queues it (`didUpdate`), and the next send builds a fresh `CKRecord` from the current columns. Use
+`SET id = id` only for a row with no metadata row at all, where the trigger creates one.
 
 0. **Delete every `recipePhotos` row with neither `displayData` nor `thumbnailData`, first** (Jon-approved).
    This is a normal write, so the deletes sync. Running it first keeps step 3 from uploading junk it is about to
    delete. Clear any `coverPhotoID` that points at a deleted row. There are none today, but the pass must not
    leave a dangling cover.
-1. **Skip the whole pass** unless at least one recipe is on the server. A device that has never synced, or has
+1. **Skip the whole pass** unless at least one recipe is server-confirmed. A device that has never synced, or has
    sync off, has nothing to repair and must not rewrite the library on every launch.
-2. **Recipes not on the server:** re-queue them with `UPDATE "recipes" SET "id" = "id"`, SQLiteData's own
-   re-sweep idiom (`SyncEngine.uploadRecordsToCloudKit`). It fires the after-update trigger, and the primary-key
-   trigger stays quiet because it's guarded `WHEN old.pk != new.pk` (verified in 1.9.0
-   `Internal/Triggers.swift`). Don't bump `dateModified`, because it drives "Newest".
-3. **Children not on the server, of recipes that are:** re-queue the same way the rows of every synced
-   table with a `recipeID` FK to `recipes`. **Never touch a child whose recipe isn't on the server yet.** It would
-   hit `.referenceViolation`, and SQLiteData would null or delete it locally. Waiting for a later launch is the
-   ordering guarantee: step 2 uploads the recipe this launch, and step 3 picks up its children on the next one.
+2. **Unconfirmed recipes:** re-queue them as above, checking only the `recipes` metadata rows (about 2.2k small
+   decodes). Remember their IDs in local storage that doesn't sync. Don't bump `dateModified`, because it drives
+   "Newest".
+3. **Children of remembered recipes that are now confirmed:** re-queue their unconfirmed rows in every synced
+   table with a `recipeID` FK to `recipes`, then forget the recipe. **Never touch a child whose recipe isn't
+   confirmed.** It would hit `.referenceViolation`, and SQLiteData would null or delete it locally. Waiting for a
+   later launch is the ordering guarantee. Only remembered recipes' children are checked, so the pass never
+   decodes the whole child metadata (about 50k rows) and goes quiet once the remembered set drains.
 4. **Re-link:** take `mealPlanItems` and `menuItems` rows with `kind = recipe` and `recipeID IS NULL`. If
-   exactly one non-archived recipe has an identical title **and is on the server**, set `recipeID` with a normal
+   exactly one non-archived recipe has an identical title **and is server-confirmed**, set `recipeID` with a normal
    write, so it syncs. Leave zero or several matches alone and log the counts. The same step-3 rule applies: never
    link to a recipe that isn't on the server.
 
