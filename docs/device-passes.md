@@ -13,6 +13,14 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**Drop raw import HTML and repair CloudKit fallout** ([effort brief](efforts/raw-import-html-drop.md), synced-schema change).
+Export a backup from both devices first. Install on the iPad, launch twice with sync on, then install and launch on the
+iPhone. Confirm Camarones a la Diabla, Coconut-Caramel Braised Tofu, Keema Palak, and the other six oversized recipes
+arrive with ingredients, steps, and hero photo. Both Keema calendar rows and the Coconut-Caramel row show thumbnails
+and open on both devices. Confirm existing recipes still show their same hero. Capture one NYT recipe and check its
+photo gallery contains only the hero. In the `dataIntegrity` log, confirm the repair summary reports 1,527 deleted
+photos on the iPad and any unmatched rows; compare library counts on both devices.
+
 **Calendar day-rail actions and recipe-editor columns** (schema-free). On 11" and 13" iPad landscape with large Dynamic Type,
 confirm a filled day shows Cook these plus Day actions in the rail, Ask/Add stay in the toolbar, and all grocery and hand-off
 actions remain available. Confirm an empty day offers Add Recipe and Add Note. Check recipe rows omit the kind label and titles

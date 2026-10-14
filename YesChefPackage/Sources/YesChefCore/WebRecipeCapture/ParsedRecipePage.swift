@@ -172,8 +172,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
 
   public func makeRecipeBundle(
     now: Date,
-    uuid: () -> UUID,
-    preserveRawImportHTML: Bool = false
+    uuid: () -> UUID
   ) throws -> RecipeBundleCoding.RecipeBundle {
     let recipeID = uuid()
     let ingredientSections = makeIngredientSections(recipeID: recipeID, uuid: uuid)
@@ -181,20 +180,20 @@ public struct ParsedRecipePage: Equatable, Sendable {
     let instructionSections = makeInstructionSections(recipeID: recipeID, uuid: uuid)
     let instructionSteps = makeInstructionSteps(recipeID: recipeID, sections: instructionSections, uuid: uuid)
     let recipeNotes = makeRecipeNotes(recipeID: recipeID, now: now, uuid: uuid)
-    let photos = imageURLs.enumerated().map { index, url in
+    let photos = imageURLs.enumerated().compactMap { index, url -> RecipePhoto? in
       let photoID = uuid()
-      let processedImage = processedImages[url]
+      guard let processedImage = processedImages[url] else { return nil }
       return RecipePhoto(
         id: photoID,
         recipeID: recipeID,
         imageDataReference: "recipePhotos/\(photoID.uuidString)",
-        displayData: processedImage?.displayData,
-        thumbnailData: processedImage?.thumbnailData,
-        mediaType: processedImage?.mediaType,
-        pixelWidth: processedImage?.pixelWidth,
-        pixelHeight: processedImage?.pixelHeight,
+        displayData: processedImage.displayData,
+        thumbnailData: processedImage.thumbnailData,
+        mediaType: processedImage.mediaType,
+        pixelWidth: processedImage.pixelWidth,
+        pixelHeight: processedImage.pixelHeight,
         sourceURL: url.absoluteString,
-        checksum: processedImage?.checksum,
+        checksum: processedImage.checksum,
         kind: index == 0 ? .hero : .gallery,
         source: .extracted,
         sortOrder: index,
@@ -214,7 +213,6 @@ public struct ParsedRecipePage: Equatable, Sendable {
       rating: rating,
       dateCreated: now,
       dateModified: now,
-      originalImportText: preserveRawImportHTML ? originalHTML : nil
     )
     recipe.originalSnapshot = try RecipeBundleCoding.snapshotData(
       recipe: recipe,

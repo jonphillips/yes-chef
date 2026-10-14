@@ -101,8 +101,7 @@ public struct PaprikaHTMLRecipe: Equatable, Sendable {
 
   public func makeRecipeBundle(
     now: Date,
-    uuid: () -> UUID,
-    preserveRawImportHTML: Bool = false
+    uuid: () -> UUID
   ) throws -> RecipeBundleCoding.RecipeBundle {
     let recipeID = uuid()
 
@@ -201,7 +200,6 @@ public struct PaprikaHTMLRecipe: Equatable, Sendable {
       rating: rating,
       dateCreated: now,
       dateModified: now,
-      originalImportText: preserveRawImportHTML ? originalHTML : nil
     )
     recipe.originalSnapshot = try RecipeBundleCoding.snapshotData(
       recipe: recipe,
@@ -560,7 +558,7 @@ public enum PaprikaHTMLImporter {
     // Paprika has no schema.org itemprop for difficulty; the export renders it (when set)
     // as a `<b>Difficulty: </b>` metadata label, so anchor on the label and read the value
     // up to the next field. Map only the known levels — anything else stays nil and the raw
-    // page is preserved in originalImportText (preserve over interpret).
+    // Values that cannot be mapped confidently remain unstructured text.
     let pattern = #"(?is)Difficulty:\s*</b>(.*?)(?:<b\b|</p>)"#
     guard let raw = captures(pattern: pattern, in: html).first?.dropFirst().first else { return nil }
     switch textContent(raw).lowercased() {
