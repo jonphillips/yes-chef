@@ -1320,14 +1320,33 @@ extension DependencyValues {
           if cuisineCourseBackfill.hasFindings {
             AppLog.dataIntegrity.warning("\(cuisineCourseBackfill.logSummary, privacy: .public)")
           }
-          let onServerRecords = Set(
-            try SyncMetadata.fetchAll(db)
-              .filter { $0.lastKnownServerRecord != nil }
-              .map { RecipeSyncRecordID(table: $0.recordType, primaryKey: $0.recordPrimaryKey) }
-          )
-          let syncRepair = try RecipeSyncRepair.run(onServerRecords: onServerRecords, in: db)
-          if syncRepair.hasFindings {
-            AppLog.dataIntegrity.warning("\(syncRepair.logSummary, privacy: .public)")
+          do {
+            try db.inSavepoint {
+              let onServerRecords = Set(
+                try SyncMetadata
+                  .where(\.hasLastKnownServerRecord)
+                  .select(\.id)
+                  .fetchAll(db)
+                  .map { RecipeSyncRecordID(table: $0.recordType, primaryKey: $0.recordPrimaryKey) }
+              )
+              let syncedTableNames = Set(try String.fetchAll(
+                db,
+                sql: #"SELECT "tableName" FROM "sqlitedata_icloud_recordTypes""#
+              ))
+              let syncRepair = try RecipeSyncRepair.run(
+                onServerRecords: onServerRecords,
+                syncedTableNames: syncedTableNames,
+                in: db
+              )
+              if syncRepair.hasFindings {
+                AppLog.dataIntegrity.warning("\(syncRepair.logSummary, privacy: .public)")
+              }
+              return .commit
+            }
+          } catch {
+            AppLog.dataIntegrity.error(
+              "recipe-sync-repair failed: \(String(describing: error), privacy: .public)"
+            )
           }
         }
       }

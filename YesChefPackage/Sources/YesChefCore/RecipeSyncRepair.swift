@@ -29,7 +29,6 @@ public struct RecipeSyncRepairAudit: Equatable, Sendable {
     deletedPhotoCount > 0 || requeuedRecipeCount > 0 || requeuedChildCount > 0
       || linkedMealPlanCount > 0 || linkedMenuCount > 0 || unmatchedMealPlanCount > 0
       || unmatchedMenuCount > 0 || ambiguousMealPlanCount > 0 || ambiguousMenuCount > 0
-      || skippedForUnsentParentCount > 0
   }
 
   public var logSummary: String {
@@ -46,6 +45,7 @@ public struct RecipeSyncRepairAudit: Equatable, Sendable {
 public enum RecipeSyncRepair {
   public static func run(
     onServerRecords: Set<RecipeSyncRecordID>,
+    syncedTableNames: Set<String>,
     in db: Database
   ) throws -> RecipeSyncRepairAudit {
     var audit = RecipeSyncRepairAudit(
@@ -84,21 +84,26 @@ public enum RecipeSyncRepair {
     audit.requeuedRecipeCount = unsentRecipeIDs.count
     try requeue(unsentRecipeIDs, table: Recipe.tableName, in: db)
 
-    let serverParentIDs = Array(serverRecipeIDs)
-    let tables = try recipeIDChildTables(in: db)
+    let serverParentIDs = serverRecipeIDs.sorted()
+    let tables = try recipeIDChildTables(in: db, syncedTableNames: syncedTableNames)
     for table in tables {
       let serverChildIDs = onServerRecords.filter { $0.table == table }.map(\.primaryKey)
-      audit.skippedForUnsentParentCount += try Int.fetchOne(
+      let childParentIDs = try String.fetchAll(
         db,
-        sql: "SELECT COUNT(*) FROM \"\(quoted(table))\" WHERE \"recipeID\" IS NOT NULL AND \"recipeID\" NOT IN (\(placeholders(serverParentIDs.count)))",
-        arguments: StatementArguments(serverParentIDs)
-      ) ?? 0
-      let childIDs = try String.fetchAll(
-        db,
-        sql: "SELECT \"id\" FROM \"\(quoted(table))\" WHERE \"recipeID\" IN (\(placeholders(serverParentIDs.count)))",
-        arguments: StatementArguments(serverParentIDs)
+        sql: "SELECT \"recipeID\" FROM \"\(quoted(table))\" WHERE \"recipeID\" IS NOT NULL"
       )
-      let unsentChildIDs = childIDs.filter { !serverChildIDs.contains($0.lowercased()) }
+      audit.skippedForUnsentParentCount += childParentIDs.filter {
+        !serverRecipeIDs.contains($0.lowercased())
+      }.count
+      var childIDs = Set<String>()
+      for parentChunk in chunks(serverParentIDs, size: 500) {
+        childIDs.formUnion(try String.fetchAll(
+          db,
+          sql: "SELECT \"id\" FROM \"\(quoted(table))\" WHERE \"recipeID\" IN (\(placeholders(parentChunk.count)))",
+          arguments: StatementArguments(parentChunk)
+        ))
+      }
+      let unsentChildIDs = childIDs.filter { !serverChildIDs.contains($0.lowercased()) }.sorted()
       audit.requeuedChildCount += unsentChildIDs.count
       try requeue(unsentChildIDs, table: table, in: db)
     }
@@ -155,7 +160,7 @@ public enum RecipeSyncRepair {
     return (linked, unmatched, ambiguous)
   }
 
-  private static func recipeIDChildTables(in db: Database) throws -> [String] {
+  private static func recipeIDChildTables(in db: Database, syncedTableNames: Set<String>) throws -> [String] {
     try String.fetchAll(
       db,
       sql: #"""
@@ -167,15 +172,23 @@ public enum RecipeSyncRepair {
           AND tables.name != 'recipes'
         ORDER BY tables.name
         """#
-    )
+    ).filter(syncedTableNames.contains)
   }
 
   private static func requeue(_ ids: [String], table: String, in db: Database) throws {
     guard !ids.isEmpty else { return }
-    try db.execute(
-      sql: "UPDATE \"\(quoted(table))\" SET \"id\" = \"id\" WHERE \"id\" IN (\(placeholders(ids.count)))",
-      arguments: StatementArguments(ids)
-    )
+    for idChunk in chunks(ids, size: 500) {
+      try db.execute(
+        sql: "UPDATE \"\(quoted(table))\" SET \"id\" = \"id\" WHERE \"id\" IN (\(placeholders(idChunk.count)))",
+        arguments: StatementArguments(idChunk)
+      )
+    }
+  }
+
+  private static func chunks<Element>(_ values: [Element], size: Int) -> [[Element]] {
+    stride(from: 0, to: values.count, by: size).map { start in
+      Array(values[start..<min(start + size, values.count)])
+    }
   }
 
   private static func recordID(_ table: String, _ primaryKey: String) -> RecipeSyncRecordID {

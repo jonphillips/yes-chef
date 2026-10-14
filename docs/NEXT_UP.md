@@ -1,7 +1,7 @@
 # Next Up — Sync failure status in Yes Chef
 
-**Slices:** effort `sync-failure-surfacing`, Slice 2 — Yes Chef (one PR, after jon-platform#70 merges)
+**Slices:** effort `sync-failure-surfacing`, Slices 1–2 — jon-platform `CloudSyncKit`, then Yes Chef (two PRs, in order)
 **Briefs:** docs/efforts/sync-failure-surfacing.md
-**Done when:** per Slice 2 and the brief's "Done when"; verification per `docs/verification.md`.
+**Done when:** per Slices 1–2 and the brief's "Done when"; verification per `docs/verification.md`.
 **Owed:** Jon's two-device sync status pass in `docs/device-passes.md`.
-**Notes:** Wait for jon-platform#70 to merge and bump to its new `CloudSyncKit` package version first. The Settings sync row shows the new state; sync detail lists unsynced rows by readable name with a Retry action that calls `requeue`. Do not add an automatic retry loop. Tick `PROD-CUTOVER.md` Phase 2, add the completion to `DONE-LOG.md`, and keep the device pass owed until Jon clears it. Start from a fresh `main`.
+**Notes:** jon-platform#70 is docs-only and must merge before Slice 1 starts. Dispatch Slice 1 to jon-platform for the additive `CloudSyncKit` signal and tests; after it merges, bump Yes Chef to that package version and dispatch Slice 2 for the Settings sync row and retry detail. The brief's device pass and completion steps still apply. Do not add an automatic retry loop. Start each slice from a fresh `main`.

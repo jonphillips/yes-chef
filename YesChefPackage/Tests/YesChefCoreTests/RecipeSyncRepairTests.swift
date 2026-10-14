@@ -84,7 +84,11 @@ extension RecipeCoreTests {
         RecipeSyncRecordID(table: Recipe.tableName, primaryKey: secondDuplicateRecipeID.uuidString),
       ]
       let audit = try await database.write { db in
-        try RecipeSyncRepair.run(onServerRecords: onServer, in: db)
+        try RecipeSyncRepair.run(
+          onServerRecords: onServer,
+          syncedTableNames: ["recipes", "ingredientSections", "recipePhotos", "mealPlanItems", "menus", "menuItems"],
+          in: db
+        )
       }
 
       #expect(audit.deletedPhotoCount == 1)
@@ -133,7 +137,7 @@ extension RecipeCoreTests {
       }
 
       let audit = try await database.write { db in
-        try RecipeSyncRepair.run(onServerRecords: [], in: db)
+        try RecipeSyncRepair.run(onServerRecords: [], syncedTableNames: [], in: db)
       }
       #expect(audit.deletedPhotoCount == 1)
       #expect(audit.requeuedRecipeCount == 0)
@@ -143,6 +147,74 @@ extension RecipeCoreTests {
         #expect(!photos.contains(where: { $0.id == emptyPhotoID }))
         #expect(recipe?.coverPhotoID == nil)
       }
+    }
+
+    @Test
+    func repairChunksParentAndRequeueIDsBeyondOneSQLiteParameterBatch() async throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 815_200_000)
+      let recipes = (0..<1_100).map { offset in
+        Recipe(id: SampleUUIDSequence.uuid(72_000 + offset), title: "Recipe \(offset)", dateCreated: now, dateModified: now)
+      }
+      let sections = recipes.enumerated().map { offset, recipe in
+        IngredientSection(id: SampleUUIDSequence.uuid(74_000 + offset), recipeID: recipe.id, sortOrder: 0)
+      }
+      try await database.write { db in
+        try Recipe.insert { recipes }.execute(db)
+        try IngredientSection.insert { sections }.execute(db)
+      }
+
+      let onServer = Set(recipes.map {
+        RecipeSyncRecordID(table: Recipe.tableName, primaryKey: $0.id.uuidString)
+      })
+      let audit = try await database.write { db in
+        try RecipeSyncRepair.run(
+          onServerRecords: onServer,
+          syncedTableNames: ["recipes", "ingredientSections"],
+          in: db
+        )
+      }
+
+      #expect(audit.requeuedRecipeCount == 0)
+      #expect(audit.requeuedChildCount == sections.count)
+    }
+
+    @Test
+    func repairLeavesLocalRecipeChildrenAlone() async throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 815_300_000)
+      let recipeID = SampleUUIDSequence.uuid(75_000)
+      let variationID = SampleUUIDSequence.uuid(75_001)
+      let activeVariationID = SampleUUIDSequence.uuid(75_002)
+      try await database.write { db in
+        try Recipe.insert {
+          Recipe(id: recipeID, title: "Local child", dateCreated: now, dateModified: now)
+        }.execute(db)
+        try RecipeVariation.insert {
+          RecipeVariation(id: variationID, recipeID: recipeID, name: "Variation", sortIndex: 0, dateCreated: now, dateModified: now)
+        }.execute(db)
+        try RecipeActiveVariation.insert {
+          RecipeActiveVariation(id: activeVariationID, recipeID: recipeID, variationID: variationID, dateModified: now)
+        }.execute(db)
+      }
+
+      let audit = try await database.write { db in
+        try RecipeSyncRepair.run(
+          onServerRecords: [
+            RecipeSyncRecordID(table: Recipe.tableName, primaryKey: recipeID.uuidString),
+            RecipeSyncRecordID(table: RecipeVariation.tableName, primaryKey: variationID.uuidString),
+          ],
+          syncedTableNames: ["recipes", "recipeVariations"],
+          in: db
+        )
+      }
+
+      #expect(audit.requeuedChildCount == 0)
+      #expect(audit.hasFindings == false)
+      let activeVariation = try await database.read { db in
+        try RecipeActiveVariation.find(activeVariationID).fetchOne(db)
+      }
+      #expect(activeVariation?.id == activeVariationID)
     }
   }
 }
