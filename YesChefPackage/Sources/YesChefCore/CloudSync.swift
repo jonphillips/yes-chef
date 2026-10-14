@@ -27,7 +27,7 @@ public enum YesChefCloudSync {
     preRestoreFilenamePrefix: "YesChef-PreRestore-",
     restoreStagingFilenamePrefix: "YesChef-Restore-",
     identifyingTableNames: ["recipes"],
-    declaredSchemaVersion: 52,
+    declaredSchemaVersion: 53,
     lastPreRestoreDefaultsKey: "YesChefDatabaseBackupLastPreRestorePath",
     cloudSync: configuration,
     liveStoreURL: { try YesChefDatabaseStorage.liveSharedDatabaseURL() },

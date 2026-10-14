@@ -13,6 +13,17 @@ public struct RecipeSyncRecordID: Hashable, Sendable {
   }
 }
 
+/// The small system-fields metadata used to decide whether CloudKit confirmed a save.
+public struct RecipeSyncMetadataState: Hashable, Sendable {
+  public var recordID: RecipeSyncRecordID
+  public var hasServerChangeTag: Bool
+
+  public init(recordID: RecipeSyncRecordID, hasServerChangeTag: Bool) {
+    self.recordID = recordID
+    self.hasServerChangeTag = hasServerChangeTag
+  }
+}
+
 public struct RecipeSyncRepairAudit: Equatable, Sendable {
   public var deletedPhotoCount: Int
   public var requeuedRecipeCount: Int
@@ -41,11 +52,12 @@ public struct RecipeSyncRepairAudit: Equatable, Sendable {
 }
 
 /// Repairs records that SQLiteData did not upload because an earlier row exceeded CloudKit's
-/// record limit. The caller supplies the on-server identity set read from SyncMetadata.
+/// record limit. The caller supplies metadata states whose change tags confirm server saves.
 public enum RecipeSyncRepair {
   public static func run(
-    onServerRecords: Set<RecipeSyncRecordID>,
+    recipeMetadata: [RecipeSyncMetadataState],
     syncedTableNames: Set<String>,
+    childMetadataFor: (String, [String], Database) throws -> [RecipeSyncMetadataState],
     in db: Database
   ) throws -> RecipeSyncRepairAudit {
     var audit = RecipeSyncRepairAudit(
@@ -76,41 +88,77 @@ public enum RecipeSyncRepair {
     ) ?? 0
     try db.execute(sql: #"DELETE FROM "recipePhotos" WHERE "displayData" IS NULL AND "thumbnailData" IS NULL"#)
 
-    let serverRecipeIDs = Set(onServerRecords.filter { $0.table == Recipe.tableName }.map(\.primaryKey))
-    guard !serverRecipeIDs.isEmpty else { return audit }
-
     let recipeIDs = try String.fetchAll(db, sql: #"SELECT "id" FROM "recipes""#)
-    let unsentRecipeIDs = recipeIDs.filter { !onServerRecords.contains(recordID(Recipe.tableName, $0)) }
-    audit.requeuedRecipeCount = unsentRecipeIDs.count
-    try requeue(unsentRecipeIDs, table: Recipe.tableName, in: db)
+    let recipeMetadataByID = Dictionary(
+      uniqueKeysWithValues: recipeMetadata
+        .filter { $0.recordID.table == Recipe.tableName }
+        .map { ($0.recordID.primaryKey, $0) }
+    )
+    let confirmedRecipeIDs = Set(
+      recipeMetadata.filter {
+        $0.recordID.table == Recipe.tableName && $0.hasServerChangeTag
+      }.map(\.recordID.primaryKey)
+    )
+    let unconfirmedRecipeIDs = recipeIDs.filter { !confirmedRecipeIDs.contains($0.lowercased()) }
+    audit.requeuedRecipeCount = unconfirmedRecipeIDs.count
+    try rememberRecipes(unconfirmedRecipeIDs, in: db)
+    try clearMetadata(
+      for: unconfirmedRecipeIDs.filter { recipeMetadataByID[$0.lowercased()] != nil },
+      table: Recipe.tableName,
+      in: db
+    )
+    try requeue(
+      unconfirmedRecipeIDs.filter { recipeMetadataByID[$0.lowercased()] == nil },
+      table: Recipe.tableName,
+      in: db
+    )
 
-    let serverParentIDs = serverRecipeIDs.sorted()
+    let queuedRecipeIDs = Set(try String.fetchAll(db, sql: #"SELECT "recipeID" FROM "recipeSyncRepairQueue""#).map { $0.lowercased() })
+    let readyParentIDs = queuedRecipeIDs.intersection(confirmedRecipeIDs).sorted()
     let tables = try recipeIDChildTables(in: db, syncedTableNames: syncedTableNames)
     for table in tables {
-      let serverChildIDs = onServerRecords.filter { $0.table == table }.map(\.primaryKey)
       let childParentIDs = try String.fetchAll(
         db,
         sql: "SELECT \"recipeID\" FROM \"\(quoted(table))\" WHERE \"recipeID\" IS NOT NULL"
       )
       audit.skippedForUnsentParentCount += childParentIDs.filter {
-        !serverRecipeIDs.contains($0.lowercased())
+        !confirmedRecipeIDs.contains($0.lowercased())
       }.count
-      var childIDs = Set<String>()
-      for parentChunk in chunks(serverParentIDs, size: 500) {
+      var childIDs: Set<String> = []
+      for parentChunk in chunks(readyParentIDs, size: 500) {
         childIDs.formUnion(try String.fetchAll(
           db,
           sql: "SELECT \"id\" FROM \"\(quoted(table))\" WHERE \"recipeID\" IN (\(placeholders(parentChunk.count)))",
           arguments: StatementArguments(parentChunk)
         ))
       }
-      let unsentChildIDs = childIDs.filter { !serverChildIDs.contains($0.lowercased()) }.sorted()
-      audit.requeuedChildCount += unsentChildIDs.count
-      try requeue(unsentChildIDs, table: table, in: db)
+      let childIDsToCheck = childIDs.sorted()
+      guard !childIDsToCheck.isEmpty else { continue }
+      let childMetadata = try childMetadataFor(table, childIDsToCheck, db)
+      let childMetadataByID = Dictionary(
+        uniqueKeysWithValues: childMetadata.map { ($0.recordID.primaryKey, $0) }
+      )
+      let unconfirmedChildIDs = childIDsToCheck.filter {
+        childMetadataByID[$0.lowercased()]?.hasServerChangeTag != true
+      }
+      audit.requeuedChildCount += unconfirmedChildIDs.count
+      try clearMetadata(
+        for: unconfirmedChildIDs.filter { childMetadataByID[$0.lowercased()] != nil },
+        table: table,
+        in: db
+      )
+      try requeue(
+        unconfirmedChildIDs.filter { childMetadataByID[$0.lowercased()] == nil },
+        table: table,
+        in: db
+      )
     }
 
+    try forgetRecipes(readyParentIDs, in: db)
+
     let recipes = try Recipe.fetchAll(db)
-    let linkedMealPlan = try relinkMealPlanItems(recipes: recipes, serverRecipeIDs: serverRecipeIDs, in: db)
-    let linkedMenu = try relinkMenuItems(recipes: recipes, serverRecipeIDs: serverRecipeIDs, in: db)
+    let linkedMealPlan = try relinkMealPlanItems(recipes: recipes, serverRecipeIDs: confirmedRecipeIDs, in: db)
+    let linkedMenu = try relinkMenuItems(recipes: recipes, serverRecipeIDs: confirmedRecipeIDs, in: db)
     audit.linkedMealPlanCount = linkedMealPlan.linked
     audit.unmatchedMealPlanCount = linkedMealPlan.unmatched
     audit.ambiguousMealPlanCount = linkedMealPlan.ambiguous
@@ -185,14 +233,38 @@ public enum RecipeSyncRepair {
     }
   }
 
+  private static func clearMetadata(for ids: [String], table: String, in db: Database) throws {
+    for idChunk in chunks(ids, size: 500) {
+      try db.execute(
+        sql: #"UPDATE "sqlitedata_icloud_metadata" SET "lastKnownServerRecord" = NULL, "_lastKnownServerRecordAllFields" = NULL WHERE "recordType" = ? AND "recordPrimaryKey" IN (\#(placeholders(idChunk.count)))"#,
+        arguments: StatementArguments([table] + idChunk)
+      )
+    }
+  }
+
+  private static func rememberRecipes(_ ids: [String], in db: Database) throws {
+    for idChunk in chunks(ids, size: 500) {
+      let values = idChunk.map { _ in "(?)" }.joined(separator: ", ")
+      try db.execute(
+        sql: "INSERT OR IGNORE INTO \"recipeSyncRepairQueue\" (\"recipeID\") VALUES \(values)",
+        arguments: StatementArguments(idChunk)
+      )
+    }
+  }
+
+  private static func forgetRecipes(_ ids: [String], in db: Database) throws {
+    for idChunk in chunks(ids, size: 500) {
+      try db.execute(
+        sql: "DELETE FROM \"recipeSyncRepairQueue\" WHERE \"recipeID\" IN (\(placeholders(idChunk.count)))",
+        arguments: StatementArguments(idChunk)
+      )
+    }
+  }
+
   private static func chunks<Element>(_ values: [Element], size: Int) -> [[Element]] {
     stride(from: 0, to: values.count, by: size).map { start in
       Array(values[start..<min(start + size, values.count)])
     }
-  }
-
-  private static func recordID(_ table: String, _ primaryKey: String) -> RecipeSyncRecordID {
-    RecipeSyncRecordID(table: table, primaryKey: primaryKey)
   }
 
   private static func placeholders(_ count: Int) -> String {

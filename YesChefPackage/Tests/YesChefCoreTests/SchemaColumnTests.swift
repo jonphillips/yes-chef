@@ -19,7 +19,7 @@ struct SchemaColumnTests {
         sql: #"SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"#
       ))
       // GRDB owns this local migration ledger; it has no @Table model by design.
-      let localBookkeepingTables: Set<String> = ["grdb_migrations"]
+      let localBookkeepingTables: Set<String> = ["grdb_migrations", "recipeSyncRepairQueue"]
       #expect(actualTables.subtracting(modelNames).subtracting(localBookkeepingTables).isEmpty)
       #expect(modelNames.isSubset(of: actualTables))
 

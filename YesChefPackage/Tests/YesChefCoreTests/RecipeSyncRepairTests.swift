@@ -1,5 +1,6 @@
 import Dependencies
 import Foundation
+import GRDB
 import Testing
 import YesChefCore
 
@@ -29,6 +30,7 @@ extension RecipeCoreTests {
       ]
 
       try await database.write { db in
+        try createRepairMetadataFixture(in: db)
         try Recipe.insert {
           Recipe(id: serverRecipeID, title: "Unique", dateCreated: now, dateModified: now, coverPhotoID: emptyPhotoID)
         }
@@ -78,15 +80,19 @@ extension RecipeCoreTests {
         try MenuItem.insert { menuItems }.execute(db)
       }
 
-      let onServer: Set<RecipeSyncRecordID> = [
-        RecipeSyncRecordID(table: Recipe.tableName, primaryKey: serverRecipeID.uuidString),
-        RecipeSyncRecordID(table: Recipe.tableName, primaryKey: duplicateRecipeID.uuidString),
-        RecipeSyncRecordID(table: Recipe.tableName, primaryKey: secondDuplicateRecipeID.uuidString),
+      let recipeMetadata = [
+        RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, serverRecipeID), hasServerChangeTag: true),
+        RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, duplicateRecipeID), hasServerChangeTag: true),
+        RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, secondDuplicateRecipeID), hasServerChangeTag: true),
       ]
+      try await database.write { db in
+        try rememberForRepair([serverRecipeID], in: db)
+      }
       let audit = try await database.write { db in
         try RecipeSyncRepair.run(
-          onServerRecords: onServer,
+          recipeMetadata: recipeMetadata,
           syncedTableNames: ["recipes", "ingredientSections", "recipePhotos", "mealPlanItems", "menus", "menuItems"],
+          childMetadataFor: { _, _, _ in [] },
           in: db
         )
       }
@@ -137,10 +143,16 @@ extension RecipeCoreTests {
       }
 
       let audit = try await database.write { db in
-        try RecipeSyncRepair.run(onServerRecords: [], syncedTableNames: [], in: db)
+        try createRepairMetadataFixture(in: db)
+        return try RecipeSyncRepair.run(
+          recipeMetadata: [],
+          syncedTableNames: [],
+          childMetadataFor: { _, _, _ in [] },
+          in: db
+        )
       }
       #expect(audit.deletedPhotoCount == 1)
-      #expect(audit.requeuedRecipeCount == 0)
+      #expect(audit.requeuedRecipeCount == 1)
       try await database.read { db in
         let photos = try RecipePhoto.fetchAll(db)
         let recipe = try Recipe.find(recipeID).fetchOne(db)
@@ -160,17 +172,20 @@ extension RecipeCoreTests {
         IngredientSection(id: SampleUUIDSequence.uuid(74_000 + offset), recipeID: recipe.id, sortOrder: 0)
       }
       try await database.write { db in
+        try createRepairMetadataFixture(in: db)
         try Recipe.insert { recipes }.execute(db)
         try IngredientSection.insert { sections }.execute(db)
+        try rememberForRepair(recipes.map(\.id), in: db)
       }
 
-      let onServer = Set(recipes.map {
-        RecipeSyncRecordID(table: Recipe.tableName, primaryKey: $0.id.uuidString)
-      })
+      let recipeMetadata = recipes.map {
+        RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, $0.id), hasServerChangeTag: true)
+      }
       let audit = try await database.write { db in
         try RecipeSyncRepair.run(
-          onServerRecords: onServer,
+          recipeMetadata: recipeMetadata,
           syncedTableNames: ["recipes", "ingredientSections"],
+          childMetadataFor: { _, _, _ in [] },
           in: db
         )
       }
@@ -187,6 +202,7 @@ extension RecipeCoreTests {
       let variationID = SampleUUIDSequence.uuid(75_001)
       let activeVariationID = SampleUUIDSequence.uuid(75_002)
       try await database.write { db in
+        try createRepairMetadataFixture(in: db)
         try Recipe.insert {
           Recipe(id: recipeID, title: "Local child", dateCreated: now, dateModified: now)
         }.execute(db)
@@ -196,15 +212,21 @@ extension RecipeCoreTests {
         try RecipeActiveVariation.insert {
           RecipeActiveVariation(id: activeVariationID, recipeID: recipeID, variationID: variationID, dateModified: now)
         }.execute(db)
+        try rememberForRepair([recipeID], in: db)
       }
 
       let audit = try await database.write { db in
         try RecipeSyncRepair.run(
-          onServerRecords: [
-            RecipeSyncRecordID(table: Recipe.tableName, primaryKey: recipeID.uuidString),
-            RecipeSyncRecordID(table: RecipeVariation.tableName, primaryKey: variationID.uuidString),
+          recipeMetadata: [
+            RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, recipeID), hasServerChangeTag: true),
+            RecipeSyncMetadataState(recordID: recordID(RecipeVariation.tableName, variationID), hasServerChangeTag: true),
           ],
           syncedTableNames: ["recipes", "recipeVariations"],
+          childMetadataFor: { table, ids, _ in
+            table == "recipeVariations"
+              ? ids.map { RecipeSyncMetadataState(recordID: RecipeSyncRecordID(table: table, primaryKey: $0), hasServerChangeTag: true) }
+              : []
+          },
           in: db
         )
       }
@@ -216,5 +238,122 @@ extension RecipeCoreTests {
       }
       #expect(activeVariation?.id == activeVariationID)
     }
+
+    @Test
+    func unconfirmedRecipeIsClearedThenItsChildrenAreProcessedAfterConfirmation() async throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 815_400_000)
+      let recipeID = SampleUUIDSequence.uuid(76_000)
+      let sectionID = SampleUUIDSequence.uuid(76_001)
+      try await database.write { db in
+        try createRepairMetadataFixture(in: db)
+        try Recipe.insert {
+          Recipe(id: recipeID, title: "Needs a fresh record", dateCreated: now, dateModified: now)
+        }.execute(db)
+        try IngredientSection.insert {
+          IngredientSection(id: sectionID, recipeID: recipeID, sortOrder: 0)
+        }.execute(db)
+        try insertRepairMetadata(recordID(Recipe.tableName, recipeID), cachedRecord: Data([1]), allFieldsRecord: Data([2]), in: db)
+        try insertRepairMetadata(recordID("ingredientSections", sectionID), cachedRecord: Data([3]), allFieldsRecord: Data([4]), in: db)
+        try db.execute(sql: #"CREATE TABLE IF NOT EXISTS "recipeSyncRepairTestUpdates" ("recordID" TEXT NOT NULL)"#)
+        try db.execute(sql: #"CREATE TRIGGER IF NOT EXISTS "recipeSyncRepairCaptureIDUpdate" AFTER UPDATE OF "id" ON "recipes" WHEN OLD."id" = NEW."id" BEGIN INSERT INTO "recipeSyncRepairTestUpdates" ("recordID") VALUES (NEW."id"); END"#)
+        try db.execute(sql: #"DELETE FROM "recipeSyncRepairTestUpdates""#)
+      }
+
+      let syncedTables: Set<String> = ["recipes", "ingredientSections"]
+      let firstPass = try await database.write { db in
+        try RecipeSyncRepair.run(
+          recipeMetadata: [RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, recipeID), hasServerChangeTag: false)],
+          syncedTableNames: syncedTables,
+          childMetadataFor: { _, _, _ in
+            #expect(Bool(false), "Children must wait for a confirmed parent")
+            return []
+          },
+          in: db
+        )
+      }
+      #expect(firstPass.requeuedRecipeCount == 1)
+      #expect(firstPass.requeuedChildCount == 0)
+      let afterFirstPass = try await database.read { db in
+        let metadata = (
+          try Data.fetchOne(db, sql: #"SELECT "lastKnownServerRecord" FROM "sqlitedata_icloud_metadata" WHERE "recordType" = ? AND "recordPrimaryKey" = ?"#, arguments: [Recipe.tableName, recipeID.uuidString.lowercased()]),
+          try Data.fetchOne(db, sql: #"SELECT "_lastKnownServerRecordAllFields" FROM "sqlitedata_icloud_metadata" WHERE "recordType" = ? AND "recordPrimaryKey" = ?"#, arguments: [Recipe.tableName, recipeID.uuidString.lowercased()])
+        )
+        let queue = try String.fetchAll(db, sql: #"SELECT "recipeID" FROM "recipeSyncRepairQueue""#)
+        let sectionRecord = try Data.fetchOne(db, sql: #"SELECT "lastKnownServerRecord" FROM "sqlitedata_icloud_metadata" WHERE "recordType" = ? AND "recordPrimaryKey" = ?"#, arguments: ["ingredientSections", sectionID.uuidString.lowercased()])
+        let idUpdates = try String.fetchAll(db, sql: #"SELECT "recordID" FROM "recipeSyncRepairTestUpdates""#)
+        return (metadata, queue, sectionRecord, idUpdates)
+      }
+      #expect(afterFirstPass.0.0 == nil)
+      #expect(afterFirstPass.0.1 == nil)
+      #expect(afterFirstPass.1.contains(recipeID.uuidString.lowercased()))
+      #expect(afterFirstPass.2 == Data([3]))
+      #expect(afterFirstPass.3.isEmpty)
+
+      let secondPass = try await database.write { db in
+        try RecipeSyncRepair.run(
+          recipeMetadata: [RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, recipeID), hasServerChangeTag: true)],
+          syncedTableNames: syncedTables,
+          childMetadataFor: { table, ids, _ in
+            ids.map { RecipeSyncMetadataState(recordID: RecipeSyncRecordID(table: table, primaryKey: $0), hasServerChangeTag: false) }
+          },
+          in: db
+        )
+      }
+      #expect(secondPass.requeuedChildCount == 1)
+      let afterSecondPass = try await database.read { db in
+        let childRecord = try Data.fetchOne(db, sql: #"SELECT "lastKnownServerRecord" FROM "sqlitedata_icloud_metadata" WHERE "recordType" = ? AND "recordPrimaryKey" = ?"#, arguments: ["ingredientSections", sectionID.uuidString.lowercased()])
+        let queue = try String.fetchAll(db, sql: #"SELECT "recipeID" FROM "recipeSyncRepairQueue""#)
+        return (childRecord, queue)
+      }
+      #expect(afterSecondPass.0 == nil)
+      #expect(!afterSecondPass.1.contains(recipeID.uuidString.lowercased()))
+
+      let thirdPass = try await database.write { db in
+        let audit = try RecipeSyncRepair.run(
+          recipeMetadata: [RecipeSyncMetadataState(recordID: recordID(Recipe.tableName, recipeID), hasServerChangeTag: true)],
+          syncedTableNames: syncedTables,
+          childMetadataFor: { _, _, _ in
+            #expect(Bool(false), "A drained parent must not be inspected again")
+            return []
+          },
+          in: db
+        )
+        return audit
+      }
+      #expect(thirdPass.requeuedChildCount == 0)
+      #expect(thirdPass.hasFindings == false)
+    }
+  }
+}
+
+private func recordID(_ table: String, _ id: UUID) -> RecipeSyncRecordID {
+  RecipeSyncRecordID(table: table, primaryKey: id.uuidString)
+}
+
+private func createRepairMetadataFixture(in db: Database) throws {
+  try db.execute(sql: #"CREATE TABLE IF NOT EXISTS "sqlitedata_icloud_metadata" ("recordPrimaryKey" TEXT NOT NULL, "recordType" TEXT NOT NULL, "lastKnownServerRecord" BLOB, "_lastKnownServerRecordAllFields" BLOB, PRIMARY KEY ("recordPrimaryKey", "recordType"))"#)
+}
+
+private func insertRepairMetadata(
+  _ recordID: RecipeSyncRecordID,
+  cachedRecord: Data,
+  allFieldsRecord: Data,
+  in db: Database
+) throws {
+  try db.execute(
+    sql: #"INSERT INTO "sqlitedata_icloud_metadata" ("recordPrimaryKey", "recordType", "lastKnownServerRecord", "_lastKnownServerRecordAllFields") VALUES (?, ?, ?, ?)"#,
+    arguments: [recordID.primaryKey, recordID.table, cachedRecord, allFieldsRecord]
+  )
+}
+
+private func rememberForRepair(_ ids: [UUID], in db: Database) throws {
+  for start in stride(from: 0, to: ids.count, by: 500) {
+    let chunk = ids[start..<min(start + 500, ids.count)]
+    let values = chunk.map { _ in "(?)" }.joined(separator: ", ")
+    try db.execute(
+      sql: "INSERT INTO \"recipeSyncRepairQueue\" (\"recipeID\") VALUES \(values)",
+      arguments: StatementArguments(chunk.map { $0.uuidString.lowercased() })
+    )
   }
 }

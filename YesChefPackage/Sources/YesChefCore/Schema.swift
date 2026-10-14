@@ -1,3 +1,4 @@
+import CloudKit
 import Dependencies
 import Foundation
 import IssueReporting
@@ -1288,6 +1289,15 @@ extension DependencyValues {
       }
     }
 
+    migrator.registerMigration("Create local recipe sync repair queue") { db in
+      try #sql("""
+        CREATE TABLE "recipeSyncRepairQueue" (
+          "recipeID" TEXT NOT NULL PRIMARY KEY REFERENCES "recipes"("id") ON DELETE CASCADE
+        ) STRICT
+        """)
+      .execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)
@@ -1322,20 +1332,26 @@ extension DependencyValues {
           }
           do {
             try db.inSavepoint {
-              let onServerRecords = Set(
-                try SyncMetadata
-                  .where(\.hasLastKnownServerRecord)
-                  .select(\.id)
-                  .fetchAll(db)
-                  .map { RecipeSyncRecordID(table: $0.recordType, primaryKey: $0.recordPrimaryKey) }
-              )
+              let recipeMetadataStates = try recipeSyncMetadataStates(for: Recipe.tableName, in: db)
               let syncedTableNames = Set(try String.fetchAll(
                 db,
                 sql: #"SELECT "tableName" FROM "sqlitedata_icloud_recordTypes""#
               ))
               let syncRepair = try RecipeSyncRepair.run(
-                onServerRecords: onServerRecords,
+                recipeMetadata: recipeMetadataStates,
                 syncedTableNames: syncedTableNames,
+                childMetadataFor: { table, primaryKeys, db in
+                  var metadataStates: [RecipeSyncMetadataState] = []
+                  for start in stride(from: 0, to: primaryKeys.count, by: 500) {
+                    let chunk = Array(primaryKeys[start..<min(start + 500, primaryKeys.count)])
+                    metadataStates.append(contentsOf: try recipeSyncMetadataStates(
+                      for: table,
+                      primaryKeys: chunk,
+                      in: db
+                    ))
+                  }
+                  return metadataStates
+                },
                 in: db
               )
               if syncRepair.hasFindings {
@@ -1378,5 +1394,50 @@ extension DependencyValues {
     try database.write { db in
       try AISettingsRepository.migrateLegacyTasteProfileIfNeeded(tasteProfile, in: db, now: now)
     }
+  }
+}
+
+private func recipeSyncMetadataStates(
+  for recordType: String,
+  primaryKeys: [String]? = nil,
+  in db: Database
+) throws -> [RecipeSyncMetadataState] {
+  let metadataIDs: [SyncMetadata.ID]
+  let serverRecords: [CKRecord?]
+  if let primaryKeys {
+    metadataIDs = try SyncMetadata
+      .where { $0.recordType.eq(recordType) && $0.recordPrimaryKey.in(primaryKeys) }
+      .select(\.id)
+      .fetchAll(db)
+    serverRecords = try SyncMetadata
+      .where {
+        $0.recordType.eq(recordType)
+          && $0.recordPrimaryKey.in(primaryKeys)
+          && $0.hasLastKnownServerRecord
+      }
+      .select(\.lastKnownServerRecord)
+      .fetchAll(db)
+  } else {
+    metadataIDs = try SyncMetadata
+      .where { $0.recordType.eq(recordType) }
+      .select(\.id)
+      .fetchAll(db)
+    serverRecords = try SyncMetadata
+      .where { $0.recordType.eq(recordType) && $0.hasLastKnownServerRecord }
+      .select(\.lastKnownServerRecord)
+      .fetchAll(db)
+  }
+  guard !metadataIDs.isEmpty else { return [] }
+
+  let confirmedRecordNames = Set(
+    serverRecords.compactMap { $0 }
+      .filter { $0.recordChangeTag != nil }
+      .map { $0.recordID.recordName }
+  )
+  return metadataIDs.map { metadataID in
+    RecipeSyncMetadataState(
+      recordID: RecipeSyncRecordID(table: metadataID.recordType, primaryKey: metadataID.recordPrimaryKey),
+      hasServerChangeTag: confirmedRecordNames.contains("\(metadataID.recordPrimaryKey):\(metadataID.recordType)")
+    )
   }
 }
