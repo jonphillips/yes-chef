@@ -1,6 +1,8 @@
 import CloudKit
 import CloudSyncKit
 import Dependencies
+import Foundation
+import GRDB
 import Observation
 import SQLiteData
 import YesChefCore
@@ -18,11 +20,19 @@ final class SyncHealthModel {
   /// True while a start attempt (Try again / Enable) is in flight — drives the
   /// button's progress affordance.
   private(set) var isStarting = false
+  private var isRefreshing = false
+  private var refreshRequestedWhileRefreshing = false
 
   /// Local row counts per synced table — the dogfood diagnostic that answers
   /// "did this table's rows actually reach this device?" at a glance. Populated on
   /// demand from the Sync detail sheet; compare the two devices side by side.
   private(set) var recordCounts: [RecordCount] = []
+
+  /// Rows that CloudSyncKit can name as not uploaded, grouped into user-readable
+  /// retry actions for the Sync detail sheet.
+  private(set) var notUploadedRows: [NotUploadedDisplayRow] = []
+  private(set) var isRetryingRows: Set<String> = []
+  private(set) var retryError: String?
 
   /// The last error from a *start attempt* (launch is discarded; Try again / Enable
   /// capture theirs). Held separately so a routine `refresh()` — which only reads
@@ -49,10 +59,23 @@ final class SyncHealthModel {
   /// so the row flips from "Syncing…" to "Up to date" as the pending count drains.
   var isSynchronizing: Bool { syncEngine.isSynchronizing }
 
-  /// Gather the live signals and fold them into `health`. Cheap and idempotent —
-  /// safe to call on appear, on scene `.active`, on a database-change beacon, and
-  /// whenever a sync cycle ends.
+  /// Gather the live signals and fold them into `health`. Overlapping calls coalesce
+  /// into one follow-up refresh so status events don't decode the library concurrently.
   func refresh() async {
+    if isRefreshing {
+      refreshRequestedWhileRefreshing = true
+      return
+    }
+    isRefreshing = true
+    defer { isRefreshing = false }
+
+    repeat {
+      refreshRequestedWhileRefreshing = false
+      await refreshOnce()
+    } while refreshRequestedWhileRefreshing
+  }
+
+  private func refreshOnce() async {
     let isManuallyEnabled = YesChefCloudSync.isManuallyEnabled()
     let isEngineRunning = syncEngine.isRunning
     // The download counterpart to the pending (upload) count: true while the engine is
@@ -66,14 +89,57 @@ final class SyncHealthModel {
     // regardless.
     let pending = isManuallyEnabled ? await currentPendingCount() : 0
 
+    let failureReport: SyncFailureReport?
+    if isManuallyEnabled, isEngineRunning {
+      failureReport = await currentSyncFailureReport(isEngineRunning: true)
+    } else {
+      failureReport = nil
+      syncFailureReportError = nil
+    }
+    if let failureReport {
+      notUploadedRows = (try? await database.read { db in
+        try Self.makeNotUploadedRows(from: failureReport, in: db)
+      }) ?? Self.fallbackNotUploadedRows(from: failureReport)
+    } else {
+      notUploadedRows = []
+    }
+
     health = SyncHealth(
       isManuallyEnabled: isManuallyEnabled,
       account: account,
       isEngineRunning: isEngineRunning,
       pendingChangeCount: pending,
       isFetchingChanges: isFetchingChanges,
-      lastError: lastStartError
+      notUploadedCount: failureReport?.notUploadedCount ?? 0,
+      notAppliedCount: failureReport?.notAppliedCount ?? 0,
+      lastError: lastStartError ?? syncFailureReportError
     )
+  }
+
+  private var syncFailureReportError: String?
+
+  /// Retry only the selected row or group. CloudSyncKit re-queues it through
+  /// SQLiteData's metadata triggers; the engine handles the next send normally.
+  func retry(_ row: NotUploadedDisplayRow) async {
+    guard !row.primaryKeys.isEmpty else { return }
+    guard isRetryingRows.insert(row.id).inserted else { return }
+    retryError = nil
+    defer { isRetryingRows.remove(row.id) }
+
+    do {
+      try await CloudSync.requeue(
+        recordType: row.recordType,
+        primaryKeys: row.primaryKeys,
+        in: database
+      )
+      await refresh()
+    } catch {
+      retryError = "Couldn’t retry \(row.title): \(error.localizedDescription)"
+    }
+  }
+
+  func isRetrying(_ row: NotUploadedDisplayRow) -> Bool {
+    isRetryingRows.contains(row.id)
   }
 
   /// Turn the gate on (the row is the enable affordance when sync is off), start the
@@ -122,6 +188,159 @@ final class SyncHealthModel {
     }) ?? []
   }
 
+  private func currentSyncFailureReport(isEngineRunning: Bool) async -> SyncFailureReport? {
+    do {
+      let report = try await CloudSync.syncFailureReport(
+        in: database,
+        isEngineRunning: isEngineRunning,
+        isSendingChanges: isEngineRunning && syncEngine.isSendingChanges,
+        isFetchingChanges: isEngineRunning && syncEngine.isFetchingChanges
+      )
+      syncFailureReportError = nil
+      return report
+    } catch {
+      // A failed signal read must not make the Settings row claim “Up to date.”
+      syncFailureReportError = "Couldn’t check which records have synced."
+      return nil
+    }
+  }
+
+  nonisolated static func makeNotUploadedRows(
+    from report: SyncFailureReport,
+    in db: Database
+  ) throws -> [NotUploadedDisplayRow] {
+    var rows: [NotUploadedDisplayRow] = []
+    for group in report.notUploaded {
+      let keys = group.primaryKeys
+      if group.recordType == "recipes" {
+        for key in keys {
+          let title = try String.fetchOne(
+            db,
+            sql: "SELECT \"title\" FROM \"recipes\" WHERE \"id\" = ?",
+            arguments: [key]
+          )
+          rows.append(NotUploadedDisplayRow(
+            recordType: group.recordType,
+            primaryKeys: [key],
+            title: title ?? "Recipe on this device",
+            detail: title == nil ? "Couldn’t read its title" : "Recipe"
+          ))
+        }
+      } else if isRecipeChildRecordType(group.recordType) {
+        var keysByRecipeID: [String: [String]] = [:]
+        var titlesByRecipeID: [String: String] = [:]
+        for key in keys {
+          let row = try Row.fetchOne(
+            db,
+            sql: """
+              SELECT child.\"recipeID\" AS recipeID, recipe.\"title\" AS title
+              FROM \"\(group.recordType)\" AS child
+              LEFT JOIN \"recipes\" AS recipe ON recipe.\"id\" = child.\"recipeID\"
+              WHERE child.\"id\" = ?
+              """,
+            arguments: [key]
+          )
+          guard let row,
+                let recipeID = row["recipeID"] as String?,
+                let title = row["title"] as String?
+          else { continue }
+          keysByRecipeID[recipeID, default: []].append(key)
+          titlesByRecipeID[recipeID] = title
+        }
+        let recipeIDs = keysByRecipeID.keys.sorted {
+          let leftTitle = titlesByRecipeID[$0, default: ""]
+          let rightTitle = titlesByRecipeID[$1, default: ""]
+          return leftTitle == rightTitle ? $0 < $1 : leftTitle < rightTitle
+        }
+        for recipeID in recipeIDs {
+          let recipeKeys = keysByRecipeID[recipeID] ?? []
+          rows.append(NotUploadedDisplayRow(
+            recordType: group.recordType,
+            primaryKeys: recipeKeys,
+            title: titlesByRecipeID[recipeID] ?? "Recipe on this device",
+            detail: "\(recipeKeys.count) \(pluralizedTableName(group.recordType))"
+          ))
+        }
+        let resolvedKeys = Set(keysByRecipeID.values.flatMap { $0 })
+        let missingKeys = keys.filter { !resolvedKeys.contains($0) }
+        if !missingKeys.isEmpty {
+          rows.append(aggregateRow(for: group, keys: missingKeys))
+        }
+      } else {
+        rows.append(aggregateRow(for: group, keys: keys))
+      }
+
+      let unlistedCount = group.count - keys.count
+      if unlistedCount > 0 {
+        rows.append(NotUploadedDisplayRow(
+          recordType: group.recordType,
+          primaryKeys: [],
+          title: "\(unlistedCount) more \(pluralizedTableName(group.recordType)) not listed",
+          detail: "Retry the listed rows and reopen Sync to see the rest."
+        ))
+      }
+    }
+    return rows
+  }
+
+  nonisolated private static func fallbackNotUploadedRows(
+    from report: SyncFailureReport
+  ) -> [NotUploadedDisplayRow] {
+    report.notUploaded.flatMap { group in
+      var rows = [aggregateRow(for: group, keys: group.primaryKeys)]
+      let unlistedCount = group.count - group.primaryKeys.count
+      if unlistedCount > 0 {
+        rows.append(NotUploadedDisplayRow(
+          recordType: group.recordType,
+          primaryKeys: [],
+          title: "\(unlistedCount) more \(pluralizedTableName(group.recordType)) not listed",
+          detail: "Retry the listed rows and reopen Sync to see the rest."
+        ))
+      }
+      return rows
+    }
+  }
+
+  nonisolated static func aggregateRow(
+    for group: NotUploadedRecordGroup,
+    keys: [String]
+  ) -> NotUploadedDisplayRow {
+    let count = keys.count == group.primaryKeys.count ? group.count : keys.count
+    let tableName = readableTableName(group.recordType)
+    return NotUploadedDisplayRow(
+      recordType: group.recordType,
+      primaryKeys: keys,
+      title: "\(count) \(count == 1 ? "row" : "rows")",
+      detail: tableName
+    )
+  }
+
+  nonisolated private static func readableTableName(_ name: String) -> String {
+    let spaced = name.replacingOccurrences(
+      of: "([a-z0-9])([A-Z])",
+      with: "$1 $2",
+      options: .regularExpression
+    )
+    return spaced.prefix(1).uppercased() + spaced.dropFirst()
+  }
+
+  nonisolated private static func pluralizedTableName(_ name: String) -> String {
+    let label = readableTableName(name).lowercased()
+    return label.hasSuffix("s") ? label : "\(label) rows"
+  }
+
+  nonisolated private static func isRecipeChildRecordType(_ recordType: String) -> Bool {
+    recipeChildRecordTypes.contains(recordType)
+  }
+
+  nonisolated private static let recipeChildRecordTypes: Set<String> = [
+    "recipeSources", "recipeImportRef", "ingredientSections", "ingredientLines",
+    "instructionSections", "instructionSteps", "recipeNotes", "recipePhotos",
+    "recipeServeWith", "recipeTags", "recipeCategories", "recipeEquipment",
+    "recipeVariations", "recipeActiveVariations", "recipeRelatedRecipes",
+    "recipeDeliberationLog",
+  ]
+
   private func currentAccountStatus() async -> SyncAccountStatus {
     do {
       let status = try await CKContainer(identifier: YesChefCloudSync.containerIdentifier)
@@ -144,4 +363,13 @@ struct RecordCount: Identifiable, Sendable {
   let name: String
   let count: Int
   var id: String { name }
+}
+
+struct NotUploadedDisplayRow: Identifiable, Equatable, Sendable {
+  let recordType: String
+  let primaryKeys: [String]
+  let title: String
+  let detail: String
+
+  var id: String { "\(recordType):\(primaryKeys.joined(separator: ","))" }
 }

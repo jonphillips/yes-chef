@@ -9,6 +9,16 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Sync failure status in Yes Chef (`effort/sync-failure-surfacing-slice-2`)
+
+**2026-10-21. No schema change; touches sync.** The Settings sync health now uses CloudSyncKit's failure report,
+so stale outbound rows and inbound rows that could not be applied keep the status from saying “Up to date.” Sync
+detail names recipes and their child rows, groups other record types by table, and offers a per-row Retry through
+`CloudSync.requeue`. No automatic retry loop was added. `scripts/check-drift.sh` passed (718 package tests and app
+test-target compile), the elevated generic iOS build succeeded, and all 75 `YesChefTests` passed. Jon's two-device
+sync status pass is owed in `docs/device-passes.md`.
+
+---
 ## Drop raw import HTML and repair CloudKit fallout (`effort/raw-import-html-drop`)
 
 **2026-10-13. Synced-schema migration and repair pass.** Removed persisted raw import HTML from `Recipe`, its

@@ -73,7 +73,7 @@ Every row that should sync must be *uploadable*; a row with no sync metadata see
 - [ ] Verify the **promotion list against `makeSyncEngine` in `CloudSync.swift`, in both directions** — a
       synced-table column is on the list; a column on an unregistered (local) table belongs nowhere near it.
 
-- [ ] **Make the check permanent in the sync status** ([`efforts/sync-failure-surfacing.md`](efforts/sync-failure-surfacing.md)).
+- [x] **Make the check permanent in the sync status** ([`efforts/sync-failure-surfacing.md`](efforts/sync-failure-surfacing.md)).
       "Up to date" requires zero rows that never reached the server and zero inbound rows that couldn't be
       applied. The detail names them. Phase 4d then reads the same signal against Production.
 

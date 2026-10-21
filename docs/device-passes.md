@@ -13,6 +13,12 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**Sync failure status** ([effort brief](efforts/sync-failure-surfacing.md), touches sync). On both the iPad and
+iPhone, confirm the Settings row says “Up to date” with no false positives. On one device, turn on Airplane mode,
+edit a recipe, and wait past the 30-minute grace window; confirm the row says “1 item hasn’t synced” and the detail
+names that recipe. Restore the network and confirm it returns to “Up to date” after upload, with or without Retry.
+On the iPhone, confirm the not-applied count is zero, or that the detail names what is stuck.
+
 **Drop raw import HTML and repair CloudKit fallout** ([effort brief](efforts/raw-import-html-drop.md), synced-schema change).
 Export a backup from both devices first. Install on the iPad, launch twice with sync on, then install and launch on the
 iPhone. Confirm Camarones a la Diabla, Coconut-Caramel Braised Tofu, Keema Palak, and the other six oversized recipes
