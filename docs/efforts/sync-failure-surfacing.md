@@ -70,7 +70,8 @@ server. That catches every cause, including ones we haven't met yet.
 - jon-platform: the signal, the reducer case, `requeue`, and tests (the reducer is pure; the query is tested
   against a migrated metadatabase with seeded rows). The package's own tests are green.
 - Yes Chef: the row and detail as above, on the new package version. The rest per `docs/verification.md`.
-- `PROD-CUTOVER.md` Phase 2 has its box ticked, `DONE-LOG.md` has the entry, `NEXT_UP.md` is advanced, and the
+- `PROD-CUTOVER.md` Phase 2 has its box ticked, `DONE-LOG.md` has the entry, `NEXT_UP.md` is advanced to
+  [`chat-access-mcp.md`](chat-access-mcp.md) S0 (the next queued effort), and the
   device pass is in `device-passes.md`.
 
 **Device pass:** this ships after the raw-HTML fix, so both devices should read "Up to date", with no false
