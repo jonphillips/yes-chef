@@ -90,18 +90,20 @@ struct SyncStatusDetailView: View {
                     .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
-                Button {
-                  Task { await model.retry(row) }
-                } label: {
-                  if model.isRetrying(row) {
-                    ProgressView()
-                      .controlSize(.small)
-                  } else {
-                    Text("Retry")
+                if !row.primaryKeys.isEmpty {
+                  Button {
+                    Task { await model.retry(row) }
+                  } label: {
+                    if model.isRetrying(row) {
+                      ProgressView()
+                        .controlSize(.small)
+                    } else {
+                      Text("Retry")
+                    }
                   }
+                  .accessibilityLabel("Retry \(row.title)")
+                  .disabled(model.isRetrying(row))
                 }
-                .accessibilityLabel("Retry \(row.title)")
-                .disabled(model.isRetrying(row))
               }
             }
             if let retryError = model.retryError {
