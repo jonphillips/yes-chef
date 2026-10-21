@@ -78,6 +78,44 @@ struct SyncStatusDetailView: View {
           Text(explanation)
         }
 
+        if !model.notUploadedRows.isEmpty {
+          Section {
+            ForEach(model.notUploadedRows) { row in
+              HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                  Text(row.title)
+                    .foregroundStyle(.primary)
+                  Text(row.detail)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                Button {
+                  Task { await model.retry(row) }
+                } label: {
+                  if model.isRetrying(row) {
+                    ProgressView()
+                      .controlSize(.small)
+                  } else {
+                    Text("Retry")
+                  }
+                }
+                .accessibilityLabel("Retry \(row.title)")
+                .disabled(model.isRetrying(row))
+              }
+            }
+            if let retryError = model.retryError {
+              Text(retryError)
+                .font(.footnote)
+                .foregroundStyle(.red)
+            }
+          } header: {
+            Text("Not uploaded")
+          } footer: {
+            Text("Retry asks iCloud to send these records again. If a record still cannot sync, it will remain here.")
+          }
+        }
+
         Section {
           Button {
             Task { await primaryAction() }
@@ -108,7 +146,10 @@ struct SyncStatusDetailView: View {
           Text("Rows in this device's database, per synced table. Compare across devices to see which records actually arrived.")
         }
       }
-      .task { await model.loadRecordCounts() }
+      .task {
+        await model.refresh()
+        await model.loadRecordCounts()
+      }
       .navigationTitle("Sync")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
