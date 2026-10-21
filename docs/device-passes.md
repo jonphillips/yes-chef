@@ -13,6 +13,12 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**Chat access over MCP — S0 iCloud Drive transport probe** ([effort brief](efforts/chat-access-mcp.md)). Install the
+signed probe build on iPhone and iPad, install `yeschef-mcp` on the Mac, and configure the `yeschef` tunnel.
+Record Q1–Q5 in the brief: iPhone-to-Mac small-file arrival and latency; `probe_list` access and privacy prompts from
+ChatGPT, Claude Code, and Terminal; Mac-to-iPhone arrival while foregrounded and after relaunch; evicted ~10 MB read
+behavior and duration from ChatGPT; and whether iPad sees the Mac's file. Capture any prompt text exactly.
+
 **Sync failure status** ([effort brief](efforts/sync-failure-surfacing.md), touches sync). On both the iPad and
 iPhone, confirm the Settings row says “Up to date” with no false positives. On one device, turn on Airplane mode,
 edit a recipe, and wait past the 30-minute grace window; confirm the row says “1 item hasn’t synced” and the detail

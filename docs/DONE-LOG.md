@@ -9,6 +9,15 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Chat access over MCP — S0 transport probe (`effort/chat-access-mcp-s0`)
+
+**2026-10-21. No schema change; adds the iCloud Documents entitlement.** Added the shared `MCP` folder accessor,
+DEBUG iCloud Drive probes in Settings, and the macOS `yeschef-mcp` helper with `probe_list` and `probe_write` plus
+its installer. The helper package's 2 tests and `scripts/check-drift.sh` (720 Core tests and app test-target compile)
+passed, and the elevated generic iOS build succeeded. Jon's signed iPhone/iPad and Mac transport pass, including
+the five outcomes in the effort brief, remains owed in `docs/device-passes.md`.
+
+---
 ## Sync failure status in Yes Chef (`effort/sync-failure-surfacing-slice-2`)
 
 **2026-10-21. No schema change; touches sync.** The Settings sync health now uses CloudSyncKit's failure report,
