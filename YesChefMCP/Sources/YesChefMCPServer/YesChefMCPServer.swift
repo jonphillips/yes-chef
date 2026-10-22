@@ -102,6 +102,8 @@ private struct ProbeContext: Sendable {
   private static func filenameTimestamp(_ date: Date) -> String {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    formatter.formatOptions.remove(.withDashSeparatorInDate)
+    formatter.formatOptions.remove(.withColonSeparatorInTime)
     return formatter.string(from: date)
   }
 }

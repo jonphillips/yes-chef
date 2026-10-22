@@ -17,6 +17,7 @@ struct YesChefMCPTests {
 
     let write = try #require(await server.handle(line: toolCall("probe_write", arguments: .object(["note": .string("hello from mac")]))))
     #expect(try object(write)["result"]?.objectValue?["isError"] != .bool(true))
+    #expect(try object(write)["result"]?.objectValue?["content"]?.arrayValue?.first?.objectValue?["text"]?.stringValue?.contains("from-mac-20261021T120000.000Z.txt") == true)
 
     let listing = try #require(await server.handle(line: toolCall("probe_list", arguments: .object([:]))))
     let response = try object(listing)

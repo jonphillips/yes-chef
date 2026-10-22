@@ -152,7 +152,7 @@ private final class ChatAccessProbeModel {
     isWorking = true
     defer { isWorking = false }
     do {
-      let suffix = prefix == "large" ? "" : "-\(Self.timestamp())"
+      let suffix = prefix == "large" ? "" : "-\(Self.filenameTimestamp(Date()))"
       let name = "\(prefix)-\(Self.safeFileComponent(deviceName))\(suffix).txt"
       let url = folder.probeURL.appending(path: name)
       try await Task.detached(priority: .utility) {
@@ -166,9 +166,15 @@ private final class ChatAccessProbeModel {
   }
 
   private static func timestamp() -> String {
+    ISO8601DateFormatter().string(from: Date())
+  }
+
+  private static func filenameTimestamp(_ date: Date) -> String {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter.string(from: Date())
+    formatter.formatOptions.remove(.withDashSeparatorInDate)
+    formatter.formatOptions.remove(.withColonSeparatorInTime)
+    return formatter.string(from: date)
   }
 
   private static func safeFileComponent(_ value: String) -> String {

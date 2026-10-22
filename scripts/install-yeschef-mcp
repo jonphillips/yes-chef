@@ -6,7 +6,7 @@ package_path="$repo_root/YesChefMCP"
 binary_path="$package_path/.build/release/yeschef-mcp"
 install_path="$HOME/Library/Application Support/YesChefMCP/yeschef-mcp"
 
-/Users/jon/code/jon-platform/scripts/quiet-run swift build --package-path "$package_path" -c release
+"${JON_PLATFORM:-$HOME/code/jon-platform}/scripts/quiet-run" swift build --package-path "$package_path" -c release
 
 mkdir -p "$(dirname "$install_path")"
 cp "$binary_path" "$install_path"
