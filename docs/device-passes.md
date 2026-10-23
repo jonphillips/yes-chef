@@ -13,15 +13,6 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
-**Chat access over MCP S1 — `stage_recipe` and the app inbox** ([effort brief](efforts/chat-access-mcp.md), PR
-[#359](https://github.com/jonphillips/yes-chef/pull/359)). Install the build on the iPhone and iPad, run
-`scripts/install-yeschef-mcp`, and refresh the Yes Chef plugin. From a ChatGPT chat outside the Yes Chef Project,
-stage a recipe, confirm the tool asks for confirmation, then Open, review, and save it on iPhone; confirm the row
-disappears on iPad. Stage an incomplete recipe and confirm the tool errors; stage another and Discard it. Stop the
-`yeschef` agent, stage again and confirm ChatGPT prints JSON-LD for paste fallback, then restart the agent. On the
-Mac, confirm claimed and discarded files are under `MCP/Inbox/Processed/` with colon-free names and `MCP/Probe/`
-is gone.
-
 **Sync failure status** ([effort brief](efforts/sync-failure-surfacing.md), touches sync). **Failed 2026-10-22 at the
 first check:** the iPad reads "44,938 items haven't synced" (the whole library), and the iPhone shows the same
 state. It is held until Slice 4 ships. **First, the Slice 4 readout:** with Slice 4 installed on both devices, on

@@ -1,8 +1,9 @@
 # Effort — Chat access over MCP
 
 Status: Designed 2026-10-21. S0 shipped (#357) and its device pass cleared 2026-10-22: D2 stands (§ S0 results).
-**S1 and S2 are specified below, 2026-10-22; S1 is dispatched.** S2 is a separate dispatch after S1's device pass,
-because it carries the one unproven mechanism (reading an evicted file on the Mac). Schema-free throughout.
+S1 shipped (#359) and its device pass cleared 2026-10-23. **S2 is queued after sync-failure-surfacing Slice 5**,
+and it starts with S1's one defect, the Create Recipe badge that never rendered. S2 carries the one unproven
+mechanism (reading an evicted file on the Mac). Schema-free throughout.
 Summary: Make Yes Chef the second consumer of jon-platform ADR-0007, so ChatGPT can stage a recipe into Yes Chef
 and look things up in the library instead of Jon pasting in both directions. S0 proved the iCloud Drive transport;
 S1 builds `stage_recipe` and the app's inbox, and S2 builds the library export and the read tools.
@@ -16,9 +17,9 @@ ops) · vinyl-fever `docs/milestones/M12-library-context-mcp.md` (the first cons
 - **S0 — Probe the transport** (this brief, below). One PR with code plus Jon's device pass. Its results go in
   [§ S0 results](#s0-results).
 - **S1 — `stage_recipe` and the app's inbox** (ADR-0060 D3, D5, D6). [§ S1](#s1--stage_recipe-and-the-apps-inbox).
-  Dispatched 2026-10-22.
-- **S2 — The export and the read tools** (ADR-0060 D4, D6). [§ S2](#s2--the-export-and-the-read-tools). Dispatched
-  after S1's device pass.
+  Shipped (#359); device pass cleared 2026-10-23.
+- **S2 — The export and the read tools** (ADR-0060 D4, D6), plus the S1 badge fix.
+  [§ S2](#s2--the-export-and-the-read-tools). Queued after sync-failure-surfacing Slice 5.
 - **S3 — Returns that target an existing recipe.** This waits on ADR-0060 OQ3.
 
 ## S0 — Probe the transport
@@ -266,9 +267,24 @@ ChatGPT (plugin page → **Refresh**) so it picks up the new tool list.
 ## S2 — The export and the read tools
 
 **What it retires:** the copy-out. ChatGPT can search the library and read a recipe or a menu instead of Jon
-pasting one in. Specified now and dispatched after S1's device pass.
+pasting one in. Specified 2026-10-22; queued after sync-failure-surfacing Slice 5. It starts with S1's one defect.
 
 ### Build
+
+0. **Fix S1's Create Recipe badge (it never rendered).** S1 put `.badge(chatAccessInboxModel.inboxCount)` on
+   the Create Recipe `Tab` in `AppMainLayout`. In Jon's S1 pass, no count showed on the iPad sidebar or on the
+   iPhone, while the From Chat list, which reads the same `inboxCount`, showed its rows. So the count is right
+   and the badge isn't drawn.
+   - **Find the cause before changing anything**, and name it in the PR. Candidates: the modifier order after
+     `.defaultVisibility(.hidden, for: .tabBar)`, a tab hidden from the tab bar not drawing badges in the sidebar
+     on iOS 27, or the count read not being tracked from the `TabView` builder. For this item only, you may run
+     the app on one iPad simulator with a DEBUG-only stub that forces a non-zero count, and take one screenshot.
+     Remove the stub before the PR.
+   - **What done looks like:** with at least one item in the inbox, the count shows on the Create Recipe row in
+     the iPad sidebar, and on the iPhone it shows on whatever Jon taps to reach Create Recipe from the default
+     tab bar. If Create Recipe isn't reachable from the iPhone's default tab bar, say how it's reached in the PR,
+     and badge that control. At zero, no badge shows.
+   - It's view-only, so it needs no `YesChefTests` of its own.
 
 1. **The export (app):**
    - Each install writes `MCP/Exports/<installation id>.json`. The installation id is a UUID made with
@@ -341,6 +357,8 @@ pasting one in. Specified now and dispatched after S1's device pass.
 
 ### Jon's device pass
 
+0. Stage a recipe from ChatGPT without opening it. The count shows on Create Recipe in the iPad sidebar and on
+   the iPhone, and it clears after Open or Discard.
 1. On the iPhone, tap **Refresh** in Settings → Chat Access. Time how long the export takes to appear on the Mac
    (`ls -lO MCP/Exports/`).
 2. In ChatGPT: "Do I have any short-rib braises?" (`search_recipes`), then open one (`get_recipe`). Check that
