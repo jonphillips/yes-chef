@@ -1,6 +1,9 @@
 import CloudSyncKit
 import SwiftUI
 import YesChefCore
+#if DEBUG
+import UIKit
+#endif
 
 /// The sync-health row in Settings (jon-platform ADR-0003): a colored dot + one line
 /// saying whether CloudKit sync is live, local-only, or broken — tappable to a small
@@ -147,6 +150,43 @@ struct SyncStatusDetailView: View {
         } footer: {
           Text("Rows in this device's database, per synced table. Compare across devices to see which records actually arrived.")
         }
+
+        #if DEBUG
+        Section {
+          Button {
+            Task { await model.diagnoseSyncFailure() }
+          } label: {
+            if model.isDiagnosingSyncFailure {
+              HStack {
+                Text("Diagnosing…")
+                Spacer()
+                ProgressView()
+              }
+            } else {
+              Text("Diagnose")
+            }
+          }
+          .disabled(model.isDiagnosingSyncFailure)
+
+          if let error = model.syncFailureDiagnosisError {
+            Text(error)
+              .font(.footnote)
+              .foregroundStyle(.red)
+          }
+          if let readout = model.syncFailureDiagnosisReadout {
+            Button("Copy diagnosis") {
+              UIPasteboard.general.string = readout
+            }
+            Text(readout)
+              .font(.system(.caption, design: .monospaced))
+              .textSelection(.enabled)
+          }
+        } header: {
+          Text("Sync diagnosis")
+        } footer: {
+          Text("Read-only details for troubleshooting. Copy the report to share it with the architect.")
+        }
+        #endif
       }
       .task {
         await model.refresh()
