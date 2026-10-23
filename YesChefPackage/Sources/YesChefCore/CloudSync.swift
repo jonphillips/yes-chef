@@ -41,6 +41,19 @@ public enum YesChefCloudSync {
   public static var containerIdentifier: String { configuration.containerIdentifier }
   public static var enabledDefaultsKey: String { configuration.enabledDefaultsKey }
 
+  /// The shared table matcher set used by failure reporting, diagnosis, and retry.
+  public static let syncedTables = SyncedTables(
+    Recipe.self, RecipeSource.self, IngredientSection.self, IngredientLine.self,
+    InstructionSection.self, InstructionStep.self, RecipeNote.self, RecipeServeWith.self,
+    RecipePhoto.self, Tag.self, Facet.self, Category.self, Equipment.self, RecipeTag.self,
+    RecipeCategory.self, RecipeEquipment.self, RecipeImportRef.self, MealPlanItem.self,
+    Menu.self, MenuItem.self, MenuPlacement.self, PrepPlanStepRecord.self, Workbench.self,
+    WorkbenchCandidate.self, WorkbenchLogEntry.self, WorkbenchReference.self,
+    RecipeVariation.self, RecipeRelatedRecipe.self, RecipeDeliberationLogEntry.self,
+    GroceryList.self, GroceryAreaAssignment.self, GroceryItem.self, GroceryItemSource.self,
+    PantryItem.self, AISettingsRecord.self, Learning.self
+  )
+
   // MARK: Enablement gate (forwarded)
 
   public static func isManuallyEnabled(
@@ -121,6 +134,42 @@ public enum YesChefCloudSync {
     try await CloudSync.waitForPendingRecordZoneChanges(
       in: database, exceeding: previousCount, timeout: timeout, pollInterval: pollInterval
     )
+  }
+
+  public static func syncFailureReport(
+    in database: any DatabaseWriter,
+    isEngineRunning: Bool,
+    isSendingChanges: Bool,
+    isFetchingChanges: Bool,
+    now: Date = .now,
+    verdictCache: SyncFailureVerdictCache
+  ) async throws -> SyncFailureReportResult {
+    try await CloudSync.syncFailureReport(in: database, tables: syncedTables,
+      isEngineRunning: isEngineRunning, isSendingChanges: isSendingChanges,
+      isFetchingChanges: isFetchingChanges, now: now, verdictCache: verdictCache)
+  }
+
+  public static func syncFailureDiagnosis(
+    in database: any DatabaseWriter,
+    isEngineRunning: Bool,
+    isSendingChanges: Bool,
+    isFetchingChanges: Bool,
+    now: Date = .now,
+    verdictCache: SyncFailureVerdictCache
+  ) async throws -> SyncFailureDiagnosis {
+    try await CloudSync.syncFailureDiagnosis(in: database, tables: syncedTables,
+      isEngineRunning: isEngineRunning, isSendingChanges: isSendingChanges,
+      isFetchingChanges: isFetchingChanges, now: now, verdictCache: verdictCache)
+  }
+
+  public static func requeue(
+    recordType: String,
+    primaryKeys: [String],
+    in database: any DatabaseWriter,
+    verdictCache: SyncFailureVerdictCache
+  ) async throws -> SyncRequeueResult {
+    try await CloudSync.requeue(recordType: recordType, primaryKeys: primaryKeys, tables: syncedTables,
+      in: database, verdictCache: verdictCache)
   }
 
   // MARK: Engine construction (domain-bound — stays here)

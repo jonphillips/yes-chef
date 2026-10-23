@@ -34,6 +34,7 @@ final class SyncHealthModel {
   private(set) var notUploadedRows: [NotUploadedDisplayRow] = []
   private(set) var isRetryingRows: Set<String> = []
   private(set) var retryError: String?
+  private var syncFailureVerdictCache = SyncFailureVerdictCache()
 
   #if DEBUG
   private(set) var isDiagnosingSyncFailure = false
@@ -134,11 +135,13 @@ final class SyncHealthModel {
     defer { isRetryingRows.remove(row.id) }
 
     do {
-      try await CloudSync.requeue(
+      let result = try await YesChefCloudSync.requeue(
         recordType: row.recordType,
         primaryKeys: row.primaryKeys,
-        in: database
+        in: database,
+        verdictCache: syncFailureVerdictCache
       )
+      syncFailureVerdictCache = result.verdictCache
       await refresh()
     } catch {
       retryError = "Couldn’t retry \(row.title): \(error.localizedDescription)"
@@ -164,14 +167,16 @@ final class SyncHealthModel {
     let fetching = engineRunning && syncEngine.isFetchingChanges
     let capturedAt = Date.now
     let deviceModel = UIDevice.current.model
+    let verdictCache = syncFailureVerdictCache
     let result: Result<SyncFailureDiagnosis, Error> = await Task.detached(priority: .utility) {
       do {
-        return .success(try await CloudSync.syncFailureDiagnosis(
+        return .success(try await YesChefCloudSync.syncFailureDiagnosis(
           in: database,
           isEngineRunning: engineRunning,
           isSendingChanges: sending,
           isFetchingChanges: fetching,
-          now: capturedAt
+          now: capturedAt,
+          verdictCache: verdictCache
         ))
       } catch {
         return .failure(error)
@@ -179,6 +184,7 @@ final class SyncHealthModel {
     }.value
     switch result {
     case let .success(diagnosis):
+      syncFailureVerdictCache = diagnosis.verdictCache
       syncFailureDiagnosisReadout = Self.format(
         diagnosis,
         capturedAt: capturedAt,
@@ -212,7 +218,11 @@ final class SyncHealthModel {
       "No server record: \(counts.noServerRecord)",
       "Undecodable: \(counts.undecodable)",
       "No change tag: \(counts.noChangeTag)",
-      "Local edit after server: \(counts.localEditAfterServer)",
+      "Unsent edits: \(counts.unsentEdit)",
+      "Stamp-only rows: \(counts.stampOnly)",
+      "Elapsed: \(diagnosis.elapsed) seconds",
+      "All-fields decoded: \(diagnosis.decodedRowCount)",
+      "Verdicts cached: \(diagnosis.cachedRowCount)",
     ]
     if let delta = diagnosis.localEditDelta {
       lines += [
@@ -223,14 +233,14 @@ final class SyncHealthModel {
     lines.append("By record type:")
     for type in diagnosis.byRecordType {
       let reason = type.reasons
-      lines.append("  \(type.recordType): confirmed \(reason.confirmed), no record \(reason.noServerRecord), undecodable \(reason.undecodable), no tag \(reason.noChangeTag), local edit \(reason.localEditAfterServer)")
+      lines.append("  \(type.recordType): confirmed \(reason.confirmed), no record \(reason.noServerRecord), undecodable \(reason.undecodable), no tag \(reason.noChangeTag), unsent edit \(reason.unsentEdit), stamp-only \(reason.stampOnly)")
     }
     lines.append("Samples:")
     for sample in diagnosis.samples {
       let serverModified = sample.serverModificationDate.map(formatter.string(from:)) ?? "none"
       let serverCreated = sample.serverCreationDate.map(formatter.string(from:)) ?? "none"
       let sentStamp = sample.serverUserModificationTime.map(formatter.string(from:)) ?? "none"
-      lines.append("  \(sample.recordType)/\(sample.primaryKey): reason=\(reasonDescription(sample.reason)), local=\(formatter.string(from: sample.userModificationTime)), serverModified=\(serverModified), serverCreated=\(serverCreated), changeTag=\(sample.hasChangeTag), sentUserModificationTime=\(sentStamp)")
+      lines.append("  \(sample.recordType)/\(sample.primaryKey): reason=\(reasonDescription(sample.reason)), local=\(formatter.string(from: sample.userModificationTime)), serverModified=\(serverModified), serverCreated=\(serverCreated), changeTag=\(sample.hasChangeTag), sentUserModificationTime=\(sentStamp), differingColumns=\(sample.differingColumns.joined(separator: ","))")
     }
     return lines.joined(separator: "\n")
   }
@@ -241,7 +251,8 @@ final class SyncHealthModel {
     case .noServerRecord: "no server record"
     case .undecodable: "undecodable"
     case .noChangeTag: "no change tag"
-    case let .localEditAfterServer(delta): "local edit after server by \(delta) seconds"
+    case let .unsentEdit(delta): "unsent edit by \(delta) seconds"
+    case let .stampOnly(delta): "stamp-only by \(delta) seconds"
     }
   }
   #endif
@@ -294,14 +305,16 @@ final class SyncHealthModel {
 
   private func currentSyncFailureReport(isEngineRunning: Bool) async -> SyncFailureReport? {
     do {
-      let report = try await CloudSync.syncFailureReport(
+      let result = try await YesChefCloudSync.syncFailureReport(
         in: database,
         isEngineRunning: isEngineRunning,
         isSendingChanges: isEngineRunning && syncEngine.isSendingChanges,
-        isFetchingChanges: isEngineRunning && syncEngine.isFetchingChanges
+        isFetchingChanges: isEngineRunning && syncEngine.isFetchingChanges,
+        verdictCache: syncFailureVerdictCache
       )
+      syncFailureVerdictCache = result.verdictCache
       syncFailureReportError = nil
-      return report
+      return result.report
     } catch {
       // A failed signal read must not make the Settings row claim “Up to date.”
       syncFailureReportError = "Couldn’t check which records have synced."

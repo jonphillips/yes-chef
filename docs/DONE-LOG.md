@@ -9,6 +9,19 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Sync failure status — Slice 4 content verdicts (`effort/sync-failure-surfacing-slice-4`)
+
+**2026-10-23. Schema-free; touches sync.** CloudSyncKit compares the current row with SQLiteData's cached
+all-fields record, so stamp-only writes no longer count as unsent or get requeued. The Yes Chef facade passes
+one `SyncedTables` value to reporting, diagnosis, and retry; its record types are checked against the tables
+registered by the sync engine. jon-platform branch `effort/sync-failure-surfacing-slice-4`
+([PR #83](https://github.com/jonphillips/jon-platform/pull/83)) and Yes Chef branch
+`effort/sync-failure-surfacing-slice-4`
+([PR #363](https://github.com/jonphillips/yes-chef/pull/363)). CloudSyncKit's 37 tests, Yes Chef's drift gate
+(728 package tests, 3 MCP tests, SwiftLint, and app test-target build), the generic iOS build, and all 83
+`YesChefTests` passed. Jon's device readout and follow-up sync status pass remain owed in `device-passes.md`.
+
+---
 ## Sync failure status — Slice 3 readout cleared, Slice 4 specified (plan PR `plan/sync-failure-slice-4`)
 
 **2026-10-23. Device pass, no code.** Jon ran the Slice 3 readout on both devices; a title edit synced normally.
