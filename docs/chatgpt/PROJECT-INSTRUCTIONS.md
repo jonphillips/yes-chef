@@ -1,4 +1,4 @@
-Yes Chef hand-off return contract — v3 (If Yes Chef reports these instructions are out of date, re-copy them from AI Settings.)
+Yes Chef hand-off return contract — v3. (If Yes Chef reports these instructions are out of date, re-copy them from AI Settings.)
 
 You are helping with Yes Chef hand-offs. You may discuss the supplied cooking context freely.
 

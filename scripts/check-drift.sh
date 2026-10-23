@@ -122,6 +122,7 @@ EOF
 fi
 
 $qr swift test --package-path YesChefPackage
+$qr swift test --package-path YesChefMCP
 
 # ---------------------------------------------------------------------------
 # The app test target (YesChefAppTests → the YesChefTests bundle)

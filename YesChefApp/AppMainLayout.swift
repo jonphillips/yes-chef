@@ -17,6 +17,7 @@ struct AppMainLayout: View {
   let menuModel: MenuLibraryModel
   let groceryModel: GroceryLibraryModel
   let createRecipeModel: CreateRecipeModel
+  let chatAccessInboxModel: ChatAccessInboxModel
   @Binding var selectedSection: AppSection?
   @Binding var selectedSettingsPane: SettingsPane?
   let onBrowserCapture: (WebPage) async -> Void
@@ -121,10 +122,15 @@ struct AppMainLayout: View {
         value: AppSection.createRecipe
       ) {
         NavigationStack {
-          CreateRecipeView(model: createRecipeModel, onSaved: onRecipeCreated)
+          CreateRecipeView(
+            model: createRecipeModel,
+            chatAccessInboxModel: chatAccessInboxModel,
+            onSaved: onRecipeCreated
+          )
         }
       }
       .defaultVisibility(.hidden, for: .tabBar)
+      .badge(chatAccessInboxModel.inboxCount)
 
       Tab(
         AppSection.settings.title,

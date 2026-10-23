@@ -9,6 +9,7 @@ import YesChefCore
 struct CreateRecipeView: View {
   @Dependency(\.createRecipeCoordinator) private var createRecipeCoordinator
   let model: CreateRecipeModel
+  let chatAccessInboxModel: ChatAccessInboxModel
   /// Called with the saved recipe's ID so the app can jump to it in the library. The session is a
   /// resident sidebar destination, not a modal, so there is nothing to dismiss here.
   let onSaved: (Recipe.ID) -> Void
@@ -20,6 +21,8 @@ struct CreateRecipeView: View {
 
     ScrollViewReader { proxy in
       Form {
+        ChatAccessInboxSection(model: chatAccessInboxModel)
+
         Section {
           StackedTextEditor(
             title: "Paste or type recipe text",

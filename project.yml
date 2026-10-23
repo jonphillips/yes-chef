@@ -179,6 +179,8 @@ targets:
         product: LLMClientKit
       - package: CloudSyncKit
         product: CloudSyncKit
+      - package: LLMHandoffKit
+        product: LLMHandoffKit
       # NOT DependenciesTestSupport. Xcode builds every other package product in
       # this graph as a dynamic framework, but DependenciesTestSupport only ever
       # builds static ("DependenciesTestSupport-product", never

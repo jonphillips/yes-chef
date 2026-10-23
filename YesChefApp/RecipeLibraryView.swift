@@ -9,12 +9,14 @@ import YesChefCore
 
 struct AppContainer: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+  @Environment(\.scenePhase) private var scenePhase
   @Dependency(\.handoffReviewCoordinator) private var handoffReviewCoordinator
   @Dependency(\.createRecipeCoordinator) private var createRecipeCoordinator
   @State private var toastCenter: AppToastCenter
   @State private var recipeModel = RecipeLibraryModel()
   @State private var powerBrowserModel = PowerBrowserModel()
   @State private var createRecipeModel = CreateRecipeModel()
+  @State private var chatAccessInboxModel = ChatAccessInboxModel()
   @State private var workbenchModel = WorkbenchLibraryModel()
   @State private var browserModel = BrowserModel()
   @State private var mealCalendarModel: MealCalendarModel
@@ -58,6 +60,7 @@ struct AppContainer: View {
       menuModel: menuModel,
       groceryModel: groceryModel,
       createRecipeModel: createRecipeModel,
+      chatAccessInboxModel: chatAccessInboxModel,
       selectedSection: $selectedSection,
       selectedSettingsPane: $selectedSettingsPane,
       onBrowserCapture: browserCaptureButtonTapped,
@@ -169,6 +172,9 @@ struct AppContainer: View {
       await createRecipeCoordinator.applyStagedText(to: createRecipeModel)
     }
     .task {
+      await chatAccessInboxModel.prepare()
+    }
+    .task {
       await createRecipeCoordinator.reconcilePersistedReferralAfterLaunch()
     }
     .onOpenURL { url in
@@ -177,6 +183,10 @@ struct AppContainer: View {
     .onChange(of: selectedSection) { oldSection, newSection in
       guard oldSection == .createRecipe, newSection != .createRecipe else { return }
       Task { await createRecipeCoordinator.abandonOutstandingReferral() }
+    }
+    .onChange(of: scenePhase) { _, phase in
+      guard phase == .active else { return }
+      Task { await chatAccessInboxModel.prepare() }
     }
     .confirmationDialog(
       "Remove Meal Plan Item?",

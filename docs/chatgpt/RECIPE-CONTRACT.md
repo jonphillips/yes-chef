@@ -8,6 +8,7 @@ Use this base shape:
 {"@context":["https://schema.org",{"yesChef":"https://yeschef.app/ns#"}],"@type":"Recipe","yesChef:recipeContractVersion":"2","name":"recipe title","description":"one- or two-sentence summary","recipeCuisine":"cuisine or omit","recipeCategory":"course or omit","recipeYield":"servings or yield, or omit","prepTime":"ISO 8601 duration like PT20M, or omit","cookTime":"ISO 8601 duration like PT35M, or omit","totalTime":"ISO 8601 duration or omit","recipeIngredient":["one ingredient line each"],"recipeInstructions":[{"@type":"HowToStep","text":"one method step each"}]}
 
 `recipeIngredient` is always the complete, ordered flat ingredient list for ordinary schema.org consumers. Do not put section headings such as `For the sauce:` in that list.
+Never put `HowToSection`, `itemListElement`, or any other objects inside `recipeIngredient`.
 
 If ingredients have meaningful named groups, also include `yesChef:ingredientSections`. It is the authoritative Yes Chef grouping and intentionally repeats the ingredient lines so ordinary schema.org consumers retain the flat list:
 
