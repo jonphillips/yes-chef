@@ -41,6 +41,21 @@ public enum YesChefCloudSync {
   public static var containerIdentifier: String { configuration.containerIdentifier }
   public static var enabledDefaultsKey: String { configuration.enabledDefaultsKey }
 
+  /// The synced schema names registered by `makeSyncEngine`. Kept beside that
+  /// registration so the app-test target can detect a report list that drifts.
+  public static let syncedTableNames = [
+    Recipe.tableName, RecipeSource.tableName, IngredientSection.tableName, IngredientLine.tableName,
+    InstructionSection.tableName, InstructionStep.tableName, RecipeNote.tableName,
+    RecipeServeWith.tableName, RecipePhoto.tableName, Tag.tableName, Facet.tableName,
+    Category.tableName, Equipment.tableName, RecipeTag.tableName, RecipeCategory.tableName,
+    RecipeEquipment.tableName, RecipeImportRef.tableName, MealPlanItem.tableName, Menu.tableName,
+    MenuItem.tableName, MenuPlacement.tableName, PrepPlanStepRecord.tableName, Workbench.tableName,
+    WorkbenchCandidate.tableName, WorkbenchLogEntry.tableName, WorkbenchReference.tableName,
+    RecipeVariation.tableName, RecipeRelatedRecipe.tableName, RecipeDeliberationLogEntry.tableName,
+    GroceryList.tableName, GroceryAreaAssignment.tableName, GroceryItem.tableName,
+    GroceryItemSource.tableName, PantryItem.tableName, AISettingsRecord.tableName, Learning.tableName,
+  ].sorted()
+
   // MARK: Enablement gate (forwarded)
 
   public static func isManuallyEnabled(
@@ -121,6 +136,69 @@ public enum YesChefCloudSync {
     try await CloudSync.waitForPendingRecordZoneChanges(
       in: database, exceeding: previousCount, timeout: timeout, pollInterval: pollInterval
     )
+  }
+
+  public static func syncFailureReport(
+    in database: any DatabaseWriter,
+    isEngineRunning: Bool,
+    isSendingChanges: Bool,
+    isFetchingChanges: Bool,
+    now: Date = .now,
+    verdictCache: SyncFailureVerdictCache
+  ) async throws -> SyncFailureReportResult {
+    try await CloudSync.syncFailureReport(in: database, tables:
+      Recipe.self, RecipeSource.self, IngredientSection.self, IngredientLine.self,
+      InstructionSection.self, InstructionStep.self, RecipeNote.self, RecipeServeWith.self,
+      RecipePhoto.self, Tag.self, Facet.self, Category.self, Equipment.self, RecipeTag.self,
+      RecipeCategory.self, RecipeEquipment.self, RecipeImportRef.self, MealPlanItem.self,
+      Menu.self, MenuItem.self, MenuPlacement.self, PrepPlanStepRecord.self, Workbench.self,
+      WorkbenchCandidate.self, WorkbenchLogEntry.self, WorkbenchReference.self,
+      RecipeVariation.self, RecipeRelatedRecipe.self, RecipeDeliberationLogEntry.self,
+      GroceryList.self, GroceryAreaAssignment.self, GroceryItem.self, GroceryItemSource.self,
+      PantryItem.self, AISettingsRecord.self, Learning.self,
+      isEngineRunning: isEngineRunning, isSendingChanges: isSendingChanges,
+      isFetchingChanges: isFetchingChanges, now: now, verdictCache: verdictCache)
+  }
+
+  public static func syncFailureDiagnosis(
+    in database: any DatabaseWriter,
+    isEngineRunning: Bool,
+    isSendingChanges: Bool,
+    isFetchingChanges: Bool,
+    now: Date = .now,
+    verdictCache: SyncFailureVerdictCache
+  ) async throws -> SyncFailureDiagnosis {
+    try await CloudSync.syncFailureDiagnosis(in: database, tables:
+      Recipe.self, RecipeSource.self, IngredientSection.self, IngredientLine.self,
+      InstructionSection.self, InstructionStep.self, RecipeNote.self, RecipeServeWith.self,
+      RecipePhoto.self, Tag.self, Facet.self, Category.self, Equipment.self, RecipeTag.self,
+      RecipeCategory.self, RecipeEquipment.self, RecipeImportRef.self, MealPlanItem.self,
+      Menu.self, MenuItem.self, MenuPlacement.self, PrepPlanStepRecord.self, Workbench.self,
+      WorkbenchCandidate.self, WorkbenchLogEntry.self, WorkbenchReference.self,
+      RecipeVariation.self, RecipeRelatedRecipe.self, RecipeDeliberationLogEntry.self,
+      GroceryList.self, GroceryAreaAssignment.self, GroceryItem.self, GroceryItemSource.self,
+      PantryItem.self, AISettingsRecord.self, Learning.self,
+      isEngineRunning: isEngineRunning, isSendingChanges: isSendingChanges,
+      isFetchingChanges: isFetchingChanges, now: now, verdictCache: verdictCache)
+  }
+
+  public static func requeue(
+    recordType: String,
+    primaryKeys: [String],
+    in database: any DatabaseWriter,
+    verdictCache: SyncFailureVerdictCache
+  ) async throws -> SyncRequeueResult {
+    try await CloudSync.requeue(recordType: recordType, primaryKeys: primaryKeys, tables:
+      Recipe.self, RecipeSource.self, IngredientSection.self, IngredientLine.self,
+      InstructionSection.self, InstructionStep.self, RecipeNote.self, RecipeServeWith.self,
+      RecipePhoto.self, Tag.self, Facet.self, Category.self, Equipment.self, RecipeTag.self,
+      RecipeCategory.self, RecipeEquipment.self, RecipeImportRef.self, MealPlanItem.self,
+      Menu.self, MenuItem.self, MenuPlacement.self, PrepPlanStepRecord.self, Workbench.self,
+      WorkbenchCandidate.self, WorkbenchLogEntry.self, WorkbenchReference.self,
+      RecipeVariation.self, RecipeRelatedRecipe.self, RecipeDeliberationLogEntry.self,
+      GroceryList.self, GroceryAreaAssignment.self, GroceryItem.self, GroceryItemSource.self,
+      PantryItem.self, AISettingsRecord.self, Learning.self,
+      in: database, verdictCache: verdictCache)
   }
 
   // MARK: Engine construction (domain-bound — stays here)
