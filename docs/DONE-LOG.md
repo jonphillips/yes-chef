@@ -9,6 +9,18 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Sync failure status — Slice 5 leftover check (`effort/leftover-check`)
+
+**2026-10-23. Schema-free; touches sync.** Sync detail can now fetch changes, scan iCloud for records whose deletes
+did not reach the server, and show their content grouped under recipe titles. Deletion requires a confirmation that
+states the records will be removed from iCloud and other devices; the app sends only the confirmed IDs and reports
+per-record failures. Unregistered record types are counted separately and never offered for deletion. The shared
+CloudSyncKit implementation landed on jon-platform `main` in [PR #84](https://github.com/jonphillips/jon-platform/pull/84).
+Yes Chef's drift gate passed (728 package tests, 3 MCP tests, SwiftLint, and app test-target build), the elevated
+generic iOS build passed, and all 83 `YesChefTests` passed. Jon's iPad leftover-check pass remains owed in
+`device-passes.md`.
+
+---
 ## Chat access over MCP — S1 device pass cleared (plan PR `plan/chat-access-mcp-s1-pass`)
 
 **2026-10-23. Device pass, no code.** Jon ran the S1 pass on the iPhone, the iPad, and the Mac, and it passed:

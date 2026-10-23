@@ -13,6 +13,13 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**Sync failure status — Slice 5 lost delete check** ([effort brief](efforts/sync-failure-surfacing.md), touches sync).
+On the iPad whose deletes were lost, wait for sync to be idle and tap Settings → Sync → **Check iCloud for
+leftovers**. Confirm Beef Bulgogi’s old flat instruction section and steps are listed unless they were already
+removed from the iPhone, along with any other recipe restructured on the iPad since July. Review the contents,
+confirm **Delete from iCloud**, then check the iPhone to confirm each step appears once. Run the check again on
+the iPad; it should list nothing except separately counted unregistered record types.
+
 **Sync failure status** ([effort brief](efforts/sync-failure-surfacing.md), touches sync). **Failed 2026-10-22 at the
 first check:** the iPad reads "44,938 items haven't synced" (the whole library), and the iPhone shows the same
 state. It is held until Slice 4 ships. **First, the Slice 4 readout:** with Slice 4 installed on both devices, on
