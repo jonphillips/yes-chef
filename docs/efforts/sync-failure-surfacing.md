@@ -4,7 +4,8 @@ Status: Designed 2026-10-13, queued after [`raw-import-html-drop.md`](raw-import
 **touches sync**, so the architect escalates both PRs to Jon. Slices 1–2 shipped (jon-platform #72, yes-chef
 #355/#356). **The device pass failed 2026-10-22 on the first check: the iPad reads "44,938 items haven't synced",
 which is the whole library, and the iPhone reports the same state.** Slices 3–4 below are the follow-up:
-diagnose, then fix (added 2026-10-22).
+diagnose, then fix (added 2026-10-22). Slice 3 shipped (jon-platform #82, yes-chef #361), and its readout
+(2026-10-23) specified Slice 4: rows rewritten with unchanged values look unsent to the date leg.
 Summary: The sync row said "Up to date" for weeks while nine recipes had never uploaded. `CloudSyncKit` gains a
 "not synced" signal: rows that never reached the server, and rows from the server that couldn't be applied here.
 "Up to date" now requires both to be zero, and Yes Chef's sync detail lists them by name with a Retry. Two PRs:
@@ -154,21 +155,92 @@ into the architect session. Don't tap Retry before that, because a retry changes
 Both PRs are merged and green. `DONE-LOG.md` has the entry, and `NEXT_UP.md` reads `Nothing dispatched.`, because
 Slice 4 is specified only from the readout. The readout pass is in `device-passes.md`.
 
-## Slice 4 — Fix the false positive
+## Slice 4 — Count a row only if its content differs from the server's
 
-Specified after Slice 3's readout. The likely branches, so that the specification is quick:
+**What the readout showed (2026-10-23).** Both devices were running and idle, and a title edit synced normally.
+- **iPad:** 54,278 rows: 9,340 confirmed, 44,749 `localEditAfterServer`, and 189 `noChangeTag` (160 of them
+  `recipeSources`).
+- **iPhone:** 53,935 rows: 51,140 confirmed, 2,795 `localEditAfterServer`, and none without a tag.
+- Neither device has a row with a missing or undecodable server record.
+- In every sample, the stamp on the cached all-fields record is before the cached `modificationDate`, and the
+  local stamp is later still. On the iPad, one recipe's rows in three tables share a stamp to the second
+  (2026-08-26 22:40:03): that's a bulk write, not an edit.
 
-- **Mostly `localEditAfterServer`, with the all-fields `userModificationTime` at or after the metadata's (the
-  server already has this edit):** the date leg is the wrong test. Compare the metadata's
-  `userModificationTime` with the `userModificationTime` SQLiteData stamped on the cached server record. Both
-  values come from SQLiteData's own clock, so the skew tolerance goes away. Do the cheap change-tag check first,
-  and decode all-fields only for the few rows that fail it.
-- **Mostly `localEditAfterServer`, with the stamped time older (the edit really never left):** the rows are
-  genuinely unsent. The fix is then a throttled re-send of the affected rows, not a reporting change, and it gets
-  its own brief because it pushes the whole library.
-- **Mostly `noChangeTag` or `noServerRecord`:** the cached server records are missing or stale, probably since a
-  restore. The fix is a confirm-from-server pass (fetch, then reconcile the metadata), specified then.
+**Why the date leg can't work.** SQLiteData at the pinned revision (`26471412`):
+- The user-table `AFTER UPDATE` trigger has no `WHEN` (`Triggers.swift`, `afterUpdate`). Every `UPDATE`,
+  including one that writes the same values, sets `userModificationTime` to now and queues a send. That covers
+  upserts, seeding, restore, and an editor save that changes nothing.
+- At send time, `CKRecord.update(with:userModificationTime:)` starts from the cached all-fields record, and
+  `setValue` changes a field, and the record's stamp, only when the value differs
+  (`CloudKit+StructuredQueries.swift`). So a row with nothing changed sends a record that keeps its old stamp.
+- `refreshLastKnownServerRecord` replaces the cached record only when the returned `modificationDate` is newer,
+  so after a no-op send the cache doesn't move.
 
-Whichever branch it is, Slice 4 adds a regression test that builds the readout's exact shape, and repeats
-Slice 2's device pass.
+A write that changes nothing therefore leaves `userModificationTime` past the cached `modificationDate` for good,
+and the cached record's stamp looks the same as for an edit that never left. Slice 3's branch list assumed that
+stamp could tell the two apart. It can't; only the content can.
 
+### Build
+
+1. **jon-platform `CloudSyncKit`.** This amends Slice 1's "never decode all-fields" rule, bounded as below.
+   - **Split the date leg.** `localEditAfterServer(delta:)` becomes two reasons:
+     - `unsentEdit(delta:)`: the row differs from the cached all-fields record. It counts.
+     - `stampOnly(delta:)`: the row matches it. It doesn't count.
+     `noServerRecord`, `undecodable`, and `noChangeTag` are unchanged and still count. The report, the diagnosis,
+     and `requeue` all go through this one predicate, so Retry never re-queues a stamp-only row.
+   - **Compare the way SQLiteData encodes.** For each writable column, rebuild its `QueryBinding` from the table
+     type, using `T.TableColumns.writableColumns` and `Value(queryOutput:).queryBinding` (the switch in
+     `update(with:userModificationTime:)`). Never compare raw SQLite values: a date is TEXT in SQLite but a `Date`
+     on the record, a Bool is 0/1, and a UUID is stored lowercased on the record. The rules:
+     - `.null` matches only when the field is absent from both `encryptedValues` and the plain values.
+     - `.blob` matches when its sha256 equals `encryptedValues["<column>_hash"]`.
+     - `.uuid` matches the lowercased string.
+     - Every other kind matches an equal value of the same type.
+     Any differing column means `unsentEdit`. So does anything the check can't settle: a missing or undecodable
+     all-fields blob, a missing row, or a `recordType` with no table type. When in doubt, count it.
+   - **The tables.** The report, the diagnosis, and `requeue` take the synced table types the way `SyncEngine`
+     does (a parameter pack of `PrimaryKeyedTable` types). The package stays domain-free.
+   - **Cost.** Decode all-fields only for rows that fail the date leg. Read them through a cursor, one at a time,
+     and never hold the blobs together. The caller owns a verdict cache, a small `Sendable` type in the package
+     keyed by `(recordType, primaryKey)`. It holds the `userModificationTime`, the change tag, and the verdict;
+     when both values match, the decode is skipped. A local write moves the stamp and a remote change replaces
+     the tag, so either one invalidates the entry. The cache lives in memory only.
+   - **The diagnosis** adds `stampOnly` and `unsentEdit` to the totals and per-type counts, plus elapsed time and
+     how many rows it decoded versus took from the cache. Samples come only from rows that count. An
+     `unsentEdit` sample lists the names of the columns that differ, never their values.
+   - **Tests**, built in the readout's shape: a row stamped past the cached `modificationDate` that matches its
+     all-fields record isn't counted or re-queued; the same row with one column changed is counted. Cover each
+     binding kind (text, int, double, bool, date, uuid, null against absent, and a blob by hash), plus an unknown
+     `recordType`. Build the all-fields fixture with SQLiteData's own encoding (`encryptedValues`, the
+     `<column>_hash` key, `encode(with:)` through a secure archiver), and cite the SQLiteData source in a comment.
+     If SQLiteData's public API can build that record from a row, use it instead. Keep the report/diagnosis
+     parity test, and add a cache-hit test.
+2. **Yes Chef.**
+   - Pass the synced table list from `YesChefCore`'s `CloudSync` to the report, the diagnosis, and the requeue.
+     Keep it the same list `makeSyncEngine` uses; a `YesChefTests` test asserts the two name the same tables.
+   - `SyncHealthModel` owns the verdict cache for its lifetime.
+   - The DEBUG readout prints the new counts, the elapsed time, the decoded and cached counts, and the differing
+     column names on each sample. Nothing else changes.
+
+**Out of scope:**
+- The iPad's 189 `noChangeTag` rows. They still count, and they look like sends the server never confirmed. They
+  get their own look after the new readout.
+- Any write to SQLiteData's metadata. Lowering a stamp would fire the metadata trigger and queue a send.
+- A SQLiteData fork, and any change to the triggers.
+
+### Verification
+
+`CloudSyncKit` tests in the jon-platform PR. In Yes Chef: `scripts/check-drift.sh`, the elevated generic iOS build,
+and `YesChefTests`.
+
+### Jon's pass
+
+Install on both devices. On the iPad, then the iPhone: Settings → Sync → detail → **Diagnose** → **Copy**, and
+paste both readouts into the architect session before tapping Retry. Expected: most of the iPad's
+`localEditAfterServer` turns into `stampOnly`; what still counts is about the 189 tagless rows plus any real
+unsent edits; and the iPhone is near zero. Then repeat Slice 2's status pass.
+
+### Done when
+
+Both PRs are merged and green. `DONE-LOG.md` has the entry, and `NEXT_UP.md` reads `Nothing dispatched.` until
+the readout says what the remaining rows are. The pass is in `device-passes.md`.

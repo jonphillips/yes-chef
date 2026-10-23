@@ -9,6 +9,16 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Sync failure status — Slice 3 readout cleared, Slice 4 specified (plan PR `plan/sync-failure-slice-4`)
+
+**2026-10-23. Device pass, no code.** Jon ran the Slice 3 readout on both devices; a title edit synced normally.
+The iPad counts 44,749 of 54,278 rows as `localEditAfterServer` and 189 as `noChangeTag`; the iPhone counts 2,795
+of 53,935 as `localEditAfterServer`. No row on either device is missing or has an undecodable server record.
+Reading SQLiteData explained it: its update trigger stamps a row on any `UPDATE`, even one that changes no value,
+and a send with nothing changed never refreshes the cached server record. So the date leg can't tell a no-op write
+from an edit that never left. Slice 4 replaces it with a content comparison against the cached all-fields record.
+
+---
 ## Sync failure status diagnosis — Slice 3 (`effort/sync-failure-surfacing-diagnosis`)
 
 **2026-10-23. Read-only; touches sync.** Added explicit server-confirmation reasons and a bounded diagnostic
