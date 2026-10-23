@@ -34,6 +34,12 @@ final class SyncHealthModel {
   private(set) var isRetryingRows: Set<String> = []
   private(set) var retryError: String?
 
+  #if DEBUG
+  private(set) var isDiagnosingSyncFailure = false
+  private(set) var syncFailureDiagnosisReadout: String?
+  private(set) var syncFailureDiagnosisError: String?
+  #endif
+
   /// The last error from a *start attempt* (launch is discarded; Try again / Enable
   /// capture theirs). Held separately so a routine `refresh()` — which only reads
   /// live account/pending signals — never clobbers it, and so it survives until the
@@ -141,6 +147,72 @@ final class SyncHealthModel {
   func isRetrying(_ row: NotUploadedDisplayRow) -> Bool {
     isRetryingRows.contains(row.id)
   }
+
+  #if DEBUG
+  /// Decode the metadatabase and bounded CloudKit samples away from the main actor.
+  func diagnoseSyncFailure() async {
+    guard !isDiagnosingSyncFailure else { return }
+    isDiagnosingSyncFailure = true
+    syncFailureDiagnosisError = nil
+    defer { isDiagnosingSyncFailure = false }
+
+    let database = database
+    let engineRunning = syncEngine.isRunning
+    let sending = engineRunning && syncEngine.isSendingChanges
+    let fetching = engineRunning && syncEngine.isFetchingChanges
+    let result: Result<SyncFailureDiagnosis, Error> = await Task.detached(priority: .utility) {
+      do {
+        return .success(try await CloudSync.syncFailureDiagnosis(
+          in: database,
+          isEngineRunning: engineRunning,
+          isSendingChanges: sending,
+          isFetchingChanges: fetching
+        ))
+      } catch {
+        return .failure(error)
+      }
+    }.value
+    switch result {
+    case let .success(diagnosis):
+      syncFailureDiagnosisReadout = Self.format(diagnosis)
+    case let .failure(error):
+      syncFailureDiagnosisError = "Couldn’t diagnose sync status: \(error.localizedDescription)"
+    }
+  }
+
+  nonisolated private static func format(_ diagnosis: SyncFailureDiagnosis) -> String {
+    let counts = diagnosis.reasons
+    var lines = [
+      "Sync failure diagnosis",
+      "Rows considered: \(diagnosis.consideredCount)",
+      "Confirmed: \(counts.confirmed)",
+      "No server record: \(counts.noServerRecord)",
+      "Undecodable: \(counts.undecodable)",
+      "No change tag: \(counts.noChangeTag)",
+      "Local edit after server: \(counts.localEditAfterServer)",
+    ]
+    if let delta = diagnosis.localEditDelta {
+      lines += [
+        "Local edit delta seconds (min / median / max): \(delta.minimum) / \(delta.median) / \(delta.maximum)",
+        "Delta histogram: under 1 h \(delta.underOneHour), 1 h–1 d \(delta.oneHourToOneDay), 1–7 d \(delta.oneToSevenDays), over 7 d \(delta.overSevenDays)",
+      ]
+    }
+    lines.append("By record type:")
+    for type in diagnosis.byRecordType {
+      let reason = type.reasons
+      lines.append("  \(type.recordType): confirmed \(reason.confirmed), no record \(reason.noServerRecord), undecodable \(reason.undecodable), no tag \(reason.noChangeTag), local edit \(reason.localEditAfterServer)")
+    }
+    lines.append("Samples:")
+    let formatter = ISO8601DateFormatter()
+    for sample in diagnosis.samples {
+      let serverModified = sample.serverModificationDate.map(formatter.string(from:)) ?? "none"
+      let serverCreated = sample.serverCreationDate.map(formatter.string(from:)) ?? "none"
+      let sentStamp = sample.serverUserModificationTime.map(formatter.string(from:)) ?? "none"
+      lines.append("  \(sample.recordType)/\(sample.primaryKey): local=\(formatter.string(from: sample.userModificationTime)), serverModified=\(serverModified), serverCreated=\(serverCreated), changeTag=\(sample.hasChangeTag), sentUserModificationTime=\(sentStamp)")
+    }
+    return lines.joined(separator: "\n")
+  }
+  #endif
 
   /// Turn the gate on (the row is the enable affordance when sync is off), start the
   /// engine, then refresh.

@@ -22,9 +22,14 @@ disappears on iPad. Stage an incomplete recipe and confirm the tool errors; stag
 Mac, confirm claimed and discarded files are under `MCP/Inbox/Processed/` with colon-free names and `MCP/Probe/`
 is gone.
 
+**Sync failure diagnosis readout (Slice 3)** ([effort brief](efforts/sync-failure-surfacing.md), touches sync).
+First, edit a recipe title on iPhone and confirm it reaches iPad. Then, on iPad and iPhone, open Settings → Sync →
+detail → **Diagnose** → **Copy** and paste both complete readouts into the architect session. Do not tap Retry
+before copying; it changes the evidence. Slice 4 is specified from these readouts.
+
 **Sync failure status** ([effort brief](efforts/sync-failure-surfacing.md), touches sync). **Failed 2026-10-22 at the
 first check:** the iPad reads "44,938 items haven't synced" (the whole library), and the iPhone shows the same
-state. It is held until Slice 4 ships. The Slice 3 readout pass comes first (see the brief).
+state. It is held until Slice 4 ships. Run the Slice 3 readout pass above first.
 Then repeat this pass. On both the iPad and iPhone, confirm the Settings row says “Up to date” with no false positives. On one device, turn on Airplane mode,
 edit a recipe, and wait past the 30-minute grace window; confirm the row says “1 item hasn’t synced” and the detail
 names that recipe. Restore the network and confirm it returns to “Up to date” after upload, with or without Retry.
