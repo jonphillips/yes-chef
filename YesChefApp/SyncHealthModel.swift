@@ -5,6 +5,7 @@ import Foundation
 import GRDB
 import Observation
 import SQLiteData
+import UIKit
 import YesChefCore
 
 /// The thin observable shell that feeds the pure `SyncHealth` reducer live signals
@@ -154,19 +155,23 @@ final class SyncHealthModel {
     guard !isDiagnosingSyncFailure else { return }
     isDiagnosingSyncFailure = true
     syncFailureDiagnosisError = nil
+    syncFailureDiagnosisReadout = nil
     defer { isDiagnosingSyncFailure = false }
 
     let database = database
     let engineRunning = syncEngine.isRunning
     let sending = engineRunning && syncEngine.isSendingChanges
     let fetching = engineRunning && syncEngine.isFetchingChanges
+    let capturedAt = Date.now
+    let deviceModel = UIDevice.current.model
     let result: Result<SyncFailureDiagnosis, Error> = await Task.detached(priority: .utility) {
       do {
         return .success(try await CloudSync.syncFailureDiagnosis(
           in: database,
           isEngineRunning: engineRunning,
           isSendingChanges: sending,
-          isFetchingChanges: fetching
+          isFetchingChanges: fetching,
+          now: capturedAt
         ))
       } catch {
         return .failure(error)
@@ -174,16 +179,34 @@ final class SyncHealthModel {
     }.value
     switch result {
     case let .success(diagnosis):
-      syncFailureDiagnosisReadout = Self.format(diagnosis)
+      syncFailureDiagnosisReadout = Self.format(
+        diagnosis,
+        capturedAt: capturedAt,
+        deviceModel: deviceModel,
+        isEngineRunning: engineRunning,
+        isSendingChanges: sending,
+        isFetchingChanges: fetching
+      )
     case let .failure(error):
       syncFailureDiagnosisError = "Couldn’t diagnose sync status: \(error.localizedDescription)"
     }
   }
 
-  nonisolated private static func format(_ diagnosis: SyncFailureDiagnosis) -> String {
+  nonisolated private static func format(
+    _ diagnosis: SyncFailureDiagnosis,
+    capturedAt: Date,
+    deviceModel: String,
+    isEngineRunning: Bool,
+    isSendingChanges: Bool,
+    isFetchingChanges: Bool
+  ) -> String {
     let counts = diagnosis.reasons
+    let formatter = ISO8601DateFormatter()
     var lines = [
       "Sync failure diagnosis",
+      "Device model: \(deviceModel)",
+      "Captured at: \(formatter.string(from: capturedAt))",
+      "Engine state: running=\(isEngineRunning), sending=\(isSendingChanges), fetching=\(isFetchingChanges)",
       "Rows considered: \(diagnosis.consideredCount)",
       "Confirmed: \(counts.confirmed)",
       "No server record: \(counts.noServerRecord)",
@@ -203,14 +226,23 @@ final class SyncHealthModel {
       lines.append("  \(type.recordType): confirmed \(reason.confirmed), no record \(reason.noServerRecord), undecodable \(reason.undecodable), no tag \(reason.noChangeTag), local edit \(reason.localEditAfterServer)")
     }
     lines.append("Samples:")
-    let formatter = ISO8601DateFormatter()
     for sample in diagnosis.samples {
       let serverModified = sample.serverModificationDate.map(formatter.string(from:)) ?? "none"
       let serverCreated = sample.serverCreationDate.map(formatter.string(from:)) ?? "none"
       let sentStamp = sample.serverUserModificationTime.map(formatter.string(from:)) ?? "none"
-      lines.append("  \(sample.recordType)/\(sample.primaryKey): local=\(formatter.string(from: sample.userModificationTime)), serverModified=\(serverModified), serverCreated=\(serverCreated), changeTag=\(sample.hasChangeTag), sentUserModificationTime=\(sentStamp)")
+      lines.append("  \(sample.recordType)/\(sample.primaryKey): reason=\(reasonDescription(sample.reason)), local=\(formatter.string(from: sample.userModificationTime)), serverModified=\(serverModified), serverCreated=\(serverCreated), changeTag=\(sample.hasChangeTag), sentUserModificationTime=\(sentStamp)")
     }
     return lines.joined(separator: "\n")
+  }
+
+  nonisolated private static func reasonDescription(_ reason: SyncFailureReason) -> String {
+    switch reason {
+    case .confirmed: "confirmed"
+    case .noServerRecord: "no server record"
+    case .undecodable: "undecodable"
+    case .noChangeTag: "no change tag"
+    case let .localEditAfterServer(delta): "local edit after server by \(delta) seconds"
+    }
   }
   #endif
 

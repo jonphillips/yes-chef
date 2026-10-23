@@ -9,6 +9,18 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Sync failure status diagnosis — Slice 3 (`effort/sync-failure-surfacing-diagnosis`)
+
+**2026-10-23. Read-only; touches sync.** Added explicit server-confirmation reasons and a bounded diagnostic
+readout in CloudSyncKit (jon-platform branch `effort/sync-failure-surfacing-diagnosis`,
+[PR #82](https://github.com/jonphillips/jon-platform/pull/82)), plus a DEBUG-only Diagnose and Copy surface in Yes Chef
+(yes-chef branch `effort/sync-failure-surfacing-diagnosis`, [PR #361](https://github.com/jonphillips/yes-chef/pull/361)).
+The report's counting behavior is unchanged. CloudSyncKit's
+35 tests, `scripts/check-drift.sh` (728 package tests and app test-target build), the elevated generic iOS build, and
+all 82 `YesChefTests` passed. The two-device diagnosis readout remains owed in `device-passes.md`; Slice 4 will be
+specified from those readouts.
+
+---
 ## Chat access over MCP — S1 `stage_recipe` and the app inbox (`effort/chat-access-mcp-s1`)
 
 **2026-10-22. Schema-free; platform prerequisite jon-platform #80 merged first.** Added the `stage_recipe` helper
