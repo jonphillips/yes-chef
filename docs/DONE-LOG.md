@@ -9,6 +9,16 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Chat access over MCP — S1 `stage_recipe` and the app inbox (`effort/chat-access-mcp-s1`)
+
+**2026-10-22. Schema-free; platform prerequisite jon-platform #80 merged first.** Added the `stage_recipe` helper
+and the Create Recipe inbox, with coordinated claims, retention, and probe cleanup. Inbox rows use the JSON-LD
+recipe title when the file is current and retain the slug label as a fallback. The installer copies the helper
+binary into `~/.local/bin/yeschef-mcp`. `scripts/check-drift.sh` passed (728 package tests, 3 helper tests, app test
+target build), all 82 `YesChefTests` passed, and the generic iOS build succeeded. Jon's iPhone/iPad and Mac device
+pass remains owed in `docs/device-passes.md`; S2 will be dispatched after it.
+
+---
 ## Chat access over MCP — S0 device pass cleared (plan PR `plan/chat-access-mcp-s1-s2`)
 
 **2026-10-22. Device pass, no code.** Jon ran the S0 transport pass on the iPhone, the iPad, and the Mac. Q1, Q2,

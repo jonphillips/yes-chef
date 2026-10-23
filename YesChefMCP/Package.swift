@@ -11,6 +11,7 @@ let package = Package(
   dependencies: [
     .package(path: "../YesChefPackage"),
     .package(path: "../../../jon-platform/packages/MCPServerKit"),
+    .package(path: "../../../jon-platform/packages/LLMHandoffKit"),
   ],
   targets: [
     .target(
@@ -18,6 +19,7 @@ let package = Package(
       dependencies: [
         .product(name: "YesChefCore", package: "YesChefPackage"),
         .product(name: "MCPServerKit", package: "MCPServerKit"),
+        .product(name: "LLMHandoffKit", package: "LLMHandoffKit"),
       ]
     ),
     .executableTarget(name: "YesChefMCP", dependencies: ["YesChefMCPServer", .product(name: "MCPServerKit", package: "MCPServerKit")]),

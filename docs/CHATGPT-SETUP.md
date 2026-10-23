@@ -40,6 +40,12 @@ The configuration is shared through the ChatGPT account, so it is reasonable to 
 - On iPhone, keep the Project selected before starting the conversation. When importing, copy the complete JSON response, switch to Yes Chef, and use Create Recipe's **Paste recipe text** control; clipboard permission prompts are expected.
 - Do the initial source replacement on the larger screen when possible. A partial selection or a duplicate old file is much harder to notice on the phone.
 
+## MCP recipe staging
+
+On the Mac, build and install the local helper with `scripts/install-yeschef-mcp`. It installs at `~/.local/bin/yeschef-mcp`, the path used by the existing `yeschef` tunnel profile (health port **8081**). On first use, allow iCloud Drive access for **tunnel-client** so the helper can reach the shared Yes Chef container. Refresh the Yes Chef plugin in ChatGPT to load its single `stage_recipe` tool.
+
+When that tool is available, ask ChatGPT to send a recipe to Yes Chef. ChatGPT asks before staging it; the item then appears under **From Chat** in Create Recipe on the iPhone and iPad. Open it to review and save it, or discard it. The **Yes Chef** Project and paste flow remain the fallback when the helper is unavailable.
+
 ## Smoke test
 
 Run this once after setup or after an update. It proves the Project source, thin capture request, deterministic import, review gate, and continued conversation all work together.

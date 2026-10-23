@@ -4,11 +4,14 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 package_path="$repo_root/YesChefMCP"
 binary_path="$package_path/.build/release/yeschef-mcp"
-install_path="$HOME/Library/Application Support/YesChefMCP/yeschef-mcp"
+install_path="$HOME/.local/bin/yeschef-mcp"
+old_install_directory="$HOME/Library/Application Support/YesChefMCP"
 
 "${JON_PLATFORM:-$HOME/code/jon-platform}/scripts/quiet-run" swift build --package-path "$package_path" -c release
 
 mkdir -p "$(dirname "$install_path")"
+rm -f "$install_path"
 cp "$binary_path" "$install_path"
 chmod 755 "$install_path"
+rm -rf "$old_install_directory"
 printf '%s\n' "$install_path"

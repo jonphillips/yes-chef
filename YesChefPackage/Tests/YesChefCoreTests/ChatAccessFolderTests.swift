@@ -3,12 +3,13 @@ import Testing
 import YesChefCore
 
 struct ChatAccessFolderTests {
-  @Test func resolvesProductionFolderAndProbeFolder() {
+  @Test func resolvesProductionInboxAndProcessedFolders() {
     let container = URL(fileURLWithPath: "/tmp/ubiquity", isDirectory: true)
     let folder = ChatAccessFolder(containerURL: container)
 
     #expect(folder.url.path == "/tmp/ubiquity/MCP")
-    #expect(folder.probeURL.path == "/tmp/ubiquity/MCP/Probe")
+    #expect(folder.inboxURL.path == "/tmp/ubiquity/MCP/Inbox")
+    #expect(folder.processedURL.path == "/tmp/ubiquity/MCP/Inbox/Processed")
   }
 
   @Test func resolvesDevelopmentFolder() {

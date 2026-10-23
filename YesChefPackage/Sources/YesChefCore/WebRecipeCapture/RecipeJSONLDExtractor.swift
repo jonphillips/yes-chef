@@ -2,12 +2,20 @@ import Foundation
 import SwiftSoup
 
 enum RecipeJSONLDExtractor {
+  enum JSONLDExtractionResult {
+    case notJSON
+    case noRecipeNode
+    case incompleteRecipe
+    case extracted
+  }
+
   /// Mine a raw schema.org `Recipe` JSON-LD block that did not arrive inside an HTML `<script>` —
   /// the ADR-0042 workbench-draft hand-off return. Reuses the same parse + salvage + node-walk as the
   /// document path, so a curly-quote-mangled paste is normalized identically (see `cleanedJSON`).
-  static func extract(fromJSONLD raw: String, into builder: inout RecipeParseBuilder) {
-    guard let top = jsonObject(from: raw) else { return }
-    minePrimaryCandidate(in: [top], into: &builder)
+  @discardableResult
+  static func extract(fromJSONLD raw: String, into builder: inout RecipeParseBuilder) -> JSONLDExtractionResult {
+    guard let top = jsonObject(from: raw) else { return .notJSON }
+    return minePrimaryCandidate(in: [top], into: &builder)
   }
 
   static func extract(from document: Document, into builder: inout RecipeParseBuilder) {
@@ -19,7 +27,7 @@ enum RecipeJSONLDExtractor {
       }
       return jsonObject(from: element.data())
     }
-    minePrimaryCandidate(in: documents, into: &builder)
+    _ = minePrimaryCandidate(in: documents, into: &builder)
   }
 
   /// Parse the raw JSON-LD **first**, so well-formed content keeps its apostrophes and
@@ -38,13 +46,16 @@ enum RecipeJSONLDExtractor {
 
   /// Fidelity: lossless-or-loud. A page can contain more than one complete Recipe node, but this
   /// single-recipe builder mines only a deterministic primary and records the ambiguity for review.
-  private static func minePrimaryCandidate(in documents: [Any], into builder: inout RecipeParseBuilder) {
+  private static func minePrimaryCandidate(in documents: [Any], into builder: inout RecipeParseBuilder) -> JSONLDExtractionResult {
+    var foundRecipeNode = false
     let candidates = documents.enumerated().flatMap { documentOrder, document in
-      recipeCandidates(in: document, documentOrder: documentOrder)
+      recipeCandidates(in: document, documentOrder: documentOrder, foundRecipeNode: &foundRecipeNode)
     }
-    guard let primary = candidates.min(by: primaryCandidatePrecedes) else { return }
+    guard foundRecipeNode else { return .noRecipeNode }
+    guard let primary = candidates.min(by: primaryCandidatePrecedes) else { return .incompleteRecipe }
     if candidates.count > 1 { builder.markMultipleRecipeCandidates() }
     mineIfComplete(primary.node, into: &builder)
+    return .extracted
   }
 
   /// A primary is a root Recipe, an `@graph` member, or a `mainEntity` before a Recipe nested in
@@ -57,7 +68,7 @@ enum RecipeJSONLDExtractor {
     return lhs.nodeOrder < rhs.nodeOrder
   }
 
-  private static func recipeCandidates(in value: Any, documentOrder: Int) -> [RecipeCandidate] {
+  private static func recipeCandidates(in value: Any, documentOrder: Int, foundRecipeNode: inout Bool) -> [RecipeCandidate] {
     var candidates: [RecipeCandidate] = []
     var nodeOrder = 0
     collectRecipeCandidates(
@@ -65,6 +76,7 @@ enum RecipeJSONLDExtractor {
       documentOrder: documentOrder,
       location: .topLevel,
       nodeOrder: &nodeOrder,
+      foundRecipeNode: &foundRecipeNode,
       into: &candidates
     )
     return candidates
@@ -75,20 +87,24 @@ enum RecipeJSONLDExtractor {
     documentOrder: Int,
     location: RecipeCandidateLocation,
     nodeOrder: inout Int,
+    foundRecipeNode: inout Bool,
     into candidates: inout [RecipeCandidate]
   ) {
     switch value {
     case let dict as [String: Any]:
-      if isRecipeNode(dict), isMateriallyComplete(dict) {
-        candidates.append(
-          RecipeCandidate(
-            node: dict,
-            isPreferredLocation: location.isPreferred,
-            documentOrder: documentOrder,
-            nodeOrder: nodeOrder
+      if isRecipeNode(dict) {
+        foundRecipeNode = true
+        if isMateriallyComplete(dict) {
+          candidates.append(
+            RecipeCandidate(
+              node: dict,
+              isPreferredLocation: location.isPreferred,
+              documentOrder: documentOrder,
+              nodeOrder: nodeOrder
+            )
           )
-        )
-        nodeOrder += 1
+          nodeOrder += 1
+        }
       }
       for key in dict.keys.sorted() {
         guard let child = dict[key] else { continue }
@@ -103,6 +119,7 @@ enum RecipeJSONLDExtractor {
           documentOrder: documentOrder,
           location: childLocation,
           nodeOrder: &nodeOrder,
+          foundRecipeNode: &foundRecipeNode,
           into: &candidates
         )
       }
@@ -113,6 +130,7 @@ enum RecipeJSONLDExtractor {
           documentOrder: documentOrder,
           location: location,
           nodeOrder: &nodeOrder,
+          foundRecipeNode: &foundRecipeNode,
           into: &candidates
         )
       }

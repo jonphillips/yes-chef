@@ -52,11 +52,6 @@ struct SettingsView: View {
         seedCoverageRow
 #if DEBUG
         modelCallInventoryRow
-        NavigationLink {
-          ChatAccessProbeView()
-        } label: {
-          Label("Chat Access Probe", systemImage: "icloud.and.arrow.up.and.down")
-        }
 #endif
       }
 

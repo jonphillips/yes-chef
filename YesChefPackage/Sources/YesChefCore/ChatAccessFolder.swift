@@ -11,7 +11,11 @@ public struct ChatAccessFolder: Sendable {
     )
   }
 
-  public var probeURL: URL {
-    url.appending(path: "Probe", directoryHint: .isDirectory)
+  public var inboxURL: URL {
+    url.appending(path: "Inbox", directoryHint: .isDirectory)
+  }
+
+  public var processedURL: URL {
+    inboxURL.appending(path: "Processed", directoryHint: .isDirectory)
   }
 }
