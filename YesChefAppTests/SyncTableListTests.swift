@@ -32,7 +32,7 @@ struct SyncTableListTests {
           .map { String($0.dropFirst("sqlitedata_icloud_after_insert_on_".count)) }
           .sorted()
       }
-      #expect(triggerNames == YesChefCloudSync.syncedTableNames)
+      #expect(triggerNames == YesChefCloudSync.syncedTables.recordTypes.sorted())
     }
   }
 }
