@@ -8,7 +8,8 @@
 > to Yes Chef's iCloud Drive container. That needs ADR-0007 Amendment 1, which is argued below and proposed
 > in jon-platform alongside this ADR.
 
-Status: **Proposed** — 2026-10-21. Origin: Jon, after Vinyl Fever M12 proved ChatGPT → MCP end to end ("we do a
+Status: **Accepted** — 2026-10-22, after S0's device pass confirmed D2 (OQ1 answered below). Proposed 2026-10-21.
+Origin: Jon, after Vinyl Fever M12 proved ChatGPT → MCP end to end ("we do a
 lot of copy/pasting of recipe prompts, and the resulting JSON recipe gets pasted back"). Queued after
 [`efforts/sync-failure-surfacing.md`](../efforts/sync-failure-surfacing.md). Effort:
 [`efforts/chat-access-mcp.md`](../efforts/chat-access-mcp.md). Builds on: jon-platform ADR-0007 (the kit, the
@@ -192,14 +193,25 @@ iCloud Documents entitlement.
 
 ## Open questions
 
-- **OQ1 (S0 answers).** Can a helper launched by `tunnel-client` (a LaunchAgent), Claude Code, and Terminal
+- **OQ1 — answered 2026-10-22 by S0** ([§ S0 results](../efforts/chat-access-mcp.md#s0-results)). **D2 stands.**
+  The container reached the Mac without a Mac app, and iCloud created the folder itself. A helper launched by
+  `tunnel-client` raised **one** iCloud Drive prompt, and macOS attributes that grant to `tunnel-client`, so it
+  survives restarts and helper rebuilds. Launches from Claude Code and Terminal worked. A helper-written file
+  reached the iPhone in about 7 s in the foreground and was still found after a relaunch. No signed Mac app is
+  needed. Two constraints came out of the pass, and they bind every slice:
+  - **The Mac evicts container files within minutes, and a `tunnel-client` child can't read a dataless file.**
+    Every Mac-side read materializes the file first (S2 builds it).
+  - **Colons in file names arrive on iOS as slashes.** Container file names are colon-free, so S1 changes
+    `HandoffInbox` naming.
+
+  The original question, kept for the record: Can a helper launched by `tunnel-client` (a LaunchAgent), Claude Code, and Terminal
   read and write `~/Library/Mobile Documents/iCloud~com~jonphillips~yeschef/` without a privacy prompt, or
   with a prompt that can be granted once? Does the container appear on the Mac with no Mac app, once a device
   has written to it? How long does a helper-written file take to reach the iPhone, and does the app find it
   while in the foreground and after a relaunch? Can the helper read a phone-written file that macOS has
   evicted to a placeholder? **If the Mac side fails,** D2 reopens. The leading fallback is a small signed Mac
   app that holds the ubiquity entitlement and runs the helper. It isn't a sync peer.
-- **OQ2.** How long items stay in `Processed/` (S1).
+- **OQ2 — answered 2026-10-22: 30 days.** S1 prunes consumed items from `Processed/` on foreground.
 - **OQ3.** Returns that target an existing recipe (D3): whether a tool call may carry an opaque, short-lived
   handle that the app resolves back to a recipe, and how that fits ADR-0042 D2 and ADR-0007 D5. Not needed
   until S3.

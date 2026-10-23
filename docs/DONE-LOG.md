@@ -9,6 +9,16 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Chat access over MCP — S0 device pass cleared (plan PR `plan/chat-access-mcp-s1-s2`)
+
+**2026-10-22. Device pass, no code.** Jon ran the S0 transport pass on the iPhone, the iPad, and the Mac. Q1, Q2,
+Q3, and Q5 passed. One iCloud Drive prompt was granted to `tunnel-client` and held. Q4 failed: the helper can't
+read a dataless (evicted) file, and the Mac evicts within minutes. An added Q6 found that colons in file names
+arrive on iOS as slashes. ADR-0060 is Accepted with OQ1 and OQ2 answered. S1 and S2 are specified in the effort
+brief, and S1 is dispatched. Two ops fixes surfaced during setup and merged in jon-platform #79: `uninstall-agent`
+kept deleting the health-port record, and helper paths with spaces broke `tunnel-client`.
+
+---
 ## Chat access over MCP — S0 transport probe (`effort/chat-access-mcp-s0`)
 
 **2026-10-21. No schema change; adds the iCloud Documents entitlement.** Added the shared `MCP` folder accessor,
