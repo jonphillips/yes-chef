@@ -21,6 +21,18 @@ struct ChatAccessInboxTests {
     #expect(rows.last?.downloadState == .downloading)
   }
 
+  @Test func rowNameUsesRecipeTitleAndFallsBackToSlugWhenMissingOrBlank() {
+    #expect(ChatAccessInbox.displayName(slug: "creme-brulee", recipeName: "Crème Brûlée") == "Crème Brûlée")
+    #expect(ChatAccessInbox.displayName(slug: "p-te-choux", recipeName: nil) == "P Te Choux")
+    #expect(ChatAccessInbox.displayName(slug: "p-te-choux", recipeName: " \n ") == "P Te Choux")
+  }
+
+  @Test func recipeNameReadsTheDeterministicJSONLDTitle() {
+    let text = #"{"@context":"https://schema.org","@type":"Recipe","name":"Crème Brûlée","recipeIngredient":["1 cup cream"],"recipeInstructions":[{"@type":"HowToStep","text":"Heat the cream."}]}"#
+    #expect(ChatAccessInbox.recipeName(from: text) == "Crème Brûlée")
+    #expect(ChatAccessInbox.recipeName(from: "not json") == nil)
+  }
+
   @Test func expirationUsesStagingDateAndFallsBackToModificationDate() {
     let root = URL(fileURLWithPath: "/tmp/MCP/Inbox/Processed", isDirectory: true)
     let now = ISO8601DateFormatter().date(from: "2027-02-15T08:00:00Z")!

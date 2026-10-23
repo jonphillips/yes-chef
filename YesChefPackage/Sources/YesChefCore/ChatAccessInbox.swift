@@ -15,11 +15,13 @@ public enum ChatAccessInbox {
     public let url: URL
     public let name: String
     public let isCurrent: Bool
+    public let recipeName: String?
 
-    public init(url: URL, name: String, isCurrent: Bool) {
+    public init(url: URL, name: String, isCurrent: Bool, recipeName: String? = nil) {
       self.url = url
       self.name = name
       self.isCurrent = isCurrent
+      self.recipeName = recipeName
     }
   }
 
@@ -54,12 +56,28 @@ public enum ChatAccessInbox {
       guard let handoff = StagedHandoff(url: snapshot.url), snapshot.name != "Processed" else { return nil }
       return Row(
         url: snapshot.url,
-        name: handoff.slug.replacingOccurrences(of: "-", with: " ").capitalized,
+        name: displayName(slug: handoff.slug, recipeName: snapshot.recipeName),
         stagedAt: handoff.stagedAt,
         downloadState: snapshot.isCurrent ? .current : .downloading
       )
     }
     .sorted { $0.stagedAt > $1.stagedAt }
+  }
+
+  public static func displayName(slug: String, recipeName: String?) -> String {
+    if let recipeName {
+      let trimmedName = recipeName.trimmingCharacters(in: .whitespacesAndNewlines)
+      if !trimmedName.isEmpty { return trimmedName }
+    }
+    return slug.replacingOccurrences(of: "-", with: " ").capitalized
+  }
+
+  /// The extraction path walks the supported JSON-LD shapes (including `@graph`) and returns
+  /// the recipe's source title without asking the LLM fallback to infer one.
+  public static func recipeName(from jsonLDText: String) -> String? {
+    guard let title = try? RecipeContractStaging.validate(jsonLDText).title else { return nil }
+    let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmedTitle.isEmpty ? nil : trimmedTitle
   }
 
   public static func expired(_ snapshots: [ProcessedSnapshot], now: Date) -> [URL] {

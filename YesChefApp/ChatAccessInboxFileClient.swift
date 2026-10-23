@@ -4,6 +4,7 @@ import LLMHandoffKit
 import YesChefCore
 
 struct ChatAccessInboxFileClient: Sendable {
+  var read: @Sendable (URL) async throws -> String
   var openAndClaim: @Sendable (ChatAccessFolder, URL) async throws -> String
   var claim: @Sendable (ChatAccessFolder, URL) async throws -> Void
   var maintain: @Sendable (ChatAccessFolder, Date, Bool) async throws -> Void
@@ -26,6 +27,11 @@ private enum ChatAccessInboxFileError: LocalizedError {
 extension ChatAccessInboxFileClient: DependencyKey {
   static var liveValue: Self {
     Self(
+      read: { url in
+        try await Task.detached(priority: .utility) {
+          try coordinatedRead(at: url)
+        }.value
+      },
       openAndClaim: { folder, url in
         try await Task.detached(priority: .utility) {
           let handoff = try stagedHandoff(at: url)

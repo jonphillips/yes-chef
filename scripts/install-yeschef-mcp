@@ -10,6 +10,8 @@ old_install_directory="$HOME/Library/Application Support/YesChefMCP"
 "${JON_PLATFORM:-$HOME/code/jon-platform}/scripts/quiet-run" swift build --package-path "$package_path" -c release
 
 mkdir -p "$(dirname "$install_path")"
-ln -sfn "$binary_path" "$install_path"
+rm -f "$install_path"
+cp "$binary_path" "$install_path"
+chmod 755 "$install_path"
 rm -rf "$old_install_directory"
 printf '%s\n' "$install_path"

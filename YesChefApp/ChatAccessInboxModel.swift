@@ -17,6 +17,9 @@ final class ChatAccessInboxModel {
   @ObservationIgnored private var query: NSMetadataQuery?
   @ObservationIgnored private var observers: [NSObjectProtocol] = []
   @ObservationIgnored private var isPreparing = false
+  @ObservationIgnored private var recipeNamesByID: [String: String] = [:]
+  @ObservationIgnored private var nameReadIDs: Set<String> = []
+  @ObservationIgnored private var nameReadsInProgress: Set<String> = []
 
   private(set) var folder: ChatAccessFolder?
   private(set) var rows: [ChatAccessInbox.Row] = []
@@ -109,15 +112,43 @@ final class ChatAccessInboxModel {
           rowErrors[url.path] = error.localizedDescription
         }
       }
-      return ChatAccessInbox.MetadataSnapshot(url: url, name: name, isCurrent: isCurrent)
+      return ChatAccessInbox.MetadataSnapshot(
+        url: url,
+        name: name,
+        isCurrent: isCurrent,
+        recipeName: recipeNamesByID[url.path]
+      )
     }
     updateRows(from: snapshots)
+    loadNames(for: snapshots)
   }
 
   func updateRows(from snapshots: [ChatAccessInbox.MetadataSnapshot]) {
     rows = ChatAccessInbox.rows(from: snapshots)
     let visibleIDs = Set(rows.map(\.id))
     rowErrors = rowErrors.filter { visibleIDs.contains($0.key) }
+  }
+
+  private func loadNames(for snapshots: [ChatAccessInbox.MetadataSnapshot]) {
+    for snapshot in snapshots where snapshot.isCurrent {
+      let id = snapshot.url.path
+      guard !nameReadIDs.contains(id), nameReadsInProgress.insert(id).inserted else { continue }
+      Task { await loadName(for: snapshot.url, id: id) }
+    }
+  }
+
+  private func loadName(for url: URL, id: String) async {
+    defer { nameReadsInProgress.remove(id) }
+    do {
+      let text = try await fileClient.read(url)
+      nameReadIDs.insert(id)
+      if let name = ChatAccessInbox.recipeName(from: text) {
+        recipeNamesByID[id] = name
+      }
+      metadataQueryDidChange()
+    } catch {
+      // Keep the slug-derived label. A later metadata update can retry the coordinated read.
+    }
   }
 
   private func resolveFolderIfNeeded() async throws -> ChatAccessFolder {

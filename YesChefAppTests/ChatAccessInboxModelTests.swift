@@ -21,6 +21,7 @@ struct ChatAccessInboxModelTests {
       $0.uuid = .incrementing
       $0.createRecipeCoordinator = coordinator
       $0.chatAccessInboxFileClient = ChatAccessInboxFileClient(
+        read: { _ in "" },
         openAndClaim: { _, _ in "original recipe JSON-LD" },
         claim: { _, _ in },
         maintain: { _, _, _ in }
@@ -48,6 +49,7 @@ struct ChatAccessInboxModelTests {
     try await withDependencies {
       $0.createRecipeCoordinator = CreateRecipeCoordinator()
       $0.chatAccessInboxFileClient = ChatAccessInboxFileClient(
+        read: { _ in "" },
         openAndClaim: { _, _ in throw InboxReadFailure.unavailable },
         claim: { _, _ in },
         maintain: { _, _, _ in }
@@ -75,6 +77,7 @@ struct ChatAccessInboxModelTests {
     try await withDependencies {
       $0.createRecipeCoordinator = CreateRecipeCoordinator()
       $0.chatAccessInboxFileClient = ChatAccessInboxFileClient(
+        read: { _ in "" },
         openAndClaim: { _, _ in throw HandoffInboxError.alreadyClaimed },
         claim: { _, _ in throw HandoffInboxError.alreadyClaimed },
         maintain: { _, _, _ in }
