@@ -5,7 +5,9 @@ Status: Designed 2026-10-13, queued after [`raw-import-html-drop.md`](raw-import
 #355/#356). **The device pass failed 2026-10-22 on the first check: the iPad reads "44,938 items haven't synced",
 which is the whole library, and the iPhone reports the same state.** Slices 3–4 below are the follow-up:
 diagnose, then fix (added 2026-10-22). Slice 3 shipped (jon-platform #82, yes-chef #361), and its readout
-(2026-10-23) specified Slice 4: rows rewritten with unchanged values look unsent to the date leg.
+(2026-10-23) specified Slice 4: rows rewritten with unchanged values look unsent to the date leg. Slice 4 shipped
+(jon-platform #83, yes-chef #363). Its readout showed the iPad really failing to upload about 300 rows, and Bulgogi
+then showed lost deletes leaving duplicate steps on the iPhone. Slice 5 (added 2026-10-23) finds those deletes.
 Summary: The sync row said "Up to date" for weeks while nine recipes had never uploaded. `CloudSyncKit` gains a
 "not synced" signal: rows that never reached the server, and rows from the server that couldn't be applied here.
 "Up to date" now requires both to be zero, and Yes Chef's sync detail lists them by name with a Retry. Two PRs:
@@ -244,3 +246,109 @@ unsent edits; and the iPhone is near zero. Then repeat Slice 2's status pass.
 
 Both PRs are merged and green. `DONE-LOG.md` has the entry, and `NEXT_UP.md` reads `Nothing dispatched.` until
 the readout says what the remaining rows are. The pass is in `device-passes.md`.
+
+## Slice 5 — Find deletes that never reached iCloud
+
+**What happened (2026-10-23).** Slice 4's readout showed the iPad holding about 300 rows CloudKit had refused,
+the iPhone healthy, and a title edit syncing normally. Jon split Beef Bulgogi's instructions into named sections
+on the iPad. The new rows only reached the iPhone after he re-saved the recipe (rename + tags), and then the
+iPhone showed every step twice: the old flat section and steps, then the new named sections. The iPad's deletes
+of the old rows never reached iCloud. Sync status didn't flag it, and nothing on the iPad could have.
+
+**Why the status can't see a lost delete.** SQLiteData at the pinned revision (`26471412`):
+- A user `DELETE` sets `_isDeleted = 1` on the metadata row (`Triggers.swift`, `afterDeleteFromUser`), and
+  `didDelete` queues a `.deleteRecord`.
+- When the engine builds the send batch, `pendingRecordZoneChanges` **deletes the metadata rows for every queued
+  delete** (`SyncEngine.swift`, the `SyncMetadata.findAll(deletedRecordIDs).delete()` before `return changes`).
+  That happens before CloudKit answers.
+- `handleSentRecordZoneChanges` re-queues a failed delete only for `.batchRequestFailed` (and parks
+  `.referenceViolation` as unsynced). Every other code is a bare `break`. That is harmless for transient codes
+  (network, rate limiting, `zoneBusy`, `serviceUnavailable`), because `CKSyncEngine` keeps those changes queued
+  and retries them itself (Apple's "Error Handling" docs; maintainer reply on upstream #432). Permanent codes
+  (`quotaExceeded`, `limitExceeded`, `invalidArguments`, `constraintViolation`, and the like) are dropped for good.
+- **Same on the latest release.** Checked 2026-10-23: 1.12.1 and `main` (`37c461a`) have both the `.delete()`
+  above and the same failure handling. Upstream #547 and its open fix #548 report the save side (a dropped parent
+  save, then the child deleted locally by `.referenceViolation`). No issue or discussion reports lost deletes.
+
+A delete that fails with a permanent code therefore leaves no user row, no metadata row, and no queued change.
+`CloudSyncKit`'s report and `requeue` also filter `_isDeleted = 0`, but that isn't the real gap: once the batch
+is built, there is nothing local left to count. **The only remaining evidence is in iCloud:** a record that still
+exists there but that this device deleted. This slice adds an on-demand check against iCloud.
+
+### Build
+
+1. **jon-platform `CloudSyncKit` (additive).**
+   - **`CloudSync.leftoverCheck`**: list every record ID in the private zones the metadatabase names (the
+     distinct `zoneName`/`ownerName`). Use `recordZoneChanges(inZoneWith:since: nil)` with `desiredKeys: []`,
+     paging until `moreComing` is false, so you get IDs, types, and `modificationDate` only. Put the CloudKit
+     calls behind a small protocol so tests can run against a fake.
+   - **A record is a leftover only if all of these hold:**
+     - its `recordType` is in the `SyncedTables` passed in;
+     - there's no metadata row for it (record name is `"<primaryKey>:<recordType>"`, as in SQLiteData's
+       `SyncMetadata`);
+     - there's no row in its table with that key;
+     - it isn't in `sqlitedata_icloud_unsyncedRecordIDs` (that's an inbound row not yet applied, not a lost
+       delete);
+     - its `modificationDate` is before the check's start (anything newer may simply not have been fetched yet).
+
+     Group record types that aren't in `SyncedTables` (for example `categorySeedStates`) separately, by count.
+     They are never deleted.
+
+     One false positive remains: a record this device never received because SQLiteData swallowed an error
+     applying it. It looks just like a lost delete. That's why the check runs only when tapped, shows every
+     item's content, and deletes only what the user confirms.
+   - **Preconditions**, so a record that hasn't arrived yet isn't mistaken for a lost delete: the engine is
+     running, the pending count is zero, and it isn't sending. Otherwise return `.notIdle`. The caller runs a
+     fetch first (below).
+   - **Detail for confirmation.** For leftovers only, fetch the full records in batches of 200 or fewer, so the
+     app can show each one (step text, line text, section name, and the parent recipe's title). Return those
+     plus counts per table.
+   - **`CloudSync.deleteLeftovers(_:)`**: delete exactly the IDs the user confirmed, directly through
+     `CKDatabase.modifyRecords(deleting:)` and in batches. Leave SQLiteData's engine untouched. Other devices
+     then receive the deletions as normal fetched changes. Report per-record failures; never retry
+     automatically.
+   - **Tests** against the fake. Cases:
+     - a record with no local row and no metadata is listed;
+     - one whose metadata is present isn't;
+     - one in `unsyncedRecordIDs` isn't;
+     - one with a `modificationDate` after the start isn't;
+     - an unregistered type is counted separately and never offered for deletion;
+     - `.notIdle` when anything is pending;
+     - the delete sends only the IDs passed in.
+2. **Yes Chef.**
+   - In Sync detail, add **Check iCloud for leftovers**, which runs only when tapped. It calls
+     `syncEngine.fetchChanges()`, then the check. Show progress, since a full listing is about 54k IDs.
+   - Group results by recipe title, and list each item's kind and text (for example "Step: Marinate the
+     beef…"). Leftovers without a recipe go under their table name.
+   - **Delete from iCloud…** opens a confirmation that states the count and says the copies on Jon's other
+     devices will be removed. Nothing is deleted without it.
+   - Pass the same `syncedTables` the report uses.
+   - The "Up to date" row stays local-only. The check needs the network and is too slow for every refresh, and
+     the row's detail text says the check exists.
+
+**Out of scope:**
+- Why CloudKit refuses the iPad's sends in the first place. That needs the `🛑 Save failed` error code from
+  the iPad's log (subsystem `SQLiteData`, category `CloudKit`, debug level). It's captured separately; the fix
+  follows from it.
+- Retry vs. re-save. A re-save moved Charred Broccoli's and Bulgogi's stuck sections when Retry hadn't. That waits
+  on the same log.
+- Any SQLiteData fork, trigger change, or write to its metadata.
+- An upstream issue for "metadata deleted before the delete is confirmed". Raise it with the error code in hand.
+
+### Verification
+
+`CloudSyncKit` tests in the jon-platform PR. In Yes Chef: `scripts/check-drift.sh`, the elevated generic iOS build,
+and `YesChefTests`.
+
+### Jon's pass
+
+On the iPad (the device whose deletes were lost), with sync idle, tap **Check iCloud for leftovers**. Expected:
+Beef Bulgogi's old flat instruction section and steps are listed, unless they were already removed from the
+iPhone, plus any other recipe restructured on the iPad since July. Confirm the delete. Then, on the iPhone,
+check that those recipes show each step once. Run the check again on the iPad: it should list nothing except the
+separately counted unregistered types.
+
+### Done when
+
+Both PRs are merged and green, `DONE-LOG.md` has the entry, `NEXT_UP.md` is advanced, and the pass is in
+`device-passes.md`.
