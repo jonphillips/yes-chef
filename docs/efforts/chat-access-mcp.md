@@ -1,13 +1,11 @@
-# Effort — Chat access over MCP (S0: prove the iCloud Drive transport)
+# Effort — Chat access over MCP
 
-Status: Designed 2026-10-21, queued after [`sync-failure-surfacing.md`](sync-failure-surfacing.md). Schema-free.
-One entitlement change (iCloud Documents on the existing container). S0 is a **probe**: its results decide
-whether S1 and S2 go ahead as [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md) D2 says, so they're
-specified only after S0 reports.
+Status: Designed 2026-10-21. S0 shipped (#357) and its device pass cleared 2026-10-22: D2 stands (§ S0 results).
+**S1 and S2 are specified below, 2026-10-22; S1 is dispatched.** S2 is a separate dispatch after S1's device pass,
+because it carries the one unproven mechanism (reading an evicted file on the Mac). Schema-free throughout.
 Summary: Make Yes Chef the second consumer of jon-platform ADR-0007, so ChatGPT can stage a recipe into Yes Chef
-and look things up in the library instead of Jon pasting in both directions. Yes Chef isn't on the Mac, so an
-iCloud Drive folder carries the inbox and the read export between the Mac helper and the phone. S0 proves that
-transport end to end with probe tools before anything is built on it.
+and look things up in the library instead of Jon pasting in both directions. S0 proved the iCloud Drive transport;
+S1 builds `stage_recipe` and the app's inbox, and S2 builds the library export and the read tools.
 Related: [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md) · jon-platform
 `docs/adr/0007-app-data-over-local-mcp.md` and its Amendment 1 · jon-platform `docs/ios/mcp-access.md` (tunnel
 ops) · vinyl-fever `docs/milestones/M12-library-context-mcp.md` (the first consumer) ·
@@ -17,8 +15,10 @@ ops) · vinyl-fever `docs/milestones/M12-library-context-mcp.md` (the first cons
 
 - **S0 — Probe the transport** (this brief, below). One PR with code plus Jon's device pass. Its results go in
   [§ S0 results](#s0-results).
-- **S1 — `stage_recipe` and the app's inbox** (ADR-0060 D3, D5). This is specified after S0.
-- **S2 — The export and the read tools** (ADR-0060 D4, D6). This is specified after S0.
+- **S1 — `stage_recipe` and the app's inbox** (ADR-0060 D3, D5, D6). [§ S1](#s1--stage_recipe-and-the-apps-inbox).
+  Dispatched 2026-10-22.
+- **S2 — The export and the read tools** (ADR-0060 D4, D6). [§ S2](#s2--the-export-and-the-read-tools). Dispatched
+  after S1's device pass.
 - **S3 — Returns that target an existing recipe.** This waits on ADR-0060 OQ3.
 
 ## S0 — Probe the transport
@@ -99,13 +99,29 @@ Fill in one row per question in [§ S0 results](#s0-results):
 *Fill in during the device pass. One line per question: the outcome, any prompt text exactly as shown, and the
 timings.*
 
+Recorded 2026-10-22 on the iPhone 17 Pro, the iPad Pro 13-inch (M5), and Jon's Mac (macOS 26), with the S0 build
+from PR #357.
+
 | # | Result |
 | - | --- |
-| Q1 | |
-| Q2 | |
-| Q3 | |
-| Q4 | |
-| Q5 | |
+| Q1 | **Pass.** A small iPhone file reached the Mac in under a minute; the iPhone wrote it at 20:01:25 and `MCP/` on the Mac changed at 20:02. iCloud created `~/Library/Mobile Documents/iCloud~com~jonphillips~yeschef/` itself, so a Mac with no Yes Chef app gets the container. The helper's rule of never creating the container folder is right. |
+| Q2 | **Pass, with one prompt that stays granted.** The first ChatGPT `probe_list` call raised one macOS prompt about accessing iCloud Drive (exact text not captured). macOS attributes the grant to **`tunnel-client`**, not `yeschef-mcp`: System Settings → Privacy & Security → Files & Folders shows `tunnel-client` with iCloud Drive on. The grant held across later calls and across an agent restart, and rebuilding the helper doesn't reopen it. Launched from a Claude Code shell (under the Claude app) and from Terminal.app, the helper listed the folder with no failure. |
+| Q3 | **Pass.** A `probe_write` file reached the iPhone in about 6–7 s with the app in the foreground. The metadata query found it, and it was still listed after a force-quit and relaunch. |
+| Q4 | **Fail: the helper can't read an evicted file.** Here the Mac evicted files on its own: a 42-byte iPhone file and a 73-byte Mac-written file were both `compressed,dataless` (`ls -lO`) within about 10 minutes. `probe_list` then listed the file (name, size, status) but its read failed with `The file "…" couldn't be opened.`. The same read from a shell (`cat`) downloaded the file and succeeded, and `probe_list` succeeded again afterwards. The 10 MB timing wasn't measured, because the read fails before the download starts. |
+| Q5 | **Pass.** The iPad sees the Mac-written file too, so the claim race in ADR-0060 D3 is real. |
+| Q6 | **Added during the pass: colons don't survive the trip.** A Mac file named `colon-test-2026-10-23T00:40:00Z.txt` showed on the iPhone as `colon-test-2026-10-23T00/40/00Z.txt`. The probe's own file names had already avoided colons (the #357 review asked for that), and those arrived intact. `LLMHandoffKit.HandoffInbox` names staged files with extended ISO 8601 (`2026-10-22T20:00:00Z-<slug>`), and on the phone its parser would drop those files silently. |
+
+**Verdict.** Q1–Q3 pass with one prompt that a single grant covers, so **ADR-0060 D2 stands**: the helper reads
+and writes the container directly, and OQ1's signed Mac app isn't needed. Two requirements follow from Q4 and Q6,
+and both are built into S1 and S2 below:
+
+1. **Never read a container file without making it current first, on either side.** On iOS this was always
+   the plan (ADR-0060 D2: metadata query, then a download request). On the Mac it's new. A process launched by
+   `tunnel-client` doesn't trigger the download when it reads a dataless file, and on this Mac eviction is
+   routine, not an edge case. S1's helper only writes. S2's export reader is the first Mac-side read, so S2
+   builds the materialize-then-read path and re-runs Q4 against the real export.
+2. **File names in the container are colon-free.** S1 changes `HandoffInbox` to name staged files with basic
+   ISO 8601 (`20261022T200000Z-<slug>`) and to parse both forms.
 
 **How to read them:**
 - If Q1–Q3 pass with no prompt, or with one prompt that can be granted for good, ADR-0060 D2 stands, and the
@@ -123,3 +139,224 @@ timings.*
   the results. The device pass is listed in `device-passes.md`, with a one-line pointer under **Owed**.
 - After Jon's pass: the S0 results table is filled in, and ADR-0060 OQ1 is marked answered. Both happen in the
   architect's plan PR that specifies S1.
+
+## S1 — `stage_recipe` and the app's inbox
+
+**What it retires:** the paste-back. In a chat with the `Yes Chef` plugin, the model calls `stage_recipe`
+instead of printing JSON-LD for Jon to copy, and the recipe appears in Create Recipe on the iPhone and iPad.
+Save there is still the only write (ADR-0060 D3). The probe tools and the DEBUG probe screen go away.
+
+One dispatch, two PRs: the `LLMHandoffKit` change (step 1) lands first in jon-platform, because Yes Chef builds
+against it by path. The Yes Chef PR links it.
+
+### Build
+
+1. **`LLMHandoffKit.HandoffInbox` (jon-platform)** — Q6, and the claim from ADR-0060 D3:
+   - `stage` names files with basic ISO 8601, `20261022T200000Z-<slug>.<ext>`, so no colon reaches iCloud
+     Drive. The collision suffix is unchanged.
+   - The name parser accepts the basic form **and** the extended form, so Vinyl Fever's existing Mac-local items
+     still list. Make it public (for example `StagedHandoff.init?(url:)`), so an app that discovers files through
+     a metadata query reads the staging time from the name without calling `list()`.
+   - `stage` and `markProcessed` go through `NSFileCoordinator` (a coordinated write, and a coordinated move
+     with `.forMoving`). Apple requires coordination in a ubiquity container, and it's harmless in a local
+     folder.
+   - `markProcessed` on an item whose file is gone throws a typed `HandoffInboxError.alreadyClaimed`, not a raw
+     Cocoa error, so a caller can tell "another device took it" from a real failure.
+   - Tests: a staged name has no colon; both forms parse; `alreadyClaimed` throws on a missing source.
+     `swift test` for `LLMHandoffKit`, plus vinyl-fever `swift test --package-path VinylFeverCore` (its
+     `PlaylistInboxClient` is the other consumer).
+2. **Core (`YesChefPackage`):**
+   - `ChatAccessFolder` gains `inboxURL` (`MCP/Inbox/`) and `processedURL` (`MCP/Inbox/Processed/`), and loses
+     `probeURL`. Keep the `isDevelopment` parameter. Nothing passes `true` until ADR-0059 lands (ADR-0060 D5).
+   - **The contract check**, `RecipeContractStaging.validate(_ jsonLDText:)`: the deterministic JSON-LD tier of
+     `CreateRecipeExtraction` and nothing else. It never falls through to the LLM engine, because the helper
+     makes no network calls. It returns the extracted recipe, or a typed reason the model can act on: not
+     JSON, no `Recipe` node, or no ingredients and no instructions. No second parser (ADR-0051).
+   - **The server instructions**, `ChatAccessServerInstructions.text`. The first 512 characters stand alone:
+     these are Yes Chef's recipe tools, call `stage_recipe` with one schema.org Recipe object when Jon wants a
+     recipe sent to Yes Chef, and Jon reviews and saves it in the app. Then comes `RecipeJSONLDContract
+     .projectSource`, then the fallback rule from ADR-0060 D6: if a tool call fails or times out, print the
+     JSON-LD object for Jon to paste instead.
+   - **The drift test** ADR-0060 D6 requires: `docs/chatgpt/RECIPE-CONTRACT.md` equals
+     `RecipeJSONLDContract.projectSource`, and `docs/chatgpt/PROJECT-INSTRUCTIONS.md` equals
+     `AIHandoffReturnContract.projectInstructions`, after trimming the trailing newline. No such test exists
+     today.
+   - **Pure inbox logic**, so it's testable without iCloud: `ChatAccessInbox.rows(from:)`, which turns metadata
+     snapshots (name, download status) into rows, sorted newest first and skipping unparseable names, and
+     `ChatAccessInbox.expired(_:now:)`, which picks the `Processed/` items older than the retention period.
+3. **The helper (`YesChefMCP`):**
+   - Remove `probe_list` and `probe_write`. Add **`stage_recipe`** with input `{"recipe": <object>}`, where the
+     object is the JSON-LD Recipe. Serialize it to text, check it with `RecipeContractStaging.validate`, and on
+     failure return `isError` with the reason, staging nothing. On success, stage it with
+     `HandoffInbox(root: inboxURL, fileExtension: "json")`, using the recipe's name as the slug. Return
+     `{"staged": "<recipe name>", "next": "Jon reviews and saves it in Yes Chef → Create Recipe."}`, with no
+     path (ADR-0007 D5). Annotations: `readOnlyHint: false`, `destructiveHint: false`, `openWorldHint: false`.
+   - Keep S0's missing-container `isError`, and keep never creating the container folder. Create `MCP/Inbox/`
+     if it's missing.
+   - `instructions` = `ChatAccessServerInstructions.text`.
+4. **The app:**
+   - **The live resolver** moves out of the probe file into its own app-side dependency (`@Dependency`), with
+     the typed nil-container error (#357 review). Delete `ChatAccessProbeView.swift` and its Settings link.
+   - **The inbox model** (`@Observable @MainActor`) runs an `NSMetadataQuery` over `MCP/Inbox/`'s top level,
+     excluding `Processed/`. Its notification observers are bound to **that query object**, not `object: nil`
+     (#357 review). It builds rows with `ChatAccessInbox.rows`, asks for any item that isn't current to be
+     downloaded, and shows it as downloading until it is.
+   - **The UI:** when the inbox has items, Create Recipe shows a **From Chat** list above its paste field. Each
+     row has the recipe name and when it was staged, and the actions **Open** and **Discard**. The Create Recipe
+     destination shows the item count as a badge.
+   - **Open:** a coordinated read once the item is current, then `markProcessed` (the claim), then
+     `CreateRecipeCoordinator.stage(text:)`, the same seam as paste and the Shortcut. If the claim throws
+     `alreadyClaimed`, drop the row quietly. If the read fails, keep the item and show the error on its row.
+     **Discard** is `markProcessed` with no stage. A claim race can still happen: two devices that both open the
+     same item within the sync window (S0 Q3 measured about 7 s) both get it. That's acceptable, because Save is
+     a human act on one device. Don't build a lock.
+   - **Retention (answers ADR-0060 OQ2):** on each foreground, coordinated-delete the `Processed/` items that
+     `ChatAccessInbox.expired` returns, meaning those staged more than **30 days** ago. Use the staging time
+     from the name, falling back to the modification date. This is the only delete (ADR-0007 Amd 1-D3).
+   - **The probe leftovers:** once per install, remove `MCP/Probe/` if it exists (coordinated), so no dead data
+     stays in the synced folder.
+   - The share extension still gets no ubiquity entitlement.
+5. **`scripts/install-yeschef-mcp`** installs to `~/.local/bin/yeschef-mcp`, a path with no spaces, because
+   `tunnel-client` splits `--mcp-command` on whitespace (jon-platform #79). It replaces the symlink Jon made
+   during S0 and removes the old `~/Library/Application Support/YesChefMCP/` copy. Jon's `yeschef` tunnel
+   profile already points at that path, so it doesn't change.
+6. **Docs:** [`CHATGPT-SETUP.md`](../CHATGPT-SETUP.md) gains a short MCP section (ADR-0060 D1). It covers
+   `scripts/install-yeschef-mcp`, the `yeschef` profile on health port 8081, the one `stage_recipe` tool, the
+   one-time iCloud Drive grant that lands on `tunnel-client`, and the rule that the Project and paste stay the
+   fallback. jon-platform `mcp-access.md` stays the ops recipe.
+
+**Out of scope:** the export and the read tools (S2), returns that target an existing recipe (S3), a Dev-variant
+helper (`--variant dev` waits for ADR-0059), and any change to the paste path or the Shortcut.
+
+### Verification (Codex)
+
+- `scripts/check-drift.sh`, which now also runs `swift test --package-path YesChefMCP` (#357 review). Add it to CI
+  too if the reusable workflow accepts a second package. If it doesn't, say so in the PR.
+- The elevated generic iOS build.
+- `YesChefTests`, because this adds an app model.
+- `LLMHandoffKit`'s tests and vinyl-fever `VinylFeverCore`'s tests, in the jon-platform PR.
+- Helper tests with the in-memory harness against a temporary container: `tools/list` shows only
+  `stage_recipe`. A valid object stages exactly one colon-free `.json` file whose text round-trips through
+  `RecipeContractStaging.validate`. An invalid object returns `isError` and stages nothing. The missing-container
+  error doesn't create the folder.
+
+### Jon's device pass
+
+Install the build on the iPhone and the iPad, run `scripts/install-yeschef-mcp`, and refresh the plugin in
+ChatGPT (plugin page → **Refresh**) so it picks up the new tool list.
+
+1. In a ChatGPT chat **outside** the `Yes Chef` Project, ask for a recipe and to send it to Yes Chef. ChatGPT
+   asks for confirmation. The recipe appears under **From Chat** in Create Recipe on the iPhone (note the time it
+   takes). Open it, review it, and save it. On the iPad, the row disappears.
+2. Ask for a recipe with no ingredients or steps. The tool returns an error, and the model corrects itself or
+   says why it can't.
+3. Stage one more recipe and **Discard** it.
+4. With the `yeschef` agent stopped (`scripts/mcp-tunnel uninstall-agent yeschef`), ask again. The model prints
+   the JSON-LD for pasting. Then restart the agent with `install-agent yeschef`.
+5. On the Mac, `ls` `MCP/Inbox/Processed/`: it holds the claimed and discarded files, with colon-free names, and
+   `MCP/Probe/` is gone.
+
+### Done when
+
+- Both PRs have merged and Verification is green.
+- The completing PR adds the `DONE-LOG.md` entry, lists the device pass in `device-passes.md` with the **Owed**
+  pointer, and sets `NEXT_UP.md` to `Nothing dispatched.`. S2 is dispatched by the architect after the pass,
+  because its read path is the next thing that could be wrong.
+
+## S2 — The export and the read tools
+
+**What it retires:** the copy-out. ChatGPT can search the library and read a recipe or a menu instead of Jon
+pasting one in. Specified now and dispatched after S1's device pass.
+
+### Build
+
+1. **The export (app):**
+   - Each install writes `MCP/Exports/<installation id>.json`. The installation id is a UUID made with
+     `@Dependency(\.uuid)` on first use and kept in `UserDefaults`, which isn't synced. It is not a recipe ID and
+     never leaves the helper.
+   - The format: `{"format": "yc-library-export", "version": 1, "generatedAt", "device": "iPhone" | "iPad",
+     "recipes", "menus", "mealPlan"}`.
+     - `recipes` holds `RecipeBundle`s (ADR-0060 D4, guardrail #6) with `photos` emptied and
+       `recipe.originalSnapshot` set to nil.
+     - `menus` holds each menu's title, notes, day count, and items: kind, title, recipe ID, day offset, slot,
+       note, and scale.
+     - `mealPlan` holds the scheduled items from 30 days back to 60 days ahead.
+     - Images, snapshots, and sync metadata never go in (ADR-0007 D5).
+   - Write it **off the main actor**, atomically and through a coordinated write, when the scene goes to the
+     background if the last export is more than **15 minutes** old (hold a background-task assertion while
+     writing). Also write it on **Refresh**.
+   - Settings gains a **Chat Access** section: the last export time and size, a **Refresh** button, and the
+     inbox count.
+2. **The Mac-side read path (helper), from S0 Q4:**
+   - Choose the newest export by its file's modification date, read from the directory listing's resource
+     values (these work on a dataless file). Materialize only that file.
+   - **Materialize, then read.**
+     - At startup, the helper opts its process into materializing dataless files:
+       `setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_PROCESS,
+       IOPOL_MATERIALIZE_DATALESS_FILES_ON)`. This is the likeliest reason a shell read downloads the file and a
+       `tunnel-client` child's read doesn't.
+     - Before reading, if the file isn't current, the helper does a **coordinated read** (`NSFileCoordinator`),
+       which asks iCloud for the download, with a **60 s deadline**. The tool deadline is 120 s.
+     - If the deadline passes, return `isError`: "The Yes Chef export is still downloading from iCloud. Try again
+       in a minute."
+     - Log the materialize time and the read time to stderr, so the device pass can read them.
+     - Put the materializer behind an injected seam, so tests drive the timeout and success paths without
+       iCloud.
+   - Decode with a version check. A newer `version` is a typed `isError` that names both versions, never a
+     partial read (`semantic-fidelity.md`). Keep the decoded export in memory, keyed by path and modification
+     date, so each call doesn't re-read it.
+   - With no export, return `isError`: "No Yes Chef export yet. Open Yes Chef on the iPhone or iPad, or tap
+     Refresh in Settings → Chat Access."
+3. **The read tools**, all with `readOnlyHint: true` and `openWorldHint: false`:
+   - `search_recipes {query, limit}` matches name, ingredients, tags, categories, and notes. It returns `{ref,
+     name, cuisine, course, tags, totalTime, yield}` rows: 20 by default, 50 at most.
+   - `get_recipe {ref}` returns the name, description, yield, times, ingredients and steps by section, notes,
+     tags, categories, and source URL.
+   - `list_menus {limit}` returns `{ref, title, dayCount, itemCount, modified}`.
+   - `get_menu {ref}` returns the title, notes, and items by day and slot, with each item's recipe name and note.
+   - `get_meal_plan {from, to}` takes a window of 31 days at most, inside the export's window, and returns the
+     scheduled items.
+   - **Every result carries `export: {generatedAt, ageMinutes, device}`.** No result carries a UUID, a path, or
+     image data.
+   - **Refs are opaque and scoped to one export** (for example `<generation>.<n>`). A ref from a superseded export
+     returns `isError`: "That reference is from an older export; search again." Refs are deliberately not recipe
+     IDs, so S2 doesn't settle ADR-0060 OQ3 by the back door.
+4. **The instructions** add a paragraph on the read tools: check the library before suggesting something, and
+   report the export's age when it matters.
+
+**Out of scope:** pantry and grocery data, any write beyond `stage_recipe`, and S3.
+
+### Verification (Codex)
+
+- `scripts/check-drift.sh`, the elevated generic iOS build, and `YesChefTests` (the export writer is app model
+  code).
+- Core tests: the export round-trips. It carries no photo bytes and no `originalSnapshot`. A newer version
+  fails loudly.
+- Helper tests against a temporary container:
+  - Each tool returns the expected rows, within the caps.
+  - A stale ref returns the older-export error.
+  - With no export, the tools return the no-export error.
+  - The materializer seam drives both the timeout error and the success path.
+  - No result contains a UUID. Assert it with a UUID regex over every tool's output.
+
+### Jon's device pass
+
+1. On the iPhone, tap **Refresh** in Settings → Chat Access. Time how long the export takes to appear on the Mac
+   (`ls -lO MCP/Exports/`).
+2. In ChatGPT: "Do I have any short-rib braises?" (`search_recipes`), then open one (`get_recipe`). Check that
+   the export age is right.
+3. **Re-run Q4 against the export.** Run `brctl evict` on the export file, then call `get_recipe`. It succeeds,
+   and the stderr log shows the materialize time. If it fails or passes 60 s, stop and report: the read path
+   needs a different mechanism before anything builds on it.
+4. Background the iPad app so it writes its own export. The tools report whichever export is newest.
+5. Call `get_recipe` with a ref from before step 4. It returns the older-export error.
+
+## Constants register
+
+| Constant | Value | Why |
+| --- | --- | --- |
+| `Processed/` retention | 30 days | Long enough to recover a mistaken Discard. Short enough that consumed items don't build up (OQ2). |
+| Export minimum interval | 15 min | Recipes change slowly, and a multi-MB file shouldn't be re-uploaded on every app switch. Refresh overrides it. |
+| Meal-plan window in the export | −30 to +60 days | Covers "what did I make last month" and "plan the next few weeks" without exporting the whole calendar. |
+| Materialize deadline | 60 s | Half the 120 s tool deadline, leaving room for decoding and the reply. |
+| Tool row cap | 20 default, 50 max | Vinyl Fever M12's precedent. The conversation pays for every byte. |
