@@ -9,6 +9,16 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Chat access over MCP — S1 device pass cleared (plan PR `plan/chat-access-mcp-s1-pass`)
+
+**2026-10-23. Device pass, no code.** Jon ran the S1 pass on the iPhone, the iPad, and the Mac, and it passed:
+`stage_recipe` stages a recipe that Create Recipe's From Chat list shows on both devices, Open and Discard claim
+it, an incomplete recipe errors, and with the agent stopped ChatGPT falls back to printing JSON-LD. On the Mac,
+the claimed file sits in `MCP/Inbox/Processed/` with a colon-free name, and `MCP/Probe/` is gone. One defect: the
+Create Recipe badge S1 specified never rendered, on the iPad sidebar or the iPhone, though the list read the same
+count. Its fix is S2's first item. S2 is queued after sync-failure-surfacing Slice 5.
+
+---
 ## Sync failure status — Slice 4 content verdicts (`effort/sync-failure-surfacing-slice-4`)
 
 **2026-10-23. Schema-free; touches sync.** CloudSyncKit compares the current row with SQLiteData's cached
