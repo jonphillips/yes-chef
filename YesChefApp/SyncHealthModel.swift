@@ -36,6 +36,15 @@ final class SyncHealthModel {
   private(set) var retryError: String?
   private var syncFailureVerdictCache = SyncFailureVerdictCache()
 
+  private(set) var isCheckingLeftovers = false
+  private(set) var isDeletingLeftovers = false
+  private(set) var leftoverReport: CloudSyncLeftoverReport?
+  private(set) var leftoverDisplayGroups: [LeftoverDisplayGroup] = []
+  private(set) var leftoverCheckError: String?
+  private(set) var leftoverDeleteSummary: String?
+
+  var leftoverCount: Int { leftoverReport?.leftovers.count ?? 0 }
+
   #if DEBUG
   private(set) var isDiagnosingSyncFailure = false
   private(set) var syncFailureDiagnosisReadout: String?
@@ -150,6 +159,169 @@ final class SyncHealthModel {
 
   func isRetrying(_ row: NotUploadedDisplayRow) -> Bool {
     isRetryingRows.contains(row.id)
+  }
+
+  /// Fetch remote changes first, then compare the private zones with this device's
+  /// rows. This is intentionally an on-demand network operation; zone scans are large.
+  func checkForLeftovers() async {
+    guard !isCheckingLeftovers, !isDeletingLeftovers else { return }
+    isCheckingLeftovers = true
+    leftoverCheckError = nil
+    leftoverDeleteSummary = nil
+    leftoverReport = nil
+    leftoverDisplayGroups = []
+    defer { isCheckingLeftovers = false }
+
+    let fetchStartedAt = Date.now
+    do {
+      try await syncEngine.fetchChanges()
+      let engineRunning = syncEngine.isRunning
+      let pending = await currentPendingCount()
+      let client = CloudKitLeftoverClient(
+        database: CKContainer(identifier: YesChefCloudSync.containerIdentifier).privateCloudDatabase
+      )
+      switch try await YesChefCloudSync.leftoverCheck(
+        in: database,
+        client: client,
+        isEngineRunning: engineRunning,
+        pendingChangeCount: pending,
+        isSendingChanges: engineRunning && syncEngine.isSendingChanges,
+        fetchStartedAt: fetchStartedAt
+      ) {
+      case .notIdle:
+        leftoverCheckError = "Sync has pending changes. Wait for it to finish, then check again."
+      case let .completed(report):
+        let groups = try await database.read { db in
+          try Self.makeLeftoverDisplayGroups(from: report, in: db)
+        }
+        leftoverReport = report
+        leftoverDisplayGroups = groups
+      }
+    } catch {
+      leftoverCheckError = "Couldn’t check iCloud for leftovers: \(error.localizedDescription)"
+    }
+  }
+
+  /// Delete only the record IDs present in the report the user reviewed and confirmed.
+  func deleteConfirmedLeftovers() async {
+    guard !isDeletingLeftovers, let report = leftoverReport else { return }
+    isDeletingLeftovers = true
+    leftoverCheckError = nil
+    defer { isDeletingLeftovers = false }
+
+    let recordIDs = report.leftovers.map { $0.record.recordID }
+    let client = CloudKitLeftoverClient(
+      database: CKContainer(identifier: YesChefCloudSync.containerIdentifier).privateCloudDatabase
+    )
+    do {
+      let result = try await YesChefCloudSync.deleteLeftovers(recordIDs, using: client)
+      let failedIDs = Set(result.failures.keys)
+      var remainingReport = report
+      remainingReport.leftovers = report.leftovers.filter { failedIDs.contains($0.record.recordID) }
+      remainingReport.countsByTable = Dictionary(
+        remainingReport.leftovers.map { ($0.tableName, 1) },
+        uniquingKeysWith: +
+      )
+      let reportAfterDelete = remainingReport
+      leftoverReport = reportAfterDelete
+      let displayGroups = try await database.read { db in
+        try Self.makeLeftoverDisplayGroups(from: reportAfterDelete, in: db)
+      }
+      leftoverDisplayGroups = displayGroups
+
+      var lines = ["Deleted \(result.deletedCount) of \(recordIDs.count) records from iCloud."]
+      if !result.failures.isEmpty {
+        lines.append("\(result.failures.count) failed:")
+        lines += result.failures.keys.sorted { $0.recordName < $1.recordName }.map { recordID in
+          "\(recordID.recordName): \(result.failures[recordID] ?? "Unknown error")"
+        }
+      }
+      leftoverDeleteSummary = lines.joined(separator: "\n")
+    } catch {
+      leftoverCheckError = "Couldn’t delete confirmed records from iCloud: \(error.localizedDescription)"
+    }
+  }
+
+  nonisolated static func makeLeftoverDisplayGroups(
+    from report: CloudSyncLeftoverReport,
+    in db: Database
+  ) throws -> [LeftoverDisplayGroup] {
+    var recipeTitles: [String: String] = [:]
+    for leftover in report.leftovers where leftover.tableName == "recipes" {
+      if let title = leftover.record["title"] as? String {
+        recipeTitles[leftover.primaryKey] = title
+      }
+    }
+    let recipeIDs = Set(report.leftovers.compactMap { leftover in
+      leftover.tableName == "recipes" ? nil : Self.stringValue(leftover.record["recipeID"])
+    })
+    for recipeID in recipeIDs where recipeTitles[recipeID] == nil {
+      if let title = try String.fetchOne(
+        db,
+        sql: "SELECT \"title\" FROM \"recipes\" WHERE \"id\" = ?",
+        arguments: [recipeID]
+      ) {
+        recipeTitles[recipeID] = title
+      }
+    }
+
+    var rowsByTitle: [String: [LeftoverDisplayRow]] = [:]
+    for leftover in report.leftovers {
+      let recipeID = Self.stringValue(leftover.record["recipeID"])
+      let recipeTitle = leftover.tableName == "recipes"
+        ? (recipeTitles[leftover.primaryKey] ?? "Recipe")
+        : recipeID.flatMap { recipeTitles[$0] }
+      let title = recipeTitle ?? Self.readableTableName(leftover.tableName)
+      rowsByTitle[title, default: []].append(LeftoverDisplayRow(
+        id: leftover.record.recordID.recordName,
+        kind: Self.leftoverKind(for: leftover.tableName),
+        detail: Self.leftoverContent(for: leftover),
+        tableName: leftover.tableName
+      ))
+    }
+    return rowsByTitle.keys.sorted().map { title in
+      LeftoverDisplayGroup(
+        title: title,
+        rows: (rowsByTitle[title] ?? []).sorted {
+          $0.tableName == $1.tableName ? $0.id < $1.id : $0.tableName < $1.tableName
+        }
+      )
+    }
+  }
+
+  nonisolated private static func stringValue(_ value: CKRecordValue?) -> String? {
+    if let value = value as? String { return value }
+    if let value = value as? UUID { return value.uuidString.lowercased() }
+    return nil
+  }
+
+  nonisolated private static func leftoverKind(for tableName: String) -> String {
+    switch tableName {
+    case "recipes": "Recipe"
+    case "instructionSteps": "Step"
+    case "instructionSections": "Instruction section"
+    case "ingredientLines": "Ingredient"
+    case "ingredientSections": "Ingredient section"
+    case "recipeNotes": "Note"
+    default: readableTableName(tableName)
+    }
+  }
+
+  nonisolated private static func leftoverContent(for leftover: CloudSyncLeftover) -> String {
+    let record = leftover.record
+    let keys: [String]
+    switch leftover.tableName {
+    case "recipes": keys = ["title"]
+    case "instructionSteps": keys = ["text"]
+    case "instructionSections", "ingredientSections": keys = ["name"]
+    case "ingredientLines": keys = ["originalText"]
+    case "recipeNotes": keys = ["text"]
+    default: keys = ["title", "name", "text", "originalText", "item", "label", "url"]
+    }
+    for key in keys {
+      if let value = record[key] as? String, !value.isEmpty { return value }
+    }
+    return leftover.primaryKey
   }
 
   #if DEBUG
@@ -489,4 +661,17 @@ struct NotUploadedDisplayRow: Identifiable, Equatable, Sendable {
   let detail: String
 
   var id: String { "\(recordType):\(primaryKeys.joined(separator: ","))" }
+}
+
+struct LeftoverDisplayGroup: Identifiable, Sendable {
+  let title: String
+  let rows: [LeftoverDisplayRow]
+  var id: String { title }
+}
+
+struct LeftoverDisplayRow: Identifiable, Sendable {
+  let id: String
+  let kind: String
+  let detail: String
+  let tableName: String
 }

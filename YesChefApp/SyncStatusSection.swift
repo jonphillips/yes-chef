@@ -68,6 +68,7 @@ struct SyncStatusDetailView: View {
   let model: SyncHealthModel
   @Environment(\.dismiss) private var dismiss
   @State private var isConfirmingRestoreSyncEnablement = false
+  @State private var isConfirmingLeftoverDelete = false
 
   var body: some View {
     NavigationStack {
@@ -119,6 +120,91 @@ struct SyncStatusDetailView: View {
           } footer: {
             Text("Retry asks iCloud to send these records again. If a record still cannot sync, it will remain here.")
           }
+        }
+
+        Section {
+          Button {
+            Task { await model.checkForLeftovers() }
+          } label: {
+            HStack {
+              Text("Check iCloud for leftovers")
+              if model.isCheckingLeftovers {
+                Spacer()
+                ProgressView()
+              }
+            }
+          }
+          .disabled(model.isCheckingLeftovers || model.isDeletingLeftovers)
+
+          if let error = model.leftoverCheckError {
+            Text(error)
+              .font(.footnote)
+              .foregroundStyle(.red)
+          }
+
+          if let summary = model.leftoverDeleteSummary {
+            Text(summary)
+              .font(.footnote)
+              .textSelection(.enabled)
+          }
+
+          if let report = model.leftoverReport {
+            if report.leftovers.isEmpty {
+              Text("No leftover records found.")
+                .foregroundStyle(.secondary)
+            }
+            ForEach(model.leftoverDisplayGroups) { group in
+              VStack(alignment: .leading, spacing: 7) {
+                Text(group.title)
+                  .font(.headline)
+                ForEach(group.rows) { row in
+                  Text("\(row.kind): \(row.detail)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .padding(.leading, 8)
+                }
+              }
+              .padding(.vertical, 4)
+            }
+
+            if !report.unregisteredTypeCounts.isEmpty {
+              VStack(alignment: .leading, spacing: 4) {
+                Text("Other iCloud record types")
+                  .font(.subheadline.weight(.medium))
+                ForEach(report.unregisteredTypeCounts.keys.sorted(), id: \.self) { type in
+                  LabeledContent(type, value: report.unregisteredTypeCounts[type, default: 0].formatted())
+                    .font(.footnote)
+                }
+              }
+            }
+
+            if !report.fetchFailures.isEmpty {
+              Text("Couldn’t fetch the details for \(report.fetchFailures.count) possible records. Those records weren’t offered for deletion.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+
+            if model.leftoverCount > 0 {
+              Button {
+                isConfirmingLeftoverDelete = true
+              } label: {
+                HStack {
+                  Text("Delete from iCloud…")
+                  if model.isDeletingLeftovers {
+                    Spacer()
+                    ProgressView()
+                  }
+                }
+              }
+              .foregroundStyle(.red)
+              .disabled(model.isDeletingLeftovers || model.isCheckingLeftovers)
+            }
+          }
+        } header: {
+          Text("Lost deletes")
+        } footer: {
+          Text("This on-demand check compares iCloud with this device after fetching changes. Review every record before deleting; other devices will remove the copies after they sync.")
         }
 
         Section {
@@ -209,6 +295,17 @@ struct SyncStatusDetailView: View {
           "This device was restored from a backup. Turning sync on uploads that restored library to iCloud and every other device, overwriting what is there — and recipes you deleted since the backup will come back.\n\nIf you only wanted this device restored, keep sync off."
         )
       }
+      .confirmationDialog(
+        "Delete \(model.leftoverCount) records from iCloud?",
+        isPresented: $isConfirmingLeftoverDelete
+      ) {
+        Button("Delete \(model.leftoverCount) Records", role: .destructive) {
+          Task { await model.deleteConfirmedLeftovers() }
+        }
+        Button("Cancel", role: .cancel) {}
+      } message: {
+        Text("This permanently deletes these records from iCloud. Copies on Jon’s other devices will be removed after they sync.")
+      }
     }
   }
 
@@ -224,7 +321,8 @@ struct SyncStatusDetailView: View {
         notApplied > 0 ? "\(notApplied) couldn’t be saved here" : nil,
       ].compactMap(\.self).joined(separator: " · ")
     case let .error(message): message
-    case .disabled, .upToDate: nil
+    case .upToDate: "Check iCloud for leftover deletes"
+    case .disabled: nil
     }
   }
 
@@ -241,7 +339,7 @@ struct SyncStatusDetailView: View {
     case .needsAttention:
       "Some changes haven’t reached iCloud, or changes from iCloud couldn’t be saved on this device. This clears once they sync; if it stays, something is stuck."
     case .upToDate:
-      "Your recipes are synced across your devices over iCloud."
+      "Your recipes are synced across your devices over iCloud. Use Check iCloud for leftovers to look for deletes that did not reach the server."
     case .error:
       "Sync hit an error. Try again — if it persists, check your iCloud account and network."
     }

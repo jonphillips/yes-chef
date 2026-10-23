@@ -172,6 +172,32 @@ public enum YesChefCloudSync {
       in: database, verdictCache: verdictCache)
   }
 
+  public static func leftoverCheck(
+    in database: any DatabaseWriter,
+    client: any CloudSyncLeftoverClient,
+    isEngineRunning: Bool,
+    pendingChangeCount: Int,
+    isSendingChanges: Bool,
+    fetchStartedAt: Date
+  ) async throws -> CloudSyncLeftoverCheckResult {
+    try await CloudSync.leftoverCheck(
+      in: database,
+      tables: syncedTables,
+      client: client,
+      isEngineRunning: isEngineRunning,
+      pendingChangeCount: pendingChangeCount,
+      isSendingChanges: isSendingChanges,
+      fetchStartedAt: fetchStartedAt
+    )
+  }
+
+  public static func deleteLeftovers(
+    _ recordIDs: [CKRecord.ID],
+    using client: any CloudSyncLeftoverClient
+  ) async throws -> CloudSyncDeleteLeftoversResult {
+    try await CloudSync.deleteLeftovers(recordIDs, using: client)
+  }
+
   // MARK: Engine construction (domain-bound — stays here)
 
   /// Construct the sync engine over Yes Chef's synced tables. This is the one method
