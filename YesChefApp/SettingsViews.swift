@@ -14,6 +14,7 @@ struct SettingsView: View {
   @State private var backupRestore = DatabaseBackupRestoreModel(
     configuration: YesChefCloudSync.databaseBackupConfiguration
   )
+  let automaticBackupModel: AutomaticBackupModel
   @State private var backupExportDocument: BackupExportDocument?
   @State private var backupExportFilename = "YesChef-Backup.sqlite"
   @State private var isPresentingBackupExporter = false
@@ -28,14 +29,17 @@ struct SettingsView: View {
   init(
     model: RecipeLibraryModel,
     groceryModel: GroceryLibraryModel,
+    automaticBackupModel: AutomaticBackupModel,
     selectedPane: Binding<SettingsPane?>? = nil
   ) {
     self.model = model
     self.groceryModel = groceryModel
     self.selectedPane = selectedPane
+    self.automaticBackupModel = automaticBackupModel
   }
 
   var body: some View {
+    @Bindable var automaticBackupModel = automaticBackupModel
     Form {
       // Above Library so "am I actually syncing?" is the first thing Settings answers
       // — silent degradation is fine for dev, not for cross-device use (ADR-0003).
@@ -60,6 +64,28 @@ struct SettingsView: View {
       }
 
       Section("Import & Export") {
+        if automaticBackupModel.isAvailable {
+          Toggle("Automatic Backups", isOn: $automaticBackupModel.isEnabled)
+          Text(automaticBackupStatusText)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+          Button {
+            Task {
+              await automaticBackupModel.backUpNow(
+                restoreInProgress: backupRestore.isPreparing || backupRestore.isRestoring
+              )
+            }
+          } label: {
+            Label("Back Up Now", systemImage: "arrow.clockwise.icloud")
+          }
+          .disabled(automaticBackupModel.isRunning || backupRestore.isPreparing || backupRestore.isRestoring)
+          if let warning = automaticBackupModel.shrinkWarning {
+            Text("Your library shrank from \(warning.previousCount) to \(warning.currentCount) recipes. The earlier backup is being kept.")
+              .foregroundStyle(.orange)
+            Button("Dismiss Warning") { automaticBackupModel.dismissShrinkWarning() }
+          }
+        }
+
         Button {
           Task {
             guard let snapshot = await backupExport.prepareBackupForExport() else { return }
@@ -123,7 +149,12 @@ struct SettingsView: View {
     }
     .onChange(of: scenePhase) { _, phase in
       guard phase == .active else { return }
-      Task { await syncHealth.refresh() }
+      Task {
+        await syncHealth.refresh()
+        await automaticBackupModel.runIfDue(
+          restoreInProgress: backupRestore.isPreparing || backupRestore.isRestoring
+        )
+      }
     }
     // When a sync cycle finishes (the engine's observable activity flips), re-read the
     // pending count so "Syncing…" clears to "Up to date" as changes drain.
@@ -176,6 +207,25 @@ struct SettingsView: View {
       }
     } message: {
       Text(backupRestore.errorMessage ?? "")
+    }
+  }
+
+  private var automaticBackupStatusText: String {
+    switch automaticBackupModel.status {
+    case .neverRun:
+      "No automatic backup yet."
+    case let .lastBackup(date, bytes):
+      "Last backup: \(date.formatted(date: .abbreviated, time: .shortened)) · \(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file))"
+    case .notRunning(.turnedOff):
+      "Automatic backups are turned off."
+    case .notRunning(.restoreInProgress):
+      "Paused while a restore is in progress."
+    case .notRunning(.participantDevice):
+      "This device uses a library shared by someone else."
+    case .notRunning(.iCloudDriveUnavailable):
+      "iCloud Drive is unavailable for Yes Chef."
+    case let .failed(message):
+      "Automatic backup failed: \(message)"
     }
   }
 

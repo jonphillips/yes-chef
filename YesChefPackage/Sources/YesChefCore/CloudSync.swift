@@ -34,6 +34,18 @@ public enum YesChefCloudSync {
     migrate: { try DependencyValues.migrateRestoreCandidate(at: $0) }
   )
 
+#if DEBUG
+  public static let automaticBackupConfiguration: AutomaticBackupConfiguration? = nil
+#else
+  public static let automaticBackupConfiguration: AutomaticBackupConfiguration? = AutomaticBackupConfiguration(
+    filenamePrefix: "YesChef-Auto-",
+    libraryCountTableName: "recipes",
+    retention: .init(daily: 14, monthly: 6),
+    installIDDefaultsKey: "YesChefAutomaticBackupInstallID",
+    enabledDefaultsKey: "YesChefAutomaticBackupEnabled"
+  )
+#endif
+
   public typealias BootstrapMode = CloudSync.BootstrapMode
   public typealias StartResult = CloudSync.StartResult
   public typealias PendingRecordZoneRedrainResult = CloudSync.PendingRecordZoneRedrainResult

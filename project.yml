@@ -81,6 +81,11 @@ targets:
             CFBundleURLName: com.jonphillips.yeschef.find-referral
         UIBackgroundModes:
           - remote-notification
+        NSUbiquitousContainers:
+          iCloud.com.jonphillips.yeschef:
+            NSUbiquitousContainerIsDocumentScopePublic: true
+            NSUbiquitousContainerName: Yes Chef
+            NSUbiquitousContainerSupportedFolderLevels: Any
         # ADR-0030's backup file type. This MUST live here, not hand-added to
         # YesChefApp/Info.plist: that file is generated from this block, so a
         # hand edit survives only until the next `xcodegen generate` — which the

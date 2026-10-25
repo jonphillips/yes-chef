@@ -1,3 +1,4 @@
+import CloudSyncKit
 import Dependencies
 import SwiftUI
 import SwiftUINavigation
@@ -17,6 +18,10 @@ struct AppContainer: View {
   @State private var powerBrowserModel = PowerBrowserModel()
   @State private var createRecipeModel = CreateRecipeModel()
   @State private var chatAccessInboxModel = ChatAccessInboxModel()
+  @State private var automaticBackupModel = AutomaticBackupModel(
+    backup: YesChefCloudSync.databaseBackupConfiguration,
+    configuration: YesChefCloudSync.automaticBackupConfiguration
+  )
   @State private var workbenchModel = WorkbenchLibraryModel()
   @State private var browserModel = BrowserModel()
   @State private var mealCalendarModel: MealCalendarModel
@@ -61,6 +66,7 @@ struct AppContainer: View {
       groceryModel: groceryModel,
       createRecipeModel: createRecipeModel,
       chatAccessInboxModel: chatAccessInboxModel,
+      automaticBackupModel: automaticBackupModel,
       selectedSection: $selectedSection,
       selectedSettingsPane: $selectedSettingsPane,
       onBrowserCapture: browserCaptureButtonTapped,
@@ -72,6 +78,9 @@ struct AppContainer: View {
       },
       onRecipeCreated: recipeCreated
     )
+    .task {
+      if scenePhase == .active { await automaticBackupModel.runIfDue() }
+    }
     .fullScreenCover(item: $presentedRecipe) { presentation in
       RecipeFullScreenCover(
         presentation: presentation,
@@ -186,7 +195,10 @@ struct AppContainer: View {
     }
     .onChange(of: scenePhase) { _, phase in
       guard phase == .active else { return }
-      Task { await chatAccessInboxModel.prepare() }
+      Task {
+        await chatAccessInboxModel.prepare()
+        await automaticBackupModel.runIfDue()
+      }
     }
     .confirmationDialog(
       "Remove Meal Plan Item?",

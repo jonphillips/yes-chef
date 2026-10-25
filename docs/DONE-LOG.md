@@ -9,6 +9,16 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Automatic daily backups — S1 (`effort/automatic-backups`)
+
+**2026-10-25. Schema-free; iCloud Drive.** CloudSyncKit now takes validated foreground snapshots, maintains
+the manifest, prunes by daily/monthly retention, and pins the last snapshot before a sharp library shrink. Yes
+Chef publishes its iCloud Documents container, runs the routine in production builds, and adds Settings
+controls for status and Back Up Now. Debug builds pass no automatic-backup configuration. The Yes Chef device
+gates G1–G4, G6, and G7 remain owed in `device-passes.md`. The CloudSyncKit half is in jon-platform branch
+`effort/automatic-backups`; the Yes Chef adoption is in the same-named branch here.
+
+---
 ## Sync failure status — Slice 5 leftover check (`effort/leftover-check`)
 
 **2026-10-23. Schema-free; touches sync.** Sync detail can now fetch changes, scan iCloud for records whose deletes
