@@ -55,7 +55,7 @@ Names are suggestions. Pick what reads best beside `DatabaseBackupConfiguration`
 - **A file-system seam.** The container URL, the listing, and the coordinated move sit behind a dependency, so
   tests run against a temporary directory with an injected clock. Discovery on device uses `NSMetadataQuery`
   (as ADR-0060 S1 does). A listing that lags only risks a second same-day file, which the install suffix
-  already exists (ADR-0060). `MCP/` is outside `Documents/` and stays hidden.
+  and pruning absorb.
 
 ## Yes Chef PR
 
