@@ -42,8 +42,8 @@ Names are suggestions. Pick what reads best beside `DatabaseBackupConfiguration`
   install-id key. No colons in any name. Prune only after a validated snapshot lands.
 - **The manifest and the shrink pin** (D6). `Backups/manifest.json`, one entry per snapshot: filename, date,
   bytes, row count. A new count below half the previous one pins the previous file and raises a warning
-  naming the pinned backup's date until it's dismissed. A manifest is rebuilt from filenames with unknown counts only when it is truly absent.
-  If it exists but cannot be read or decoded, the run fails closed without replacing it or pruning any snapshots.
+  until it's dismissed. A missing or unreadable manifest is rebuilt from the filenames with unknown counts.
+  It never blocks a backup.
 - **Pruning** (D5) as a pure function: entries + now + calendar + policy + pins → the files to delete. Keep
   the newest per day for the 14 most recent days *that have a file*, the first of each of the 6 most recent
   months, and every pinned file. **It only ever matches the automatic filename pattern.** A manual export
@@ -52,10 +52,10 @@ Names are suggestions. Pick what reads best beside `DatabaseBackupConfiguration`
   backup (date, bytes) · not running (iCloud Drive unavailable, participant device, restore in progress,
   turned off) · failed (message). It also carries the shrink warning, `isRunning`, `backUpNow()`, and
   `dismissShrinkWarning()`. No flag soup.
-- **A file-system seam.** The container URL, metadata listing, coordinated manifest access, moves, and deletes
-  sit behind a dependency, so tests run against a temporary directory with an injected clock. Discovery on
-  device uses `NSMetadataQuery` (as ADR-0060 S1 does). Metadata includes dates, sizes, and download state;
-  incomplete listings retain manifest-only entries, and due checks use the newest date from either source.
+- **A file-system seam.** The container URL, the listing, and the coordinated move sit behind a dependency, so
+  tests run against a temporary directory with an injected clock. Discovery on device uses `NSMetadataQuery`
+  (as ADR-0060 S1 does). A listing that lags only risks a second same-day file, which the install suffix
+  already exists (ADR-0060). `MCP/` is outside `Documents/` and stays hidden.
 
 ## Yes Chef PR
 
