@@ -11,9 +11,7 @@ struct SettingsView: View {
   @State private var backupExport = DatabaseBackupExportModel(
     configuration: YesChefCloudSync.databaseBackupConfiguration
   )
-  @State private var backupRestore = DatabaseBackupRestoreModel(
-    configuration: YesChefCloudSync.databaseBackupConfiguration
-  )
+  @State private var backupRestore: DatabaseBackupRestoreModel
   let automaticBackupModel: AutomaticBackupModel
   @State private var backupExportDocument: BackupExportDocument?
   @State private var backupExportFilename = "YesChef-Backup.sqlite"
@@ -36,6 +34,10 @@ struct SettingsView: View {
     self.groceryModel = groceryModel
     self.selectedPane = selectedPane
     self.automaticBackupModel = automaticBackupModel
+    _backupRestore = State(wrappedValue: DatabaseBackupRestoreModel(
+      configuration: YesChefCloudSync.databaseBackupConfiguration,
+      state: automaticBackupModel.restoreState
+    ))
   }
 
   var body: some View {
@@ -71,18 +73,19 @@ struct SettingsView: View {
             .foregroundStyle(.secondary)
           Button {
             Task {
-              await automaticBackupModel.backUpNow(
-                restoreInProgress: backupRestore.isPreparing || backupRestore.isRestoring
-              )
+              await automaticBackupModel.backUpNow()
             }
           } label: {
             Label("Back Up Now", systemImage: "arrow.clockwise.icloud")
           }
           .disabled(automaticBackupModel.isRunning || backupRestore.isPreparing || backupRestore.isRestoring)
           if let warning = automaticBackupModel.shrinkWarning {
-            Text("Your library shrank from \(warning.previousCount) to \(warning.currentCount) recipes. The earlier backup is being kept.")
+            let date = warning.previousDate.formatted(.dateTime.month(.abbreviated).day())
+            Text("Your library shrank from \(warning.previousCount) to \(warning.currentCount) recipes since \(date). The \(date) backup is being kept.")
               .foregroundStyle(.orange)
-            Button("Dismiss Warning") { automaticBackupModel.dismissShrinkWarning() }
+            Button("Dismiss Warning") {
+              Task { await automaticBackupModel.dismissShrinkWarning() }
+            }
           }
         }
 
@@ -151,9 +154,6 @@ struct SettingsView: View {
       guard phase == .active else { return }
       Task {
         await syncHealth.refresh()
-        await automaticBackupModel.runIfDue(
-          restoreInProgress: backupRestore.isPreparing || backupRestore.isRestoring
-        )
       }
     }
     // When a sync cycle finishes (the engine's observable activity flips), re-read the

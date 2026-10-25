@@ -1,7 +1,7 @@
 # Effort — Automatic daily backups (S1: `CloudSyncKit` + Yes Chef)
 
-Status: Dispatched 2026-10-25, ahead of chat-access-mcp S2. Schema-free. It publishes the iCloud container to
-Files and owes device gates, so the architect escalates the Yes Chef PR to Jon.
+Status: **Complete** — 2026-10-25. Schema-free. It publishes the iCloud container to Files and owes device gates,
+so the architect escalates the Yes Chef PR to Jon.
 Summary: Yes Chef backs itself up. When the app comes to the foreground and the newest automatic backup is over
 24 hours old, `CloudSyncKit` takes the same `VACUUM INTO` snapshot a manual export takes and writes it to
 iCloud Drive › Yes Chef › Backups. It keeps 14 daily and 6 monthly snapshots and never prunes the last one
@@ -42,8 +42,8 @@ Names are suggestions. Pick what reads best beside `DatabaseBackupConfiguration`
   install-id key. No colons in any name. Prune only after a validated snapshot lands.
 - **The manifest and the shrink pin** (D6). `Backups/manifest.json`, one entry per snapshot: filename, date,
   bytes, row count. A new count below half the previous one pins the previous file and raises a warning
-  until it's dismissed. A missing or unreadable manifest is rebuilt from the filenames with unknown counts.
-  It never blocks a backup.
+  naming the pinned backup's date until it's dismissed. A manifest is rebuilt from filenames with unknown counts only when it is truly absent.
+  If it exists but cannot be read or decoded, the run fails closed without replacing it or pruning any snapshots.
 - **Pruning** (D5) as a pure function: entries + now + calendar + policy + pins → the files to delete. Keep
   the newest per day for the 14 most recent days *that have a file*, the first of each of the 6 most recent
   months, and every pinned file. **It only ever matches the automatic filename pattern.** A manual export
@@ -52,10 +52,10 @@ Names are suggestions. Pick what reads best beside `DatabaseBackupConfiguration`
   backup (date, bytes) · not running (iCloud Drive unavailable, participant device, restore in progress,
   turned off) · failed (message). It also carries the shrink warning, `isRunning`, `backUpNow()`, and
   `dismissShrinkWarning()`. No flag soup.
-- **A file-system seam.** The container URL, the listing, and the coordinated move sit behind a dependency, so
-  tests run against a temporary directory with an injected clock. Discovery on device uses `NSMetadataQuery`
-  (as ADR-0060 S1 does). A listing that lags only risks a second same-day file, which the install suffix
-  and pruning absorb.
+- **A file-system seam.** The container URL, metadata listing, coordinated manifest access, moves, and deletes
+  sit behind a dependency, so tests run against a temporary directory with an injected clock. Discovery on
+  device uses `NSMetadataQuery` (as ADR-0060 S1 does). Metadata includes dates, sizes, and download state;
+  incomplete listings retain manifest-only entries, and due checks use the newest date from either source.
 
 ## Yes Chef PR
 

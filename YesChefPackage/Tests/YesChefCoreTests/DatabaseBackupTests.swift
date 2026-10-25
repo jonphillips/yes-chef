@@ -124,10 +124,33 @@ struct DatabaseBackupTests {
       containerURL: { _ in containerURL },
       listFiles: { folder, prefix in
         let urls = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
-        return urls.filter { $0.lastPathComponent.hasPrefix(prefix) && $0.pathExtension == "sqlite" }
+        let files = try urls.filter { $0.lastPathComponent.hasPrefix(prefix) && $0.pathExtension == "sqlite" }
+          .map { url in
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            return AutomaticBackupFile(
+              url: url,
+              date: attributes[.modificationDate] as? Date ?? .distantPast,
+              bytes: attributes[.size] as? Int ?? 0,
+              isDownloaded: true
+            )
+          }
+        return AutomaticBackupListing(files: files, isComplete: true)
+      },
+      readManifest: { url in
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return try Data(contentsOf: url)
+      },
+      writeManifest: { data, url in
+        try data.write(to: url, options: .atomic)
       },
       moveCoordinated: { source, destination in
+        if FileManager.default.fileExists(atPath: destination.path) {
+          try FileManager.default.removeItem(at: destination)
+        }
         try FileManager.default.moveItem(at: source, to: destination)
+      },
+      removeCoordinated: { url in
+        try FileManager.default.removeItem(at: url)
       }
     )
     let suiteName = "AutomaticBackupTests-\(UUID().uuidString)"
