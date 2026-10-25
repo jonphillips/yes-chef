@@ -16,7 +16,8 @@ the manifest, prunes by daily/monthly retention, and pins the last snapshot befo
 Chef publishes its iCloud Documents container, runs the routine in production builds, and adds Settings
 controls for status and Back Up Now. Debug builds pass no automatic-backup configuration. The Yes Chef device
 gates G1–G4, G6, and G7 remain owed in `device-passes.md`. The CloudSyncKit half is in jon-platform branch
-`effort/automatic-backups`; the Yes Chef adoption is in the same-named branch here.
+`effort/automatic-backups` ([PR #86](https://github.com/jonphillips/jon-platform/pull/86)); the Yes Chef adoption
+is in the same-named branch here ([PR #368](https://github.com/jonphillips/yes-chef/pull/368)).
 
 ---
 ## Sync failure status — Slice 5 leftover check (`effort/leftover-check`)
