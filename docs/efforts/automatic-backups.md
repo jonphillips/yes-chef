@@ -1,7 +1,7 @@
 # Effort — Automatic daily backups (S1: `CloudSyncKit` + Yes Chef)
 
-Status: Dispatched 2026-10-25, ahead of chat-access-mcp S2. Schema-free. It publishes the iCloud container to
-Files and owes device gates, so the architect escalates the Yes Chef PR to Jon.
+Status: **Complete** — 2026-10-25. Schema-free. It publishes the iCloud container to Files and owes device gates,
+so the architect escalates the Yes Chef PR to Jon.
 Summary: Yes Chef backs itself up. When the app comes to the foreground and the newest automatic backup is over
 24 hours old, `CloudSyncKit` takes the same `VACUUM INTO` snapshot a manual export takes and writes it to
 iCloud Drive › Yes Chef › Backups. It keeps 14 daily and 6 monthly snapshots and never prunes the last one

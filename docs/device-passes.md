@@ -13,6 +13,17 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**Automatic backups (ADR-0008 S1; effort brief `automatic-backups`).** Run this on the first TestFlight build
+after the change merges; Debug builds intentionally take no automatic backups. On iPhone and iPad, open Yes Chef
+with Automatic Backups enabled and confirm a dated `YesChef-Auto-` file appears in Files under iCloud Drive →
+Yes Chef → Backups. Record the first snapshot size, whether Files required a `CFBundleVersion` bump, and whether
+the App ID needed the iCloud Documents capability enabled in the developer portal at archive time (G1).
+Confirm it reaches the Mac's Yes Chef iCloud container and the other device (G2). Open on the second device
+within minutes; there should be one file or two non-colliding files (G3). Restore an automatic file from the
+existing importer and confirm the library matches that snapshot (G4). Turn iCloud Drive off for Yes Chef and
+confirm Settings explains why no file is written (G6). With a test library, shrink the recipe count by over
+half, foreground the next day, and confirm the earlier file stays pinned with a warning (G7).
+
 **Sync failure status — Slice 5 lost delete check** ([effort brief](efforts/sync-failure-surfacing.md), touches sync).
 On the iPad whose deletes were lost, wait for sync to be idle and tap Settings → Sync → **Check iCloud for
 leftovers**. Confirm Beef Bulgogi’s old flat instruction section and steps are listed unless they were already

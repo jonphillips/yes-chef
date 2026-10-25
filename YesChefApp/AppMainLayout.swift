@@ -1,3 +1,4 @@
+import CloudSyncKit
 import SwiftUI
 import WebExtractorKit
 import WebKit
@@ -18,6 +19,7 @@ struct AppMainLayout: View {
   let groceryModel: GroceryLibraryModel
   let createRecipeModel: CreateRecipeModel
   let chatAccessInboxModel: ChatAccessInboxModel
+  let automaticBackupModel: AutomaticBackupModel
   @Binding var selectedSection: AppSection?
   @Binding var selectedSettingsPane: SettingsPane?
   let onBrowserCapture: (WebPage) async -> Void
@@ -140,6 +142,7 @@ struct AppMainLayout: View {
         SettingsTab(
           recipeModel: recipeModel,
           groceryModel: groceryModel,
+          automaticBackupModel: automaticBackupModel,
           selectedPane: $selectedSettingsPane,
           usesCompactTabLayout: horizontalSizeClass == .compact
         )
@@ -293,6 +296,7 @@ private struct SettingsTab: View {
 
   let recipeModel: RecipeLibraryModel
   let groceryModel: GroceryLibraryModel
+  let automaticBackupModel: AutomaticBackupModel
   @Binding var selectedPane: SettingsPane?
   let usesCompactTabLayout: Bool
 
@@ -300,12 +304,13 @@ private struct SettingsTab: View {
     if usesCompactTabLayout {
       // The More tab supplies the compact navigation context. Passing no pane binding keeps these
       // rows as NavigationLinks instead of changing a split-view selection with no compact push.
-      SettingsView(model: recipeModel, groceryModel: groceryModel)
+      SettingsView(model: recipeModel, groceryModel: groceryModel, automaticBackupModel: automaticBackupModel)
     } else {
       NavigationSplitView(columnVisibility: $columnVisibility) {
         SettingsView(
           model: recipeModel,
           groceryModel: groceryModel,
+          automaticBackupModel: automaticBackupModel,
           selectedPane: $selectedPane
         )
       } detail: {

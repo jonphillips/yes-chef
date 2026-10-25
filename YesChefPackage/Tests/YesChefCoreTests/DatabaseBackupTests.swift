@@ -16,6 +16,15 @@ struct DatabaseBackupTests {
     }
     #expect(YesChefCloudSync.databaseBackupConfiguration.identifyingTableNames == ["recipes"])
     #expect(YesChefCloudSync.databaseBackupConfiguration.declaredSchemaVersion == registeredCount)
+#if DEBUG
+    #expect(YesChefCloudSync.automaticBackupConfiguration == nil)
+#else
+    #expect(YesChefCloudSync.automaticBackupConfiguration?.filenamePrefix == "YesChef-Auto-")
+    #expect(YesChefCloudSync.automaticBackupConfiguration?.libraryCountTableName == "recipes")
+    #expect(YesChefCloudSync.automaticBackupConfiguration?.retention == .init(daily: 14, monthly: 6))
+    #expect(YesChefCloudSync.automaticBackupConfiguration?.installIDDefaultsKey == "YesChefAutomaticBackupInstallID")
+    #expect(YesChefCloudSync.automaticBackupConfiguration?.enabledDefaultsKey == "YesChefAutomaticBackupEnabled")
+#endif
     try database.close()
   }
 
@@ -81,6 +90,109 @@ struct DatabaseBackupTests {
     #expect(restoredPhoto?.displayData == imageBytes)
     #expect(restoredPhoto?.thumbnailData == Data([0xAA, 0xBB]))
     try restoredDatabase.close()
+    try database.close()
+  }
+
+  @Test
+  @MainActor
+  func automaticSnapshotRestoresThroughTheExistingImporter() async throws {
+    let directoryURL = try temporaryDirectory()
+    let liveURL = directoryURL.appendingPathComponent("live.sqlite")
+    let database = try pathBackedDatabase(at: liveURL)
+    let recipeID = SampleUUIDSequence.uuid(73)
+    try await database.write { db in
+      try Recipe.insert {
+        Recipe(
+          id: recipeID,
+          title: "Automatic Backup Round Trip",
+          dateCreated: Date(timeIntervalSinceReferenceDate: 811_000_000),
+          dateModified: Date(timeIntervalSinceReferenceDate: 811_000_000)
+        )
+      }
+      .execute(db)
+    }
+
+    let containerURL = directoryURL.appendingPathComponent("iCloud", isDirectory: true)
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let automaticConfiguration = AutomaticBackupConfiguration(
+      filenamePrefix: "YesChef-Auto-",
+      libraryCountTableName: "recipes",
+      installIDDefaultsKey: "YesChefAutomaticBackupInstallID",
+      enabledDefaultsKey: "YesChefAutomaticBackupEnabled"
+    )
+    let client = AutomaticBackupClient(
+      containerURL: { _ in containerURL },
+      listFiles: { folder, prefix in
+        let urls = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+        let files = try urls.filter { $0.lastPathComponent.hasPrefix(prefix) && $0.pathExtension == "sqlite" }
+          .map { url in
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            return AutomaticBackupFile(
+              url: url,
+              date: attributes[.modificationDate] as? Date ?? .distantPast,
+              bytes: attributes[.size] as? Int ?? 0,
+              isDownloaded: true
+            )
+          }
+        return AutomaticBackupListing(files: files, isComplete: true)
+      },
+      readManifest: { url in
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return try Data(contentsOf: url)
+      },
+      writeManifest: { data, url in
+        try data.write(to: url, options: .atomic)
+      },
+      moveCoordinated: { source, destination in
+        if FileManager.default.fileExists(atPath: destination.path) {
+          try FileManager.default.removeItem(at: destination)
+        }
+        try FileManager.default.moveItem(at: source, to: destination)
+      },
+      removeCoordinated: { url in
+        try FileManager.default.removeItem(at: url)
+      }
+    )
+    let suiteName = "AutomaticBackupTests-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let status = await withDependencies {
+      $0.defaultDatabase = database
+      $0.automaticBackupClient = client
+      $0.date.now = now
+      $0.uuid = .incrementing
+    } operation: {
+      let model = AutomaticBackupModel(
+        backup: YesChefCloudSync.databaseBackupConfiguration,
+        configuration: automaticConfiguration,
+        defaults: defaults
+      )
+      await model.backUpNow()
+      return model.status
+    }
+
+    guard case let .lastBackup(_, bytes) = status else {
+      Issue.record("Expected the automatic backup to complete, got \(status).")
+      return
+    }
+    #expect(bytes > 0)
+    let backupFolder = containerURL.appendingPathComponent("Documents/Backups", isDirectory: true)
+    let automaticFile = try #require(
+      FileManager.default.contentsOfDirectory(at: backupFolder, includingPropertiesForKeys: nil)
+        .first { $0.lastPathComponent.hasPrefix("YesChef-Auto-") && $0.pathExtension == "sqlite" }
+    )
+    let prepared = try await DatabaseBackup.prepareRestore(
+      from: automaticFile,
+      to: directoryURL.appendingPathComponent("prepared.sqlite"),
+      currentSchemaVersion: YesChefCloudSync.databaseBackupConfiguration.declaredSchemaVersion,
+      configuration: YesChefCloudSync.databaseBackupConfiguration,
+      migrate: YesChefCloudSync.databaseBackupConfiguration.migrate
+    )
+    let restored = try DatabaseQueue(path: prepared.fileURL.path)
+    let title = try await restored.read { db in try Recipe.find(recipeID).fetchOne(db)?.title }
+    #expect(title == "Automatic Backup Round Trip")
+    try restored.close()
     try database.close()
   }
 }
