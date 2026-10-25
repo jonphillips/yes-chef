@@ -78,8 +78,9 @@ only to an app that has a Mac bundle.)
 
 ### D2 — The Mac ↔ device transport is Yes Chef's iCloud Drive container, not the database
 
-The app gains the **iCloud Documents** service on the existing `iCloud.com.jonphillips.yeschef` container. The
-container is not published, so nothing shows up in Files. One folder carries both directions:
+The app gains the **iCloud Documents** service on the existing `iCloud.com.jonphillips.yeschef` container. At
+acceptance the container was not published, so nothing showed up in Files. ADR-0008 S1 later published its
+`Documents/` scope for backups; `MCP/` remains outside that scope and hidden. One folder carries both directions:
 
 ```
 <ubiquity container>/MCP/
