@@ -1,7 +1,7 @@
 # Effort — Chat access over MCP
 
 Status: Designed 2026-10-21. S0 shipped (#357) and its device pass cleared 2026-10-22: D2 stands (§ S0 results).
-S1 shipped (#359) and its device pass cleared 2026-10-23. **S2 is queued after sync-failure-surfacing Slice 5**,
+S1 shipped (#359) and its device pass cleared 2026-10-23. **S2 is queued after sync-failure-surfacing Slice 5 and automatic-backups S1** (backups dispatched first, 2026-10-25),
 and it starts with S1's one defect, the Create Recipe badge that never rendered. S2 carries the one unproven
 mechanism (reading an evicted file on the Mac). Schema-free throughout.
 Summary: Make Yes Chef the second consumer of jon-platform ADR-0007, so ChatGPT can stage a recipe into Yes Chef
