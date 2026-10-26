@@ -11,7 +11,7 @@ Newest first.
 ---
 ## Chat access over MCP — S2 export and read tools (`effort/chat-access-mcp-s2`)
 
-**2026-10-26. Schema-free.** Yes Chef writes a text-only, versioned library export per installation and exposes recipe search/detail, menu list/detail, and meal-plan read tools from the newest iCloud Drive export. Reads materialize the selected export with a bounded coordinated read and return export age; references expire when that file changes. Settings adds Chat Access export status and Refresh. The Create Recipe badge modifier now precedes hidden tab visibility. Lint, 730 core tests, 7 helper tests, generic iOS build, and all 83 `YesChefTests` pass. The badge's iPad rendering and Mac iCloud materialization remain owed in `device-passes.md`.
+**2026-10-26. Schema-free.** Yes Chef writes a text-only, versioned library export per installation and exposes recipe search/detail, menu list/detail, and meal-plan read tools from the newest iCloud Drive export. Reads materialize the selected export with a bounded coordinated read and return export age; references expire when that file changes. Settings adds Chat Access export status and Refresh. The Create Recipe badge's cause was modifier order: `.badge` now precedes `.defaultVisibility(.hidden, for: .tabBar)`, and the badge showed on device 2026-10-26. Lint, core and helper tests, the generic iOS build, and `YesChefTests` pass. The export and the Mac iCloud materialization pass remain owed in `device-passes.md`.
 
 ---
 ## Device passes cleared — production cutover Phase 1, sync failure Slices 1–6

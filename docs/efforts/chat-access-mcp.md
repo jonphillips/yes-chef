@@ -367,6 +367,11 @@ pasting one in. Specified 2026-10-22; queued after sync-failure-surfacing Slice 
 4. Background the iPad app so it writes its own export. The tools report whichever export is newest.
 5. Call `get_recipe` with a ref from before step 4. It returns the older-export error.
 
+### S2 results
+
+- **Item 0 (badge) cleared 2026-10-26.** A count shows next to Create Recipe; it renders small, but it renders. The cause was modifier order: S1 put `.badge` after `.defaultVisibility(.hidden, for: .tabBar)` and it never drew. #376 moved `.badge` first, and the device confirmed the fix.
+- Items 1–5, including the step 3 materialize result, are still owed.
+
 ### Done when
 
 - The PR has merged and the checks in Verification are green. The PR names the badge's cause (item 0).
