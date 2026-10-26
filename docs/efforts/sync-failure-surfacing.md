@@ -7,7 +7,9 @@ which is the whole library, and the iPhone reports the same state.** Slices 3–
 diagnose, then fix (added 2026-10-22). Slice 3 shipped (jon-platform #82, yes-chef #361), and its readout
 (2026-10-23) specified Slice 4: rows rewritten with unchanged values look unsent to the date leg. Slice 4 shipped
 (jon-platform #83, yes-chef #363). Its readout showed the iPad really failing to upload about 300 rows, and Bulgogi
-then showed lost deletes leaving duplicate steps on the iPhone. Slice 5 (added 2026-10-23) finds those deletes.
+then showed lost deletes leaving duplicate steps on the iPhone. Slice 5 (added 2026-10-23) finds those deletes,
+and shipped (jon-platform #84, yes-chef #366). By 2026-10-26 Retry had cleared every real stuck row. Slice 6
+(added 2026-10-26) clears the 20 `categorySeedStates` rows a dropped table left behind.
 Summary: The sync row said "Up to date" for weeks while nine recipes had never uploaded. `CloudSyncKit` gains a
 "not synced" signal: rows that never reached the server, and rows from the server that couldn't be applied here.
 "Up to date" now requires both to be zero, and Yes Chef's sync detail lists them by name with a Retry. Two PRs:
@@ -347,6 +349,87 @@ Beef Bulgogi's old flat instruction section and steps are listed, unless they we
 iPhone, plus any other recipe restructured on the iPad since July. Confirm the delete. Then, on the iPhone,
 check that those recipes show each step once. Run the check again on the iPad: it should list nothing except the
 separately counted unregistered types.
+
+### Done when
+
+Both PRs are merged and green, `DONE-LOG.md` has the entry, `NEXT_UP.md` is advanced, and the pass is in
+`device-passes.md`.
+
+## Slice 6 — Clear out the rows of retired synced tables
+
+**What's left (2026-10-26).** With the iPad on Console, Retry cleared every real stuck row; no `Save failed`
+line was ever captured, so the original cause stays unknown. Both devices still show 20 unsynced
+`categorySeedStates` rows, and Sync can't read "Up to date" while they're there.
+
+**Why they can never sync.** ADR-0049 Amendment 2 (`54c1658`) removed `CategorySeedState` and
+`CategorySeedTombstone` from `makeSyncEngine` and dropped both tables in the "Promote category namespaces to facets"
+migration. That migration ran before the engine, so SQLiteData's metadata rows for the 20 seed states were never
+cleaned up (the reverse of the migration-writes-bypass-triggers trap). The 20 records also remain in
+iCloud. Each part keeps the count up:
+- **The report counts them.** An unrecognized `recordType` counts as unsent by design ("when in doubt, count it",
+  Slice 4).
+- **Retry can't send them.** SQLiteData drops a queued save whose table it doesn't know (`nextRecordZoneChangeBatch`,
+  the `missingTable` branch).
+- **A fresh device re-creates the problem.** Fetching an unknown type still inserts a metadata row
+  (`upsertFromServerRecord`), so a new install would show the same 20.
+
+### Build
+
+1. **jon-platform `CloudSyncKit` (additive).**
+   - **`CloudSync.purgeRetiredRecordTypes(_:tables:in:client:)`.** It takes the retired record type names, the
+     app's `SyncedTables`, the database, and Slice 5's `CloudSyncLeftoverClient`.
+     - **Refuse a registered type.** If a retired name is also in `SyncedTables`, throw before doing anything.
+     - **Delete in iCloud first.** Read the metadata rows for the retired types (`recordName`, `zoneName`,
+       `ownerName`), and delete those record IDs through `client.deleteRecords` in batches of 200, the same path as
+       Slice 5.
+     - **Then delete the metadata rows.** Only for IDs whose iCloud delete succeeded, or came back as already gone
+       (`unknownItem`). To tell those apart, `CloudSyncDeleteFailure` gains an additive `code` (or an
+       `isAlreadyGone` flag); today it carries only a description.
+     - **Why the direct metadata delete is safe here.** It's the one write to SQLiteData's metadata this effort
+       allows, and it's inert. No trigger fires on a metadata `DELETE` (`Triggers.swift`, `callbackTriggers`
+       creates insert, zone-update, update, and soft-delete triggers only). It's also exactly what SQLiteData does
+       itself when it fetches a deletion for a type it doesn't recognize (`handleFetchedRecordZoneChanges`, the
+       "table we do not currently recognize" branch). That branch is also why other devices clean themselves up
+       once one device deletes the iCloud records.
+     - Leave metadata rows whose iCloud delete failed for any other reason, and report them.
+     - It's idempotent: a second run finds nothing and makes no network call. The result has counts per type, plus
+       failures.
+   - **Tests** against the Slice 5 fake:
+     - deletes iCloud first, then the metadata;
+     - `unknownItem` counts as done;
+     - any other failure keeps the metadata row;
+     - a registered type throws;
+     - a second run is a no-op with no client calls;
+     - metadata rows of registered types are never touched.
+   - **House doc.** Add a short "Retiring a synced table" paragraph to `docs/ios/persistence-and-sync.md`.
+     Removing a table from the engine means listing it as retired, so its metadata and iCloud records get
+     purged; dropping it in a migration alone strands them.
+2. **Yes Chef.**
+   - Add `YesChefCloudSync.retiredRecordTypes = ["categorySeedStates", "categorySeedTombstones"]`, with a comment
+     carrying the rule above. A test asserts it shares no name with `syncedTables`.
+   - **Run the purge after sync starts.** Find where the app sees a successful start (the place that handles
+     `CloudSync.StartResult`). Run the purge in the background when the engine is running and nothing is pending.
+     It needs no confirmation: these record types have no consumer, and the purge never touches a registered table.
+   - Log the summary through `AppLog.dataIntegrity`, but only when something was deleted or failed. A failure
+     stays visible as before, because the rows still count, and the next launch tries again.
+
+**Out of scope:**
+- Changing how the report treats unknown types. Once the purge has run they're gone. A type that turns up
+  unexpectedly should still count.
+- The `categories` table and its starter rows (ADR-0049 Amendment 1's remaining work).
+- Any SQLiteData fork or trigger change.
+
+### Verification
+
+`CloudSyncKit` tests in the jon-platform PR. In Yes Chef: `scripts/check-drift.sh`, the elevated generic iOS build,
+and `YesChefTests`.
+
+### Jon's pass
+
+Install on the iPad, launch with sync on, and wait for it to go idle. Sync should read "Up to date". Then open the
+iPhone (on the old build is fine). Once it has fetched, it should drop to "Up to date" too, because SQLiteData
+clears the unknown-type rows on the fetched deletions. On the iPad, run Slice 5's **Check iCloud for leftovers**:
+the separately counted unregistered types should no longer include `categorySeedStates`.
 
 ### Done when
 
