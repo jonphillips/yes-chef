@@ -1,7 +1,7 @@
 # Effort — Chat access over MCP
 
 Status: Designed 2026-10-21. S0 shipped (#357) and its device pass cleared 2026-10-22: D2 stands (§ S0 results).
-S1 shipped (#359) and its device pass cleared 2026-10-23. **S2 is queued after sync-failure-surfacing Slice 5 and automatic-backups S1** (backups dispatched first, 2026-10-25),
+S1 shipped (#359) and its device pass cleared 2026-10-23. **S2 is dispatched 2026-10-26**, after sync-failure-surfacing Slice 6 and automatic-backups S1,
 and it starts with S1's one defect, the Create Recipe badge that never rendered. S2 carries the one unproven
 mechanism (reading an evicted file on the Mac). Schema-free throughout.
 Summary: Make Yes Chef the second consumer of jon-platform ADR-0007, so ChatGPT can stage a recipe into Yes Chef
@@ -19,7 +19,7 @@ ops) · vinyl-fever `docs/milestones/M12-library-context-mcp.md` (the first cons
 - **S1 — `stage_recipe` and the app's inbox** (ADR-0060 D3, D5, D6). [§ S1](#s1--stage_recipe-and-the-apps-inbox).
   Shipped (#359); device pass cleared 2026-10-23.
 - **S2 — The export and the read tools** (ADR-0060 D4, D6), plus the S1 badge fix.
-  [§ S2](#s2--the-export-and-the-read-tools). Queued after sync-failure-surfacing Slice 5.
+  [§ S2](#s2--the-export-and-the-read-tools). Dispatched 2026-10-26.
 - **S3 — Returns that target an existing recipe.** This waits on ADR-0060 OQ3.
 
 ## S0 — Probe the transport
@@ -368,6 +368,14 @@ pasting one in. Specified 2026-10-22; queued after sync-failure-surfacing Slice 
    needs a different mechanism before anything builds on it.
 4. Background the iPad app so it writes its own export. The tools report whichever export is newest.
 5. Call `get_recipe` with a ref from before step 4. It returns the older-export error.
+
+### Done when
+
+- The PR has merged and the checks in Verification are green. The PR names the badge's cause (item 0).
+- The completing PR adds the `DONE-LOG.md` entry, lists the device pass in `device-passes.md` with the **Owed**
+  pointer, and sets `NEXT_UP.md` to `Nothing dispatched.`, because S3 waits on ADR-0060 OQ3.
+- After Jon's pass, the architect records the step 3 materialize result here. If step 3 failed, the read path is
+  re-planned before anything builds on the export.
 
 ## Constants register
 
