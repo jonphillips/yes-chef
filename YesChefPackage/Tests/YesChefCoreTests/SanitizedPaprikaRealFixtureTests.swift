@@ -159,12 +159,8 @@ extension RecipeCoreTests {
           instructionSteps: 7,
           recipeNotes: 0,
           recipePhotos: 2,
-          tags: 0,
           categories: 5,
-          equipment: 0,
-          recipeTags: 0,
-          recipeCategories: 5,
-          recipeEquipment: 0
+          recipeCategories: 5
         )
       )
       expectNoDifference(countsAfterSecondImport, countsAfterFirstImport)
@@ -212,12 +208,8 @@ private struct SanitizedRealFixtureEntityCounts: Equatable {
   var instructionSteps: Int
   var recipeNotes: Int
   var recipePhotos: Int
-  var tags: Int
   var categories: Int
-  var equipment: Int
-  var recipeTags: Int
   var recipeCategories: Int
-  var recipeEquipment: Int
 
   static func fetch(in db: Database) throws -> Self {
     Self(
@@ -230,12 +222,8 @@ private struct SanitizedRealFixtureEntityCounts: Equatable {
       instructionSteps: try InstructionStep.fetchAll(db).count,
       recipeNotes: try RecipeNote.fetchAll(db).count,
       recipePhotos: try RecipePhoto.fetchAll(db).count,
-      tags: try Tag.fetchAll(db).count,
       categories: try YesChefCore.Category.fetchAll(db).count,
-      equipment: try Equipment.fetchAll(db).count,
-      recipeTags: try RecipeTag.fetchAll(db).count,
-      recipeCategories: try RecipeCategory.fetchAll(db).count,
-      recipeEquipment: try RecipeEquipment.fetchAll(db).count
+      recipeCategories: try RecipeCategory.fetchAll(db).count
     )
   }
 }

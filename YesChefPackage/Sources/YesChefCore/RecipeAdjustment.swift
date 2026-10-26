@@ -184,8 +184,6 @@ public struct RecipeAdjustmentProposal: Codable, Equatable, Sendable {
       photos: detail.photos,
       categories: detail.categories,
       categoryDisplayNames: detail.categoryDisplayNames,
-      equipment: detail.equipment,
-      recipeEquipment: detail.recipeEquipment,
       serveWith: detail.serveWith
     )
     return RecipeVariationResolution(detail: resolvedDetail, unresolvedAnchors: unresolvedAnchors)
@@ -1529,9 +1527,7 @@ extension RecipeRepository {
       categoryNames: detail.categoryDisplayNames,
       // Snapshots strip image bytes anyway (leanSnapshotPhotos); the restore path
       // never re-writes photo rows, so a metadata-only conversion is faithful.
-      photos: detail.photos.map(\.leanRecipePhoto),
-      equipment: detail.equipment,
-      recipeEquipment: detail.recipeEquipment
+      photos: detail.photos.map(\.leanRecipePhoto)
     )
   }
 
@@ -1594,8 +1590,6 @@ extension RecipeRepository {
       prepTimeMinutes: detail.recipe.prepTimeMinutes,
       cookTimeMinutes: detail.recipe.cookTimeMinutes,
       totalTimeMinutes: detail.recipe.totalTimeMinutes,
-      activeTimeMinutes: detail.recipe.activeTimeMinutes,
-      restTimeMinutes: detail.recipe.restTimeMinutes,
       cuisine: detail.recipe.cuisine,
       course: detail.recipe.course,
       difficulty: detail.recipe.difficulty,
@@ -1641,7 +1635,7 @@ extension RecipeRepository {
           id: uuid(), recipeID: recipeID, sectionID: ingredientSectionIDs[line.sectionID]!,
           originalText: line.originalText, quantity: line.quantity, quantityText: line.quantityText,
           unit: line.unit, item: line.item, canonicalName: line.canonicalName, preparation: line.preparation,
-          comment: line.comment, isOptional: line.isOptional, shoppingCategory: line.shoppingCategory,
+          comment: line.comment, isOptional: line.isOptional,
           doNotShop: line.doNotShop, isHeader: line.isHeader, sortOrder: line.sortOrder,
           confidence: line.confidence
         )
@@ -1670,7 +1664,7 @@ extension RecipeRepository {
       try RecipeNote.insert {
         RecipeNote(
           id: uuid(), recipeID: recipeID, text: note.text, noteType: note.noteType,
-          dateCreated: now, dateModified: now, cookingSessionID: nil, pinned: note.pinned
+          dateCreated: now, dateModified: now, pinned: note.pinned
         )
       }
       .execute(db)
@@ -1692,12 +1686,6 @@ extension RecipeRepository {
     for category in detail.categories {
       try RecipeCategory.insert {
         RecipeCategory(id: uuid(), recipeID: recipeID, categoryID: category.id)
-      }
-      .execute(db)
-    }
-    for join in detail.recipeEquipment {
-      try RecipeEquipment.insert {
-        RecipeEquipment(id: uuid(), recipeID: recipeID, equipmentID: join.equipmentID, notes: join.notes)
       }
       .execute(db)
     }
@@ -1725,9 +1713,7 @@ extension RecipeRepository {
           kind: photo.kind, caption: photo.caption, source: photo.source, sortOrder: photo.sortOrder,
           dateCreated: photo.dateCreated
         )
-      },
-      equipment: savedDetail.equipment,
-      recipeEquipment: savedDetail.recipeEquipment
+      }
     )
     try Recipe.find(recipeID).update { $0.originalSnapshot = #bind(snapshot) }.execute(db)
     return recipeID
@@ -2224,7 +2210,6 @@ private extension IngredientLine {
     )
     replacement.sortOrder = sortOrder
     replacement.comment = comment
-    replacement.shoppingCategory = shoppingCategory
     return replacement
   }
 }

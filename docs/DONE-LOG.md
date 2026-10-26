@@ -9,6 +9,16 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Drop never-set columns and retired tags/equipment (`effort/prod-never-set-drop`)
+
+**2026-10-26. Synced schema, version 54; escalated to Jon.** One appended migration removes the seven never-set
+columns and the `equipment`, `recipeEquipment`, `tags`, and `recipeTags` tables. The persisted models, readers,
+bundle paths, and dormant every-launch tag fold no longer carry those records. The migration regression preserves
+recipes, categories, and recipe/category links while dropping populated legacy tag tables. Lint, 727 package tests,
+the elevated generic iOS build, and all 84 `YesChefTests` passed. The two-device check is owed in
+[`device-passes.md`](device-passes.md).
+
+---
 ## Chat access over MCP — S2 export and read tools (`effort/chat-access-mcp-s2`)
 
 **2026-10-26. Schema-free.** Yes Chef writes a text-only, versioned library export per installation and exposes recipe search/detail, menu list/detail, and meal-plan read tools from the newest iCloud Drive export. Reads materialize the selected export with a bounded coordinated read and return export age; references expire when that file changes. Settings adds Chat Access export status and Refresh. The Create Recipe badge's cause was modifier order: `.badge` now precedes `.defaultVisibility(.hidden, for: .tabBar)`, and the badge showed on device 2026-10-26. Lint, core and helper tests, the generic iOS build, and `YesChefTests` pass. The export and the Mac iCloud materialization pass remain owed in `device-passes.md`.

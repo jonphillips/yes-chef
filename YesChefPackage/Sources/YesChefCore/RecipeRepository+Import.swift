@@ -126,12 +126,8 @@ public struct RecipeImportRollbackResult: Equatable, Sendable {
   public var instructionSteps: Int
   public var recipeNotes: Int
   public var recipePhotos: Int
-  public var tags: Int
   public var categories: Int
-  public var equipment: Int
-  public var recipeTags: Int
   public var recipeCategories: Int
-  public var recipeEquipment: Int
 
   public init(
     recipes: Int = 0,
@@ -143,12 +139,8 @@ public struct RecipeImportRollbackResult: Equatable, Sendable {
     instructionSteps: Int = 0,
     recipeNotes: Int = 0,
     recipePhotos: Int = 0,
-    tags: Int = 0,
     categories: Int = 0,
-    equipment: Int = 0,
-    recipeTags: Int = 0,
-    recipeCategories: Int = 0,
-    recipeEquipment: Int = 0
+    recipeCategories: Int = 0
   ) {
     self.recipes = recipes
     self.recipeSources = recipeSources
@@ -159,12 +151,8 @@ public struct RecipeImportRollbackResult: Equatable, Sendable {
     self.instructionSteps = instructionSteps
     self.recipeNotes = recipeNotes
     self.recipePhotos = recipePhotos
-    self.tags = tags
     self.categories = categories
-    self.equipment = equipment
-    self.recipeTags = recipeTags
     self.recipeCategories = recipeCategories
-    self.recipeEquipment = recipeEquipment
   }
 }
 
@@ -282,8 +270,6 @@ extension RecipeRepository {
       .filter { existingRecipeIDs.contains($0.recipeID) }
     let recipeCategories = try RecipeCategory.fetchAll(db)
       .filter { existingRecipeIDs.contains($0.recipeID) }
-    let recipeEquipment = try RecipeEquipment.fetchAll(db)
-      .filter { existingRecipeIDs.contains($0.recipeID) }
     let categoryIDs = Set(recipeCategories.map(\.categoryID))
     let linkedCategories = try Category.fetchAll(db)
       .filter { categoryIDs.contains($0.id) }
@@ -310,14 +296,8 @@ extension RecipeRepository {
       instructionSteps: instructionSteps.count,
       recipeNotes: recipeNotes.count,
       recipePhotos: recipePhotos.count,
-      tags: 0,
       categories: deletedCategoryCount,
-      // Equipment has no batch-provenance column. Preserve orphaned equipment until an
-      // importer actually creates it and can prove which rows belong to an undo batch.
-      equipment: 0,
-      recipeTags: 0,
-      recipeCategories: recipeCategories.count,
-      recipeEquipment: recipeEquipment.count
+      recipeCategories: recipeCategories.count
     )
   }
 
@@ -414,9 +394,7 @@ extension RecipeRepository {
         notes: bundle.recipeNotes,
         tagNames: bundle.tagNames,
         categoryNames: bundle.categoryNames,
-        photos: bundle.photos,
-        equipment: bundle.equipment,
-        recipeEquipment: bundle.recipeEquipment
+        photos: bundle.photos
       )
     }
 
@@ -440,12 +418,6 @@ extension RecipeRepository {
     }
     for photo in bundle.photos {
       try RecipePhoto.upsert { photo }.execute(db)
-    }
-    for equipment in bundle.equipment {
-      try Equipment.upsert { equipment }.execute(db)
-    }
-    for recipeEquipment in bundle.recipeEquipment {
-      try RecipeEquipment.upsert { recipeEquipment }.execute(db)
     }
 
     try reconcileCategories(
@@ -605,9 +577,7 @@ extension RecipeRepository {
     if try InstructionStep.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
     if try RecipeNote.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
     if try RecipePhoto.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
-    if try RecipeTag.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
     if try RecipeCategory.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
-    if try RecipeEquipment.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
     if try RecipeVariation.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
     if try RecipeActiveVariation.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
     if try RecipeDeliberationLogEntry.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }

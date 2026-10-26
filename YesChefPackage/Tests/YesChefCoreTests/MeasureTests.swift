@@ -89,7 +89,6 @@ extension RecipeCoreTests {
               quantityText: "8",
               unit: "oz",
               item: "cheddar",
-              shoppingCategory: "Dairy",
               sortOrder: 0
             )
           ],
@@ -110,7 +109,6 @@ extension RecipeCoreTests {
               quantityText: "1",
               unit: "lb",
               item: "cheddar",
-              shoppingCategory: "Dairy",
               sortOrder: 0
             )
           ],
@@ -176,7 +174,6 @@ extension RecipeCoreTests {
               quantityText: "1",
               unit: "cup",
               item: "sugar",
-              shoppingCategory: "Baking",
               sortOrder: 0
             )
           ],
@@ -197,7 +194,6 @@ extension RecipeCoreTests {
               quantityText: "1",
               unit: "lb",
               item: "sugar",
-              shoppingCategory: "Baking",
               sortOrder: 0
             )
           ],
@@ -218,7 +214,6 @@ extension RecipeCoreTests {
               quantityText: "1",
               unit: "splash",
               item: "wine",
-              shoppingCategory: "Wine",
               sortOrder: 0
             )
           ],
@@ -239,7 +234,6 @@ extension RecipeCoreTests {
               quantityText: "1",
               unit: "splash",
               item: "wine",
-              shoppingCategory: "Wine",
               sortOrder: 0
             )
           ],

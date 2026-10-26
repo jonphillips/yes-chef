@@ -146,7 +146,6 @@ extension RecipeCoreTests {
             sectionID: sectionID,
             originalText: "1 cup cream",
             canonicalName: "heavy cream",
-            shoppingCategory: "Dairy",
             doNotShop: true,
             sortOrder: 1
           )
@@ -164,7 +163,6 @@ extension RecipeCoreTests {
         let cream = try #require(saved.ingredientLines.first { $0.id == creamID })
         expectNoDifference(cream.sectionID, SampleUUIDSequence.uuid(71_500))
         expectNoDifference(cream.canonicalName, "heavy cream")
-        expectNoDifference(cream.shoppingCategory, "Dairy")
         expectNoDifference(cream.doNotShop, true)
         expectNoDifference(saved.ingredientLines.map(\.id).contains(creamID), true)
 

@@ -256,8 +256,6 @@ extension RecipeCoreTests {
       let cookStepID = SampleUUIDSequence.uuid(31_609)
       let sourceID = SampleUUIDSequence.uuid(31_610)
       let photoID = SampleUUIDSequence.uuid(31_611)
-      let tagID = SampleUUIDSequence.uuid(31_612)
-      let recipeTagID = SampleUUIDSequence.uuid(31_613)
       let categoryID = SampleUUIDSequence.uuid(31_614)
       let recipeCategoryID = SampleUUIDSequence.uuid(31_615)
       let generalNoteID = SampleUUIDSequence.uuid(31_616)
@@ -316,8 +314,6 @@ extension RecipeCoreTests {
           RecipePhoto(id: photoID, recipeID: recipeID, imageDataReference: "recipePhotos/\(photoID.uuidString)", displayData: Data([1]), sortOrder: 0, dateCreated: now)
         }
         .execute(db)
-        try Tag.insert { Tag(id: tagID, name: "Dinner", sortOrder: 0, dateCreated: now) }.execute(db)
-        try RecipeTag.insert { RecipeTag(id: recipeTagID, recipeID: recipeID, tagID: tagID, sortOrder: 0) }.execute(db)
         try Category.insert { Category(id: categoryID, name: "Chicken", sortOrder: 0, dateCreated: now) }.execute(db)
         try RecipeCategory.insert { RecipeCategory(id: recipeCategoryID, recipeID: recipeID, categoryID: categoryID) }.execute(db)
       }

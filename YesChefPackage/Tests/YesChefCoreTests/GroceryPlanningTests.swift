@@ -37,7 +37,6 @@ extension RecipeCoreTests {
               quantity: 3,
               quantityText: "3",
               item: "carrots",
-              shoppingCategory: "Produce",
               sortOrder: 0,
               confidence: .medium
             )
@@ -149,7 +148,6 @@ extension RecipeCoreTests {
               quantityText: "2",
               unit: "cans",
               item: "beans",
-              shoppingCategory: "Pantry",
               sortOrder: 0,
               confidence: .medium
             )

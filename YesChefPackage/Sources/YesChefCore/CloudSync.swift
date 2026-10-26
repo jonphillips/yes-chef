@@ -27,7 +27,7 @@ public enum YesChefCloudSync {
     preRestoreFilenamePrefix: "YesChef-PreRestore-",
     restoreStagingFilenamePrefix: "YesChef-Restore-",
     identifyingTableNames: ["recipes"],
-    declaredSchemaVersion: 53,
+    declaredSchemaVersion: 54,
     lastPreRestoreDefaultsKey: "YesChefDatabaseBackupLastPreRestorePath",
     cloudSync: configuration,
     liveStoreURL: { try YesChefDatabaseStorage.liveSharedDatabaseURL() },
@@ -57,8 +57,8 @@ public enum YesChefCloudSync {
   public static let syncedTables = SyncedTables(
     Recipe.self, RecipeSource.self, IngredientSection.self, IngredientLine.self,
     InstructionSection.self, InstructionStep.self, RecipeNote.self, RecipeServeWith.self,
-    RecipePhoto.self, Tag.self, Facet.self, Category.self, Equipment.self, RecipeTag.self,
-    RecipeCategory.self, RecipeEquipment.self, RecipeImportRef.self, MealPlanItem.self,
+    RecipePhoto.self, Facet.self, Category.self,
+    RecipeCategory.self, RecipeImportRef.self, MealPlanItem.self,
     Menu.self, MenuItem.self, MenuPlacement.self, PrepPlanStepRecord.self, Workbench.self,
     WorkbenchCandidate.self, WorkbenchLogEntry.self, WorkbenchReference.self,
     RecipeVariation.self, RecipeRelatedRecipe.self, RecipeDeliberationLogEntry.self,
@@ -68,7 +68,7 @@ public enum YesChefCloudSync {
 
   /// These types were removed from the engine. Purge their CloudKit records and
   /// SQLiteData metadata; never include a type that remains in `syncedTables`.
-  public static let retiredRecordTypes = ["categorySeedStates", "categorySeedTombstones"]
+  public static let retiredRecordTypes = ["categorySeedStates", "categorySeedTombstones", "tags", "recipeTags"]
 
   // SQLiteData can begin its automatic initial fetch just after start returns. Polling
   // once per second and requiring two idle snapshots lets that fetch become observable;
@@ -315,13 +315,9 @@ public enum YesChefCloudSync {
         RecipeNote.self,
         RecipeServeWith.self,
         RecipePhoto.self,
-        Tag.self,
         Facet.self,
         Category.self,
-        Equipment.self,
-        RecipeTag.self,
         RecipeCategory.self,
-        RecipeEquipment.self,
         RecipeImportRef.self,
         MealPlanItem.self,
         Menu.self,

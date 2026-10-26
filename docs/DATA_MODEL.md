@@ -12,7 +12,7 @@ The model should support:
 * Ingredient parsing
 * Instruction organization
 * Notes
-* Tags and categories
+* Categories, including imported source tag labels
 * Search
 * Scaling
 * Cooking mode
@@ -141,14 +141,13 @@ share-accept flow for normal use.
 columns/tables on your own recipes. No per-cook "opinion" rows, no attribution columns
 inside a library — there is only one person in it (you).
 * Relationships are ordinary. With nothing shared, there is no single-FK sharing
-constraint: join tables (RecipeTag, RecipeCategory, RecipeEquipment) hold real foreign
-keys to both sides. Model relationships the normal relational way.
+constraint: RecipeCategory holds the recipe/category association.
 * UUID primary keys everywhere, still. CloudKit private-DB sync requires them, and
 they make transfer clean — an imported copy is re-keyed with fresh UUIDs so it can
 never collide with the original.
 * Dedup-on-read still applies, narrowly. Two of your OWN devices, both offline, can
-each insert a name-unique row (e.g. a Tag "grill"). Keep UUID PKs + a code-level
-upsert + dedup-on-read (lowest UUID wins) for name-unique entities (Tag, Category).
+each insert a name-unique row (e.g. a Category "grill"). Keep UUID PKs + a code-level
+upsert + dedup-on-read (lowest UUID wins) for name-unique entities (Category).
 Lower stakes than a multi-person share, but the race still exists; seed duplicates in
 tests.
 
@@ -158,8 +157,7 @@ Phase 1 — Send a copy (no shared infrastructure). "Send recipe" serializes the
 and its children — sections, lines, instructions, notes, photos, plus its tag/category
 NAMES — into a self-contained bundle (a .yeschef file or a universal link) handed to
 the system share sheet (Messages, AirDrop, …). The recipient opens it and IMPORTS: the
-bundle is rebuilt as new rows with fresh UUIDs in their private library. Tags and
-categories are matched by name to the recipient's own (find-or-create) or dropped —
+bundle is rebuilt as new rows with fresh UUIDs in their private library. Category names are matched by name to the recipient's own (find-or-create) or dropped —
 the recipient's organization wins. The sender's name can ride along as a plain string
 ("from Dad") for provenance; it is not a synced entity.
 
@@ -174,22 +172,20 @@ would force. Design it once the private library and Phase-1 send are solid.
 
 No new shared entities. There is no Household, Cook, RecipeOpinion, or
 RecipeSuggestedTag — those existed only to make a co-edited shared library survive
-CloudKit. favorite and rating are plain columns on Recipe; tags and categories are
+CloudKit. favorite and rating are plain columns on Recipe; categories are
 your own ordinary entities; provenance ("from Dad") is a plain string captured on
 import.
 
 Join entities (ordinary many-to-many, real FKs to both sides — nothing is shared):
 
-  RecipeTag        { id, recipeID, tagID, sortOrder }
   RecipeCategory   { id, recipeID, categoryID }
-  RecipeEquipment  { id, recipeID, equipmentID, notes: String? }
 
 The transfer payload (shared by both transfer phases). A recipe bundle is a
 self-contained snapshot: the Recipe plus its IngredientSections/Lines,
 InstructionSections/Steps, RecipeNotes, RecipePhotos (or photo references), and its
-tag/category NAMES (strings, not IDs — IDs are local to a library). On import,
+category names (including imported source tag labels) (strings, not IDs — IDs are local to a library). On import,
 everything is re-keyed with fresh UUIDs and names are reconciled against the
-recipient's own tags/categories (find-or-create). source is
+recipient's own categories (find-or-create). source is
 preserved — transfer is just another import path (see §29).
 
 Adjustments to entities defined elsewhere in this document:
@@ -201,8 +197,7 @@ plain field too. Calendar-derived cooking history is not persisted on Recipe.
 both are ordinary foreign keys now (no sharing-tree constraint).
 * RecipeNote, CookingSession, etc. carry no Cook attribution columns; everything in a
 library belongs to its single owner.
-* Tag, Category, Equipment are ordinary local entities; their recipe links are the
-join entities above, with real FKs to both sides. No householdID, no privateTables
+* Category is an ordinary local entity; recipe links use RecipeCategory, with real FKs to both sides. No householdID, no privateTables
 exception — the whole library is private already.
 
 MVP note: build the private library first — a single-user app whose data syncs across
@@ -224,13 +219,9 @@ InstructionSection
 InstructionStep
 RecipeNote
 RecipePhoto
-Tag
 Category
-Equipment
-RecipeTag
-RecipeCategory
-RecipeEquipment
-CookingSession
+RecipeRecipeCategory
+RecipeCookingSession
 MealPlanEntry
 ShoppingList
 ShoppingListItem
@@ -251,13 +242,9 @@ InstructionSection
 InstructionStep
 RecipeNote
 RecipePhoto
-Tag
 Category
-Equipment
-RecipeTag
-RecipeCategory
-RecipeEquipment
-
+RecipeRecipeCategory
+Recipe
 MVP 2+ entities:
 
 ImportJob
@@ -313,15 +300,11 @@ yieldText: String?
 prepTimeMinutes: Int?
 cookTimeMinutes: Int?
 totalTimeMinutes: Int?
-activeTimeMinutes: Int?
-restTimeMinutes: Int?
 ingredientSections: [IngredientSection]
 instructionSections: [InstructionSection]
 notes: [RecipeNote]
 photos: [RecipePhoto]
-tags: [Tag]
 categories: [Category]
-equipment: [Equipment]
 cuisine: String?
 course: String?
 difficulty: RecipeDifficulty?
@@ -416,8 +399,6 @@ Examples:
 prepTimeMinutes: 30
 cookTimeMinutes: 90
 totalTimeMinutes: 150
-activeTimeMinutes: 45
-restTimeMinutes: 20
 
 Imported recipes may have only vague time data. Do not force all fields.
 
@@ -630,7 +611,6 @@ item: String?
 preparation: String?
 comment: String?
 isOptional: Bool
-shoppingCategory: String?
 doNotShop: Bool
 isHeader: Bool
 sortOrder: Int
@@ -736,20 +716,6 @@ shadowing Swift's Optional.)
 
 Can be inferred from text but should be user-editable.
 
-shoppingCategory
-
-User-facing grocery grouping.
-
-Examples:
-
-Produce
-Meat
-Seafood
-Dairy
-Dry Goods
-Condiments
-Spices
-Frozen
 Bakery
 Alcohol
 
@@ -951,7 +917,6 @@ text: String
 noteType: RecipeNoteType
 dateCreated: Date
 dateModified: Date
-cookingSessionID: UUID?
 pinned: Bool
 
 10.3 Note Types
@@ -1035,45 +1000,7 @@ reference string. Imported external paths belong in provenance fields such as
 Production import/user-photo features should preserve readability for
 recipe-reference photos.
 
-12. Tag
-
-12.1 Purpose
-
-Flexible user-defined metadata.
-
-Tags are for cross-cutting concepts.
-
-Examples:
-
-beach
-make-ahead
-freezer-friendly
-grill
-sous-vide
-wok
-dinner-party
-weeknight
-company
-low-carb
-summer
-
-12.2 Fields
-
-id: UUID
-name: String
-color: String?
-sortOrder: Int
-dateCreated: Date
-
-12.3 Rules
-
-* Tags are your own — the whole library is private (§2.6), so a tag vocabulary belongs
-to its single owner. When you send a recipe, its tag NAMES travel in the payload and
-the recipient reconciles them against their own tags (find-or-create) on import.
-* The recipe↔tag link is the RecipeTag join entity (real FKs to both sides).
-* Tags are many-to-many with recipes.
-* Tags should be user-editable.
-* Tags should not be forced into a rigid taxonomy.
+Source tag labels are imported as categories; there is no separate persisted Tag model.
 
 13. Category
 
@@ -1129,8 +1056,7 @@ and re-parent workflows.
 * Categories should not be the primary model for known facets that deserve typed
 fields, including source, author, cuisine, course, and library placement. See
 ADR-0006.
-* Tags remain flat and cross-cutting; do not recreate Paprika-style parent/child
-tags in the Tag model.
+* Imported source tag labels are stored as categories.
 * Paprika `.paprikarecipes` exports observed so far preserve flat category names per
 recipe but not the global parent/child category tree, so category hierarchy may need
 manual reconstruction or a separate source of truth.
@@ -1141,44 +1067,6 @@ Categories are user/library data, not built-in constants. Import can create cate
 from source labels, and future UI should allow creating, renaming, merging, deleting,
 and re-parenting categories. The app may ship suggestions or templates later, but the
 owner's library taxonomy wins.
-
-14. Equipment
-
-14.1 Purpose
-
-Represents cooking equipment associated with a recipe.
-
-14.2 Fields
-
-id: UUID
-name: String
-equipmentType: String?
-notes: String?
-
-14.3 Examples
-
-oven
-grill
-gas grill
-charcoal grill
-wok burner
-sous vide
-Dutch oven
-sheet pan
-food processor
-blender
-stand mixer
-rice cooker
-vacuum sealer
-
-14.4 Future Use
-
-Equipment can later support:
-
-* Filtering recipes
-* Cooking-plan conflict detection
-* Prep planning
-* “Can I cook this at the beach house?” evaluation
 
 15. CookingSession
 
@@ -1736,13 +1624,10 @@ Search should eventually cover:
 * Parsed ingredient item
 * Instruction text
 * Notes
-* Tags
 * Categories
 * Cuisine
 * Course
-* Equipment
-
-MVP search can be simple full-text filtering across recipe title, ingredients, instructions, notes, tags, and categories.
+MVP search can be simple full-text filtering across recipe title, ingredients, instructions, notes, and categories.
 
 27. Scaling Requirements
 
@@ -1958,13 +1843,9 @@ InstructionSection
 InstructionStep
 RecipeNote
 RecipePhoto
-Tag
 Category
-Equipment
-RecipeTag
-RecipeCategory
-RecipeEquipment
-
+RecipeRecipeCategory
+Recipe
 (A single owner's private library — no Household, Cook, or sharing entities. Recipe
 transfer between people is a separate feature, not part of the core schema. See §2.6.)
 
@@ -1997,7 +1878,7 @@ structs, one per table, related by UUID foreign keys. The nested arrays shown be
 composition of a recipe, not stored object graphs. They are materialized at read
 time via @FetchAll queries over the child tables (using the `recipeID`/`sectionID`
 FKs already defined on those entities) and join tables for the many-to-many links
-(recipe↔tag, recipe↔category, recipe↔equipment). Do not model these as stored
+(recipe↔category). Do not model these as stored
 nested collections on a `@Model` class — that is the SwiftData/Core Data shape this
 stack deliberately avoids.
 
@@ -2013,15 +1894,11 @@ struct Recipe: Identifiable {
     var prepTimeMinutes: Int?
     var cookTimeMinutes: Int?
     var totalTimeMinutes: Int?
-    var activeTimeMinutes: Int?
-    var restTimeMinutes: Int?
-    var ingredientSections: [IngredientSection]
+    var     var     var ingredientSections: [IngredientSection]
     var instructionSections: [InstructionSection]
     var notes: [RecipeNote]
-    var tags: [Tag]
-    var categories: [Category]
-    var equipment: [Equipment]
-    var cuisine: String?
+    var     var categories: [Category]
+    var     var cuisine: String?
     var course: String?
     var difficulty: RecipeDifficulty?
     var rating: Int?
@@ -2043,7 +1920,6 @@ struct IngredientLine: Identifiable {
     var preparation: String?
     var comment: String?
     var isOptional: Bool
-    var shoppingCategory: String?
     var doNotShop: Bool
     var isHeader: Bool
     var sortOrder: Int

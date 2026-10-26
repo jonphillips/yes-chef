@@ -542,30 +542,16 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func legacyTagDraftInputReconcilesIntoCategoriesWithoutTouchingDormantTagRows() throws {
+    func legacyTagDraftInputReconcilesIntoCategories() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 814_300_000)
       let recipeID = SampleUUIDSequence.uuid(34_001)
-      let tagID = SampleUUIDSequence.uuid(34_010)
-      let duplicateTagID = SampleUUIDSequence.uuid(34_011)
       let categoryID = SampleUUIDSequence.uuid(34_020)
       let duplicateCategoryID = SampleUUIDSequence.uuid(34_021)
 
       try database.write { db in
         try Recipe.insert {
           Recipe(id: recipeID, title: "Tagged Dinner", dateCreated: now, dateModified: now)
-        }
-        .execute(db)
-        try Tag.insert {
-          Tag(id: tagID, name: "Weeknight", sortOrder: 0, dateCreated: now)
-        }
-        .execute(db)
-        try Tag.insert {
-          Tag(id: duplicateTagID, name: "weeknight", sortOrder: 1, dateCreated: now.addingTimeInterval(60))
-        }
-        .execute(db)
-        try RecipeTag.insert {
-          RecipeTag(id: SampleUUIDSequence.uuid(34_012), recipeID: recipeID, tagID: duplicateTagID, sortOrder: 0)
         }
         .execute(db)
         try Category.insert {
@@ -597,15 +583,11 @@ extension RecipeCoreTests {
 
       let snapshot = try database.read { db in
         (
-          tags: try Tag.fetchAll(db),
-          recipeTagIDs: try RecipeTag.fetchAll(db).map(\.tagID),
           categories: try Category.fetchAll(db),
           recipeCategoryIDs: try RecipeCategory.fetchAll(db).map(\.categoryID)
         )
       }
-      expectNoDifference(Set(snapshot.tags.map(\.id)), [tagID, duplicateTagID])
-      expectNoDifference(Set(snapshot.recipeTagIDs), [duplicateTagID])
-      expectNoDifference(Set(snapshot.categories.map(\.id)), [categoryID, SampleUUIDSequence.uuid(34_100)])
+      expectNoDifference(Set(snapshot.categories.map(\.name)), ["Dinner", "Weeknight"])
       expectNoDifference(Set(snapshot.recipeCategoryIDs), [categoryID, SampleUUIDSequence.uuid(34_100)])
     }
   }

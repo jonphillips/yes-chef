@@ -13,8 +13,6 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
   public var prepTimeMinutes: Int?
   public var cookTimeMinutes: Int?
   public var totalTimeMinutes: Int?
-  public var activeTimeMinutes: Int?
-  public var restTimeMinutes: Int?
   public var cuisine: String?
   public var course: String?
   public var difficulty: RecipeDifficulty?
@@ -42,8 +40,6 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     prepTimeMinutes: Int? = nil,
     cookTimeMinutes: Int? = nil,
     totalTimeMinutes: Int? = nil,
-    activeTimeMinutes: Int? = nil,
-    restTimeMinutes: Int? = nil,
     cuisine: String? = nil,
     course: String? = nil,
     difficulty: RecipeDifficulty? = nil,
@@ -70,8 +66,6 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     self.prepTimeMinutes = prepTimeMinutes
     self.cookTimeMinutes = cookTimeMinutes
     self.totalTimeMinutes = totalTimeMinutes
-    self.activeTimeMinutes = activeTimeMinutes
-    self.restTimeMinutes = restTimeMinutes
     self.cuisine = cuisine
     self.course = course
     self.difficulty = difficulty
@@ -100,8 +94,6 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     case prepTimeMinutes
     case cookTimeMinutes
     case totalTimeMinutes
-    case activeTimeMinutes
-    case restTimeMinutes
     case cuisine
     case course
     case difficulty
@@ -132,8 +124,6 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
       prepTimeMinutes: try container.decodeIfPresent(Int.self, forKey: .prepTimeMinutes),
       cookTimeMinutes: try container.decodeIfPresent(Int.self, forKey: .cookTimeMinutes),
       totalTimeMinutes: try container.decodeIfPresent(Int.self, forKey: .totalTimeMinutes),
-      activeTimeMinutes: try container.decodeIfPresent(Int.self, forKey: .activeTimeMinutes),
-      restTimeMinutes: try container.decodeIfPresent(Int.self, forKey: .restTimeMinutes),
       cuisine: try container.decodeIfPresent(String.self, forKey: .cuisine),
       course: try container.decodeIfPresent(String.self, forKey: .course),
       difficulty: try container.decodeIfPresent(RecipeDifficulty.self, forKey: .difficulty),
@@ -152,7 +142,6 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     )
   }
 }
-
 public struct ServeWithItem: Codable, Identifiable, Equatable, Sendable {
   public var id: UUID
   public var title: String
@@ -259,8 +248,6 @@ public struct MealPlanItem: Codable, Identifiable, Equatable, Sendable {
   public var scheduledDate: Date
   public var mealSlot: MealPlanItemSlot
   public var notes: String?
-  public var startTime: Date?
-  public var endTime: Date?
   public var sortOrder: Int
   public var dateCreated: Date
   public var dateModified: Date
@@ -274,8 +261,6 @@ public struct MealPlanItem: Codable, Identifiable, Equatable, Sendable {
     scheduledDate: Date,
     mealSlot: MealPlanItemSlot,
     notes: String? = nil,
-    startTime: Date? = nil,
-    endTime: Date? = nil,
     sortOrder: Int,
     dateCreated: Date,
     dateModified: Date,
@@ -288,8 +273,6 @@ public struct MealPlanItem: Codable, Identifiable, Equatable, Sendable {
     self.scheduledDate = scheduledDate
     self.mealSlot = mealSlot
     self.notes = notes
-    self.startTime = startTime
-    self.endTime = endTime
     self.sortOrder = sortOrder
     self.dateCreated = dateCreated
     self.dateModified = dateModified
@@ -745,7 +728,6 @@ public struct IngredientLine: Codable, Identifiable, Equatable, Sendable {
   public var preparation: String?
   public var comment: String?
   public var isOptional: Bool
-  public var shoppingCategory: String?
   public var doNotShop: Bool
   public var isHeader: Bool
   public var sortOrder: Int
@@ -764,7 +746,6 @@ public struct IngredientLine: Codable, Identifiable, Equatable, Sendable {
     preparation: String? = nil,
     comment: String? = nil,
     isOptional: Bool = false,
-    shoppingCategory: String? = nil,
     doNotShop: Bool = false,
     isHeader: Bool = false,
     sortOrder: Int,
@@ -782,7 +763,6 @@ public struct IngredientLine: Codable, Identifiable, Equatable, Sendable {
     self.preparation = preparation
     self.comment = comment
     self.isOptional = isOptional
-    self.shoppingCategory = shoppingCategory
     self.doNotShop = doNotShop
     self.isHeader = isHeader
     self.sortOrder = sortOrder
@@ -845,7 +825,6 @@ public struct RecipeNote: Codable, Identifiable, Equatable, Sendable {
   public var noteType: RecipeNoteType
   public var dateCreated: Date
   public var dateModified: Date
-  public var cookingSessionID: UUID?
   public var pinned: Bool
 
   public init(
@@ -855,7 +834,6 @@ public struct RecipeNote: Codable, Identifiable, Equatable, Sendable {
     noteType: RecipeNoteType = .general,
     dateCreated: Date,
     dateModified: Date,
-    cookingSessionID: UUID? = nil,
     pinned: Bool = false
   ) {
     self.id = id
@@ -864,7 +842,6 @@ public struct RecipeNote: Codable, Identifiable, Equatable, Sendable {
     self.noteType = noteType
     self.dateCreated = dateCreated
     self.dateModified = dateModified
-    self.cookingSessionID = cookingSessionID
     self.pinned = pinned
   }
 }
@@ -953,53 +930,6 @@ public enum RecipePhotoKind: String, Codable, QueryBindable, QueryDecodable, Sen
   case referenceDocument
 }
 
-@Table("tags")
-public struct Tag: Codable, Identifiable, Equatable, Sendable {
-  public let id: UUID
-  public var name: String
-  public var color: String?
-  public var sortOrder: Int
-  public var dateCreated: Date
-
-  public init(id: UUID, name: String, color: String? = nil, sortOrder: Int, dateCreated: Date) {
-    self.id = id
-    self.name = name
-    self.color = color
-    self.sortOrder = sortOrder
-    self.dateCreated = dateCreated
-  }
-}
-
-@Table("equipment")
-public struct Equipment: Codable, Identifiable, Equatable, Sendable {
-  public let id: UUID
-  public var name: String
-  public var equipmentType: String?
-  public var notes: String?
-
-  public init(id: UUID, name: String, equipmentType: String? = nil, notes: String? = nil) {
-    self.id = id
-    self.name = name
-    self.equipmentType = equipmentType
-    self.notes = notes
-  }
-}
-
-@Table("recipeTags")
-public struct RecipeTag: Codable, Identifiable, Equatable, Sendable {
-  public let id: UUID
-  public var recipeID: Recipe.ID
-  public var tagID: Tag.ID
-  public var sortOrder: Int
-
-  public init(id: UUID, recipeID: Recipe.ID, tagID: Tag.ID, sortOrder: Int) {
-    self.id = id
-    self.recipeID = recipeID
-    self.tagID = tagID
-    self.sortOrder = sortOrder
-  }
-}
-
 @Table("recipeCategories")
 public struct RecipeCategory: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID
@@ -1010,20 +940,5 @@ public struct RecipeCategory: Codable, Identifiable, Equatable, Sendable {
     self.id = id
     self.recipeID = recipeID
     self.categoryID = categoryID
-  }
-}
-
-@Table("recipeEquipment")
-public struct RecipeEquipment: Codable, Identifiable, Equatable, Sendable {
-  public let id: UUID
-  public var recipeID: Recipe.ID
-  public var equipmentID: Equipment.ID
-  public var notes: String?
-
-  public init(id: UUID, recipeID: Recipe.ID, equipmentID: Equipment.ID, notes: String? = nil) {
-    self.id = id
-    self.recipeID = recipeID
-    self.equipmentID = equipmentID
-    self.notes = notes
   }
 }

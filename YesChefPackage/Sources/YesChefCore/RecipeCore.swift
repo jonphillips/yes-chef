@@ -100,8 +100,6 @@ public struct RecipeDetailData: Equatable, Sendable {
   public var photos: [RecipeDetailPhoto]
   public var categories: [Category]
   public var categoryDisplayNames: [String]
-  public var equipment: [Equipment]
-  public var recipeEquipment: [RecipeEquipment]
   public var learnings: [Learning]
   public var serveWith: [RecipeServeWith]
   public var variations: [RecipeVariation]
@@ -120,8 +118,6 @@ public struct RecipeDetailData: Equatable, Sendable {
     photos: [RecipeDetailPhoto] = [],
     categories: [Category] = [],
     categoryDisplayNames: [String] = [],
-    equipment: [Equipment] = [],
-    recipeEquipment: [RecipeEquipment] = [],
     learnings: [Learning] = [],
     serveWith: [RecipeServeWith] = [],
     variations: [RecipeVariation] = [],
@@ -139,8 +135,6 @@ public struct RecipeDetailData: Equatable, Sendable {
     self.photos = photos
     self.categories = categories
     self.categoryDisplayNames = categoryDisplayNames
-    self.equipment = equipment
-    self.recipeEquipment = recipeEquipment
     self.learnings = learnings
     self.serveWith = serveWith
     self.variations = variations
@@ -266,8 +260,6 @@ public enum RecipeRepository {
       .fetchOne(db)
     let recipeCategories = try (RecipeCategory.where { $0.recipeID.eq(recipeID) })
       .fetchAll(db)
-    let recipeEquipment = try (RecipeEquipment.where { $0.recipeID.eq(recipeID) })
-      .fetchAll(db)
     let variations = try (RecipeVariation.where { $0.recipeID.eq(recipeID) })
       .order { $0.sortIndex }
       .fetchAll(db)
@@ -290,9 +282,6 @@ public enum RecipeRepository {
     let categoryDisplayNames = categories.map {
       CategoryHierarchy.displayName(for: $0, categoriesByID: categoriesByID)
     }
-    let equipment = try Equipment.fetchAll(db)
-      .filter { equipment in recipeEquipment.contains { $0.equipmentID == equipment.id } }
-      .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
 
     let knownInstructionSectionIDs = Set(instructionSections.map(\.id))
     let orphanSteps = instructionSteps.filter { !knownInstructionSectionIDs.contains($0.sectionID) }
@@ -317,8 +306,6 @@ public enum RecipeRepository {
       photos: photos,
       categories: categories,
       categoryDisplayNames: categoryDisplayNames,
-      equipment: equipment,
-      recipeEquipment: recipeEquipment,
       learnings: try LearningRepository.learnings(sourceType: .recipe, sourceID: recipeID, in: db),
       serveWith: serveWith,
       variations: variations,
@@ -436,9 +423,7 @@ extension RecipeRepository {
         notes: snapshotNotes,
         tagNames: [],
         categoryNames: categoryNames,
-        photos: photos,
-        equipment: existingDetail?.equipment ?? [],
-        recipeEquipment: existingDetail?.recipeEquipment ?? []
+        photos: photos
       )
     }
 
@@ -1005,7 +990,6 @@ func reconcileIngredientLines(
         preparation: parsedLine.preparation,
         comment: parsedLine.comment,
         isOptional: parsedLine.isOptional,
-        shoppingCategory: parsedLine.shoppingCategory,
         doNotShop: parsedLine.doNotShop,
         isHeader: parsedLine.isHeader,
         sortOrder: parsedLine.sortOrder,
@@ -1029,7 +1013,6 @@ func reconcileIngredientLines(
       preparation: parsedLine.preparation ?? existingLine.preparation,
       comment: parsedLine.comment ?? existingLine.comment,
       isOptional: parsedLine.isOptional,
-      shoppingCategory: existingLine.shoppingCategory,
       doNotShop: parsedLine.doNotShop || existingLine.doNotShop,
       // Historical header rows remain readable until Jon repairs the small audited set by hand.
       // New lines are produced with the model default (`false`); the editor no longer writes this flag.
