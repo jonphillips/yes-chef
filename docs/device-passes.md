@@ -13,12 +13,6 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
-**Sync failure status — Slice 6 retired types** ([effort brief](efforts/sync-failure-surfacing.md), touches sync).
-Install on the iPad, launch with sync on, and wait for it to go idle; the status should read “Up to date.” Open the
-iPhone (the old build is fine) and wait for it to fetch; it should also read “Up to date.” On the iPad, run Slice 5's
-**Check iCloud for leftovers** and confirm `categorySeedStates` is no longer among the separately counted
-unregistered types.
-
 **Automatic backups (ADR-0008 S1; effort brief `automatic-backups`).** Run this on the first TestFlight build
 after the change merges; Debug builds intentionally take no automatic backups. On iPhone and iPad, open Yes Chef
 with Automatic Backups enabled and confirm a dated `YesChef-Auto-` file appears in Files under iCloud Drive →
@@ -30,30 +24,10 @@ existing importer and confirm the library matches that snapshot (G4). Turn iClou
 confirm Settings explains why no file is written (G6). With a test library, shrink the recipe count by over
 half, foreground the next day, and confirm the earlier file stays pinned with a warning (G7).
 
-**Sync failure status — Slice 5 lost delete check** ([effort brief](efforts/sync-failure-surfacing.md), touches sync).
-On the iPad whose deletes were lost, wait for sync to be idle and tap Settings → Sync → **Check iCloud for
-leftovers**. Confirm Beef Bulgogi’s old flat instruction section and steps are listed unless they were already
-removed from the iPhone, along with any other recipe restructured on the iPad since July. Review the contents,
-confirm **Delete from iCloud**, then check the iPhone to confirm each step appears once. Run the check again on
-the iPad; it should list nothing except separately counted unregistered record types.
-
-**Sync failure status** ([effort brief](efforts/sync-failure-surfacing.md), touches sync). **Failed 2026-10-22 at the
-first check:** the iPad reads "44,938 items haven't synced" (the whole library), and the iPhone shows the same
-state. It is held until Slice 4 ships. **First, the Slice 4 readout:** with Slice 4 installed on both devices, on
-the iPad and then the iPhone, open Settings → Sync → detail → **Diagnose** → **Copy**, and paste both readouts into
-the architect session before tapping Retry (see the brief for what to expect).
-Then repeat this pass. On both the iPad and iPhone, confirm the Settings row says “Up to date” with no false positives. On one device, turn on Airplane mode,
-edit a recipe, and wait past the 30-minute grace window; confirm the row says “1 item hasn’t synced” and the detail
-names that recipe. Restore the network and confirm it returns to “Up to date” after upload, with or without Retry.
-On the iPhone, confirm the not-applied count is zero, or that the detail names what is stuck.
-
-**Drop raw import HTML and repair CloudKit fallout** ([effort brief](efforts/raw-import-html-drop.md), synced-schema change).
-Export a backup from both devices first. Install on the iPad, launch twice with sync on, then install and launch on the
-iPhone. Confirm Camarones a la Diabla, Coconut-Caramel Braised Tofu, Keema Palak, and the other six oversized recipes
-arrive with ingredients, steps, and hero photo. Both Keema calendar rows and the Coconut-Caramel row show thumbnails
-and open on both devices. Confirm existing recipes still show their same hero. Capture one NYT recipe and check its
-photo gallery contains only the hero. In the `dataIntegrity` log, confirm the repair summary reports 1,527 deleted
-photos on the iPad and any unmatched rows; compare library counts on both devices.
+**Sync failure status — the offline check** ([effort brief](efforts/sync-failure-surfacing.md), touches sync). Both
+devices read "Up to date" with nothing unsynced (2026-10-26), so only this remains. On one device, turn on Airplane mode,
+edit a recipe, and wait past the 30-minute grace window. Confirm the row says "1 item hasn't synced" and the detail
+names that recipe. Restore the network and confirm it returns to "Up to date" after upload, with or without Retry.
 
 **Calendar day-rail actions and recipe-editor columns** (schema-free). On 11" and 13" iPad landscape with large Dynamic Type,
 confirm a filled day shows Cook these plus Day actions in the rail, Ask/Add stay in the toolbar, and all grocery and hand-off
@@ -62,10 +36,6 @@ stay within three lines. In Create Recipe, confirm Timing and Yield fits one row
 Categories, and tap Library, Cuisine, and Course individually to confirm each opens its own menu. The editor sheet falls back
 without clipping. Type `90` into Prep time and tap Save without pressing Done; confirm it saves as 90. On iPhone, confirm both
 editor sections stay stacked and Ask opens the chat sheet. Check the photo paste button aligns with Add Photo.
-
-**Drop legacy recipe cooking columns** ([effort brief](efforts/prod-dead-column-drop.md), schema change).
-Export a backup from each device before installing the build. Confirm the library is intact afterwards and
-“Last cooked” still appears for a cooked recipe. Edit a recipe and confirm the edit syncs to the other device.
 
 **Before the CloudSyncKit backup lift's Yes Chef PR merges** ([effort brief](efforts/cloudsynckit-backup-lift.md)).
 Export a backup from the current build and store it off-device (Files / iCloud Drive). It's insurance before the
