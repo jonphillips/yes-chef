@@ -66,6 +66,17 @@ public enum YesChefCloudSync {
     PantryItem.self, AISettingsRecord.self, Learning.self
   )
 
+  /// These types were removed from the engine. Purge their CloudKit records and
+  /// SQLiteData metadata; never include a type that remains in `syncedTables`.
+  public static let retiredRecordTypes = ["categorySeedStates", "categorySeedTombstones"]
+
+  // SQLiteData can begin its automatic initial fetch just after start returns. Polling
+  // once per second and requiring two idle snapshots lets that fetch become observable;
+  // the one-minute bound keeps cleanup from waiting indefinitely during a long sync.
+  private static let retiredPurgeIdlePollInterval: Duration = .seconds(1)
+  private static let retiredPurgeIdlePollLimit = 60 // 60-second bound / 1-second poll interval.
+  private static let retiredPurgeRequiredIdleReads = 2
+
   // MARK: Enablement gate (forwarded)
 
   public static func isManuallyEnabled(
@@ -109,7 +120,79 @@ public enum YesChefCloudSync {
   // MARK: Start / redrain / pending (forwarded)
 
   public static func startIfManuallyEnabled() async -> StartResult {
-    await CloudSync.startIfManuallyEnabled(configuration: configuration)
+    let result = await CloudSync.startIfManuallyEnabled(configuration: configuration)
+    guard case .started = result else { return result }
+
+    Task(priority: .background) {
+      await purgeRetiredRecordTypesWhenIdle()
+    }
+    return result
+  }
+
+  private static func purgeRetiredRecordTypesWhenIdle() async {
+    @Dependency(\.defaultDatabase) var database
+    @Dependency(\.defaultSyncEngine) var syncEngine
+    @Dependency(\.continuousClock) var clock
+    guard syncEngine.isRunning else { return }
+
+    var consecutiveIdleReads = 0
+    for _ in 0..<retiredPurgeIdlePollLimit {
+      if !syncEngine.isSynchronizing {
+        consecutiveIdleReads += 1
+        if consecutiveIdleReads == retiredPurgeRequiredIdleReads { break }
+      } else {
+        consecutiveIdleReads = 0
+      }
+      do {
+        try await clock.sleep(for: retiredPurgeIdlePollInterval)
+      } catch {
+        return
+      }
+    }
+    guard consecutiveIdleReads == retiredPurgeRequiredIdleReads else {
+      AppLog.dataIntegrity.debug("Retired CloudKit sync cleanup skipped because sync did not become idle in time")
+      return
+    }
+    guard syncEngine.isRunning else { return }
+
+    let pendingChangeCount: Int
+    do {
+      pendingChangeCount = try await CloudSync.pendingRecordZoneChangeCount(in: database)
+    } catch {
+      AppLog.dataIntegrity.error(
+        "Couldn’t check pending changes before retired sync cleanup: \(String(describing: error), privacy: .public)"
+      )
+      return
+    }
+    guard pendingChangeCount == 0 else { return }
+
+    let client = CloudKitLeftoverClient(
+      database: CKContainer(identifier: configuration.containerIdentifier).privateCloudDatabase
+    )
+    do {
+      let result = try await CloudSync.purgeRetiredRecordTypes(
+        retiredRecordTypes, tables: syncedTables, in: database, client: client
+      )
+      let purgedCount = result.purgedCountsByType.values.reduce(0, +)
+      guard purgedCount > 0 || !result.failures.isEmpty else { return }
+
+      var summary = result.purgedCountsByType.keys.sorted().map { recordType in
+        "\(recordType): purged \(result.purgedCountsByType[recordType, default: 0])"
+      }
+      summary += result.failures.keys.sorted { $0.recordName < $1.recordName }.map { recordID in
+        "\(recordID.recordName): \(result.failures[recordID] ?? "Unknown error")"
+      }
+      let message = "Retired CloudKit sync cleanup: \(summary.joined(separator: "; "))"
+      if result.failures.isEmpty {
+        AppLog.dataIntegrity.notice("\(message, privacy: .public)")
+      } else {
+        AppLog.dataIntegrity.warning("\(message, privacy: .public)")
+      }
+    } catch {
+      AppLog.dataIntegrity.error(
+        "Retired CloudKit sync cleanup failed: \(String(describing: error), privacy: .public)"
+      )
+    }
   }
 
   public static func redrainPendingRecordZoneChangesIfManuallyEnabled(

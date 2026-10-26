@@ -9,6 +9,17 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Sync failure status — Slice 6 retired synced rows (`effort/sync-failure-surfacing-s6-retired-types`)
+
+**2026-10-26. Schema-free; touches sync.** CloudSyncKit deletes the retired `categorySeedStates` and
+`categorySeedTombstones` records from iCloud before deleting their metadata; it refuses any type still registered
+with the engine and retains metadata for failed deletes. Yes Chef runs the purge only after sync starts and becomes
+idle, and logs only deletions or failures. The jon-platform branch is in [PR #87](https://github.com/jonphillips/jon-platform/pull/87);
+the Yes Chef branch is in [PR #370](https://github.com/jonphillips/yes-chef/pull/370). CloudSyncKit's 64 tests
+passed. Yes Chef's drift gate, generic iOS build, and all 83 `YesChefTests` passed. The Slice 6 two-device pass
+remains owed in `device-passes.md`.
+
+---
 ## Automatic daily backups — S1 (`effort/automatic-backups`)
 
 **2026-10-25. Schema-free; iCloud Drive.** CloudSyncKit now takes validated foreground snapshots, maintains

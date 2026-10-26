@@ -13,6 +13,12 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**Sync failure status — Slice 6 retired types** ([effort brief](efforts/sync-failure-surfacing.md), touches sync).
+Install on the iPad, launch with sync on, and wait for it to go idle; the status should read “Up to date.” Open the
+iPhone (the old build is fine) and wait for it to fetch; it should also read “Up to date.” On the iPad, run Slice 5's
+**Check iCloud for leftovers** and confirm `categorySeedStates` is no longer among the separately counted
+unregistered types.
+
 **Automatic backups (ADR-0008 S1; effort brief `automatic-backups`).** Run this on the first TestFlight build
 after the change merges; Debug builds intentionally take no automatic backups. On iPhone and iPad, open Yes Chef
 with Automatic Backups enabled and confirm a dated `YesChef-Auto-` file appears in Files under iCloud Drive →
