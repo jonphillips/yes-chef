@@ -131,6 +131,21 @@ Live ambiguities and recently-resolved decisions. Resolved items stay here brief
   header toggles vs. inline bold/italic ([`decisions/ADR-0014-recipe-text-editing-model.md`](decisions/ADR-0014-recipe-text-editing-model.md));
   and chat persistence/history — chat is ephemeral today ([`decisions/ADR-0015-chat-persistence.md`](decisions/ADR-0015-chat-persistence.md)).
 
+## Live — production cutover: keep-or-drop the never-set synced columns
+
+- **Decide per column before the 4a deploy** ([`PROD-CUTOVER.md` § 4a](PROD-CUTOVER.md)). Jon (2026-10-26):
+  some of the 23 never-set columns on 4a's missing list have no UI. Compare the lists and decide, column by
+  column, what we still care about.
+- **The rule.** A missing Production field fails an upload only when the app writes a non-nil value to it. A
+  column with no UI and no write path can never fail, but it is dead schema ([[no-dead-data]]).
+  - **Keep:** create the field in Development before the deploy.
+  - **Drop:** an appended migration before the cut, while dropping is still free. After the deploy the field is
+    permanent in Production.
+- **How to decide.** For each column, grep the model and its writers for any code path that writes it. A write
+  path means keep (and create it); none means drop. Record the verdict per column in 4a's missing list. The two
+  empty tables (`equipment`, `recipeEquipment`) take the same test.
+- These drops are the only synced-schema change allowed to merge before the cut (4a's sequencing note).
+
 ## Live — recipe normalization ("normalize recipe" function)
 
 - **Unscoped.** Jon (dogfood 2026-07-04): a one-tap "normalize recipe" that de-caps old all-caps Milk Street
