@@ -247,7 +247,6 @@ RecipeNote
 RecipePhoto
 Category
 RecipeCategory
-CookingSession
 
 MVP 2+ entities:
 
@@ -1843,7 +1842,6 @@ RecipeNote
 RecipePhoto
 Category
 RecipeCategory
-CookingSession
 
 (A single owner's private library — no Household, Cook, or sharing entities. Recipe
 transfer between people is a separate feature, not part of the core schema. See §2.6.)
