@@ -121,6 +121,7 @@
 		96AEA500A9F6D8D9BE126014 /* RecipeActiveFilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0F7538696E770B31AA47A0 /* RecipeActiveFilterBar.swift */; };
 		9ADADC85EDEC6208590FC533 /* YesChefCore in Frameworks */ = {isa = PBXBuildFile; productRef = 13643DFF3682EB50C6B096D2 /* YesChefCore */; };
 		9B8EFD5B3540051D7122B27D /* PaprikaImportReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E29F682A3093D37071F5A924 /* PaprikaImportReviewView.swift */; };
+		9E3F90581198D1DF4FBBE49D /* ChatAccessExportModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B69D7AF49F0E848F45AE1103 /* ChatAccessExportModelTests.swift */; };
 		A103667583AD5577C2633211 /* OriginalSnapshotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76C7E4899A1093E58F713C2F /* OriginalSnapshotView.swift */; };
 		A53A9EE95AC871F9F6B627C5 /* RecipeLibraryListState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3B1C7A7E48A8FFE074A05E0 /* RecipeLibraryListState.swift */; };
 		A588A64D8DC3C98AE1FABF6A /* RecipeReaderRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42C6393B132228BA0329E4A7 /* RecipeReaderRows.swift */; };
@@ -322,6 +323,7 @@
 		ABD955FEF5EBA92A06FCE62C /* HandoffReviewCoordinator+Variation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HandoffReviewCoordinator+Variation.swift"; sourceTree = "<group>"; };
 		AF820DD380C76A8BFE19ED0E /* CreateRecipeModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateRecipeModelTests.swift; sourceTree = "<group>"; };
 		B49D2E9B66A731DB272F063C /* MealCalendarModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCalendarModels.swift; sourceTree = "<group>"; };
+		B69D7AF49F0E848F45AE1103 /* ChatAccessExportModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAccessExportModelTests.swift; sourceTree = "<group>"; };
 		B7D5D51E71889140798985EB /* WorkbenchReferenceViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchReferenceViews.swift; sourceTree = "<group>"; };
 		B9CC26315C4C3E333C66F625 /* SharePreprocessor.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = SharePreprocessor.js; sourceTree = "<group>"; };
 		BCD1FADF980D78977F069A1D /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
@@ -440,6 +442,7 @@
 				E178BA63F9FC305703A8061E /* AIHandoffRecipePasteRoutingTests.swift */,
 				E4E2858E5F7AA38D95511ACB /* BrowserReaderFeedbackRoutingTests.swift */,
 				DEA0C6E4BA57FD6DBD24F975 /* CategoryRecipeMoveModelTests.swift */,
+				B69D7AF49F0E848F45AE1103 /* ChatAccessExportModelTests.swift */,
 				9B4F1C5A6DBD76ED3478EC75 /* ChatAccessInboxModelTests.swift */,
 				842FC32385274C6E7D875B4D /* ChatAssistantSelectionTests.swift */,
 				4802BA56B714BCEF8679A289 /* ChatSurfaceTests.swift */,
@@ -804,6 +807,7 @@
 				0FC786DD6158C0277309423D /* AIHandoffRecipePasteRoutingTests.swift in Sources */,
 				2E34817DD5653BC61AFF9BB1 /* BrowserReaderFeedbackRoutingTests.swift in Sources */,
 				D7F27AD6726CB1E3E48F720D /* CategoryRecipeMoveModelTests.swift in Sources */,
+				9E3F90581198D1DF4FBBE49D /* ChatAccessExportModelTests.swift in Sources */,
 				6DBBE364EC2B4CA8410CEEDB /* ChatAccessInboxModelTests.swift in Sources */,
 				0CC37A24661F09BC79B0D2DD /* ChatAssistantSelectionTests.swift in Sources */,
 				B1A4B0832475BA500093C538 /* ChatSurfaceTests.swift in Sources */,

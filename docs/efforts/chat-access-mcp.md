@@ -1,9 +1,7 @@
 # Effort — Chat access over MCP
 
 Status: Designed 2026-10-21. S0 shipped (#357) and its device pass cleared 2026-10-22: D2 stands (§ S0 results).
-S1 shipped (#359) and its device pass cleared 2026-10-23. **S2 is dispatched 2026-10-26**, after sync-failure-surfacing Slice 6 and automatic-backups S1,
-and it starts with S1's one defect, the Create Recipe badge that never rendered. S2 carries the one unproven
-mechanism (reading an evicted file on the Mac). Schema-free throughout.
+S1 shipped (#359) and its device pass cleared 2026-10-23. **S2 shipped (#376) with its badge and Mac materialization device pass owed. S3 waits on ADR-0060 OQ3.** Schema-free throughout.
 Summary: Make Yes Chef the second consumer of jon-platform ADR-0007, so ChatGPT can stage a recipe into Yes Chef
 and look things up in the library instead of Jon pasting in both directions. S0 proved the iCloud Drive transport;
 S1 builds `stage_recipe` and the app's inbox, and S2 builds the library export and the read tools.
@@ -19,7 +17,7 @@ ops) · vinyl-fever `docs/milestones/M12-library-context-mcp.md` (the first cons
 - **S1 — `stage_recipe` and the app's inbox** (ADR-0060 D3, D5, D6). [§ S1](#s1--stage_recipe-and-the-apps-inbox).
   Shipped (#359); device pass cleared 2026-10-23.
 - **S2 — The export and the read tools** (ADR-0060 D4, D6), plus the S1 badge fix.
-  [§ S2](#s2--the-export-and-the-read-tools). Dispatched 2026-10-26.
+  [§ S2](#s2--the-export-and-the-read-tools). Shipped (#376); badge and Mac materialization device pass owed.
 - **S3 — Returns that target an existing recipe.** This waits on ADR-0060 OQ3.
 
 ## S0 — Probe the transport
@@ -358,13 +356,13 @@ pasting one in. Specified 2026-10-22; queued after sync-failure-surfacing Slice 
 ### Jon's device pass
 
 0. Stage a recipe from ChatGPT without opening it. The count shows on Create Recipe in the iPad sidebar and on
-   the iPhone, and it clears after Open or Discard.
+   the iPhone More list row (Create Recipe is hidden from the default tab bar), and it clears after Open or Discard.
 1. On the iPhone, tap **Refresh** in Settings → Chat Access. Time how long the export takes to appear on the Mac
    (`ls -lO MCP/Exports/`).
 2. In ChatGPT: "Do I have any short-rib braises?" (`search_recipes`), then open one (`get_recipe`). Check that
    the export age is right.
 3. **Re-run Q4 against the export.** Run `brctl evict` on the export file, then call `get_recipe`. It succeeds,
-   and the stderr log shows the materialize time. If it fails or passes 60 s, stop and report: the read path
+   and the stderr log shows the `materialize` and `read` durations. If it fails or passes 60 s, stop and report: the read path
    needs a different mechanism before anything builds on it.
 4. Background the iPad app so it writes its own export. The tools report whichever export is newest.
 5. Call `get_recipe` with a ref from before step 4. It returns the older-export error.
@@ -373,7 +371,7 @@ pasting one in. Specified 2026-10-22; queued after sync-failure-surfacing Slice 
 
 - The PR has merged and the checks in Verification are green. The PR names the badge's cause (item 0).
 - The completing PR adds the `DONE-LOG.md` entry, lists the device pass in `device-passes.md` with the **Owed**
-  pointer, and sets `NEXT_UP.md` to `Nothing dispatched.`, because S3 waits on ADR-0060 OQ3.
+  pointer, and advances `NEXT_UP.md` to the queued PROD-CUTOVER Step 1 drop slice. S3 waits on ADR-0060 OQ3.
 - After Jon's pass, the architect records the step 3 materialize result here. If step 3 failed, the read path is
   re-planned before anything builds on the export.
 

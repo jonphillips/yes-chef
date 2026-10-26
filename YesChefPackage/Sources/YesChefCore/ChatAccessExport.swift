@@ -93,10 +93,13 @@ public struct ChatAccessExport: Codable, Equatable, Sendable {
 }
 
 public enum ChatAccessExportError: LocalizedError, Equatable {
+  case unsupportedFormat(found: String)
   case unsupportedVersion(found: Int, supported: Int)
 
   public var errorDescription: String? {
     switch self {
+    case let .unsupportedFormat(found):
+      "This file uses the export format `\(found)`; this helper expects `yc-library-export`."
     case let .unsupportedVersion(found, supported):
       "This Yes Chef export uses version \(found); this helper supports version \(supported). Update the helper before reading it."
     }
@@ -104,6 +107,11 @@ public enum ChatAccessExportError: LocalizedError, Equatable {
 }
 
 public enum ChatAccessExportCoding {
+  private struct Header: Decodable {
+    var format: String
+    var version: Int
+  }
+
   public static func encode(_ export: ChatAccessExport) throws -> Data {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -111,11 +119,14 @@ public enum ChatAccessExportCoding {
   }
 
   public static func decode(_ data: Data) throws -> ChatAccessExport {
-    let export = try JSONDecoder().decode(ChatAccessExport.self, from: data)
-    guard export.format == "yc-library-export", export.version == 1 else {
-      throw ChatAccessExportError.unsupportedVersion(found: export.version, supported: 1)
+    let header = try JSONDecoder().decode(Header.self, from: data)
+    guard header.format == "yc-library-export" else {
+      throw ChatAccessExportError.unsupportedFormat(found: header.format)
     }
-    return export
+    guard header.version == 1 else {
+      throw ChatAccessExportError.unsupportedVersion(found: header.version, supported: 1)
+    }
+    return try JSONDecoder().decode(ChatAccessExport.self, from: data)
   }
 }
 
@@ -135,22 +146,33 @@ public enum ChatAccessExportBuilder {
     let recipeEquipment = try RecipeEquipment.fetchAll(db)
     let equipmentByID = try Dictionary(uniqueKeysWithValues: Equipment.fetchAll(db).map { ($0.id, $0) })
     let photos = try RecipePhoto.fetchAll(db)
+    let sourcesByRecipeID = Dictionary(uniqueKeysWithValues: sources.map { ($0.recipeID, $0) })
+    let ingredientSectionsByRecipeID = Dictionary(grouping: ingredientSections, by: \.recipeID)
+    let ingredientLinesByRecipeID = Dictionary(grouping: ingredientLines, by: \.recipeID)
+    let instructionSectionsByRecipeID = Dictionary(grouping: instructionSections, by: \.recipeID)
+    let instructionStepsByRecipeID = Dictionary(grouping: instructionSteps, by: \.recipeID)
+    let notesByRecipeID = Dictionary(grouping: recipeNotes, by: \.recipeID)
+    let tagsByRecipeID = Dictionary(grouping: recipeTags, by: \.recipeID)
+    let categoriesByRecipeID = Dictionary(grouping: recipeCategories, by: \.recipeID)
+    let equipmentByRecipeID = Dictionary(grouping: recipeEquipment, by: \.recipeID)
+    let photosByRecipeID = Dictionary(grouping: photos, by: \.recipeID)
 
     let bundles = recipes.map { recipe in
       let id = recipe.id
-      let associations = recipeEquipment.filter { $0.recipeID == id }
-      let sections = ingredientSections.filter { $0.recipeID == id }.sorted { $0.sortOrder < $1.sortOrder }
-      let lines = ingredientLines.filter { $0.recipeID == id }.sorted { $0.sortOrder < $1.sortOrder }
-      let methodSections = instructionSections.filter { $0.recipeID == id }.sorted { $0.sortOrder < $1.sortOrder }
-      let steps = instructionSteps.filter { $0.recipeID == id }.sorted { $0.sortOrder < $1.sortOrder }
-      let notes = recipeNotes.filter { $0.recipeID == id }.sorted { $0.dateCreated < $1.dateCreated }
-      let tagNames = recipeTags.filter { $0.recipeID == id }.compactMap { tagsByID[$0.tagID] }.sorted()
-      let categoryNames = recipeCategories.filter { $0.recipeID == id }.compactMap { categoriesByID[$0.categoryID] }.sorted()
+      let associations = equipmentByRecipeID[id, default: []]
+      let sections = ingredientSectionsByRecipeID[id, default: []].sorted { $0.sortOrder < $1.sortOrder }
+      let lines = ingredientLinesByRecipeID[id, default: []].sorted { $0.sortOrder < $1.sortOrder }
+      let methodSections = instructionSectionsByRecipeID[id, default: []].sorted { $0.sortOrder < $1.sortOrder }
+      let steps = instructionStepsByRecipeID[id, default: []].sorted { $0.sortOrder < $1.sortOrder }
+      let notes = notesByRecipeID[id, default: []].sorted { $0.dateCreated < $1.dateCreated }
+      let tagNames = tagsByRecipeID[id, default: []].compactMap { tagsByID[$0.tagID] }.sorted()
+      let categoryNames = categoriesByRecipeID[id, default: []].compactMap { categoriesByID[$0.categoryID] }.sorted()
       let equipment = associations.compactMap { equipmentByID[$0.equipmentID] }
-      return RecipeBundleCoding.RecipeBundle(recipe: recipe, source: sources.first { $0.recipeID == id }, ingredientSections: sections, ingredientLines: lines, instructionSections: methodSections, instructionSteps: steps, recipeNotes: notes, photos: photos.filter { $0.recipeID == id }, tagNames: tagNames, categoryNames: categoryNames, equipment: equipment, recipeEquipment: associations)
+      return RecipeBundleCoding.RecipeBundle(recipe: recipe, source: sourcesByRecipeID[id], ingredientSections: sections, ingredientLines: lines, instructionSections: methodSections, instructionSteps: steps, recipeNotes: notes, photos: photosByRecipeID[id, default: []], tagNames: tagNames, categoryNames: categoryNames, equipment: equipment, recipeEquipment: associations)
     }
 
     let menuItems = try MenuItem.fetchAll(db)
+    let menuItemsByMenuID = Dictionary(grouping: menuItems, by: \.menuID)
     let menus = try Menu.fetchAll(db).map { menu in
       ChatAccessExport.MenuRecord(
         id: menu.id,
@@ -158,16 +180,17 @@ public enum ChatAccessExportBuilder {
         notes: menu.notes,
         dayCount: menu.dayCount,
         modified: menu.dateModified,
-        items: menuItems.filter { $0.menuID == menu.id }.sorted { ($0.dayOffset, $0.mealSlot.sortOrder, $0.sortOrder) < ($1.dayOffset, $1.mealSlot.sortOrder, $1.sortOrder) }.map {
+        items: menuItemsByMenuID[menu.id, default: []].sorted { ($0.dayOffset, $0.mealSlot.sortOrder, $0.sortOrder) < ($1.dayOffset, $1.mealSlot.sortOrder, $1.sortOrder) }.map {
           ChatAccessExport.MenuItemRecord(kind: $0.kind, title: $0.title, recipeID: $0.recipeID, dayOffset: $0.dayOffset, slot: $0.mealSlot, note: $0.notes, scale: $0.scale)
         }
       )
     }
 
-    let lower = calendar.date(byAdding: .day, value: -30, to: generatedAt) ?? generatedAt
-    let upper = calendar.date(byAdding: .day, value: 60, to: generatedAt) ?? generatedAt
+    let generatedDay = calendar.startOfDay(for: generatedAt)
+    let lower = calendar.date(byAdding: .day, value: -30, to: generatedDay) ?? generatedDay
+    let upperExclusive = calendar.date(byAdding: .day, value: 61, to: generatedDay) ?? generatedDay
     let mealPlan = try MealPlanItem.fetchAll(db)
-      .filter { $0.scheduledDate >= lower && $0.scheduledDate <= upper }
+      .filter { $0.scheduledDate >= lower && $0.scheduledDate < upperExclusive }
       .sorted { ($0.scheduledDate, $0.mealSlot.sortOrder, $0.sortOrder) < ($1.scheduledDate, $1.mealSlot.sortOrder, $1.sortOrder) }
       .map { ChatAccessExport.MealPlanRecord(kind: $0.kind, title: $0.title, recipeID: $0.recipeID, scheduledDate: $0.scheduledDate, slot: $0.mealSlot, note: $0.notes, scale: $0.scale) }
     return ChatAccessExport(generatedAt: generatedAt, device: device, recipes: bundles, menus: menus, mealPlan: mealPlan)

@@ -14,6 +14,7 @@ final class ChatAccessExportModel {
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored @Dependency(\.uuid) private var uuid
   @ObservationIgnored @Dependency(\.date.now) private var now
+  @ObservationIgnored @Dependency(\.chatAccessFolderClient) private var folderClient
   @ObservationIgnored private let defaults: UserDefaults
 
   private(set) var lastExportDate: Date?
@@ -36,31 +37,31 @@ final class ChatAccessExportModel {
     guard !isRefreshing else { return }
     isRefreshing = true
     errorMessage = nil
-    let taskID = UIApplication.shared.beginBackgroundTask(withName: "YesChefChatAccessExport")
+    let backgroundTask = BackgroundTaskLease()
+    backgroundTask.begin()
     defer {
-      UIApplication.shared.endBackgroundTask(taskID)
+      backgroundTask.end()
       isRefreshing = false
     }
 
     do {
-      guard let container = FileManager.default.url(forUbiquityContainerIdentifier: "iCloud.com.jonphillips.yeschef") else {
-        throw ExportError.containerUnavailable
-      }
+      let folder = try await folderClient.resolveFolder()
       let generatedAt = now
       let device = UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"
-      var installationID = defaults.string(forKey: Self.installationIDKey)
-      if installationID == nil {
+      let installationID: String
+      if let savedInstallationID = defaults.string(forKey: Self.installationIDKey) {
+        installationID = savedInstallationID
+      } else {
         installationID = uuid().uuidString
         defaults.set(installationID, forKey: Self.installationIDKey)
       }
-      guard let installationID else { throw ExportError.containerUnavailable }
       let export = try await database.read { db in
         try ChatAccessExportBuilder.build(in: db, generatedAt: generatedAt, device: device)
       }
       let data = try await Task.detached(priority: .utility) {
         try ChatAccessExportCoding.encode(export)
       }.value
-      let destination = ChatAccessFolder(containerURL: container).exportsURL
+      let destination = folder.exportsURL
         .appending(path: "\(installationID).json")
       try await Task.detached(priority: .utility) {
         try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -82,8 +83,22 @@ final class ChatAccessExportModel {
     }
   }
 
-  private enum ExportError: LocalizedError {
-    case containerUnavailable
-    var errorDescription: String? { "The Yes Chef iCloud Drive container is unavailable. Check that this device is signed in to iCloud and iCloud Drive is enabled." }
+}
+
+@MainActor
+private final class BackgroundTaskLease {
+  private var identifier = UIBackgroundTaskIdentifier.invalid
+
+  func begin() {
+    identifier = UIApplication.shared.beginBackgroundTask(withName: "YesChefChatAccessExport") { [weak self] in
+      Task { @MainActor in self?.end() }
+    }
+  }
+
+  func end() {
+    guard identifier != .invalid else { return }
+    let identifier = self.identifier
+    self.identifier = .invalid
+    UIApplication.shared.endBackgroundTask(identifier)
   }
 }

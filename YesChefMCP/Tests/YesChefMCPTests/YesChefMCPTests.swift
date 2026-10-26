@@ -45,14 +45,23 @@ struct YesChefMCPTests {
     defer { try? FileManager.default.removeItem(at: temporary) }
     let fixedDate = ISO8601DateFormatter().date(from: "2026-10-21T12:00:00Z")!
     let recipeID = UUID()
+    let mealCalendar = Calendar.current
+    let firstMealDay = mealCalendar.startOfDay(for: fixedDate)
+    let lastMealDay = mealCalendar.date(byAdding: .day, value: 1, to: firstMealDay)!
+    let outsideMealDay = mealCalendar.date(byAdding: .day, value: 2, to: firstMealDay)!
     let recipe = Recipe(id: recipeID, title: "Braised Beans", servingsText: "4", totalTimeMinutes: 90, cuisine: "Italian", course: "Dinner", dateCreated: fixedDate, dateModified: fixedDate)
     let otherRecipeID = UUID()
     let otherRecipe = Recipe(id: otherRecipeID, title: "Apple Cake", dateCreated: fixedDate, dateModified: fixedDate)
     let sectionID = UUID()
     let bundle = RecipeBundleCoding.RecipeBundle(recipe: recipe, ingredientSections: [IngredientSection(id: sectionID, recipeID: recipeID, name: "Main", sortOrder: 0)], ingredientLines: [IngredientLine(id: UUID(), recipeID: recipeID, sectionID: sectionID, originalText: "1 cup beans", sortOrder: 0)], tagNames: ["Beans"])
     let otherBundle = RecipeBundleCoding.RecipeBundle(recipe: otherRecipe)
-    let menu = ChatAccessExport.MenuRecord(id: UUID(), title: "Sunday", notes: nil, dayCount: 1, modified: fixedDate, items: [])
-    let export = ChatAccessExport(generatedAt: fixedDate, device: "iPad", recipes: [otherBundle, bundle], menus: [menu], mealPlan: [])
+    let menu = ChatAccessExport.MenuRecord(id: UUID(), title: "Sunday", notes: nil, dayCount: 1, modified: fixedDate, items: [
+      ChatAccessExport.MenuItemRecord(kind: .recipe, title: "Beans special", recipeID: recipeID, dayOffset: 0, slot: .dinner, note: nil, scale: 1),
+    ])
+    let mealPlanRows = [firstMealDay, lastMealDay, outsideMealDay].enumerated().map { index, day in
+      ChatAccessExport.MealPlanRecord(kind: .note, title: "Day \(index)", recipeID: nil, scheduledDate: day, slot: .dinner, note: nil, scale: 1)
+    }
+    let export = ChatAccessExport(generatedAt: fixedDate, device: "iPad", recipes: [otherBundle, bundle], menus: [menu], mealPlan: mealPlanRows)
     let exportURL = exportFolder.appending(path: "install.json")
     try ChatAccessExportCoding.encode(export).write(to: exportURL)
     let clock = TestClock(fixedDate.addingTimeInterval(600))
@@ -62,14 +71,16 @@ struct YesChefMCPTests {
     let searchText = try toolText(search)
     #expect(searchText.contains("Braised Beans"))
     #expect(searchText.contains("ageMinutes"))
+    #expect(searchText.contains("90 min"))
     #expect(!containsUUID(searchText))
     let parsed = try object(searchText)
     let ref = try #require(parsed["recipes"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
-    #expect(ref.hasSuffix(".1"))
+    #expect(ref.hasSuffix(".r1"))
     let detail = try #require(await server.handle(line: genericToolCall("get_recipe", args: ["ref": .string(ref)])))
     let detailText = try toolText(detail)
     #expect(detailText.contains("Braised Beans"))
     #expect(detailText.contains("1 cup beans"))
+    #expect(detailText.contains("90 min"))
     #expect(!containsUUID(detailText))
 
     clock.advance(by: 50 * 60)
@@ -83,14 +94,49 @@ struct YesChefMCPTests {
     let menuDetail = try #require(await server.handle(line: genericToolCall("get_menu", args: ["ref": .string(menuRef)])))
     let menuText = try toolText(menuDetail)
     #expect(menuText.contains("Sunday"))
+    #expect(menuText.contains("Braised Beans"))
     #expect(!containsUUID(menuText))
-    let mealPlan = try #require(await server.handle(line: genericToolCall("get_meal_plan", args: ["from": .string("2026-10-21"), "to": .string("2026-10-22")])))
-    #expect(try toolText(mealPlan).contains("items"))
-    #expect(!containsUUID(try toolText(mealPlan)))
+    let mealPlanResult = try #require(await server.handle(line: genericToolCall("get_meal_plan", args: ["from": .string("2026-10-21"), "to": .string("2026-10-22")])))
+    let mealPlanText = try toolText(mealPlanResult)
+    let mealPlanOutput = try object(mealPlanText)
+    #expect(mealPlanOutput["items"]?.arrayValue?.count == 2)
+    #expect(mealPlanText.contains("2026-10-21"))
+    #expect(mealPlanText.contains("2026-10-22"))
+    #expect(!mealPlanText.contains("2026-10-23"))
+    #expect(!containsUUID(mealPlanText))
     try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: 60)], ofItemAtPath: exportURL.path)
     let stale = try #require(await server.handle(line: genericToolCall("get_recipe", args: ["ref": .string(ref)])))
     #expect(try object(stale)["result"]?.objectValue?["isError"] == .bool(true))
     #expect(try toolText(stale).contains("older export; search again"))
+    let wrongRecipeKind = try #require(await server.handle(line: genericToolCall("get_recipe", args: ["ref": .string(menuRef)])))
+    #expect(try toolText(wrongRecipeKind).contains("isn't a recipe"))
+    let wrongMenuKind = try #require(await server.handle(line: genericToolCall("get_menu", args: ["ref": .string(ref)])))
+    #expect(try toolText(wrongMenuKind).contains("isn't a menu"))
+  }
+
+  @Test func materializerSeamSuccessResolvesRecipeNamesInMenu() async throws {
+    let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let container = temporary.appending(path: "container", directoryHint: .isDirectory)
+    let exports = ChatAccessFolder(containerURL: container).exportsURL
+    try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: temporary) }
+    let date = Date(timeIntervalSince1970: 1_800_000_000)
+    let recipeID = UUID()
+    let bundle = RecipeBundleCoding.RecipeBundle(recipe: Recipe(id: recipeID, title: "Chicken Soup", dateCreated: date, dateModified: date))
+    let menu = ChatAccessExport.MenuRecord(id: UUID(), title: "Weeknight", notes: nil, dayCount: 1, modified: date, items: [
+      ChatAccessExport.MenuItemRecord(kind: .recipe, title: "Soup", recipeID: recipeID, dayOffset: 0, slot: .dinner, note: nil, scale: 1),
+    ])
+    let data = try ChatAccessExportCoding.encode(ChatAccessExport(generatedAt: date, device: "iPhone", recipes: [bundle], menus: [menu], mealPlan: []))
+    try data.write(to: exports.appending(path: "install.json"))
+    let server = YesChefMCPServer.make(
+      containerURL: container,
+      now: { date },
+      exportMaterializer: { _ in data }
+    )
+    let menuList = try #require(await server.handle(line: genericToolCall("list_menus", args: [:])))
+    let menuRef = try #require(object(toolText(menuList))["menus"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
+    let detail = try #require(await server.handle(line: genericToolCall("get_menu", args: ["ref": .string(menuRef)])))
+    #expect(try toolText(detail).contains("Chicken Soup"))
   }
 
   @Test func readToolsExplainWhenNoExportExists() async throws {
