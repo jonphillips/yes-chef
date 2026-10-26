@@ -75,7 +75,7 @@ The brief is [`efforts/prod-never-set-drop.md`](efforts/prod-never-set-drop.md).
 columns, the `equipment`/`recipeEquipment` tables and the retired `tags`/`recipeTags` tables (ADR-0049 Amd 5)
 in one appended migration, and retires the tag record types through `retiredRecordTypes`.
 
-- [ ] The architect sets `NEXT_UP.md` to the drop slice when chat-access S2 merges.
+- [x] The architect sets `NEXT_UP.md` to the drop slice when chat-access S2 merges.
 - [ ] Review: the architect escalates the PR to Jon (synced schema). Jon merges.
 - [ ] Device check, per the brief:
   - export a backup from each device first;

@@ -272,78 +272,6 @@ public enum CategoryRepository {
     return audit
   }
 
-  /// Moves the still-synced, dormant tag graph into loose categories. The legacy tables remain
-  /// registered for CloudKit but are never mutated here.
-  public static func foldDormantTagsIntoCategories(in db: Database) throws {
-    let tags = try Tag.fetchAll(db).sorted(by: areTagsInFoldOrder)
-    var categories = try Category.fetchAll(db)
-    var categoryIDByTagID: [Tag.ID: Category.ID] = [:]
-    var mergedCategories = false
-
-    for tag in tags {
-      let matchingRoots = categories
-        .filter {
-          $0.parentCategoryID == nil
-            && $0.facetID == nil
-            && $0.name.caseInsensitiveCompare(tag.name) == .orderedSame
-        }
-        .sorted(by: areCategoriesInFoldOrder)
-
-      if var canonical = matchingRoots.first {
-        for duplicate in matchingRoots.dropFirst() {
-          canonical = try mergeCategory(duplicate, into: canonical, in: db)
-          mergedCategories = true
-        }
-        if canonical.color == nil, let color = tag.color {
-          canonical.color = color
-          try Category.find(canonical.id).update { $0.color = #bind(color) }.execute(db)
-        }
-        categories = try Category.fetchAll(db)
-        categoryIDByTagID[tag.id] = canonical.id
-      } else if let priorFold = categories.first(where: { $0.id == tag.id }) {
-        categoryIDByTagID[tag.id] = priorFold.id
-      } else {
-        let category = Category(
-          id: tag.id,
-          name: tag.name,
-          color: tag.color,
-          sortOrder: tag.sortOrder,
-          dateCreated: tag.dateCreated
-        )
-        try Category.insert { category }.execute(db)
-        categories.append(category)
-        categoryIDByTagID[tag.id] = category.id
-      }
-    }
-
-    let pendingRecipeTags = try RecipeTag.fetchAll(db)
-      .sorted(by: areRecipeTagsInFoldOrder)
-      .filter { try RecipeCategory.find($0.id).fetchOne(db) == nil }
-    guard !pendingRecipeTags.isEmpty else {
-      if mergedCategories {
-        try deduplicateRecipeCategoryPairs(in: db)
-      }
-      return
-    }
-
-    var recipeCategories = try RecipeCategory.fetchAll(db)
-    var insertedRecipeCategories = false
-    for tag in pendingRecipeTags {
-      guard let categoryID = categoryIDByTagID[tag.tagID] else { continue }
-      guard !recipeCategories.contains(where: { $0.recipeID == tag.recipeID && $0.categoryID == categoryID }) else {
-        continue
-      }
-      guard !recipeCategories.contains(where: { $0.id == tag.id }) else { continue }
-      let category = RecipeCategory(id: tag.id, recipeID: tag.recipeID, categoryID: categoryID)
-      try RecipeCategory.insert { category }.execute(db)
-      recipeCategories.append(category)
-      insertedRecipeCategories = true
-    }
-    if mergedCategories || insertedRecipeCategories {
-      try deduplicateRecipeCategoryPairs(in: db)
-    }
-  }
-
   public static func sortedCategories(_ categories: [Category]) -> [Category] {
     CategoryHierarchy.displayRows(from: categories).map(\.category)
   }
@@ -634,11 +562,6 @@ public enum CategoryRepository {
 
   fileprivate static func mergeCategory(_ duplicate: Category, into canonical: Category, in db: Database) throws -> Category {
     guard duplicate.id != canonical.id else { return canonical }
-    var canonical = canonical
-    if canonical.color == nil, let color = duplicate.color {
-      canonical.color = color
-      try Category.find(canonical.id).update { $0.color = #bind(color) }.execute(db)
-    }
     for var child in try Category.fetchAll(db) where child.parentCategoryID == duplicate.id {
       child.parentCategoryID = canonical.id
       try Category.upsert { child }.execute(db)
@@ -731,17 +654,6 @@ public enum CategoryRepository {
     return lhs.id.uuidString < rhs.id.uuidString
   }
 
-  private static func areTagsInFoldOrder(_ lhs: Tag, _ rhs: Tag) -> Bool {
-    if lhs.dateCreated != rhs.dateCreated { return lhs.dateCreated < rhs.dateCreated }
-    if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
-    return lhs.id.uuidString < rhs.id.uuidString
-  }
-
-  private static func areRecipeTagsInFoldOrder(_ lhs: RecipeTag, _ rhs: RecipeTag) -> Bool {
-    if lhs.recipeID != rhs.recipeID { return lhs.recipeID.uuidString < rhs.recipeID.uuidString }
-    if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
-    return lhs.id.uuidString < rhs.id.uuidString
-  }
 }
 
 private struct RecipeCategoryPair: Hashable {

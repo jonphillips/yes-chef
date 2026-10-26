@@ -13,8 +13,6 @@ public enum RecipeBundleCoding {
     public var photos: [RecipePhoto]
     public var tagNames: [String]
     public var categoryNames: [String]
-    public var equipment: [Equipment]
-    public var recipeEquipment: [RecipeEquipment]
 
     public init(
       version: Int = 1,
@@ -27,9 +25,7 @@ public enum RecipeBundleCoding {
       recipeNotes: [RecipeNote] = [],
       photos: [RecipePhoto] = [],
       tagNames: [String] = [],
-      categoryNames: [String] = [],
-      equipment: [Equipment] = [],
-      recipeEquipment: [RecipeEquipment] = []
+      categoryNames: [String] = []
     ) {
       self.version = version
       self.recipe = recipe
@@ -42,8 +38,6 @@ public enum RecipeBundleCoding {
       self.photos = photos
       self.tagNames = tagNames
       self.categoryNames = categoryNames
-      self.equipment = equipment
-      self.recipeEquipment = recipeEquipment
     }
 
     public var ingredients: [String] {
@@ -81,9 +75,7 @@ public enum RecipeBundleCoding {
     notes: [RecipeNote],
     tagNames: [String],
     categoryNames: [String],
-    photos: [RecipePhoto] = [],
-    equipment: [Equipment] = [],
-    recipeEquipment: [RecipeEquipment] = []
+    photos: [RecipePhoto] = []
   ) throws -> Data {
     let snapshot = RecipeBundle(
       recipe: recipe,
@@ -96,9 +88,7 @@ public enum RecipeBundleCoding {
       recipeNotes: notes.sorted { $0.dateCreated < $1.dateCreated },
       photos: leanSnapshotPhotos(photos),
       tagNames: tagNames,
-      categoryNames: categoryNames,
-      equipment: equipment,
-      recipeEquipment: recipeEquipment
+      categoryNames: categoryNames
     )
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

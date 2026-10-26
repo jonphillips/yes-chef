@@ -19,7 +19,6 @@ extension RecipeCoreTests {
         originalText: "8-10 ounces kale",
         comment: "keep this comment",
         isOptional: true,
-        shoppingCategory: "Produce",
         doNotShop: true,
         sortOrder: 4,
         confidence: .low
@@ -61,7 +60,6 @@ extension RecipeCoreTests {
         canonicalName: "1/2-inch piece fresh ginger",
         preparation: "peeled",
         isOptional: true,
-        shoppingCategory: "Produce",
         doNotShop: true,
         sortOrder: 7,
         confidence: .medium
@@ -93,7 +91,6 @@ extension RecipeCoreTests {
         expectNoDifference(repaired.item, "kale")
         expectNoDifference(repaired.canonicalName, "kale")
         expectNoDifference(repaired.comment, "keep this comment")
-        expectNoDifference(repaired.shoppingCategory, "Produce")
         expectNoDifference(repaired.isOptional, true)
         expectNoDifference(repaired.doNotShop, true)
         expectNoDifference(repaired.sortOrder, 4)
@@ -108,7 +105,6 @@ extension RecipeCoreTests {
         expectNoDifference(repairedSize.canonicalName, CanonicalIngredient.canonicalName("1 1/2-inch piece fresh ginger"))
         expectNoDifference(repairedSize.preparation, "peeled")
         expectNoDifference(repairedSize.confidence, .low)
-        expectNoDifference(repairedSize.shoppingCategory, "Produce")
         expectNoDifference(repairedSize.isOptional, true)
         expectNoDifference(repairedSize.doNotShop, true)
         expectNoDifference(repairedSize.sortOrder, 7)

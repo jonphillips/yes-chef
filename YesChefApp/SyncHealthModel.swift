@@ -625,7 +625,7 @@ final class SyncHealthModel {
   nonisolated private static let recipeChildRecordTypes: Set<String> = [
     "recipeSources", "recipeImportRef", "ingredientSections", "ingredientLines",
     "instructionSections", "instructionSteps", "recipeNotes", "recipePhotos",
-    "recipeServeWith", "recipeTags", "recipeCategories", "recipeEquipment",
+    "recipeServeWith", "recipeCategories",
     "recipeVariations", "recipeActiveVariations", "recipeRelatedRecipes",
     "recipeDeliberationLog",
   ]

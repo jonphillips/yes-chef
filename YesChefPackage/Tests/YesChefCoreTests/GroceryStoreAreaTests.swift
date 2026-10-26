@@ -202,7 +202,7 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func preservesUserSetAisleOnGenerationAndBackfill() throws {
+    func usesSeededAisleAndPreservesLaterUserEdit() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 880_000_000)
       let recipeID = SampleUUIDSequence.uuid(88_001)
@@ -227,7 +227,6 @@ extension RecipeCoreTests {
               sectionID: sectionID,
               originalText: "chicken thighs",
               item: "chicken thighs",
-              shoppingCategory: "My Butcher",
               sortOrder: 0
             )
           ],
@@ -243,7 +242,11 @@ extension RecipeCoreTests {
           uuid: { uuids.next() }
         )
         let item = try #require(try GroceryItem.find(itemID[0]).fetchOne(db))
-        expectNoDifference(item.aisle, "My Butcher")
+        expectNoDifference(item.aisle, "Meat & Seafood")
+
+        var editedItem = item
+        editedItem.aisle = "My Butcher"
+        try GroceryItem.upsert { editedItem }.execute(db)
 
         try GroceryStoreAreaCache.backfill(in: db)
         let backfilledItem = try #require(try GroceryItem.find(itemID[0]).fetchOne(db))

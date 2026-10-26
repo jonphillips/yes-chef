@@ -38,7 +38,6 @@ extension RecipeCoreTests {
               quantityText: "2",
               unit: "cups",
               item: "milk",
-              shoppingCategory: "Dairy",
               sortOrder: 0,
               confidence: .medium
             )

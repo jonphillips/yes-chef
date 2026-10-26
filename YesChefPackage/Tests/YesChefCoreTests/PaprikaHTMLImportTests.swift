@@ -372,12 +372,8 @@ extension RecipeCoreTests {
           instructionSteps: 8,
           recipeNotes: 1,
           recipePhotos: 1,
-          tags: 0,
           categories: 3,
-          equipment: 0,
-          recipeTags: 0,
-          recipeCategories: 3,
-          recipeEquipment: 0
+          recipeCategories: 3
         )
       )
 
@@ -527,51 +523,6 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func rollbackPreservesLinkedEquipmentWithoutBatchProvenance() throws {
-      @Dependency(\.defaultDatabase) var database
-      let parseResult = try PaprikaHTMLImporter.parseExport(at: Self.fixtureURL)
-      let pasta = try #require(parseResult.recipes.first { $0.title == "Weeknight Tomato Pasta" })
-      let now = Date(timeIntervalSinceReferenceDate: 802_950_000)
-      let equipment = Equipment(
-        id: SampleUUIDSequence.uuid(14_800),
-        name: "Dutch oven",
-        equipmentType: "Cookware"
-      )
-      var bundleUUIDs = SampleUUIDSequence(start: 14_900)
-      var bundle = try pasta.makeRecipeBundle(now: now, uuid: { bundleUUIDs.next() })
-      bundle.equipment = [equipment]
-      bundle.recipeEquipment = [
-        RecipeEquipment(
-          id: SampleUUIDSequence.uuid(14_801),
-          recipeID: bundle.recipe.id,
-          equipmentID: equipment.id
-        )
-      ]
-
-      let importSummary = try database.write { db in
-        try Equipment.insert { equipment }.execute(db)
-        var repositoryUUIDs = SampleUUIDSequence(start: 14_950)
-        return try RecipeRepository.importBundles(
-          [bundle],
-          in: db,
-          now: now,
-          uuid: { repositoryUUIDs.next() }
-        )
-      }
-
-      let rollback = try database.write { db in
-        try RecipeRepository.rollbackImportedRecipes(recipeIDs: importSummary.importedIDs, in: db)
-      }
-      let remainingEquipment = try database.read { db in
-        try Equipment.find(equipment.id).fetchOne(db)
-      }
-
-      expectNoDifference(rollback.recipeEquipment, 1)
-      expectNoDifference(rollback.equipment, 0)
-      expectNoDifference(remainingEquipment, equipment)
-    }
-
-    @Test
     func rollbackRecipeImportLeavesGroceryDanglingSourceReadable() throws {
       @Dependency(\.defaultDatabase) var database
       let parseResult = try PaprikaHTMLImporter.parseExport(at: Self.fixtureURL)
@@ -670,12 +621,8 @@ private struct LibraryEntityCounts: Equatable {
   var instructionSteps: Int
   var recipeNotes: Int
   var recipePhotos: Int
-  var tags: Int
   var categories: Int
-  var equipment: Int
-  var recipeTags: Int
   var recipeCategories: Int
-  var recipeEquipment: Int
 
   static func fetch(in db: Database) throws -> Self {
     Self(
@@ -688,12 +635,8 @@ private struct LibraryEntityCounts: Equatable {
       instructionSteps: try InstructionStep.fetchAll(db).count,
       recipeNotes: try RecipeNote.fetchAll(db).count,
       recipePhotos: try RecipePhoto.fetchAll(db).count,
-      tags: try Tag.fetchAll(db).count,
       categories: try YesChefCore.Category.fetchAll(db).count,
-      equipment: try Equipment.fetchAll(db).count,
-      recipeTags: try RecipeTag.fetchAll(db).count,
-      recipeCategories: try RecipeCategory.fetchAll(db).count,
-      recipeEquipment: try RecipeEquipment.fetchAll(db).count
+      recipeCategories: try RecipeCategory.fetchAll(db).count
     )
   }
 }

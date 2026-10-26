@@ -120,7 +120,6 @@ public struct RecipeBrowserRecipe: Equatable, Sendable {
   public var totalTimeMinutes: Int?
   public var prepTimeMinutes: Int?
   public var cookTimeMinutes: Int?
-  public var activeTimeMinutes: Int?
   public var servings: Double?
   public var rating: Int?
   public var favorite: Bool
@@ -141,7 +140,6 @@ public struct RecipeBrowserRecipe: Equatable, Sendable {
     totalTimeMinutes: Int? = nil,
     prepTimeMinutes: Int? = nil,
     cookTimeMinutes: Int? = nil,
-    activeTimeMinutes: Int? = nil,
     servings: Double? = nil,
     rating: Int? = nil,
     favorite: Bool = false,
@@ -162,7 +160,6 @@ public struct RecipeBrowserRecipe: Equatable, Sendable {
     self.totalTimeMinutes = totalTimeMinutes
     self.prepTimeMinutes = prepTimeMinutes
     self.cookTimeMinutes = cookTimeMinutes
-    self.activeTimeMinutes = activeTimeMinutes
     self.servings = servings
     self.rating = rating
     self.favorite = favorite
@@ -175,7 +172,7 @@ public struct RecipeBrowserRecipe: Equatable, Sendable {
 
   public var listTimeMinutes: Int? {
     if let totalTimeMinutes { return totalTimeMinutes }
-    let parts = [prepTimeMinutes, cookTimeMinutes, activeTimeMinutes].compactMap { $0 }
+    let parts = [prepTimeMinutes, cookTimeMinutes].compactMap { $0 }
     return parts.isEmpty ? nil : parts.reduce(0, +)
   }
 
@@ -669,7 +666,6 @@ public struct RecipeBrowserDataRequest: FetchKeyRequest {
           totalTimeMinutes: $0.totalTimeMinutes,
           prepTimeMinutes: $0.prepTimeMinutes,
           cookTimeMinutes: $0.cookTimeMinutes,
-          activeTimeMinutes: $0.activeTimeMinutes,
           servings: $0.servings,
           rating: $0.rating,
           favorite: $0.favorite,
@@ -752,7 +748,6 @@ private struct RecipeBrowserRecipeRow: Equatable, Sendable {
   let totalTimeMinutes: Int?
   let prepTimeMinutes: Int?
   let cookTimeMinutes: Int?
-  let activeTimeMinutes: Int?
   let servings: Double?
   let rating: Int?
   let favorite: Bool
@@ -773,7 +768,6 @@ private struct RecipeBrowserRecipeRow: Equatable, Sendable {
       totalTimeMinutes: totalTimeMinutes,
       prepTimeMinutes: prepTimeMinutes,
       cookTimeMinutes: cookTimeMinutes,
-      activeTimeMinutes: activeTimeMinutes,
       servings: servings,
       rating: rating,
       favorite: favorite,

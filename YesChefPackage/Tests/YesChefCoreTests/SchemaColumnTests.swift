@@ -120,6 +120,90 @@ struct SchemaColumnTests {
     }
     try migratedDatabase.close()
   }
+
+  @Test
+  func droppingRetiredColumnsAndTablesPreservesCategoriesAndRecipeData() async throws {
+    let databaseURL = try temporaryDirectory().appendingPathComponent("retired-schema-library.sqlite")
+    let recipeID = UUID()
+    let categoryID = UUID()
+    let recipeCategoryID = UUID()
+    let tagID = UUID()
+    let recipeTagID = UUID()
+    let now = Date(timeIntervalSinceReferenceDate: 812_000_000)
+    let expectedRecipe = Recipe(
+      id: recipeID,
+      title: "Recipe survives retired schema",
+      summary: "Still intact",
+      servingsText: "Feeds four",
+      dateCreated: now,
+      dateModified: now.addingTimeInterval(60)
+    )
+    let expectedCategory = Category(
+      id: categoryID,
+      name: "Weeknight",
+      facetID: nil,
+      sortOrder: 3,
+      dateCreated: now
+    )
+    let expectedLink = RecipeCategory(id: recipeCategoryID, recipeID: recipeID, categoryID: categoryID)
+    let database = try pathBackedDatabase(at: databaseURL)
+
+    try await database.write { db in
+      try Recipe.insert { expectedRecipe }.execute(db)
+      try Category.insert { expectedCategory }.execute(db)
+      try RecipeCategory.insert { expectedLink }.execute(db)
+      for (table, column, type) in [
+        ("recipes", "activeTimeMinutes", "INTEGER"),
+        ("recipes", "restTimeMinutes", "INTEGER"),
+        ("ingredientLines", "shoppingCategory", "TEXT"),
+        ("recipeNotes", "cookingSessionID", "TEXT"),
+        ("categories", "color", "TEXT"),
+        ("mealPlanItems", "startTime", "TEXT"),
+        ("mealPlanItems", "endTime", "TEXT"),
+      ] {
+        try db.execute(sql: "ALTER TABLE \"\(table)\" ADD COLUMN \"\(column)\" \(type)")
+      }
+      try db.execute(sql: #"CREATE TABLE "tags" ("id" TEXT PRIMARY KEY, "name" TEXT, "color" TEXT, "sortOrder" INTEGER, "dateCreated" TEXT) STRICT"#)
+      try db.execute(sql: #"CREATE TABLE "recipeTags" ("id" TEXT PRIMARY KEY, "recipeID" TEXT, "tagID" TEXT, "sortOrder" INTEGER) STRICT"#)
+      try db.execute(sql: #"CREATE TABLE "equipment" ("id" TEXT PRIMARY KEY, "name" TEXT) STRICT"#)
+      try db.execute(sql: #"CREATE TABLE "recipeEquipment" ("id" TEXT PRIMARY KEY, "recipeID" TEXT, "equipmentID" TEXT) STRICT"#)
+      try db.execute(
+        sql: #"INSERT INTO "tags" VALUES (?, ?, ?, ?, ?)"#,
+        arguments: [tagID.uuidString, "Weeknight", "orange", 0, "2026-10-26T12:00:00Z"]
+      )
+      try db.execute(sql: #"INSERT INTO "recipeTags" VALUES (?, ?, ?, ?)"#, arguments: [recipeTagID.uuidString, recipeID.uuidString, tagID.uuidString, 0])
+      try db.execute(
+        sql: #"DELETE FROM "grdb_migrations" WHERE "identifier" = 'Drop never-set columns and retired tag and equipment tables'"#
+      )
+    }
+    try database.close()
+
+    let migratedDatabase = try pathBackedDatabase(at: databaseURL)
+    try await migratedDatabase.read { db in
+      #expect(try Recipe.find(recipeID).fetchOne(db) == expectedRecipe)
+      #expect(try Category.find(categoryID).fetchOne(db) == expectedCategory)
+      #expect(try RecipeCategory.find(recipeCategoryID).fetchOne(db) == expectedLink)
+      let droppedColumns: [(String, String)] = [
+        ("recipes", "activeTimeMinutes"), ("recipes", "restTimeMinutes"),
+        ("ingredientLines", "shoppingCategory"), ("recipeNotes", "cookingSessionID"),
+        ("categories", "color"), ("mealPlanItems", "startTime"), ("mealPlanItems", "endTime"),
+      ]
+      for (table, column) in droppedColumns {
+        let remaining = try Int.fetchOne(
+          db,
+          sql: "SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?",
+          arguments: [table, column]
+        ) ?? 0
+        #expect(remaining == 0, "Unexpected column \(table).\(column)")
+      }
+      let remainingTables = try String.fetchAll(
+        db,
+        sql: #"SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('tags', 'recipeTags', 'equipment', 'recipeEquipment')"#
+      )
+      #expect(remainingTables.isEmpty)
+    }
+    try migratedDatabase.close()
+  }
 }
 
 private struct PersistedTableModel {
@@ -151,11 +235,7 @@ private let persistedTableModels = [
   persistedTableModel(InstructionStep.self),
   persistedTableModel(RecipeNote.self),
   persistedTableModel(RecipePhoto.self),
-  persistedTableModel(Tag.self),
-  persistedTableModel(Equipment.self),
-  persistedTableModel(RecipeTag.self),
   persistedTableModel(RecipeCategory.self),
-  persistedTableModel(RecipeEquipment.self),
   persistedTableModel(AIHandoff.self),
   persistedTableModel(Learning.self),
   persistedTableModel(Category.self),

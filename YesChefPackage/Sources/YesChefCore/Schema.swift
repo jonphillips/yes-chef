@@ -1298,6 +1298,31 @@ extension DependencyValues {
       .execute(db)
     }
 
+    migrator.registerMigration("Drop never-set columns and retired tag and equipment tables") { db in
+      let columnsByTable = [
+        "recipes": ["activeTimeMinutes", "restTimeMinutes"],
+        "ingredientLines": ["shoppingCategory"],
+        "recipeNotes": ["cookingSessionID"],
+        "categories": ["color"],
+        "mealPlanItems": ["startTime", "endTime"],
+      ]
+      for (table, columns) in columnsByTable {
+        for column in columns {
+          let columnExists = (try Int.fetchOne(
+            db,
+            sql: "SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?",
+            arguments: [table, column]
+          ) ?? 0) > 0
+          if columnExists {
+            try db.execute(sql: "ALTER TABLE \"\(table)\" DROP COLUMN \"\(column)\"")
+          }
+        }
+      }
+      for table in ["recipeTags", "tags", "recipeEquipment", "equipment"] {
+        try db.execute(sql: "DROP TABLE IF EXISTS \"\(table)\"")
+      }
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)
@@ -1317,7 +1342,6 @@ extension DependencyValues {
           if facetMigrationAudit.requiresReview {
             AppLog.dataIntegrity.warning("\(facetMigrationAudit.logSummary, privacy: .public)")
           }
-          try CategoryRepository.foldDormantTagsIntoCategories(in: db)
           let variationAnchorBackfill = try RecipeRepository.backfillVariationAnchors(in: db)
           if variationAnchorBackfill.hasFindings {
             AppLog.dataIntegrity.warning("\(variationAnchorBackfill.logSummary, privacy: .public)")

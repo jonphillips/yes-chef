@@ -107,7 +107,6 @@ extension RecipeCoreTests {
               quantity: 2,
               quantityText: "2",
               item: "eggs",
-              shoppingCategory: "Dairy",
               sortOrder: 0,
               confidence: .medium
             ),
@@ -120,7 +119,6 @@ extension RecipeCoreTests {
               quantityText: "1",
               unit: "cup",
               item: "milk",
-              shoppingCategory: "Dairy",
               sortOrder: 1,
               confidence: .medium
             ),
@@ -196,7 +194,6 @@ extension RecipeCoreTests {
               quantityText: "2",
               unit: "cups",
               item: "milk",
-              shoppingCategory: "Dairy",
               sortOrder: 0,
               confidence: .medium
             )
@@ -218,7 +215,6 @@ extension RecipeCoreTests {
               quantityText: "1.5",
               unit: "cups",
               item: "Milk",
-              shoppingCategory: "Dairy",
               sortOrder: 0,
               confidence: .medium
             )
@@ -297,7 +293,6 @@ extension RecipeCoreTests {
               quantityText: "1",
               unit: "cup",
               item: "milk",
-              shoppingCategory: "Dairy",
               sortOrder: 0,
               confidence: .medium
             )
@@ -319,7 +314,6 @@ extension RecipeCoreTests {
               quantityText: "1",
               unit: "cup",
               item: "milk",
-              shoppingCategory: "Dairy",
               sortOrder: 0,
               confidence: .medium
             )
@@ -342,7 +336,6 @@ extension RecipeCoreTests {
               unit: "cup",
               item: "milk",
               preparation: "warmed",
-              shoppingCategory: "Dairy",
               sortOrder: 0,
               confidence: .medium
             )
@@ -605,7 +598,6 @@ extension RecipeCoreTests {
               quantityText: "2",
               unit: "cups",
               item: "flour",
-              shoppingCategory: "Baking",
               sortOrder: 0,
               confidence: .medium
             ),
@@ -618,7 +610,6 @@ extension RecipeCoreTests {
               quantityText: "1",
               unit: "cup",
               item: "sugar",
-              shoppingCategory: "Baking",
               sortOrder: 1,
               confidence: .medium
             ),
@@ -631,7 +622,6 @@ extension RecipeCoreTests {
               quantityText: "4",
               unit: "tablespoons",
               item: "butter",
-              shoppingCategory: "Dairy",
               sortOrder: 2,
               confidence: .medium
             ),
@@ -698,7 +688,6 @@ extension RecipeCoreTests {
               quantityText: "2",
               unit: "cups",
               item: "milk",
-              shoppingCategory: "Dairy",
               sortOrder: 0,
               confidence: .medium
             )
@@ -721,7 +710,6 @@ extension RecipeCoreTests {
               quantityText: "1.5",
               unit: "cups",
               item: "milk",
-              shoppingCategory: "Dairy",
               sortOrder: 0,
               confidence: .medium
             )
@@ -800,7 +788,6 @@ extension RecipeCoreTests {
               quantityText: "2",
               unit: "cups",
               item: "milk",
-              shoppingCategory: "Dairy",
               sortOrder: 0,
               confidence: .medium
             ),
@@ -812,7 +799,6 @@ extension RecipeCoreTests {
               quantity: 2,
               quantityText: "2",
               item: "eggs",
-              shoppingCategory: "Dairy",
               sortOrder: 1,
               confidence: .medium
             ),
@@ -834,7 +820,6 @@ extension RecipeCoreTests {
               quantityText: "1.5",
               unit: "cups",
               item: "milk",
-              shoppingCategory: "Dairy",
               sortOrder: 0,
               confidence: .medium
             )
@@ -916,7 +901,6 @@ extension RecipeCoreTests {
               quantityText: "2",
               unit: "cups",
               item: "milk",
-              shoppingCategory: "Dairy",
               sortOrder: 0,
               confidence: .medium
             ),
@@ -928,7 +912,6 @@ extension RecipeCoreTests {
               quantity: 2,
               quantityText: "2",
               item: "eggs",
-              shoppingCategory: "Dairy",
               sortOrder: 1,
               confidence: .medium
             ),

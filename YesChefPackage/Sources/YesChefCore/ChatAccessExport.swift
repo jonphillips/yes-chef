@@ -139,12 +139,8 @@ public enum ChatAccessExportBuilder {
     let instructionSections = try InstructionSection.fetchAll(db)
     let instructionSteps = try InstructionStep.fetchAll(db)
     let recipeNotes = try RecipeNote.fetchAll(db)
-    let recipeTags = try RecipeTag.fetchAll(db)
-    let tagsByID = try Dictionary(uniqueKeysWithValues: Tag.fetchAll(db).map { ($0.id, $0.name) })
     let recipeCategories = try RecipeCategory.fetchAll(db)
     let categoriesByID = try Dictionary(uniqueKeysWithValues: Category.fetchAll(db).map { ($0.id, $0.name) })
-    let recipeEquipment = try RecipeEquipment.fetchAll(db)
-    let equipmentByID = try Dictionary(uniqueKeysWithValues: Equipment.fetchAll(db).map { ($0.id, $0) })
     let photos = try RecipePhoto.fetchAll(db)
     let sourcesByRecipeID = Dictionary(uniqueKeysWithValues: sources.map { ($0.recipeID, $0) })
     let ingredientSectionsByRecipeID = Dictionary(grouping: ingredientSections, by: \.recipeID)
@@ -152,23 +148,18 @@ public enum ChatAccessExportBuilder {
     let instructionSectionsByRecipeID = Dictionary(grouping: instructionSections, by: \.recipeID)
     let instructionStepsByRecipeID = Dictionary(grouping: instructionSteps, by: \.recipeID)
     let notesByRecipeID = Dictionary(grouping: recipeNotes, by: \.recipeID)
-    let tagsByRecipeID = Dictionary(grouping: recipeTags, by: \.recipeID)
     let categoriesByRecipeID = Dictionary(grouping: recipeCategories, by: \.recipeID)
-    let equipmentByRecipeID = Dictionary(grouping: recipeEquipment, by: \.recipeID)
     let photosByRecipeID = Dictionary(grouping: photos, by: \.recipeID)
 
     let bundles = recipes.map { recipe in
       let id = recipe.id
-      let associations = equipmentByRecipeID[id, default: []]
       let sections = ingredientSectionsByRecipeID[id, default: []].sorted { $0.sortOrder < $1.sortOrder }
       let lines = ingredientLinesByRecipeID[id, default: []].sorted { $0.sortOrder < $1.sortOrder }
       let methodSections = instructionSectionsByRecipeID[id, default: []].sorted { $0.sortOrder < $1.sortOrder }
       let steps = instructionStepsByRecipeID[id, default: []].sorted { $0.sortOrder < $1.sortOrder }
       let notes = notesByRecipeID[id, default: []].sorted { $0.dateCreated < $1.dateCreated }
-      let tagNames = tagsByRecipeID[id, default: []].compactMap { tagsByID[$0.tagID] }.sorted()
       let categoryNames = categoriesByRecipeID[id, default: []].compactMap { categoriesByID[$0.categoryID] }.sorted()
-      let equipment = associations.compactMap { equipmentByID[$0.equipmentID] }
-      return RecipeBundleCoding.RecipeBundle(recipe: recipe, source: sourcesByRecipeID[id], ingredientSections: sections, ingredientLines: lines, instructionSections: methodSections, instructionSteps: steps, recipeNotes: notes, photos: photosByRecipeID[id, default: []], tagNames: tagNames, categoryNames: categoryNames, equipment: equipment, recipeEquipment: associations)
+      return RecipeBundleCoding.RecipeBundle(recipe: recipe, source: sourcesByRecipeID[id], ingredientSections: sections, ingredientLines: lines, instructionSections: methodSections, instructionSteps: steps, recipeNotes: notes, photos: photosByRecipeID[id, default: []], categoryNames: categoryNames)
     }
 
     let menuItems = try MenuItem.fetchAll(db)

@@ -133,7 +133,6 @@ extension RecipeCoreTests {
               quantity: 4,
               quantityText: "4",
               item: "anchovy fillets",
-              shoppingCategory: "Seafood",
               sortOrder: 0
             ),
             IngredientLine(
@@ -144,7 +143,6 @@ extension RecipeCoreTests {
               quantity: 2,
               quantityText: "2",
               item: "scallions",
-              shoppingCategory: "Produce",
               sortOrder: 1
             ),
             IngredientLine(
@@ -155,7 +153,6 @@ extension RecipeCoreTests {
               quantity: 1,
               quantityText: "1",
               item: "tomato",
-              shoppingCategory: "Produce",
               sortOrder: 2
             ),
           ],
@@ -175,7 +172,6 @@ extension RecipeCoreTests {
               quantity: 2,
               quantityText: "2",
               item: "anchovies",
-              shoppingCategory: "Seafood",
               sortOrder: 0
             ),
             IngredientLine(
@@ -186,7 +182,6 @@ extension RecipeCoreTests {
               quantity: 1,
               quantityText: "1",
               item: "green onion",
-              shoppingCategory: "Produce",
               sortOrder: 1
             ),
             IngredientLine(
@@ -197,7 +192,6 @@ extension RecipeCoreTests {
               quantity: 2,
               quantityText: "2",
               item: "tomatoes",
-              shoppingCategory: "Produce",
               sortOrder: 2
             ),
           ],
