@@ -13,6 +13,8 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**Chat access over MCP — S2** (after this PR merges). On the iPad, stage a recipe from ChatGPT without opening it; confirm the Create Recipe sidebar row shows the count and it clears after Open or Discard. On iPhone, confirm the count is shown on the control that opens Create Recipe. Refresh in Settings → Chat Access; confirm last export time and size update. On the Mac, confirm `search_recipes` and `get_recipe` return expected content and export age. Evict the newest export with `brctl evict`, call `get_recipe`, and confirm it succeeds within 60 seconds; record the helper's materialize and read timings. Background the iPad to write its per-install export, then confirm tools choose the newest export and reject a ref from the previous export as stale.
+
 **Automatic backups (ADR-0008 S1; effort brief `automatic-backups`).** Run this on the first TestFlight build
 after the change merges; Debug builds intentionally take no automatic backups. On iPhone and iPad, open Yes Chef
 with Automatic Backups enabled and confirm a dated `YesChef-Auto-` file appears in Files under iCloud Drive →

@@ -16,8 +16,7 @@ struct YesChefMCPTests {
     let server = YesChefMCPServer.make(containerURL: container) { fixedDate }
     let list = try #require(await server.handle(line: request("tools/list")))
     let tools = try object(list)["result"]?.objectValue?["tools"]?.arrayValue ?? []
-    #expect(tools.count == 1)
-    #expect(tools.first?.objectValue?["name"] == .string("stage_recipe"))
+    #expect(Set(tools.compactMap { $0.objectValue?["name"]?.stringValue }) == Set(["stage_recipe", "search_recipes", "get_recipe", "list_menus", "get_menu", "get_meal_plan"]))
 
     let response = try #require(await server.handle(line: toolCall("stage_recipe", recipe: validRecipe)))
     let responseObject = try object(response)["result"]?.objectValue ?? [:]
@@ -36,6 +35,95 @@ struct YesChefMCPTests {
     let parsed = try RecipeContractStaging.validate(stagedText)
     #expect(parsed.title == "Braised Beans")
     #expect(try inbox.list().count == 1)
+  }
+
+  @Test func readToolsServeTextOnlyResultsAndRejectOldRefs() async throws {
+    let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let container = temporary.appending(path: "container", directoryHint: .isDirectory)
+    let exportFolder = ChatAccessFolder(containerURL: container).exportsURL
+    try FileManager.default.createDirectory(at: exportFolder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: temporary) }
+    let fixedDate = ISO8601DateFormatter().date(from: "2026-10-21T12:00:00Z")!
+    let recipeID = UUID()
+    let recipe = Recipe(id: recipeID, title: "Braised Beans", servingsText: "4", totalTimeMinutes: 90, cuisine: "Italian", course: "Dinner", dateCreated: fixedDate, dateModified: fixedDate)
+    let sectionID = UUID()
+    let bundle = RecipeBundleCoding.RecipeBundle(recipe: recipe, ingredientSections: [IngredientSection(id: sectionID, recipeID: recipeID, name: "Main", sortOrder: 0)], ingredientLines: [IngredientLine(id: UUID(), recipeID: recipeID, sectionID: sectionID, originalText: "1 cup beans", sortOrder: 0)], tagNames: ["Beans"])
+    let menu = ChatAccessExport.MenuRecord(id: UUID(), title: "Sunday", notes: nil, dayCount: 1, modified: fixedDate, items: [])
+    let export = ChatAccessExport(generatedAt: fixedDate, device: "iPad", recipes: [bundle], menus: [menu], mealPlan: [])
+    let exportURL = exportFolder.appending(path: "install.json")
+    try ChatAccessExportCoding.encode(export).write(to: exportURL)
+    let server = YesChefMCPServer.make(containerURL: container) { fixedDate.addingTimeInterval(600) }
+
+    let search = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("beans")])))
+    let searchText = try toolText(search)
+    #expect(searchText.contains("Braised Beans"))
+    #expect(searchText.contains("ageMinutes"))
+    #expect(!containsUUID(searchText))
+    let parsed = try object(searchText)
+    let ref = try #require(parsed["recipes"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
+    let detail = try #require(await server.handle(line: genericToolCall("get_recipe", args: ["ref": .string(ref)])))
+    let detailText = try toolText(detail)
+    #expect(detailText.contains("1 cup beans"))
+    #expect(!containsUUID(detailText))
+
+    let menus = try #require(await server.handle(line: genericToolCall("list_menus", args: [:])))
+    #expect(!containsUUID(try toolText(menus)))
+    let menuRef = try #require(object(toolText(menus))["menus"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
+    let menuDetail = try #require(await server.handle(line: genericToolCall("get_menu", args: ["ref": .string(menuRef)])))
+    let menuText = try toolText(menuDetail)
+    #expect(menuText.contains("Sunday"))
+    #expect(!containsUUID(menuText))
+    let mealPlan = try #require(await server.handle(line: genericToolCall("get_meal_plan", args: ["from": .string("2026-10-21"), "to": .string("2026-10-22")])))
+    #expect(try toolText(mealPlan).contains("items"))
+    #expect(!containsUUID(try toolText(mealPlan)))
+    try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: 60)], ofItemAtPath: exportURL.path)
+    let stale = try #require(await server.handle(line: genericToolCall("get_recipe", args: ["ref": .string(ref)])))
+    #expect(try object(stale)["result"]?.objectValue?["isError"] == .bool(true))
+    #expect(try toolText(stale).contains("older export; search again"))
+  }
+
+  @Test func readToolsExplainWhenNoExportExists() async throws {
+    let container = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let server = YesChefMCPServer.make(containerURL: container)
+    let response = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("soup")])))
+    #expect(try toolText(response).contains("No Yes Chef export yet"))
+    try? FileManager.default.removeItem(at: container)
+  }
+
+  @Test func materializerSeamReturnsTimeoutErrorWithoutWaitingSixtySeconds() async throws {
+    let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let container = temporary.appending(path: "container", directoryHint: .isDirectory)
+    let exports = ChatAccessFolder(containerURL: container).exportsURL
+    try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
+    try Data("placeholder".utf8).write(to: exports.appending(path: "install.json"))
+    defer { try? FileManager.default.removeItem(at: temporary) }
+    let server = YesChefMCPServer.make(
+      containerURL: container,
+      exportMaterializer: { _ in try await Task.sleep(for: .seconds(1)); return Data() },
+      materializationDeadline: .milliseconds(10)
+    )
+    let response = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("soup")])))
+    #expect(try toolText(response).contains("still downloading from iCloud"))
+  }
+
+  @Test func recipeSearchUsesTwentyDefaultAndFiftyMaximum() async throws {
+    let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let container = temporary.appending(path: "container", directoryHint: .isDirectory)
+    let exports = ChatAccessFolder(containerURL: container).exportsURL
+    try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: temporary) }
+    let date = Date(timeIntervalSince1970: 1_800_000_000)
+    let bundles = (0..<51).map { index in
+      RecipeBundleCoding.RecipeBundle(recipe: Recipe(id: UUID(), title: "Recipe \(index)", dateCreated: date, dateModified: date))
+    }
+    let export = ChatAccessExport(generatedAt: date, device: "iPhone", recipes: bundles, menus: [], mealPlan: [])
+    try ChatAccessExportCoding.encode(export).write(to: exports.appending(path: "install.json"))
+    let server = YesChefMCPServer.make(containerURL: container) { date }
+
+    let defaults = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("")])))
+    #expect(try object(toolText(defaults))["recipes"]?.arrayValue?.count == 20)
+    let capped = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string(""), "limit": .integer(100)])))
+    #expect(try object(toolText(capped))["recipes"]?.arrayValue?.count == 50)
   }
 
   @Test func invalidRecipeReturnsErrorAndStagesNothing() async throws {
@@ -83,6 +171,22 @@ struct YesChefMCPTests {
       "method": .string("tools/call"),
       "params": .object(["name": .string(name), "arguments": .object(["recipe": recipe])]),
     ])), as: UTF8.self)
+  }
+
+  private func genericToolCall(_ name: String, args: [String: MCPValue]) -> String {
+    String(decoding: try! JSONEncoder().encode(MCPValue.object([
+      "jsonrpc": .string("2.0"), "id": .integer(1), "method": .string("tools/call"),
+      "params": .object(["name": .string(name), "arguments": .object(args)]),
+    ])), as: UTF8.self)
+  }
+
+  private func toolText(_ response: String) throws -> String {
+    let responseObject = try object(response)["result"]?.objectValue ?? [:]
+    return try #require(responseObject["content"]?.arrayValue?.first?.objectValue?["text"]?.stringValue)
+  }
+
+  private func containsUUID(_ text: String) -> Bool {
+    text.range(of: #"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}"#, options: .regularExpression) != nil
   }
 
   private func object(_ json: String) throws -> [String: MCPValue] {

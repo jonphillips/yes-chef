@@ -9,6 +9,11 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Chat access over MCP — S2 export and read tools (`effort/chat-access-mcp-s2`)
+
+**2026-10-26. Schema-free.** Yes Chef writes a text-only, versioned library export per installation and exposes recipe search/detail, menu list/detail, and meal-plan read tools from the newest iCloud Drive export. Reads materialize the selected export with a bounded coordinated read and return export age; references expire when that file changes. Settings adds Chat Access export status and Refresh. The Create Recipe badge modifier now precedes hidden tab visibility. Lint, 730 core tests, 7 helper tests, generic iOS build, and all 83 `YesChefTests` pass. The badge's iPad rendering and Mac iCloud materialization remain owed in `device-passes.md`.
+
+---
 ## Device passes cleared — production cutover Phase 1, sync failure Slices 1–6
 
 **2026-10-26. Jon's passes.** The raw-import-HTML drop and the dead cook-column drop are passed, so

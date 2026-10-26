@@ -18,4 +18,8 @@ public struct ChatAccessFolder: Sendable {
   public var processedURL: URL {
     inboxURL.appending(path: "Processed", directoryHint: .isDirectory)
   }
+
+  public var exportsURL: URL {
+    url.appending(path: "Exports", directoryHint: .isDirectory)
+  }
 }

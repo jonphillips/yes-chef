@@ -13,6 +13,8 @@ struct SettingsView: View {
   )
   @State private var backupRestore: DatabaseBackupRestoreModel
   let automaticBackupModel: AutomaticBackupModel
+  let chatAccessExportModel: ChatAccessExportModel
+  let chatAccessInboxModel: ChatAccessInboxModel
   @State private var backupExportDocument: BackupExportDocument?
   @State private var backupExportFilename = "YesChef-Backup.sqlite"
   @State private var isPresentingBackupExporter = false
@@ -28,12 +30,16 @@ struct SettingsView: View {
     model: RecipeLibraryModel,
     groceryModel: GroceryLibraryModel,
     automaticBackupModel: AutomaticBackupModel,
+    chatAccessExportModel: ChatAccessExportModel,
+    chatAccessInboxModel: ChatAccessInboxModel,
     selectedPane: Binding<SettingsPane?>? = nil
   ) {
     self.model = model
     self.groceryModel = groceryModel
     self.selectedPane = selectedPane
     self.automaticBackupModel = automaticBackupModel
+    self.chatAccessExportModel = chatAccessExportModel
+    self.chatAccessInboxModel = chatAccessInboxModel
     _backupRestore = State(wrappedValue: DatabaseBackupRestoreModel(
       configuration: YesChefCloudSync.databaseBackupConfiguration,
       state: automaticBackupModel.restoreState
@@ -63,6 +69,30 @@ struct SettingsView: View {
 
       Section("AI") {
         aiRow
+      }
+
+      Section("Chat Access") {
+        if let date = chatAccessExportModel.lastExportDate {
+          Text("Last export: \(date.formatted(date: .abbreviated, time: .shortened))")
+          if let size = chatAccessExportModel.lastExportSize {
+            Text(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          }
+        } else {
+          Text("No export yet")
+            .foregroundStyle(.secondary)
+        }
+        Button {
+          Task { await chatAccessExportModel.refresh() }
+        } label: {
+          Label("Refresh", systemImage: "arrow.clockwise")
+        }
+        .disabled(chatAccessExportModel.isRefreshing)
+        LabeledContent("Inbox", value: "\(chatAccessInboxModel.inboxCount)")
+        if let error = chatAccessExportModel.errorMessage {
+          Text(error).foregroundStyle(.red)
+        }
       }
 
       Section("Import & Export") {

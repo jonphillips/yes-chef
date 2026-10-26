@@ -1,6 +1,5 @@
-# Next Up — Chat access over MCP — S2 export and read tools
+# Next Up — nothing dispatched
 
-**Slices:** effort `chat-access-mcp`, S2.
-**Briefs:** docs/efforts/chat-access-mcp.md § S2
-**Done when:** per S2's "Done when"; verification per `docs/verification.md`.
-**Owed:** The automatic-backups pass remains owed (first TestFlight build); see [device-passes.md](device-passes.md).
+Nothing dispatched.
+
+**Owed:** Chat access S2's badge and Mac materialization pass, plus the automatic-backups pass; see [device-passes.md](device-passes.md).
