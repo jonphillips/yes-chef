@@ -144,6 +144,14 @@ Live ambiguities and recently-resolved decisions. Resolved items stay here brief
 - **How to decide.** For each column, grep the model and its writers for any code path that writes it. A write
   path means keep (and create it); none means drop. Record the verdict per column in 4a's missing list. The two
   empty tables (`equipment`, `recipeEquipment`) take the same test.
+- **Proposed 2026-10-26, waiting on Jon** (4a's table, after diffing the Development export). Of the 17 fields
+  Development lacks, 9 have a write path and are kept: `pageNumber`, `mealPlanItems.notes`, `menus.notes`,
+  `workbenchLog.outcome`/`relatedRecipeID`, `remindersListName`, `pantryItems.threshold*`, and
+  `groceryItemSources.menuPlacementID`. 8 have none and are dropped, along with both equipment tables:
+  `activeTimeMinutes`, `restTimeMinutes`, `shoppingCategory`, `cookingSessionID`, `tags.color`, `categories.color`,
+  and `mealPlanItems.startTime`/`endTime`. ⚠️ `categories.color` was on the Prod-schema promotion list, but its
+  only writer copies `tags.color`, which nothing sets. The drops are a persistent model change, so they need
+  Jon's OK before they're dispatched (AGENTS.md § Persistent Model Change Rule).
 - These drops are the only synced-schema change allowed to merge before the cut (4a's sequencing note).
 
 ## Live — recipe normalization ("normalize recipe" function)
