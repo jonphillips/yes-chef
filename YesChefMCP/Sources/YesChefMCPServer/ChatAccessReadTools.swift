@@ -37,7 +37,12 @@ private actor ChatAccessExportStore {
       throw ReadToolError("No Yes Chef export yet. Open Yes Chef on the iPhone or iPad, or tap Refresh in Settings → Chat Access.")
     }
     let key = "\(url.path)|\(modified.timeIntervalSince1970)"
-    if key == cachedKey, let cachedSnapshot { return cachedSnapshot }
+    if key == cachedKey, let cachedSnapshot {
+      var refreshed = cachedSnapshot
+      refreshed.ageMinutes = max(0, Int(now().timeIntervalSince(refreshed.generatedAt) / 60))
+      self.cachedSnapshot = refreshed
+      return refreshed
+    }
 
     let materialize = self.materialize
     let deadline = self.materializationDeadline
@@ -154,9 +159,9 @@ enum ChatAccessReadTools {
         let query = args["query"]?.stringValue ?? ""
         let limit = max(1, min(50, args["limit"]?.intValue ?? 20))
         let snapshot = try await store.load()
-        let rows = snapshot.value.recipes.filter { bundle in
+        let rows = snapshot.value.recipes.enumerated().filter { _, bundle in
           RecipeSearchMatcher.matches(query: query, in: [bundle.recipe.title, bundle.recipe.subtitle, bundle.recipe.summary].compactMap { $0 } + bundle.ingredients + bundle.tagNames + bundle.categoryNames + bundle.recipeNotes.map(\.text))
-        }.sorted { $0.recipe.title.localizedCaseInsensitiveCompare($1.recipe.title) == .orderedAscending }.prefix(limit).enumerated().map { index, bundle in
+        }.sorted { $0.element.recipe.title.localizedCaseInsensitiveCompare($1.element.recipe.title) == .orderedAscending }.prefix(limit).map { index, bundle in
           MCPValue.object(["ref": ref(snapshot, index), "name": .string(bundle.recipe.title), "cuisine": optional(bundle.recipe.cuisine), "course": optional(bundle.recipe.course), "tags": .array(bundle.tagNames.map(MCPValue.string)), "totalTime": optional(bundle.recipe.totalTimeMinutes.map(String.init)), "yield": optional(bundle.recipe.yieldText ?? bundle.recipe.servingsText)])
         }
         return .json(["export": exportMeta(snapshot), "recipes": .array(rows)])

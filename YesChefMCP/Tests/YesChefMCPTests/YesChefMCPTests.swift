@@ -46,13 +46,17 @@ struct YesChefMCPTests {
     let fixedDate = ISO8601DateFormatter().date(from: "2026-10-21T12:00:00Z")!
     let recipeID = UUID()
     let recipe = Recipe(id: recipeID, title: "Braised Beans", servingsText: "4", totalTimeMinutes: 90, cuisine: "Italian", course: "Dinner", dateCreated: fixedDate, dateModified: fixedDate)
+    let otherRecipeID = UUID()
+    let otherRecipe = Recipe(id: otherRecipeID, title: "Apple Cake", dateCreated: fixedDate, dateModified: fixedDate)
     let sectionID = UUID()
     let bundle = RecipeBundleCoding.RecipeBundle(recipe: recipe, ingredientSections: [IngredientSection(id: sectionID, recipeID: recipeID, name: "Main", sortOrder: 0)], ingredientLines: [IngredientLine(id: UUID(), recipeID: recipeID, sectionID: sectionID, originalText: "1 cup beans", sortOrder: 0)], tagNames: ["Beans"])
+    let otherBundle = RecipeBundleCoding.RecipeBundle(recipe: otherRecipe)
     let menu = ChatAccessExport.MenuRecord(id: UUID(), title: "Sunday", notes: nil, dayCount: 1, modified: fixedDate, items: [])
-    let export = ChatAccessExport(generatedAt: fixedDate, device: "iPad", recipes: [bundle], menus: [menu], mealPlan: [])
+    let export = ChatAccessExport(generatedAt: fixedDate, device: "iPad", recipes: [otherBundle, bundle], menus: [menu], mealPlan: [])
     let exportURL = exportFolder.appending(path: "install.json")
     try ChatAccessExportCoding.encode(export).write(to: exportURL)
-    let server = YesChefMCPServer.make(containerURL: container) { fixedDate.addingTimeInterval(600) }
+    let clock = TestClock(fixedDate.addingTimeInterval(600))
+    let server = YesChefMCPServer.make(containerURL: container) { clock.now() }
 
     let search = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("beans")])))
     let searchText = try toolText(search)
@@ -61,10 +65,17 @@ struct YesChefMCPTests {
     #expect(!containsUUID(searchText))
     let parsed = try object(searchText)
     let ref = try #require(parsed["recipes"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
+    #expect(ref.hasSuffix(".1"))
     let detail = try #require(await server.handle(line: genericToolCall("get_recipe", args: ["ref": .string(ref)])))
     let detailText = try toolText(detail)
+    #expect(detailText.contains("Braised Beans"))
     #expect(detailText.contains("1 cup beans"))
     #expect(!containsUUID(detailText))
+
+    clock.advance(by: 50 * 60)
+    let agedSearch = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("beans")])))
+    let agedText = try toolText(agedSearch)
+    #expect(try object(agedText)["export"]?.objectValue?["ageMinutes"] == .integer(60))
 
     let menus = try #require(await server.handle(line: genericToolCall("list_menus", args: [:])))
     #expect(!containsUUID(try toolText(menus)))
@@ -203,4 +214,23 @@ private extension MCPValue {
 
 private extension Optional where Wrapped == String {
   var orEmpty: String { self ?? "" }
+}
+
+private final class TestClock: @unchecked Sendable {
+  private let lock = NSLock()
+  private var date: Date
+
+  init(_ date: Date) { self.date = date }
+
+  func now() -> Date {
+    lock.lock()
+    defer { lock.unlock() }
+    return date
+  }
+
+  func advance(by interval: TimeInterval) {
+    lock.lock()
+    date.addTimeInterval(interval)
+    lock.unlock()
+  }
 }
