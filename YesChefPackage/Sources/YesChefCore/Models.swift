@@ -142,6 +142,7 @@ public struct Recipe: Codable, Identifiable, Equatable, Sendable {
     )
   }
 }
+
 public struct ServeWithItem: Codable, Identifiable, Equatable, Sendable {
   public var id: UUID
   public var title: String

@@ -872,8 +872,7 @@ private struct GroceryGeneratedItemDraft {
       self.quantityText = line.groceryQuantityText
     }
     self.unit = line.unit?.nonEmptyGroceryText
-    self.aisle = nil
-      ?? GroceryStoreArea.seed(for: canonicalName)?.title
+    self.aisle = GroceryStoreArea.seed(for: canonicalName)?.title
     self.notes = line.groceryNotes
   }
 

@@ -562,7 +562,6 @@ public enum CategoryRepository {
 
   fileprivate static func mergeCategory(_ duplicate: Category, into canonical: Category, in db: Database) throws -> Category {
     guard duplicate.id != canonical.id else { return canonical }
-    let canonical = canonical
     for var child in try Category.fetchAll(db) where child.parentCategoryID == duplicate.id {
       child.parentCategoryID = canonical.id
       try Category.upsert { child }.execute(db)
