@@ -183,7 +183,7 @@ store's migration record in the week the library is most exposed, for a benefit 
   backup-first plus a device pass.
 - **Consequences, "This is why the squash precedes the deploy":** read it as "why the dead-column drop
   precedes the deploy". One more step is needed. Development's CloudKit schema still carries the two fields
-  from past uploads, and a deploy copies Development's fields, so `PROD-CUTOVER.md` Phase 4a deletes them in
+  from past uploads, and a deploy copies Development's fields, so `PROD-CUTOVER.md` Step 5 (formerly Phase 4a) deletes them in
   the console first. **It never resets Development**, because Development is the fallback.
 - **Failure list item 1** ("the squash erases the local store") no longer applies.
 - **Correction:** this ADR's runbook and the first plan draft also listed the retired category-seed tables for
