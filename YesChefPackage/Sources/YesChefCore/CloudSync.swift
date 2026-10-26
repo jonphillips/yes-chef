@@ -153,6 +153,7 @@ public enum YesChefCloudSync {
       AppLog.dataIntegrity.debug("Retired CloudKit sync cleanup skipped because sync did not become idle in time")
       return
     }
+    guard syncEngine.isRunning else { return }
 
     let pendingChangeCount: Int
     do {
