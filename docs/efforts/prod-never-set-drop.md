@@ -1,4 +1,4 @@
-# Effort — Drop the never-set columns and retired tables before the Production deploy (PROD-CUTOVER 4a)
+# Effort — Drop the never-set columns and retired tables before the Production deploy (PROD-CUTOVER Step 1)
 
 Status: Designed 2026-10-26. Jon approved every drop in chat on 2026-10-26. **Schema change, synced tables.** The
 architect escalates the PR to Jon. Dispatch it after chat-access-mcp S2. Under the cutover sequencing note, this
@@ -6,8 +6,8 @@ is the one synced-schema change allowed before the cut.
 Summary: One appended migration drops 7 synced columns that no code path ever sets, the two equipment tables that
 nothing ever fills, and the dormant `tags`/`recipeTags` tables (ADR-0049 Amd 5). It also removes their model
 fields and readers, retires the two tag record types through Slice 6's purge, and deletes the every-launch tag
-fold. Production then never carries them, and Development's leftovers go in 4a's console step.
-Related: [`PROD-CUTOVER.md`](../PROD-CUTOVER.md) § 4a (the diff and verdict table) ·
+fold. Production then never carries them, and Development's leftovers go in the cutover's Step 5 console step.
+Related: [`PROD-CUTOVER.md`](../PROD-CUTOVER.md) Step 1 and Reference A (the diff and verdict table) ·
 [ADR-0049 Amendment 5](../decisions/ADR-0049-unified-labels-and-assisted-tagging.md#amendment-5--retire-tags-and-recipetags-physically-before-the-production-cut-2026-10-26) ·
 [`prod-dead-column-drop.md`](prod-dead-column-drop.md) (the same shape, Phase 1) ·
 [`sync-failure-surfacing.md`](sync-failure-surfacing.md) § Slice 6 (`retiredRecordTypes`)
@@ -78,7 +78,7 @@ Append one migration to `Schema.swift`, e.g. `"Drop never-set columns and retire
 - `declaredSchemaVersion` is 54 and its test passes.
 - The completing PR:
   - adds the `DONE-LOG.md` entry;
-  - ticks PROD-CUTOVER 4a's "drops ship as one appended-migration slice" box;
+  - ticks PROD-CUTOVER Step 1's merge and device-check boxes (Jon ticks the device check);
   - lists the device pass below in `device-passes.md`, with a pointer under **Owed**;
   - advances `NEXT_UP.md` in plan order.
 

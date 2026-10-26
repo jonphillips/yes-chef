@@ -1,116 +1,268 @@
 # Production Cutover Runbook
 
-**Purpose.** The ordered, reversible procedure for taking Yes Chef from a dev-signed build on CloudKit
-**Development** to a TestFlight/App Store build on CloudKit **Production** — **without re-importing the
-dogfood library.** This is the ops companion to
-[ADR-0056](decisions/ADR-0056-move-to-production-and-data-carry.md); read the ADR first for *why* each step
-is shaped this way. It absorbs and sequences the **Prod-schema promotion list** in
-[`CURRENT_HANDOFF.md`](CURRENT_HANDOFF.md).
+**Purpose.** This is the ordered, reversible procedure for taking Yes Chef from a dev-signed build on CloudKit
+**Development** to a TestFlight build on CloudKit **Production**, **without re-importing the dogfood library**.
+It is the ops companion to [ADR-0056](decisions/ADR-0056-move-to-production-and-data-carry.md), which explains
+why each step is shaped the way it is. Rewritten 2026-10-26 as one numbered sequence from here to the end.
 
-**Shared platform guidance lives up in jon-platform** — `jon-platform/docs/ios/persistence-and-sync.md`
-owns the CloudSyncKit-level pieces this runbook leans on (the metadatabase coverage diagnostic, the
-migration-behind-the-engine trap, the one-way Dev→Prod schema deploy, dashboard verification). This runbook
-is the yes-chef-specific execution on top of it; the shared *data-carry* finding is tracked in
-`jon-platform/SEAM-LEDGER.md` and lifts into that house doc once the dry run (Phase 4) proves it.
+**The spine (ADR-0056).** The local SQLite store carries across the update in place, because the bundle id and
+container id don't change. The **Production private zone starts empty**, and the sync metadatabase is keyed by
+container id, not environment, so the carried store may not upload itself. The known-good re-seed is
+**backup → restore**: a restore begins as a fresh sync peer and re-pushes the whole library as authoritative.
+Galavant's cutover (2026-10-08) followed this shape and ended with its library in Production. It didn't record
+whether the in-place carry did the seeding, so Step 9 records that answer.
 
-**Not a dispatch.** These are ops steps Jon runs (with the architect), each gated on the one before. The
-build/schema/CloudKit actions are not Codex work; the dead-column drop's *code* (D2, as amended) is the one part that ships as a
-normal reviewed slice.
+**Who does what.**
+- **Jon:** the device, console and TestFlight steps.
+- **Architect:** the diffs, the dispatches, and the record keeping.
+- **Codex:** only Step 1's drop slice and Step 3a's script fix, each as a normal reviewed PR.
 
-**The spine (ADR-0056):** the local SQLite store carries across the update in place (same bundle id), but
-the **Production private zone starts empty and may not auto-seed** (the sync metadatabase is keyed by
-container id, not environment). So the **known-good re-seed is backup→restore** — restore begins as a fresh
-sync peer and re-pushes the whole library as authoritative. In-place auto-seed is an optimization the dry
-run may bless, never the plan's assumption.
+**Shared platform guidance.** jon-platform `docs/ios/persistence-and-sync.md` owns the CloudSyncKit pieces this
+leans on, and `docs/ios/testflight.md` owns the release script. The data-carry finding is a row in
+jon-platform `SEAM-LEDGER.md`, waiting for this run's answer.
 
 ---
 
-## Preconditions (before anything below)
+## Steps at a glance
 
-- [ ] `main` is green: package build + `check-drift` + `YesChefTests`/`YesChefCoreTests`.
-- [ ] Calendar-derived cooking history has landed; `Recipe` no longer persists
-      `lastCookedAt` / `timesCooked`.
-- [ ] **Do not change** the bundle id (`com.jonphillips.yeschef`) or container id
-      (`iCloud.com.jonphillips.yeschef`). Local-container carry depends on both being stable.
-      ADR-0059's Debug-only `.dev` identity comes **after** the cut and leaves these Release identifiers
-      alone. Don't dispatch it before Phase 4e (ADR-0059 D1).
-- [ ] Schedule a window with slack — the first Production sync is large and will throttle (see Phase 4).
+**Done**
+- [x] Dead cook columns and raw import HTML dropped; oversize recipes and calendar links repaired (Phase 1).
+- [x] SyncMetadata coverage is clean and is now permanent in the Sync status (Phase 2).
+- [x] Development schema exported and diffed; Jon settled every keep/drop verdict (Reference A). 2026-10-26.
 
-**Sequencing while the cut is open (2026-10-26).** Codex's schema-free work (chat-access S2) can continue
-alongside the cut. Merge **no synced-schema change** other than 4a's keep/drop drops until the cut is done.
-S2's two-device pass must finish before Phase 4c or wait for TestFlight: after 4c nothing gets an Xcode Run
-onto a device until ADR-0059 (Yes Chef Dev) ships post-cut.
+**Before the freeze**
+1. [ ] Ship the drop slice (Codex), and pass its device check on both devices.
+2. [ ] Finish every device pass that needs an Xcode Run.
+3. [ ] Set up TestFlight for Yes Chef (script fix, tools, config, App Store Connect).
 
----
+**The cut**
+4. [ ] Freeze edits, then take and verify the authoritative backup.
+5. [ ] Clean the Development schema in the console: delete the dead list, create the 9 kept fields.
+6. [ ] Re-export, confirm an exact match, and deploy Development → Production.
+7. [ ] Upload the first TestFlight build.
+8. [ ] iPhone: install TestFlight over the dev build and observe the in-place carry.
+9. [ ] iPhone: re-seed by restore, unless Step 8 already filled Production.
+10. [ ] Confirm Production holds the library, server-side.
+11. [ ] iPad: fresh TestFlight install pulls the whole library. **← The cut is real here.**
 
-## Phase 1 — Drop the dead cook columns  *(ships as a reviewed slice; ADR-0056 D2 as amended by Amd 1)*
-
-Brief: [`efforts/prod-dead-column-drop.md`](efforts/prod-dead-column-drop.md). **No migration squash.**
-Production locks the CloudKit schema, not the local migration list, so the squash is deferred cleanup that
-can happen any time after the cut (ADR-0056 Amd 1).
-
-- [x] One appended migration drops `recipes.lastCookedAt` and `recipes.timesCooked`. The fields and
-      CodingKeys come out of `Recipe`. Old backup JSON still decodes, since unknown keys are ignored.
-- [x] A test proves every table's on-disk columns match its model, so no other dead column reaches
-      Production unnoticed.
-- [x] Before installing the build, export a backup from each device. Afterwards, confirm the library is
-      intact and that an edit syncs to the other device.
-- [x] **Raw import HTML dropped, and its fallout repaired** ([`efforts/raw-import-html-drop.md`](efforts/raw-import-html-drop.md),
-      ADR-0010 Amd 1). This is the second reviewed slice. An appended migration drops `recipes.originalImportText`.
-      A post-engine pass deletes the 1,527 photo rows that have no image bytes. It then re-uploads the nine
-      recipes over CloudKit's 1 MB record limit, plus their children, and re-links the three calendar rows that
-      sync blanked. Capture stops saving photos it never downloads. **It must land before Phase 3.** Otherwise the re-seed
-      backup carries records that can't upload and calendar links that are NULL.
-
-**Gate:** the drop has shipped and Jon's device pass is clean. **Cleared 2026-10-26.**
+**After**
+12. [ ] Post-cut device checks: automatic backups, two-way edits.
+13. [ ] Post-cut housekeeping: record the answers, archive Development, dispatch Yes Chef Dev.
 
 ---
 
-## Phase 2 — SyncMetadata coverage check  *(ADR-0056 D4)*
+## Rules while the cut is open
 
-Every row that should sync must be *uploadable*; a row with no sync metadata seeds neither zone.
-
-- [x] For each synced table, compare row count to the count the engine will push; investigate any gap.
-      **2026-10-26:** both devices read "Up to date" with nothing unsynced, which is this check made permanent.
-      Migration-inserted or pre-engine rows are the usual orphans ([[migration-writes-bypass-sync-triggers]]).
-- [x] Remediate orphans **deterministically** (deterministic-UUID, post-engine), never with a fresh-UUID
-      migration write.
-- [x] Verify the **promotion list against `makeSyncEngine` in `CloudSync.swift`, in both directions** — a
-      synced-table column is on the list; a column on an unregistered (local) table belongs nowhere near it.
-      **2026-10-26:** every entry is on one of the 36 registered tables. But the list is not what a deploy
-      copies: a deploy copies the whole Development schema, so the check that decides the cut is 4a's parity
-      check. The 2026-10-26 backup also shows two listed items that have never held a value
-      (`pantryItems.thresholdQuantity`/`thresholdUnit` and `categories.color`), so they may not be in
-      Development at all.
-
-- [x] **Make the check permanent in the sync status** ([`efforts/sync-failure-surfacing.md`](efforts/sync-failure-surfacing.md)).
-      "Up to date" requires zero rows that never reached the server and zero inbound rows that couldn't be
-      applied. The detail names them. Phase 4d then reads the same signal against Production.
-
-**Gate:** coverage is clean, or the remaining gaps are understood and intentional.
+- **Identifiers don't change.** Keep the bundle id `com.jonphillips.yeschef` and the container
+  `iCloud.com.jonphillips.yeschef`. The local carry depends on both. ADR-0059's Debug-only `.dev` identity
+  comes after the cut; don't dispatch it before Step 11 (ADR-0059 D1).
+- **Schema.** Codex's schema-free work (chat-access S2) can continue alongside the cut. Until Step 11, merge
+  no synced-schema change other than Step 1's drop slice. A schema change after Step 6 would need another
+  Development change and another deploy before any TestFlight build can ship.
+- **Xcode Run.** After Step 8, nothing gets an Xcode Run onto the iPhone, and after Step 11, nothing onto the
+  iPad. A Debug build still carries the production bundle id and app group until ADR-0059 ships, so it would
+  install over TestFlight against Development. Use the simulator until then.
+- **The freeze.** From Step 4 until Step 11 passes, make no edits on either device. An iPhone edit made after
+  the backup is lost when the backup is restored. An iPad edit made before its reinstall goes only to
+  Development.
+- **Leave slack.** The first Production sync is large and will throttle.
 
 ---
 
-## Phase 3 — Take the authoritative backup  *(ADR-0056 D3)*
+## 1 — Ship the drop slice  *(Codex; schema change, escalated to Jon)*
 
-- [ ] From the current dev-signed build, export a full backup (`VACUUM INTO` snapshot — images ride along as
-      in-DB BLOBs).
-- [ ] Verify the file opens and is complete (not a truncated/partial write).
-- [ ] Store it off-device (Files / iCloud Drive) **and** a second location. **This file is the re-seed
-      source and the rollback.** Nothing after this point is trusted until this exists.
+The brief is [`efforts/prod-never-set-drop.md`](efforts/prod-never-set-drop.md). It drops the 7 never-set
+columns, the `equipment`/`recipeEquipment` tables and the retired `tags`/`recipeTags` tables (ADR-0049 Amd 5)
+in one appended migration, and retires the tag record types through `retiredRecordTypes`.
 
-**Gate:** a verified pre-cut backup exists in two places.
+- [ ] The architect sets `NEXT_UP.md` to the drop slice when chat-access S2 merges.
+- [ ] Review: the architect escalates the PR to Jon (synced schema). Jon merges.
+- [ ] Device check, per the brief:
+  - export a backup from each device first;
+  - install on both devices, and confirm the library and the category browser are intact;
+  - delete the empty loose **beach** and **cocktail** categories, relaunch, and confirm they stay gone;
+  - Sync reads "Up to date" on both devices once the purge has run;
+  - an edit syncs.
+
+**Gate:** the slice has merged, the device check is clean, and both devices read "Up to date".
+
+## 2 — Finish the Xcode-Run device passes
+
+Anything that needs a dev build on a device has to happen now, before the freeze.
+
+- [ ] **Chat access S2's two-device pass** (`efforts/chat-access-mcp.md` § S2, once it ships). If S2 isn't done
+      by the time everything else is ready, don't hold the cut for it: run its pass on a later TestFlight build.
+- [ ] **The drop slice's pass** (Step 1).
+- [ ] Nothing else in [`device-passes.md`](device-passes.md) under **Owed** needs a dev build. The automatic-backups
+      pass needs a TestFlight build, so it moves to Step 12.
+
+**Gate:** no owed pass needs a dev build on a device.
+
+## 3 — Set up TestFlight for Yes Chef  *(one time)*
+
+Verified 2026-10-26: Yes Chef has no `testflight.conf`, and neither `asc` nor `testflight` is installed on this
+Mac. The guide is jon-platform `docs/ios/testflight.md` § One-time setup.
+
+- [ ] **3a — Fix the script's app-group check (jon-platform, Codex).** `scripts/testflight` fails any bundle with
+      a second app group (`… app group or CloudKit container mismatch`). Yes Chef's app is entitled to two:
+      `group.com.jonphillips.yeschef` and ADR-0058's `group.com.jonphillips.cockpit-yeschef`. Add an optional
+      `EXTRA_APP_GROUPS` config key (space-separated) that the verifier also accepts. Every other group still
+      fails, and the share extension keeps the single-group rule. Update the conf reference in `testflight.md`.
+      The architect writes the dispatch.
+- [ ] **3b — Tools (Jon).**
+  - Install and pin `asc` at Galavant's pin (`brew install asc && brew pin asc`; `asc --version` = `5.14.0`).
+  - Log in with the shared Team API key (`asc auth login …`, then `asc auth status --validate`).
+  - Link the command: `ln -s ~/code/jon-platform/scripts/testflight ~/code/bin/testflight`.
+  - The CloudKit management token is already saved (Reference A).
+- [ ] **3c — `testflight.conf` at the repo root.** It rides in Step 3a's yes-chef companion PR, or Jon adds it:
+
+      SCHEME=YesChef
+      PROJECT=YesChef.xcodeproj
+      XCODEGEN=1
+      TEAM_ID=7MQEE539G9
+      APP_BUNDLE_ID=com.jonphillips.yeschef
+      EXTENSION_BUNDLE_IDS="com.jonphillips.yeschef.share-extension"
+      APP_GROUP=group.com.jonphillips.yeschef
+      EXTRA_APP_GROUPS="group.com.jonphillips.cockpit-yeschef"
+      CLOUDKIT_CONTAINER=iCloud.com.jonphillips.yeschef
+      SCHEMA_GATE=1
+      ASC_VERSION=5.14.0
+      TEST_NOTES_LOCALE=en-US
+      DONE_LOG=docs/DONE-LOG.md
+      DEVICE_PASSES=docs/device-passes.md
+
+- [ ] **3d — App Store Connect (Jon).** A Yes Chef app record exists for `com.jonphillips.yeschef`, and Jon is in an
+      internal testing group with automatic distribution.
+- [ ] **3e — Dry run.** From a clean `main`, run `testflight --dry-run`. Preflight and setup must pass. The schema
+      gate is **expected to fail** ("Deploy Schema Changes…") until Step 6. Any other stop gets fixed now.
+
+**Gate:** the dry run fails only on the schema gate.
+
+## 4 — Freeze, then take the authoritative backup  *(ADR-0056 D3)*
+
+- [ ] Both devices read "Up to date". **Start the freeze**: no edits on either device until Step 11 passes.
+- [ ] iPhone: Settings → Import & Export → **Export a Backup**. This is the re-seed source and the rollback.
+- [ ] iPad: export a backup too. It's insurance for Step 11, which deletes the app there.
+- [ ] Verify the iPhone file: run Reference B's audit on a scratch copy. It opens read-only, and the recipe count
+      matches Settings → Sync → Local record counts.
+- [ ] Keep it in **two places**: iCloud Drive and the Mac.
+
+**Gate:** a verified backup exists in two places.
+
+## 5 — Clean the Development schema  *(CloudKit Console, Development)*
+
+**Never use "Reset Development Environment".** It deletes the Development data, and that data is the fallback.
+
+- [ ] **Try one deletion first.** Delete `recipes.originalImportText`, which still holds values on existing
+      records. If the console refuses, stop and tell the architect before going on.
+- [ ] Delete everything on Reference A's dead list:
+  - the record types `categorySeedStates`, `tags` and `recipeTags`;
+  - the dead fields on `recipes` and `menus`;
+  - the `sqlitedata_icloud_userModificationTime_<column>` companion of each column Step 1 dropped.
+- [ ] Create the 9 kept fields in Reference A's table, each **encrypted**, with the type the table gives. A wrong
+      type or a missing encryption makes those uploads fail.
+
+## 6 — Verify, then deploy to Production
+
+- [ ] Re-export Development:
+      `xcrun cktool export-schema --team-id 7MQEE539G9 --container-id iCloud.com.jonphillips.yeschef --environment development --output-file yeschef-dev.ckdb`
+- [ ] The architect diffs it against `syncedTables` (32 tables after Step 1) and their columns, with Reference A's
+      method. **It must match exactly**: every live column, its modification-time companion, a `_hash` for each
+      asset, and nothing else.
+- [ ] CloudKit Console → **Deploy Schema Changes** → Production. This is permanent: Production can never remove a
+      deployed type or field.
+
+**Gate:** Production's schema equals Development's, which equals the app.
+
+## 7 — Upload the first TestFlight build
+
+- [ ] From a clean, green `main`: `testflight`. Its schema gate now passes. The export verifier checks each
+      bundle's id, version, app groups and container, and that the app's `aps-environment` is `production`.
+- [ ] Wait for processing to reach `VALID` (up to 45 minutes; `testflight --resume` if it times out).
+
+**Gate:** the build is installable from TestFlight.
+
+## 8 — iPhone: install over the dev build, and observe the in-place carry  *(ADR-0056 OQ1)*
+
+> ⚠️ From here on, no Xcode Run onto the iPhone (Rules).
+
+- [ ] Install the TestFlight build over the dev build. Confirm the **local library is intact**: recipes, photos,
+      calendar, menus.
+- [ ] **Sync is already on after the update.** The enable key lives in the app's defaults, which carry over, so the
+      engine starts against the empty Production zone on first launch, holding Development's sync metadata. That
+      is the in-place carry test. Galavant's identical start lost nothing.
+- [ ] Leave it about 10 minutes. Then, in the CloudKit Console, query the **Production** private database, zone
+      `co.pointfree.SQLiteData.defaultZone`, and compare counts for a few big types (`recipes`, `ingredientLines`,
+      `recipePhotos`) against Settings → Sync → Local record counts.
+  - **Production has everything:** in-place carry works, so skip Step 9. Record OQ1 = yes.
+  - **Empty or partial** (the expected case): do Step 9. Record OQ1 = no.
+
+## 9 — iPhone: re-seed by restore
+
+- [ ] Settings → Import & Export → **Restore from a Backup**, choosing the Step 4 file. The restore holds sync off.
+- [ ] Settings → Sync → **Turn on iCloud sync**, and confirm at **Turn On iCloud Sync?**. The whole library
+      re-pushes into Production as authoritative.
+- [ ] **Expect throttling.** The first push hits CloudKit 429s and takes a while. Don't intervene, reinstall or
+      wipe. Let it drain until Sync reads "Up to date".
+
+## 10 — Confirm Production holds the library  *(server-side, ADR-0056 OQ3)*
+
+- [ ] In the console, Production private database, zone `co.pointfree.SQLiteData.defaultZone`: per-type counts
+      match the iPhone's Local record counts. "Up to date" in the app has been wrong before, so this check is
+      the server's word.
+
+## 11 — iPad: a fresh install pulls everything
+
+> ⚠️ From here on, no Xcode Run onto the iPad (Rules).
+
+- [ ] Delete Yes Chef from the iPad. Its copy stays in Development and in its Step 4 backup.
+- [ ] Install the TestFlight build. **Before turning sync on, confirm the library is empty.** That proves deleting
+      the app cleared its app-group container, the check the ADR-0030 restore procedure rests on. If the old
+      library is still there, stop and tell the architect.
+- [ ] Settings → Sync → **Turn on iCloud sync**. The whole library arrives, photos included, and Sync reads
+      "Up to date".
+
+**Gate (the real one):** Steps 10 and 11 both pass. **Only now is the cut real**, and the freeze ends.
+
+## 12 — Post-cut device checks
+
+- [ ] **Automatic backups**, on the first TestFlight build: the full pass in [`device-passes.md`](device-passes.md),
+      on both devices.
+- [ ] Make an edit on each device, and confirm it arrives on the other.
+- [ ] If S2's pass was deferred in Step 2, run it now.
+
+## 13 — Post-cut housekeeping  *(architect, with Jon)*
+
+- [ ] Record the OQ1 answer from Step 8 in ADR-0056, and in jon-platform `SEAM-LEDGER.md`'s data-carry row (its
+      trigger needs it). Then lift the carry guidance into `persistence-and-sync.md`.
+- [ ] Keep **Development** as a cold archive through at least one confirmed two-device Production round trip
+      (ADR-0056 OQ2). Reset it after that, **before** Yes Chef Dev first turns sync on (ADR-0059 OQ1).
+- [ ] Set `NEXT_UP.md` to the Yes Chef Dev dispatch (ADR-0059; the ticket is at the end of
+      [`efforts/yes-chef-dev-variant.md`](efforts/yes-chef-dev-variant.md)). Until it merges, Xcode Run goes only to
+      the simulator.
+- [ ] **From now on, every TestFlight build waits on a schema deploy.** A slice that adds a synced table or column,
+      or is the first to write a non-nil value to one, must create it in Development (from a simulator build or
+      the console) and deploy before its TestFlight build ships. `testflight` enforces this.
+- [ ] Add the cut to `DONE-LOG.md`. Remove the keep-or-drop item from `open-questions.md`. Delete
+      `yeschef-dev.ckdb` from the repo root.
 
 ---
 
-## Phase 4 — Deploy the Production schema, then dry-run the cut on ONE device  *(ADR-0056 D5)*
+## Rollback
 
-Do these in order on a **single** device. The Development environment stays live and untouched as a
-fallback throughout.
+- **Before Step 8:** nothing has changed on either device's install. Development and its data are untouched.
+- **Steps 8–10 (iPhone on TestFlight, iPad still on the dev build):** the iPad still has the full library on
+  Development. To back out on the iPhone, delete the app, reinstall the dev build from Xcode, and restore the
+  Step 4 backup with sync held. Nothing is lost.
+- **After Step 11:** restore the Step 4 backup. Restore is authoritative ([[restore-is-authoritative]]), but quiesce
+  the other device first, so a held delete there can't re-delete a restored record (ADR-0030 Amd 3).
 
-**4a — Make the Development schema match the app, then deploy it.** A deploy copies the **whole**
-Development schema into Production. Development's schema is whatever past uploads created, not what
-`makeSyncEngine` registers, so it can be wrong in two ways:
+---
+
+## Reference A — The Development schema diff  *(2026-10-26)*
+
+A deploy copies the **whole** Development schema into Production. Development's schema is whatever past uploads
+created, not what `makeSyncEngine` registers, so it can be wrong in two ways:
 
 - **Dead types and fields (permanent once deployed).** Development keeps every record type and field that was
   ever uploaded, and Production can't remove them later. SQLiteData also writes companion fields per column: a
@@ -121,12 +273,22 @@ Development schema into Production. Development's schema is whatever past upload
   never creates either one, so a missing one makes that record's upload fail until a later additive deploy.
   The sync status will show it as not synced.
 
+The old hand-kept "Prod-schema promotion list" (formerly in `device-passes.md`) is superseded by this diff.
+
+**How it was made.**
+- Token: CloudKit Console → Settings → Tokens, then `xcrun cktool save-token --type management`.
+- Export: `xcrun cktool export-schema --team-id 7MQEE539G9 --container-id iCloud.com.jonphillips.yeschef --environment development --output-file yeschef-dev.ckdb`.
+- Diff: for each table in `syncedTables`, the expected fields are each on-disk column, plus
+  `sqlitedata_icloud_userModificationTime` and its per-column `_<column>` companion, plus `<column>_hash` for each
+  BLOB column. A field in the export that isn't expected is dead, and an expected field the export lacks is
+  missing. Ignore CloudKit's `___` system fields and the `Users` type.
+
 **The diff (Development export of 2026-10-26 against the 36 `syncedTables`).** The 2026-10-26 backup found
 `equipment` and `recipeEquipment` empty and 23 columns that have never held a value. The export settles which of
 them Development actually lacks. Every live column's modification-time companion is already present, including
 the companions of the never-set columns.
 
-*Dead — delete in the console:*
+*Dead — delete in the console (Step 5):*
 - record type `categorySeedStates`. `categorySeedTombstones` was never uploaded, so it isn't there.
 - `recipes`: `originalImportText`, `timesCooked`, and the companions
   `sqlitedata_icloud_userModificationTime_originalImportText`, `_timesCooked`, and `_lastCookedAt`. The
@@ -134,144 +296,63 @@ the companions of the never-set columns.
 - `menus`: `prepPlan` (an asset), `prepPlan_hash`, and `sqlitedata_icloud_userModificationTime_prepPlan`.
 - Not in Development, so nothing to do: `ingredientLines.substitution`, `workbenchReferences.kind`, and
   `workbenchReferences.provenance`.
+- **Once Step 1 ships:**
+  - the record types `tags` and `recipeTags` (ADR-0049 Amd 5; Slice 6's purge empties them first);
+  - the companion `sqlitedata_icloud_userModificationTime_<column>` of each dropped column below.
 
 *Missing — 2 record types and 17 fields.* The other 6 never-set columns
 (`groceryItemSources.mealPlanItemID`/`menuID`/`menuItemID`/`scheduledDate`/`mealSlot`/`sourceSubtitle`) already
-exist from earlier values. Each missing item is kept or dropped per
-[`open-questions.md`](open-questions.md) § "production cutover: keep-or-drop the never-set synced columns".
-Every field is `ENCRYPTED`.
+exist from earlier values. The keep-or-drop reasoning is in [`open-questions.md`](open-questions.md)
+§ "production cutover: keep-or-drop the never-set synced columns". Every field is `ENCRYPTED`.
 
 | Missing | Type | Write path | Verdict (Jon, 2026-10-26) |
 |---|---|---|---|
-| `recipeSources.pageNumber` | STRING | editor "Page" field | keep → create |
-| `mealPlanItems.notes` | STRING | calendar entry editor | keep → create |
-| `menus.notes` | STRING | new-menu sheet | keep → create |
-| `workbenchLog.outcome` | STRING | log-entry editor | keep → create |
-| `workbenchLog.relatedRecipeID` | STRING | Adjust rationale logged to the Workbench | keep → create |
-| `groceryLists.remindersListName` | STRING | grocery list "Reminders List" field | keep → create |
-| `pantryItems.thresholdQuantity` | DOUBLE | pantry editor | keep → create |
-| `pantryItems.thresholdUnit` | STRING | pantry editor | keep → create |
-| `groceryItemSources.menuPlacementID` | STRING | grocery generation from placed menu dishes | keep → create |
-| `recipes.activeTimeMinutes` | INT64 | none (copied by Adjust, read by the browser) | drop |
-| `recipes.restTimeMinutes` | INT64 | none (copied by Adjust) | drop |
-| `ingredientLines.shoppingCategory` | STRING | none (parser never sets it; read as a grocery-aisle fallback) | drop |
-| `recipeNotes.cookingSessionID` | STRING | none (only ever written nil) | drop |
+| `recipeSources.pageNumber` | STRING | editor "Page" field | keep → create (Step 5) |
+| `mealPlanItems.notes` | STRING | calendar entry editor | keep → create (Step 5) |
+| `menus.notes` | STRING | new-menu sheet | keep → create (Step 5) |
+| `workbenchLog.outcome` | STRING | log-entry editor | keep → create (Step 5) |
+| `workbenchLog.relatedRecipeID` | STRING | Adjust rationale logged to the Workbench | keep → create (Step 5) |
+| `groceryLists.remindersListName` | STRING | grocery list "Reminders List" field | keep → create (Step 5) |
+| `pantryItems.thresholdQuantity` | DOUBLE | pantry editor | keep → create (Step 5) |
+| `pantryItems.thresholdUnit` | STRING | pantry editor | keep → create (Step 5) |
+| `groceryItemSources.menuPlacementID` | STRING | grocery generation from placed menu dishes | keep → create (Step 5) |
+| `recipes.activeTimeMinutes` | INT64 | none (copied by Adjust, read by the browser) | drop (Step 1) |
+| `recipes.restTimeMinutes` | INT64 | none (copied by Adjust) | drop (Step 1) |
+| `ingredientLines.shoppingCategory` | STRING | none (parser never sets it; read as a grocery-aisle fallback) | drop (Step 1) |
+| `recipeNotes.cookingSessionID` | STRING | none (only ever written nil) | drop (Step 1) |
 | `tags.color` | STRING | none | drop, with the `tags` table (ADR-0049 Amd 5) |
-| `categories.color` | STRING | only copied from `tags.color` when tags merge into categories | drop |
-| `mealPlanItems.startTime` | TIMESTAMP | none | drop |
-| `mealPlanItems.endTime` | TIMESTAMP | none | drop |
-| record types `equipment` and `recipeEquipment` | — | none (no importer fills a bundle's equipment; Adjust only copies it) | drop |
+| `categories.color` | STRING | only copied from `tags.color`; no UI sets or shows it | drop (Step 1); re-add additively if a color UI is built |
+| `mealPlanItems.startTime` | TIMESTAMP | none | drop (Step 1) |
+| `mealPlanItems.endTime` | TIMESTAMP | none | drop (Step 1) |
+| record types `equipment` and `recipeEquipment` | — | none (no importer fills a bundle's equipment; Adjust only copies it) | drop (Step 1) |
 
-A dropped column's modification-time companion is already in Development, so it joins the dead list above.
+## Reference B — How to run the backup audit  *(repeatable)*
 
-*Also dead once the drop slice ships:* the record types `tags` and `recipeTags`. They were folded into
-categories and retired by [ADR-0049 Amd 5](decisions/ADR-0049-unified-labels-and-assisted-tagging.md). The slice
-lists them in `retiredRecordTypes`, so Slice 6's purge empties them in Development. The console step then deletes
-both types.
-
-The drops ship as one slice: [`efforts/prod-never-set-drop.md`](efforts/prod-never-set-drop.md).
-
-**How to run the backup audit (repeatable).**
 1. Audit a **fresh in-app backup**, never a simulator store. Jon exports it to iCloud Drive → Documents →
    App Backups → `YesChef-Backup-<date>.sqlite`; it may need to sync down to the Mac first.
 2. Copy it into its own scratch directory and open the copy read-only:
    `sqlite3 "file:<path>?immutable=1"`.
-3. For each of the 36 tables in `YesChefCloudSync.syncedTables`, count the rows, and for each column count the
-   non-NULL rows. Zero rows means the record type may be missing; zero non-NULL means the field may be missing.
+3. For each table in `YesChefCloudSync.syncedTables` (36 today, 32 after Step 1), count the rows, and for each
+   column count the non-NULL rows. Zero rows means the record type may be missing; zero non-NULL means the field
+   may be missing.
 
-Steps:
-- [x] Create a CloudKit management token (CloudKit Console → Settings → Tokens) and store it with
-      `xcrun cktool save-token --type management`. Then export Development:
-      `xcrun cktool export-schema --team-id 7MQEE539G9 --container-id iCloud.com.jonphillips.yeschef --environment development --output-file yeschef-dev.ckdb`
-      **2026-10-26.**
-- [x] The architect diffs the export against the registered tables and their columns, and writes the exact dead
-      list and missing list here. **2026-10-26** (above).
-- [x] Jon settles each keep/drop verdict. **2026-10-26:** all as proposed (table above), plus the `tags`/`recipeTags`
-      retirement.
-- [ ] The drops ship as one appended-migration slice before the cut ([`efforts/prod-never-set-drop.md`](efforts/prod-never-set-drop.md)),
-      and the device pass is clean. Each dropped column's companion and the two tag types join the dead list.
-- [ ] Delete the dead record types and fields in the console. Once Phase 1 has shipped to every device, nothing
-      writes them. **Never use "Reset Development Environment"**: it deletes the Development data, and that data is
-      the fallback.
-- [ ] Create the missing record types and fields in Development. How depends on the diff: either add them in the
-      console with the type and encryption SQLiteData uses, or use a DEBUG-only primer that uploads one throwaway
-      record per type with every column set and then deletes it. Deleting the record doesn't remove the schema.
-      With the proposed verdicts that is 9 fields and no record types, so the console is enough (types in the table).
-- [ ] Re-export, confirm the schema matches the app exactly, then deploy Development to **Production**. This
-      permanently locks the record types.
+## History
 
-**4b — Distribution build config  (ADR-0056 D6).**
-- [ ] Shipping build has dogfood scaffolding OFF: no seed-sample-data, no erase-on-schema-change, and sync
-      enablement goes through the **persistent** path, not a volatile Xcode launch argument.
-- [ ] Entitlements intact on **both** the app and the share extension: app-group + iCloud container.
+**Old phase numbers** (cited by shipped briefs): Phase 3 → Step 4 · Phase 4a → Steps 5–6 and Reference A ·
+Phase 4b → Steps 3 and 7 · Phase 4c → Steps 8–9 · Phase 4d → Step 10 · Phase 4e → Step 11 · Post-cut → Steps 12–13.
 
-**4c — Install over the dev build; re-seed via restore.**
 
-> ⚠️ **From here on, nothing gets an Xcode Run onto a device that has TestFlight Yes Chef.** A Debug build
-> still has the production bundle ID and app group until ADR-0059 lands, and it would install over
-> TestFlight against the Development environment. Use the simulator until then (ADR-0059 D1).
-
-- [ ] Install the distribution (TestFlight) build over the dev build on the one device. Confirm the **local
-      library is intact** after the update.
-- [ ] Restore the Phase 3 backup on this build (restore begins as a new peer; sync stays held by
-      `disableForRestore` until you enable it).
-- [ ] Enable sync. The whole library re-pushes into the empty Production zone as authoritative.
-- [ ] **Expect throttling.** The initial push of the full library will hit CloudKit 429s and take a while
-      ([[sqlitedata-single-fk-sync-limit]]). **Do not intervene, do not wipe** — let it drain.
-
-**4d — Confirm the zone is actually seeded (server-side, not the in-app indicator).**
-- [ ] Check the **Production private zone** record counts in the CloudKit dashboard — "up to date" in-app has
-      lied before, so confirm against the zone (ADR-0056 OQ3).
-
-**4e — Confirm a fresh device pulls the full library.**
-- [ ] On a **second, fresh** install of the distribution build, sign into the same iCloud account and
-      confirm the entire library (recipes + images) arrives from Production.
-
-**Gate (the real one):** 4d and 4e both pass. Only now is the cut real.
-
-> **Optional — bless in-place carry (ADR-0056 D1 optimization).** Before the restore in 4c, you may first
-> enable sync *without* restoring and observe whether the local rows upload to Production on their own
-> (watch 4d). If they seed the zone cleanly, in-place carry works on this device and the restore is
-> unnecessary going forward. If nothing uploads, fall back to the restore path above. Never skip the backup
-> (Phase 3) to try this.
-
----
-
-## Rollback
-
-- **Before the cut is proven (through 4e):** the Development environment and its data are untouched.
-  Reinstall the dev-signed build (or restore the Phase 3 backup on a dev build) to return to the working
-  Development library. Nothing is lost.
-- **After Production is proven but something is wrong later:** restore the pre-cut backup — restore is
-  authoritative and re-establishes the library as the source of truth for iCloud and every peer
-  ([[restore-is-authoritative]]). Quiesce other peers first so a held peer delete cannot re-delete a
-  restored record (ADR-0030 Amd 3).
-
----
-
-## Post-cut
-
-- [ ] Keep the **Development** zone as a cold archive through at least one confirmed two-device Production
-      round-trip before deciding whether to reset it (ADR-0056 OQ2). Recommended: reset it then, **before**
-      Yes Chef Dev first turns sync on, so it starts light and never writes into the archive (ADR-0059 OQ1).
-- [ ] The architect sets `NEXT_UP.md` to the Yes Chef Dev dispatch (ADR-0059; the ticket is at the end of
-      [`efforts/yes-chef-dev-variant.md`](efforts/yes-chef-dev-variant.md)). Until it merges, Xcode Run goes
-      only to the simulator.
-- [ ] In `CURRENT_HANDOFF.md`, retire the **Prod-schema promotion list** section once deployed (it is a
-      one-time ops step, not standing guidance) and note the cut in `DONE-LOG.md`.
-
----
-
-## Condensed checklist
-
-1. [ ] Preconditions: green main, cook columns unread, ids unchanged, window with slack.
-2. [x] Phase 1 — cook columns and raw import HTML dropped by appended migrations; oversize recipes re-uploaded and
-   calendar links repaired; no other dead columns; device pass clean.
-3. [x] Phase 2 — SyncMetadata coverage clean; promotion list checked against `CloudSync.swift` (2026-10-26).
-4. [ ] Phase 3 — verified pre-cut backup in two places.
-5. [ ] Phase 4a — Development schema exported and matched to the app (dead removed, missing created); Production schema deployed.
-6. [ ] Phase 4b — distribution build: scaffolding off, entitlements intact.
-7. [ ] Phase 4c — install over dev build, library intact, restore + enable sync, let throttling drain.
-8. [ ] Phase 4d — Production zone seeded, **confirmed server-side**.
-9. [ ] Phase 4e — fresh device pulls the full library. **← cut is real here.**
-10. [ ] Post-cut — Development kept as archive; handoff/DONE-LOG updated; Yes Chef Dev (ADR-0059) dispatched.
+- **Phase 1 (cleared 2026-10-26).**
+  - [`efforts/prod-dead-column-drop.md`](efforts/prod-dead-column-drop.md) dropped `recipes.lastCookedAt` and
+    `timesCooked`, and added the test that every table's on-disk columns match its model. There was no migration
+    squash (ADR-0056 Amd 1).
+  - [`efforts/raw-import-html-drop.md`](efforts/raw-import-html-drop.md) dropped `recipes.originalImportText`,
+    deleted 1,527 photo rows with no bytes, re-uploaded the nine recipes over the 1 MB limit, and re-linked three
+    calendar rows (ADR-0010 Amd 1).
+- **Phase 2 (cleared 2026-10-26).**
+  - Both devices read "Up to date" with nothing unsynced.
+  - [`efforts/sync-failure-surfacing.md`](efforts/sync-failure-surfacing.md) made this check permanent: "Up to
+    date" requires zero rows that never reached the server and zero inbound rows that couldn't be applied, and
+    Slice 6 purges retired record types.
+- **Reference A (2026-10-26).** Development was exported, diffed, and the keep/drop verdicts settled (plan PRs
+  #373 and #374).

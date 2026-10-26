@@ -700,7 +700,7 @@ inferred cuisine.
 ## Amendment 5 — retire `tags` and `recipeTags` physically, before the Production cut (2026-10-26)
 
 Status: **Accepted** — 2026-10-26, Jon, while reviewing the Development schema diff for
-[`PROD-CUTOVER.md`](../PROD-CUTOVER.md) § 4a. **Schema change, synced tables.** Built by
+[`PROD-CUTOVER.md`](../PROD-CUTOVER.md) Reference A. **Schema change, synced tables.** Built by
 [`efforts/prod-never-set-drop.md`](../efforts/prod-never-set-drop.md).
 
 **Why.** S1 step 3 left the two tables dormant and still registered with the sync engine. It made physical removal
@@ -726,5 +726,5 @@ reverses that trade:
 - Supersedes S1 step 3's "Do not drop the physical tables."
 
 **Consequences.** Labels have one home, `categories`. The empty loose **beach** and **cocktail** categories can
-be deleted for good once the build ships. Development keeps the `tags` and `recipeTags` record types until the 4a
+be deleted for good once the build ships. Development keeps the `tags` and `recipeTags` record types until the cutover's Step 5
 console step deletes them.

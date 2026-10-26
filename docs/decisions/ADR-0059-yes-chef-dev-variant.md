@@ -43,7 +43,7 @@ Yes Chef is not Galavant in three ways:
 
 ## Decision
 
-**D1 — Cutover first, split second.** The split is dispatched once ADR-0056 Phase 4e passes (the cut is
+**D1 — Cutover first, split second.** The split is dispatched once ADR-0056's cut is real (`PROD-CUTOVER.md` Step 11; formerly Phase 4e) (the cut is
 real), not before. Three reasons, the first decisive:
 
 - **Before the cut, the Development zone is the real library.** A Yes Chef Dev with sync on would be a third
@@ -54,9 +54,9 @@ real), not before. Three reasons, the first decisive:
 - **The one legitimate cross-environment restore happens at the cut.** That's ADR-0056's re-seed. With it
   behind us, D6 doesn't have to work around it (it stays safe anyway; see D6).
 
-*Cost:* between Phase 4e and this split merging, **nothing gets an Xcode Run onto a device that has
+*Cost:* between the cut (Step 11) and this split merging, **nothing gets an Xcode Run onto a device that has
 TestFlight Yes Chef.** Use the simulator only. Galavant lived with the same window for two days.
-`PROD-CUTOVER.md` says so at Phase 4c and Post-cut.
+`PROD-CUTOVER.md` says so in its Rules, at Steps 8 and 11, and in Step 13.
 
 **D2 — The Debug configuration builds "Yes Chef Dev". Release builds don't change.**
 

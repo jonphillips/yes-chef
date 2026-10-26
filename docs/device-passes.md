@@ -214,41 +214,9 @@ container), which also closed OQ1. OQ6 is now diagnosed (Amendment 3): a naive r
 procedure gates it** (quiesce peers → restore on one → reinstall peers). When it runs, follow that procedure —
 and **Undo Last Restore** is untested at all and rode the same broken binding as restore, so exercise it too.
 
-## Prod-schema promotion list
+## Prod-schema promotion list — superseded (2026-10-26)
 
-**Standing release follow-up — not a dispatch. A pre-cut ops step Jon runs.** We stay in the CloudKit
-**Development** environment so the schema keeps evolving freely; promoting to **Production** is
-additive-only and **permanently locks those record types**, so it is deliberately **held** until an actual
-prod/TestFlight cut. At that cut, deploy the following to the production schema:
-
-- Phase E Slice 3 **pantry-policy + `canonicalName`** fields
-- **`Recipe.coverPhotoID`** (reader photo affordances, PR #87)
-- **`Category.color`**, **`Category.facetID`**, and **`Category.hidden`**, plus the synced **`facets`**
-  table (ADR-0049 Amendment 2)
-- The synced **`aiSettings`** table (ADR-0018, PR #96), **including** its additive `readerFeedbackPreference`
-  (ADR-0025 D6) and `captureToNotePreference` (ADR-0027 S1, PR #141) columns
-- The synced **`recipeVariations`** table (ADR-0021 / recipe edit proposals S2)
-- The synced **`recipeServeWith`** table (ADR-0048 S3)
-- **`Menu.externalProjectName`** (ADR-0038 S2)
-- The synced **`learnings`** table, **including** its `sortOrder` column (ADR-0038 Amd 1 / Amd 5)
-- The synced **`prepPlanSteps`** table (ADR-0040 S2)
-- The synced **`workbenchLog`** table, **including** its nullable `hypothesis` / `change` / `rationale`
-  columns (ADR-0042 S2)
-- **`workbenches.dateCompleted`** (Dogfood ferry Dispatch 3)
-- The synced **`workbenchReferences`** table (ADR-0032 S1)
-- The synced **`recipeDeliberationLog`** table (ADR-0021 V3 / [Amd 3](decisions/ADR-0021-recipe-variations.md#amendment-3--the-why-survives-the-commit-a-recipe-scoped-deliberation-log-2026-07-23))
-- The synced **`groceryAreaAssignments`** table (ADR-0052 S1+S2)
-- The synced **`recipeRelatedRecipes`** table (ADR-0021 Amendment 4 V4b)
-
-*The `Menu.prepPlan` BLOB is **not** on this list and must not be re-added — it was dropped outright, so the
-dead CKAsset field never enters the prod schema.*
-
-*`Recipe.lastCookedAt` and `Recipe.timesCooked` are **not** on this list and must not be promoted — both are
-superseded by calendar-derived values (this slice) and are **dropped by an appended migration before the deploy**
-([`efforts/prod-dead-column-drop.md`](efforts/prod-dead-column-drop.md), ADR-0056 Amd 1). Delete them from the
-Development CloudKit schema in the console before deploying (`PROD-CUTOVER.md` Phase 4a). Old backup JSON carrying these keys still decodes (unknown keys are ignored), so no backup-compat
-migration is needed.*
-
-**The check is the registration list, in both directions.** A column on a synced table is on this list; a
-column on a table that is *not* registered in `CloudSync` is local and belongs nowhere near it. Both
-mistakes have been made — verify against `CloudSync.swift`, not against intuition.
+Retired. A deploy copies the **whole** Development schema, so the deploy is decided by the exact Development
+diff in [`PROD-CUTOVER.md`](PROD-CUTOVER.md) Reference A, not by a hand-kept list. Every item this list carried
+is either already in Development or settled there: the pantry thresholds are created in Step 5, and
+`Category.color` is dropped in Step 1. The executed steps are PROD-CUTOVER Steps 5–6.
