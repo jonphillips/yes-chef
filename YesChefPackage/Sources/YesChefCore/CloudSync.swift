@@ -66,6 +66,10 @@ public enum YesChefCloudSync {
     PantryItem.self, AISettingsRecord.self, Learning.self
   )
 
+  /// These types were removed from the engine. Purge their CloudKit records and
+  /// SQLiteData metadata; never include a type that remains in `syncedTables`.
+  public static let retiredRecordTypes = ["categorySeedStates", "categorySeedTombstones"]
+
   // MARK: Enablement gate (forwarded)
 
   public static func isManuallyEnabled(
@@ -109,7 +113,55 @@ public enum YesChefCloudSync {
   // MARK: Start / redrain / pending (forwarded)
 
   public static func startIfManuallyEnabled() async -> StartResult {
-    await CloudSync.startIfManuallyEnabled(configuration: configuration)
+    let result = await CloudSync.startIfManuallyEnabled(configuration: configuration)
+    guard case .started = result else { return result }
+
+    Task(priority: .background) {
+      await purgeRetiredRecordTypesWhenIdle()
+    }
+    return result
+  }
+
+  private static func purgeRetiredRecordTypesWhenIdle() async {
+    @Dependency(\.defaultDatabase) var database
+    @Dependency(\.defaultSyncEngine) var syncEngine
+    guard syncEngine.isRunning,
+          !syncEngine.isSendingChanges,
+          !syncEngine.isFetchingChanges
+    else { return }
+    let pendingChangeCount: Int
+    do {
+      pendingChangeCount = try await CloudSync.pendingRecordZoneChangeCount(in: database)
+    } catch {
+      AppLog.dataIntegrity.error(
+        "Couldn’t check pending changes before retired sync cleanup: \(String(describing: error), privacy: .public)"
+      )
+      return
+    }
+    guard pendingChangeCount == 0 else { return }
+
+    let client = CloudKitLeftoverClient(
+      database: CKContainer(identifier: configuration.containerIdentifier).privateCloudDatabase
+    )
+    do {
+      let result = try await CloudSync.purgeRetiredRecordTypes(
+        retiredRecordTypes, tables: syncedTables, in: database, client: client
+      )
+      let purgedCount = result.purgedCountsByType.values.reduce(0, +)
+      guard purgedCount > 0 || !result.failures.isEmpty else { return }
+
+      var summary = result.purgedCountsByType.keys.sorted().map { recordType in
+        "\(recordType): purged \(result.purgedCountsByType[recordType, default: 0])"
+      }
+      summary += result.failures.keys.sorted { $0.recordName < $1.recordName }.map { recordID in
+        "\(recordID.recordName): \(result.failures[recordID] ?? "Unknown error")"
+      }
+      AppLog.dataIntegrity.warning("Retired CloudKit sync cleanup: \(summary.joined(separator: "; "), privacy: .public)")
+    } catch {
+      AppLog.dataIntegrity.error(
+        "Retired CloudKit sync cleanup failed: \(String(describing: error), privacy: .public)"
+      )
+    }
   }
 
   public static func redrainPendingRecordZoneChangesIfManuallyEnabled(

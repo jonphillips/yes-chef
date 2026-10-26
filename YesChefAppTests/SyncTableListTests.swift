@@ -33,6 +33,9 @@ struct SyncTableListTests {
           .sorted()
       }
       #expect(triggerNames == YesChefCloudSync.syncedTables.recordTypes.sorted())
+      #expect(Set(YesChefCloudSync.retiredRecordTypes).isDisjoint(
+        with: Set(YesChefCloudSync.syncedTables.recordTypes)
+      ))
     }
   }
 }
