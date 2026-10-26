@@ -11,6 +11,8 @@ Amendment 1.**
 **Amendment 2 (2026-08-01, proposed): D1's "the parent is the dimension" is superseded — a **facet** becomes
 an explicit synced entity and structured values carry `facetID`; loose labels are `facetID == nil`. Amendment 2
 **absorbs unbuilt Amendment 1** — do not implement Amd 1 separately. Supersedes OQ2. See Amendment 2.**
+**Amendment 5 (2026-10-26, accepted): retire the dormant `tags`/`recipeTags` tables physically before the
+Production cut, and delete the every-launch fold. Supersedes S1 step 3's "do not drop". See Amendment 5.**
 Extends [ADR-0026](ADR-0026-review-collection-sheet.md) (the review-collection sheet is the proposer's UI),
 [ADR-0023](ADR-0023-recipe-edit-proposals.md) (propose-to-preview, commit deterministically) and
 [ADR-0025](ADR-0025-reader-comment-ingestion.md) (the one-by-one curation queue). Governed by
@@ -694,3 +696,35 @@ recipe yields three good tags (`Chicken` + `Fry` from the floor, `American` from
 floor is pure Core logic, schema-free and sync-free, fully unit-testable, with the KFC recipe as the
 precision-anchor fixture: it fires `Chicken` + `Fry`, and does **not** fire `Eggs`, any loose label, or an
 inferred cuisine.
+
+## Amendment 5 — retire `tags` and `recipeTags` physically, before the Production cut (2026-10-26)
+
+Status: **Accepted** — 2026-10-26, Jon, while reviewing the Development schema diff for
+[`PROD-CUTOVER.md`](../PROD-CUTOVER.md) § 4a. **Schema change, synced tables.** Built by
+[`efforts/prod-never-set-drop.md`](../efforts/prod-never-set-drop.md).
+
+**Why.** S1 step 3 left the two tables dormant and still registered with the sync engine. It made physical removal
+"a later, optional slice, or never", because dropping a synced table is itself a sync event. The Production cut
+reverses that trade:
+- **Registered tables deploy to Production as permanent record types.** The Production zone starts empty, so
+  retiring the tables before the cut means Production never sees them. Afterwards they can never be removed.
+- **The fold is finished.** In both devices' backups (iPhone 2026-10-26, iPad 2026-10-13), every one of the 10
+  tags has a category, and every one of the 13 tag links has an equivalent `recipeCategories` link. Three of
+  those links now point at the faceted **Beach** and **Cocktail** categories.
+- **The dormant fold does harm.** `foldDormantTagsIntoCategories` runs post-engine on every launch. When no loose
+  category with a tag's name exists, it re-creates one with the tag's id. That is why the library carries empty
+  loose **beach** and **cocktail** categories (0 recipes each). If you delete them, they come back on the next
+  launch.
+- The retirement path now exists. Sync-failure Slice 6 built `retiredRecordTypes`, which purges a retired type's
+  iCloud records and sync metadata after sync starts.
+
+**Decision.**
+- **A5-D1:** Remove `Tag` and `RecipeTag` from the sync engine and `syncedTables`, and add `tags` and `recipeTags`
+  to `YesChefCloudSync.retiredRecordTypes`.
+- **A5-D2:** An appended migration drops both tables. `tags.color` goes with them.
+- **A5-D3:** Delete `foldDormantTagsIntoCategories`, its tests, and every remaining `Tag`/`RecipeTag` reader.
+- Supersedes S1 step 3's "Do not drop the physical tables."
+
+**Consequences.** Labels have one home, `categories`. The empty loose **beach** and **cocktail** categories can
+be deleted for good once the build ships. Development keeps the `tags` and `recipeTags` record types until the 4a
+console step deletes them.

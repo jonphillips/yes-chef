@@ -113,29 +113,63 @@ Development schema into Production. Development's schema is whatever past upload
 `makeSyncEngine` registers, so it can be wrong in two ways:
 
 - **Dead types and fields (permanent once deployed).** Development keeps every record type and field that was
-  ever uploaded, and Production can't remove them later. Candidates, taken from the migrations that dropped them:
-  - record types `categorySeedStates` and `categorySeedTombstones` (emptied by sync-failure Slice 6);
-  - fields `recipes.lastCookedAt`, `recipes.timesCooked`, and `recipes.originalImportText`;
-  - fields `ingredientLines.substitution` and `menus.prepPlan`;
-  - fields `workbenchReferences.kind` and `workbenchReferences.provenance`, if an early device uploaded them.
-
-  SQLiteData also writes companion fields per column: a modification-time field for every column, and a
-  `_hash` field for assets. A dead column's companions are dead too.
+  ever uploaded, and Production can't remove them later. SQLiteData also writes companion fields per column: a
+  modification-time field (`sqlitedata_icloud_userModificationTime_<column>`) for every column, even when the
+  value is nil, and a `<column>_hash` field for each asset. A dead column's companions are dead too.
 - **Missing types and fields (recoverable, but uploads fail until fixed).** Development creates a record type
   only when its first record uploads, and a field only when some record carries a non-nil value. Production
   never creates either one, so a missing one makes that record's upload fail until a later additive deploy.
-  The sync status will show it as not synced. From the 2026-10-26 backup:
-  - `equipment` and `recipeEquipment` have no rows, so their record types may not exist;
-  - 23 columns have never held a value: `recipes.activeTimeMinutes`/`restTimeMinutes`,
-    `recipeSources.pageNumber`, `ingredientLines.shoppingCategory`, `recipeNotes.cookingSessionID`,
-    `tags.color`, `categories.color`, `mealPlanItems.notes`/`startTime`/`endTime`, `menus.notes`,
-    `workbenchLog.outcome`/`relatedRecipeID`, `groceryLists.remindersListName`,
-    `groceryItemSources.mealPlanItemID`/`menuID`/`menuItemID`/`menuPlacementID`/`scheduledDate`/`mealSlot`/`sourceSubtitle`,
-    and `pantryItems.thresholdQuantity`/`thresholdUnit`, plus the 8 columns of the two empty tables.
+  The sync status will show it as not synced.
 
-  A field may already exist if an earlier value was later cleared. The schema export decides. Whether each
-  never-set column is kept (create it) or dropped (an appended migration before the cut) is decided per column
-  in [`open-questions.md`](open-questions.md) § "production cutover: keep-or-drop the never-set synced columns".
+**The diff (Development export of 2026-10-26 against the 36 `syncedTables`).** The 2026-10-26 backup found
+`equipment` and `recipeEquipment` empty and 23 columns that have never held a value. The export settles which of
+them Development actually lacks. Every live column's modification-time companion is already present, including
+the companions of the never-set columns.
+
+*Dead — delete in the console:*
+- record type `categorySeedStates`. `categorySeedTombstones` was never uploaded, so it isn't there.
+- `recipes`: `originalImportText`, `timesCooked`, and the companions
+  `sqlitedata_icloud_userModificationTime_originalImportText`, `_timesCooked`, and `_lastCookedAt`. The
+  `lastCookedAt` field itself was never uploaded.
+- `menus`: `prepPlan` (an asset), `prepPlan_hash`, and `sqlitedata_icloud_userModificationTime_prepPlan`.
+- Not in Development, so nothing to do: `ingredientLines.substitution`, `workbenchReferences.kind`, and
+  `workbenchReferences.provenance`.
+
+*Missing — 2 record types and 17 fields.* The other 6 never-set columns
+(`groceryItemSources.mealPlanItemID`/`menuID`/`menuItemID`/`scheduledDate`/`mealSlot`/`sourceSubtitle`) already
+exist from earlier values. Each missing item is kept or dropped per
+[`open-questions.md`](open-questions.md) § "production cutover: keep-or-drop the never-set synced columns".
+Every field is `ENCRYPTED`.
+
+| Missing | Type | Write path | Verdict (Jon, 2026-10-26) |
+|---|---|---|---|
+| `recipeSources.pageNumber` | STRING | editor "Page" field | keep → create |
+| `mealPlanItems.notes` | STRING | calendar entry editor | keep → create |
+| `menus.notes` | STRING | new-menu sheet | keep → create |
+| `workbenchLog.outcome` | STRING | log-entry editor | keep → create |
+| `workbenchLog.relatedRecipeID` | STRING | Adjust rationale logged to the Workbench | keep → create |
+| `groceryLists.remindersListName` | STRING | grocery list "Reminders List" field | keep → create |
+| `pantryItems.thresholdQuantity` | DOUBLE | pantry editor | keep → create |
+| `pantryItems.thresholdUnit` | STRING | pantry editor | keep → create |
+| `groceryItemSources.menuPlacementID` | STRING | grocery generation from placed menu dishes | keep → create |
+| `recipes.activeTimeMinutes` | INT64 | none (copied by Adjust, read by the browser) | drop |
+| `recipes.restTimeMinutes` | INT64 | none (copied by Adjust) | drop |
+| `ingredientLines.shoppingCategory` | STRING | none (parser never sets it; read as a grocery-aisle fallback) | drop |
+| `recipeNotes.cookingSessionID` | STRING | none (only ever written nil) | drop |
+| `tags.color` | STRING | none | drop, with the `tags` table (ADR-0049 Amd 5) |
+| `categories.color` | STRING | only copied from `tags.color` when tags merge into categories | drop |
+| `mealPlanItems.startTime` | TIMESTAMP | none | drop |
+| `mealPlanItems.endTime` | TIMESTAMP | none | drop |
+| record types `equipment` and `recipeEquipment` | — | none (no importer fills a bundle's equipment; Adjust only copies it) | drop |
+
+A dropped column's modification-time companion is already in Development, so it joins the dead list above.
+
+*Also dead once the drop slice ships:* the record types `tags` and `recipeTags`. They were folded into
+categories and retired by [ADR-0049 Amd 5](decisions/ADR-0049-unified-labels-and-assisted-tagging.md). The slice
+lists them in `retiredRecordTypes`, so Slice 6's purge empties them in Development. The console step then deletes
+both types.
+
+The drops ship as one slice: [`efforts/prod-never-set-drop.md`](efforts/prod-never-set-drop.md).
 
 **How to run the backup audit (repeatable).**
 1. Audit a **fresh in-app backup**, never a simulator store. Jon exports it to iCloud Drive → Documents →
@@ -146,17 +180,23 @@ Development schema into Production. Development's schema is whatever past upload
    non-NULL rows. Zero rows means the record type may be missing; zero non-NULL means the field may be missing.
 
 Steps:
-- [ ] Create a CloudKit management token (CloudKit Console → Settings → Tokens) and store it with
+- [x] Create a CloudKit management token (CloudKit Console → Settings → Tokens) and store it with
       `xcrun cktool save-token --type management`. Then export Development:
       `xcrun cktool export-schema --team-id 7MQEE539G9 --container-id iCloud.com.jonphillips.yeschef --environment development --output-file yeschef-dev.ckdb`
-- [ ] The architect diffs the export against the registered tables and their columns, and writes the exact dead
-      list and missing list here.
+      **2026-10-26.**
+- [x] The architect diffs the export against the registered tables and their columns, and writes the exact dead
+      list and missing list here. **2026-10-26** (above).
+- [x] Jon settles each keep/drop verdict. **2026-10-26:** all as proposed (table above), plus the `tags`/`recipeTags`
+      retirement.
+- [ ] The drops ship as one appended-migration slice before the cut ([`efforts/prod-never-set-drop.md`](efforts/prod-never-set-drop.md)),
+      and the device pass is clean. Each dropped column's companion and the two tag types join the dead list.
 - [ ] Delete the dead record types and fields in the console. Once Phase 1 has shipped to every device, nothing
       writes them. **Never use "Reset Development Environment"**: it deletes the Development data, and that data is
       the fallback.
 - [ ] Create the missing record types and fields in Development. How depends on the diff: either add them in the
       console with the type and encryption SQLiteData uses, or use a DEBUG-only primer that uploads one throwaway
       record per type with every column set and then deletes it. Deleting the record doesn't remove the schema.
+      With the proposed verdicts that is 9 fields and no record types, so the console is enough (types in the table).
 - [ ] Re-export, confirm the schema matches the app exactly, then deploy Development to **Production**. This
       permanently locks the record types.
 

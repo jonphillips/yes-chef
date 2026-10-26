@@ -144,6 +144,17 @@ Live ambiguities and recently-resolved decisions. Resolved items stay here brief
 - **How to decide.** For each column, grep the model and its writers for any code path that writes it. A write
   path means keep (and create it); none means drop. Record the verdict per column in 4a's missing list. The two
   empty tables (`equipment`, `recipeEquipment`) take the same test.
+- **Decided 2026-10-26: Jon approved every verdict as proposed** (4a's table, after diffing the Development export). Of the 17 fields
+  Development lacks, 9 have a write path and are kept: `pageNumber`, `mealPlanItems.notes`, `menus.notes`,
+  `workbenchLog.outcome`/`relatedRecipeID`, `remindersListName`, `pantryItems.threshold*`, and
+  `groceryItemSources.menuPlacementID`. 8 have none and are dropped, along with both equipment tables:
+  `activeTimeMinutes`, `restTimeMinutes`, `shoppingCategory`, `cookingSessionID`, `tags.color`, `categories.color`,
+  and `mealPlanItems.startTime`/`endTime`. `categories.color` was on the Prod-schema promotion list, but no UI
+  sets or shows it; its only writer copies `tags.color`, which nothing sets. **Jon confirmed the drop
+  (2026-10-26):** re-add it additively if a color UI is ever built. Jon also retired the dormant `tags`/`recipeTags`
+  tables (ADR-0049 Amd 5). All of it ships as one slice,
+  [`efforts/prod-never-set-drop.md`](efforts/prod-never-set-drop.md), dispatched after chat-access S2. Remove this
+  item once that slice merges.
 - These drops are the only synced-schema change allowed to merge before the cut (4a's sequencing note).
 
 ## Live — recipe normalization ("normalize recipe" function)
