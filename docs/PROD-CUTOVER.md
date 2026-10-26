@@ -36,6 +36,11 @@ run may bless, never the plan's assumption.
       alone. Don't dispatch it before Phase 4e (ADR-0059 D1).
 - [ ] Schedule a window with slack — the first Production sync is large and will throttle (see Phase 4).
 
+**Sequencing while the cut is open (2026-10-26).** Codex's schema-free work (chat-access S2) can continue
+alongside the cut. Merge **no synced-schema change** other than 4a's keep/drop drops until the cut is done.
+S2's two-device pass must finish before Phase 4c or wait for TestFlight: after 4c nothing gets an Xcode Run
+onto a device until ADR-0059 (Yes Chef Dev) ships post-cut.
+
 ---
 
 ## Phase 1 — Drop the dead cook columns  *(ships as a reviewed slice; ADR-0056 D2 as amended by Amd 1)*
@@ -121,14 +126,24 @@ Development schema into Production. Development's schema is whatever past upload
   never creates either one, so a missing one makes that record's upload fail until a later additive deploy.
   The sync status will show it as not synced. From the 2026-10-26 backup:
   - `equipment` and `recipeEquipment` have no rows, so their record types may not exist;
-  - 29 columns have never held a value: `recipes.activeTimeMinutes`/`restTimeMinutes`,
+  - 23 columns have never held a value: `recipes.activeTimeMinutes`/`restTimeMinutes`,
     `recipeSources.pageNumber`, `ingredientLines.shoppingCategory`, `recipeNotes.cookingSessionID`,
     `tags.color`, `categories.color`, `mealPlanItems.notes`/`startTime`/`endTime`, `menus.notes`,
     `workbenchLog.outcome`/`relatedRecipeID`, `groceryLists.remindersListName`,
     `groceryItemSources.mealPlanItemID`/`menuID`/`menuItemID`/`menuPlacementID`/`scheduledDate`/`mealSlot`/`sourceSubtitle`,
     and `pantryItems.thresholdQuantity`/`thresholdUnit`, plus the 8 columns of the two empty tables.
 
-  A field may already exist if an earlier value was later cleared. The schema export decides.
+  A field may already exist if an earlier value was later cleared. The schema export decides. Whether each
+  never-set column is kept (create it) or dropped (an appended migration before the cut) is decided per column
+  in [`open-questions.md`](open-questions.md) § "production cutover: keep-or-drop the never-set synced columns".
+
+**How to run the backup audit (repeatable).**
+1. Audit a **fresh in-app backup**, never a simulator store. Jon exports it to iCloud Drive → Documents →
+   App Backups → `YesChef-Backup-<date>.sqlite`; it may need to sync down to the Mac first.
+2. Copy it into its own scratch directory and open the copy read-only:
+   `sqlite3 "file:<path>?immutable=1"`.
+3. For each of the 36 tables in `YesChefCloudSync.syncedTables`, count the rows, and for each column count the
+   non-NULL rows. Zero rows means the record type may be missing; zero non-NULL means the field may be missing.
 
 Steps:
 - [ ] Create a CloudKit management token (CloudKit Console → Settings → Tokens) and store it with
