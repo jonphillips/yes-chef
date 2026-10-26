@@ -48,7 +48,7 @@ can happen any time after the cut (ADR-0056 Amd 1).
       CodingKeys come out of `Recipe`. Old backup JSON still decodes, since unknown keys are ignored.
 - [x] A test proves every table's on-disk columns match its model, so no other dead column reaches
       Production unnoticed.
-- [ ] Before installing the build, export a backup from each device. Afterwards, confirm the library is
+- [x] Before installing the build, export a backup from each device. Afterwards, confirm the library is
       intact and that an edit syncs to the other device.
 - [x] **Raw import HTML dropped, and its fallout repaired** ([`efforts/raw-import-html-drop.md`](efforts/raw-import-html-drop.md),
       ADR-0010 Amd 1). This is the second reviewed slice. An appended migration drops `recipes.originalImportText`.
@@ -57,8 +57,7 @@ can happen any time after the cut (ADR-0056 Amd 1).
       sync blanked. Capture stops saving photos it never downloads. **It must land before Phase 3.** Otherwise the re-seed
       backup carries records that can't upload and calendar links that are NULL.
 
-**Gate:** the drop has shipped and Jon's device pass is clean. The device pass remains owed in
-[`device-passes.md`](device-passes.md).
+**Gate:** the drop has shipped and Jon's device pass is clean. **Cleared 2026-10-26.**
 
 ---
 
@@ -66,12 +65,18 @@ can happen any time after the cut (ADR-0056 Amd 1).
 
 Every row that should sync must be *uploadable*; a row with no sync metadata seeds neither zone.
 
-- [ ] For each synced table, compare row count to the count the engine will push; investigate any gap.
+- [x] For each synced table, compare row count to the count the engine will push; investigate any gap.
+      **2026-10-26:** both devices read "Up to date" with nothing unsynced, which is this check made permanent.
       Migration-inserted or pre-engine rows are the usual orphans ([[migration-writes-bypass-sync-triggers]]).
-- [ ] Remediate orphans **deterministically** (deterministic-UUID, post-engine), never with a fresh-UUID
+- [x] Remediate orphans **deterministically** (deterministic-UUID, post-engine), never with a fresh-UUID
       migration write.
-- [ ] Verify the **promotion list against `makeSyncEngine` in `CloudSync.swift`, in both directions** — a
+- [x] Verify the **promotion list against `makeSyncEngine` in `CloudSync.swift`, in both directions** — a
       synced-table column is on the list; a column on an unregistered (local) table belongs nowhere near it.
+      **2026-10-26:** every entry is on one of the 36 registered tables. But the list is not what a deploy
+      copies: a deploy copies the whole Development schema, so the check that decides the cut is 4a's parity
+      check. The 2026-10-26 backup also shows two listed items that have never held a value
+      (`pantryItems.thresholdQuantity`/`thresholdUnit` and `categories.color`), so they may not be in
+      Development at all.
 
 - [x] **Make the check permanent in the sync status** ([`efforts/sync-failure-surfacing.md`](efforts/sync-failure-surfacing.md)).
       "Up to date" requires zero rows that never reached the server and zero inbound rows that couldn't be
@@ -98,16 +103,47 @@ Every row that should sync must be *uploadable*; a row with no sync metadata see
 Do these in order on a **single** device. The Development environment stays live and untouched as a
 fallback throughout.
 
-**4a — Deploy schema to Production.**
-- [ ] Deploy the Development schema to **Production** in the CloudKit dashboard (additive-only; **this
-      permanently locks the record types** — confirm the promotion list is complete and the dropped columns
-      are absent *before* deploying).
-- [ ] **Delete the dead fields from the Development schema first.** Development still carries
-      `lastCookedAt` / `timesCooked` / `originalImportText` on the recipes record type, created there by past
-      uploads, and a deploy copies Development's fields. Once Phase 1 has shipped to every device, delete those
-      fields in the
-      console (Galavant's cutover did the same). **Never use "Reset Development Environment"**: it deletes the
-      Development data, and that data is the fallback.
+**4a — Make the Development schema match the app, then deploy it.** A deploy copies the **whole**
+Development schema into Production. Development's schema is whatever past uploads created, not what
+`makeSyncEngine` registers, so it can be wrong in two ways:
+
+- **Dead types and fields (permanent once deployed).** Development keeps every record type and field that was
+  ever uploaded, and Production can't remove them later. Candidates, taken from the migrations that dropped them:
+  - record types `categorySeedStates` and `categorySeedTombstones` (emptied by sync-failure Slice 6);
+  - fields `recipes.lastCookedAt`, `recipes.timesCooked`, and `recipes.originalImportText`;
+  - fields `ingredientLines.substitution` and `menus.prepPlan`;
+  - fields `workbenchReferences.kind` and `workbenchReferences.provenance`, if an early device uploaded them.
+
+  SQLiteData also writes companion fields per column: a modification-time field for every column, and a
+  `_hash` field for assets. A dead column's companions are dead too.
+- **Missing types and fields (recoverable, but uploads fail until fixed).** Development creates a record type
+  only when its first record uploads, and a field only when some record carries a non-nil value. Production
+  never creates either one, so a missing one makes that record's upload fail until a later additive deploy.
+  The sync status will show it as not synced. From the 2026-10-26 backup:
+  - `equipment` and `recipeEquipment` have no rows, so their record types may not exist;
+  - 29 columns have never held a value: `recipes.activeTimeMinutes`/`restTimeMinutes`,
+    `recipeSources.pageNumber`, `ingredientLines.shoppingCategory`, `recipeNotes.cookingSessionID`,
+    `tags.color`, `categories.color`, `mealPlanItems.notes`/`startTime`/`endTime`, `menus.notes`,
+    `workbenchLog.outcome`/`relatedRecipeID`, `groceryLists.remindersListName`,
+    `groceryItemSources.mealPlanItemID`/`menuID`/`menuItemID`/`menuPlacementID`/`scheduledDate`/`mealSlot`/`sourceSubtitle`,
+    and `pantryItems.thresholdQuantity`/`thresholdUnit`, plus the 8 columns of the two empty tables.
+
+  A field may already exist if an earlier value was later cleared. The schema export decides.
+
+Steps:
+- [ ] Create a CloudKit management token (CloudKit Console → Settings → Tokens) and store it with
+      `xcrun cktool save-token --type management`. Then export Development:
+      `xcrun cktool export-schema --team-id 7MQEE539G9 --container-id iCloud.com.jonphillips.yeschef --environment development --output-file yeschef-dev.ckdb`
+- [ ] The architect diffs the export against the registered tables and their columns, and writes the exact dead
+      list and missing list here.
+- [ ] Delete the dead record types and fields in the console. Once Phase 1 has shipped to every device, nothing
+      writes them. **Never use "Reset Development Environment"**: it deletes the Development data, and that data is
+      the fallback.
+- [ ] Create the missing record types and fields in Development. How depends on the diff: either add them in the
+      console with the type and encryption SQLiteData uses, or use a DEBUG-only primer that uploads one throwaway
+      record per type with every column set and then deletes it. Deleting the record doesn't remove the schema.
+- [ ] Re-export, confirm the schema matches the app exactly, then deploy Development to **Production**. This
+      permanently locks the record types.
 
 **4b — Distribution build config  (ADR-0056 D6).**
 - [ ] Shipping build has dogfood scaffolding OFF: no seed-sample-data, no erase-on-schema-change, and sync
@@ -174,11 +210,11 @@ fallback throughout.
 ## Condensed checklist
 
 1. [ ] Preconditions: green main, cook columns unread, ids unchanged, window with slack.
-2. [ ] Phase 1 — cook columns and raw import HTML dropped by appended migrations; oversize recipes re-uploaded and
+2. [x] Phase 1 — cook columns and raw import HTML dropped by appended migrations; oversize recipes re-uploaded and
    calendar links repaired; no other dead columns; device pass clean.
-3. [ ] Phase 2 — SyncMetadata coverage clean; promotion list verified both directions vs `CloudSync.swift`.
+3. [x] Phase 2 — SyncMetadata coverage clean; promotion list checked against `CloudSync.swift` (2026-10-26).
 4. [ ] Phase 3 — verified pre-cut backup in two places.
-5. [ ] Phase 4a — dead fields deleted from the Dev schema; Production schema deployed (list complete).
+5. [ ] Phase 4a — Development schema exported and matched to the app (dead removed, missing created); Production schema deployed.
 6. [ ] Phase 4b — distribution build: scaffolding off, entitlements intact.
 7. [ ] Phase 4c — install over dev build, library intact, restore + enable sync, let throttling drain.
 8. [ ] Phase 4d — Production zone seeded, **confirmed server-side**.

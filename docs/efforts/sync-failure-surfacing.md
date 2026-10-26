@@ -1,6 +1,6 @@
 # Effort — Sync status reports what didn't sync
 
-Status: **Done → DONE-LOG** — Slice 6 implemented; device pass owed. Designed 2026-10-13, queued after
+Status: **Done → DONE-LOG** — Slices 1–6 shipped and device-passed 2026-10-26. Designed 2026-10-13, queued after
 [`raw-import-html-drop.md`](raw-import-html-drop.md). Schema-free, but
 **touches sync**, so the architect escalates both PRs to Jon. Slices 1–2 shipped (jon-platform #72, yes-chef
 #355/#356). **The device pass failed 2026-10-22 on the first check: the iPad reads "44,938 items haven't synced",

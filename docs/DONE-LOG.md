@@ -9,6 +9,15 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Device passes cleared — production cutover Phase 1, sync failure Slices 1–6
+
+**2026-10-26. Jon's passes.** The raw-import-HTML drop and the dead cook-column drop are passed, so
+`PROD-CUTOVER.md` Phase 1 is done. Both devices read "Up to date" with nothing unsynced. On the iPad, Check iCloud for
+leftovers found deleted rows still in iCloud and cleared them (Slice 5), and the retired `categorySeedStates` rows are
+gone (Slice 6). The offline check passed too: an edit made in Airplane mode showed as "1 item hasn't synced" after the
+30-minute grace window, and the row went back to "Up to date" once the edit uploaded. The sync-failure effort has no owed passes.
+
+---
 ## Sync failure status — Slice 6 retired synced rows (`effort/sync-failure-surfacing-s6-retired-types`)
 
 **2026-10-26. Schema-free; touches sync.** CloudSyncKit deletes the retired `categorySeedStates` and
