@@ -70,6 +70,13 @@ public enum YesChefCloudSync {
   /// SQLiteData metadata; never include a type that remains in `syncedTables`.
   public static let retiredRecordTypes = ["categorySeedStates", "categorySeedTombstones"]
 
+  // SQLiteData can begin its automatic initial fetch just after start returns. Polling
+  // once per second and requiring two idle snapshots lets that fetch become observable;
+  // the one-minute bound keeps cleanup from waiting indefinitely during a long sync.
+  private static let retiredPurgeIdlePollInterval: Duration = .seconds(1)
+  private static let retiredPurgeIdlePollLimit = 60 // 60-second bound / 1-second poll interval.
+  private static let retiredPurgeRequiredIdleReads = 2
+
   // MARK: Enablement gate (forwarded)
 
   public static func isManuallyEnabled(
@@ -125,10 +132,28 @@ public enum YesChefCloudSync {
   private static func purgeRetiredRecordTypesWhenIdle() async {
     @Dependency(\.defaultDatabase) var database
     @Dependency(\.defaultSyncEngine) var syncEngine
-    guard syncEngine.isRunning,
-          !syncEngine.isSendingChanges,
-          !syncEngine.isFetchingChanges
-    else { return }
+    @Dependency(\.continuousClock) var clock
+    guard syncEngine.isRunning else { return }
+
+    var consecutiveIdleReads = 0
+    for _ in 0..<retiredPurgeIdlePollLimit {
+      if !syncEngine.isSynchronizing {
+        consecutiveIdleReads += 1
+        if consecutiveIdleReads == retiredPurgeRequiredIdleReads { break }
+      } else {
+        consecutiveIdleReads = 0
+      }
+      do {
+        try await clock.sleep(for: retiredPurgeIdlePollInterval)
+      } catch {
+        return
+      }
+    }
+    guard consecutiveIdleReads == retiredPurgeRequiredIdleReads else {
+      AppLog.dataIntegrity.debug("Retired CloudKit sync cleanup skipped because sync did not become idle in time")
+      return
+    }
+
     let pendingChangeCount: Int
     do {
       pendingChangeCount = try await CloudSync.pendingRecordZoneChangeCount(in: database)
@@ -156,7 +181,12 @@ public enum YesChefCloudSync {
       summary += result.failures.keys.sorted { $0.recordName < $1.recordName }.map { recordID in
         "\(recordID.recordName): \(result.failures[recordID] ?? "Unknown error")"
       }
-      AppLog.dataIntegrity.warning("Retired CloudKit sync cleanup: \(summary.joined(separator: "; "), privacy: .public)")
+      let message = "Retired CloudKit sync cleanup: \(summary.joined(separator: "; "))"
+      if result.failures.isEmpty {
+        AppLog.dataIntegrity.notice("\(message, privacy: .public)")
+      } else {
+        AppLog.dataIntegrity.warning("\(message, privacy: .public)")
+      }
     } catch {
       AppLog.dataIntegrity.error(
         "Retired CloudKit sync cleanup failed: \(String(describing: error), privacy: .public)"
