@@ -18,6 +18,7 @@ struct AppContainer: View {
   @State private var powerBrowserModel = PowerBrowserModel()
   @State private var createRecipeModel = CreateRecipeModel()
   @State private var chatAccessInboxModel = ChatAccessInboxModel()
+  @State private var chatAccessExportModel = ChatAccessExportModel()
   @State private var automaticBackupModel = AutomaticBackupModel(
     backup: YesChefCloudSync.databaseBackupConfiguration,
     configuration: YesChefCloudSync.automaticBackupConfiguration
@@ -66,6 +67,7 @@ struct AppContainer: View {
       groceryModel: groceryModel,
       createRecipeModel: createRecipeModel,
       chatAccessInboxModel: chatAccessInboxModel,
+      chatAccessExportModel: chatAccessExportModel,
       automaticBackupModel: automaticBackupModel,
       selectedSection: $selectedSection,
       selectedSettingsPane: $selectedSettingsPane,
@@ -194,10 +196,13 @@ struct AppContainer: View {
       Task { await createRecipeCoordinator.abandonOutstandingReferral() }
     }
     .onChange(of: scenePhase) { _, phase in
-      guard phase == .active else { return }
-      Task {
-        await chatAccessInboxModel.prepare()
-        await automaticBackupModel.runIfDue()
+      if phase == .background {
+        Task { await chatAccessExportModel.exportIfDue() }
+      } else if phase == .active {
+        Task {
+          await chatAccessInboxModel.prepare()
+          await automaticBackupModel.runIfDue()
+        }
       }
     }
     .confirmationDialog(

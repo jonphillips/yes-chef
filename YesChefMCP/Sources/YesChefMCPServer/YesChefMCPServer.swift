@@ -51,7 +51,9 @@ public enum YesChefMCPServer {
   public static func make(
     containerURL: URL = FileManager.default.homeDirectoryForCurrentUser
       .appending(path: "Library/Mobile Documents/iCloud~com~jonphillips~yeschef", directoryHint: .isDirectory),
-    now: @escaping @Sendable () -> Date = { Date() }
+    now: @escaping @Sendable () -> Date = { Date() },
+    exportMaterializer: (@Sendable (URL) async throws -> Data)? = nil,
+    materializationDeadline: Duration = .seconds(60)
   ) -> MCPServer {
     let context = StageRecipeContext(containerURL: containerURL, now: now)
     let recipeSchema: MCPValue = .object([
@@ -85,7 +87,7 @@ public enum YesChefMCPServer {
             return .error(error.localizedDescription)
           }
         },
-      ]
+      ] + ChatAccessReadTools.make(containerURL: containerURL, now: now, materialize: exportMaterializer, materializationDeadline: materializationDeadline)
     )
   }
 }

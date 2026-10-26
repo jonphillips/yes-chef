@@ -1,6 +1,6 @@
-# Next Up — Chat access over MCP — S2 export and read tools
+# Next Up — Drop never-set columns and retired tables (PROD-CUTOVER Step 1)
 
-**Slices:** effort `chat-access-mcp`, S2.
-**Briefs:** docs/efforts/chat-access-mcp.md § S2
-**Done when:** per S2's "Done when"; verification per `docs/verification.md`.
-**Owed:** The automatic-backups pass remains owed (first TestFlight build); see [device-passes.md](device-passes.md).
+**Slices:** effort `prod-never-set-drop`, single slice.
+**Briefs:** docs/efforts/prod-never-set-drop.md
+**Done when:** per its "Done when"; verification per `docs/verification.md`. Schema change on synced tables: the PR escalates to Jon.
+**Owed:** Chat access S2's export and Mac materialization pass, plus the automatic-backups pass; see [device-passes.md](device-passes.md).

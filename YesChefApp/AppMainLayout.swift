@@ -19,6 +19,7 @@ struct AppMainLayout: View {
   let groceryModel: GroceryLibraryModel
   let createRecipeModel: CreateRecipeModel
   let chatAccessInboxModel: ChatAccessInboxModel
+  let chatAccessExportModel: ChatAccessExportModel
   let automaticBackupModel: AutomaticBackupModel
   @Binding var selectedSection: AppSection?
   @Binding var selectedSettingsPane: SettingsPane?
@@ -131,8 +132,8 @@ struct AppMainLayout: View {
           )
         }
       }
-      .defaultVisibility(.hidden, for: .tabBar)
       .badge(chatAccessInboxModel.inboxCount)
+      .defaultVisibility(.hidden, for: .tabBar)
 
       Tab(
         AppSection.settings.title,
@@ -143,6 +144,8 @@ struct AppMainLayout: View {
           recipeModel: recipeModel,
           groceryModel: groceryModel,
           automaticBackupModel: automaticBackupModel,
+          chatAccessExportModel: chatAccessExportModel,
+          chatAccessInboxModel: chatAccessInboxModel,
           selectedPane: $selectedSettingsPane,
           usesCompactTabLayout: horizontalSizeClass == .compact
         )
@@ -297,6 +300,8 @@ private struct SettingsTab: View {
   let recipeModel: RecipeLibraryModel
   let groceryModel: GroceryLibraryModel
   let automaticBackupModel: AutomaticBackupModel
+  let chatAccessExportModel: ChatAccessExportModel
+  let chatAccessInboxModel: ChatAccessInboxModel
   @Binding var selectedPane: SettingsPane?
   let usesCompactTabLayout: Bool
 
@@ -304,13 +309,15 @@ private struct SettingsTab: View {
     if usesCompactTabLayout {
       // The More tab supplies the compact navigation context. Passing no pane binding keeps these
       // rows as NavigationLinks instead of changing a split-view selection with no compact push.
-      SettingsView(model: recipeModel, groceryModel: groceryModel, automaticBackupModel: automaticBackupModel)
+      SettingsView(model: recipeModel, groceryModel: groceryModel, automaticBackupModel: automaticBackupModel, chatAccessExportModel: chatAccessExportModel, chatAccessInboxModel: chatAccessInboxModel)
     } else {
       NavigationSplitView(columnVisibility: $columnVisibility) {
         SettingsView(
           model: recipeModel,
           groceryModel: groceryModel,
           automaticBackupModel: automaticBackupModel,
+          chatAccessExportModel: chatAccessExportModel,
+          chatAccessInboxModel: chatAccessInboxModel,
           selectedPane: $selectedPane
         )
       } detail: {

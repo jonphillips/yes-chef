@@ -6,6 +6,8 @@ public enum ChatAccessServerInstructions {
 
     \(RecipeJSONLDContract.projectSource)
 
+    Before suggesting a recipe, check the Yes Chef library with the read tools. When export age matters to a recommendation, report how old the export is.
+
     If a tool call fails or times out, print the JSON-LD object for Jon to paste instead.
     """
 }
