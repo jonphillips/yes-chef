@@ -24,11 +24,6 @@ existing importer and confirm the library matches that snapshot (G4). Turn iClou
 confirm Settings explains why no file is written (G6). With a test library, shrink the recipe count by over
 half, foreground the next day, and confirm the earlier file stays pinned with a warning (G7).
 
-**Sync failure status — the offline check** ([effort brief](efforts/sync-failure-surfacing.md), touches sync). Both
-devices read "Up to date" with nothing unsynced (2026-10-26), so only this remains. On one device, turn on Airplane mode,
-edit a recipe, and wait past the 30-minute grace window. Confirm the row says "1 item hasn't synced" and the detail
-names that recipe. Restore the network and confirm it returns to "Up to date" after upload, with or without Retry.
-
 **Calendar day-rail actions and recipe-editor columns** (schema-free). On 11" and 13" iPad landscape with large Dynamic Type,
 confirm a filled day shows Cook these plus Day actions in the rail, Ask/Add stay in the toolbar, and all grocery and hand-off
 actions remain available. Confirm an empty day offers Add Recipe and Add Note. Check recipe rows omit the kind label and titles
