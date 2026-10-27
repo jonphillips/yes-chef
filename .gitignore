@@ -10,3 +10,6 @@ xcuserdata/
 # Xcode workspace's derived SwiftPM state; local Swift package lockfiles stay tracked.
 *.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 import-inbox/
+
+# Local TestFlight archives, exports, recovery state, and generated notes.
+build/testflight/
