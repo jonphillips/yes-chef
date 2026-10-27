@@ -40,11 +40,26 @@ The configuration is shared through the ChatGPT account, so it is reasonable to 
 - On iPhone, keep the Project selected before starting the conversation. When importing, copy the complete JSON response, switch to Yes Chef, and use Create Recipe's **Paste recipe text** control; clipboard permission prompts are expected.
 - Do the initial source replacement on the larger screen when possible. A partial selection or a duplicate old file is much harder to notice on the phone.
 
-## MCP recipe staging
+## Chat access over MCP
 
-On the Mac, build and install the local helper with `scripts/install-yeschef-mcp`. It installs at `~/.local/bin/yeschef-mcp`, the path used by the existing `yeschef` tunnel profile (health port **8081**). On first use, allow iCloud Drive access for **tunnel-client** so the helper can reach the shared Yes Chef container. Refresh the Yes Chef plugin in ChatGPT to load its single `stage_recipe` tool.
+On the Mac, build and install the local helper with `scripts/install-yeschef-mcp`. It installs at `~/.local/bin/yeschef-mcp`, the path used by the existing `yeschef` tunnel profile (health port **8081**). On first use, allow iCloud Drive access for **tunnel-client** so the helper can reach the shared Yes Chef container. Refresh the Yes Chef plugin in ChatGPT to load its tools:
 
-When that tool is available, ask ChatGPT to send a recipe to Yes Chef. ChatGPT asks before staging it; the item then appears under **From Chat** in Create Recipe on the iPhone and iPad. Open it to review and save it, or discard it. The **Yes Chef** Project and paste flow remain the fallback when the helper is unavailable.
+- `stage_recipe` sends a recipe to Yes Chef's inbox (below).
+- `search_recipes`, `get_recipe`, `list_menus`, `get_menu` and `get_meal_plan` read the library export that the app writes to iCloud (Settings → **Chat Access**).
+
+### After a helper update
+
+The helper doesn't update itself. After any merge that touches `YesChefMCP/` or the export code in `YesChefCore`, reinstall it, or ChatGPT keeps the old tool list. The tunnel also keeps one helper process running, so restart it after installing a new binary:
+
+1. From a fresh `main`, run `scripts/install-yeschef-mcp`.
+2. Restart the tunnel: `~/code/jon-platform/scripts/mcp-tunnel uninstall-agent yeschef`, then `~/code/jon-platform/scripts/mcp-tunnel install-agent yeschef`. `mcp-tunnel status yeschef` should then read `live` and `ready`.
+3. Refresh the Yes Chef plugin in ChatGPT.
+
+If ChatGPT still shows an old tool list, check what the installed helper offers by piping an MCP `initialize` and a `tools/list` request into `~/.local/bin/yeschef-mcp`. If that list is wrong, the binary is stale. If it's right, the tunnel or ChatGPT is stale.
+
+### Staging a recipe
+
+When `stage_recipe` is available, ask ChatGPT to send a recipe to Yes Chef. ChatGPT asks before staging it; the item then appears under **From Chat** in Create Recipe on the iPhone and iPad. Open it to review and save it, or discard it. The **Yes Chef** Project and paste flow remain the fallback when the helper is unavailable.
 
 ## Smoke test
 

@@ -1,6 +1,6 @@
 # Effort — Drop the never-set columns and retired tables before the Production deploy (PROD-CUTOVER Step 1)
 
-Status: Designed 2026-10-26. Jon approved every drop in chat on 2026-10-26. **Schema change, synced tables.** The
+Status: **Complete 2026-10-26** — merged in PR #377 and device-passed on both devices the same day. Designed 2026-10-26. Jon approved every drop in chat on 2026-10-26. **Schema change, synced tables.** The
 architect escalates the PR to Jon. Dispatch it after chat-access-mcp S2. Under the cutover sequencing note, this
 is the one synced-schema change allowed before the cut.
 Summary: One appended migration drops 7 synced columns that no code path ever sets, the two equipment tables that
