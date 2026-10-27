@@ -107,13 +107,13 @@ Mac. The guide is jon-platform `docs/ios/testflight.md` § One-time setup.
       `group.com.jonphillips.yeschef` and ADR-0058's `group.com.jonphillips.cockpit-yeschef`. Add an optional
       `EXTRA_APP_GROUPS` config key (space-separated) that the verifier also accepts. Every other group still
       fails, and the share extension keeps the single-group rule. Update the conf reference in `testflight.md`.
-      The architect writes the dispatch.
+      Brief: [`efforts/testflight-app-groups.md`](efforts/testflight-app-groups.md), dispatched 2026-10-26.
 - [ ] **3b — Tools (Jon).**
   - Install and pin `asc` at Galavant's pin (`brew install asc && brew pin asc`; `asc --version` = `5.14.0`).
   - Log in with the shared Team API key (`asc auth login …`, then `asc auth status --validate`).
   - Link the command: `ln -s ~/code/jon-platform/scripts/testflight ~/code/bin/testflight`.
   - The CloudKit management token is already saved (Reference A).
-- [ ] **3c — `testflight.conf` at the repo root.** It rides in Step 3a's yes-chef companion PR, or Jon adds it:
+- [ ] **3c — `testflight.conf` at the repo root.** It rides in Step 3a's yes-chef companion PR:
 
       SCHEME=YesChef
       PROJECT=YesChef.xcodeproj

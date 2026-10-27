@@ -1,7 +1,7 @@
 # Effort — Chat access over MCP
 
 Status: Designed 2026-10-21. S0 shipped (#357) and its device pass cleared 2026-10-22: D2 stands (§ S0 results).
-S1 shipped (#359) and its device pass cleared 2026-10-23. **S2 shipped (#376) and its device pass cleared 2026-10-26. S3 waits on ADR-0060 OQ3.** Schema-free throughout.
+S1 shipped (#359) and its device pass cleared 2026-10-23. **S2 shipped (#376) and its device pass cleared 2026-10-26. S2b (search rows show categories) is dispatched. S3 waits on ADR-0060 OQ3.** Schema-free throughout.
 Summary: Make Yes Chef the second consumer of jon-platform ADR-0007, so ChatGPT can stage a recipe into Yes Chef
 and look things up in the library instead of Jon pasting in both directions. S0 proved the iCloud Drive transport;
 S1 builds `stage_recipe` and the app's inbox, and S2 builds the library export and the read tools.
@@ -17,7 +17,9 @@ ops) · vinyl-fever `docs/milestones/M12-library-context-mcp.md` (the first cons
 - **S1 — `stage_recipe` and the app's inbox** (ADR-0060 D3, D5, D6). [§ S1](#s1--stage_recipe-and-the-apps-inbox).
   Shipped (#359); device pass cleared 2026-10-23.
 - **S2 — The export and the read tools** (ADR-0060 D4, D6), plus the S1 badge fix.
-  [§ S2](#s2--the-export-and-the-read-tools). Shipped (#376); badge and Mac materialization device pass owed.
+  [§ S2](#s2--the-export-and-the-read-tools). Shipped (#376); device pass cleared 2026-10-26.
+- **S2b — Search rows show categories** (a fix after PR #377). [§ S2b](#s2b--search-rows-show-categories).
+  Dispatched 2026-10-26 with PROD-CUTOVER Step 3a.
 - **S3 — Returns that target an existing recipe.** This waits on ADR-0060 OQ3.
 
 ## S0 — Probe the transport
@@ -370,7 +372,15 @@ pasting one in. Specified 2026-10-22; queued after sync-failure-surfacing Slice 
 ### S2 results
 
 - **Item 0 (badge) cleared 2026-10-26.** A count shows next to Create Recipe; it renders small, but it renders. The cause was modifier order: S1 put `.badge` after `.defaultVisibility(.hidden, for: .tabBar)` and it never drew. #376 moved `.badge` first, and the device confirmed the fix.
-- Items 1–5, including the step 3 materialize result, are still owed.
+- **Items 1–5 passed 2026-10-26.**
+  - **Step 3, the materialize result:** an evicted 26 MB export read back in 11.8 s (`materialize=11.84 s`,
+    `read=0.03 s`), well inside the 60 s bound. The read path stands. Nearly all of that time is iCloud
+    downloading the file; reading a file that's already local is instant.
+  - **Step 4 needs Refresh, not backgrounding.** `exportIfDue` skips the write when the last export is under
+    15 minutes old, so a test forces it with Settings → Chat Access → Refresh. After a forced iPad Refresh, the
+    tools picked the newer export, and a ref from the older one was refused as stale (step 5).
+  - **The helper has to be reinstalled.** ChatGPT showed only `stage_recipe` until `scripts/install-yeschef-mcp`
+    ran and the tunnel restarted. `CHATGPT-SETUP.md` § After a helper update now covers it.
 
 ### Done when
 
@@ -379,6 +389,40 @@ pasting one in. Specified 2026-10-22; queued after sync-failure-surfacing Slice 
   pointer, and advances `NEXT_UP.md` to the queued PROD-CUTOVER Step 1 drop slice. S3 waits on ADR-0060 OQ3.
 - After Jon's pass, the architect records the step 3 materialize result here. If step 3 failed, the read path is
   re-planned before anything builds on the export.
+
+## S2b — Search rows show categories
+
+PR #377 dropped the `tags` table that the export built `tagNames` from, so `tagNames` is now always empty. Search
+still matches on labels through `categoryNames`, and `get_recipe` returns `categories`. But each `search_recipes`
+row carries an always-empty `tags` field and no categories, so ChatGPT can't see a recipe's labels in a list.
+This fix is helper-only and schema-free, so it's allowed during the cut.
+
+### Build
+
+In `YesChefMCP/Sources/YesChefMCPServer/ChatAccessReadTools.swift`:
+- **`search_recipes` rows.** Replace `"tags"` with `"categories": bundle.categoryNames`, and drop
+  `bundle.tagNames` from the match fields.
+- **`get_recipe`.** Drop the `"tags"` key, and keep `"categories"`.
+- **The `search_recipes` description.** It becomes "Search recipes by name, ingredients, categories, and notes."
+
+Leave the export format alone. `RecipeBundle.tagNames` is a shared bundle field (snapshots and transfer), and the
+export keeps emitting it as `[]`.
+
+### Verification (Codex)
+
+`scripts/check-drift.sh`, which runs the `YesChefMCP` tests. There's no app or core change, so no device build is
+needed. In the helper tests, assert that a search row carries its recipe's `categories`, that no tool output
+has a `tags` key, and that a query matching only a category name finds the recipe.
+
+### Jon's device pass
+
+Once it merges, reinstall the helper and restart the tunnel (`CHATGPT-SETUP.md` § After a helper update). Then
+search ChatGPT for a label you use (for example "weeknight"). The rows list `categories`.
+
+### Done when
+
+- It has merged with check-drift green. The completing PR adds the `DONE-LOG.md` entry and lists the pass above
+  in `device-passes.md`.
 
 ## Constants register
 

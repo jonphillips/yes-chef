@@ -10,14 +10,6 @@ and everything downstream move forward without waiting on it.
 
 From the old Next Up:
 
-- **`search_recipes` rows show an empty `tags` field and no categories (found 2026-10-26).** The export filled
-  `tagNames` from the `tags` table, which PR #377 dropped, so the field is now always `[]`. Matching still works,
-  because search checks `categoryNames`, and `get_recipe` returns categories. ChatGPT just can't see a recipe's
-  labels in the search list. The fix is helper-only (`YesChefMCP/…/ChatAccessReadTools.swift`): return
-  `categories` in place of `tags` in the search rows, drop the empty `tags` from `get_recipe`, and update the tool
-  description. After it merges, reinstall the helper (`CHATGPT-SETUP.md` § After a helper update). It's
-  schema-free, so it's allowed during the cut.
-
 - **Migration baseline squash — optional, post-cut, both apps (deferred by ADR-0056 Amd 1).** Use GRDB
   `registerMigration(_:merging:)`. The precondition is that every device is at the final legacy migration.
   Also raise `declaredSchemaVersion` so older backups still restore. It's tidiness only: fresh installs stop
