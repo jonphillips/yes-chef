@@ -37,8 +37,8 @@ jon-platform `SEAM-LEDGER.md`, waiting for this run's answer.
 
 **The cut**
 4. [x] Freeze edits, then take and verify the authoritative backup.
-5. [ ] Clean the Development schema in the console: delete the dead list, create the 9 kept fields.
-6. [ ] Re-export, confirm an exact match, and deploy Development → Production.
+5. [x] Clean the Development schema in the console: delete the dead list, create the 9 kept fields.
+6. [x] Re-export, confirm an exact match, and deploy Development → Production.
 7. [ ] Upload the first TestFlight build.
 8. [ ] iPad: install TestFlight over its current build and observe the in-place carry.
 9. [ ] iPad: re-seed by restore, unless Step 8 already filled Production.
@@ -182,25 +182,36 @@ iPad's library to be the complete one.
 ## 5 — Clean the Development schema  *(CloudKit Console, Development)*
 
 **Never use "Reset Development Environment".** It deletes the Development data, and that data is the fallback.
+**Pick the right container.** The console also lists `iCloud.com.jon.yeschef`, which is empty and unused and shows
+only `Users`. Work in **`iCloud.com.jonphillips.yeschef`**.
 
-- [ ] **Try one deletion first.** Delete `recipes.originalImportText`, which still holds values on existing
+**Done 2026-10-27.** Before any change, a fresh Development export was diffed against `main`'s 32 `syncedTables`. It
+matched Reference A plus Step 1's drops exactly, and the iPad's unpushed build had added nothing.
+
+- [x] **Try one deletion first.** Delete `recipes.originalImportText`, which still holds values on existing
       records. If the console refuses, stop and tell the architect before going on.
-- [ ] Delete everything on Reference A's dead list:
+- [x] Delete everything on Reference A's dead list (3 record types and 15 fields):
   - the record types `categorySeedStates`, `tags` and `recipeTags`;
   - the dead fields on `recipes` and `menus`;
   - the `sqlitedata_icloud_userModificationTime_<column>` companion of each column Step 1 dropped.
-- [ ] Create the 9 kept fields in Reference A's table, each **encrypted**, with the type the table gives. A wrong
+- [x] Create the 9 kept fields in Reference A's table, each **encrypted**, with the type the table gives. A wrong
       type or a missing encryption makes those uploads fail.
 
 ## 6 — Verify, then deploy to Production
 
-- [ ] Re-export Development:
+- [x] Re-export Development:
       `xcrun cktool export-schema --team-id 7MQEE539G9 --container-id iCloud.com.jonphillips.yeschef --environment development --output-file yeschef-dev.ckdb`
-- [ ] The architect diffs it against `syncedTables` (32 tables after Step 1) and their columns, with Reference A's
+- [x] The architect diffs it against `syncedTables` (32 tables after Step 1) and their columns, with Reference A's
       method. **It must match exactly**: every live column, its modification-time companion, a `_hash` for each
       asset, and nothing else.
-- [ ] CloudKit Console → **Deploy Schema Changes** → Production. This is permanent: Production can never remove a
+- [x] CloudKit Console → **Deploy Schema Changes** → Production. This is permanent: Production can never remove a
       deployed type or field.
+
+**Done 2026-10-27.** The post-Step-5 export had 33 record types (the 32 synced plus `Users`), no dead or missing
+fields, and every field encrypted except assets. Compared with the pre-Step-5 export, it changed only by the
+planned 3 types and 15 fields removed and 9 fields added. Production held only `Users` before the deploy, and the
+dialog listed exactly 32 "Create" types. Afterwards a Production export equaled Development's, field for field,
+so `testflight`'s schema gate now passes.
 
 **Gate:** Production's schema equals Development's, which equals the app.
 
