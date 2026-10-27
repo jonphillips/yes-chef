@@ -107,6 +107,21 @@ targets:
             UTTypeDescription: Yes Chef Menu Recipe
             UTTypeIdentifier: com.jonphillips.yeschef.menu-recipe
         UILaunchScreen: {}
+        # HTTPS only, no custom crypto: exempt. Answers App Store Connect's export
+        # compliance question so it isn't asked on every TestFlight upload.
+        ITSAppUsesNonExemptEncryption: false
+        # App Store Connect rejects an iPad-capable bundle without these: iPad
+        # multitasking requires all four orientations. These match iOS's defaults
+        # when the key is absent, so device behavior doesn't change.
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
     dependencies:
       - package: YesChefPackage
         product: YesChefCore
