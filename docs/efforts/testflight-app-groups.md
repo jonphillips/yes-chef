@@ -1,6 +1,7 @@
 # Effort — Let `testflight` verify Yes Chef's second app group (PROD-CUTOVER Step 3a and 3c)
 
-Status: Designed 2026-10-26. Schema-free. Two PRs: jon-platform first, then Yes Chef.
+Status: **Complete** — 2026-10-27. Schema-free. Both PRs shipped: jon-platform #88, then Yes Chef #381. The
+verifier's first signed run is PROD-CUTOVER Step 7's upload.
 Summary: jon-platform's `scripts/testflight` fails any app with a second application group, and Yes Chef's app
 carries two (`group.com.jonphillips.yeschef` and ADR-0058's `group.com.jonphillips.cockpit-yeschef`). Add an
 optional `EXTRA_APP_GROUPS` config key, and have the verifier check each bundle's full group set against the

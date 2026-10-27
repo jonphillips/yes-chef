@@ -11,7 +11,7 @@ Newest first.
 ---
 ## TestFlight app groups and chat-access S2b (`effort/testflight-app-groups`)
 
-**2026-10-27. Schema-free.** Added Yes Chef's TestFlight config with its primary and cockpit app groups. Chat access search rows now expose categories instead of the removed tags field, and category-only searches find matching recipes. The helper tests cover category output and matching. The TestFlight verifier prerequisite is in jon-platform PR #88.
+**2026-10-27. Schema-free.** Added Yes Chef's TestFlight config with its primary and cockpit app groups. Chat access search rows now expose categories instead of the removed tags field, and category-only searches find matching recipes. The helper tests cover category output and matching. The TestFlight verifier prerequisite is in jon-platform PR #88. Device pass owed; see `device-passes.md`.
 
 ---
 ## Drop never-set columns and retired tags/equipment (`effort/prod-never-set-drop`)
