@@ -102,7 +102,7 @@ Anything that needs a dev build on a device has to happen now, before the freeze
 Verified 2026-10-26: Yes Chef has no `testflight.conf`, and neither `asc` nor `testflight` is installed on this
 Mac. The guide is jon-platform `docs/ios/testflight.md` § One-time setup.
 
-- [ ] **3a — Fix the script's app-group check (jon-platform, Codex).** `scripts/testflight` fails any bundle with
+- [x] **3a — Fix the script's app-group check (jon-platform, Codex).** `scripts/testflight` fails any bundle with
       a second app group (`… app group or CloudKit container mismatch`). Yes Chef's app is entitled to two:
       `group.com.jonphillips.yeschef` and ADR-0058's `group.com.jonphillips.cockpit-yeschef`. Add an optional
       `EXTRA_APP_GROUPS` config key (space-separated) that the verifier also accepts. Every other group still
@@ -113,7 +113,7 @@ Mac. The guide is jon-platform `docs/ios/testflight.md` § One-time setup.
   - Log in with the shared Team API key (`asc auth login …`, then `asc auth status --validate`).
   - Link the command: `ln -s ~/code/jon-platform/scripts/testflight ~/code/bin/testflight`.
   - The CloudKit management token is already saved (Reference A).
-- [ ] **3c — `testflight.conf` at the repo root.** It rides in Step 3a's yes-chef companion PR:
+- [x] **3c — `testflight.conf` at the repo root.** It rides in Step 3a's yes-chef companion PR:
 
       SCHEME=YesChef
       PROJECT=YesChef.xcodeproj

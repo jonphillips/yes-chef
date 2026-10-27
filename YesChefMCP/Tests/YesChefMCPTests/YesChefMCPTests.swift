@@ -53,7 +53,7 @@ struct YesChefMCPTests {
     let otherRecipeID = UUID()
     let otherRecipe = Recipe(id: otherRecipeID, title: "Apple Cake", dateCreated: fixedDate, dateModified: fixedDate)
     let sectionID = UUID()
-    let bundle = RecipeBundleCoding.RecipeBundle(recipe: recipe, ingredientSections: [IngredientSection(id: sectionID, recipeID: recipeID, name: "Main", sortOrder: 0)], ingredientLines: [IngredientLine(id: UUID(), recipeID: recipeID, sectionID: sectionID, originalText: "1 cup beans", sortOrder: 0)], tagNames: ["Beans"])
+    let bundle = RecipeBundleCoding.RecipeBundle(recipe: recipe, ingredientSections: [IngredientSection(id: sectionID, recipeID: recipeID, name: "Main", sortOrder: 0)], ingredientLines: [IngredientLine(id: UUID(), recipeID: recipeID, sectionID: sectionID, originalText: "1 cup beans", sortOrder: 0)], tagNames: ["Harvest tag"], categoryNames: ["Weeknight"])
     let otherBundle = RecipeBundleCoding.RecipeBundle(recipe: otherRecipe)
     let menu = ChatAccessExport.MenuRecord(id: UUID(), title: "Sunday", notes: nil, dayCount: 1, modified: fixedDate, items: [
       ChatAccessExport.MenuItemRecord(kind: .recipe, title: "Beans special", recipeID: recipeID, dayOffset: 0, slot: .dinner, note: nil, scale: 1),
@@ -75,12 +75,23 @@ struct YesChefMCPTests {
     #expect(!containsUUID(searchText))
     let parsed = try object(searchText)
     let ref = try #require(parsed["recipes"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
+    let searchRow = try #require(parsed["recipes"]?.arrayValue?.first?.objectValue)
+    #expect(searchRow["categories"]?.arrayValue == [.string("Weeknight")])
+    #expect(searchRow["tags"] == nil)
+    let categorySearch = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("weeknight")])))
+    let categoryRows = try object(toolText(categorySearch))["recipes"]?.arrayValue ?? []
+    #expect(categoryRows.count == 1)
+    let tagSearch = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("Harvest tag")])))
+    #expect(try object(toolText(tagSearch))["recipes"]?.arrayValue?.isEmpty == true)
     #expect(ref.hasSuffix(".r1"))
     let detail = try #require(await server.handle(line: genericToolCall("get_recipe", args: ["ref": .string(ref)])))
     let detailText = try toolText(detail)
     #expect(detailText.contains("Braised Beans"))
     #expect(detailText.contains("1 cup beans"))
     #expect(detailText.contains("90 min"))
+    let detailRecipe = try #require(try object(detailText)["recipe"]?.objectValue)
+    #expect(detailRecipe["categories"]?.arrayValue == [.string("Weeknight")])
+    #expect(detailRecipe["tags"] == nil)
     #expect(!containsUUID(detailText))
 
     clock.advance(by: 50 * 60)
