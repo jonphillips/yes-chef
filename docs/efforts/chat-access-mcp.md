@@ -1,7 +1,7 @@
 # Effort — Chat access over MCP
 
 Status: Designed 2026-10-21. S0 shipped (#357) and its device pass cleared 2026-10-22: D2 stands (§ S0 results).
-S1 shipped (#359) and its device pass cleared 2026-10-23. **S2 shipped (#376) with its badge and Mac materialization device pass owed. S3 waits on ADR-0060 OQ3.** Schema-free throughout.
+S1 shipped (#359) and its device pass cleared 2026-10-23. **S2 shipped (#376) and its device pass cleared 2026-10-26. S3 waits on ADR-0060 OQ3.** Schema-free throughout.
 Summary: Make Yes Chef the second consumer of jon-platform ADR-0007, so ChatGPT can stage a recipe into Yes Chef
 and look things up in the library instead of Jon pasting in both directions. S0 proved the iCloud Drive transport;
 S1 builds `stage_recipe` and the app's inbox, and S2 builds the library export and the read tools.

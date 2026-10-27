@@ -13,8 +13,6 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
-**Chat access over MCP — S2.** The app half passed 2026-10-26: the Create Recipe badge shows a count and clears after Open or Discard, and Settings → Chat Access → Refresh updates the export time and size. The Mac half is left. **Setup:** reinstall the helper and restart the `yeschef` tunnel first ([`CHATGPT-SETUP.md`](CHATGPT-SETUP.md) § After a helper update). This was done 2026-10-26, after a stale S1 helper showed ChatGPT only `stage_recipe`. Then confirm `search_recipes` and `get_recipe` return expected content and export age. Evict the newest export with `brctl evict`, call `get_recipe`, and confirm it succeeds within 60 seconds; record the helper's `materialize` and `read` timings. Background the iPad to write its per-install export, then confirm tools choose the newest export and reject a ref from the previous export as stale.
-
 **Automatic backups (ADR-0008 S1; effort brief `automatic-backups`).** Run this on the first TestFlight build
 after the change merges; Debug builds intentionally take no automatic backups. On iPhone and iPad, open Yes Chef
 with Automatic Backups enabled and confirm a dated `YesChef-Auto-` file appears in Files under iCloud Drive →
