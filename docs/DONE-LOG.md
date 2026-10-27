@@ -9,6 +9,21 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## TestFlight set up for Yes Chef — PROD-CUTOVER Step 3
+
+**2026-10-27.** `testflight --dry-run` from clean `main` passes preflight and stops only at the schema gate, as
+expected until Step 6. Getting there took four changes:
+- jon-platform #88 lets the verifier accept the app's second group (`EXTRA_APP_GROUPS`), and #381 added
+  `testflight.conf`.
+- #382, Galavant #177 and jon-platform #89 re-pinned `asc` to 5.17.1, because nothing had ever run on 5.14.0.
+- Jon created the App Store Connect Team API key, which it turned out had never existed.
+- #383 moved `MARKETING_VERSION` to a project-level, unquoted `1.0.0`, because the script couldn't read the quoted
+  per-target `"1.0"`.
+
+Preflight verified the pin, the key, and the app record. The internal testing group is unchecked and gets
+confirmed before Step 7.
+
+---
 ## TestFlight app groups and chat-access S2b (`effort/testflight-app-groups`)
 
 **2026-10-27. Schema-free.** Added Yes Chef's TestFlight config with its primary and cockpit app groups. Chat access search rows now expose categories instead of the removed tags field, and category-only searches find matching recipes. The helper tests cover category output and matching. The TestFlight verifier prerequisite is in jon-platform PR #88. Device pass owed; see `device-passes.md`.

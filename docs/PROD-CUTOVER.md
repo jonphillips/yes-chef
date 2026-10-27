@@ -33,7 +33,7 @@ jon-platform `SEAM-LEDGER.md`, waiting for this run's answer.
 **Before the freeze**
 1. [x] Ship the drop slice (Codex), and pass its device check on both devices.
 2. [x] Finish every device pass that needs an Xcode Run.
-3. [ ] Set up TestFlight for Yes Chef (script fix, tools, config, App Store Connect).
+3. [x] Set up TestFlight for Yes Chef (script fix, tools, config, App Store Connect).
 
 **The cut**
 4. [ ] Freeze edits, then take and verify the authoritative backup.
@@ -108,7 +108,7 @@ pinned on this Mac, `testflight.conf` is on `main` (3c), and the `testflight` li
       `EXTRA_APP_GROUPS` config key (space-separated) that the verifier also accepts. Every other group still
       fails, and the share extension keeps the single-group rule. Update the conf reference in `testflight.md`.
       Brief: [`efforts/testflight-app-groups.md`](efforts/testflight-app-groups.md), dispatched 2026-10-26.
-- [ ] **3b — Tools (Jon).**
+- [x] **3b — Tools (Jon).** Done 2026-10-27, and preflight verified the pin and the key.
   - Install and pin `asc` (`brew install asc && brew pin asc`); `asc --version` must equal `ASC_VERSION`, now
     `5.17.1` for both apps. That's done. The pin moved up from `5.14.0` on 2026-10-27, because Homebrew installs
     5.17.1 and no release had ever run on 5.14.0. Every `asc` command and flag the script uses exists in 5.17.1.
@@ -137,9 +137,10 @@ pinned on this Mac, `testflight.conf` is on `main` (3c), and the `testflight` li
       DONE_LOG=docs/DONE-LOG.md
       DEVICE_PASSES=docs/device-passes.md
 
-- [ ] **3d — App Store Connect (Jon).** A Yes Chef app record exists for `com.jonphillips.yeschef`, and Jon is in an
-      internal testing group with automatic distribution.
-- [ ] **3e — Dry run.** From a clean `main`, run `testflight --dry-run`. Preflight and setup must pass. The schema
+- [x] **3d — App Store Connect (Jon).** A Yes Chef app record exists for `com.jonphillips.yeschef`, and Jon is in an
+      internal testing group with automatic distribution. Preflight read the record's build numbers on 2026-10-27.
+      **Confirm the internal testing group before Step 7**, because no script checks it.
+- [x] **3e — Dry run.** Passed 2026-10-27: it stopped only at the schema gate. From a clean `main`, run `testflight --dry-run`. Preflight and setup must pass. The schema
       gate is **expected to fail** ("Deploy Schema Changes…") until Step 6. Any other stop gets fixed now.
 
 **Gate:** the dry run fails only on the schema gate.
