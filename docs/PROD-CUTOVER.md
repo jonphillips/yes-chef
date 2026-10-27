@@ -99,8 +99,8 @@ Anything that needs a dev build on a device has to happen now, before the freeze
 
 ## 3 — Set up TestFlight for Yes Chef  *(one time)*
 
-Verified 2026-10-26: Yes Chef has no `testflight.conf`, and neither `asc` nor `testflight` is installed on this
-Mac. The guide is jon-platform `docs/ios/testflight.md` § One-time setup.
+The guide is jon-platform `docs/ios/testflight.md` § One-time setup. As of 2026-10-27, `asc` 5.17.1 is installed and
+pinned on this Mac, `testflight.conf` is on `main` (3c), and the `testflight` link and the API key aren't set up yet.
 
 - [x] **3a — Fix the script's app-group check (jon-platform, Codex).** `scripts/testflight` fails any bundle with
       a second app group (`… app group or CloudKit container mismatch`). Yes Chef's app is entitled to two:
@@ -109,8 +109,15 @@ Mac. The guide is jon-platform `docs/ios/testflight.md` § One-time setup.
       fails, and the share extension keeps the single-group rule. Update the conf reference in `testflight.md`.
       Brief: [`efforts/testflight-app-groups.md`](efforts/testflight-app-groups.md), dispatched 2026-10-26.
 - [ ] **3b — Tools (Jon).**
-  - Install and pin `asc` at Galavant's pin (`brew install asc && brew pin asc`; `asc --version` = `5.14.0`).
-  - Log in with the shared Team API key (`asc auth login …`, then `asc auth status --validate`).
+  - Install and pin `asc` (`brew install asc && brew pin asc`); `asc --version` must equal `ASC_VERSION`, now
+    `5.17.1` for both apps. That's done. The pin moved up from `5.14.0` on 2026-10-27, because Homebrew installs
+    5.17.1 and no release had ever run on 5.14.0. Every `asc` command and flag the script uses exists in 5.17.1.
+  - **Create the Team API key.** Nothing has created it yet; Galavant's setup gate is open too. In App Store
+    Connect, go to Users and Access → Integrations → App Store Connect API → **Team Keys**. Choose **Request
+    Access** if the API was never enabled. Generate a key with the **App Manager** role, then note its Key ID and
+    the Issuer ID, and download the `.p8` (it downloads only once). Run `asc auth login --name jon-team --key-id …
+    --issuer-id … --private-key <path>`, then `asc auth status --validate`, then delete the `.p8`. The key is
+    stored in the Keychain, and one Team key serves Galavant and Yes Chef.
   - Link the command: `ln -s ~/code/jon-platform/scripts/testflight ~/code/bin/testflight`.
   - The CloudKit management token is already saved (Reference A).
 - [x] **3c — `testflight.conf` at the repo root.** It rides in Step 3a's yes-chef companion PR:
@@ -125,7 +132,7 @@ Mac. The guide is jon-platform `docs/ios/testflight.md` § One-time setup.
       EXTRA_APP_GROUPS="group.com.jonphillips.cockpit-yeschef"
       CLOUDKIT_CONTAINER=iCloud.com.jonphillips.yeschef
       SCHEMA_GATE=1
-      ASC_VERSION=5.14.0
+      ASC_VERSION=5.17.1
       TEST_NOTES_LOCALE=en-US
       DONE_LOG=docs/DONE-LOG.md
       DEVICE_PASSES=docs/device-passes.md
