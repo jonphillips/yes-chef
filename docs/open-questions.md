@@ -10,6 +10,14 @@ and everything downstream move forward without waiting on it.
 
 From the old Next Up:
 
+- **"Up to date" can't see inbound records that never arrived (found 2026-10-27, PROD-CUTOVER Step 4 audit).**
+  The iPhone read "Up to date" while missing 199 `ingredientLines` (19 recipes from the 2026-07-08 import) that
+  the iPad had. Sync status counts only a device's own unsent or unapplied rows, so a record that was never
+  delivered is invisible to it. The cut repairs this iPhone, because Step 11 fresh-installs it from Production.
+  The open question is whether status should also compare against the server (per-type server counts, as
+  Reference B does by hand) or offer a "check for missing records" pass like Slice 5's leftover check. Decide
+  after the cut. Related: [[no-dead-data]] (sync status must never stay quietly green).
+
 - **Migration baseline squash — optional, post-cut, both apps (deferred by ADR-0056 Amd 1).** Use GRDB
   `registerMigration(_:merging:)`. The precondition is that every device is at the final legacy migration.
   Also raise `declaredSchemaVersion` so older backups still restore. It's tidiness only: fresh installs stop

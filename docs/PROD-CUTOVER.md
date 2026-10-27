@@ -36,14 +36,14 @@ jon-platform `SEAM-LEDGER.md`, waiting for this run's answer.
 3. [x] Set up TestFlight for Yes Chef (script fix, tools, config, App Store Connect).
 
 **The cut**
-4. [ ] Freeze edits, then take and verify the authoritative backup.
+4. [x] Freeze edits, then take and verify the authoritative backup.
 5. [ ] Clean the Development schema in the console: delete the dead list, create the 9 kept fields.
 6. [ ] Re-export, confirm an exact match, and deploy Development → Production.
 7. [ ] Upload the first TestFlight build.
-8. [ ] iPhone: install TestFlight over the dev build and observe the in-place carry.
-9. [ ] iPhone: re-seed by restore, unless Step 8 already filled Production.
+8. [ ] iPad: install TestFlight over its current build and observe the in-place carry.
+9. [ ] iPad: re-seed by restore, unless Step 8 already filled Production.
 10. [ ] Confirm Production holds the library, server-side.
-11. [ ] iPad: fresh TestFlight install pulls the whole library. **← The cut is real here.**
+11. [ ] iPhone: fresh TestFlight install pulls the whole library. **← The cut is real here.**
 
 **After**
 12. [ ] Post-cut device checks: automatic backups, two-way edits.
@@ -59,11 +59,11 @@ jon-platform `SEAM-LEDGER.md`, waiting for this run's answer.
 - **Schema.** Codex's schema-free work (chat-access S2) can continue alongside the cut. Until Step 11, merge
   no synced-schema change other than Step 1's drop slice. A schema change after Step 6 would need another
   Development change and another deploy before any TestFlight build can ship.
-- **Xcode Run.** After Step 8, nothing gets an Xcode Run onto the iPhone, and after Step 11, nothing onto the
-  iPad. A Debug build still carries the production bundle id and app group until ADR-0059 ships, so it would
+- **Xcode Run.** After Step 8, nothing gets an Xcode Run onto the iPad, and after Step 11, nothing onto the
+  iPhone. A Debug build still carries the production bundle id and app group until ADR-0059 ships, so it would
   install over TestFlight against Development. Use the simulator until then.
-- **The freeze.** From Step 4 until Step 11 passes, make no edits on either device. An iPhone edit made after
-  the backup is lost when the backup is restored. An iPad edit made before its reinstall goes only to
+- **The freeze.** From Step 4 until Step 11 passes, make no edits on either device. An iPad edit made after
+  the backup is lost when the backup is restored. An iPhone edit made before its reinstall goes only to
   Development.
 - **Leave slack.** The first Production sync is large and will throttle.
 
@@ -147,12 +147,35 @@ pinned on this Mac, `testflight.conf` is on `main` (3c), and the `testflight` li
 
 ## 4 — Freeze, then take the authoritative backup  *(ADR-0056 D3)*
 
-- [ ] Both devices read "Up to date". **Start the freeze**: no edits on either device until Step 11 passes.
-- [ ] iPhone: Settings → Import & Export → **Export a Backup**. This is the re-seed source and the rollback.
-- [ ] iPad: export a backup too. It's insurance for Step 11, which deletes the app there.
-- [ ] Verify the iPhone file: run Reference B's audit on a scratch copy. It opens read-only, and the recipe count
-      matches Settings → Sync → Local record counts.
-- [ ] Keep it in **two places**: iCloud Drive and the Mac.
+**Roles swapped 2026-10-27 (Jon):** the **iPad** carries the library and re-seeds Production (Steps 8–9), and
+the **iPhone** gets the fresh install (Step 11). Jon uses the iPad more and trusts its library, Step 11 discards
+the reinstalled device's local-only rows (chat threads and messages, AI hand-offs), and the audit below found the
+iPad's library to be the complete one.
+
+- [x] Both devices read "Up to date". **Start the freeze**: no edits on either device until Step 11 passes.
+- [x] iPad: Settings → Import & Export → **Export a Backup** (`YesChef-Backup-2026-10-27 ipad.sqlite`). This is the
+      re-seed source and the rollback.
+- [x] iPhone: export a backup too (`YesChef-Backup-2026-10-27 iphone.sqlite`). It's insurance for Step 11, which
+      deletes the app there.
+- [x] Verify the iPad file: run Reference B's audit on a scratch copy. **Passed 2026-10-27:** it's byte-identical to
+      the source, `integrity_check` is ok, it's stamped schema 54, and every synced table is present.
+- [x] Keep both in **two places**: iCloud Drive and the Mac.
+
+**What the audit found** (the two backups compared row by row):
+- **The iPhone is missing 199 `ingredientLines` across 19 recipes**, all from the 2026-07-08 import and in one
+  alphabetical run, "Bruschetta…" to "Buffalo…". Fifteen of them have no lines at all on the iPhone. The iPad has
+  every line, and the iPhone has nothing the iPad lacks. The iPhone still read "Up to date", because that check
+  only counts its own unsent or unapplied rows; it can't see inbound records that never arrived. Restoring the
+  iPhone backup, as this runbook first planned, would have lost these lines in Production.
+- **One `workbenchCandidates` row exists only on the iPhone**: "Broccoli Spoon Salad with Warm Vinaigrette",
+  added 2026-07-15. With the iPad as the source it's dropped, so Jon re-adds it after the cut if he wants it.
+- **The iPad ran a build with two migrations that aren't on GitHub**: "Create meal plan day order overlay" and
+  "Add captureKind to workbench references". They're harmless to the restore. The backup is stamped 54, the same as
+  `main`, so the restore accepts it. GRDB leaves unknown applied migrations in place, and erase-on-schema-change
+  is opt-in. What's left is an empty `mealPlanDayOrders` table, which `main` never syncs, and a `captureKind`
+  column that `main` also has.
+- The rest are expected per-device differences: `aiHandoffs`, `chatThreads`, `chatMessages` and
+  `recipeActiveVariations` never sync. Every other synced table matches row for row.
 
 **Gate:** a verified backup exists in two places.
 
@@ -189,12 +212,12 @@ pinned on this Mac, `testflight.conf` is on `main` (3c), and the `testflight` li
 
 **Gate:** the build is installable from TestFlight.
 
-## 8 — iPhone: install over the dev build, and observe the in-place carry  *(ADR-0056 OQ1)*
+## 8 — iPad: install over its current build, and observe the in-place carry  *(ADR-0056 OQ1)*
 
-> ⚠️ From here on, no Xcode Run onto the iPhone (Rules).
+> ⚠️ From here on, no Xcode Run onto the iPad (Rules).
 
-- [ ] Install the TestFlight build over the dev build. Confirm the **local library is intact**: recipes, photos,
-      calendar, menus.
+- [ ] Install the TestFlight build over the iPad's current build. Confirm the **local library is intact**: recipes,
+      photos, calendar, menus.
 - [ ] **Sync is already on after the update.** The enable key lives in the app's defaults, which carry over, so the
       engine starts against the empty Production zone on first launch, holding Development's sync metadata. That
       is the in-place carry test. Galavant's identical start lost nothing.
@@ -204,9 +227,10 @@ pinned on this Mac, `testflight.conf` is on `main` (3c), and the `testflight` li
   - **Production has everything:** in-place carry works, so skip Step 9. Record OQ1 = yes.
   - **Empty or partial** (the expected case): do Step 9. Record OQ1 = no.
 
-## 9 — iPhone: re-seed by restore
+## 9 — iPad: re-seed by restore
 
-- [ ] Settings → Import & Export → **Restore from a Backup**, choosing the Step 4 file. The restore holds sync off.
+- [ ] Settings → Import & Export → **Restore from a Backup**, choosing the Step 4 **iPad** file. The restore holds
+      sync off.
 - [ ] Settings → Sync → **Turn on iCloud sync**, and confirm at **Turn On iCloud Sync?**. The whole library
       re-pushes into Production as authoritative.
 - [ ] **Expect throttling.** The first push hits CloudKit 429s and takes a while. Don't intervene, reinstall or
@@ -215,19 +239,21 @@ pinned on this Mac, `testflight.conf` is on `main` (3c), and the `testflight` li
 ## 10 — Confirm Production holds the library  *(server-side, ADR-0056 OQ3)*
 
 - [ ] In the console, Production private database, zone `co.pointfree.SQLiteData.defaultZone`: per-type counts
-      match the iPhone's Local record counts. "Up to date" in the app has been wrong before, so this check is
-      the server's word.
+      match the iPad's Local record counts (`ingredientLines` 27,613 at Step 4). "Up to date" in the app has been
+      wrong before, so this check is the server's word.
 
-## 11 — iPad: a fresh install pulls everything
+## 11 — iPhone: a fresh install pulls everything
 
-> ⚠️ From here on, no Xcode Run onto the iPad (Rules).
+> ⚠️ From here on, no Xcode Run onto the iPhone (Rules).
 
-- [ ] Delete Yes Chef from the iPad. Its copy stays in Development and in its Step 4 backup.
+- [ ] Delete Yes Chef from the iPhone. Its copy stays in Development and in its Step 4 backup.
 - [ ] Install the TestFlight build. **Before turning sync on, confirm the library is empty.** That proves deleting
       the app cleared its app-group container, the check the ADR-0030 restore procedure rests on. If the old
       library is still there, stop and tell the architect.
 - [ ] Settings → Sync → **Turn on iCloud sync**. The whole library arrives, photos included, and Sync reads
       "Up to date".
+- [ ] **The iPhone's gap is closed.** Local record counts match the iPad's (`ingredientLines` 27,613), and
+      **Buffalo Chicken Wings with Blue Cheese** shows its 24 ingredient lines (Step 4 audit).
 
 **Gate (the real one):** Steps 10 and 11 both pass. **Only now is the cut real**, and the freeze ends.
 
@@ -258,9 +284,10 @@ pinned on this Mac, `testflight.conf` is on `main` (3c), and the `testflight` li
 ## Rollback
 
 - **Before Step 8:** nothing has changed on either device's install. Development and its data are untouched.
-- **Steps 8–10 (iPhone on TestFlight, iPad still on the dev build):** the iPad still has the full library on
-  Development. To back out on the iPhone, delete the app, reinstall the dev build from Xcode, and restore the
-  Step 4 backup with sync held. Nothing is lost.
+- **Steps 8–10 (iPad on TestFlight, iPhone still on the dev build):** the iPhone still has its library on
+  Development, minus the 199 lines it never received. To back out on the iPad, delete the app, reinstall a dev
+  build of `main` from Xcode, and restore the Step 4 iPad backup with sync held. Nothing is lost. The iPad's earlier
+  build came from code that isn't on GitHub, so don't try to reinstall that one.
 - **After Step 11:** restore the Step 4 backup. Restore is authoritative ([[restore-is-authoritative]]), but quiesce
   the other device first, so a held delete there can't re-delete a restored record (ADR-0030 Amd 3).
 
