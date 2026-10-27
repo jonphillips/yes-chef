@@ -13,6 +13,8 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**Chat access S2b — search rows show categories** (schema-free). Once this merges, reinstall the helper and restart the tunnel (`CHATGPT-SETUP.md` § After a helper update). Search ChatGPT for a category used in your library and confirm matching recipe rows show `categories`; confirm the `tags` field is absent.
+
 **Automatic backups (ADR-0008 S1; effort brief `automatic-backups`).** Run this on the first TestFlight build
 after the change merges; Debug builds intentionally take no automatic backups. On iPhone and iPad, open Yes Chef
 with Automatic Backups enabled and confirm a dated `YesChef-Auto-` file appears in Files under iCloud Drive →

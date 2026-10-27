@@ -166,15 +166,15 @@ enum ChatAccessReadTools {
     let reader = materialize ?? { url in try await Task.detached(priority: .utility) { try ChatAccessExportStore.coordinatedRead(url) }.value }
     let store = ChatAccessExportStore(containerURL: containerURL, now: now, materialize: reader, materializationDeadline: materializationDeadline)
     return [
-      tool("search_recipes", "Search recipes by name, ingredients, tags, categories, and notes.", schema: objectSchema(["query": stringSchema, "limit": integerSchema], required: ["query"])) { input in
+      tool("search_recipes", "Search recipes by name, ingredients, categories, and notes.", schema: objectSchema(["query": stringSchema, "limit": integerSchema], required: ["query"])) { input in
         let args = arguments(input)
         let query = args["query"]?.stringValue ?? ""
         let limit = max(1, min(50, args["limit"]?.intValue ?? 20))
         let snapshot = try await store.load()
         let rows = snapshot.value.recipes.enumerated().filter { _, bundle in
-          RecipeSearchMatcher.matches(query: query, in: [bundle.recipe.title, bundle.recipe.subtitle, bundle.recipe.summary].compactMap { $0 } + bundle.ingredients + bundle.tagNames + bundle.categoryNames + bundle.recipeNotes.map(\.text))
+          RecipeSearchMatcher.matches(query: query, in: [bundle.recipe.title, bundle.recipe.subtitle, bundle.recipe.summary].compactMap { $0 } + bundle.ingredients + bundle.categoryNames + bundle.recipeNotes.map(\.text))
         }.sorted { $0.element.recipe.title.localizedCaseInsensitiveCompare($1.element.recipe.title) == .orderedAscending }.prefix(limit).map { index, bundle in
-          MCPValue.object(["ref": ref(snapshot, kind: .recipe, index: index), "name": .string(bundle.recipe.title), "cuisine": optional(bundle.recipe.cuisine), "course": optional(bundle.recipe.course), "tags": .array(bundle.tagNames.map(MCPValue.string)), "totalTime": formattedMinutes(bundle.recipe.totalTimeMinutes), "yield": optional(bundle.recipe.yieldText ?? bundle.recipe.servingsText)])
+          MCPValue.object(["ref": ref(snapshot, kind: .recipe, index: index), "name": .string(bundle.recipe.title), "cuisine": optional(bundle.recipe.cuisine), "course": optional(bundle.recipe.course), "categories": .array(bundle.categoryNames.map(MCPValue.string)), "totalTime": formattedMinutes(bundle.recipe.totalTimeMinutes), "yield": optional(bundle.recipe.yieldText ?? bundle.recipe.servingsText)])
         }
         return .json(["export": exportMeta(snapshot), "recipes": .array(rows)])
       },
@@ -187,7 +187,7 @@ enum ChatAccessReadTools {
           "prepTime": formattedMinutes(bundle.recipe.prepTimeMinutes), "cookTime": formattedMinutes(bundle.recipe.cookTimeMinutes), "totalTime": formattedMinutes(bundle.recipe.totalTimeMinutes),
           "ingredientSections": .array(bundle.ingredientSections.sorted { $0.sortOrder < $1.sortOrder }.map { section in .object(["name": optional(section.name), "ingredients": .array(bundle.ingredientLines.filter { $0.sectionID == section.id }.sorted { $0.sortOrder < $1.sortOrder }.map { .string($0.originalText) })]) }),
           "instructionSections": .array(bundle.instructionSections.sorted { $0.sortOrder < $1.sortOrder }.map { section in .object(["name": optional(section.name), "steps": .array(bundle.instructionSteps.filter { $0.sectionID == section.id }.sorted { $0.sortOrder < $1.sortOrder }.map { .string($0.text) })]) }),
-          "notes": .array(bundle.recipeNotes.sorted { $0.dateCreated < $1.dateCreated }.map { .string($0.text) }), "tags": .array(bundle.tagNames.map(MCPValue.string)), "categories": .array(bundle.categoryNames.map(MCPValue.string)), "sourceURL": optional(bundle.source?.url)
+          "notes": .array(bundle.recipeNotes.sorted { $0.dateCreated < $1.dateCreated }.map { .string($0.text) }), "categories": .array(bundle.categoryNames.map(MCPValue.string)), "sourceURL": optional(bundle.source?.url)
         ])])
       },
       tool("list_menus", "List menus from the latest Yes Chef export.", schema: objectSchema(["limit": integerSchema], required: [])) { input in
