@@ -2,4 +2,4 @@
 
 Nothing dispatched.
 
-**Owed:** Chat access S2's export and Mac materialization pass, and the automatic-backups pass; see [device-passes.md](device-passes.md).
+**Owed:** the automatic-backups pass (first TestFlight build); see [device-passes.md](device-passes.md).
