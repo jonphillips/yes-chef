@@ -15,8 +15,9 @@ Newest first.
 columns and the `equipment`, `recipeEquipment`, `tags`, and `recipeTags` tables. The persisted models, readers,
 bundle paths, and dormant every-launch tag fold no longer carry those records. The migration regression preserves
 recipes, categories, and recipe/category links while dropping populated legacy tag tables. Lint, 727 package tests,
-the elevated generic iOS build, and all 84 `YesChefTests` passed. The two-device check is owed in
-[`device-passes.md`](device-passes.md).
+the elevated generic iOS build, and all 84 `YesChefTests` passed. **Device-passed 2026-10-26 (Jon), both devices:**
+library and labels intact, the retired-record purge ran and Sync reads "Up to date", the deleted loose **beach**
+and **cocktail** labels stay gone across relaunch, and an edit syncs. PROD-CUTOVER Step 1's gate is met.
 
 ---
 ## Chat access over MCP — S2 export and read tools (`effort/chat-access-mcp-s2`)

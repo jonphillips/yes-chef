@@ -31,7 +31,7 @@ jon-platform `SEAM-LEDGER.md`, waiting for this run's answer.
 - [x] Development schema exported and diffed; Jon settled every keep/drop verdict (Reference A). 2026-10-26.
 
 **Before the freeze**
-1. [ ] Ship the drop slice (Codex), and pass its device check on both devices.
+1. [x] Ship the drop slice (Codex), and pass its device check on both devices.
 2. [ ] Finish every device pass that needs an Xcode Run.
 3. [ ] Set up TestFlight for Yes Chef (script fix, tools, config, App Store Connect).
 
@@ -76,8 +76,8 @@ columns, the `equipment`/`recipeEquipment` tables and the retired `tags`/`recipe
 in one appended migration, and retires the tag record types through `retiredRecordTypes`.
 
 - [x] The architect sets `NEXT_UP.md` to the drop slice when chat-access S2 merges.
-- [ ] Review: the architect escalates the PR to Jon (synced schema). Jon merges.
-- [ ] Device check, per the brief:
+- [x] Review: the architect escalates the PR to Jon (synced schema). Jon merges. (PR #377, 2026-10-26.)
+- [x] Device check, per the brief (both devices passed, 2026-10-26):
   - export a backup from each device first;
   - install on both devices, and confirm the library and the category browser are intact;
   - delete the empty loose **beach** and **cocktail** categories, relaunch, and confirm they stay gone;
@@ -92,7 +92,7 @@ Anything that needs a dev build on a device has to happen now, before the freeze
 
 - [ ] **Chat access S2's two-device pass** (`efforts/chat-access-mcp.md` § S2, once it ships). If S2 isn't done
       by the time everything else is ready, don't hold the cut for it: run its pass on a later TestFlight build.
-- [ ] **The drop slice's pass** (Step 1).
+- [x] **The drop slice's pass** (Step 1). Passed 2026-10-26.
 - [ ] Nothing else in [`device-passes.md`](device-passes.md) under **Owed** needs a dev build. The automatic-backups
       pass needs a TestFlight build, so it moves to Step 12.
 

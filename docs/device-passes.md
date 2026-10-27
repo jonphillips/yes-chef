@@ -13,12 +13,6 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
-**Production cutover Step 1 — dead schema drop** (`effort/prod-never-set-drop`). Before installing, export a
-backup from both devices. Install on iPhone and iPad and confirm the library and category browser are intact.
-Delete the empty loose **beach** and **cocktail** categories, relaunch, and confirm they stay gone. After the
-retired-record purge runs, confirm Sync reads “Up to date” on both devices with no `tags` or `recipeTags` left,
-then edit a recipe and confirm the edit syncs.
-
 **Chat access over MCP — S2.** The Create Recipe badge cleared 2026-10-26 (a count shows next to Create Recipe); still check that it clears after Open or Discard. Refresh in Settings → Chat Access; confirm last export time and size update. On the Mac, confirm `search_recipes` and `get_recipe` return expected content and export age. Evict the newest export with `brctl evict`, call `get_recipe`, and confirm it succeeds within 60 seconds; record the helper's `materialize` and `read` timings. Background the iPad to write its per-install export, then confirm tools choose the newest export and reject a ref from the previous export as stale.
 
 **Automatic backups (ADR-0008 S1; effort brief `automatic-backups`).** Run this on the first TestFlight build
