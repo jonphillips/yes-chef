@@ -9,6 +9,20 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Vendored SQLiteData reference-violation retry (`effort/sqlite-data-reference-violation-patch`)
+
+**2026-10-28. Schema-free; touches CloudKit sync.** Vendored SQLiteData 1.8.2 from upstream commit
+`26471412f457f2c640bf5759a63870353a19f9e1` and patched the save-side `referenceViolation` handler to retain and
+re-queue children when the local parent has no server-confirmed record. Cascade and `SET NULL` regression cases
+pass along with all four existing reference-violation cases. The focused suite (7 tests) and full vendor suite
+(297 tests, 2 known issues) passed. The repo drift gate passed (SwiftLint, 727 package tests, helper tests, and
+app test-target compile/link), and the generic iOS build passed. SwiftPM package tests needed the upstream 1.8.2
+dependency lock, a macOS 14 test triple, and a temporary compatibility edit in the ignored SwiftPerception build
+checkout because the installed Xcode 27 toolchain otherwise rejects its macOS availability annotation. Xcode's
+project package resolution uses `Vendor/sqlite-data` and has no `sqlite-data` pin. Jon's upload and re-seed remain
+Steps 9b and 9c.
+
+---
 ## TestFlight set up for Yes Chef — PROD-CUTOVER Step 3
 
 **2026-10-27.** `testflight --dry-run` from clean `main` passes preflight and stops only at the schema gate, as
