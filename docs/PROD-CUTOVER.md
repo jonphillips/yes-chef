@@ -39,10 +39,11 @@ jon-platform `SEAM-LEDGER.md`, waiting for this run's answer.
 4. [x] Freeze edits, then take and verify the authoritative backup.
 5. [x] Clean the Development schema in the console: delete the dead list, create the 9 kept fields.
 6. [x] Re-export, confirm an exact match, and deploy Development → Production.
-7. [ ] Upload the first TestFlight build.
-8. [ ] iPad: install TestFlight over its current build and observe the in-place carry.
-9. [ ] iPad: re-seed by restore, unless Step 8 already filled Production.
-10. [ ] Confirm Production holds the library, server-side.
+7. [x] Upload the first TestFlight build.
+8. [x] iPad: install TestFlight over its current build and observe the in-place carry.
+9. [ ] iPad: re-seed by restore. **The first attempt lost data on the iPad** (see Step 9); the retry waits on a
+   SQLiteData patch.
+10. [ ] Confirm Production holds the library, server-side, and the iPad's library matches Step 4's backup.
 11. [ ] iPhone: fresh TestFlight install pulls the whole library. **← The cut is real here.**
 
 **After**
@@ -238,20 +239,49 @@ so `testflight`'s schema gate now passes.
   - **Production has everything:** in-place carry works, so skip Step 9. Record OQ1 = yes.
   - **Empty or partial** (the expected case): do Step 9. Record OQ1 = no.
 
+**Done 2026-10-27, build 1.0.0 (1168). OQ1 = no.** The library was intact on the iPad, but the carry only
+partly seeded Production: recipes arrived, with no `ingredientLines`. Sync still read "Up to date", because the
+Development sync metadata marked every row as already uploaded.
+
 ## 9 — iPad: re-seed by restore
 
-- [ ] Settings → Import & Export → **Restore from a Backup**, choosing the Step 4 **iPad** file. The restore holds
-      sync off.
-- [ ] Settings → Sync → **Turn on iCloud sync**, and confirm at **Turn On iCloud Sync?**. The whole library
-      re-pushes into Production as authoritative.
-- [ ] **Expect throttling.** The first push hits CloudKit 429s and takes a while. Don't intervene, reinstall or
-      wipe. Let it drain until Sync reads "Up to date".
+**First attempt (2026-10-27/28): data loss on the iPad.** The restore and "Turn on iCloud sync" worked, and the
+upload ran for hours. During that upload SQLiteData deleted 669 rows on the iPad: every row whose single parent
+wasn't on the server yet when the row was sent (upstream
+[pointfreeco/sqlite-data#547](https://github.com/pointfreeco/sqlite-data/issues/547)). Those were all 289 recipe
+notes, all 9 variations, all 13 grocery-item sources, 41 instruction sections with their 244 steps, 41 photos,
+30 serve-with rows and 2 deliberation-log entries. Recipes and ingredient lines were untouched. The Step 4 iPad
+backup still holds every row, so nothing is unrecoverable. The audit file is `YesChef-Backup-2026-10-28 probable
+DATA LOSS.sqlite` in Jon's Downloads. The retry:
+
+> ⚠️ Until 9c, **keep Yes Chef closed on the iPad**. Every run can delete more rows and queue those deletes to
+> CloudKit. Don't turn off iCloud for Yes Chef in iOS Settings: SQLiteData treats that as a sign-out and erases
+> local data.
+
+- [ ] **9a — The patch** (Codex): [`efforts/sqlite-data-reference-violation-patch.md`](efforts/sqlite-data-reference-violation-patch.md).
+- [ ] **9b — Upload the patched build**: `testflight` from a clean `main`, as in Step 7.
+- [ ] **9c — Re-seed:**
+  - Install the 9b build on the iPad from TestFlight, then turn on **Airplane Mode before first launching it**.
+    That way the old sync state can't send anything.
+  - Open Yes Chef. Settings → Import & Export → **Restore from a Backup**, choosing the Step 4 **iPad** file
+    (`YesChef-Backup-2026-10-27 ipad.sqlite`). The restore discards the old sync state and holds sync off.
+  - Turn Airplane Mode off. Settings → Sync → **Turn on iCloud sync**.
+  - Set Auto-Lock to **Never**, keep the iPad plugged in, and keep Yes Chef **in the foreground**. The engine
+    uploads very little in the background. Expect throttling and several hours. Don't intervene, reinstall or
+    restore again.
+  - **Ignore "Up to date" while it runs.** It can read green mid-upload (see `open-questions.md`). The gate is
+    Step 10.
 
 ## 10 — Confirm Production holds the library  *(server-side, ADR-0056 OQ3)*
 
-- [ ] In the console, Production private database, zone `co.pointfree.SQLiteData.defaultZone`: per-type counts
-      match the iPad's Local record counts (`ingredientLines` 27,613 at Step 4). "Up to date" in the app has been
-      wrong before, so this check is the server's word.
+- [ ] **The iPad lost nothing.** Export a backup from the iPad. The architect compares its row counts with the
+      Step 4 iPad backup (Reference B). Every synced table must match. The only allowed difference is
+      `recipeCategories` rows that the launch-time cuisine/course backfill adds.
+- [ ] In the console, Production private database, zone `co.pointfree.SQLiteData.defaultZone`: spot-check the types
+      that lost rows (`recipeNotes`, `recipeVariations`, `instructionSections`, `recipePhotos`) plus
+      `ingredientLines`. Production → Logs should show no `BAD_REQUEST` bursts after the upload settles.
+      "Up to date" in the app has been wrong before, so this check is the server's word. The iPhone's fresh install
+      (Step 11) is the full count check.
 
 ## 11 — iPhone: a fresh install pulls everything
 
@@ -299,6 +329,8 @@ so `testflight`'s schema gate now passes.
   Development, minus the 199 lines it never received. To back out on the iPad, delete the app, reinstall a dev
   build of `main` from Xcode, and restore the Step 4 iPad backup with sync held. Nothing is lost. The iPad's earlier
   build came from code that isn't on GitHub, so don't try to reinstall that one.
+- **Step 9's first attempt:** the iPad's library is short 669 rows. The fix is Step 9c itself, a restore of the Step
+  4 backup. Never restore it on the unpatched build 1168, because the next sync would delete the same rows again.
 - **After Step 11:** restore the Step 4 backup. Restore is authoritative ([[restore-is-authoritative]]), but quiesce
   the other device first, so a held delete there can't re-delete a restored record (ADR-0030 Amd 3).
 
