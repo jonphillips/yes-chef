@@ -15,6 +15,10 @@
 **⚠️ [Amendment 1](#amendment-1--no-squash-before-the-cut-only-the-dead-columns-are-dropped-2026-10-08) (2026-10-08) narrows D2:** there is no squash before the cut. Only the dead cook
 columns are dropped, by an appended migration.
 
+**⚠️ [Amendment 2](#amendment-2--oq1-answered-and-the-re-seed-needs-a-patched-sqlitedata-2026-10-28) (2026-10-28):** OQ1
+is answered no. The restore re-seed lost single-parent child rows on the iPad (SQLiteData #547), so the retry runs
+only on a build with a vendored, patched SQLiteData.
+
 Status: **Accepted** — 2026-08-24 (proposed and accepted same day, Jon's explicit call; the load-bearing
 decision is D1, restore-as-primary re-seed). Origin: Jon, asking whether we have a real move-to-production
 plan and whether he can leverage his local database instead of re-importing. Extends
@@ -189,3 +193,25 @@ store's migration record in the week the library is most exposed, for a benefit 
 - **Correction:** this ADR's runbook and the first plan draft also listed the retired category-seed tables for
   dropping. Migration `Promote category namespaces to facets` already dropped them.
 
+
+## Amendment 2 — OQ1 answered, and the re-seed needs a patched SQLiteData (2026-10-28)
+
+**OQ1: no.** Build 1168's in-place carry only partly seeded Production. Recipes arrived and ingredient lines didn't,
+while the app read "Up to date", because the Development sync metadata said every row was already uploaded.
+Restore is the re-seed, as D1 assumed.
+
+**The restore re-seed lost data on the iPad.** The restore worked, but during the upload SQLiteData's
+`referenceViolation` handler deleted 669 single-parent child rows on the device. Those rows reached the server before
+their parents had (upstream [pointfreeco/sqlite-data#547](https://github.com/pointfreeco/sqlite-data/issues/547),
+unfixed through 1.12.1). The handler can't tell "the parent was deleted elsewhere" from "the parent hasn't uploaded
+yet". A first upload of a large library into an empty zone is the second case, many times over. D1's mechanism
+didn't fail; the library's sync engine did. The Step 4 backup holds every lost row.
+
+**Decision.** Until a SQLiteData release fixes #547, Yes Chef builds against a vendored 1.8.2 with one patch: if
+the server never confirmed the parent (no change tag), keep the child and re-queue both instead of applying the
+foreign key's delete action
+([`efforts/sqlite-data-reference-violation-patch.md`](../efforts/sqlite-data-reference-violation-patch.md)). It is
+wired as an Xcode local-package override, so neither `YesChefPackage` nor jon-platform's `CloudSyncKit` (Galavant's
+dependency too) changes. The re-seed (`PROD-CUTOVER.md` Step 9c) runs only on a build carrying the patch. Its gate
+(Step 10) adds a row-count comparison of an iPad backup against Step 4's, because neither "Up to date" nor a
+Production record count would have caught this loss.

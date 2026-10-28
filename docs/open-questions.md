@@ -17,6 +17,29 @@ From the old Next Up:
   The open question is whether status should also compare against the server (per-type server counts, as
   Reference B does by hand) or offer a "check for missing records" pass like Slice 5's leftover check. Decide
   after the cut. Related: [[no-dead-data]] (sync status must never stay quietly green).
+  **Three more blind spots (found 2026-10-28, PROD-CUTOVER Step 9),** all in CloudSyncKit's status inputs:
+  - The pending count reads `sqlitedata_icloud_pendingRecordZoneChanges`, which SQLiteData fills only while the
+    engine is stopped. While it runs, the queue lives in CKSyncEngine's own state, so a full re-seed reads 0 pending.
+  - The not-uploaded scan is skipped while the engine is sending, and it ignores rows changed in the last 30
+    minutes. A skipped scan reports nothing, which reads as "Up to date".
+  - `nextRecordZoneChangeBatch` stores the locally built record as `lastKnownServerRecord` before sending (no
+    change tag), so a save CloudKit later drops looks sent to any check that doesn't require a change tag.
+
+  The fix is a jon-platform CloudSyncKit slice (Galavant shares it): show "Syncing…" or the last scan's result
+  instead of green when the scan is skipped, and count the engine's real queue. Do it after the cut.
+
+- **Launch-time repair passes run on the main thread on every launch (found 2026-10-28).** `bootstrapDatabase`
+  (`Schema.swift`, the `runsPostEngineDataPasses` block) runs in `YesChefApp.init`, before the first frame:
+  `reparseIngredientRanges` loads and parses all ~27,600 lines, `RecipeSyncRepair` decodes every recipe's
+  `lastKnownServerRecord`, and the cuisine/course and variation-anchor backfills scan every recipe. All of it runs
+  in one write transaction. The app is unresponsive for 5 seconds or more at launch. Make each pass run once
+  (gated by a stored version) or retire the finished ones, and run what's left off the main thread. Do it after
+  the cut, with a TestFlight build.
+
+- **Drop the vendored SQLiteData when upstream fixes #547.** `Vendor/sqlite-data` (ADR-0056 Amd 2) exits when a
+  SQLiteData release keeps children of parents the server never confirmed. Watch
+  [pointfreeco/sqlite-data#548](https://github.com/pointfreeco/sqlite-data/pull/548). Return to the remote package
+  then, and remove the `project.yml` override.
 
 - **Migration baseline squash — optional, post-cut, both apps (deferred by ADR-0056 Amd 1).** Use GRDB
   `registerMigration(_:merging:)`. The precondition is that every device is at the final legacy migration.
