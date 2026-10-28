@@ -258,7 +258,7 @@ DATA LOSS.sqlite` in Jon's Downloads. The retry:
 > CloudKit. Don't turn off iCloud for Yes Chef in iOS Settings: SQLiteData treats that as a sign-out and erases
 > local data.
 
-- [ ] **9a — The patch** (Codex): [`efforts/sqlite-data-reference-violation-patch.md`](efforts/sqlite-data-reference-violation-patch.md).
+- [x] **9a — The patch** (Codex): [`efforts/sqlite-data-reference-violation-patch.md`](efforts/sqlite-data-reference-violation-patch.md).
 - [ ] **9b — Upload the patched build**: `testflight` from a clean `main`, as in Step 7.
 - [ ] **9c — Re-seed:**
   - Install the 9b build on the iPad from TestFlight, then turn on **Airplane Mode before first launching it**.

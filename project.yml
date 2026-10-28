@@ -27,8 +27,7 @@ packages:
   # same fix, as the GRDB entries in YesChefPackage/Package.swift and
   # jon-platform/packages/CloudSyncKit/Package.swift.
   SQLiteData:
-    url: https://github.com/pointfreeco/sqlite-data
-    from: 1.8.0
+    path: Vendor/sqlite-data
   GRDB:
     url: https://github.com/groue/GRDB.swift
     from: 7.6.0

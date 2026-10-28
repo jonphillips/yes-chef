@@ -338,6 +338,7 @@
 		CA17898A1596E60044FEFE09 /* BrowserModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserModels.swift; sourceTree = "<group>"; };
 		CD89E4D3C6F5F5901942349A /* WebExtractorKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WebExtractorKit; path = "../../jon-platform/packages/WebExtractorKit"; sourceTree = SOURCE_ROOT; };
 		CE5A1F4C00B47C679035FCEA /* RecipeDetailModel+Labels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecipeDetailModel+Labels.swift"; sourceTree = "<group>"; };
+		CF1594C8BADD3DA2D82B2E6B /* sqlite-data */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "sqlite-data"; path = "Vendor/sqlite-data"; sourceTree = SOURCE_ROOT; };
 		D2B809424555C42DEB0318A9 /* RecipeDeliberationLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeDeliberationLogView.swift; sourceTree = "<group>"; };
 		D3B1C7A7E48A8FFE074A05E0 /* RecipeLibraryListState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeLibraryListState.swift; sourceTree = "<group>"; };
 		D4F3ADFFD14E222AAFF380E6 /* AISettingsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISettingsModel.swift; sourceTree = "<group>"; };
@@ -429,6 +430,7 @@
 				723650C08EE6D537EBEA0253 /* CloudSyncKit */,
 				771C2C4368450EDD66EC5E77 /* LLMClientKit */,
 				985301473FA815A45B50BF66 /* LLMHandoffKit */,
+				CF1594C8BADD3DA2D82B2E6B /* sqlite-data */,
 				CD89E4D3C6F5F5901942349A /* WebExtractorKit */,
 				07FEC345E664B62E662EA479 /* YesChefPackage */,
 			);
@@ -756,13 +758,13 @@
 				DE1542BD614FC83C36333FD0 /* XCRemoteSwiftPackageReference "swift-custom-dump" */,
 				A927C2C338F67E8F2C611140 /* XCRemoteSwiftPackageReference "swift-dependencies" */,
 				A9A58BB4AFC674A75EA282BA /* XCRemoteSwiftPackageReference "GRDB.swift" */,
-				0FE2DAE45E5731FFCF8C21D2 /* XCRemoteSwiftPackageReference "sqlite-data" */,
 				0346D55682473A3511D799C7 /* XCRemoteSwiftPackageReference "swift-structured-queries" */,
 				8C626E2F21AE016D9E0C1DB5 /* XCRemoteSwiftPackageReference "swift-navigation" */,
 				8905B07D7FD63BCF3E395911 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 				31B99064C169F69BEBFDCDFC /* XCLocalSwiftPackageReference "../../jon-platform/packages/CloudSyncKit" */,
 				177E535AE1B360E716AFAF8E /* XCLocalSwiftPackageReference "../../jon-platform/packages/LLMClientKit" */,
 				30F1A320403584BEBC511745 /* XCLocalSwiftPackageReference "../../jon-platform/packages/LLMHandoffKit" */,
+				419CD0203C8C973F916543B1 /* XCLocalSwiftPackageReference "Vendor/sqlite-data" */,
 				8D05F004F00CB681D1E3D4F2 /* XCLocalSwiftPackageReference "../../jon-platform/packages/WebExtractorKit" */,
 				FBAB5C8635244B7925C0418E /* XCLocalSwiftPackageReference "YesChefPackage" */,
 			);
@@ -1277,6 +1279,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../jon-platform/packages/CloudSyncKit";
 		};
+		419CD0203C8C973F916543B1 /* XCLocalSwiftPackageReference "Vendor/sqlite-data" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "Vendor/sqlite-data";
+		};
 		8D05F004F00CB681D1E3D4F2 /* XCLocalSwiftPackageReference "../../jon-platform/packages/WebExtractorKit" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../jon-platform/packages/WebExtractorKit";
@@ -1294,14 +1300,6 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 0.31.0;
-			};
-		};
-		0FE2DAE45E5731FFCF8C21D2 /* XCRemoteSwiftPackageReference "sqlite-data" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/pointfreeco/sqlite-data";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.8.0;
 			};
 		};
 		8905B07D7FD63BCF3E395911 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
@@ -1414,12 +1412,10 @@
 		};
 		86859006FF66FAFF04016AA2 /* SQLiteData */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 0FE2DAE45E5731FFCF8C21D2 /* XCRemoteSwiftPackageReference "sqlite-data" */;
 			productName = SQLiteData;
 		};
 		87DE389964638E7777ABB383 /* SQLiteData */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 0FE2DAE45E5731FFCF8C21D2 /* XCRemoteSwiftPackageReference "sqlite-data" */;
 			productName = SQLiteData;
 		};
 		94BD562408492AC6E81B0035 /* Dependencies */ = {
@@ -1463,7 +1459,6 @@
 		};
 		E94FE1F285F6B338A789EE95 /* SQLiteData */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 0FE2DAE45E5731FFCF8C21D2 /* XCRemoteSwiftPackageReference "sqlite-data" */;
 			productName = SQLiteData;
 		};
 		F6DB8F903598A87E2AA0443F /* CasePaths */ = {
