@@ -1,6 +1,6 @@
 # Effort — Recover the 241 instruction steps from the Step 4 backup (PROD-CUTOVER Step 10a)
 
-Status: **Dispatched** — 2026-10-29. Schema-free. Blocks the Step 10 gate.
+Status: **Done → done-log** — implementation and verification complete 2026-10-29; device pass remains owed. Schema-free.
 Summary: The Step 9c re-seed left the iPad 241 instruction steps short of the Step 4 backup. They are steps the
 first, unpatched attempt deleted, and Production still held those deletes, so the re-seed's download deleted them
 again. Add a temporary Settings action that reads a chosen backup and inserts only the instruction steps missing
@@ -25,7 +25,7 @@ backup):
 - In 9c the restore brought them back. The most likely path (from the counts; no log shows it): the fresh sync state
   downloaded Production's zone, those deletes included, and the steps were deleted again. The 3 steps that never reached Production had no delete, so they
   survived. So did the 41 sections and everything else the first attempt lost: they never reached Production either.
-- All 241 steps' recipes and sections are on the iPad now. No step is new on the iPad. None of the 41 recipes has
+- All 241 steps' recipes and sections are on the iPad now. No step is new on the iPad. None of the 40 recipes has
   a variation.
 
 A full restore can't fix this: it replaces the whole library, discards a day's sync state, and would meet the same
@@ -60,7 +60,7 @@ these sections, so the original order is correct as it stands. Running it again 
 
 - A button under **Restore from a Backup**: **Recover Missing Instruction Steps**. It reuses the backup file
   importer's content types. Add a separate `fileImporter` only if sharing the existing one gets awkward.
-- After a file is picked, run Plan and show one confirmation alert: "Recover 241 instruction steps in 41 recipes?",
+- After a file is picked, run Plan and show one confirmation alert: "Recover 241 instruction steps in 40 recipes?",
   with the skipped count in the message when it isn't zero. When nothing is missing, show "No missing steps in this
   backup." and nothing else.
 - Confirming runs Apply and shows the inserted count. Errors use the same alert pattern as restore.
@@ -97,6 +97,6 @@ or the vendored SQLiteData. The "Up to date" blind spots and the launch-time pas
   build item.
 - **Device pass (Jon, then the architect):** upload with `testflight`, install it on the iPad, then Settings →
   Recover Missing Instruction Steps → the Step 4 iPad backup (`YesChef-Backup-2026-10-27 ipad.sqlite`). Expect
-  **241 steps in 41 recipes**, with nothing skipped. Afterward, Local record counts show `instructionSteps` at 11,330, and
+  **241 steps in 40 recipes**, with nothing skipped. Afterward, Local record counts show `instructionSteps` at 11,330, and
   **American, French, and Frozen Custard Style Vanilla Ice Cream** has its 37 steps back. Keep Yes Chef open until
   Sync lists nothing not uploaded, then export a backup. The architect re-runs the Step 4 comparison.

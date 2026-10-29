@@ -12,6 +12,8 @@ struct SettingsView: View {
     configuration: YesChefCloudSync.databaseBackupConfiguration
   )
   @State private var backupRestore: DatabaseBackupRestoreModel
+  // TEMPORARY: PROD-CUTOVER Step 10a
+  @State private var instructionStepRecovery = InstructionStepRecoveryModel()
   let automaticBackupModel: AutomaticBackupModel
   let chatAccessExportModel: ChatAccessExportModel
   let chatAccessInboxModel: ChatAccessInboxModel
@@ -19,10 +21,15 @@ struct SettingsView: View {
   @State private var backupExportFilename = "YesChef-Backup.sqlite"
   @State private var isPresentingBackupExporter = false
   @State private var isPresentingBackupImporter = false
+  // TEMPORARY: PROD-CUTOVER Step 10a
+  @State private var isPresentingInstructionStepRecoveryImporter = false
   /// The view owns this rather than deriving it from `backupRestore.isPrepared` — see the note on
   /// `isPrepared`. Binding an alert to the model's payload made SwiftUI discard the staged restore
   /// on dismissal, before the Restore button's action could use it.
   @State private var isConfirmingRestore = false
+  // TEMPORARY: PROD-CUTOVER Step 10a
+  @State private var isConfirmingInstructionStepRecovery = false
+  @State private var isShowingNoMissingInstructionSteps = false
   @State private var isPresentingRestoreRestartCover = false
   @Environment(\.scenePhase) private var scenePhase
 
@@ -144,6 +151,20 @@ struct SettingsView: View {
         }
         .disabled(backupRestore.isPreparing || backupRestore.isRestoring)
 
+        // TEMPORARY: PROD-CUTOVER Step 10a
+        Button {
+          isPresentingInstructionStepRecoveryImporter = true
+        } label: {
+          HStack {
+            Label("Recover Missing Instruction Steps", systemImage: "arrow.uturn.backward.circle")
+            if instructionStepRecovery.isWorking {
+              Spacer()
+              ProgressView()
+            }
+          }
+        }
+        .disabled(instructionStepRecovery.isWorking || backupRestore.isPreparing || backupRestore.isRestoring)
+
         if backupRestore.hasUndoableRestore {
           Button {
             Task {
@@ -207,6 +228,12 @@ struct SettingsView: View {
       allowedContentTypes: [.yesChefSQLiteBackup, .data],
       onCompletion: backupRestoreSelected
     )
+    // TEMPORARY: PROD-CUTOVER Step 10a
+    .fileImporter(
+      isPresented: $isPresentingInstructionStepRecoveryImporter,
+      allowedContentTypes: [.yesChefSQLiteBackup, .data],
+      onCompletion: instructionStepRecoverySelected
+    )
     .alert("Restore This Backup?", isPresented: $isConfirmingRestore) {
       Button("Restore", role: .destructive) {
         Task {
@@ -237,6 +264,34 @@ struct SettingsView: View {
       }
     } message: {
       Text(backupRestore.errorMessage ?? "")
+    }
+    // TEMPORARY: PROD-CUTOVER Step 10a
+    .alert("Recover \(instructionStepRecovery.missingStepCount) instruction steps in \(instructionStepRecovery.recipeCount) recipes?", isPresented: $isConfirmingInstructionStepRecovery) {
+      Button("Recover") {
+        Task { await instructionStepRecovery.apply() }
+      }
+      Button("Cancel", role: .cancel) {
+        instructionStepRecovery.discardPlan()
+      }
+    } message: {
+      if instructionStepRecovery.skippedCount == 0 {
+        Text("The missing steps will be added to this device's library.")
+      } else {
+        Text("\(instructionStepRecovery.skippedCount) backup steps were skipped because their recipe or section is not on this device.")
+      }
+    }
+    .alert("No missing steps in this backup.", isPresented: $isShowingNoMissingInstructionSteps) {
+      Button("OK", role: .cancel) {}
+    }
+    .alert("Instruction Steps Recovered", isPresented: recoveryResultPresented) {
+      Button("OK", role: .cancel) { instructionStepRecovery.dismissResult() }
+    } message: {
+      Text("Inserted \(instructionStepRecovery.insertedCount ?? 0) instruction steps.")
+    }
+    .alert("Could Not Recover Instruction Steps", isPresented: recoveryErrorPresented) {
+      Button("OK") { instructionStepRecovery.dismissResult() }
+    } message: {
+      Text(instructionStepRecovery.errorMessage ?? "")
     }
   }
 
@@ -274,6 +329,22 @@ struct SettingsView: View {
     return $backupRestore.isErrorPresented
   }
 
+  // TEMPORARY: PROD-CUTOVER Step 10a
+  private var recoveryResultPresented: Binding<Bool> {
+    Binding(
+      get: { instructionStepRecovery.insertedCount != nil },
+      set: { if !$0 { instructionStepRecovery.dismissResult() } }
+    )
+  }
+
+  // TEMPORARY: PROD-CUTOVER Step 10a
+  private var recoveryErrorPresented: Binding<Bool> {
+    Binding(
+      get: { instructionStepRecovery.errorMessage != nil },
+      set: { if !$0 { instructionStepRecovery.dismissResult() } }
+    )
+  }
+
   private func backupExportCompleted(_ result: Result<URL, any Error>) {
     defer { clearPreparedBackup() }
     guard case let .failure(error) = result else { return }
@@ -301,6 +372,25 @@ struct SettingsView: View {
       }
     case let .failure(error):
       backupRestore.recordImportFailure(error)
+    }
+  }
+
+  // TEMPORARY: PROD-CUTOVER Step 10a
+  private func instructionStepRecoverySelected(_ result: Result<URL, any Error>) {
+    switch result {
+    case let .success(url):
+      Task {
+        await instructionStepRecovery.prepare(from: url)
+        guard instructionStepRecovery.errorMessage == nil else { return }
+        if instructionStepRecovery.missingStepCount == 0 {
+          isShowingNoMissingInstructionSteps = true
+        } else {
+          isConfirmingInstructionStepRecovery = instructionStepRecovery.hasPlan
+        }
+      }
+    case let .failure(error):
+      // Match restore's error presentation for importer failures.
+      instructionStepRecovery.recordImportFailure(error)
     }
   }
 

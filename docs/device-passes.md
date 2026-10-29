@@ -13,6 +13,13 @@ CloudKit **Development** by design; prod-schema promotion is the held ops step i
 
 Not work, a checklist.
 
+**PROD-CUTOVER Step 10a — recover the 241 instruction steps.** Upload this build with `testflight` and install it
+on the iPad. Settings → Import & Export → **Recover Missing Instruction Steps**, then choose the Step 4 iPad backup
+(`YesChef-Backup-2026-10-27 ipad.sqlite`). Expect **241 steps in 40 recipes**, with none skipped. Check Local record
+counts for 11,330 `instructionSteps`, and confirm **American, French, and Frozen Custard Style Vanilla Ice Cream**
+has its 37 steps back. Keep Yes Chef open until Sync lists nothing not uploaded, then export a backup for the
+architect to compare with Step 4. Do not edit instructions in the 40 affected recipes before the comparison.
+
 **Chat access S2b — search rows show categories** (schema-free). Once this merges, reinstall the helper and restart the tunnel (`CHATGPT-SETUP.md` § After a helper update). Search ChatGPT for a category used in your library and confirm matching recipe rows show `categories`; confirm the `tags` field is absent.
 
 **Automatic backups (ADR-0008 S1; effort brief `automatic-backups`).** Run this on the first TestFlight build

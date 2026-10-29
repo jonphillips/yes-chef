@@ -282,10 +282,11 @@ DATA LOSS.sqlite` in Jon's Downloads. The retry:
       **2026-10-29 audit:** everything matches (`recipeCategories` +2) except **`instructionSteps`, 241 short**.
       All 241 are among the 244 steps the first attempt deleted. Production still held those deletes, and the
       re-seed's download almost certainly applied them again. Every one's recipe and section is on the iPad.
-  - [ ] **10a — Put the 241 steps back** from the Step 4 backup, with their IDs:
-        [`efforts/recover-lost-instruction-steps.md`](efforts/recover-lost-instruction-steps.md). Codex builds it,
-        Jon uploads it and runs it on the iPad, and the architect re-runs this comparison. Until then, don't edit
-        instructions in the 41 affected recipes.
+  - [x] **10a — Recovery action built** to put the 241 steps back from the Step 4 backup with their IDs:
+        [`efforts/recover-lost-instruction-steps.md`](efforts/recover-lost-instruction-steps.md).
+  - [ ] **10a device pass:** Jon uploads the build and runs the recovery action on the iPad; the architect
+        re-runs this comparison. Until then, don't edit instructions in the 40 affected recipes. See
+        [`device-passes.md`](device-passes.md).
 - [ ] In the console, Production private database, zone `co.pointfree.SQLiteData.defaultZone`: spot-check the types
       that lost rows (`recipeNotes`, `recipeVariations`, `instructionSections`, `recipePhotos`) plus
       `ingredientLines`. Production → Logs should show no `BAD_REQUEST` bursts after the upload settles.
