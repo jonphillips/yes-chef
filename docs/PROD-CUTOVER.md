@@ -276,7 +276,7 @@ DATA LOSS.sqlite` in Jon's Downloads. The retry:
 
 ## 10 — Confirm Production holds the library  *(server-side, ADR-0056 OQ3)*
 
-- [ ] **The iPad lost nothing.** Export a backup from the iPad. The architect compares its row counts with the
+- [x] **The iPad lost nothing.** Export a backup from the iPad. The architect compares its row counts with the
       Step 4 iPad backup (Reference B). Every synced table must match. The only allowed difference is
       `recipeCategories` rows that the launch-time cuisine/course backfill adds.
       **2026-10-29 audit:** everything matches (`recipeCategories` +2) except **`instructionSteps`, 241 short**.
@@ -284,14 +284,18 @@ DATA LOSS.sqlite` in Jon's Downloads. The retry:
       re-seed's download almost certainly applied them again. Every one's recipe and section is on the iPad.
   - [x] **10a — Recovery action built** to put the 241 steps back from the Step 4 backup with their IDs:
         [`efforts/recover-lost-instruction-steps.md`](efforts/recover-lost-instruction-steps.md).
-  - [ ] **10a device pass:** Jon uploads the build and runs the recovery action on the iPad; the architect
-        re-runs this comparison. Until then, don't edit instructions in the 40 affected recipes. See
-        [`device-passes.md`](device-passes.md).
-- [ ] In the console, Production private database, zone `co.pointfree.SQLiteData.defaultZone`: spot-check the types
+  - [x] **10a device pass (2026-10-29):** the recovery put back 241 steps in 40 recipes. Local record counts
+        now match Step 4 on every table shown, including 11,330 `instructionSteps`, and Jon spot-checked the
+        affected recipes. The 40 recipes can be edited again.
+- [x] In the console, Production private database, zone `co.pointfree.SQLiteData.defaultZone`: spot-check the types
       that lost rows (`recipeNotes`, `recipeVariations`, `instructionSections`, `recipePhotos`) plus
       `ingredientLines`. Production → Logs should show no `BAD_REQUEST` bursts after the upload settles.
       "Up to date" in the app has been wrong before, so this check is the server's word. The iPhone's fresh install
       (Step 11) is the full count check.
+      **2026-10-29:** Production record types can't be queried by record name. They have no `recordName` index,
+      and an index only arrives with a schema deploy from Development, which isn't worth doing mid-cut. So the
+      per-type spot-check moves to Step 11's full count. The logs after the recovery show 241 `instructionSteps`
+      RecordSaves from the iPad, all `SUCCESS`, and no `BAD_REQUEST`.
 
 ## 11 — iPhone: a fresh install pulls everything
 
