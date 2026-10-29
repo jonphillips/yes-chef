@@ -259,8 +259,10 @@ DATA LOSS.sqlite` in Jon's Downloads. The retry:
 > local data.
 
 - [x] **9a — The patch** (Codex): [`efforts/sqlite-data-reference-violation-patch.md`](efforts/sqlite-data-reference-violation-patch.md).
-- [ ] **9b — Upload the patched build**: `testflight` from a clean `main`, as in Step 7.
-- [ ] **9c — Re-seed:**
+- [x] **9b — Upload the patched build**: `testflight` from a clean `main`, as in Step 7. **Done 2026-10-28,
+  build 1.0.0 (1170).**
+- [x] **9c — Re-seed:** **Done 2026-10-28/29.** The patch held: no single-parent child was deleted. CloudKit
+  throttled the upload overnight, and 384 rows sat as not uploaded until it cleared by itself.
   - Install the 9b build on the iPad from TestFlight, then turn on **Airplane Mode before first launching it**.
     That way the old sync state can't send anything.
   - Open Yes Chef. Settings → Import & Export → **Restore from a Backup**, choosing the Step 4 **iPad** file
@@ -277,6 +279,13 @@ DATA LOSS.sqlite` in Jon's Downloads. The retry:
 - [ ] **The iPad lost nothing.** Export a backup from the iPad. The architect compares its row counts with the
       Step 4 iPad backup (Reference B). Every synced table must match. The only allowed difference is
       `recipeCategories` rows that the launch-time cuisine/course backfill adds.
+      **2026-10-29 audit:** everything matches (`recipeCategories` +2) except **`instructionSteps`, 241 short**.
+      All 241 are among the 244 steps the first attempt deleted. Production still held those deletes, and the
+      re-seed's download almost certainly applied them again. Every one's recipe and section is on the iPad.
+  - [ ] **10a — Put the 241 steps back** from the Step 4 backup, with their IDs:
+        [`efforts/recover-lost-instruction-steps.md`](efforts/recover-lost-instruction-steps.md). Codex builds it,
+        Jon uploads it and runs it on the iPad, and the architect re-runs this comparison. Until then, don't edit
+        instructions in the 41 affected recipes.
 - [ ] In the console, Production private database, zone `co.pointfree.SQLiteData.defaultZone`: spot-check the types
       that lost rows (`recipeNotes`, `recipeVariations`, `instructionSections`, `recipePhotos`) plus
       `ingredientLines`. Production → Logs should show no `BAD_REQUEST` bursts after the upload settles.
@@ -317,6 +326,7 @@ DATA LOSS.sqlite` in Jon's Downloads. The retry:
 - [ ] **From now on, every TestFlight build waits on a schema deploy.** A slice that adds a synced table or column,
       or is the first to write a non-nil value to one, must create it in Development (from a simulator build or
       the console) and deploy before its TestFlight build ships. `testflight` enforces this.
+- [ ] Remove the temporary **Recover Missing Instruction Steps** action (Step 10a), marked `TEMPORARY`.
 - [ ] Add the cut to `DONE-LOG.md`. Remove the keep-or-drop item from `open-questions.md`. Delete
       `yeschef-dev.ckdb` from the repo root.
 

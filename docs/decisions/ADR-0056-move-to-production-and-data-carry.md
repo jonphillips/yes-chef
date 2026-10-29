@@ -215,3 +215,11 @@ wired as an Xcode local-package override, so neither `YesChefPackage` nor jon-pl
 dependency too) changes. The re-seed (`PROD-CUTOVER.md` Step 9c) runs only on a build carrying the patch. Its gate
 (Step 10) adds a row-count comparison of an iPad backup against Step 4's, because neither "Up to date" nor a
 Production record count would have caught this loss.
+
+**Step 10 audit (2026-10-29).** On the patched build 1170 the re-seed lost no single-parent child. The iPad still
+came up 241 `instructionSteps` short. All 241 are among the 244 the first attempt deleted through the local cascade
+from their sections. Being two-parent rows, most had uploaded, so that attempt also deleted them in Production. The
+restore brought them back, and the fresh sync state's download almost certainly deleted them again. **A restore
+re-seeds the rows, but not past deletes the zone already holds.** After a failed upload, check what it deleted
+on the server before re-seeding. The steps go back by ID from the Step 4 backup, through a temporary recovery
+action ([`efforts/recover-lost-instruction-steps.md`](../efforts/recover-lost-instruction-steps.md)).
