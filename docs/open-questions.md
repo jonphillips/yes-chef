@@ -36,6 +36,14 @@ From the old Next Up:
   (gated by a stored version) or retire the finished ones, and run what's left off the main thread. Do it after
   the cut, with a TestFlight build.
 
+- **Settings' Sync detail sheet slides up, then straight back down (Jon, 2026-10-29; long-standing).** Tapping
+  the Sync row usually takes a second tap. The likely cause: `SyncStatusSection` hangs `.sheet(isPresented:)` on
+  its `Section` inside the Settings `Form` (`SyncStatusSection.swift`), so the presentation lives on a lazy,
+  List-backed row. The row re-renders whenever `SyncHealthModel` ticks, which is often while the engine runs,
+  and that can dismiss the sheet. Fix: hoist the sheet's state and `.sheet` out to the `Form` in `SettingsView`,
+  and leave the row as a plain button. It's the only sheet in Settings; the other detail views push and are
+  fine. Small, post-cut; bundle with the next polish dispatch.
+
 - **Drop the vendored SQLiteData when upstream fixes #547.** `Vendor/sqlite-data` (ADR-0056 Amd 2) exits when a
   SQLiteData release keeps children of parents the server never confirmed. Watch
   [pointfreeco/sqlite-data#548](https://github.com/pointfreeco/sqlite-data/pull/548). Return to the remote package
