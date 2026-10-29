@@ -1,6 +1,6 @@
 # Effort — Recover the 241 instruction steps from the Step 4 backup (PROD-CUTOVER Step 10a)
 
-Status: **Dispatched** — 2026-10-29. Schema-free. Blocks the Step 10 gate.
+Status: **Done → done-log** — implementation and verification complete 2026-10-29; device pass remains owed. Schema-free.
 Summary: The Step 9c re-seed left the iPad 241 instruction steps short of the Step 4 backup. They are steps the
 first, unpatched attempt deleted, and Production still held those deletes, so the re-seed's download deleted them
 again. Add a temporary Settings action that reads a chosen backup and inserts only the instruction steps missing

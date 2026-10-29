@@ -122,6 +122,7 @@
 		9ADADC85EDEC6208590FC533 /* YesChefCore in Frameworks */ = {isa = PBXBuildFile; productRef = 13643DFF3682EB50C6B096D2 /* YesChefCore */; };
 		9B8EFD5B3540051D7122B27D /* PaprikaImportReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E29F682A3093D37071F5A924 /* PaprikaImportReviewView.swift */; };
 		9E3F90581198D1DF4FBBE49D /* ChatAccessExportModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B69D7AF49F0E848F45AE1103 /* ChatAccessExportModelTests.swift */; };
+		9FB5CE6316569DDDFE40FBD2 /* InstructionStepRecoveryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E065B1A08E3350A717DACDD /* InstructionStepRecoveryModel.swift */; };
 		A103667583AD5577C2633211 /* OriginalSnapshotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76C7E4899A1093E58F713C2F /* OriginalSnapshotView.swift */; };
 		A53A9EE95AC871F9F6B627C5 /* RecipeLibraryListState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3B1C7A7E48A8FFE074A05E0 /* RecipeLibraryListState.swift */; };
 		A588A64D8DC3C98AE1FABF6A /* RecipeReaderRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42C6393B132228BA0329E4A7 /* RecipeReaderRows.swift */; };
@@ -267,6 +268,7 @@
 		669BA3E9D8C0F3631F217603 /* OnboardChatFinalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardChatFinalizationTests.swift; sourceTree = "<group>"; };
 		6B1068DDF81D623B93CC467A /* RecipeDetailLabelSuggestionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeDetailLabelSuggestionTests.swift; sourceTree = "<group>"; };
 		6C250D0CBA2170B99AE070A1 /* RecipeEditorModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeEditorModels.swift; sourceTree = "<group>"; };
+		6E065B1A08E3350A717DACDD /* InstructionStepRecoveryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstructionStepRecoveryModel.swift; sourceTree = "<group>"; };
 		6EEED601CE748216744F3637 /* MealCalendarHandoffSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCalendarHandoffSource.swift; sourceTree = "<group>"; };
 		6F811B4BCF619BB9EFC3CFFA /* WorkbenchCandidatePickerViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchCandidatePickerViews.swift; sourceTree = "<group>"; };
 		6FE4F6BA219B7819AFB1FEAE /* RecipeLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeLibraryView.swift; sourceTree = "<group>"; };
@@ -554,6 +556,7 @@
 				18FECD94C6F2E120A02EE0A6 /* IdleTimerDisabledModifier.swift */,
 				7ED8C4BF9300184ABE4E59A5 /* Info.plist */,
 				A5B6A9C5B5B1B8A7AA3C2136 /* IngredientFractionPillRow.swift */,
+				6E065B1A08E3350A717DACDD /* InstructionStepRecoveryModel.swift */,
 				F50F87C9475E4E92D549DA40 /* MealCalendarDayHeader.swift */,
 				6EEED601CE748216744F3637 /* MealCalendarHandoffSource.swift */,
 				1CB41385D4CCB012DB81407F /* MealCalendarMealPlanItemRow.swift */,
@@ -885,6 +888,7 @@
 				2F07342A5ED8AB64EFA742F1 /* HandoffReviewCoordinator.swift in Sources */,
 				26A54D34845DADD8C9E1493D /* IdleTimerDisabledModifier.swift in Sources */,
 				195F4BE15DAFE5DF10414E83 /* IngredientFractionPillRow.swift in Sources */,
+				9FB5CE6316569DDDFE40FBD2 /* InstructionStepRecoveryModel.swift in Sources */,
 				0428A2992F17EBEB4BF5644F /* MealCalendarDayHeader.swift in Sources */,
 				68A79CAF1B3EDB56758F1CC1 /* MealCalendarHandoffSource.swift in Sources */,
 				75774CFD29CACD1E3AEE28D7 /* MealCalendarMealPlanItemRow.swift in Sources */,

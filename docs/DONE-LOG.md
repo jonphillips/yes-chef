@@ -9,6 +9,17 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Recover lost instruction steps (`effort/recover-lost-instruction-steps`)
+
+**2026-10-29. Schema-free; PROD-CUTOVER Step 10a.** Added `InstructionStepRecovery` to plan from a migrated
+temporary copy of a selected backup and insert only missing steps whose recipe and section are present, preserving
+the original IDs and all fields. Settings has a temporary confirmation action; ordinary inserts create the normal
+SQLiteData sync metadata. Recovery tests cover absent and mismatched parents, existing-row preservation, repeat
+application, and byte-identical backup input. The focused suite passed, the 728-test package suite and drift gate
+passed, the generic iOS build succeeded, and all 84 `YesChefTests` passed. Jon's iPad recovery and the architect's
+Step 4 comparison remain owed in `device-passes.md`.
+
+---
 ## Vendored SQLiteData reference-violation retry (`effort/sqlite-data-reference-violation-patch`)
 
 **2026-10-28. Schema-free; touches CloudKit sync.** Vendored SQLiteData 1.8.2 from upstream commit
