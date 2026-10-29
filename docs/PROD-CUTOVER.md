@@ -285,7 +285,7 @@ DATA LOSS.sqlite` in Jon's Downloads. The retry:
   - [x] **10a — Recovery action built** to put the 241 steps back from the Step 4 backup with their IDs:
         [`efforts/recover-lost-instruction-steps.md`](efforts/recover-lost-instruction-steps.md).
   - [ ] **10a device pass:** Jon uploads the build and runs the recovery action on the iPad; the architect
-        re-runs this comparison. Until then, don't edit instructions in the 41 affected recipes. See
+        re-runs this comparison. Until then, don't edit instructions in the 40 affected recipes. See
         [`device-passes.md`](device-passes.md).
 - [ ] In the console, Production private database, zone `co.pointfree.SQLiteData.defaultZone`: spot-check the types
       that lost rows (`recipeNotes`, `recipeVariations`, `instructionSections`, `recipePhotos`) plus
