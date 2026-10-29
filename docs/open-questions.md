@@ -41,8 +41,8 @@ From the old Next Up:
   its `Section` inside the Settings `Form` (`SyncStatusSection.swift`), so the presentation lives on a lazy,
   List-backed row. The row re-renders whenever `SyncHealthModel` ticks, which is often while the engine runs,
   and that can dismiss the sheet. Fix: hoist the sheet's state and `.sheet` out to the `Form` in `SettingsView`,
-  and leave the row as a plain button. Jon says other Settings detail views do this too; ask which ones before
-  the slice so they ride along. Small, post-cut; bundle with the next polish dispatch.
+  and leave the row as a plain button. It's the only sheet in Settings; the other detail views push and are
+  fine. Small, post-cut; bundle with the next polish dispatch.
 
 - **Drop the vendored SQLiteData when upstream fixes #547.** `Vendor/sqlite-data` (ADR-0056 Amd 2) exits when a
   SQLiteData release keeps children of parents the server never confirmed. Watch
