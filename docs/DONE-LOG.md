@@ -346,7 +346,7 @@ passed 2026-09-30.
 
 **2026-09-29. No code or schema change.** `check-drift.sh` and `xcodebuild-summary.sh` run noisy stages through
 jon-platform's `quiet-run` (3.46 MB of raw app-build log became about 15 lines). `docs/AGENTS.md` went from
-18 KB to 9 KB, with its background moved out to `docs/work-intake.md` and `docs/product-principles.md`.
+18 KB to 9 KB, with its background moved out to `docs/archive/work-intake.md` and `docs/product-principles.md`.
 `CURRENT_HANDOFF.md` is retired per jon-platform ADR-0005: `docs/NEXT_UP.md` (nothing dispatched),
 `docs/standing-guards.md`, `docs/device-passes.md` (device passes and the prod-schema list),
 `docs/verification.md`, and candidates in `docs/open-questions.md`. The handoff-hygiene stage now calls the
@@ -420,7 +420,7 @@ switch.
 ## ADR-0042 Amd 5 — the return-contract marker is the first LLMHandoffKit lift; tolerant, not strict
 
 **Merged 2026-08-17; PR [#309](https://github.com/jonphillips/yes-chef/pull/309). No schema. Jon's device pass
-owed.** Takes **Path A** on the [convergence recon](llmhandoffkit-convergence-recon.md): lift *only* the one
+owed.** Takes **Path A** on the [convergence recon](archive/llmhandoffkit-convergence-recon.md): lift *only* the one
 genuinely neutral helper (`LLMHandoffKit.HandoffContractMarker`), leaving the package's galavant router,
 UserDefaults `HandoffSessionStore`, and return-model forks out of the build ([[llmhandoffkit-adoption-path-a]]).
 `AIHandoffReturnContract` now wraps the shared marker. **Strict-reject softened to import-with-warning** for the

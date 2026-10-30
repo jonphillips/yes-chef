@@ -95,6 +95,6 @@ deploy. No export or debug store replaces it. Brief: [`efforts/archive/raw-impor
 - Stripping scripts: that removes `ld+json` and `__NEXT_DATA__`, the only parts with any value.
 
 **Consequences.** Data Preservation Rule 1 ("never discard original imported text") means the snapshot plus each
-line's original text, not the raw page (`docs/AGENTS.md` now says so). `IMPORT_EXPORT.md` and `DATA_MODEL.md` drop
+line's original text, not the raw page (`AGENTS.md` now says so). `IMPORT_EXPORT.md` and `DATA_MODEL.md` drop
 the "preserve raw HTML for later re-parse" intent. ADR-0054's deferred "Create Recipe retains
 `originalImportText`" P1 is moot. Raw page storage is a standing guard.

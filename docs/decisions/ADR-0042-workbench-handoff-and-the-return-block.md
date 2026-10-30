@@ -924,7 +924,7 @@ finding about the source).
 
 **Status: Proposed** (architect; shipped in [#309](https://github.com/jonphillips/yes-chef/pull/309),
 awaiting Jon's device pass). Answers the recon gate in
-[`docs/llmhandoffkit-convergence-recon.md`](../llmhandoffkit-convergence-recon.md) — *is graceful
+[`docs/archive/llmhandoffkit-convergence-recon.md`](../archive/llmhandoffkit-convergence-recon.md) — *is graceful
 stale-marker tolerance wanted?* — with **yes**, and takes **Path A**: lift only the one genuinely
 neutral helper, leave the persistence and return-model forks alone.
 
