@@ -18,30 +18,12 @@ through `quiet-run` (same doc, § "Token discipline").
 
 ## Work Intake & Dispatch
 
-The document shape is jon-platform ADR-0005, and the loop is `jon-platform/docs/agent-collaboration.md`.
-The dispatch is **`docs/NEXT_UP.md`**: one ticket, and the executor's only planning input. The rest
-have a home the executor doesn't load: candidates go in `docs/open-questions.md`, Jon's device passes
-and held ops in `docs/device-passes.md`, and history in `docs/DONE-LOG.md`. Closed decisions live in
-`docs/standing-guards.md`; read it when a dispatch touches what it guards. The reasoning behind the
-rules below is in [`docs/archive/work-intake.md`](docs/archive/work-intake.md).
-
-1. **Dispatch trigger:** "go" (or *"do Next Up"*). Read `docs/NEXT_UP.md`, open the briefs it links,
-   and implement that, nothing else. "comments posted" means: run `jon-platform/scripts/pr-verdicts`
-   and address every `changes` verdict.
-2. **Never infer the next task.** If `NEXT_UP.md` says `Nothing dispatched.` or is missing, STOP and
-   ask Jon. Never pick from open questions, efforts, or milestones yourself.
-3. **Curation is the architect's job.** The architect sets `NEXT_UP.md` in the plan PR that writes a
-   brief or milestone, and the PR that completes a dispatch advances it in plan order. No PR exists
-   only to move it.
-4. **The ticket points, it does not duplicate.** `NEXT_UP.md` links brief and milestone sections; it
-   doesn't re-spec them.
-5. **Batch cohesive slices by default** (slices that share files and a mental model), decided at plan
-   time. Keep a slice separate when it could be wrong or redirect the next. One dispatch = one PR.
-6. **Keep `NEXT_UP.md` a ticket:** the ADR-0005 template, about 300 words, replaced wholesale, never
-   appended to.
-7. **Move, don't mark.** The completing PR adds a `DONE-LOG.md` entry naming its branch (and ticks
-   any ledger box). Litmus: *a sentence describing finished work belongs in DONE-LOG.* Owed device
-   passes go to `device-passes.md`, with a one-line pointer under **Owed**.
+The dispatch is **`docs/NEXT_UP.md`**: one ticket, and the executor's only planning input (empty →
+stop and ask). The loop around it is jon-platform's `AGENTS.md`, `docs/agent-collaboration.md`, and
+ADR-0005; this repo doesn't restate it. Yes Chef's homes for the rest: candidates in
+`docs/open-questions.md`, Jon's device passes and held ops in `docs/device-passes.md`, history in
+`docs/DONE-LOG.md`, and closed decisions in `docs/standing-guards.md` (read it when a dispatch
+touches what it guards).
 
 ## Development Priorities
 
@@ -64,13 +46,9 @@ complex AI recipe generation, OCR, or a voice assistant.
 
 ## Architecture Guidance
 
-The house stack from jon-platform (`docs/ios/swift-style.md`, `persistence-and-sync.md`,
-`ui-and-platforms.md` — read before proposing architecture): SQLiteData (**not SwiftData or
-Core Data**), `@Observable` feature models with enum `Destination` navigation,
-`@Dependency` for clock/date/UUID/database, value-type models, functional core with thin
-views. Keep model, persistence, parsing/import, and UI separate; use the `pfw-*` skills for
-library mechanics. No massive view files, hidden global state, speculative abstractions,
-unexplained dependencies, or destructive data transformations.
+The house stack is jon-platform's (`AGENTS.md`, then `docs/ios/swift-style.md`,
+`persistence-and-sync.md`, and `ui-and-platforms.md`, read before proposing architecture). Yes
+Chef's own rule on top: keep model, persistence, parsing/import, and UI separate.
 
 Product and style background (recipe model, UI feel, import, AI, coding style, original MVP
 scope) is in [`docs/product-principles.md`](docs/product-principles.md) — read the relevant
@@ -143,7 +121,6 @@ never raw `xcodebuild` in chat; open the full log only to diagnose a failure.
 Test logic: model creation, ingredient parsing, scaling, search, import parsing (fixtures in a
 dedicated directory), shopping-list aggregation.
 
-When completing a slice as the coding worker: commit, push, and open a PR for Jon as architect
-unless told otherwise. Keep unrelated working-tree changes out. Use direct `gh` commands with
+When completing a slice as the executor, keep unrelated working-tree changes out. Use direct `gh` commands with
 network escalation immediately, and `gh pr create --body-file` rather than a multiline `--body`
 so saved permission prefixes match.

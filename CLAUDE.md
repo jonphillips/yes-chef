@@ -1,0 +1,6 @@
+# CLAUDE.md
+
+See [AGENTS.md](AGENTS.md) for how to work in this repo.
+
+This file exists for Claude Code tooling compatibility; `AGENTS.md` is the single
+source of truth so the same instructions serve every coding tool.

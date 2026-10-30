@@ -34,8 +34,8 @@ change is migration-aware.
    clean milestone rebaseline. The build orders that implement it live in
    [milestones/](milestones/) while live and move to
    [milestones/archive/](milestones/archive/) when finished (all of M1–M4 and grocery are archived).
-7. [open-questions.md](open-questions.md) — live ambiguities and recently-resolved
-   decisions.
+7. [open-questions.md](open-questions.md) — candidates and open decisions; long topic
+   threads are parked notes it links.
 
 ## Decisions, efforts, and reviews
 
@@ -52,7 +52,6 @@ change is migration-aware.
   root, finished in [milestones/archive/](milestones/archive/).
 - For what's outstanding, run `jon-platform/scripts/outstanding`; no doc here is a status page.
 - [reviews/](reviews/) — architect review passes (historical and ongoing).
-- [work-intake.md](archive/work-intake.md) — the full dispatch protocol behind `AGENTS.md` § Work Intake.
 - [product-principles.md](product-principles.md) — recipe-model, UI, import, AI, and style
   principles plus the original MVP scope (moved out of `AGENTS.md` to keep it lean).
 
