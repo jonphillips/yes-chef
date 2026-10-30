@@ -32,7 +32,8 @@ change is migration-aware.
    deferred planning/AI vision; explicitly post-parity.
 6. [implementation-plan.md](implementation-plan.md) — the strategic arc and the
    clean milestone rebaseline. The build orders that implement it live in
-   [milestones/](milestones/).
+   [milestones/](milestones/) while live and move to
+   [milestones/archive/](milestones/archive/) when finished (all of M1–M4 and grocery are archived).
 7. [open-questions.md](open-questions.md) — live ambiguities and recently-resolved
    decisions.
 
@@ -40,10 +41,16 @@ change is migration-aware.
 
 - [decisions/](decisions/) — settled ADRs (indexed in [decisions/README.md](decisions/README.md)).
   Check before proposing architecture changes; don't re-litigate them.
-- [efforts/](efforts/) — worked designs + slice plans that implement the ADRs
-  (indexed in [efforts/README.md](efforts/README.md)). **Search here before writing a
-  new effort or ADR** — per jon-platform `agent-workflow.md` § "Working docs stay
-  discoverable."
+- [efforts/](efforts/) — worked designs + slice plans that implement the ADRs. The root
+  holds only live briefs (indexed in [efforts/README.md](efforts/README.md)); shipped,
+  retired and parked briefs live in [efforts/archive/](efforts/archive/). A brief's
+  folder is its status (jon-platform ADR-0005 D10), so finishing or parking one means
+  moving it with `jon-platform/scripts/archive-brief`, never marking it Done in place.
+  **Search both before writing a new effort or ADR** — per jon-platform
+  `agent-workflow.md` § "Working docs stay discoverable."
+- [milestones/](milestones/) — the committed arc's build orders, same rule: live in the
+  root, finished in [milestones/archive/](milestones/archive/).
+- For what's outstanding, run `jon-platform/scripts/outstanding`; no doc here is a status page.
 - [reviews/](reviews/) — architect review passes (historical and ongoing).
 - [work-intake.md](work-intake.md) — the full dispatch protocol behind `AGENTS.md` § Work Intake.
 - [product-principles.md](product-principles.md) — recipe-model, UI, import, AI, and style
@@ -64,14 +71,11 @@ overrides those unless a Yes Chef ADR says so explicitly.
 
 Two agents build this repo under the architect/executor protocol
 (`~/code/jon-platform/docs/agent-collaboration.md`): **Claude as architect** (owns
-these docs, the ADRs, and the milestone build orders; reviews slice PRs) and
-**Codex as executor** (one branch + PR per slice, green before ready). The milestone
-build orders in [milestones/](milestones/) are the contract.
+these docs, the ADRs, and the milestone and effort briefs; reviews slice PRs) and
+**Codex as executor** (one branch + PR per dispatch, green before ready). The dispatch
+is [NEXT_UP.md](NEXT_UP.md), which points at the live brief sections that are the contract.
 
 ## Forthcoming (not yet written)
 
-- `reviews/` re-baselining audit of current `main` — conformance of the existing
-  code to the now-codified house rules; gates the first forward build order.
 - `technical-architecture.md` — module/layout boundaries and the ratified Pass-1
   rules in one place.
-- `milestones/M1-*.md` — the first forward build order, authored after the audit.

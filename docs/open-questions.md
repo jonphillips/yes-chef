@@ -8,6 +8,22 @@
 **Per-recipe facet/tag coverage is Jon's ongoing hand work and gates nothing** — Power Browser (ADR-0050)
 and everything downstream move forward without waiting on it.
 
+**Parked briefs (ADR-0005 D10 archive sweep, 2026-10-30).** Designed but not scheduled. Each brief sits in
+`efforts/archive/`. Restore one to the root, restated `Designed` or `Ready`, in the plan PR that schedules it.
+
+- **Prepared components** ([brief](efforts/archive/prepared-components.md), [ADR-0057](decisions/ADR-0057-prepared-components.md)) —
+  a `Recipe.kind` and a directional dish → component edge. Additive schema, so it's safe after the cut. Nothing forces it sooner.
+- **ATK "Gather Your Ingredients" repair** ([brief](efforts/archive/import-text-normalization.md)) — P1 only, a
+  backup-first data pass; see the fuller candidate below.
+- **Tandoor idea harvest** ([notes](efforts/archive/tandoor-idea-harvest.md)) — reference notes mined from Tandoor
+  Recipes. Nothing ratified; read before the next ADR they touch.
+- **Commit authority as a typed, test-enforced property** ([review](efforts/archive/application-actions-review.md) D1) —
+  the one new track from the 2026-08-02 application-actions review, never built. OQ1 (where the declaration lives) is open.
+- **In-app browser Passwords autofill** ([spike](efforts/archive/browser-passwords-autofill-spike.md)) — the
+  2026-07-08 spike defending ADR-0009's "never store credentials." First confirm autofill still fails.
+- **Full-screen moves the app tabs to the top** ([dogfood 2026-09-21](efforts/archive/dogfood-fixes-2026-09-21.md)
+  Thread F) — the one thread from that pass not confirmed in code. Check on device before scoping.
+
 From the old Next Up:
 
 - **"Up to date" can't see inbound records that never arrived (found 2026-10-27, PROD-CUTOVER Step 4 audit).**

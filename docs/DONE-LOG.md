@@ -9,6 +9,18 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Brief archive sweep (`plan/archive-sweep`)
+
+**2026-10-30. Docs only; jon-platform ADR-0005 D10–D11's one-time sweep.** `scripts/archive-brief` moved 80
+effort briefs and all five milestone files (M1–M4, grocery) to their folders' `archive/` and rewrote every link,
+including comment paths in two Core sources, a test-fixture comment and `check-drift.sh`. Most had shipped under
+stale headers. Jon parked six (prepared components, the ATK text repair, the Tandoor notes, the
+application-actions D1 track, the autofill spike, and dogfood 2026-09-21 Thread F) as `open-questions.md`
+candidates and retired two (parser-hardening, reader-feedback-comment-ingestion). Two briefs stay live, both
+Blocked: chat-access-mcp (trimmed to S3, waiting on ADR-0060 OQ3) and yes-chef-dev-variant (waiting on
+PROD-CUTOVER Step 11). The efforts index lists only those two, and the `docs/README.md` atlas points at `archive/`.
+
+---
 ## Recover lost instruction steps (`effort/recover-lost-instruction-steps`)
 
 **2026-10-29. Schema-free; PROD-CUTOVER Step 10a.** Added `InstructionStepRecovery` to plan from a migrated
