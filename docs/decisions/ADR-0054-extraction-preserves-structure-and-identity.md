@@ -15,7 +15,7 @@ input exceeds the shape it and the canonical model can hold. It does not redesig
 fallback, or any UI.**
 
 > **Out of scope, on purpose.** The audit's P0 (destructive duplicate-import convergence) is a data-loss bug,
-> handled in [its own effort](../efforts/import-duplicate-destructive-convergence-2026-08-09.md), not here.
+> handled in [its own effort](../efforts/archive/import-duplicate-destructive-convergence-2026-08-09.md), not here.
 > *(Moot since [ADR-0010 Amd 1](ADR-0010-cloudkit-sync-enablement.md#amendment-1--raw-import-html-is-not-kept-in-any-build-2026-10-13): the column is gone.)*
 > The audit's other P1 — **Create Recipe retaining `originalImportText`** — is *provenance retention*, a
 > different mechanism from structural fidelity, and belongs in an **ADR-0053 amendment**, not this ADR. I

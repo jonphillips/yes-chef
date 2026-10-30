@@ -169,7 +169,7 @@ lesson). Entitlements (app-group + iCloud container) intact on both the app and 
 
 **Decision.** D2's baseline squash comes off the cutover path. Phase 1 becomes one ordinary appended migration
 that drops `Recipe.lastCookedAt` and `Recipe.timesCooked`, plus a test that every table's on-disk columns match
-its model ([`efforts/prod-dead-column-drop.md`](../efforts/prod-dead-column-drop.md)). The squash is deferred,
+its model ([`efforts/archive/prod-dead-column-drop.md`](../efforts/archive/prod-dead-column-drop.md)). The squash is deferred,
 optional cleanup that can happen any time after the cut.
 
 **Why.** D2 tied two things together that only one constraint needed. **Production makes the CloudKit schema
@@ -210,7 +210,7 @@ didn't fail; the library's sync engine did. The Step 4 backup holds every lost r
 **Decision.** Until a SQLiteData release fixes #547, Yes Chef builds against a vendored 1.8.2 with one patch: if
 the server never confirmed the parent (no change tag), keep the child and re-queue both instead of applying the
 foreign key's delete action
-([`efforts/sqlite-data-reference-violation-patch.md`](../efforts/sqlite-data-reference-violation-patch.md)). It is
+([`efforts/archive/sqlite-data-reference-violation-patch.md`](../efforts/archive/sqlite-data-reference-violation-patch.md)). It is
 wired as an Xcode local-package override, so neither `YesChefPackage` nor jon-platform's `CloudSyncKit` (Galavant's
 dependency too) changes. The re-seed (`PROD-CUTOVER.md` Step 9c) runs only on a build carrying the patch. Its gate
 (Step 10) adds a row-count comparison of an iPad backup against Step 4's, because neither "Up to date" nor a
@@ -222,4 +222,4 @@ from their sections. Being two-parent rows, most had uploaded, so that attempt a
 restore brought them back, and the fresh sync state's download almost certainly deleted them again. **A restore
 re-seeds the rows, but not past deletes the zone already holds.** After a failed upload, check what it deleted
 on the server before re-seeding. The steps go back by ID from the Step 4 backup, through a temporary recovery
-action ([`efforts/recover-lost-instruction-steps.md`](../efforts/recover-lost-instruction-steps.md)).
+action ([`efforts/archive/recover-lost-instruction-steps.md`](../efforts/archive/recover-lost-instruction-steps.md)).

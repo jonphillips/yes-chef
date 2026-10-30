@@ -79,15 +79,15 @@ section is work.**
   export of raw HTML or JSON-LD "for debugging" or "for a later re-parse" is a review block. Jon accepts a capture
   at review or debugs it live, and never redoes a recipe. Large TEXT in a synced table is also how a record
   silently passes CloudKit's 1 MB limit.
-- **⚠️ A `RecipePhoto` row exists only with image bytes** ([`efforts/raw-import-html-drop.md`](efforts/raw-import-html-drop.md) S2).
+- **⚠️ A `RecipePhoto` row exists only with image bytes** ([`efforts/archive/raw-import-html-drop.md`](efforts/archive/raw-import-html-drop.md) S2).
   Capture persists only images it downloaded. A URL-only photo row, or a body-image scrape that runs although a
   structured source found an image, is a review block. Jon's rule: no dead data in the library.
 - **The Recipe Workbench store/curate/compare arc (ADR-0019) is complete**, S1–S4 shipped. Parked follow-ons
-  live in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md), not here.
+  live in [`efforts/archive/recipe-workbench.md`](efforts/archive/recipe-workbench.md), not here.
 - **The workbench's experiment-outcome verb is NOT scoped** — only its *placement* is ratified (ADR-0042 D8's
   corollary: a conjecture suppresses learnings, a **cooked** experiment is findings, so learnings come back
   on). That amendment gets written when that half is scoped, **deliberately not now.**
-- **Chat entry points are unified and closed** ([`efforts/chat-ask-uniformity.md`](efforts/chat-ask-uniformity.md),
+- **Chat entry points are unified and closed** ([`efforts/archive/chat-ask-uniformity.md`](efforts/archive/chat-ask-uniformity.md),
   PR #244), and **ADR-0046 S2 (PR #298) closed the presentation half too** — every wide-width surface (Recipe,
   Calendar, Workbench Detail, Workbench Compare) is now the **`.inspector`** presentation; compact stays a modal
   sheet. Uniformity is **cross-surface, not cross-device**: modal sheets keep the iOS nav bar, embedded/inspector

@@ -7,11 +7,11 @@
 > reviewable `RecipeNote` of a new `readerFeedback` type**, displayed on the recipe as a **Reader
 > Feedback** section and available to the recipe chat. It **wires the already-written but unreferenced
 > `RecipeReaderCommentExtractor`**. The detailed build lives in the companion effort
-> [`efforts/reader-feedback-comment-ingestion.md`](../efforts/reader-feedback-comment-ingestion.md);
+> [`efforts/archive/reader-feedback-comment-ingestion.md`](../efforts/archive/reader-feedback-comment-ingestion.md);
 > this ADR records the *decisions*.
 
 Status: **Accepted** — 2026-07-09 (Jon ratified; proposed 2026-07-08, dogfood pass 2026-07-08). Ratifies the design in
-`efforts/reader-feedback-comment-ingestion.md` (2026-07-01), with two updates for what shipped since:
+`efforts/archive/reader-feedback-comment-ingestion.md` (2026-07-01), with two updates for what shipped since:
 the LLM client and key storage now exist (`LLMClientKit` + Keychain `apiKeyStore`), and the curation
 prompt is a DB-backed AI **preference**, not `AppStorage`. **Extends [ADR-0007](ADR-0007-web-recipe-capture-engine.md)**
 (capture parser) and **[ADR-0009](ADR-0009-in-app-authenticated-browser-capture.md)** (in-app
@@ -84,7 +84,7 @@ browser renders so nicely — the stated goal being to let the AI **scour commen
 `RecipeReaderCommentExtractor` (NYT-only; `[RawComment { text, helpfulCount }]`) exists but has **zero
 callers**, nothing persists comments, and the chat context omits them.
 
-We already designed this in `efforts/reader-feedback-comment-ingestion.md` (2026-07-01): harvest the
+We already designed this in `efforts/archive/reader-feedback-comment-ingestion.md` (2026-07-01): harvest the
 ranked thread, LLM-**curate** it into distinct tips, surface them as a reviewed **Reader Feedback** note
 section. Jon reconfirmed that design over a leaner "raw comments → chat only" alternative (2026-07-08):
 the value is in *distinct, specific, human-approved tips* ("I used cardamom instead and it was great"),

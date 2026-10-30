@@ -1,9 +1,10 @@
 # Effort — Yes Chef Dev: Debug builds get their own app identity; backups carry their build variant
 
-Status: Designed 2026-10-10. **Gated on the cutover:** dispatch only after ADR-0056 Phase 4e passes
-(ADR-0059 D1). Touches identifiers, entitlements and the restore path, so the architect escalates both PRs to
-Jon before merge. No schema change, no migration, no sync-model change.
-Summary: Implements [ADR-0059](../decisions/ADR-0059-yes-chef-dev-variant.md). After the cutover, Xcode Run
+Status: Blocked — dispatch only after [`PROD-CUTOVER.md`](../PROD-CUTOVER.md) Step 11 passes (ADR-0056 Phase 4e, ADR-0059 D1).
+Summary: Debug builds become **Yes Chef Dev**, its own app beside TestFlight Yes Chef, and backups record their build variant.
+Touches identifiers, entitlements and the restore path, so the architect escalates both PRs to Jon before merge.
+No schema change, no migration, no sync-model change.
+Implements [ADR-0059](../decisions/ADR-0059-yes-chef-dev-variant.md). After the cutover, Xcode Run
 (Debug) builds **Yes Chef Dev**: its own bundle IDs, app group, URL scheme, display name and icon, so it can
 sit next to TestFlight Yes Chef on the same device. It keeps the real iCloud container, which puts it on
 CloudKit Development. Release doesn't change. Separately, `CloudSyncKit` backups record which build variant
@@ -28,7 +29,7 @@ The executor's builds are compile-only (`CODE_SIGNING_ALLOWED=NO`), so they don'
 ## Shape: two PRs, in order
 
 Yes Chef CI checks out jon-platform `main`, so the Yes Chef PR can only go green after the jon-platform PR
-merges. This is the same pattern as [`cloudsynckit-backup-lift.md`](cloudsynckit-backup-lift.md).
+merges. This is the same pattern as [`cloudsynckit-backup-lift.md`](archive/cloudsynckit-backup-lift.md).
 
 1. **jon-platform, branch `effort/yes-chef-dev-variant`: additive.** The backup variant marker goes into
    `packages/CloudSyncKit`. **Galavant `main` must still build and pass unchanged against it.** Check this by

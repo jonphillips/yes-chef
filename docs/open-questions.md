@@ -8,6 +8,22 @@
 **Per-recipe facet/tag coverage is Jon's ongoing hand work and gates nothing** — Power Browser (ADR-0050)
 and everything downstream move forward without waiting on it.
 
+**Parked briefs (ADR-0005 D10 archive sweep, 2026-10-30).** Designed but not scheduled. Each brief sits in
+`efforts/archive/`. Restore one to the root, restated `Designed` or `Ready`, in the plan PR that schedules it.
+
+- **Prepared components** ([brief](efforts/archive/prepared-components.md), [ADR-0057](decisions/ADR-0057-prepared-components.md)) —
+  a `Recipe.kind` and a directional dish → component edge. Additive schema, so it's safe after the cut. Nothing forces it sooner.
+- **ATK "Gather Your Ingredients" repair** ([brief](efforts/archive/import-text-normalization.md)) — P1 only, a
+  backup-first data pass; see the fuller candidate below.
+- **Tandoor idea harvest** ([notes](efforts/archive/tandoor-idea-harvest.md)) — reference notes mined from Tandoor
+  Recipes. Nothing ratified; read before the next ADR they touch.
+- **Commit authority as a typed, test-enforced property** ([review](efforts/archive/application-actions-review.md) D1) —
+  the one new track from the 2026-08-02 application-actions review, never built. OQ1 (where the declaration lives) is open.
+- **In-app browser Passwords autofill** ([spike](efforts/archive/browser-passwords-autofill-spike.md)) — the
+  2026-07-08 spike defending ADR-0009's "never store credentials." First confirm autofill still fails.
+- **Full-screen moves the app tabs to the top** ([dogfood 2026-09-21](efforts/archive/dogfood-fixes-2026-09-21.md)
+  Thread F) — the one thread from that pass not confirmed in code. Check on device before scoping.
+
 From the old Next Up:
 
 - **"Up to date" can't see inbound records that never arrived (found 2026-10-27, PROD-CUTOVER Step 4 audit).**
@@ -68,14 +84,14 @@ From the old Next Up:
 **Prior candidates (queue — not the designated target).** Per-recipe facet/tag coverage is Jon's ongoing hand
 work (Edit Tags + DEBUG Facet Coverage) that **gates nothing**.
 
-The ATK grocery-bug slice ([`efforts/import-text-normalization.md`](efforts/import-text-normalization.md)) is a
+The ATK grocery-bug slice ([`efforts/archive/import-text-normalization.md`](efforts/archive/import-text-normalization.md)) is a
 **data migration wanting backup-first + a device pass** — hold it until Jon is local. D3's settled
 hidden-vocabulary rule lives in ADR-0049 D11.
 
 Drawn into **Next Up** as needed; not itself a dispatch target. Completed efforts live in
 [`docs/DONE-LOG.md`](DONE-LOG.md).
 
-**[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md) — ATK's "Gather Your
+**[`efforts/archive/import-text-normalization.md`](efforts/archive/import-text-normalization.md) — ATK's "Gather Your
 Ingredients" is a latent grocery bug (scoped 2026-07-28). P1 only; **no schema**.** 101 shoppable ingredient
 lines + 70 section names across **171 recipes** are page chrome captured as content, all canonicalizing to
 one key, so any of those recipes on a menu puts "Gather your ingredient" on the grocery list.
@@ -99,7 +115,7 @@ gone; decide whenever, it blocks nothing.
 Playbook sections getting the same per-section toolbar, and section-selection checkboxes on the whole-recipe
 hand-off (the scoped per-section verbs make these *less* necessary, not more).
 
-**Meal-Planner chat verbs** (ADR-0013 + `efforts/cooking-workspace.md`) — the one remaining named
+**Meal-Planner chat verbs** (ADR-0013 + `efforts/archive/cooking-workspace.md`) — the one remaining named
 actionable-chat verb instance. Classify each verb's commit shape first ([[chat-verb-commit-shapes]]) — likely
 no-commit advisory or a per-day note, not a per-recipe write; respect [[llm-curation-not-synthesis]].
 **Confirm with Jon what verb scope remains.**
@@ -136,7 +152,7 @@ remain to build, plus one upstream loose end:
 - **Workbench log-editor** (ADR-0042 S2 review): the `canSave` / `normalizedLogEntryDraft` mismatch when a body
   is combined with partially-filled typed fields, the dead save spinner, the compare `.menuPrepPlan` mislabel.
 - **Workbench synthesis-shaped apply-action** — the draft verb's own action shape (no last-reply gate/chip);
-  spec in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md). ⚠️ Re-read against ADR-0042 D2/OQ5
+  spec in [`efforts/archive/recipe-workbench.md`](efforts/archive/recipe-workbench.md). ⚠️ Re-read against ADR-0042 D2/OQ5
   first: it is an *in-app* draft verb and the draft is a structured write.
 - **`stageReaderFeedback` defaults `unparsedLines` to `[]`**, so accepting a single tip through the *in-app*
   path clears the evidence banner (cosmetic).
@@ -165,7 +181,7 @@ Live ambiguities and recently-resolved decisions. Resolved items stay here brief
   *deployed* schema, and there's no production deployment to protect; the same drop would be off-limits
   post-launch. Substitutions were stored **per-recipe** (column on `IngredientLine`, non-optional
   `recipeID`, no shared ingredient catalog), so nothing cross-recipe is affected. → Dogfood batch 4, Slice 3
-  ([`efforts/dogfood-fixes-batch-4.md`](efforts/dogfood-fixes-batch-4.md)).
+  ([`efforts/archive/dogfood-fixes-batch-4.md`](efforts/archive/dogfood-fixes-batch-4.md)).
 - **Two design questions promoted to ADRs (discussion open, not decided):** recipe text editing model —
   header toggles vs. inline bold/italic ([`decisions/ADR-0014-recipe-text-editing-model.md`](decisions/ADR-0014-recipe-text-editing-model.md));
   and chat persistence/history — chat is ephemeral today ([`decisions/ADR-0015-chat-persistence.md`](decisions/ADR-0015-chat-persistence.md)).
@@ -192,7 +208,7 @@ Live ambiguities and recently-resolved decisions. Resolved items stay here brief
   sets or shows it; its only writer copies `tags.color`, which nothing sets. **Jon confirmed the drop
   (2026-10-26):** re-add it additively if a color UI is ever built. Jon also retired the dormant `tags`/`recipeTags`
   tables (ADR-0049 Amd 5). All of it ships as one slice,
-  [`efforts/prod-never-set-drop.md`](efforts/prod-never-set-drop.md), dispatched after chat-access S2. Remove this
+  [`efforts/archive/prod-never-set-drop.md`](efforts/archive/prod-never-set-drop.md), dispatched after chat-access S2. Remove this
   item once that slice merges.
 - These drops are the only synced-schema change allowed to merge before the cut (the cutover's Rules).
 
@@ -323,8 +339,8 @@ ADR-0009). Post-sync; **do not front-load over the iCloud gate** (see
 
 - **Per-site "capture playbooks" as a superpower (Jon's framing).** Turbocharge the in-app
   browser with small, named, per-host behaviors: Milk Street → DOM print-template fallback
-  (`docs/efforts/parser-hardening-truncated-structured-data.md`); NYT → sort comments to Most
-  Helpful + Load-More + scrape; ATK → editorial-prose scrape (`docs/efforts/editorial-prose.md`).
+  (`docs/efforts/archive/parser-hardening-truncated-structured-data.md`); NYT → sort comments to Most
+  Helpful + Load-More + scrape; ATK → editorial-prose scrape (`docs/efforts/archive/editorial-prose.md`).
   These are the **same site-specific-DOM brittleness class** as the editorial-prose and
   comment-ingestion ideas — hashed CSS-module classes the publisher can rotate, lazy-load
   timing, layout shift. So the design constraint is: keep them a **registry of declarative,
@@ -436,7 +452,7 @@ chat are **one unified "cooking workspace" effort**, not separate slices — the
      as a popover over the reader) because it's momentary. **The commit lands in the reader on the left**,
      in place. The tap on Commit is the only write (ADR-0011 invariant + Amendment 1 selection-scoping).
 
-  **Spec'd:** [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) (Slice A = split +
+  **Spec'd:** [`docs/efforts/archive/cooking-workspace.md`](efforts/archive/cooking-workspace.md) (Slice A = split +
   width-responsive reader; Slice B = selection-scoped apply-actions). Starts after batch 2 merges;
   awaiting Jon's dispatch greenlight.
 
@@ -463,7 +479,7 @@ chat are **one unified "cooking workspace" effort**, not separate slices — the
 ## Dogfooding — menu-planner pass (2026-07-09)
 
 Source: `~/code/cooking/menu_planning_llm_questions_and_responses-1.md`. The mechanical fixes from this
-pass are scoped in `docs/efforts/dogfood-fixes-menu-planner-2026-07-09.md`; the review-area fix is
+pass are scoped in `docs/efforts/archive/dogfood-fixes-menu-planner-2026-07-09.md`; the review-area fix is
 [ADR-0026](decisions/ADR-0026-review-collection-sheet.md). These two are the **design** residue — decide
 with Jon before any build:
 

@@ -72,7 +72,7 @@ jon-platform `SEAM-LEDGER.md`, waiting for this run's answer.
 
 ## 1 — Ship the drop slice  *(Codex; schema change, escalated to Jon)*
 
-The brief is [`efforts/prod-never-set-drop.md`](efforts/prod-never-set-drop.md). It drops the 7 never-set
+The brief is [`efforts/archive/prod-never-set-drop.md`](efforts/archive/prod-never-set-drop.md). It drops the 7 never-set
 columns, the `equipment`/`recipeEquipment` tables and the retired `tags`/`recipeTags` tables (ADR-0049 Amd 5)
 in one appended migration, and retires the tag record types through `retiredRecordTypes`.
 
@@ -108,7 +108,7 @@ pinned on this Mac, `testflight.conf` is on `main` (3c), and the `testflight` li
       `group.com.jonphillips.yeschef` and ADR-0058's `group.com.jonphillips.cockpit-yeschef`. Add an optional
       `EXTRA_APP_GROUPS` config key (space-separated) that the verifier also accepts. Every other group still
       fails, and the share extension keeps the single-group rule. Update the conf reference in `testflight.md`.
-      Brief: [`efforts/testflight-app-groups.md`](efforts/testflight-app-groups.md), dispatched 2026-10-26.
+      Brief: [`efforts/archive/testflight-app-groups.md`](efforts/archive/testflight-app-groups.md), dispatched 2026-10-26.
 - [x] **3b — Tools (Jon).** Done 2026-10-27, and preflight verified the pin and the key.
   - Install and pin `asc` (`brew install asc && brew pin asc`); `asc --version` must equal `ASC_VERSION`, now
     `5.17.1` for both apps. That's done. The pin moved up from `5.14.0` on 2026-10-27, because Homebrew installs
@@ -258,7 +258,7 @@ DATA LOSS.sqlite` in Jon's Downloads. The retry:
 > CloudKit. Don't turn off iCloud for Yes Chef in iOS Settings: SQLiteData treats that as a sign-out and erases
 > local data.
 
-- [x] **9a — The patch** (Codex): [`efforts/sqlite-data-reference-violation-patch.md`](efforts/sqlite-data-reference-violation-patch.md).
+- [x] **9a — The patch** (Codex): [`efforts/archive/sqlite-data-reference-violation-patch.md`](efforts/archive/sqlite-data-reference-violation-patch.md).
 - [x] **9b — Upload the patched build**: `testflight` from a clean `main`, as in Step 7. **Done 2026-10-28,
   build 1.0.0 (1170).**
 - [x] **9c — Re-seed:** **Done 2026-10-28/29.** The patch held: no single-parent child was deleted. CloudKit
@@ -283,7 +283,7 @@ DATA LOSS.sqlite` in Jon's Downloads. The retry:
       All 241 are among the 244 steps the first attempt deleted. Production still held those deletes, and the
       re-seed's download almost certainly applied them again. Every one's recipe and section is on the iPad.
   - [x] **10a — Recovery action built** to put the 241 steps back from the Step 4 backup with their IDs:
-        [`efforts/recover-lost-instruction-steps.md`](efforts/recover-lost-instruction-steps.md).
+        [`efforts/archive/recover-lost-instruction-steps.md`](efforts/archive/recover-lost-instruction-steps.md).
   - [x] **10a device pass (2026-10-29):** the recovery put back 241 steps in 40 recipes. Local record counts
         now match Step 4 on every table shown, including 11,330 `instructionSteps`, and Jon spot-checked the
         affected recipes. The 40 recipes can be edited again.
@@ -435,15 +435,15 @@ Phase 4b → Steps 3 and 7 · Phase 4c → Steps 8–9 · Phase 4d → Step 10 �
 
 
 - **Phase 1 (cleared 2026-10-26).**
-  - [`efforts/prod-dead-column-drop.md`](efforts/prod-dead-column-drop.md) dropped `recipes.lastCookedAt` and
+  - [`efforts/archive/prod-dead-column-drop.md`](efforts/archive/prod-dead-column-drop.md) dropped `recipes.lastCookedAt` and
     `timesCooked`, and added the test that every table's on-disk columns match its model. There was no migration
     squash (ADR-0056 Amd 1).
-  - [`efforts/raw-import-html-drop.md`](efforts/raw-import-html-drop.md) dropped `recipes.originalImportText`,
+  - [`efforts/archive/raw-import-html-drop.md`](efforts/archive/raw-import-html-drop.md) dropped `recipes.originalImportText`,
     deleted 1,527 photo rows with no bytes, re-uploaded the nine recipes over the 1 MB limit, and re-linked three
     calendar rows (ADR-0010 Amd 1).
 - **Phase 2 (cleared 2026-10-26).**
   - Both devices read "Up to date" with nothing unsynced.
-  - [`efforts/sync-failure-surfacing.md`](efforts/sync-failure-surfacing.md) made this check permanent: "Up to
+  - [`efforts/archive/sync-failure-surfacing.md`](efforts/archive/sync-failure-surfacing.md) made this check permanent: "Up to
     date" requires zero rows that never reached the server and zero inbound rows that couldn't be applied, and
     Slice 6 purges retired record types.
 - **Reference A (2026-10-26).** Development was exported, diffed, and the keep/drop verdicts settled (plan PRs

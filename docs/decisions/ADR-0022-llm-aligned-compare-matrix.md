@@ -166,7 +166,7 @@ but the Compare surface earns its fix now, cheaply, on its own.
   **ADR-0011/0012** (actionable-chat structured-output + tier-aware grounding), **ADR-0017** (LLM effort
   tiers), **ADR-0018** (prompt customization / taste profile — where a cook-tunable policy would live),
   **ADR-0002 / §14** (the sync/determinism boundary this ADR is careful not to cross).
-- **[PR #114]** (`docs/efforts/comparison-key-granularity.md`) — the deterministic `comparisonKey`, now
+- **[PR #114]** (`docs/efforts/archive/comparison-key-granularity.md`) — the deterministic `comparisonKey`, now
   the fallback.
 - Memory: [[llm-curation-not-synthesis]] (structured out, never flatten), [[grocery-pantry-threshold-design]]
   (the determinism-at-merge boundary), [[personal-app-latency-tolerance]] (seconds-on-open is fine),

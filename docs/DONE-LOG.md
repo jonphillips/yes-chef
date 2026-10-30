@@ -9,6 +9,18 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Brief archive sweep (`plan/archive-sweep`)
+
+**2026-10-30. Docs only; jon-platform ADR-0005 D10–D11's one-time sweep.** `scripts/archive-brief` moved 80
+effort briefs and all five milestone files (M1–M4, grocery) to their folders' `archive/` and rewrote every link,
+including comment paths in two Core sources, a test-fixture comment and `check-drift.sh`. Most had shipped under
+stale headers. Jon parked six (prepared components, the ATK text repair, the Tandoor notes, the
+application-actions D1 track, the autofill spike, and dogfood 2026-09-21 Thread F) as `open-questions.md`
+candidates and retired two (parser-hardening, reader-feedback-comment-ingestion). Two briefs stay live, both
+Blocked: chat-access-mcp (trimmed to S3, waiting on ADR-0060 OQ3) and yes-chef-dev-variant (waiting on
+PROD-CUTOVER Step 11). The efforts index lists only those two, and the `docs/README.md` atlas points at `archive/`.
+
+---
 ## Recover lost instruction steps (`effort/recover-lost-instruction-steps`)
 
 **2026-10-29. Schema-free; PROD-CUTOVER Step 10a.** Added `InstructionStepRecovery` to plan from a migrated
@@ -613,7 +625,7 @@ its own; Calendar loses its now-meaningless Focus button, Jon's live-with-it cal
 **Browser** were bare tab children, so Create Recipe lost its title **and its Clear/Save buttons** — both now
 wrapped in `NavigationStack`. Dead `MealCalendarPlannerView` + `AppSection.label` removed. Verified: elevated
 generic build + `YesChefTests` 40/40 green. **S2 (the chat presentation merge) is briefed and queued** behind this
-device pass; see [`efforts/sidebar-adaptable-shell.md`](../efforts/sidebar-adaptable-shell.md).
+device pass; see [`efforts/archive/sidebar-adaptable-shell.md`](../efforts/archive/sidebar-adaptable-shell.md).
 
 ---
 ## ADR-0021 Amendment 4 V4b — the synced related-recipe edge table
@@ -780,7 +792,7 @@ draft's instruction `HowToSection` groupings flatten (single instruction section
 **Architect review 2026-08-06.** Decision: [ADR-0021](decisions/ADR-0021-recipe-variations.md) Amendment 4
 (D4), plus a gap-fill Delete that Amd2-D4 already sanctioned but that was never built. **Schema-free** — both
 halves ride the existing `deltas` BLOB and an existing synced row, **no prod-schema promotion entry**. Spec:
-[`efforts/adr-0021-v4c-and-variation-delete.md`](efforts/adr-0021-v4c-and-variation-delete.md). Gate was
+[`efforts/archive/adr-0021-v4c-and-variation-delete.md`](efforts/archive/adr-0021-v4c-and-variation-delete.md). Gate was
 anchor-repair Dispatch 1 (read-lenient / write-strict), cleared 2026-08-05.
 
 **What it does.** A variation can now **add and remove instruction steps**, which is what forced Jon's
@@ -854,7 +866,7 @@ anchor-repair Dispatch 1).
 
 **Approved (architect review) 2026-08-05; branch `codex/variation-anchor-repair-dispatch-1`** (Codex ran out of
 tokens; architect completed the handoff-site fixes + verification). Spec:
-[`efforts/variation-anchor-repair.md`](../efforts/variation-anchor-repair.md). **Core + app-layer read surfaces,
+[`efforts/archive/variation-anchor-repair.md`](../efforts/archive/variation-anchor-repair.md). **Core + app-layer read surfaces,
 no schema.** **Unblocks ADR-0021 Amd4 V4c** (the `stepInsert`/`stepRemove` step ops).
 
 **What it does.** Dispatch 0 stopped *new* dead anchors and repaired the resolvable legacy ones, but a single
@@ -895,7 +907,7 @@ pattern is on the record ([[exported-import-not-link-time]]).
 
 **Approved (architect review) 2026-08-05; PR [#284](https://github.com/jonphillips/yes-chef/pull/284), branch
 `codex/variation-anchor-repair-dispatch-0`.** Spec:
-[`efforts/variation-anchor-repair.md`](../efforts/variation-anchor-repair.md). **Core-heavy + a small app-layer
+[`efforts/archive/variation-anchor-repair.md`](../efforts/archive/variation-anchor-repair.md). **Core-heavy + a small app-layer
 touch, no schema, no prod-schema entry** (`recipeVariations` was already on the promotion list); a backfill data
 pass, **device-passed 2026-08-05**.
 
@@ -991,7 +1003,7 @@ remain.
 
 **Merged 2026-08-04; PR [#278](https://github.com/jonphillips/yes-chef/pull/278),
 branch `codex/adr-0049-labeling-backfill`. Architect-approved 2026-08-04; device look done 2026-08-05 (Jon).** Spec:
-[`efforts/recipe-facets.md`](efforts/recipe-facets.md) § "The dispatch — S6 + S5 + D8". **Core + app, no
+[`efforts/archive/recipe-facets.md`](efforts/archive/recipe-facets.md) § "The dispatch — S6 + S5 + D8". **Core + app, no
 schema, no prod-schema entry, no two-device pass.** The existing `LabelProposer` remains on-device and
 `RecipeRepository.reconcileSuggestedLabels` remains the sole category/join writer.
 
@@ -1027,7 +1039,7 @@ label re-runs the full coverage recompute; confirm Save & Next stays snappy acro
 
 **Merged 2026-08-04; PR [#279](https://github.com/jonphillips/yes-chef/pull/279),
 branch `codex/app-tests-to-core-final` — no device pass owed (pure relocation, no behavior change).** Spec:
-[`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md). **Core + app, no schema, no
+[`efforts/archive/app-target-tests-to-core.md`](efforts/archive/app-target-tests-to-core.md). **Core + app, no schema, no
 prod-schema entry, no device pass.** `RecipeScaleFormatting` and the `@MainActor @Observable`
 `WorkbenchCompareAlignmentModel` now compile in `YesChefCore`, with every app-facing type, initializer,
 property, and method exported `public`. `ServeWithRepairPresentation` was extracted from its SwiftUI sheet into
@@ -1046,7 +1058,7 @@ green.
 **Merged 2026-08-04; PR [#277](https://github.com/jonphillips/yes-chef/pull/277),
 branch `codex/adr-0049-amd2-o4-editorial-facets`. Architect-approved 2026-08-04; two-device convergence pass done 2026-08-05 (Jon).** Spec:
 [ADR-0049 Amd 2 § Resolved OQ4](decisions/ADR-0049-unified-labels-and-assisted-tagging.md);
-[`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Labeling backfill. **Core only, no schema, no new
+[`efforts/archive/recipe-facets.md`](efforts/archive/recipe-facets.md) § Labeling backfill. **Core only, no schema, no new
 prod-schema entry** — `facets` + `Category.facetID`/`hidden` are already registered and already on the
 promotion list. Verified per the PR: `swift build` + `CategoryRepositoryTests` (23 tests / 3 suites) green,
 `check-drift.sh` (SwiftLint + 566 Core tests) green; the unskipped run hits the documented pre-existing
@@ -1071,7 +1083,7 @@ facet ordinal and mint a permanent cross-fleet PK collision.
 **Merged 2026-08-04; PR [#276](https://github.com/jonphillips/yes-chef/pull/276),
 branch `codex/adr-0049-amd2-f1-f2`. Architect-approved 2026-08-04; device look done 2026-08-05 (Jon).**
 Both found on Jon's D1–D5 device pass. Spec:
-[`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Post-D5 device-pass findings. **Core + app, no schema,
+[`efforts/archive/recipe-facets.md`](efforts/archive/recipe-facets.md) § Post-D5 device-pass findings. **Core + app, no schema,
 no prod-schema entry, no two-device pass.** Verified per the PR: `swift build` + a new Core hidden-suppression
 test green, generic-iOS app build green, `check-drift.sh` green.
 
@@ -1099,7 +1111,7 @@ rebinding it to facet values rather than deleting it; pure UI, no `selectionMode
 
 **Merged 2026-08-04; PR [#275](https://github.com/jonphillips/yes-chef/pull/275), branch
 `codex/adr-0049-amd2-d5-editable-facets`. Architect-approved 2026-08-04.** Spec:
-[`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 5. **App + Core, no schema, no prod-schema
+[`efforts/archive/recipe-facets.md`](efforts/archive/recipe-facets.md) § Dispatch 5. **App + Core, no schema, no prod-schema
 entry, no two-device pass** (writes through D1's already-sync-tested reconcile/merge paths). Verified: `swift
 build` + `CategoryRepositoryTests` (19 tests) green, generic-iOS app build green, `check-drift.sh` green.
 
@@ -1125,7 +1137,7 @@ backfill (ADR-0050 D6 coverage gate).
 
 **Merged 2026-08-04; PR [#274](https://github.com/jonphillips/yes-chef/pull/274), branch
 `codex/adr-0049-d3-proposer-repoint`. Architect-approved 2026-08-03; device capture-flow look done 2026-08-04.**
-Spec: [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 3. **App-layer + Core, no
+Spec: [`efforts/archive/recipe-facets.md`](efforts/archive/recipe-facets.md) § Dispatch 3. **App-layer + Core, no
 schema** (writes through D1's already-sync-tested reconcile paths); no new prod-schema entry. Verification per
 the PR: `check-drift.sh` green, elevated `generic/platform=iOS` app build green, `git diff --check` green.
 
@@ -1168,7 +1180,7 @@ into an invalid batch update (the `NSInternalInconsistencyException` on deleting
 **Merged 2026-08-04; PR [#272](https://github.com/jonphillips/yes-chef/pull/272), branch
 `codex/adr-0049-amendment-2-category-management`. Architect-approved 2026-08-03; device UI look done 2026-08-04.**
 Reads D1's schema (#270/#271, merged 2026-08-03). Spec:
-[`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 2. Verified in-session: `check-drift.sh`
+[`efforts/archive/recipe-facets.md`](efforts/archive/recipe-facets.md) § Dispatch 2. Verified in-session: `check-drift.sh`
 green (SwiftLint + 546 Core tests), generic-iOS app build green. **App-layer dispatch — not a synced-migration
 pass** (writes through D1's already-sync-tested create/reconcile paths); no new prod-schema entry.
 
@@ -1208,7 +1220,7 @@ prod-schema promotion list. This slice adds only behavior and UI.
 branch `codex/adr-0049-amendment-2-facets` — device audit-review + two-device convergence pass done 2026-08-04**
 (migration was a no-op on the real library — no `Cuisine`/`Course` parent to promote — so real categories stayed
 loose labels; the resulting 15 loose-label shadows of empty starter values were consolidated in the D5/D4 hand
-pass, both devices converged with no duplicate rows). Spec: [`efforts/recipe-facets.md`](efforts/recipe-facets.md) § Dispatch 1;
+pass, both devices converged with no duplicate rows). Spec: [`efforts/archive/recipe-facets.md`](efforts/archive/recipe-facets.md) § Dispatch 1;
 [ADR-0049 Amendment 2](decisions/ADR-0049-unified-labels-and-assisted-tagging.md). Verified in-session:
 `swift build` clean, `CategoryRepositoryTests` **8/8** green. **Absorbs Amendment 1's teardown** — the
 seed-state and tombstone tables are dropped *inside* this migration, not in a separate synced pass.
@@ -1275,7 +1287,7 @@ above.
 
 **✅ Merged 2026-07-30.** PR [#265](https://github.com/jonphillips/yes-chef/pull/265) "Prep plan · S3 —
 Regenerate intent", branch `codex/prep-plan-regenerate-intent`. Spec:
-[`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) § Slice 3. **One
+[`efforts/archive/prep-plan-dish-links-and-dates.md`](efforts/archive/prep-plan-dish-links-and-dates.md) § Slice 3. **One
 column on the local-only `aiHandoffs` table, no sync, no prod-schema-promotion entry** — a plain local
 migration ([[migration-writes-bypass-sync-triggers]] is about synced tables and does not bite here); **no
 two-device pass**. Verification per the PR: `check-drift.sh` green, elevated `generic/platform=iOS` app build
@@ -1313,7 +1325,7 @@ positive review wording (across `AIHandoffMenuPasteTests`, `AIHandoffAdvisoryTes
 
 **Device-confirmed 2026-07-30 (day-anchored labels); PR [#262](https://github.com/jonphillips/yes-chef/pull/262),
 branch `codex/prep-plan-dish-links-and-dates`.** Spec:
-[`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) §§ Slice 1–2.
+[`efforts/archive/prep-plan-dish-links-and-dates.md`](efforts/archive/prep-plan-dish-links-and-dates.md) §§ Slice 1–2.
 *(Finalize this entry's verification record on merge.)* **No schema** — both slices use fields that already
 exist and already sync.
 
@@ -1342,7 +1354,7 @@ column for the outboard round-trip only); it is the live Next Up target and does
 
 **✅ Merged 2026-07-30, device pass owed to Jon.** PR [#261](https://github.com/jonphillips/yes-chef/pull/261),
 branch `codex/playbook-serve-with-rows`, merge `f1517f7`. Spec:
-[`efforts/playbook-edit-grain-2026-07-26.md`](efforts/playbook-edit-grain-2026-07-26.md) § Slice S3;
+[`efforts/archive/playbook-edit-grain-2026-07-26.md`](efforts/archive/playbook-edit-grain-2026-07-26.md) § Slice S3;
 [ADR-0048](decisions/ADR-0048-playbook-edit-grain.md). **This closes the playbook-edit-grain effort — all three
 dispatches (S0/S0.1, S1, S3) are done.** Verified in-PR: `scripts/check-drift.sh` green, `swift test` **518
 tests / 97 suites**, elevated `generic/platform=iOS` build green.
@@ -1376,7 +1388,7 @@ prod-schema promotion list in this same PR.
 **✅ Done 2026-07-29.** Branch `codex/playbook-edit-grain-s1`, PR
 [#260](https://github.com/jonphillips/yes-chef/pull/260) (commit `615cb1c`, "Extract shared playbook row
 editor", plus the review follow-up commits). Spec:
-[`efforts/playbook-edit-grain-2026-07-26.md`](efforts/playbook-edit-grain-2026-07-26.md) § Slice S1. Owner:
+[`efforts/archive/playbook-edit-grain-2026-07-26.md`](efforts/archive/playbook-edit-grain-2026-07-26.md) § Slice S1. Owner:
 Codex implement, Claude architect/review. **No schema, no prod-promotion entry** — app layer only. Closes
 **Dispatch 1**; only Dispatch 2 (S3) remains on the effort.
 
@@ -1448,7 +1460,7 @@ undefined-symbols wall.
 **✅ Done 2026-07-29.** Branch `codex/playbook-edit-grain-s0-1-repair`, PR
 [#258](https://github.com/jonphillips/yes-chef/pull/258), commits `5ee76c7` → `e79a481` across **three
 architect review rounds**. Spec:
-[`efforts/playbook-edit-grain-2026-07-26.md`](efforts/playbook-edit-grain-2026-07-26.md) § Slice S0.1. Owner:
+[`efforts/archive/playbook-edit-grain-2026-07-26.md`](efforts/archive/playbook-edit-grain-2026-07-26.md) § Slice S0.1. Owner:
 Codex implement, Claude architect/review. **No schema, no prod-promotion entry** — Core plus app layer.
 Closes Dispatch 0.
 
@@ -1514,7 +1526,7 @@ them.** `check-drift.sh`'s `build-for-testing` stage dies at `Ld … SQLiteData.
 upstream missing-`StructuredQueriesCore` defect, [[exported-import-not-link-time]]), reproduced on clean
 `main`. So `ServeWithRepairTests.swift` is not known to compile, let alone pass, and the pure-value half of it
 — `ServeWithRepairPresentation`'s identity guard and UTF-8/Base64 forms — is SwiftUI-free logic that would run
-on every dispatch if it lived in Core. **Move it down as a rider on S1** ([`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md));
+on every dispatch if it lived in Core. **Move it down as a rider on S1** ([`efforts/archive/app-target-tests-to-core.md`](efforts/archive/app-target-tests-to-core.md));
 only the two model-routing tests genuinely need the app target.
 
 **The verification claim failed twice in one PR, in both available directions.** Round 2 caught tests added
@@ -1532,7 +1544,7 @@ upstream and pre-existing, so the only thing lost was the belief that the app te
 
 **✅ Done 2026-07-29.** Branch `codex/playbook-edit-grain-s0-loud-decode`, PR
 [#257](https://github.com/jonphillips/yes-chef/pull/257). Spec:
-[`efforts/playbook-edit-grain-2026-07-26.md`](efforts/playbook-edit-grain-2026-07-26.md) § Slice S0. Owner:
+[`efforts/archive/playbook-edit-grain-2026-07-26.md`](efforts/archive/playbook-edit-grain-2026-07-26.md) § Slice S0. Owner:
 Codex implement, Claude architect/review. **No schema, no prod-promotion entry** — Core plus app layer.
 Dispatch 0 of three; it shipped on its own and first, as the effort doc required.
 
@@ -1592,7 +1604,7 @@ slice.
 ## Grocery rapid add — a persistent Add Item field, plus Accept All on review
 
 **✅ Done 2026-07-29.** Branch `codex/grocery-rapid-add`. Spec:
-[`efforts/grocery-rapid-add-2026-07-26.md`](efforts/grocery-rapid-add-2026-07-26.md). Owner: Codex implement,
+[`efforts/archive/grocery-rapid-add-2026-07-26.md`](efforts/archive/grocery-rapid-add-2026-07-26.md). Owner: Codex implement,
 Claude architect/review, Jon device pass. **No schema, no prod-promotion entry** — app layer plus one
 shared-component extraction and one small Core addition.
 
@@ -1771,7 +1783,7 @@ uncovered. Lift both into Core, sweep the one missed render site (`WorkbenchView
 
 **`normalize-recipe` was investigated and turns out not to exist** — the ADR's markup-awareness requirement
 constrains a future thing, not live code. Measuring the library to establish that produced
-[`efforts/import-text-normalization.md`](efforts/import-text-normalization.md), where the real finding is
+[`efforts/archive/import-text-normalization.md`](efforts/archive/import-text-normalization.md), where the real finding is
 that ATK/Cook's "Gather Your Ingredients" is page chrome captured as content: **101 shoppable ingredient
 lines + 70 section names across 171 recipes**, all canonicalizing to the single grocery key
 `gather your ingredient`. Latent, not manifest — 0 `groceryItemSources` point at them yet.
@@ -1838,7 +1850,7 @@ build that PR #249 flagged and deferred. Not caused by this change; **now under 
 
 ## Recipe section grain S2+S3 — the editor edits every section
 
-**✅ Device-passed by Jon 2026-07-28.** PR [#249](https://github.com/jonphillips/yes-chef/pull/249), branch `claude/recipe-section-grain-s2-s3`. Spec: [`efforts/recipe-editor-section-grain.md`](efforts/recipe-editor-section-grain.md) S2+S3 — this **closes the effort**. Owner: Claude (implement **and** architect — Codex was out of tokens). **No schema, nothing added to the prod-promotion list.** Verified: package `swift test` **486 / 94 suites** (480 → 486, six new grain tests plus the updated structure test), elevated `generic/platform=iOS` build `** BUILD SUCCEEDED **` with no new warnings in the changed files. `check-drift.sh` was **not** clean — but it fails **identically on clean `main`** at a linker error inside the *sqlite-data* dependency's dynamic (test-bundle) build (`StructuredQueriesCore` missing `IssueReporting` → `Ld … SQLiteData.framework`), the [[exported-import-not-link-time]] seam surfacing again; not caused by this change, flagged for a separate look.
+**✅ Device-passed by Jon 2026-07-28.** PR [#249](https://github.com/jonphillips/yes-chef/pull/249), branch `claude/recipe-section-grain-s2-s3`. Spec: [`efforts/archive/recipe-editor-section-grain.md`](efforts/archive/recipe-editor-section-grain.md) S2+S3 — this **closes the effort**. Owner: Claude (implement **and** architect — Codex was out of tokens). **No schema, nothing added to the prod-promotion list.** Verified: package `swift test` **486 / 94 suites** (480 → 486, six new grain tests plus the updated structure test), elevated `generic/platform=iOS` build `** BUILD SUCCEEDED **` with no new warnings in the changed files. `check-drift.sh` was **not** clean — but it fails **identically on clean `main`** at a linker error inside the *sqlite-data* dependency's dynamic (test-bundle) build (`StructuredQueriesCore` missing `IssueReporting` → `Ld … SQLiteData.framework`), the [[exported-import-not-link-time]] seam surfacing again; not caused by this change, flagged for a separate look.
 
 **The shipped work.** `RecipeEditorDraft`'s four flat ingredient/instruction fields become two ordered arrays of section drafts (`RecipeEditorIngredientSectionDraft` / `RecipeEditorInstructionSectionDraft`); `init(detail:)` maps every persisted section, and the old flat init survives as a single-section convenience so `SampleData`, `WorkbenchDraftRecipe`, and new-recipe creation compile untouched. The reconciliation lives in Core, not the view — new `RecipeEditorSectionReconcile` turns the draft's sections into rows to upsert plus section ids to delete, **scoped per section** so a save never touches a section the draft didn't describe (orphan lines/steps whose section row is gone are carried through untouched — "nothing is lost"). `save(draft:)`/`saveEditableChildren` consume those plans and the four now-dead `merged*` helpers are deleted. The editor renders one block per section with a title field, the ingredient per-line header toggles, a **Delete Section** button when more than one, and **Add … Section** controls; the fraction pill row targets the focused section.
 
@@ -1848,7 +1860,7 @@ build that PR #249 flagged and deferred. Not caused by this change; **now under 
 
 ## Architect track — the app test target runs, 26 of 26
 
-**✅ Done 2026-07-27. This closes the architect track and retires the "a test only counts in `YesChefPackage/Tests/`" rule.** PRs [#247](https://github.com/jonphillips/yes-chef/pull/247) (make it run: 21/26) and [#248](https://github.com/jonphillips/yes-chef/pull/248) (green the last five), plus [jon-platform#34](https://github.com/jonphillips/jon-platform/pull/34), which #247 depends on. Spec: [`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md), rewritten in place — **its previous central claim, that the target was unfixable, was wrong.** Owner: Claude, off to the side of the Codex dispatch, as scoped. Package tests **476** at #248's head (468 → 476).
+**✅ Done 2026-07-27. This closes the architect track and retires the "a test only counts in `YesChefPackage/Tests/`" rule.** PRs [#247](https://github.com/jonphillips/yes-chef/pull/247) (make it run: 21/26) and [#248](https://github.com/jonphillips/yes-chef/pull/248) (green the last five), plus [jon-platform#34](https://github.com/jonphillips/jon-platform/pull/34), which #247 depends on. Spec: [`efforts/archive/app-target-tests-to-core.md`](efforts/archive/app-target-tests-to-core.md), rewritten in place — **its previous central claim, that the target was unfixable, was wrong.** Owner: Claude, off to the side of the Codex dispatch, as scoped. Package tests **476** at #248's head (468 → 476).
 
 **The diagnosis was wrong four times, and every time the same way: the first line of the log was read as the blocker.** The brief recorded `ld: warning: … not an allowed client of SwiftUICore` and concluded that a dynamic library pulling SwiftUI transitively hits Apple's restricted-client list, that the fix meant re-linking a shared package, and that it wasn't worth it. **That line is a warning — it still appears in builds that now succeed.** The error was four lines below it: undefined GRDB / StructuredQueriesCore symbols. Two later readings (missing `await`s, then "the same wall") were each a real first error mistaken for the wall behind it. The standing instruction that came out of this — *report the first error you hit as the first error, not as the blocker* — was written after the third miss and earned by the fourth.
 
@@ -1862,7 +1874,7 @@ build that PR #249 flagged and deferred. Not caused by this change; **now under 
 
 ## Recipe section grain S1 — instructions are read at the grain they are stored
 
-**✅ Architect-approved 2026-07-27; device pass owed.** PR [#246](https://github.com/jonphillips/yes-chef/pull/246), branch `codex/recipe-section-grain-s1`, commits `8bf669c` → `c4305b6` (**three review rounds**). Spec: [`efforts/recipe-editor-section-grain.md`](efforts/recipe-editor-section-grain.md) S1, which gained an amendment out of this review. **No schema, nothing added to the prod-promotion list.** Verified at the review head by the architect, not taken on report: `scripts/check-drift.sh` clean at **479 tests / 93 suites** (475 → 479), elevated `generic/platform=iOS` build `** BUILD SUCCEEDED **` with no new warnings. **Jon's device pass owes** the Samin capture showing its three instruction sections with subheads, and — the canary — a single-section recipe looking and spacing exactly as it did before.
+**✅ Architect-approved 2026-07-27; device pass owed.** PR [#246](https://github.com/jonphillips/yes-chef/pull/246), branch `codex/recipe-section-grain-s1`, commits `8bf669c` → `c4305b6` (**three review rounds**). Spec: [`efforts/archive/recipe-editor-section-grain.md`](efforts/archive/recipe-editor-section-grain.md) S1, which gained an amendment out of this review. **No schema, nothing added to the prod-promotion list.** Verified at the review head by the architect, not taken on report: `scripts/check-drift.sh` clean at **479 tests / 93 suites** (475 → 479), elevated `generic/platform=iOS` build `** BUILD SUCCEEDED **` with no new warnings. **Jon's device pass owes** the Samin capture showing its three instruction sections with subheads, and — the canary — a single-section recipe looking and spacing exactly as it did before.
 
 **The shipped work.** `InstructionStepGroup.groups(sections:steps:)` is the one place that orders instructions: sections by `(sortOrder, id)`, steps within a section by `(sortOrder, id)`, orphans trailing. `RecipeDetailData.instructionGroups` is a thin wrapper over it, and the reader, Compare, the adjustment review, the adjustment engine, the recipe-chat context, the meal-plan hand-off, and the snapshot bundle all consume it. Section names render as subheads with `isHeader`; unnamed sections render their steps unheaded, so a single-section recipe is untouched. **This retires the load-bearing assumption that step `sortOrder` is globally unique** — the assumption S2's per-section renumbering was one save away from breaking.
 
@@ -1898,9 +1910,9 @@ build that PR #249 flagged and deferred. Not caused by this change; **now under 
 
 ## Chat-ask uniformity S1–S4 — one Ask, on every surface
 
-**✅ Architect-approved 2026-07-27; device pass owed.** PR [#244](https://github.com/jonphillips/yes-chef/pull/244), branch `codex/chat-ask-uniformity`, commits `968ed52` → `5e9552a` (**two review rounds**). Spec: [`efforts/chat-ask-uniformity.md`](efforts/chat-ask-uniformity.md) S1–S4. **No schema, nothing added to the prod-promotion list**; one Core rename (`ChatSurfaceResolution.Sections.switchable` → `.starters`). Verified at the review head by the architect, not taken on report: `scripts/check-drift.sh` clean at **468 tests / 92 suites**, elevated `generic/platform=iOS` build `** BUILD SUCCEEDED **`. **Jon's device pass owes** Menu (Ask opens free, Discuss ▾ seeds into the open thread, Ask again closes), Recipe unchanged in both presentations — the canary — plus Calendar and Workbench, and the rotation behaviour noted below. This also carries **PR #243's owed device pass** on the same four surfaces.
+**✅ Architect-approved 2026-07-27; device pass owed.** PR [#244](https://github.com/jonphillips/yes-chef/pull/244), branch `codex/chat-ask-uniformity`, commits `968ed52` → `5e9552a` (**two review rounds**). Spec: [`efforts/archive/chat-ask-uniformity.md`](efforts/archive/chat-ask-uniformity.md) S1–S4. **No schema, nothing added to the prod-promotion list**; one Core rename (`ChatSurfaceResolution.Sections.switchable` → `.starters`). Verified at the review head by the architect, not taken on report: `scripts/check-drift.sh` clean at **468 tests / 92 suites**, elevated `generic/platform=iOS` build `** BUILD SUCCEEDED **`. **Jon's device pass owes** Menu (Ask opens free, Discuss ▾ seeds into the open thread, Ask again closes), Recipe unchanged in both presentations — the canary — plus Calendar and Workbench, and the rotation behaviour noted below. This also carries **PR #243's owed device pass** on the same four surfaces.
 
-**The shipped work.** `ChatSurface.Sections` stops being typed to `PlaybookSectionKind` — a Recipe concept — and carries host-supplied `ChatStarter` values instead. The Recipe keeps its typed `selectSection:`/`activeSection:` factory API and the translation happens *inside* `ChatSurface.recipeStarters`, so the reference implementation cannot drift into stringly-typed call sites. The Menu's pre-flight verb `Menu` — the one live defect, the reason **there was no way to look at a Menu chat without buying a discussion first** — becomes a plain Ask toggle, with Prep Plan and Complement moved into the panel's Discuss ▾ and "Regenerate whole plan" staying on the playbook header as its own control. The three open-only entry points gain the close-if-open guard, two `Chat` labels become `Ask`, and both places that named a Recipe concept to surfaces that lack it — the empty-state clause and the starter menu's accessibility label/hint — stop doing so. This answers [`chat-surface-contract.md`](efforts/chat-surface-contract.md)'s Open Question 1: the Menu's `sections: .none` was an omission, and starters are the real answer.
+**The shipped work.** `ChatSurface.Sections` stops being typed to `PlaybookSectionKind` — a Recipe concept — and carries host-supplied `ChatStarter` values instead. The Recipe keeps its typed `selectSection:`/`activeSection:` factory API and the translation happens *inside* `ChatSurface.recipeStarters`, so the reference implementation cannot drift into stringly-typed call sites. The Menu's pre-flight verb `Menu` — the one live defect, the reason **there was no way to look at a Menu chat without buying a discussion first** — becomes a plain Ask toggle, with Prep Plan and Complement moved into the panel's Discuss ▾ and "Regenerate whole plan" staying on the playbook header as its own control. The three open-only entry points gain the close-if-open guard, two `Chat` labels become `Ask`, and both places that named a Recipe concept to surfaces that lack it — the empty-state clause and the starter menu's accessibility label/hint — stop doing so. This answers [`chat-surface-contract.md`](efforts/archive/chat-surface-contract.md)'s Open Question 1: the Menu's `sections: .none` was an omission, and starters are the real answer.
 
 **The blocking find: moving state ownership halfway is worse than not moving it.** S2 gave `MenuDetailModel` a `chatModel` while `MenuDetailView` kept owning the presentation in `toolOverlay`/`compactTool`. Two paths cleared the presentation without passing through the model — compact swipe-to-dismiss (a `.sheet(item:)` with no `onDismiss:`) and Browse Recipes replacing an open chat overlay. Both left `chatModel` non-nil with **no panel on screen**, so `isAskActive` read true, the button rendered its tinted "Panel open" state, and the next Ask tap took the *close* branch: nothing opened, and in the browser case the browser closed instead. Two taps to reopen — a regression on the exact button the effort exists to fix, on the iPhone path, shipped inside the fix for it.
 
@@ -1912,7 +1924,7 @@ build that PR #249 flagged and deferred. Not caused by this change; **now under 
 
 ## Chat surface contract S2–S4 — one descriptor, no silent defaults
 
-**✅ Architect-approved 2026-07-27; device pass owed.** PR [#243](https://github.com/jonphillips/yes-chef/pull/243), branch `codex/chat-surface-contract-s2-s4`, commits `dbe733e` → `e87c1c5` plus one architect-applied one-liner (**three review rounds**). Spec: [`efforts/chat-surface-contract.md`](efforts/chat-surface-contract.md) S2–S4; S1 shipped separately in PR #240. **No schema, no Core behavior change, nothing added to the prod-promotion list.** Verified at the review head by the architect, not taken on report: `scripts/check-drift.sh` clean at **467 tests / 92 suites** (466 → 467, the new Core suite discovered), SwiftLint `--strict` 0 violations across 277 files, elevated `generic/platform=iOS` build `** BUILD SUCCEEDED **`. **Jon's device pass owes** all four surfaces in both presentations on iPad Pro 13-inch (M5) and iPhone 17 Pro — confirming nothing moved visually, which is this effort's whole acceptance bar.
+**✅ Architect-approved 2026-07-27; device pass owed.** PR [#243](https://github.com/jonphillips/yes-chef/pull/243), branch `codex/chat-surface-contract-s2-s4`, commits `dbe733e` → `e87c1c5` plus one architect-applied one-liner (**three review rounds**). Spec: [`efforts/archive/chat-surface-contract.md`](efforts/archive/chat-surface-contract.md) S2–S4; S1 shipped separately in PR #240. **No schema, no Core behavior change, nothing added to the prod-promotion list.** Verified at the review head by the architect, not taken on report: `scripts/check-drift.sh` clean at **467 tests / 92 suites** (466 → 467, the new Core suite discovered), SwiftLint `--strict` 0 violations across 277 files, elevated `generic/platform=iOS` build `** BUILD SUCCEEDED **`. **Jon's device pass owes** all four surfaces in both presentations on iPad Pro 13-inch (M5) and iPhone 17 Pro — confirming nothing moved visually, which is this effort's whole acceptance bar.
 
 **The shipped work.** `RecipeChatPanel` drops from eight parameters (six defaulted) to two: a chat model and one `ChatSurface`. Its three structural questions — sections, presentation, dismissal — take no default, so a ninth surface fails to compile until it states them. `presentation` folds `showsEmbeddedHeader` and `onDismiss` into one choice, making their disagreement unrepresentable rather than documented. Compare's hand-rolled `.onAppear`/`.onChange` tier pair is deleted in favour of one field the panel honours. The three split sites get independent detent identities, with `"recipeChatWorkspaceDetent"` migrated forward as the Calendar's key so a dogfood device does not reset to `.balanced`. Per-host static factories (`.recipeAskSheet`, `.menuTool`, `.workbenchDetailColumn`, …) are the only construction path, enforced two ways: a `private` memberwise init, and a `check-drift.sh` guard that no raw `ChatSurface(` initializer exists outside `ChatSurface.swift`.
 
@@ -1928,9 +1940,9 @@ build that PR #249 flagged and deferred. Not caused by this change; **now under 
 
 **A guard that has never failed is not known to work.** The construction-path check was probed in both directions before approval, not merely observed passing: a scratch file containing a raw `ChatSurface(...)` correctly failed it before `swift test`, and `let x: ChatSurface = .init(...)` **silently passed** — the memberwise init was still internal, so the textual guard had a hole the compiler could have closed for free. Hence the architect one-liner: `private init`, with the factories (static members of the type) unaffected. The grep guard is now belt-and-braces over a compiler-enforced rule, which is the effort's own thesis applied to its own enforcement — *unrepresentable, not documented*.
 
-**The residual gap, stated rather than papered over.** Nothing executable proves that `RecipeDetailView` calls `.recipeAskSheet` rather than some other factory; that assertion needs the app target, and the app target does not build. This is the second effort in a row to want a test it cannot run — **and the failure mode has changed since [`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md) was scoped.** That brief records `CloudSyncKitdynamic-product` failing to link `SwiftUICore` ("not an allowed client"); a `build-for-testing` run on 2026-07-27 instead died on missing GRDB / StructuredQueriesCore conformance symbols, reproducibly and identically on `main`. The diagnosis in that brief is stale and is being re-derived directly.
+**The residual gap, stated rather than papered over.** Nothing executable proves that `RecipeDetailView` calls `.recipeAskSheet` rather than some other factory; that assertion needs the app target, and the app target does not build. This is the second effort in a row to want a test it cannot run — **and the failure mode has changed since [`efforts/archive/app-target-tests-to-core.md`](efforts/archive/app-target-tests-to-core.md) was scoped.** That brief records `CloudSyncKitdynamic-product` failing to link `SwiftUICore` ("not an allowed client"); a `build-for-testing` run on 2026-07-27 instead died on missing GRDB / StructuredQueriesCore conformance symbols, reproducibly and identically on `main`. The diagnosis in that brief is stale and is being re-derived directly.
 
-**Deliberately not done, and now on the record as intent:** the effort's two Open Questions shipped as assumed — the Menu gets no section switcher, and the two Workbench splits get independent detents. The first is answered properly by [`efforts/chat-ask-uniformity.md`](efforts/chat-ask-uniformity.md); the second stands.
+**Deliberately not done, and now on the record as intent:** the effort's two Open Questions shipped as assumed — the Menu gets no section switcher, and the two Workbench splits get independent detents. The first is answered properly by [`efforts/archive/chat-ask-uniformity.md`](efforts/archive/chat-ask-uniformity.md); the second stands.
 
 ## ADR-0032 S3 — the reference list UI, and the in-app browser's "Capture to Workbench"
 
@@ -1942,7 +1954,7 @@ build that PR #249 flagged and deferred. Not caused by this change; **now under 
 
 **The blocking find, and the reason it is worth writing down: the fix that satisfies an instruction can defeat it.** The dispatch said keep `reducedText` off the always-on `@Fetch` ([[sqlitedata-fetch-writer-convoy]], ADR-0029 Finding 8). The first commit removed references from `WorkbenchDetailRequest` — and added a *new* standing `@Fetch` of `WorkbenchChatContextRequest`, which re-runs the **entire** detail request (every candidate's full recipe detail, the draft recipe) **plus every full extract**. Net: two heavy detail reads and all extracts, synchronously on the writer, on every workbench mutation — strictly worse than what it replaced, reachable from the debounced inline title editor. **The diff read as compliance.** The correct shape was already in the repo two files over: `HandoffAppOperations` does an on-demand `database.read`.
 
-**A defaulted parameter on a completeness-carrying initializer is how a shipped slice silently un-ships.** Moving `references` off `WorkbenchDetailData` gave `WorkbenchChatContext(detail:references: = [])` a default — so the two ADR-0042 outboard handoff call sites kept compiling, kept running, and shipped **zero** reference material. S2's stated deliverable was "one source, both surfaces"; S3 quietly made it one. The fix was **deleting the default**, not patching the call sites, which is the general move: on a value whose entire job is completeness, a default is a decision made by whoever doesn't type it — the same sentence [`efforts/chat-surface-contract.md`](efforts/chat-surface-contract.md) is built around, arriving here on its own.
+**A defaulted parameter on a completeness-carrying initializer is how a shipped slice silently un-ships.** Moving `references` off `WorkbenchDetailData` gave `WorkbenchChatContext(detail:references: = [])` a default — so the two ADR-0042 outboard handoff call sites kept compiling, kept running, and shipped **zero** reference material. S2's stated deliverable was "one source, both surfaces"; S3 quietly made it one. The fix was **deleting the default**, not patching the call sites, which is the general move: on a value whose entire job is completeness, a default is a decision made by whoever doesn't type it — the same sentence [`efforts/archive/chat-surface-contract.md`](efforts/archive/chat-surface-contract.md) is built around, arriving here on its own.
 
 **Two bugs can protect each other.** The replacement confirmation shipped as `Text("This replaces the durable (context.captureKind.referenceDisplayName.lowercased()) extract…")` — a missing backslash, so the cook read the source expression. It **compiled because it was broken**: `referenceDisplayName` was `private` to a different file, so the correct interpolation would not have built. The literal-string defect and the visibility defect concealed each other, and this was the one sentence carrying Amendment 1's whole point (show the capture kind at the replacement decision). Fixed by moving the copy into Core as `replacementConfirmationMessage` with a test pinning the exact sentence — better than the visibility fix that was asked for.
 
@@ -1950,7 +1962,7 @@ build that PR #249 flagged and deferred. Not caused by this change; **now under 
 
 **Removing liveness as a side effect of a performance fix, twice.** Round 2 correctly deleted the standing `@Fetch` — and replaced it with a one-shot snapshot keyed on `isSplitEnabled`, which froze `ChatWorkspaceSplit`'s `onChange(of: context)` → `updateContext` path ([`RecipeChatWorkspace.swift:113`](../YesChefApp/RecipeChatWorkspace.swift)): the open iPad chat pane kept whatever context it had when it appeared. Round 3 correctly re-keyed on `workbench.dateModified` — an invariant every reference op maintains — but **replaced** the split-toggle key instead of joining it, so widening from compact on iPad (rotation, Stage Manager) left `chatContext` nil and the chat column absent until some unrelated write. The architect applied the composite key. **Each round was right about the thing it was fixing and lost a different input to the same expression**; the general form is that a cache-invalidation key has as many inputs as the thing it feeds has reasons to change, and dropping one is invisible in a diff that adds the other.
 
-**Every defect across three rounds was in the app layer, which executes no tests.** The core additions were correct on first submission and stayed correct. That is not a coincidence and it is the sharpest available argument for [`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md): the layer with coverage held, the layer with none produced six defects in a slice its own dispatch called "UI over an already-complete core."
+**Every defect across three rounds was in the app layer, which executes no tests.** The core additions were correct on first submission and stayed correct. That is not a coincidence and it is the sharpest available argument for [`efforts/archive/app-target-tests-to-core.md`](efforts/archive/app-target-tests-to-core.md): the layer with coverage held, the layer with none produced six defects in a slice its own dispatch called "UI over an already-complete core."
 
 **Forward-compatibility caveat, carried into the device pass.** `WorkbenchReferenceCaptureKind.pastedText` is a new raw value in a **synced** column. A device on this build writing `"pastedText"` will fail to decode on a device still on the previous build. Two devices, Development CloudKit, low stakes — but **update both before saving a pasted-text reference.**
 
@@ -1982,7 +1994,7 @@ build that PR #249 flagged and deferred. Not caused by this change; **now under 
 ---
 ## App-layer polish — the four sheets get a `Done`, and the Dispatch 3 punch list
 
-**✅ Architect-approved 2026-07-26; device pass owed.** PR [#240](https://github.com/jonphillips/yes-chef/pull/240), branch `codex/app-layer-polish`, commits `9a9e486` → `8dcffa9` (one review round). **App layer plus a small Core move; no schema**, nothing added to the prod-promotion list. Spec: [`efforts/chat-surface-contract.md`](efforts/chat-surface-contract.md) S1 plus the seven items deferred from PR [#238](https://github.com/jonphillips/yes-chef/pull/238)'s device pass. Verified at the review head: elevated `generic/platform=iOS` build `** BUILD SUCCEEDED **` (no new warnings), `scripts/check-drift.sh` clean at **457 tests / 91 suites**, `xcodegen generate` zero drift — all three re-run by the architect, not taken on report. **Jon's device pass still owes** the four `Done` controls, the Add-a-learning card, and the duplicate-learning close.
+**✅ Architect-approved 2026-07-26; device pass owed.** PR [#240](https://github.com/jonphillips/yes-chef/pull/240), branch `codex/app-layer-polish`, commits `9a9e486` → `8dcffa9` (one review round). **App layer plus a small Core move; no schema**, nothing added to the prod-promotion list. Spec: [`efforts/archive/chat-surface-contract.md`](efforts/archive/chat-surface-contract.md) S1 plus the seven items deferred from PR [#238](https://github.com/jonphillips/yes-chef/pull/238)'s device pass. Verified at the review head: elevated `generic/platform=iOS` build `** BUILD SUCCEEDED **` (no new warnings), `scripts/check-drift.sh` clean at **457 tests / 91 suites**, `xcodegen generate` zero drift — all three re-run by the architect, not taken on report. **Jon's device pass still owes** the four `Done` controls, the Add-a-learning card, and the duplicate-learning close.
 
 **S1 — four sheets that were swipe-only on iPhone now have a labelled dismiss.** Calendar, Calendar-day, Workbench and Compare each pass an `onDismiss` that clears the `item:` binding driving their own sheet, so the panel's existing `Done` at `.topBarLeading` renders. **No new control was invented** — the modal contract already existed in `RecipeChatPanel` and Recipe already used it; these four call sites had simply never opted in. The one remaining call site without `onDismiss` is `ChatWorkspaceSplit`'s resizable column, which is exactly what the parameter's documented `nil` means.
 
@@ -1994,7 +2006,7 @@ build that PR #249 flagged and deferred. Not caused by this change; **now under 
 
 **A `Bool` that meant three things made a dead tap into a loop.** `createLearning` returned `false` for both "already saved" and "the write failed," so the duplicate path was silent and the tap read as broken. Giving it a toast fixed the silence and created a worse bug: the form stayed open holding text that was already saved, so tapping Add again produced the same green checkmark indefinitely. The cure is `LearningCreationResult { added, duplicate, failed }` — **a duplicate is a terminal success** (the cook's intent is already satisfied, so clear and close), while only `.failed` keeps the form open with the text intact. Related, unfixed and not queued: `AppToastCenter.Style` has exactly one case, so "already saved" ships with a success checkmark and a success-styled accessibility announcement.
 
-**The generalizable find, and the reason a Core move rode a UI-polish PR: a test in a target that nothing runs is not a test.** The first commit put a deletion-copy assertion in `YesChefAppTests`, which is compiled and executed by **nothing** — not `scripts/check-drift.sh` (it ends in `swift test --package-path YesChefPackage`), not CI (the same command), and not the generic app build (`build` never compiles the test target). A `build-for-testing` probe dies at a CloudSyncKit dynamic-product link error before it reaches the target, so the seven files already sitting there are not even known to compile. **This is the standing "keep pure logic out of the App layer" corollary arriving from the other direction:** if a thing is pure enough to unit-test, it is pure enough to live in Core, and putting it there is what makes the test real. `MenuDeletionContext`, `WorkbenchDeletionContext`, `deleteMenuMessage` and `deleteWorkbenchMessage` moved to `YesChefCore/DeletionCopy.swift` — all four are pure values and strings over Core ID types with no SwiftUI — and the test moved to `YesChefCoreTests` covering all three workbench branches and six menu cases. Test count went 455 → 457 because those two now actually execute. **The warning went into CURRENT_HANDOFF's Verification Pattern**, where it is read before someone writes the next app-target test. The review then went looking at what was already stranded there: **23 tests, of which only 4 are stranded by the target** — the other 19 are stranded by pure logic sitting in `YesChefApp/`, recoverable by moving five files/types to Core with no cross-repo work. Scoped as [`efforts/app-target-tests-to-core.md`](efforts/app-target-tests-to-core.md). The target itself is genuinely broken, confirmed against cleared DerivedData: `CloudSyncKitdynamic-product` cannot link `SwiftUICore` ("not an allowed client of it") because a test bundle forces SwiftPM to emit dynamic products, so fixing it is a linkage change in `jon-platform`, deliberately not taken for four tests.
+**The generalizable find, and the reason a Core move rode a UI-polish PR: a test in a target that nothing runs is not a test.** The first commit put a deletion-copy assertion in `YesChefAppTests`, which is compiled and executed by **nothing** — not `scripts/check-drift.sh` (it ends in `swift test --package-path YesChefPackage`), not CI (the same command), and not the generic app build (`build` never compiles the test target). A `build-for-testing` probe dies at a CloudSyncKit dynamic-product link error before it reaches the target, so the seven files already sitting there are not even known to compile. **This is the standing "keep pure logic out of the App layer" corollary arriving from the other direction:** if a thing is pure enough to unit-test, it is pure enough to live in Core, and putting it there is what makes the test real. `MenuDeletionContext`, `WorkbenchDeletionContext`, `deleteMenuMessage` and `deleteWorkbenchMessage` moved to `YesChefCore/DeletionCopy.swift` — all four are pure values and strings over Core ID types with no SwiftUI — and the test moved to `YesChefCoreTests` covering all three workbench branches and six menu cases. Test count went 455 → 457 because those two now actually execute. **The warning went into CURRENT_HANDOFF's Verification Pattern**, where it is read before someone writes the next app-target test. The review then went looking at what was already stranded there: **23 tests, of which only 4 are stranded by the target** — the other 19 are stranded by pure logic sitting in `YesChefApp/`, recoverable by moving five files/types to Core with no cross-repo work. Scoped as [`efforts/archive/app-target-tests-to-core.md`](efforts/archive/app-target-tests-to-core.md). The target itself is genuinely broken, confirmed against cleared DerivedData: `CloudSyncKitdynamic-product` cannot link `SwiftUICore` ("not an allowed client of it") because a test bundle forces SwiftPM to emit dynamic products, so fixing it is a linkage change in `jon-platform`, deliberately not taken for four tests.
 
 **Two accepted nits, neither queued:** `DeletionCopy.swift` exposes two public free functions at module scope rather than a namespace enum in the `WorkbenchInlineEditor` mould, and the singular `candidateCount: 1` branch is the one still untested — which is also the one whose copy reads oddly ("its 1 candidate? **The recipes** stay in your library") when no working recipe exists.
 
@@ -2027,7 +2039,7 @@ build that PR #249 flagged and deferred. Not caused by this change; **now under 
 ---
 ## Dogfood ferry Dispatch 3 — workbench lifecycle and hand-authored learnings
 
-**✅ Approved, 2026-07-26.** PR [#238](https://github.com/jonphillips/yes-chef/pull/238), branch `codex/dogfood-ferry-dispatch-3`, commits `6356ac6` / `04bc18d` / `3b1e1e8`. Spec: [`efforts/dogfood-ferry-2026-07-25.md`](efforts/dogfood-ferry-2026-07-25.md) Dispatch 3 (E1–E3 + H). Verified: package `swift build` + elevated `generic/platform=iOS` build + `scripts/check-drift.sh` (445 tests); Jon's device pass — good overall, one finding, deferred (below). **This closes the 2026-07-25 ferry track: 1 → 1.5 → 2 → 3, all shipped.**
+**✅ Approved, 2026-07-26.** PR [#238](https://github.com/jonphillips/yes-chef/pull/238), branch `codex/dogfood-ferry-dispatch-3`, commits `6356ac6` / `04bc18d` / `3b1e1e8`. Spec: [`efforts/archive/dogfood-ferry-2026-07-25.md`](efforts/archive/dogfood-ferry-2026-07-25.md) Dispatch 3 (E1–E3 + H). Verified: package `swift build` + elevated `generic/platform=iOS` build + `scripts/check-drift.sh` (445 tests); Jon's device pass — good overall, one finding, deferred (below). **This closes the 2026-07-25 ferry track: 1 → 1.5 → 2 → 3, all shipped.**
 
 **Schema: one column, and it IS synced — the mirror image of Dispatch 2.** `workbenches.dateCompleted TEXT` (nullable) was added by migration ([`Schema.swift`](../YesChefPackage/Sources/YesChefCore/Schema.swift)), and **`Workbench` *is* registered in `CloudSync`** — verified against the registration list — so it **went onto the prod-promotion list** in this same PR. Dispatch 2's `aiHandoffs.dayOffset` looked synced and was not; this one is. The check is the registration list, both directions.
 
@@ -2046,7 +2058,7 @@ build that PR #249 flagged and deferred. Not caused by this change; **now under 
 ---
 ## Dogfood ferry Dispatch 2 — hand-off regrouping, day-scoped asks, and the vocabulary cleanup
 
-**✅ Approved, 2026-07-26.** PR [#237](https://github.com/jonphillips/yes-chef/pull/237), branch `codex/dogfood-ferry-dispatch-2`, commits `9abd0f5` / `04a7ae6` / `b055a17` / `e839f38`. Spec: [`efforts/dogfood-ferry-2026-07-25.md`](efforts/dogfood-ferry-2026-07-25.md) Dispatch 2 (D1–D3 + the renames). Verified: elevated `generic/platform=iOS` build + `scripts/check-drift.sh` (441 tests); Jon's device pass on `iPad Pro 13-inch (M5)` and `iPhone 17 Pro`.
+**✅ Approved, 2026-07-26.** PR [#237](https://github.com/jonphillips/yes-chef/pull/237), branch `codex/dogfood-ferry-dispatch-2`, commits `9abd0f5` / `04a7ae6` / `b055a17` / `e839f38`. Spec: [`efforts/archive/dogfood-ferry-2026-07-25.md`](efforts/archive/dogfood-ferry-2026-07-25.md) Dispatch 2 (D1–D3 + the renames). Verified: elevated `generic/platform=iOS` build + `scripts/check-drift.sh` (441 tests); Jon's device pass on `iPad Pro 13-inch (M5)` and `iPhone 17 Pro`.
 
 **Schema: one column, and it is LOCAL.** `aiHandoffs.dayOffset INTEGER` was added by migration ([`Schema.swift`](../YesChefPackage/Sources/YesChefCore/Schema.swift)). **`AIHandoff` is not registered in `CloudSync`** — verified against the registration list — so **nothing was added to the prod-promotion list.** Same trap as Dispatch 1.5's `chatMessages.resolvedTier`: check the registration, do not assume from the name.
 
@@ -2064,12 +2076,12 @@ build that PR #249 flagged and deferred. Not caused by this change; **now under 
 
 **The lesson, since it cost three review rounds:** a behavior with a test whose *name asserts it is deliberate* is a decision until proven otherwise. Read the name, then the ADR, then call it a bug.
 
-**One effort spun out of the review and the device pass:** [`efforts/prep-plan-dish-links-and-dates.md`](efforts/prep-plan-dish-links-and-dates.md) — the prep plan knows two things the model never sees (`sourceDish`, and the menu's placement dates), and ADR-0034 designed for the version where it does. In Ready Efforts.
+**One effort spun out of the review and the device pass:** [`efforts/archive/prep-plan-dish-links-and-dates.md`](efforts/archive/prep-plan-dish-links-and-dates.md) — the prep plan knows two things the model never sees (`sourceDish`, and the menu's placement dates), and ADR-0034 designed for the version where it does. In Ready Efforts.
 
 ---
 ## Dogfood ferry Dispatch 1.5 — the embedded chat panel owns its chrome, and the panel header settles
 
-**✅ Approved, 2026-07-26.** Two PRs: [#234](https://github.com/jonphillips/yes-chef/pull/234) (G1–G4, branch `codex/dogfood-ferry-dispatch-1-5`, commits `4d89999` / `9866c7f` / `051a1bc`) and [#235](https://github.com/jonphillips/yes-chef/pull/235) (G5 + the architect review + the device-pass follow-ons, branch `codex/dogfood-ferry-dispatch-1-5-g5`, commits `0253f5e` / `b202b72`). Spec: [`efforts/dogfood-ferry-2026-07-25.md`](efforts/dogfood-ferry-2026-07-25.md) Dispatch 1.5 (G1–G5) + [ADR-0045 Amendment 3](decisions/ADR-0045-onboard-path-stays-viable.md#amendment-3--ask-opens-the-panel-the-launcher-stops-picking-sections-2026-07-26) and [its codicil](decisions/ADR-0045-onboard-path-stays-viable.md#codicil-to-amendment-3--the-embedded-panel-header-contract-2026-07-26). Verified: elevated `generic/platform=iOS` build + `scripts/check-drift.sh` (SwiftLint clean, 433 tests); Jon's device pass on `iPad Pro 13-inch (M5)` and `iPhone 17 Pro`.
+**✅ Approved, 2026-07-26.** Two PRs: [#234](https://github.com/jonphillips/yes-chef/pull/234) (G1–G4, branch `codex/dogfood-ferry-dispatch-1-5`, commits `4d89999` / `9866c7f` / `051a1bc`) and [#235](https://github.com/jonphillips/yes-chef/pull/235) (G5 + the architect review + the device-pass follow-ons, branch `codex/dogfood-ferry-dispatch-1-5-g5`, commits `0253f5e` / `b202b72`). Spec: [`efforts/archive/dogfood-ferry-2026-07-25.md`](efforts/archive/dogfood-ferry-2026-07-25.md) Dispatch 1.5 (G1–G5) + [ADR-0045 Amendment 3](decisions/ADR-0045-onboard-path-stays-viable.md#amendment-3--ask-opens-the-panel-the-launcher-stops-picking-sections-2026-07-26) and [its codicil](decisions/ADR-0045-onboard-path-stays-viable.md#codicil-to-amendment-3--the-embedded-panel-header-contract-2026-07-26). Verified: elevated `generic/platform=iOS` build + `scripts/check-drift.sh` (SwiftLint clean, 433 tests); Jon's device pass on `iPad Pro 13-inch (M5)` and `iPhone 17 Pro`.
 
 **Schema: one column, and it is LOCAL.** `chatMessages.resolvedTier` was added by migration ([`Schema.swift`](../YesChefPackage/Sources/YesChefCore/Schema.swift)). **`chatMessages` is not registered in `CloudSync`** — the chat transcript is device-local scratch, pruned on a cutoff — so **nothing was added to the prod-promotion list.** Verify before assuming otherwise; this is the one table in the chat stack that looks synced and isn't.
 
@@ -2091,12 +2103,12 @@ build that PR #249 flagged and deferred. Not caused by this change; **now under 
 - The restored tier accessibility hint still reads *"Choose whether **recipe** context stays on device…"* on a control that renders on all four surfaces, so Menu / Calendar / Workbench announce a recipe that isn't there. Same defect class the visible copy fix closed, one layer down.
 - `RecipeChatMessageTier.init(resolvedTier:)` maps `.frontierPreferred` → `.onDevice`. **Unreachable today** — `resolveTier` returns only `.onDevice` or `.frontier(provider)` ([`ModelTierResolution.swift:34`](../YesChefPackage/Sources/YesChefCore/ModelTierResolution.swift)) — but the initializer is `public`, so a future caller passing `.frontierPreferred` would be labeled *On-device* on a badge whose entire purpose is being truthful about where data went.
 
-**One effort spun out of the review:** [`efforts/chat-surface-contract.md`](efforts/chat-surface-contract.md) — the panel *view* is shared but its *contract* is not (eight call sites, eight parameters, six defaulted), which is why four sheets silently shipped with no dismiss control at all and three surfaces inherited Recipe's copy. In Ready Efforts; **does not jump the ferry queue**.
+**One effort spun out of the review:** [`efforts/archive/chat-surface-contract.md`](efforts/archive/chat-surface-contract.md) — the panel *view* is shared but its *contract* is not (eight call sites, eight parameters, six defaulted), which is why four sheets silently shipped with no dismiss control at all and three surfaces inherited Recipe's copy. In Ready Efforts; **does not jump the ferry queue**.
 
 ---
 ## Dogfood ferry Dispatch 1 — one expand control, four surfaces, and the Menu's onboard column
 
-**✅ Approved with follow-ups, 2026-07-26.** PR [#233](https://github.com/jonphillips/yes-chef/pull/233), branch `codex/dogfood-ferry-dispatch-1`, commit `12a6612`. **App layer only — no Core, no schema**, nothing added to the prod-promotion list. Spec: [`efforts/dogfood-ferry-2026-07-25.md`](efforts/dogfood-ferry-2026-07-25.md) Dispatch 1 (Slices A / B / C / F1). Verified: elevated `generic/platform=iOS` build + `scripts/check-drift.sh`; Jon's device pass on `iPad Pro 13-inch (M5)` and `iPhone 17 Pro`.
+**✅ Approved with follow-ups, 2026-07-26.** PR [#233](https://github.com/jonphillips/yes-chef/pull/233), branch `codex/dogfood-ferry-dispatch-1`, commit `12a6612`. **App layer only — no Core, no schema**, nothing added to the prod-promotion list. Spec: [`efforts/archive/dogfood-ferry-2026-07-25.md`](efforts/archive/dogfood-ferry-2026-07-25.md) Dispatch 1 (Slices A / B / C / F1). Verified: elevated `generic/platform=iOS` build + `scripts/check-drift.sh`; Jon's device pass on `iPad Pro 13-inch (M5)` and `iPhone 17 Pro`.
 
 **Four independent copies of one interaction became one.** `FocusToolbarButton` is now the single definition of the full-screen expand control — glyph, tint, label, accessibility value — and Recipe (already correct), Menu, Workbench and Calendar all adopt it at `.topBarLeading`. The Calendar had none: its `NavigationSplitView` branch gained a `columnVisibility` binding so the control has something to collapse. **The point of extracting it was to stop a fifth copy appearing**, and it is the control [ADR-0046](decisions/ADR-0046-sidebar-adaptable-app-shell.md) is gated behind.
 
@@ -3014,7 +3026,7 @@ ChatGPT's answer pastes back cleanly. The meal-calendar per-day make-ahead-strat
 
 **Architect-reviewed 2026-07-12 — yes-chef PR [#154](https://github.com/jonphillips/yes-chef/pull/154)
 (branch `codex/meal-planner-affordances`).** Closes the effort in
-[`efforts/meal-planner-affordances.md`](efforts/meal-planner-affordances.md) (Jon's 2026-07-11 dogfood batch,
+[`efforts/archive/meal-planner-affordances.md`](efforts/archive/meal-planner-affordances.md) (Jon's 2026-07-11 dogfood batch,
 effort #1). Reworks the meal-calendar row so a **row tap opens the recipe reader** (recipe rows) and the
 **Edit-Meal sheet moves off the row tap** onto a dedicated right-hand affordance; note rows (no reader) tap
 straight to Edit-Meal. App-layer only (`MealCalendarViews.swift`), no schema. Package tests + `git diff --check`
@@ -3030,7 +3042,7 @@ follow-ons still live in the effort doc: **drag-and-drop retest on Beta 3** and 
 ## Workbench dogfood polish (Jon's 2026-07-11 two-device pass)
 
 **Architect-approved 2026-07-11 — rides in the slice commit; app build + device pass are Jon's.** Effort
-[`efforts/workbench-dogfood-polish.md`](efforts/workbench-dogfood-polish.md), all six slices shipped in the
+[`efforts/archive/workbench-dogfood-polish.md`](efforts/archive/workbench-dogfood-polish.md), all six slices shipped in the
 working tree: candidate rows show thumbnail + source; draft rationale renders candidates by **title/source not
 object ID** (chat context + synthesis prompt both hardened); the apply/review sheet is **scrollable**;
 **archive-all-candidates** archives the candidate recipes *out of the library* + clears them from the workbench
@@ -3045,7 +3057,7 @@ design (a persistent-provenance variant is a separable follow-up if wanted).
 ## Chrome & navigation polish (Jon's 2026-07-11 two-device pass)
 
 **Architect-approved 2026-07-11 — rides in the slice commit; app build + device pass are Jon's.** Effort
-[`efforts/dogfood-fixes-2026-07-11-chrome.md`](efforts/dogfood-fixes-2026-07-11-chrome.md), all five slices
+[`efforts/archive/dogfood-fixes-2026-07-11-chrome.md`](efforts/archive/dogfood-fixes-2026-07-11-chrome.md), all five slices
 shipped in the working tree: side-menu order/naming (Recipes · Groceries · Calendar · Menus · Browser · Workbench
 · Settings); AI-widget cleanup (dropped the on-/off-device disclaimer + static provider label + de-mangled a11y
 hint, chat input two lines); recipe-detail toolbar reorder (Edit · Grocery · Add Meal · AI toggle · Workbench);
@@ -3058,7 +3070,7 @@ Revise Recipe, suffixes dropped). App-layer, no schema. Package builds + 29 touc
 
 **Jon device-confirmed 2026-07-11:** recipes, images, menus, and the whole synced library round-trip
 **end-to-end across two physical devices** (`iPad Pro 13-inch (M5)` ↔ `iPhone 17 Pro`). This is the M4
-iCloud-sync milestone ([`milestones/M4-icloud-sync.md`](milestones/M4-icloud-sync.md), ADR-0002/ADR-0010)
+iCloud-sync milestone ([`milestones/archive/M4-icloud-sync.md`](milestones/archive/M4-icloud-sync.md), ADR-0002/ADR-0010)
 **landing in practice** — the one-way gate everything preceded is crossed and holding. The earlier
 "missing content on iPhone" scare was diagnosed (ADR-0028) as a throttled bulk *initial* sync that simply
 needed to finish downloading, **not** data loss; once caught up, convergence is clean. We remain in the
@@ -3290,7 +3302,7 @@ chat-context feed. Additive enum + `aiSettings` column, no new table; sync-safe.
 
 **Merged to main 2026-07-09 — yes-chef PR [#136](https://github.com/jonphillips/yes-chef/pull/136).** The
 one-PR, no-schema quick-fixes bundle from the 2026-07-09 menu-planner dogfood pass (brief
-[`efforts/dogfood-fixes-menu-planner-2026-07-09.md`](efforts/dogfood-fixes-menu-planner-2026-07-09.md)): the
+[`efforts/archive/dogfood-fixes-menu-planner-2026-07-09.md`](efforts/archive/dogfood-fixes-menu-planner-2026-07-09.md)): the
 **chat selection-clear bug + a clear affordance**, the **complement note-body** write (ADR-0012 Amendment 2 —
 complement suggestions land their body onto the `.note` `MenuItem`), the **prep-plan "explain better"** revision
 (compose from the stored Make-Ahead strategy, just describe it more legibly — [[menu-planner-dogfood-2026-07-09]]),
@@ -3370,7 +3382,7 @@ eyeball that the auto-presented sheet + its staged "Review" row behind it don't 
 **Architect-reviewed 2026-07-09 — yes-chef PR [#126](https://github.com/jonphillips/yes-chef/pull/126);
 merges after Jon's device pass** (the app target never compiled in CI — its `PreferenceKey` concurrency
 error and the whole app layer are verified only in Jon's Xcode build). Four mechanical dogfood fixes from
-the 2026-07-08 pass, one PR; `efforts/dogfood-fixes-batch-5-mechanical-polish.md`. **Schema-free.**
+the 2026-07-08 pass, one PR; `efforts/archive/dogfood-fixes-batch-5-mechanical-polish.md`. **Schema-free.**
 
 - **Recipe-detail layout/toolbar** — "Chef It Up" now renders below Notes (both idioms); the Focus control
   became highlighted leading chevrons with the Edit button moved leading; the Chat button *toggles* the
@@ -3402,7 +3414,7 @@ review-edits-persist-on-import. The `PreferenceKey` concurrency fix (computed `d
 **Merged — yes-chef PR [#123](https://github.com/jonphillips/yes-chef/pull/123)** (backfilled into this log
 2026-07-09 from the ratified ADRs; confirm detail against #123). Implements
 [ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) S2, which **is** ADR-0021's build
-([ADR-0021](decisions/ADR-0021-recipe-variations.md)); `efforts/recipe-edit-proposals.md`. Adds **"keep as
+([ADR-0021](decisions/ADR-0021-recipe-variations.md)); `efforts/archive/recipe-edit-proposals.md`. Adds **"keep as
 a variation"** as the second commit path on the *same* proposal surface built in S1 — the structured delta
 the S1 extractor already produces *is* the ADR-0021 variation payload (no separate extraction; resolves
 ADR-0021 OQ1/OQ2).
@@ -3422,7 +3434,7 @@ ADR-0021 OQ1/OQ2).
 
 **Architect-reviewed + Jon device-passed 2026-07-07** — yes-chef PR #122 (this slice). Implements
 [ADR-0023](decisions/ADR-0023-recipe-edit-proposals.md) S1 (which extends
-[ADR-0021](decisions/ADR-0021-recipe-variations.md)); `efforts/recipe-edit-proposals.md`. **Schema-free** —
+[ADR-0021](decisions/ADR-0021-recipe-variations.md)); `efforts/archive/recipe-edit-proposals.md`. **Schema-free** —
 no migration, no synced column. The **first chat verb that edits a recipe's canonical ingredients/method**
 (Make-ahead/Chef-It-Up/Serve-With only ever wrote additive sidecar sections; the workbench draft only
 *creates*). Made safe by construction: the model writes only to a transient preview, never to a stored
@@ -3459,7 +3471,7 @@ same `Recipe`+delta code, no fork. Review caught + fixed a `file_length` overflo
 
 **Architect-reviewed + merged 2026-07-07** — yes-chef PRs [#116](https://github.com/jonphillips/yes-chef/pull/116)–[#120](https://github.com/jonphillips/yes-chef/pull/120).
 Implements [ADR-0022](decisions/ADR-0022-llm-aligned-compare-matrix.md) (now **Accepted**), the semantic
-upgrade to the Workbench Compare matrix; `efforts/compare-alignment.md`. **S1** ([#116](https://github.com/jonphillips/yes-chef/pull/116))
+upgrade to the Workbench Compare matrix; `efforts/archive/compare-alignment.md`. **S1** ([#116](https://github.com/jonphillips/yes-chef/pull/116))
 was a no-LLM **parse/key fix** that stands alone and improved the deterministic fallback: fixed the
 singularizer `chilies → chily` bug and a dual-unit quantity leak. **S2–S4** ([#117](https://github.com/jonphillips/yes-chef/pull/117)/[#118](https://github.com/jonphillips/yes-chef/pull/118)/[#119](https://github.com/jonphillips/yes-chef/pull/119))
 built the **LLM aligner**: clusters ingredient rows by culinary role (chicken breast ≡ thigh;
@@ -3478,7 +3490,7 @@ chat rework) were both resolved — the chat rework was split into its own PR (#
 ## Compare-key granularity — coarser matrix key, grocery key untouched
 
 **Merged 2026-07-07** — yes-chef [PR #114](https://github.com/jonphillips/yes-chef/pull/114);
-`efforts/comparison-key-granularity.md`. A second, coarser `CanonicalIngredient.comparisonKey` that the
+`efforts/archive/comparison-key-granularity.md`. A second, coarser `CanonicalIngredient.comparisonKey` that the
 Workbench Compare matrix aligns on so `fresh`/`frozen`/`dried` variants share one base row with the form
 shown in the cells. The grocery canonical key is **untouched** (determinism-at-merge preserved); no schema.
 Core-only. This became the *fallback* that ADR-0022's LLM aligner sits on top of.
@@ -3488,7 +3500,7 @@ Core-only. This became the *fallback* that ADR-0022's LLM aligner sits on top of
 ## Recipe Workbench — S4 (Compare: ingredient-diff matrix + Full flip-through)
 
 **Merged 2026-07-07** — yes-chef [PR #113](https://github.com/jonphillips/yes-chef/pull/113);
-`efforts/recipe-workbench.md`. Completes the Workbench build arc **S1–S4**. App-layer only — no migration,
+`efforts/archive/recipe-workbench.md`. Completes the Workbench build arc **S1–S4**. App-layer only — no migration,
 no new fetch, no sync touch. A pure `WorkbenchCompare.ingredientComparison` read (`WorkbenchCompareCore.swift`)
 with unit tests, rendered by a responsive `WorkbenchCompareView` (full-screen cover on iPad via the
 `.detailOnly` focus pattern, sheet on iPhone), reached from a **Compare** button in the Candidates header
@@ -3515,7 +3527,7 @@ surface. Ships the **store + manual/curate path first** — AI-*generated* exper
 (new `kind` / compose path = no migration). Sync-safe (additive-nullable table, UUID PK, no unique index,
 cascade FK matching `workbenchCandidates`, soft `relatedRecipeID`). 208 package tests + drift green; app-target
 `xcodebuild` couldn't complete in CI (simdiskimaged crash) so the SwiftUI was closed by Jon's device pass.
-Three non-blocking review notes parked in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md): the log
+Three non-blocking review notes parked in [`efforts/archive/recipe-workbench.md`](efforts/archive/recipe-workbench.md): the log
 isn't self-trimmed against the chat-context budget (fold into on-device overflow work); `relatedRecipeID` is
 plumbed but has no UI/title-snapshot yet; the chat-save path is a raw copy, not yet a distillation.
 
@@ -3541,7 +3553,7 @@ truncation surfaced as a real retryable error (not a silent empty draft); a pers
 an unpromoted `.reference` scratch draft, only unlinks a promoted `.main` recipe, always clears the soft-FK
 link so drafting re-enables). Effort locked at **`high`** — dogfood-validated as a clear quality step over
 `medium`. Sync-safe (UUID PKs, soft FKs + denormalized snapshots, additive migrations). Dogfood-surfaced
-follow-ons parked in [`efforts/recipe-workbench.md`](efforts/recipe-workbench.md): synthesis-shaped draft
+follow-ons parked in [`efforts/archive/recipe-workbench.md`](efforts/archive/recipe-workbench.md): synthesis-shaped draft
 action (not gated on the last reply), AI effort/tier as a user-facing setting (ADR-0017/0018), tabbed
 candidate/working-recipe quick-view. Design in
 [ADR-0019](decisions/ADR-0019-recipe-design-studies.md) (whole, incl. both amendments).
@@ -3567,7 +3579,7 @@ model methods + shared-panel controls, no domain pattern-match, no lift yet.
 [PR #103](https://github.com/jonphillips/yes-chef/pull/103) (grounding fix + polish). Pending Jon's device
 pass. Slice 1 landed the workbench shell; the grounding fix + polish made it dogfoodable: the shared
 `ChatWorkspaceSplit` now refreshes the chat model's context `onChange` (recipe/menu benefit too), editable
-title, candidate-picker search, full-screen focus. Docs: `efforts/recipe-workbench.md`, ADR-0019, ADR-0020
+title, candidate-picker search, full-screen focus. Docs: `efforts/archive/recipe-workbench.md`, ADR-0019, ADR-0020
 (chat UI harvest).
 
 ---
@@ -3578,7 +3590,7 @@ title, candidate-picker search, full-screen focus. Docs: `efforts/recipe-workben
 Jon's device pass. All five slices shipped: tier-aware AI context + prep-plan-in-context + living-artifact
 refinement · swipe-delete/move · inline meal-slot pill · full-screen focus · toolbar reorg. Drag-drop
 reorder of dishes stays parked as the named follow-on (swipe-move is the interim). Effort doc
-[`efforts/menu-planning-ux.md`](efforts/menu-planning-ux.md).
+[`efforts/archive/menu-planning-ux.md`](efforts/archive/menu-planning-ux.md).
 
 ---
 
@@ -3704,7 +3716,7 @@ unit-tested for the three cases; both the reader thumbnail and gallery default p
 "Set as Cover" / "Use Automatic" affordance. **The effort's first schema touch** — additive, nullable,
 CloudKit-safe; added to the standing prod-schema promotion follow-up in `CURRENT_HANDOFF.md`. **Slice 2 —
 pinch-to-zoom + pan** in `RecipePhotoFullScreenView` (`MagnifyGesture` + clamped drag, double-tap reset),
-no schema. Design record in [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) §
+no schema. Design record in [`docs/efforts/archive/cooking-workspace.md`](efforts/archive/cooking-workspace.md) §
 "Reader photo affordances". (Handoff bump did not ride in #87; repaired in the batch-4 PR.)
 
 ---
@@ -3820,7 +3832,7 @@ across `MenuItemRowData` and `MenuChatItemContext` (distinct types; a shared hel
 **Architect-approved 2026-07-03** — yes-chef [PR #80](https://github.com/jonphillips/yes-chef/pull/80).
 The milestone's **payoff and final slice** — no schema change, consumes the Slice 3 columns. **This
 completes the grocery/pantry milestone** (last box ticked in
-[`docs/milestones/grocery-consolidation-and-pantry.md`](milestones/grocery-consolidation-and-pantry.md)).
+[`docs/milestones/archive/grocery-consolidation-and-pantry.md`](milestones/archive/grocery-consolidation-and-pantry.md)).
 Design rationale = [[grocery-pantry-threshold-design]].
 
 - **Pure `PantrySuppression.evaluate(list:policies:)`** over the consolidated list → `{ shown,
@@ -3850,7 +3862,7 @@ not the consolidation summation itself). Standing Slice-3 release follow-up stil
 **Architect-approved 2026-07-03** — yes-chef [PR #79](https://github.com/jonphillips/yes-chef/pull/79).
 The milestone's **single synced-schema change**, carrying both the pantry policy columns and the
 `canonicalName` cache deferred out of Slice 1. Milestone build order:
-[`docs/milestones/grocery-consolidation-and-pantry.md`](milestones/grocery-consolidation-and-pantry.md).
+[`docs/milestones/archive/grocery-consolidation-and-pantry.md`](milestones/archive/grocery-consolidation-and-pantry.md).
 
 - **Pantry policy on `PantryItem`.** New `PantryPolicy` enum (`unlimited` / `threshold(qty,unit)` /
   `alwaysConfirm`) over three columns: `isUnlimited: Bool` (default **true**), `thresholdQuantity: Double?`,
@@ -3877,7 +3889,7 @@ covers it; (2) promote the new CloudKit fields to the **production** schema befo
 **Architect-approved 2026-07-03** — yes-chef [PR #77](https://github.com/jonphillips/yes-chef/pull/77).
 Both pure-core `YesChefCore` slices in one PR, no UI, no schema migration (the `canonicalName` cache
 column stays deferred to Slice 3 per the 2026-07-03 architect amendment). Milestone build order:
-[`docs/milestones/grocery-consolidation-and-pantry.md`](milestones/grocery-consolidation-and-pantry.md).
+[`docs/milestones/archive/grocery-consolidation-and-pantry.md`](milestones/archive/grocery-consolidation-and-pantry.md).
 
 - **Slice 1 — one canonical key + data alias table.** New `CanonicalIngredient.canonicalName(_:)` is the
   single normalizer (case/diacritic fold, hyphen-collapse, leading-descriptor strip, light
@@ -3901,7 +3913,7 @@ Codex authored; architect reviewed. Verified: `swift build`/`swift test` green, 
 
 **Architect-approved 2026-07-03** — yes-chef [PR #75](https://github.com/jonphillips/yes-chef/pull/75).
 Four cohesive slices in one PR, all from Jon's 2026-07-03 dogfooding. Effort doc:
-[`docs/efforts/dogfood-fixes-batch-3.md`](efforts/dogfood-fixes-batch-3.md).
+[`docs/efforts/archive/dogfood-fixes-batch-3.md`](efforts/archive/dogfood-fixes-batch-3.md).
 
 - **Slice 1 — ingredient list honors headers/sections/spacing.** `ingredientLineList` stopped
   hardcoding `"• "` on every line: `IngredientLine.isHeader` renders as a bold, bullet-less heading;
@@ -3963,7 +3975,7 @@ and opened it. Verified: `swift build` clean, `swift test` 131 pass (incl. new
 `stagedMakeAheadReviewItemWritesOnlyWhenCommitted` proving `run` stages nothing to the DB — only
 `item.commit()` writes), check-drift clean. App target build + device UI pass are Jon's.
 
-Effort doc: [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) § Slice B — **effort now
+Effort doc: [`docs/efforts/archive/cooking-workspace.md`](efforts/archive/cooking-workspace.md) § Slice B — **effort now
 complete** (Menu/Planner chat verbs + reader photo affordances named there as later efforts).
 
 ---
@@ -3990,7 +4002,7 @@ First of two slices; implements [ADR-0011](decisions/ADR-0011-actionable-chat-ma
 - **Deferred to Slice B / roadmap:** action-verb strings still hardcoded (`"Saving make-ahead…"` — Slice B
   reshapes that surface); reader photo affordances (manual set-as-cover, pinch-zoom) → effort doc roadmap.
 
-Effort doc: [`docs/efforts/cooking-workspace.md`](efforts/cooking-workspace.md) § Slice A.
+Effort doc: [`docs/efforts/archive/cooking-workspace.md`](efforts/archive/cooking-workspace.md) § Slice A.
 
 ---
 
@@ -4008,7 +4020,7 @@ design-free slices; ran in parallel with the cooking-workspace design.
   (`RecipeChatModel.selectedProvider` / `availableProviders` / `activeTier`). No new backend — surfaced
   LLMClientKit's existing `OpenAIModelClient`; mirrors Galavant's provider-picker shape.
 
-Effort doc: [`docs/efforts/dogfood-fixes-batch-2.md`](efforts/dogfood-fixes-batch-2.md).
+Effort doc: [`docs/efforts/archive/dogfood-fixes-batch-2.md`](efforts/archive/dogfood-fixes-batch-2.md).
 
 ---
 
@@ -4027,7 +4039,7 @@ Final slice of the dogfood-driven multiplier rework; closes the effort.
   constructions were routed through the `ScaleContext` seam (`RecipeLibraryView`/`MenuViews`/
   `MealCalendarViews`).
 
-Effort doc: [`docs/efforts/recipe-multiplier-rework.md`](efforts/recipe-multiplier-rework.md) — **complete**.
+Effort doc: [`docs/efforts/archive/recipe-multiplier-rework.md`](efforts/archive/recipe-multiplier-rework.md) — **complete**.
 
 ---
 
@@ -4053,7 +4065,7 @@ left orphaned after the quick buttons were removed, and an inert `.disabled()` o
 (the real clamp lives in `scalePickerChanged`). Duplicated fraction tables across the module boundary
 (`IngredientScaler.commonFractions` vs `ScaleText`/`ScaleFraction`) noted as acceptable, not a change request.
 
-Effort doc: [`docs/efforts/recipe-multiplier-rework.md`](efforts/recipe-multiplier-rework.md).
+Effort doc: [`docs/efforts/archive/recipe-multiplier-rework.md`](efforts/archive/recipe-multiplier-rework.md).
 
 ---
 
@@ -4080,7 +4092,7 @@ placeholder. (2) MEDIUM — apply action hardcoded `.frontier(.anthropic)` inste
 fixed by threading `tier` through `MakeAheadPlanClient`, with a regression test. (3) LOW — apply errors
 dumped raw enum values; fixed by extracting the shared `RecipeChatErrorText.describe`.
 
-Effort doc: [`docs/efforts/actionable-chat-make-ahead.md`](efforts/actionable-chat-make-ahead.md).
+Effort doc: [`docs/efforts/archive/actionable-chat-make-ahead.md`](efforts/archive/actionable-chat-make-ahead.md).
 Remaining named-but-deferred work (Galavant adoption = ADR-0031 Slice 3; jon-platform cross-app ADR =
 Slice 4) lives in other repos, "after the shape holds here."
 

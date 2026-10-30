@@ -34,7 +34,7 @@ Categories, and tap Library, Cuisine, and Course individually to confirm each op
 without clipping. Type `90` into Prep time and tap Save without pressing Done; confirm it saves as 90. On iPhone, confirm both
 editor sections stay stacked and Ask opens the chat sheet. Check the photo paste button aligns with Add Photo.
 
-**Before the CloudSyncKit backup lift's Yes Chef PR merges** ([effort brief](efforts/cloudsynckit-backup-lift.md)).
+**Before the CloudSyncKit backup lift's Yes Chef PR merges** ([effort brief](efforts/archive/cloudsynckit-backup-lift.md)).
 Export a backup from the current build and store it off-device (Files / iCloud Drive). It's insurance before the
 code behind ADR-0056's re-seed moves. After the lift merges, the restore path's first real-device run is
 ADR-0056 Phase 4 (`PROD-CUTOVER.md`), which then covers the lifted code for both apps.
@@ -43,7 +43,7 @@ ADR-0056 Phase 4 (`PROD-CUTOVER.md`), which then covers the lifted code for both
 the device, Settings → **Restore from a Backup** can select a Yes Chef `.sqlite` backup (it is not greyed out). Then pick
 a Galavant backup or any other non–Yes Chef file and confirm restore refuses it as not a Yes Chef backup.
 
-**NYT capture fidelity** ([effort brief](efforts/nyt-capture-fidelity.md)). In the in-app browser, capture the
+**NYT capture fidelity** ([effort brief](efforts/archive/nyt-capture-fidelity.md)). In the in-app browser, capture the
 NYT carrot cake and confirm it shows “For the cake” and “For the frosting,” with author “Genevieve Ko.” Save
 without tapping a tag and confirm none were added. Then capture a second NYT recipe through the share sheet
 and confirm it saves without tags.
@@ -53,17 +53,17 @@ To…** on the loose **Salad** tag to move it to **Dish Type > Salad** with "Del
 message counts, that the recipes show Dish Type > Salad, that loose Salad is gone, and that the change arrives
 on the iPhone.
 
-**Power Browser responsiveness + reader header wrapping** ([effort brief](efforts/power-browser-perf-and-reader-header.md),
+**Power Browser responsiveness + reader header wrapping** ([effort brief](efforts/archive/power-browser-perf-and-reader-header.md),
 schema-free). On iPad with the full library, remove a Power Browser selection and confirm the result updates
 immediately. After visiting Power Browser, move a category in Settings and confirm it is no slower than before
 the visit. In a narrow directions column, open Whipped Feta: the title is readable, servings stays on one line,
 and **Edit Tags** is visible and tappable.
 
-**Reader count scaling — count-only amounts and unit agreement** ([effort brief](efforts/reader-count-scaling.md),
+**Reader count scaling — count-only amounts and unit agreement** ([effort brief](efforts/archive/reader-count-scaling.md),
 schema-free). In the soup at 4 → 8 servings, confirm the reader shows `2 large onion`, `2 large carrot`,
 `6 garlic cloves`, and `¼ teaspoon red-pepper flakes`.
 
-**Ingredient range scaling — reader, grocery, and sync** ([effort brief](efforts/ingredient-range-scaling.md),
+**Ingredient range scaling — reader, grocery, and sync** ([effort brief](efforts/archive/ingredient-range-scaling.md),
 schema-free). Scale an `8-10 ounces` ingredient to 2× and ½× in the reader and confirm both range ends
 change. Add the recipe to grocery at 2× and confirm the upper bound is 20 oz. On a second device, confirm
 the repaired parse fields for existing range lines arrive through sync.

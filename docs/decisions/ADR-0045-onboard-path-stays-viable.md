@@ -209,7 +209,7 @@ without a seeded discussion). V3 is independent of both and should follow ADR-00
 
 Accepted 2026-07-24, from the architect review of PR [#227](https://github.com/jonphillips/yes-chef/pull/227)
 (V1's first implementation). Ships on V1's own branch via
-[`docs/efforts/adr-0045-v1-review-fixes.md`](../efforts/adr-0045-v1-review-fixes.md) — this is a correction
+[`docs/efforts/archive/adr-0045-v1-review-fixes.md`](../efforts/archive/adr-0045-v1-review-fixes.md) — this is a correction
 to V1 before it merges, not a later slice.
 
 **What D2 did not anticipate.** *"Reuse the existing `.discuss` prompt"* is right about the **authored
@@ -352,7 +352,7 @@ amendment, false after it, and "seeded" is internal vocabulary besides.
 **This contract is the reason to settle it now.** Every embedded panel — Recipe, Menu, Calendar, Workbench —
 renders the same `RecipeChatPanel` header, and the modal sheet path groups its trailing controls the same way.
 Settling the shape before it spreads is cheaper than harmonizing four copies later, which is the drift this
-ADR's own ferry dispatch exists to undo. Implementation: `efforts/dogfood-ferry-2026-07-25.md` **Slice G5**.
+ADR's own ferry dispatch exists to undo. Implementation: `efforts/archive/dogfood-ferry-2026-07-25.md` **Slice G5**.
 
 ## Related
 

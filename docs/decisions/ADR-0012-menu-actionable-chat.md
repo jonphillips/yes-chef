@@ -3,7 +3,7 @@
 Status: **Accepted** (2026-07-03, resolved in design session with Jon). Extends **ADR-0011**
 (actionable chat, the recipe-scope instance) to a **composite subject**. Binds jon-platform
 `docs/ios/actionable-chat.md`. Realizes the "Menu + Meal-Planner chat verbs" effort in
-`docs/efforts/cooking-workspace.md`, **Menu surface only** — the Meal-Planner (`MealPlanItem`,
+`docs/efforts/archive/cooking-workspace.md`, **Menu surface only** — the Meal-Planner (`MealPlanItem`,
 absolute-date) surface is a named follow-on, not this ADR.
 
 ## Context
@@ -129,7 +129,7 @@ one-field-per-verb corrupts the model and the UI):
 ## Amendment 1 — Menu AI context: tier-aware budget, prep plan in-context, living-artifact refinement
 
 Accepted 2026-07-05 (design session with Jon). Ships in the **menu planning overhaul** dispatch
-(`docs/efforts/menu-planning-ux.md`), not the original slices. Three fixes to how the menu chat is
+(`docs/efforts/archive/menu-planning-ux.md`), not the original slices. Three fixes to how the menu chat is
 grounded, all in `MenuChatContext` (`RecipeChat.swift`) + the prep-plan flow:
 
 - **A1 — The 12K character budget is tier-aware, not a flat cap.** `serializedCharacterBudget = 12_000`
@@ -151,7 +151,7 @@ Invariant unchanged: the model proposes and structures; the human's tap is the o
 ## Amendment 2 — Complement suggestions carry a body (ingredients live in the note)
 
 Accepted 2026-07-09 (dogfood pass 2026-07-09, menu-planner). Ships in
-`docs/efforts/dogfood-fixes-menu-planner-2026-07-09.md`. One fix to what the "What complements this?" verb
+`docs/efforts/archive/dogfood-fixes-menu-planner-2026-07-09.md`. One fix to what the "What complements this?" verb
 captures.
 
 **The defect.** A complement suggestion is **title-only**: `MenuComplementSuggestion`

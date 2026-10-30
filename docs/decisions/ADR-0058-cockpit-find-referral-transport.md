@@ -5,7 +5,7 @@ Status: **Accepted — 2026-09-24.** D1, the transport choice, was ratified by J
 narrow exception to Cockpit's `APP-FAMILY-INTERACTION.md` §9. D2–D6 were accepted on the merge of
 [#324](https://github.com/jonphillips/yes-chef/pull/324), and all six were built in
 [#325](https://github.com/jonphillips/yes-chef/pull/325). Worked design + slice detail:
-[`../efforts/cockpit-find-handoff-receiver.md`](../efforts/cockpit-find-handoff-receiver.md). Amends
+[`../efforts/archive/cockpit-find-handoff-receiver.md`](../efforts/archive/cockpit-find-handoff-receiver.md). Amends
 [ADR-0053 Amd2-D3](ADR-0053-create-recipe-destination.md#amd2-d3--reuse-the-shipped-operation-no-new-parser-no-url-scheme)
 (no URL scheme) for this one door; Amd2-D1/D2/D4 are unchanged.
 

@@ -131,6 +131,6 @@ prod/TestFlight cut. That deadline, not aesthetics, is what makes this urgent.
   invisibly," and "I'm on the wrong build" all looked identical. Every import path ends in a **visible
   outcome** — what landed, or what didn't and why.
 
-**Sequenced ahead of [ADR-0038 S3b](../efforts/adr-0038-external-llm-handoff.md)** — S3b adds two more sources
+**Sequenced ahead of [ADR-0038 S3b](../efforts/archive/adr-0038-external-llm-handoff.md)** — S3b adds two more sources
 writing LLM content into more fields, and it should inherit this rule rather than add three more places that
 need retrofitting.

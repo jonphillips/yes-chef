@@ -2,7 +2,7 @@
 
 Status: **Accepted** — opened 2026-07-25 from Jon's ferry dogfood pass ("like on Apple Music, let's have the
 buttons so you can move the tab bar to the top and then back to the side"); **ratified 2026-08-08** after
-[`efforts/dogfood-ferry-2026-07-25.md`](../efforts/dogfood-ferry-2026-07-25.md) Dispatch 1 landed (Slice A's
+[`efforts/archive/dogfood-ferry-2026-07-25.md`](../efforts/archive/dogfood-ferry-2026-07-25.md) Dispatch 1 landed (Slice A's
 shared expand control shipped 2026-07-26), scoped against the real post-extraction code. The container rewrite,
 the answered open questions, and the two-slice plan are in **Ratification** below. Governed by
 [ADR-0039](ADR-0039-playbook-column-thinking-vs-doing.md) (the sidebar-icon collision this must not reproduce).
@@ -57,7 +57,7 @@ as a navigation preference. **The mitigation is sequencing and isolation, not cl
 
 ## Sequencing (binding)
 
-1. **[`efforts/dogfood-ferry-2026-07-25.md`](../efforts/dogfood-ferry-2026-07-25.md) Dispatch 1 lands first.**
+1. **[`efforts/archive/dogfood-ferry-2026-07-25.md`](../efforts/archive/dogfood-ferry-2026-07-25.md) Dispatch 1 lands first.**
    Its Slice A extracts the full-screen expand control into **one** definition. That control reads
    `columnVisibility`, whose ownership **moves** under this ADR — from one app-level split to one split per
    tab. Doing the extraction first means this ADR re-points a single call site instead of four.
@@ -106,7 +106,7 @@ so `.tabViewStyle(.sidebarAdaptable)` + `TabViewCustomization` are available unc
 
 **S2 — the chat presentation merge (the deferred half; separate PR, after S1 device-passes).** Reconcile the
 Calendar/Workbench **detent-sheet** chat vs the Recipe **inspector** chat now that all eight sites live in
-per-tab layouts. This is the deferred half [`efforts/chat-ask-uniformity.md`](../efforts/chat-ask-uniformity.md)
+per-tab layouts. This is the deferred half [`efforts/archive/chat-ask-uniformity.md`](../efforts/archive/chat-ask-uniformity.md)
 hands off — the *contract* is already unified (PR #244); only presentation remains. It genuinely needs S1's
 shell to exist, and it is product polish rather than structure, so it must **not** ride in S1.
 

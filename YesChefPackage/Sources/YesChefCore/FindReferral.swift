@@ -3,7 +3,7 @@ import Foundation
 /// A cross-app recipe referral from Cockpit's Find (M6 Gate 5). Cockpit sends the whole readable body
 /// plus provenance plus a fallible "this looks like a recipe" hint, and nothing more. **All** recipe
 /// intelligence is Yes Chef's: parsing, LLM extraction, 0/1/N cardinality, dedup, merge, admission, and
-/// the decline. See `docs/efforts/cockpit-find-handoff-receiver.md`.
+/// the decline. See `docs/efforts/archive/cockpit-find-handoff-receiver.md`.
 ///
 /// - Important: `referralID` is an **opaque, machine-only** correlation token — never surface it to the
 ///   cook. `provenance.contentPieceToken` is opaque Cockpit custody state — round-trip it untouched.

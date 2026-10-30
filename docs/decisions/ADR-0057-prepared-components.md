@@ -14,7 +14,7 @@ Accepted records the design is ratified, not that the build is queued. Origin: J
 right-sized rather than cheerled. The measured result is that most of the pitch is already our roadmap
 ([`../PRODUCT_BRIEF.md`](../PRODUCT_BRIEF.md), [`../FUTURE_INTELLIGENCE_AND_PLANNING.md`](../FUTURE_INTELLIGENCE_AND_PLANNING.md)
 §4.4/§11/§12/§14) and the one load-bearing new abstraction is small. Worked design + slice detail live in the
-companion effort [`../efforts/prepared-components.md`](../efforts/prepared-components.md). Governed by
+companion effort [`../efforts/archive/prepared-components.md`](../efforts/archive/prepared-components.md). Governed by
 [ADR-0056](ADR-0056-move-to-production-and-data-carry.md) + [`../PROD-CUTOVER.md`](../PROD-CUTOVER.md) (the one-way
 Dev→Prod schema deploy that makes *breaking* schema expensive after cutover, and why this is all additive),
 [ADR-0040](ADR-0040-editable-at-the-grain-it-is-stored.md) (editable at the grain stored), and the house style rule
@@ -119,7 +119,7 @@ A dish links to the components it uses at the **recipe** level, surfaced in its 
 
 The reason is cost, not ideology. An ingredient-line link needs a stable `ingredientRef` that survives a base-text
 edit — the exact anchor-repair failure mode that bit recipe variations when anchors were taken from model output
-(see [`../efforts/variation-anchor-repair.md`](../efforts/variation-anchor-repair.md)). That is a real rabbit hole,
+(see [`../efforts/archive/variation-anchor-repair.md`](../efforts/archive/variation-anchor-repair.md)). That is a real rabbit hole,
 and recipe-grain linking sidesteps it entirely while keeping most of the payoff.
 
 The cost, stated plainly so a future reader doesn't think it was missed: we **lose the inline behaviors** — a dish

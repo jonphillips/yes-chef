@@ -701,7 +701,7 @@ inferred cuisine.
 
 Status: **Accepted** — 2026-10-26, Jon, while reviewing the Development schema diff for
 [`PROD-CUTOVER.md`](../PROD-CUTOVER.md) Reference A. **Schema change, synced tables.** Built by
-[`efforts/prod-never-set-drop.md`](../efforts/prod-never-set-drop.md).
+[`efforts/archive/prod-never-set-drop.md`](../efforts/archive/prod-never-set-drop.md).
 
 **Why.** S1 step 3 left the two tables dormant and still registered with the sync engine. It made physical removal
 "a later, optional slice, or never", because dropping a synced table is itself a sync event. The Production cut
