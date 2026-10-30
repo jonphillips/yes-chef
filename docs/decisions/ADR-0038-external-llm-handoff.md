@@ -493,7 +493,7 @@ generic `stageReviewForKnownSource`).
 ## Amendment 7 — a `YC-LEARNINGS:` line is a learning (format-agnostic); the token, not the paste door, is the authority for scope (2026-08-23)
 
 **Status: Accepted** — 2026-08-23 (architect). Ships in the
-[learnings parser-floor effort](../efforts/handoff-learnings-parser-floor-2026-08-19.md). Amends **Amd 1**
+[learnings parser-floor effort](../efforts/archive/handoff-learnings-parser-floor-2026-08-19.md). Amends **Amd 1**
 (the two-part Deliverable + Learnings return), **Amd 4** (append-only ingest + exact dedup), and **D6** (route
 by ID first); extends **Amd 6**'s routing rule to the scope discriminators.
 
@@ -602,7 +602,7 @@ serializers. Sequenced to de-risk by proving the transport on the surface that *
 - **S3 — generalize the serializer (follow-up dispatch).** Recipe + MealPlan context builders on the D3
   pattern; wire each source's commit shape. Independent; rides after S1+S2.
 
-Build brief to live at `efforts/adr-0038-external-llm-handoff.md` when dispatched. Verify per
+Build brief to live at `efforts/archive/adr-0038-external-llm-handoff.md` when dispatched. Verify per
 [[lean-verification-default]] — build + check-drift for the core; **Jon's device pass** for the App
 Intents / Siri / Action Button loop (they need a device, not the simulator), which also settles the
 ChatGPT-action question (D5).

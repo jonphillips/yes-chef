@@ -123,7 +123,7 @@ passes on both `iPad Pro 13-inch (M5)` (both orientations) and `iPhone 17 Pro`.
 ## Related
 
 - ADR-0006 (vocabulary hygiene — "cook session" ≠ "Cooking Mode"), the cooking-workspace effort
-  ([`docs/efforts/cooking-workspace.md`](../efforts/cooking-workspace.md)) whose width-responsive Reader this
+  ([`docs/efforts/archive/cooking-workspace.md`](../efforts/archive/cooking-workspace.md)) whose width-responsive Reader this
   hosts.
 - Memory: [[menu-item-recipe-id-invariant]] (D6 filtering), [[post-browser-sync-vs-features-tension]] (why
   session-only done, D3), [[yeschef-milestone-arc]].

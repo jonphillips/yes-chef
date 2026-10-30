@@ -361,7 +361,7 @@ extension WorkbenchDraftRecipeClient: DependencyKey {
       // Effort is `.high` deliberately: drafting the working recipe is a user-initiated synthesis where
       // a good answer is worth a slow one — this is a personal app, not a request-bound server, so the
       // frontier session grants a generous request timeout to match (LLMClientKit `URLSession.frontier`).
-      // Surfacing effort as a user control is the real fix (see efforts/recipe-workbench.md).
+      // Surfacing effort as a user control is the real fix (see efforts/archive/recipe-workbench.md).
       prompt: prompt(selection: selection, messages: messages, context: context),
       maxTokens: 16_384,
       reasoningEffort: .high

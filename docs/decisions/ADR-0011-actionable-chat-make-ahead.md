@@ -1,7 +1,7 @@
 # ADR-0011 — Actionable chat, first verb: make-ahead distillation
 
 Status: **Accepted** — 2026-07-02 (Jon signed off same day; open questions resolved; Slice 1
-dispatched via `docs/efforts/actionable-chat-make-ahead.md`). Binds jon-platform
+dispatched via `docs/efforts/archive/actionable-chat-make-ahead.md`). Binds jon-platform
 `docs/ios/actionable-chat.md` (the cross-app pattern) and `docs/ios/ai-model-access.md` (the
 ModelClient boundary law) to Yes Chef. Yes Chef is the **first real consumer** of actionable
 chat; per galavant **ADR-0031** (proposed 2026-07-02, the Galavant home of the decision) the

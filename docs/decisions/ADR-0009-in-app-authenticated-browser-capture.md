@@ -58,4 +58,4 @@ flow already uses. The browser is a new **fetch seam, not a new write path**.
 - Two **content** gaps surfaced during M3 device use (hero image bytes, editorial-prose blocks) were
   handled as follow-on efforts, not part of this ADR; the capture *mechanism* is what this records.
 
-Build order and slice detail: [`../milestones/M3-authenticated-browser-capture.md`](../milestones/M3-authenticated-browser-capture.md).
+Build order and slice detail: [`../milestones/archive/M3-authenticated-browser-capture.md`](../milestones/archive/M3-authenticated-browser-capture.md).

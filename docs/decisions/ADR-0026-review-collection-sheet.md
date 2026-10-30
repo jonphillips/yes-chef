@@ -14,7 +14,7 @@ Status: **Accepted** — 2026-07-10 (Proposed 2026-07-09). Dogfood pass 2026-07-
 "the review area is too small" and asked that the NYT-comment-style slide-up sheet become the *universal*
 LLM-evaluation surface. Accepted after the 2026-07-10 architect pass reconciled the D1/D4 adjust-verb
 collision (→ launch-only row) and resolved OQ1/OQ3/OQ4 against current code; build brief:
-[`efforts/adr-0026-review-collection-sheet.md`](../efforts/adr-0026-review-collection-sheet.md). **Extends [ADR-0024](ADR-0024-editable-proposal-preview.md)** (which made the per-item review a
+[`efforts/archive/adr-0026-review-collection-sheet.md`](../efforts/archive/adr-0026-review-collection-sheet.md). **Extends [ADR-0024](ADR-0024-editable-proposal-preview.md)** (which made the per-item review a
 sheet) and **[ADR-0011](ADR-0011-actionable-chat-make-ahead.md)/[ADR-0012](ADR-0012-menu-actionable-chat.md)**
 (the `(extract → review → commit)` apply-action). **Serves [ADR-0025](ADR-0025-reader-comment-ingestion.md)**
 — reader-feedback curation is the other multi-item review and inherits this surface. A consumer of the

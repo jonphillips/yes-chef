@@ -10,12 +10,12 @@
 
 Status: **Accepted** — 2026-10-22, after S0's device pass confirmed D2 (OQ1 answered below). Proposed 2026-10-21.
 **Amended by jon-platform [ADR-0008](../../../../jon-platform/docs/adr/0008-automatic-scheduled-backups.md)** (2026-10-25,
-built by effort [`automatic-backups`](../efforts/automatic-backups.md)): the container's `Documents/` is now
+built by effort [`automatic-backups`](../efforts/archive/automatic-backups.md)): the container's `Documents/` is now
 published so automatic backups show in Files. D2's "the container is not published" no longer holds. `MCP/`
 sits outside `Documents/`, so it stays hidden.
 Origin: Jon, after Vinyl Fever M12 proved ChatGPT → MCP end to end ("we do a
 lot of copy/pasting of recipe prompts, and the resulting JSON recipe gets pasted back"). Queued after
-[`efforts/sync-failure-surfacing.md`](../efforts/sync-failure-surfacing.md). Effort:
+[`efforts/archive/sync-failure-surfacing.md`](../efforts/archive/sync-failure-surfacing.md). Effort:
 [`efforts/chat-access-mcp.md`](../efforts/chat-access-mcp.md). Builds on: jon-platform ADR-0007 (the kit, the
 inbox, and the tunnel ops) and its Amendment 1 (proposed with this ADR);
 [ADR-0042](ADR-0042-workbench-handoff-and-the-return-block.md) (deliberation happens in the chat app; a

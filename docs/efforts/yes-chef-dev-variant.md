@@ -28,7 +28,7 @@ The executor's builds are compile-only (`CODE_SIGNING_ALLOWED=NO`), so they don'
 ## Shape: two PRs, in order
 
 Yes Chef CI checks out jon-platform `main`, so the Yes Chef PR can only go green after the jon-platform PR
-merges. This is the same pattern as [`cloudsynckit-backup-lift.md`](cloudsynckit-backup-lift.md).
+merges. This is the same pattern as [`cloudsynckit-backup-lift.md`](archive/cloudsynckit-backup-lift.md).
 
 1. **jon-platform, branch `effort/yes-chef-dev-variant`: additive.** The backup variant marker goes into
    `packages/CloudSyncKit`. **Galavant `main` must still build and pass unchanged against it.** Check this by

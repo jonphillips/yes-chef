@@ -16,7 +16,7 @@ transient tools slide *over* (see the
 [Amendment 3](#amendment-3--2026-07-16-the-menu-playbook-is-permanent-and-transient-tools-go-over-it-not-beside-it) section).
 **[Amendment 4](#amendment-4--recipe-reader-density-and-playbook-order-2026-09-22)**
 (2026-09-22) sets the recipe-only Playbook order and moves its Ask entry into the sparkle toolbar menu;
-**accepted by Jon**, scoped in [recipe-reader-density](../efforts/recipe-reader-density.md).
+**accepted by Jon**, scoped in [recipe-reader-density](../efforts/archive/recipe-reader-density.md).
 **[Amendment 5](#amendment-5--recipe-playbook-moves-below-the-reader-2026-09-22)**
 (2026-09-22 device review) moves the recipe Playbook below Instructions in the Directions scroll;
 **accepted by Jon** and supersedes Amendment 4's retained right-column placement.
@@ -493,7 +493,7 @@ deliberate, not forgotten.
 ## Amendment 4 — recipe reader density and Playbook order (2026-09-22)
 
 **Status: Accepted — Jon-approved 2026-09-22.** Implementation contract:
-[recipe-reader-density](../efforts/recipe-reader-density.md). This is scoped to the recipe reader;
+[recipe-reader-density](../efforts/archive/recipe-reader-density.md). This is scoped to the recipe reader;
 Amendments 2 and 3's menu behavior stands. **The retained recipe right-column placement below was
 superseded by Amendment 5 after Jon reviewed the implementation on device.**
 
@@ -514,7 +514,7 @@ the underlying sections or Ask behavior, nor the menu Playbook. Variation placem
 ## Amendment 5 — recipe Playbook moves below the reader (2026-09-22)
 
 **Status: Accepted — Jon's device review, 2026-09-22.** The
-[effort's placement correction](../efforts/recipe-reader-density.md#follow-up-correction--remove-the-right-playbook-column)
+[effort's placement correction](../efforts/archive/recipe-reader-density.md#follow-up-correction--remove-the-right-playbook-column)
 is the implementation contract for the existing draft PR.
 
 The returned iPad layout still showed a third/right supplemental column because the effort had explicitly

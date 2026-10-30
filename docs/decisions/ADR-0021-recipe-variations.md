@@ -36,7 +36,7 @@ second part of this ADR that adds schema (one synced join table), and its consum
 (variation selection in the recipe header; related recipes separately in the Playbook) is **ACCEPTED —
 Jon-approved 2026-09-22**. It supersedes Amendment 4's combined Choices placement, not its two typed
 relations or their behavior. Implementation is scoped in
-[recipe-reader-density](../efforts/recipe-reader-density.md).
+[recipe-reader-density](../efforts/archive/recipe-reader-density.md).
 
 ## Context
 
@@ -651,7 +651,7 @@ goes relative to things it was not anchored to?* If yes, it stays out.
 
 **Cost:** schema-free — the `deltas` BLOB (Amd1-D3). `RecipeStepReference` reuses
 `RecipeMethodStepReplacement`'s anchoring, which the
-[variation-anchor-repair](../efforts/variation-anchor-repair.md) effort is repairing first — see the
+[variation-anchor-repair](../efforts/archive/variation-anchor-repair.md) effort is repairing first — see the
 sequencing note in Amd4-V4a.
 
 **Why these two and not more.** They are what Jon's own motivating example needs. Cook's Illustrated's shape
@@ -713,7 +713,7 @@ promotion list entry in this slice's own PR. **Two-device sync pass owed; back u
 **V4c — the two new ops.** `stepInsert` / `stepRemove` in Core with the derivation's minimality and
 round-trip tests extended, the two `UnrepresentableEdit` cases removed, and the reader rendering an inserted
 step as an addition in the same visual grammar as an added ingredient. **Gated behind
-[variation-anchor-repair](../efforts/variation-anchor-repair.md) Dispatch 1** — adding two more anchored op
+[variation-anchor-repair](../efforts/archive/variation-anchor-repair.md) Dispatch 1** — adding two more anchored op
 kinds while anchors are still unrepairable multiplies the defect rather than the feature.
 
 ### Open questions
@@ -818,7 +818,7 @@ to stage at all — see
 ## Amendment 5 — variation selection returns to the reader header (2026-09-22)
 
 **Status: Accepted — Jon-approved 2026-09-22.** See the
-[implementation brief](../efforts/recipe-reader-density.md) and its approved mockup.
+[implementation brief](../efforts/archive/recipe-reader-density.md) and its approved mockup.
 
 The Playbook's combined Choices section makes a cook select a variation deep in the right column, then
 scroll back to the Directions/Ingredients fold to see what changed. Its long variation text also repeats

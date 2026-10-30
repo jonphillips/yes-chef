@@ -167,7 +167,7 @@ $qr swift test --package-path YesChefMCP
 #
 # Execution stays opt-in because of the teardown hang above, not because
 # anything is known-red. If this stage ever
-# goes red, read docs/efforts/app-target-tests-to-core.md first: three of the
+# goes red, read docs/efforts/archive/app-target-tests-to-core.md first: three of the
 # five original failures were stale expectations left behind by an API swap that
 # nothing ever ran, so "the test is wrong" and "the code is wrong" are both live
 # possibilities. Do not edit assertions to match today's behavior without

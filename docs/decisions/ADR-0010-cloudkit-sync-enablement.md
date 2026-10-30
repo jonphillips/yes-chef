@@ -11,7 +11,7 @@ that must be settled **before** the flip, because CloudKit's first sync and its 
 one-way doors: the first `SyncEngine` start uploads every existing local row into the zone, and once
 a record field is deployed to Production it **cannot be deleted**. A planning session (2026-06-30)
 audited the solo-built schema and resolved those calls. This ADR records them; the build order lives
-in [`../milestones/M4-icloud-sync.md`](../milestones/M4-icloud-sync.md).
+in [`../milestones/archive/M4-icloud-sync.md`](../milestones/archive/M4-icloud-sync.md).
 
 The audit found the schema **already conformant**: single UUID text PKs everywhere
 (`DEFAULT (uuid())`), no unique or compound indexes, and no reserved-keyword column collisions (it
@@ -76,7 +76,7 @@ uses `dateCreated`/`dateModified`, not CloudKit's forbidden `creationDate`/`modi
 
 **Decision (Jon, 2026-10-13).** D2's "stop persisting raw import HTML in release builds" now covers **every** build
 configuration. `Recipe.originalImportText` is removed, and its column and data are dropped before the Production
-deploy. No export or debug store replaces it. Brief: [`efforts/raw-import-html-drop.md`](../efforts/raw-import-html-drop.md).
+deploy. No export or debug store replaces it. Brief: [`efforts/archive/raw-import-html-drop.md`](../efforts/archive/raw-import-html-drop.md).
 
 **Why.**
 - *The DEBUG exception leaked into the real library.* The DOM-export revival (PR #51) kept writing the page in

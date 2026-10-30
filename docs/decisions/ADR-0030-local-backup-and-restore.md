@@ -216,7 +216,7 @@ is the one thing standing between this design and full confidence in restore.
 
 Status: **Accepted** — 2026-07-29, two-simulator measurement in the isolated container
 (`iCloud.com.jonphillips.yescheftest`), protocol in
-[`efforts/adr-0030-oq6-oq7-measurement.md`](../efforts/adr-0030-oq6-oq7-measurement.md). Closes OQ6 and OQ7 and
+[`efforts/archive/adr-0030-oq6-oq7-measurement.md`](../efforts/archive/adr-0030-oq6-oq7-measurement.md). Closes OQ6 and OQ7 and
 **bounds Amendment 2's "restored values win every collision."**
 
 ### OQ7 — CLOSED clean: images survive the re-push byte-intact on the peer

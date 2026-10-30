@@ -68,7 +68,7 @@ Output: a foundation already trusted enough to build import on — confirmed, no
 
 Goal: make Paprika import trustworthy enough to bring Jon's real library in — the
 gate that must close before sync. **Build order:**
-[milestones/M1-paprika-import-hardening.md](milestones/M1-paprika-import-hardening.md)
+[milestones/archive/M1-paprika-import-hardening.md](milestones/archive/M1-paprika-import-hardening.md)
 (which opens with the Phase-A fold-in as Slice 0).
 
 - Mine Paprika feature-and-format parity systematically (its export formats, the
@@ -87,7 +87,7 @@ extension — so the app becomes his daily driver instead of Paprika. M1 lands t
 *existing* library; capture is what makes the *next* recipe land here. Sequenced
 **before sync** because a share extension is another write path: an un-idempotent
 capture pollutes the iCloud zone exactly like a bad bulk import. **Build order:**
-[milestones/M2-web-recipe-capture.md](milestones/M2-web-recipe-capture.md).
+[milestones/archive/M2-web-recipe-capture.md](milestones/archive/M2-web-recipe-capture.md).
 
 - Harvest Galavant's proven, same-stack capture engine (JSON-LD/microdata value-votes,
   headless rendered-DOM fetch) and re-target it to `schema.org/Recipe` — harvest now,
@@ -163,7 +163,7 @@ Paprika-parity-first, then the features that make Yes Chef next-gen:
 - Scaling and cooking-mode hardening (old roadmap M3).
 - Menu / meal-plan / grocery polish; ratify the Menus model (likely its own ADR).
   Grocery consolidation + pantry thresholds is specced ahead in
-  [milestones/grocery-consolidation-and-pantry.md](milestones/grocery-consolidation-and-pantry.md)
+  [milestones/archive/grocery-consolidation-and-pantry.md](milestones/archive/grocery-consolidation-and-pantry.md)
   (one canonical key, same-dimension unit merge, static pantry thresholds — deterministic,
   no inventory).
 - Send-a-recipe (Phase-1 transfer), then Family Cookbook (Phase-2, CloudKit
