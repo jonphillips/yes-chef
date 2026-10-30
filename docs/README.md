@@ -52,7 +52,7 @@ change is migration-aware.
   root, finished in [milestones/archive/](milestones/archive/).
 - For what's outstanding, run `jon-platform/scripts/outstanding`; no doc here is a status page.
 - [reviews/](reviews/) — architect review passes (historical and ongoing).
-- [work-intake.md](work-intake.md) — the full dispatch protocol behind `AGENTS.md` § Work Intake.
+- [work-intake.md](archive/work-intake.md) — the full dispatch protocol behind `AGENTS.md` § Work Intake.
 - [product-principles.md](product-principles.md) — recipe-model, UI, import, AI, and style
   principles plus the original MVP scope (moved out of `AGENTS.md` to keep it lean).
 

@@ -24,7 +24,7 @@ was lifted, nothing else:
 - **Tolerance semantics.** Missing/older marker ⇒ import anyway, carrying a non-blocking warning to
   the review surface (App Intents, in-app review, reader-feedback capture, new-recipe path); current
   `v3` ⇒ silent; *newer* marker ⇒ hard stop (the one case where decoding could misread a future
-  schema — consistent with [ADR-0040](decisions/ADR-0040-editable-at-the-grain-it-is-stored.md)
+  schema — consistent with [ADR-0040](../decisions/ADR-0040-editable-at-the-grain-it-is-stored.md)
   lossless-or-loud, the JSON decode being the real guard).
 - **Blocker #1 (galavant identity) handled at the seam, not in the package.** yes-chef passes the
   marker's *default neutral* `remediation` copy for warnings, and **translates** the package's
@@ -33,7 +33,7 @@ was lifted, nothing else:
   galavant-named internally (router, store, `unsupportedMarker` copy); **Path B (full de-galavant)
   stays deferred** per §4 — revisit only if a third consumer appears.
 
-Recorded as [ADR-0042 Amendment 5](decisions/ADR-0042-workbench-handoff-and-the-return-block.md#amendment-5--the-return-contract-marker-is-the-first-lift-from-llmhandoffkit-tolerant-not-strict-2026-08-16).
+Recorded as [ADR-0042 Amendment 5](../decisions/ADR-0042-workbench-handoff-and-the-return-block.md#amendment-5--the-return-contract-marker-is-the-first-lift-from-llmhandoffkit-tolerant-not-strict-2026-08-16).
 **One consequence to watch (flagged to Jon):** the tokenless bare-JSON reader-feedback shortcut now
 always shows the "missing contract marker" footnote, because that path by design carries no marker —
 a mild false-positive on an otherwise-legitimate paste. Left as-is pending a dogfood read.
