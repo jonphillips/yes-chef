@@ -32,3 +32,5 @@ discoverable"):
 - [yes-chef-dev-variant.md](yes-chef-dev-variant.md) — **Blocked** on [`PROD-CUTOVER.md`](../PROD-CUTOVER.md)
   Step 11 · Debug builds become **Yes Chef Dev**, its own app beside TestFlight Yes Chef, and backups record
   their build variant.
+- [pantry-seed-collision.md](pantry-seed-collision.md) — **Ready** · A fresh install no longer seeds pantry rows
+  with positional fixed IDs that overwrite another device's pantry; starters are added on request with canonical-name IDs.
