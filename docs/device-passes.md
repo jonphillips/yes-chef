@@ -27,12 +27,19 @@ confirm Settings explains why no file is written (G6). With a test library, shri
 half, foreground the next day, and confirm the earlier file stays pinned with a warning (G7).
 
 **Calendar day-rail actions and recipe-editor columns** (schema-free). On 11" and 13" iPad landscape with large Dynamic Type,
-confirm a filled day shows Cook these plus Day actions in the rail, Ask/Add stay in the toolbar, and all grocery and hand-off
+confirm a filled day shows Cook these plus Day actions in the rail, the Hand off menu and Add stay in the toolbar, and all grocery and hand-off
 actions remain available. Confirm an empty day offers Add Recipe and Add Note. Check recipe rows omit the kind label and titles
 stay within three lines. In Create Recipe, confirm Timing and Yield fits one row, Organization shows its three pickers before
 Categories, and tap Library, Cuisine, and Course individually to confirm each opens its own menu. The editor sheet falls back
 without clipping. Type `90` into Prep time and tap Save without pressing Done; confirm it saves as 90. On iPhone, confirm both
 editor sections stay stacked and Ask opens the chat sheet. Check the photo paste button aligns with Add Photo.
+
+**Control conventions** (schema-free). On iPad, take the screenshots the brief asked for: the meal calendar, a
+workbench, and a grocery list. Open the Hand off menu on the calendar, workbench, recipe and Menu Playbook column, and
+confirm Ask now shows a checkmark while chat is open and clears it on a second tap. Long-press a grocery item, a
+grocery source, a meal plan item, a menu placement, a category, a related recipe and a variation; each should open
+its context menu. Swipe a meal row in both the iPad landscape agenda rail and portrait. Swipe a related recipe on
+the wide recipe layout and a variation in Manage Variations. Each swipe should reveal its action.
 
 **Before the CloudSyncKit backup lift's Yes Chef PR merges** ([effort brief](efforts/archive/cloudsynckit-backup-lift.md)).
 Export a backup from the current build and store it off-device (Files / iCloud Drive). It's insurance before the

@@ -9,6 +9,21 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Control conventions conformance (`effort/control-conventions-conformance`)
+
+**2026-10-31. Schema-free, view-only; implements jon-platform `ui-and-platforms.md` § Controls (#99).** Every AI
+entry point is now the Hand off · Paste · Ask now menu. The meal calendar's menu holds Ask now alone, since the
+calendar has no hand-off of its own. The workbench's toolbar menu uses its compare hand-off. The Menu Playbook column
+carries a scoped copy. The Compare cover's menu is also Ask now alone, because a pasted review can't present over a
+full-screen cover. Ask now is a native `Toggle`, checked while chat is open. UI labels use **Hand off** casing,
+and the day-level hand-off menus use the sparkles menu icon with `Hand off · Prep` and similar items. List rows
+dropped their `ellipsis.circle` in favor of `.contextMenu`, and the most-used actions also have swipe actions.
+Stacks outside a `List` got `.swipeActionsContainer()`: the calendar's stacked content and agenda rail, the
+variation manager, and the wide recipe layout. The prep-plan card, Playbook section, calendar day header and
+grocery toolbar keep their `…`. CI, `check-drift.sh` and the generic iOS build passed. **Device pass owed — see
+`device-passes.md`** (it also covers the screenshots the brief asked for).
+
+---
 ## Brief archive sweep (`plan/archive-sweep`)
 
 **2026-10-30. Docs only; jon-platform ADR-0005 D10–D11's one-time sweep.** `scripts/archive-brief` moved 80

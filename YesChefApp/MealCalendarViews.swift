@@ -256,6 +256,7 @@ private struct MealCalendarAgendaRail: View {
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .swipeActionsContainer()
     .background(.background)
   }
 }
