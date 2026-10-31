@@ -6,19 +6,60 @@ struct PowerBrowserView: View {
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   var body: some View {
+    @Bindable var model = model
     let result = model.result
 
-    NavigationSplitView {
-      PowerBrowserFacetsView(model: model, result: result)
-    } detail: {
-      PowerBrowserResultsView(model: model, result: result, onRecipeSelected: onRecipeSelected)
+    Group {
+      if model.isShowingLensShelves {
+        NavigationStack {
+          RecipeLensShelvesView(model: model, onRecipeSelected: onRecipeSelected)
+        }
+      } else {
+        NavigationSplitView {
+          PowerBrowserFacetsView(model: model, result: result)
+        } detail: {
+          PowerBrowserResultsView(model: model, result: result, onRecipeSelected: onRecipeSelected)
+        }
+        .navigationSplitViewStyle(.balanced)
+        .onChange(of: result.availableFacets.map(\.id), initial: true) { _, facetIDs in
+          model.availableFacetsAppeared(facetIDs)
+        }
+      }
     }
-    // Facets and results are peer work areas, so this intentionally stays balanced rather than
-    // adopting a focus toggle intended for master/detail surfaces.
-    .navigationSplitViewStyle(.balanced)
-    .onChange(of: result.availableFacets.map(\.id), initial: true) { _, facetIDs in
-      model.availableFacetsAppeared(facetIDs)
+    .toolbar {
+      ToolbarItem(placement: .principal) {
+        Picker("Recipe Lens", selection: $model.selectedLensID) {
+          Text("All recipes").tag(Optional<RecipeLens.ID>.none)
+          ForEach(model.lensLibrary.lenses) { lens in Text(lens.name).tag(Optional(lens.id)) }
+        }
+        .pickerStyle(.menu)
+        .onChange(of: model.selectedLensID) { _, id in model.lensSelectionChanged(id) }
+      }
+      ToolbarItem(placement: .primaryAction) {
+        if model.isEditingSavedQuery {
+          Button("Save query") { model.saveQueryEditsButtonTapped() }
+        } else if model.selectedLens != nil {
+          Button("Edit Lens", systemImage: "slider.horizontal.3") { model.editLensButtonTapped() }
+        } else {
+          Button("Save as Lens", systemImage: "bookmark") { model.saveAsLensButtonTapped() }
+        }
+      }
     }
+    .sheet(item: $model.destination) { destination in
+      switch destination {
+      case .saveLens:
+        SaveRecipeLensView(model: model)
+      case let .editLens(id):
+        if let lens = model.lensLibrary.lenses.first(where: { $0.id == id }) {
+          RecipeLensEditorView(model: model, lens: lens)
+        }
+      case let .seeAll(title, ids):
+        LensSeeAllView(title: title, rows: model.recipeRows(for: RecipeBrowserResult(matchingRecipeIDs: ids, availableFacets: [])), onRecipeSelected: onRecipeSelected)
+      }
+    }
+    .alert("Lens Error", isPresented: $model.isShowingLensError) {
+      Button("OK") { model.lensError = nil }
+    } message: { Text(model.lensError ?? "") }
   }
 }
 

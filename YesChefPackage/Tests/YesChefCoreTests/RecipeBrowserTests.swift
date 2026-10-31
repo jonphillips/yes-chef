@@ -8,6 +8,112 @@ extension RecipeCoreTests {
   @Suite
   struct RecipeBrowserTests {
     @Test
+    func lensShelvesIntersectIndependentlyAndOverlapsStayOutOfRemainder() throws {
+      let fixture = BrowserFixture()
+      let base = try RecipeLensQueryCodec.encode(RecipeBrowserQuery())
+      let korean = try RecipeLensQueryCodec.encode(RecipeBrowserQuery(
+        facetSelections: [.init(facetID: fixture.cuisine.id, categoryIDs: [fixture.korean.id])]
+      ))
+      let weeknight = try RecipeLensQueryCodec.encode(RecipeBrowserQuery(looseLabelIDs: [fixture.weeknight.id]))
+      let lens = RecipeLens(
+        id: fixture.ids.next(), name: "All", baseQuery: base, sortOrder: 0,
+        dateCreated: fixture.now, dateModified: fixture.now
+      )
+      let first = RecipeLensShelf(id: fixture.ids.next(), lensID: lens.id, title: "Korean", query: korean, sortOrder: 0)
+      let second = RecipeLensShelf(id: fixture.ids.next(), lensID: lens.id, title: "Weeknight", query: weeknight, sortOrder: 1)
+
+      let result = RecipeLensEvaluator.evaluate(
+        lens: lens, shelves: [first, second], using: fixture.engine,
+        facets: [fixture.cuisine, fixture.protein],
+        categories: [fixture.korean, fixture.mexican, fixture.beef, fixture.tenderloin, fixture.pork, fixture.weeknight]
+      )
+
+      #expect(result.shelves[0].state == .ready([fixture.koreanBeef.id, fixture.koreanPork.id]))
+      #expect(result.shelves[1].state == .ready([fixture.koreanPork.id]))
+      #expect(result.remainderRecipeIDs == [fixture.mexicanBeef.id, fixture.mexicanPork.id])
+    }
+
+    @Test
+    func lensSameFacetBaseAndShelfSelectsOnlyDescendant() throws {
+      let fixture = BrowserFixture()
+      let oaxacan = YesChefCore.Category(
+        id: fixture.ids.next(), name: "Oaxacan", facetID: fixture.cuisine.id,
+        parentCategoryID: fixture.mexican.id, sortOrder: 0, dateCreated: fixture.now
+      )
+      let oaxacanRecipe = RecipeBrowserRecipe(id: fixture.ids.next(), title: "Mole", dateCreated: fixture.now, dateModified: fixture.now)
+      let engine = RecipeBrowserEngine(
+        recipes: [fixture.koreanBeef, fixture.mexicanBeef, fixture.mexicanPork, oaxacanRecipe],
+        recipeCategories: [
+          .init(id: fixture.ids.next(), recipeID: fixture.koreanBeef.id, categoryID: fixture.korean.id),
+          .init(id: fixture.ids.next(), recipeID: fixture.mexicanBeef.id, categoryID: fixture.mexican.id),
+          .init(id: fixture.ids.next(), recipeID: fixture.mexicanPork.id, categoryID: fixture.mexican.id),
+          .init(id: fixture.ids.next(), recipeID: oaxacanRecipe.id, categoryID: oaxacan.id),
+        ], categories: [fixture.korean, fixture.mexican, oaxacan], facets: [fixture.cuisine]
+      )
+      let base = try RecipeLensQueryCodec.encode(RecipeBrowserQuery(
+        facetSelections: [.init(facetID: fixture.cuisine.id, categoryIDs: [fixture.mexican.id])]
+      ))
+      let query = try RecipeLensQueryCodec.encode(RecipeBrowserQuery(
+        facetSelections: [.init(facetID: fixture.cuisine.id, categoryIDs: [oaxacan.id])]
+      ))
+      let lens = RecipeLens(id: fixture.ids.next(), name: "Mexican", baseQuery: base, sortOrder: 0, dateCreated: fixture.now, dateModified: fixture.now)
+      let shelf = RecipeLensShelf(id: fixture.ids.next(), lensID: lens.id, title: "Oaxacan", query: query, sortOrder: 0)
+
+      let result = RecipeLensEvaluator.evaluate(lens: lens, shelves: [shelf], using: engine, facets: [fixture.cuisine], categories: [fixture.korean, fixture.mexican, oaxacan])
+
+      #expect(result.shelves[0].state == .ready([oaxacanRecipe.id]))
+    }
+
+    @Test
+    func corruptShelfAndDeletedValueAreUnresolved() throws {
+      let fixture = BrowserFixture()
+      let lens = RecipeLens(
+        id: fixture.ids.next(), name: "Lens", baseQuery: try RecipeLensQueryCodec.encode(RecipeBrowserQuery()),
+        sortOrder: 0, dateCreated: fixture.now, dateModified: fixture.now
+      )
+      let corrupt = RecipeLensShelf(id: fixture.ids.next(), lensID: lens.id, title: "Corrupt", query: "{", sortOrder: 0)
+      let deleted = RecipeLensShelf(
+        id: fixture.ids.next(), lensID: lens.id, title: "Deleted",
+        query: try RecipeLensQueryCodec.encode(RecipeBrowserQuery(looseLabelIDs: [fixture.ids.next()])), sortOrder: 1
+      )
+      let merged = RecipeLensShelf(
+        id: fixture.ids.next(), lensID: lens.id, title: "Merged",
+        query: try RecipeLensQueryCodec.encode(RecipeBrowserQuery(
+          facetSelections: [.init(facetID: fixture.cuisine.id, categoryIDs: [fixture.beef.id])]
+        )), sortOrder: 2
+      )
+
+      let result = RecipeLensEvaluator.evaluate(
+        lens: lens, shelves: [corrupt, deleted, merged], using: fixture.engine,
+        facets: [fixture.cuisine, fixture.protein],
+        categories: [fixture.korean, fixture.mexican, fixture.beef, fixture.tenderloin, fixture.pork, fixture.weeknight]
+      )
+
+      #expect({ if case .unresolved = result.shelves[0].state { true } else { false } }())
+      #expect({ if case .unresolved = result.shelves[1].state { true } else { false } }())
+      #expect({ if case .unresolved = result.shelves[2].state { true } else { false } }())
+    }
+
+    @Test
+    func unresolvedBaseMakesEveryShelfUnresolved() throws {
+      let fixture = BrowserFixture()
+      let lens = RecipeLens(id: fixture.ids.next(), name: "Lens", baseQuery: "{}", sortOrder: 0, dateCreated: fixture.now, dateModified: fixture.now)
+      let shelf = RecipeLensShelf(
+        id: fixture.ids.next(), lensID: lens.id, title: "Korean",
+        query: try RecipeLensQueryCodec.encode(RecipeBrowserQuery()), sortOrder: 0
+      )
+
+      let result = RecipeLensEvaluator.evaluate(
+        lens: lens, shelves: [shelf], using: fixture.engine,
+        facets: [fixture.cuisine, fixture.protein],
+        categories: [fixture.korean, fixture.mexican, fixture.beef, fixture.tenderloin, fixture.pork, fixture.weeknight]
+      )
+
+      #expect({ if case .unresolved = result.baseState { true } else { false } }())
+      #expect({ if case .unresolved = result.shelves[0].state { true } else { false } }())
+    }
+
+    @Test
     func facetSelectionsOrWithinAFacetAndAndAcrossFacetsWithSelfExcludingCounts() throws {
       let fixture = BrowserFixture()
       let query = RecipeBrowserQuery(

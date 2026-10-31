@@ -248,6 +248,8 @@ private let persistedTableModels = [
   persistedTableModel(RecipeServeWith.self),
   persistedTableModel(RecipeVariation.self),
   persistedTableModel(RecipeActiveVariation.self),
+  persistedTableModel(RecipeLens.self),
+  persistedTableModel(RecipeLensShelf.self),
   persistedTableModel(Workbench.self),
   persistedTableModel(WorkbenchCandidate.self),
   persistedTableModel(WorkbenchLogEntry.self),

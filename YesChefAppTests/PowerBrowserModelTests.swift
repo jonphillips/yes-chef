@@ -164,6 +164,61 @@ struct PowerBrowserModelTests {
   }
 
   @Test
+  func selectingLensLoadsItsBaseAndAllRecipesReturnsToBrowser() throws {
+    let now = Date(timeIntervalSinceReferenceDate: 904_900_000)
+    let query = RecipeBrowserQuery(text: "taco")
+    let lens = RecipeLens(
+      id: SampleUUIDSequence.uuid(94_901), name: "Tacos",
+      baseQuery: try RecipeLensQueryCodec.encode(query), sortOrder: 0,
+      dateCreated: now, dateModified: now
+    )
+    try withDependencies {
+      try $0.bootstrapDatabase()
+    } operation: {
+      let model = PowerBrowserModel()
+      model.lensSelectionChanged(lens.id, using: lens)
+      #expect(model.selectedLensID == lens.id)
+      #expect(model.query == query)
+
+      model.lensSelectionChanged(nil)
+      #expect(model.selectedLensID == nil)
+      #expect(model.query == RecipeBrowserQuery())
+    }
+  }
+
+  @Test
+  func savingAsLensPersistsCurrentQueryAndShelfReorderKeepsIDs() async throws {
+    let now = Date(timeIntervalSinceReferenceDate: 904_910_000)
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.uuid = .incrementing
+      $0.date.now = now
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      let model = PowerBrowserModel()
+      model.query = RecipeBrowserQuery(text: "salsa")
+      model.saveLensButtonTapped(name: "Salsa")
+      let lens = try await database.read { db in try #require(RecipeLens.fetchAll(db).first) }
+      #expect(try RecipeLensQueryCodec.decode(lens.baseQuery) == model.query)
+
+      let first = try await database.write { db in
+        try RecipeLensRepository.addShelf(lensID: lens.id, title: "First", query: RecipeBrowserQuery(), in: db, uuid: { UUID() })
+      }
+      let second = try await database.write { db in
+        try RecipeLensRepository.addShelf(lensID: lens.id, title: "Second", query: RecipeBrowserQuery(), in: db, uuid: { UUID() })
+      }
+      try await database.write { db in
+        try RecipeLensRepository.reorderShelves(lensID: lens.id, orderedIDs: [second.id, first.id], in: db)
+      }
+      let reordered = try await database.read { db in
+        try RecipeLensShelf.where { $0.lensID.eq(lens.id) }.order { $0.sortOrder }.fetchAll(db)
+      }
+      #expect(reordered.map(\.id) == [second.id, first.id])
+      #expect(reordered.map(\.sortOrder) == [0, 1])
+    }
+  }
+
+  @Test
   func browserDataPhotoIDsExcludeNilThumbnailsAndReferenceDocuments() async throws {
     let now = Date(timeIntervalSinceReferenceDate: 904_200_000)
     let includedRecipeID = SampleUUIDSequence.uuid(94_301)

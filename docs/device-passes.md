@@ -231,3 +231,9 @@ Retired. A deploy copies the **whole** Development schema, so the deploy is deci
 diff in [`PROD-CUTOVER.md`](PROD-CUTOVER.md) Reference A, not by a hand-kept list. Every item this list carried
 is either already in Development or settled there: the pantry thresholds are created in Step 5, and
 `Category.color` is dropped in Step 1. The executed steps are PROD-CUTOVER Steps 5–6.
+
+
+## Recipe Lenses (ADR-0050 Amendment 1, L1 + L2)
+
+- [ ] **Held ops before the next TestFlight build:** On a simulator Debug build against Development, create a Lens with a shelf so both new record types and every field upload with a non-nil value. Re-export Development and diff against [`PROD-CUTOVER.md`](PROD-CUTOVER.md) Reference A, then deploy Development → Production.
+- [ ] **iPad device pass:** Check the Lens shelf view and editor after the schema deploy.

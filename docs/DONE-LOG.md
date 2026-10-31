@@ -1,5 +1,11 @@
 # Done Log
 
+## 2026-10-31 — Recipe Lenses (L1 + L2)
+Implemented ADR-0050 Amendment 1 with synced Lens and shelf records, independent query intersection, remainder evaluation, saved Lens management, and the iPad Power Browser shelf surface. Added the Development-to-Production held operations and iPad device gates to `docs/device-passes.md`.
+
+- Branch: `effort/recipe-lenses`
+- Verification: `scripts/check-drift.sh`, generic iOS build, and `YesChefTests` passed.
+
 Archive of completed efforts, the implemented-behavior checkpoint, and strategic
 background. **Read-rarely, append-on-approval.** No dispatch instruction should ever
 point the coding agent (or the architect during a dispatch) at this file — it is a

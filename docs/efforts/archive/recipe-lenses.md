@@ -3,7 +3,7 @@
 Status: Dispatched
 Summary: Saved Lenses in the Power Browser: a base query plus ordered shelves of recipes, each shelf a query intersected with the base. Replaces ADR-0050 S4 (saved browsers); slices L1 + L2 in one PR.
 
-Implements: [ADR-0050 Amendment 1](../decisions/ADR-0050-recipe-power-browser.md#amendment-1--saved-browsers-become-lenses-a-base-query-plus-ordered-shelves-2026-10-31).
+Implements: [ADR-0050 Amendment 1](../../decisions/ADR-0050-recipe-power-browser.md#amendment-1--saved-browsers-become-lenses-a-base-query-plus-ordered-shelves-2026-10-31).
 The amendment is the design; read A1-D1 through A1-D7 before starting. This brief only adds where things go and
 what done looks like. **Synced-schema change: two new tables.**
 
