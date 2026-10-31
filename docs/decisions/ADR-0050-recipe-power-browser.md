@@ -232,7 +232,8 @@ Nothing here is dispatchable until ADR-0049 Amd 2 is ratified and its data pass 
 - **S3.5 — re-point `RecipeActiveFilterBar` onto the engine** (OQ2). A deletion, not an addition; the filter
   bar's UI is unchanged. Do this *after* the engine is proven, and treat "the phone list and the browser now
   agree on what a selection means" as its acceptance test.
-- **S4 — saved browsers**, including D9's unresolved-selection repair.
+- **S4 — saved browsers**, including D9's unresolved-selection repair. **Replaced by Amendment 1** (Lenses):
+  a saved browser is a zero-shelf Lens, built in slices L1–L2.
 - **S5 — iPhone presentation** over the same engine.
 - **S6 — classification diagnostics and cleanup entry points**, promoted out of D8's dev-only scaffolding.
   **Partial: the existing facet work list is a Release labeling surface** (`Settings → Label Recipes`) that routes
@@ -312,3 +313,143 @@ Nothing here is dispatchable until ADR-0049 Amd 2 is ratified and its data pass 
   is pure UI. It touches the deferred `selectionMode` column (ADR-0049 D8) **only** if the schema must actively
   *prevent* a second value — which the soft convention says it must not. Ship the picker as an affordance, not a
   data-model change.
+
+## Amendment 1 — saved browsers become **Lenses**: a base query plus ordered shelves (2026-10-31)
+
+**The want (Jon, 2026-10-31).** Browsing by one cuisine for a dinner returns a flat result, and the cook
+wants it laid out by what is appropriate to that cuisine: a Mexican view with a shelf of antojitos, a shelf of
+tacos, a shelf of salsas; an Indian view with curries, dals, breads. The layout is chosen by the cook, saved, and
+reopened any time. It is mostly an iPad surface. **S4's "saved browser" is one flat query, which cannot express
+this.** It also turns out to be the degenerate case of it.
+
+### A1-D1 — A Lens is a base query and an ordered list of shelves, and nothing else
+
+```swift
+struct RecipeLens {
+  var name: String
+  var baseQuery: RecipeBrowserQuery          // "Cuisine: Mexican"
+  var shelves: [Shelf]                        // ordered
+  var showsRemainder: Bool                    // A1-D3
+
+  struct Shelf {
+    var title: String                         // "Tacos"; defaults to the selected value's name
+    var query: RecipeBrowserQuery             // "Dish Type: Taco"
+  }
+}
+```
+
+Shapes are illustrative; the distinctions are binding. A shelf's predicate is **a full `RecipeBrowserQuery`, not a
+category id.** Tags are the expected common case and the editor leads with them, but a "Weeknight" shelf
+(`total time ≤ 45`) or a "Never cooked" shelf costs nothing extra and a category-only shelf would have to be
+widened later through a schema change. D7 still holds inside a shelf: an attribute is not a category there either.
+
+**A Lens with zero shelves is a saved browser.** S4 is therefore *replaced*, not built alongside: there is one
+saved thing, not two. Opening a zero-shelf Lens opens the Power Browser on its base query, which is exactly what
+S4 described. Opening a Lens with shelves opens the shelf view.
+
+**Still a typed query, still no recipe-id membership** (D1). A Lens re-evaluates as the library and its
+classification change. Hand-picked membership remains ADR-0008's curated collections; a Lens never pins a recipe.
+
+### A1-D2 — A shelf is `matches(base) ∩ matches(shelf)`, set intersection, never a merged query
+
+The shelf's recipes are the intersection of two independently evaluated results. **The two queries are not
+merged into one**, because D2's OR-within-a-facet would make a merge wrong exactly when both name the same
+facet: base `Cuisine: Mexican`, shelf `Cuisine: Oaxacan` merges to `Mexican OR Oaxacan` (all of Mexican, since
+Oaxacan descends from it), while the intersection is the Oaxacan recipes, which is what the cook meant.
+Intersection needs no new semantics in the engine: it evaluates two ordinary queries and the Lens intersects
+their id sets. D3's descendant matching applies inside each query as usual.
+
+**Shelves may overlap.** A recipe that is both a taco and make-ahead appears on both shelves; shelves are views,
+not filing. Each shelf sorts by its own query's `sort`.
+
+**"See all" on a shelf stays inside the Lens** (a full grid of that one shelf), because there is no single
+`RecipeBrowserQuery` that equals an intersection in general. The Lens's hand-off to the Power Browser is its
+**base query only** ("browse all Mexican"), which is always exact.
+
+### A1-D3 — The remainder shelf is derived, and it doubles as the labeling work list
+
+When `showsRemainder` is on, a final **Everything else** shelf shows `matches(base) − ⋃ matches(shelf)`. It is
+computed, never stored, and has no editable predicate. It is useful when browsing ("what else is Mexican?"), and
+it is D6's coverage gap made visible inside the cook's own frame: a large remainder on the Mexican Lens usually
+means Mexican recipes with no Dish Type. Each remainder recipe reaches the per-recipe tag editor the same way
+the S6 `Label Recipes` queue does. Default on.
+
+### A1-D4 — Empty is quiet; broken is loud
+
+Two different states, never rendered the same way:
+
+- **Empty** — the shelf's query is valid and today's intersection has no recipes. Hidden in the shelf view, shown
+  with a count of 0 in the Lens editor. This is normal; a "Moles" shelf can be empty until the first mole is
+  captured.
+- **Unresolved** — the base or a shelf references a facet, value or label that has been deleted, merged away or
+  hidden. **D9 applies unchanged**, to the base and to every shelf: the selection surfaces as unresolved and
+  repairable, merges re-point, deletions report. An unresolved shelf is **shown, never hidden**, with its repair
+  affordance. Hiding it with the empty ones would make a broken Lens look like a sparse one.
+
+An unresolved base query makes the whole Lens unresolved: shelves cannot be evaluated against a base that no
+longer means what it was saved to mean.
+
+### A1-D5 — Suggested shelves come from the engine's counts, not from a model
+
+The Lens editor offers candidate shelves for the current base: the engine's existing availability and
+self-excluding counts (D4) over the base result, ranked by D6's configured facet priority. Pick Mexican and the
+editor offers "Dish Type: Taco (14), Salsa (11), Soup (7); Course: Appetizer (9) …" to check off. Deterministic,
+offline, no model call (D5). Suggestions are only offers; a shelf exists when the cook adds it.
+
+### A1-D6 — Storage: a Lens row and ordered shelf rows; each query is a versioned value with a loud decode
+
+Two **synced** tables, so a Lens built on the iPad opens on the phone:
+
+- `recipeLenses` — `id`, `name`, `baseQuery` (TEXT), `showsRemainder`, `sortOrder`, timestamps.
+- `recipeLensShelves` — `id`, `lensID` (FK, cascade), `title`, `query` (TEXT), `sortOrder`.
+
+Shelves are rows because they are the grain the cook edits: added, removed, renamed and reordered one at a time
+([ADR-0040](ADR-0040-editable-at-the-grain-it-is-stored.md)). A whole Lens encoded as one blob would turn a
+reorder into a rewrite and a conflict between devices into a lost shelf. **The query inside a row is a value, not
+a grain**: the cook edits it whole through the browser's controls. It is stored as D1 already allows, a
+versioned `Codable` encoding with a **loud** decode. A query that fails to decode is a broken shelf under A1-D4,
+reported in place; it never decodes to an empty query, which would match the whole base and look like a working
+shelf. Decoding happens at read time in the feature, never in a migrator ([[loud-decode-not-in-migrator]]).
+
+Both tables have a consumer that ships with them ([[synced-table-cost-calibration]]). Both join `makeSyncEngine`'s
+synced tables and reach Production through an additive Development→Production schema deploy checked against
+[PROD-CUTOVER](../PROD-CUTOVER.md) Reference A's diff. Every column, `showsRemainder` included, must have uploaded a
+non-nil value in Development before that deploy, or the field is missing in Production and uploads fail.
+
+### A1-D7 — Platform: shelves where there is width, sections where there is not
+
+D12 holds: the engine and the Lens evaluation are shared Core; the surface starts on iPad/macOS. The binding UI
+constraints are few:
+
+- **On regular width, each shelf is a horizontally scrolling row** with a count and "See all"; shelves stack
+  vertically in Lens order.
+- **The base query is always visible** on the Lens screen, as D12's chips (`Cuisine: Mexican`).
+- **"Save as Lens"** from the Power Browser seeds a zero-shelf Lens from the current query.
+
+On compact width (S5), the same Lens renders as vertical sections, each showing its first few recipes and
+"See all". The phone opens and uses Lenses; editing them there is not required. Where Lenses appear in the
+ADR-0046 sidebar is design, not decision.
+
+### Rejected
+
+- **A shelf as a single category id.** Narrower than the query value already built, and widening it later is a
+  schema change (A1-D1).
+- **Merging base and shelf into one query** (A1-D2).
+- **Keeping S4 saved browsers as a separate concept.** Two saved things with overlapping meaning, one of which
+  is a special case of the other.
+- **Nested shelves or per-shelf sub-sections.** A Lens is one level. A cook who wants Tacos → Fish / Pork wants a
+  Tacos Lens.
+- **Manual recipe pinning on a shelf.** That is ADR-0008's static collection (D1).
+- **Model-generated Lenses or shelf suggestions** (D5). A1-D5's counts answer the same want deterministically.
+
+### Slices (replace S4)
+
+- **L1 — Lens core and schema.** The two tables and their migration; the `RecipeLens` value, versioned query
+  encoding with loud decode; evaluation (per-shelf intersection, remainder, empty vs unresolved, A1-D4); D9
+  unresolved detection over base and shelves; shelf suggestions (A1-D5). Core tests lead with the intersection
+  semantics (including the same-facet base/shelf case from A1-D2), remainder correctness with overlapping
+  shelves, and a corrupt-encoding shelf reporting as broken rather than empty.
+- **L2 — iPad/macOS Lens surface.** The shelf view, "See all", the Lens editor (add from suggestions or from a
+  Power Browser query, rename, reorder, remove, remainder toggle), "Save as Lens" from the Power Browser, and the
+  unresolved-shelf repair affordance. *Batchable with L1.*
+- **S5 (unchanged slot) — iPhone presentation** now also opens Lenses as vertical sections.
