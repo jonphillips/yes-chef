@@ -1,5 +1,6 @@
 import LLMClientKit
 import SwiftUI
+import UIKit
 import YesChefCore
 
 /// The Compare surface: an aligned ingredient-diff matrix (Ingredients) plus a whole-recipe
@@ -23,6 +24,7 @@ struct WorkbenchCompareView: View {
   @Environment(\.dismiss) private var dismiss
   @State private var segment: Segment = .ingredients
   @State private var chatModel: RecipeChatModel?
+  @State private var handoffTransport = HandoffInAppTransport()
 
   private var workingDetail: RecipeDetailData? {
     detail.draftRecipeDetail
@@ -120,15 +122,39 @@ struct WorkbenchCompareView: View {
           }
         }
         if let chatContext {
-          ToolbarItem(placement: .topBarLeading) {
-            Button {
-              if chatModel != nil {
-                chatModel = nil
-              } else {
-                chatModel = RecipeChatModel(context: chatContext)
+          ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+              Button {
+                Task {
+                  await handoffTransport.copyPrompt(
+                    for: .workbench(detail.workbench.id, task: .compare)
+                  )
+                }
+              } label: {
+                Label("Hand off", systemImage: "sparkles.square.filled.on.square")
+              }
+              Button {
+                let results = UIPasteboard.general.string.map { [$0] } ?? []
+                Task {
+                  await handoffTransport.pastedResultsReceived(
+                    results,
+                    source: .workbench(detail.workbench.id, task: .compare)
+                  )
+                }
+              } label: {
+                Label("Paste", systemImage: "doc.on.clipboard")
+              }
+              Button {
+                if chatModel != nil {
+                  chatModel = nil
+                } else {
+                  chatModel = RecipeChatModel(context: chatContext)
+                }
+              } label: {
+                Label("Ask now", systemImage: chatModel == nil ? "sparkles" : "checkmark")
               }
             } label: {
-              Label("Ask", systemImage: "sparkles")
+              Label("Hand off", systemImage: "sparkles.square.filled.on.square")
             }
           }
         }
@@ -186,6 +212,7 @@ struct WorkbenchCompareView: View {
         onDismiss: { chatModel = nil }
       )
     }
+    .handoffTransportAlert(handoffTransport)
   }
 
   private func ingredientsSegmentAppeared() async {

@@ -267,8 +267,12 @@ private struct MealCalendarNavigationToolbar: ToolbarContent {
         Label("Today", systemImage: "calendar.badge.clock")
       }
       if let chatButtonTapped {
-        Button(action: chatButtonTapped) {
-          Label("Ask", systemImage: "sparkles")
+        Menu {
+          Button(action: chatButtonTapped) {
+            Label("Ask now", systemImage: "sparkles")
+          }
+        } label: {
+          Label("Hand off", systemImage: "sparkles.square.filled.on.square")
         }
       }
       Menu {
@@ -874,17 +878,16 @@ private struct MealCalendarWeekCell: View {
             handoffSource: sources.makeAhead,
             complementHandoffSource: sources.complement,
             transport: handoffTransport,
-            prepLabel: "Handoff Make-ahead",
-            pastePrepLabel: "Paste Make-ahead",
-            complementLabel: "Handoff Complement",
-            pasteComplementLabel: "Paste Complement"
+            prepLabel: "Hand off · Make-ahead",
+            pastePrepLabel: "Paste · Make-ahead",
+            complementLabel: "Hand off · Complement",
+            pasteComplementLabel: "Paste · Complement"
           )
         } label: {
-          Label("Handoff actions", systemImage: "ellipsis.circle")
-            .labelStyle(.iconOnly)
+          Label("Hand off", systemImage: "sparkles.square.filled.on.square")
         }
         .padding(8)
-        .accessibilityLabel("Handoff actions for \(summary.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))")
+        .accessibilityLabel("Hand off actions for \(summary.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))")
       }
     }
     .handoffTransportAlert(handoffTransport)

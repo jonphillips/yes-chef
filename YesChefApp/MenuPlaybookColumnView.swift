@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import YesChefCore
 
 struct MenuDetailReader: View {
@@ -213,17 +214,28 @@ struct MenuDetailReader: View {
   private var menuPlaybookHeader: some View {
     HStack(alignment: .top, spacing: 12) {
       Spacer()
-      Button(action: askButtonTapped) {
-        Label("Ask", systemImage: "sparkles")
-      }
-      .buttonStyle(.bordered)
-      .buttonBorderShape(.roundedRectangle(radius: 8))
-      .tint(isAskActive ? .accentColor : nil)
-      .overlay {
-        if isAskActive {
-          RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .strokeBorder(.tint, lineWidth: 3)
+      Menu {
+        Button {
+          Task { await handoffTransport.copyPrompt(for: .menu(detailModel.menuID)) }
+        } label: {
+          Label("Hand off", systemImage: "sparkles.square.filled.on.square")
         }
+        Button {
+          let results = UIPasteboard.general.string.map { [$0] } ?? []
+          Task {
+            await handoffTransport.pastedResultsReceived(
+              results,
+              source: .menu(detailModel.menuID)
+            )
+          }
+        } label: {
+          Label("Paste", systemImage: "doc.on.clipboard")
+        }
+        Button(action: askButtonTapped) {
+          Label("Ask now", systemImage: isAskActive ? "checkmark" : "sparkles")
+        }
+      } label: {
+        Label("Hand off", systemImage: "sparkles.square.filled.on.square")
       }
       .accessibilityValue(isAskActive ? "Panel open" : "Panel closed")
       Button(action: regeneratePrepPlan) {

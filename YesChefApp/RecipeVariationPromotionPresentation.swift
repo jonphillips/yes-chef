@@ -97,8 +97,9 @@ struct RecipeVariationChoices: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
 
-      Menu {
-        Button("Hand Off") {
+    }
+    .contextMenu {
+        Button("Hand off") {
           Task {
             await handoffTransport.copyPrompt(
               for: .recipeAdjustment(model.recipeID, variationID: variation.id)
@@ -132,12 +133,11 @@ struct RecipeVariationChoices: View {
         Button("Delete", role: .destructive) {
           deletingVariation = variation
         }
-      } label: {
-        Label("\(variation.name) actions", systemImage: "ellipsis.circle")
-          .labelStyle(.iconOnly)
-          .frame(width: 44, height: 44)
+    }
+    .swipeActions(edge: .trailing) {
+      Button("Delete", systemImage: "trash", role: .destructive) {
+        deletingVariation = variation
       }
-      .accessibilityLabel("\(variation.name) actions")
     }
     .padding(.vertical, 6)
     .accessibilityElement(children: .contain)

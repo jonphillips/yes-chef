@@ -118,7 +118,7 @@ struct RecipeDetailView: View {
       isPresented: $isConfirmingBaseRecipeHandoff,
       titleVisibility: .visible
     ) {
-      Button("Hand Off Base Recipe") {
+      Button("Hand off base recipe") {
         copyAdjustmentPrompt()
       }
       Button("Cancel", role: .cancel) {}
@@ -204,7 +204,7 @@ struct RecipeDetailView: View {
         Button {
           model.askButtonTapped()
         } label: {
-          Label("Ask now", systemImage: "sparkles")
+          Label("Ask now", systemImage: model.destination.chat == nil ? "sparkles" : "checkmark")
         }
       } label: {
         Label("Hand off", systemImage: "sparkles.square.filled.on.square")

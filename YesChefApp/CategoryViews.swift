@@ -146,7 +146,8 @@ private struct CategoryGroupRow: View {
         }
       }
 
-      Menu {
+    }
+    .contextMenu {
         Button {
           model.editCategoryGroupButtonTapped(facetID: facet.id)
         } label: {
@@ -164,12 +165,6 @@ private struct CategoryGroupRow: View {
             Label("Delete", systemImage: "trash")
           }
         }
-      } label: {
-        Label("Category Group Actions", systemImage: "ellipsis.circle")
-      }
-      .labelStyle(.iconOnly)
-      .font(.title3)
-      .frame(width: 44, height: 44)
     }
   }
 }
@@ -244,7 +239,8 @@ private struct CategoryRow: View {
         label
       }
 
-      Menu {
+    }
+    .contextMenu {
         Button {
           model.editCategoryButtonTapped(categoryID: category.id)
         } label: {
@@ -267,12 +263,6 @@ private struct CategoryRow: View {
             Label("Delete", systemImage: "trash")
           }
         }
-      } label: {
-        Label("Category Actions", systemImage: "ellipsis.circle")
-      }
-      .labelStyle(.iconOnly)
-      .font(.title3)
-      .frame(width: 44, height: 44)
     }
   }
 
