@@ -25,6 +25,8 @@ discoverable"):
 
 ## Live
 
+- [recipe-lenses.md](recipe-lenses.md) — **Dispatched** · Saved Lenses in the Power Browser: a base query plus
+  ordered shelves, each intersected with the base. Replaces ADR-0050 S4; L1 + L2 in one PR.
 - [chat-access-mcp.md](chat-access-mcp.md) — **Blocked** on [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md)
   OQ3 · S3 lets a ChatGPT return target an existing recipe, not only stage a new one; S0–S2b shipped.
 - [yes-chef-dev-variant.md](yes-chef-dev-variant.md) — **Blocked** on [`PROD-CUTOVER.md`](../PROD-CUTOVER.md)
