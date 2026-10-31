@@ -231,8 +231,15 @@ struct MenuDetailReader: View {
         } label: {
           Label("Paste", systemImage: "doc.on.clipboard")
         }
-        Button(action: askButtonTapped) {
-          Label("Ask now", systemImage: isAskActive ? "checkmark" : "sparkles")
+        Toggle(isOn: Binding(
+          get: { isAskActive },
+          set: { isOpen in
+            if isOpen != isAskActive {
+              askButtonTapped()
+            }
+          }
+        )) {
+          Label("Ask now", systemImage: "sparkles")
         }
       } label: {
         Label("Hand off", systemImage: "sparkles.square.filled.on.square")

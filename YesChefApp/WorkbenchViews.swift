@@ -233,13 +233,15 @@ struct WorkbenchDetailView: View {
               } label: {
                 Label("Paste", systemImage: "doc.on.clipboard")
               }
-              Button {
-                model.chatButtonTapped()
-              } label: {
-                Label(
-                  "Ask now",
-                  systemImage: model.destination.chat == nil ? "sparkles" : "checkmark"
-                )
+              Toggle(isOn: Binding(
+                get: { model.destination.chat != nil },
+                set: { isOpen in
+                  if isOpen != (model.destination.chat != nil) {
+                    model.chatButtonTapped()
+                  }
+                }
+              )) {
+                Label("Ask now", systemImage: "sparkles")
               }
             } label: {
               Label("Hand off", systemImage: "sparkles.square.filled.on.square")

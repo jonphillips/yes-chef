@@ -490,20 +490,20 @@ struct MenuPlacementList: View {
 
             }
             .contextMenu {
-                Button {
-                  model.editPlacementButtonTapped(
-                    menu: menu,
-                    placement: placement,
-                    minimumDayCount: minimumDayCount
-                  )
-                } label: {
-                  Label("Change Start Date", systemImage: "calendar")
-                }
-                Button(role: .destructive) {
-                  model.deletePlacementButtonTapped(menu: menu, placement: placement)
-                } label: {
-                  Label("Remove from Calendar", systemImage: "trash")
-                }
+              Button {
+                model.editPlacementButtonTapped(
+                  menu: menu,
+                  placement: placement,
+                  minimumDayCount: minimumDayCount
+                )
+              } label: {
+                Label("Change Start Date", systemImage: "calendar")
+              }
+              Button(role: .destructive) {
+                model.deletePlacementButtonTapped(menu: menu, placement: placement)
+              } label: {
+                Label("Remove from Calendar", systemImage: "trash")
+              }
             }
             .swipeActions(edge: .trailing) {
               Button(role: .destructive) {

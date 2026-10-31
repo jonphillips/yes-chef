@@ -379,7 +379,7 @@ struct GroceryItemRowView: View {
     }
     .padding(.vertical, 4)
     .contextMenu {
-      GroceryItemActionsMenu(
+      GroceryItemActions(
         row: row,
         addToPantry: addToPantry,
         editItem: editItem,
@@ -413,7 +413,7 @@ private func groceryQuantityText(for item: GroceryItem) -> String? {
 }
 
 @MainActor
-private struct GroceryItemActionsMenu {
+private struct GroceryItemActions {
   let row: GroceryItemRowData
   var addToPantry: () -> Void
   var editItem: () -> Void
@@ -492,11 +492,6 @@ private struct GrocerySourceLabel: View {
       Button(role: .destructive) {
         deleteSource()
       } label: {
-        Label("Remove Source", systemImage: "minus.circle")
-      }
-    }
-    .swipeActions(edge: .trailing) {
-      Button(role: .destructive, action: deleteSource) {
         Label("Remove Source", systemImage: "minus.circle")
       }
     }

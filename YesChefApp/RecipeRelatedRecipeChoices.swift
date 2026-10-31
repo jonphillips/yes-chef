@@ -80,12 +80,11 @@ struct RecipeRelatedRecipeChoices: View {
       }
       .buttonStyle(.plain)
       .accessibilityLabel(recipe.title)
-
     }
     .contextMenu {
-        Button("Unlink", role: .destructive) {
-          unlinkingRecipe = recipe
-        }
+      Button("Unlink", role: .destructive) {
+        unlinkingRecipe = recipe
+      }
     }
     .swipeActions(edge: .trailing) {
       Button("Unlink", systemImage: "link.slash", role: .destructive) {

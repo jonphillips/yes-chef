@@ -99,40 +99,40 @@ struct RecipeVariationChoices: View {
 
     }
     .contextMenu {
-        Button("Hand off") {
-          Task {
-            await handoffTransport.copyPrompt(
-              for: .recipeAdjustment(model.recipeID, variationID: variation.id)
-            )
-          }
+      Button("Hand off") {
+        Task {
+          await handoffTransport.copyPrompt(
+            for: .recipeAdjustment(model.recipeID, variationID: variation.id)
+          )
         }
-        Button("Paste") {
-          let results = UIPasteboard.general.string.map { [$0] } ?? []
-          Task {
-            await handoffTransport.pastedResultsReceived(
-              results,
-              source: .recipeAdjustment(model.recipeID, variationID: variation.id)
-            )
-          }
+      }
+      Button("Paste") {
+        let results = UIPasteboard.general.string.map { [$0] } ?? []
+        Task {
+          await handoffTransport.pastedResultsReceived(
+            results,
+            source: .recipeAdjustment(model.recipeID, variationID: variation.id)
+          )
         }
-        Divider()
-        Button("Rename") {
-          variationNameDraft = variation.name
-          renamingVariation = variation
-        }
-        Button("Edit Variation") {
-          model.editVariationButtonTapped(variation.id)
-        }
-        Button("Split Off as Recipe") {
-          splitOffTitleDraft = variation.name
-          splittingOffVariation = variation
-        }
-        Button("Promote to Base") {
-          promotingVariation = variation
-        }
-        Button("Delete", role: .destructive) {
-          deletingVariation = variation
-        }
+      }
+      Divider()
+      Button("Rename") {
+        variationNameDraft = variation.name
+        renamingVariation = variation
+      }
+      Button("Edit Variation") {
+        model.editVariationButtonTapped(variation.id)
+      }
+      Button("Split Off as Recipe") {
+        splitOffTitleDraft = variation.name
+        splittingOffVariation = variation
+      }
+      Button("Promote to Base") {
+        promotingVariation = variation
+      }
+      Button("Delete", role: .destructive) {
+        deletingVariation = variation
+      }
     }
     .swipeActions(edge: .trailing) {
       Button("Delete", systemImage: "trash", role: .destructive) {
