@@ -1,70 +1,43 @@
 {
   "fill" : {
-    "automatic-gradient" : "display-p3:0.96078,0.93725,0.90196,1.00000"
+    "automatic-gradient" : "extended-srgb:0.00000,0.53333,1.00000,1.00000"
   },
   "groups" : [
     {
       "layers" : [
         {
-          "image-name" : "YesChefSpoon.png",
-          "name" : "YesChefSpoon",
+          "image-name" : "04_small_pocket_and_hardware.svg",
+          "name" : "04_small_pocket_and_hardware"
+        },
+        {
+          "image-name" : "03_wooden_spoon.png",
+          "name" : "03_wooden_spoon",
           "position" : {
-            "scale" : 0.15,
+            "scale" : 1,
             "translation-in-points" : [
-              39.4609375,
-              -171.1875
+              -69,
+              55
             ]
           }
         },
         {
-          "image-name" : "YesChefTowel.png",
-          "name" : "YesChefTowel",
-          "position" : {
-            "scale" : 0.35,
-            "translation-in-points" : [
-              -109.8671875,
-              145.45781250000005
-            ]
-          }
+          "image-name" : "02_apron_and_straps.png",
+          "name" : "02_apron_and_straps"
         },
         {
-          "image-name" : "YesChefApronIcon.png",
-          "name" : "YesChefApronIcon"
+          "hidden" : false,
+          "image-name" : "01_background.png",
+          "name" : "01_background"
         }
       ],
+      "name" : "Yes_Chef",
       "shadow" : {
         "kind" : "neutral",
-        "opacity" : 0.6
+        "opacity" : 0.5
       },
       "translucency" : {
         "enabled" : true,
-        "value" : 0.2
-      }
-    },
-    {
-      "layers" : [
-
-      ],
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.6
-      },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.2
-      }
-    },
-    {
-      "layers" : [
-
-      ],
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.6
-      },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.2
+        "value" : 0.3
       }
     }
   ],
