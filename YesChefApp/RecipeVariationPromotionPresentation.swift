@@ -97,47 +97,47 @@ struct RecipeVariationChoices: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
 
-      Menu {
-        Button("Hand Off") {
-          Task {
-            await handoffTransport.copyPrompt(
-              for: .recipeAdjustment(model.recipeID, variationID: variation.id)
-            )
-          }
+    }
+    .contextMenu {
+      Button("Hand off") {
+        Task {
+          await handoffTransport.copyPrompt(
+            for: .recipeAdjustment(model.recipeID, variationID: variation.id)
+          )
         }
-        Button("Paste") {
-          let results = UIPasteboard.general.string.map { [$0] } ?? []
-          Task {
-            await handoffTransport.pastedResultsReceived(
-              results,
-              source: .recipeAdjustment(model.recipeID, variationID: variation.id)
-            )
-          }
-        }
-        Divider()
-        Button("Rename") {
-          variationNameDraft = variation.name
-          renamingVariation = variation
-        }
-        Button("Edit Variation") {
-          model.editVariationButtonTapped(variation.id)
-        }
-        Button("Split Off as Recipe") {
-          splitOffTitleDraft = variation.name
-          splittingOffVariation = variation
-        }
-        Button("Promote to Base") {
-          promotingVariation = variation
-        }
-        Button("Delete", role: .destructive) {
-          deletingVariation = variation
-        }
-      } label: {
-        Label("\(variation.name) actions", systemImage: "ellipsis.circle")
-          .labelStyle(.iconOnly)
-          .frame(width: 44, height: 44)
       }
-      .accessibilityLabel("\(variation.name) actions")
+      Button("Paste") {
+        let results = UIPasteboard.general.string.map { [$0] } ?? []
+        Task {
+          await handoffTransport.pastedResultsReceived(
+            results,
+            source: .recipeAdjustment(model.recipeID, variationID: variation.id)
+          )
+        }
+      }
+      Divider()
+      Button("Rename") {
+        variationNameDraft = variation.name
+        renamingVariation = variation
+      }
+      Button("Edit Variation") {
+        model.editVariationButtonTapped(variation.id)
+      }
+      Button("Split Off as Recipe") {
+        splitOffTitleDraft = variation.name
+        splittingOffVariation = variation
+      }
+      Button("Promote to Base") {
+        promotingVariation = variation
+      }
+      Button("Delete", role: .destructive) {
+        deletingVariation = variation
+      }
+    }
+    .swipeActions(edge: .trailing) {
+      Button("Delete", systemImage: "trash", role: .destructive) {
+        deletingVariation = variation
+      }
     }
     .padding(.vertical, 6)
     .accessibilityElement(children: .contain)

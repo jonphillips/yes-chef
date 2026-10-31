@@ -375,13 +375,13 @@ struct MenuPrepPlanSection: View {
             handoffTransport.copyRecipeCaptureRequest()
           }
           Divider()
-          Button("Handoff Prep") {
+          Button("Hand off · Prep") {
             Task { await handoffTransport.copyPrompt(for: handoffSource) }
           }
-          Button("Handoff to Regenerate") {
+          Button("Hand off · Regenerate") {
             Task { await handoffTransport.copyPrompt(for: regenerateHandoffSource) }
           }
-          Button("Paste Prep") {
+          Button("Paste · Prep") {
             Task {
               await handoffTransport.pastedResultsReceived(
                 [UIPasteboard.general.string ?? ""],

@@ -120,15 +120,24 @@ struct WorkbenchCompareView: View {
           }
         }
         if let chatContext {
-          ToolbarItem(placement: .topBarLeading) {
-            Button {
-              if chatModel != nil {
-                chatModel = nil
-              } else {
-                chatModel = RecipeChatModel(context: chatContext)
+          ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+              Toggle(isOn: Binding(
+                get: { chatModel != nil },
+                set: { isOpen in
+                  if isOpen != (chatModel != nil) {
+                    if chatModel != nil {
+                      chatModel = nil
+                    } else {
+                      chatModel = RecipeChatModel(context: chatContext)
+                    }
+                  }
+                }
+              )) {
+                Label("Ask now", systemImage: "sparkles")
               }
             } label: {
-              Label("Ask", systemImage: "sparkles")
+              Label("Hand off", systemImage: "sparkles.square.filled.on.square")
             }
           }
         }
