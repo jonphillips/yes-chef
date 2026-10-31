@@ -53,9 +53,9 @@ what done looks like. **Synced-schema change: two new tables.**
 - `PowerBrowserModel` (or a new `LensModel`) tests for choosing a Lens, Save as Lens, and returning to the
   browser, run in the `YesChefTests` app target.
 - Verification per `docs/verification.md`: `scripts/check-drift.sh`, the elevated generic iOS build, and
-  `YesChefTests`. iPad simulator screenshots of a Lens with three shelves and the remainder, and of the editor,
-  in the PR.
+  `YesChefTests`. No screenshots or simulator driving; Jon takes screenshots during the device pass.
 - The PR appends a held-ops block to `docs/device-passes.md`: before the next TestFlight build, create a Lens
   with a shelf on a simulator Debug build against Development (so both record types and every field upload
   with a non-nil value), re-export and diff per PROD-CUTOVER Reference A, then deploy Development → Production.
-  Then the iPad device pass for the shelf view and the editor.
+  Then the iPad device pass for the shelf view and the editor, with Jon's screenshots of a Lens with three
+  shelves and the remainder, and of the editor, posted to the PR for the architect's review.
