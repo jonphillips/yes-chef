@@ -376,15 +376,18 @@ struct GroceryItemRowView: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
 
-      GroceryItemActionsMenu(
+    }
+    .padding(.vertical, 4)
+    .contextMenu {
+      GroceryItemActions(
         row: row,
         addToPantry: addToPantry,
         editItem: editItem,
         deleteItem: deleteItem,
         deleteContribution: deleteContribution
       )
+      .actions
     }
-    .padding(.vertical, 4)
   }
 
   private var detailText: String? {
@@ -409,15 +412,15 @@ private func groceryQuantityText(for item: GroceryItem) -> String? {
   .nonEmptyGroceryViewText
 }
 
-private struct GroceryItemActionsMenu: View {
+@MainActor
+private struct GroceryItemActions {
   let row: GroceryItemRowData
   var addToPantry: () -> Void
   var editItem: () -> Void
   var deleteItem: () -> Void
   var deleteContribution: (GroceryItemSource.ID) -> Void
 
-  var body: some View {
-    Menu {
+  @ViewBuilder var actions: some View {
       Button {
         editItem()
       } label: {
@@ -449,14 +452,6 @@ private struct GroceryItemActionsMenu: View {
       } label: {
         Label("Delete Item", systemImage: "trash")
       }
-    } label: {
-      Image(systemName: "ellipsis.circle")
-        .imageScale(.large)
-        .frame(width: 32, height: 32)
-    }
-    .buttonStyle(.borderless)
-    .menuStyle(.button)
-    .accessibilityLabel("Grocery Item Actions")
   }
 
   private var removableContributions: [GrocerySourceContribution] {
@@ -484,27 +479,21 @@ private struct GrocerySourceLabel: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
 
-      Menu {
-        if let contributionRemovalTitle = source.contributionRemovalTitle {
-          Button(role: .destructive) {
-            deleteContribution()
-          } label: {
-            Label(contributionRemovalTitle, systemImage: "minus.square")
-          }
-        }
-
+    }
+    .contextMenu {
+      if let contributionRemovalTitle = source.contributionRemovalTitle {
         Button(role: .destructive) {
-          deleteSource()
+          deleteContribution()
         } label: {
-          Label("Remove Source", systemImage: "minus.circle")
+          Label(contributionRemovalTitle, systemImage: "minus.square")
         }
-      } label: {
-        Image(systemName: "ellipsis.circle")
-          .imageScale(.medium)
       }
-      .buttonStyle(.borderless)
-      .menuStyle(.button)
-      .accessibilityLabel("Source Actions")
+
+      Button(role: .destructive) {
+        deleteSource()
+      } label: {
+        Label("Remove Source", systemImage: "minus.circle")
+      }
     }
   }
 

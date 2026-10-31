@@ -80,17 +80,16 @@ struct RecipeRelatedRecipeChoices: View {
       }
       .buttonStyle(.plain)
       .accessibilityLabel(recipe.title)
-
-      Menu {
-        Button("Unlink", role: .destructive) {
-          unlinkingRecipe = recipe
-        }
-      } label: {
-        Label("\(recipe.title) actions", systemImage: "ellipsis.circle")
-          .labelStyle(.iconOnly)
-          .frame(width: 44, height: 44)
+    }
+    .contextMenu {
+      Button("Unlink", role: .destructive) {
+        unlinkingRecipe = recipe
       }
-      .accessibilityLabel("\(recipe.title) actions")
+    }
+    .swipeActions(edge: .trailing) {
+      Button("Unlink", systemImage: "link.slash", role: .destructive) {
+        unlinkingRecipe = recipe
+      }
     }
     .padding(.vertical, 6)
   }

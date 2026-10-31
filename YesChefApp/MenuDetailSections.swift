@@ -237,16 +237,15 @@ private struct MenuDaySection: View {
             handoffSource: .menuDay(menu.id, dayOffset: dayOffset),
             complementHandoffSource: .menuDayComplement(menu.id, dayOffset: dayOffset),
             transport: handoffTransport,
-            prepLabel: "Handoff Prep",
-            pastePrepLabel: "Paste Prep",
-            complementLabel: "Handoff Complement",
-            pasteComplementLabel: "Paste Complement"
+            prepLabel: "Hand off · Prep",
+            pastePrepLabel: "Paste · Prep",
+            complementLabel: "Hand off · Complement",
+            pasteComplementLabel: "Paste · Complement"
           )
         } label: {
-          Label("Day \(dayNumber) Handoff", systemImage: "ellipsis.circle")
-            .labelStyle(.iconOnly)
+          Label("Hand off", systemImage: "sparkles.square.filled.on.square")
         }
-        .accessibilityLabel("Day \(dayNumber) handoff actions")
+        .accessibilityLabel("Hand off actions for Day \(dayNumber)")
       }
 
       if isExpanded, rows.isEmpty {
@@ -318,6 +317,26 @@ private struct MenuDishRowView: View {
   var body: some View {
     rowContent
       .background(isDepositTarget ? Color.accentColor.opacity(0.12) : Color.clear)
+      .contextMenu {
+        Button(role: .destructive) {
+          model.deleteMenuItemButtonTapped(row)
+        } label: {
+          Label("Delete", systemImage: "trash")
+        }
+
+        Menu {
+          ForEach(0..<menu.dayCount, id: \.self) { dayOffset in
+            Button {
+              _ = model.moveMenuItem(itemID: row.id, toDayOffset: dayOffset)
+            } label: {
+              Label("Day \(dayOffset + 1)", systemImage: "calendar")
+            }
+            .disabled(dayOffset == row.item.dayOffset)
+          }
+        } label: {
+          Label("Move to Day", systemImage: "arrow.right")
+        }
+      }
       .swipeActions {
         Button(role: .destructive) {
           model.deleteMenuItemButtonTapped(row)
@@ -469,24 +488,28 @@ struct MenuPlacementList: View {
 
               Spacer()
 
-              Menu {
-                Button {
-                  model.editPlacementButtonTapped(
-                    menu: menu,
-                    placement: placement,
-                    minimumDayCount: minimumDayCount
-                  )
-                } label: {
-                  Label("Change Start Date", systemImage: "calendar")
-                }
-                Button(role: .destructive) {
-                  model.deletePlacementButtonTapped(menu: menu, placement: placement)
-                } label: {
-                  Label("Remove from Calendar", systemImage: "trash")
-                }
+            }
+            .contextMenu {
+              Button {
+                model.editPlacementButtonTapped(
+                  menu: menu,
+                  placement: placement,
+                  minimumDayCount: minimumDayCount
+                )
               } label: {
-                Label("Placement Actions", systemImage: "ellipsis.circle")
-                  .labelStyle(.iconOnly)
+                Label("Change Start Date", systemImage: "calendar")
+              }
+              Button(role: .destructive) {
+                model.deletePlacementButtonTapped(menu: menu, placement: placement)
+              } label: {
+                Label("Remove from Calendar", systemImage: "trash")
+              }
+            }
+            .swipeActions(edge: .trailing) {
+              Button(role: .destructive) {
+                model.deletePlacementButtonTapped(menu: menu, placement: placement)
+              } label: {
+                Label("Remove from Calendar", systemImage: "trash")
               }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

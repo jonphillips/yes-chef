@@ -146,30 +146,25 @@ private struct CategoryGroupRow: View {
         }
       }
 
-      Menu {
-        Button {
-          model.editCategoryGroupButtonTapped(facetID: facet.id)
-        } label: {
-          Label("Edit", systemImage: "pencil")
-        }
-        Button {
-          model.toggleCategoryGroupVisibilityButtonTapped(facetID: facet.id)
-        } label: {
-          Label(facet.hidden ? "Show Category Group" : "Hide Category Group", systemImage: facet.hidden ? "eye" : "eye.slash")
-        }
-        if model.canDeleteCategoryGroup(facetID: facet.id) {
-          Button(role: .destructive) {
-            model.deleteCategoryGroupButtonTapped(facetID: facet.id)
-          } label: {
-            Label("Delete", systemImage: "trash")
-          }
-        }
+    }
+    .contextMenu {
+      Button {
+        model.editCategoryGroupButtonTapped(facetID: facet.id)
       } label: {
-        Label("Category Group Actions", systemImage: "ellipsis.circle")
+        Label("Edit", systemImage: "pencil")
       }
-      .labelStyle(.iconOnly)
-      .font(.title3)
-      .frame(width: 44, height: 44)
+      Button {
+        model.toggleCategoryGroupVisibilityButtonTapped(facetID: facet.id)
+      } label: {
+        Label(facet.hidden ? "Show Category Group" : "Hide Category Group", systemImage: facet.hidden ? "eye" : "eye.slash")
+      }
+      if model.canDeleteCategoryGroup(facetID: facet.id) {
+        Button(role: .destructive) {
+          model.deleteCategoryGroupButtonTapped(facetID: facet.id)
+        } label: {
+          Label("Delete", systemImage: "trash")
+        }
+      }
     }
   }
 }
@@ -244,35 +239,30 @@ private struct CategoryRow: View {
         label
       }
 
-      Menu {
-        Button {
-          model.editCategoryButtonTapped(categoryID: category.id)
-        } label: {
-          Label("Edit", systemImage: "pencil")
-        }
-        Button {
-          model.moveRecipesButtonTapped(categoryID: category.id)
-        } label: {
-          Label("Move Recipes To…", systemImage: "arrow.right.arrow.left")
-        }
-        Button {
-          model.toggleCategoryVisibilityButtonTapped(categoryID: category.id)
-        } label: {
-          Label(category.hidden ? "Show Category" : "Hide Category", systemImage: category.hidden ? "eye" : "eye.slash")
-        }
-        if model.canDelete(categoryID: category.id) {
-          Button(role: .destructive) {
-            model.deleteCategoryButtonTapped(categoryID: category.id)
-          } label: {
-            Label("Delete", systemImage: "trash")
-          }
-        }
+    }
+    .contextMenu {
+      Button {
+        model.editCategoryButtonTapped(categoryID: category.id)
       } label: {
-        Label("Category Actions", systemImage: "ellipsis.circle")
+        Label("Edit", systemImage: "pencil")
       }
-      .labelStyle(.iconOnly)
-      .font(.title3)
-      .frame(width: 44, height: 44)
+      Button {
+        model.moveRecipesButtonTapped(categoryID: category.id)
+      } label: {
+        Label("Move Recipes To…", systemImage: "arrow.right.arrow.left")
+      }
+      Button {
+        model.toggleCategoryVisibilityButtonTapped(categoryID: category.id)
+      } label: {
+        Label(category.hidden ? "Show Category" : "Hide Category", systemImage: category.hidden ? "eye" : "eye.slash")
+      }
+      if model.canDelete(categoryID: category.id) {
+        Button(role: .destructive) {
+          model.deleteCategoryButtonTapped(categoryID: category.id)
+        } label: {
+          Label("Delete", systemImage: "trash")
+        }
+      }
     }
   }
 

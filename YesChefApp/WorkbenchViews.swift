@@ -1,5 +1,6 @@
 import LLMClientKit
 import SwiftUI
+import UIKit
 import YesChefCore
 
 struct WorkbenchListView: View {
@@ -210,10 +211,41 @@ struct WorkbenchDetailView: View {
           } label: {
             Label("Add Candidates", systemImage: "plus")
           }
-          Button {
-            model.chatButtonTapped()
-          } label: {
-            Label("Ask", systemImage: "sparkles")
+          if let workbenchID = model.detail?.workbench.id {
+            Menu {
+              Button {
+                Task {
+                  await handoffTransport.copyPrompt(
+                    for: .workbench(workbenchID, task: .compare)
+                  )
+                }
+              } label: {
+                Label("Hand off", systemImage: "sparkles.square.filled.on.square")
+              }
+              Button {
+                let results = UIPasteboard.general.string.map { [$0] } ?? []
+                Task {
+                  await handoffTransport.pastedResultsReceived(
+                    results,
+                    source: .workbench(workbenchID, task: .compare)
+                  )
+                }
+              } label: {
+                Label("Paste", systemImage: "doc.on.clipboard")
+              }
+              Toggle(isOn: Binding(
+                get: { model.destination.chat != nil },
+                set: { isOpen in
+                  if isOpen != (model.destination.chat != nil) {
+                    model.chatButtonTapped()
+                  }
+                }
+              )) {
+                Label("Ask now", systemImage: "sparkles")
+              }
+            } label: {
+              Label("Hand off", systemImage: "sparkles.square.filled.on.square")
+            }
           }
         }
       }

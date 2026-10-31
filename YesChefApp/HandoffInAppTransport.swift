@@ -351,33 +351,41 @@ struct HandoffMenuActions: View {
   let handoffSource: HandoffExportSource
   let complementHandoffSource: HandoffExportSource
   let transport: HandoffInAppTransport
-  var prepLabel = "Handoff Prep"
-  var pastePrepLabel = "Paste Prep"
-  var complementLabel = "Handoff Complement"
-  var pasteComplementLabel = "Paste Complement"
+  var prepLabel = "Hand off · Prep"
+  var pastePrepLabel = "Paste · Prep"
+  var complementLabel = "Hand off · Complement"
+  var pasteComplementLabel = "Paste · Complement"
 
   var body: some View {
-    Button(prepLabel) {
+    Button {
       Task { await transport.copyPrompt(for: handoffSource) }
+    } label: {
+      Label(prepLabel, systemImage: "sparkles.square.filled.on.square")
     }
-    Button(pastePrepLabel) {
+    Button {
       Task {
         await transport.pastedResultsReceived(
           [UIPasteboard.general.string ?? ""],
           source: handoffSource
         )
       }
+    } label: {
+      Label(pastePrepLabel, systemImage: "doc.on.clipboard")
     }
-    Button(complementLabel) {
+    Button {
       Task { await transport.copyPrompt(for: complementHandoffSource) }
+    } label: {
+      Label(complementLabel, systemImage: "sparkles.square.filled.on.square")
     }
-    Button(pasteComplementLabel) {
+    Button {
       Task {
         await transport.pastedResultsReceived(
           [UIPasteboard.general.string ?? ""],
           source: complementHandoffSource
         )
       }
+    } label: {
+      Label(pasteComplementLabel, systemImage: "doc.on.clipboard")
     }
   }
 }

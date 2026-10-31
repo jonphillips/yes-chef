@@ -43,7 +43,11 @@ struct MealCalendarWorkspaceView: View {
           FocusToolbarButton(isActive: isFocusActive, action: focusButtonTapped)
         }
       }
-      MealCalendarNavigationToolbar(model: model, chatButtonTapped: chatButtonTapped)
+      MealCalendarNavigationToolbar(
+        model: model,
+        chatButtonTapped: chatButtonTapped,
+        isChatOpen: chatModel != nil
+      )
     }
   }
 
@@ -188,6 +192,7 @@ private struct MealCalendarStackedContent: View {
       .frame(maxWidth: maxContentWidth, alignment: .leading)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .swipeActionsContainer()
   }
 }
 
@@ -258,6 +263,7 @@ private struct MealCalendarAgendaRail: View {
 private struct MealCalendarNavigationToolbar: ToolbarContent {
   let model: MealCalendarModel
   var chatButtonTapped: (() -> Void)?
+  var isChatOpen: Bool
 
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .primaryAction) {
@@ -267,8 +273,19 @@ private struct MealCalendarNavigationToolbar: ToolbarContent {
         Label("Today", systemImage: "calendar.badge.clock")
       }
       if let chatButtonTapped {
-        Button(action: chatButtonTapped) {
-          Label("Ask", systemImage: "sparkles")
+        Menu {
+          Toggle(isOn: Binding(
+            get: { isChatOpen },
+            set: { isOpen in
+              if isOpen != isChatOpen {
+                chatButtonTapped()
+              }
+            }
+          )) {
+            Label("Ask now", systemImage: "sparkles")
+          }
+        } label: {
+          Label("Hand off", systemImage: "sparkles.square.filled.on.square")
         }
       }
       Menu {
@@ -874,17 +891,16 @@ private struct MealCalendarWeekCell: View {
             handoffSource: sources.makeAhead,
             complementHandoffSource: sources.complement,
             transport: handoffTransport,
-            prepLabel: "Handoff Make-ahead",
-            pastePrepLabel: "Paste Make-ahead",
-            complementLabel: "Handoff Complement",
-            pasteComplementLabel: "Paste Complement"
+            prepLabel: "Hand off · Make-ahead",
+            pastePrepLabel: "Paste · Make-ahead",
+            complementLabel: "Hand off · Complement",
+            pasteComplementLabel: "Paste · Complement"
           )
         } label: {
-          Label("Handoff actions", systemImage: "ellipsis.circle")
-            .labelStyle(.iconOnly)
+          Label("Hand off", systemImage: "sparkles.square.filled.on.square")
         }
         .padding(8)
-        .accessibilityLabel("Handoff actions for \(summary.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))")
+        .accessibilityLabel("Hand off actions for \(summary.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))")
       }
     }
     .handoffTransportAlert(handoffTransport)

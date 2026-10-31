@@ -118,7 +118,7 @@ struct RecipeDetailView: View {
       isPresented: $isConfirmingBaseRecipeHandoff,
       titleVisibility: .visible
     ) {
-      Button("Hand Off Base Recipe") {
+      Button("Hand off base recipe") {
         copyAdjustmentPrompt()
       }
       Button("Cancel", role: .cancel) {}
@@ -201,9 +201,14 @@ struct RecipeDetailView: View {
           Label("Paste", systemImage: "doc.on.clipboard")
         }
 
-        Button {
-          model.askButtonTapped()
-        } label: {
+        Toggle(isOn: Binding(
+          get: { model.destination.chat != nil },
+          set: { isOpen in
+            if isOpen != (model.destination.chat != nil) {
+              model.askButtonTapped()
+            }
+          }
+        )) {
           Label("Ask now", systemImage: "sparkles")
         }
       } label: {
@@ -444,6 +449,7 @@ private struct RecipeReaderView: View {
           )
           .padding()
         }
+        .swipeActionsContainer()
         .navigationTitle("Manage Variations")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -781,6 +787,7 @@ private struct RecipeReaderView: View {
             scrollProxy.scrollTo("recipe-playbook", anchor: .top)
           }
         }
+        .swipeActionsContainer()
         .frame(width: directionsWidth)
       }
     }

@@ -70,10 +70,10 @@ struct MealCalendarDayHeader: View {
               handoffSource: handoffSource,
               complementHandoffSource: complementHandoffSource,
               transport: handoffTransport,
-              prepLabel: "Handoff Make-ahead",
-              pastePrepLabel: "Paste Make-ahead",
-              complementLabel: "Handoff Complement",
-              pasteComplementLabel: "Paste Complement"
+              prepLabel: "Hand off · Make-ahead",
+              pastePrepLabel: "Paste · Make-ahead",
+              complementLabel: "Hand off · Complement",
+              pasteComplementLabel: "Paste · Complement"
             )
           }
         }
