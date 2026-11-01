@@ -223,7 +223,7 @@ container), which also closed OQ1. OQ6 is now diagnosed (Amendment 3): a naive r
 procedure gates it** (quiesce peers → restore on one → reinstall peers). When it runs, follow that procedure —
 and **Undo Last Restore** is untested at all and rode the same broken binding as restore, so exercise it too.
 
-- [Yes Chef Dev variant](efforts/archive/yes-chef-dev-variant.md): Xcode Run on the iPhone installs "Yes Chef Dev", with the DEV icon, next to TestFlight Yes Chef. Each opens its own library. The share sheet lists "Save to Yes Chef" and "Save to Yes Chef Dev", and each saves into its own app. Yes Chef Dev's Settings shows "CloudKit Development". Leave sync off in Yes Chef Dev until Development is reset (PROD-CUTOVER Step 13). A backup exported from Yes Chef Dev is refused by TestFlight Yes Chef with the development-backup message. A TestFlight backup restores in Yes Chef Dev. A Cockpit Find referral still opens TestFlight Yes Chef.
+- [Yes Chef Dev variant](efforts/archive/yes-chef-dev-variant.md): Xcode Run on the iPhone installs "Yes Chef Dev", with the DEV icon, next to TestFlight Yes Chef. Each opens its own library. The share sheet lists "Save to Yes Chef" and "Save to Yes Chef Dev", and each saves into its own app. Yes Chef Dev's Settings shows "CloudKit Development". A backup exported from Yes Chef Dev is refused by TestFlight Yes Chef with the development-backup message. A TestFlight backup restores in Yes Chef Dev. A Cockpit Find referral still opens TestFlight Yes Chef.
 - **Hand-off review over the recipe cover** ([effort brief](efforts/archive/handoff-review-over-recipe-cover.md), schema-free). On the iPad, open a recipe from the Calendar and paste a return for it into the toolbar Paste: the review opens over the recipe, matched and unmatched (Review Anyway) alike. Draft a revision through to the adjustment review, and commit it. Repeat from a Menu, from the workbench sheet, and from a variation's Paste in Manage Variations. From the Library, paste still works as before, including from the recipe's Workbench sheet and from a variation's Paste in Manage Variations; and from a Cook Session recipe page. Paste a return with its `YC-HANDOFF:` line deleted, tap Review Anyway, back out, and paste it again: it still opens.
 
 ## Prod-schema promotion list — superseded (2026-10-26)
@@ -235,7 +235,7 @@ is either already in Development or settled there: the pantry thresholds are cre
 
 ## Recipe Lenses (ADR-0050 Amendment 1, L1 + L2)
 
-- [ ] **Held ops before the next TestFlight build:** Development remains a cold archive until reset. Create both Lens record types and every field in the CloudKit console (Development), then re-export, diff against [`PROD-CUTOVER.md`](PROD-CUTOVER.md) Reference A, and deploy Development → Production.
+- [ ] **Held ops before the next TestFlight build:** Create both Lens record types and every field in the CloudKit console (Development), then re-export, diff against [`PROD-CUTOVER.md`](PROD-CUTOVER.md) Reference A, and deploy Development → Production.
 - [ ] **iPad device pass:** Jon checks the Lens shelf view and editor after the schema deploy.
 
 - **Pantry seed collision** (effort `pantry-seed-collision`). In the Pantry, delete the extra "vegetable oil",

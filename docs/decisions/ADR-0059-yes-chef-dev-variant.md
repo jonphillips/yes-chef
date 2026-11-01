@@ -177,3 +177,24 @@ app group means it starts with an empty library and sync off, so installing it c
 Until the reset, a slice that needs new record types in Development creates them from the CloudKit console
 (PROD-CUTOVER Step 13's schema-deploy rule allows the console), not by syncing Yes Chef Dev.
 
+## Amendment 2 — OQ1 answered: keep Development; Yes Chef Dev may sync to it (2026-11-01)
+
+**OQ1: don't reset Development.** The two-device Production round trip was confirmed on 2026-11-01
+(PROD-CUTOVER Step 12). That was the point OQ1 recommended resetting. Jon chose to keep Development's pre-cut
+library as test data.
+
+- **Why keep it.** The reset only bought two things. One was a lighter first sync for Yes Chef Dev. The other was
+  keeping experiments out of an archive that no longer needs protecting: the cut is confirmed, and the rollback
+  was always the Step 4 backup *file*, never the zone. A full, realistic library is worth more for testing,
+  especially sync work.
+- **Yes Chef Dev may turn sync on whenever it's useful.** Its first sync downloads the pre-cut library, about
+  44,000 rows, and CloudKit throttles that. The parked-record retry (#414) keeps it from stalling. Its edits change
+  Development's data, and that's acceptable: Development's data is disposable.
+- **For fresher test data,** restore a current TestFlight backup into Yes Chef Dev with sync off. That never
+  touches Development.
+- **The schema rule doesn't change.** A deploy copies Development's whole schema to Production, so a Yes Chef Dev
+  experiment that syncs a new field creates schema the next deploy would make permanent. Every deploy still goes
+  through the Reference A export-and-diff in `PROD-CUTOVER.md` first.
+- **Still never use "Reset Development Environment"** (PROD-CUTOVER Step 5).
+
+This also answers ADR-0056 OQ2.
