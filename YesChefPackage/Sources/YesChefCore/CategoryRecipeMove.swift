@@ -43,8 +43,8 @@ extension CategoryRepository {
     in db: Database
   ) throws -> CategoryRecipeMoveReport {
     let categories = try Category.fetchAll(db)
-    _ = try category(sourceID, in: categories)
-    _ = try category(targetID, in: categories)
+    let source = try category(sourceID, in: categories)
+    let target = try category(targetID, in: categories)
     guard sourceID != targetID else { throw CategoryRecipeMoveError.sameCategory }
 
     let targetRecipeIDs = Set(
@@ -67,6 +67,7 @@ extension CategoryRepository {
     }
 
     if deletingSource {
+      try RecipeLensRepository.repointCategoryReferences(from: source, to: target, in: db)
       try deleteCategory(categoryID: sourceID, in: db)
       report.deletedSource = true
     }

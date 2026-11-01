@@ -13,6 +13,7 @@ struct PowerBrowserView: View {
       if model.isShowingLensShelves {
         NavigationStack {
           RecipeLensShelvesView(model: model, onRecipeSelected: onRecipeSelected)
+            .toolbar { PowerBrowserLensToolbar(model: model) }
         }
       } else {
         NavigationSplitView {
@@ -23,25 +24,6 @@ struct PowerBrowserView: View {
         .navigationSplitViewStyle(.balanced)
         .onChange(of: result.availableFacets.map(\.id), initial: true) { _, facetIDs in
           model.availableFacetsAppeared(facetIDs)
-        }
-      }
-    }
-    .toolbar {
-      ToolbarItem(placement: .principal) {
-        Picker("Recipe Lens", selection: $model.selectedLensID) {
-          Text("All recipes").tag(Optional<RecipeLens.ID>.none)
-          ForEach(model.lensLibrary.lenses) { lens in Text(lens.name).tag(Optional(lens.id)) }
-        }
-        .pickerStyle(.menu)
-        .onChange(of: model.selectedLensID) { _, id in model.lensSelectionChanged(id) }
-      }
-      ToolbarItem(placement: .primaryAction) {
-        if model.isEditingSavedQuery {
-          Button("Save query") { model.saveQueryEditsButtonTapped() }
-        } else if model.selectedLens != nil {
-          Button("Edit Lens", systemImage: "slider.horizontal.3") { model.editLensButtonTapped() }
-        } else {
-          Button("Save as Lens", systemImage: "bookmark") { model.saveAsLensButtonTapped() }
         }
       }
     }
@@ -350,6 +332,7 @@ private struct PowerBrowserResultsView: View {
     .navigationBarTitleDisplayMode(.inline)
     .searchable(text: $model.searchText, prompt: "Search recipes")
     .toolbar {
+      PowerBrowserLensToolbar(model: model)
       ToolbarItem(placement: .primaryAction) {
         Menu {
           Picker("Sort", selection: $model.query.sort) {
@@ -360,6 +343,31 @@ private struct PowerBrowserResultsView: View {
         } label: {
           Label("Sort", systemImage: "arrow.up.arrow.down")
         }
+      }
+    }
+  }
+}
+
+private struct PowerBrowserLensToolbar: ToolbarContent {
+  let model: PowerBrowserModel
+
+  var body: some ToolbarContent {
+    @Bindable var model = model
+    ToolbarItem(placement: .principal) {
+      Picker("Recipe Lens", selection: $model.selectedLensID) {
+        Text("All recipes").tag(Optional<RecipeLens.ID>.none)
+        ForEach(model.lensLibrary.lenses) { lens in Text(lens.name).tag(Optional(lens.id)) }
+      }
+      .pickerStyle(.menu)
+      .onChange(of: model.selectedLensID) { _, id in model.lensSelectionChanged(id) }
+    }
+    ToolbarItem(placement: .primaryAction) {
+      if model.isEditingSavedQuery {
+        Button("Save query") { model.saveQueryEditsButtonTapped() }
+      } else if model.selectedLens != nil {
+        Button("Edit Lens", systemImage: "slider.horizontal.3") { model.editLensButtonTapped() }
+      } else {
+        Button("Save as Lens", systemImage: "bookmark") { model.saveAsLensButtonTapped() }
       }
     }
   }

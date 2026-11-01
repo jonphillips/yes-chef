@@ -5,6 +5,12 @@ import YesChefCore
 
 extension PowerBrowserModel {
   func lensSelectionChanged(_ id: RecipeLens.ID?, using lensOverride: RecipeLens? = nil) {
+    if id != nil, id == pendingRestoredLensID {
+      pendingRestoredLensID = nil
+      selectedLensID = id
+      queryEditTarget = nil
+      return
+    }
     selectedLensID = id
     if id == nil, queryEditTarget != nil { return }
     if id != nil { queryEditTarget = nil }
@@ -49,17 +55,21 @@ extension PowerBrowserModel {
   func saveQueryEditsButtonTapped() {
     guard let queryEditTarget else { return }
     do {
+      let restoredLensID: RecipeLens.ID = switch queryEditTarget {
+      case let .lensBase(id): id
+      case let .shelf(_, lensID): lensID
+      }
       try database.write { db in
         switch queryEditTarget {
         case let .lensBase(id):
-          guard let lens = lensLibrary.lenses.first(where: { $0.id == id }) else { return }
-          try RecipeLensRepository.setBaseQuery(lens, to: query, in: db, now: now)
+          try RecipeLensRepository.setBaseQuery(lensID: id, to: query, in: db, now: now)
         case let .shelf(id, _):
-          guard let shelf = lensLibrary.shelves.first(where: { $0.id == id }) else { return }
-          try RecipeLensRepository.setShelfQuery(shelf, to: query, in: db)
+          try RecipeLensRepository.setShelfQuery(shelfID: id, to: query, in: db)
         }
       }
       self.queryEditTarget = nil
+      pendingRestoredLensID = restoredLensID
+      selectedLensID = restoredLensID
     } catch { lensError = error.localizedDescription }
   }
 
@@ -100,16 +110,25 @@ extension PowerBrowserModel {
     }
   }
 
-  func addShelfButtonTapped(lensID: RecipeLens.ID, title: String, query: RecipeBrowserQuery) {
+  @discardableResult
+  func addShelfButtonTapped(lensID: RecipeLens.ID, title: String, query: RecipeBrowserQuery) -> RecipeLensShelf? {
     do {
-      try database.write { db in
-        _ = try RecipeLensRepository.addShelf(
+      return try database.write { db in
+        try RecipeLensRepository.addShelf(
           lensID: lensID, title: title, query: query, in: db, uuid: { uuid() }
         )
       }
     } catch {
       lensError = error.localizedDescription
+      return nil
     }
+  }
+
+  func newShelfButtonTapped(lensID: RecipeLens.ID) {
+    guard let shelf = addShelfButtonTapped(
+      lensID: lensID, title: "New shelf", query: RecipeBrowserQuery()
+    ) else { return }
+    editShelfQueryButtonTapped(shelf)
   }
 
   func renameLensButtonTapped(_ lens: RecipeLens, name: String) {

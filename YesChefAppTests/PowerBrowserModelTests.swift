@@ -219,6 +219,51 @@ struct PowerBrowserModelTests {
   }
 
   @Test
+  func savingEditedLensQueryRestoresLensSelectionWithoutReloadingStaleBase() async throws {
+    let now = Date(timeIntervalSinceReferenceDate: 904_920_000)
+    let lensID = SampleUUIDSequence.uuid(94_921)
+    let shelfID = SampleUUIDSequence.uuid(94_922)
+    let initialQuery = RecipeBrowserQuery(text: "initial")
+    let editedQuery = RecipeBrowserQuery(text: "edited")
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      let lens = RecipeLens(
+        id: lensID, name: "Edited", baseQuery: try RecipeLensQueryCodec.encode(initialQuery),
+        sortOrder: 0, dateCreated: now, dateModified: now
+      )
+      let shelf = RecipeLensShelf(
+        id: shelfID, lensID: lensID, title: "Shelf",
+        query: try RecipeLensQueryCodec.encode(initialQuery), sortOrder: 0
+      )
+      try await database.write { db in
+        try RecipeLens.insert { lens }.execute(db)
+        try RecipeLensShelf.insert { shelf }.execute(db)
+      }
+
+      let model = PowerBrowserModel()
+      model.query = editedQuery
+      model.queryEditTarget = .lensBase(lensID)
+      model.saveQueryEditsButtonTapped()
+      #expect(model.selectedLensID == lensID)
+      #expect(model.query == editedQuery)
+      model.lensSelectionChanged(lensID)
+      #expect(model.query == editedQuery)
+
+      let shelfEdit = RecipeBrowserQuery(text: "shelf edit")
+      model.query = shelfEdit
+      model.queryEditTarget = .shelf(shelfID, lensID: lensID)
+      model.saveQueryEditsButtonTapped()
+      #expect(model.selectedLensID == lensID)
+      #expect(model.query == shelfEdit)
+      model.lensSelectionChanged(lensID)
+      #expect(model.query == shelfEdit)
+    }
+  }
+
+  @Test
   func browserDataPhotoIDsExcludeNilThumbnailsAndReferenceDocuments() async throws {
     let now = Date(timeIntervalSinceReferenceDate: 904_200_000)
     let includedRecipeID = SampleUUIDSequence.uuid(94_301)

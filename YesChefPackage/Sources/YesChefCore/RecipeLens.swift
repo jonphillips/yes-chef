@@ -68,6 +68,25 @@ public enum RecipeLensQueryCodec {
     )) }
     return envelope.query
   }
+
+  static func replacingCategoryReference(
+    in string: String,
+    sourceID: Category.ID,
+    targetID: Category.ID,
+    facetID: Facet.ID?
+  ) throws -> String {
+    var query = try decode(string)
+    if let facetID {
+      for index in query.facetSelections.indices where query.facetSelections[index].facetID == facetID {
+        if query.facetSelections[index].categoryIDs.remove(sourceID) != nil {
+          query.facetSelections[index].categoryIDs.insert(targetID)
+        }
+      }
+    } else if query.looseLabelIDs.remove(sourceID) != nil {
+      query.looseLabelIDs.insert(targetID)
+    }
+    return try encode(query)
+  }
 }
 
 public enum RecipeLensShelfState: Equatable, Sendable {
@@ -219,8 +238,12 @@ public enum RecipeLensRepository {
   }
 
   public static func setBaseQuery(_ lens: RecipeLens, to query: RecipeBrowserQuery, in db: Database, now: Date) throws {
+    try setBaseQuery(lensID: lens.id, to: query, in: db, now: now)
+  }
+
+  public static func setBaseQuery(lensID: RecipeLens.ID, to query: RecipeBrowserQuery, in db: Database, now: Date) throws {
     let encoded = try RecipeLensQueryCodec.encode(query)
-    try RecipeLens.find(lens.id).update { $0.baseQuery = encoded; $0.dateModified = now }.execute(db)
+    try RecipeLens.find(lensID).update { $0.baseQuery = encoded; $0.dateModified = now }.execute(db)
   }
 
   public static func delete(_ lens: RecipeLens, in db: Database) throws {
@@ -248,8 +271,34 @@ public enum RecipeLensRepository {
   }
 
   public static func setShelfQuery(_ shelf: RecipeLensShelf, to query: RecipeBrowserQuery, in db: Database) throws {
+    try setShelfQuery(shelfID: shelf.id, to: query, in: db)
+  }
+
+  public static func setShelfQuery(shelfID: RecipeLensShelf.ID, to query: RecipeBrowserQuery, in db: Database) throws {
     let encoded = try RecipeLensQueryCodec.encode(query)
-    try RecipeLensShelf.find(shelf.id).update { $0.query = encoded }.execute(db)
+    try RecipeLensShelf.find(shelfID).update { $0.query = encoded }.execute(db)
+  }
+
+  static func repointCategoryReferences(
+    from source: Category,
+    to target: Category,
+    in db: Database
+  ) throws {
+    guard source.facetID == target.facetID else { return }
+    for lens in try RecipeLens.fetchAll(db) {
+      if let query = try? RecipeLensQueryCodec.replacingCategoryReference(
+        in: lens.baseQuery, sourceID: source.id, targetID: target.id, facetID: source.facetID
+      ), query != lens.baseQuery {
+        try RecipeLens.find(lens.id).update { $0.baseQuery = query }.execute(db)
+      }
+    }
+    for shelf in try RecipeLensShelf.fetchAll(db) {
+      if let query = try? RecipeLensQueryCodec.replacingCategoryReference(
+        in: shelf.query, sourceID: source.id, targetID: target.id, facetID: source.facetID
+      ), query != shelf.query {
+        try RecipeLensShelf.find(shelf.id).update { $0.query = query }.execute(db)
+      }
+    }
   }
 
   public static func removeShelf(_ shelf: RecipeLensShelf, in db: Database) throws {

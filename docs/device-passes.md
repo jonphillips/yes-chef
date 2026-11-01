@@ -235,5 +235,5 @@ is either already in Development or settled there: the pantry thresholds are cre
 
 ## Recipe Lenses (ADR-0050 Amendment 1, L1 + L2)
 
-- [ ] **Held ops before the next TestFlight build:** On a simulator Debug build against Development, create a Lens with a shelf so both new record types and every field upload with a non-nil value. Re-export Development and diff against [`PROD-CUTOVER.md`](PROD-CUTOVER.md) Reference A, then deploy Development → Production.
-- [ ] **iPad device pass:** Check the Lens shelf view and editor after the schema deploy.
+- [ ] **Held ops before the next TestFlight build:** Development remains a cold archive until reset. Create both Lens record types and every field in the CloudKit console (Development), then re-export, diff against [`PROD-CUTOVER.md`](PROD-CUTOVER.md) Reference A, and deploy Development → Production.
+- [ ] **iPad device pass:** Jon checks the Lens shelf view and editor after the schema deploy.

@@ -19,6 +19,13 @@ final class PowerBrowserModel {
     var looseCategoryOptions: [LooseCategoryOption]
   }
 
+  private struct CachedLensEvaluation {
+    var lens: RecipeLens
+    var shelves: [RecipeLensShelf]
+    var data: RecipeBrowserData
+    var evaluation: RecipeLensEvaluation
+  }
+
   enum BrowserDestination: Identifiable {
     case saveLens
     case editLens(RecipeLens.ID)
@@ -102,7 +109,9 @@ final class PowerBrowserModel {
   @ObservationIgnored @Dependency(\.uuid) var uuid
   @ObservationIgnored private var cachedEngine: CachedEngine?
   @ObservationIgnored private var cachedDerivations: CachedDerivations?
+  @ObservationIgnored private var cachedLensEvaluation: CachedLensEvaluation?
   @ObservationIgnored private var hasSeededFacetExpansion = false
+  @ObservationIgnored var pendingRestoredLensID: RecipeLens.ID?
 
   var query = RecipeBrowserQuery()
   var expandedFacetIDs: Set<Facet.ID> = []
@@ -140,10 +149,21 @@ final class PowerBrowserModel {
 
   var lensEvaluation: RecipeLensEvaluation? {
     guard let lens = selectedLens else { return nil }
-    return RecipeLensEvaluator.evaluate(
-      lens: lens, shelves: selectedLensShelves, using: browserEngine(),
+    let shelves = selectedLensShelves
+    if let cachedLensEvaluation,
+      cachedLensEvaluation.lens == lens,
+      cachedLensEvaluation.shelves == shelves,
+      cachedLensEvaluation.data == browserData {
+      return cachedLensEvaluation.evaluation
+    }
+    let evaluation = RecipeLensEvaluator.evaluate(
+      lens: lens, shelves: shelves, using: browserEngine(),
       facets: browserData.facets, categories: browserData.categories
     )
+    cachedLensEvaluation = CachedLensEvaluation(
+      lens: lens, shelves: shelves, data: browserData, evaluation: evaluation
+    )
+    return evaluation
   }
 
   func shelfCount(_ id: RecipeLensShelf.ID) -> Int? {

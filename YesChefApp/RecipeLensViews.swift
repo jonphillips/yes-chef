@@ -156,10 +156,7 @@ struct RecipeLensEditorView: View {
             ids.move(fromOffsets: source, toOffset: destination)
             model.reorderShelvesButtonTapped(ids, lensID: lens.id)
           }
-          Button("Add shelf from current browser query") {
-            let labels = model.selectionLabels(for: model.query)
-            model.addShelfButtonTapped(lensID: lens.id, title: labels.first ?? "New shelf", query: model.query)
-          }
+          Button("New shelf") { model.newShelfButtonTapped(lensID: lens.id); dismiss() }
         }
         Section {
           Button("Delete Lens", role: .destructive) {
@@ -169,7 +166,9 @@ struct RecipeLensEditorView: View {
         }
         ForEach(model.lensSuggestions, id: \.facet.id) { availability in
           Section("\(availability.facet.name) suggestions") {
-            ForEach(availability.values) { value in
+            ForEach(availability.values.filter {
+              !isShelfSuggestion($0.category.id, facetID: availability.facet.id)
+            }) { value in
               Button {
                 let query = RecipeBrowserQuery(facetSelections: [
                   .init(facetID: availability.facet.id, categoryIDs: [value.category.id])
@@ -210,6 +209,15 @@ struct RecipeLensEditorView: View {
       .onAppear {
         if name.isEmpty { name = lens.name }
         showsRemainder = lens.showsRemainder
+      }
+    }
+  }
+
+  private func isShelfSuggestion(_ categoryID: YesChefCore.Category.ID, facetID: Facet.ID) -> Bool {
+    shelves.contains { shelf in
+      guard let query = try? RecipeLensQueryCodec.decode(shelf.query) else { return false }
+      return query.facetSelections.contains {
+        $0.facetID == facetID && $0.categoryIDs.contains(categoryID)
       }
     }
   }

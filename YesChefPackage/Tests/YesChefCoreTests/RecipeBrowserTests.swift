@@ -65,7 +65,7 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func corruptShelfAndDeletedValueAreUnresolved() throws {
+    func corruptShelfDeletedValueAndWrongFacetValueAreUnresolved() throws {
       let fixture = BrowserFixture()
       let lens = RecipeLens(
         id: fixture.ids.next(), name: "Lens", baseQuery: try RecipeLensQueryCodec.encode(RecipeBrowserQuery()),
@@ -76,15 +76,15 @@ extension RecipeCoreTests {
         id: fixture.ids.next(), lensID: lens.id, title: "Deleted",
         query: try RecipeLensQueryCodec.encode(RecipeBrowserQuery(looseLabelIDs: [fixture.ids.next()])), sortOrder: 1
       )
-      let merged = RecipeLensShelf(
-        id: fixture.ids.next(), lensID: lens.id, title: "Merged",
+      let wrongFacet = RecipeLensShelf(
+        id: fixture.ids.next(), lensID: lens.id, title: "Wrong facet",
         query: try RecipeLensQueryCodec.encode(RecipeBrowserQuery(
           facetSelections: [.init(facetID: fixture.cuisine.id, categoryIDs: [fixture.beef.id])]
         )), sortOrder: 2
       )
 
       let result = RecipeLensEvaluator.evaluate(
-        lens: lens, shelves: [corrupt, deleted, merged], using: fixture.engine,
+        lens: lens, shelves: [corrupt, deleted, wrongFacet], using: fixture.engine,
         facets: [fixture.cuisine, fixture.protein],
         categories: [fixture.korean, fixture.mexican, fixture.beef, fixture.tenderloin, fixture.pork, fixture.weeknight]
       )
