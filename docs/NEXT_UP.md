@@ -1,6 +1,5 @@
-# Next Up — Sync activity log
+# Next Up — nothing dispatched
 
-**Slices:** effort `sync-activity-log`
-**Briefs:** [docs/efforts/sync-activity-log.md](efforts/sync-activity-log.md)
-**Done when:** per the brief
+Nothing dispatched.
+
 **Owed:** see [device-passes.md](device-passes.md)

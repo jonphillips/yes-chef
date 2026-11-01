@@ -24,11 +24,6 @@ final class SyncHealthModel {
   private var isRefreshing = false
   private var refreshRequestedWhileRefreshing = false
 
-  /// Local row counts per synced table — the dogfood diagnostic that answers
-  /// "did this table's rows actually reach this device?" at a glance. Populated on
-  /// demand from the Sync detail sheet; compare the two devices side by side.
-  private(set) var recordCounts: [RecordCount] = []
-
   /// Rows that CloudSyncKit can name as not uploaded, grouped into user-readable
   /// retry actions for the Sync detail sheet.
   private(set) var notUploadedRows: [NotUploadedDisplayRow] = []
@@ -453,26 +448,6 @@ final class SyncHealthModel {
       lastStartError = nil
     }
     await refresh()
-  }
-
-  /// Read per-table row counts from the local store. Cheap `COUNT(*)`s; failures
-  /// collapse to an empty list rather than disturbing the sync detail sheet.
-  func loadRecordCounts() async {
-    recordCounts = (try? await database.read { db in
-      [
-        RecordCount(name: "recipes", count: try Recipe.fetchCount(db)),
-        RecordCount(name: "recipeSources", count: try RecipeSource.fetchCount(db)),
-        RecordCount(name: "ingredientSections", count: try IngredientSection.fetchCount(db)),
-        RecordCount(name: "ingredientLines", count: try IngredientLine.fetchCount(db)),
-        RecordCount(name: "instructionSections", count: try InstructionSection.fetchCount(db)),
-        RecordCount(name: "instructionSteps", count: try InstructionStep.fetchCount(db)),
-        RecordCount(name: "recipePhotos", count: try RecipePhoto.fetchCount(db)),
-        RecordCount(name: "recipeNotes", count: try RecipeNote.fetchCount(db)),
-        RecordCount(name: "menus", count: try Menu.fetchCount(db)),
-        RecordCount(name: "menuItems", count: try MenuItem.fetchCount(db)),
-        RecordCount(name: "mealPlanItems", count: try MealPlanItem.fetchCount(db)),
-      ]
-    }) ?? []
   }
 
   private func currentSyncFailureReport(isEngineRunning: Bool) async -> SyncFailureReport? {

@@ -11,6 +11,7 @@ import YesChefCore
 struct AppContainer: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   @Environment(\.scenePhase) private var scenePhase
+  @Environment(SyncActivityRecorder.self) private var syncActivityRecorder
   @Dependency(\.handoffReviewCoordinator) private var handoffReviewCoordinator
   @Dependency(\.createRecipeCoordinator) private var createRecipeCoordinator
   @State private var toastCenter: AppToastCenter
@@ -81,6 +82,7 @@ struct AppContainer: View {
       onRecipeCreated: recipeCreated
     )
     .task {
+      await syncActivityRecorder.scenePhaseChanged(isForeground: scenePhase == .active)
       if scenePhase == .active { await automaticBackupModel.runIfDue() }
     }
     .fullScreenCover(item: $presentedRecipe) { presentation in
@@ -196,6 +198,7 @@ struct AppContainer: View {
       Task { await createRecipeCoordinator.abandonOutstandingReferral() }
     }
     .onChange(of: scenePhase) { _, phase in
+      Task { await syncActivityRecorder.scenePhaseChanged(isForeground: phase == .active) }
       if phase == .background {
         Task { await chatAccessExportModel.exportIfDue() }
       } else if phase == .active {

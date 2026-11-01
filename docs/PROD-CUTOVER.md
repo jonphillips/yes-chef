@@ -312,7 +312,7 @@ DATA LOSS.sqlite` in Jon's Downloads. The retry:
       **Buffalo Chicken Wings with Blue Cheese** shows its 24 ingredient lines (Step 4 audit).
 
 - **While the download runs:** a newer TestFlight build (such as the
-  [sync activity log](efforts/sync-activity-log.md)) goes on the iPhone as an **update over the current build**.
+  [sync activity log](efforts/archive/sync-activity-log.md)) goes on the iPhone as an **update over the current build**.
   Never delete the app, because deleting it restarts the download from nothing.
 
 **Gate (the real one):** Steps 10 and 11 both pass. **Only now is the cut real**, and the freeze ends.

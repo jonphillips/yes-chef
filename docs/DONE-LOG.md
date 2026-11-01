@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-01 — Sync activity log (`effort/sync-activity-log`)
+
+Added a capped, local JSON activity ledger and app-lifetime recorder for sync launches, scene changes, fetch transitions, and in-fetch samples. The Settings → Sync detail now shows arrival rates, zero-row fetches, a CSV export, and counts for all synced tables; the file lives in Application Support and is excluded from backup. Added Core ledger tests and app recorder tests.
+
+Verified with `scripts/check-drift.sh` (SwiftLint, 749 Core tests, 8 package tests, app test-target build-for-testing), the elevated generic iOS build, and the `YesChefTests` simulator target (93 tests in 25 suites; exit 0).
+
+---
 ## 2026-11-01 — Retry parked sync records from their saved copy (`effort/sqlite-data-parked-retry`)
 
 Patched vendored SQLiteData to retry parked records from their saved server copy, refresh that copy when a newer version arrives, and use one capped CloudKit fallback when local copies or assets are missing. Added public retry-batch diagnostics and readable Release issue logging. Commits: `698b40c` (vendor patch) and `903bf54` (app reporter).
