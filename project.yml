@@ -36,9 +36,15 @@ packages:
   # `QueryExpression` / `QueryBindable` conformances on `Foundation.Data`, `Date`
   # and `UUID` that live in StructuredQueriesCore, and app sources reference them
   # directly — `GroceryModels.o` and `HandoffEntities.o` fail to link without it.
+  #
+  # Capped below 0.38: 0.38 is the first release on swift-issue-reporting, and it breaks
+  # vendored SQLiteData 1.8.2 (`Statement+Sections.swift`: 'TableColumns' is not a member
+  # type of type 'From'). Vendored SQLiteData requires 0.34.0 or later. Lift the cap when
+  # Vendor/sqlite-data goes. The committed app Package.resolved pins the exact set.
   StructuredQueries:
     url: https://github.com/pointfreeco/swift-structured-queries
-    from: 0.31.0
+    minVersion: 0.34.0
+    maxVersion: 0.38.0
   # CustomDump is the same class of defect one layer out: YesChefAppTests calls
   # `expectNoDifference`, which the type checker sees because SQLiteData and
   # StructuredQueriesCore re-export CustomDump, and which the linker cannot find
