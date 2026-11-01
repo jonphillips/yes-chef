@@ -9,6 +9,11 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## App package graph pinned (`chore/app-package-resolved`)
+
+**2026-11-01.** The app's `Package.resolved` is now tracked, so a fresh checkout builds `YesChefTests`. Before this, every fresh resolve pulled `swift-issue-reporting` 2.x alongside `xctest-dynamic-overlay`, and the test build's two `IssueReporting` frameworks collided. `project.yml` caps StructuredQueries at `0.34.0 ..< 0.38.0`, because 0.38 breaks vendored SQLiteData 1.8.2. Lift the cap when `Vendor/sqlite-data` goes. Unblocks #403's test run. Verified with a fresh `-onlyUsePackageVersionsFromResolvedFile` build-for-testing and `check-drift.sh`.
+
+---
 ## Yes Chef Dev identity and backup variant (`effort/yes-chef-dev-variant`)
 
 **2026-11-01.** Debug builds now install as Yes Chef Dev with an isolated app group, extension, URL scheme, and DEV icon. Backups identify their build variant; production refuses development backups, while restored stores clear the marker. CloudSyncKit implementation: jon-platform PR #102; Yes Chef implementation: PR #406. Debug and Release generic iOS builds, `check-drift.sh`, and the YesChefTests simulator run passed. The portal assignment check and device pass remain owed; leave Dev sync off until the Development reset.
