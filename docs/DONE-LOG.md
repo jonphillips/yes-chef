@@ -9,6 +9,24 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-01 — Production cutover complete (ADR-0056)
+
+Yes Chef is off CloudKit Development. Both devices run TestFlight builds against Production and hold the same
+library, edits sync both ways, and automatic backups restore. [`PROD-CUTOVER.md`](PROD-CUTOVER.md) holds the
+whole record. The short version:
+
+- **The in-place carry didn't seed Production** (ADR-0056 OQ1 = no), so the iPad re-seeded by restore. The
+  first attempt lost 669 rows to SQLiteData's single-parent delete (#547). A vendored patch fixed it, and the
+  retry lost nothing. A temporary action put back the 241 steps Production still held deletes for.
+- **The iPhone's fresh install stalled for a week** behind 11,753 parked records, then finished in about
+  15 minutes on the parked-record retry patch. 24 `recipeSources` the iPad believed were uploaded were missing
+  from Production. Re-saving the 24 recipes on the iPad put them back.
+- **Development is kept as test data** (ADR-0059 Amendment 2).
+- **Follow-ups are live efforts:** the expected-fields gate for `testflight`, removing the temporary recovery
+  action, and a check for rows missing from iCloud. The generic guidance moved into jon-platform's
+  `persistence-and-sync.md`.
+
+---
 ## 2026-11-01 — Show the hand-off review over the recipe cover (`effort/handoff-review-over-recipe-cover`)
 
 Moved both hand-off review sheets to gated presentation hosts at the library, recipe full-screen cover, root and recipe Workbench sheets, Manage Variations sheet, and Cook Session cover. The modal audit found that Cook Session inherits the recipe toolbar Paste door through RecipeDetailView, so its cover also needs a host. Unmatched Review Anyway staging now builds the unsaved handoff read-only; the imported ledger row is inserted in the first content commit transaction and remains absent on discard. Matched returns, cross-item routing, and reader feedback keep their existing paths. The new-recipe JSON return remains routed to Create Recipe; its success toast is shown by RecipeDetailView's toast overlay over the cover. Verification: check-drift, generic iOS build, and YesChefTests passed.

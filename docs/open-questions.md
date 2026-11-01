@@ -171,32 +171,6 @@ selection (per-bubble `UITextView` caps the payload).
 Live ambiguities and recently-resolved decisions. Resolved items stay here briefly
 (dated) so the reasoning is durable, then graduate into the relevant doc or ADR.
 
-## Live — production cutover: keep-or-drop the never-set synced columns
-
-- **Decide per column before the Production deploy** ([`PROD-CUTOVER.md`](PROD-CUTOVER.md) Reference A). Jon (2026-10-26):
-  some of the 23 never-set columns on the missing list have no UI. Compare the lists and decide, column by
-  column, what we still care about.
-- **The rule.** A missing Production field fails an upload only when the app writes a non-nil value to it. A
-  column with no UI and no write path can never fail, but it is dead schema ([[no-dead-data]]).
-  - **Keep:** create the field in Development before the deploy.
-  - **Drop:** an appended migration before the cut, while dropping is still free. After the deploy the field is
-    permanent in Production.
-- **How to decide.** For each column, grep the model and its writers for any code path that writes it. A write
-  path means keep (and create it); none means drop. Record the verdict per column in Reference A's table. The two
-  empty tables (`equipment`, `recipeEquipment`) take the same test.
-- **Decided 2026-10-26: Jon approved every verdict as proposed** (Reference A's table, after diffing the Development export). Of the 17 fields
-  Development lacks, 9 have a write path and are kept: `pageNumber`, `mealPlanItems.notes`, `menus.notes`,
-  `workbenchLog.outcome`/`relatedRecipeID`, `remindersListName`, `pantryItems.threshold*`, and
-  `groceryItemSources.menuPlacementID`. 8 have none and are dropped, along with both equipment tables:
-  `activeTimeMinutes`, `restTimeMinutes`, `shoppingCategory`, `cookingSessionID`, `tags.color`, `categories.color`,
-  and `mealPlanItems.startTime`/`endTime`. `categories.color` was on the Prod-schema promotion list, but no UI
-  sets or shows it; its only writer copies `tags.color`, which nothing sets. **Jon confirmed the drop
-  (2026-10-26):** re-add it additively if a color UI is ever built. Jon also retired the dormant `tags`/`recipeTags`
-  tables (ADR-0049 Amd 5). All of it ships as one slice,
-  [`efforts/archive/prod-never-set-drop.md`](efforts/archive/prod-never-set-drop.md), dispatched after chat-access S2. Remove this
-  item once that slice merges.
-- These drops are the only synced-schema change allowed to merge before the cut (the cutover's Rules).
-
 ## Dormant — variation ↔ Workbench overlap (watch)
 
 The 2026-07-11 two-device pass raised three variation/Workbench-overlap forks; all three were answered by

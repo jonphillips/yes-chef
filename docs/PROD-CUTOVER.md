@@ -1,5 +1,10 @@
 # Production Cutover Runbook
 
+**Status: complete, 2026-11-01.** Yes Chef runs on CloudKit Production on both devices. The leftover follow-ups
+are live efforts: [`cloudkit-expected-fields-gate.md`](efforts/cloudkit-expected-fields-gate.md),
+[`remove-instruction-step-recovery.md`](efforts/remove-instruction-step-recovery.md) and
+[`missing-from-icloud-check.md`](efforts/missing-from-icloud-check.md).
+
 **Purpose.** This is the ordered, reversible procedure for taking Yes Chef from a dev-signed build on CloudKit
 **Development** to a TestFlight build on CloudKit **Production**, **without re-importing the dogfood library**.
 It is the ops companion to [ADR-0056](decisions/ADR-0056-move-to-production-and-data-carry.md), which explains
@@ -46,8 +51,8 @@ jon-platform `SEAM-LEDGER.md`, waiting for this run's answer.
 11. [x] iPhone: fresh TestFlight install pulls the whole library. **← The cut is real here. Passed 2026-11-01.**
 
 **After**
-12. [ ] Post-cut device checks: automatic backups, two-way edits.
-13. [ ] Post-cut housekeeping: record the answers, archive Development, dispatch Yes Chef Dev.
+12. [x] Post-cut device checks: automatic backups, two-way edits.
+13. [x] Post-cut housekeeping: record the answers, decide Development's fate, dispatch Yes Chef Dev.
 
 ---
 
@@ -338,30 +343,41 @@ arriving in about 15 minutes.
 
 ## 12 — Post-cut device checks
 
-- [ ] **Automatic backups**, on the first TestFlight build: the full pass in [`device-passes.md`](device-passes.md),
-      on both devices.
+- [x] **Automatic backups**, on the first TestFlight build: the full pass in [`device-passes.md`](device-passes.md),
+      on both devices. **Closed 2026-11-01.**
+      - Both devices write dated `YesChef-Auto-` files with their own suffixes, so they can't collide (G1, G3).
+        The files reach the Mac's Yes Chef iCloud container (G2).
+      - An automatic file restored cleanly in Yes Chef Dev (G4), so the real library was never at risk.
+      - G6 (iCloud Drive off) and G7 (the shrink pin) were **not run on a device, by agreement.** Turning off
+        iCloud for Yes Chef in iOS Settings can read as a sign-out and erase local data, and a shrink needs a
+        throwaway library on a TestFlight build. CloudSyncKit's `AutomaticBackupTests` cover both.
 - [x] Make an edit on each device, and confirm it arrives on the other. **Done 2026-11-01:** an edit on each device
       arrived on the other.
 - [x] If S2's pass was deferred in Step 2, run it now. *(It wasn't deferred: it passed 2026-10-26, Step 2.)*
 
 ## 13 — Post-cut housekeeping  *(architect, with Jon)*
 
-- [ ] Record the OQ1 answer from Step 8 in ADR-0056, and in jon-platform `SEAM-LEDGER.md`'s data-carry row (its
-      trigger needs it). Then lift the carry guidance into `persistence-and-sync.md`.
+- [x] Record the OQ1 answer from Step 8 in ADR-0056, and in jon-platform `SEAM-LEDGER.md`'s data-carry row (its
+      trigger needs it). Then lift the carry guidance into `persistence-and-sync.md`. **Done 2026-11-01:** OQ1 is
+      ADR-0056 Amendment 2. Both halves of the ledger row's trigger have fired, so the guidance moves into
+      `persistence-and-sync.md` § *Moving a populated library to Production*, and the row moves to
+      `EXTRACTION-NOTES.md` (jon-platform PR).
 - [x] Keep **Development** as a cold archive through at least one confirmed two-device Production round trip
       (ADR-0056 OQ2). **Decided 2026-11-01: keep it with no reset,** as test data that Yes Chef Dev may sync to
       (ADR-0059 Amendment 2).
 - [x] Ship Yes Chef Dev's Debug identity and variant-aware backups (ADR-0059; the implementation is recorded in
       [`efforts/archive/yes-chef-dev-variant.md`](efforts/archive/yes-chef-dev-variant.md)). The device pass remains owed. **Done 2026-11-01, ahead of the rest of this step (ADR-0059 Amendment 1).**
-- [ ] **From now on, every TestFlight build waits on a schema deploy.** A slice that adds a synced table or column,
+- **Standing rule, not a step: every TestFlight build waits on a schema deploy.** A slice that adds a synced table or column,
       or is the first to write a non-nil value to one, must create it in Development (from a simulator build or
       the console) and deploy before its TestFlight build ships. `testflight` refuses an undeployed Development
       change. A field missing from *both* environments isn't caught until
       [`efforts/cloudkit-expected-fields-gate.md`](efforts/cloudkit-expected-fields-gate.md) ships.
-- [ ] Remove the temporary **Recover Missing Instruction Steps** action (Step 10a), marked `TEMPORARY`.
-- [ ] Brief a check for rows a device believes are on the server but aren't. Step 11's 24 `recipeSources`
+- [x] Remove the temporary **Recover Missing Instruction Steps** action (Step 10a), marked `TEMPORARY`.
+      *Queued as [`efforts/remove-instruction-step-recovery.md`](efforts/remove-instruction-step-recovery.md).*
+- [x] Brief a check for rows a device believes are on the server but aren't. Step 11's 24 `recipeSources`
       sat behind a green status, and only a comparison of record IDs between devices found them.
-- [ ] Add the cut to `DONE-LOG.md`. Remove the keep-or-drop item from `open-questions.md`.
+      *Designed as [`efforts/missing-from-icloud-check.md`](efforts/missing-from-icloud-check.md).*
+- [x] Add the cut to `DONE-LOG.md`. Remove the keep-or-drop item from `open-questions.md`.
 - [x] Delete `yeschef-dev.ckdb` from the repo root. *(Already gone by 2026-11-01.)*
 
 ---
@@ -423,8 +439,8 @@ the companions of the never-set columns.
 
 *Missing — 2 record types and 17 fields.* The other 6 never-set columns
 (`groceryItemSources.mealPlanItemID`/`menuID`/`menuItemID`/`scheduledDate`/`mealSlot`/`sourceSubtitle`) already
-exist from earlier values. The keep-or-drop reasoning is in [`open-questions.md`](open-questions.md)
-§ "production cutover: keep-or-drop the never-set synced columns". Every field is `ENCRYPTED`.
+exist from earlier values. The rule behind each verdict: a column with a write path is kept, and one with no write path is
+dropped as dead schema. Every field is `ENCRYPTED`.
 
 | Missing | Type | Write path | Verdict (Jon, 2026-10-26) |
 |---|---|---|---|

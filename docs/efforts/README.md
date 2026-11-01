@@ -30,5 +30,9 @@ discoverable"):
 - [cloudkit-expected-fields-gate.md](cloudkit-expected-fields-gate.md) — **Ready** · `testflight` refuses a build
   whose synced fields Production lacks: a committed expected-fields list, kept current by a Core test, checked
   against the Production schema export.
+- [remove-instruction-step-recovery.md](remove-instruction-step-recovery.md) — **Ready** · Remove PROD-CUTOVER
+  Step 10a's temporary Settings action, its model, Core type and tests, now that the cut is done.
+- [missing-from-icloud-check.md](missing-from-icloud-check.md) — **Designed** · The on-demand iCloud check also
+  lists local rows the server doesn't have (the Step 11 `recipeSources` case), with **Upload again**.
 - [chat-access-mcp.md](chat-access-mcp.md) — **Blocked** on [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md)
   OQ3 · S3 lets a ChatGPT return target an existing recipe, not only stage a new one; S0–S2b shipped.
