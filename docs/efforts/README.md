@@ -26,6 +26,6 @@ discoverable"):
 ## Live
 
 - [sync-throttle-refetch.md](sync-throttle-refetch.md) — **Ready** · A throttled CloudKit fetch stalls until
-  the app is next foregrounded; a `CloudSyncKit` catch-up loop re-fetches after each retry-after while active.
+  the app is next foregrounded; a `CloudSyncKit` catch-up loop re-fetches while active, with public sync logging.
 - [chat-access-mcp.md](chat-access-mcp.md) — **Blocked** on [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md)
   OQ3 · S3 lets a ChatGPT return target an existing recipe, not only stage a new one; S0–S2b shipped.
