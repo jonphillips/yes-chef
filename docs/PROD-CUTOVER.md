@@ -41,10 +41,9 @@ jon-platform `SEAM-LEDGER.md`, waiting for this run's answer.
 6. [x] Re-export, confirm an exact match, and deploy Development → Production.
 7. [x] Upload the first TestFlight build.
 8. [x] iPad: install TestFlight over its current build and observe the in-place carry.
-9. [ ] iPad: re-seed by restore. **The first attempt lost data on the iPad** (see Step 9); the retry waits on a
-   SQLiteData patch.
-10. [ ] Confirm Production holds the library, server-side, and the iPad's library matches Step 4's backup.
-11. [ ] iPhone: fresh TestFlight install pulls the whole library. **← The cut is real here.**
+9. [x] iPad: re-seed by restore. The first attempt lost data on the iPad; the patched retry (9c) didn't.
+10. [x] Confirm Production holds the library, server-side, and the iPad's library matches Step 4's backup.
+11. [x] iPhone: fresh TestFlight install pulls the whole library. **← The cut is real here. Passed 2026-11-01.**
 
 **After**
 12. [ ] Post-cut device checks: automatic backups, two-way edits.
@@ -302,20 +301,40 @@ DATA LOSS.sqlite` in Jon's Downloads. The retry:
 
 > ⚠️ From here on, no Xcode Run onto the iPhone (Rules).
 
-- [ ] Delete Yes Chef from the iPhone. Its copy stays in Development and in its Step 4 backup.
-- [ ] Install the TestFlight build. **Before turning sync on, confirm the library is empty.** That proves deleting
+- [x] Delete Yes Chef from the iPhone. Its copy stays in Development and in its Step 4 backup.
+- [x] Install the TestFlight build. **Before turning sync on, confirm the library is empty.** That proves deleting
       the app cleared its app-group container, the check the ADR-0030 restore procedure rests on. If the old
-      library is still there, stop and tell the architect.
-- [ ] Settings → Sync → **Turn on iCloud sync**. The whole library arrives, photos included, and Sync reads
+      library is still there, stop and tell the architect. *(Installed by 2026-10-29. The empty-library check
+      wasn't written down at the time.)*
+- [x] Settings → Sync → **Turn on iCloud sync**. The whole library arrives, photos included, and Sync reads
       "Up to date".
-- [ ] **The iPhone's gap is closed.** Local record counts match the iPad's (`ingredientLines` 27,613), and
+- [x] **The iPhone's gap is closed.** Local record counts match the iPad's (`ingredientLines` 27,613), and
       **Buffalo Chicken Wings with Blue Cheese** shows its 24 ingredient lines (Step 4 audit).
+
+**Done 2026-11-01.** The download stalled for more than a week: 11,753 records were parked waiting on a missing
+parent, and SQLiteData re-downloaded all of them on every batch until CloudKit throttled it. The parked-record
+retry ([`efforts/archive/sqlite-data-parked-retry.md`](efforts/archive/sqlite-data-parked-retry.md)) and the
+[sync activity log](efforts/archive/sync-activity-log.md) went on as a TestFlight update, and the library finished
+arriving in about 15 minutes.
+- **Count audit (Reference B):** the iPhone's 11-01 export matched the iPad's 10-31 automatic backup on every
+  synced table except `recipeSources`. Buffalo Chicken Wings had its 24 lines.
+- **`recipeSources`: 24 rows never reached Production** (iPad 2,134, iPhone 2,110). Matching by ID found 24
+  rows on the iPad only, none on the iPhone only. They're cookbook sources (`importedFrom` empty, all modified
+  2026-07-08) for recipes running alphabetically from *Chile-Sumac-Pomegranate Nuts* through *Hart City Loaf
+  Master Recipe*. All 24 are in the Step 4 backup and in the first attempt's backup, so the first attempt didn't
+  delete them. The iPad's Sync screen listed **nothing** as not uploaded. Why they never arrived is unknown. The
+  iPad's sync metadata isn't in its backups, so it can't be checked from here.
+- **Repair:** Jon opened each of the 24 recipes on the iPad and tapped Edit → Save without changes. Saving always
+  rewrites the source row, and SQLiteData's update trigger queues an upload for any rewrite. If the server
+  doesn't have the record, the save fails with `unknownItem`, and the engine uploads it as new. Counts then
+  matched on every table.
 
 - **While the download runs:** a newer TestFlight build (such as the
   [sync activity log](efforts/archive/sync-activity-log.md)) goes on the iPhone as an **update over the current build**.
   Never delete the app, because deleting it restarts the download from nothing.
 
 **Gate (the real one):** Steps 10 and 11 both pass. **Only now is the cut real**, and the freeze ends.
+**Passed 2026-11-01: the cut is real, and the freeze is over.**
 
 ## 12 — Post-cut device checks
 
@@ -337,8 +356,10 @@ DATA LOSS.sqlite` in Jon's Downloads. The retry:
       or is the first to write a non-nil value to one, must create it in Development (from a simulator build or
       the console) and deploy before its TestFlight build ships. `testflight` enforces this.
 - [ ] Remove the temporary **Recover Missing Instruction Steps** action (Step 10a), marked `TEMPORARY`.
-- [ ] Add the cut to `DONE-LOG.md`. Remove the keep-or-drop item from `open-questions.md`. Delete
-      `yeschef-dev.ckdb` from the repo root.
+- [ ] Brief a check for rows a device believes are on the server but aren't. Step 11's 24 `recipeSources`
+      sat behind a green status, and only a comparison of record IDs between devices found them.
+- [ ] Add the cut to `DONE-LOG.md`. Remove the keep-or-drop item from `open-questions.md`.
+- [x] Delete `yeschef-dev.ckdb` from the repo root. *(Already gone by 2026-11-01.)*
 
 ---
 
