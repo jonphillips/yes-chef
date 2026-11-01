@@ -4,9 +4,9 @@ Status: Dispatched
 Summary: SQLiteData re-downloads every record parked on a missing parent each time a batch arrives, which
 throttles the iPhone's first sync to a standstill; retry parked records from their locally saved server copy,
 and make SQLiteData's reported issues readable in Release logs.
-Related: [PROD-CUTOVER](../PROD-CUTOVER.md) Step 11 (the iPhone download this was found on) ·
-[archive/sqlite-data-reference-violation-patch.md](archive/sqlite-data-reference-violation-patch.md) (the first
-vendored patch; same vendor directory, same override) · [sync-activity-log.md](sync-activity-log.md) if plan PR
+Related: [PROD-CUTOVER](../../PROD-CUTOVER.md) Step 11 (the iPhone download this was found on) ·
+[archive/sqlite-data-reference-violation-patch.md](sqlite-data-reference-violation-patch.md) (the first
+vendored patch; same vendor directory, same override) · [sync-activity-log.md](../sync-activity-log.md) if plan PR
 #410 has merged (an app-side ledger of arrivals; complementary, separate effort)
 
 Schema-free, but **changes sync behavior**: the architect escalates the PR to Jon before merge.

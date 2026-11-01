@@ -17,6 +17,7 @@ public enum AppLog {
   /// Interactive-latency diagnostics (ADR-0029). Paired with `performanceSignposter`
   /// so a plain console capture is enough — no Instruments run required.
   public static let performance = Logger(subsystem: subsystem, category: "performance")
+  public static let sync = Logger(subsystem: subsystem, category: "sync")
   public static let performanceSignposter = OSSignposter(
     subsystem: subsystem,
     category: "performance"

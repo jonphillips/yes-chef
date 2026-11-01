@@ -110,6 +110,156 @@
         }
       }
 
+      @available(iOS 17, macOS 14, tvOS 17, watchOS 10, *)
+      @Test func newerParkedRecordIsAppliedAfterItsParentArrives() async throws {
+        let firstVersion = reminderRecord(id: 1, listID: 1, title: "First")
+        let parent = remindersListRecord(id: 2, title: "Business")
+        await receive([firstVersion])
+        try await syncEngine.metadatabase.read { db in
+          try #expect(UnsyncedRecordID.count().fetchOne(db) == 1)
+        }
+
+        await withDependencies {
+          $0.currentTime.now += 1
+        } operation: {
+          let newerVersion = reminderRecord(id: 1, listID: 2, title: "Latest")
+          newerVersion.parent = CKRecord.Reference(
+            recordID: RemindersList.recordID(for: 2),
+            action: .none
+          )
+          await receive([newerVersion])
+        }
+
+        await receive([parent])
+
+        assertQuery(
+          Reminder.select { ($0.title, $0.remindersListID) },
+          database: userDatabase.database
+        ) {
+          """
+          ┌──────────┬───┐
+          │ "Latest" │ 2 │
+          └──────────┴───┘
+          """
+        }
+        try await syncEngine.metadatabase.read { db in
+          try #expect(UnsyncedRecordID.count().fetchOne(db) == 0)
+        }
+        #expect(container.privateCloudDatabase.state.withValue(\.recordsRequestSizes).isEmpty)
+      }
+
+      @available(iOS 17, macOS 14, tvOS 17, watchOS 10, *)
+      @Test func parkedRecordWithoutSavedCopyFallsBackToCloudKit() async throws {
+        let record = reminderRecord(id: 1, listID: 1, title: "Saved remotely")
+        let parent = remindersListRecord(id: 1, title: "Personal")
+        try saveCloudRecords([parent, record])
+        await receive([record])
+        try await syncEngine.metadatabase.write { db in
+          try SyncMetadata.find(record.recordID)
+            .update {
+              $0.lastKnownServerRecord = #bind(nil)
+              $0._lastKnownServerRecordAllFields = #bind(nil)
+            }
+            .execute(db)
+        }
+
+        await receive([parent])
+
+        try await userDatabase.read { db in try #expect(Reminder.count().fetchOne(db) == 1) }
+        try await syncEngine.metadatabase.read { db in
+          try #expect(UnsyncedRecordID.count().fetchOne(db) == 0)
+        }
+        #expect(container.privateCloudDatabase.state.withValue(\.recordsRequestSizes) == [1])
+      }
+
+      @available(iOS 17, macOS 14, tvOS 17, watchOS 10, *)
+      @Test func throttledFallbackPreservesLocalRetriesAndTheIncomingBatch() async throws {
+        let localRecord = reminderRecord(id: 1, listID: 1, title: "Local copy")
+        let fallbackRecord = reminderRecord(id: 2, listID: 1, title: "Missing copy")
+        let parent = remindersListRecord(id: 1, title: "Personal")
+        try saveCloudRecords([parent, localRecord, fallbackRecord])
+        await receive([localRecord, fallbackRecord])
+        try await syncEngine.metadatabase.write { db in
+          try SyncMetadata.find(fallbackRecord.recordID)
+            .update {
+              $0.lastKnownServerRecord = #bind(nil)
+              $0._lastKnownServerRecordAllFields = #bind(nil)
+            }
+            .execute(db)
+        }
+        container.privateCloudDatabase.state.withValue { $0.rateLimitRecordRequests = true }
+
+        await receive([parent])
+
+        try await userDatabase.read { db in
+          try #expect(Reminder.find(1).fetchCount(db) == 1)
+          try #expect(RemindersList.find(1).fetchCount(db) == 1)
+        }
+        try await syncEngine.metadatabase.read { db in
+          try #expect(UnsyncedRecordID.find(fallbackRecord.recordID).fetchCount(db) == 1)
+        }
+        #expect(container.privateCloudDatabase.state.withValue(\.recordsRequestSizes) == [1])
+        try await syncEngine.metadatabase.write { db in
+          try UnsyncedRecordID.find(fallbackRecord.recordID).delete().execute(db)
+        }
+      }
+
+      @available(iOS 17, macOS 14, tvOS 17, watchOS 10, *)
+      @Test func fallbackRequestsAtMost150ParkedRecordsPerBatch() async throws {
+        let recordIDs = (1...151).map { Reminder.recordID(for: $0) }
+        try await syncEngine.metadatabase.write { db in
+          for recordID in recordIDs {
+            try UnsyncedRecordID.insert { UnsyncedRecordID(recordID: recordID) }.execute(db)
+          }
+        }
+        let parent = remindersListRecord(id: 1, title: "Personal")
+        try saveCloudRecords([parent])
+
+        await receive([parent])
+
+        #expect(container.privateCloudDatabase.state.withValue(\.recordsRequestSizes) == [150])
+        try await syncEngine.metadatabase.read { db in
+          try #expect(UnsyncedRecordID.count().fetchOne(db) == 1)
+        }
+        try await syncEngine.metadatabase.write { db in
+          try UnsyncedRecordID.findAll(recordIDs).delete().execute(db)
+        }
+      }
+
+      @available(iOS 17, macOS 14, tvOS 17, watchOS 10, *)
+      @Test func firstFetchedBatchRetriesAllParkedRecords() async throws {
+        let parent = RemindersList(id: 1, title: "Personal")
+        let child = reminderRecord(id: 1, listID: 1, title: "Already has parent")
+        try await userDatabase.write { db in
+          try RemindersList.insert { parent }.execute(db)
+          try SyncMetadata.insert {
+            SyncMetadata(
+              recordPrimaryKey: "1",
+              recordType: Reminder.tableName,
+              zoneName: child.recordID.zoneID.zoneName,
+              ownerName: child.recordID.zoneID.ownerName,
+              parentRecordPrimaryKey: "1",
+              parentRecordType: RemindersList.tableName,
+              lastKnownServerRecord: child,
+              _lastKnownServerRecordAllFields: child,
+              userModificationTime: child.userModificationTime
+            )
+          }
+          .execute(db)
+          try UnsyncedRecordID.insert { UnsyncedRecordID(recordID: child.recordID) }.execute(db)
+        }
+
+        let parentRecord = remindersListRecord(id: 1, title: "Personal")
+        try saveCloudRecords([parentRecord, child])
+        await receive([parentRecord])
+
+        try await userDatabase.read { db in try #expect(Reminder.find(1).fetchCount(db) == 1) }
+        try await syncEngine.metadatabase.read { db in
+          try #expect(UnsyncedRecordID.count().fetchOne(db) == 0)
+        }
+        #expect(container.privateCloudDatabase.state.withValue(\.recordsRequestSizes).isEmpty)
+      }
+
       /*
        * Remote client creates records A <- B <- C
        * Records A and C are sync'd to local client.
@@ -936,6 +1086,41 @@
           try #expect(RemindersList.fetchCount(db) == 1)
           try #expect(Reminder.fetchCount(db) == 500)
         }
+      }
+
+      private func reminderRecord(id: Int, listID: Int, title: String) -> CKRecord {
+        let listRecord = remindersListRecord(id: listID, title: "List \(listID)")
+        let record = CKRecord(
+          recordType: Reminder.tableName,
+          recordID: Reminder.recordID(for: id)
+        )
+        record.setValue(id, forKey: "id", at: now)
+        record.setValue(title, forKey: "title", at: now)
+        record.setValue(listID, forKey: "remindersListID", at: now)
+        record.parent = CKRecord.Reference(record: listRecord, action: .none)
+        return record
+      }
+
+      private func saveCloudRecords(_ records: [CKRecord]) throws {
+        let (saveResults, _) = try container.privateCloudDatabase.modifyRecords(saving: records)
+        try saveResults.values.forEach { _ = try $0.get() }
+      }
+
+      private func receive(_ records: [CKRecord]) async {
+        await syncEngine.handleFetchedRecordZoneChanges(
+          modifications: records,
+          syncEngine: syncEngine.private
+        )
+      }
+
+      private func remindersListRecord(id: Int, title: String) -> CKRecord {
+        let record = CKRecord(
+          recordType: RemindersList.tableName,
+          recordID: RemindersList.recordID(for: id)
+        )
+        record.setValue(id, forKey: "id", at: now)
+        record.setValue(title, forKey: "title", at: now)
+        return record
       }
     }
   }
