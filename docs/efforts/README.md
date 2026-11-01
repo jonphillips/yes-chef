@@ -27,5 +27,3 @@ discoverable"):
 
 - [chat-access-mcp.md](chat-access-mcp.md) — **Blocked** on [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md)
   OQ3 · S3 lets a ChatGPT return target an existing recipe, not only stage a new one; S0–S2b shipped.
-- [pantry-seed-collision.md](pantry-seed-collision.md) — **Ready** · A fresh install no longer seeds pantry rows
-  with positional fixed IDs that overwrite another device's pantry; starters are added on request with canonical-name IDs.

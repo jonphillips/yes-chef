@@ -9,6 +9,12 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Pantry starters no longer seed with positional IDs (`effort/pantry-seed-collision`)
+
+**2026-11-01. Schema-free.** Removed automatic live pantry seeding and the retired UserDefaults pantry import. The empty pantry now offers **Add common staples**, and reset staples use UUIDv5 IDs derived from canonical names so separate devices converge on the same rows. User-added items retain their injected random IDs. Core tests cover stable IDs, cross-database reset equality, canonical deduplication, and user IDs; the live-context app test confirms a fresh pantry stays empty. `check-drift.sh`, `YesChefTests` (84), and the generic iOS build passed. Jon's duplicate-row cleanup and cross-device confirmation remain owed in `device-passes.md`.
+
+---
+
 ## Recipe Lenses (`effort/recipe-lenses`)
 
 **2026-11-01.** Implemented ADR-0050 Amendment 1: synced Lens and shelf records, independent base/shelf query evaluation, the remainder, saved-Lens management, and the iPad Power Browser shelf view. The Development schema held op and the iPad pass are in `device-passes.md`. Verified: `check-drift.sh` (lint, 738 package tests, app build-for-testing), the generic iOS build, and 87 `YesChefTests` with `-onlyUsePackageVersionsFromResolvedFile`.

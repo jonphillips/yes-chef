@@ -221,8 +221,7 @@ final class GroceryLibraryModel {
       _ = try database.write { db in
         try PantryRepository.resetToDefaults(
           in: db,
-          now: now,
-          uuid: { uuid() }
+          now: now
         )
       }
     } catch {

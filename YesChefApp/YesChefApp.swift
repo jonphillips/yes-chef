@@ -20,13 +20,10 @@ struct YesChefApp: App {
     let modelCallRecordCollector = ModelCallRecordCollector()
     self.modelCallRecordCollector = modelCallRecordCollector
 #endif
-    let legacyPantryText = UserDefaults.standard.string(forKey: GroceryPantryStorage.storageKey)
-    let legacyPantryItems = legacyPantryText.map(GroceryPantryStorage.items(from:))
     let legacyTasteProfile = UserDefaults.standard.string(forKey: legacyRecipeChatCustomInstructionsKey)
     prepareDependencies {
       try! $0.bootstrapDatabase()
       try! $0.migrateLegacyAISettingsIfNeeded(tasteProfile: legacyTasteProfile)
-      try! $0.seedPantryItemsIfNeeded(titles: legacyPantryItems)
       try! $0.seedSampleDataIfNeeded()
       $0.handoffReviewCoordinator = handoffReviewCoordinator
       $0.createRecipeCoordinator = createRecipeCoordinator

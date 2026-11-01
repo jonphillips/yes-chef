@@ -629,15 +629,20 @@ public enum PantryRepository {
   @discardableResult
   public static func resetToDefaults(
     in db: Database,
-    now: Date,
-    uuid: () -> UUID
+    now: Date
   ) throws -> [PantryItem.ID] {
-    try replaceItems(
-      titles: GroceryPantryAssumptions.defaultStaples,
-      in: db,
-      now: now,
-      uuid: uuid
-    )
+    try PantryItem.delete().execute(db)
+    var itemIDs: [PantryItem.ID] = []
+    for title in uniquePantryTitles(GroceryPantryAssumptions.defaultStaples) {
+      guard let canonicalName = CanonicalIngredient.canonicalName(title) else { continue }
+      itemIDs.append(try addItem(
+        title: title,
+        in: db,
+        now: now,
+        uuid: { DeterministicID.pantryStaple(canonicalName: canonicalName) }
+      ))
+    }
+    return itemIDs
   }
 
   @discardableResult
