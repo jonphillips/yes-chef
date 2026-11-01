@@ -14,6 +14,26 @@ Newest first.
 `check-drift.sh` and `xcodebuild-summary.sh` pass `-onlyUsePackageVersionsFromResolvedFile`, so every scripted build uses the `Package.resolved` tracked since #407, or fails saying it's stale. A clone with a leftover resolution can no longer fail `check-drift` in a way a clean checkout doesn't (jon-platform ADR-0005 D16). Verified with `check-drift.sh` and the generic iOS build.
 
 ---
+## 2026-11-01 — Sync activity log (`effort/sync-activity-log`)
+
+Added a capped, local JSON activity ledger and app-lifetime recorder for sync launches, scene changes, fetch transitions, and in-fetch samples. The Settings → Sync detail now shows arrival rates, zero-row fetches, a CSV export, and counts for all synced tables; the file lives in Application Support and is excluded from backup. Added Core ledger tests and app recorder tests.
+
+Verified with `scripts/check-drift.sh` (SwiftLint, 749 Core tests, 8 package tests, app test-target build-for-testing), the elevated generic iOS build, and the `YesChefTests` simulator target (93 tests in 25 suites; exit 0).
+
+---
+## 2026-11-01 — Retry parked sync records from their saved copy (`effort/sqlite-data-parked-retry`)
+
+Patched vendored SQLiteData to retry parked records from their saved server copy, refresh that copy when a newer version arrives, and use one capped CloudKit fallback when local copies or assets are missing. Added public retry-batch diagnostics and readable Release issue logging. Commits: `698b40c` (vendor patch) and `903bf54` (app reporter).
+
+Verification: focused parked-retry suites; full SQLiteData suite (302 tests, 2 known issues); `scripts/check-drift.sh`; generic iOS build; `YesChefTests` (88 tests).
+
+---
+## Pantry starters no longer seed with positional IDs (`effort/pantry-seed-collision`)
+
+**2026-11-01. Schema-free.** Removed automatic live pantry seeding and the retired UserDefaults pantry import. The empty pantry now offers **Add common staples**, and reset staples use UUIDv5 IDs derived from canonical names so separate devices converge on the same rows. Reset upserts existing staples in place, preserving `dateCreated` and active sync metadata; user-added items retain their injected random IDs. Core and CloudSync tests cover stable IDs, cross-database reset equality, canonical deduplication, user IDs, and repeat-reset metadata; the live-context app test confirms a fresh pantry stays empty. After rebasing onto #403, `check-drift.sh` passed with 742 core tests, 8 MCP tests and an app bundle build; `YesChefTests` passed (88). The generic iOS build passed before the rebase. Jon's duplicate-row cleanup and cross-device confirmation remain owed in `device-passes.md`.
+
+---
+
 ## Recipe Lenses (`effort/recipe-lenses`)
 
 **2026-11-01.** Implemented ADR-0050 Amendment 1: synced Lens and shelf records, independent base/shelf query evaluation, the remainder, saved-Lens management, and the iPad Power Browser shelf view. The Development schema held op and the iPad pass are in `device-passes.md`. Verified: `check-drift.sh` (lint, 738 package tests, app build-for-testing), the generic iOS build, and 87 `YesChefTests` with `-onlyUsePackageVersionsFromResolvedFile`.

@@ -1,8 +1,10 @@
 import CloudSyncKit
 import SwiftUI
 import YesChefCore
-#if DEBUG
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
 #endif
 
 /// The sync-health row in Settings (jon-platform ADR-0003): a colored dot + one line
@@ -12,6 +14,7 @@ import UIKit
 /// carried after the CloudSyncKit lift.
 struct SyncStatusSection: View {
   let model: SyncHealthModel
+  @Environment(SyncActivityRecorder.self) private var activityRecorder
   @State private var showingDetail = false
 
   var body: some View {
@@ -33,7 +36,7 @@ struct SyncStatusSection: View {
       Text("Sync")
     }
     .sheet(isPresented: $showingDetail) {
-      SyncStatusDetailView(model: model)
+      SyncStatusDetailView(model: model, activityRecorder: activityRecorder)
     }
   }
 }
@@ -66,6 +69,7 @@ private struct SyncStatusDot: View {
 /// primary action — "Turn on sync" when the gate is off, "Try again" otherwise.
 struct SyncStatusDetailView: View {
   let model: SyncHealthModel
+  let activityRecorder: SyncActivityRecorder
   @Environment(\.dismiss) private var dismiss
   @State private var isConfirmingRestoreSyncEnablement = false
   @State private var isConfirmingLeftoverDelete = false
@@ -223,10 +227,59 @@ struct SyncStatusDetailView: View {
         }
 
         Section {
-          if model.recordCounts.isEmpty {
-            ProgressView()
+          if let lastArrival = activityRecorder.lastArrival {
+            LabeledContent {
+              Text(lastArrival, style: .relative)
+            } label: {
+              Text("Last rows arrived")
+            }
           } else {
-            ForEach(model.recordCounts) { row in
+            LabeledContent("Last rows arrived", value: "No new rows yet")
+          }
+          LabeledContent("Last hour", value: activityRecorder.rowsArrived(in: SyncActivityRecorder.hourWindow).formatted())
+          LabeledContent("Last 24 hours", value: activityRecorder.rowsArrived(in: SyncActivityRecorder.dayWindow).formatted())
+          if let startedAt = activityRecorder.ledger.startedAt {
+            LabeledContent {
+              Text(startedAt, style: .date)
+            } label: {
+              Text("Since")
+            }
+            LabeledContent("Rows", value: activityRecorder.ledger.rowsSinceStart.formatted())
+          }
+          let fetches = activityRecorder.fetchSummary(in: SyncActivityRecorder.dayWindow)
+          LabeledContent("Fetches (24 h)", value: "\(fetches.total), \(fetches.empty) with nothing new")
+          Button("Copy activity log") {
+            #if canImport(UIKit)
+            UIPasteboard.general.string = activityRecorder.ledger.csv
+            #elseif canImport(AppKit)
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(activityRecorder.ledger.csv, forType: .string)
+            #endif
+          }
+          .disabled(activityRecorder.ledger.entries.isEmpty)
+        } header: {
+          Text("Download activity")
+        } footer: {
+          Text("Rows received while sync is enabled on this device. The activity log is stored locally.")
+        }
+
+        Section {
+          if activityRecorder.latestCounts.isEmpty {
+            if model.health.isManuallyEnabled {
+              ProgressView()
+            } else {
+              Text("Turn on sync to record local counts.")
+                .foregroundStyle(.secondary)
+            }
+          } else {
+            if let latestEntry = activityRecorder.ledger.entries.last {
+              LabeledContent {
+                Text(latestEntry.date, style: .relative)
+              } label: {
+                Text("Last entry")
+              }
+            }
+            ForEach(activityRecorder.latestCounts) { row in
               LabeledContent(row.name, value: row.count.formatted())
                 .monospacedDigit()
             }
@@ -234,7 +287,7 @@ struct SyncStatusDetailView: View {
         } header: {
           Text("Local record counts")
         } footer: {
-          Text("Rows in this device's database, per synced table. Compare across devices to see which records actually arrived.")
+          Text("Counts show the local database as of the last activity entry and aren't refreshed while sync is off. Compare across devices to see which records actually arrived.")
         }
 
         #if DEBUG
@@ -276,7 +329,6 @@ struct SyncStatusDetailView: View {
       }
       .task {
         await model.refresh()
-        await model.loadRecordCounts()
       }
       .navigationTitle("Sync")
       .navigationBarTitleDisplayMode(.inline)

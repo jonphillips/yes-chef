@@ -10,6 +10,13 @@ public enum DeterministicID {
     )
   }
 
+  public static func pantryStaple(canonicalName: String) -> UUID {
+    uuidV5(
+      namespace: oidNamespace,
+      name: "pantryStaple:\(canonicalName)"
+    )
+  }
+
   private static let oidNamespace = UUID(uuidString: "6ba7b812-9dad-11d1-80b4-00c04fd430c8")!
 
   private static func uuidV5(namespace: UUID, name: String) -> UUID {

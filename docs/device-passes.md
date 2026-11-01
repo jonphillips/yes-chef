@@ -224,6 +224,8 @@ procedure gates it** (quiesce peers → restore on one → reinstall peers). Whe
 and **Undo Last Restore** is untested at all and rode the same broken binding as restore, so exercise it too.
 
 - [Yes Chef Dev variant](efforts/archive/yes-chef-dev-variant.md): Xcode Run on the iPhone installs "Yes Chef Dev", with the DEV icon, next to TestFlight Yes Chef. Each opens its own library. The share sheet lists "Save to Yes Chef" and "Save to Yes Chef Dev", and each saves into its own app. Yes Chef Dev's Settings shows "CloudKit Development". Leave sync off in Yes Chef Dev until Development is reset (PROD-CUTOVER Step 13). A backup exported from Yes Chef Dev is refused by TestFlight Yes Chef with the development-backup message. A TestFlight backup restores in Yes Chef Dev. A Cockpit Find referral still opens TestFlight Yes Chef.
+- **Parked-record retry** ([effort brief](efforts/archive/sqlite-data-parked-retry.md), schema-free). Install the TestFlight build on the iPhone **as an update; never delete the app**. Write down Settings → Sync’s “couldn’t be saved here” number and the record counts first. Keep Yes Chef open for an hour: the parked number falls, `ingredientSections`, `ingredientLines` and `instructionSteps` climb toward the iPad’s, and the whole library eventually arrives (then Step 11’s count check). Run `sudo log collect --device-udid <udid> --last 1h` and hand the archive to the architect: each batch has a public parked-retry line, and SQLiteData issues read as text, not `<private>`.
+- **Sync activity log** ([effort brief](efforts/archive/sync-activity-log.md)). After the TestFlight update on the iPhone, confirm the Local record counts match the counts written down before the update. Keep the app open and confirm Download activity fills in within an hour. Confirm Copy activity log pastes a CSV.
 
 ## Prod-schema promotion list — superseded (2026-10-26)
 
@@ -232,8 +234,10 @@ diff in [`PROD-CUTOVER.md`](PROD-CUTOVER.md) Reference A, not by a hand-kept lis
 is either already in Development or settled there: the pantry thresholds are created in Step 5, and
 `Category.color` is dropped in Step 1. The executed steps are PROD-CUTOVER Steps 5–6.
 
-
 ## Recipe Lenses (ADR-0050 Amendment 1, L1 + L2)
 
 - [ ] **Held ops before the next TestFlight build:** Development remains a cold archive until reset. Create both Lens record types and every field in the CloudKit console (Development), then re-export, diff against [`PROD-CUTOVER.md`](PROD-CUTOVER.md) Reference A, and deploy Development → Production.
 - [ ] **iPad device pass:** Jon checks the Lens shelf view and editor after the schema deploy.
+
+- **Pantry seed collision** (effort `pantry-seed-collision`). In the Pantry, delete the extra "vegetable oil",
+  "water" and "white pepper" rows (either copy of each), then confirm on the other device that each appears once.

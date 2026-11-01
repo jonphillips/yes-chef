@@ -554,7 +554,16 @@ struct PantrySettingsView: View {
     // invalid-batch-update exception (see ArchivedRecipesView, which crashed this way).
     Group {
       if model.pantryItems.isEmpty {
-        ContentUnavailableView("No Pantry Items", systemImage: "archivebox")
+        ContentUnavailableView {
+          Label("No Pantry Items", systemImage: "archivebox")
+        } description: {
+          Text("Add common staples to your pantry when you’re ready.")
+        } actions: {
+          Button("Add common staples") {
+            model.resetPantryButtonTapped()
+          }
+          .buttonStyle(.borderedProminent)
+        }
       } else {
         List {
           Section("Pantry Items") {
@@ -616,28 +625,6 @@ private struct PantryItemRowView: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.vertical, 4)
-  }
-}
-
-enum GroceryPantryStorage {
-  static let storageKey = "GroceryPantry.items"
-  static let defaultText = GroceryPantryAssumptions.defaultStaples.joined(separator: "\n")
-
-  static func items(from text: String) -> [String] {
-    var seen: Set<String> = []
-    return text
-      .split(whereSeparator: \.isNewline)
-      .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-      .filter { !$0.isEmpty }
-      .filter { item in
-        let key = item.folding(
-          options: [.caseInsensitive, .diacriticInsensitive],
-          locale: Locale(identifier: "en_US_POSIX")
-        )
-        guard !seen.contains(key) else { return false }
-        seen.insert(key)
-        return true
-      }
   }
 }
 

@@ -8,7 +8,7 @@ Debug install.
 
 ## What happened
 
-At launch, `YesChefApp` calls `seedPantryItemsIfNeeded` ([SampleData.swift](../../YesChefPackage/Sources/YesChefCore/SampleData.swift)).
+At launch, `YesChefApp` calls `seedPantryItemsIfNeeded` ([SampleData.swift](../../../YesChefPackage/Sources/YesChefCore/SampleData.swift)).
 When the local pantry is empty it adds `GroceryPantryAssumptions.defaultStaples` with IDs from
 `SampleUUIDSequence(start: 90_000)`, one ID per title **actually inserted**. `PantryRepository.addItems` skips
 titles whose canonical name is already present ("freshly ground black pepper" and "ground black pepper" are
