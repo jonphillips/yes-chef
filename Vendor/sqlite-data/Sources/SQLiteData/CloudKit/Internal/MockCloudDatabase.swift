@@ -16,6 +16,8 @@
       package var storage: [CKRecordZone.ID: Zone] = [:]
       var assets: [AssetID: Data] = [:]
       var deletedRecords: [(CKRecord.ID, CKRecord.RecordType)] = []
+      package var recordsRequestSizes: [Int] = []
+      package var rateLimitRecordRequests = false
       mutating func nextRecordChangeTag() -> Int {
         lastRecordChangeTag += 1
         return lastRecordChangeTag
@@ -75,6 +77,11 @@
       for ids: [CKRecord.ID],
       desiredKeys: [CKRecord.FieldKey]?
     ) throws -> [CKRecord.ID: Result<CKRecord, any Error>] {
+      let isRateLimited = state.withValue { state in
+        state.recordsRequestSizes.append(ids.count)
+        return state.rateLimitRecordRequests
+      }
+      if isRateLimited { throw CKError(.requestRateLimited) }
       let accountStatus = container.accountStatus()
       guard accountStatus == .available
       else { throw ckError(forAccountStatus: accountStatus) }
