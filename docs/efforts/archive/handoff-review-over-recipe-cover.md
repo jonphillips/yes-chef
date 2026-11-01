@@ -1,11 +1,11 @@
 # Effort — Show the hand-off review over the recipe cover
 
-Status: Ready
+Status: Complete
 Summary: A return pasted into a recipe opened from the Calendar, a Menu or Power Browser opens no review
 until the cover closes. Host the hand-off review sheets with the gated presenters, so they open from the cover;
 and an unmatched no-row paste writes its ledger row only when the cook commits.
-Related: [archive/dogfood-fixes-batch-1.md](archive/dogfood-fixes-batch-1.md) (the gated presenters, PR #58) ·
-[ADR-0038 Amd 8](../decisions/ADR-0038-external-llm-handoff.md) (ledger row at commit) · Amd 6 / Amd 7 (the
+Related: [archive/dogfood-fixes-batch-1.md](dogfood-fixes-batch-1.md) (the gated presenters, PR #58) ·
+[ADR-0038 Amd 8](../../decisions/ADR-0038-external-llm-handoff.md) (ledger row at commit) · Amd 6 / Amd 7 (the
 unmatched routing this leaves in place)
 
 App-layer only. No schema, no migration, no change to how a return is routed. Steps 1–3 are view wiring; step 4

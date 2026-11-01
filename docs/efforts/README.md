@@ -25,9 +25,6 @@ discoverable"):
 
 ## Live
 
-- [handoff-review-over-recipe-cover.md](handoff-review-over-recipe-cover.md) — **Ready** · A paste into a recipe
-  opened from the Calendar, a Menu or Power Browser opens no review until the cover closes; host the review
-  sheets with the gated presenters, and write an unmatched no-row paste's ledger row only at commit.
 - [sqlite-data-vendor-rebase.md](sqlite-data-vendor-rebase.md) — **Ready** ·
   re-vendor SQLiteData 1.12.1 with both patches, four minor releases ahead of today's 1.8.2 base.
 - [chat-access-mcp.md](chat-access-mcp.md) — **Blocked** on [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md)

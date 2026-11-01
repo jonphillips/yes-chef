@@ -12,7 +12,6 @@ struct AppContainer: View {
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
   @Environment(\.scenePhase) private var scenePhase
   @Environment(SyncActivityRecorder.self) private var syncActivityRecorder
-  @Dependency(\.handoffReviewCoordinator) private var handoffReviewCoordinator
   @Dependency(\.createRecipeCoordinator) private var createRecipeCoordinator
   @State private var toastCenter: AppToastCenter
   @State private var recipeModel = RecipeLibraryModel()
@@ -33,6 +32,7 @@ struct AppContainer: View {
   @State private var selectedSettingsPane: SettingsPane? = .categories
   @State private var presentedRecipe: RecipeDetailPresentation?
   @State private var presentedCookSession: CookSessionPresentation?
+  @State private var hasNestedHandoffReviewHostClaim = false
 
   init() {
     let toastCenter = AppToastCenter()
@@ -55,7 +55,6 @@ struct AppContainer: View {
     @Bindable var mealCalendarModel = mealCalendarModel
     @Bindable var menuModel = menuModel
     @Bindable var groceryModel = groceryModel
-    @Bindable var handoffReviewCoordinator = handoffReviewCoordinator
 
     AppMainLayout(
       horizontalSizeClass: horizontalSizeClass,
@@ -132,6 +131,10 @@ struct AppContainer: View {
       recipeModel: recipeModel,
       isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil
     )
+    .handoffReviewDestinations(
+      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil
+        && recipeModel.destination.workbench == nil && !hasNestedHandoffReviewHostClaim
+    )
     .sheet(isPresented: $recipeModel.destination.captureRecipe) {
       NavigationStack {
         RecipeCaptureView(libraryModel: recipeModel, model: recipeModel.captureModel)
@@ -156,28 +159,12 @@ struct AppContainer: View {
           }
         )
       }
+      .handoffReviewDestinations()
     }
     .sheet(isPresented: $workbenchModel.destination.addWorkbench) {
       NavigationStack {
         WorkbenchEditorView(model: workbenchModel)
       }
-    }
-    .sheet(
-      item: $handoffReviewCoordinator.review,
-      id: \.handoffID,
-      onDismiss: {
-        handoffReviewCoordinator.presentPendingAdjustmentReviewAfterReviewDismissal()
-      }
-    ) { review in
-      HandoffReviewSheet(coordinator: handoffReviewCoordinator, review: review)
-    }
-    .sheet(item: $handoffReviewCoordinator.adjustmentReview) { review in
-      RecipeAdjustmentReviewView(
-        review: review,
-        overwrite: { handoffReviewCoordinator.overwriteAdjustmentButtonTapped($0) },
-        keepAsVariation: { handoffReviewCoordinator.keepAdjustmentAsVariationButtonTapped($0, name: $1) },
-        saveVariation: { handoffReviewCoordinator.saveScopedVariationButtonTapped($0) }
-      )
     }
     .task(id: createRecipeCoordinator.stagedText) {
       guard createRecipeCoordinator.stagedText != nil else { return }
@@ -197,6 +184,7 @@ struct AppContainer: View {
       guard oldSection == .createRecipe, newSection != .createRecipe else { return }
       Task { await createRecipeCoordinator.abandonOutstandingReferral() }
     }
+    .onPreferenceChange(HandoffReviewHostClaimKey.self) { hasNestedHandoffReviewHostClaim = $0 }
     .onChange(of: scenePhase) { _, phase in
       Task { await syncActivityRecorder.scenePhaseChanged(isForeground: phase == .active) }
       if phase == .background {
@@ -418,6 +406,7 @@ private struct RecipeFullScreenCover: View {
         libraryModel: recipeModel,
         mealCalendarModel: mealCalendarModel,
         groceryModel: groceryModel,
+        hostsHandoffReviews: true,
         onRecipeSelected: onRecipeSelected
       )
       .toolbar {
@@ -449,6 +438,7 @@ private struct CookSessionFullScreenCover: View {
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
   let toastCenter: AppToastCenter
+  @State private var hasNestedHandoffReviewHostClaim = false
 
   var body: some View {
     NavigationStack {
@@ -477,6 +467,8 @@ private struct CookSessionFullScreenCover: View {
       mealCalendarModel: mealCalendarModel
     )
     .recipeDetailDestinations(recipeModel: recipeModel)
+    .onPreferenceChange(HandoffReviewHostClaimKey.self) { hasNestedHandoffReviewHostClaim = $0 }
+    .handoffReviewDestinations(isPresentationEnabled: !hasNestedHandoffReviewHostClaim)
   }
 }
 

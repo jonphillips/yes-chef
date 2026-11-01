@@ -9,6 +9,11 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-01 — Show the hand-off review over the recipe cover (`effort/handoff-review-over-recipe-cover`)
+
+Moved both hand-off review sheets to gated presentation hosts at the library, recipe full-screen cover, root and recipe Workbench sheets, Manage Variations sheet, and Cook Session cover. The modal audit found that Cook Session inherits the recipe toolbar Paste door through RecipeDetailView, so its cover also needs a host. Unmatched Review Anyway staging now builds the unsaved handoff read-only; the imported ledger row is inserted in the first content commit transaction and remains absent on discard. Matched returns, cross-item routing, and reader feedback keep their existing paths. The new-recipe JSON return remains routed to Create Recipe; its success toast is shown by RecipeDetailView's toast overlay over the cover. Verification: check-drift, generic iOS build, and YesChefTests passed.
+
+---
 ## 2026-11-01 — Production cutover Step 11 passed; the cut is real
 
 The iPhone's fresh TestFlight install now holds the whole Production library. That closes PROD-CUTOVER Steps 9–11
