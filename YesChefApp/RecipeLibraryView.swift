@@ -32,6 +32,7 @@ struct AppContainer: View {
   @State private var selectedSettingsPane: SettingsPane? = .categories
   @State private var presentedRecipe: RecipeDetailPresentation?
   @State private var presentedCookSession: CookSessionPresentation?
+  @State private var hasNestedHandoffReviewHostClaim = false
 
   init() {
     let toastCenter = AppToastCenter()
@@ -131,7 +132,8 @@ struct AppContainer: View {
       isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil
     )
     .handoffReviewDestinations(
-      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil && recipeModel.destination.workbench == nil
+      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil
+        && recipeModel.destination.workbench == nil && !hasNestedHandoffReviewHostClaim
     )
     .sheet(isPresented: $recipeModel.destination.captureRecipe) {
       NavigationStack {
@@ -182,6 +184,7 @@ struct AppContainer: View {
       guard oldSection == .createRecipe, newSection != .createRecipe else { return }
       Task { await createRecipeCoordinator.abandonOutstandingReferral() }
     }
+    .onPreferenceChange(HandoffReviewHostClaimKey.self) { hasNestedHandoffReviewHostClaim = $0 }
     .onChange(of: scenePhase) { _, phase in
       Task { await syncActivityRecorder.scenePhaseChanged(isForeground: phase == .active) }
       if phase == .background {
@@ -435,6 +438,7 @@ private struct CookSessionFullScreenCover: View {
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
   let toastCenter: AppToastCenter
+  @State private var hasNestedHandoffReviewHostClaim = false
 
   var body: some View {
     NavigationStack {
@@ -463,7 +467,8 @@ private struct CookSessionFullScreenCover: View {
       mealCalendarModel: mealCalendarModel
     )
     .recipeDetailDestinations(recipeModel: recipeModel)
-    .handoffReviewDestinations()
+    .onPreferenceChange(HandoffReviewHostClaimKey.self) { hasNestedHandoffReviewHostClaim = $0 }
+    .handoffReviewDestinations(isPresentationEnabled: !hasNestedHandoffReviewHostClaim)
   }
 }
 

@@ -1,6 +1,6 @@
 # Effort — Show the hand-off review over the recipe cover
 
-Status: Ready
+Status: Complete
 Summary: A return pasted into a recipe opened from the Calendar, a Menu or Power Browser opens no review
 until the cover closes. Host the hand-off review sheets with the gated presenters, so they open from the cover;
 and an unmatched no-row paste writes its ledger row only when the cook commits.

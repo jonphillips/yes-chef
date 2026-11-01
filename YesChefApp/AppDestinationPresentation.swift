@@ -1,6 +1,14 @@
 import Dependencies
 import SwiftUI
 
+struct HandoffReviewHostClaimKey: PreferenceKey {
+  static let defaultValue = false
+
+  static func reduce(value: inout Bool, nextValue: () -> Bool) {
+    value = value || nextValue()
+  }
+}
+
 private struct HandoffReviewDestinationsModifier: ViewModifier {
   @Dependency(\.handoffReviewCoordinator) private var coordinator
   var isPresentationEnabled: Bool
@@ -12,7 +20,7 @@ private struct HandoffReviewDestinationsModifier: ViewModifier {
       .sheet(
         item: gatedBinding($coordinator.review, enabled: isPresentationEnabled),
         id: \.handoffID,
-        onDismiss: { coordinator.presentPendingAdjustmentReviewAfterReviewDismissal() }
+        onDismiss: { coordinator.reviewSheetDidDismiss() }
       ) { review in
         HandoffReviewSheet(coordinator: coordinator, review: review)
       }

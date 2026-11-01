@@ -232,6 +232,145 @@ struct HandoffSectionRoutingTests {
 
   @Test
   @MainActor
+  func adjustmentDraftingKeepsPendingHandoffUntilOverwriteCommitsIt() async throws {
+    let recipeID = UUID(uuidString: "00000000-0000-0000-0000-000000003940")!
+    let handoffID = UUID(uuidString: "00000000-0000-0000-0000-000000003941")!
+    let now = Date(timeIntervalSinceReferenceDate: 840_300_200)
+    let coordinator = HandoffReviewCoordinator()
+    let brief = AIHandoffRecipeAdjustmentBriefReview(
+      handoffID: handoffID,
+      recipeID: recipeID,
+      brief: "Make the spices more aromatic.",
+      learnings: []
+    )
+    let handoff = AIHandoff(
+      id: handoffID,
+      sourceType: .recipe,
+      sourceID: recipeID,
+      taskType: .adjustRecipe,
+      createdAt: now,
+      exportedPrompt: ""
+    )
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+      $0.uuid = .incrementing
+      $0.handoffReviewCoordinator = coordinator
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try await database.write { db in
+        try Recipe.insert {
+          Recipe(id: recipeID, title: "Aromatic Stew", dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+      }
+      let possibleDetail = try await database.read { db in
+        try RecipeDetailRequest(recipeID: recipeID).fetch(db)
+      }
+      let detail = try #require(possibleDetail)
+      let proposal = RecipeAdjustmentProposal(summary: "Toast the spices before adding liquid.")
+      let proposedDetail = try proposal.proposedDetail(applyingTo: detail, now: now, uuid: { UUID() })
+      let adjustmentReview = RecipeAdjustmentReviewState(
+        currentDetail: detail,
+        proposedDetail: proposedDetail,
+        proposal: proposal,
+        deliberationBody: brief.brief
+      )
+      let originalReview = AIHandoffReview.recipeAdjustmentBrief(brief)
+
+      coordinator.present(originalReview, pendingHandoff: handoff)
+      coordinator.finishDraftingRecipeAdjustment(from: originalReview, adjustmentReview: adjustmentReview)
+      let beforeOverwrite = try await database.read { db in try AIHandoff.fetchAll(db) }
+      #expect(beforeOverwrite.isEmpty)
+
+      coordinator.presentPendingAdjustmentReviewAfterReviewDismissal()
+      #expect(coordinator.adjustmentReview != nil)
+      guard case .success = coordinator.overwriteAdjustmentButtonTapped(adjustmentReview) else {
+        Issue.record("Expected the recipe adjustment overwrite to succeed.")
+        return
+      }
+
+      let rows = try await database.read { db in try AIHandoff.fetchAll(db) }
+      #expect(rows.count == 1)
+      #expect(rows.first?.id == handoffID)
+      #expect(rows.first?.status == .imported)
+      #expect(rows.first?.importedAt == now)
+    }
+  }
+
+  @Test
+  @MainActor
+  func everyDiscardPathClearsPendingHandoffBeforeAnotherCommit() async throws {
+    let recipeID = UUID(uuidString: "00000000-0000-0000-0000-000000003942")!
+    let now = Date(timeIntervalSinceReferenceDate: 840_300_300)
+    let coordinator = HandoffReviewCoordinator()
+    let pendingIDs = [
+      UUID(uuidString: "00000000-0000-0000-0000-000000003943")!,
+      UUID(uuidString: "00000000-0000-0000-0000-000000003944")!,
+      UUID(uuidString: "00000000-0000-0000-0000-000000003945")!
+    ]
+    let discardReviews: [AIHandoffReview] = [
+      .recipeMakeAhead(AIHandoffRecipeMakeAheadReview(
+        handoffID: pendingIDs[0], recipeID: recipeID, makeAhead: "Toast the spices.", learnings: []
+      )),
+      .recipeMakeAhead(AIHandoffRecipeMakeAheadReview(
+        handoffID: pendingIDs[1], recipeID: recipeID, makeAhead: "Toast the spices.", learnings: []
+      )),
+      .recipeAdjustmentBrief(AIHandoffRecipeAdjustmentBriefReview(
+        handoffID: pendingIDs[2], recipeID: recipeID, brief: "Brighten the stew.", learnings: []
+      ))
+    ]
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+      $0.uuid = .incrementing
+      $0.handoffReviewCoordinator = coordinator
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try await database.write { db in
+        try Recipe.insert {
+          Recipe(id: recipeID, title: "Discarded Handoff", dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+      }
+      let unrelatedReview = AIHandoffRecipeMakeAheadReview(
+        handoffID: UUID(uuidString: "00000000-0000-0000-0000-000000003946")!,
+        recipeID: recipeID,
+        makeAhead: "Toast the spices.",
+        learnings: []
+      )
+      let unrelatedCommit = try #require(coordinator.reviewItems(for: .recipeMakeAhead(unrelatedReview)).first)
+
+      for (index, review) in discardReviews.enumerated() {
+        let handoff = AIHandoff(
+          id: pendingIDs[index],
+          sourceType: .recipe,
+          sourceID: recipeID,
+          taskType: index == 2 ? .adjustRecipe : .recipeMakeAhead,
+          createdAt: now,
+          exportedPrompt: ""
+        )
+        coordinator.present(review, pendingHandoff: handoff)
+        switch index {
+        case 0:
+          coordinator.discard(review)
+        case 1:
+          coordinator.discardAll()
+        default:
+          coordinator.discardPendingHandoff()
+        }
+        try await unrelatedCommit.commit(unrelatedCommit.unmodifiedApprovedText)
+      }
+
+      let rows = try await database.read { db in try AIHandoff.fetchAll(db) }
+      #expect(rows.isEmpty)
+    }
+  }
+
+  @Test
+  @MainActor
   func workbenchDraftReviewStagesTheRecipeEvenWhenTheRationaleIsMissing() {
     // ADR-0042 S3b: a draft that omitted the rationale block (it argued it in-thread) must still
     // stage the recipe item — the review sheet fills the empty rationale — alongside its learnings.

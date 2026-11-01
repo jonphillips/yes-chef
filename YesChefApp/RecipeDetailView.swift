@@ -116,6 +116,10 @@ struct RecipeDetailView: View {
     .handoffReviewDestinations(
       isPresentationEnabled: hostsHandoffReviews && model.destination.workbench == nil && !isVariationManagerPresented
     )
+    .preference(
+      key: HandoffReviewHostClaimKey.self,
+      value: model.destination.workbench != nil || isVariationManagerPresented
+    )
     .overlay(alignment: .top) {
       AppToastOverlay(toastCenter: toastCenter)
         .ignoresSafeArea(.keyboard)
