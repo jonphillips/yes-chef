@@ -9,6 +9,16 @@ the app tests" is structural, not a regression — and it once *masked two genui
 `bootstrapDatabase()` → `RecipeEditorModel`'s eager `@Fetch` tripped SQLiteData's blank-DB reporter), fixed by
 the architect running the target locally ([[codex-build-excuse-reproduce]]).
 
+⚠️ **A sandbox denial is not a toolchain failure.** Codex's sandbox blocks things every Swift build and test
+needs. SwiftPM sandboxes its own manifest compile, which fails nested inside Codex's sandbox with
+`sandbox-exec: sandbox_apply: Operation not permitted`, and the user-level SwiftPM, Swift and Clang caches are
+denied (`… is not accessible or not writable`). So **run every `swift build`, `swift test`, `xcodebuild` and
+`scripts/check-drift.sh`, and any `quiet-run` wrapping one, elevated from the first attempt,** for every package,
+`Vendor/sqlite-data` included. If a sandboxed run shows one of those signatures (or an unexplained `143`), rerun
+the same command elevated, once; that is not a "retry with variations". **Fail fast applies to a failure from an
+elevated run:** paste the error and stop. A brief's "stop on a build or toolchain failure" means the same thing.
+(2026-11-01: the parked-retry dispatch stopped at a sandboxed `swift test --package-path Vendor/sqlite-data`.)
+
 Lean by default — the cost center is the build/simulator loop, not the code, and Jon does the device pass
 regardless. So verify with **compiler + tests once**, then hand off:
 
@@ -66,7 +76,7 @@ regardless. So verify with **compiler + tests once**, then hand off:
 - **Do not install/launch on simulators by default** — hand straight to Jon's UI pass. Only boot a simulator
   when a change genuinely can't be confirmed from build + tests, and say why in the PR.
 - **Fail fast, without false escape hatches.** No alternate destinations, simulator resets, or install loops.
-  An environment failure that prevents the elevated build reaching the compiler is an architect gate, not a
-  successful Codex verification.
+  A sandbox denial gets its one elevated rerun first (top of this file). An environment failure that prevents
+  the **elevated** build reaching the compiler is an architect gate, not a successful Codex verification.
 
 Jon performs the primary UI testing pass on `iPad Pro 13-inch (M5) (16GB)` and `iPhone 17 Pro`.
