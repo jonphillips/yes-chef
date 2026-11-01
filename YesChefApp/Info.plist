@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Yes Chef</string>
+	<string>$(YESCHEF_DISPLAY_NAME)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -25,7 +25,7 @@
 			<string>com.jonphillips.yeschef.find-referral</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>yeschef</string>
+				<string>$(YESCHEF_URL_SCHEME)</string>
 			</array>
 		</dict>
 	</array>
@@ -96,5 +96,7 @@
 			<string>com.jonphillips.yeschef.menu-recipe</string>
 		</dict>
 	</array>
+	<key>YesChefAppGroupID</key>
+	<string>$(YESCHEF_APP_GROUP)</string>
 </dict>
 </plist>

@@ -52,7 +52,9 @@ struct YesChefApp: App {
     Task {
       _ = await YesChefCloudSync.startIfManuallyEnabled()
     }
-    DatabaseChangeBeacon.startObserving()
+    DatabaseChangeBeacon.startObserving(
+      appGroupIdentifier: try! YesChefDatabaseStorage.liveAppGroupIdentifier()
+    )
   }
 
   var body: some Scene {

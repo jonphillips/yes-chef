@@ -1,22 +1,38 @@
 import Foundation
+import IssueReporting
 import SQLiteData
 
 public enum YesChefDatabaseStorage {
-  public static let appGroupIdentifier = "group.com.jonphillips.yeschef"
+  public static let appGroupInfoKey = "YesChefAppGroupID"
   public static let databaseFileName = "SQLiteData.db"
 
   public enum StorageError: Error, Equatable, LocalizedError {
+    case missingAppGroupIdentifier(String)
     case missingAppGroupContainer(String)
     case missingSharedStoreForExtension
 
     public var errorDescription: String? {
       switch self {
+      case let .missingAppGroupIdentifier(key):
+        "Missing or empty \(key) in Info.plist."
       case let .missingAppGroupContainer(identifier):
         "Could not locate the app group container for \(identifier)."
       case .missingSharedStoreForExtension:
         "Open Yes Chef once to finish setup before saving from the share sheet."
       }
     }
+  }
+
+  public static func appGroupIdentifier(from infoDictionary: [String: Any]) throws -> String {
+    guard let identifier = infoDictionary[appGroupInfoKey] as? String, !identifier.isEmpty else {
+      reportIssue("Missing or empty \(appGroupInfoKey) in Info.plist")
+      throw StorageError.missingAppGroupIdentifier(appGroupInfoKey)
+    }
+    return identifier
+  }
+
+  public static func liveAppGroupIdentifier() throws -> String {
+    try appGroupIdentifier(from: Bundle.main.infoDictionary ?? [:])
   }
 
   public static func sharedDatabaseURL(appGroupContainerURL: URL) -> URL {
@@ -28,6 +44,7 @@ public enum YesChefDatabaseStorage {
   }
 
   public static func liveSharedDatabaseURL(fileManager: FileManager = .default) throws -> URL {
+    let appGroupIdentifier = try liveAppGroupIdentifier()
     guard
       let appGroupContainerURL = fileManager.containerURL(
         forSecurityApplicationGroupIdentifier: appGroupIdentifier

@@ -223,6 +223,8 @@ container), which also closed OQ1. OQ6 is now diagnosed (Amendment 3): a naive r
 procedure gates it** (quiesce peers → restore on one → reinstall peers). When it runs, follow that procedure —
 and **Undo Last Restore** is untested at all and rode the same broken binding as restore, so exercise it too.
 
+- [Yes Chef Dev variant](efforts/archive/yes-chef-dev-variant.md): Xcode Run on the iPhone installs "Yes Chef Dev", with the DEV icon, next to TestFlight Yes Chef. Each opens its own library. The share sheet lists "Save to Yes Chef" and "Save to Yes Chef Dev", and each saves into its own app. Yes Chef Dev's Settings shows "CloudKit Development". Leave sync off in Yes Chef Dev until Development is reset (PROD-CUTOVER Step 13). A backup exported from Yes Chef Dev is refused by TestFlight Yes Chef with the development-backup message. A TestFlight backup restores in Yes Chef Dev. A Cockpit Find referral still opens TestFlight Yes Chef.
+
 ## Prod-schema promotion list — superseded (2026-10-26)
 
 Retired. A deploy copies the **whole** Development schema, so the deploy is decided by the exact Development

@@ -8,13 +8,13 @@
 > the Cockpit pair** (D5); and it **answers Galavant ADR-0050 OQ2**: backups record which build exported
 > them, and the production app refuses a development backup (D6).
 
-Status: **Proposed** — 2026-10-10. Origin: Jon, asking for Galavant's Dev/Prod split before Yes Chef moves to
+Status: **Accepted** — 2026-11-01. Origin: Jon, asking for Galavant's Dev/Prod split before Yes Chef moves to
 production, with Galavant ADR-0050 OQ2 to be dealt with. Builds on
 [ADR-0056](ADR-0056-move-to-production-and-data-carry.md) (the cutover),
 [ADR-0030](ADR-0030-local-backup-and-restore.md) (backup and restore; Amd 2, *restore is authoritative*, is
 why D6 exists) and [ADR-0058](ADR-0058-cockpit-find-referral-transport.md) (the Cockpit pair D5 keeps Dev
 out of). The backup code is jon-platform `CloudSyncKit` (jon-platform ADR-0006). Effort:
-[`efforts/yes-chef-dev-variant.md`](../efforts/yes-chef-dev-variant.md).
+[`efforts/archive/yes-chef-dev-variant.md`](../efforts/archive/yes-chef-dev-variant.md).
 
 ## Context
 

@@ -1,16 +1,16 @@
 # Effort — Yes Chef Dev: Debug builds get their own app identity; backups carry their build variant
 
-Status: Dispatched — 2026-10-31, ahead of [`PROD-CUTOVER.md`](../PROD-CUTOVER.md) Step 11 ([ADR-0059 Amendment 1](../decisions/ADR-0059-yes-chef-dev-variant.md#amendment-1--d1s-gate-is-met-before-step-11-closes-dev-sync-waits-on-oq1-2026-10-31)).
+Status: Done — 2026-11-01, ahead of [`PROD-CUTOVER.md`](../../PROD-CUTOVER.md) Step 11 ([ADR-0059 Amendment 1](../../decisions/ADR-0059-yes-chef-dev-variant.md#amendment-1--d1s-gate-is-met-before-step-11-closes-dev-sync-waits-on-oq1-2026-10-31)).
 Summary: Debug builds become **Yes Chef Dev**, its own app beside TestFlight Yes Chef, and backups record their build variant.
 Touches identifiers, entitlements and the restore path, so the architect escalates both PRs to Jon before merge.
 No schema change, no migration, no sync-model change.
-Implements [ADR-0059](../decisions/ADR-0059-yes-chef-dev-variant.md). After the cutover, Xcode Run
+Implements [ADR-0059](../../decisions/ADR-0059-yes-chef-dev-variant.md). After the cutover, Xcode Run
 (Debug) builds **Yes Chef Dev**: its own bundle IDs, app group, URL scheme, display name and icon, so it can
 sit next to TestFlight Yes Chef on the same device. It keeps the real iCloud container, which puts it on
 CloudKit Development. Release doesn't change. Separately, `CloudSyncKit` backups record which build variant
 exported them, and the production app refuses a development backup (this answers Galavant ADR-0050 OQ2).
-Related: [ADR-0059](../decisions/ADR-0059-yes-chef-dev-variant.md) · [ADR-0056](../decisions/ADR-0056-move-to-production-and-data-carry.md)
-/ [`PROD-CUTOVER.md`](../PROD-CUTOVER.md) · [ADR-0058](../decisions/ADR-0058-cockpit-find-referral-transport.md)
+Related: [ADR-0059](../../decisions/ADR-0059-yes-chef-dev-variant.md) · [ADR-0056](../../decisions/ADR-0056-move-to-production-and-data-carry.md)
+/ [`PROD-CUTOVER.md`](../../PROD-CUTOVER.md) · [ADR-0058](../../decisions/ADR-0058-cockpit-find-referral-transport.md)
 (the Cockpit pair Dev stays out of) · Galavant's precedent: `galavant/docs/efforts/galavant-dev-variant.md`
 and galavant#171. Read Galavant's diff before starting; this mirrors it, apart from the differences listed
 in ADR-0059.
@@ -29,7 +29,7 @@ The executor's builds are compile-only (`CODE_SIGNING_ALLOWED=NO`), so they don'
 ## Shape: two PRs, in order
 
 Yes Chef CI checks out jon-platform `main`, so the Yes Chef PR can only go green after the jon-platform PR
-merges. This is the same pattern as [`cloudsynckit-backup-lift.md`](archive/cloudsynckit-backup-lift.md).
+merges. This is the same pattern as [`cloudsynckit-backup-lift.md`](cloudsynckit-backup-lift.md).
 
 1. **jon-platform, branch `effort/yes-chef-dev-variant`: additive.** The backup variant marker goes into
    `packages/CloudSyncKit`. **Galavant `main` must still build and pass unchanged against it.** Check this by
@@ -113,7 +113,7 @@ Release values must resolve to exactly what ships today. The names are suggestio
 ### 2. Runtime reads the app group; nothing falls back to production (ADR-0059 D3)
 
 - `YesChefDatabaseStorage.appGroupIdentifier`
-  ([DatabaseStorage.swift](../../YesChefPackage/Sources/YesChefCore/DatabaseStorage.swift)) stops being a
+  ([DatabaseStorage.swift](../../../YesChefPackage/Sources/YesChefCore/DatabaseStorage.swift)) stops being a
   literal. It reads `YesChefAppGroupID` from `Bundle.main`, which is the app's or the extension's own plist.
   Put the read behind a small pure function that takes an info dictionary, so tests don't need
   `Bundle.main`.
@@ -162,7 +162,7 @@ Development"*. A screenshot then shows which world it came from. Release shows n
 
 ## Verification
 
-Follow [`verification.md`](../verification.md):
+Follow [`verification.md`](../../verification.md):
 
 - PR 1: CloudSyncKit `swift test` through `quiet-run`, plus `GalavantLibrary` building and testing against
   the branch, unchanged.
@@ -205,7 +205,7 @@ Follow [`verification.md`](../verification.md):
 
 **Slices:** effort `yes-chef-dev-variant`: two PRs on branch `effort/yes-chef-dev-variant`, jon-platform
 (CloudSyncKit, additive) first, then Yes Chef
-**Briefs:** `docs/efforts/yes-chef-dev-variant.md` · decision `docs/decisions/ADR-0059-yes-chef-dev-variant.md`
+**Briefs:** `docs/efforts/archive/yes-chef-dev-variant.md` · decision `docs/decisions/ADR-0059-yes-chef-dev-variant.md`
 **Done when:** per the brief's "Done when"; verification per `docs/verification.md`.
 **Owed:** Jon's portal check (container on both `.dev` App IDs, Cockpit group on neither) before the first
 device run. Identifiers, entitlements and restore: the architect escalates both PRs to Jon before merge.

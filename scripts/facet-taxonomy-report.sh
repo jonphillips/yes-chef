@@ -3,7 +3,7 @@
 # write-capable mode, and `query_only` rejects accidental writes on this connection.
 set -euo pipefail
 
-readonly app_bundle_identifier="com.jonphillips.yeschef"
+readonly app_bundle_identifier="${YESCHEF_APP_BUNDLE_IDENTIFIER:-com.jonphillips.yeschef.dev}"
 readonly database_file_name="SQLiteData.db"
 
 usage() {

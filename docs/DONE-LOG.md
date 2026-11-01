@@ -9,6 +9,11 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Yes Chef Dev identity and backup variant (`effort/yes-chef-dev-variant`)
+
+**2026-11-01.** Debug builds now install as Yes Chef Dev with an isolated app group, extension, URL scheme, and DEV icon. Backups identify their build variant; production refuses development backups, while restored stores clear the marker. CloudSyncKit implementation: jon-platform PR #102; Yes Chef implementation: PR #406. Debug and Release generic iOS builds, `check-drift.sh`, and the YesChefTests simulator run passed. The portal assignment check and device pass remain owed; leave Dev sync off until the Development reset.
+
+---
 ## Control conventions conformance (`effort/control-conventions-conformance`)
 
 **2026-10-31. Schema-free, view-only; implements jon-platform `ui-and-platforms.md` § Controls (#99).** Every AI
