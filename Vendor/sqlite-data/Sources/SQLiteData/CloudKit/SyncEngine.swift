@@ -44,6 +44,7 @@
     private let notificationsObserver = LockIsolated<(any NSObjectProtocol)?>(nil)
     private let activityCounts = LockIsolated(ActivityCounts())
     private let didRetryParkedRecordScopesAfterStart = LockIsolated(Set<String>())
+    private let fallbackRecordCursorsByScope = LockIsolated<[String: String]>([:])
     private let startTask = LockIsolated<Task<Void, Never>?>(nil)
     #if DEBUG && canImport(DeveloperToolsSupport)
       private let previewTimerTask = LockIsolated<Task<Void, Never>?>(nil)
@@ -1545,7 +1546,7 @@
       let unsyncedRecordIDsToDelete = modificationRecordIDs.intersection(unsyncedRecordIDs)
       if !unsyncedRecordIDsToDelete.isEmpty {
         await withErrorReporting(.sqliteDataCloudKitFailure) {
-          try await metadatabase.write { db in
+          try await userDatabase.write { db in
             try UnsyncedRecordID.findAll(unsyncedRecordIDsToDelete).delete().execute(db)
           }
         }
@@ -1624,7 +1625,20 @@
       var fallbackRecords: [CKRecord] = []
       var unknownItemRecordIDs: Set<CKRecord.ID> = []
       if !fallbackRecordIDs.isEmpty {
-        let fallbackBatch = Array(fallbackRecordIDs.prefix(150))
+        let orderedFallbackRecordIDs = fallbackRecordIDs.sorted {
+          Self.fallbackOrderingKey($0) < Self.fallbackOrderingKey($1)
+        }
+        let fallbackCursor = fallbackRecordCursorsByScope.withValue { $0[scopeKey] }
+        let fallbackStartIndex = fallbackCursor.flatMap { cursor in
+          orderedFallbackRecordIDs.firstIndex { Self.fallbackOrderingKey($0) > cursor }
+        } ?? 0
+        let rotatedFallbackRecordIDs =
+          Array(orderedFallbackRecordIDs.dropFirst(fallbackStartIndex))
+          + Array(orderedFallbackRecordIDs.prefix(fallbackStartIndex))
+        let fallbackBatch = Array(rotatedFallbackRecordIDs.prefix(150))
+        fallbackRecordCursorsByScope.withValue {
+          $0[scopeKey] = fallbackBatch.last.map(Self.fallbackOrderingKey)
+        }
         do {
           let results = try await syncEngine.database.records(for: fallbackBatch)
           fallbackOutcome = "success"
@@ -1634,10 +1648,11 @@
               fallbackRecords.append(record)
             case .failure(let error as CKError) where error.code == .unknownItem:
               unknownItemRecordIDs.insert(recordID)
-              try await metadatabase.write { db in
+              try await userDatabase.write { db in
                 try UnsyncedRecordID.find(recordID).delete().execute(db)
               }
             case .failure:
+              fallbackOutcome = "partial failure"
               break
             }
           }
@@ -1655,23 +1670,25 @@
           rootFirst: true
         )
       }
-      let parkedRecordIDsToForce = Set(retryRecords.map(\.recordID))
-
+      let retryRecordIDs = Set(retryRecords.map(\.recordID))
       enum ShareOrReference {
         case share(CKShare)
         case reference(CKShare.Reference)
       }
-      let shares: [ShareOrReference] =
+      func apply(_ records: [CKRecord]) async -> [ShareOrReference] {
         await withErrorReporting(.sqliteDataCloudKitFailure) {
           try await userDatabase.write { db in
             var shares: [ShareOrReference] = []
-            for record in modifications {
+            for record in records {
               if let share = record as? CKShare {
                 shares.append(.share(share))
               } else {
+                // A parked update may overlap an older local row. Without force, the field merge
+                // treats that stale row as a local edit and can preserve the missing parent FK.
+                // `changeParentRelationshipToUnknownRecord` covers this case.
                 upsertFromServerRecord(
                   record,
-                  force: parkedRecordIDsToForce.contains(record.recordID),
+                  force: retryRecordIDs.contains(record.recordID),
                   db: db
                 )
                 if let shareReference = record.share {
@@ -1683,6 +1700,14 @@
           }
         }
         ?? []
+      }
+      var shares: [ShareOrReference] = []
+      let writeBatchSize = 500
+      for start in stride(from: 0, to: modifications.count, by: writeBatchSize) {
+        shares += await apply(
+          Array(modifications.dropFirst(start).prefix(writeBatchSize))
+        )
+      }
 
       await withTaskGroup(of: Void.self) { group in
         for share in shares {
@@ -1742,6 +1767,10 @@
         }
         return rootFirst ? lhsIndex < rhsIndex : lhsIndex > rhsIndex
       }
+    }
+
+    private static func fallbackOrderingKey(_ recordID: CKRecord.ID) -> String {
+      "\(recordID.zoneID.zoneName)/\(recordID.zoneID.ownerName)/\(recordID.recordName)"
     }
 
     package func handleSentRecordZoneChanges(
