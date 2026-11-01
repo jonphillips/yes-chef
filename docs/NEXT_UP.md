@@ -1,9 +1,8 @@
-# Next Up — Sync activity log: watch the iPhone's first sync from the TestFlight build
+# Next Up — Retry parked sync records from their saved copy (vendored SQLiteData patch)
 
-**Slices:** effort `sync-activity-log`, one Yes Chef PR.
-**Briefs:** [docs/efforts/sync-activity-log.md](efforts/sync-activity-log.md)
+**Slices:** effort `sqlite-data-parked-retry`, one Yes Chef PR.
+**Briefs:** [docs/efforts/sqlite-data-parked-retry.md](efforts/sqlite-data-parked-retry.md)
 **Done when:** per the brief's "Done when"; verification per the brief and `docs/verification.md`.
 **Owed:** see [device-passes.md](device-passes.md)
-**Notes:** Dispatched during PROD-CUTOVER Step 11, to ship as a TestFlight update while the iPhone is still
-downloading. No synced-schema change, no migration, and no edit under `Vendor/`. Start from a fresh `main`. The
-PR escalates to Jon for merge.
+**Notes:** Unblocks PROD-CUTOVER Step 11: the iPhone's first sync is stuck behind this. Patch commit on its own.
+Changes sync behavior, so the PR escalates to Jon for merge. Start from a fresh `main`.

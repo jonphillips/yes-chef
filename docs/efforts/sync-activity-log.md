@@ -1,10 +1,11 @@
 # Effort — Sync activity log
 
-Status: Dispatched
+Status: Ready
 Summary: The TestFlight build records when synced rows arrive and how many, in a local ledger shown in Settings → Sync and written to the console, so a first sync that takes days can be watched without a Debug build.
 
 No schema change, no migration, no vendored-SQLiteData patch, no sync-model change. Drafted 2026-11-01, during
-PROD-CUTOVER Step 11.
+PROD-CUTOVER Step 11. Queued behind [sqlite-data-parked-retry.md](sqlite-data-parked-retry.md), which fixes
+why the iPhone's sync is stuck (11,753 parked records re-downloaded on every batch).
 
 Related: [`PROD-CUTOVER.md`](../PROD-CUTOVER.md) Step 11 ·
 [`archive/sync-failure-surfacing.md`](archive/sync-failure-surfacing.md) · jon-platform ADR-0003 (the sync-health
@@ -76,10 +77,9 @@ What the Release build has today:
 
 - **A count of what's still to come.** Production has no `recordName` index, and CloudKit has no cheap way to
   count a zone. Jon compares against the iPad.
-- **CKSyncEngine fetch errors in the app.** Getting them would mean a second vendored-SQLiteData patch.
-  `YESCHEF-PATCH.md` limits the vendor directory to one function, and that has an exit condition. The ledger
-  tells you whether rows are moving, and Console.app tells you why they aren't. Reconsider only if the ledger
-  shows fetches that keep bringing nothing and Console.app can't explain them.
+- **CKSyncEngine fetch errors in the app.** The parked-retry effort already adds the second vendored patch
+  (with a public per-batch log line) and an issue reporter that logs SQLiteData's reported issues readably. If
+  it has added `AppLog.sync`, reuse that category here.
 - **Lifting this into CloudSyncKit.** It's noted on the existing sync-failure-surface row in jon-platform's
   `SEAM-LEDGER.md`.
 
@@ -87,11 +87,8 @@ What the Release build has today:
 
 Shipping this while the sync is still running is safe, but only by this route:
 
-- **The schema gate comes first.** Main carries the Lens tables (`recipeLenses`, `recipeLensShelves`, #403),
-  and Production doesn't have them yet. `testflight` won't ship until the Lens held ops in
-  [`device-passes.md`](../device-passes.md) have run: create the types in the Development console, re-export,
-  diff against Reference A, then deploy Development → Production. The deploy only adds types, so it doesn't
-  touch the records the iPhone is pulling.
+- **The schema gate is met.** The Lens record types were created in Development and deployed to Production on
+  2026-11-01; the Production export matches Development.
 - **Install it as a TestFlight update over build 1180. Never delete the app.** The store, the metadatabase and
   the CKSyncEngine state all carry over, because the bundle id and container are unchanged. The update
   restarts the app, which the engine handles like any other termination: it picks up from its last saved

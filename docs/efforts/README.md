@@ -25,7 +25,9 @@ discoverable"):
 
 ## Live
 
+- [sqlite-data-parked-retry.md](sqlite-data-parked-retry.md) — **Dispatched** · SQLiteData re-downloads every
+  parked record on each fetched batch and throttles a first sync to a standstill; retry them from the saved copy.
+- [sync-activity-log.md](sync-activity-log.md) — **Ready** · The TestFlight build records when synced rows
+  arrive and how many, in a local ledger shown in Settings → Sync and written to the console.
 - [chat-access-mcp.md](chat-access-mcp.md) — **Blocked** on [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md)
   OQ3 · S3 lets a ChatGPT return target an existing recipe, not only stage a new one; S0–S2b shipped.
-- [sync-activity-log.md](sync-activity-log.md) — **Dispatched** · The TestFlight build records when synced rows
-  arrive and how many, in a local ledger shown in Settings → Sync and written to the console.
