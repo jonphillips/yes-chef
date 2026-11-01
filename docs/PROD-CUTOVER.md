@@ -340,8 +340,9 @@ arriving in about 15 minutes.
 
 - [ ] **Automatic backups**, on the first TestFlight build: the full pass in [`device-passes.md`](device-passes.md),
       on both devices.
-- [ ] Make an edit on each device, and confirm it arrives on the other.
-- [ ] If S2's pass was deferred in Step 2, run it now.
+- [x] Make an edit on each device, and confirm it arrives on the other. **Done 2026-11-01:** an edit on each device
+      arrived on the other.
+- [x] If S2's pass was deferred in Step 2, run it now. *(It wasn't deferred: it passed 2026-10-26, Step 2.)*
 
 ## 13 — Post-cut housekeeping  *(architect, with Jon)*
 
@@ -349,6 +350,7 @@ arriving in about 15 minutes.
       trigger needs it). Then lift the carry guidance into `persistence-and-sync.md`.
 - [ ] Keep **Development** as a cold archive through at least one confirmed two-device Production round trip
       (ADR-0056 OQ2). Reset it after that, **before** Yes Chef Dev first turns sync on (ADR-0059 OQ1).
+      *The round trip was confirmed 2026-11-01 (Step 12), so Jon can reset Development in the console now.*
 - [x] Ship Yes Chef Dev's Debug identity and variant-aware backups (ADR-0059; the implementation is recorded in
       [`efforts/archive/yes-chef-dev-variant.md`](efforts/archive/yes-chef-dev-variant.md)). The device pass remains owed, and Dev
       sync stays off until Development is reset. **Done 2026-11-01, ahead of the rest of this step (ADR-0059 Amendment 1).**
