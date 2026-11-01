@@ -1712,6 +1712,81 @@
             continue
           }
           func open<T>(_: some SynchronizableTable<T>) async throws {
+            func retryForUnconfirmedParent<U>(
+              _ childTable: some SynchronizableTable<U>
+            ) async throws -> Bool {
+              let parentRecordPrimaryKey = try await userDatabase.read { db in
+                try #sql(
+                  """
+                  SELECT CAST(\(quote: foreignKey.from, delimiter: .identifier) AS TEXT)
+                  FROM \(U.self)
+                  WHERE (\(U.primaryKey)) = (\(bind: recordPrimaryKey))
+                  """,
+                  as: String?.self
+                )
+                .fetchOne(db)
+                ?? nil
+              }
+              guard let parentRecordPrimaryKey,
+                let parentTable = tablesByName[foreignKey.table]
+              else { return false }
+
+              func parentExists<V>(_: some SynchronizableTable<V>) async throws -> Bool {
+                try await userDatabase.read { db in
+                  try V.unscoped
+                    .where {
+                      #sql("\($0.primaryKey) = \(bind: parentRecordPrimaryKey)")
+                    }
+                    .fetchOne(db) != nil
+                }
+              }
+              guard try await parentExists(parentTable)
+              else { return false }
+
+              let (parentMetadata, childMetadata) = try await metadatabase.read { db in
+                (
+                  try SyncMetadata
+                    .where {
+                      $0.recordPrimaryKey.eq(parentRecordPrimaryKey)
+                        && $0.recordType.eq(foreignKey.table)
+                    }
+                    .fetchOne(db),
+                  try SyncMetadata.find(failedRecord.recordID).fetchOne(db)
+                )
+              }
+              guard let parentMetadata,
+                let childMetadata,
+                let parentRecordName = childMetadata.parentRecordName,
+                parentMetadata.lastKnownServerRecord.map({
+                  // MockCloudDatabase represents CloudKit's read-only change tag with this field.
+                  $0.recordChangeTag == nil && $0._recordChangeTag == nil
+                }) ?? true
+              else { return false }
+
+              let parentRecordID = CKRecord.ID(
+                recordName: parentRecordName,
+                zoneID: failedRecord.recordID.zoneID
+              )
+
+              try await metadatabase.write { db in
+                try SyncMetadata
+                  .find(parentRecordID)
+                  .update { $0.setLastKnownServerRecord(nil) }
+                  .execute(db)
+                try SyncMetadata
+                  .find(failedRecord.recordID)
+                  .update { $0.setLastKnownServerRecord(nil) }
+                  .execute(db)
+              }
+              newPendingRecordZoneChanges.append(.saveRecord(parentRecordID))
+              newPendingRecordZoneChanges.append(.saveRecord(failedRecord.recordID))
+              logger.error(
+                "Keeping \(failedRecord.recordID.recordName); parent \(parentRecordID.recordName) has no confirmed server record."
+              )
+              return true
+            }
+
+            if try await retryForUnconfirmedParent(table) { return }
             try await userDatabase.write { db in
               try $_isSynchronizingChanges.withValue(false) {
                 switch foreignKey.onDelete {
