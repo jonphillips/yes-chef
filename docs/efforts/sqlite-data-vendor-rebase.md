@@ -1,11 +1,10 @@
 # Effort — Rebase the vendored SQLiteData onto 1.12.1
 
-Status: Blocked on the `sqlite-data-parked-retry` device pass (the iPhone's first sync completes on the patched build)
+Status: Ready. The parked-retry device pass cleared 2026-11-01: the iPhone's first sync completed on the patched build.
 Summary: `Vendor/sqlite-data` is upstream 1.8.2 plus our patches, four minor releases behind 1.12.1; re-vendor
 1.12.1 with the same patches so we carry our changes on a current base, and lift the StructuredQueries cap.
 Related: [archive/sqlite-data-reference-violation-patch.md](archive/sqlite-data-reference-violation-patch.md)
-(first patch, the vendor setup) · [sqlite-data-parked-retry.md](sqlite-data-parked-retry.md) (second patch;
-archived once it completes) · `Vendor/sqlite-data/YESCHEF-PATCH.md` · the monthly "SQLiteData upstream watch"
+(first patch, the vendor setup) · [archive/sqlite-data-parked-retry.md](archive/sqlite-data-parked-retry.md) (second patch) · `Vendor/sqlite-data/YESCHEF-PATCH.md` · the monthly "SQLiteData upstream watch"
 scheduled task (reports drift and exit conditions) · jon-platform `SEAM-LEDGER.md` § Patched SQLiteData
 
 Schema-free, but **replaces the sync engine's code**: the architect escalates the PR to Jon before merge.

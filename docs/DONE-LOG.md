@@ -9,6 +9,23 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-01 — Production cutover Step 11 passed; the cut is real
+
+The iPhone's fresh TestFlight install now holds the whole Production library. That closes PROD-CUTOVER Steps 9–11
+and ends the freeze. Steps 12 (post-cut device checks) and 13 (housekeeping) remain.
+
+Two device passes cleared on the iPhone, on one TestFlight update:
+- **Parked-record retry** (#414). The first sync had been stuck for more than a week behind 11,753 parked records.
+  It finished in about 15 minutes. The `log collect` part of the pass wasn't needed, because the library arrived.
+- **Sync activity log** (#416). Local record counts carried over the update, Download activity showed rows as they
+  arrived, and Copy activity log pasted a CSV.
+
+The count audit matched every synced table except `recipeSources`. 24 iPad rows had never reached Production,
+while the iPad's Sync screen showed nothing as not uploaded. Re-saving those 24 recipes on the iPad uploaded them,
+and the counts now match. The cause is unknown; PROD-CUTOVER Step 11 has the details, and Step 13 has the
+follow-up to brief a check that would catch this.
+
+---
 ## 2026-11-01 — Builds use the committed package pins (`chore/build-against-pins`)
 
 `check-drift.sh` and `xcodebuild-summary.sh` pass `-onlyUsePackageVersionsFromResolvedFile`, so every scripted build uses the `Package.resolved` tracked since #407, or fails saying it's stale. A clone with a leftover resolution can no longer fail `check-drift` in a way a clean checkout doesn't (jon-platform ADR-0005 D16). Verified with `check-drift.sh` and the generic iOS build.
