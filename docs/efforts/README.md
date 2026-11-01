@@ -27,5 +27,8 @@ discoverable"):
 
 - [sqlite-data-vendor-rebase.md](sqlite-data-vendor-rebase.md) — **Ready** ·
   re-vendor SQLiteData 1.12.1 with both patches, four minor releases ahead of today's 1.8.2 base.
+- [cloudkit-expected-fields-gate.md](cloudkit-expected-fields-gate.md) — **Ready** · `testflight` refuses a build
+  whose synced fields Production lacks: a committed expected-fields list, kept current by a Core test, checked
+  against the Production schema export.
 - [chat-access-mcp.md](chat-access-mcp.md) — **Blocked** on [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md)
   OQ3 · S3 lets a ChatGPT return target an existing recipe, not only stage a new one; S0–S2b shipped.

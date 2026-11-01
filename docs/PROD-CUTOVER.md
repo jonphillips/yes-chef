@@ -355,7 +355,9 @@ arriving in about 15 minutes.
       [`efforts/archive/yes-chef-dev-variant.md`](efforts/archive/yes-chef-dev-variant.md)). The device pass remains owed. **Done 2026-11-01, ahead of the rest of this step (ADR-0059 Amendment 1).**
 - [ ] **From now on, every TestFlight build waits on a schema deploy.** A slice that adds a synced table or column,
       or is the first to write a non-nil value to one, must create it in Development (from a simulator build or
-      the console) and deploy before its TestFlight build ships. `testflight` enforces this.
+      the console) and deploy before its TestFlight build ships. `testflight` refuses an undeployed Development
+      change. A field missing from *both* environments isn't caught until
+      [`efforts/cloudkit-expected-fields-gate.md`](efforts/cloudkit-expected-fields-gate.md) ships.
 - [ ] Remove the temporary **Recover Missing Instruction Steps** action (Step 10a), marked `TEMPORARY`.
 - [ ] Brief a check for rows a device believes are on the server but aren't. Step 11's 24 `recipeSources`
       sat behind a green status, and only a comparison of record IDs between devices found them.
