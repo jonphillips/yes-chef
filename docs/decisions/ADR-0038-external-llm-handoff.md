@@ -562,6 +562,24 @@ separate defect folded into the same effort — a body-time snapshot, not an ope
 those actions already routes the empty case to the transport for visible feedback, so the guard bought a
 dead-looking button and nothing else.
 
+## Amendment 8 — an unmatched no-row paste writes its ledger row at commit, not at Review Anyway (2026-11-01)
+
+**Status: Accepted** — 2026-11-01 (Jon). Ships in the
+[review-over-recipe-cover effort](../efforts/handoff-review-over-recipe-cover.md). Amends **Amd 7**'s "no token,
+or an ID with no stored row" branch, for every door that opens the shared hand-off review sheet.
+
+Today *Review Anyway* on that branch runs `stageReviewForKnownSource`, which inserts a synthetic `aiHandoffs`
+row (empty `exportedPrompt`), marked imported, before the cook has committed anything. Backing out of the review
+leaves that row behind ([[no-dead-data]]).
+
+Instead, *Review Anyway* stages **read-only** against an unsaved `AIHandoff` built from the door's metadata, the
+same shape `stageOnboardReview` uses for onboard chat. The row is inserted, marked imported, in the same
+transaction as the first write that commits content from that review. Backing out writes nothing. No table
+references `aiHandoffs`, and no commit path reads the row back, so deferring the insert changes nothing else.
+
+Unchanged: the warn-but-allow alert (Amd 6), the cross-item branch (its row already exists, and it routes by
+that row, Amd 7), and reader feedback, whose review is the capture draft's own sheet.
+
 ## Deferred (on the record, explicitly not built here)
 
 - **Widened share-extension "Import into Yes Chef."** A polished entry point for when you're already
