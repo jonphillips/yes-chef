@@ -27,3 +27,5 @@ discoverable"):
 
 - [chat-access-mcp.md](chat-access-mcp.md) — **Blocked** on [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md)
   OQ3 · S3 lets a ChatGPT return target an existing recipe, not only stage a new one; S0–S2b shipped.
+- [sync-activity-log.md](sync-activity-log.md) — **Dispatched** · The TestFlight build records when synced rows
+  arrive and how many, in a local ledger shown in Settings → Sync and written to the console.

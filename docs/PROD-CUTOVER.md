@@ -311,6 +311,10 @@ DATA LOSS.sqlite` in Jon's Downloads. The retry:
 - [ ] **The iPhone's gap is closed.** Local record counts match the iPad's (`ingredientLines` 27,613), and
       **Buffalo Chicken Wings with Blue Cheese** shows its 24 ingredient lines (Step 4 audit).
 
+- **While the download runs:** a newer TestFlight build (such as the
+  [sync activity log](efforts/sync-activity-log.md)) goes on the iPhone as an **update over the current build**.
+  Never delete the app, because deleting it restarts the download from nothing.
+
 **Gate (the real one):** Steps 10 and 11 both pass. **Only now is the cut real**, and the freeze ends.
 
 ## 12 — Post-cut device checks
