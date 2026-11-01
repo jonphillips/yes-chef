@@ -55,8 +55,8 @@ jon-platform `SEAM-LEDGER.md`, waiting for this run's answer.
 
 - **Identifiers don't change.** Keep the bundle id `com.jonphillips.yeschef` and the container
   `iCloud.com.jonphillips.yeschef`. The local carry depends on both. ADR-0059's Debug-only `.dev` identity
-  was dispatched on 2026-10-31, before Step 11 closed (ADR-0059 Amendment 1). Yes Chef Dev keeps sync off
-  until Development is reset (Step 13).
+  was dispatched on 2026-10-31, before Step 11 closed (ADR-0059 Amendment 1). Development is kept as test data,
+  and Yes Chef Dev may sync to it (ADR-0059 Amendment 2).
 - **Schema.** Codex's schema-free work (chat-access S2) can continue alongside the cut. Until Step 11, merge
   no synced-schema change other than Step 1's drop slice. A schema change after Step 6 would need another
   Development change and another deploy before any TestFlight build can ship.
@@ -348,12 +348,11 @@ arriving in about 15 minutes.
 
 - [ ] Record the OQ1 answer from Step 8 in ADR-0056, and in jon-platform `SEAM-LEDGER.md`'s data-carry row (its
       trigger needs it). Then lift the carry guidance into `persistence-and-sync.md`.
-- [ ] Keep **Development** as a cold archive through at least one confirmed two-device Production round trip
-      (ADR-0056 OQ2). Reset it after that, **before** Yes Chef Dev first turns sync on (ADR-0059 OQ1).
-      *The round trip was confirmed 2026-11-01 (Step 12), so Jon can reset Development in the console now.*
+- [x] Keep **Development** as a cold archive through at least one confirmed two-device Production round trip
+      (ADR-0056 OQ2). **Decided 2026-11-01: keep it with no reset,** as test data that Yes Chef Dev may sync to
+      (ADR-0059 Amendment 2).
 - [x] Ship Yes Chef Dev's Debug identity and variant-aware backups (ADR-0059; the implementation is recorded in
-      [`efforts/archive/yes-chef-dev-variant.md`](efforts/archive/yes-chef-dev-variant.md)). The device pass remains owed, and Dev
-      sync stays off until Development is reset. **Done 2026-11-01, ahead of the rest of this step (ADR-0059 Amendment 1).**
+      [`efforts/archive/yes-chef-dev-variant.md`](efforts/archive/yes-chef-dev-variant.md)). The device pass remains owed. **Done 2026-11-01, ahead of the rest of this step (ADR-0059 Amendment 1).**
 - [ ] **From now on, every TestFlight build waits on a schema deploy.** A slice that adds a synced table or column,
       or is the first to write a non-nil value to one, must create it in Development (from a simulator build or
       the console) and deploy before its TestFlight build ships. `testflight` enforces this.

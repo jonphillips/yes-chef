@@ -223,3 +223,9 @@ restore brought them back, and the fresh sync state's download almost certainly 
 re-seeds the rows, but not past deletes the zone already holds.** After a failed upload, check what it deleted
 on the server before re-seeding. The steps go back by ID from the Step 4 backup, through a temporary recovery
 action ([`efforts/archive/recover-lost-instruction-steps.md`](../efforts/archive/recover-lost-instruction-steps.md)).
+
+## Amendment 3 — OQ2 answered: keep the Development zone (2026-11-01)
+
+**OQ2: keep it, with no reset.** The two-device Production round trip was confirmed on 2026-11-01, and Jon chose
+to keep Development's pre-cut library as test data for Yes Chef Dev. The reasoning and its consequences are in
+[ADR-0059 Amendment 2](ADR-0059-yes-chef-dev-variant.md).
