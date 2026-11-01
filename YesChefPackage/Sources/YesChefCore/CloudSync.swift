@@ -37,7 +37,7 @@ public enum YesChefCloudSync {
     preRestoreFilenamePrefix: "YesChef-PreRestore-",
     restoreStagingFilenamePrefix: "YesChef-Restore-",
     identifyingTableNames: ["recipes"],
-    declaredSchemaVersion: 54,
+    declaredSchemaVersion: 55,
     lastPreRestoreDefaultsKey: "YesChefDatabaseBackupLastPreRestorePath",
     cloudSync: configuration,
     variant: backupVariant,
@@ -74,7 +74,7 @@ public enum YesChefCloudSync {
     WorkbenchCandidate.self, WorkbenchLogEntry.self, WorkbenchReference.self,
     RecipeVariation.self, RecipeRelatedRecipe.self, RecipeDeliberationLogEntry.self,
     GroceryList.self, GroceryAreaAssignment.self, GroceryItem.self, GroceryItemSource.self,
-    PantryItem.self, AISettingsRecord.self, Learning.self
+    PantryItem.self, AISettingsRecord.self, Learning.self, RecipeLens.self, RecipeLensShelf.self
   )
 
   /// These types were removed from the engine. Purge their CloudKit records and
@@ -349,6 +349,8 @@ public enum YesChefCloudSync {
         PantryItem.self,
         AISettingsRecord.self,
         Learning.self,
+        RecipeLens.self,
+        RecipeLensShelf.self,
       containerIdentifier: configuration.containerIdentifier,
       startImmediately: startImmediately
     )

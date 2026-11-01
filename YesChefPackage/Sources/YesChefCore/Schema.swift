@@ -1323,6 +1323,32 @@ extension DependencyValues {
       }
     }
 
+    migrator.registerMigration("Create recipe lenses and shelves") { db in
+      try #sql("""
+        CREATE TABLE "recipeLenses" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "name" TEXT NOT NULL,
+          "baseQuery" TEXT NOT NULL,
+          "showsRemainder" INTEGER NOT NULL DEFAULT 1,
+          "sortOrder" INTEGER NOT NULL,
+          "dateCreated" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """)
+      .execute(db)
+
+      try #sql("""
+        CREATE TABLE "recipeLensShelves" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "lensID" TEXT NOT NULL REFERENCES "recipeLenses"("id") ON DELETE CASCADE,
+          "title" TEXT NOT NULL,
+          "query" TEXT NOT NULL,
+          "sortOrder" INTEGER NOT NULL
+        ) STRICT
+        """)
+      .execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

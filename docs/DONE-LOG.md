@@ -9,6 +9,11 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## Recipe Lenses (`effort/recipe-lenses`)
+
+**2026-11-01.** Implemented ADR-0050 Amendment 1: synced Lens and shelf records, independent base/shelf query evaluation, the remainder, saved-Lens management, and the iPad Power Browser shelf view. The Development schema held op and the iPad pass are in `device-passes.md`. Verified: `check-drift.sh` (lint, 738 package tests, app build-for-testing), the generic iOS build, and 87 `YesChefTests` with `-onlyUsePackageVersionsFromResolvedFile`.
+
+---
 ## App package graph pinned (`chore/app-package-resolved`)
 
 **2026-11-01.** The app's `Package.resolved` is now tracked, so a fresh checkout builds `YesChefTests`. Before this, every fresh resolve pulled `swift-issue-reporting` 2.x alongside `xctest-dynamic-overlay`, and the test build's two `IssueReporting` frameworks collided. `project.yml` caps StructuredQueries at `0.34.0 ..< 0.38.0`, because 0.38 breaks vendored SQLiteData 1.8.2. Lift the cap when `Vendor/sqlite-data` goes. Unblocks #403's test run. Verified with a fresh `-onlyUsePackageVersionsFromResolvedFile` build-for-testing and `check-drift.sh`.
