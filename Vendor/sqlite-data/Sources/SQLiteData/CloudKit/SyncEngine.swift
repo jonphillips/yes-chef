@@ -43,6 +43,8 @@
     private let observationRegistrar = ObservationRegistrar()
     private let notificationsObserver = LockIsolated<(any NSObjectProtocol)?>(nil)
     private let activityCounts = LockIsolated(ActivityCounts())
+    private let didRetryParkedRecordScopesAfterStart = LockIsolated(Set<String>())
+    private let fallbackRecordCursorsByScope = LockIsolated<[String: String]>([:])
     private let startTask = LockIsolated<Task<Void, Never>?>(nil)
     #if DEBUG && canImport(DeveloperToolsSupport)
       private let previewTimerTask = LockIsolated<Task<Void, Never>?>(nil)
@@ -1474,6 +1476,8 @@
       deletions: [(recordID: CKRecord.ID, recordType: CKRecord.RecordType)] = [],
       syncEngine: any SyncEngineProtocol
     ) async {
+      let batchStart = ContinuousClock.now
+      let batchRecordCount = modifications.count
       let deletedRecordIDsByRecordType = OrderedDictionary(
         grouping: deletions.sorted { lhs, rhs in
           topologicallyAscending(
@@ -1528,79 +1532,165 @@
         }
       }
 
-      let unsyncedRecords =
+      let modificationRecordIDs = Set(modifications.map(\.recordID))
+      let unsyncedRecordIDs =
         await withErrorReporting(.sqliteDataCloudKitFailure) {
-          var unsyncedRecordIDs = try await userDatabase.write { db in
+          try await metadatabase.read { db in
             Set(
               try UnsyncedRecordID.all
                 .fetchAll(db)
                 .map(CKRecord.ID.init(unsyncedRecordID:))
             )
           }
-          let modificationRecordIDs = Set(modifications.map(\.recordID))
-          let unsyncedRecordIDsToDelete = modificationRecordIDs.intersection(unsyncedRecordIDs)
-          unsyncedRecordIDs.subtract(modificationRecordIDs)
-          if !unsyncedRecordIDsToDelete.isEmpty {
-            try await userDatabase.write { db in
-              try UnsyncedRecordID
-                .findAll(unsyncedRecordIDsToDelete)
-                .delete()
-                .execute(db)
-            }
+        } ?? []
+      let unsyncedRecordIDsToDelete = modificationRecordIDs.intersection(unsyncedRecordIDs)
+      if !unsyncedRecordIDsToDelete.isEmpty {
+        await withErrorReporting(.sqliteDataCloudKitFailure) {
+          try await userDatabase.write { db in
+            try UnsyncedRecordID.findAll(unsyncedRecordIDsToDelete).delete().execute(db)
           }
-          let batchSize = 150
-          let orderedUnsyncedRecordIDs = unsyncedRecordIDs.sorted {
-            topologicallyAscending(
-              lhsTableName: $0.tableName,
-              rhsTableName: $1.tableName,
-              rootFirst: true
-            )
-          }
-          var unsyncedRecords: [CKRecord] = []
-          for start in stride(from: 0, to: orderedUnsyncedRecordIDs.count, by: batchSize) {
-            let recordIDsBatch =
-              orderedUnsyncedRecordIDs
-              .dropFirst(start)
-              .prefix(batchSize)
-            let results = try await syncEngine.database.records(for: Array(recordIDsBatch))
-            for (recordID, result) in results {
-              switch result {
-              case .success(let record):
-                unsyncedRecords.append(record)
-              case .failure(let error as CKError) where error.code == .unknownItem:
-                try await userDatabase.write { db in
-                  try UnsyncedRecordID.find(recordID).delete().execute(db)
-                }
-              case .failure:
-                continue
-              }
-            }
-          }
-          return unsyncedRecords
         }
-        ?? [CKRecord]()
+      }
 
-      let modifications = (modifications + unsyncedRecords).sorted { lhs, rhs in
+      let scopeKey = syncEngine.database.databaseScope == .private ? "private" : "shared"
+      let isFirstBatchAfterStart = didRetryParkedRecordScopesAfterStart.withValue { scopes in
+        scopes.insert(scopeKey).inserted
+      }
+      var retryTableNames = Set(modifications.map(\.recordType))
+      var parkedRecordIDsToRetrySet = Set<CKRecord.ID>()
+      let parkedRecordCandidates = unsyncedRecordIDs.subtracting(modificationRecordIDs)
+      var didAddRetryCandidate = true
+      while didAddRetryCandidate {
+        didAddRetryCandidate = false
+        for recordID in parkedRecordCandidates {
+          guard
+            !parkedRecordIDsToRetrySet.contains(recordID),
+            let tableName = recordID.tableName
+          else { continue }
+          let foreignKeys = foreignKeysByTableName[tableName] ?? []
+          let isAvailableRootRecord = foreignKeys.isEmpty
+            && foreignKeysByTableName.values.contains { keys in
+              keys.contains { $0.table == tableName }
+            }
+          guard
+            isFirstBatchAfterStart
+              || isAvailableRootRecord
+              || foreignKeys.contains(where: { retryTableNames.contains($0.table) })
+          else { continue }
+          parkedRecordIDsToRetrySet.insert(recordID)
+          retryTableNames.insert(tableName)
+          didAddRetryCandidate = true
+        }
+      }
+      let parkedRecordIDsToRetry = parkedRecordIDsToRetrySet.sorted {
+          topologicallyAscending(
+            lhsTableName: $0.tableName,
+            rhsTableName: $1.tableName,
+            rootFirst: true
+          )
+        }
+
+      let savedRecords: [String: CKRecord] = await withErrorReporting(.sqliteDataCloudKitFailure) {
+        try await metadatabase.read { db in
+          Dictionary<String, CKRecord>(
+            uniqueKeysWithValues: try SyncMetadata.findAll(parkedRecordIDsToRetry)
+              .fetchAll(db)
+              .compactMap { metadata in
+                guard let record = metadata._lastKnownServerRecordAllFields else { return nil }
+                return (metadata.recordName, record)
+              }
+          )
+        }
+      } ?? [String: CKRecord]()
+
+      var localRetryRecords: [CKRecord] = []
+      var fallbackRecordIDs: [CKRecord.ID] = []
+      for recordID in parkedRecordIDsToRetry {
+        guard let record = savedRecords[recordID.recordName] else {
+          fallbackRecordIDs.append(recordID)
+          continue
+        }
+        let hasMissingAsset = record.allKeys().contains { key in
+          guard let asset = record[key] as? CKAsset, let fileURL = asset.fileURL else { return false }
+          return !FileManager.default.fileExists(atPath: fileURL.path)
+        }
+        if hasMissingAsset {
+          fallbackRecordIDs.append(recordID)
+        } else {
+          localRetryRecords.append(record)
+        }
+      }
+
+      var fallbackOutcome = "none"
+      var fallbackRecords: [CKRecord] = []
+      var unknownItemRecordIDs: Set<CKRecord.ID> = []
+      if !fallbackRecordIDs.isEmpty {
+        let orderedFallbackRecordIDs = fallbackRecordIDs.sorted {
+          Self.fallbackOrderingKey($0) < Self.fallbackOrderingKey($1)
+        }
+        let fallbackCursor = fallbackRecordCursorsByScope.withValue { $0[scopeKey] }
+        let fallbackStartIndex = fallbackCursor.flatMap { cursor in
+          orderedFallbackRecordIDs.firstIndex { Self.fallbackOrderingKey($0) > cursor }
+        } ?? 0
+        let rotatedFallbackRecordIDs =
+          Array(orderedFallbackRecordIDs.dropFirst(fallbackStartIndex))
+          + Array(orderedFallbackRecordIDs.prefix(fallbackStartIndex))
+        let fallbackBatch = Array(rotatedFallbackRecordIDs.prefix(150))
+        fallbackRecordCursorsByScope.withValue {
+          $0[scopeKey] = fallbackBatch.last.map(Self.fallbackOrderingKey)
+        }
+        do {
+          let results = try await syncEngine.database.records(for: fallbackBatch)
+          fallbackOutcome = "success"
+          for (recordID, result) in results {
+            switch result {
+            case .success(let record):
+              fallbackRecords.append(record)
+            case .failure(let error as CKError) where error.code == .unknownItem:
+              unknownItemRecordIDs.insert(recordID)
+              try await userDatabase.write { db in
+                try UnsyncedRecordID.find(recordID).delete().execute(db)
+              }
+            case .failure:
+              fallbackOutcome = "partial failure"
+              break
+            }
+          }
+        } catch {
+          fallbackOutcome = "failed (\(String(describing: error)))"
+        }
+      }
+
+      let retryRecords = localRetryRecords + fallbackRecords
+
+      let modifications = (modifications + retryRecords).sorted { lhs, rhs in
         topologicallyAscending(
           lhsTableName: lhs.recordType,
           rhsTableName: rhs.recordType,
           rootFirst: true
         )
       }
-
+      let retryRecordIDs = Set(retryRecords.map(\.recordID))
       enum ShareOrReference {
         case share(CKShare)
         case reference(CKShare.Reference)
       }
-      let shares: [ShareOrReference] =
+      func apply(_ records: [CKRecord]) async -> [ShareOrReference] {
         await withErrorReporting(.sqliteDataCloudKitFailure) {
           try await userDatabase.write { db in
             var shares: [ShareOrReference] = []
-            for record in modifications {
+            for record in records {
               if let share = record as? CKShare {
                 shares.append(.share(share))
               } else {
-                upsertFromServerRecord(record, db: db)
+                // A parked update may overlap an older local row. Without force, the field merge
+                // treats that stale row as a local edit and can preserve the missing parent FK.
+                // `changeParentRelationshipToUnknownRecord` covers this case.
+                upsertFromServerRecord(
+                  record,
+                  force: retryRecordIDs.contains(record.recordID),
+                  db: db
+                )
                 if let shareReference = record.share {
                   shares.append(.reference(shareReference))
                 }
@@ -1610,6 +1700,14 @@
           }
         }
         ?? []
+      }
+      var shares: [ShareOrReference] = []
+      let writeBatchSize = 500
+      for start in stride(from: 0, to: modifications.count, by: writeBatchSize) {
+        shares += await apply(
+          Array(modifications.dropFirst(start).prefix(writeBatchSize))
+        )
+      }
 
       await withTaskGroup(of: Void.self) { group in
         for share in shares {
@@ -1631,6 +1729,23 @@
           }
         }
       }
+
+      let parkedAfterCount = await withErrorReporting(.sqliteDataCloudKitFailure) {
+        try await metadatabase.read { db in try UnsyncedRecordID.all.fetchCount(db) }
+      } ?? unsyncedRecordIDs.count
+      let stillParkedRetryCount = await withErrorReporting(.sqliteDataCloudKitFailure) {
+        try await metadatabase.read { db in
+          try UnsyncedRecordID.findAll(parkedRecordIDsToRetry).fetchCount(db)
+        }
+      } ?? parkedRecordIDsToRetry.count
+      let appliedRetryCount = max(
+        0,
+        parkedRecordIDsToRetry.count - stillParkedRetryCount - unknownItemRecordIDs.count
+      )
+      let duration = batchStart.duration(to: .now)
+      logger.notice(
+        "parked-retry batch=\(batchRecordCount, privacy: .public) parkedBefore=\(unsyncedRecordIDs.count, privacy: .public) retriedLocally=\(localRetryRecords.count, privacy: .public) applied=\(appliedRetryCount, privacy: .public) stillParked=\(parkedAfterCount, privacy: .public) fallback=\(min(fallbackRecordIDs.count, 150), privacy: .public) fallbackOutcome=\(fallbackOutcome, privacy: .public) duration=\(duration, privacy: .public)"
+      )
     }
 
     private func topologicallyAscending(
@@ -1652,6 +1767,10 @@
         }
         return rootFirst ? lhsIndex < rhsIndex : lhsIndex > rhsIndex
       }
+    }
+
+    private static func fallbackOrderingKey(_ recordID: CKRecord.ID) -> String {
+      "\(recordID.zoneID.zoneName)/\(recordID.zoneID.ownerName)/\(recordID.recordName)"
     }
 
     package func handleSentRecordZoneChanges(
@@ -2030,6 +2149,7 @@
         }
 
         serverRecord.userModificationTime = metadata.userModificationTime
+        let latestServerRecord = serverRecord.copy() as! CKRecord
 
         func open<T>(_ table: some SynchronizableTable<T>) throws {
           var columnNames: [String] = T.TableColumns.writableColumns.map(\.name)
@@ -2069,6 +2189,9 @@
             } onConflictDoUpdate: { _ in
             }
             .execute(db)
+            try SyncMetadata.find(serverRecord.recordID)
+              .update { $0.setLastKnownServerRecord(latestServerRecord) }
+              .execute(db)
           }
         }
         try open(table)
