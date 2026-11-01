@@ -1,6 +1,6 @@
 # Effort — Find rows this device thinks are in iCloud but aren't
 
-Status: Designed
+Status: Ready
 Summary: The 24 `recipeSources` from PROD-CUTOVER Step 11 sat behind a green Sync status: the iPad treated them as
 uploaded, and Production didn't have them. Extend the on-demand "Check iCloud for leftovers" pass so it also lists
 local rows missing from the server, with an **Upload again** action.
@@ -60,13 +60,24 @@ opposite case, records in iCloud with no local row. The same listing answers thi
 - **Upload again** needs no confirmation. Unlike deleting leftovers, it can't lose data: it only sends this device's
   rows.
 
-## Open questions
+## Decisions (Jon, 2026-11-01)
 
-- **OQ1 — On demand only, or also automatically after a first sync completes?** The listing is keys-only but
-  covers the whole zone, about 50,000 records for Yes Chef. *Recommendation:* on demand only. It's the
-  conservative choice, and the sync activity log already shows when a first sync ends.
-- **OQ2 — Should the status row turn yellow when the last check found missing rows?** *Recommendation:* yes,
-  until **Upload again** finishes. A green row with known missing data is the failure this effort exists to fix.
+- **D1 — On demand only.** The check runs only when Jon taps **Check iCloud**. It doesn't run automatically, not
+  even after a first sync. The listing is keys-only but covers the whole zone, about 50,000 records for Yes
+  Chef, and the sync activity log already shows when a first sync ends.
+- **D2 — The status row turns yellow while missing rows are unrepaired.** A green row with known missing data is
+  the failure this effort exists to fix.
+  - **CloudSyncKit.** `SyncHealth` gains `missingFromICloudCount`, defaulting to 0. When it's above 0, the
+    display status is `needsAttention`, and the summary names the missing records. Merge it into the existing
+    `needsAttention` case; don't add a new one. Galavant passes 0 until it adopts the check.
+  - **Yes Chef: the finding has to outlive the sheet.** `SyncHealthModel` only exists while Settings is on
+    screen, so keep the last check's missing keys (record type and primary key) in a small device-local store:
+    `UserDefaults` or a JSON file in Application Support, never the synced database. Feed their count into
+    `SyncHealth` on every refresh.
+  - **When it clears.** **Upload again** clears the stored keys once it has queued the rows. From then on, the
+    existing not-uploaded report keeps the row yellow until the server confirms each one. A later check that finds
+    nothing missing also clears them. Turning sync off and restoring a backup clear them too, since both start a
+    new sync peer.
 
 ## Not in scope
 
@@ -84,7 +95,12 @@ opposite case, records in iCloud with no local row. The same listing answers thi
   - a deleted row isn't;
   - `reuploadMissing` touches exactly the rows passed in, parents first;
   - the idle guard returns `.notIdle` before listing anything.
-- **Yes Chef:** `YesChefTests` cover the Sync detail model presenting missing rows and calling the repair.
+- **CloudSyncKit `SyncHealth` tests:** `missingFromICloudCount > 0` gives `needsAttention`, its summary names
+  the missing records, and 0 leaves today's statuses unchanged.
+- **Yes Chef:** `YesChefTests` cover:
+  - the Sync detail model presenting missing rows and calling the repair;
+  - the stored finding surviving a new model, which keeps the status yellow;
+  - **Upload again** and a clean check each clearing it.
   Verification per [`verification.md`](../verification.md).
 - **Galavant:** builds against the changed CloudSyncKit, with no behavior change until it adopts the UI.
-- **Device pass (Jon):** on the iPad, **Check iCloud** reports 0 missing.
+- **Device pass (Jon):** on the iPad, **Check iCloud** reports 0 missing, and the status row stays green.
