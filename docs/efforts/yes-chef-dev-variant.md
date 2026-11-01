@@ -1,6 +1,6 @@
 # Effort — Yes Chef Dev: Debug builds get their own app identity; backups carry their build variant
 
-Status: Blocked — dispatch only after [`PROD-CUTOVER.md`](../PROD-CUTOVER.md) Step 11 passes (ADR-0056 Phase 4e, ADR-0059 D1).
+Status: Dispatched — 2026-10-31, ahead of [`PROD-CUTOVER.md`](../PROD-CUTOVER.md) Step 11 ([ADR-0059 Amendment 1](../decisions/ADR-0059-yes-chef-dev-variant.md#amendment-1--d1s-gate-is-met-before-step-11-closes-dev-sync-waits-on-oq1-2026-10-31)).
 Summary: Debug builds become **Yes Chef Dev**, its own app beside TestFlight Yes Chef, and backups record their build variant.
 Touches identifiers, entitlements and the restore path, so the architect escalates both PRs to Jon before merge.
 No schema change, no migration, no sync-model change.
@@ -186,7 +186,7 @@ Follow [`verification.md`](../verification.md):
   - adds to `docs/device-passes.md`: *Xcode Run on the iPhone installs "Yes Chef Dev", with the DEV icon,
     **next to** TestFlight Yes Chef. Each opens its own library. The share sheet lists "Save to Yes Chef"
     and "Save to Yes Chef Dev", and each saves into its own app. Yes Chef Dev's Settings shows "CloudKit
-    Development". A backup exported from Yes Chef Dev is **refused** by TestFlight Yes Chef with the
+    Development". **Leave sync off in Yes Chef Dev** until Development is reset (PROD-CUTOVER Step 13). A backup exported from Yes Chef Dev is **refused** by TestFlight Yes Chef with the
     development-backup message. A TestFlight backup restores in Yes Chef Dev. A Cockpit Find referral
     still opens TestFlight Yes Chef.* Add a one-line pointer under **Owed** in `NEXT_UP.md`;
   - sets `docs/NEXT_UP.md` to `Nothing dispatched.`

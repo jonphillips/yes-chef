@@ -153,3 +153,27 @@ a development backup. Everything else is accepted.**
   and its experiments never touch the archive. The reset also returns the Development schema to
   Production's, which is harmless because deploys only add. If the schema loop needs Yes Chef Dev syncing
   before the gate, accept the throttled download.
+
+## Amendment 1 — D1's gate is met before Step 11 closes; Dev sync waits on OQ1 (2026-10-31)
+
+**D1 gated the dispatch on PROD-CUTOVER Step 11.** Step 11 hasn't closed: the iPhone's fresh TestFlight install
+is still downloading the library. But all three of D1's reasons are already spent:
+
+- **Development is no longer the real library.** Production was seeded from the iPad in Step 9 and confirmed in
+  Step 10; the iPad has run against Production since.
+- **No pre-cut device pass still needs the old identity.** Steps 1 and 2 are done.
+- **The cross-environment restore is behind us.** That was the Step 9 re-seed.
+
+The iPhone finishing its download doesn't touch any of them, and the split changes only Debug builds; Release
+identifiers don't move, so nothing about the iPhone's install changes. Meanwhile the cost of waiting is real:
+on 2026-10-31 an Xcode Run of an unmerged slice installed over TestFlight on the iPad and synced against
+Development, exactly the failure in this ADR's Context. A row-by-row audit of the iPad's backup against its
+10-28 backup found nothing brought in from Development, and the iPad went back to TestFlight. **So the split
+is dispatched now.**
+
+**What still waits is turning sync on in Yes Chef Dev.** OQ1's recommendation stands: reset Development after
+the two-device Production round trip (PROD-CUTOVER Step 13), and only then turn sync on in Yes Chef Dev. Its own
+app group means it starts with an empty library and sync off, so installing it changes nothing in Development.
+Until the reset, a slice that needs new record types in Development creates them from the CloudKit console
+(PROD-CUTOVER Step 13's schema-deploy rule allows the console), not by syncing Yes Chef Dev.
+
