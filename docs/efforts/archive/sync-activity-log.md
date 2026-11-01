@@ -4,13 +4,13 @@ Status: Ready
 Summary: The TestFlight build records when synced rows arrive and how many, in a local ledger shown in Settings → Sync and written to the console, so a first sync that takes days can be watched without a Debug build.
 
 No schema change, no migration, no vendored-SQLiteData patch, no sync-model change. Drafted 2026-11-01, during
-PROD-CUTOVER Step 11. Queued behind [sqlite-data-parked-retry.md](archive/sqlite-data-parked-retry.md), which fixes
+PROD-CUTOVER Step 11. Queued behind [sqlite-data-parked-retry.md](sqlite-data-parked-retry.md), which fixes
 why the iPhone's sync is stuck (11,753 parked records re-downloaded on every batch).
 
-Related: [`PROD-CUTOVER.md`](../PROD-CUTOVER.md) Step 11 ·
-[`archive/sync-failure-surfacing.md`](archive/sync-failure-surfacing.md) · jon-platform ADR-0003 (the sync-health
-row) · [`YesChefApp/SyncHealthModel.swift`](../../YesChefApp/SyncHealthModel.swift) ·
-[`YesChefApp/SyncStatusSection.swift`](../../YesChefApp/SyncStatusSection.swift)
+Related: [`PROD-CUTOVER.md`](../../PROD-CUTOVER.md) Step 11 ·
+[`archive/sync-failure-surfacing.md`](sync-failure-surfacing.md) · jon-platform ADR-0003 (the sync-health
+row) · [`YesChefApp/SyncHealthModel.swift`](../../../YesChefApp/SyncHealthModel.swift) ·
+[`YesChefApp/SyncStatusSection.swift`](../../../YesChefApp/SyncStatusSection.swift)
 
 ## Why
 
@@ -105,7 +105,7 @@ Shipping this while the sync is still running is safe, but only by this route:
 - **`YesChefTests`:** the recorder records `fetchStarted` and `fetchEnded` when the injected fetch state flips.
   It throttles counting to once every 30 seconds. It records nothing while sync is off. Its counts include
   every table in `syncedTables`.
-- **Verification** per [`verification.md`](../verification.md): `scripts/check-drift.sh`, the elevated generic
+- **Verification** per [`verification.md`](../../verification.md): `scripts/check-drift.sh`, the elevated generic
   iOS build (run `xcodegen generate` first, for the new files), and `YesChefTests`.
 - **Device pass.** The PR adds this to `device-passes.md`: *After the TestFlight update on the iPhone, the Local
   record counts match the ones written down before the update. Download activity fills in within an hour of

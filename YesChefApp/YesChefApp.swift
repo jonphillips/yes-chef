@@ -8,6 +8,7 @@ import YesChefCore
 struct YesChefApp: App {
   private let handoffReviewCoordinator: HandoffReviewCoordinator
   private let createRecipeCoordinator: CreateRecipeCoordinator
+  private let syncActivityRecorder: SyncActivityRecorder
 #if DEBUG
   private let modelCallRecordCollector: ModelCallRecordCollector
 #endif
@@ -46,9 +47,12 @@ struct YesChefApp: App {
       $0.modelCallRecordCollector = modelCallRecordCollector
 #endif
     }
+    let syncActivityRecorder = SyncActivityRecorder()
+    self.syncActivityRecorder = syncActivityRecorder
     YesChefIssueReporter.install()
     YesChefCloudSync.persistManualEnablementFromLaunchEnvironment()
     Task {
+      syncActivityRecorder.start()
       _ = await YesChefCloudSync.startIfManuallyEnabled()
     }
     DatabaseChangeBeacon.startObserving(
@@ -59,6 +63,7 @@ struct YesChefApp: App {
   var body: some Scene {
     WindowGroup {
       AppContainer()
+        .environment(syncActivityRecorder)
     }
   }
 }
