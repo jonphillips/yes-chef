@@ -15,17 +15,6 @@ Not work, a checklist.
 
 **Chat access S2b — search rows show categories** (schema-free). Once this merges, reinstall the helper and restart the tunnel (`CHATGPT-SETUP.md` § After a helper update). Search ChatGPT for a category used in your library and confirm matching recipe rows show `categories`; confirm the `tags` field is absent.
 
-**Automatic backups (ADR-0008 S1; effort brief `automatic-backups`).** Run this on the first TestFlight build
-after the change merges; Debug builds intentionally take no automatic backups. On iPhone and iPad, open Yes Chef
-with Automatic Backups enabled and confirm a dated `YesChef-Auto-` file appears in Files under iCloud Drive →
-Yes Chef → Backups. Record the first snapshot size, whether Files required a `CFBundleVersion` bump, and whether
-the App ID needed the iCloud Documents capability enabled in the developer portal at archive time (G1).
-Confirm it reaches the Mac's Yes Chef iCloud container and the other device (G2). Open on the second device
-within minutes; there should be one file or two non-colliding files (G3). Restore an automatic file from the
-existing importer and confirm the library matches that snapshot (G4). Turn iCloud Drive off for Yes Chef and
-confirm Settings explains why no file is written (G6). With a test library, shrink the recipe count by over
-half, foreground the next day, and confirm the earlier file stays pinned with a warning (G7).
-
 **Calendar day-rail actions and recipe-editor columns** (schema-free). On 11" and 13" iPad landscape with large Dynamic Type,
 confirm a filled day shows Cook these plus Day actions in the rail, the Hand off menu and Add stay in the toolbar, and all grocery and hand-off
 actions remain available. Confirm an empty day offers Add Recipe and Add Note. Check recipe rows omit the kind label and titles
