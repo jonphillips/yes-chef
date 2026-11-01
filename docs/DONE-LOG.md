@@ -9,6 +9,11 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-01 — Builds use the committed package pins (`chore/build-against-pins`)
+
+`check-drift.sh` and `xcodebuild-summary.sh` pass `-onlyUsePackageVersionsFromResolvedFile`, so every scripted build uses the `Package.resolved` tracked since #407, or fails saying it's stale. A clone with a leftover resolution can no longer fail `check-drift` in a way a clean checkout doesn't (jon-platform ADR-0005 D16). Verified with `check-drift.sh` and the generic iOS build.
+
+---
 ## Recipe Lenses (`effort/recipe-lenses`)
 
 **2026-11-01.** Implemented ADR-0050 Amendment 1: synced Lens and shelf records, independent base/shelf query evaluation, the remainder, saved-Lens management, and the iPad Power Browser shelf view. The Development schema held op and the iPad pass are in `device-passes.md`. Verified: `check-drift.sh` (lint, 738 package tests, app build-for-testing), the generic iOS build, and 87 `YesChefTests` with `-onlyUsePackageVersionsFromResolvedFile`.

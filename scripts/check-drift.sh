@@ -231,7 +231,10 @@ EOF
   # `set +e` rather than relying on `set -e`: the point of this stage is to say
   # WHY it failed, and `set -e` would exit before the message.
   set +e
+  # Against the committed Package.resolved: a clone with a stale resolution fails here the same
+  # way a clean one would (jon-platform drift-control.md, ADR-0005 D16).
   $qr xcodebuild build-for-testing \
+    -onlyUsePackageVersionsFromResolvedFile \
     -scheme "$app_test_scheme" \
     -destination "$app_test_destination" \
     -skipMacroValidation \
@@ -250,6 +253,7 @@ EOF
   if [[ -n "${YESCHEF_RUN_APP_TESTS:-}" ]]; then
     echo "Running the app test target (YESCHEF_RUN_APP_TESTS is set)..."
     $qr xcodebuild test-without-building \
+      -onlyUsePackageVersionsFromResolvedFile \
       -scheme "$app_test_scheme" \
       -destination "$app_test_destination" \
       -skipMacroValidation \
