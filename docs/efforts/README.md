@@ -25,5 +25,7 @@ discoverable"):
 
 ## Live
 
+- [sqlite-data-parked-retry.md](sqlite-data-parked-retry.md) — **Dispatched** · SQLiteData re-downloads every
+  parked record on each fetched batch and throttles a first sync to a standstill; retry them from the saved copy.
 - [chat-access-mcp.md](chat-access-mcp.md) — **Blocked** on [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md)
   OQ3 · S3 lets a ChatGPT return target an existing recipe, not only stage a new one; S0–S2b shipped.
