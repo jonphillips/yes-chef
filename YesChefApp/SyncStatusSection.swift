@@ -227,18 +227,18 @@ struct SyncStatusDetailView: View {
         }
 
         Section {
-          if activityRecorder.lastArrival == nil {
-            LabeledContent("Last rows arrived", value: "No new rows yet")
-          } else if let lastArrival = activityRecorder.lastArrival {
+          if let lastArrival = activityRecorder.lastArrival {
             LabeledContent {
               Text(lastArrival, style: .relative)
             } label: {
               Text("Last rows arrived")
             }
+          } else {
+            LabeledContent("Last rows arrived", value: "No new rows yet")
           }
           LabeledContent("Last hour", value: activityRecorder.rowsArrived(in: SyncActivityRecorder.hourWindow).formatted())
           LabeledContent("Last 24 hours", value: activityRecorder.rowsArrived(in: SyncActivityRecorder.dayWindow).formatted())
-          if let startedAt = activityRecorder.ledger.entries.first?.date {
+          if let startedAt = activityRecorder.ledger.startedAt {
             LabeledContent {
               Text(startedAt, style: .date)
             } label: {
@@ -272,6 +272,13 @@ struct SyncStatusDetailView: View {
                 .foregroundStyle(.secondary)
             }
           } else {
+            if let latestEntry = activityRecorder.ledger.entries.last {
+              LabeledContent {
+                Text(latestEntry.date, style: .relative)
+              } label: {
+                Text("Last entry")
+              }
+            }
             ForEach(activityRecorder.latestCounts) { row in
               LabeledContent(row.name, value: row.count.formatted())
                 .monospacedDigit()
@@ -280,7 +287,7 @@ struct SyncStatusDetailView: View {
         } header: {
           Text("Local record counts")
         } footer: {
-          Text("Rows in this device's database, per synced table. Compare across devices to see which records actually arrived.")
+          Text("Counts show the local database as of the last activity entry and aren't refreshed while sync is off. Compare across devices to see which records actually arrived.")
         }
 
         #if DEBUG

@@ -23,11 +23,11 @@ struct YesChefIssueReporterTests {
     #expect(originalIDs.allSatisfy { id in
       IssueReporters.current.contains { ObjectIdentifier($0 as AnyObject) == id }
     })
-    withIssueReporters(IssueReporters.current) {
-      reportIssue("sync diagnostic", fileID: "ReporterTests.swift", line: 42)
+    withIssueReporters([reporter]) {
+      reportIssue("sync diagnostic", fileID: "YesChefTests/ReporterTests.swift", line: 42)
     }
     #expect(received?.0 == "sync diagnostic")
-    #expect(received?.1 == "ReporterTests.swift")
+    #expect(received?.1 == "YesChefTests/ReporterTests.swift")
     #expect(received?.2 == 42)
   }
 }

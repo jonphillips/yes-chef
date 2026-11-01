@@ -1,6 +1,6 @@
 # Effort — Sync activity log
 
-Status: Ready
+Status: Done → DONE-LOG
 Summary: The TestFlight build records when synced rows arrive and how many, in a local ledger shown in Settings → Sync and written to the console, so a first sync that takes days can be watched without a Debug build.
 
 No schema change, no migration, no vendored-SQLiteData patch, no sync-model change. Drafted 2026-11-01, during
@@ -36,7 +36,8 @@ What the Release build has today:
 
 1. **`SyncActivityLedger` (YesChefCore), a pure value type.** Each entry holds a date, a kind, the total row
    count, and a count for each table. The kinds are `launch`, `foreground`, `background`, `fetchStarted`,
-   `fetchEnded` and `sample`. It keeps at most 1,000 entries and drops the oldest first. It derives:
+   `fetchEnded` and `sample`. It keeps at most 1,000 entries and drops the oldest first, while retaining
+   `startedAt` from the first entry. It derives:
    - **last arrival**: the latest entry whose total is above the entry before it
    - **rows in the last hour** and **rows in the last 24 hours**
    - **rows since the ledger began**
@@ -50,12 +51,14 @@ What the Release build has today:
    not by Settings: `SettingsView`'s `SyncHealthModel` only exists while Settings is on screen. It records only
    while sync is turned on (`YesChefCloudSync.isManuallyEnabled()`).
    - It watches the engine's `isFetchingChanges` and records `fetchStarted` and `fetchEnded` when it flips.
+   - It polls the fetch state once per second; a fetch shorter than one second may be missed.
    - It watches scene phase and records `foreground` and `background`.
    - It records `launch` once when the app starts.
-   - While a fetch runs, it adds a `sample` every 60 seconds.
+   - While a fetch runs, it adds a `sample` every 5 minutes, and skips the sample when its counts match the
+     preceding entry.
    - Counting is a `SELECT COUNT(*)` for each name in `YesChefCloudSync.syncedTables.recordTypes`, run in a
-     `database.read`, never the writer (see the SQLiteData @Fetch writer-convoy note). Count at most once every 30
-     seconds. A flip inside that window records an entry that reuses the last counts.
+     `database.read`, never the writer (see the SQLiteData @Fetch writer-convoy note). `fetchStarted` and
+     `fetchEnded` always count. The 30-second throttle applies only to `launch`, `foreground` and `background`.
    - Feed it the fetch state through an injected source, so tests don't need a real CloudKit engine.
 4. **A console line for each entry.** Add an `AppLog.sync` category. Each entry logs once at `.notice` with a
    public payload, for example `sync-activity fetchEnded total=41210 delta=+312
@@ -65,7 +68,7 @@ What the Release build has today:
    counts, outside `#if DEBUG`. It shows:
    - **Last rows arrived** (relative time)
    - **Last hour** and **Last 24 hours** (rows)
-   - **Since** the first entry's date (rows)
+   - **Since** `startedAt` (rows)
    - **Fetches (24 h)**, as "n, m with nothing new"
    - a **Copy activity log** button that puts the CSV on the pasteboard
 
@@ -99,12 +102,14 @@ Shipping this while the sync is still running is safe, but only by this route:
 
 ## Done when
 
-- **Core tests:** the cap drops the oldest entry. Last arrival skips entries that brought nothing. The hour and
-  24-hour windows count from the right entries. Fetches with zero rows are counted. The CSV has a header and one
-  column per table. The JSON round-trips. A corrupt file gives an empty ledger and one warning.
+- **Core tests:** the cap drops the oldest entry while `startedAt` and `rowsSinceStart` retain the same period.
+  Last arrival skips entries that brought nothing. The hour and 24-hour windows count from the right entries.
+  A fetch with rows before a middle sample and none after is not empty. Fetches with zero rows are counted. The
+  CSV has a header and one column per table. The JSON round-trips. A corrupt file gives an empty ledger and one
+  warning.
 - **`YesChefTests`:** the recorder records `fetchStarted` and `fetchEnded` when the injected fetch state flips.
-  It throttles counting to once every 30 seconds. It records nothing while sync is off. Its counts include
-  every table in `syncedTables`.
+  A `fetchEnded` five seconds after `fetchStarted` gets fresh counts. Lifecycle counts throttle to once every 30
+  seconds. It records nothing while sync is off. The live `database.read` counts every table in `syncedTables`.
 - **Verification** per [`verification.md`](../../verification.md): `scripts/check-drift.sh`, the elevated generic
   iOS build (run `xcodegen generate` first, for the new files), and `YesChefTests`.
 - **Device pass.** The PR adds this to `device-passes.md`: *After the TestFlight update on the iPhone, the Local

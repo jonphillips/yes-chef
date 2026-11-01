@@ -10,12 +10,22 @@ struct SyncActivitySource {
   var counts: (() async throws -> [String: Int])?
 }
 
+private actor SyncActivityLedgerWriter {
+  private var latestGeneration: UInt64 = 0
+
+  func save(_ ledger: SyncActivityLedger, to url: URL, generation: UInt64) throws {
+    guard generation > latestGeneration else { return }
+    latestGeneration = generation
+    try SyncActivityLedgerFile.save(ledger, to: url)
+  }
+}
+
 @MainActor
 @Observable
 final class SyncActivityRecorder {
   private static let pollInterval = Duration.seconds(1)
   private static let countInterval: TimeInterval = 30 // The brief caps COUNT(*) at once per 30 seconds.
-  private static let sampleInterval: TimeInterval = 60 // The brief samples active fetches once per minute.
+  private static let sampleInterval: TimeInterval = 5 * 60 // Five minutes × 60 seconds per minute.
   // An hour is 60 minutes × 60 seconds per minute.
   static let hourWindow: TimeInterval = 60 * 60
   // A day is 24 hours.
@@ -27,8 +37,11 @@ final class SyncActivityRecorder {
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored @Dependency(\.defaultSyncEngine) private var syncEngine
   @ObservationIgnored private let source: SyncActivitySource?
-  @ObservationIgnored private let ledgerURL: URL
+  @ObservationIgnored private let ledgerURL: URL?
+  @ObservationIgnored private let ledgerWriter = SyncActivityLedgerWriter()
   @ObservationIgnored private var monitorTask: Task<Void, Never>?
+  @ObservationIgnored private var pendingSave: Task<Void, Never>?
+  @ObservationIgnored private var saveGeneration: UInt64 = 0
   @ObservationIgnored private var didLaunchRecord = false
   @ObservationIgnored private var wasEnabled = false
   @ObservationIgnored private var previousFetching = false
@@ -39,9 +52,9 @@ final class SyncActivityRecorder {
   init(source: SyncActivitySource? = nil, ledgerURL: URL? = nil) {
     self.source = source
     self.ledgerURL = ledgerURL ?? Self.liveLedgerURL()
-    if FileManager.default.fileExists(atPath: self.ledgerURL.path) {
+    if let ledgerURL = self.ledgerURL, FileManager.default.fileExists(atPath: ledgerURL.path) {
       do {
-        ledger = try SyncActivityLedgerFile.load(from: self.ledgerURL)
+        ledger = try SyncActivityLedgerFile.load(from: ledgerURL)
         latestCounts = Self.displayCounts(ledger.entries.last?.tableCounts ?? [:])
       } catch {
         AppLog.sync.warning("Could not decode sync activity ledger; starting a new log: \(error.localizedDescription, privacy: .public)")
@@ -106,6 +119,10 @@ final class SyncActivityRecorder {
     ledger.fetchSummary(since: now.addingTimeInterval(-interval))
   }
 
+  func flushPendingSave() async {
+    await pendingSave?.value
+  }
+
   private func begin(now: Date) async {
     didLaunchRecord = true
     await record(.launch, now: now)
@@ -121,7 +138,8 @@ final class SyncActivityRecorder {
 
   private func record(_ kind: SyncActivityLedger.Kind, now: Date) async {
     let counts: [String: Int]
-    if lastCountedAt.map({ now.timeIntervalSince($0) >= Self.countInterval }) ?? true {
+    let alwaysCount = kind == .fetchStarted || kind == .fetchEnded || kind == .sample
+    if alwaysCount || (lastCountedAt.map { now.timeIntervalSince($0) >= Self.countInterval } ?? true) {
       do {
         counts = try await readCounts()
         lastCountedAt = now
@@ -134,6 +152,7 @@ final class SyncActivityRecorder {
     }
 
     let previous = ledger.entries.last
+    if kind == .sample, previous?.tableCounts == counts { return }
     let entry = SyncActivityLedger.Entry(date: now, kind: kind, tableCounts: counts)
     ledger.append(entry)
     latestCounts = Self.displayCounts(counts)
@@ -145,10 +164,23 @@ final class SyncActivityRecorder {
     }.joined(separator: ",")
     let suffix = tableDeltas.isEmpty ? "" : " \(tableDeltas)"
     AppLog.sync.notice("sync-activity \(kind.rawValue, privacy: .public) total=\(entry.totalCount, privacy: .public) delta=\(delta, privacy: .public)\(suffix, privacy: .public)")
-    do {
-      try SyncActivityLedgerFile.save(ledger, to: ledgerURL)
-    } catch {
-      AppLog.sync.warning("Could not save sync activity ledger: \(error.localizedDescription, privacy: .public)")
+    scheduleSave()
+  }
+
+  private func scheduleSave() {
+    guard let ledgerURL else { return }
+    saveGeneration &+= 1
+    let generation = saveGeneration
+    let snapshot = ledger
+    let writer = ledgerWriter
+    let previousSave = pendingSave
+    pendingSave = Task.detached {
+      await previousSave?.value
+      do {
+        try await writer.save(snapshot, to: ledgerURL, generation: generation)
+      } catch {
+        AppLog.sync.warning("Could not save sync activity ledger: \(error.localizedDescription, privacy: .public)")
+      }
     }
   }
 
@@ -166,13 +198,18 @@ final class SyncActivityRecorder {
     counts.keys.sorted().map { RecordCount(name: $0, count: counts[$0, default: 0]) }
   }
 
-  private static func liveLedgerURL() -> URL {
-    let directory = try! FileManager.default.url(
-      for: .applicationSupportDirectory,
-      in: .userDomainMask,
-      appropriateFor: nil,
-      create: true
-    )
-    return SyncActivityLedgerFile.fileURL(applicationSupportDirectory: directory)
+  private static func liveLedgerURL() -> URL? {
+    do {
+      let directory = try FileManager.default.url(
+        for: .applicationSupportDirectory,
+        in: .userDomainMask,
+        appropriateFor: nil,
+        create: true
+      )
+      return SyncActivityLedgerFile.fileURL(applicationSupportDirectory: directory)
+    } catch {
+      AppLog.sync.warning("Could not resolve Application Support for sync activity; the ledger will remain in memory: \(error.localizedDescription, privacy: .public)")
+      return nil
+    }
   }
 }

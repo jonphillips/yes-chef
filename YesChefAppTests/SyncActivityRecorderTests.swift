@@ -1,5 +1,7 @@
+import Dependencies
 import Foundation
 import Testing
+import YesChefCore
 @testable import YesChef
 
 @MainActor
@@ -19,7 +21,7 @@ struct SyncActivityRecorderTests {
         isFetching: { fetching },
         counts: {
           countCalls += 1
-          return ["recipes": 10]
+          return ["recipes": countCalls <= 2 ? 10 : 12]
         }
       ),
       ledgerURL: root.appendingPathComponent("activity.json")
@@ -33,8 +35,41 @@ struct SyncActivityRecorderTests {
     await recorder.poll(now: start.addingTimeInterval(2))
 
     #expect(recorder.ledger.entries.map(\.kind) == [.launch, .fetchStarted, .fetchEnded])
-    #expect(countCalls == 1)
+    #expect(countCalls == 3)
     #expect(recorder.latestCounts.map(\.name) == ["recipes"])
+    #expect(recorder.ledger.fetchSummary(since: start).empty == 0)
+    await recorder.flushPendingSave()
+  }
+
+  @Test
+  func fetchEndFiveSecondsLaterUsesFreshCounts() async throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent("YesChefSyncActivityRecorder-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    var fetching = false
+    var countCalls = 0
+    let recorder = SyncActivityRecorder(
+      source: SyncActivitySource(
+        isEnabled: { true },
+        isFetching: { fetching },
+        counts: {
+          countCalls += 1
+          return ["recipes": countCalls <= 2 ? 10 : 11]
+        }
+      ),
+      ledgerURL: root.appendingPathComponent("activity.json")
+    )
+    let start = Date(timeIntervalSince1970: 15_000)
+
+    await recorder.poll(now: start)
+    fetching = true
+    await recorder.poll(now: start.addingTimeInterval(1))
+    fetching = false
+    await recorder.poll(now: start.addingTimeInterval(6))
+
+    #expect(countCalls == 3)
+    #expect(recorder.ledger.entries.last?.tableCounts == ["recipes": 11])
+    await recorder.flushPendingSave()
   }
 
   @Test
@@ -68,5 +103,26 @@ struct SyncActivityRecorderTests {
 
     #expect(countCalls == 2)
     #expect(recorder.ledger.entries.map(\.kind) == [.launch, .foreground, .background, .foreground])
+    await recorder.flushPendingSave()
+  }
+
+  @Test
+  func liveCountReadIncludesEverySyncedTable() async throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent("YesChefSyncActivityRecorder-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+    } operation: {
+      let recorder = SyncActivityRecorder(
+        source: SyncActivitySource(isEnabled: { true }, isFetching: { false }, counts: nil),
+        ledgerURL: root.appendingPathComponent("activity.json")
+      )
+      await recorder.poll(now: Date(timeIntervalSince1970: 30_000))
+
+      #expect(recorder.latestCounts.map(\.name) == YesChefCloudSync.syncedTables.recordTypes.sorted())
+      await recorder.flushPendingSave()
+    }
   }
 }

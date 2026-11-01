@@ -16,6 +16,7 @@ struct SyncActivityLedgerTests {
     }
     #expect(ledger.entries.count == 1_000)
     #expect(ledger.entries.first?.date == Date(timeIntervalSince1970: 5))
+    #expect(ledger.startedAt == Date(timeIntervalSince1970: 0))
     #expect(ledger.rowsSinceStart == 1_004)
   }
 
@@ -58,6 +59,20 @@ struct SyncActivityLedgerTests {
     let summary = ledger.fetchSummary(since: base)
     #expect(summary.total == 2)
     #expect(summary.empty == 1)
+  }
+
+  @Test
+  func fetchWithRowsBeforeItsLastSampleIsNotEmpty() {
+    let base = Date(timeIntervalSince1970: 2_000)
+    let ledger = SyncActivityLedger(entries: [
+      .init(date: base, kind: .fetchStarted, tableCounts: ["recipes": 10]),
+      .init(date: base.addingTimeInterval(300), kind: .sample, tableCounts: ["recipes": 15]),
+      .init(date: base.addingTimeInterval(330), kind: .fetchEnded, tableCounts: ["recipes": 15]),
+    ])
+
+    let summary = ledger.fetchSummary(since: base)
+    #expect(summary.total == 1)
+    #expect(summary.empty == 0)
   }
 
   @Test

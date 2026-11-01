@@ -27,16 +27,19 @@ public struct SyncActivityLedger: Codable, Equatable, Sendable {
   }
 
   public private(set) var entries: [Entry]
+  public private(set) var startedAt: Date?
   public private(set) var rowsSinceStart: Int
 
   public init(entries: [Entry] = []) {
     self.entries = Array(entries.suffix(Self.maximumEntries))
+    self.startedAt = entries.first?.date
     self.rowsSinceStart = entries.indices.dropFirst().reduce(into: 0) { total, index in
       total += max(0, entries[index].totalCount - entries[index - 1].totalCount)
     }
   }
 
   public mutating func append(_ entry: Entry) {
+    if startedAt == nil { startedAt = entry.date }
     if let previous = entries.last {
       rowsSinceStart += max(0, entry.totalCount - previous.totalCount)
     }
@@ -63,16 +66,19 @@ public struct SyncActivityLedger: Codable, Equatable, Sendable {
   public func fetchSummary(since date: Date) -> (total: Int, empty: Int) {
     let fetchIndices = entries.indices.filter { entries[$0].kind == .fetchEnded && entries[$0].date >= date }
     return (fetchIndices.count, fetchIndices.filter { index in
-      guard index > 0 else { return true }
-      return entries[index].totalCount <= entries[index - 1].totalCount
+      guard let startIndex = (0..<index).reversed().first(where: { entries[$0].kind == .fetchStarted }) else {
+        return true
+      }
+      return entries[index].totalCount <= entries[startIndex].totalCount
     }.count)
   }
 
   public var csv: String {
     let tables = Set(entries.flatMap { $0.tableCounts.keys }).sorted()
     let header = ["date", "kind", "total"] + tables
+    let dateFormatter = ISO8601DateFormatter()
     let rows = entries.map { entry in
-      [Self.csvField(ISO8601DateFormatter().string(from: entry.date)), entry.kind.rawValue, String(entry.totalCount)] +
+      [Self.csvField(dateFormatter.string(from: entry.date)), entry.kind.rawValue, String(entry.totalCount)] +
         tables.map { String(entry.tableCounts[$0, default: 0]) }
     }
     return ([header] + rows).map { $0.joined(separator: ",") }.joined(separator: "\n")
