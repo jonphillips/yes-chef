@@ -19,12 +19,14 @@ extension RecipeCoreTests {
 
     @Test(arguments: [[:], [YesChefDatabaseStorage.appGroupInfoKey: ""]])
     func missingOrEmptyAppGroupIsReportedAndRejected(_ infoDictionary: [String: String]) {
+      var result: Result<String, any Error>?
       withKnownIssue {
-        #expect(throws: YesChefDatabaseStorage.StorageError.missingAppGroupIdentifier(
-          YesChefDatabaseStorage.appGroupInfoKey
-        )) {
-          try YesChefDatabaseStorage.appGroupIdentifier(from: infoDictionary)
-        }
+        result = Result { try YesChefDatabaseStorage.appGroupIdentifier(from: infoDictionary) }
+      }
+      #expect(throws: YesChefDatabaseStorage.StorageError.missingAppGroupIdentifier(
+        YesChefDatabaseStorage.appGroupInfoKey
+      )) {
+        try result?.get()
       }
     }
 
