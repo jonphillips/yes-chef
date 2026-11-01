@@ -44,6 +44,14 @@ re-delivers records the device already has, or records being skipped, today's lo
 SQLiteData's own event logging is `#if DEBUG`, and Galavant uses upstream, so the visibility has to come from
 `CloudSyncKit`.
 
+**The iPhone at 11:31** (Settings → Sync → Local record counts): `recipes` 1,934, `recipeSources` 1,755,
+`instructionSections` 2,062, `instructionSteps` 1,749, `ingredientSections` 10, `ingredientLines` 111,
+`recipePhotos` 11, `recipeNotes` 3, menus and meal plan 0. The iPad holds 27,613 `ingredientLines` and 11,330
+`instructionSteps`. Yet the live Console at 11:14–11:15 showed the fetch delivering `recipes` and
+`instructionSections` records, types the iPhone already holds most of. If those were records it already had, the
+fetch is restarting near the beginning each cycle rather than advancing, and the loop alone can't fix that: the
+progress snapshot below is how the device pass tells.
+
 ## The fix
 
 While the scene is active and sync is on, call the engine's `fetchChanges()` (SQLiteData's
@@ -61,8 +69,12 @@ suggestion: `CloudSync.fetchUntilCaughtUpIfManuallyEnabled(configuration:…)`.
 - **The loop.** Call `fetchChanges()`. On success, return. On a `CKError` whose code is `.requestRateLimited`,
   `.zoneBusy` or `.serviceUnavailable`, sleep `retryAfterSeconds` and go again. If `retryAfterSeconds` is
   missing, use a fixed fallback (5 seconds is fine). Any other error ends the loop and is returned.
-- **No attempt cap.** The loop is bounded by the scene: the app ends it by cancelling the task when the scene
-  leaves `.active`. A sleep must be cancellable, and a cancelled loop must not issue another fetch.
+- **Bounded by the scene, and by progress.** The app ends the loop by cancelling the task when the scene leaves
+  `.active`. A sleep must be cancellable, and a cancelled loop must not issue another fetch. The loop also stops
+  after **three consecutive throttled attempts in which the `SyncMetadata` row count doesn't grow**, and returns a
+  distinct "no progress" result, logged as such. A fetch that only re-delivers records the device already has
+  would otherwise hammer CloudKit for nothing, and earn longer throttles. The iPhone's counts (below) make that
+  a live possibility.
 - **Testable without CloudKit.** Inject the fetch, the account status and the clock, the way the re-drain
   injects `stopSyncEngine`/`startSyncEngine` (`@Dependency(\.continuousClock)` for the sleep is fine).
 - **A result enum,** like `PendingRecordZoneRedrainResult`: disabled, unavailable, caught up (with the number
@@ -115,7 +127,7 @@ app's configuration (`com.jonphillips.yeschef` for Yes Chef); use a `sync` categ
 ## Done when
 
 - `CloudSyncKit` has the function, and its tests cover: two throttles then success (three fetches, sleeps equal
-  to each retry-after); a throttle with no retry-after uses the fallback; a non-throttle error ends the loop and
+  to each retry-after); three throttled attempts with no `SyncMetadata` growth stop with the no-progress result; a throttle with no retry-after uses the fallback; a non-throttle error ends the loop and
   is returned; cancellation during a sleep issues no further fetch; the gate off or the account unavailable
   issues no fetch.
 - The issue reporter has tests: an issue reported after installing reaches it (inject its log sink), the
