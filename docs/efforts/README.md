@@ -25,8 +25,6 @@ discoverable"):
 
 ## Live
 
-- [sqlite-data-parked-retry.md](sqlite-data-parked-retry.md) — **Dispatched** · SQLiteData re-downloads every
-  parked record on each fetched batch and throttles a first sync to a standstill; retry them from the saved copy.
 - [sync-activity-log.md](sync-activity-log.md) — **Ready** · The TestFlight build records when synced rows
   arrive and how many, in a local ledger shown in Settings → Sync and written to the console.
 - [chat-access-mcp.md](chat-access-mcp.md) — **Blocked** on [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md)

@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-01 — Retry parked sync records from their saved copy (`effort/sqlite-data-parked-retry`)
+
+Patched vendored SQLiteData to retry parked records from their saved server copy, refresh that copy when a newer version arrives, and use one capped CloudKit fallback when local copies or assets are missing. Added public retry-batch diagnostics and readable Release issue logging. Commits: `698b40c` (vendor patch) and `903bf54` (app reporter).
+
+Verification: focused parked-retry suites; full SQLiteData suite (302 tests, 2 known issues); `scripts/check-drift.sh`; generic iOS build; `YesChefTests` (88 tests).
+
+---
 ## Pantry starters no longer seed with positional IDs (`effort/pantry-seed-collision`)
 
 **2026-11-01. Schema-free.** Removed automatic live pantry seeding and the retired UserDefaults pantry import. The empty pantry now offers **Add common staples**, and reset staples use UUIDv5 IDs derived from canonical names so separate devices converge on the same rows. Reset upserts existing staples in place, preserving `dateCreated` and active sync metadata; user-added items retain their injected random IDs. Core and CloudSync tests cover stable IDs, cross-database reset equality, canonical deduplication, user IDs, and repeat-reset metadata; the live-context app test confirms a fresh pantry stays empty. After rebasing onto #403, `check-drift.sh` passed with 742 core tests, 8 MCP tests and an app bundle build; `YesChefTests` passed (88). The generic iOS build passed before the rebase. Jon's duplicate-row cleanup and cross-device confirmation remain owed in `device-passes.md`.

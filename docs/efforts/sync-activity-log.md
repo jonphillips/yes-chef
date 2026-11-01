@@ -4,7 +4,7 @@ Status: Ready
 Summary: The TestFlight build records when synced rows arrive and how many, in a local ledger shown in Settings → Sync and written to the console, so a first sync that takes days can be watched without a Debug build.
 
 No schema change, no migration, no vendored-SQLiteData patch, no sync-model change. Drafted 2026-11-01, during
-PROD-CUTOVER Step 11. Queued behind [sqlite-data-parked-retry.md](sqlite-data-parked-retry.md), which fixes
+PROD-CUTOVER Step 11. Queued behind [sqlite-data-parked-retry.md](archive/sqlite-data-parked-retry.md), which fixes
 why the iPhone's sync is stuck (11,753 parked records re-downloaded on every batch).
 
 Related: [`PROD-CUTOVER.md`](../PROD-CUTOVER.md) Step 11 ·
