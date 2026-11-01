@@ -565,7 +565,7 @@ dead-looking button and nothing else.
 ## Amendment 8 — an unmatched no-row paste writes its ledger row at commit, not at Review Anyway (2026-11-01)
 
 **Status: Accepted** — 2026-11-01 (Jon). Ships in the
-[review-over-recipe-cover effort](../efforts/handoff-review-over-recipe-cover.md). Amends **Amd 7**'s "no token,
+[review-over-recipe-cover effort](../efforts/archive/handoff-review-over-recipe-cover.md). Amends **Amd 7**'s "no token,
 or an ID with no stored row" branch, for every door that opens the shared hand-off review sheet.
 
 Today *Review Anyway* on that branch runs `stageReviewForKnownSource`, which inserts a synthetic `aiHandoffs`

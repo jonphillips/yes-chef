@@ -196,6 +196,7 @@ final class HandoffInAppTransport {
         readerFeedbackReceive(staged)
       default:
         let staged: AIHandoffReviewResult
+        var pendingHandoff: AIHandoff?
         if let storedHandoff {
           staged = try await HandoffAppOperations.stageReview(
             handoffID: storedHandoff.id,
@@ -204,17 +205,20 @@ final class HandoffInAppTransport {
             now: now
           )
         } else {
-          staged = try await HandoffAppOperations.stageReviewForKnownSource(
+          let unmatched = try await HandoffAppOperations.stageUnmatchedReviewForKnownSource(
             source: unmatchedSource,
             result: unmatchedResult,
             in: database,
             now: now,
             handoffID: uuid()
           )
+          staged = unmatched.result
+          pendingHandoff = unmatched.handoff
         }
         handoffReviewCoordinator.present(
           unmatchedSource.applyingScope(to: staged.review, resolvedHandoff: storedHandoff),
-          warning: staged.warning
+          warning: staged.warning,
+          pendingHandoff: pendingHandoff
         )
       }
     } catch {

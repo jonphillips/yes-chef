@@ -17,17 +17,23 @@ final class HandoffReviewCoordinator {
   var contractWarning: String?
   var adjustmentReview: RecipeAdjustmentReviewState?
   private var pendingAdjustmentReview: RecipeAdjustmentReviewState?
+  private var pendingHandoff: AIHandoff?
   var errorMessage: String?
   var errorTitle = "Could Not Save Handoff"
   var isShowingError = false
 
-  func present(_ review: AIHandoffReview, warning: String? = nil) {
+  func present(
+    _ review: AIHandoffReview,
+    warning: String? = nil,
+    pendingHandoff: AIHandoff? = nil
+  ) {
     clearError()
     contractWarning = warning
     // A fresh paste replaces whatever review was in process, including a half-finished adjustment
     // sub-flow, so re-pasting after backing out reliably lands on the new review.
     adjustmentReview = nil
     pendingAdjustmentReview = nil
+    self.pendingHandoff = pendingHandoff
     self.review = review
   }
 
@@ -320,7 +326,9 @@ final class HandoffReviewCoordinator {
     let plan = parsed.plan
     guard !plan.steps.isEmpty else { throw AIHandoffMenuPrepPlanImportError.emptyPlan }
     try database.write { db in
-      try MenuRepository.applyPrepPlan(plan, to: review.menuID, in: db, now: now, uuid: { uuid() })
+      try commitPendingHandoff(in: db) {
+        try MenuRepository.applyPrepPlan(plan, to: review.menuID, in: db, now: now, uuid: { uuid() })
+      }
     }
   }
 
@@ -360,7 +368,9 @@ final class HandoffReviewCoordinator {
     let makeAhead = approvedText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !makeAhead.isEmpty else { throw HandoffReviewError.emptyDeliverable }
     try database.write { db in
-      try RecipeRepository.updateMakeAhead(makeAhead, recipeID: review.recipeID, in: db, now: now)
+      try commitPendingHandoff(in: db) {
+        try RecipeRepository.updateMakeAhead(makeAhead, recipeID: review.recipeID, in: db, now: now)
+      }
     }
   }
 
@@ -371,7 +381,9 @@ final class HandoffReviewCoordinator {
     let chefItUp = approvedText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !chefItUp.isEmpty else { throw HandoffReviewError.emptyDeliverable }
     try database.write { db in
-      try RecipeRepository.updateChefItUp(chefItUp, recipeID: review.recipeID, in: db, now: now)
+      try commitPendingHandoff(in: db) {
+        try RecipeRepository.updateChefItUp(chefItUp, recipeID: review.recipeID, in: db, now: now)
+      }
     }
   }
 
@@ -382,13 +394,15 @@ final class HandoffReviewCoordinator {
     let plan = ServeWithPlan().applyingEditableReviewText(approvedText)
     guard !plan.items.isEmpty else { throw HandoffReviewError.emptyDeliverable }
     try database.write { db in
-      try RecipeRepository.replaceServeWithPlan(
-        plan,
-        recipeID: review.recipeID,
-        in: db,
-        now: now,
-        uuid: { uuid() }
-      )
+      try commitPendingHandoff(in: db) {
+        try RecipeRepository.replaceServeWithPlan(
+          plan,
+          recipeID: review.recipeID,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
     }
   }
 
@@ -411,13 +425,15 @@ final class HandoffReviewCoordinator {
     }
     guard !parsed.strategy.steps.isEmpty else { throw HandoffReviewError.emptyDeliverable }
     _ = try database.write { db in
-      try MealCalendarRepository.addMakeAheadStrategyNote(
-        parsed.strategy,
-        on: review.scheduledDate,
-        in: db,
-        now: now,
-        uuid: { uuid() }
-      )
+      try commitPendingHandoff(in: db) {
+        try MealCalendarRepository.addMakeAheadStrategyNote(
+          parsed.strategy,
+          on: review.scheduledDate,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
     }
   }
 
@@ -431,15 +447,17 @@ final class HandoffReviewCoordinator {
     _ = try database.write { db in
       // Exact-dedup on ingest against what's already stored (ADR-0038 Amd 4). All-duplicate commits
       // insert nothing and succeed — the review item is still consumed.
-      try LearningRepository.insertNew(
-        texts: returned.learnings,
-        sourceType: sourceType,
-        sourceID: sourceID,
-        provenance: .externalHandoff,
-        in: db,
-        now: now,
-        uuid: { uuid() }
-      )
+      try commitPendingHandoff(in: db) {
+        try LearningRepository.insertNew(
+          texts: returned.learnings,
+          sourceType: sourceType,
+          sourceID: sourceID,
+          provenance: .externalHandoff,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
     }
   }
 
@@ -450,13 +468,15 @@ final class HandoffReviewCoordinator {
     let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !body.isEmpty else { throw HandoffReviewError.emptyDeliverable }
     _ = try database.write { db in
-      try WorkbenchRepository.addLogEntry(
-        WorkbenchLogEntryDraft(kind: .observation, body: body),
-        to: workbenchID,
-        in: db,
-        now: now,
-        uuid: { uuid() }
-      )
+      try commitPendingHandoff(in: db) {
+        try WorkbenchRepository.addLogEntry(
+          WorkbenchLogEntryDraft(kind: .observation, body: body),
+          to: workbenchID,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
     }
   }
 
@@ -465,33 +485,37 @@ final class HandoffReviewCoordinator {
     to workbenchID: Workbench.ID
   ) throws {
     _ = try database.write { db in
-      try WorkbenchRepository.addLogEntry(
-        WorkbenchLogEntryDraft(
-          kind: .experiment,
-          body: "",
-          hypothesis: experiment.hypothesis,
-          change: experiment.change,
-          rationale: experiment.rationale
-        ),
-        to: workbenchID,
-        in: db,
-        now: now,
-        uuid: { uuid() }
-      )
+      try commitPendingHandoff(in: db) {
+        try WorkbenchRepository.addLogEntry(
+          WorkbenchLogEntryDraft(
+            kind: .experiment,
+            body: "",
+            hypothesis: experiment.hypothesis,
+            change: experiment.change,
+            rationale: experiment.rationale
+          ),
+          to: workbenchID,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
     }
   }
 
   func overwriteAdjustmentButtonTapped(_ review: RecipeAdjustmentReviewState) -> Result<Void, any Error> {
     do {
       try database.write { db in
-        _ = try RecipeRepository.overwriteRecipeWithAdjustmentProposal(
-          review.proposal,
-          recipeID: review.currentDetail.recipe.id,
-          deliberationBody: review.deliberationBody,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
+        try commitPendingHandoff(in: db) {
+          _ = try RecipeRepository.overwriteRecipeWithAdjustmentProposal(
+            review.proposal,
+            recipeID: review.currentDetail.recipe.id,
+            deliberationBody: review.deliberationBody,
+            in: db,
+            now: now,
+            uuid: { uuid() }
+          )
+        }
       }
       adjustmentReview = nil
       return .success(())
@@ -506,15 +530,17 @@ final class HandoffReviewCoordinator {
   ) -> Result<Void, any Error> {
     do {
       try database.write { db in
-        _ = try RecipeRepository.keepAdjustmentProposalAsVariation(
-          review.proposal,
-          recipeID: review.currentDetail.recipe.id,
-          name: name,
-          deliberationBody: review.deliberationBody,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
+        try commitPendingHandoff(in: db) {
+          _ = try RecipeRepository.keepAdjustmentProposalAsVariation(
+            review.proposal,
+            recipeID: review.currentDetail.recipe.id,
+            name: name,
+            deliberationBody: review.deliberationBody,
+            in: db,
+            now: now,
+            uuid: { uuid() }
+          )
+        }
       }
       adjustmentReview = nil
       return .success(())
@@ -534,12 +560,33 @@ final class HandoffReviewCoordinator {
   func discard(_ review: AIHandoffReview) {
     guard self.review?.handoffID == review.handoffID else { return }
     clearError()
+    pendingHandoff = nil
     self.review = nil
   }
 
   func discardAll() {
     clearError()
+    pendingHandoff = nil
     review = nil
+  }
+
+  func discardPendingHandoff() {
+    pendingHandoff = nil
+  }
+
+  func commitPendingHandoff<T>(in db: Database, operation: () throws -> T) throws -> T {
+    let value = try operation()
+    guard let handoff = pendingHandoff else { return value }
+    if try AIHandoffRepository.handoff(id: handoff.id, in: db) == nil {
+      var imported = handoff
+      imported.importedAt = now
+      imported.status = .imported
+      try AIHandoffRepository.create(imported, in: db)
+    } else {
+      try AIHandoffRepository.markImported(id: handoff.id, at: now, in: db)
+    }
+    pendingHandoff = nil
+    return value
   }
 }
 
@@ -617,13 +664,15 @@ extension HandoffReviewCoordinator {
   ) throws {
     guard draft.hasReviewableContent else { throw HandoffReviewError.emptyDeliverable }
     _ = try database.write { db in
-      try WorkbenchRepository.createDraftRecipe(
-        draft,
-        for: workbenchID,
-        in: db,
-        now: now,
-        uuid: { uuid() }
-      )
+      try commitPendingHandoff(in: db) {
+        try WorkbenchRepository.createDraftRecipe(
+          draft,
+          for: workbenchID,
+          in: db,
+          now: now,
+          uuid: { uuid() }
+        )
+      }
     }
   }
 }

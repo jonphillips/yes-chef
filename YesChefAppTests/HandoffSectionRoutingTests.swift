@@ -130,6 +130,103 @@ struct HandoffSectionRoutingTests {
         return
       }
       #expect(review.variationID == variationID)
+      let stagedRows = try await database.read { db in try AIHandoff.fetchAll(db) }
+      #expect(stagedRows.isEmpty)
+    }
+  }
+
+  @Test
+  @MainActor
+  func unmatchedNoTokenPasteOpensReviewWithoutWritingALedgerRow() async throws {
+    let recipeID = UUID(uuidString: "00000000-0000-0000-0000-000000003933")!
+    let now = Date(timeIntervalSinceReferenceDate: 840_300_100)
+    let coordinator = HandoffReviewCoordinator()
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+      $0.uuid = .incrementing
+      $0.handoffReviewCoordinator = coordinator
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try await database.write { db in
+        try Recipe.insert {
+          Recipe(id: recipeID, title: "No Token", dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+      }
+
+      let transport = HandoffInAppTransport()
+      await transport.pastedResultsReceived(
+        ["\(AIHandoffReturnContract.marker)\nBrown the butter before creaming it."],
+        source: .recipeAdjustment(recipeID)
+      )
+      #expect(transport.isShowingUnmatchedConfirmation)
+      await transport.reviewUnmatchedResult()
+
+      guard case .recipeAdjustmentBrief = coordinator.review else {
+        Issue.record("Expected a recipe-adjustment brief review.")
+        return
+      }
+      let rows = try await database.read { db in try AIHandoff.fetchAll(db) }
+      #expect(rows.isEmpty)
+    }
+  }
+
+  @Test
+  @MainActor
+  func pendingUnmatchedHandoffIsWrittenImportedWithTheFirstReviewCommit() async throws {
+    let recipeID = UUID(uuidString: "00000000-0000-0000-0000-000000003930")!
+    let handoffID = UUID(uuidString: "00000000-0000-0000-0000-000000003931")!
+    let variationID = UUID(uuidString: "00000000-0000-0000-0000-000000003932")!
+    let now = Date(timeIntervalSinceReferenceDate: 840_300_000)
+    let coordinator = HandoffReviewCoordinator()
+    let review = AIHandoffRecipeMakeAheadReview(
+      handoffID: handoffID,
+      recipeID: recipeID,
+      makeAhead: "Toast the spices.",
+      learnings: []
+    )
+    let handoff = AIHandoff(
+      id: handoffID,
+      sourceType: .recipe,
+      sourceID: recipeID,
+      taskType: .recipeMakeAhead,
+      dayOffset: 2,
+      variationID: variationID,
+      createdAt: now,
+      exportedPrompt: ""
+    )
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+      $0.uuid = .incrementing
+      $0.handoffReviewCoordinator = coordinator
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try await database.write { db in
+        try Recipe.insert {
+          Recipe(id: recipeID, title: "Spiced Lentils", dateCreated: now, dateModified: now)
+        }
+        .execute(db)
+      }
+
+      coordinator.present(.recipeMakeAhead(review), pendingHandoff: handoff)
+      let item = try #require(coordinator.reviewItems(for: .recipeMakeAhead(review)).first)
+      try await item.commit(item.unmodifiedApprovedText)
+      try await item.commit(item.unmodifiedApprovedText)
+
+      let rows = try await database.read { db in try AIHandoff.fetchAll(db) }
+      #expect(rows.count == 1)
+      #expect(rows.first?.id == handoffID)
+      #expect(rows.first?.sourceType == .recipe)
+      #expect(rows.first?.sourceID == recipeID)
+      #expect(rows.first?.taskType == .recipeMakeAhead)
+      #expect(rows.first?.variationID == variationID)
+      #expect(rows.first?.dayOffset == 2)
+      #expect(rows.first?.status == .imported)
+      #expect(rows.first?.importedAt == now)
     }
   }
 

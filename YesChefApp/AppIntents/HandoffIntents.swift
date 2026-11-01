@@ -770,14 +770,15 @@ enum HandoffAppOperations {
     }
   }
 
-  static func stageReviewForKnownSource(
+  static func stageUnmatchedReviewForKnownSource(
     source: HandoffExportSource,
     result: String,
     in database: any DatabaseWriter,
     now: Date,
     handoffID: AIHandoff.ID
-  ) async throws -> AIHandoffReviewResult {
+  ) async throws -> (handoff: AIHandoff, result: AIHandoffReviewResult) {
     let contract = try AIHandoffReturnContract.strippingMarker(from: result)
+    let payload = AIHandoffToken.stripping(from: contract.text)?.payload ?? contract.text
     let metadata = source.metadata(handoffID: handoffID)
     let handoff = AIHandoff(
       id: handoffID,
@@ -790,16 +791,10 @@ enum HandoffAppOperations {
       regenerates: source.prepPlanIntent == .regenerate,
       exportedPrompt: ""
     )
-    return try await database.write { db in
-      try AIHandoffRepository.create(handoff, in: db)
-      let review = try AIHandoffIntentImport.stageReview(
-        handoffID: handoff.id,
-        result: contract.text,
-        in: db,
-        now: now
-      )
-      return AIHandoffReviewResult(review: review, warning: contract.warning)
+    let review = try await database.read { db in
+      try AIHandoffIntentImport.stageOnboardReview(handoff: handoff, result: payload, in: db)
     }
+    return (handoff, AIHandoffReviewResult(review: review.review, warning: contract.warning))
   }
 
   static func stageReaderFeedbackReviewForKnownSource(

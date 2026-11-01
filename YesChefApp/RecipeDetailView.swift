@@ -11,12 +11,14 @@ struct RecipeDetailView: View {
   /// layouts, and the cook session) and only one of them mounts an overlay.
   @State private var toastCenter: AppToastCenter
   @State private var isConfirmingBaseRecipeHandoff = false
+  @State private var isVariationManagerPresented = false
   @State private var isPlaybookJumpAvailable = false
   @State private var playbookJumpRequest = UUID()
   let libraryModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
   let isFocusActive: Bool
+  let hostsHandoffReviews: Bool
   let focusButtonTapped: (() -> Void)?
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
@@ -28,6 +30,7 @@ struct RecipeDetailView: View {
     libraryModel: RecipeLibraryModel,
     mealCalendarModel: MealCalendarModel,
     groceryModel: GroceryLibraryModel,
+    hostsHandoffReviews: Bool = false,
     isFocusActive: Bool = false,
     focusButtonTapped: (() -> Void)? = nil,
     onRecipeSelected: @escaping (RecipeDetailPresentation) -> Void = { _ in }
@@ -48,6 +51,7 @@ struct RecipeDetailView: View {
     self.libraryModel = libraryModel
     self.mealCalendarModel = mealCalendarModel
     self.groceryModel = groceryModel
+    self.hostsHandoffReviews = hostsHandoffReviews
     self.isFocusActive = isFocusActive
     self.focusButtonTapped = focusButtonTapped
     self.onRecipeSelected = onRecipeSelected
@@ -83,6 +87,7 @@ struct RecipeDetailView: View {
           onRecipeSelected: onRecipeSelected
         )
       }
+      .handoffReviewDestinations()
     }
     .sheet(item: $model.destination.repairServeWith) { presentation in
       ServeWithRepairSheet(presentation: presentation, save: model.repairServeWith)
@@ -108,6 +113,9 @@ struct RecipeDetailView: View {
       Text(model.errorMessage ?? "Something went wrong.")
     }
     .handoffTransportAlert(handoffTransport)
+    .handoffReviewDestinations(
+      isPresentationEnabled: hostsHandoffReviews && model.destination.workbench == nil && !isVariationManagerPresented
+    )
     .overlay(alignment: .top) {
       AppToastOverlay(toastCenter: toastCenter)
         .ignoresSafeArea(.keyboard)
@@ -141,6 +149,7 @@ struct RecipeDetailView: View {
       model: model,
       handoffTransport: handoffTransport,
       libraryModel: libraryModel,
+      isVariationManagerPresented: $isVariationManagerPresented,
       isPlaybookJumpAvailable: $isPlaybookJumpAvailable,
       playbookJumpRequest: playbookJumpRequest,
       onRecipeSelected: onRecipeSelected
@@ -360,13 +369,13 @@ private struct RecipeReaderView: View {
   let model: RecipeDetailModel
   let handoffTransport: HandoffInAppTransport
   let libraryModel: RecipeLibraryModel
+  @Binding var isVariationManagerPresented: Bool
   @Binding var isPlaybookJumpAvailable: Bool
   let playbookJumpRequest: UUID
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   @State private var compactSection: CompactSection = .ingredients
   @State private var isPhotoGalleryPresented = false
-  @State private var isVariationManagerPresented = false
   @State private var isSummaryExpanded = false
   @State private var promotingVariation: RecipeVariation?
   @State private var splittingOffVariation: RecipeVariation?
@@ -458,6 +467,7 @@ private struct RecipeReaderView: View {
           }
         }
       }
+      .handoffReviewDestinations()
       .presentationDetents([.medium, .large])
     }
     .keepsScreenAwakeWhilePresented()

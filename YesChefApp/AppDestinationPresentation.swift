@@ -1,4 +1,34 @@
+import Dependencies
 import SwiftUI
+
+private struct HandoffReviewDestinationsModifier: ViewModifier {
+  @Dependency(\.handoffReviewCoordinator) private var coordinator
+  var isPresentationEnabled: Bool
+
+  func body(content: Content) -> some View {
+    @Bindable var coordinator = coordinator
+
+    content
+      .sheet(
+        item: gatedBinding($coordinator.review, enabled: isPresentationEnabled),
+        id: \.handoffID,
+        onDismiss: { coordinator.presentPendingAdjustmentReviewAfterReviewDismissal() }
+      ) { review in
+        HandoffReviewSheet(coordinator: coordinator, review: review)
+      }
+      .sheet(
+        item: gatedBinding($coordinator.adjustmentReview, enabled: isPresentationEnabled),
+        onDismiss: { coordinator.discardPendingHandoff() }
+      ) { review in
+        RecipeAdjustmentReviewView(
+          review: review,
+          overwrite: { coordinator.overwriteAdjustmentButtonTapped($0) },
+          keepAsVariation: { coordinator.keepAdjustmentAsVariationButtonTapped($0, name: $1) },
+          saveVariation: { coordinator.saveScopedVariationButtonTapped($0) }
+        )
+      }
+  }
+}
 
 private struct MealCalendarItemEditorDestinationModifier: ViewModifier {
   let mealCalendarModel: MealCalendarModel
@@ -157,6 +187,10 @@ private struct RecipeDetailDestinationsModifier: ViewModifier {
 }
 
 extension View {
+  func handoffReviewDestinations(isPresentationEnabled: Bool = true) -> some View {
+    modifier(HandoffReviewDestinationsModifier(isPresentationEnabled: isPresentationEnabled))
+  }
+
   func mealCalendarItemEditorDestination(
     mealCalendarModel: MealCalendarModel,
     isPresentationEnabled: Bool = true

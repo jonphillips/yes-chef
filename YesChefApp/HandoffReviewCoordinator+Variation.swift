@@ -7,7 +7,7 @@ extension HandoffReviewCoordinator {
     }
     do {
       let derivation = try database.write { db in
-        try RecipeRepository.saveEditedVariation(
+        let derivation = try RecipeRepository.saveEditedVariation(
           variationID,
           resolvedDetail: review.proposedDetail,
           name: variationName,
@@ -15,6 +15,8 @@ extension HandoffReviewCoordinator {
           in: db,
           now: now
         )
+        guard derivation.isRepresentable else { return derivation }
+        return try commitPendingHandoff(in: db) { derivation }
       }
       guard derivation.isRepresentable else {
         return .failure(HandoffReviewError.variationCannotRepresent)
