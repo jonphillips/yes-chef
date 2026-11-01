@@ -601,21 +601,6 @@ public enum GroceryRepository {
 
 public enum PantryRepository {
   @discardableResult
-  public static func ensureDefaultItems(
-    in db: Database,
-    now: Date,
-    uuid: () -> UUID
-  ) throws -> [PantryItem.ID] {
-    guard try PantryItem.fetchCount(db) == 0 else { return [] }
-    return try addItems(
-      GroceryPantryAssumptions.defaultStaples,
-      in: db,
-      now: now,
-      uuid: uuid
-    )
-  }
-
-  @discardableResult
   public static func replaceItems(
     titles: [String],
     in db: Database,
@@ -629,15 +614,38 @@ public enum PantryRepository {
   @discardableResult
   public static func resetToDefaults(
     in db: Database,
-    now: Date,
-    uuid: () -> UUID
+    now: Date
   ) throws -> [PantryItem.ID] {
-    try replaceItems(
-      titles: GroceryPantryAssumptions.defaultStaples,
-      in: db,
-      now: now,
-      uuid: uuid
-    )
+    let stapleTitles = uniquePantryTitles(GroceryPantryAssumptions.defaultStaples)
+    let stapleRows = try stapleTitles.enumerated().compactMap { sortOrder, title -> PantryItem? in
+      guard let canonicalName = CanonicalIngredient.canonicalName(title) else { return nil }
+      let id = DeterministicID.pantryStaple(canonicalName: canonicalName)
+      let existingItem = try PantryItem.find(id).fetchOne(db)
+      return PantryItem(
+        id: id,
+        title: title,
+        notes: nil,
+        isUnlimited: true,
+        thresholdQuantity: nil,
+        thresholdUnit: nil,
+        sortOrder: sortOrder,
+        dateCreated: existingItem?.dateCreated ?? now,
+        dateModified: now
+      )
+    }
+
+    let stapleIDs = Set(stapleRows.map(\.id))
+    let obsoleteIDs = try PantryItem.fetchAll(db)
+      .map(\.id)
+      .filter { !stapleIDs.contains($0) }
+    for obsoleteID in obsoleteIDs {
+      try PantryItem.find(obsoleteID).delete().execute(db)
+    }
+
+    for staple in stapleRows {
+      try PantryItem.upsert { staple }.execute(db)
+    }
+    return stapleRows.map(\.id)
   }
 
   @discardableResult

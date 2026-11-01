@@ -9,6 +9,41 @@ extension RecipeCoreTests {
   @Suite
   struct PantryPolicyTests {
     @Test
+    func pantryStapleIDsAreStableAndDistinctByCanonicalName() {
+      let oliveOilID = DeterministicID.pantryStaple(canonicalName: "olive oil")
+      expectNoDifference(oliveOilID, DeterministicID.pantryStaple(canonicalName: "olive oil"))
+      #expect(oliveOilID != DeterministicID.pantryStaple(canonicalName: "water"))
+    }
+
+    @Test
+    func resettingDefaultsProducesIdenticalDeduplicatedRowsAcrossDatabases() throws {
+      let firstRows = try pantryDefaultsSnapshot()
+      let secondRows = try pantryDefaultsSnapshot()
+      expectNoDifference(firstRows, secondRows)
+
+      let canonicalNames = GroceryPantryAssumptions.defaultStaples
+        .compactMap(CanonicalIngredient.canonicalName)
+      expectNoDifference(firstRows.count, Set(canonicalNames).count)
+      let rowCanonicalNames = firstRows.values.compactMap(CanonicalIngredient.canonicalName)
+      expectNoDifference(rowCanonicalNames.count, Set(rowCanonicalNames).count)
+    }
+
+    @Test
+    func addingAUserPantryItemUsesTheInjectedID() throws {
+      @Dependency(\.defaultDatabase) var database
+      let expectedID = UUID()
+      try database.write { db in
+        let itemID = try PantryRepository.addItem(
+          title: "User's special flour",
+          in: db,
+          now: Date(timeIntervalSinceReferenceDate: 824_000_000),
+          uuid: { expectedID }
+        )
+        expectNoDifference(itemID, expectedID)
+      }
+    }
+
+    @Test
     func policyStatesRoundTripThroughRepository() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 824_000_000)
@@ -66,6 +101,23 @@ extension RecipeCoreTests {
         expectNoDifference(item.isUnlimited, false)
         expectNoDifference(item.thresholdQuantity, nil)
         expectNoDifference(item.thresholdUnit, nil)
+      }
+    }
+
+    private func pantryDefaultsSnapshot() throws -> [String: String] {
+      try withDependencies {
+        try $0.bootstrapDatabase(path: nil, syncMode: .disabled)
+      } operation: {
+        @Dependency(\.defaultDatabase) var database
+        return try database.write { db in
+          _ = try PantryRepository.resetToDefaults(
+            in: db,
+            now: Date(timeIntervalSinceReferenceDate: 824_000_000)
+          )
+          return try PantryItem.fetchAll(db).reduce(into: [:]) { rows, item in
+            rows[item.id.uuidString] = item.title
+          }
+        }
       }
     }
 

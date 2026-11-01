@@ -232,8 +232,10 @@ diff in [`PROD-CUTOVER.md`](PROD-CUTOVER.md) Reference A, not by a hand-kept lis
 is either already in Development or settled there: the pantry thresholds are created in Step 5, and
 `Category.color` is dropped in Step 1. The executed steps are PROD-CUTOVER Steps 5–6.
 
-
 ## Recipe Lenses (ADR-0050 Amendment 1, L1 + L2)
 
 - [ ] **Held ops before the next TestFlight build:** Development remains a cold archive until reset. Create both Lens record types and every field in the CloudKit console (Development), then re-export, diff against [`PROD-CUTOVER.md`](PROD-CUTOVER.md) Reference A, and deploy Development → Production.
 - [ ] **iPad device pass:** Jon checks the Lens shelf view and editor after the schema deploy.
+
+- **Pantry seed collision** (effort `pantry-seed-collision`). In the Pantry, delete the extra "vegetable oil",
+  "water" and "white pepper" rows (either copy of each), then confirm on the other device that each appears once.
