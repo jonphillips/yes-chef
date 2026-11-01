@@ -27,4 +27,6 @@ if [[ ! -x "$qr" ]]; then
   echo "xcodebuild-summary.sh: $qr not found — Yes Chef needs ~/code/jon-platform (see AGENTS.md)." >&2
   exit 1
 fi
-exec "$qr" --label yeschef-xcodebuild xcodebuild "$@"
+# Build against the committed Package.resolved (jon-platform drift-control.md, ADR-0005 D16): a
+# stale or missing pin fails loudly instead of quietly re-resolving to newer packages.
+exec "$qr" --label yeschef-xcodebuild xcodebuild -onlyUsePackageVersionsFromResolvedFile "$@"

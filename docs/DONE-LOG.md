@@ -9,6 +9,11 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-01 — Builds use the committed package pins (`chore/build-against-pins`)
+
+`check-drift.sh` and `xcodebuild-summary.sh` pass `-onlyUsePackageVersionsFromResolvedFile`, so every scripted build uses the `Package.resolved` tracked since #407, or fails saying it's stale. A clone with a leftover resolution can no longer fail `check-drift` in a way a clean checkout doesn't (jon-platform ADR-0005 D16). Verified with `check-drift.sh` and the generic iOS build.
+
+---
 ## 2026-11-01 — Sync activity log (`effort/sync-activity-log`)
 
 Added a capped, local JSON activity ledger and app-lifetime recorder for sync launches, scene changes, fetch transitions, and in-fetch samples. The Settings → Sync detail now shows arrival rates, zero-row fetches, a CSV export, and counts for all synced tables; the file lives in Application Support and is excluded from backup. Added Core ledger tests and app recorder tests.
