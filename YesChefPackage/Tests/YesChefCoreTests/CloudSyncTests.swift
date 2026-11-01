@@ -162,6 +162,45 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func resettingPantryStaplesTwiceKeepsTheirSyncMetadataActive() throws {
+      let database = try cloudSyncTestDatabase(at: temporaryCloudSyncDatabaseURL())
+      let syncEngine = try YesChefCloudSync.makeSyncEngine(
+        for: database,
+        startImmediately: false
+      )
+      let firstResetAt = Date(timeIntervalSinceReferenceDate: 813_400_000)
+      let secondResetAt = Date(timeIntervalSinceReferenceDate: 813_500_000)
+
+      try database.write { db in
+        _ = try PantryRepository.resetToDefaults(in: db, now: firstResetAt)
+      }
+      let dateCreatedByID = try database.read { db in
+        try Dictionary(uniqueKeysWithValues: PantryItem.fetchAll(db).map { ($0.id, $0.dateCreated) })
+      }
+
+      try database.write { db in
+        _ = try PantryRepository.resetToDefaults(in: db, now: secondResetAt)
+      }
+
+      try database.read { db in
+        let pantryItems = try PantryItem.fetchAll(db)
+        let pantryIDs = Set(pantryItems.map(\.id))
+        let pantryMetadata = try SyncMetadata.fetchAll(db).filter { metadata in
+          metadata.recordType == PantryItem.tableName
+            && pantryIDs.contains { id in
+              metadata.recordPrimaryKey.caseInsensitiveCompare(id.uuidString) == .orderedSame
+            }
+        }
+
+        #expect(pantryMetadata.count == pantryItems.count)
+        #expect(pantryMetadata.allSatisfy { !$0._isDeleted })
+        #expect(pantryItems.allSatisfy { $0.dateCreated == dateCreatedByID[$0.id] })
+        #expect(pantryItems.allSatisfy { $0.dateModified == secondResetAt })
+      }
+      #expect(!syncEngine.isRunning)
+    }
+
+    @Test
     func shareExtensionConnectionInstallsStoppedEngineTriggers() throws {
       let databaseURL = try temporaryCloudSyncDatabaseURL()
       let recipeID = SampleUUIDSequence.uuid(601)

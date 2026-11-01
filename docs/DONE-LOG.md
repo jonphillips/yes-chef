@@ -11,7 +11,7 @@ Newest first.
 ---
 ## Pantry starters no longer seed with positional IDs (`effort/pantry-seed-collision`)
 
-**2026-11-01. Schema-free.** Removed automatic live pantry seeding and the retired UserDefaults pantry import. The empty pantry now offers **Add common staples**, and reset staples use UUIDv5 IDs derived from canonical names so separate devices converge on the same rows. User-added items retain their injected random IDs. Core tests cover stable IDs, cross-database reset equality, canonical deduplication, and user IDs; the live-context app test confirms a fresh pantry stays empty. `check-drift.sh`, `YesChefTests` (84), and the generic iOS build passed. Jon's duplicate-row cleanup and cross-device confirmation remain owed in `device-passes.md`.
+**2026-11-01. Schema-free.** Removed automatic live pantry seeding and the retired UserDefaults pantry import. The empty pantry now offers **Add common staples**, and reset staples use UUIDv5 IDs derived from canonical names so separate devices converge on the same rows. Reset upserts existing staples in place, preserving `dateCreated` and active sync metadata; user-added items retain their injected random IDs. Core and CloudSync tests cover stable IDs, cross-database reset equality, canonical deduplication, user IDs, and repeat-reset metadata; the live-context app test confirms a fresh pantry stays empty. `check-drift.sh`, `YesChefTests` (84), and the generic iOS build passed. Jon's duplicate-row cleanup and cross-device confirmation remain owed in `device-passes.md`.
 
 ---
 
