@@ -68,7 +68,7 @@ final class YesChefIssueReporter: IssueReporter, @unchecked Sendable {
 
   init(onReport: @escaping (String, StaticString, UInt) -> Void = { message, fileID, line in
     AppLog.sync.error(
-      "SQLiteData issue: \(message, privacy: .public) at \(String(describing: fileID), privacy: .public):\(line, privacy: .public)"
+      "Issue: \(message, privacy: .public) at \(String(describing: fileID), privacy: .public):\(line, privacy: .public)"
     )
   }) {
     self.onReport = onReport
