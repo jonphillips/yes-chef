@@ -17,8 +17,14 @@ struct DatabaseBackupTests {
     #expect(YesChefCloudSync.databaseBackupConfiguration.identifyingTableNames == ["recipes"])
     #expect(YesChefCloudSync.databaseBackupConfiguration.declaredSchemaVersion == registeredCount)
 #if DEBUG
+    #expect(YesChefCloudSync.databaseBackupConfiguration.displayName == "Yes Chef Dev")
+    #expect(YesChefCloudSync.databaseBackupConfiguration.backupFilenamePrefix == "YesChef-Dev-Backup-")
+    #expect(YesChefCloudSync.databaseBackupConfiguration.variant == .development)
     #expect(YesChefCloudSync.automaticBackupConfiguration == nil)
 #else
+    #expect(YesChefCloudSync.databaseBackupConfiguration.displayName == "Yes Chef")
+    #expect(YesChefCloudSync.databaseBackupConfiguration.backupFilenamePrefix == "YesChef-Backup-")
+    #expect(YesChefCloudSync.databaseBackupConfiguration.variant == .production)
     #expect(YesChefCloudSync.automaticBackupConfiguration?.filenamePrefix == "YesChef-Auto-")
     #expect(YesChefCloudSync.automaticBackupConfiguration?.libraryCountTableName == "recipes")
     #expect(YesChefCloudSync.automaticBackupConfiguration?.retention == .init(daily: 14, monthly: 6))

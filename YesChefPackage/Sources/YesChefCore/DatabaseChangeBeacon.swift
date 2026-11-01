@@ -1,28 +1,30 @@
 import Foundation
 
 public enum DatabaseChangeBeacon {
-  private static let darwinName = "group.com.jonphillips.yeschef.databaseDidChange"
-
   public static let didChange = Notification.Name("YesChefDatabaseDidChange")
 
-  public static func post() {
+  public static func notificationName(appGroupIdentifier: String) -> String {
+    "\(appGroupIdentifier).databaseDidChange"
+  }
+
+  public static func post(appGroupIdentifier: String) {
     CFNotificationCenterPostNotification(
       CFNotificationCenterGetDarwinNotifyCenter(),
-      CFNotificationName(darwinName as CFString),
+      CFNotificationName(notificationName(appGroupIdentifier: appGroupIdentifier) as CFString),
       nil,
       nil,
       true
     )
   }
 
-  public static func startObserving() {
+  public static func startObserving(appGroupIdentifier: String) {
     CFNotificationCenterAddObserver(
       CFNotificationCenterGetDarwinNotifyCenter(),
       nil,
       { _, _, _, _, _ in
         NotificationCenter.default.post(name: DatabaseChangeBeacon.didChange, object: nil)
       },
-      darwinName as CFString,
+      notificationName(appGroupIdentifier: appGroupIdentifier) as CFString,
       nil,
       .deliverImmediately
     )

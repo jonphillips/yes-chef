@@ -11,6 +11,16 @@ import SQLiteData
 /// gate keys) and `makeSyncEngine`, which lists the app's synced `@Table` types and so
 /// can't lift. Everything else forwards to `CloudSync`, passing `configuration`.
 public enum YesChefCloudSync {
+#if DEBUG
+  private static let backupDisplayName = "Yes Chef Dev"
+  private static let backupFilenamePrefix = "YesChef-Dev-Backup-"
+  private static let backupVariant = DatabaseBackupVariant.development
+#else
+  private static let backupDisplayName = "Yes Chef"
+  private static let backupFilenamePrefix = "YesChef-Backup-"
+  private static let backupVariant = DatabaseBackupVariant.production
+#endif
+
   /// The per-app constants — the only thing that differed from galavant's copy.
   public static let configuration = CloudSyncConfiguration(
     containerIdentifier: "iCloud.com.jonphillips.yeschef",
@@ -22,14 +32,15 @@ public enum YesChefCloudSync {
 
   /// Yes Chef's store identity and migration closure for the shared backup workflow.
   public static let databaseBackupConfiguration = DatabaseBackupConfiguration(
-    displayName: "Yes Chef",
-    backupFilenamePrefix: "YesChef-Backup-",
+    displayName: backupDisplayName,
+    backupFilenamePrefix: backupFilenamePrefix,
     preRestoreFilenamePrefix: "YesChef-PreRestore-",
     restoreStagingFilenamePrefix: "YesChef-Restore-",
     identifyingTableNames: ["recipes"],
     declaredSchemaVersion: 54,
     lastPreRestoreDefaultsKey: "YesChefDatabaseBackupLastPreRestorePath",
     cloudSync: configuration,
+    variant: backupVariant,
     liveStoreURL: { try YesChefDatabaseStorage.liveSharedDatabaseURL() },
     migrate: { try DependencyValues.migrateRestoreCandidate(at: $0) }
   )

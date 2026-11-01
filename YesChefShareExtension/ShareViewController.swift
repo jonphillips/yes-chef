@@ -150,7 +150,9 @@ final class ShareCaptureModel {
           exceeding: pendingChangeCountBeforeSave
         )
       }
-      DatabaseChangeBeacon.post()
+      DatabaseChangeBeacon.post(
+        appGroupIdentifier: try YesChefDatabaseStorage.liveAppGroupIdentifier()
+      )
       didSave = true
       extensionContext?.completeRequest(returningItems: nil)
     } catch is CancellationError {

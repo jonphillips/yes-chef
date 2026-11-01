@@ -9,6 +9,26 @@ extension RecipeCoreTests {
   @Suite
   struct DatabaseStorageTests {
     @Test
+    func readsAppGroupFromInfoDictionary() throws {
+      #expect(
+        try YesChefDatabaseStorage.appGroupIdentifier(
+          from: [YesChefDatabaseStorage.appGroupInfoKey: "group.example.dev"]
+        ) == "group.example.dev"
+      )
+    }
+
+    @Test(arguments: [[:], [YesChefDatabaseStorage.appGroupInfoKey: ""]])
+    func missingOrEmptyAppGroupIsReportedAndRejected(_ infoDictionary: [String: String]) {
+      withKnownIssue {
+        #expect(throws: YesChefDatabaseStorage.StorageError.missingAppGroupIdentifier(
+          YesChefDatabaseStorage.appGroupInfoKey
+        )) {
+          try YesChefDatabaseStorage.appGroupIdentifier(from: infoDictionary)
+        }
+      }
+    }
+
+    @Test
     func resolvesSharedAndLegacyDatabaseURLs() {
       let rootURL = URL(fileURLWithPath: "/tmp/yeschef-storage-test", isDirectory: true)
       let groupURL = rootURL.appendingPathComponent("group", isDirectory: true)

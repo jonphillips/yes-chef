@@ -70,6 +70,7 @@ struct SettingsView: View {
       Section("Developer") {
         seedCoverageRow
 #if DEBUG
+        Text("Yes Chef Dev · CloudKit Development")
         modelCallInventoryRow
 #endif
       }
