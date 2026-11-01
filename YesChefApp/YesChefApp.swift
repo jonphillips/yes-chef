@@ -1,3 +1,4 @@
+import IssueReporting
 import LLMClientKit
 import SwiftUI
 import WebExtractorKit
@@ -45,6 +46,7 @@ struct YesChefApp: App {
       $0.modelCallRecordCollector = modelCallRecordCollector
 #endif
     }
+    YesChefIssueReporter.install()
     YesChefCloudSync.persistManualEnablementFromLaunchEnvironment()
     Task {
       _ = await YesChefCloudSync.startIfManuallyEnabled()
@@ -58,5 +60,34 @@ struct YesChefApp: App {
     WindowGroup {
       AppContainer()
     }
+  }
+}
+
+final class YesChefIssueReporter: IssueReporter, @unchecked Sendable {
+  private let onReport: (String, StaticString, UInt) -> Void
+
+  init(onReport: @escaping (String, StaticString, UInt) -> Void = { message, fileID, line in
+    AppLog.sync.error(
+      "SQLiteData issue: \(message, privacy: .public) at \(String(describing: fileID), privacy: .public):\(line, privacy: .public)"
+    )
+  }) {
+    self.onReport = onReport
+  }
+
+  static func install(_ reporter: YesChefIssueReporter = YesChefIssueReporter()) {
+    guard !IssueReporters.current.contains(where: { $0 is YesChefIssueReporter }) else { return }
+    IssueReporters.current.append(reporter)
+  }
+
+  func reportIssue(
+    _ message: @autoclosure () -> String?,
+    severity: IssueSeverity,
+    fileID: StaticString,
+    filePath: StaticString,
+    line: UInt,
+    column: UInt
+  ) {
+    guard let message = message() else { return }
+    onReport(message, fileID, line)
   }
 }
