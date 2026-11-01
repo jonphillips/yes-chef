@@ -219,7 +219,7 @@ struct PowerBrowserModelTests {
   }
 
   @Test
-  func savingEditedLensQueryRestoresLensSelectionWithoutReloadingStaleBase() async throws {
+  func savingShelfQueryThenReSelectingLensLoadsBaseQuery() async throws {
     let now = Date(timeIntervalSinceReferenceDate: 904_920_000)
     let lensID = SampleUUIDSequence.uuid(94_921)
     let shelfID = SampleUUIDSequence.uuid(94_922)
@@ -249,8 +249,10 @@ struct PowerBrowserModelTests {
       model.saveQueryEditsButtonTapped()
       #expect(model.selectedLensID == lensID)
       #expect(model.query == editedQuery)
-      model.lensSelectionChanged(lensID)
-      #expect(model.query == editedQuery)
+      let updatedLensRecord = try await database.read { db in
+        try RecipeLens.find(lensID).fetchOne(db)
+      }
+      let updatedLens = try #require(updatedLensRecord)
 
       let shelfEdit = RecipeBrowserQuery(text: "shelf edit")
       model.query = shelfEdit
@@ -258,8 +260,9 @@ struct PowerBrowserModelTests {
       model.saveQueryEditsButtonTapped()
       #expect(model.selectedLensID == lensID)
       #expect(model.query == shelfEdit)
-      model.lensSelectionChanged(lensID)
-      #expect(model.query == shelfEdit)
+      model.lensSelectionChanged(nil)
+      model.lensSelectionChanged(lensID, using: updatedLens)
+      #expect(model.query == editedQuery)
     }
   }
 

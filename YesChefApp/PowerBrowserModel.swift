@@ -111,8 +111,6 @@ final class PowerBrowserModel {
   @ObservationIgnored private var cachedDerivations: CachedDerivations?
   @ObservationIgnored private var cachedLensEvaluation: CachedLensEvaluation?
   @ObservationIgnored private var hasSeededFacetExpansion = false
-  @ObservationIgnored var pendingRestoredLensID: RecipeLens.ID?
-
   var query = RecipeBrowserQuery()
   var expandedFacetIDs: Set<Facet.ID> = []
   var totalTimeAtMostText = ""

@@ -5,12 +5,6 @@ import YesChefCore
 
 extension PowerBrowserModel {
   func lensSelectionChanged(_ id: RecipeLens.ID?, using lensOverride: RecipeLens? = nil) {
-    if id != nil, id == pendingRestoredLensID {
-      pendingRestoredLensID = nil
-      selectedLensID = id
-      queryEditTarget = nil
-      return
-    }
     selectedLensID = id
     if id == nil, queryEditTarget != nil { return }
     if id != nil { queryEditTarget = nil }
@@ -68,7 +62,6 @@ extension PowerBrowserModel {
         }
       }
       self.queryEditTarget = nil
-      pendingRestoredLensID = restoredLensID
       selectedLensID = restoredLensID
     } catch { lensError = error.localizedDescription }
   }

@@ -4,7 +4,7 @@
 Implemented ADR-0050 Amendment 1 with synced Lens and shelf records, independent query intersection, remainder evaluation, saved Lens management, and the iPad Power Browser shelf surface. Added the Development-to-Production held operations and iPad device gates to `docs/device-passes.md`.
 
 - Branch: `effort/recipe-lenses`
-- Verification: `scripts/check-drift.sh`, generic iOS build, and `YesChefTests` passed.
+- Verification: SwiftLint and 738 package tests passed in `scripts/check-drift.sh`; its app build-for-testing stage hit the unpinned SwiftNavigation CasePaths trait resolver error. The generic iOS build and all 87 `YesChefTests` passed using the committed Package.resolved versions.
 
 Archive of completed efforts, the implemented-behavior checkpoint, and strategic
 background. **Read-rarely, append-on-approval.** No dispatch instruction should ever

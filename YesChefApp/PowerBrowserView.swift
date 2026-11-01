@@ -352,14 +352,15 @@ private struct PowerBrowserLensToolbar: ToolbarContent {
   let model: PowerBrowserModel
 
   var body: some ToolbarContent {
-    @Bindable var model = model
     ToolbarItem(placement: .principal) {
-      Picker("Recipe Lens", selection: $model.selectedLensID) {
+      Picker("Recipe Lens", selection: Binding(
+        get: { model.selectedLensID },
+        set: { model.lensSelectionChanged($0) }
+      )) {
         Text("All recipes").tag(Optional<RecipeLens.ID>.none)
         ForEach(model.lensLibrary.lenses) { lens in Text(lens.name).tag(Optional(lens.id)) }
       }
       .pickerStyle(.menu)
-      .onChange(of: model.selectedLensID) { _, id in model.lensSelectionChanged(id) }
     }
     ToolbarItem(placement: .primaryAction) {
       if model.isEditingSavedQuery {

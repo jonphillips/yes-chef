@@ -103,10 +103,48 @@ extension RecipeCoreTests {
         #expect(try RecipeLensQueryCodec.decode(updatedLens.baseQuery) == RecipeBrowserQuery(
           facetSelections: [.init(facetID: facetID, categoryIDs: [targetID])]
         ))
-        // A loose-label query does not use the source's facet namespace and stays unresolved.
         #expect(try RecipeLensQueryCodec.decode(updatedShelf.query) == RecipeBrowserQuery(
           facetSelections: [.init(facetID: facetID, categoryIDs: [targetID])]
         ))
+      }
+    }
+
+    @Test
+    func deletingMergedLooseLabelRepointsLensAndShelfQueries() throws {
+      @Dependency(\.defaultDatabase) var database
+      let looseTargetID = SampleUUIDSequence.uuid(82_532)
+      let lensID = SampleUUIDSequence.uuid(82_533)
+      let shelfID = SampleUUIDSequence.uuid(82_534)
+      let now = Date(timeIntervalSinceReferenceDate: 82_500_000)
+      let sourceQuery = RecipeBrowserQuery(looseLabelIDs: [looseSaladID])
+      let targetQuery = RecipeBrowserQuery(looseLabelIDs: [looseTargetID])
+
+      try database.write { db in
+        try seedRetagTaxonomy(in: db)
+        try YesChefCore.Category.insert {
+          YesChefCore.Category(id: looseTargetID, name: "Target loose", sortOrder: 1, dateCreated: now)
+        }.execute(db)
+        let lens = RecipeLens(
+          id: lensID, name: "Loose merge", baseQuery: try RecipeLensQueryCodec.encode(sourceQuery),
+          sortOrder: 0, dateCreated: now, dateModified: now
+        )
+        let shelf = RecipeLensShelf(
+          id: shelfID, lensID: lensID, title: "Loose shelf",
+          query: try RecipeLensQueryCodec.encode(sourceQuery), sortOrder: 0
+        )
+        try RecipeLens.insert { lens }.execute(db)
+        try RecipeLensShelf.insert { shelf }.execute(db)
+
+        _ = try CategoryRepository.moveRecipes(
+          fromCategoryID: looseSaladID, toCategoryID: looseTargetID, deletingSource: true, in: db
+        )
+
+        let updatedLensRecord = try RecipeLens.find(lensID).fetchOne(db)
+        let updatedShelfRecord = try RecipeLensShelf.find(shelfID).fetchOne(db)
+        let updatedLens = try #require(updatedLensRecord)
+        let updatedShelf = try #require(updatedShelfRecord)
+        #expect(try RecipeLensQueryCodec.decode(updatedLens.baseQuery) == targetQuery)
+        #expect(try RecipeLensQueryCodec.decode(updatedShelf.query) == targetQuery)
       }
     }
 
