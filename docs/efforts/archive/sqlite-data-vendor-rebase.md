@@ -1,6 +1,6 @@
 # Effort — Rebase the vendored SQLiteData onto 1.12.1
 
-Status: Ready. The parked-retry device pass cleared 2026-11-01: the iPhone's first sync completed on the patched build.
+Status: Complete — 2026-11-01, PR #425. Device pass owed (device-passes.md).
 Summary: `Vendor/sqlite-data` is upstream 1.8.2 plus our patches, four minor releases behind 1.12.1; re-vendor
 1.12.1 with the same patches so we carry our changes on a current base, and lift the StructuredQueries cap.
 Related: [archive/sqlite-data-reference-violation-patch.md](sqlite-data-reference-violation-patch.md)
