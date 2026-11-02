@@ -20,8 +20,9 @@ The Yes Chef carry-forwards touch the following upstream surfaces:
 3. `SyncEngine.upsertFromServerRecord` refreshes a parked record's saved server copy when a newer
    version arrives. `SyncEngine` also adds `didRetryParkedRecordScopesAfterStart` and
    `fallbackRecordCursorsByScope` state. `MockCloudDatabase` records request sizes and can simulate
-   throttling for the parked-retry tests. The upstream issue for this behavior is pending the
-   architect. Related context: [SQLiteData discussion #334](https://github.com/pointfreeco/sqlite-data/discussions/334).
+   throttling for the parked-retry tests. Tracking:
+   [issue #565](https://github.com/pointfreeco/sqlite-data/issues/565). Related context:
+   [SQLiteData discussion #334](https://github.com/pointfreeco/sqlite-data/discussions/334).
 
 The Yes Chef-only stored-value regression lives in
 `Tests/SQLiteDataTests/StoredValuesCompatibilityTests.swift`; keep it when re-vendoring, along
@@ -31,5 +32,5 @@ The package uses upstream's iOS 16 / macOS 13 / tvOS 16 / watchOS 9 platform flo
 `StructuredQueries` requirement starts at 0.39.1, the floor required by this base.
 
 Exit condition: remove this vendor and return to the remote SQLiteData package only when an
-upstream release fixes both [#547](https://github.com/pointfreeco/sqlite-data/issues/547) and the
-parked-record re-fetch behavior (the architect will add the tracking issue link here).
+upstream release fixes both [#547](https://github.com/pointfreeco/sqlite-data/issues/547) and
+[#565](https://github.com/pointfreeco/sqlite-data/issues/565).
