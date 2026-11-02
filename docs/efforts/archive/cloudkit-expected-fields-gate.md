@@ -6,11 +6,11 @@ Commit the list of CloudKit fields the app writes, keep it current with a Core t
 to upload when Production is missing any of them.
 
 Schema-free. No app behavior change. Two PRs, jon-platform first, the same shape as
-[archive/testflight-app-groups.md](archive/testflight-app-groups.md).
-Related: [`PROD-CUTOVER.md`](../PROD-CUTOVER.md) Step 13 (the schema-deploy rule) and Reference A (the manual
+[archive/testflight-app-groups.md](testflight-app-groups.md).
+Related: [`PROD-CUTOVER.md`](../../PROD-CUTOVER.md) Step 13 (the schema-deploy rule) and Reference A (the manual
 diff this automates) · jon-platform `scripts/testflight` (`schema_gate`) and `docs/ios/testflight.md` ·
 `YesChefPackage/Tests/YesChefCoreTests/SchemaColumnTests.swift` ·
-[ADR-0059 Amendment 2](../decisions/ADR-0059-yes-chef-dev-variant.md) (Development is kept)
+[ADR-0059 Amendment 2](../../decisions/ADR-0059-yes-chef-dev-variant.md) (Development is kept)
 
 ## Why
 
@@ -118,7 +118,7 @@ same way `SchemaColumnTests` does, and compare it with the committed file, found
 - **PR 2:** `CloudKitExpectedFieldsTests` passes against the committed file. Running it with
   `YESCHEF_RECORD_CLOUDKIT_FIELDS=1` on a clean tree produces no diff. Deleting a line from the file makes the
   test fail with that line named.
-- **Verification** per [`verification.md`](../verification.md): `scripts/check-drift.sh`. No simulator run is
+- **Verification** per [`verification.md`](../../verification.md): `scripts/check-drift.sh`. No simulator run is
   needed, since there's no app-target change.
 - **Jon's check (added to `device-passes.md` by PR 2):** run `testflight --dry-run` from a clean `main`. The
   schema gate passes, and its output shows the expected-fields check ran. The executor can't reach CloudKit.
