@@ -1,12 +1,12 @@
 # Effort — Remove the temporary Recover Missing Instruction Steps action
 
-Status: Ready
+Status: Done — 2026-11-02 ([PR #428](https://github.com/jonphillips/yes-chef/pull/428))
 Summary: The production cut is done, so remove PROD-CUTOVER Step 10a's temporary Settings action, its model, its
 Core type and its tests. Nothing else uses them.
 
 Schema-free. No migration. The rows it recovered stay; only the action goes.
-Related: [`PROD-CUTOVER.md`](../PROD-CUTOVER.md) Steps 10a and 13 ·
-[archive/recover-lost-instruction-steps.md](archive/recover-lost-instruction-steps.md) (what it added)
+Related: [`PROD-CUTOVER.md`](../../PROD-CUTOVER.md) Steps 10a and 13 ·
+[archive/recover-lost-instruction-steps.md](recover-lost-instruction-steps.md) (what it added)
 
 ## Why
 
@@ -28,7 +28,7 @@ Left in place, it's a Settings button that restores rows from an arbitrary backu
 ## Done when
 
 - The grep above is empty, and nothing else in the app refers to the removed types.
-- **Verification** per [`verification.md`](../verification.md): `scripts/check-drift.sh`, the elevated generic iOS
+- **Verification** per [`verification.md`](../../verification.md): `scripts/check-drift.sh`, the elevated generic iOS
   build, and `YesChefTests`, since this removes an app-target model. A `YesChefTests` pass means exit 0 with no
   "Restarting after unexpected exit" line.
 - In `PROD-CUTOVER.md` Step 13, tick the removal item.
