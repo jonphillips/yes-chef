@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-02 — Find rows missing from iCloud (`effort/missing-from-icloud-check`)
+
+Added the on-demand iCloud missing-row check, local persistence of unresolved findings, and an Upload again action. CloudSyncKit PR #108 merged; Galavant compatibility PR #195 is open.
+
+Verification passed: 72 CloudSyncKit tests; Yes Chef drift checks with 749 package tests and 8 MCP tests; all 100 YesChefTests; and the generic iOS build.
+
+---
 ## 2026-11-02 — Remove temporary instruction-step recovery action (`effort/remove-instruction-step-recovery`)
 
 Removed the temporary Settings recovery action, its app model, Core implementation, and Core tests. The production cut's recovered instruction rows remain in place. PROD-CUTOVER Step 13 records the removal.
