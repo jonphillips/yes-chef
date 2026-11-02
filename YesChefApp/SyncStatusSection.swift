@@ -131,14 +131,14 @@ struct SyncStatusDetailView: View {
             Task { await model.checkForLeftovers() }
           } label: {
             HStack {
-              Text("Check iCloud for leftovers")
+              Text("Check iCloud")
               if model.isCheckingLeftovers {
                 Spacer()
                 ProgressView()
               }
             }
           }
-          .disabled(model.isCheckingLeftovers || model.isDeletingLeftovers)
+          .disabled(model.isCheckingLeftovers || model.isDeletingLeftovers || model.isReuploadingMissing)
 
           if let error = model.leftoverCheckError {
             Text(error)
@@ -152,10 +152,39 @@ struct SyncStatusDetailView: View {
               .textSelection(.enabled)
           }
 
+          if let summary = model.missingReuploadSummary {
+            Text(summary)
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          }
+
           if let report = model.leftoverReport {
-            if report.leftovers.isEmpty {
-              Text("No leftover records found.")
+            if report.leftovers.isEmpty && report.missing.isEmpty {
+              Text("No missing or leftover records found.")
                 .foregroundStyle(.secondary)
+            }
+            if !report.missing.isEmpty {
+              VStack(alignment: .leading, spacing: 7) {
+                Text("\(report.missing.count) records on this device are missing from iCloud")
+                  .font(.headline)
+                ForEach(report.missingCountsByTable.keys.sorted(), id: \.self) { type in
+                  LabeledContent(type, value: report.missingCountsByTable[type, default: 0].formatted())
+                    .font(.footnote)
+                }
+                Button {
+                  Task { await model.reuploadMissingRows() }
+                } label: {
+                  HStack {
+                    Text("Upload again")
+                    if model.isReuploadingMissing {
+                      Spacer()
+                      ProgressView()
+                    }
+                  }
+                }
+                .disabled(model.isReuploadingMissing || model.isCheckingLeftovers)
+              }
+              .padding(.vertical, 4)
             }
             ForEach(model.leftoverDisplayGroups) { group in
               VStack(alignment: .leading, spacing: 7) {
@@ -206,9 +235,9 @@ struct SyncStatusDetailView: View {
             }
           }
         } header: {
-          Text("Lost deletes")
+          Text("iCloud check")
         } footer: {
-          Text("This on-demand check compares iCloud with this device after fetching changes. Review every record before deleting; other devices will remove the copies after they sync.")
+          Text("This on-demand check compares iCloud with this device after fetching changes. Upload again queues missing rows for retry. Review every leftover record before deleting; other devices will remove the copies after they sync.")
         }
 
         Section {
@@ -367,13 +396,14 @@ struct SyncStatusDetailView: View {
     case let .localOnly(reason): reason
     case let .syncing(pending): "\(pending) change\(pending == 1 ? "" : "s") uploading"
     case .downloading: "Downloading changes from iCloud"
-    case let .needsAttention(notUploaded, notApplied):
+    case let .needsAttention(notUploaded, notApplied, missingFromICloud):
       [
         notUploaded > 0 ? "\(notUploaded) not uploaded" : nil,
         notApplied > 0 ? "\(notApplied) couldn’t be saved here" : nil,
+        missingFromICloud > 0 ? "\(missingFromICloud) missing from iCloud" : nil,
       ].compactMap(\.self).joined(separator: " · ")
     case let .error(message): message
-    case .upToDate: "Check iCloud for leftover deletes"
+    case .upToDate: "Check iCloud for missing rows or leftover deletes"
     case .disabled: nil
     }
   }

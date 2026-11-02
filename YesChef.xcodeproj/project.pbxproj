@@ -136,6 +136,7 @@
 		AC5E169D7FD4E2A968FE17C3 /* AppMainLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D076ED31F43B8378E0DFA2F /* AppMainLayout.swift */; };
 		ADDF8E556B8570CC0D68D5A0 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = 87DE389964638E7777ABB383 /* SQLiteData */; };
 		AE11AE8D6A7D9F8E06642477 /* GroceryPantryReviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C2EE75870C5C9AAD099505 /* GroceryPantryReviewViews.swift */; };
+		AEC289EFB725BB6BF91258AB /* MissingICloudRowsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3893F864052C16388BABE48 /* MissingICloudRowsStoreTests.swift */; };
 		AEEFD13CB08E83C9958ACC8E /* AppDestinationPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10717DBD3251B160509FD4E9 /* AppDestinationPresentation.swift */; };
 		B1A4B0832475BA500093C538 /* ChatSurfaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4802BA56B714BCEF8679A289 /* ChatSurfaceTests.swift */; };
 		B2021B723DFF4B090A0EDFBF /* ChatStarterMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A9BA1822C178E165616DFE6 /* ChatStarterMenu.swift */; };
@@ -344,6 +345,7 @@
 		BF6D7AE0E516607E7C801612 /* HandoffReviewCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffReviewCoordinator.swift; sourceTree = "<group>"; };
 		C04525676D7E3DBE58E299E4 /* AppIcon-Dev.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = "AppIcon-Dev.icon"; sourceTree = "<group>"; };
 		C0D3B7B8B0BBC62599125F27 /* MenuPrepPlanEditingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuPrepPlanEditingViews.swift; sourceTree = "<group>"; };
+		C3893F864052C16388BABE48 /* MissingICloudRowsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissingICloudRowsStoreTests.swift; sourceTree = "<group>"; };
 		C39EB2615AF4AAC9AFF1F6C3 /* RecipeCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeCaptureView.swift; sourceTree = "<group>"; };
 		C469ECE48285073F98E35D10 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		C53BF3A6DACBE4FF07F30717 /* AppNavigationHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNavigationHelpers.swift; sourceTree = "<group>"; };
@@ -468,6 +470,7 @@
 				17E669665E13FA2090694CB0 /* HandoffSectionRoutingTests.swift */,
 				9E9F0E4818A532AB62F41BA8 /* LearnedAreaAuditModelTests.swift */,
 				A09330F46A0E8E28834FD02B /* MenuWideColumnLayoutTests.swift */,
+				C3893F864052C16388BABE48 /* MissingICloudRowsStoreTests.swift */,
 				669BA3E9D8C0F3631F217603 /* OnboardChatFinalizationTests.swift */,
 				F7E31E429F06F0A09CF37D1E /* PantryLaunchTests.swift */,
 				F84AAEC891DC74D674D7B576 /* PowerBrowserModelTests.swift */,
@@ -843,6 +846,7 @@
 				36753CBE212E39908AA91B4E /* HandoffSectionRoutingTests.swift in Sources */,
 				3987101D8A2C769EC719BCDC /* LearnedAreaAuditModelTests.swift in Sources */,
 				2332533F5D83A3EF69B7F960 /* MenuWideColumnLayoutTests.swift in Sources */,
+				AEC289EFB725BB6BF91258AB /* MissingICloudRowsStoreTests.swift in Sources */,
 				24F9A4FFD871728DA7782411 /* OnboardChatFinalizationTests.swift in Sources */,
 				01C464BAEB9D49FF3E96CFD3 /* PantryLaunchTests.swift in Sources */,
 				8F4A9F45FB3ECDBDD882EFA0 /* PowerBrowserModelTests.swift in Sources */,

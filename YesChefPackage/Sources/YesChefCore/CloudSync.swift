@@ -304,6 +304,13 @@ public enum YesChefCloudSync {
     try await CloudSync.deleteLeftovers(recordIDs, using: client)
   }
 
+  public static func reuploadMissing(
+    _ rows: [CloudSyncMissingRow],
+    in database: any DatabaseWriter
+  ) async throws -> CloudSyncReuploadMissingResult {
+    try await CloudSync.reuploadMissing(rows, tables: syncedTables, in: database)
+  }
+
   // MARK: Engine construction (domain-bound — stays here)
 
   /// Construct the sync engine over Yes Chef's synced tables. This is the one method
