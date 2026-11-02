@@ -2,7 +2,7 @@
 
 **Status: complete, 2026-11-01.** Yes Chef runs on CloudKit Production on both devices. The expected-fields gate
 is shipped ([archived brief](efforts/archive/cloudkit-expected-fields-gate.md)); the remaining follow-ups are live
-efforts: [`remove-instruction-step-recovery.md`](efforts/remove-instruction-step-recovery.md) and
+efforts: [`remove-instruction-step-recovery.md`](efforts/archive/remove-instruction-step-recovery.md) and
 [`missing-from-icloud-check.md`](efforts/missing-from-icloud-check.md).
 
 **Purpose.** This is the ordered, reversible procedure for taking Yes Chef from a dev-signed build on CloudKit
@@ -373,7 +373,7 @@ arriving in about 15 minutes.
       change and any expected field missing from both environments. Use Reference A's manual diff only to review
       dead fields before a deploy.
 - [x] Remove the temporary **Recover Missing Instruction Steps** action (Step 10a), marked `TEMPORARY`.
-      *Queued as [`efforts/remove-instruction-step-recovery.md`](efforts/remove-instruction-step-recovery.md).*
+      *Queued as [`efforts/archive/remove-instruction-step-recovery.md`](efforts/archive/remove-instruction-step-recovery.md).*
 - [x] Brief a check for rows a device believes are on the server but aren't. Step 11's 24 `recipeSources`
       sat behind a green status, and only a comparison of record IDs between devices found them.
       *Designed as [`efforts/missing-from-icloud-check.md`](efforts/missing-from-icloud-check.md).*

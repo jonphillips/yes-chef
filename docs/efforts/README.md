@@ -25,8 +25,6 @@ discoverable"):
 
 ## Live
 
-- [remove-instruction-step-recovery.md](remove-instruction-step-recovery.md) — **Ready** · Remove PROD-CUTOVER
-  Step 10a's temporary Settings action, its model, Core type and tests, now that the cut is done.
 - [missing-from-icloud-check.md](missing-from-icloud-check.md) — **Ready** · The on-demand iCloud check also
   lists local rows the server doesn't have (the Step 11 `recipeSources` case), with **Upload again**.
 - [chat-access-mcp.md](chat-access-mcp.md) — **Blocked** on [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md)

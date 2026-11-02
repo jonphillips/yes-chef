@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-02 — Remove temporary instruction-step recovery action (`effort/remove-instruction-step-recovery`)
+
+Removed the temporary Settings recovery action, its app model, Core implementation, and Core tests. The production cut's recovered instruction rows remain in place. PROD-CUTOVER Step 13 records the removal.
+
+Verification: `scripts/check-drift.sh` passed (SwiftLint, 749 package tests, 8 MCP tests, app test target build); generic iOS build passed; `YesChefTests` passed (97 tests).
+
+---
 ## 2026-11-01 — TestFlight refuses builds missing expected CloudKit fields (`effort/cloudkit-expected-fields-gate`)
 
 Committed the expected fields written by all 34 synced record types and added a Core test that derives them from a fully migrated path-backed database. `testflight.conf` opts the TestFlight gate into the committed list; PROD-CUTOVER Step 13 now describes both missing-from-Development and missing-from-both protections. The gate implementation landed first in [jon-platform PR #106](https://github.com/jonphillips/jon-platform/pull/106).

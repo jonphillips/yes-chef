@@ -1,6 +1,6 @@
-# Next Up — Remove the temporary Recover Missing Instruction Steps action
+# Next Up — Find rows this device thinks are in iCloud but aren't
 
-**Slices:** effort `remove-instruction-step-recovery`
-**Briefs:** [docs/efforts/remove-instruction-step-recovery.md](efforts/remove-instruction-step-recovery.md)
+**Slices:** effort `missing-from-icloud-check`
+**Briefs:** [docs/efforts/missing-from-icloud-check.md](efforts/missing-from-icloud-check.md)
 **Done when:** per the brief
 **Owed:** see [device-passes.md](device-passes.md)
