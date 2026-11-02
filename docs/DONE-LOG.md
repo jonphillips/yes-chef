@@ -15,7 +15,7 @@ Re-vendored SQLiteData from upstream 1.12.1 (`aa613accbe882b561f26e37a348a8f42e9
 
 Verification: full vendored SQLiteData suite (322 tests passed; 2 known issues), `scripts/check-drift.sh` (SwiftLint, 749 package tests and 8 MCP tests passed; app test target compiled and linked), generic iOS build, and `YesChefTests` (97 tests passed). Xcode package resolution succeeds with StructuredQueries 0.39.2, one IssueReporting module, and no remote `sqlite-data` pin.
 
-Device pass owed — see `device-passes.md`.
+Device pass partly cleared 2026-11-01 (Jon): library counts unchanged, edits round-trip between devices, and a backup restores on Yes Chef Dev. The `@Fetch*` refresh check (Power Browser, recipe list, calendar) is still owed — see `device-passes.md`.
 
 ---
 ## 2026-11-01 — Production cutover complete (ADR-0056)
