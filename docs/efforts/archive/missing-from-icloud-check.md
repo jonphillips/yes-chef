@@ -1,6 +1,6 @@
 # Effort — Find rows this device thinks are in iCloud but aren't
 
-Status: Ready
+Status: Done — 2026-11-02 ([PR #429](https://github.com/jonphillips/yes-chef/pull/429)); iPad pass owed.
 Summary: The 24 `recipeSources` from PROD-CUTOVER Step 11 sat behind a green Sync status: the iPad treated them as
 uploaded, and Production didn't have them. Extend the on-demand "Check iCloud for leftovers" pass so it also lists
 local rows missing from the server, with an **Upload again** action.
@@ -10,7 +10,7 @@ Related: [`PROD-CUTOVER.md`](../../PROD-CUTOVER.md) Step 11 (the 24 rows) · jon
 `Packages/CloudSyncKit/Sources/CloudSyncKit/CloudSyncLeftoverCheck.swift` (`leftoverCheck`,
 `CloudKitLeftoverClient.recordHeaders`) and `SyncFailureReport.swift` (`requeue`) · jon-platform
 `docs/ios/persistence-and-sync.md` § SQLiteData fails silently ·
-[archive/sync-failure-surfacing.md](sync-failure-surfacing.md)
+[sync-failure-surfacing.md](sync-failure-surfacing.md)
 
 ## Why
 

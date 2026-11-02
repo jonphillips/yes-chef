@@ -158,33 +158,39 @@ struct SyncStatusDetailView: View {
               .foregroundStyle(.secondary)
           }
 
-          if let report = model.leftoverReport {
-            if report.leftovers.isEmpty && report.missing.isEmpty {
-              Text("No missing or leftover records found.")
-                .foregroundStyle(.secondary)
-            }
-            if !report.missing.isEmpty {
-              VStack(alignment: .leading, spacing: 7) {
-                Text("\(report.missing.count) records on this device are missing from iCloud")
-                  .font(.headline)
-                ForEach(report.missingCountsByTable.keys.sorted(), id: \.self) { type in
-                  LabeledContent(type, value: report.missingCountsByTable[type, default: 0].formatted())
-                    .font(.footnote)
-                }
-                Button {
-                  Task { await model.reuploadMissingRows() }
-                } label: {
-                  HStack {
-                    Text("Upload again")
-                    if model.isReuploadingMissing {
-                      Spacer()
-                      ProgressView()
-                    }
+          // Driven by the stored finding, not the report, so Upload again is still offered
+          // after the sheet closes and reopens while the status row stays yellow.
+          if !model.missingRows.isEmpty {
+            let countsByTable = Dictionary(model.missingRows.map { ($0.recordType, 1) }, uniquingKeysWith: +)
+            VStack(alignment: .leading, spacing: 7) {
+              Text(model.missingCount == 1
+                ? "1 record on this device is missing from iCloud"
+                : "\(model.missingCount) records on this device are missing from iCloud")
+                .font(.headline)
+              ForEach(countsByTable.keys.sorted(), id: \.self) { type in
+                LabeledContent(type, value: countsByTable[type, default: 0].formatted())
+                  .font(.footnote)
+              }
+              Button {
+                Task { await model.reuploadMissingRows() }
+              } label: {
+                HStack {
+                  Text("Upload again")
+                  if model.isReuploadingMissing {
+                    Spacer()
+                    ProgressView()
                   }
                 }
-                .disabled(model.isReuploadingMissing || model.isCheckingLeftovers)
               }
-              .padding(.vertical, 4)
+              .disabled(model.isReuploadingMissing || model.isCheckingLeftovers)
+            }
+            .padding(.vertical, 4)
+          }
+
+          if let report = model.leftoverReport {
+            if report.leftovers.isEmpty && model.missingRows.isEmpty {
+              Text("No missing or leftover records found.")
+                .foregroundStyle(.secondary)
             }
             ForEach(model.leftoverDisplayGroups) { group in
               VStack(alignment: .leading, spacing: 7) {

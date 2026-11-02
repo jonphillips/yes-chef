@@ -2,8 +2,8 @@
 
 **Status: complete, 2026-11-01.** Yes Chef runs on CloudKit Production on both devices. The expected-fields gate
 is shipped ([archived brief](efforts/archive/cloudkit-expected-fields-gate.md)), and so is the removal of Step 10a's
-temporary action ([archived brief](efforts/archive/remove-instruction-step-recovery.md)). The remaining follow-up is
-a live effort: [`missing-from-icloud-check.md`](efforts/archive/missing-from-icloud-check.md).
+temporary action ([archived brief](efforts/archive/remove-instruction-step-recovery.md)), and the check for rows
+missing from iCloud ([archived brief](efforts/archive/missing-from-icloud-check.md)); its iPad pass is owed.
 
 **Purpose.** This is the ordered, reversible procedure for taking Yes Chef from a dev-signed build on CloudKit
 **Development** to a TestFlight build on CloudKit **Production**, **without re-importing the dogfood library**.

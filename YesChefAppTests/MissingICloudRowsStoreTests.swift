@@ -18,7 +18,9 @@ struct MissingICloudRowsStoreTests {
 
     #expect(model.missingCount == 2)
     #expect(model.missingRows == rows)
-    #expect(SyncHealthModel(defaults: defaults).missingRows == rows)
+    let reopened = SyncHealthModel(defaults: defaults)
+    #expect(reopened.missingRows == rows)
+    #expect(reopened.health.missingFromICloudCount == 2)
   }
 
   @Test
