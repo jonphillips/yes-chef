@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-01 — TestFlight refuses builds missing expected CloudKit fields (`effort/cloudkit-expected-fields-gate`)
+
+Committed the expected fields written by all 34 synced record types and added a Core test that derives them from a fully migrated path-backed database. `testflight.conf` opts the TestFlight gate into the committed list; PROD-CUTOVER Step 13 now describes both missing-from-Development and missing-from-both protections. The gate implementation landed first in [jon-platform PR #106](https://github.com/jonphillips/jon-platform/pull/106).
+
+Verification: the recorder regenerated the same file and deliberately failed; deleting `aiSettings id` made the test fail with that line named; the clean expected-fields test passed; `scripts/check-drift.sh` passed (750 Core tests, 8 MCP tests, app test target compiled and linked).
+
+---
 ## 2026-11-01 — SQLiteData 1.12.1 rebase (`effort/sqlite-data-vendor-rebase`)
 
 Re-vendored SQLiteData from upstream 1.12.1 (`aa613accbe882b561f26e37a348a8f42e92cd398`) and carried forward both Yes Chef sync fixes in separate commits. The reference-violation patch is the [#389 implementation](https://github.com/jonphillips/yes-chef/pull/389), re-applied unchanged. It is equivalent in effect to the keep-and-requeue half of upstream #548, not its code, and excludes #548's `quotaExceeded` retry. The parked-record patch retries saved local copies with a bounded CloudKit fallback. Added CloudKit regression tests and a legacy date, UUID, and string read/write compatibility test.

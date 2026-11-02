@@ -1,8 +1,8 @@
 # Production Cutover Runbook
 
-**Status: complete, 2026-11-01.** Yes Chef runs on CloudKit Production on both devices. The leftover follow-ups
-are live efforts: [`cloudkit-expected-fields-gate.md`](efforts/cloudkit-expected-fields-gate.md),
-[`remove-instruction-step-recovery.md`](efforts/remove-instruction-step-recovery.md) and
+**Status: complete, 2026-11-01.** Yes Chef runs on CloudKit Production on both devices. The expected-fields gate
+is shipped ([archived brief](efforts/archive/cloudkit-expected-fields-gate.md)); the remaining follow-ups are live
+efforts: [`remove-instruction-step-recovery.md`](efforts/remove-instruction-step-recovery.md) and
 [`missing-from-icloud-check.md`](efforts/missing-from-icloud-check.md).
 
 **Purpose.** This is the ordered, reversible procedure for taking Yes Chef from a dev-signed build on CloudKit
@@ -367,11 +367,11 @@ arriving in about 15 minutes.
       (ADR-0059 Amendment 2).
 - [x] Ship Yes Chef Dev's Debug identity and variant-aware backups (ADR-0059; the implementation is recorded in
       [`efforts/archive/yes-chef-dev-variant.md`](efforts/archive/yes-chef-dev-variant.md)). The device pass remains owed. **Done 2026-11-01, ahead of the rest of this step (ADR-0059 Amendment 1).**
-- **Standing rule, not a step: every TestFlight build waits on a schema deploy.** A slice that adds a synced table or column,
+- **Standing rule, not a step: every TestFlight build waits on the schema gate.** A slice that adds a synced table or column,
       or is the first to write a non-nil value to one, must create it in Development (from a simulator build or
-      the console) and deploy before its TestFlight build ships. `testflight` refuses an undeployed Development
-      change. A field missing from *both* environments isn't caught until
-      [`efforts/cloudkit-expected-fields-gate.md`](efforts/cloudkit-expected-fields-gate.md) ships.
+      the console) and deploy before its TestFlight build ships. `testflight` refuses both an undeployed Development
+      change and any expected field missing from both environments. Use Reference A's manual diff only to review
+      dead fields before a deploy.
 - [x] Remove the temporary **Recover Missing Instruction Steps** action (Step 10a), marked `TEMPORARY`.
       *Queued as [`efforts/remove-instruction-step-recovery.md`](efforts/remove-instruction-step-recovery.md).*
 - [x] Brief a check for rows a device believes are on the server but aren't. Step 11's 24 `recipeSources`
@@ -417,8 +417,9 @@ The old hand-kept "Prod-schema promotion list" (formerly in `device-passes.md`) 
 - Export: `xcrun cktool export-schema --team-id 7MQEE539G9 --container-id iCloud.com.jonphillips.yeschef --environment development --output-file yeschef-dev.ckdb`.
 - Diff: for each table in `syncedTables`, the expected fields are each on-disk column, plus
   `sqlitedata_icloud_userModificationTime` and its per-column `_<column>` companion, plus `<column>_hash` for each
-  BLOB column. A field in the export that isn't expected is dead, and an expected field the export lacks is
-  missing. Ignore CloudKit's `___` system fields and the `Users` type.
+  BLOB column. The app's committed `cloudkit-expected-fields.txt` and TestFlight gate check that Production has
+  every expected field. A field in the export that isn't expected is dead; review those before a deploy. Ignore
+  CloudKit's `___` system fields and the `Users` type.
 
 **The diff (Development export of 2026-10-26 against the 36 `syncedTables`).** The 2026-10-26 backup found
 `equipment` and `recipeEquipment` empty and 23 columns that have never held a value. The export settles which of
