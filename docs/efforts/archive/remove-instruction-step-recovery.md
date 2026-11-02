@@ -1,6 +1,6 @@
 # Effort — Remove the temporary Recover Missing Instruction Steps action
 
-Status: Ready
+Status: Done — 2026-11-02 ([PR #428](https://github.com/jonphillips/yes-chef/pull/428))
 Summary: The production cut is done, so remove PROD-CUTOVER Step 10a's temporary Settings action, its model, its
 Core type and its tests. Nothing else uses them.
 
