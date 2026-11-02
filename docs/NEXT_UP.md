@@ -1,8 +1,6 @@
-# Next Up — Rebase the vendored SQLiteData onto 1.12.1
+# Next Up — `testflight` refuses a build whose synced fields Production lacks
 
-**Slices:** effort `sqlite-data-vendor-rebase`, one Yes Chef PR.
-**Briefs:** [docs/efforts/sqlite-data-vendor-rebase.md](efforts/sqlite-data-vendor-rebase.md)
-**Done when:** per the brief's "Done when"; verification per the brief and `docs/verification.md`.
+**Slices:** effort `cloudkit-expected-fields-gate`
+**Briefs:** [docs/efforts/cloudkit-expected-fields-gate.md](efforts/cloudkit-expected-fields-gate.md)
+**Done when:** per the brief
 **Owed:** see [device-passes.md](device-passes.md)
-**Notes:** Unblocked 2026-11-01 when the parked-retry device pass cleared. Commits in the brief's order. Replaces
-the sync engine's code, so the PR escalates to Jon for merge. Start from a fresh `main`.

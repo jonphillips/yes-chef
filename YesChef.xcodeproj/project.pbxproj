@@ -1344,9 +1344,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/pointfreeco/swift-structured-queries";
 			requirement = {
-				kind = versionRange;
-				maximumVersion = 0.38.0;
-				minimumVersion = 0.34.0;
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.39.1;
 			};
 		};
 		8905B07D7FD63BCF3E395911 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {

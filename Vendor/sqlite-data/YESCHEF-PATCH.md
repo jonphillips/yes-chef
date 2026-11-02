@@ -1,25 +1,36 @@
-# Yes Chef patch: SQLiteData reference violations
+# Yes Chef patches: SQLiteData 1.12.1
 
-Vendored from upstream commit `26471412f457f2c640bf5759a63870353a19f9e1` (tag 1.8.2).
+Vendored from upstream tag `1.12.1`, commit `aa613accbe882b561f26e37a348a8f42e92cd398`.
+The vendor contains upstream `Package.swift`, all `Package@swift-*.swift` manifests,
+`LICENSE`, `Sources/`, and `Tests/`; it excludes `Examples/`.
 
-The changed upstream functions are `SyncEngine.handleSentRecordZoneChanges`,
-`SyncEngine.handleFetchedRecordZoneChanges`, and `SyncEngine.upsertFromServerRecord` in
-`Sources/SQLiteData/CloudKit/SyncEngine.swift`. The first patch preserves and re-queues a child
-and its parent when CloudKit rejects the child with `referenceViolation` and the parent has no
-server-confirmed record. The parked-record patch keeps each parked row's latest downloaded copy,
-retries those copies locally when their parent tables change (and all parked copies once after
-startup), and uses at most one bounded CloudKit fetch for missing or unusable saved copies.
+The Yes Chef carry-forwards touch the following upstream surfaces:
 
-The manifests (`Package.swift`, `Package@swift-6.0.swift`) also raise `platforms` to
-iOS 17 / macOS 14 / tvOS 17 / watchOS 10. swift-structured-queries 0.35.0 raised its own
-floors to iOS 16 (so upstream 1.8.2's iOS 13 declaration fails to link
-`StructuredQueriesSQLite`) and gated `octetLength()` behind iOS 17 (which
-`CloudKit/Internal/Triggers.swift` uses). First seen in `jon-platform-workspace`, which
-resolves 0.35+. Every consumer targets iOS 27 / macOS 15+, so nothing loses support.
+1. `SyncEngine.handleSentRecordZoneChanges` carries forward Yes Chef's [#389 patch](https://github.com/jonphillips/yes-chef/pull/389),
+   re-applied unchanged. It preserves and re-queues a child and parent when the child save fails
+   with `referenceViolation`, the parent row exists locally, and the parent's last known server
+   record has no change tag. This is equivalent in effect to the keep-and-requeue half of
+   [upstream PR #548](https://github.com/pointfreeco/sqlite-data/pull/548), not its code: this
+   patch reads the parent key from the local row, requires the parent row to exist, and clears both
+   saved server copies before re-queuing. It does not port #548's `quotaExceeded` retry. Tracking:
+   [issue #547](https://github.com/pointfreeco/sqlite-data/issues/547).
+2. `SyncEngine.handleFetchedRecordZoneChanges` retries parked records from saved server copies
+   when their parent tables change, and retries every parked copy once on startup. It uses one
+   bounded CloudKit fetch only when a saved copy is missing or unusable.
+3. `SyncEngine.upsertFromServerRecord` refreshes a parked record's saved server copy when a newer
+   version arrives. `SyncEngine` also adds `didRetryParkedRecordScopesAfterStart` and
+   `fallbackRecordCursorsByScope` state. `MockCloudDatabase` records request sizes and can simulate
+   throttling for the parked-retry tests. Tracking:
+   [issue #565](https://github.com/pointfreeco/sqlite-data/issues/565). Related context:
+   [SQLiteData discussion #334](https://github.com/pointfreeco/sqlite-data/discussions/334).
 
-Upstream tracking: [issue #547](https://github.com/pointfreeco/sqlite-data/issues/547) and
-[PR #548](https://github.com/pointfreeco/sqlite-data/pull/548).
+The Yes Chef-only stored-value regression lives in
+`Tests/SQLiteDataTests/StoredValuesCompatibilityTests.swift`; keep it when re-vendoring, along
+with the CloudKit mock and regression tests.
 
-Exit condition: delete this vendor directory and return to the remote SQLiteData package only
-when an upstream release fixes both #547 and the parked-record re-fetch behavior (upstream issue
-link to be added by the architect).
+The package uses upstream's iOS 16 / macOS 13 / tvOS 16 / watchOS 9 platform floors. Yes Chef's
+`StructuredQueries` requirement starts at 0.39.1, the floor required by this base.
+
+Exit condition: remove this vendor and return to the remote SQLiteData package only when an
+upstream release fixes both [#547](https://github.com/pointfreeco/sqlite-data/issues/547) and
+[#565](https://github.com/pointfreeco/sqlite-data/issues/565).
