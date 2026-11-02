@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-01 — SQLiteData 1.12.1 rebase (`effort/sqlite-data-vendor-rebase`)
+
+Re-vendored SQLiteData from upstream 1.12.1 (`aa613accbe882b561f26e37a348a8f42e92cd398`) and carried forward both Yes Chef sync fixes in separate commits. The reference-violation patch ports only #548's keep-and-requeue behavior; the parked-record patch retries saved local copies with a bounded CloudKit fallback. Added CloudKit regression tests and a legacy date, UUID, and string read/write compatibility test.
+
+Verification: full vendored SQLiteData suite (322 tests passed; 2 known issues), `scripts/check-drift.sh` (SwiftLint, 749 package tests and 8 MCP tests passed; app test target compiled and linked), generic iOS build, and `YesChefTests` (97 tests passed). Xcode package resolution succeeds with StructuredQueries 0.39.2, one IssueReporting module, and no remote `sqlite-data` pin.
+
+---
 ## 2026-11-01 — Production cutover complete (ADR-0056)
 
 Yes Chef is off CloudKit Development. Both devices run TestFlight builds against Production and hold the same
