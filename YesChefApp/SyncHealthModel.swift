@@ -37,8 +37,14 @@ final class SyncHealthModel {
   private(set) var leftoverDisplayGroups: [LeftoverDisplayGroup] = []
   private(set) var leftoverCheckError: String?
   private(set) var leftoverDeleteSummary: String?
+  private(set) var missingRows: [CloudSyncMissingRow]
+  private(set) var isReuploadingMissing = false
+  private(set) var missingReuploadSummary: String?
+  private let missingRowsStore: MissingICloudRowsStore
+  private let missingRowsReuploader: (@MainActor ([CloudSyncMissingRow]) async throws -> Int)?
 
   var leftoverCount: Int { leftoverReport?.leftovers.count ?? 0 }
+  var missingCount: Int { missingRows.count }
 
   #if DEBUG
   private(set) var isDiagnosingSyncFailure = false
@@ -55,12 +61,20 @@ final class SyncHealthModel {
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored @Dependency(\.defaultSyncEngine) private var syncEngine
 
-  init() {
+  init(
+    defaults: UserDefaults = .standard,
+    missingRowsReuploader: (@MainActor ([CloudSyncMissingRow]) async throws -> Int)? = nil
+  ) {
+    let store = MissingICloudRowsStore(defaults: defaults)
+    missingRowsStore = store
+    self.missingRowsReuploader = missingRowsReuploader
+    missingRows = store.rows
     health = SyncHealth(
       isManuallyEnabled: YesChefCloudSync.isManuallyEnabled(),
       account: .couldNotDetermine,
       isEngineRunning: false,
-      pendingChangeCount: 0
+      pendingChangeCount: 0,
+      missingFromICloudCount: store.rows.count
     )
   }
 
@@ -89,6 +103,12 @@ final class SyncHealthModel {
 
   private func refreshOnce() async {
     let isManuallyEnabled = YesChefCloudSync.isManuallyEnabled()
+    if !isManuallyEnabled {
+      missingRowsStore.clear()
+      missingRows = []
+    } else {
+      missingRows = missingRowsStore.rows
+    }
     let isEngineRunning = syncEngine.isRunning
     // The download counterpart to the pending (upload) count: true while the engine is
     // pulling changes down. Without it a fresh device pulling a large library reads
@@ -124,6 +144,7 @@ final class SyncHealthModel {
       isFetchingChanges: isFetchingChanges,
       notUploadedCount: failureReport?.notUploadedCount ?? 0,
       notAppliedCount: failureReport?.notAppliedCount ?? 0,
+      missingFromICloudCount: missingRows.count,
       lastError: lastStartError ?? syncFailureReportError
     )
   }
@@ -191,6 +212,8 @@ final class SyncHealthModel {
         }
         leftoverReport = report
         leftoverDisplayGroups = groups
+        recordMissingRows(report.missing)
+        await refresh()
       }
     } catch {
       leftoverCheckError = "Couldn’t check iCloud for leftovers: \(error.localizedDescription)"
@@ -622,6 +645,42 @@ final class SyncHealthModel {
   }
 }
 
+extension SyncHealthModel {
+  /// Queue the latest finding, then let the ordinary not-uploaded report own status.
+  func reuploadMissingRows() async {
+    guard !isReuploadingMissing, !missingRows.isEmpty else { return }
+    isReuploadingMissing = true
+    missingReuploadSummary = nil
+    defer { isReuploadingMissing = false }
+    do {
+      let count: Int
+      if let missingRowsReuploader {
+        count = try await missingRowsReuploader(missingRows)
+      } else {
+        count = try await YesChefCloudSync.reuploadMissing(missingRows, in: database).changedCount
+      }
+      recordMissingRows([])
+      if var report = leftoverReport {
+        report.missing = []
+        report.missingCountsByTable = [:]
+        leftoverReport = report
+      }
+      missingReuploadSummary = "Queued \(count) \(count == 1 ? "record" : "records") to upload again."
+      await refresh()
+    } catch {
+      leftoverCheckError = "Couldn’t upload the missing records again: \(error.localizedDescription)"
+    }
+  }
+
+  func clearMissingRowsAfterRestore() { recordMissingRows([]) }
+
+  func recordMissingRows(_ rows: [CloudSyncMissingRow]) {
+    missingRows = rows
+    missingRowsStore.replace(with: rows)
+    health.missingFromICloudCount = rows.count
+  }
+}
+
 /// One synced table's local row count, for the Sync detail diagnostics list.
 struct RecordCount: Identifiable, Sendable {
   let name: String
@@ -649,4 +708,30 @@ struct LeftoverDisplayRow: Identifiable, Sendable {
   let kind: String
   let detail: String
   let tableName: String
+}
+
+/// Device-local persistence for findings that must keep Sync yellow after the detail
+/// sheet closes. This deliberately lives outside the synced recipe database.
+struct MissingICloudRowsStore {
+  private let defaults: UserDefaults
+  private let key = "YesChef.missingICloudRows.v1"
+
+  init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+
+  var rows: [CloudSyncMissingRow] {
+    guard let data = defaults.data(forKey: key),
+          let rows = try? JSONDecoder().decode([CloudSyncMissingRow].self, from: data)
+    else { return [] }
+    return rows
+  }
+
+  func replace(with rows: [CloudSyncMissingRow]) {
+    guard !rows.isEmpty, let data = try? JSONEncoder().encode(rows) else {
+      clear()
+      return
+    }
+    defaults.set(data, forKey: key)
+  }
+
+  func clear() { defaults.removeObject(forKey: key) }
 }

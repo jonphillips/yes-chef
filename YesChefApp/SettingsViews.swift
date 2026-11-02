@@ -212,6 +212,7 @@ struct SettingsView: View {
       Button("Restore", role: .destructive) {
         Task {
           if await backupRestore.restorePreparedBackup() {
+            syncHealth.clearMissingRowsAfterRestore()
             isPresentingRestoreRestartCover = true
           }
         }

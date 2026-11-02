@@ -1,16 +1,16 @@
 # Effort — Find rows this device thinks are in iCloud but aren't
 
-Status: Ready
+Status: Done — 2026-11-02 ([PR #429](https://github.com/jonphillips/yes-chef/pull/429)); iPad pass owed.
 Summary: The 24 `recipeSources` from PROD-CUTOVER Step 11 sat behind a green Sync status: the iPad treated them as
 uploaded, and Production didn't have them. Extend the on-demand "Check iCloud for leftovers" pass so it also lists
 local rows missing from the server, with an **Upload again** action.
 
 Schema-free. Changes CloudSyncKit (jon-platform), which Galavant also uses, so the PRs are escalated to Jon.
-Related: [`PROD-CUTOVER.md`](../PROD-CUTOVER.md) Step 11 (the 24 rows) · jon-platform
+Related: [`PROD-CUTOVER.md`](../../PROD-CUTOVER.md) Step 11 (the 24 rows) · jon-platform
 `Packages/CloudSyncKit/Sources/CloudSyncKit/CloudSyncLeftoverCheck.swift` (`leftoverCheck`,
 `CloudKitLeftoverClient.recordHeaders`) and `SyncFailureReport.swift` (`requeue`) · jon-platform
 `docs/ios/persistence-and-sync.md` § SQLiteData fails silently ·
-[archive/sync-failure-surfacing.md](archive/sync-failure-surfacing.md)
+[sync-failure-surfacing.md](sync-failure-surfacing.md)
 
 ## Why
 
@@ -101,6 +101,6 @@ opposite case, records in iCloud with no local row. The same listing answers thi
   - the Sync detail model presenting missing rows and calling the repair;
   - the stored finding surviving a new model, which keeps the status yellow;
   - **Upload again** and a clean check each clearing it.
-  Verification per [`verification.md`](../verification.md).
+  Verification per [`verification.md`](../../verification.md).
 - **Galavant:** builds against the changed CloudSyncKit, with no behavior change until it adopts the UI.
 - **Device pass (Jon):** on the iPad, **Check iCloud** reports 0 missing, and the status row stays green.
