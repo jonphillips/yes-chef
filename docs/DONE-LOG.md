@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-03 — Hand-off routing moves into the tool descriptions (`fix/handoff-tool-descriptions`)
+
+- **Result:** S3a's device gate showed that ChatGPT doesn't use the helper's server instructions. On Finalize, a chat outside the Project printed a bare revision brief, with no token, no contract line and no tool call. `stage_handoff_return`'s description now says to call it instead of printing and spells out the envelope. `stage_recipe`'s description now says it's only for conversations with no token.
+- **Verification:** Helper package: 13 tests passed; check-drift.sh: lint clean, 749 Core tests passed (2 known issues), and app test-target build passed.
+- **Owed:** the S3a device gate in [device-passes.md](device-passes.md), rerun after reinstalling the helper.
+
+---
 ## 2026-11-03 — Chat access S3a — stage hand-off returns (`effort/chat-access-s3a`)
 
 - **Result:** Added the token-routed MCP staging tool, shared hand-off instructions, and a JSON-only recipe inbox projection.
