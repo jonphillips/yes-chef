@@ -175,8 +175,15 @@ private enum AIHandoffReviewStager {
     case .menuComplement:
       let returned = AIHandoffReturn.menuComplement(from: payload, dayCount: menu.dayCount)
       guard !returned.plan.items.isEmpty else { throw AIHandoffIntentImportError.emptyPlan }
+      let plan = handoff.dayOffset.map { dayOffset in
+        MenuComplementPlan(items: returned.plan.items.map { suggestion in
+          var suggestion = suggestion
+          suggestion.dayOffset = dayOffset
+          return suggestion
+        })
+      } ?? returned.plan
       return .menuComplement(AIHandoffMenuComplementReview(
-        handoffID: handoff.id, menuID: menu.id, plan: returned.plan, unparsedBlocks: returned.unparsedBlocks
+        handoffID: handoff.id, menuID: menu.id, plan: plan, unparsedBlocks: returned.unparsedBlocks
       ))
     case .recipe, .recipeMakeAhead, .chefItUp, .serveWith, .adjustRecipe, .mealPlanMakeAheadStrategy,
       .mealPlanComplement, .readerFeedbackCuration, .workbenchCompare, .workbenchExperiments,

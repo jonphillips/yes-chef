@@ -233,6 +233,38 @@ struct ChatAccessInboxModelTests {
     }
   }
 
+  @Test func dayScopedComplementReturnStaysOnItsDay() async throws {
+    let (folder, defaults, suiteName, temporary) = try fixture()
+    defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }
+    let handoffID = UUID(), menuID = UUID()
+    let text = "YC-HANDOFF: \(handoffID.uuidString)\nNote: Charred cucumber salad\nDay 1 - Dinner"
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Date(timeIntervalSince1970: 1_800_000_000)
+      $0.uuid = .incrementing
+      $0.handoffReviewCoordinator = HandoffReviewCoordinator()
+      $0.chatAccessInboxFileClient = .init(read: { _ in text }, openAndClaim: { _, _ in "" },
+        claim: { _, _ in }, maintain: { _, _, _ in })
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      @Dependency(\.handoffReviewCoordinator) var coordinator
+      try await database.write { db in
+        try Menu.insert { Menu(id: menuID, title: "Dinner", dayCount: 3, dateCreated: .now, dateModified: .now) }.execute(db)
+        try AIHandoffRepository.create(AIHandoff(id: handoffID, sourceType: .menu, sourceID: menuID,
+          taskType: .menuComplement, dayOffset: 2, createdAt: .now, exportedPrompt: "Complement: Dinner, Day 3"), in: db)
+      }
+      let url = folder.inboxURL.appending(path: "20261022T180000Z-\(handoffID.uuidString).ycreturn")
+      let model = ChatAccessInboxModel(folder: folder, defaults: defaults)
+      await model.updateReturnRows(from: [.init(url: url, name: url.lastPathComponent, isCurrent: true)])
+      await model.open(try #require(model.returnRows.first))
+      guard case let .menuComplement(review) = coordinator.review else {
+        Issue.record("expected a menu complement review")
+        return
+      }
+      #expect(review.plan.items.map(\.dayOffset) == [2])
+    }
+  }
+
   private func fixture() throws -> (ChatAccessFolder, UserDefaults, String, URL) {
     let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     let suiteName = "ChatAccessInboxModelTests-\(UUID().uuidString)"

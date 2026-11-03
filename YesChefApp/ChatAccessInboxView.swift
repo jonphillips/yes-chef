@@ -70,7 +70,7 @@ struct ChatAccessInboxSection: View {
         Spacer()
         if row.downloadState == .downloading { Text("Downloading…").font(.caption).foregroundStyle(.secondary) }
       }
-      Text(row.stagedAt.formatted(date: .omitted, time: .shortened)).font(.caption).foregroundStyle(.secondary)
+      Text(row.stagedAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
       if case .capture = row.destination {
         Text("This return can only be opened in the capture editor that started it.")
           .font(.footnote).foregroundStyle(.secondary)
