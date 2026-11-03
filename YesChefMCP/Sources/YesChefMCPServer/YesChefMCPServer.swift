@@ -115,7 +115,7 @@ public enum YesChefMCPServer {
       tools: [
         MCPTool(
           name: "stage_recipe",
-          description: "Stage one schema.org Recipe in Yes Chef for review and saving.",
+          description: "Stage one schema.org Recipe in Yes Chef for review and saving. Only for a conversation with no `\(AIHandoffToken.prefix)` line; a hand-off conversation finalizes through `stage_handoff_return`.",
           inputSchema: .object([
             "type": .string("object"),
             "properties": .object(["recipe": recipeSchema]),
@@ -137,10 +137,15 @@ public enum YesChefMCPServer {
         },
         MCPTool(
           name: "stage_handoff_return",
-          description: "For a conversation that began with a Yes Chef hand-off prompt containing a YC-HANDOFF: line, stage text as the whole return block exactly as it would be printed.",
+          description: "Call this instead of printing the return when the cook asks to finalize a conversation that began with a Yes Chef hand-off prompt (one with a `\(AIHandoffToken.prefix)` line), including a riff into a new recipe. `text` is the whole return: line 1 is the exact `\(AIHandoffToken.prefix)` line from the prompt, line 2 is `\(AIHandoffReturnContract.marker)`, then the deliverable the prompt asked for. Jon reviews it in Yes Chef.",
           inputSchema: .object([
             "type": .string("object"),
-            "properties": .object(["text": .object(["type": .string("string")])]),
+            "properties": .object([
+              "text": .object([
+                "type": .string("string"),
+                "description": .string("The whole return: the `\(AIHandoffToken.prefix)` line, then `\(AIHandoffReturnContract.marker)`, then the deliverable."),
+              ])
+            ]),
             "required": .array([.string("text")]),
             "additionalProperties": .bool(false),
           ]),

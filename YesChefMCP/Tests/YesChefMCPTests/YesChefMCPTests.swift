@@ -218,6 +218,26 @@ struct YesChefMCPTests {
     #expect(!FileManager.default.fileExists(atPath: container.path))
   }
 
+  @Test func stagingToolDescriptionsCarryTheHandoffRouting() async throws {
+    // ChatGPT doesn't put server instructions in front of the model, so the tool descriptions must route on their own.
+    let server = YesChefMCPServer.make(containerURL: FileManager.default.temporaryDirectory)
+    let list = try #require(await server.handle(line: request("tools/list")))
+    let tools = try object(list)["result"]?.objectValue?["tools"]?.arrayValue ?? []
+    func tool(_ name: String) -> [String: MCPValue] {
+      tools.compactMap(\.objectValue).first { $0["name"]?.stringValue == name } ?? [:]
+    }
+    let recipe = tool("stage_recipe")["description"]?.stringValue ?? ""
+    #expect(recipe.contains("Only for a conversation with no `YC-HANDOFF:` line"))
+    #expect(recipe.contains("`stage_handoff_return`"))
+
+    let handoff = tool("stage_handoff_return")
+    let description = handoff["description"]?.stringValue ?? ""
+    #expect(description.hasPrefix("Call this instead of printing the return when the cook asks to finalize"))
+    #expect(description.contains("line 1 is the exact `YC-HANDOFF:` line from the prompt, line 2 is `YC-CONTRACT: v3`"))
+    let text = handoff["inputSchema"]?.objectValue?["properties"]?.objectValue?["text"]?.objectValue
+    #expect(text?["description"]?.stringValue == "The whole return: the `YC-HANDOFF:` line, then `YC-CONTRACT: v3`, then the deliverable.")
+  }
+
   @Test func handoffReturnsPreserveTextAndAllowRepeatedTokens() async throws {
     let container = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
