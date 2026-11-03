@@ -12,12 +12,16 @@ final class HandoffReviewCoordinator {
   @ObservationIgnored @Dependency(\.date.now) var now
   @ObservationIgnored @Dependency(\.defaultDatabase) var database
   @ObservationIgnored @Dependency(\.uuid) var uuid
+  @ObservationIgnored @Dependency(\.createRecipeCoordinator) var createRecipeCoordinator
+  @ObservationIgnored weak var recipeReturnToastCenter: AppToastCenter?
 
   var review: AIHandoffReview?
   var contractWarning: String?
+  var newRecipeWarning: String?
   var adjustmentReview: RecipeAdjustmentReviewState?
   private var pendingAdjustmentReview: RecipeAdjustmentReviewState?
   private var pendingHandoff: AIHandoff?
+  var pendingRecipeReviews: [AIHandoffReview] = []
   var errorMessage: String?
   var errorTitle = "Could Not Save Handoff"
   var isShowingError = false
@@ -34,11 +38,15 @@ final class HandoffReviewCoordinator {
     adjustmentReview = nil
     pendingAdjustmentReview = nil
     self.pendingHandoff = pendingHandoff
-    self.review = review
+    setPresentedReview(review)
   }
 
   func reviewItems(for review: AIHandoffReview) -> [ChatApplyReviewItem] {
     switch review {
+    case let .recipeItems(_, items):
+      items.flatMap { reviewItems(for: $0) }
+    case .recipeNew, .recipeUnfiled:
+      []
     case let .menuComplement(review):
       menuComplementReviewItems(for: review)
     case let .menuPrepPlan(review):
@@ -118,7 +126,7 @@ final class HandoffReviewCoordinator {
       let currentMakeAhead = review.currentMakeAhead.flatMap(Self.nonEmpty)
       items.append(
         ChatApplyReviewItem(
-          id: review.handoffID,
+          id: uuid(),
           title: "Review make-ahead",
           summary: review.makeAhead,
           presentation: .sheet,
@@ -163,7 +171,7 @@ final class HandoffReviewCoordinator {
       let currentChefItUp = review.currentText.flatMap(Self.nonEmpty)
       items.append(
         ChatApplyReviewItem(
-          id: review.handoffID,
+          id: uuid(),
           title: "Review Chef It Up",
           summary: review.text,
           presentation: .sheet,
@@ -210,7 +218,7 @@ final class HandoffReviewCoordinator {
       let editableText = currentPlan.unioning(returnedPlan).editableReviewText()
       items.append(
         ChatApplyReviewItem(
-          id: review.handoffID,
+          id: uuid(),
           title: "Review Serve With",
           summary: review.text,
           presentation: .sheet,
@@ -540,26 +548,35 @@ final class HandoffReviewCoordinator {
   func discard(_ review: AIHandoffReview) {
     guard self.review?.handoffID == review.handoffID else { return }
     clearError()
-    pendingHandoff = nil
+    if pendingRecipeReviews.isEmpty { pendingHandoff = nil }
     self.review = nil
   }
 
   func discardAll() {
+    pendingRecipeReviews = []
     clearError()
     pendingHandoff = nil
     review = nil
   }
 
-  func discardPendingHandoff() {
-    pendingHandoff = nil
+  func adjustmentSheetDidDismiss() {
+    advanceQueuedRecipeReview()
+  }
+
+  func advanceQueuedRecipeReview() {
+    if !pendingRecipeReviews.isEmpty {
+      review = pendingRecipeReviews.removeFirst()
+    } else {
+      pendingHandoff = nil
+    }
   }
 
   func reviewSheetDidDismiss() {
-    guard pendingAdjustmentReview != nil else {
-      pendingHandoff = nil
-      return
+    if pendingAdjustmentReview != nil {
+      presentPendingAdjustmentReviewAfterReviewDismissal()
+    } else {
+      advanceQueuedRecipeReview()
     }
-    presentPendingAdjustmentReviewAfterReviewDismissal()
   }
 
   func commitReviewWrite<T>(
@@ -730,6 +747,10 @@ struct HandoffReviewSheet: View {
   var body: some View {
     Group {
       switch review {
+      case let .recipeUnfiled(id, recipeID, text):
+        RecipeUnfiledReviewSheet(coordinator: coordinator, handoffID: id, recipeID: recipeID, text: text)
+      case .recipeNew:
+        EmptyView()
       case let .workbenchExperiments(experimentsReview):
         WorkbenchExperimentsReviewSheet(
           coordinator: coordinator,
@@ -742,7 +763,7 @@ struct HandoffReviewSheet: View {
           review: briefReview,
           originalReview: review
         )
-      case .menuPrepPlan, .menuComplement, .recipeMakeAhead, .recipeChefItUp, .recipeServeWith,
+      case .recipeItems, .menuPrepPlan, .menuComplement, .recipeMakeAhead, .recipeChefItUp, .recipeServeWith,
            .mealPlanMakeAhead, .mealPlanComplement, .workbenchCompare, .workbenchDraft:
         standardReviewSheet
       }

@@ -99,23 +99,6 @@ struct RecipeVariationChoices: View {
 
     }
     .contextMenu {
-      Button("Hand off") {
-        Task {
-          await handoffTransport.copyPrompt(
-            for: .recipeAdjustment(model.recipeID, variationID: variation.id)
-          )
-        }
-      }
-      Button("Paste") {
-        let results = UIPasteboard.general.string.map { [$0] } ?? []
-        Task {
-          await handoffTransport.pastedResultsReceived(
-            results,
-            source: .recipeAdjustment(model.recipeID, variationID: variation.id)
-          )
-        }
-      }
-      Divider()
       Button("Rename") {
         variationNameDraft = variation.name
         renamingVariation = variation

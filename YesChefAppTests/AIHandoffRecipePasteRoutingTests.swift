@@ -108,4 +108,139 @@ struct AIHandoffRecipePasteRoutingTests {
       #expect(status == .imported)
     }
   }
+  @Test
+  func intentRoutesLegacyRecipeToCreateRecipe() async throws {
+    let create = CreateRecipeCoordinator()
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Self.now
+      $0.uuid = .incrementing
+      $0.createRecipeCoordinator = create
+      $0.handoffReviewCoordinator = HandoffReviewCoordinator()
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try seedRecipeAndHandoff(in: database)
+      let payload = """
+      YC-HANDOFF: \(Self.handoffID.uuidString)
+      \(AIHandoffReturnContract.marker)
+      {"@context":"https://schema.org","@type":"Recipe","name":"Cabbage",\
+      "recipeIngredient":["1 cabbage"],\
+      "recipeInstructions":[{"@type":"HowToStep","text":"Char it."}]}
+      """
+      _ = try await ImportHandoffResult(result: payload).perform()
+      #expect(create.stagedText?.text.contains("Cabbage") == true)
+    }
+  }
+
+  @Test
+  func multipleItemsAppearBeforeRevision() async throws {
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Self.now
+      $0.uuid = .incrementing
+    } operation: {
+      let coordinator = HandoffReviewCoordinator()
+      let makeAhead = AIHandoffReview.recipeMakeAhead(.init(handoffID: Self.handoffID,
+        recipeID: Self.recipeID, makeAhead: "Tomorrow: Chill", currentMakeAhead: nil, learnings: []))
+      let chef = AIHandoffReview.recipeChefItUp(.init(handoffID: Self.handoffID,
+        recipeID: Self.recipeID, section: .chefItUp, text: "Brown butter", learnings: []))
+      let brief = AIHandoffReview.recipeAdjustmentBrief(.init(handoffID: Self.handoffID,
+        recipeID: Self.recipeID, variationID: nil, brief: "Use brown butter", learnings: []))
+      await coordinator.presentStaged(.init(review: .recipeItems(handoffID: Self.handoffID,
+        items: [makeAhead, chef, brief]), warning: nil))
+      let first = try #require(coordinator.review)
+      #expect(coordinator.reviewItems(for: first).count == 2)
+      coordinator.discard(first)
+      coordinator.reviewSheetDidDismiss()
+      guard case .recipeAdjustmentBrief = coordinator.review else {
+        Issue.record("Expected the revision after section reviews"); return
+      }
+    }
+  }
+
+  @Test
+  func unlabelledJSONCanBeFiledAsNewRecipe() async throws {
+    let create = CreateRecipeCoordinator()
+    let toast = AppToastCenter()
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Self.now
+      $0.uuid = .incrementing
+      $0.createRecipeCoordinator = create
+    } operation: {
+      let coordinator = HandoffReviewCoordinator()
+      await coordinator.presentStaged(.init(review: .recipeUnfiled(handoffID: Self.handoffID,
+        recipeID: Self.recipeID, text: "Unfiled"), warning: nil), toastCenter: toast)
+      let json = """
+      {"@context":"https://schema.org","@type":"Recipe","name":"Cabbage",\
+      "recipeIngredient":["1 cabbage"],\
+      "recipeInstructions":[{"@type":"HowToStep","text":"Char it."}]}
+      """
+      try await coordinator.fileUnlabeled(json, label: "YC-NEW-RECIPE:",
+        handoffID: Self.handoffID, recipeID: Self.recipeID)
+      #expect(create.stagedText?.text == json)
+      #expect(toast.message?.text == "New recipe sent to Create Recipe.")
+    }
+  }
+
+  @Test
+  func dismissalAndAdjustmentDismissalContinueQueuedBriefs() async throws {
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Self.now
+      $0.uuid = .incrementing
+    } operation: {
+      let coordinator = HandoffReviewCoordinator()
+      let section = AIHandoffReview.recipeMakeAhead(.init(handoffID: Self.handoffID,
+        recipeID: Self.recipeID, makeAhead: "Chill", learnings: []))
+      let first = AIHandoffReview.recipeAdjustmentBrief(.init(handoffID: Self.handoffID,
+        recipeID: Self.recipeID, variationID: nil, brief: "First", learnings: []))
+      let second = AIHandoffReview.recipeAdjustmentBrief(.init(handoffID: Self.handoffID,
+        recipeID: Self.recipeID, variationID: nil, brief: "Second", learnings: []))
+      await coordinator.presentStaged(.init(review: .recipeItems(handoffID: Self.handoffID,
+        items: [section, first, second]), warning: nil))
+      coordinator.review = nil
+      coordinator.reviewSheetDidDismiss()
+      guard case let .recipeAdjustmentBrief(firstShown) = coordinator.review else {
+        Issue.record("Expected first brief after Done"); return
+      }
+      #expect(firstShown.brief == "First")
+      coordinator.review = nil
+      coordinator.adjustmentSheetDidDismiss()
+      guard case let .recipeAdjustmentBrief(secondShown) = coordinator.review else {
+        Issue.record("Expected second brief after side-by-side"); return
+      }
+      #expect(secondShown.brief == "Second")
+    }
+  }
+
+  @Test
+  func unmatchedNewRecipeShowsConfirmationToast() async throws {
+    let create = CreateRecipeCoordinator()
+    let toast = AppToastCenter()
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Self.now
+      $0.uuid = .incrementing
+      $0.createRecipeCoordinator = create
+      $0.handoffReviewCoordinator = HandoffReviewCoordinator()
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try seedRecipeAndHandoff(in: database)
+      let transport = HandoffInAppTransport(toastCenter: toast)
+      let result = """
+      \(AIHandoffReturnContract.marker)
+      YC-NEW-RECIPE:
+      {"@context":"https://schema.org","@type":"Recipe","name":"Cabbage",\
+      "recipeIngredient":["1 cabbage"],\
+      "recipeInstructions":[{"@type":"HowToStep","text":"Char it."}]}
+      """
+      await transport.stageReview(for: result, source: .recipe(Self.recipeID))
+      #expect(transport.isShowingUnmatchedConfirmation)
+      await transport.reviewUnmatchedResult()
+      #expect(create.stagedText?.text.contains("Cabbage") == true)
+      #expect(toast.message?.text == "New recipe sent to Create Recipe.")
+    }
+  }
+
 }

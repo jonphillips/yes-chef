@@ -7,7 +7,7 @@
 > type on the row no longer decides it. Each section's `•••` becomes a plain **Edit** button, and **Clear**
 > moves to the bottom of the section's editor.
 
-Status: **Accepted** — 2026-11-03 (proposed the same day, #432). Effort: [`efforts/one-recipe-handoff.md`](../efforts/one-recipe-handoff.md).
+Status: **Accepted** — 2026-11-03 (proposed the same day, #432). Effort: [`efforts/archive/one-recipe-handoff.md`](../efforts/archive/one-recipe-handoff.md).
 Origin: Jon, while reviewing the ADR-0060 Amendment 1 plan PR (#431): *"make ahead [and] chef it up both have
 prompt creation as well as there is a general prompt creation for the recipe… it can be confusing as to which
 one you should hit and it really feels like we should only have one."*

@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-03 — One recipe hand-off (`effort/one-recipe-handoff`)
+
+- **Result:** Added one recipe hand-off with labeled return routing, repeat returns, shared app presentation, and Edit or Write controls for Playbook sections. Addressed review feedback on queued returns, unfiled recipes, validation, and prompt formats.
+- **Verification:** check-drift.sh passed; 754 Core tests passed with two known issues, the generic iOS build passed, and 105 YesChefTests passed on a simulator.
+- **Owed:** one-recipe-handoff's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-03 — Chat access S3a device gate cleared (`docs/s3a-gate-cleared`)
 
 - **Result:** S3a's device gate passed. In ChatGPT chats outside the Yes Chef Project, two pasted Adjust hand-offs finalized through `stage_handoff_return`: a revision brief at 15:15, and a riff into a new recipe (JSON-LD) at 15:43, after #435. Neither return has the `YC-CONTRACT:` line, even with #435's description asking for it, so both will open with the missing-marker warning. S3b should check that warning's wording fits an MCP return.

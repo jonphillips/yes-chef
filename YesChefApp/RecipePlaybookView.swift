@@ -1,10 +1,8 @@
 import SwiftUI
-import UIKit
 import YesChefCore
 
 struct RecipePlaybookView: View {
   let model: RecipeDetailModel
-  let handoffTransport: HandoffInAppTransport
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   @State private var isMakeAheadExpanded = false
@@ -14,7 +12,6 @@ struct RecipePlaybookView: View {
   @State private var isLearningsExpanded = false
   @State private var isDeliberationLogExpanded = false
   @State private var editingSection: PlaybookSectionKind?
-  @State private var clearingSection: PlaybookSectionKind?
   @State private var isWritingNote = false
   @State private var fullText: RecipePlaybookFullText?
   var body: some View {
@@ -114,6 +111,7 @@ struct RecipePlaybookView: View {
         RecipePlaybookSectionEditorSheet(
           section: section,
           initialText: model.makeAhead ?? "",
+          clear: model.clearMakeAheadButtonTapped,
           commit: { text in
             try commit(text, for: section)
           }
@@ -122,20 +120,11 @@ struct RecipePlaybookView: View {
         RecipePlaybookSectionEditorSheet(
           section: section,
           initialText: model.chefItUp ?? "",
+          clear: model.clearChefItUpButtonTapped,
           commit: { text in
             try commit(text, for: section)
           }
         )
-      }
-    }
-    .confirmationDialog("Clear section?", item: $clearingSection) { section in
-      Button("Clear \(section.title)", role: .destructive) {
-        clear(section)
-      }
-    } message: { section in
-      switch section {
-      case .makeAhead, .chefItUp, .serveWith:
-        Text("This permanently clears the \(section.title) section. This cannot be undone.")
       }
     }
     .sheet(isPresented: $isWritingNote) {
@@ -173,7 +162,7 @@ struct RecipePlaybookView: View {
       preview: preview,
       isExpanded: isExpanded,
       showsActions: true,
-      actions: { sectionMenu(for: section, isFilled: isFilled) },
+      actions: { sectionEditButton(for: section, isFilled: isFilled) },
       content: content
     )
   }
@@ -207,7 +196,7 @@ struct RecipePlaybookView: View {
           }
         }
         Spacer(minLength: 12)
-        if showsActions, isExpanded.wrappedValue {
+        if showsActions {
           actions()
             .padding(.trailing, 12)
         }
@@ -313,53 +302,9 @@ struct RecipePlaybookView: View {
     return line
   }
 
-  private func sectionMenu(for section: PlaybookSectionKind, isFilled: Bool) -> some View {
-    return Menu {
-      Button {
-        Task {
-          await handoffTransport.copyPrompt(for: .recipeSection(model.recipeID, section))
-        }
-      } label: {
-        Label(
-          isFilled ? "Hand off again" : "Hand off",
-          systemImage: "sparkles.square.filled.on.square"
-        )
-      }
-
-      Button {
-        // A declined paste alert (or a non-string clipboard) yields nil. Hand the empty case to the
-        // transport rather than returning silently, so the tap always produces visible feedback.
-        let results = UIPasteboard.general.string.map { [$0] } ?? []
-        Task {
-          await handoffTransport.pastedResultsReceived(
-            results,
-            source: .recipeSection(model.recipeID, section)
-          )
-        }
-      } label: {
-        Label("Paste", systemImage: "doc.on.clipboard")
-      }
-
-      if section != .serveWith {
-        Button(isFilled ? "Edit" : "Write manually") {
-          editingSection = section
-        }
-      }
-
-      // No per-section "Ask" here — the playbook opens an unseeded panel, and its Discuss ▾ switcher
-      // is the one home for section-scoped discussion (ADR-0045 Amd 3).
-
-      if isFilled {
-        Button("Clear", role: .destructive) {
-          clearingSection = section
-        }
-      }
-    } label: {
-      Image(systemName: "ellipsis")
-        .frame(width: 44, height: 44)
-        .contentShape(.rect)
-    }
-    .accessibilityLabel("\(section.title) actions")
+  private func sectionEditButton(for section: PlaybookSectionKind, isFilled: Bool) -> some View {
+    Button(isFilled ? "Edit" : "Write") { editingSection = section }
+      .accessibilityLabel("\(isFilled ? "Edit" : "Write") \(section.title)")
   }
 
   private func commit(_ text: String, for section: PlaybookSectionKind) throws {
@@ -370,17 +315,6 @@ struct RecipePlaybookView: View {
       try model.commitChefItUpText(text)
     case .serveWith:
       try model.commitServeWithText(text)
-    }
-  }
-
-  private func clear(_ section: PlaybookSectionKind) {
-    switch section {
-    case .makeAhead:
-      model.clearMakeAheadButtonTapped()
-    case .chefItUp:
-      model.clearChefItUpButtonTapped()
-    case .serveWith:
-      model.clearServeWithButtonTapped()
     }
   }
 
@@ -432,6 +366,7 @@ private struct RecipeServeWithStrip: View {
 
   @State private var editor: ServeWithItemEditorRoute?
   @State private var isManaging = false
+  @State private var isConfirmingClear = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -439,15 +374,8 @@ private struct RecipeServeWithStrip: View {
         Text("Serve With")
           .font(.title3.bold())
         Spacer()
-        if !items.isEmpty {
-          Button {
-            isManaging = true
-          } label: {
-            Image(systemName: "slider.horizontal.3")
-              .frame(width: 44, height: 44)
-          }
-          .accessibilityLabel("Manage Serve With")
-        }
+        Button(items.isEmpty ? "Write" : "Edit") { isManaging = true }
+          .accessibilityLabel("\(items.isEmpty ? "Write" : "Edit") Serve With")
       }
 
       if needsRepair {
@@ -567,10 +495,22 @@ private struct RecipeServeWithStrip: View {
               .font(.caption)
               .foregroundStyle(.secondary)
             }
+            if !items.isEmpty {
+              Button("Clear Serve With", role: .destructive) { isConfirmingClear = true }
+                .frame(maxWidth: .infinity)
+            }
           }
           .padding()
         }
-        .navigationTitle("Manage Serve With")
+        .confirmationDialog("Clear Serve With?", isPresented: $isConfirmingClear) {
+          Button("Clear Serve With", role: .destructive) {
+            model.clearServeWithButtonTapped()
+            isManaging = false
+          }
+        } message: {
+          Text("This permanently clears the Serve With section. This cannot be undone.")
+        }
+        .navigationTitle("Edit Serve With")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
           ToolbarItem(placement: .confirmationAction) {
@@ -714,19 +654,25 @@ private extension PlaybookSectionKind {
 
 private struct RecipePlaybookSectionEditorSheet: View {
   let section: PlaybookSectionKind
+  let clear: () -> Void
   let commit: (String) throws -> Void
+  let isFilled: Bool
 
   @Environment(\.dismiss) private var dismiss
   @State private var draftText: String
   @State private var errorMessage: String?
+  @State private var isConfirmingClear = false
 
   init(
     section: PlaybookSectionKind,
     initialText: String,
+    clear: @escaping () -> Void,
     commit: @escaping (String) throws -> Void
   ) {
     self.section = section
+    self.clear = clear
     self.commit = commit
+    self.isFilled = !initialText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     _draftText = State(initialValue: initialText)
   }
 
@@ -747,6 +693,10 @@ private struct RecipePlaybookSectionEditorSheet: View {
               .autocorrectionDisabled(false)
               .frame(minHeight: 320)
           }
+          if isFilled {
+            Button("Clear \(section.title)", role: .destructive) { isConfirmingClear = true }
+              .frame(maxWidth: .infinity)
+          }
         }
         .padding()
       }
@@ -765,6 +715,14 @@ private struct RecipePlaybookSectionEditorSheet: View {
           .disabled(draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
       }
+    }
+    .confirmationDialog("Clear \(section.title)?", isPresented: $isConfirmingClear) {
+      Button("Clear \(section.title)", role: .destructive) {
+        clear()
+        dismiss()
+      }
+    } message: {
+      Text("This permanently clears the \(section.title) section. This cannot be undone.")
     }
     .alert("Could Not Save \(section.title)", isPresented: Binding(
       get: { errorMessage != nil },

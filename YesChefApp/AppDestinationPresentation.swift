@@ -17,6 +17,14 @@ private struct HandoffReviewDestinationsModifier: ViewModifier {
     @Bindable var coordinator = coordinator
 
     content
+      .alert("Imported with a warning", isPresented: Binding(
+        get: { coordinator.newRecipeWarning != nil && isPresentationEnabled },
+        set: { if !$0 { coordinator.newRecipeWarning = nil } }
+      )) {
+        Button("OK") { coordinator.newRecipeWarning = nil }
+      } message: {
+        Text(coordinator.newRecipeWarning ?? "")
+      }
       .sheet(
         item: gatedBinding($coordinator.review, enabled: isPresentationEnabled),
         id: \.handoffID,
@@ -26,7 +34,7 @@ private struct HandoffReviewDestinationsModifier: ViewModifier {
       }
       .sheet(
         item: gatedBinding($coordinator.adjustmentReview, enabled: isPresentationEnabled),
-        onDismiss: { coordinator.discardPendingHandoff() }
+        onDismiss: { coordinator.adjustmentSheetDidDismiss() }
       ) { review in
         RecipeAdjustmentReviewView(
           review: review,

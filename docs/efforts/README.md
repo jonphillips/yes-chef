@@ -25,7 +25,5 @@ discoverable"):
 
 ## Live
 
-- [one-recipe-handoff.md](one-recipe-handoff.md) — **Ready** · ADR-0061: one recipe Hand off whose return is filed
-  by label; section `•••` becomes Edit, Clear moves into each editor.
 - [chat-access-mcp.md](chat-access-mcp.md) — **Ready** · ADR-0060 Amd 1: S3a stages hand-off returns from the
   helper; S3b opens them on the device that minted the token. S0–S2b shipped.

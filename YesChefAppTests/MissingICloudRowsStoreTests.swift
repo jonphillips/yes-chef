@@ -31,7 +31,7 @@ struct MissingICloudRowsStoreTests {
     let model = SyncHealthModel(defaults: defaults, missingRowsReuploader: { values in
       queued = values
       return values.count
-    })
+    }, accountStatusReader: { .available })
     model.recordMissingRows(rows)
 
     await model.reuploadMissingRows()

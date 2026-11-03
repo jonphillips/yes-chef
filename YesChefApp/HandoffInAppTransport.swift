@@ -10,7 +10,6 @@ final class HandoffInAppTransport {
   @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored @Dependency(\.handoffReviewCoordinator) private var handoffReviewCoordinator
-  @ObservationIgnored @Dependency(\.createRecipeCoordinator) private var createRecipeCoordinator
   @ObservationIgnored @Dependency(\.uuid) private var uuid
 
   var errorMessage: String?
@@ -87,35 +86,20 @@ final class HandoffInAppTransport {
         )
         return
       }
-      // A recipe-body hand-off can be finalized two ways (ADR-0042 Amd): a prose revision brief that
-      // resolves against this recipe's live rows, or a whole new recipe as schema.org JSON-LD. Route
-      // on the payload's shape — a new recipe goes to Create Recipe as a standalone draft, not the
-      // adjustment review — and mark the handoff imported so its ledger row does not stay open.
-      if handoff.sourceType == .recipe, handoff.taskType == .adjustRecipe,
-        case .newRecipe = try RecipeAdjustmentFinalize.classify(payload: routedText.payload) {
-        let importDate = now
-        try await database.write { db in
-          try AIHandoffRepository.markImported(id: handoff.id, at: importDate, in: db)
-        }
-        await createRecipeCoordinator.stage(text: routedText.payload)
-        if let warning = contract.warning {
-          errorTitle = "Imported with a warning"
-          errorMessage = warning
-          isShowingError = true
-        }
-        toastCenter?.postSuccess("New recipe sent to Create Recipe.")
-        return
-      }
       let staged = try await HandoffAppOperations.stageReview(
         handoffID: handoff.id,
         result: result,
         in: database,
-        now: now
+        now: now,
+        allowRestage: true
       )
-      handoffReviewCoordinator.present(
-        source.applyingScope(to: staged.review, resolvedHandoff: handoff),
-        warning: staged.warning
-      )
+      await handoffReviewCoordinator.presentStaged(.init(
+        review: source.applyingScope(to: staged.review, resolvedHandoff: handoff), warning: staged.warning
+      ), toastCenter: toastCenter)
+      if case .recipeNew = staged.review {
+        toastCenter?.postSuccess("New recipe sent to Create Recipe.")
+        return
+      }
       if let message = await scopeRedirectMessage(for: source, handoff: handoff) {
         toastCenter?.postSuccess(message)
       }
@@ -202,7 +186,8 @@ final class HandoffInAppTransport {
             handoffID: storedHandoff.id,
             result: unmatchedResult,
             in: database,
-            now: now
+            now: now,
+            allowRestage: true
           )
         } else {
           let unmatched = try await HandoffAppOperations.stageUnmatchedReviewForKnownSource(
@@ -215,11 +200,13 @@ final class HandoffInAppTransport {
           staged = unmatched.result
           pendingHandoff = unmatched.handoff
         }
-        handoffReviewCoordinator.present(
-          unmatchedSource.applyingScope(to: staged.review, resolvedHandoff: storedHandoff),
-          warning: staged.warning,
-          pendingHandoff: pendingHandoff
+        await handoffReviewCoordinator.presentStaged(
+          .init(review: unmatchedSource.applyingScope(to: staged.review, resolvedHandoff: storedHandoff),
+                warning: staged.warning), pendingHandoff: pendingHandoff, toastCenter: toastCenter
         )
+        if case .recipeNew = staged.review {
+          toastCenter?.postSuccess("New recipe sent to Create Recipe.")
+        }
       }
     } catch {
       present(error)
@@ -323,9 +310,8 @@ private extension AIHandoffSourceType {
 ///   render inside a `Menu` or a `ToolbarItemGroup(placement: .secondaryAction)` (which collapses
 ///   into the overflow menu) — the copy button survives and the paste control silently disappears,
 ///   leaving the surface unable to take a return. In a menu, use plain buttons that read
-///   `UIPasteboard.general.string` directly, as the Playbook section menu and the recipe-body
-///   toolbar do. ADR-0041 Amd 1 retired `PasteButton` for the sections for this reason; ADR-0042 S4
-///   hit it again on the recipe body.
+///   `UIPasteboard.general.string` directly, as the recipe toolbar does. ADR-0042 S4 records
+///   why the recipe toolbar uses that approach.
 struct HandoffCopyPasteControls: View {
   let source: HandoffExportSource
   let transport: HandoffInAppTransport
