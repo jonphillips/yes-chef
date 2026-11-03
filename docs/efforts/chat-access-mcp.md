@@ -1,6 +1,7 @@
 # Effort — Chat access over MCP
 
-Status: Blocked — S3 waits on [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md) OQ3. Schema-free throughout.
+Status: Blocked — S3 waits on [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md) Amendment 1 (proposed
+2026-11-03; answers OQ3). Schema-free throughout.
 Summary: S3 lets a ChatGPT return target an existing recipe, not only stage a new one; S0–S2b shipped.
 
 Related: [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md) · jon-platform
@@ -18,8 +19,9 @@ because S3 builds on both.
 
 ## S3 — Returns that target an existing recipe
 
-Waits on ADR-0060 OQ3. The architect specifies this slice here once OQ3 is answered; until then there is no
-next step to dispatch.
+Waits on ADR-0060 Amendment 1, which answers OQ3 and outlines S3a (the helper's `stage_handoff_return`) and
+S3b (the app's token-routed inbox items). The architect specifies both here once the amendment is accepted;
+until then there is no next step to dispatch.
 
 ## S0 results
 

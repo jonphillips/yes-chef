@@ -13,6 +13,9 @@ Status: **Accepted** — 2026-10-22, after S0's device pass confirmed D2 (OQ1 an
 built by effort [`automatic-backups`](../efforts/archive/automatic-backups.md)): the container's `Documents/` is now
 published so automatic backups show in Files. D2's "the container is not published" no longer holds. `MCP/`
 sits outside `Documents/`, so it stays hidden.
+**[Amendment 1](#amendment-1--a-handoff-return-is-routed-by-its-yc-handoff-token-2026-11-03) — Proposed
+2026-11-03:** answers OQ3. A return may carry the app-minted `YC-HANDOFF` token and nothing else that names a
+row; `stage_handoff_return` stages the whole return block, and only the device that minted the token opens it.
 Origin: Jon, after Vinyl Fever M12 proved ChatGPT → MCP end to end ("we do a
 lot of copy/pasting of recipe prompts, and the resulting JSON recipe gets pasted back"). Queued after
 [`efforts/archive/sync-failure-surfacing.md`](../efforts/archive/sync-failure-surfacing.md). Effort:
@@ -134,7 +137,8 @@ This is ADR-0007 D3, unchanged except for where the inbox is:
 **Out of scope here: returns that target an existing recipe** (a revision brief, learnings, `YC-HANDOFF`
 blocks). A paste never carries a recipe's identity (ADR-0042 D2 and Amd 1-D2). A tool call could carry an
 identifier back, but ADR-0007 D5 keeps internal IDs away from the model. How these two rules meet is a
-decision of its own (OQ3), not something to settle while building.
+decision of its own (OQ3), not something to settle while building. *(Answered by
+[Amendment 1](#amendment-1--a-handoff-return-is-routed-by-its-yc-handoff-token-2026-11-03).)*
 
 ### D4 — Reads come from an export each device writes, not from the database
 
@@ -178,7 +182,8 @@ only when it's needed.
    discriminating probe, not a build slice. It answers OQ1 and either confirms D2 or reopens it.
 2. **S1 — `stage_recipe` and the inbox in the app** (D3). This retires the paste-back.
 3. **S2 — the export and the read tools** (D4, D6). This retires the copy-out.
-4. **S3 — returns that target a recipe.** This needs an amendment that answers OQ3 first.
+4. **S3 — returns that target a recipe.** This needs an amendment that answers OQ3 first
+   ([Amendment 1](#amendment-1--a-handoff-return-is-routed-by-its-yc-handoff-token-2026-11-03)).
 
 S1 and S2 are specified after S0 reports. The whole effort is **schema-free**. Its one platform change is the
 iCloud Documents entitlement.
@@ -217,6 +222,158 @@ iCloud Documents entitlement.
   evicted to a placeholder? **If the Mac side fails,** D2 reopens. The leading fallback is a small signed Mac
   app that holds the ubiquity entitlement and runs the helper. It isn't a sync peer.
 - **OQ2 — answered 2026-10-22: 30 days.** S1 prunes consumed items from `Processed/` on foreground.
-- **OQ3.** Returns that target an existing recipe (D3): whether a tool call may carry an opaque, short-lived
-  handle that the app resolves back to a recipe, and how that fits ADR-0042 D2 and ADR-0007 D5. Not needed
-  until S3.
+- **OQ3 — answered 2026-11-03 by
+  [Amendment 1](#amendment-1--a-handoff-return-is-routed-by-its-yc-handoff-token-2026-11-03): yes, and the handle
+  already exists.** It's the `YC-HANDOFF` token, which the app mints and resolves on the device that minted it.
+  The original question, kept for the record: Returns that target an existing recipe (D3): whether a tool call
+  may carry an opaque, short-lived handle that the app resolves back to a recipe, and how that fits ADR-0042 D2
+  and ADR-0007 D5. Not needed until S3.
+
+## Amendment 1 — A handoff return is routed by its YC-HANDOFF token (2026-11-03)
+
+Status: **Proposed** — 2026-11-03. Answers OQ3 and unblocks S3. Schema-free. No contract bump.
+
+### Context
+
+OQ3 asked whether a tool call may carry something the app resolves back to a recipe, given two rules:
+ADR-0042 Amd 1-D2 ("the paste door never carries identity") and jon-platform ADR-0007 D5 (tools never return
+"internal IDs the model doesn't need"). The code already answers most of it. As of `origin/main` 614ee59:
+
+- **The model already carries a handle.** Every routed handoff prompt carries a `YC-HANDOFF: <uuid>` line
+  (`AIHandoffToken.header`), and the return contract makes the model echo it as the return's first line
+  (`AIHandoffReturnContract.projectInstructions`). The UUID is the `AIHandoff` row's id. It isn't the
+  recipe's, the menu's, or any line's.
+- **A return already finds its handoff without a screen.** The **Import Handoff Result** App Intent passes the
+  text to `AIHandoffIntentImport.stageReview(handoffID: nil, result:)`. That reads the token from the text,
+  loads the row, and stages the review that the row's source and task call for. That's the path a Shortcut
+  uses, and it's the one an inbox item needs.
+- **The token resolves only where it was minted.** `AIHandoff` is device-local: it isn't in `CloudSync`'s
+  synced tables, and ADR-0042's storage sketch says so. A handoff started on the iPhone has no row on the iPad.
+- **The read tools already hand the model opaque refs.** `search_recipes` returns `<generation>.r<index>`, and
+  a ref from an older export fails with "search again." So D5 already means a handle the model can't misuse,
+  not "nothing that names a row."
+
+On the paste door, the token is a **check**. The door is opened from the recipe or menu screen, so the target
+is known already, and the token only confirms the match (`HandoffInAppTransport`'s unmatched-result prompt).
+An inbox has no screen, so for an inbox item the token becomes the **router**. That's the only real change
+here, and the App Intent already made it.
+
+Amd 1-D2 was about what the return **contains**: no anchors, no line IDs, no rewritten recipe. A revision
+returns a prose brief, and the structured change is derived in-app against live rows. None of that moves.
+
+### Amd 1-D1 — A return may carry the app-minted token, and nothing else that names a row
+
+- **The handle is the existing `YC-HANDOFF` UUID.** No recipe, menu, variation, section, or line id ever
+  crosses, and there's no new handle type. The token can't address anything except its own row on the device
+  that minted it, and it resolves only to a **review**, never to a write.
+- **It's short-lived in practice.** The row's status (`awaitingReturn` → `imported`) and its device-locality
+  bound it. A token from a reset device, or one the app no longer has, resolves to nothing.
+- **ADR-0007 D5 holds.** The model needs the token to route the return, and the token gives it no reach.
+- **ADR-0042 Amd 1-D2 holds.** The payload is the same return the paste door takes: a revision is still a
+  prose brief, and a riff is still one JSON-LD Recipe (ADR-0042 Amd 4). Save, or the brief sheet's **Draft the
+  revision**, is still the only write.
+
+### Amd 1-D2 — One tool, `stage_handoff_return`, stages the whole return block
+
+- **Input: `text`,** exactly what the model would print at finalize. That's the token line, the `YC-CONTRACT`
+  marker, the deliverable, and the `YC-LEARNINGS:` section. **One tool, not one per task.** Every routed return
+  shares `AIHandoffReturnContract`, and the app already routes by task. Tools like `stage_revision` or
+  `stage_prep_plan` would restate thirteen task types in the server, and the two lists would drift.
+- **The helper checks the envelope; the app checks the body.** The helper runs the Core functions the paste
+  door runs first: `AIHandoffReturnContract.strippingMarker` and `AIHandoffToken.stripping`. A missing or
+  malformed token, or a **newer** marker, returns `isError` with the reason so the model can correct itself.
+  An older or missing marker stages with a warning, as on the paste door (ADR-0042 Amd 5-D2). The body's parse
+  depends on the task type, and the task type is on the device-local row, so the body is checked when the item
+  is opened and its errors show in the app. **This is a named gap against ADR-0007 D3** ("checked by the same
+  decoder before it's written"): the envelope is checked before writing, the body after.
+- **The file:** `HandoffInbox(root: …/MCP/Inbox, fileExtension: "ycreturn")`, with the token UUID as the slug.
+  The distinct extension keeps builds that list only `json` recipes from opening a return as a recipe. The
+  slug lets the app group items by token without reading them.
+- **Annotations:** `readOnlyHint: false, destructiveHint: false`, so ChatGPT asks before staging (D3's second
+  checkpoint).
+- **The result tells the model where it went:** staged for review on the device that started the handoff.
+  The model says that, not "saved."
+
+**Rejected: a pending-handoffs manifest that the app writes to `MCP/`, so the helper can resolve tokens.** It
+would let the helper check the body too, and it would support a `get_handoff(token)` read tool. But it adds a
+second iCloud Drive hop in the outbound direction, at the moment Jon moves fastest: tap, paste, start talking.
+The prompt already carries the context (ADR-0042 D4: token, context, ask), so `get_handoff` would add nothing
+the model doesn't have. **Revisit** if body errors found only in-app turn out to be common.
+
+### Amd 1-D3 — Only the device that minted the token opens the item
+
+This narrows D3's claim rule for `.ycreturn` items. `json` recipe items are unchanged.
+
+- **The row is on this device:** the item appears under **From Chat** with its handoff title (for example
+  "Adjust Recipe: Absurdly Addictive Asparagus"). Opening it claims it (moves it to `Processed/`) and calls
+  `stageReview(handoffID: token, result: text, in:, now:, allowRestage: true)`, the same call the paste
+  transports make. The existing review follows: the brief sheet, the section review, the prep-plan review, or
+  Create Recipe for a riff.
+- **The row isn't on this device:** the item belongs to another device, or its row is gone. This device
+  doesn't claim it and doesn't hide it. It lists it as **Started on another device**, with **Copy**. Pasted on
+  the right screen, it goes through the existing unmatched-result review.
+- **A capture-sourced token** (Reader Feedback) returns only to the open capture editor
+  (`AIHandoffSourceType.capture`), so it gets the same **Copy** treatment.
+- **The same token staged more than once:** a later finalize, after more discussion, is a real new answer.
+  The app shows the newest file for a token, and claiming it also moves the older ones to `Processed/`.
+  `allowRestage: true` means a return for an already-imported handoff reopens a review, as a re-paste does.
+- **Orphans expire.** During its usual maintenance, any device moves an unclaimed `.ycreturn` item older than
+  the `Processed/` retention (30 days) to `Processed/`. That's the one exception to "only the minting device
+  moves it." An item from a reset device doesn't sit in the inbox for good.
+
+### Amd 1-D4 — The return contract travels with the server, so a routed handoff no longer needs the Project
+
+- `ChatAccessServerInstructions` gains the routed-return rules, built from
+  `AIHandoffReturnContract.projectInstructions`, the same Core constant as
+  `docs/chatgpt/PROJECT-INSTRUCTIONS.md`. A test fails if they drift, as D6 already requires for the recipe
+  contract.
+- **The opening of the instructions names both tools,** so the first 512 characters still stand alone
+  (ADR-0007 D1). A conversation with a `YC-HANDOFF:` line finalizes through `stage_handoff_return`. That
+  includes a riff into a new recipe, so its handoff is closed. `stage_recipe` is for conversations with no
+  token.
+- **If the tool fails or times out,** the model prints the return block for Jon to paste. That's D6's
+  existing rule, extended.
+- **What this changes for Jon:** with the plugin on, a handoff pasted into **any** ChatGPT chat returns
+  correctly, not only in the `Yes Chef` Project. The Project stays as the home for chats without the tools
+  (D6: nothing is retired).
+- **This decides where the rules live today, not forever.** If ChatGPT plugin skills turn out to load on iOS
+  for a tunnel plugin (unverified as of 2026-11-03), the handoff workflow could move into a skill, and
+  ADR-0042 D4's premise that "the iOS app cannot take a skills file" would need revisiting. The tool and
+  D1–D3 wouldn't change.
+
+### Amd 1-D5 — Out: revising a recipe from a chat that started in ChatGPT
+
+A chat that starts in ChatGPT and finds a recipe with `search_recipes` holds a read ref, not a token. If
+`stage_handoff_return` accepted read refs, the export's index would become a write target, and nothing on the
+device would confirm the target. Not here (OQ4).
+
+Until OQ4 is answered, such a chat can still do either of two things. It can stage a **new** recipe with
+`stage_recipe`. Or Jon taps **Adjust Recipe** on that recipe in Yes Chef and pastes the prompt into the
+**same** chat. The conversation goes on, now with a token, and its next finalize routes.
+
+### Amd 1 — slices (the architect specifies S3 in the effort brief)
+
+- **S3a — helper:** `stage_handoff_return`, envelope checks, the `.ycreturn` file, the instructions from
+  D4, and tests. Tests cover the 512-character opening, drift against `PROJECT-INSTRUCTIONS.md`, a missing
+  token, a newer marker, and an older marker staging with its warning.
+- **S3b — app:** listing `.ycreturn` items, the claim rule in D3, routing through `stageReview`, the **Copy**
+  fallback, newest-per-token, and orphan expiry.
+- **Device pass:** on the iPhone, start **Adjust Recipe**, paste it into a ChatGPT chat **outside** the
+  `Yes Chef` Project, discuss, and finalize. The item opens the brief sheet on the iPhone. The iPad shows
+  **Started on another device**. Repeat with a riff, which should open Create Recipe and mark the handoff
+  imported.
+
+### Amd 1 — consequences
+
+- The last copy-paste in the recipe loop goes: out is still a copied prompt, but back is a confirmation tap.
+- The `Yes Chef` Project is no longer needed for routed handoffs in chats that have the tools.
+- A body error (say, an empty brief) now shows in the app, after the model has moved on. Jon asks the chat to
+  try again, or pastes.
+- No lift into `LLMHandoffKit`. Token routing over an inbox is Yes Chef's alone. It's evidence for
+  jon-platform's `SEAM-LEDGER.md` row "LLM handoff envelope," whose trigger hasn't fired.
+
+### Amd 1 — open questions
+
+- **OQ4 — revisions from chats that start in ChatGPT (D5).** One shape: the app resolves a read ref against the
+  export it wrote, and asks Jon to confirm the target recipe before the review. Decide when dogfooding shows
+  that tapping **Adjust Recipe** to mint a token costs something real.
