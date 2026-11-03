@@ -9,11 +9,17 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-03 — Chat access S3a device gate cleared (`docs/s3a-gate-cleared`)
+
+- **Result:** S3a's device gate passed. In ChatGPT chats outside the Yes Chef Project, two pasted Adjust hand-offs finalized through `stage_handoff_return`: a revision brief at 15:15, and a riff into a new recipe (JSON-LD) at 15:43, after #435. Neither return has the `YC-CONTRACT:` line, even with #435's description asking for it, so both will open with the missing-marker warning. S3b should check that warning's wording fits an MCP return.
+- **Verification:** Jon, iPhone and iPad, 2026-11-03: both `.ycreturn` files are in `MCP/Inbox/` on the Mac under their tokens, and **From Chat** on neither device lists them. They wait for S3b.
+
+---
 ## 2026-11-03 — Hand-off routing moves into the tool descriptions (`fix/handoff-tool-descriptions`)
 
-- **Result:** S3a's device gate showed that ChatGPT doesn't use the helper's server instructions. On Finalize, a chat outside the Project printed a bare revision brief, with no token, no contract line and no tool call. `stage_handoff_return`'s description now says to call it instead of printing and spells out the envelope. `stage_recipe`'s description now says it's only for conversations with no token.
+- **Result:** `stage_handoff_return`'s description now says to call it instead of printing and spells out the envelope. `stage_recipe`'s description now says it's only for conversations with no token. The motivating diagnosis was wrong: the first gate attempt looked like a printed brief with no tool call, but it had in fact staged a `.ycreturn` (token, no contract line). The change stays as belt-and-braces; it didn't get ChatGPT to add the contract line.
 - **Verification:** Helper package: 13 tests passed; check-drift.sh: lint clean, 749 Core tests passed (2 known issues), and app test-target build passed.
-- **Owed:** the S3a device gate in [device-passes.md](device-passes.md), rerun after reinstalling the helper.
+- **Owed:** none; the S3a gate cleared (entry above).
 
 ---
 ## 2026-11-03 — Chat access S3a — stage hand-off returns (`effort/chat-access-s3a`)
