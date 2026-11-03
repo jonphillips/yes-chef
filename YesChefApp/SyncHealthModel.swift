@@ -42,6 +42,7 @@ final class SyncHealthModel {
   private(set) var missingReuploadSummary: String?
   private let missingRowsStore: MissingICloudRowsStore
   private let missingRowsReuploader: (@MainActor ([CloudSyncMissingRow]) async throws -> Int)?
+  private let accountStatusReader: @Sendable () async throws -> CKAccountStatus
 
   var leftoverCount: Int { leftoverReport?.leftovers.count ?? 0 }
   var missingCount: Int { missingRows.count }
@@ -63,11 +64,15 @@ final class SyncHealthModel {
 
   init(
     defaults: UserDefaults = .standard,
-    missingRowsReuploader: (@MainActor ([CloudSyncMissingRow]) async throws -> Int)? = nil
+    missingRowsReuploader: (@MainActor ([CloudSyncMissingRow]) async throws -> Int)? = nil,
+    accountStatusReader: @escaping @Sendable () async throws -> CKAccountStatus = {
+      try await CKContainer(identifier: YesChefCloudSync.containerIdentifier).accountStatus()
+    }
   ) {
     let store = MissingICloudRowsStore(defaults: defaults)
     missingRowsStore = store
     self.missingRowsReuploader = missingRowsReuploader
+    self.accountStatusReader = accountStatusReader
     missingRows = store.rows
     health = SyncHealth(
       isManuallyEnabled: YesChefCloudSync.isManuallyEnabled(),
@@ -630,9 +635,7 @@ final class SyncHealthModel {
 
   private func currentAccountStatus() async -> SyncAccountStatus {
     do {
-      let status = try await CKContainer(identifier: YesChefCloudSync.containerIdentifier)
-        .accountStatus()
-      return SyncAccountStatus(status)
+      return SyncAccountStatus(try await accountStatusReader())
     } catch {
       // A thrown status read is itself "couldn't determine" — the reducer shows it as
       // local-only, which is the honest thing to say.
