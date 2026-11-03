@@ -17,7 +17,7 @@ struct AppContainer: View {
   @State private var recipeModel = RecipeLibraryModel()
   @State private var powerBrowserModel = PowerBrowserModel()
   @State private var createRecipeModel = CreateRecipeModel()
-  @State private var chatAccessInboxModel = ChatAccessInboxModel()
+  @State private var chatAccessInboxModel: ChatAccessInboxModel
   @State private var chatAccessExportModel = ChatAccessExportModel()
   @State private var automaticBackupModel = AutomaticBackupModel(
     backup: YesChefCloudSync.databaseBackupConfiguration,
@@ -36,6 +36,8 @@ struct AppContainer: View {
 
   init() {
     let toastCenter = AppToastCenter()
+    let inboxModel = ChatAccessInboxModel()
+    inboxModel.toastCenter = toastCenter
     let mealCalendarModel = MealCalendarModel(toastCenter: toastCenter)
     let groceryModel = GroceryLibraryModel(toastCenter: toastCenter)
     // Push a day's recipes into the grocery list from the Meal Calendar without either model
@@ -44,6 +46,7 @@ struct AppContainer: View {
       groceryModel?.addMealRowsImmediately(rows)
     }
     _toastCenter = State(wrappedValue: toastCenter)
+    _chatAccessInboxModel = State(wrappedValue: inboxModel)
     _mealCalendarModel = State(wrappedValue: mealCalendarModel)
     _menuModel = State(wrappedValue: MenuLibraryModel(toastCenter: toastCenter))
     _groceryModel = State(wrappedValue: groceryModel)

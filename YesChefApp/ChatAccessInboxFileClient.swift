@@ -42,11 +42,21 @@ extension ChatAccessInboxFileClient: DependencyKey {
       },
       claim: { folder, url in
         try await Task.detached(priority: .utility) {
-          _ = try HandoffInbox(root: folder.inboxURL, fileExtension: "json").markProcessed(stagedHandoff(at: url))
+          _ = try HandoffInbox(root: folder.inboxURL, fileExtension: url.pathExtension).markProcessed(stagedHandoff(at: url))
         }.value
       },
       maintain: { folder, now, removesProbe in
         try await Task.detached(priority: .utility) {
+          if FileManager.default.fileExists(atPath: folder.inboxURL.path) {
+            let urls = try FileManager.default.contentsOfDirectory(at: folder.inboxURL, includingPropertiesForKeys: nil)
+            for url in ChatAccessInbox.expiredReturns(urls, inbox: folder.inboxURL, now: now) {
+              do {
+                _ = try HandoffInbox(root: folder.inboxURL, fileExtension: "ycreturn").markProcessed(stagedHandoff(at: url))
+              } catch HandoffInboxError.alreadyClaimed {
+                continue
+              }
+            }
+          }
           let processedItems: [ChatAccessInbox.ProcessedSnapshot]
           if FileManager.default.fileExists(atPath: folder.processedURL.path) {
             let urls = try FileManager.default.contentsOfDirectory(
