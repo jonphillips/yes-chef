@@ -25,5 +25,7 @@ discoverable"):
 
 ## Live
 
-- [chat-access-mcp.md](chat-access-mcp.md) — **Blocked** on [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md)
-  OQ3 · S3 lets a ChatGPT return target an existing recipe, not only stage a new one; S0–S2b shipped.
+- [one-recipe-handoff.md](one-recipe-handoff.md) — **Ready** · ADR-0061: one recipe Hand off whose return is filed
+  by label; section `•••` becomes Edit, Clear moves into each editor.
+- [chat-access-mcp.md](chat-access-mcp.md) — **Ready** · ADR-0060 Amd 1: S3a stages hand-off returns from the
+  helper; S3b opens them on the device that minted the token. S0–S2b shipped.

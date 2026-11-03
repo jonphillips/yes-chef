@@ -7,7 +7,7 @@
 > type on the row no longer decides it. Each section's `•••` becomes a plain **Edit** button, and **Clear**
 > moves to the bottom of the section's editor.
 
-Status: **Proposed** — 2026-11-03.
+Status: **Accepted** — 2026-11-03 (proposed the same day, #432). Effort: [`efforts/one-recipe-handoff.md`](../efforts/one-recipe-handoff.md).
 Origin: Jon, while reviewing the ADR-0060 Amendment 1 plan PR (#431): *"make ahead [and] chef it up both have
 prompt creation as well as there is a general prompt creation for the recipe… it can be confusing as to which
 one you should hit and it really feels like we should only have one."*
@@ -186,14 +186,21 @@ The onboard panel's **Discuss ▾** still offers one starter per section (ADR-00
 verbs. It's a follow-on, taken only after the outboard version passes on device. The prompt builder from D2
 is shared, so the remaining cost is in the onboard finalize UI.
 
-## Relation to ADR-0060 Amendment 1 (PR #431, open)
+## Relation to ADR-0060 Amendment 1 (PR #431, merged)
 
-**No change is needed there.** Amd 1-D2 says the helper checks only the envelope, and the app checks the body
+**No change is needed to its envelope or its tool.** Amd 1-D2 says the helper checks only the envelope, and the app checks the body
 "because the task type is on the device-local row." Under this ADR the row still says `.recipe`, so the app
 still knows to parse labels. The body check still happens in the app, as Amd 1-D2 says.
 
 D3's move of JSON-LD detection into Core matters for one reason: a `stage_handoff_return` call that carries a
 `YC-NEW-RECIPE:` block must route the same way a paste does.
+
+**One interaction was missed here, and the acceptance records it.** D4 lets a `.recipe` token take several
+returns, but Amd 1-D3 shows only the newest inbox file for a token. Those rules conflict once returns arrive
+through the inbox. D4 wins for task types that take repeat returns. ADR-0060's
+[notes at acceptance](ADR-0060-chat-access-over-mcp.md#amd-1--notes-at-acceptance-2026-11-03) narrow Amd 1-D3,
+and S1 states the rule on the task type in Core so the inbox can read it. That's also why Amd 1's app slice
+(S3b) is built after this ADR's dispatch.
 
 ## Persistent model impact
 
