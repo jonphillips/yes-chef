@@ -150,6 +150,7 @@ final class ChatAccessInboxModel {
       do { try await fileClient.claim(folder, url) }
       catch HandoffInboxError.alreadyClaimed { continue }
     }
+    metadataGeneration += 1
     returnRows.removeAll { $0.id == row.id }
     rowErrors[row.id] = nil
   }

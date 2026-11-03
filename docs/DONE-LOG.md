@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-03 — Chat access S3b — token-routed returns (`effort/chat-access-mcp-s3b`)
+
+- **Result:** Routes staged hand-off returns to their originating device for review, preserving copy-only returns and handling retention and repeat deliveries.
+- **Verification:** Generic iOS build passed; YesChefTests passed 110 tests in 26 suites; check-drift passed package tests and app test target compilation.
+- **Owed:** chat-access-mcp's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-03 — One recipe hand-off (`effort/one-recipe-handoff`)
 
 - **Result:** Added one recipe hand-off with labeled return routing, repeat returns, shared app presentation, and Edit or Write controls for Playbook sections. Addressed review feedback on queued returns, unfiled recipes, validation, and prompt formats.

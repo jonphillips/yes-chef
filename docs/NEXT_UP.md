@@ -1,6 +1,5 @@
-# Next Up — Chat access over MCP
+# Next Up — nothing dispatched
 
-**Slices:** effort `chat-access-mcp`
-**Briefs:** [docs/efforts/chat-access-mcp.md](efforts/chat-access-mcp.md)
-**Done when:** per the brief
+Nothing dispatched.
+
 **Owed:** see [device-passes.md](device-passes.md)

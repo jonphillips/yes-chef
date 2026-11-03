@@ -93,7 +93,7 @@ public enum ChatAccessInbox {
       }
       return ReturnRow(url: snapshot.url, stagedAt: staged.stagedAt,
         downloadState: snapshot.isCurrent ? .current : .downloading, destination: destination, superseded: [])
-    }.sorted { ($0.stagedAt, $0.id) < ($1.stagedAt, $1.id) }
+    }.sorted(by: returnRowPrecedes)
 
     var result: [ReturnRow] = []
     for row in candidates {
@@ -113,7 +113,20 @@ public enum ChatAccessInbox {
         result.append(row)
       }
     }
-    return result.sorted { ($0.stagedAt, $0.id) < ($1.stagedAt, $1.id) }
+    return result.sorted(by: returnRowPrecedes)
+  }
+
+  private static func returnRowPrecedes(_ lhs: ReturnRow, _ rhs: ReturnRow) -> Bool {
+    if lhs.stagedAt != rhs.stagedAt { return lhs.stagedAt < rhs.stagedAt }
+    if let left = StagedHandoff(url: lhs.url), let right = StagedHandoff(url: rhs.url), left.slug == right.slug {
+      func sequence(_ url: URL) -> Int {
+        let name = url.deletingPathExtension().lastPathComponent
+        guard let range = name.range(of: #"--\d+$"#, options: .regularExpression) else { return 1 }
+        return Int(name[range].dropFirst(2)) ?? 1
+      }
+      return sequence(lhs.url) < sequence(rhs.url)
+    }
+    return lhs.id.compare(rhs.id, options: .numeric) == .orderedAscending
   }
 
   public static func expiredReturns(_ urls: [URL], inbox: URL, now: Date) -> [URL] {
@@ -156,7 +169,9 @@ public enum ChatAccessInbox {
 
   public static func expired(_ snapshots: [ProcessedSnapshot], now: Date) -> [URL] {
     snapshots.compactMap { snapshot in
-      guard let date = StagedHandoff(url: snapshot.url)?.stagedAt ?? snapshot.modifiedAt,
+      let stagedAt = StagedHandoff(url: snapshot.url)?.stagedAt
+      let date = snapshot.url.pathExtension == "ycreturn" ? (snapshot.modifiedAt ?? stagedAt) : (stagedAt ?? snapshot.modifiedAt)
+      guard let date,
         now.timeIntervalSince(date) > processedRetentionInterval
       else { return nil }
       return snapshot.url

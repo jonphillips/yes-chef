@@ -8,7 +8,7 @@ Playbook section's `•••` becomes **Edit / Write**, and **Clear** moves to 
 Related: [ADR-0061](../../decisions/ADR-0061-one-recipe-handoff.md) (the decision and the slice spec) ·
 [ADR-0042](../../decisions/ADR-0042-workbench-handoff-and-the-return-block.md) Amd 1 ·
 [ADR-0041](../../decisions/ADR-0041-playbook-section-toolbar-and-scoped-handoff.md) Amd 1 and Amd 2 ·
-[chat-access-mcp.md](../chat-access-mcp.md) (its S3b builds on this dispatch)
+[chat-access-mcp.md](chat-access-mcp.md) (its S3b builds on this dispatch)
 
 ## Spec
 
