@@ -6,7 +6,7 @@ import YesChefCore
 import YesChefMCPServer
 
 struct YesChefMCPTests {
-  @Test func listsOnlyStageRecipeAndStagesAValidatedColonFreeFile() async throws {
+  @Test func listsToolsAndStagesAValidatedColonFreeRecipe() async throws {
     let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     let container = temporary.appending(path: "container", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
@@ -16,7 +16,7 @@ struct YesChefMCPTests {
     let server = YesChefMCPServer.make(containerURL: container) { fixedDate }
     let list = try #require(await server.handle(line: request("tools/list")))
     let tools = try object(list)["result"]?.objectValue?["tools"]?.arrayValue ?? []
-    #expect(Set(tools.compactMap { $0.objectValue?["name"]?.stringValue }) == Set(["stage_recipe", "search_recipes", "get_recipe", "list_menus", "get_menu", "get_meal_plan"]))
+    #expect(Set(tools.compactMap { $0.objectValue?["name"]?.stringValue }) == Set(["stage_recipe", "stage_handoff_return", "search_recipes", "get_recipe", "list_menus", "get_menu", "get_meal_plan"]))
 
     let response = try #require(await server.handle(line: toolCall("stage_recipe", recipe: validRecipe)))
     let responseObject = try object(response)["result"]?.objectValue ?? [:]
@@ -215,6 +215,75 @@ struct YesChefMCPTests {
     let response = try #require(await server.handle(line: toolCall("stage_recipe", recipe: validRecipe)))
     #expect(try object(response)["result"]?.objectValue?["isError"] == .bool(true))
     #expect(try object(response)["result"]?.objectValue?["content"]?.arrayValue?.first?.objectValue?["text"]?.stringValue?.contains(container.path) == true)
+    #expect(!FileManager.default.fileExists(atPath: container.path))
+  }
+
+  @Test func handoffReturnsPreserveTextAndAllowRepeatedTokens() async throws {
+    let container = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: container) }
+    let date = ISO8601DateFormatter().date(from: "2026-10-21T12:00:00Z")!
+    let server = YesChefMCPServer.make(containerURL: container) { date }
+    let id = UUID()
+    let text = "YC-HANDOFF: \(id.uuidString)\nYC-CONTRACT: v3\nCrème brûlée\n"
+    for _ in 0..<2 {
+      let response = try #require(await server.handle(line: genericToolCall("stage_handoff_return", args: ["text": .string(text)])))
+      #expect(try object(response)["result"]?.objectValue?["isError"] != .bool(true))
+      let result = try object(toolText(response))
+      #expect(result["warning"] == nil)
+      #expect(result["next"]?.stringValue == "Staged for review on the device that started this hand-off. Jon opens it from From Chat there.")
+    }
+    let inbox = HandoffInbox(root: ChatAccessFolder(containerURL: container).inboxURL, fileExtension: "ycreturn")
+    let files = try inbox.list()
+    #expect(files.count == 2)
+    for file in files {
+      #expect(file.slug == id.uuidString.lowercased())
+      #expect(!file.url.lastPathComponent.contains(":"))
+      #expect(try Data(contentsOf: file.url) == Data(text.utf8))
+    }
+  }
+
+  @Test func invalidHandoffEnvelopesStageNothing() async throws {
+    let container = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: container) }
+    let server = YesChefMCPServer.make(containerURL: container)
+    let id = UUID().uuidString
+    let cases = [
+      ("YC-CONTRACT: v3\nBody", "first line"),
+      ("YC-HANDOFF: invalid\nYC-CONTRACT: v3\nBody", "first line"),
+      ("YC-HANDOFF: \(id)\nYC-CONTRACT: v3\n  \n", "no content"),
+      ("YC-HANDOFF: \(id)\nYC-CONTRACT: v4\nBody", "contract v3"),
+    ]
+    for (text, message) in cases {
+      let response = try #require(await server.handle(line: genericToolCall("stage_handoff_return", args: ["text": .string(text)])))
+      #expect(try object(response)["result"]?.objectValue?["isError"] == .bool(true))
+      #expect(try toolText(response).contains(message))
+    }
+    #expect(!FileManager.default.fileExists(atPath: ChatAccessFolder(containerURL: container).inboxURL.path))
+  }
+
+  @Test func olderAndMissingMarkersStageWithWarnings() async throws {
+    let container = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: container) }
+    let server = YesChefMCPServer.make(containerURL: container)
+    let id = UUID().uuidString
+    for text in ["YC-HANDOFF: \(id)\nYC-CONTRACT: v2\nBody", "YC-HANDOFF: \(id)\nBody"] {
+      let response = try #require(await server.handle(line: genericToolCall("stage_handoff_return", args: ["text": .string(text)])))
+      #expect(try object(response)["result"]?.objectValue?["isError"] != .bool(true))
+      #expect(try object(toolText(response))["warning"]?.stringValue != nil)
+    }
+    let inbox = HandoffInbox(root: ChatAccessFolder(containerURL: container).inboxURL, fileExtension: "ycreturn")
+    #expect(try inbox.list().count == 2)
+  }
+
+  @Test func handoffReturnDoesNotCreateMissingContainer() async throws {
+    let container = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let server = YesChefMCPServer.make(containerURL: container)
+    let text = "YC-HANDOFF: \(UUID().uuidString)\nYC-CONTRACT: v3\nBody"
+    let response = try #require(await server.handle(line: genericToolCall("stage_handoff_return", args: ["text": .string(text)])))
+    #expect(try object(response)["result"]?.objectValue?["isError"] == .bool(true))
     #expect(!FileManager.default.fileExists(atPath: container.path))
   }
 
