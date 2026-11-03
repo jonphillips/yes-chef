@@ -12,29 +12,17 @@ final class HandoffReviewCoordinator {
   @ObservationIgnored @Dependency(\.date.now) var now
   @ObservationIgnored @Dependency(\.defaultDatabase) var database
   @ObservationIgnored @Dependency(\.uuid) var uuid
-  @ObservationIgnored @Dependency(\.createRecipeCoordinator) private var createRecipeCoordinator
+  @ObservationIgnored @Dependency(\.createRecipeCoordinator) var createRecipeCoordinator
 
   var review: AIHandoffReview?
   var contractWarning: String?
   var adjustmentReview: RecipeAdjustmentReviewState?
   private var pendingAdjustmentReview: RecipeAdjustmentReviewState?
   private var pendingHandoff: AIHandoff?
+  var pendingRecipeReviews: [AIHandoffReview] = []
   var errorMessage: String?
   var errorTitle = "Could Not Save Handoff"
   var isShowingError = false
-
-  /// All external hand-off doors present a staged result through the same router.
-  func presentStaged(
-    _ result: AIHandoffReviewResult,
-    pendingHandoff: AIHandoff? = nil
-  ) async {
-    if case let .recipeNew(_, text) = result.review {
-      await createRecipeCoordinator.stage(text: text)
-      contractWarning = result.warning
-    } else {
-      present(result.review, warning: result.warning, pendingHandoff: pendingHandoff)
-    }
-  }
 
   func present(
     _ review: AIHandoffReview,
@@ -48,11 +36,15 @@ final class HandoffReviewCoordinator {
     adjustmentReview = nil
     pendingAdjustmentReview = nil
     self.pendingHandoff = pendingHandoff
-    self.review = review
+    setPresentedReview(review)
   }
 
   func reviewItems(for review: AIHandoffReview) -> [ChatApplyReviewItem] {
     switch review {
+    case let .recipeItems(_, items):
+      items.flatMap { reviewItems(for: $0) }
+    case .recipeNew, .recipeUnfiled:
+      []
     case let .menuComplement(review):
       menuComplementReviewItems(for: review)
     case let .menuPrepPlan(review):
@@ -132,7 +124,7 @@ final class HandoffReviewCoordinator {
       let currentMakeAhead = review.currentMakeAhead.flatMap(Self.nonEmpty)
       items.append(
         ChatApplyReviewItem(
-          id: review.handoffID,
+          id: uuid(),
           title: "Review make-ahead",
           summary: review.makeAhead,
           presentation: .sheet,
@@ -177,7 +169,7 @@ final class HandoffReviewCoordinator {
       let currentChefItUp = review.currentText.flatMap(Self.nonEmpty)
       items.append(
         ChatApplyReviewItem(
-          id: review.handoffID,
+          id: uuid(),
           title: "Review Chef It Up",
           summary: review.text,
           presentation: .sheet,
@@ -224,7 +216,7 @@ final class HandoffReviewCoordinator {
       let editableText = currentPlan.unioning(returnedPlan).editableReviewText()
       items.append(
         ChatApplyReviewItem(
-          id: review.handoffID,
+          id: uuid(),
           title: "Review Serve With",
           summary: review.text,
           presentation: .sheet,
@@ -559,6 +551,7 @@ final class HandoffReviewCoordinator {
   }
 
   func discardAll() {
+    pendingRecipeReviews = []
     clearError()
     pendingHandoff = nil
     review = nil
@@ -569,11 +562,13 @@ final class HandoffReviewCoordinator {
   }
 
   func reviewSheetDidDismiss() {
-    guard pendingAdjustmentReview != nil else {
+    if pendingAdjustmentReview != nil {
+      presentPendingAdjustmentReviewAfterReviewDismissal()
+    } else if !pendingRecipeReviews.isEmpty {
+      review = pendingRecipeReviews.removeFirst()
+    } else {
       pendingHandoff = nil
-      return
     }
-    presentPendingAdjustmentReviewAfterReviewDismissal()
   }
 
   func commitReviewWrite<T>(
@@ -744,6 +739,10 @@ struct HandoffReviewSheet: View {
   var body: some View {
     Group {
       switch review {
+      case let .recipeUnfiled(id, recipeID, text):
+        RecipeUnfiledReviewSheet(coordinator: coordinator, handoffID: id, recipeID: recipeID, text: text)
+      case .recipeNew:
+        EmptyView()
       case let .workbenchExperiments(experimentsReview):
         WorkbenchExperimentsReviewSheet(
           coordinator: coordinator,
@@ -756,7 +755,7 @@ struct HandoffReviewSheet: View {
           review: briefReview,
           originalReview: review
         )
-      case .menuPrepPlan, .menuComplement, .recipeMakeAhead, .recipeChefItUp, .recipeServeWith,
+      case .recipeItems, .menuPrepPlan, .menuComplement, .recipeMakeAhead, .recipeChefItUp, .recipeServeWith,
            .mealPlanMakeAhead, .mealPlanComplement, .workbenchCompare, .workbenchDraft:
         standardReviewSheet
       }

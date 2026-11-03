@@ -137,6 +137,7 @@ struct HandoffAppShortcuts: AppShortcutsProvider {
 }
 
 enum HandoffExportSource: Sendable {
+  case recipe(Recipe.ID)
   case recipeSection(Recipe.ID, PlaybookSectionKind)
   case recipeAdjustment(Recipe.ID, variationID: RecipeVariation.ID? = nil)
   case menu(Menu.ID, prepPlanIntent: AIHandoffPrepPlanIntent = .refine)
@@ -150,7 +151,7 @@ enum HandoffExportSource: Sendable {
 
   init(_ source: HandoffSource) {
     switch source {
-    case let .recipe(recipe): self = .recipeAdjustment(recipe.id)
+    case let .recipe(recipe): self = .recipe(recipe.id)
     case let .menu(menu): self = .menu(menu.id)
     case let .mealPlan(mealPlan): self = .mealPlan(mealPlan.id)
     case let .workbench(workbench): self = .workbench(workbench.id, task: .compare)
@@ -169,6 +170,8 @@ extension HandoffExportSource {
 
   func metadata(handoffID: AIHandoff.ID) -> Metadata {
     switch self {
+    case let .recipe(recipeID):
+      Metadata(sourceType: .recipe, sourceID: recipeID, taskType: .recipe, dayOffset: nil, variationID: nil)
     case let .recipeSection(recipeID, section):
       Metadata(
         sourceType: .recipe,
@@ -213,7 +216,7 @@ extension HandoffExportSource {
   var unmatchedSubject: String {
     switch self {
     case .recipeSection: "recipe section"
-    case .recipeAdjustment: "recipe"
+    case .recipe, .recipeAdjustment: "recipe"
     case .menu: "menu"
     case .menuComplement: "menu"
     case .menuDay: "menu day"
@@ -258,7 +261,7 @@ extension HandoffExportSource {
   var prepPlanIntent: AIHandoffPrepPlanIntent {
     switch self {
     case let .menu(_, prepPlanIntent): prepPlanIntent
-    case .recipeSection, .recipeAdjustment, .menuComplement, .menuDay, .menuDayComplement,
+    case .recipe, .recipeSection, .recipeAdjustment, .menuComplement, .menuDay, .menuDayComplement,
       .mealPlan, .mealPlanComplement, .readerFeedback, .workbench:
       .refine
     }
@@ -433,7 +436,7 @@ enum HandoffAppOperations {
     let prompt = AIHandoffToken.selfContainedPrompt(
       handoffID: handoffID,
       title: "\(metadata.taskType.title): \(detail.recipe.title)",
-      body: try RecipeHandoffContext(detail: detail).prompt(forTask: .adjustRecipe)
+      body: try RecipeHandoffContext(detail: detail).prompt(forTask: metadata.taskType)
     )
     return AIHandoff(
       id: handoffID,
@@ -651,6 +654,10 @@ enum HandoffAppOperations {
         now: now,
         handoffID: handoffID
       )
+
+    case let .recipe(recipeID):
+      handoff = try await exportedRecipeAdjustmentHandoff(recipeID: recipeID, variationID: nil,
+        metadata: metadata, mode: mode, in: database, now: now, handoffID: handoffID)
 
     case let .recipeAdjustment(recipeID, variationID):
       handoff = try await exportedRecipeAdjustmentHandoff(

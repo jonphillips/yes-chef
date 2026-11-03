@@ -143,7 +143,7 @@ struct RecipeDetailView: View {
 
   private func copyAdjustmentPrompt() {
     Task {
-      await handoffTransport.copyPrompt(for: .recipeAdjustment(model.recipeID))
+      await handoffTransport.copyPrompt(for: .recipe(model.recipeID))
     }
   }
 
@@ -207,7 +207,7 @@ struct RecipeDetailView: View {
           Task {
             await handoffTransport.pastedResultsReceived(
               results,
-              source: .recipeAdjustment(model.recipeID)
+              source: .recipe(model.recipeID)
             )
           }
         } label: {

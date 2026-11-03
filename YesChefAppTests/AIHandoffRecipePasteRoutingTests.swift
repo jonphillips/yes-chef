@@ -108,4 +108,54 @@ struct AIHandoffRecipePasteRoutingTests {
       #expect(status == .imported)
     }
   }
+  @Test
+  func intentRoutesLegacyRecipeToCreateRecipe() async throws {
+    let create = CreateRecipeCoordinator()
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Self.now
+      $0.uuid = .incrementing
+      $0.createRecipeCoordinator = create
+      $0.handoffReviewCoordinator = HandoffReviewCoordinator()
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try seedRecipeAndHandoff(in: database)
+      let payload = """
+      YC-HANDOFF: \(Self.handoffID.uuidString)
+      \(AIHandoffReturnContract.marker)
+      {"@context":"https://schema.org","@type":"Recipe","name":"Cabbage",\
+      "recipeIngredient":["1 cabbage"],\
+      "recipeInstructions":[{"@type":"HowToStep","text":"Char it."}]}
+      """
+      _ = try await ImportHandoffResult(result: payload).perform()
+      #expect(create.stagedText?.text.contains("Cabbage") == true)
+    }
+  }
+
+  @Test
+  func multipleItemsAppearBeforeRevision() async throws {
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Self.now
+      $0.uuid = .incrementing
+    } operation: {
+      let coordinator = HandoffReviewCoordinator()
+      let makeAhead = AIHandoffReview.recipeMakeAhead(.init(handoffID: Self.handoffID,
+        recipeID: Self.recipeID, makeAhead: "Tomorrow: Chill", currentMakeAhead: nil, learnings: []))
+      let chef = AIHandoffReview.recipeChefItUp(.init(handoffID: Self.handoffID,
+        recipeID: Self.recipeID, section: .chefItUp, text: "Brown butter", learnings: []))
+      let brief = AIHandoffReview.recipeAdjustmentBrief(.init(handoffID: Self.handoffID,
+        recipeID: Self.recipeID, variationID: nil, brief: "Use brown butter", learnings: []))
+      await coordinator.presentStaged(.init(review: .recipeItems(handoffID: Self.handoffID,
+        items: [makeAhead, chef, brief]), warning: nil))
+      let first = try #require(coordinator.review)
+      #expect(coordinator.reviewItems(for: first).count == 2)
+      coordinator.discard(first)
+      coordinator.reviewSheetDidDismiss()
+      guard case .recipeAdjustmentBrief = coordinator.review else {
+        Issue.record("Expected the revision after section reviews"); return
+      }
+    }
+  }
+
 }
