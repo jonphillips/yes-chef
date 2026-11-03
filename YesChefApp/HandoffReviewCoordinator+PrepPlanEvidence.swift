@@ -1,3 +1,4 @@
+import Foundation
 import YesChefCore
 
 extension HandoffReviewCoordinator {
@@ -25,8 +26,9 @@ extension HandoffReviewCoordinator {
     pendingHandoff: AIHandoff? = nil
   ) async {
     if case let .recipeNew(_, text) = result.review {
+      discardAll()
       await createRecipeCoordinator.stage(text: text)
-      contractWarning = result.warning
+      newRecipeWarning = result.warning
     } else {
       present(result.review, warning: result.warning, pendingHandoff: pendingHandoff)
     }
@@ -41,6 +43,7 @@ extension HandoffReviewCoordinator {
     if case let .recipeItems(_, items) = staged.review {
       pendingRecipeReviews.insert(contentsOf: items, at: 0)
     }
+    advanceRecipeReviews = true
     review = nil
   }
 
@@ -49,6 +52,7 @@ extension HandoffReviewCoordinator {
 extension HandoffReviewCoordinator {
   func setPresentedReview(_ review: AIHandoffReview) {
     pendingRecipeReviews = []
+    advanceRecipeReviews = false
     if case let .recipeItems(id, items) = review {
       let ordinary = items.filter {
         switch $0 {

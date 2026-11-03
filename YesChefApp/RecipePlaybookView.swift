@@ -198,7 +198,7 @@ struct RecipePlaybookView: View {
           }
         }
         Spacer(minLength: 12)
-        if showsActions, isExpanded.wrappedValue {
+        if showsActions {
           actions()
             .padding(.trailing, 12)
         }

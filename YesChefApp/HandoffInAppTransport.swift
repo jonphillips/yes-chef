@@ -90,7 +90,8 @@ final class HandoffInAppTransport {
         handoffID: handoff.id,
         result: result,
         in: database,
-        now: now
+        now: now,
+        allowRestage: true
       )
       await handoffReviewCoordinator.presentStaged(.init(
         review: source.applyingScope(to: staged.review, resolvedHandoff: handoff), warning: staged.warning
@@ -181,7 +182,8 @@ final class HandoffInAppTransport {
             handoffID: storedHandoff.id,
             result: unmatchedResult,
             in: database,
-            now: now
+            now: now,
+            allowRestage: true
           )
         } else {
           let unmatched = try await HandoffAppOperations.stageUnmatchedReviewForKnownSource(
@@ -440,9 +442,16 @@ struct RecipeUnfiledReviewSheet: View {
   let coordinator: HandoffReviewCoordinator
   let handoffID: UUID
   let recipeID: UUID
-  @State var text: String
+  @State private var text: String
   @State private var label: String?
   @State private var error: String?
+
+  init(coordinator: HandoffReviewCoordinator, handoffID: UUID, recipeID: UUID, text: String) {
+    self.coordinator = coordinator
+    self.handoffID = handoffID
+    self.recipeID = recipeID
+    _text = State(initialValue: text)
+  }
 
   var body: some View {
     NavigationStack {
@@ -460,7 +469,9 @@ struct RecipeUnfiledReviewSheet: View {
       .navigationTitle("File returned text")
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Discard", role: .destructive) { coordinator.review = nil }
+          Button("Discard", role: .destructive) {
+            if let review = coordinator.review { coordinator.discard(review) }
+          }
         }
         ToolbarItem(placement: .confirmationAction) {
           Button("Review") {

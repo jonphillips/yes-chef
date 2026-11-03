@@ -762,7 +762,8 @@ enum HandoffAppOperations {
     handoffID: AIHandoff.ID?,
     result: String,
     in database: any DatabaseWriter,
-    now: Date
+    now: Date,
+    allowRestage: Bool = false
   ) async throws -> AIHandoffReviewResult {
     let contract = try AIHandoffReturnContract.strippingMarker(from: result)
     return try await database.write { db in
@@ -771,7 +772,7 @@ enum HandoffAppOperations {
         result: contract.text,
         in: db,
         now: now,
-        allowRestage: true
+        allowRestage: allowRestage
       )
       return AIHandoffReviewResult(review: review, warning: contract.warning)
     }
