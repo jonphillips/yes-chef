@@ -27,7 +27,7 @@ Schema-free, and no contract bump. Code references are to `origin/main` 0c383cb.
 
 ### Build order
 
-- [ ] **S3a — the helper's `stage_handoff_return`.** It's the dispatch now.
+- [x] **S3a — the helper's `stage_handoff_return`.** It's the dispatch now.
 - The [one-recipe-handoff](one-recipe-handoff.md) dispatch (ADR-0061 S1 + S2) goes next. It's that brief's
   index row, above this one.
 - [ ] **S3b — the app's token-routed inbox items**, after the ADR-0061 dispatch merges.

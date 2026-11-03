@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-03 — Chat access S3a — stage hand-off returns (`effort/chat-access-s3a`)
+
+- **Result:** Added the token-routed MCP staging tool, shared hand-off instructions, and a JSON-only recipe inbox projection.
+- **Verification:** Helper package: 12 tests passed; check-drift.sh: lint clean, 749 Core tests passed (2 known issues), and app test-target build passed.
+- **Owed:** chat-access-mcp, S3a only's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-02 — Missing iCloud rows: copy fixes and device pass (`effort/missing-from-icloud-closeout`)
 
 Recorded the iPhone device pass. Fixed two lines of sync status copy: the Up-to-date explanation still named the old
