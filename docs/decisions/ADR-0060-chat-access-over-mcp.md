@@ -13,7 +13,7 @@ Status: **Accepted** — 2026-10-22, after S0's device pass confirmed D2 (OQ1 an
 built by effort [`automatic-backups`](../efforts/archive/automatic-backups.md)): the container's `Documents/` is now
 published so automatic backups show in Files. D2's "the container is not published" no longer holds. `MCP/`
 sits outside `Documents/`, so it stays hidden.
-**[Amendment 1](#amendment-1--a-handoff-return-is-routed-by-its-yc-handoff-token-2026-11-03) — Proposed
+**[Amendment 1](#amendment-1--a-handoff-return-is-routed-by-its-yc-handoff-token-2026-11-03) — Accepted
 2026-11-03:** answers OQ3. A return may carry the app-minted `YC-HANDOFF` token and nothing else that names a
 row; `stage_handoff_return` stages the whole return block, and only the device that minted the token opens it.
 Origin: Jon, after Vinyl Fever M12 proved ChatGPT → MCP end to end ("we do a
@@ -231,7 +231,9 @@ iCloud Documents entitlement.
 
 ## Amendment 1 — A handoff return is routed by its YC-HANDOFF token (2026-11-03)
 
-Status: **Proposed** — 2026-11-03. Answers OQ3 and unblocks S3. Schema-free. No contract bump.
+Status: **Accepted** — 2026-11-03 (proposed the same day, #431). Answers OQ3 and unblocks S3. Schema-free. No
+contract bump. Read with the [notes at acceptance](#amd-1--notes-at-acceptance-2026-11-03), which correct D2's
+premise about the shipped inbox and narrow D3 for ADR-0061's `.recipe` task type.
 
 ### Context
 
@@ -287,7 +289,8 @@ returns a prose brief, and the structured change is derived in-app against live 
   is opened and its errors show in the app. **This is a named gap against ADR-0007 D3** ("checked by the same
   decoder before it's written"): the envelope is checked before writing, the body after.
 - **The file:** `HandoffInbox(root: …/MCP/Inbox, fileExtension: "ycreturn")`, with the token UUID as the slug.
-  The distinct extension keeps builds that list only `json` recipes from opening a return as a recipe. The
+  The distinct extension keeps builds that list only `json` recipes from opening a return as a recipe. *(Shipped
+  builds don't yet list only `json`; S3a makes them. See the notes at acceptance.)* The
   slug lets the app group items by token without reading them.
 - **Annotations:** `readOnlyHint: false, destructiveHint: false`, so ChatGPT asks before staging (D3's second
   checkpoint).
@@ -315,7 +318,8 @@ This narrows D3's claim rule for `.ycreturn` items. `json` recipe items are unch
 - **A capture-sourced token** (Reader Feedback) returns only to the open capture editor
   (`AIHandoffSourceType.capture`), so it gets the same **Copy** treatment.
 - **The same token staged more than once:** a later finalize, after more discussion, is a real new answer.
-  The app shows the newest file for a token, and claiming it also moves the older ones to `Processed/`.
+  The app shows the newest file for a token, and claiming it also moves the older ones to `Processed/`. *(Not for
+  a task type that takes repeat returns, ADR-0061's `.recipe`. See the notes at acceptance.)*
   `allowRestage: true` means a return for an already-imported handoff reopens a review, as a re-paste does.
 - **Orphans expire.** During its usual maintenance, any device moves an unclaimed `.ycreturn` item older than
   the `Processed/` retention (30 days) to `Processed/`. That's the one exception to "only the minting device
@@ -362,6 +366,25 @@ Until OQ4 is answered, such a chat can still do either of two things. It can sta
   `Yes Chef` Project, discuss, and finalize. The item opens the brief sheet on the iPhone. The iPad shows
   **Started on another device**. Repeat with a riff, which should open Create Recipe and mark the handoff
   imported.
+
+### Amd 1 — notes at acceptance (2026-11-03)
+
+Found while specifying S3a and S3b against `origin/main` 0c383cb. Jon accepted this amendment and ADR-0061 the
+same day, and the two meet in S3b.
+
+- **D2's extension premise isn't true of shipped builds yet.** `ChatAccessInbox.rows(from:)` lists any file
+  whose name `StagedHandoff` parses, whatever its extension, and the app's metadata query matches by path
+  alone. A `.ycreturn` staged against today's build would list under **From Chat** as a recipe. Opening it
+  would send the return block to Create Recipe and move the file to `Processed/` renamed `.json`, from
+  whichever device got there first. S3a filters recipe rows to `json`. Jon installs the S3a helper only once
+  both devices run a build with that filter.
+- **D3's newest-per-token rule is narrowed by ADR-0061 D4.** A `.recipe` token takes several returns, and each
+  can be a different deliverable: a make-ahead plan first, then a revision. Keeping only the newest would move
+  the make-ahead to `Processed/` without anyone seeing it. For a task type that takes repeat returns, every
+  file stays its own item, and claiming one claims only that one. Every other task type keeps D3 as written.
+  ADR-0061 S1 states the rule on the task type in Core, so S3b reads it instead of restating it.
+- **The device pass starts from ADR-0061's one door.** After ADR-0061 D1 the toolbar **Hand off** mints
+  `.recipe`, not `.adjustRecipe`, so the pass below starts there. The effort brief holds the revised pass.
 
 ### Amd 1 — consequences
 
