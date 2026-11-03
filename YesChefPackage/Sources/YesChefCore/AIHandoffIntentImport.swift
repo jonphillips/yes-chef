@@ -98,7 +98,7 @@ public extension AIHandoffIntentImport {
       throw AIHandoffIntentImportError.handoffNotFound(id)
     }
     let alreadyImported = handoff.status != .awaitingReturn || handoff.importedAt != nil
-    guard allowRestage || !alreadyImported else {
+    guard allowRestage || !alreadyImported || (handoff.taskType.acceptsRepeatReturns && handoff.status == .imported) else {
       throw AIHandoffIntentImportError.duplicate
     }
     let review = try AIHandoffReviewStager.stage(
@@ -106,7 +106,7 @@ public extension AIHandoffIntentImport {
       payload: routedText?.payload ?? result,
       in: db
     )
-    try AIHandoffRepository.markImported(id: handoff.id, at: now, in: db)
+    if !alreadyImported { try AIHandoffRepository.markImported(id: handoff.id, at: now, in: db) }
     return review
   }
 
@@ -178,7 +178,7 @@ private enum AIHandoffReviewStager {
       return .menuComplement(AIHandoffMenuComplementReview(
         handoffID: handoff.id, menuID: menu.id, plan: returned.plan, unparsedBlocks: returned.unparsedBlocks
       ))
-    case .recipeMakeAhead, .chefItUp, .serveWith, .adjustRecipe, .mealPlanMakeAheadStrategy,
+    case .recipe, .recipeMakeAhead, .chefItUp, .serveWith, .adjustRecipe, .mealPlanMakeAheadStrategy,
       .mealPlanComplement, .readerFeedbackCuration, .workbenchCompare, .workbenchExperiments,
       .workbenchDraft:
       throw AIHandoffIntentImportError.wrongTask
@@ -188,6 +188,13 @@ private enum AIHandoffReviewStager {
   private static func recipeReview(handoff: AIHandoff, payload: String, in db: Database) throws -> AIHandoffReview {
     guard let recipe = try Recipe.find(handoff.sourceID).fetchOne(db), !recipe.archived else {
       throw AIHandoffIntentImportError.wrongTask
+    }
+    if handoff.taskType == .recipe {
+      return try labeledRecipeReview(handoff: handoff, recipe: recipe, payload: payload, in: db)
+    }
+    if handoff.taskType == .adjustRecipe,
+      try RecipeAdjustmentFinalize.classify(payload: payload) == .newRecipe {
+      return .recipeNew(handoffID: handoff.id, text: payload)
     }
     let returned = AIHandoffReturn.plainText(from: payload)
     guard !returned.deliverable.isEmpty || !returned.learnings.isEmpty else {
@@ -220,10 +227,71 @@ private enum AIHandoffReviewStager {
         brief: returned.deliverable,
         learnings: returned.learnings
       ))
-    case .prepPlan, .mealPlanMakeAheadStrategy, .mealPlanComplement, .menuComplement,
+    case .recipe, .prepPlan, .mealPlanMakeAheadStrategy, .mealPlanComplement, .menuComplement,
       .readerFeedbackCuration, .workbenchCompare, .workbenchExperiments, .workbenchDraft:
       throw AIHandoffIntentImportError.wrongTask
     }
+  }
+
+  private static func labeledRecipeReview(
+    handoff: AIHandoff, recipe: Recipe, payload: String, in db: Database
+  ) throws -> AIHandoffReview {
+    let regex = try NSRegularExpression(pattern: "(?m)^YC-[A-Z0-9-]+:")
+    let range = NSRange(payload.startIndex..., in: payload)
+    let matches = regex.matches(in: payload, range: range)
+    var blocks: [(String, String)] = []
+    var cursor = payload.startIndex
+    for (index, match) in matches.enumerated() {
+      guard let labelRange = Range(match.range, in: payload) else { continue }
+      if index == 0 {
+        let prefix = String(payload[cursor..<labelRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+        if !prefix.isEmpty { blocks.append(("", prefix)) }
+      }
+      let end = index + 1 < matches.count ? Range(matches[index + 1].range, in: payload)!.lowerBound : payload.endIndex
+      let text = String(payload[labelRange.upperBound..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
+      blocks.append((String(payload[labelRange]), text))
+      cursor = end
+    }
+    if matches.isEmpty { blocks = [("", payload.trimmingCharacters(in: .whitespacesAndNewlines))] }
+    guard blocks.contains(where: { !$0.1.isEmpty || !$0.0.isEmpty }) else { throw AIHandoffIntentImportError.emptyPlan }
+    if blocks.contains(where: { $0.0 == "YC-NEW-RECIPE:" }) {
+      guard blocks.count == 1, let block = blocks.first,
+        try RecipeAdjustmentFinalize.classify(payload: block.1) == .newRecipe
+      else { throw AIHandoffIntentImportError.wrongTask }
+      return .recipeNew(handoffID: handoff.id, text: block.1)
+    }
+    let learnings = blocks.filter { $0.0 == "YC-LEARNINGS:" }
+      .flatMap { AIHandoffReturn.learnings(from: $0.1).learnings }
+    var items: [AIHandoffReview] = []
+    var brief: AIHandoffReview?
+    for (label, text) in blocks where label != "YC-LEARNINGS:" {
+      switch label {
+      case "YC-MAKE-AHEAD:":
+        items.append(.recipeMakeAhead(.init(handoffID: handoff.id, recipeID: recipe.id, makeAhead: text,
+          currentMakeAhead: recipe.makeAhead, learnings: [])))
+      case "YC-CHEF-IT-UP:":
+        items.append(.recipeChefItUp(.init(handoffID: handoff.id, recipeID: recipe.id, section: .chefItUp,
+          text: text, currentText: recipe.chefItUp, learnings: [])))
+      case "YC-SERVE-WITH:":
+        items.append(.recipeServeWith(.init(handoffID: handoff.id, recipeID: recipe.id, section: .serveWith,
+          text: text, currentServeWith: try RecipeServeWithRepository.serveWith(for: recipe.id, in: db).map(\.item),
+          learnings: [])))
+      case "YC-REVISION:":
+        let item = AIHandoffReview.recipeAdjustmentBrief(.init(handoffID: handoff.id, recipeID: recipe.id,
+          variationID: handoff.variationID, brief: text, learnings: []))
+        if let previous = brief { items.append(previous) }
+        brief = item
+      default:
+        items.append(.recipeUnfiled(handoffID: handoff.id, recipeID: recipe.id,
+          text: label.isEmpty ? text : label + "\n" + text))
+      }
+    }
+    if !learnings.isEmpty {
+      items.append(.recipeMakeAhead(.init(handoffID: handoff.id, recipeID: recipe.id, makeAhead: "",
+        currentMakeAhead: recipe.makeAhead, learnings: learnings)))
+    }
+    if let brief { items.append(brief) }
+    return .recipeItems(handoffID: handoff.id, items: items)
   }
 
   private static func mealPlanReview(handoff: AIHandoff, payload: String, in db: Database) throws -> AIHandoffReview {
@@ -249,7 +317,7 @@ private enum AIHandoffReviewStager {
         handoffID: handoff.id, mealPlanItemID: item.id, scheduledDate: item.scheduledDate,
         plan: returned.plan, unparsedBlocks: returned.unparsedBlocks
       ))
-    case .prepPlan, .recipeMakeAhead, .chefItUp, .serveWith, .adjustRecipe, .menuComplement,
+    case .recipe, .prepPlan, .recipeMakeAhead, .chefItUp, .serveWith, .adjustRecipe, .menuComplement,
       .readerFeedbackCuration, .workbenchCompare, .workbenchExperiments, .workbenchDraft:
       throw AIHandoffIntentImportError.wrongTask
     }
@@ -293,7 +361,7 @@ private enum AIHandoffReviewStager {
         handoffID: handoff.id, workbenchID: handoff.sourceID,
         draftRecipe: draftRecipe, learnings: returned.learnings
       ))
-    case .prepPlan, .learning, .recipeMakeAhead, .chefItUp, .serveWith, .adjustRecipe,
+    case .recipe, .prepPlan, .learning, .recipeMakeAhead, .chefItUp, .serveWith, .adjustRecipe,
       .mealPlanMakeAheadStrategy, .mealPlanComplement, .menuComplement, .readerFeedbackCuration:
       throw AIHandoffIntentImportError.wrongTask
     }

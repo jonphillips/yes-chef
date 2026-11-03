@@ -62,10 +62,33 @@ public struct RecipeHandoffContext: Equatable, Sendable {
   /// Recipe-body hand-offs have a different return shape from Playbook sections: they outboard
   /// deliberation, then bring back prose that the in-app extractor resolves against live rows.
   public func prompt(forTask task: AIHandoffTaskType) -> String {
-    precondition(task == .adjustRecipe, "RecipeHandoffContext only supports recipe-body hand-off tasks.")
+    precondition(task == .adjustRecipe || task == .recipe, "Unsupported recipe task.")
 
     @Dependency(\.aiPromptPreferences) var preferences
     let settings = preferences.current()
+    if task == .recipe {
+      return """
+      Discuss this recipe freely. When the cook asks to finalize, return only the deliverables requested.
+      If the request is ambiguous, ask one short question. Prefix each deliverable with its label on a line:
+      YC-REVISION: Targeted revision brief, one change per line in method order, referring to existing wording.
+      YC-NEW-RECIPE: A standalone schema.org Recipe JSON-LD for a different dish.
+      \(RecipeJSONLDContract.outputInstructions)
+      YC-MAKE-AHEAD: Up to six `When: task` lines, using these timing labels: \(MakeAheadTiming.canonicalLabelList).
+      YC-CHEF-IT-UP: Up to six concrete technique or flavor upgrades, one per line.
+      YC-SERVE-WITH: Accompaniments, one `title: note` per line.
+      YC-LEARNINGS: Only new durable constraints or rejected ideas, not changes already in the brief.
+      A new recipe must stand alone, without any other deliverable or learnings. If a revision travels with
+      section notes, those notes describe the recipe as revised. The Playbook sections below are currently
+      saved; the cook may want them replaced instead of refined.
+
+      Taste profile: \(settings.tasteProfile)
+      Make-ahead preferences: \(AISettingsRepository.preference(in: settings, for: .makeAheadPrepPlan))
+      Chef It Up preferences: \(AISettingsRepository.preference(in: settings, for: .chefItUp))
+      Serve With preferences: \(AISettingsRepository.preference(in: settings, for: .serveWith))
+      \(Self.knownLearningsBlock(recipe.learnings))
+      \(bounded(recipe.serialized()))
+      """
+    }
     return Self.recipeAdjustmentPrompt(
       context: bounded(recipe.serialized()),
       knownLearnings: Self.knownLearningsBlock(recipe.learnings),

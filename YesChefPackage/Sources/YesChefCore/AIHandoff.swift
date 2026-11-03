@@ -72,6 +72,7 @@ public enum AIHandoffSourceType: String, Codable, QueryBindable, QueryDecodable,
 public enum AIHandoffTaskType: String, Codable, QueryBindable, QueryDecodable, Sendable {
   case prepPlan
   case learning
+  case recipe
   case recipeMakeAhead
   case chefItUp
   case serveWith
@@ -84,10 +85,13 @@ public enum AIHandoffTaskType: String, Codable, QueryBindable, QueryDecodable, S
   case workbenchExperiments
   case workbenchDraft
 
+  public var acceptsRepeatReturns: Bool { self == .recipe }
+
   public var title: String {
     switch self {
     case .prepPlan: "Prep Plan"
     case .learning: "Learnings"
+    case .recipe: "Recipe"
     case .recipeMakeAhead: "Make-ahead"
     case .chefItUp: "Chef It Up"
     case .serveWith: "Serve With"
@@ -763,7 +767,10 @@ public struct AIHandoffWorkbenchCompareReview: Equatable, Sendable {
   }
 }
 
-public enum AIHandoffReview: Equatable, Sendable {
+public indirect enum AIHandoffReview: Equatable, Sendable {
+  case recipeItems(handoffID: AIHandoff.ID, items: [AIHandoffReview])
+  case recipeNew(handoffID: AIHandoff.ID, text: String)
+  case recipeUnfiled(handoffID: AIHandoff.ID, recipeID: Recipe.ID, text: String)
   case menuComplement(AIHandoffMenuComplementReview)
   case menuPrepPlan(AIHandoffMenuPrepPlanReview)
   case recipeMakeAhead(AIHandoffRecipeMakeAheadReview)
@@ -778,6 +785,7 @@ public enum AIHandoffReview: Equatable, Sendable {
 
   public var handoffID: AIHandoff.ID {
     switch self {
+    case let .recipeItems(id, _), let .recipeNew(id, _), let .recipeUnfiled(id, _, _): id
     case let .menuComplement(review): review.handoffID
     case let .menuPrepPlan(review): review.handoffID
     case let .recipeMakeAhead(review): review.handoffID
