@@ -53,7 +53,7 @@ public enum ChatAccessInbox {
 
   public static func rows(from snapshots: [MetadataSnapshot]) -> [Row] {
     snapshots.compactMap { snapshot in
-      guard let handoff = StagedHandoff(url: snapshot.url), snapshot.name != "Processed" else { return nil }
+      guard snapshot.url.pathExtension == "json", let handoff = StagedHandoff(url: snapshot.url) else { return nil }
       return Row(
         url: snapshot.url,
         name: displayName(slug: handoff.slug, recipeName: snapshot.recipeName),

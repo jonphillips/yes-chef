@@ -12,6 +12,7 @@ struct ChatAccessInboxTests {
       ChatAccessInbox.MetadataSnapshot(
         url: root.appending(path: "2026-10-22T19:00:00Z-stew.json"), name: "2026-10-22T19:00:00Z-stew.json", isCurrent: true
       ),
+      ChatAccessInbox.MetadataSnapshot(url: root.appending(path: "20261022T200000Z-return.ycreturn"), name: "20261022T200000Z-return.ycreturn", isCurrent: true),
       ChatAccessInbox.MetadataSnapshot(url: root.appending(path: "malformed.json"), name: "malformed.json", isCurrent: true),
       ChatAccessInbox.MetadataSnapshot(url: root.appending(path: "Processed"), name: "Processed", isCurrent: true),
     ]
@@ -75,7 +76,14 @@ struct ChatAccessInboxTests {
   @Test func serverInstructionsCarryTheProjectContractAndPasteFallback() {
     #expect(ChatAccessServerInstructions.text.hasPrefix("These are Yes Chef's recipe tools."))
     #expect(ChatAccessServerInstructions.text.contains(RecipeJSONLDContract.projectSource))
-    #expect(ChatAccessServerInstructions.text.contains("If a tool call fails or times out"))
+    let text = ChatAccessServerInstructions.text
+    let opening = String(text.prefix(512))
+    #expect(opening.contains("stage_recipe"))
+    #expect(opening.contains("stage_handoff_return"))
+    #expect(text.contains(AIHandoffReturnContract.projectInstructions))
+    #expect(text.contains("If a tool call fails or times out, print the return block or the JSON-LD object for Jon to paste instead."))
+    let libraryCheck = "Before suggesting a recipe, check the Yes Chef library with the read tools."
+    #expect(text.components(separatedBy: libraryCheck).count == 2)
   }
 
   @Test func projectDocumentsMatchTheirCanonicalSources() throws {
