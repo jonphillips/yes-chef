@@ -34,7 +34,7 @@ private struct HandoffReviewDestinationsModifier: ViewModifier {
       }
       .sheet(
         item: gatedBinding($coordinator.adjustmentReview, enabled: isPresentationEnabled),
-        onDismiss: { coordinator.discardPendingHandoff() }
+        onDismiss: { coordinator.adjustmentSheetDidDismiss() }
       ) { review in
         RecipeAdjustmentReviewView(
           review: review,

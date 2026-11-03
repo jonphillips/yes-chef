@@ -1,6 +1,6 @@
 # Effort — Chat access over MCP
 
-Status: Ready — S3a shipped. S3b waits on the [one-recipe-handoff](one-recipe-handoff.md) dispatch.
+Status: Ready — S3a shipped. S3b waits on the [one-recipe-handoff](archive/one-recipe-handoff.md) dispatch.
 Schema-free throughout.
 Summary: S3 lets a ChatGPT return target an existing recipe: S3a adds the helper's `stage_handoff_return`, and S3b
 opens those returns on the device that started the hand-off. S0–S2b shipped.
@@ -29,7 +29,7 @@ Schema-free, and no contract bump. Code references are to `origin/main` 0c383cb.
 
 - [x] **S3a — the helper's `stage_handoff_return`.** Shipped; Jon's device gate is owed in
   [`device-passes.md`](../device-passes.md).
-- The [one-recipe-handoff](one-recipe-handoff.md) dispatch (ADR-0061 S1 + S2) goes next. It's that brief's
+- The [one-recipe-handoff](archive/one-recipe-handoff.md) dispatch (ADR-0061 S1 + S2) goes next. It's that brief's
   index row, above this one.
 - [ ] **S3b — the app's token-routed inbox items**, after the ADR-0061 dispatch merges.
 
@@ -128,7 +128,7 @@ before calling `stage_handoff_return`, that a `.ycreturn` file appears in `MCP/I
 
 ### S3b — the app's token-routed inbox items
 
-**Precondition:** the [one-recipe-handoff](one-recipe-handoff.md) dispatch has merged. S3b uses three things it
+**Precondition:** the [one-recipe-handoff](archive/one-recipe-handoff.md) dispatch has merged. S3b uses three things it
 adds: Core's new-recipe routing, the single app entry that presents a staged recipe return, and the repeat-return
 rule on `AIHandoffTaskType`.
 

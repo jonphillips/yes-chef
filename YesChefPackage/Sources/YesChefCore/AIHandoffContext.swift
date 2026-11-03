@@ -70,12 +70,13 @@ public struct RecipeHandoffContext: Equatable, Sendable {
       return """
       Discuss this recipe freely. When the cook asks to finalize, return only the deliverables requested.
       If the request is ambiguous, ask one short question. Prefix each deliverable with its label on a line:
-      YC-REVISION: Targeted revision brief, one change per line in method order, referring to existing wording.
-      YC-NEW-RECIPE: A standalone schema.org Recipe JSON-LD for a different dish.
+      YC-REVISION: \(Self.revisionFormat)
+      YC-NEW-RECIPE: A standalone schema.org Recipe JSON-LD for a different dish. Put the YC-NEW-RECIPE: label
+      on its own line first, followed by the JSON-LD object. The following object-only rule applies after the label:
       \(RecipeJSONLDContract.outputInstructions)
-      YC-MAKE-AHEAD: Up to six `When: task` lines, using these timing labels: \(MakeAheadTiming.canonicalLabelList).
-      YC-CHEF-IT-UP: Up to six concrete technique or flavor upgrades, one per line.
-      YC-SERVE-WITH: Accompaniments, one `title: note` per line.
+      YC-MAKE-AHEAD: \(Self.makeAheadFormat)
+      YC-CHEF-IT-UP: \(Self.lineListFormat("upgrade"))
+      YC-SERVE-WITH: \(Self.serveWithFormat)
       YC-LEARNINGS: Only new durable constraints or rejected ideas, not changes already in the brief.
       A new recipe must stand alone, without any other deliverable or learnings. If a revision travels with
       section notes, those notes describe the recipe as revised. The Playbook sections below are currently
@@ -121,6 +122,26 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     """
   }
 
+  private static let makeAheadFormat = """
+    Return format: one make-ahead step per line as `When: task` — a timing label, a colon, then a single \
+    concrete action the cook can take before cooking or serving. Order steps from earliest to just before \
+    serving, and use only these timing labels, exactly: \(MakeAheadTiming.canonicalLabelList) (replace N with \
+    a number). No bullets, no Markdown emphasis, no introduction, and no assessment of what the recipe already \
+    does well. Six steps at most — fewer if there is less worth saying.
+    """
+
+  private static let serveWithFormat = """
+    Return one suggestion per line, exactly as `title: note` (or `title` when no note is useful). Do not use \
+    bullets, Markdown emphasis, an introduction, JSON, or any other text.
+    """
+
+  private static let revisionFormat = """
+    revision brief: plain prose stating what to change and why, in a cook's language, one change per line, in the
+    order the change happens. Refer to ingredients and steps by their existing wording. Return only the brief
+    itself, with no title or summary. Do not return a rewritten recipe, an ingredient list, JSON, IDs, or any
+    structured format for a revision.
+    """
+
   private static func makeAheadPrompt(
     context: String,
     knownLearnings: String,
@@ -133,11 +154,7 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     ingredients as context; suggest only work that can happen before cooking or serving. Do not rewrite the
     recipe or turn the response into a merged mega-recipe.
 
-    Return format: one make-ahead step per line as `When: task` — a timing label, a colon, then a single \
-    concrete action the cook can take before cooking or serving. Order steps from earliest to just before \
-    serving, and use only these timing labels, exactly: \(MakeAheadTiming.canonicalLabelList) (replace N with \
-    a number). No bullets, no Markdown emphasis, no introduction, and no assessment of what the recipe already \
-    does well. Six steps at most — fewer if there is less worth saying.
+    \(makeAheadFormat)
 
     Taste profile:
     \(tasteProfile)
@@ -184,9 +201,10 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     destination: AIHandoffPromptDestination
   ) -> String {
     """
-    You are suggesting accompaniments for one recipe. Return one suggestion per line, exactly as `title: note`
-    (or `title` when no note is useful). Do not use bullets, Markdown emphasis, an introduction, JSON, or any
-    other text. Do not rewrite the recipe or turn the response into a merged mega-recipe.
+    You are suggesting accompaniments for one recipe. Do not rewrite the recipe or turn the response into a
+    merged mega-recipe.
+
+    \(serveWithFormat)
 
     Taste profile:
     \(tasteProfile)
@@ -223,9 +241,7 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     question before you emit anything. Never emit both.
 
     1. A REVISION of this recipe — targeted changes to the recipe as it stands. Return a
-    revision brief: plain prose stating what to change and why, in a cook's language, one
-    change per line, in the order the change happens. Refer to ingredients and steps by
-    their existing wording so each change can be matched to the recipe as it stands.
+    \(revisionFormat)
     Return only the brief itself — nothing before it, nothing after it, no title, no
     summary of the discussion. Like this:
 
@@ -233,10 +249,8 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     Move the salt into the flour instead of the wet mix so it distributes evenly.
     Rest the dough 20 minutes before shaping so the flour hydrates.
 
-    Do not return a rewritten recipe, an ingredient list, JSON, IDs, or any structured
-    format for a revision. Yes Chef derives the structured edit from your brief itself,
-    and the cook reviews that edit side by side against the current recipe before anything
-    is saved.
+    Yes Chef derives the structured edit from your brief itself, and the cook reviews that edit side by side
+    against the current recipe before anything is saved.
 
     2. A NEW RECIPE — only when you and the cook have riffed into a substantially different
     dish that deserves to stand on its own rather than edit this one. Return it as

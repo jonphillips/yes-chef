@@ -158,4 +158,56 @@ struct AIHandoffRecipePasteRoutingTests {
     }
   }
 
+  @Test
+  func unlabelledJSONCanBeFiledAsNewRecipe() async throws {
+    let create = CreateRecipeCoordinator()
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Self.now
+      $0.uuid = .incrementing
+      $0.createRecipeCoordinator = create
+    } operation: {
+      let coordinator = HandoffReviewCoordinator()
+      let json = """
+      {"@context":"https://schema.org","@type":"Recipe","name":"Cabbage",\
+      "recipeIngredient":["1 cabbage"],\
+      "recipeInstructions":[{"@type":"HowToStep","text":"Char it."}]}
+      """
+      try await coordinator.fileUnlabeled(json, label: "YC-NEW-RECIPE:",
+        handoffID: Self.handoffID, recipeID: Self.recipeID)
+      #expect(create.stagedText?.text == json)
+    }
+  }
+
+  @Test
+  func dismissalAndAdjustmentDismissalContinueQueuedBriefs() async throws {
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Self.now
+      $0.uuid = .incrementing
+    } operation: {
+      let coordinator = HandoffReviewCoordinator()
+      let section = AIHandoffReview.recipeMakeAhead(.init(handoffID: Self.handoffID,
+        recipeID: Self.recipeID, makeAhead: "Chill", learnings: []))
+      let first = AIHandoffReview.recipeAdjustmentBrief(.init(handoffID: Self.handoffID,
+        recipeID: Self.recipeID, variationID: nil, brief: "First", learnings: []))
+      let second = AIHandoffReview.recipeAdjustmentBrief(.init(handoffID: Self.handoffID,
+        recipeID: Self.recipeID, variationID: nil, brief: "Second", learnings: []))
+      await coordinator.presentStaged(.init(review: .recipeItems(handoffID: Self.handoffID,
+        items: [section, first, second]), warning: nil))
+      coordinator.review = nil
+      coordinator.reviewSheetDidDismiss()
+      guard case let .recipeAdjustmentBrief(firstShown) = coordinator.review else {
+        Issue.record("Expected first brief after Done"); return
+      }
+      #expect(firstShown.brief == "First")
+      coordinator.review = nil
+      coordinator.adjustmentSheetDidDismiss()
+      guard case let .recipeAdjustmentBrief(secondShown) = coordinator.review else {
+        Issue.record("Expected second brief after side-by-side"); return
+      }
+      #expect(secondShown.brief == "Second")
+    }
+  }
+
 }

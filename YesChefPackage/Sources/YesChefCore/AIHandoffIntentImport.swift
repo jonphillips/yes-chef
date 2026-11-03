@@ -247,24 +247,28 @@ private enum AIHandoffReviewStager {
         let prefix = String(payload[cursor..<labelRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
         if !prefix.isEmpty { blocks.append(("", prefix)) }
       }
-      let end = index + 1 < matches.count ? Range(matches[index + 1].range, in: payload)!.lowerBound : payload.endIndex
+      let end = index + 1 < matches.count
+        ? (Range(matches[index + 1].range, in: payload)?.lowerBound ?? payload.endIndex) : payload.endIndex
       let text = String(payload[labelRange.upperBound..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
       blocks.append((String(payload[labelRange]), text))
       cursor = end
     }
     if matches.isEmpty { blocks = [("", payload.trimmingCharacters(in: .whitespacesAndNewlines))] }
-    guard blocks.contains(where: { !$0.1.isEmpty || !$0.0.isEmpty }) else { throw AIHandoffIntentImportError.emptyPlan }
+    guard blocks.contains(where: { !$0.1.isEmpty }) else { throw AIHandoffIntentImportError.emptyPlan }
     if blocks.contains(where: { $0.0 == "YC-NEW-RECIPE:" }) {
-      guard blocks.count == 1, let block = blocks.first,
-        try RecipeAdjustmentFinalize.classify(payload: block.1) == .newRecipe
-      else { throw AIHandoffIntentImportError.wrongTask }
+      guard blocks.count == 1, let block = blocks.first else {
+        throw AIHandoffIntentImportError.newRecipeMustStandAlone
+      }
+      guard try RecipeAdjustmentFinalize.classify(payload: block.1) == .newRecipe else {
+        throw AIHandoffIntentImportError.invalidNewRecipe
+      }
       return .recipeNew(handoffID: handoff.id, text: block.1)
     }
     let learnings = blocks.filter { $0.0 == "YC-LEARNINGS:" }
       .flatMap { AIHandoffReturn.learnings(from: $0.1).learnings }
     var items: [AIHandoffReview] = []
     var brief: AIHandoffReview?
-    for (label, text) in blocks where label != "YC-LEARNINGS:" {
+    for (label, text) in blocks where label != "YC-LEARNINGS:" && !text.isEmpty {
       switch label {
       case "YC-MAKE-AHEAD:":
         items.append(.recipeMakeAhead(.init(handoffID: handoff.id, recipeID: recipe.id, makeAhead: text,
@@ -291,6 +295,7 @@ private enum AIHandoffReviewStager {
         currentMakeAhead: recipe.makeAhead, learnings: learnings)))
     }
     if let brief { items.append(brief) }
+    guard !items.isEmpty else { throw AIHandoffIntentImportError.emptyPlan }
     return .recipeItems(handoffID: handoff.id, items: items)
   }
 

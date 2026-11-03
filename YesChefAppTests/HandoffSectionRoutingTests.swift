@@ -359,7 +359,7 @@ struct HandoffSectionRoutingTests {
         case 1:
           coordinator.discardAll()
         default:
-          coordinator.discardPendingHandoff()
+          coordinator.adjustmentSheetDidDismiss()
         }
         try await unrelatedCommit.commit(unrelatedCommit.unmodifiedApprovedText)
       }

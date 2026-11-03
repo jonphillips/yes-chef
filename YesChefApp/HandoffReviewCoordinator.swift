@@ -21,7 +21,6 @@ final class HandoffReviewCoordinator {
   private var pendingAdjustmentReview: RecipeAdjustmentReviewState?
   private var pendingHandoff: AIHandoff?
   var pendingRecipeReviews: [AIHandoffReview] = []
-  var advanceRecipeReviews = false
   var errorMessage: String?
   var errorTitle = "Could Not Save Handoff"
   var isShowingError = false
@@ -549,32 +548,33 @@ final class HandoffReviewCoordinator {
     guard self.review?.handoffID == review.handoffID else { return }
     clearError()
     if pendingRecipeReviews.isEmpty { pendingHandoff = nil }
-    advanceRecipeReviews = true
     self.review = nil
   }
 
   func discardAll() {
     pendingRecipeReviews = []
-    advanceRecipeReviews = false
     clearError()
     pendingHandoff = nil
     review = nil
   }
 
-  func discardPendingHandoff() {
-    pendingHandoff = nil
+  func adjustmentSheetDidDismiss() {
+    advanceQueuedRecipeReview()
+  }
+
+  func advanceQueuedRecipeReview() {
+    if !pendingRecipeReviews.isEmpty {
+      review = pendingRecipeReviews.removeFirst()
+    } else {
+      pendingHandoff = nil
+    }
   }
 
   func reviewSheetDidDismiss() {
     if pendingAdjustmentReview != nil {
       presentPendingAdjustmentReviewAfterReviewDismissal()
-    } else if advanceRecipeReviews && !pendingRecipeReviews.isEmpty {
-      advanceRecipeReviews = false
-      review = pendingRecipeReviews.removeFirst()
     } else {
-      advanceRecipeReviews = false
-      pendingRecipeReviews = []
-      pendingHandoff = nil
+      advanceQueuedRecipeReview()
     }
   }
 
@@ -804,7 +804,6 @@ struct HandoffReviewSheet: View {
       },
       discardAll: {
         items = []
-        coordinator.discardAll()
       },
       onEmpty: {
         coordinator.discard(review)

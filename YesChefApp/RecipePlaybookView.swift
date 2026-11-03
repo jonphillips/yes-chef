@@ -1,10 +1,8 @@
 import SwiftUI
-import UIKit
 import YesChefCore
 
 struct RecipePlaybookView: View {
   let model: RecipeDetailModel
-  let handoffTransport: HandoffInAppTransport
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   @State private var isMakeAheadExpanded = false
@@ -164,7 +162,7 @@ struct RecipePlaybookView: View {
       preview: preview,
       isExpanded: isExpanded,
       showsActions: true,
-      actions: { sectionMenu(for: section, isFilled: isFilled) },
+      actions: { sectionEditButton(for: section, isFilled: isFilled) },
       content: content
     )
   }
@@ -304,7 +302,7 @@ struct RecipePlaybookView: View {
     return line
   }
 
-  private func sectionMenu(for section: PlaybookSectionKind, isFilled: Bool) -> some View {
+  private func sectionEditButton(for section: PlaybookSectionKind, isFilled: Bool) -> some View {
     Button(isFilled ? "Edit" : "Write") { editingSection = section }
       .accessibilityLabel("\(isFilled ? "Edit" : "Write") \(section.title)")
   }

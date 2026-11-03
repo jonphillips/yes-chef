@@ -738,7 +738,6 @@ private struct RecipeReaderView: View {
     case .playbook:
       RecipePlaybookView(
         model: model,
-        handoffTransport: handoffTransport,
         onRecipeSelected: onRecipeSelected
       )
     }
@@ -788,7 +787,6 @@ private struct RecipeReaderView: View {
 
             RecipePlaybookView(
               model: model,
-              handoffTransport: handoffTransport,
               onRecipeSelected: onRecipeSelected
             )
           }

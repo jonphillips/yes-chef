@@ -96,6 +96,10 @@ final class HandoffInAppTransport {
       await handoffReviewCoordinator.presentStaged(.init(
         review: source.applyingScope(to: staged.review, resolvedHandoff: handoff), warning: staged.warning
       ))
+      if case .recipeNew = staged.review {
+        toastCenter?.postSuccess("New recipe sent to Create Recipe.")
+        return
+      }
       if let message = await scopeRedirectMessage(for: source, handoff: handoff) {
         toastCenter?.postSuccess(message)
       }
@@ -303,9 +307,8 @@ private extension AIHandoffSourceType {
 ///   render inside a `Menu` or a `ToolbarItemGroup(placement: .secondaryAction)` (which collapses
 ///   into the overflow menu) — the copy button survives and the paste control silently disappears,
 ///   leaving the surface unable to take a return. In a menu, use plain buttons that read
-///   `UIPasteboard.general.string` directly, as the Playbook section menu and the recipe-body
-///   toolbar do. ADR-0041 Amd 1 retired `PasteButton` for the sections for this reason; ADR-0042 S4
-///   hit it again on the recipe body.
+///   `UIPasteboard.general.string` directly, as the recipe toolbar does. ADR-0042 S4 records
+///   why the recipe toolbar uses that approach.
 struct HandoffCopyPasteControls: View {
   let source: HandoffExportSource
   let transport: HandoffInAppTransport
@@ -437,55 +440,3 @@ extension View {
     modifier(HandoffTransportAlert(transport: transport))
   }
 }
-
-struct RecipeUnfiledReviewSheet: View {
-  let coordinator: HandoffReviewCoordinator
-  let handoffID: UUID
-  let recipeID: UUID
-  @State private var text: String
-  @State private var label: String?
-  @State private var error: String?
-
-  init(coordinator: HandoffReviewCoordinator, handoffID: UUID, recipeID: UUID, text: String) {
-    self.coordinator = coordinator
-    self.handoffID = handoffID
-    self.recipeID = recipeID
-    _text = State(initialValue: text)
-  }
-
-  var body: some View {
-    NavigationStack {
-      Form {
-        Section("Returned text") { TextEditor(text: $text).frame(minHeight: 180) }
-        Picker("File as…", selection: $label) {
-          Text("Choose a destination").tag(String?.none)
-          Text("Make-ahead").tag(Optional("YC-MAKE-AHEAD:"))
-          Text("Chef It Up").tag(Optional("YC-CHEF-IT-UP:"))
-          Text("Serve With").tag(Optional("YC-SERVE-WITH:"))
-          Text("Revision brief").tag(Optional("YC-REVISION:"))
-          Text("Learnings").tag(Optional("YC-LEARNINGS:"))
-        }
-      }
-      .navigationTitle("File returned text")
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Discard", role: .destructive) {
-            if let review = coordinator.review { coordinator.discard(review) }
-          }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Review") {
-            guard let label else { return }
-            do { try coordinator.fileUnlabeled(text, label: label, handoffID: handoffID, recipeID: recipeID) }
-            catch { self.error = error.localizedDescription }
-          }
-          .disabled(label == nil)
-        }
-      }
-      .alert("Could Not File", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
-        Button("OK") { error = nil }
-      } message: { Text(error ?? "") }
-    }
-  }
-}
-

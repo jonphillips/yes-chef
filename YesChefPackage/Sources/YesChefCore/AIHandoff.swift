@@ -1004,6 +1004,8 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
   case wrongTask
   case duplicate
   case emptyPlan
+  case newRecipeMustStandAlone
+  case invalidNewRecipe
   case unparsedPlanText([String])
   case unparsedExperimentBlocks([String])
   case unparsedReaderFeedbackLines([String])
@@ -1020,6 +1022,10 @@ public enum AIHandoffIntentImportError: Error, Equatable, LocalizedError, Custom
       "This handoff result was already imported for review."
     case .emptyPlan:
       "The returned handoff needs a deliverable or at least one learning."
+    case .newRecipeMustStandAlone:
+      "A new recipe must stand alone, without other text or deliverables."
+    case .invalidNewRecipe:
+      "The JSON-LD under the new recipe label could not be read."
     case let .unparsedPlanText(lines):
       "Could not import these prep-plan lines: \(lines.joined(separator: " | "))"
     case let .unparsedExperimentBlocks(blocks):
