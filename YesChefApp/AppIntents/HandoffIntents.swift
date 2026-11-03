@@ -108,7 +108,7 @@ struct ImportHandoffResult: AppIntent {
       in: database,
       now: now
     )
-    await handoffReviewCoordinator.present(staged.review, warning: staged.warning)
+    await handoffReviewCoordinator.presentStaged(staged)
     return .result(opensIntent: OpenHandoffReviewIntent(), dialog: "Review the returned handoff in Yes Chef.")
   }
 }

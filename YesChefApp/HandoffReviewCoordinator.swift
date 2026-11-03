@@ -12,6 +12,7 @@ final class HandoffReviewCoordinator {
   @ObservationIgnored @Dependency(\.date.now) var now
   @ObservationIgnored @Dependency(\.defaultDatabase) var database
   @ObservationIgnored @Dependency(\.uuid) var uuid
+  @ObservationIgnored @Dependency(\.createRecipeCoordinator) private var createRecipeCoordinator
 
   var review: AIHandoffReview?
   var contractWarning: String?
@@ -21,6 +22,19 @@ final class HandoffReviewCoordinator {
   var errorMessage: String?
   var errorTitle = "Could Not Save Handoff"
   var isShowingError = false
+
+  /// All external hand-off doors present a staged result through the same router.
+  func presentStaged(
+    _ result: AIHandoffReviewResult,
+    pendingHandoff: AIHandoff? = nil
+  ) async {
+    if case let .recipeNew(_, text) = result.review {
+      await createRecipeCoordinator.stage(text: text)
+      contractWarning = result.warning
+    } else {
+      present(result.review, warning: result.warning, pendingHandoff: pendingHandoff)
+    }
+  }
 
   func present(
     _ review: AIHandoffReview,
