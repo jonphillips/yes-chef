@@ -81,7 +81,7 @@ server. That catches every cause, including ones we haven't met yet.
 - Yes Chef: the row and detail as above, built against jon-platform `main` (Slice 1 is jon-platform#72; local path,
   so there's no package version to bump). The rest per `docs/verification.md`.
 - `PROD-CUTOVER.md` Phase 2 has its box ticked, `DONE-LOG.md` has the entry, `NEXT_UP.md` is advanced to
-  [`chat-access-mcp.md`](../chat-access-mcp.md) S0 (the next queued effort), and the
+  [`chat-access-mcp.md`](chat-access-mcp.md) S0 (the next queued effort), and the
   device pass is in `device-passes.md`.
 
 **Device pass:** this ships after the raw-HTML fix, so both devices should read "Up to date", with no false

@@ -19,7 +19,7 @@ row; `stage_handoff_return` stages the whole return block, and only the device t
 Origin: Jon, after Vinyl Fever M12 proved ChatGPT → MCP end to end ("we do a
 lot of copy/pasting of recipe prompts, and the resulting JSON recipe gets pasted back"). Queued after
 [`efforts/archive/sync-failure-surfacing.md`](../efforts/archive/sync-failure-surfacing.md). Effort:
-[`efforts/chat-access-mcp.md`](../efforts/chat-access-mcp.md). Builds on: jon-platform ADR-0007 (the kit, the
+[`efforts/archive/chat-access-mcp.md`](../efforts/archive/chat-access-mcp.md). Builds on: jon-platform ADR-0007 (the kit, the
 inbox, and the tunnel ops) and its Amendment 1 (proposed with this ADR);
 [ADR-0042](ADR-0042-workbench-handoff-and-the-return-block.md) (deliberation happens in the chat app; a
 pinned contract carries the result back); [ADR-0053](ADR-0053-create-recipe-destination.md) Amd 2-D3 (one
@@ -203,7 +203,7 @@ iCloud Documents entitlement.
 
 ## Open questions
 
-- **OQ1 — answered 2026-10-22 by S0** ([§ S0 results](../efforts/chat-access-mcp.md#s0-results)). **D2 stands.**
+- **OQ1 — answered 2026-10-22 by S0** ([§ S0 results](../efforts/archive/chat-access-mcp.md#s0-results)). **D2 stands.**
   The container reached the Mac without a Mac app, and iCloud created the folder itself. A helper launched by
   `tunnel-client` raised **one** iCloud Drive prompt, and macOS attributes that grant to `tunnel-client`, so it
   survives restarts and helper rebuilds. Launches from Claude Code and Terminal worked. A helper-written file

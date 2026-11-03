@@ -1,36 +1,36 @@
 # Effort — Chat access over MCP
 
-Status: Ready — S3a and [one-recipe-handoff](archive/one-recipe-handoff.md) shipped; S3b is next.
+Status: Complete — S3a, [one-recipe-handoff](one-recipe-handoff.md), and S3b shipped.
 Schema-free throughout.
 Summary: S3 lets a ChatGPT return target an existing recipe: S3a adds the helper's `stage_handoff_return`, and S3b
 opens those returns on the device that started the hand-off. S0–S2b shipped.
 
-Related: [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md) · jon-platform
+Related: [ADR-0060](../../decisions/ADR-0060-chat-access-over-mcp.md) · jon-platform
 `docs/adr/0007-app-data-over-local-mcp.md` and its Amendment 1 · jon-platform `docs/ios/mcp-access.md` (tunnel
 ops) · vinyl-fever `docs/milestones/M12-library-context-mcp.md` (the first consumer) ·
-[`CHATGPT-SETUP.md`](../CHATGPT-SETUP.md)
+[`CHATGPT-SETUP.md`](../../CHATGPT-SETUP.md)
 
 ## Shipped
 
 S0 (transport probe, #357), S1 (`stage_recipe` and the app's inbox, #359), S2 (the export and the read tools,
-#376) and S2b (search rows show categories, #381) shipped; their records are in [`DONE-LOG.md`](../DONE-LOG.md),
-and the S2b device pass is owed in [`device-passes.md`](../device-passes.md). Their full build specs are in git
+#376) and S2b (search rows show categories, #381) shipped; their records are in [`DONE-LOG.md`](../../DONE-LOG.md),
+and the S2b device pass is owed in [`device-passes.md`](../../device-passes.md). Their full build specs are in git
 history (this file before the 2026-10-30 archive sweep). The S0 results and the constants register stay below
 because S3 builds on both.
 
 ## S3 — Returns that target an existing recipe
 
-Decided by [ADR-0060 Amendment 1](../decisions/ADR-0060-chat-access-over-mcp.md#amendment-1--a-handoff-return-is-routed-by-its-yc-handoff-token-2026-11-03)
+Decided by [ADR-0060 Amendment 1](../../decisions/ADR-0060-chat-access-over-mcp.md#amendment-1--a-handoff-return-is-routed-by-its-yc-handoff-token-2026-11-03)
 (accepted 2026-11-03), read with its
-[notes at acceptance](../decisions/ADR-0060-chat-access-over-mcp.md#amd-1--notes-at-acceptance-2026-11-03).
+[notes at acceptance](../../decisions/ADR-0060-chat-access-over-mcp.md#amd-1--notes-at-acceptance-2026-11-03).
 Schema-free, and no contract bump. Code references are to `origin/main` 0c383cb.
 
 ### Build order
 
 - [x] **S3a — the helper's `stage_handoff_return`.** Shipped; Jon's device gate is owed in
-  [`device-passes.md`](../device-passes.md).
-- [x] The [one-recipe-handoff](archive/one-recipe-handoff.md) dispatch (ADR-0061 S1 + S2) shipped in #437.
-- [ ] **S3b — the app's token-routed inbox items**, next.
+  [`device-passes.md`](../../device-passes.md).
+- [x] The [one-recipe-handoff](one-recipe-handoff.md) dispatch (ADR-0061 S1 + S2) shipped in #437.
+- [x] **S3b — the app's token-routed inbox items.**
 
 **S3a doesn't depend on ADR-0061.** The helper checks only the envelope: the token line and the contract marker
 (Amd 1-D2). ADR-0061 changes neither (its D6: no contract bump). A `YC-NEW-RECIPE:` block, or any other label, is
@@ -85,7 +85,7 @@ S3b's PR ticks its box and runs closeout without the flag, which archives this b
    prerequisite. Shipped builds list a `.ycreturn` as a recipe, as the ADR's acceptance notes explain.
    `ChatAccessInbox.rows(from:)` keeps only snapshots whose extension is `json`. This is Core, not UI. The app
    lists nothing for `.ycreturn` files until S3b.
-4. **Docs:** the MCP section of [`CHATGPT-SETUP.md`](../CHATGPT-SETUP.md) lists `stage_handoff_return`. It also
+4. **Docs:** the MCP section of [`CHATGPT-SETUP.md`](../../CHATGPT-SETUP.md) lists `stage_handoff_return`. It also
    says that with the plugin on, a hand-off pasted into any chat returns through the tool, and the `Yes Chef`
    Project is still the home for chats without the tools.
 
@@ -109,7 +109,7 @@ In `YesChefCoreTests`:
 
 **Verification:** `scripts/check-drift.sh`, plus the helper package's own tests
 (`swift test --package-path YesChefMCP` through `quiet-run`, elevated from the first attempt per
-[`verification.md`](../verification.md)). No `YesChefApp/` change, so no generic device build.
+[`verification.md`](../../verification.md)). No `YesChefApp/` change, so no generic device build.
 
 **Done when:** the tool, the instructions, the filter and the doc change are in, the tests above pass, S3a's box
 is ticked, and closeout runs with `--keep-brief`.
@@ -123,7 +123,7 @@ before calling `stage_handoff_return`, that a `.ycreturn` file appears in `MCP/I
 
 ### S3b — the app's token-routed inbox items
 
-**Precondition:** the [one-recipe-handoff](archive/one-recipe-handoff.md) dispatch has merged. S3b uses three things it
+**Precondition:** the [one-recipe-handoff](one-recipe-handoff.md) dispatch has merged. S3b uses three things it
 adds: Core's new-recipe routing, the single app entry that presents a staged recipe return, and the repeat-return
 rule on `AIHandoffTaskType`.
 
@@ -205,7 +205,7 @@ In `YesChefTests` (required: this changes app model code), with a fake file clie
 - `inboxCount` excludes other-device rows.
 
 **Verification:** `scripts/check-drift.sh`, the generic device build, and `YesChefTests` on a simulator
-(guardrail #9; the exact commands are in [`verification.md`](../verification.md)).
+(guardrail #9; the exact commands are in [`verification.md`](../../verification.md)).
 
 **Done when:** items 1–8 are in, the tests above pass, S3b's box is ticked, and closeout runs (without
 `--keep-brief`), with the device pass below as its gate.

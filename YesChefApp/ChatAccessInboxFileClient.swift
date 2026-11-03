@@ -42,11 +42,25 @@ extension ChatAccessInboxFileClient: DependencyKey {
       },
       claim: { folder, url in
         try await Task.detached(priority: .utility) {
-          _ = try HandoffInbox(root: folder.inboxURL, fileExtension: "json").markProcessed(stagedHandoff(at: url))
+          let processed = try HandoffInbox(root: folder.inboxURL, fileExtension: url.pathExtension).markProcessed(stagedHandoff(at: url))
+          if url.pathExtension == "ycreturn" {
+            try coordinatedTouch(at: processed.url, date: Date())
+          }
         }.value
       },
       maintain: { folder, now, removesProbe in
         try await Task.detached(priority: .utility) {
+          if FileManager.default.fileExists(atPath: folder.inboxURL.path) {
+            let urls = try FileManager.default.contentsOfDirectory(at: folder.inboxURL, includingPropertiesForKeys: nil)
+            for url in ChatAccessInbox.expiredReturns(urls, inbox: folder.inboxURL, now: now) {
+              do {
+                let processed = try HandoffInbox(root: folder.inboxURL, fileExtension: "ycreturn").markProcessed(stagedHandoff(at: url))
+                try coordinatedTouch(at: processed.url, date: now)
+              } catch HandoffInboxError.alreadyClaimed {
+                continue
+              }
+            }
+          }
           let processedItems: [ChatAccessInbox.ProcessedSnapshot]
           if FileManager.default.fileExists(atPath: folder.processedURL.path) {
             let urls = try FileManager.default.contentsOfDirectory(
@@ -88,6 +102,16 @@ extension ChatAccessInboxFileClient: DependencyKey {
     if let coordinationError { throw coordinationError }
     guard let result else { throw ChatAccessInboxFileError.coordinatedReadFailed }
     return try result.get()
+  }
+
+  private static func coordinatedTouch(at url: URL, date: Date) throws {
+    var coordinationError: NSError?
+    var result: Result<Void, Error>?
+    NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: [], error: &coordinationError) { coordinatedURL in
+      result = Result { try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: coordinatedURL.path) }
+    }
+    if let coordinationError { throw coordinationError }
+    try result?.get()
   }
 
   private static func coordinatedDeleteIfPresent(at url: URL) throws {

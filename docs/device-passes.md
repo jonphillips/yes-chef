@@ -217,6 +217,7 @@ and **Undo Last Restore** is untested at all and rode the same broken binding as
 - **SQLiteData 1.12.1 rebase** ([effort brief](efforts/archive/sqlite-data-vendor-rebase.md), schema-free). Still owed: on both devices, Power Browser, the recipe list and the calendar update when rows change. *(Cleared 2026-11-01, Jon: library counts unchanged after the update, an edit on each device arrives on the other, and a backup restores on Yes Chef Dev.)*
 - **TestFlight expected-fields check** ([effort](efforts/archive/cloudkit-expected-fields-gate.md)): from clean `main`, run `testflight --dry-run`; confirm the schema gate passes and reports the expected-fields check.
 - **one-recipe-handoff:** On device, finalize Make-ahead and Chef It Up in one chat, then a revision from the same chat, and riff into a new recipe. Confirm Currently saved and Replace or Append for filled sections; clear each section from the bottom of its editor and check that Cancel and Clear are distinct. ([brief](efforts/archive/one-recipe-handoff.md))
+- **chat-access-mcp:** Run the S3 device pass: review a revision, repeat returns, a new recipe, a single-return task, cross-device copy, and discard. ([brief](efforts/archive/chat-access-mcp.md))
 
 ## Prod-schema promotion list — superseded (2026-10-26)
 

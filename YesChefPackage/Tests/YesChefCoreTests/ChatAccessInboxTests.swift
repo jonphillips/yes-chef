@@ -3,6 +3,56 @@ import Testing
 import YesChefCore
 
 struct ChatAccessInboxTests {
+  @Test func returnRowsRespectTaskAndDeviceRouting() throws {
+    let root = URL(fileURLWithPath: "/tmp/MCP/Inbox", isDirectory: true)
+    let singleID = UUID(), repeatID = UUID(), captureID = UUID(), unknownID = UUID()
+    func handoff(_ id: UUID, _ source: AIHandoffSourceType, _ task: AIHandoffTaskType) -> AIHandoff {
+      AIHandoff(id: id, sourceType: source, sourceID: UUID(), taskType: task,
+        createdAt: .distantPast, exportedPrompt: "Task: Soup\nYC-HANDOFF:")
+    }
+    let values = [handoff(singleID, .menu, .prepPlan), handoff(repeatID, .recipe, .recipe), handoff(captureID, .capture, .recipe)]
+    func snapshot(_ time: String, _ slug: String) -> ChatAccessInbox.MetadataSnapshot {
+      let url = root.appending(path: "20261022T\(time)Z-\(slug).ycreturn")
+      return .init(url: url, name: url.lastPathComponent, isCurrent: true)
+    }
+    let snapshots = [snapshot("180000", singleID.uuidString), snapshot("190000", singleID.uuidString),
+      snapshot("180000", repeatID.uuidString), snapshot("190000", repeatID.uuidString),
+      snapshot("180000", captureID.uuidString), snapshot("180000", unknownID.uuidString),
+      snapshot("190000", unknownID.uuidString), snapshot("180000", "broken")]
+    let rows = ChatAccessInbox.returnRows(from: snapshots) { id in values.first { $0.id == id } }
+    let single = try #require(rows.first { if case let .openable(h) = $0.destination { h.id == singleID } else { false } })
+    #expect(single.url == snapshots[1].url)
+    #expect(single.superseded == [snapshots[0].url])
+    #expect(single.title == "Task: Soup")
+    #expect(rows.filter { if case let .openable(h) = $0.destination { h.id == repeatID } else { false } }.map(\.url) == [snapshots[2].url, snapshots[3].url])
+    #expect(rows.filter { if case .otherDevice = $0.destination { true } else { false } }.count == 2)
+    #expect(rows.contains { if case .capture = $0.destination { true } else { false } })
+    #expect(rows.contains { if case .unreadable = $0.destination { true } else { false } })
+  }
+
+  @Test func returnExpiryOnlySelectsOldReturnsInInbox() {
+    let root = URL(fileURLWithPath: "/tmp/MCP/Inbox", isDirectory: true)
+    let now = ISO8601DateFormatter().date(from: "2027-02-15T08:00:00Z")!
+    let old = root.appending(path: "20270115T080000Z-old.ycreturn")
+    let recent = root.appending(path: "20270214T080000Z-new.ycreturn")
+    let recipe = root.appending(path: "20270115T080000Z-old.json")
+    let processed = root.appending(path: "Processed/20270115T080000Z-old.ycreturn")
+    #expect(ChatAccessInbox.expiredReturns([old, recent, recipe, processed], inbox: root, now: now) == [old])
+    #expect(ChatAccessInbox.expired([.init(url: processed, modifiedAt: now)], now: now).isEmpty)
+  }
+
+  @Test func returnsStagedInSameSecondUseCollisionSequence() throws {
+    let id = UUID()
+    let handoff = AIHandoff(id: id, sourceType: .menu, sourceID: UUID(), taskType: .prepPlan,
+      createdAt: .distantPast, exportedPrompt: "Plan: Dinner")
+    let root = URL(fileURLWithPath: "/tmp/MCP/Inbox", isDirectory: true)
+    let urls = ["", "--2", "--10"].map { root.appending(path: "20261022T180000Z-\(id.uuidString)\($0).ycreturn") }
+    let snapshots = urls.map { ChatAccessInbox.MetadataSnapshot(url: $0, name: $0.lastPathComponent, isCurrent: true) }
+    let row = try #require(ChatAccessInbox.returnRows(from: snapshots) { _ in handoff }.first)
+    #expect(row.url == urls[2])
+    #expect(row.superseded == Array(urls.prefix(2)))
+  }
+
   @Test func rowsParseBothTimestampFormsSkipBadNamesAndSortNewestFirst() {
     let root = URL(fileURLWithPath: "/tmp/MCP/Inbox", isDirectory: true)
     let snapshots = [

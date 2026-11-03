@@ -96,7 +96,7 @@ in one appended migration, and retires the tag record types through `retiredReco
 
 Anything that needs a dev build on a device has to happen now, before the freeze.
 
-- [x] **Chat access S2's two-device pass** (`efforts/chat-access-mcp.md` § S2). Passed 2026-10-26.
+- [x] **Chat access S2's two-device pass** (`efforts/archive/chat-access-mcp.md` § S2). Passed 2026-10-26.
 - [x] **The drop slice's pass** (Step 1). Passed 2026-10-26.
 - [x] Nothing else in [`device-passes.md`](device-passes.md) under **Owed** needs a dev build. The automatic-backups
       pass needs a TestFlight build, so it moves to Step 12.
