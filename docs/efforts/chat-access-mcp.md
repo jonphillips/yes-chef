@@ -150,11 +150,13 @@ rule on `AIHandoffTaskType`.
      orphan expiry (item 6).
 3. **Opening an Openable row:**
    1. Do a coordinated read of the file, as `read` does today.
-   2. Call `HandoffAppOperations.stageReview(handoffID: <token>, result: text, …)`, which strips the marker and
-      passes `allowRestage: true`.
-   3. Present the result through the entry the paste door uses after ADR-0061. Review items come first, then the
-      brief's side-by-side. A new recipe goes to Create Recipe, and the hand-off is marked imported. A contract
-      warning shows the same way it does for a paste.
+   2. Call `HandoffAppOperations.stageReview(handoffID: <token>, result: text, allowRestage: true, …)`, which
+      strips the marker. Pass `allowRestage` explicitly: its default is `false` since the ADR-0061 dispatch.
+   3. Present the result through the entry the paste door uses after ADR-0061 (`presentStaged`). Review items come
+      first, then the brief's side-by-side. A new recipe goes to Create Recipe, and the hand-off is marked imported.
+      Pass a `toastCenter` and post the same toast the paste door does for a new recipe, because the switch to
+      Create Recipe can't be seen from a recipe in the full-screen cover. (The **Import Handoff Result** intent has
+      that gap today.) A contract warning shows the same way it does for a paste.
       **Except a missing marker** (decided 2026-11-03, Jon, from the S3a gate): an inbox return with no
       `YC-CONTRACT:` line shows no warning. ChatGPT's MCP returns drop that line even when the tool description
       asks for it, and the warning's remedy ("re-copy your project instructions") doesn't apply to a chat that has

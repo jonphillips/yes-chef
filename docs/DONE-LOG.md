@@ -12,7 +12,7 @@ Newest first.
 ## 2026-11-03 — One recipe hand-off (`effort/one-recipe-handoff`)
 
 - **Result:** Added one recipe hand-off with labeled return routing, repeat returns, shared app presentation, and Edit or Write controls for Playbook sections. Addressed review feedback on queued returns, unfiled recipes, validation, and prompt formats.
-- **Verification:** check-drift.sh passed; 754 Core tests passed with two known issues, the generic iOS build passed, and 104 YesChefTests passed on a simulator.
+- **Verification:** check-drift.sh passed; 754 Core tests passed with two known issues, the generic iOS build passed, and 105 YesChefTests passed on a simulator.
 - **Owed:** one-recipe-handoff's device gate, in [device-passes.md](device-passes.md).
 
 ---
