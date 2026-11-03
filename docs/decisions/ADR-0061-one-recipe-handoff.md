@@ -4,7 +4,8 @@
 > prompt lists everything Yes Chef can take back: a revision brief, a new recipe, Make-ahead lines, Chef It
 > Up lines, Serve With lines, and learnings. The cook talks it through and then says which ones to finalize.
 > Each deliverable comes back under its own label, and the router files each one by its label. The task
-> type on the row no longer decides it. The section menus lose **Hand off** and **Paste**.
+> type on the row no longer decides it. Each section's `•••` becomes a plain **Edit** button, and **Clear**
+> moves to the bottom of the section's editor.
 
 Status: **Proposed** — 2026-11-03.
 Origin: Jon, while reviewing the ADR-0060 Amendment 1 plan PR (#431): *"make ahead [and] chef it up both have
@@ -13,7 +14,8 @@ one you should hit and it really feels like we should only have one."*
 **Supersedes, for recipes on the outboard path:** [ADR-0041](ADR-0041-playbook-section-toolbar-and-scoped-handoff.md)
 D3 (section-scoped hand-off). **Widens** [ADR-0042](ADR-0042-workbench-handoff-and-the-return-block.md) Amd 1-D4
 (the Adjust prompt's scope). **Reverses**, for this prompt only, the regenerate-fresh rule in ADR-0041 Amd 1-D1
-(see D5). **Closes** the checkbox item that [ADR-0038](ADR-0038-external-llm-handoff.md) Amd 2 and ADR-0041 both
+(see D5). **Partly reverses** ADR-0041 Amd 2's "Clear leaves the section editor sheet": Clear returns to the
+editor, in a different spot (see D1a). **Closes** the checkbox item that [ADR-0038](ADR-0038-external-llm-handoff.md) Amd 2 and ADR-0041 both
 deferred (see D7). Builds on: ADR-0038 Amd 7 (`YC-LEARNINGS:` lines are format-agnostic; the token is the
 authority for scope); [ADR-0040](ADR-0040-editable-at-the-grain-it-is-stored.md) (lossless or loud);
 ADR-0041 Amd 1-D1 (a section return is merge-or-choose).
@@ -68,13 +70,34 @@ different `AIHandoffTaskType`. The return's parse is chosen by that type in `AIH
 ### D1 — A recipe has one outboard door
 
 The toolbar **Hand off** is the only way to copy a recipe prompt. The toolbar **Paste** is the only in-app way
-to paste a recipe return. The section `•••` menus lose **Hand off / Hand off again** and **Paste**. They keep
-**Write manually / Edit** and **Clear**. The variation guard stays: the prompt exports the base recipe, so it
+to paste a recipe return. The section `•••` menus lose **Hand off / Hand off again** and **Paste**, which
+leaves only Edit and Clear. D1a replaces the menu. The variation guard stays: the prompt exports the base recipe, so it
 asks first when a variation is showing (ADR-0042 Amd 1 OQ3).
 
 The menu, meal-plan day, workbench, and capture hand-offs are out of scope. The meal-plan day has the same
 two-door shape (**Make-ahead** / **Complement**), and this pattern would fit it. That's a later amendment,
 taken only if the recipe version holds up on device.
+
+### D1a — The section `•••` becomes an **Edit** button, and Clear moves to the bottom of the editor
+
+With D1, the menu would hold only Edit and Clear. A menu with one routine action and one destructive one is
+more ceremony than it's worth. Origin: Jon, reviewing this ADR (2026-11-03).
+
+- **One button per section.** It reads **Edit** when the section is filled and **Write** when it's empty, and
+  it opens that section's editor.
+  - **Make-ahead and Chef It Up** open the text editor sheet they use today.
+  - **Serve With** opens its whole-list editor: add, edit, delete, reorder. Today its header carries **two**
+    buttons, a **Manage** slider (`slider.horizontal.3`, shown only when filled) that opens that editor, and
+    `•••`, which has no Edit. **Edit / Write** replaces both. The per-row **+** and swipe-to-delete stay.
+- **Clear goes inside the editor, at the bottom of its content.** It's a full-width destructive row (**Clear
+  Make-ahead**), the way iOS Settings places a destructive action at the end of a form. It's shown only when
+  the section is filled, and it keeps Amd 2's confirmation, which names the section and says there's no undo.
+- **Never in the navigation bar.** This is the part of ADR-0041 Amd 2 that still holds. Amd 2 moved Clear out of
+  the editor because it sat next to **Cancel** and was easy to hit by mistake. The defect was where it sat, not
+  which sheet it was in. At the far end of the content, behind a confirmation, it's in a different place from
+  Cancel in the top bar.
+- **No change to what Clear writes.** Each section's clear path stays as it is (`clear(_:)` in
+  `RecipePlaybookView`). Only the button moves.
 
 ### D2 — The prompt offers a menu of deliverables; the cook picks at finalize
 
@@ -191,11 +214,13 @@ One dispatch, two parts. S2 has nothing to call until S1 lands, and S1 has no co
   Tests: each label alone; make-ahead plus Chef It Up in one paste; revision plus a section; new recipe
   rejected when combined; an unlabeled body; an unknown label; a second return on one token; legacy
   task-type tokens still importing.
-- **S2 — App.** The toolbar **Hand off** mints `.recipe`. The section `•••` menus drop **Hand off** and
-  **Paste**. The review coordinator shows several items from one return, then the brief's side-by-side.
+- **S2 — App.** The toolbar **Hand off** mints `.recipe`. Each section's `•••` becomes D1a's **Edit / Write**
+  button. **Clear** moves to the bottom of each editor, including Serve With's list editor, and keeps its
+  confirmation. The review coordinator shows several items from one return, then the brief's side-by-side.
 - **Device pass (Jon).** One chat that finalizes Make-ahead and Chef It Up in one block. The same chat
   finalizing a revision afterward. One that riffs into a new recipe. Checking that a filled section shows
-  **Currently saved** with Replace or Append.
+  **Currently saved** with Replace or Append. Clearing each section from the bottom of its editor, and
+  confirming that Cancel and Clear can't be confused.
 
 ## Open questions
 
