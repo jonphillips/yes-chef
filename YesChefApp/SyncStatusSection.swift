@@ -424,10 +424,12 @@ struct SyncStatusDetailView: View {
       "Uploading recent changes to iCloud."
     case .downloading:
       "Downloading changes from iCloud. A first sync of a large library can take a while — iCloud drip-feeds it and it will finish on its own; keep this device on Wi-Fi and power."
+    case let .needsAttention(_, _, missingFromICloud) where missingFromICloud > 0:
+      "The last iCloud check found records on this device that iCloud doesn’t have. Use Upload again below to send them."
     case .needsAttention:
       "Some changes haven’t reached iCloud, or changes from iCloud couldn’t be saved on this device. This clears once they sync; if it stays, something is stuck."
     case .upToDate:
-      "Your recipes are synced across your devices over iCloud. Use Check iCloud for leftovers to look for deletes that did not reach the server."
+      "Your recipes are synced across your devices over iCloud. Use Check iCloud to look for records iCloud is missing or deletes that did not reach it."
     case .error:
       "Sync hit an error. Try again — if it persists, check your iCloud account and network."
     }

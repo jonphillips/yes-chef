@@ -9,11 +9,21 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-02 — Missing iCloud rows: copy fixes and device pass (`effort/missing-from-icloud-closeout`)
+
+Recorded the iPhone device pass. Fixed two lines of sync status copy: the Up-to-date explanation still named the old
+"Check iCloud for leftovers", and a yellow status caused by missing rows now points at Upload again instead of saying
+it clears once they sync.
+
+---
 ## 2026-11-02 — Find rows missing from iCloud (`effort/missing-from-icloud-check`)
 
 Added the on-demand iCloud missing-row check, local persistence of unresolved findings, and an Upload again action. jon-platform #108 (CloudSyncKit) and galavant #195 (compatibility) merged.
 
 Verification passed: 72 CloudSyncKit tests; Yes Chef drift checks with 749 package tests and 8 MCP tests; all 100 YesChefTests; and the generic iOS build.
+
+Device pass cleared 2026-11-02 (Jon, iPhone): Check iCloud found no missing or leftover records, and the status
+stayed Up to date. The iPad wasn't checked.
 
 ---
 ## 2026-11-02 — Remove temporary instruction-step recovery action (`effort/remove-instruction-step-recovery`)
