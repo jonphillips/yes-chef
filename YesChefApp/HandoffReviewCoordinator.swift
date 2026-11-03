@@ -13,6 +13,7 @@ final class HandoffReviewCoordinator {
   @ObservationIgnored @Dependency(\.defaultDatabase) var database
   @ObservationIgnored @Dependency(\.uuid) var uuid
   @ObservationIgnored @Dependency(\.createRecipeCoordinator) var createRecipeCoordinator
+  @ObservationIgnored weak var recipeReturnToastCenter: AppToastCenter?
 
   var review: AIHandoffReview?
   var contractWarning: String?

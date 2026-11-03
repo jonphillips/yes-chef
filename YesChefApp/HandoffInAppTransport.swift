@@ -95,7 +95,7 @@ final class HandoffInAppTransport {
       )
       await handoffReviewCoordinator.presentStaged(.init(
         review: source.applyingScope(to: staged.review, resolvedHandoff: handoff), warning: staged.warning
-      ))
+      ), toastCenter: toastCenter)
       if case .recipeNew = staged.review {
         toastCenter?.postSuccess("New recipe sent to Create Recipe.")
         return
@@ -202,8 +202,11 @@ final class HandoffInAppTransport {
         }
         await handoffReviewCoordinator.presentStaged(
           .init(review: unmatchedSource.applyingScope(to: staged.review, resolvedHandoff: storedHandoff),
-                warning: staged.warning), pendingHandoff: pendingHandoff
+                warning: staged.warning), pendingHandoff: pendingHandoff, toastCenter: toastCenter
         )
+        if case .recipeNew = staged.review {
+          toastCenter?.postSuccess("New recipe sent to Create Recipe.")
+        }
       }
     } catch {
       present(error)

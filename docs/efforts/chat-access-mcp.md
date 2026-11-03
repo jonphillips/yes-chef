@@ -1,6 +1,6 @@
 # Effort — Chat access over MCP
 
-Status: Ready — S3a shipped. S3b waits on the [one-recipe-handoff](archive/one-recipe-handoff.md) dispatch.
+Status: Ready — S3a and [one-recipe-handoff](archive/one-recipe-handoff.md) shipped; S3b is next.
 Schema-free throughout.
 Summary: S3 lets a ChatGPT return target an existing recipe: S3a adds the helper's `stage_handoff_return`, and S3b
 opens those returns on the device that started the hand-off. S0–S2b shipped.
@@ -29,9 +29,8 @@ Schema-free, and no contract bump. Code references are to `origin/main` 0c383cb.
 
 - [x] **S3a — the helper's `stage_handoff_return`.** Shipped; Jon's device gate is owed in
   [`device-passes.md`](../device-passes.md).
-- The [one-recipe-handoff](archive/one-recipe-handoff.md) dispatch (ADR-0061 S1 + S2) goes next. It's that brief's
-  index row, above this one.
-- [ ] **S3b — the app's token-routed inbox items**, after the ADR-0061 dispatch merges.
+- [x] The [one-recipe-handoff](archive/one-recipe-handoff.md) dispatch (ADR-0061 S1 + S2) shipped in #437.
+- [ ] **S3b — the app's token-routed inbox items**, next.
 
 **S3a doesn't depend on ADR-0061.** The helper checks only the envelope: the token line and the contract marker
 (Amd 1-D2). ADR-0061 changes neither (its D6: no contract bump). A `YC-NEW-RECIPE:` block, or any other label, is
@@ -39,18 +38,14 @@ body, which the helper doesn't read.
 
 **S3b does depend on ADR-0061, for two reasons:**
 
-1. **Only the paste door routes a riff today.** `HandoffInAppTransport.stageReview` classifies an `.adjustRecipe`
-   payload (`RecipeAdjustmentFinalize.classify`) and sends JSON-LD to Create Recipe. Core's
-   `AIHandoffIntentImport.stageReview` doesn't, so through Core an Adjust riff stages as a prose brief. (The
-   **Import Handoff Result** intent has that gap now.) Amd 1's device pass needs a riff to open Create Recipe.
-   ADR-0061 D3 moves the detection into Core for every door. If S3b came first, it would copy the app-layer
-   branch, and ADR-0061 would then have to move both copies.
+1. **A riff needs the shared Core route.** ADR-0061 D3 moved JSON-LD detection into Core for every door, so
+   an Adjust or recipe hand-off can send a new recipe to Create Recipe. S3b uses that same staged-result route.
 2. **ADR-0061 D4 conflicts with Amd 1-D3's newest-per-token rule.** A `.recipe` token takes several returns,
    and each can be a different deliverable, so keeping only the newest would hide a real answer. Built after
    ADR-0061, S3b writes that rule once, against D4.
 
 **Records.** S3a's PR ticks its box above and runs closeout (ADR-0005 D16) with `--keep-brief`, because S3b is
-still here. Closeout then advances to the first Ready brief in index order, which is the ADR-0061 dispatch.
+still here. Closeout advanced to the ADR-0061 dispatch, which is now shipped.
 S3b's PR ticks its box and runs closeout without the flag, which archives this brief.
 
 ### S3a — the helper's `stage_handoff_return`

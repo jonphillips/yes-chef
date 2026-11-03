@@ -1,7 +1,7 @@
 # Effort — One recipe hand-off
 
-Status: Ready — one dispatch, ADR-0061 S1 (Core) and S2 (App) in one PR. Schema-free: the local `aiHandoffs`
-table gains a task-type case.
+Status: Done — 2026-11-03 ([PR #437](https://github.com/jonphillips/yes-chef/pull/437)). Schema-free: the local
+`aiHandoffs` table gained a task-type case.
 Summary: One recipe **Hand off** whose prompt offers every deliverable and whose return is filed by label; each
 Playbook section's `•••` becomes **Edit / Write**, and **Clear** moves to the bottom of its editor.
 

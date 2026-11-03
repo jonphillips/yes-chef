@@ -161,6 +161,7 @@ struct AIHandoffRecipePasteRoutingTests {
   @Test
   func unlabelledJSONCanBeFiledAsNewRecipe() async throws {
     let create = CreateRecipeCoordinator()
+    let toast = AppToastCenter()
     try await withDependencies {
       try $0.bootstrapDatabase()
       $0.date.now = Self.now
@@ -168,6 +169,8 @@ struct AIHandoffRecipePasteRoutingTests {
       $0.createRecipeCoordinator = create
     } operation: {
       let coordinator = HandoffReviewCoordinator()
+      await coordinator.presentStaged(.init(review: .recipeUnfiled(handoffID: Self.handoffID,
+        recipeID: Self.recipeID, text: "Unfiled"), warning: nil), toastCenter: toast)
       let json = """
       {"@context":"https://schema.org","@type":"Recipe","name":"Cabbage",\
       "recipeIngredient":["1 cabbage"],\
@@ -176,6 +179,7 @@ struct AIHandoffRecipePasteRoutingTests {
       try await coordinator.fileUnlabeled(json, label: "YC-NEW-RECIPE:",
         handoffID: Self.handoffID, recipeID: Self.recipeID)
       #expect(create.stagedText?.text == json)
+      #expect(toast.message?.text == "New recipe sent to Create Recipe.")
     }
   }
 
@@ -207,6 +211,35 @@ struct AIHandoffRecipePasteRoutingTests {
         Issue.record("Expected second brief after side-by-side"); return
       }
       #expect(secondShown.brief == "Second")
+    }
+  }
+
+  @Test
+  func unmatchedNewRecipeShowsConfirmationToast() async throws {
+    let create = CreateRecipeCoordinator()
+    let toast = AppToastCenter()
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Self.now
+      $0.uuid = .incrementing
+      $0.createRecipeCoordinator = create
+      $0.handoffReviewCoordinator = HandoffReviewCoordinator()
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try seedRecipeAndHandoff(in: database)
+      let transport = HandoffInAppTransport(toastCenter: toast)
+      let result = """
+      \(AIHandoffReturnContract.marker)
+      YC-NEW-RECIPE:
+      {"@context":"https://schema.org","@type":"Recipe","name":"Cabbage",\
+      "recipeIngredient":["1 cabbage"],\
+      "recipeInstructions":[{"@type":"HowToStep","text":"Char it."}]}
+      """
+      await transport.stageReview(for: result, source: .recipe(Self.recipeID))
+      #expect(transport.isShowingUnmatchedConfirmation)
+      await transport.reviewUnmatchedResult()
+      #expect(create.stagedText?.text.contains("Cabbage") == true)
+      #expect(toast.message?.text == "New recipe sent to Create Recipe.")
     }
   }
 

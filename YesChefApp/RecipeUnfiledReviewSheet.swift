@@ -8,6 +8,7 @@ struct RecipeUnfiledReviewSheet: View {
   @State private var text: String
   @State private var label: String?
   @State private var error: String?
+  @State private var isFiling = false
 
   init(coordinator: HandoffReviewCoordinator, handoffID: UUID, recipeID: UUID, text: String) {
     self.coordinator = coordinator
@@ -36,16 +37,19 @@ struct RecipeUnfiledReviewSheet: View {
           Button("Discard", role: .destructive) {
             if let review = coordinator.review { coordinator.discard(review) }
           }
+          .disabled(isFiling)
         }
         ToolbarItem(placement: .confirmationAction) {
           Button("Review") {
-            guard let label else { return }
+            guard let label, !isFiling else { return }
+            isFiling = true
             Task {
+              defer { isFiling = false }
               do { try await coordinator.fileUnlabeled(text, label: label, handoffID: handoffID, recipeID: recipeID) }
               catch { self.error = error.localizedDescription }
             }
           }
-          .disabled(label == nil || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          .disabled(isFiling || label == nil || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
       }
       .alert("Could Not File", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {

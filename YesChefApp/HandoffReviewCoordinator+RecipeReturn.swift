@@ -6,8 +6,10 @@ extension HandoffReviewCoordinator {
   func presentStaged(
     _ result: AIHandoffReviewResult,
     pendingHandoff: AIHandoff? = nil,
-    preservingQueue: Bool = false
+    preservingQueue: Bool = false,
+    toastCenter: AppToastCenter? = nil
   ) async {
+    if !preservingQueue { recipeReturnToastCenter = toastCenter }
     if case let .recipeNew(_, text) = result.review {
       if !preservingQueue { discardAll() }
       await createRecipeCoordinator.stage(text: text)
@@ -25,6 +27,7 @@ extension HandoffReviewCoordinator {
       await presentStaged(.init(review: .recipeNew(handoffID: handoffID, text: text), warning: nil),
         preservingQueue: true)
       review = nil
+      recipeReturnToastCenter?.postSuccess("New recipe sent to Create Recipe.")
       return
     }
     let handoff = AIHandoff(id: handoffID, sourceType: .recipe, sourceID: recipeID,
