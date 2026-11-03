@@ -160,6 +160,11 @@ rule on `AIHandoffTaskType`.
    3. Present the result through the entry the paste door uses after ADR-0061. Review items come first, then the
       brief's side-by-side. A new recipe goes to Create Recipe, and the hand-off is marked imported. A contract
       warning shows the same way it does for a paste.
+      **Open (S3a gate, 2026-11-03):** ChatGPT's MCP returns drop the `YC-CONTRACT:` line, even when the tool
+      description asks for it. So every inbox return would carry the missing-marker warning, and its remedy
+      ("re-copy your project instructions") doesn't apply to a chat that has the tools. Architect's lean: an inbox
+      return shows no missing-marker warning, and older or newer markers behave as they do for a paste. Settle
+      this before S3b is dispatched.
    4. **Claim the file, and any older files it supersedes, only after staging succeeds.** If staging fails (an
       archived recipe, an empty brief), the error stays on the row with **Copy** and **Discard**, and the file
       stays in `Inbox/`. That's the order this spec puts on Amd 1-D3's "opening claims it and calls
