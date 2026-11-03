@@ -68,3 +68,4 @@ ADR, not here (jon-platform ADR-0005 D14). Add the line when you write the ADR.
 - [ADR-0058](ADR-0058-cockpit-find-referral-transport.md) — Cockpit Find referrals travel through a **pair-scoped App Group mailbox**, opened by a **single-purpose `yeschef://find-referral` door**; the verdict returns silently *(Accepted, 2026-09-24)*
 - [ADR-0059](ADR-0059-yes-chef-dev-variant.md) — Yes Chef Dev: after the cut, Debug builds get their own app identity, and backups say which build made them *(Accepted, 2026-11-01)*
 - [ADR-0060](ADR-0060-chat-access-over-mcp.md) — Chat assistants reach Yes Chef through a local MCP server, and an iCloud Drive folder carries the inbox and the read data to and from the phone *(Accepted, 2026-10-22)*
+- [ADR-0061](ADR-0061-one-recipe-handoff.md) — One recipe hand-off: one button, one prompt, and the cook picks what comes back at finalize *(Proposed, 2026-11-03)*
