@@ -24,3 +24,6 @@ discoverable"):
   <topic> docs/` and read adjacent efforts, including `archive/`, and cross-link them.
 
 ## Live
+
+- [serve-with-recipe-links.md](serve-with-recipe-links.md) — **Ready** · Let a Serve With row link to a recipe, with free text
+  unchanged. Adds one nullable synced column, the link editor and picker, and a chip that opens the linked recipe.

@@ -227,6 +227,10 @@ diff in [`PROD-CUTOVER.md`](PROD-CUTOVER.md) Reference A, not by a hand-kept lis
 is either already in Development or settled there: the pantry thresholds are created in Step 5, and
 `Category.color` is dropped in Step 1. The executed steps are PROD-CUTOVER Steps 5–6.
 
+## Serve With recipe links (ADR-0062)
+
+- **serve-with-recipe-links (held ops, before the first TestFlight build containing ADR-0062):** In the CloudKit console (Development), add `linkedRecipeID` and `sqlitedata_icloud_userModificationTime_linkedRecipeID` to `recipeServeWith`, matching the types of the record's existing fields of the same kind. Re-export, confirm the diff against `cloudkit-expected-fields.txt` is only those two fields, and deploy Development → Production. The deploy is one-way.
+
 ## Recipe Lenses (ADR-0050 Amendment 1, L1 + L2)
 
 - [ ] **Held ops before the next TestFlight build:** Create both Lens record types and every field in the CloudKit console (Development), then re-export, diff against [`PROD-CUTOVER.md`](PROD-CUTOVER.md) Reference A, and deploy Development → Production.
