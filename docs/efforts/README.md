@@ -27,3 +27,6 @@ discoverable"):
 
 - [launch-data-passes.md](launch-data-passes.md) — **Ready** · Run the five launch-time data passes after launch and
   before sync starts, and only when their version has changed.
+- [dogfood-2026-11-04.md](dogfood-2026-11-04.md) — **Ready** · One schema-free dispatch for Jon's morning pass: the
+  swipe-delete crash on Workbench and Menu, Playbook and recipe toolbar cleanup, the Menu recipe panel (tint, icon, drop
+  feedback, wrong-day fallback), and removing the header Add Dish. Serve With recipe links are held for their own ADR.
